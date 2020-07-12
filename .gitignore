@@ -1,0 +1,32 @@
+local/
+
+# ANTLR
+.antlr/
+
+# Dart/Pub
+**/doc/api/
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+pubspec.lock
+.test_coverage.dart
+coverage/
+
+# IntelliJ
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
