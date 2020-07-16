@@ -194,12 +194,33 @@ Visibility (can't have a manual modifier): intersection of `class` and abstract 
 
 ## 5. Enums
 
+```rust
+enum class Foo1 {
+  // Variants are implicitly `object`s
+  Bar
+  Baz
+}
+enum class Foo2(let value: Int) {
+  // Variants are implicitly `object`s
+  Bar: super(1)
+  Baz: super(2)
+}
+enum class Expr(let a) {
+  // Variants are implicitly `class`es
+  Const(a: Int): super(a)
+  Sum(a: Int): super(a)
+  NotANumber(a: Int): super(a) {
+    override fun bar() => Unit
+  }
 
-## 6. Traits ❤️
+  fun bar() => Unit
+}
+```
 
-TODO: inline `impl` of `interface`
+example usage: `Foo1.Bar`, `Foo2.Baz`, `Expr.Const(4)`
 
-## 7. Generics
+
+## 6. Generics
 
 ```rust
 named trait Abc<T1, T2, …, Tn: Foo = Bar>
@@ -212,13 +233,12 @@ impl Abc<Foo, Tn: Bar, T2: Baz> for MyStruct
 The behavior of `named` and named/positional type arguments is the same as that of function calls.
 
 
-## 8. Metadata
+## 7. Metadata
 
-## 9. Expressions
+## 8. Expressions
 
 - Implicit member access (see Swift)
 
-### Operators
 
 | Precedence | Description                | Operators                                                                        | Associativity |
 | :--------- | :------------------------- | :------------------------------------------------------------------------------- | :-----------: |
@@ -242,6 +262,7 @@ The behavior of `named` and named/positional type arguments is the same as that 
 |            | logical implication        | `->` `<-`                                                                        | left to right |
 |            | spread (in function calls) | `...`                                                                            |               |
 | Lowest     | assignment                 | `=` `*=` `/=` `~/=` `%=` `+=` `-=` `&=` `|=` `^=` `&&=` `||=` `<<=` `>>=` `>>>=` | right to left |
+### 8.1. Operators
 
 Spread in function calls:
 
@@ -253,7 +274,7 @@ Point(...tuple)
 
 TODO: ??/?:, :, ternary, `??=`
 
-### Labels
+### 8.2. Labels
 
 Loops and lambdas can be prefixed by an optional label. This can then be used by `continue`, `break` and `return` statements:
 
@@ -273,7 +294,7 @@ fun bar() {
 }
 ```
 
-### 9.1. If
+### 8.3. If
 
 TODO: If-let
 
@@ -295,37 +316,38 @@ else if … {
 if (…) … else …
 ```
 
-### 9.2. When/Match
-### 9.3. Try?
 
-## 10. Statements
+### 8.4. When/Match
+### 8.5. Try?
 
-### 10.1. For?
-### 10.2. While?
-### 10.3. Do-While?
-### 10.4. Rethrow?
-### 10.5. Return
-### 10.6. Labels
-### 10.7. Break
-### 10.8. Continue
-### 10.9. Yield & Yield-Each
-### 10.10. Assert
+## 9. Statements
 
-## 11. Modules & Scripts
+### 9.1. For?
+### 9.2. While?
+### 9.3. Do-While?
+### 9.4. Rethrow?
+### 9.5. Return
+### 9.6. Labels
+### 9.7. Break
+### 9.8. Continue
+### 9.9. Yield & Yield-Each
+### 9.10. Assert
+
+## 10. Modules & Scripts
 
 - `use`: import a module
 - `public use`: import & export a module
 
 
-## 12. Types
+## 11. Types
 
-### 12.1. Function Types
+### 11.1. Function Types
 
 ```kotlin
 [named] R.(T1 t1, T2 t2, …, Tn tn = dn) -> T
 ```
 
-### 12.2. Value Constraints
+### 11.2. Value Constraints
 
 ```kotlin
 fun a(Pair<Int, Int> pair)
@@ -335,7 +357,6 @@ fun a(Pair<Int, Int> pair)
 ```
 
 
-## 13. Reference
+### 11.3. Comments
 
-### 13.1. Comments
 
