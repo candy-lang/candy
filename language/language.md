@@ -106,11 +106,15 @@ impl SimpleClass2 {
     return this(baz.foo, baz.bar)
   }
 }
+```
+
+- secondary constructors might come in a later version if they seem necessary
 
 // TODO: const constructors?
 
 
 
+```kotlin
 class FieldClass private constructor(this.foo, this.bar, bazfoo: Int) {
   // constructors:
   constructor() => this(foo, 0, 0)
@@ -160,6 +164,32 @@ class FieldClass private constructor(this.foo, this.bar, bazfoo: Int) {
 let unit: VerySimpleClass = VerySimpleClass()
 let field: FieldClass = FieldClass(foo: 1, bar: 2)
 ```
+
+### 4.1. Abstract classes
+
+```kotlin
+abstract class Foo
+```
+
+- cannot be instantiated
+
+### 4.2. Interfaces
+
+```kotlin
+interface Foo
+```
+
+- cannot be instantiated
+
+### 4.3. `impl`
+
+Abstract classes and interfaces can be implemented:
+
+```rust
+impl Foo for Bar
+```
+
+Visibility (can't have a manual modifier): intersection of `class` and abstract class/interface visibilities
 
 
 ## 5. Enums
