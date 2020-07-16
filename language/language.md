@@ -242,28 +242,33 @@ The behavior of `named` and named/positional type arguments is the same as that 
 
 ### 8.1. Operators
 
-| Precedence   | Description         | Operators                                                                        | Associativity |
-| :----------- | :------------------ | :------------------------------------------------------------------------------- | :-----------: |
-| 20 (highest) | grouping            | `(expr)`                                                                         |       —       |
-| 19           | unary postfix       | `expr++` `expr--` `.` `?.` `expr(args)` `expr?(args)` `expr[args]` `expr?[args]` |               |
-| 18           | unary prefix        | `-expr` `!expr` `~expr` `++expr` `--expr` label                                  |       —       |
-| 17           | multiplicative      | `*` `/` `~/` `%`                                                                 | left to right |
-| 16           | additive            | `+` `-`                                                                          | left to right |
-| 15           | shift               | `<<` `>>` `>>>`                                                                  | left to right |
-| 14           | bitwise and         | `&`                                                                              | left to right |
-| 13           | bitwise xor         | `^`                                                                              | left to right |
-| 12           | bitwise or          | `|`                                                                              | left to right |
-| 11           | type check          | `as` `as?`                                                                       | left to right |
-| 10           | range               | `..`, `..=`                                                                      |               |
-| 9            | infix function      | `simpleIdentifier`                                                               |               |
-| 8            | named checks        | `in` `!in` `is` `!is`                                                            |               |
-| 7            | comparison          | `<` `<=` `>` `>=`                                                                |               |
-| 6            | equality            | `==` `!=` `===` `!==`                                                            |               |
-| 5            | logical and         | `&&`                                                                             | left to right |
-| 4            | logical or          | `||`                                                                             | left to right |
-| 3            | logical implication | `->` `<-`                                                                        | left to right |
-| 2            | spread              | `...`                                                                            |               |
-| 1 (lowest)   | assignment          | `=` `*=` `/=` `~/=` `%=` `+=` `-=` `&=` `|=` `^=` `&&=` `||=` `<<=` `>>=` `>>>=` | right to left |
+| Precedence   | Description             | Operators                                                                        | Associativity |
+| :----------- | :---------------------- | :------------------------------------------------------------------------------- | :-----------: |
+| 21 (highest) | grouping                | `(expr)`                                                                         |       —       |
+| 20           | unary postfix           | `expr++` `expr--` `.` `?.` `expr(args)` `expr?(args)` `expr[args]` `expr?[args]` |               |
+| 19           | unary prefix            | `-expr` `!expr` `~expr` `++expr` `--expr` label                                  |       —       |
+| 18           | implicit multiplication | `number expr`                                                                    |       —       |
+| 17           | multiplicative          | `*` `/` `~/` `%`                                                                 | left to right |
+| 16           | additive                | `+` `-`                                                                          | left to right |
+| 15           | shift                   | `<<` `>>` `>>>`                                                                  | left to right |
+| 14           | bitwise and             | `&`                                                                              | left to right |
+| 13           | bitwise xor             | `^`                                                                              | left to right |
+| 12           | bitwise or              | `|`                                                                              | left to right |
+| 11           | type check              | `as` `as?`                                                                       | left to right |
+| 10           | range                   | `..`, `..=`                                                                      |               |
+| 9            | infix function          | `simpleIdentifier`                                                               |               |
+| 8            | named checks            | `in` `!in` `is` `!is`                                                            |               |
+| 7            | comparison              | `<` `<=` `>` `>=`                                                                |               |
+| 6            | equality                | `==` `!=` `===` `!==`                                                            |               |
+| 5            | logical and             | `&&`                                                                             | left to right |
+| 4            | logical or              | `||`                                                                             | left to right |
+| 3            | logical implication     | `->` `<-`                                                                        | left to right |
+| 2            | spread                  | `...`                                                                            |               |
+| 1 (lowest)   | assignment              | `=` `*=` `/=` `~/=` `%=` `+=` `-=` `&=` `|=` `^=` `&&=` `||=` `<<=` `>>=` `>>>=` | right to left |
+
+- implicit multiplication: a literal number before an identifier creates an implicit multiplication: `2 apples` is equivalent to `2 * apples`
+  - something like `2 to -2` is equivalent to `2.to(-2)`, not `2 * to - 2`
+
 
 Spread in function calls:
 
