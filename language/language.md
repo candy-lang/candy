@@ -217,7 +217,7 @@ Abstract classes and interfaces can be implemented:
 impl Foo for Bar
 ```
 
-Visibility (can't have a manual modifier): intersection of `class` and abstract class/interface visibilities
+Visibility (can't have an explicit modifier): intersection of `class` and abstract class/interface visibilities
 
 
 ## 5. Enums
@@ -255,7 +255,7 @@ example usage: `Foo1.Bar`, `Foo2.FooBar.value`, `Barcode.Upc((1, 2, 3, 4))`
 ## 6. Generics
 
 ```rust
-named trait Abc<T1, T2, …, Tn: Foo = Bar>
+trait Abc<T1, T2, …, Tn: Foo = Bar>
   where <ValueConstraints> {}
 
 impl Abc<Foo, Tn: Bar, T2: Baz> for MyStruct
