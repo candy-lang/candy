@@ -95,17 +95,6 @@ fun abc(a: Int, b: String = 'abc') {
   abc(0, b: "abc")
   abc(a: 0, "abc")
 }
-
-named fun onlyAllowsNamedParameters(a: Int = 0, c: Double, b: String = 'abc') {
-  /// When calling this function, all parameters must be named. This allows
-  /// new parameters to be added in a backwards compatible change, such as `c`
-  /// above.
-
-  // Can be called like:
-  onlyAllowsNamedParameters()
-  onlyAllowsNamedParameters(b: "abc")
-  onlyAllowsNamedParameters(a: 0, b: "abc")
-}
 ```
 
 Overloading is supported based on parameters and return type.
@@ -269,7 +258,7 @@ impl Abc<Foo, Tn: Bar, T2: Baz> for MyStruct
   where <ValueConstraints> {}
 ```
 
-The behavior of `named` and named/positional type arguments is the same as that of function calls.
+The behavior of named/positional type arguments is the same as that of function calls.
 
 
 ## 7. Metadata
@@ -389,7 +378,7 @@ if (…) … else …
 ### 11.1. Function Types
 
 ```kotlin
-[named] R.(T1 t1, T2 t2, …, Tn tn = dn) -> T
+R.(T1 t1, T2 t2, …, Tn tn = dn) -> T
 ```
 
 ### 11.2. Value Constraints
