@@ -222,30 +222,34 @@ Visibility (can't have a manual modifier): intersection of `class` and abstract 
 
 ## 5. Enums
 
-```rust
-enum class Foo1 {
-  // Variants are implicitly `object`s
-  Bar
-  Baz
+```kotlin
+enum Foo1 { // implicitly extends `Enum<Void>`
+  Bar,
+  Baz,
+  FooBar,
 }
-enum class Foo2(let value: Int) {
-  // Variants are implicitly `object`s
-  Bar: super(1)
-  Baz: super(2)
+enum Foo2: Int {
+  Bar, // implicitly 0
+  Baz, // implicitly 1
+  FooBar = Bar | Baz, // You can access enum values defined above.
 }
-enum class Expr(let a) {
-  // Variants are implicitly `class`es
-  Const(a: Int): super(a)
-  Sum(a: Int): super(a)
-  NotANumber(a: Int): super(a) {
-    override fun bar() => Unit
-  }
-
-  fun bar() => Unit
+enum Foo3: String {
+  Bar = "abc",
+  Baz = "def",
+  FooBar = Bar + Baz,
+}
+enum Barcode {
+  // generates: class Barcode<T : (Int, Int, Int, Int) | String> : Enum<T>
+  Upc = (Int, Int, Int, Int),
+  // generates: class Upc : Barcode<(Int, Int, Int, Int)>
+  QrCode = String,
+  // generates: class QrCode : Barcode<String>
 }
 ```
 
-example usage: `Foo1.Bar`, `Foo2.Baz`, `Expr.Const(4)`
+(with `class Enum<T>(let value: T, name: String)`)
+
+example usage: `Foo1.Bar`, `Foo2.FooBar.value`, `Barcode.Upc((1, 2, 3, 4))`
 
 
 ## 6. Generics
