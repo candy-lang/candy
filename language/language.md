@@ -13,6 +13,41 @@ method(param1)
 ```
 
 
+- [1. Visibility Modifiers](#1-visibility-modifiers)
+- [2. Variables](#2-variables)
+- [3. Functions](#3-functions)
+  - [3.1. Extension Methods](#31-extension-methods)
+- [4. Classes](#4-classes)
+  - [4.1. Abstract classes](#41-abstract-classes)
+  - [4.2. Interfaces](#42-interfaces)
+  - [4.3. `impl`](#43-impl)
+- [5. Enums](#5-enums)
+- [6. Generics](#6-generics)
+- [7. Metadata](#7-metadata)
+- [8. Expressions](#8-expressions)
+  - [8.1. Operators](#81-operators)
+  - [8.2. Labels](#82-labels)
+  - [8.3. If](#83-if)
+  - [8.4. When/Match](#84-whenmatch)
+  - [8.5. Try?](#85-try)
+- [9. Statements](#9-statements)
+  - [9.1. For?](#91-for)
+  - [9.2. While?](#92-while)
+  - [9.3. Do-While?](#93-do-while)
+  - [9.4. Rethrow?](#94-rethrow)
+  - [9.5. Return](#95-return)
+  - [9.6. Labels](#96-labels)
+  - [9.7. Break](#97-break)
+  - [9.8. Continue](#98-continue)
+  - [9.9. Yield & Yield-Each](#99-yield--yield-each)
+  - [9.10. Assert](#910-assert)
+- [10. Modules & Scripts](#10-modules--scripts)
+- [11. Types](#11-types)
+  - [11.1. Function Types](#111-function-types)
+  - [11.2. Value Constraints](#112-value-constraints)
+  - [11.3. Comments](#113-comments)
+
+
 ## 1. Visibility Modifiers
 
 - `secret`: functions/methods only callable in the same `class`/`impl`
@@ -74,6 +109,10 @@ named fun onlyAllowsNamedParameters(a: Int = 0, c: Double, b: String = 'abc') {
 ```
 
 Overloading is supported based on parameters and return type.
+
+### 3.1. Extension Methods
+
+Syntax is equivalent to Kotlin.
 
 
 ## 4. Classes
