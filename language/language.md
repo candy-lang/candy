@@ -80,7 +80,7 @@ TODO:
 
 
 ```kotlin
-fun abc(a: Int, b: String = 'abc') {
+fun abc(a: Int, b: String = "abc") {
   /// Parameters may have default values that don't need to be `const`.
 
   /// After a parameter with a default value, all following parameters need to
