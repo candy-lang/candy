@@ -46,6 +46,8 @@ method(param1)
   - [11.1. Function Types](#111-function-types)
   - [11.2. Value Constraints](#112-value-constraints)
   - [11.3. Comments](#113-comments)
+- [12. Decisions](#12-decisions)
+  - [12.1. Differentiate between immutable list & immutable view](#121-differentiate-between-immutable-list--immutable-view)
 
 
 ## 1. Visibility Modifiers
@@ -409,3 +411,8 @@ fun a(Pair<Int, Int> pair)
 ### 11.3. Comments
 
 
+## 12. Decisions
+
+### 12.1. Differentiate between immutable list & immutable view
+
+- just provide an immutable trait, since anybody could still implement an immutable list trait on a mutable one
