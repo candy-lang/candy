@@ -50,7 +50,6 @@ method(param1)
 
 ## 1. Visibility Modifiers
 
-- `secret`: functions/methods only callable in the same `class`/`impl`
 - `private`: functions/methods only callable in the same `class` and `impl`s
 - `internal`: visible in the same file
 - `protected`: visible in the class, subclasses, and impls
@@ -58,12 +57,11 @@ method(param1)
 
 | keyword     | same `class`/`impl` | same file | direct outer scope | subclasses | everywhere |
 | :---------- | :-----------------: | :-------: | :----------------: | :--------: | :--------: |
-| `secret`    |          ✅          |     ❌     |         ❌          |     ❌      |     ❌      |
 | `private`   |          ✅          |     ❌     |         ✅          |     ❌      |     ❌      |
 | `protected` |          ✅          |     ❌     |         ✅          |     ✅      |     ❌      |
 | `public`    |          ✅          |     ✅     |         ✅          |     ✅      |     ✅      |
 
-By default, everything has the lowest possible visibility modifier (usually `secret`).
+By default, everything has the lowest possible visibility modifier (usually `private`).
 
 ## 2. Variables
 
