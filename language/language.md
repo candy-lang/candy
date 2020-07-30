@@ -23,7 +23,7 @@ method(param1)
   - [4.3. `impl`](#43-impl)
 - [5. Enums](#5-enums)
 - [6. Generics](#6-generics)
-- [7. Metadata](#7-metadata)
+- [7. Annotations](#7-annotations)
 - [8. Expressions](#8-expressions)
   - [8.1. Operators](#81-operators)
   - [8.2. Labels](#82-labels)
@@ -278,7 +278,7 @@ impl Abc<Foo, Tn: Bar, T2: Baz> for MyStruct
 The behavior of named/positional type arguments is the same as that of function calls.
 
 
-## 7. Metadata
+## 7. Annotations
 
 ## 8. Expressions
 
