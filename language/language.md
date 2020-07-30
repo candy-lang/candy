@@ -19,7 +19,7 @@ method(param1)
   - [3.1. Extension Methods](#31-extension-methods)
 - [4. Classes](#4-classes)
   - [4.1. Abstract classes](#41-abstract-classes)
-  - [4.2. Interfaces](#42-interfaces)
+  - [4.2. Traits](#42-traits)
   - [4.3. `impl`](#43-impl)
 - [5. Enums](#5-enums)
 - [6. Generics](#6-generics)
@@ -115,6 +115,11 @@ class SimpleClass1 {
 }
 // equivalent to:
 class SimpleClass2(this.foo, this.bar) {
+  constructor(baz: Foobar) => this(baz.foo, baz.bar)
+  constructor(baz: Foobar) {
+    return this(baz.foo, baz.bar)
+  }
+
   let foo: String
   let bar: Int
 }
@@ -126,13 +131,6 @@ class SimpleClass3(baz: Foobar) {
 class SimpleClass4 private constructor {
   let foo: String = baz.foo
   let bar: Int = baz.bar
-}
-
-impl SimpleClass2 {
-  constructor(baz: Foobar) => this(baz.foo, baz.bar)
-  constructor(baz: Foobar) {
-    return this(baz.foo, baz.bar)
-  }
 }
 ```
 
@@ -201,23 +199,38 @@ abstract class Foo
 
 - cannot be instantiated
 
-### 4.2. Interfaces
+### 4.2. Traits
 
 ```kotlin
-interface Foo
+trait Foo
 ```
 
 - cannot be instantiated
 
 ### 4.3. `impl`
 
-Abstract classes and interfaces can be implemented:
+Abstract classes and traits can be implemented:
 
 ```rust
-impl Foo for Bar
+impl Foo: Bar {
+  // Implement trait [Bar] for type [Foo].
+
+  override fun baz() {}
+}
+
+// Implementations for all cases must be provided. The same goes for abstract
+// classes.
+//
+// Note that you can't require an impl to be provided for a type defined by
+// some other package without providing a default implementation for it.
+impl MyEnum: Foo
+
+// Existing methods matching the trait will be reused → the implementation can
+// potentially be empty.
+impl MyClass: Foo
 ```
 
-Visibility (can't have an explicit modifier): intersection of `class` and abstract class/interface visibilities
+Visibility (can't have an explicit modifier): intersection of `class`/`enum` and abstract class/trait visibilities
 
 
 ## 5. Enums
