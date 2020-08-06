@@ -83,7 +83,7 @@ TODO:
 
 
 ```kotlin
-fun abc(a: Int, b: String = "abc") {
+fun abc(a: Int, b: String = "abc"): Foo {
   /// Parameters may have default values that don't need to be `const`.
 
   /// After a parameter with a default value, all following parameters need to
@@ -95,8 +95,12 @@ fun abc(a: Int, b: String = "abc") {
   abc(a: 0, b: "abc")
   abc(0, b: "abc")
   abc(a: 0, "abc")
+
+  return Foo()
 }
 ```
+
+The default return type (if not specified) is `Unit`. When using an expression body or delegating to a different function, the return type is inferred.
 
 Overloading is supported based on parameters and return type.
 
