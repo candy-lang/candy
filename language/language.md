@@ -231,6 +231,8 @@ impl MyEnum: Foo
 impl MyClass: Foo
 ```
 
+You can also overload the `impl` based on the `trait`s type parameters – so `Foo` can implement both `List<Int>` and `List<String>`.
+
 Visibility (can't have an explicit modifier): intersection of `class`/`enum` and abstract class/trait visibilities
 
 
