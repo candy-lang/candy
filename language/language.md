@@ -235,6 +235,24 @@ You can also overload the `impl` based on the `trait`s type parameters – so `F
 
 Visibility (can't have an explicit modifier): intersection of `class`/`enum` and abstract class/trait visibilities
 
+You can also implement `trait`s anonymously inline. The following creates an anonymous class implementing the trait `Foo` and passes it to the method `doWithFoo`:
+
+```
+dooWithFoo(impl : Foo {
+  fun foo() {}
+  fun bar() {}
+})
+```
+
+For implementing multiple `trait`s, shorten your code like the following:
+
+```
+impl Int: Add<Int, Int>, Subtract<Int, Int> {
+  fun add(other: Int): Int {}
+  fun subtract(other: Int): Int {}
+}
+```
+
 
 ## 5. Enums
 
