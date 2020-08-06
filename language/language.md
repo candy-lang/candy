@@ -45,9 +45,10 @@ method(param1)
 - [11. Types](#11-types)
   - [11.1. Function Types](#111-function-types)
   - [11.2. Value Constraints](#112-value-constraints)
-  - [11.3. Comments](#113-comments)
-- [12. Decisions](#12-decisions)
-  - [12.1. Differentiate between immutable list & immutable view](#121-differentiate-between-immutable-list--immutable-view)
+  - [11.3. Implicit Casts](#113-implicit-casts)
+- [12. Comments](#12-comments)
+- [13. Decisions](#13-decisions)
+  - [13.1. Differentiate between immutable list & immutable view](#131-differentiate-between-immutable-list--immutable-view)
 
 
 ## 1. Visibility Modifiers
@@ -408,11 +409,20 @@ fun a(Pair<Int, Int> pair)
 ```
 
 
-### 11.3. Comments
+### 11.3. Implicit Casts
+
+By implementing `As<T>` for `Foo`, you can implicitly (or explicitly) use `Foo` as `T`. This doesn't work transitively, though you could write `Foo as T as R`.
+
+This also provides what is known as Interface Delegation in Kotlin.
 
 
-## 12. Decisions
+## 12. Comments
 
-### 12.1. Differentiate between immutable list & immutable view
+- automatic line wrapping
+
+
+## 13. Decisions
+
+### 13.1. Differentiate between immutable list & immutable view
 
 - just provide an immutable trait, since anybody could still implement an immutable list trait on a mutable one
