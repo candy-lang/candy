@@ -1,8 +1,6 @@
 # Language X
 
-## TODO
 
-- Compiler Plugins
 
 ```
 val instance = FieldClass()
@@ -433,6 +431,10 @@ File structure of a project `foo`:
 - `libaries`
   - `mod.candy`: alternative location for the default library export → `use foo`
   - `bar.candy`: named library export → `use foo::bar`
+- `plugin.candy`: default compiler plugin export
+- `plugins`
+  - `mod.candy`: alternative location for the default compiler plugin
+  - `my_plugin.candy`: named compiler plugin export
 - `src`: folder with shared source code
 
 ```yaml
@@ -441,6 +443,22 @@ libraries:
   bar:
 binaries:
   bar:
+plugins:
+  my_plugin:
+    isReadOnly: false
+    functionVisitor: myFunctionVisitingFunction
+    after:
+      - data_classes
+    before:
+      - serialization
+```
+
+Compiler Plugin:
+- runs in separate process; communication via stdin/stdout → TODO: protocol
+- can request execution per class, per function
+  - can be filtered to classes/methods with specific annotations
+- runs only on the target module and not on its dependencies
+
 
 ## 11. Types
 
