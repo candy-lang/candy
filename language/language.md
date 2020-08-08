@@ -221,13 +221,13 @@ trait Foo
 
 ### 4.3. `impl`
 
-Abstract classes and traits can be implemented:
+`trait`s can be implemented:
 
 ```rust
 impl Foo: Bar {
   // Implement trait [Bar] for type [Foo].
 
-  override fun baz() {}
+  fun baz() {}
 }
 
 // Implementations for all cases must be provided. The same goes for abstract
@@ -241,6 +241,8 @@ impl MyEnum: Foo
 // potentially be empty.
 impl MyClass: Foo
 ```
+
+`impl`s may only contain the functions specified by the implemented `trait`s.
 
 You can also overload the `impl` based on the `trait`s type parameters – so `Foo` can implement both `List<Int>` and `List<String>`.
 
