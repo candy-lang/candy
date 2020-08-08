@@ -47,6 +47,7 @@ method(param1)
 - [12. Comments](#12-comments)
 - [13. Decisions](#13-decisions)
   - [13.1. Differentiate between immutable list & immutable view](#131-differentiate-between-immutable-list--immutable-view)
+- [14. Ideas for the future](#14-ideas-for-the-future)
 
 
 ## 1. Visibility Modifiers
@@ -495,3 +496,19 @@ This also provides what is known as Interface Delegation in Kotlin.
 ### 13.1. Differentiate between immutable list & immutable view
 
 - just provide an immutable trait, since anybody could still implement an immutable list trait on a mutable one
+
+
+## 14. Ideas for the future
+
+- allow dependencies in default parameter values in any order, as long as these dependencies form a DAG (i.e., they don't contain any cycles)
+- syntactic sugar for the `As<T>` trait
+- `.=` operator (e.g., `email .= trim()` means `email = email.trim()`)
+- allow values (not only types) as type arguments
+  - this would enable parameter names as part of function signatures as well
+- pre-/postcondition for functions: possibly with a similar syntax to Kotlin's contracts
+- secondary constructors
+- module aliases in imports
+- `impl` directly in `class`
+- cross-boundary lazy
+- write-only property (`let settable onlyWriteable: Int`)
+- named, factory and delegating constructors
