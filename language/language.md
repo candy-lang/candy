@@ -112,47 +112,54 @@ Syntax is equivalent to Kotlin.
 ## 4. Classes
 
 ```kotlin
-class VerySimpleClass;
+const class VerySimpleClass
 
-class SimpleClass1 {
+const class SimpleClass1 {
   let foo: String
-  let bar: Int
+  let bar: Int = 0
 }
-// equivalent to:
-class SimpleClass2(this.foo, this.bar) {
-  constructor(baz: Foobar) => this(baz.foo, baz.bar)
-  constructor(baz: Foobar) {
-    return this(baz.foo, baz.bar)
+
+// Implicitly generates constructor with parameters foo and bar, where foo is optional.
+class VerySimpleClass {
+  let foo: Int = 0
+  let bar: String
+}
+
+// Defines a constructor, so there's no default constructor any more.
+class SimpleClass2 {
+  constructor(this.foo, unnecessaryOther: Int = 3) {
+    // This is an optional body.
+    // Every readonly property without a default value must be set exactly once.
+    // Every read-and-write property must be set at least once.
   }
 
-  let foo: String
-  let bar: Int
+  let foo: Int = 0
+  let bar: Int = 0
+    get => field as Double
 }
 
-class SimpleClass3(baz: Foobar) {
-  let foo: String = baz.foo
-  let bar: Int = baz.bar
+class SimpleClass3 {
+  let foo: String = "blub"
+  let bar: Int = -1
 }
-class SimpleClass4 private constructor {
-  let foo: String = baz.foo
-  let bar: Int = baz.bar
+class SimpleClass4 {
+  private constructor
+  // This uses the default constructor, but changes its visibility.
+
+  let foo: String = "0"
+  let bar: Int = 0
+}
+
+class Class5 {
+  class NestedClass
 }
 ```
 
-- secondary constructors might come in a later version if they seem necessary
-
-// TODO: const constructors?
-
-
 
 ```kotlin
-class FieldClass private constructor(this.foo, this.bar, bazfoo: Int) {
+class FieldClass {
   // constructors:
-  constructor() => this(foo, 0, 0)
-
-  init {
-    bar = 0
-  }
+  constructor(this.foo, this.bar, bazfoo: Int)
 
   // properties:
   let foo: Int
