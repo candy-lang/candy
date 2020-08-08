@@ -423,6 +423,24 @@ if (…) … else …
 - `use`: import a module
 - `public use`: import & export a module
 
+File structure of a project `foo`:
+
+- `main.candy`: default executable
+- `binaries`
+  - `mod.candy`: alternative location for the default executable
+  - `bar.candy`: named executable
+- `lib.candy`: default library export → `use foo`
+- `libaries`
+  - `mod.candy`: alternative location for the default library export → `use foo`
+  - `bar.candy`: named library export → `use foo::bar`
+- `src`: folder with shared source code
+
+```yaml
+# specifying targets isn't necessary unless you want to configure them
+libraries:
+  bar:
+binaries:
+  bar:
 
 ## 11. Types
 
