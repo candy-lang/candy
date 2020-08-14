@@ -441,11 +441,14 @@ File structure of a project `foo`:
 ```yaml
 # specifying targets isn't necessary unless you want to configure them
 libraries:
-  bar:
+  default: lib
+  json: json
+  yaml: yaml
 binaries:
-  bar:
+  default: main
 plugins:
   my_plugin:
+    module: plugins.my_plugin
     isReadOnly: false
     functionVisitor: myFunctionVisitingFunction
     after:
@@ -453,6 +456,76 @@ plugins:
     before:
       - serialization
 ```
+
+---
+
+<details>
+<summary>Example library exports & imports</summary>
+
+**`serializable` package**
+
+- `README.md`
+- `src`: folder with all source code
+  - `default.candy`: `const class Serializable`
+  - `json`
+    - `mod.candy`: `const class JsonName`
+    - `plugin.candy`
+  - `yaml`
+    - `mod.candy`: `const class YamlName`
+    - `plugin.candy`
+- `example.candy` (or `examples/main.candy`)
+- package config:
+  ```yaml
+  libraries:
+    default
+    json
+    yaml
+  plugins:
+    json:
+      module: json.plugin
+    yaml:
+      module: yaml.plugin
+  ```
+
+**Usage**
+
+```rust
+use serializable
+
+@Serializable()
+class Foo {
+  @json.JsonName("foo_bar")
+  let mut fooBar
+}
+```
+
+```rust
+use serializable
+use serializable.json
+
+@Serializable()
+class Foo {
+  @JsonName("foo_bar")
+  let mut fooBar
+}
+```
+
+```rust
+use serializable
+use other_serializable
+
+@serializable.Serializable()
+class Foo
+```
+
+```rust
+use serializable
+use other_serializable hide Serializable
+
+@Serializable()
+class Foo
+```
+</details>
 
 Compiler Plugin:
 - runs in separate process; communication via stdin/stdout → TODO: protocol
