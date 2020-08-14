@@ -248,7 +248,7 @@ impl MyClass: Foo
 
 You can also overload the `impl` based on the `trait`s type parameters – so `Foo` can implement both `List<Int>` and `List<String>`.
 
-Visibility (can't have an explicit modifier): intersection of `class`/`enum` and abstract class/trait visibilities
+Visibility (can't have an explicit modifier): that of the base class, as long as the package defining the trait is a dependency (no `use` for the trait necessary)
 
 You can also implement `trait`s anonymously inline. The following creates an anonymous class implementing the trait `Foo` and passes it to the method `doWithFoo`:
 
