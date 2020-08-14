@@ -424,19 +424,14 @@ if (…) … else …
 
 File structure of a project `foo`:
 
-- `main.candy`: default executable
-- `binaries`
-  - `mod.candy`: alternative location for the default executable
-  - `bar.candy`: named executable
-- `lib.candy`: default library export → `use foo`
-- `libaries`
-  - `mod.candy`: alternative location for the default library export → `use foo`
-  - `bar.candy`: named library export → `use foo::bar`
-- `plugin.candy`: default compiler plugin export
-- `plugins`
-  - `mod.candy`: alternative location for the default compiler plugin
-  - `my_plugin.candy`: named compiler plugin export
-- `src`: folder with shared source code
+- `src`: folder with all source code
+  - `main.candy`: default executable
+  - `lib.candy`: default library export → `use foo`
+  - `plugin.candy`: default compiler plugin export
+- package config
+- `README.md`
+- `.git`, etc.
+
 
 ```yaml
 # specifying targets isn't necessary unless you want to configure them
@@ -473,6 +468,18 @@ plugins:
   - `yaml`
     - `mod.candy`: `const class YamlName`
     - `plugin.candy`
+  - `config.candy`:
+    ```kotlin
+    @Serializable()
+    const class Config {
+      let json: JsonConfig = JsonConfig()
+    }
+
+    @Serializable()
+    const class JsonConfig {
+      let defaultCasing: Casing = Casing.lowerPascal
+    }
+    ```
 - `example.candy` (or `examples/main.candy`)
 - package config:
   ```yaml
@@ -480,14 +487,23 @@ plugins:
     default
     json
     yaml
+  config: config.Config
   plugins:
-    json:
-      module: json.plugin
-    yaml:
-      module: yaml.plugin
+    json: json.plugin
+    yaml: yaml.plugin
   ```
 
 **Usage**
+
+```yaml
+dependencies:
+  serializable:
+    version: ^1.0.0
+    config:
+      json:
+        defaultCasing: snake
+```
+
 
 ```rust
 use serializable
