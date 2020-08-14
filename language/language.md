@@ -499,9 +499,20 @@ plugins:
 dependencies:
   serializable:
     version: ^1.0.0
-    config:
-      json:
-        defaultCasing: snake
+    plugin:
+      permissions:
+        file:
+          - assets/private/**: deny
+          - assets/**: read
+          - generated/**: write
+        network:
+          - https://evil.dev: false
+          - https://*.dev: true
+        environment:
+          - CANDY_SERIALIZABLE_*: true
+      config:
+        json:
+          defaultCasing: snake
 ```
 
 
@@ -548,6 +559,7 @@ Compiler Plugin:
 - can request execution per class, per function
   - can be filtered to classes/methods with specific annotations
 - runs only on the target module and not on its dependencies
+- when providing a configuration, `impl Json: TryTo<Config>` and `impl Config: To<Json>` must be available
 
 
 ## 11. Types
