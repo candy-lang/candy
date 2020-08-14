@@ -14,7 +14,6 @@ method(param1)
 - [1. Visibility Modifiers](#1-visibility-modifiers)
 - [2. Variables](#2-variables)
 - [3. Functions](#3-functions)
-  - [3.1. Extension Methods](#31-extension-methods)
 - [4. Classes](#4-classes)
   - [4.1. Abstract classes](#41-abstract-classes)
   - [4.2. Traits](#42-traits)
@@ -103,9 +102,6 @@ The default return type (if not specified) is `Unit`. When using an expression b
 
 Overloading is supported based on parameters and return type.
 
-### 3.1. Extension Methods
-
-Syntax is equivalent to Kotlin.
 
 
 ## 4. Classes
@@ -258,10 +254,30 @@ dooWithFoo(impl : Foo {
 
 For implementing multiple `trait`s, shorten your code like the following:
 
-```
+```rust
 impl Int: Add<Int, Int>, Subtract<Int, Int> {
   fun add(other: Int): Int {}
   fun subtract(other: Int): Int {}
+}
+```
+
+Is the same as:
+
+```rust
+impl Int: Add<Int, Int> {
+  fun add(other: Int): Int {}
+}
+impl Int: Subtract<Int, Int> {
+  fun subtract(other: Int): Int {}
+}
+```
+
+For defining an `impl` without a trait (visible on the base type, but limited to the current package), write this:
+
+```rust
+impl String {
+  let doubled: This
+    get => this + this
 }
 ```
 
