@@ -102,6 +102,15 @@ The default return type (if not specified) is `Unit`. When using an expression b
 
 Overloading is supported based on parameters and return type.
 
+Infix methods are supported:
+
+```kotlin
+class Matrix {
+  infix fun dot(other: Matrix): Matrix
+}
+
+// Use as `matrix dot matrix`.
+```
 
 
 ## 4. Classes
