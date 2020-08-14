@@ -174,8 +174,6 @@ class FieldClass {
     private get
   let mut floop: Int
     private set
-  let settable onlyWriteable: Int = 0
-    private set
   let mut blub: Int
     private get: int => blub * 5
     private get: double => blub / 2 // recursion?
