@@ -12,6 +12,8 @@ local/
 build/
 pubspec.lock
 .test_coverage.dart
+*.g.dart
+*.freezed.dart
 coverage/
 
 # IntelliJ

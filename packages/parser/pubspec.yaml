@@ -1,0 +1,20 @@
+name: parser
+description: "🍭 Source code parser for the Candy language"
+version: 0.0.1
+homepage: https://github.com/JonasWanke/candy
+
+environment:
+  sdk: ">=2.7.0 <3.0.0"
+
+dependencies:
+  basics: ^0.4.0
+  collection: ^1.14.12
+  extra_pedantic: ^1.2.0
+  freezed_annotation: ^0.11.0+1
+  meta: ^1.1.8
+  petitparser: ^3.0.4
+
+dev_dependencies:
+  build_runner: ^1.10.1
+  freezed: ^0.11.5
+  test: ^1.14.3
