@@ -176,9 +176,9 @@ class LexerGrammar {
 
   // SECTION: lexicalIdentifiers
 
-  static final Identifier =
-      ((Letter | char('_')) & (Letter | char('_') | _DecDigit).star())
-          .tokenize((lexeme, span) => SimpleIdentifier(lexeme, span: span));
+  static final Identifier = ((Letter | char('_')) &
+          (Letter | char('_') | _DecDigit).star())
+      .tokenize((lexeme, span) => SimpleIdentifierToken(lexeme, span: span));
 
   // SECTION: characters
 

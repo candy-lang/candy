@@ -28,10 +28,10 @@ class ParserGrammar {
         invocationPostfix,
         mapper: (expression, postfix) {
           return InvocationExpression(
-            expression,
-            postfix.first as OperatorToken,
-            postfix.sublist(1, postfix.length - 2) as List<Argument>,
-            postfix.last as OperatorToken,
+            target: expression,
+            leftParenthesis: postfix.first as OperatorToken,
+            arguments: postfix.sublist(1, postfix.length - 2) as List<Argument>,
+            rightParenthesis: postfix.last as OperatorToken,
           );
         },
       )
@@ -39,10 +39,10 @@ class ParserGrammar {
         indexingPostfix,
         mapper: (expression, postfix) {
           return IndexExpression(
-            expression,
-            postfix.first as OperatorToken,
-            postfix.sublist(1, postfix.length - 2) as List<Expression>,
-            postfix.last as OperatorToken,
+            target: expression,
+            leftSquareBracket: postfix.first as OperatorToken,
+            indices: postfix.sublist(1, postfix.length - 2) as List<Expression>,
+            rightSquareBracket: postfix.last as OperatorToken,
           );
         },
       )
@@ -162,9 +162,9 @@ class ParserGrammar {
           expression)
       .map<Argument>((value) {
     return Argument(
-      (value[1] as List<dynamic>)?.first as SimpleIdentifier,
-      (value[1] as List<dynamic>)?.elementAt(2) as OperatorToken,
-      value[3] as Expression,
+      name: (value[1] as List<dynamic>)?.first as SimpleIdentifierToken,
+      equals: (value[1] as List<dynamic>)?.elementAt(2) as OperatorToken,
+      expression: value[3] as Expression,
     );
   });
 
@@ -191,10 +191,9 @@ class ParserGrammar {
 
   static final literalConstant =
       // ignore: unnecessary_cast, Without the cast the compiler complains…
-      (LexerGrammar.IntegerLiteral.map((l) => IntegerLiteral(l))
-              as Parser<Literal<Object>>) |
-          LexerGrammar.BooleanLiteral.map((l) => BooleanLiteral(l)) |
-          LexerGrammar.NullLiteral.map((l) => NullLiteral(l));
+      ((LexerGrammar.IntegerLiteral as Parser<LiteralToken<Object>>) |
+              LexerGrammar.BooleanLiteral)
+          .map((l) => Literal(l));
 
   // SECTION: identifiers
 

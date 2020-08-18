@@ -6,14 +6,7 @@ import '../syntactic_entity.dart';
 
 part 'token.freezed.dart';
 
-class Token extends SyntacticEntity {
-  const Token({
-    @required this.span,
-  }) : assert(span != null);
-
-  @override
-  final SourceSpan span;
-}
+abstract class Token extends SyntacticEntity {}
 
 @freezed
 abstract class OperatorToken extends Token with _$OperatorToken {
@@ -21,6 +14,38 @@ abstract class OperatorToken extends Token with _$OperatorToken {
     OperatorTokenType type, {
     @required SourceSpan span,
   }) = _OperatorToken;
+}
+
+@freezed
+abstract class SimpleIdentifierToken extends Token
+    with _$SimpleIdentifierToken {
+  const factory SimpleIdentifierToken(
+    String name, {
+    @required SourceSpan span,
+  }) = _SimpleIdentifierToken;
+}
+
+abstract class LiteralToken<T> extends Token {
+  T get value;
+}
+
+@freezed
+abstract class IntegerLiteralToken extends LiteralToken<int>
+    with _$IntegerLiteralToken {
+  const factory IntegerLiteralToken(
+    int value, {
+    @required SourceSpan span,
+  }) = _IntegerLiteralToken;
+}
+
+@freezed
+abstract class BooleanLiteralToken extends LiteralToken<bool>
+    with _$BooleanLiteralToken {
+  const factory BooleanLiteralToken(
+    // ignore: avoid_positional_boolean_parameters
+    bool value, {
+    @required SourceSpan span,
+  }) = _BooleanLiteralToken;
 }
 
 enum OperatorTokenType {
@@ -202,41 +227,4 @@ enum OperatorTokenType {
 
   /// `>>>=`
   greaterGreaterGreaterEquals,
-}
-
-class LiteralToken<T> extends Token {
-  const LiteralToken(
-    this.value, {
-    @required SourceSpan span,
-  }) : super(span: span);
-
-  final T value;
-}
-
-class IntegerLiteralToken extends LiteralToken<int> {
-  const IntegerLiteralToken(
-    // ignore: avoid_positional_boolean_parameters
-    int value, {
-    @required SourceSpan span,
-  })  : assert(value != null),
-        super(value, span: span);
-}
-
-class BooleanLiteralToken extends LiteralToken<bool> {
-  const BooleanLiteralToken(
-    // ignore: avoid_positional_boolean_parameters
-    bool value, {
-    @required SourceSpan span,
-  })  : assert(value != null),
-        super(value, span: span);
-}
-
-class SimpleIdentifier extends Token {
-  const SimpleIdentifier(
-    this.name, {
-    @required SourceSpan span,
-  })  : assert(name != null),
-        super(span: span);
-
-  final String name;
 }

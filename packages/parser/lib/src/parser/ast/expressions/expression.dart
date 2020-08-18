@@ -1,7 +1,10 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:parser/src/lexer/token.dart';
 
 import '../../../syntactic_entity.dart';
 import '../node.dart';
+
+part 'expression.freezed.dart';
 
 abstract class Expression extends AstNode {
   const Expression();
@@ -25,78 +28,71 @@ class ParenthesizedExpression extends Expression {
 }
 
 abstract class OperatorExpression extends Expression {
-  const OperatorExpression(this.operatorToken) : assert(operatorToken != null);
+  const OperatorExpression();
 
-  final OperatorToken operatorToken;
+  OperatorToken get operatorToken;
 
   // TODO(JonasWanke): actual operator
   // Operator get operator => operatorToken.type;
 }
 
 abstract class UnaryExpression extends OperatorExpression {
-  const UnaryExpression(
-    OperatorToken operatorToken,
-    this.operand,
-  )   : assert(operand != null),
-        super(operatorToken);
+  const UnaryExpression();
 
-  final Expression operand;
+  Expression get operand;
 }
 
-class PrefixExpression extends UnaryExpression {
-  const PrefixExpression(
+@freezed
+abstract class PrefixExpression extends UnaryExpression
+    implements _$PrefixExpression {
+  const factory PrefixExpression(
     OperatorToken operatorToken,
     Expression operand,
-  )   : assert(operand != null),
-        super(operatorToken, operand);
+  ) = _PrefixExpression;
+  const PrefixExpression._();
 
   @override
   Iterable<SyntacticEntity> get children => [operatorToken, operand];
 }
 
-class PostfixExpression extends UnaryExpression {
-  const PostfixExpression(
+@freezed
+abstract class PostfixExpression extends UnaryExpression
+    implements _$PostfixExpression {
+  const factory PostfixExpression(
     Expression operand,
     OperatorToken operatorToken,
-  )   : assert(operand != null),
-        super(operatorToken, operand);
+  ) = _PostfixExpression;
+  const PostfixExpression._();
 
   @override
   Iterable<SyntacticEntity> get children => [operand, operatorToken];
 }
 
-class BinaryExpression extends OperatorExpression {
-  const BinaryExpression(
-    this.leftOperand,
+@freezed
+abstract class BinaryExpression extends OperatorExpression
+    implements _$BinaryExpression {
+  const factory BinaryExpression(
+    Expression leftOperand,
     OperatorToken operatorToken,
-    this.rightOperand,
-  )   : assert(leftOperand != null),
-        assert(rightOperand != null),
-        super(operatorToken);
-
-  final Expression leftOperand;
-  final Expression rightOperand;
+    Expression rightOperand,
+  ) = _BinaryExpression;
+  const BinaryExpression._();
 
   @override
   Iterable<SyntacticEntity> get children =>
       [leftOperand, operatorToken, rightOperand];
 }
 
-class InvocationExpression extends Expression {
-  const InvocationExpression(
-    this.target,
-    this.leftParenthesis,
-    this.arguments,
-    this.rightParenthesis,
-  )   : assert(target != null),
-        assert(leftParenthesis != null),
-        assert(arguments != null),
-        assert(rightParenthesis != null);
-
-  final Expression target;
-  final OperatorToken leftParenthesis;
-  final List<Argument> arguments;
-  final OperatorToken rightParenthesis;
+@freezed
+abstract class InvocationExpression extends Expression
+    implements _$InvocationExpression {
+  const factory InvocationExpression({
+    @required Expression target,
+    @required OperatorToken leftParenthesis,
+    @required List<Argument> arguments,
+    @required OperatorToken rightParenthesis,
+  }) = _InvocationExpression;
+  const InvocationExpression._();
 
   @override
   Iterable<SyntacticEntity> get children => [
@@ -109,14 +105,14 @@ class InvocationExpression extends Expression {
       ];
 }
 
-class Argument extends AstNode {
-  const Argument(this.name, this.equals, this.expression)
-      : assert((name != null) == (equals != null)),
-        assert(expression != null);
-
-  final SimpleIdentifier name;
-  final OperatorToken equals;
-  final Expression expression;
+@freezed
+abstract class Argument extends AstNode implements _$Argument {
+  const factory Argument({
+    SimpleIdentifierToken name,
+    OperatorToken equals,
+    @required Expression expression,
+  }) = _Argument;
+  const Argument._();
 
   @override
   Iterable<SyntacticEntity> get children => [
@@ -126,21 +122,15 @@ class Argument extends AstNode {
       ];
 }
 
-class IndexExpression extends Expression {
-  const IndexExpression(
-    this.target,
-    this.leftSquareBracket,
-    this.indices,
-    this.rightSquareBracket,
-  )   : assert(target != null),
-        assert(leftSquareBracket != null),
-        assert(indices != null),
-        assert(rightSquareBracket != null);
-
-  final Expression target;
-  final OperatorToken leftSquareBracket;
-  final List<Expression> indices;
-  final OperatorToken rightSquareBracket;
+@freezed
+abstract class IndexExpression extends Expression implements _$IndexExpression {
+  const factory IndexExpression({
+    @required Expression target,
+    @required OperatorToken leftSquareBracket,
+    @required List<Expression> indices,
+    @required OperatorToken rightSquareBracket,
+  }) = _IndexExpression;
+  const IndexExpression._();
 
   @override
   Iterable<SyntacticEntity> get children =>

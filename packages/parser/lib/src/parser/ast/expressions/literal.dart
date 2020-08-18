@@ -1,25 +1,16 @@
-import '../../../lexer/lexer.dart';
-import '../../../syntactic_entity.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import '../../../lexer/token.dart';
+import '../../../source_span.dart';
 import 'expression.dart';
 
-abstract class Literal<T> extends Expression {
-  const Literal(this.valueToken);
+part 'literal.freezed.dart';
 
-  final LiteralToken<T> valueToken;
-  T get value => valueToken.value;
+@freezed
+abstract class Literal<T> extends Expression implements _$Literal<T> {
+  const factory Literal(LiteralToken<T> value) = _Literal;
+  const Literal._();
 
   @override
-  Iterable<SyntacticEntity> get children => [valueToken];
-}
-
-class IntegerLiteral extends Literal<int> {
-  const IntegerLiteral(IntegerLiteralToken valueToken)
-      : assert(valueToken != null),
-        super(valueToken);
-}
-
-class BooleanLiteral extends Literal<bool> {
-  const BooleanLiteral(BooleanLiteralToken valueToken)
-      : assert(valueToken != null),
-        super(valueToken);
+  SourceSpan get span => value.span;
 }
