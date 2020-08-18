@@ -8,7 +8,7 @@ part 'literal.freezed.dart';
 
 @freezed
 abstract class Literal<T> extends Expression implements _$Literal<T> {
-  const factory Literal(LiteralToken<T> value) = _Literal;
+  const factory Literal(LiteralToken<T> value) = _Literal<T>;
   const Literal._();
 
   @override

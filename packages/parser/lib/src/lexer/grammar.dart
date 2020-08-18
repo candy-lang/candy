@@ -123,13 +123,15 @@ class LexerGrammar {
 
   static final IntegerLiteral = DecLiteral | HexLiteral | BinLiteral;
 
+  // TODO(JonasWanke): disallow trailing underscore
+  // formerly: DecDigitNoZero & DecDigitOrSeparator.star() & DecDigit | DecDigit
   static final DecLiteral =
-      (_DecDigitNoZero & _DecDigitOrSeparator.star() & _DecDigit | _DecDigit)
-          .tokenize((lexeme, span) =>
-              IntegerLiteralToken(int.parse(lexeme), span: span));
+      (_DecDigitNoZero & _DecDigitOrSeparator.star() | _DecDigit).tokenize(
+          (lexeme, span) => IntegerLiteralToken(int.parse(lexeme), span: span));
 
-  static final _DecDigits =
-      _DecDigit & _DecDigitOrSeparator.star() & _DecDigit | _DecDigit;
+  // TODO(JonasWanke): disallow trailing underscore
+  // formerly: DecDigit & DecDigitOrSeparator.star() & DecDigit | DecDigit
+  static final _DecDigits = _DecDigit & _DecDigitOrSeparator.star();
 
   static final _DecDigit = digit();
   static final _DecDigitNoZero = char('1') |
