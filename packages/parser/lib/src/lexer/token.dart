@@ -231,12 +231,6 @@ class BooleanLiteralToken extends LiteralToken<bool> {
         super(value, span: span);
 }
 
-class NullLiteralToken extends LiteralToken<void> {
-  const NullLiteralToken({
-    @required SourceSpan span,
-  }) : super(null, span: span);
-}
-
 class SimpleIdentifier extends Token {
   const SimpleIdentifier(
     this.name, {

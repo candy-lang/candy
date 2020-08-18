@@ -23,9 +23,3 @@ class BooleanLiteral extends Literal<bool> {
       : assert(valueToken != null),
         super(valueToken);
 }
-
-class NullLiteral extends Literal<void> {
-  const NullLiteral(NullLiteralToken valueToken)
-      : assert(valueToken != null),
-        super(valueToken);
-}

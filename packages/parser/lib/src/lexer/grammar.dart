@@ -174,9 +174,6 @@ class LexerGrammar {
   static final BooleanLiteral = (string('true') | string('false')).tokenize(
       (lexeme, span) => BooleanLiteralToken(lexeme == 'true', span: span));
 
-  static final NullLiteral =
-      string('null').tokenize((lexeme, span) => NullLiteralToken(span: span));
-
   // SECTION: lexicalIdentifiers
 
   static final Identifier =
