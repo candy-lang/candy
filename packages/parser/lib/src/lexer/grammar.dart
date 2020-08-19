@@ -121,38 +121,25 @@ class LexerGrammar {
 
   // SECTION: literals
 
-  static final IntegerLiteral = DecLiteral | HexLiteral | BinLiteral;
+  static final IntegerLiteral = HexLiteral | BinLiteral | DecLiteral;
 
-  // TODO(JonasWanke): disallow trailing underscore
-  // formerly: DecDigitNoZero & DecDigitOrSeparator.star() & DecDigit | DecDigit
-  static final DecLiteral =
-      (_DecDigitNoZero & _DecDigitOrSeparator.star() | _DecDigit).tokenize(
-          (lexeme, span) => IntegerLiteralToken(int.parse(lexeme), span: span));
+  // TODO(JonasWanke): disallow leading/trailing underscore
+  // formerly: DecDigit & DecDigitOrSeparator.star() & DecDigit | DecDigit
+  static final DecLiteral = _DecDigitOrSeparator.star().tokenizeInteger();
 
-  // TODO(JonasWanke): disallow trailing underscore
+  // TODO(JonasWanke): disallow leading/trailing underscore
   // formerly: DecDigit & DecDigitOrSeparator.star() & DecDigit | DecDigit
   static final _DecDigits = _DecDigit & _DecDigitOrSeparator.star();
 
   static final _DecDigit = digit();
-  static final _DecDigitNoZero = char('1') |
-      char('2') |
-      char('3') |
-      char('4') |
-      char('5') |
-      char('6') |
-      char('7') |
-      char('8') |
-      char('9');
-  static final _DecDigitOrSeparator = _DecDigit | char('_').ignore();
+  static final _DecDigitOrSeparator = _DecDigit | char('_');
 
   // TODO: RealLiteral, FloatLiteral, DoubleLiteral
 
-  static final HexLiteral = (_hexLiteralPrefix.ignore() &
-          _HexDigit &
-          (_HexDigitOrSeparator.star() & _HexDigit).optional())
-      .tokenize<IntegerLiteralToken>((lexeme, span) {
-    return IntegerLiteralToken(int.parse(lexeme, radix: 16), span: span);
-  });
+  // TODO(JonasWanke): disallow leading/trailing underscore
+  // formerly: _hexLiteralPrefix & _HexDigit & (_HexDigitOrSeparator.star() & _HexDigit).optional()
+  static final HexLiteral = (_hexLiteralPrefix & _HexDigitOrSeparator.star())
+      .tokenizeInteger(radix: 16, hasPrefix: true);
   static final _hexLiteralPrefix = char('0') & (char('x') | char('X'));
 
   static final _HexDigit = _DecDigit | _hexLettersLower | _hexLettersUpper;
@@ -160,18 +147,16 @@ class LexerGrammar {
       char('a') | char('b') | char('c') | char('d') | char('e') | char('f');
   static final _hexLettersUpper =
       char('A') | char('B') | char('C') | char('D') | char('E') | char('F');
-  static final _HexDigitOrSeparator = _HexDigit | char('_').ignore();
+  static final _HexDigitOrSeparator = _HexDigit | char('_');
 
-  static final BinLiteral = (_binLiteralPrefix.ignore() &
-          _BinDigit &
-          (_BinDigitOrSeparator.star() & _BinDigit).optional())
-      .tokenize<IntegerLiteralToken>((lexeme, span) {
-    return IntegerLiteralToken(int.parse(lexeme, radix: 2), span: span);
-  });
+  // TODO(JonasWanke): disallow leading/trailing underscore
+  // formerly: _binLiteralPrefix & _BinDigit & (_BinDigitOrSeparator.star() & _BinDigit).optional()
+  static final BinLiteral = (_binLiteralPrefix & _BinDigitOrSeparator.star())
+      .tokenizeInteger(radix: 2, hasPrefix: true);
   static final _binLiteralPrefix = char('0') & (char('b') | char('B'));
 
   static final _BinDigit = char('0') | char('1');
-  static final _BinDigitOrSeparator = _BinDigit | char('_').ignore();
+  static final _BinDigitOrSeparator = _BinDigit | char('_');
 
   static final BooleanLiteral = (string('true') | string('false')).tokenize(
       (lexeme, span) => BooleanLiteralToken(lexeme == 'true', span: span));
@@ -204,10 +189,24 @@ extension on Parser<String> {
     OperatorTokenType type,
   ) =>
       tokenize((lexeme, span) => OperatorToken(type, span: span));
+  Parser<IntegerLiteralToken> tokenizeInteger({
+    int radix = 10,
+    bool hasPrefix = false,
+  }) {
+    return tokenize<IntegerLiteralToken>((lexeme, span) {
+      return IntegerLiteralToken(
+        int.parse(
+          lexeme.substring(hasPrefix ? 2 : 0).replaceAll('_', ''),
+          radix: radix,
+        ),
+        span: span,
+      );
+    });
+  }
 
   Parser<String> operator &(Parser<String> other) =>
       SequenceParser([this, other]).flatten();
 
   Parser<String> star() =>
-      PossessiveRepeatingParser(this, 0, unbounded).flatten();
+      PossessiveRepeatingParser(this, 0, unbounded).map((list) => list.join());
 }

@@ -191,9 +191,9 @@ class ParserGrammar {
 
   static final literalConstant =
       // ignore: unnecessary_cast, Without the cast the compiler complains…
-      ((LexerGrammar.IntegerLiteral as Parser<LiteralToken<Object>>) |
-              LexerGrammar.BooleanLiteral)
-          .map((l) => Literal(l));
+      (LexerGrammar.IntegerLiteral.map((l) => Literal<int>(l))
+              as Parser<Literal<dynamic>>) |
+          LexerGrammar.BooleanLiteral.map((l) => Literal<bool>(l));
 
   // SECTION: identifiers
 
