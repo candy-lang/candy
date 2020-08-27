@@ -13,7 +13,7 @@ void main() {
   group('literals', () {
     group('IntegerLiteral', () {
       // TODO(JonasWanke): negative literals
-      tableTestExpressionParser<Literal<int>>(
+      tableTestExpressionParser<int, Literal<int>>(
         'decimal',
         table: {
           '0': 0,
@@ -27,14 +27,11 @@ void main() {
           '1_0_0': 100,
           '1000': 1000,
           '1_000': 1000,
-        }.map((key, value) {
-          final newValue = Literal(
-            IntegerLiteralToken(value, span: SourceSpan(0, key.length)),
-          );
-          return MapEntry(key, newValue);
-        }),
+        },
+        astMapper: (value, fullSpan) =>
+            Literal(IntegerLiteralToken(value, span: fullSpan)),
       );
-      tableTestExpressionParser<Literal<int>>(
+      tableTestExpressionParser<int, Literal<int>>(
         'hexadecimal',
         table: {
           '0x0': 0,
@@ -47,14 +44,11 @@ void main() {
           '0x1_0_0': 0x100,
           '0x1000': 0x1000,
           '0x1_000': 0x1000,
-        }.map((key, value) {
-          final newValue = Literal(
-            IntegerLiteralToken(value, span: SourceSpan(0, key.length)),
-          );
-          return MapEntry(key, newValue);
-        }),
+        },
+        astMapper: (value, fullSpan) =>
+            Literal(IntegerLiteralToken(value, span: fullSpan)),
       );
-      tableTestExpressionParser<Literal<int>>(
+      tableTestExpressionParser<int, Literal<int>>(
         'binary',
         table: {
           '0b0': 0x0,
@@ -66,25 +60,19 @@ void main() {
           '0b1_0_0': 0x4,
           '0b1000': 0x8,
           '0b1_000': 0x8,
-        }.map((key, value) {
-          final newValue = Literal(
-            IntegerLiteralToken(value, span: SourceSpan(0, key.length)),
-          );
-          return MapEntry(key, newValue);
-        }),
+        },
+        astMapper: (value, fullSpan) =>
+            Literal(IntegerLiteralToken(value, span: fullSpan)),
       );
     });
-    tableTestExpressionParser<Literal<bool>>(
+    tableTestExpressionParser<bool, Literal<bool>>(
       'BooleanLiteral',
       table: {
         'true': true,
         'false': false,
-      }.map((key, value) {
-        final newValue = Literal(
-          BooleanLiteralToken(value, span: SourceSpan(0, key.length)),
-        );
-        return MapEntry(key, newValue);
-      }),
+      },
+      astMapper: (value, fullSpan) =>
+          Literal(BooleanLiteralToken(value, span: fullSpan)),
     );
   });
 }
@@ -106,17 +94,20 @@ void tableTest<T, R>(
 }
 
 @isTestGroup
-void tableTestParser<R extends AstNode>(
+void tableTestParser<R, N extends AstNode>(
   String description, {
   @required Map<String, R> table,
+  @required N Function(R raw, SourceSpan fullSpan) astMapper,
   @required Parser parser,
 }) {
   assert(table != null);
   assert(parser != null);
 
-  tableTest<String, R>(
+  tableTest<String, N>(
     description,
-    table: table,
+    table: table.map((key, value) {
+      return MapEntry(key, astMapper(value, SourceSpan(0, key.length)));
+    }),
     converter: (source) {
       final result = parser.parse(source);
       expect(result.isSuccess, isTrue);
@@ -125,21 +116,21 @@ void tableTestParser<R extends AstNode>(
         source.length,
         reason: "Didn't match the whole input string.",
       );
-      return result.value as R;
+      return result.value as N;
     },
   );
 }
 
 @isTestGroup
-void tableTestExpressionParser<R extends AstNode>(
+void tableTestExpressionParser<R, N extends AstNode>(
   String description, {
   @required Map<String, R> table,
+  @required N Function(R raw, SourceSpan fullSpan) astMapper,
 }) {
-  assert(table != null);
-
-  tableTestParser<R>(
+  tableTestParser<R, N>(
     description,
     table: table,
+    astMapper: astMapper,
     parser: ParserGrammar.expression,
   );
 }
