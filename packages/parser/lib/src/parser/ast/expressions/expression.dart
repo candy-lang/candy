@@ -66,10 +66,10 @@ abstract class UnaryExpression extends OperatorExpression {
 @freezed
 abstract class PrefixExpression extends UnaryExpression
     implements _$PrefixExpression {
-  const factory PrefixExpression(
-    OperatorToken operatorToken,
-    Expression operand,
-  ) = _PrefixExpression;
+  const factory PrefixExpression({
+    @required OperatorToken operatorToken,
+    @required Expression operand,
+  }) = _PrefixExpression;
   const PrefixExpression._();
 
   @override
@@ -79,10 +79,10 @@ abstract class PrefixExpression extends UnaryExpression
 @freezed
 abstract class PostfixExpression extends UnaryExpression
     implements _$PostfixExpression {
-  const factory PostfixExpression(
-    Expression operand,
-    OperatorToken operatorToken,
-  ) = _PostfixExpression;
+  const factory PostfixExpression({
+    @required Expression operand,
+    @required OperatorToken operatorToken,
+  }) = _PostfixExpression;
   const PostfixExpression._();
 
   @override

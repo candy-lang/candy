@@ -123,12 +123,85 @@ void main() {
       },
     );
   });
+
+  group('unary postfix', () {
+    group('simple operators', () {
+      forAllMap<String, OperatorTokenType>(
+        table: <String, OperatorTokenType>{
+          '++': OperatorTokenType.plusPlus,
+          '--': OperatorTokenType.minusMinus,
+          '?': OperatorTokenType.question,
+          '!': OperatorTokenType.exclamation,
+        },
+        tester: (operatorSource, operatorType) {
+          group(operatorType.toString(), () {
+            forAllPrimitives(tester: (primitiveSource, primitiveFactory) {
+              testExpressionParser(
+                '$primitiveSource$operatorSource',
+                expression: PostfixExpression(
+                  operand: primitiveFactory(0),
+                  operatorToken: OperatorToken(
+                    operatorType,
+                    span: SourceSpan(
+                      primitiveSource.length,
+                      primitiveSource.length + operatorSource.length,
+                    ),
+                  ),
+                ),
+              );
+            });
+          });
+        },
+      );
+    });
+  });
+
+  group('unary prefix', () {
+    group('simple operators', () {
+      forAllMap<String, OperatorTokenType>(
+        table: <String, OperatorTokenType>{
+          '-': OperatorTokenType.minus,
+          '!': OperatorTokenType.exclamation,
+          '~': OperatorTokenType.tilde,
+          '++': OperatorTokenType.plusPlus,
+          '--': OperatorTokenType.minusMinus,
+        },
+        tester: (operatorSource, operatorType) {
+          group(operatorType.toString(), () {
+            forAllPrimitives(tester: (primitiveSource, primitiveFactory) {
+              testExpressionParser(
+                '$operatorSource$primitiveSource',
+                expression: PrefixExpression(
+                  operatorToken: OperatorToken(
+                    operatorType,
+                    span: SourceSpan(0, operatorSource.length),
+                  ),
+                  operand: primitiveFactory(operatorSource.length),
+                ),
+              );
+            });
+          });
+        },
+      );
+    });
+  });
 }
 
 @isTestGroup
 void forAll<T>({
   @required Iterable<T> table,
   @required void Function(T value) tester,
+}) {
+  assert(table != null);
+  assert(tester != null);
+
+  table.forEach(tester);
+}
+
+@isTestGroup
+void forAllMap<K, V>({
+  @required Map<K, V> table,
+  @required void Function(K key, V value) tester,
 }) {
   assert(table != null);
   assert(tester != null);

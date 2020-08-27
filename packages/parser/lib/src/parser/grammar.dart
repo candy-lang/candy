@@ -50,11 +50,11 @@ class ParserGrammar {
         },
       )
       // unary prefix
-      ..prefix(LexerGrammar.MINUS |
-          LexerGrammar.EXCLAMATION |
+      ..prefix(LexerGrammar.EXCLAMATION |
           LexerGrammar.TILDE |
           LexerGrammar.PLUS_PLUS |
-          LexerGrammar.MINUS_MINUS)
+          LexerGrammar.MINUS_MINUS |
+          LexerGrammar.MINUS)
       // implicit multiplication
       // TODO(JonasWanke): add implicit multiplication
       // multiplicative
@@ -219,7 +219,8 @@ extension on ExpressionBuilder {
   void postfix(Parser<OperatorToken> operator) {
     group().postfix<OperatorToken, Expression>(
       operator,
-      (operand, operator) => PostfixExpression(operand, operator),
+      (operand, operator) =>
+          PostfixExpression(operand: operand, operatorToken: operator),
     );
   }
 
@@ -232,7 +233,8 @@ extension on ExpressionBuilder {
   void prefix(Parser<OperatorToken> operator) {
     group().prefix<OperatorToken, Expression>(
       operator,
-      (operator, operand) => PrefixExpression(operator, operand),
+      (operator, operand) =>
+          PrefixExpression(operatorToken: operator, operand: operand),
     );
   }
 
