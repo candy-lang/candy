@@ -4,104 +4,49 @@ import 'package:parser/src/parser/ast/expressions/expression.dart';
 import 'package:parser/src/parser/grammar.dart';
 import 'package:parser/src/source_span.dart';
 import 'package:parser/src/syntactic_entity.dart';
-import 'package:petitparser/petitparser.dart';
 import 'package:test/test.dart';
+
+import 'utils.dart';
 
 void main() {
   setUpAll(ParserGrammar.init);
 
   group('primitive', () {
-    tableTestExpressionParser<String, Identifier>(
-      'identifiers',
-      table: Map.fromIterable(<String>[
-        'a',
-        'a123',
-        'aa',
-        'aa123',
-        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa123',
-        'A',
-        'A123',
-        'AA',
-        'AA123',
-        'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
-        'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA123',
-        '_',
-        '_123',
-        '__',
-        '__123',
-        '_______________________________',
-        '_______________________________123',
-      ]),
-      nodeMapper: (value, fullSpan) =>
-          Identifier(SimpleIdentifierToken(value, span: fullSpan)),
-    );
-
     group('literals', () {
       group('IntegerLiteral', () {
-        // TODO(JonasWanke): negative literals
         tableTestExpressionParser<int, Literal<int>>(
           'decimal',
-          table: {
-            '0': 0,
-            '1': 1,
-            '01': 1,
-            '2': 2,
-            '10': 10,
-            '1_0': 10,
-            '100': 100,
-            '10_0': 100,
-            '1_0_0': 100,
-            '1000': 1000,
-            '1_000': 1000,
-          },
+          table: validDecIntegerLiterals,
           nodeMapper: (value, fullSpan) =>
               Literal(IntegerLiteralToken(value, span: fullSpan)),
         );
         tableTestExpressionParser<int, Literal<int>>(
           'hexadecimal',
-          table: {
-            '0x0': 0,
-            '0x1': 1,
-            '0x2': 2,
-            '0x10': 0x10,
-            '0x1_0': 0x10,
-            '0x100': 0x100,
-            '0x10_0': 0x100,
-            '0x1_0_0': 0x100,
-            '0x1000': 0x1000,
-            '0x1_000': 0x1000,
-          },
+          table: validHexIntegerLiterals,
           nodeMapper: (value, fullSpan) =>
               Literal(IntegerLiteralToken(value, span: fullSpan)),
         );
         tableTestExpressionParser<int, Literal<int>>(
           'binary',
-          table: {
-            '0b0': 0x0,
-            '0b1': 0x1,
-            '0b10': 0x2,
-            '0b1_0': 0x2,
-            '0b100': 0x4,
-            '0b10_0': 0x4,
-            '0b1_0_0': 0x4,
-            '0b1000': 0x8,
-            '0b1_000': 0x8,
-          },
+          table: validBinIntegerLiterals,
           nodeMapper: (value, fullSpan) =>
               Literal(IntegerLiteralToken(value, span: fullSpan)),
         );
       });
       tableTestExpressionParser<bool, Literal<bool>>(
         'BooleanLiteral',
-        table: {
-          'true': true,
-          'false': false,
-        },
+        table: validBooleanLiterals,
         nodeMapper: (value, fullSpan) =>
             Literal(BooleanLiteralToken(value, span: fullSpan)),
       );
     });
+
+    tableTestExpressionParser<String, Identifier>(
+      'identifiers',
+      table: Map.fromIterable(validIdentifiers),
+      nodeMapper: (value, fullSpan) =>
+          Identifier(SimpleIdentifierToken(value, span: fullSpan)),
+    );
   });
 
   group('grouping', () {
@@ -187,27 +132,72 @@ void main() {
   });
 }
 
-@isTestGroup
-void forAll<T>({
-  @required Iterable<T> table,
-  @required void Function(T value) tester,
-}) {
-  assert(table != null);
-  assert(tester != null);
-
-  table.forEach(tester);
-}
-
-@isTestGroup
-void forAllMap<K, V>({
-  @required Map<K, V> table,
-  @required void Function(K key, V value) tester,
-}) {
-  assert(table != null);
-  assert(tester != null);
-
-  table.forEach(tester);
-}
+// TODO(JonasWanke): negative literals
+final validDecIntegerLiterals = {
+  '0': 0,
+  '1': 1,
+  '01': 1,
+  '2': 2,
+  '10': 10,
+  '1_0': 10,
+  '100': 100,
+  '10_0': 100,
+  '1_0_0': 100,
+  '1000': 1000,
+  '1_000': 1000,
+};
+final validHexIntegerLiterals = {
+  '0x0': 0,
+  '0x1': 1,
+  '0x2': 2,
+  '0x10': 0x10,
+  '0x1_0': 0x10,
+  '0x100': 0x100,
+  '0x10_0': 0x100,
+  '0x1_0_0': 0x100,
+  '0x1000': 0x1000,
+  '0x1_000': 0x1000,
+};
+final validBinIntegerLiterals = {
+  '0b0': 0x0,
+  '0b1': 0x1,
+  '0b10': 0x2,
+  '0b1_0': 0x2,
+  '0b100': 0x4,
+  '0b10_0': 0x4,
+  '0b1_0_0': 0x4,
+  '0b1000': 0x8,
+  '0b1_000': 0x8,
+};
+final validIntegerLiterals = {
+  ...validDecIntegerLiterals,
+  ...validHexIntegerLiterals,
+  ...validHexIntegerLiterals,
+};
+final validBooleanLiterals = {
+  'true': true,
+  'false': false,
+};
+final validIdentifiers = [
+  'a',
+  'a123',
+  'aa',
+  'aa123',
+  'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa123',
+  'A',
+  'A123',
+  'AA',
+  'AA123',
+  'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+  'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA123',
+  '_',
+  '_123',
+  '__',
+  '__123',
+  '_______________________________',
+  '_______________________________123',
+];
 
 typedef PrimitiveFactory = Expression Function(int startOffset);
 typedef PrimitiveTester = void Function(
@@ -218,41 +208,8 @@ typedef PrimitiveTester = void Function(
 void forAllPrimitives({@required PrimitiveTester tester}) {
   assert(tester != null);
 
-  final integerLiterals = {
-    // decimal
-    '0': 0,
-    '1': 1,
-    '01': 1,
-    '2': 2,
-    '10': 10,
-    '1_0': 10,
-    '100': 100,
-    '10_0': 100,
-    '1_0_0': 100,
-    '1000': 1000,
-    '1_000': 1000,
-    // hexadecimal
-    '0x0': 0,
-    '0x1': 1,
-    '0x2': 2,
-    '0x10': 0x10,
-    '0x1_0': 0x10,
-    '0x100': 0x100,
-    '0x10_0': 0x100,
-    '0x1_0_0': 0x100,
-    '0x1000': 0x1000,
-    '0x1_000': 0x1000,
-    // binary
-    '0b0': 0x0,
-    '0b1': 0x1,
-    '0b10': 0x2,
-    '0b1_0': 0x2,
-    '0b100': 0x4,
-    '0b10_0': 0x4,
-    '0b1_0_0': 0x4,
-    '0b1000': 0x8,
-    '0b1_000': 0x8,
-  }.map<String, PrimitiveFactory>((source, value) {
+  final integerLiterals =
+      validIntegerLiterals.map<String, PrimitiveFactory>((source, value) {
     return MapEntry(
       source,
       (offset) => Literal<int>(
@@ -263,10 +220,8 @@ void forAllPrimitives({@required PrimitiveTester tester}) {
       ),
     );
   });
-  final booleanLiterals = {
-    'true': true,
-    'false': false,
-  }.map<String, PrimitiveFactory>((source, value) {
+  final booleanLiterals =
+      validBooleanLiterals.map<String, PrimitiveFactory>((source, value) {
     return MapEntry(
       source,
       (offset) => Literal<bool>(
@@ -278,26 +233,7 @@ void forAllPrimitives({@required PrimitiveTester tester}) {
     );
   });
   final identifierLiterals = Map<String, PrimitiveFactory>.fromIterable(
-    <String>[
-      'a',
-      'a123',
-      'aa',
-      'aa123',
-      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa123',
-      'A',
-      'A123',
-      'AA',
-      'AA123',
-      'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
-      'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA123',
-      '_',
-      '_123',
-      '__',
-      '__123',
-      '_______________________________',
-      '_______________________________123',
-    ],
+    validIdentifiers,
     value: (dynamic source) => (offset) {
       return Identifier(
         SimpleIdentifierToken(
@@ -334,38 +270,6 @@ void testExpressionParser(
       reason: "Didn't match the whole input string.",
     );
     expect(result.value, equals(expression));
-  });
-}
-
-@isTestGroup
-void tableTestParser<R, N extends SyntacticEntity>(
-  String description, {
-  @required Map<String, R> table,
-  @required N Function(R raw, SourceSpan fullSpan) nodeMapper,
-  @required Parser parser,
-}) {
-  assert(table != null);
-  assert(parser != null);
-
-  group(description, () {
-    forAll<MapEntry<String, R>>(
-      table: table.entries,
-      tester: (entry) {
-        final source = entry.key;
-        test(source, () {
-          final node = nodeMapper(entry.value, SourceSpan(0, source.length));
-
-          final result = parser.parse(source);
-          expect(result.isSuccess, isTrue);
-          expect(
-            result.position,
-            source.length,
-            reason: "Didn't match the whole input string.",
-          );
-          expect(result.value, equals(node));
-        });
-      },
-    );
   });
 }
 
