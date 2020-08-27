@@ -12,9 +12,10 @@ import 'token.dart';
 class LexerGrammar {
   // SECTION: lexicalGeneral
 
+  static final Parser<void> WS = (char(' ') | char('\t')).plus().ignore();
   static final Parser<void> NL =
       (char('\n') | char('\r') & char('\n').optional()).ignore();
-  static final Parser<void> NLs = NL.star();
+  static final Parser<void> NLs = (NL | WS).star();
 
   // SECTION: separatorsAndOperations
 
