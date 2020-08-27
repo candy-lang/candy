@@ -9,6 +9,8 @@ class SourceSpan {
         assert(start >= 0),
         assert(end != null),
         assert(start <= end);
+  const SourceSpan.fromStartLength(int start, int length)
+      : this(start, start + length);
 
   final int start;
   final int end;

@@ -50,7 +50,7 @@ void main() {
   });
 
   group('grouping', () {
-    forAllPrimitives(
+    forPrimitives(
       tester: (source, primitiveFactory) {
         final primitive = primitiveFactory(1);
         testExpressionParser(
@@ -61,7 +61,7 @@ void main() {
             expression: primitive,
             rightParenthesis: OperatorToken(
               OperatorTokenType.rparen,
-              span: SourceSpan(source.length + 1, source.length + 2),
+              span: SourceSpan.fromStartLength(source.length + 1, 1),
             ),
           ),
         );
@@ -80,16 +80,16 @@ void main() {
         },
         tester: (operatorSource, operatorType) {
           group(operatorType.toString(), () {
-            forAllPrimitives(tester: (primitiveSource, primitiveFactory) {
+            forPrimitives(tester: (primitiveSource, primitiveFactory) {
               testExpressionParser(
                 '$primitiveSource$operatorSource',
                 expression: PostfixExpression(
                   operand: primitiveFactory(0),
                   operatorToken: OperatorToken(
                     operatorType,
-                    span: SourceSpan(
+                    span: SourceSpan.fromStartLength(
                       primitiveSource.length,
-                      primitiveSource.length + operatorSource.length,
+                      operatorSource.length,
                     ),
                   ),
                 ),
@@ -101,7 +101,7 @@ void main() {
     });
 
     group('navigation', () {
-      forAllPrimitives(tester: (primitiveSource, primitiveFactory) {
+      forPrimitives(tester: (primitiveSource, primitiveFactory) {
         forAll<String>(
           table: validIdentifiers,
           tester: (identifier) {
@@ -111,22 +111,107 @@ void main() {
                 target: primitiveFactory(0),
                 dot: OperatorToken(
                   OperatorTokenType.dot,
-                  span: SourceSpan(
-                    primitiveSource.length,
-                    primitiveSource.length + 1,
-                  ),
+                  span: SourceSpan.fromStartLength(primitiveSource.length, 1),
                 ),
                 name: IdentifierToken(
                   identifier,
-                  span: SourceSpan(
+                  span: SourceSpan.fromStartLength(
                     primitiveSource.length + 1,
-                    primitiveSource.length + 1 + identifier.length,
+                    identifier.length,
                   ),
                 ),
               ),
             );
           },
         );
+      });
+    });
+
+    group('invocation', () {
+      group('positional', () {
+        forPrimitives(tester: (targetSource, targetFactory) {
+          group('0 args', () {
+            testExpressionParser(
+              '$targetSource()',
+              expression: InvocationExpression(
+                target: targetFactory(0),
+                leftParenthesis: OperatorToken(
+                  OperatorTokenType.lparen,
+                  span: SourceSpan.fromStartLength(targetSource.length, 1),
+                ),
+                arguments: [],
+                rightParenthesis: OperatorToken(
+                  OperatorTokenType.rparen,
+                  span: SourceSpan.fromStartLength(
+                    targetSource.length + 1,
+                    1,
+                  ),
+                ),
+              ),
+            );
+          });
+
+          forPrimitives(tester: (arg1Source, arg1Factory) {
+            group('1 args', () {
+              testExpressionParser(
+                '$targetSource($arg1Source)',
+                expression: InvocationExpression(
+                  target: targetFactory(0),
+                  leftParenthesis: OperatorToken(
+                    OperatorTokenType.lparen,
+                    span: SourceSpan.fromStartLength(targetSource.length, 1),
+                  ),
+                  arguments: [
+                    Argument(expression: arg1Factory(targetSource.length + 1)),
+                  ],
+                  rightParenthesis: OperatorToken(
+                    OperatorTokenType.rparen,
+                    span: SourceSpan.fromStartLength(
+                      targetSource.length + 1 + arg1Source.length,
+                      1,
+                    ),
+                  ),
+                ),
+              );
+            });
+
+            group('2 args', () {
+              forPrimitives(tester: (arg2Source, arg2Factory) {
+                testExpressionParser(
+                  '$targetSource($arg1Source, $arg2Source)',
+                  expression: InvocationExpression(
+                    target: targetFactory(0),
+                    leftParenthesis: OperatorToken(
+                      OperatorTokenType.lparen,
+                      span: SourceSpan.fromStartLength(targetSource.length, 1),
+                    ),
+                    arguments: [
+                      Argument(
+                        expression: arg1Factory(targetSource.length + 1),
+                      ),
+                      Argument(
+                        expression: arg2Factory(
+                          targetSource.length + 1 + arg1Source.length + 2,
+                        ),
+                      ),
+                    ],
+                    rightParenthesis: OperatorToken(
+                      OperatorTokenType.rparen,
+                      span: SourceSpan.fromStartLength(
+                        targetSource.length +
+                            1 +
+                            arg1Source.length +
+                            2 +
+                            arg2Source.length,
+                        1,
+                      ),
+                    ),
+                  ),
+                );
+              });
+            });
+          });
+        });
       });
     });
   });
@@ -143,7 +228,7 @@ void main() {
         },
         tester: (operatorSource, operatorType) {
           group(operatorType.toString(), () {
-            forAllPrimitives(tester: (primitiveSource, primitiveFactory) {
+            forPrimitives(tester: (primitiveSource, primitiveFactory) {
               testExpressionParser(
                 '$operatorSource$primitiveSource',
                 expression: PrefixExpression(
@@ -163,9 +248,13 @@ void main() {
 }
 
 // TODO(JonasWanke): negative literals
-final validDecIntegerLiterals = {
+final someValidDecIntegerLiterals = {
   '0': 0,
   '1': 1,
+  '1000': 1000,
+};
+final validDecIntegerLiterals = {
+  ...someValidDecIntegerLiterals,
   '01': 1,
   '2': 2,
   '10': 10,
@@ -173,14 +262,16 @@ final validDecIntegerLiterals = {
   '100': 100,
   '10_0': 100,
   '1_0_0': 100,
-  '1000': 1000,
   '1_000': 1000,
 };
-final validHexIntegerLiterals = {
+final someValidHexIntegerLiterals = {
   '0x0': 0,
+  '0x10': 0x10,
+};
+final validHexIntegerLiterals = {
+  ...someValidHexIntegerLiterals,
   '0x1': 1,
   '0x2': 2,
-  '0x10': 0x10,
   '0x1_0': 0x10,
   '0x100': 0x100,
   '0x10_0': 0x100,
@@ -188,10 +279,13 @@ final validHexIntegerLiterals = {
   '0x1000': 0x1000,
   '0x1_000': 0x1000,
 };
-final validBinIntegerLiterals = {
+final someValidBinIntegerLiterals = {
   '0b0': 0x0,
-  '0b1': 0x1,
   '0b10': 0x2,
+};
+final validBinIntegerLiterals = {
+  ...someValidBinIntegerLiterals,
+  '0b1': 0x1,
   '0b1_0': 0x2,
   '0b100': 0x4,
   '0b10_0': 0x4,
@@ -199,29 +293,40 @@ final validBinIntegerLiterals = {
   '0b1000': 0x8,
   '0b1_000': 0x8,
 };
+final someValidIntegerLiterals = {
+  ...someValidDecIntegerLiterals,
+  ...someValidHexIntegerLiterals,
+  ...someValidHexIntegerLiterals,
+};
 final validIntegerLiterals = {
   ...validDecIntegerLiterals,
   ...validHexIntegerLiterals,
   ...validHexIntegerLiterals,
 };
-final validBooleanLiterals = {
+final someValidBooleanLiterals = {
   'true': true,
+};
+final validBooleanLiterals = {
+  ...someValidBooleanLiterals,
   'false': false,
 };
-final validIdentifiers = [
+final someValidIdentifiers = [
   'a',
+  'A123',
+  '_',
+];
+final validIdentifiers = [
+  ...someValidIdentifiers,
   'a123',
   'aa',
   'aa123',
   'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa123',
   'A',
-  'A123',
   'AA',
   'AA123',
   'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
   'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA123',
-  '_',
   '_123',
   '__',
   '__123',
@@ -235,11 +340,11 @@ typedef PrimitiveTester = void Function(
   PrimitiveFactory primitiveFactory,
 );
 @isTestGroup
-void forAllPrimitives({@required PrimitiveTester tester}) {
+void forPrimitives({@required PrimitiveTester tester}) {
   assert(tester != null);
 
   final integerLiterals =
-      validIntegerLiterals.map<String, PrimitiveFactory>((source, value) {
+      someValidIntegerLiterals.map<String, PrimitiveFactory>((source, value) {
     return MapEntry(
       source,
       (offset) => Literal<int>(
@@ -251,7 +356,7 @@ void forAllPrimitives({@required PrimitiveTester tester}) {
     );
   });
   final booleanLiterals =
-      validBooleanLiterals.map<String, PrimitiveFactory>((source, value) {
+      someValidBooleanLiterals.map<String, PrimitiveFactory>((source, value) {
     return MapEntry(
       source,
       (offset) => Literal<bool>(
@@ -263,7 +368,7 @@ void forAllPrimitives({@required PrimitiveTester tester}) {
     );
   });
   final identifierLiterals = Map<String, PrimitiveFactory>.fromIterable(
-    validIdentifiers,
+    someValidIdentifiers,
     value: (dynamic source) => (offset) {
       return Identifier(
         IdentifierToken(

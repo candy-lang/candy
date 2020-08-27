@@ -42,7 +42,7 @@ class ParserGrammar {
           return InvocationExpression(
             target: expression,
             leftParenthesis: postfix.first as OperatorToken,
-            arguments: postfix.sublist(1, postfix.length - 2) as List<Argument>,
+            arguments: postfix.sublist(1, postfix.length - 1).cast<Argument>(),
             rightParenthesis: postfix.last as OperatorToken,
           );
         },
@@ -172,6 +172,7 @@ class ParserGrammar {
           (LexerGrammar.NLs & LexerGrammar.COMMA).optional())
       .optional()
       .map<List<Argument>>((value) {
+    if (value == null) return [];
     return [value[1] as Argument, ...value[2] as List<Argument>];
   });
 
