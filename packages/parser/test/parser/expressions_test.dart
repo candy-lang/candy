@@ -45,7 +45,7 @@ void main() {
       'identifiers',
       table: Map.fromIterable(validIdentifiers),
       nodeMapper: (value, fullSpan) =>
-          Identifier(SimpleIdentifierToken(value, span: fullSpan)),
+          Identifier(IdentifierToken(value, span: fullSpan)),
     );
   });
 
@@ -116,7 +116,7 @@ void main() {
                     primitiveSource.length + 1,
                   ),
                 ),
-                name: SimpleIdentifierToken(
+                name: IdentifierToken(
                   identifier,
                   span: SourceSpan(
                     primitiveSource.length + 1,
@@ -266,7 +266,7 @@ void forAllPrimitives({@required PrimitiveTester tester}) {
     validIdentifiers,
     value: (dynamic source) => (offset) {
       return Identifier(
-        SimpleIdentifierToken(
+        IdentifierToken(
           source as String,
           span: SourceSpan(0, (source as String).length).plus(offset),
         ),

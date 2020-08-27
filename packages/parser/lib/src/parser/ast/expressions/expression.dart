@@ -21,7 +21,7 @@ abstract class Literal<T> extends Expression implements _$Literal<T> {
 
 @freezed
 abstract class Identifier extends Expression implements _$Identifier {
-  const factory Identifier(SimpleIdentifierToken value) = _Identifier;
+  const factory Identifier(IdentifierToken value) = _Identifier;
   const Identifier._();
 
   @override
@@ -110,7 +110,7 @@ abstract class NavigationExpression extends Expression
   const factory NavigationExpression({
     @required Expression target,
     @required OperatorToken dot,
-    @required SimpleIdentifierToken name,
+    @required IdentifierToken name,
   }) = _NavigationExpression;
   const NavigationExpression._();
 
@@ -143,7 +143,7 @@ abstract class InvocationExpression extends Expression
 @freezed
 abstract class Argument extends AstNode implements _$Argument {
   const factory Argument({
-    SimpleIdentifierToken name,
+    IdentifierToken name,
     OperatorToken equals,
     @required Expression expression,
   }) = _Argument;

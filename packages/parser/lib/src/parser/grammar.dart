@@ -32,7 +32,7 @@ class ParserGrammar {
           return NavigationExpression(
             target: expression,
             dot: postfix.first as OperatorToken,
-            name: postfix[1] as SimpleIdentifierToken,
+            name: postfix[1] as IdentifierToken,
           );
         },
       )
@@ -144,7 +144,7 @@ class ParserGrammar {
       .map<List<SyntacticEntity>>((value) {
     return [
       value[1] as OperatorToken, // dot
-      value[3] as SimpleIdentifierToken, // name
+      value[3] as IdentifierToken, // name
     ];
   });
 
@@ -185,7 +185,7 @@ class ParserGrammar {
           expression)
       .map<Argument>((value) {
     return Argument(
-      name: (value[1] as List<dynamic>)?.first as SimpleIdentifierToken,
+      name: (value[1] as List<dynamic>)?.first as IdentifierToken,
       equals: (value[1] as List<dynamic>)?.elementAt(2) as OperatorToken,
       expression: value[3] as Expression,
     );

@@ -17,12 +17,11 @@ abstract class OperatorToken extends Token with _$OperatorToken {
 }
 
 @freezed
-abstract class SimpleIdentifierToken extends Token
-    with _$SimpleIdentifierToken {
-  const factory SimpleIdentifierToken(
+abstract class IdentifierToken extends Token with _$IdentifierToken {
+  const factory IdentifierToken(
     String name, {
     @required SourceSpan span,
-  }) = _SimpleIdentifierToken;
+  }) = _IdentifierToken;
 }
 
 abstract class LiteralToken<T> extends Token {
