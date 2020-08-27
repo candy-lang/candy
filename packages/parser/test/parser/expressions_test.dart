@@ -129,8 +129,8 @@ void main() {
 
     group('invocation', () {
       group('positional', () {
-        forPrimitives(tester: (targetSource, targetFactory) {
-          group('0 args', () {
+        group('0 args', () {
+          forPrimitives(tester: (targetSource, targetFactory) {
             testExpressionParser(
               '$targetSource()',
               expression: InvocationExpression(
@@ -150,9 +150,11 @@ void main() {
               ),
             );
           });
+        });
 
-          forPrimitives(tester: (arg1Source, arg1Factory) {
-            group('1 args', () {
+        group('1 arg', () {
+          forPrimitives(tester: (targetSource, targetFactory) {
+            forPrimitives(tester: (arg1Source, arg1Factory) {
               testExpressionParser(
                 '$targetSource($arg1Source)',
                 expression: InvocationExpression(
@@ -174,8 +176,12 @@ void main() {
                 ),
               );
             });
+          });
+        });
 
-            group('2 args', () {
+        group('2 args', () {
+          forPrimitives(tester: (targetSource, targetFactory) {
+            forPrimitives(tester: (arg1Source, arg1Factory) {
               forPrimitives(tester: (arg2Source, arg2Factory) {
                 testExpressionParser(
                   '$targetSource($arg1Source, $arg2Source)',
@@ -295,13 +301,12 @@ final validBinIntegerLiterals = {
 };
 final someValidIntegerLiterals = {
   ...someValidDecIntegerLiterals,
-  ...someValidHexIntegerLiterals,
-  ...someValidHexIntegerLiterals,
+  // Hexadecimal and binary are completely removed for performance reasons.
 };
 final validIntegerLiterals = {
   ...validDecIntegerLiterals,
   ...validHexIntegerLiterals,
-  ...validHexIntegerLiterals,
+  ...validBinIntegerLiterals,
 };
 final someValidBooleanLiterals = {
   'true': true,
