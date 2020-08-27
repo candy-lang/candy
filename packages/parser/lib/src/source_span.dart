@@ -14,6 +14,12 @@ class SourceSpan {
   final int end;
   int get length => end - start;
 
+  SourceSpan plus(int offset) {
+    assert(offset != null);
+
+    return SourceSpan(start + offset, end + offset);
+  }
+
   @override
   String toString() => '$start–$end';
 
