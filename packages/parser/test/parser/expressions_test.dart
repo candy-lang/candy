@@ -100,14 +100,49 @@ void main() {
       nodeMapper: (value, fullSpan) =>
           Literal(BooleanLiteralToken(value, span: fullSpan)),
     );
-    tableTestExpressionParser<bool, Literal<bool>>(
-      'BooleanLiteral',
-      table: {
-        'true': true,
-        'false': false,
-      },
-      nodeMapper: (value, fullSpan) =>
-          Literal(BooleanLiteralToken(value, span: fullSpan)),
+  });
+
+  group('grouping', () {
+    group('literals', () {
+      tableTestExpressionParser<LiteralToken<int>, ParenthesizedExpression>(
+        'integer',
+        table: {
+          '(0)': IntegerLiteralToken(0, span: SourceSpan(1, 2)),
+          '(1)': IntegerLiteralToken(1, span: SourceSpan(1, 2)),
+          '(01)': IntegerLiteralToken(1, span: SourceSpan(1, 3)),
+          '(2)': IntegerLiteralToken(2, span: SourceSpan(1, 2)),
+          '(10)': IntegerLiteralToken(10, span: SourceSpan(1, 3)),
+          '(1_0)': IntegerLiteralToken(10, span: SourceSpan(1, 4)),
+          '(100)': IntegerLiteralToken(100, span: SourceSpan(1, 4)),
+        },
+        nodeMapper: (value, fullSpan) => ParenthesizedExpression(
+          leftParenthesis:
+              OperatorToken(OperatorTokenType.lparen, span: SourceSpan(0, 1)),
+          expression: Literal<int>(value),
+          rightParenthesis: OperatorToken(
+            OperatorTokenType.rparen,
+            span: SourceSpan(value.span.end, value.span.end + 1),
+          ),
+        ),
+      );
+    });
+    tableTestExpressionParser<String, ParenthesizedExpression>(
+      'identifiers',
+      table: Map.fromIterable(
+        <String>['a', 'a123', 'A', 'A123', '_', '_123'],
+        key: (dynamic v) => '($v)',
+      ),
+      nodeMapper: (value, fullSpan) => ParenthesizedExpression(
+        leftParenthesis:
+            OperatorToken(OperatorTokenType.lparen, span: SourceSpan(0, 1)),
+        expression: Identifier(
+          SimpleIdentifierToken(value, span: SourceSpan(1, value.length + 1)),
+        ),
+        rightParenthesis: OperatorToken(
+          OperatorTokenType.rparen,
+          span: SourceSpan(value.length + 1, value.length + 2),
+        ),
+      ),
     );
   });
 }

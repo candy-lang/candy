@@ -28,21 +28,24 @@ abstract class Identifier extends Expression implements _$Identifier {
   Iterable<SyntacticEntity> get children => [value];
 }
 
-class ParenthesizedExpression extends Expression {
-  const ParenthesizedExpression(
-    this.leftParenthesis,
-    this.expression,
-    this.rightParenthesis,
-  )   : assert(leftParenthesis != null),
-        assert(expression != null),
-        assert(rightParenthesis != null);
+@freezed
+abstract class ParenthesizedExpression extends Expression
+    implements _$ParenthesizedExpression {
+  const factory ParenthesizedExpression({
+    @required OperatorToken leftParenthesis,
+    @required Expression expression,
+    @required OperatorToken rightParenthesis,
+  }) = _ParenthesizedExpression;
+  const ParenthesizedExpression._();
 
-  final OperatorToken leftParenthesis;
-  final Expression expression;
-  final OperatorToken rightParenthesis;
+  // assert(leftParenthesis.type == OperatorTokenType.lparen),
 
   @override
-  Iterable<SyntacticEntity> get children => [expression];
+  Iterable<SyntacticEntity> get children => [
+        leftParenthesis,
+        expression,
+        rightParenthesis,
+      ];
 }
 
 abstract class OperatorExpression extends Expression {

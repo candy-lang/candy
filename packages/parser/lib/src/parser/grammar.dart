@@ -15,8 +15,10 @@ class ParserGrammar {
     _isInitialized = true;
 
     final builder = ExpressionBuilder()
-      ..primitive(literalConstant)
-      ..primitive(LexerGrammar.Identifier.map((t) => Identifier(t)))
+      ..primitive(
+          // ignore: unnecessary_cast, Without the cast the compiler complains…
+          (literalConstant as Parser<Expression>) |
+              LexerGrammar.Identifier.map((t) => Identifier(t)))
       // grouping
       ..wrapper(LexerGrammar.LPAREN, LexerGrammar.RPAREN)
       // unary postfix
@@ -204,8 +206,13 @@ extension on ExpressionBuilder {
     group().wrapper<OperatorToken, Expression>(
       left,
       right,
-      (left, expression, right) =>
-          ParenthesizedExpression(left, expression, right),
+      (left, expression, right) {
+        return ParenthesizedExpression(
+          leftParenthesis: left,
+          expression: expression,
+          rightParenthesis: right,
+        );
+      },
     );
   }
 
