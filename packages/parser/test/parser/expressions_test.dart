@@ -1,14 +1,40 @@
 import 'package:meta/meta.dart';
 import 'package:parser/src/lexer/lexer.dart';
-import 'package:parser/src/parser/ast/expressions/literal.dart';
-import 'package:parser/src/parser/ast/node.dart';
+import 'package:parser/src/parser/ast/expressions/expression.dart';
 import 'package:parser/src/parser/grammar.dart';
 import 'package:parser/src/source_span.dart';
+import 'package:parser/src/syntactic_entity.dart';
 import 'package:petitparser/petitparser.dart';
 import 'package:test/test.dart';
 
 void main() {
   setUpAll(ParserGrammar.init);
+
+  tableTestExpressionParser<String, Identifier>(
+    'identifiers',
+    table: Map.fromIterable(<String>[
+      'a',
+      'a123',
+      'aa',
+      'aa123',
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa123',
+      'A',
+      'A123',
+      'AA',
+      'AA123',
+      'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+      'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA123',
+      '_',
+      '_123',
+      '__',
+      '__123',
+      '_______________________________',
+      '_______________________________123',
+    ]),
+    nodeMapper: (value, fullSpan) =>
+        Identifier(SimpleIdentifierToken(value, span: fullSpan)),
+  );
 
   group('literals', () {
     group('IntegerLiteral', () {
@@ -28,7 +54,7 @@ void main() {
           '1000': 1000,
           '1_000': 1000,
         },
-        astMapper: (value, fullSpan) =>
+        nodeMapper: (value, fullSpan) =>
             Literal(IntegerLiteralToken(value, span: fullSpan)),
       );
       tableTestExpressionParser<int, Literal<int>>(
@@ -45,7 +71,7 @@ void main() {
           '0x1000': 0x1000,
           '0x1_000': 0x1000,
         },
-        astMapper: (value, fullSpan) =>
+        nodeMapper: (value, fullSpan) =>
             Literal(IntegerLiteralToken(value, span: fullSpan)),
       );
       tableTestExpressionParser<int, Literal<int>>(
@@ -61,7 +87,7 @@ void main() {
           '0b1000': 0x8,
           '0b1_000': 0x8,
         },
-        astMapper: (value, fullSpan) =>
+        nodeMapper: (value, fullSpan) =>
             Literal(IntegerLiteralToken(value, span: fullSpan)),
       );
     });
@@ -71,7 +97,16 @@ void main() {
         'true': true,
         'false': false,
       },
-      astMapper: (value, fullSpan) =>
+      nodeMapper: (value, fullSpan) =>
+          Literal(BooleanLiteralToken(value, span: fullSpan)),
+    );
+    tableTestExpressionParser<bool, Literal<bool>>(
+      'BooleanLiteral',
+      table: {
+        'true': true,
+        'false': false,
+      },
+      nodeMapper: (value, fullSpan) =>
           Literal(BooleanLiteralToken(value, span: fullSpan)),
     );
   });
@@ -94,10 +129,10 @@ void tableTest<T, R>(
 }
 
 @isTestGroup
-void tableTestParser<R, N extends AstNode>(
+void tableTestParser<R, N extends SyntacticEntity>(
   String description, {
   @required Map<String, R> table,
-  @required N Function(R raw, SourceSpan fullSpan) astMapper,
+  @required N Function(R raw, SourceSpan fullSpan) nodeMapper,
   @required Parser parser,
 }) {
   assert(table != null);
@@ -106,7 +141,7 @@ void tableTestParser<R, N extends AstNode>(
   tableTest<String, N>(
     description,
     table: table.map((key, value) {
-      return MapEntry(key, astMapper(value, SourceSpan(0, key.length)));
+      return MapEntry(key, nodeMapper(value, SourceSpan(0, key.length)));
     }),
     converter: (source) {
       final result = parser.parse(source);
@@ -122,15 +157,15 @@ void tableTestParser<R, N extends AstNode>(
 }
 
 @isTestGroup
-void tableTestExpressionParser<R, N extends AstNode>(
+void tableTestExpressionParser<R, N extends SyntacticEntity>(
   String description, {
   @required Map<String, R> table,
-  @required N Function(R raw, SourceSpan fullSpan) astMapper,
+  @required N Function(R raw, SourceSpan fullSpan) nodeMapper,
 }) {
   tableTestParser<R, N>(
     description,
     table: table,
-    astMapper: astMapper,
+    nodeMapper: nodeMapper,
     parser: ParserGrammar.expression,
   );
 }

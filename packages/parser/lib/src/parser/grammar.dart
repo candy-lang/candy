@@ -6,7 +6,6 @@ import '../lexer/lexer.dart';
 import '../syntactic_entity.dart';
 import '../utils.dart';
 import 'ast/expressions/expression.dart';
-import 'ast/expressions/literal.dart';
 
 // ignore: avoid_classes_with_only_static_members
 @immutable
@@ -17,6 +16,7 @@ class ParserGrammar {
 
     final builder = ExpressionBuilder()
       ..primitive(literalConstant)
+      ..primitive(LexerGrammar.Identifier.map((t) => Identifier(t)))
       // grouping
       ..wrapper(LexerGrammar.LPAREN, LexerGrammar.RPAREN)
       // unary postfix
@@ -154,7 +154,7 @@ class ParserGrammar {
   });
 
   static final valueArgument = (LexerGrammar.NLs &
-          (simpleIdentifier &
+          (LexerGrammar.Identifier &
                   LexerGrammar.NLs &
                   LexerGrammar.EQUALS &
                   LexerGrammar.NLs)
@@ -194,14 +194,6 @@ class ParserGrammar {
     LexerGrammar.IntegerLiteral.map((l) => Literal<int>(l)),
     LexerGrammar.BooleanLiteral.map((l) => Literal<bool>(l)),
   ]);
-
-  // SECTION: identifiers
-
-  static final simpleIdentifier = LexerGrammar.Identifier;
-
-  // TODO
-  static final identifier = simpleIdentifier &
-      (LexerGrammar.NLs & LexerGrammar.DOT & simpleIdentifier).star();
 }
 
 extension on ExpressionBuilder {

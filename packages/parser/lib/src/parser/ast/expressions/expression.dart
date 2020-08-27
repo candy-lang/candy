@@ -10,6 +10,24 @@ abstract class Expression extends AstNode {
   const Expression();
 }
 
+@freezed
+abstract class Literal<T> extends Expression implements _$Literal<T> {
+  const factory Literal(LiteralToken<T> value) = _Literal<T>;
+  const Literal._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [value];
+}
+
+@freezed
+abstract class Identifier extends Expression implements _$Identifier {
+  const factory Identifier(SimpleIdentifierToken value) = _Identifier;
+  const Identifier._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [value];
+}
+
 class ParenthesizedExpression extends Expression {
   const ParenthesizedExpression(
     this.leftParenthesis,
