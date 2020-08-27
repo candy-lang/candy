@@ -22,11 +22,20 @@ class ParserGrammar {
       // grouping
       ..wrapper(LexerGrammar.LPAREN, LexerGrammar.RPAREN)
       // unary postfix
-      // TODO(JonasWanke): add navigation
       ..postfix(LexerGrammar.PLUS_PLUS |
           LexerGrammar.MINUS_MINUS |
           LexerGrammar.QUESTION |
           LexerGrammar.EXCLAMATION)
+      ..complexPostfix<List<SyntacticEntity>, NavigationExpression>(
+        navigationPostfix,
+        mapper: (expression, postfix) {
+          return NavigationExpression(
+            target: expression,
+            dot: postfix.first as OperatorToken,
+            name: postfix[1] as SimpleIdentifierToken,
+          );
+        },
+      )
       ..complexPostfix<List<SyntacticEntity>, InvocationExpression>(
         invocationPostfix,
         mapper: (expression, postfix) {
@@ -127,6 +136,17 @@ class ParserGrammar {
 
   static final _expression = undefined<dynamic>();
   static Parser<dynamic> get expression => _expression;
+
+  static final navigationPostfix = (LexerGrammar.NLs &
+          LexerGrammar.DOT &
+          LexerGrammar.NLs &
+          LexerGrammar.Identifier)
+      .map<List<SyntacticEntity>>((value) {
+    return [
+      value[1] as OperatorToken, // dot
+      value[3] as SimpleIdentifierToken, // name
+    ];
+  });
 
   // TODO(JonasWanke): typeArguments? valueArguments? annotatedLambda | typeArguments? valueArguments
   static final invocationPostfix = (LexerGrammar.LPAREN &

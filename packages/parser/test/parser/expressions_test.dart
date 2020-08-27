@@ -99,6 +99,36 @@ void main() {
         },
       );
     });
+
+    group('navigation', () {
+      forAllPrimitives(tester: (primitiveSource, primitiveFactory) {
+        forAll<String>(
+          table: validIdentifiers,
+          tester: (identifier) {
+            testExpressionParser(
+              '$primitiveSource.$identifier',
+              expression: NavigationExpression(
+                target: primitiveFactory(0),
+                dot: OperatorToken(
+                  OperatorTokenType.dot,
+                  span: SourceSpan(
+                    primitiveSource.length,
+                    primitiveSource.length + 1,
+                  ),
+                ),
+                name: SimpleIdentifierToken(
+                  identifier,
+                  span: SourceSpan(
+                    primitiveSource.length + 1,
+                    primitiveSource.length + 1 + identifier.length,
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      });
+    });
   });
 
   group('unary prefix', () {

@@ -105,6 +105,20 @@ abstract class BinaryExpression extends OperatorExpression
 }
 
 @freezed
+abstract class NavigationExpression extends Expression
+    implements _$NavigationExpression {
+  const factory NavigationExpression({
+    @required Expression target,
+    @required OperatorToken dot,
+    @required SimpleIdentifierToken name,
+  }) = _NavigationExpression;
+  const NavigationExpression._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [target, dot, name];
+}
+
+@freezed
 abstract class InvocationExpression extends Expression
     implements _$InvocationExpression {
   const factory InvocationExpression({
