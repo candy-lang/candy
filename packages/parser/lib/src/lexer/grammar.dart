@@ -125,7 +125,7 @@ class LexerGrammar {
 
   // TODO(JonasWanke): disallow leading/trailing underscore
   // formerly: DecDigit & DecDigitOrSeparator.star() & DecDigit | DecDigit
-  static final DecLiteral = _DecDigitOrSeparator.star().tokenizeInteger();
+  static final DecLiteral = _DecDigitOrSeparator.plus().tokenizeInteger();
 
   // TODO(JonasWanke): disallow leading/trailing underscore
   // formerly: DecDigit & DecDigitOrSeparator.star() & DecDigit | DecDigit
@@ -138,7 +138,7 @@ class LexerGrammar {
 
   // TODO(JonasWanke): disallow leading/trailing underscore
   // formerly: _hexLiteralPrefix & _HexDigit & (_HexDigitOrSeparator.star() & _HexDigit).optional()
-  static final HexLiteral = (_hexLiteralPrefix & _HexDigitOrSeparator.star())
+  static final HexLiteral = (_hexLiteralPrefix & _HexDigitOrSeparator.plus())
       .tokenizeInteger(radix: 16, hasPrefix: true);
   static final _hexLiteralPrefix = char('0') & (char('x') | char('X'));
 
@@ -151,7 +151,7 @@ class LexerGrammar {
 
   // TODO(JonasWanke): disallow leading/trailing underscore
   // formerly: _binLiteralPrefix & _BinDigit & (_BinDigitOrSeparator.star() & _BinDigit).optional()
-  static final BinLiteral = (_binLiteralPrefix & _BinDigitOrSeparator.star())
+  static final BinLiteral = (_binLiteralPrefix & _BinDigitOrSeparator.plus())
       .tokenizeInteger(radix: 2, hasPrefix: true);
   static final _binLiteralPrefix = char('0') & (char('b') | char('B'));
 
@@ -209,4 +209,6 @@ extension on Parser<String> {
 
   Parser<String> star() =>
       PossessiveRepeatingParser(this, 0, unbounded).map((list) => list.join());
+  Parser<String> plus() =>
+      PossessiveRepeatingParser(this, 1, unbounded).map((list) => list.join());
 }

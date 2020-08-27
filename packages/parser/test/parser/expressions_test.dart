@@ -74,6 +74,18 @@ void main() {
         }),
       );
     });
+    tableTestExpressionParser<Literal<bool>>(
+      'BooleanLiteral',
+      table: {
+        'true': true,
+        'false': false,
+      }.map((key, value) {
+        final newValue = Literal(
+          BooleanLiteralToken(value, span: SourceSpan(0, key.length)),
+        );
+        return MapEntry(key, newValue);
+      }),
+    );
   });
 }
 

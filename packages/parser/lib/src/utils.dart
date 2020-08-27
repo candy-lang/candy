@@ -1,4 +1,4 @@
-import 'package:petitparser/petitparser.dart';
+import 'package:petitparser/petitparser.dart' hide ChoiceParser;
 
 /// Combines the [Object.hashCode] values of an arbitrary number of objects
 /// from an [Iterable] into one value. This function will return the same
@@ -22,7 +22,7 @@ int hashList(Iterable<Object> arguments) {
 extension CandyParser<T> on Parser<T> {
   Parser<String> ignore() => map((_) => '');
 
-  Parser<T> operator |(Parser<T> other) => _ChoiceParser([this, other]);
+  Parser<T> operator |(Parser<T> other) => ChoiceParser([this, other]);
 }
 
 /// Copy of [ListParser] with proper type arguments.
@@ -44,9 +44,9 @@ abstract class _ListParser<T> extends Parser<T> {
   }
 }
 
-/// Copy of [ChoiceParser] with proper type arguments.
-class _ChoiceParser<T> extends _ListParser<T> {
-  _ChoiceParser(Iterable<Parser<T>> children) : super(children) {
+/// Copy of PetitParser's [ChoiceParser] with proper type arguments.
+class ChoiceParser<T> extends _ListParser<T> {
+  ChoiceParser(Iterable<Parser<T>> children) : super(children) {
     if (children.isEmpty) {
       throw ArgumentError('Choice parser cannot be empty.');
     }
@@ -77,5 +77,5 @@ class _ChoiceParser<T> extends _ListParser<T> {
   }
 
   @override
-  _ChoiceParser<T> copy() => _ChoiceParser(children);
+  ChoiceParser<T> copy() => ChoiceParser<T>(children);
 }

@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
-import 'package:petitparser/petitparser.dart' hide ChoiceParserExtension;
+import 'package:petitparser/petitparser.dart'
+    hide ChoiceParser, ChoiceParserExtension;
 
 import '../lexer/lexer.dart';
 import '../syntactic_entity.dart';
@@ -189,11 +190,10 @@ class ParserGrammar {
     ];
   });
 
-  static final literalConstant =
-      // ignore: unnecessary_cast, Without the cast the compiler complains…
-      (LexerGrammar.IntegerLiteral.map((l) => Literal<int>(l))
-              as Parser<Literal<dynamic>>) |
-          LexerGrammar.BooleanLiteral.map((l) => Literal<bool>(l));
+  static final literalConstant = ChoiceParser<Literal<dynamic>>([
+    LexerGrammar.IntegerLiteral.map((l) => Literal<int>(l)),
+    LexerGrammar.BooleanLiteral.map((l) => Literal<bool>(l)),
+  ]);
 
   // SECTION: identifiers
 
