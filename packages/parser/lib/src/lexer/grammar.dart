@@ -123,9 +123,10 @@ class LexerGrammar {
 
   static final IntegerLiteral = HexLiteral | BinLiteral | DecLiteral;
 
-  // TODO(JonasWanke): disallow leading/trailing underscore
+  // TODO(JonasWanke): disallow trailing underscore
   // formerly: DecDigit & DecDigitOrSeparator.star() & DecDigit | DecDigit
-  static final DecLiteral = _DecDigitOrSeparator.plus().tokenizeInteger();
+  static final DecLiteral =
+      (_DecDigit & _DecDigitOrSeparator.star()).tokenizeInteger();
 
   // TODO(JonasWanke): disallow leading/trailing underscore
   // formerly: DecDigit & DecDigitOrSeparator.star() & DecDigit | DecDigit

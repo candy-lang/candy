@@ -42,7 +42,7 @@ class ParenthesizedExpression extends Expression {
   final OperatorToken rightParenthesis;
 
   @override
-  Iterable<AstNode> get children => [expression];
+  Iterable<SyntacticEntity> get children => [expression];
 }
 
 abstract class OperatorExpression extends Expression {
