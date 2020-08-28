@@ -648,6 +648,10 @@ This also provides what is known as Interface Delegation in Kotlin.
 - cross-boundary lazy
 - write-only property (`let settable onlyWriteable: Int`)
 - named, factory and delegating constructors
+- permissions for the executable and dependencies (network, file, etc.)
+- overloading classes/traits based on type parameters
+- use abstract class as trait by ignoring implementations depending on private fields
+- static initializer block
 - overflow operators
 - chained comparison
 - implicit multiplication: a literal number before an identifier creates an implicit multiplication: `2 apples` is equivalent to `2 * apples`
