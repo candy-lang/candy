@@ -394,22 +394,10 @@ void forPrimitives({@required PrimitiveTester tester}) {
 }
 
 @isTest
-void testExpressionParser(
-  String source, {
-  @required Expression expression,
-}) {
+void testExpressionParser(String source, {@required Expression expression}) {
   assert(expression != null);
 
-  test(source, () {
-    final result = ParserGrammar.expression.parse(source);
-    expect(result.isSuccess, isTrue);
-    expect(
-      result.position,
-      source.length,
-      reason: "Didn't match the whole input string.",
-    );
-    expect(result.value, equals(expression));
-  });
+  testParser(source, result: expression, parser: ParserGrammar.expression);
 }
 
 @isTestGroup

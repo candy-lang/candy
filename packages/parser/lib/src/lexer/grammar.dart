@@ -20,6 +20,8 @@ class LexerGrammar {
 
   // SECTION: separatorsAndOperations
 
+  static final Parser<void> SEMICOLON = char(';').ignore();
+
   static final DOT = _operator('.', OperatorTokenType.dot);
   static final COMMA = _operator(',', OperatorTokenType.comma);
 

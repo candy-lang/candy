@@ -26,6 +26,24 @@ void forAllMap<K, V>({
   table.forEach(tester);
 }
 
+@isTest
+void testParser<R>(
+  String source, {
+  @required R result,
+  @required Parser<R> parser,
+}) {
+  test(source, () {
+    final actual = parser.parse(source);
+    expect(actual.isSuccess, isTrue);
+    expect(
+      actual.position,
+      source.length,
+      reason: "Didn't match the whole input string.",
+    );
+    expect(actual.value, equals(result));
+  });
+}
+
 @isTestGroup
 void tableTestParser<R, N extends SyntacticEntity>(
   String description, {

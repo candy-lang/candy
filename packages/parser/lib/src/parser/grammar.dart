@@ -6,6 +6,7 @@ import '../lexer/lexer.dart';
 import '../syntactic_entity.dart';
 import '../utils.dart';
 import 'ast/expressions/expression.dart';
+import 'ast/statements.dart';
 
 // ignore: avoid_classes_with_only_static_members
 @immutable
@@ -14,6 +15,36 @@ class ParserGrammar {
     assert(!_isInitialized, 'Already initialized.');
     _isInitialized = true;
 
+    _initExpression();
+  }
+
+  static bool _isInitialized = false;
+
+  // SECTION: statements
+
+  static final Parser<List<Statement>> statements =
+      ((statement & (semis & statement).map((v) => v[1] as Statement).star())
+                  .map((v) => [v[0] as Statement, ...v[1] as List<Statement>])
+                  .optional() &
+              semis.optional())
+          .map((v) => v[0] as List<Statement> ?? []);
+  static final Parser<Statement> statement =
+      expression.map($Statement.expression);
+
+  // ignore: unnecessary_cast
+  static final Parser<void> semi = ((LexerGrammar.SEMICOLON | LexerGrammar.NL) &
+          LexerGrammar.NL.star() as Parser<void>) |
+      endOfInput();
+  static final Parser<void> semis =
+      // ignore: unnecessary_cast
+      ((LexerGrammar.SEMICOLON | LexerGrammar.NL).plus() as Parser<void>) |
+          endOfInput();
+
+  // SECTION: expressions
+
+  static final _expression = undefined<Expression>();
+  static Parser<Expression> get expression => _expression;
+  static void _initExpression() {
     final builder = ExpressionBuilder()
       ..primitive(
           // ignore: unnecessary_cast, Without the cast the compiler complains…
@@ -129,13 +160,8 @@ class ParserGrammar {
           LexerGrammar.GREATER_GREATER_EQUALS |
           LexerGrammar.GREATER_GREATER_GREATER_EQUALS);
 
-    _expression.set(builder.build());
+    _expression.set(builder.build().map((dynamic e) => e as Expression));
   }
-
-  static bool _isInitialized = false;
-
-  static final _expression = undefined<dynamic>();
-  static Parser<dynamic> get expression => _expression;
 
   static final navigationPostfix = (LexerGrammar.NLs &
           LexerGrammar.DOT &
@@ -162,19 +188,9 @@ class ParserGrammar {
   });
 
   static final valueArguments = (LexerGrammar.NLs &
-          valueArgument &
-          (LexerGrammar.NLs &
-                  LexerGrammar.COMMA &
-                  LexerGrammar.NLs &
-                  valueArgument)
-              .map<Argument>((value) => value[3] as Argument)
-              .star() &
-          (LexerGrammar.NLs & LexerGrammar.COMMA).optional())
-      .optional()
-      .map<List<Argument>>((value) {
-    if (value == null) return [];
-    return [value[1] as Argument, ...value[2] as List<Argument>];
-  });
+          valueArgument.commaSeparatedList().optional() &
+          LexerGrammar.NLs)
+      .map((value) => value[1] as List<Argument> ?? []);
 
   static final valueArgument = (LexerGrammar.NLs &
           (LexerGrammar.Identifier &
@@ -194,22 +210,14 @@ class ParserGrammar {
 
   static final indexingPostfix = (LexerGrammar.LSQUARE &
           LexerGrammar.NLs &
-          expression &
-          (LexerGrammar.NLs &
-                  LexerGrammar.COMMA &
-                  LexerGrammar.NLs &
-                  expression)
-              .map<Expression>((v) => v[3] as Expression)
-              .star() &
-          (LexerGrammar.NLs & LexerGrammar.COMMA).optional() &
+          expression.commaSeparatedList() &
           LexerGrammar.NLs &
           LexerGrammar.RSQUARE)
       .map<List<SyntacticEntity>>((value) {
     return [
       value[0] as OperatorToken, // leftSquareBracket
-      value[2] as Expression,
-      ...value[3] as List<Expression>,
-      value[6] as OperatorToken, // rightSquareBracket
+      ...value[2] as List<Expression>, // indices
+      value[4] as OperatorToken, // rightSquareBracket
     ];
   });
 
@@ -217,6 +225,19 @@ class ParserGrammar {
     LexerGrammar.IntegerLiteral.map((l) => Literal<int>(l)),
     LexerGrammar.BooleanLiteral.map((l) => Literal<bool>(l)),
   ]);
+}
+
+extension<T> on Parser<T> {
+  Parser<List<T>> commaSeparatedList() {
+    return (this &
+            (LexerGrammar.NLs & LexerGrammar.COMMA & LexerGrammar.NLs & this)
+                .map<T>((v) => v[3] as T)
+                .star() &
+            (LexerGrammar.NLs & LexerGrammar.COMMA).optional())
+        .map((value) {
+      return [value.first as T, ...value[1] as List<T>];
+    });
+  }
 }
 
 extension on ExpressionBuilder {
