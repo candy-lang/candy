@@ -27,17 +27,32 @@ class ParserGrammar {
                   .map((v) => [v[0] as Statement, ...v[1] as List<Statement>])
                   .optional() &
               semis.optional())
-          .map((v) => v[0] as List<Statement> ?? []);
+          .map((values) => values[0] as List<Statement> ?? []);
   static final Parser<Statement> statement =
       expression.map($Statement.expression);
 
+  static final block = (LexerGrammar.LCURL &
+          LexerGrammar.NLs &
+          statements &
+          LexerGrammar.NLs &
+          LexerGrammar.RCURL)
+      .map((values) => Block(
+            leftBrace: values.first as OperatorToken,
+            statements: values[2] as List<Statement>,
+            rightBrace: values[4] as OperatorToken,
+          ));
+
   // ignore: unnecessary_cast
-  static final Parser<void> semi = ((LexerGrammar.SEMICOLON | LexerGrammar.NL) &
-          LexerGrammar.NL.star() as Parser<void>) |
+  static final Parser<void> semi = (LexerGrammar.WS.optional() &
+          (LexerGrammar.SEMICOLON | LexerGrammar.NL) &
+          LexerGrammar.NLs as Parser<void>) |
       endOfInput();
   static final Parser<void> semis =
       // ignore: unnecessary_cast
-      ((LexerGrammar.SEMICOLON | LexerGrammar.NL).plus() as Parser<void>) |
+      ((LexerGrammar.WS.optional() &
+                  (LexerGrammar.SEMICOLON | LexerGrammar.NL) &
+                  LexerGrammar.WS.optional())
+              .plus() as Parser<void>) |
           endOfInput();
 
   // SECTION: expressions

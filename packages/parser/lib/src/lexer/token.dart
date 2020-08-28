@@ -66,6 +66,12 @@ enum OperatorTokenType {
   /// `]`
   rsquare,
 
+  /// `{`
+  lcurl,
+
+  /// `}`
+  rcurl,
+
   /// `++`
   plusPlus,
 
