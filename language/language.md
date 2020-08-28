@@ -343,33 +343,30 @@ The behavior of named/positional type arguments is the same as that of function 
 
 ### 8.1. Operators
 
-| Precedence   | Description             | Operators                                                                              | Associativity |
-| :----------- | :---------------------- | :------------------------------------------------------------------------------------- | :-----------: |
-| 22 (highest) | grouping                | `(expr)`                                                                               |       —       |
-| 21           | unary postfix           | `expr++` `expr--` `?` `!` `.identifier` `expr<types>(args)` `expr<types>[args]`        |               |
-| 20           | unary prefix            | `-expr` `!expr` `~expr` `++expr` `--expr` label                                        |       —       |
-| 19           | implicit multiplication | `number expr`                                                                          |       —       |
-| 18           | multiplicative          | `*` `/` `~/` `%`                                                                       | left to right |
-| 17           | additive                | `+` `-`                                                                                | left to right |
-| 16           | shift                   | `<<` `>>` `>>>`                                                                        | left to right |
-| 15           | bitwise and             | `&`                                                                                    | left to right |
-| 14           | bitwise xor             | `^`                                                                                    | left to right |
-| 13           | bitwise or              | `|`                                                                                    | left to right |
-| 12           | type check              | `as!` `as?`                                                                            | left to right |
-| 11           | range                   | `..`, `..=`                                                                            |               |
-| 10           | infix function          | `simpleIdentifier`                                                                     | left to right |
-| 9            | null coalescing         | `??`                                                                                   | left to right |
-| 8            | named checks            | `in` `!in` `is` `!is`                                                                  |               |
-| 7            | comparison              | `<` `<=` `>` `>=`                                                                      |               |
-| 6            | equality                | `==` `!=` `===` `!==`                                                                  |               |
-| 5            | logical and             | `&&`                                                                                   | left to right |
-| 4            | logical or              | `||`                                                                                   | left to right |
-| 3            | logical implication     | `->` `<-`                                                                              | left to right |
-| 2            | spread                  | `...`                                                                                  |               |
-| 1 (lowest)   | assignment              | `=` `*=` `/=` `~/=` `%=` `+=` `-=` `<<=` `>>=` `>>>=` `&=` `|=` `^=` `??=` `&&=` `||=` | right to left |
-
-- implicit multiplication: a literal number before an identifier creates an implicit multiplication: `2 apples` is equivalent to `2 * apples`
-  - something like `2 to -2` is equivalent to `2.to(-2)`, not `2 * to - 2`
+| Precedence   | Description         | Operators                                                                              | Associativity |
+| :----------- | :------------------ | :------------------------------------------------------------------------------------- | :-----------: |
+| 22 (highest) | primitive           | literals, identifiers                                                                  |       —       |
+| 21           | grouping            | `(expr)`                                                                               |       —       |
+| 20           | postfix             | `expr++` `expr--` `?` `!` `.identifier` `expr<types>(args)` `expr<types>[args]`        |               |
+| 19           | unary prefix        | `-expr` `!expr` `~expr` `++expr` `--expr` label                                        |       —       |
+| 18           | multiplicative      | `*` `/` `~/` `%`                                                                       | left to right |
+| 17           | additive            | `+` `-`                                                                                | left to right |
+| 16           | shift               | `<<` `>>` `>>>`                                                                        | left to right |
+| 15           | bitwise and         | `&`                                                                                    | left to right |
+| 14           | bitwise xor         | `^`                                                                                    | left to right |
+| 13           | bitwise or          | `|`                                                                                    | left to right |
+| 12           | type check          | `as!` `as?`                                                                            | left to right |
+| 11           | range               | `..`, `..=`                                                                            |               |
+| 10           | infix function      | `simpleIdentifier`                                                                     | left to right |
+| 9            | null coalescing     | `??`                                                                                   | left to right |
+| 8            | named checks        | `in` `!in` `is` `!is`                                                                  |               |
+| 7            | comparison          | `<` `<=` `>` `>=`                                                                      | left to right |
+| 6            | equality            | `==` `!=` `===` `!==`                                                                  | left to right |
+| 5            | logical and         | `&&`                                                                                   | left to right |
+| 4            | logical or          | `||`                                                                                   | left to right |
+| 3            | logical implication | `->` `<-`                                                                              | left to right |
+| 2            | spread              | `...`                                                                                  |               |
+| 1 (lowest)   | assignment          | `=` `*=` `/=` `~/=` `%=` `+=` `-=` `<<=` `>>=` `>>>=` `&=` `|=` `^=` `??=` `&&=` `||=` | right to left |
 
 Spread in function calls:
 
@@ -379,7 +376,6 @@ Point(tuple.x, tuple.y)
 Point(...tuple)
 ```
 
-TODO: ??/?:, :, ternary, `??=`
 
 ### 8.2. Labels
 
@@ -636,3 +632,8 @@ This also provides what is known as Interface Delegation in Kotlin.
 - cross-boundary lazy
 - write-only property (`let settable onlyWriteable: Int`)
 - named, factory and delegating constructors
+- overflow operators
+- chained comparison
+- implicit multiplication: a literal number before an identifier creates an implicit multiplication: `2 apples` is equivalent to `2 * apples`
+  - `2 to -2` is equivalent to `2.to(-2)`, not `2 * to - 2`?
+  - what about `1 / 2 foo`?
