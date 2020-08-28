@@ -1,6 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:parser/src/lexer/token.dart';
 
+import '../../../lexer/token.dart';
 import '../../../syntactic_entity.dart';
 import '../node.dart';
 

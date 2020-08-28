@@ -3,7 +3,6 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../lexer/token.dart';
 import '../../syntactic_entity.dart';
 import '../../utils.dart';
-import 'expressions/expression.dart';
 import 'node.dart';
 
 part 'types.freezed.dart';
