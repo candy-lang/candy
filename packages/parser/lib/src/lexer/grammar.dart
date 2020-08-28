@@ -8,6 +8,7 @@ import 'token.dart';
 
 // ignore_for_file: non_constant_identifier_names
 
+// ignore: avoid_classes_with_only_static_members
 @immutable
 class LexerGrammar {
   // SECTION: lexicalGeneral
