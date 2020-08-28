@@ -253,7 +253,6 @@ void main() {
   });
 }
 
-// TODO(JonasWanke): negative literals
 final someValidDecIntegerLiterals = {
   '0': 0,
   '1': 1,
