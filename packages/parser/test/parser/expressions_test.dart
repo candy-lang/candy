@@ -133,7 +133,7 @@ void main() {
           forPrimitives(tester: (targetSource, targetFactory) {
             testExpressionParser(
               '$targetSource()',
-              expression: InvocationExpression(
+              expression: CallExpression(
                 target: targetFactory(0),
                 leftParenthesis: OperatorToken(
                   OperatorTokenType.lparen,
@@ -157,7 +157,7 @@ void main() {
             forPrimitives(tester: (arg1Source, arg1Factory) {
               testExpressionParser(
                 '$targetSource($arg1Source)',
-                expression: InvocationExpression(
+                expression: CallExpression(
                   target: targetFactory(0),
                   leftParenthesis: OperatorToken(
                     OperatorTokenType.lparen,
@@ -185,7 +185,7 @@ void main() {
               forPrimitives(tester: (arg2Source, arg2Factory) {
                 testExpressionParser(
                   '$targetSource($arg1Source, $arg2Source)',
-                  expression: InvocationExpression(
+                  expression: CallExpression(
                     target: targetFactory(0),
                     leftParenthesis: OperatorToken(
                       OperatorTokenType.lparen,

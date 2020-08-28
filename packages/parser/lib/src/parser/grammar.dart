@@ -36,10 +36,10 @@ class ParserGrammar {
           );
         },
       )
-      ..complexPostfix<List<SyntacticEntity>, InvocationExpression>(
+      ..complexPostfix<List<SyntacticEntity>, CallExpression>(
         invocationPostfix,
         mapper: (expression, postfix) {
-          return InvocationExpression(
+          return CallExpression(
             target: expression,
             leftParenthesis: postfix.first as OperatorToken,
             arguments: postfix.sublist(1, postfix.length - 1).cast<Argument>(),

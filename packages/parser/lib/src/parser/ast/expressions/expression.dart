@@ -119,15 +119,14 @@ abstract class NavigationExpression extends Expression
 }
 
 @freezed
-abstract class InvocationExpression extends Expression
-    implements _$InvocationExpression {
-  const factory InvocationExpression({
+abstract class CallExpression extends Expression implements _$CallExpression {
+  const factory CallExpression({
     @required Expression target,
     @required OperatorToken leftParenthesis,
     @required List<Argument> arguments,
     @required OperatorToken rightParenthesis,
   }) = _InvocationExpression;
-  const InvocationExpression._();
+  const CallExpression._();
 
   @override
   Iterable<SyntacticEntity> get children => [
