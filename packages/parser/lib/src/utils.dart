@@ -79,3 +79,15 @@ class ChoiceParser<T> extends _ListParser<T> {
   @override
   ChoiceParser<T> copy() => ChoiceParser<T>(children);
 }
+
+Iterable<T> interleave<T>(Iterable<T> a, Iterable<T> b) sync* {
+  // Taken from https://stackoverflow.com/a/59093703/6220609.
+  final iteratorA = a.iterator;
+  final iteratorB = b.iterator;
+  bool hasA;
+  bool hasB;
+  while ((hasA = iteratorA.moveNext()) | (hasB = iteratorB.moveNext())) {
+    if (hasA) yield iteratorA.current;
+    if (hasB) yield iteratorB.current;
+  }
+}

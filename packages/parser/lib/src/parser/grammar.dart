@@ -7,6 +7,7 @@ import '../syntactic_entity.dart';
 import '../utils.dart';
 import 'ast/expressions/expression.dart';
 import 'ast/statements.dart';
+import 'ast/types.dart';
 
 // ignore: avoid_classes_with_only_static_members
 @immutable
@@ -15,10 +16,42 @@ class ParserGrammar {
     assert(!_isInitialized, 'Already initialized.');
     _isInitialized = true;
 
+    _initType();
     _initExpression();
   }
 
   static bool _isInitialized = false;
+
+  // SECTION: types
+
+  static final _type = undefined<Type>();
+  static Parser<Type> get type => _type;
+  static void _initType() {
+    _type.set(
+      // ignore: unnecessary_cast
+      (userType.map($Type.user) as Parser<Type>) | tupleType.map($Type.tuple),
+    );
+  }
+
+  static final userType =
+      simpleUserType.separatedList(LexerGrammar.DOT).map((values) => UserType(
+            simpleTypes: values.first as List<SimpleUserType>,
+            dots: values[1] as List<OperatorToken>,
+          ));
+  static final Parser<SimpleUserType> simpleUserType =
+      LexerGrammar.Identifier.map($SimpleUserType);
+
+  static final tupleType = (LexerGrammar.LPAREN &
+          LexerGrammar.NLs &
+          type.fullCommaSeparatedList(2) &
+          LexerGrammar.NLs &
+          LexerGrammar.RPAREN)
+      .map((value) => TupleType(
+            leftParenthesis: value[0] as OperatorToken,
+            types: value[2][0] as List<Type>,
+            commata: value[2][1] as List<OperatorToken>,
+            rightParenthesis: value[4] as OperatorToken,
+          ));
 
   // SECTION: statements
 
@@ -243,6 +276,43 @@ class ParserGrammar {
 }
 
 extension<T> on Parser<T> {
+  Parser<List<dynamic>> separatedList(Parser<OperatorToken> separator) {
+    return (this &
+            (LexerGrammar.NLs & separator & LexerGrammar.NLs & this)
+                .map<dynamic>((v) => [v[1] as OperatorToken, v[3] as T])
+                .star())
+        .map((value) {
+      final trailing = (value[1] as List<dynamic>).cast<List<dynamic>>();
+      return <dynamic>[
+        [value.first as T, ...trailing.map((dynamic v) => v[1] as T)],
+        [...trailing.map((dynamic v) => v[0] as OperatorToken)],
+      ];
+    });
+  }
+
+  Parser<List<dynamic>> fullCommaSeparatedList([int minimum = 1]) {
+    assert(minimum != null);
+    assert(minimum >= 1);
+
+    return (this &
+            (LexerGrammar.NLs & LexerGrammar.COMMA & LexerGrammar.NLs & this)
+                .map<dynamic>((v) => [v[1] as OperatorToken, v[3] as T])
+                .repeat(minimum - 1, unbounded) &
+            (LexerGrammar.NLs & LexerGrammar.COMMA).optional())
+        .map((value) {
+      final trailing = (value[1] as List<dynamic>).cast<List<dynamic>>();
+      final trailingComma =
+          (value[2] as List<dynamic>)?.elementAt(1) as OperatorToken;
+      return <dynamic>[
+        [value.first as T, ...trailing.map((dynamic v) => v[1] as T)],
+        [
+          ...trailing.map((dynamic v) => v[0] as OperatorToken),
+          if (trailingComma != null) trailingComma,
+        ],
+      ];
+    });
+  }
+
   Parser<List<T>> commaSeparatedList() {
     return (this &
             (LexerGrammar.NLs & LexerGrammar.COMMA & LexerGrammar.NLs & this)

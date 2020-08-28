@@ -54,6 +54,9 @@ enum OperatorTokenType {
   /// `,`
   comma,
 
+  /// `=>`
+  equalsGreater,
+
   /// `(`
   lparen,
 

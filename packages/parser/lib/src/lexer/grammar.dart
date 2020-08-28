@@ -24,6 +24,7 @@ class LexerGrammar {
 
   static final DOT = _operator('.', OperatorTokenType.dot);
   static final COMMA = _operator(',', OperatorTokenType.comma);
+  static final EQUALS_GREATER = _operator('=>', OperatorTokenType.colon);
 
   static final LPAREN = _operator('(', OperatorTokenType.lparen);
   static final RPAREN = _operator(')', OperatorTokenType.rparen);
@@ -78,13 +79,13 @@ class LexerGrammar {
   static final GREATER = _operator('>', OperatorTokenType.greater);
   static final GREATER_EQUAL = _operator('>=', OperatorTokenType.greaterEquals);
 
-  static final EQUALS_EQUALS = _operator('=>=', OperatorTokenType.equalsEquals);
+  static final EQUALS_EQUALS = _operator('==', OperatorTokenType.equalsEquals);
   static final EXCLAMATION_EQUALS =
       _operator('!=', OperatorTokenType.exclamationEquals);
   static final EQUALS_EQUALS_EQUALS =
-      _operator('=>=>=', OperatorTokenType.equalsEqualsEquals);
+      _operator('===', OperatorTokenType.equalsEqualsEquals);
   static final EXCLAMATION_EQUALS_EQUALS =
-      _operator('!=>=', OperatorTokenType.exclamationEqualsEquals);
+      _operator('!==', OperatorTokenType.exclamationEqualsEquals);
 
   static final AMPERSAND_AMPERSAND =
       _operator('&&', OperatorTokenType.ampersandAmpersand);

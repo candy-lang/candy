@@ -34,7 +34,7 @@ void testParser<R>(
 }) {
   test(source, () {
     final actual = parser.parse(source);
-    expect(actual.isSuccess, isTrue);
+    expect(actual.isSuccess, isTrue, reason: 'No match.');
     expect(
       actual.position,
       source.length,
