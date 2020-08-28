@@ -29,14 +29,13 @@ abstract class Identifier extends Expression implements _$Identifier {
 }
 
 @freezed
-abstract class ParenthesizedExpression extends Expression
-    implements _$ParenthesizedExpression {
-  const factory ParenthesizedExpression({
+abstract class GroupExpression extends Expression implements _$GroupExpression {
+  const factory GroupExpression({
     @required OperatorToken leftParenthesis,
     @required Expression expression,
     @required OperatorToken rightParenthesis,
   }) = _ParenthesizedExpression;
-  const ParenthesizedExpression._();
+  const GroupExpression._();
 
   // assert(leftParenthesis.type == OperatorTokenType.lparen),
 

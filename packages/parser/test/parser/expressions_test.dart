@@ -55,7 +55,7 @@ void main() {
         final primitive = primitiveFactory(1);
         testExpressionParser(
           '($source)',
-          expression: ParenthesizedExpression(
+          expression: GroupExpression(
             leftParenthesis:
                 OperatorToken(OperatorTokenType.lparen, span: SourceSpan(0, 1)),
             expression: primitive,

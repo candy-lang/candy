@@ -228,7 +228,7 @@ extension on ExpressionBuilder {
       left,
       right,
       (left, expression, right) {
-        return ParenthesizedExpression(
+        return GroupExpression(
           leftParenthesis: left,
           expression: expression,
           rightParenthesis: right,
