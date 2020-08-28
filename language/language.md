@@ -583,6 +583,22 @@ Compiler Plugin:
 
 ## 11. Types
 
+Primitive types:
+- `Bool`
+- `Number`:
+  - integers:
+    - probably: `Int8`, `UInt8`, `Int16`, `UInt16`, `Int32`, `UInt32`, `Int64`, `UInt64` & `Int`, `UInt`
+    - alternative: `Byte`, `UByte`, `Short`, `UShort`, `Int`, `UInt`, `Long`, `ULong`
+  - floating point:
+    - probably: `Float32`, `Float64` & `Float`
+    - alternative: `Float`, `Double`
+- `String`: `ByteArray`, `Iterable<CodePoint>`, `Iterable<GraphemeCluster>`
+- `Unit`
+- `Nothing`, `Never` or `None`
+- `(T1, …, Tn) ≡ Tuple<T1, …, Tn>` (with `n in 2..*`)
+- `(P1, …, Pn) -> R ≡ Function<P1, …, Pn, R>` ()
+- `Type<T>` (potentially)
+
 ### 11.1. Function Types
 
 ```kotlin
