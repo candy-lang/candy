@@ -27,10 +27,36 @@ class ParserGrammar {
   static final _type = undefined<Type>();
   static Parser<Type> get type => _type;
   static void _initType() {
-    _type.set(
+    final builder = ExpressionBuilder()
       // ignore: unnecessary_cast
-      (userType.map($Type.user) as Parser<Type>) | tupleType.map($Type.tuple),
-    );
+      ..primitive<Type>((userType as Parser<Type>) | tupleType)
+      ..grouping<Type>(
+        LexerGrammar.LPAREN,
+        LexerGrammar.RPAREN,
+        mapper: (left, expression, right) => GroupType(
+          leftParenthesis: left,
+          type: expression,
+          rightParenthesis: right,
+        ),
+      )
+      ..left<Type>(
+        LexerGrammar.AMPERSAND,
+        mapper: (left, ampersand, right) => IntersectionType(
+          leftType: left,
+          ampersand: ampersand,
+          rightType: right,
+        ),
+      )
+      ..left<Type>(
+        LexerGrammar.BAR,
+        mapper: (left, bar, right) => UnionType(
+          leftType: left,
+          bar: bar,
+          rightType: right,
+        ),
+      );
+
+    _type.set(builder.build().map((dynamic t) => t as Type));
   }
 
   static final userType =
@@ -94,12 +120,20 @@ class ParserGrammar {
   static Parser<Expression> get expression => _expression;
   static void _initExpression() {
     final builder = ExpressionBuilder()
-      ..primitive(
+      ..primitive<Expression>(
           // ignore: unnecessary_cast, Without the cast the compiler complains…
           (literalConstant as Parser<Expression>) |
               LexerGrammar.Identifier.map((t) => Identifier(t)))
       // grouping
-      ..wrapper(LexerGrammar.LPAREN, LexerGrammar.RPAREN)
+      ..grouping<Expression>(
+        LexerGrammar.LPAREN,
+        LexerGrammar.RPAREN,
+        mapper: (left, expression, right) => GroupExpression(
+          leftParenthesis: left,
+          expression: expression,
+          rightParenthesis: right,
+        ),
+      )
       // unary postfix
       ..postfix(LexerGrammar.PLUS_PLUS |
           LexerGrammar.MINUS_MINUS |
@@ -146,49 +180,49 @@ class ParserGrammar {
       // implicit multiplication
       // TODO(JonasWanke): add implicit multiplication
       // multiplicative
-      ..left(LexerGrammar.ASTERISK |
+      ..leftExpression(LexerGrammar.ASTERISK |
           LexerGrammar.SLASH |
           LexerGrammar.TILDE_SLASH |
           LexerGrammar.PERCENT)
       // additive
-      ..left(LexerGrammar.PLUS | LexerGrammar.MINUS)
+      ..leftExpression(LexerGrammar.PLUS | LexerGrammar.MINUS)
       // shift
-      ..left(LexerGrammar.LESS_LESS |
+      ..leftExpression(LexerGrammar.LESS_LESS |
           LexerGrammar.GREATER_GREATER |
           LexerGrammar.GREATER_GREATER_GREATER)
       // bitwise and
-      ..left(LexerGrammar.AMPERSAND)
+      ..leftExpression(LexerGrammar.AMPERSAND)
       // bitwise or
-      ..left(LexerGrammar.CARET)
+      ..leftExpression(LexerGrammar.CARET)
       // bitwise not
-      ..left(LexerGrammar.BAR)
+      ..leftExpression(LexerGrammar.BAR)
       // type check
-      ..left(LexerGrammar.AS | LexerGrammar.AS_SAFE)
+      ..leftExpression(LexerGrammar.AS | LexerGrammar.AS_SAFE)
       // range
-      ..left(LexerGrammar.DOT_DOT | LexerGrammar.DOT_DOT_EQUALS)
+      ..leftExpression(LexerGrammar.DOT_DOT | LexerGrammar.DOT_DOT_EQUALS)
       // infix function
       // TODO(JonasWanke): infix function
       // named checks
-      ..left(LexerGrammar.IN |
+      ..leftExpression(LexerGrammar.IN |
           LexerGrammar.EXCLAMATION_IN |
           LexerGrammar.IS |
           LexerGrammar.EXCLAMATION_IS)
       // comparison
-      ..left(LexerGrammar.LESS |
+      ..leftExpression(LexerGrammar.LESS |
           LexerGrammar.LESS_EQUAL |
           LexerGrammar.GREATER |
           LexerGrammar.GREATER_EQUAL)
       // equality
-      ..left(LexerGrammar.EQUALS_EQUALS |
+      ..leftExpression(LexerGrammar.EQUALS_EQUALS |
           LexerGrammar.EXCLAMATION_EQUALS_EQUALS |
           LexerGrammar.EQUALS_EQUALS_EQUALS |
           LexerGrammar.EXCLAMATION_EQUALS_EQUALS)
       // logical and
-      ..left(LexerGrammar.AMPERSAND_AMPERSAND)
+      ..leftExpression(LexerGrammar.AMPERSAND_AMPERSAND)
       // logical or
-      ..left(LexerGrammar.BAR_BAR)
+      ..leftExpression(LexerGrammar.BAR_BAR)
       // logical implication
-      ..left(LexerGrammar.DASH_GREATER | LexerGrammar.LESS_DASH)
+      ..leftExpression(LexerGrammar.DASH_GREATER | LexerGrammar.LESS_DASH)
       // spread
       ..prefix(LexerGrammar.DOT_DOT_DOT)
       // assignment
@@ -326,22 +360,14 @@ extension<T> on Parser<T> {
 }
 
 extension on ExpressionBuilder {
-  void primitive(Parser<Expression> primitive) =>
-      group().primitive<Expression>(primitive);
+  void primitive<T>(Parser<T> primitive) => group().primitive<T>(primitive);
 
-  void wrapper(Parser<OperatorToken> left, Parser<OperatorToken> right) {
-    group().wrapper<OperatorToken, Expression>(
-      left,
-      right,
-      (left, expression, right) {
-        return GroupExpression(
-          leftParenthesis: left,
-          expression: expression,
-          rightParenthesis: right,
-        );
-      },
-    );
-  }
+  void grouping<T>(
+    Parser<OperatorToken> left,
+    Parser<OperatorToken> right, {
+    @required T Function(OperatorToken, T, OperatorToken) mapper,
+  }) =>
+      group().wrapper<OperatorToken, T>(left, right, mapper);
 
   void postfix(Parser<OperatorToken> operator) {
     group().postfix<OperatorToken, Expression>(
@@ -365,10 +391,21 @@ extension on ExpressionBuilder {
     );
   }
 
-  void left(Parser<OperatorToken> operator) {
-    group().left<OperatorToken, Expression>(
+  void left<T>(
+    Parser<OperatorToken> operator, {
+    @required T Function(T, OperatorToken, T) mapper,
+  }) =>
+      group().left<List<dynamic>, T>(
+        LexerGrammar.WS.optional() & operator & LexerGrammar.NLs,
+        (left, operator, right) =>
+            mapper(left, operator[1] as OperatorToken, right),
+      );
+
+  void leftExpression(Parser<OperatorToken> operator) {
+    left<Expression>(
       operator,
-      (left, operator, right) => BinaryExpression(left, operator, right),
+      mapper: (left, operator, right) =>
+          BinaryExpression(left, operator, right),
     );
   }
 

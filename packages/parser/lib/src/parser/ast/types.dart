@@ -7,20 +7,12 @@ import 'node.dart';
 
 part 'types.freezed.dart';
 
-@freezed
-abstract class Type extends AstNode implements _$Type {
-  // TODO(JonasWanke): add type arguments
-  const factory Type.user(UserType type) = _UserTypeType;
-  const factory Type.tuple(TupleType type) = _TupleTypeType;
-  const Type._();
-
-  @override
-  Iterable<SyntacticEntity> get children =>
-      [when(user: (t) => t, tuple: (t) => t)];
+abstract class Type extends AstNode {
+  const Type();
 }
 
 @freezed
-abstract class UserType extends AstNode implements _$UserType {
+abstract class UserType extends Type implements _$UserType {
   const factory UserType({
     @required List<SimpleUserType> simpleTypes,
     @Default(<OperatorToken>[]) List<OperatorToken> dots,
@@ -35,7 +27,7 @@ abstract class UserType extends AstNode implements _$UserType {
 }
 
 @freezed
-abstract class SimpleUserType extends AstNode implements _$SimpleUserType {
+abstract class SimpleUserType extends Type implements _$SimpleUserType {
   // TODO(JonasWanke): add type arguments
   const factory SimpleUserType(IdentifierToken name) = _SimpleUserType;
   const SimpleUserType._();
@@ -45,9 +37,23 @@ abstract class SimpleUserType extends AstNode implements _$SimpleUserType {
 }
 
 @freezed
-abstract class FunctionType extends AstNode implements _$FunctionType {
+abstract class GroupType extends Type implements _$GroupType {
+  const factory GroupType({
+    @required OperatorToken leftParenthesis,
+    @required Type type,
+    @required OperatorToken rightParenthesis,
+  }) = _GroupType;
+  const GroupType._();
+
+  @override
+  Iterable<SyntacticEntity> get children =>
+      [leftParenthesis, type, rightParenthesis];
+}
+
+@freezed
+abstract class FunctionType extends Type implements _$FunctionType {
   const factory FunctionType({
-    // Must be a [GroupedType] or [UserType].
+    // Must be a wrapped [GroupType] or [UserType].
     Type receiver,
     OperatorToken receiverDot,
     @required OperatorToken leftParenthesis,
@@ -72,7 +78,7 @@ abstract class FunctionType extends AstNode implements _$FunctionType {
 }
 
 @freezed
-abstract class TupleType extends AstNode implements _$TupleType {
+abstract class TupleType extends Type implements _$TupleType {
   const factory TupleType({
     @required OperatorToken leftParenthesis,
     @required List<Type> types,
@@ -84,4 +90,30 @@ abstract class TupleType extends AstNode implements _$TupleType {
   @override
   Iterable<SyntacticEntity> get children =>
       [leftParenthesis, ...interleave(types, commata), rightParenthesis];
+}
+
+@freezed
+abstract class UnionType extends Type implements _$UnionType {
+  const factory UnionType({
+    @required Type leftType,
+    @required OperatorToken bar,
+    @required Type rightType,
+  }) = _UnionType;
+  const UnionType._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [leftType, bar, rightType];
+}
+
+@freezed
+abstract class IntersectionType extends Type implements _$IntersectionType {
+  const factory IntersectionType({
+    @required Type leftType,
+    @required OperatorToken ampersand,
+    @required Type rightType,
+  }) = _IntersectionType;
+  const IntersectionType._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [leftType, ampersand, rightType];
 }
