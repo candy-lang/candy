@@ -1,0 +1,132 @@
+use core: math
+use currency
+
+pub fun main() {
+  print("Hello world!")
+  main1()
+  main2()
+  main3()
+}
+
+@mem pure fun fibonacci(n: Uint) -> Uint {
+  /// Returns the [n]th fibonacci number.
+  return match n {
+    0 => 0
+    1 => 1
+    n => fibonacci(n - 1) + fibonacci(n - 2)
+  }
+}
+
+fun main1() {
+  assert(fibonacci(10) == 55)
+  print("The 100th fibonacci number is ${fibonacci(100)}")
+}
+
+@data class Fruit {
+  let name: String
+  let cost: Currency
+  let ripeness: Ripeness
+}
+
+enum Ripeness { ripe, unripe }
+
+const apple = Fruit("apple", 2.euro)
+const banana = Fruit("banana", 5.20.euro)
+const kiwi = Fruit("kiwi", 7.euro)
+const smoothieIngredients = [apple, banana, kiwi, apple, kiwi]
+
+fun main2() {
+  let expensiveIngredients = smoothieIngredients.where { it.cost > 3 }
+}
+
+class Cart {
+  /// A shopping cart than can contain items.
+
+  let items: MutableList<Item> = []
+  /// The items currently in the cart.
+
+  trait Item {
+    let cost: Int
+  }
+
+  get cost => items.cost
+
+  fun buy() {
+    TODO()
+  }
+}
+
+impl List<Item>: Item {
+  /// Simplifies getting the cost of a list of items.
+
+  get cost => map{ it.cost }.sum()
+}
+
+impl Fruit: Cart.Item
+
+@data class Box<T: Cart.Item> {
+  /// A beautiful, handcrafted, wooden box.
+
+  static const cost: Uint = 30 euro
+  /// A box is very expensive.
+
+  let content: List<T>
+}
+
+impl Box<T>: Cart.Item {
+  get cost => content.map{ it.cost }.sum() + Box.cost
+}
+
+const cart = Cart([
+  kiwi,
+  ...smoothieIngredients,
+  Box([apple, 2 times banana])
+])
+
+void main3() {
+  print("The cart costs ${cart.cost}")
+}
+
+impl Fruit {
+  let yumminess: Int
+    /// Computes a yumminess score for this [Fruit] using a secret formula.
+    get => fibonacci(cost) + name.bytes.sum() + match ripeness {
+      ripe => 0
+      unripe => -20
+    }
+}
+
+void main4() {
+  for ingredient in smoothieIngredients {
+    TODO("Do something")
+  }
+}
+
+class Human {
+  fun eat(fruits: List<Fruit>): Result<Burp, ThrowUp> {
+    var fullness = 0
+    for fruit in fruits {
+      if fullness < 10 || randomBool() {
+        fullness++
+      } else {
+        throw up
+      }
+    }
+    burp
+  }
+}
+
+/*
+- var
+- abstract classes
+- labels
+- try
+- while
+- break
+- continue
+- yield & yield each
+- modules
+- function types
+- value constraints
+- implicit casts
+*/
