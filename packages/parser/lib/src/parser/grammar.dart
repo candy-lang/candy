@@ -29,16 +29,7 @@ class ParserGrammar {
   static void _initType() {
     final builder = ExpressionBuilder()
       // ignore: unnecessary_cast
-      ..primitive<Type>((userType as Parser<Type>) | tupleType)
-      ..grouping<Type>(
-        LexerGrammar.LPAREN,
-        LexerGrammar.RPAREN,
-        mapper: (left, expression, right) => GroupType(
-          leftParenthesis: left,
-          type: expression,
-          rightParenthesis: right,
-        ),
-      )
+      ..primitive<Type>((userType as Parser<Type>) | groupType | tupleType)
       ..left<Type>(
         LexerGrammar.AMPERSAND,
         mapper: (left, ampersand, right) => IntersectionType(
@@ -54,6 +45,19 @@ class ParserGrammar {
           bar: bar,
           rightType: right,
         ),
+      )
+      ..prefix<List<dynamic>, Type>(
+        functionTypePrefix,
+        mapper: (operator, type) => FunctionType(
+          receiver: operator[0] as Type,
+          receiverDot: operator[1] as OperatorToken,
+          leftParenthesis: operator[2] as OperatorToken,
+          parameterTypes: operator[3] as List<Type>,
+          parameterCommata: operator[4] as List<OperatorToken>,
+          rightParenthesis: operator[5] as OperatorToken,
+          arrow: operator[6] as OperatorToken,
+          returnType: type,
+        ),
       );
 
     _type.set(builder.build().map((dynamic t) => t as Type));
@@ -66,6 +70,54 @@ class ParserGrammar {
           ));
   static final Parser<SimpleUserType> simpleUserType =
       LexerGrammar.Identifier.map($SimpleUserType);
+
+  static final groupType = (LexerGrammar.LPAREN &
+          LexerGrammar.NLs &
+          type &
+          LexerGrammar.NLs &
+          LexerGrammar.RPAREN)
+      .map((value) => GroupType(
+            leftParenthesis: value[0] as OperatorToken,
+            type: value[2] as Type,
+            rightParenthesis: value[4] as OperatorToken,
+          ));
+
+  static final functionTypePrefix = ((functionTypeReceiver &
+                  LexerGrammar.NLs &
+                  LexerGrammar.DOT &
+                  LexerGrammar.NLs)
+              .optional() &
+          functionTypeParameters &
+          LexerGrammar.NLs &
+          LexerGrammar.EQUALS_GREATER &
+          LexerGrammar.NLs)
+      .map<List<dynamic>>((value) {
+    final receiverPrefix = value[0] as List<dynamic>;
+    final parameters = value[1] as List<dynamic>;
+    return <dynamic>[
+      receiverPrefix?.elementAt(0), // receiver
+      receiverPrefix?.elementAt(2), // receiverDot
+      parameters[0] as OperatorToken, // leftParenthesis
+      parameters[1] as List<Type>, // parameterTypes
+      parameters[2] as List<OperatorToken>, // parameterCommata
+      parameters[3] as OperatorToken, // rightParenthesis
+      value[3] as OperatorToken, // arrow
+    ];
+  });
+  static final functionTypeParameters = (LexerGrammar.LPAREN &
+          LexerGrammar.NLs &
+          type.fullCommaSeparatedList().optional() &
+          LexerGrammar.NLs &
+          LexerGrammar.RPAREN)
+      .map((value) => <dynamic>[
+            value[0] as OperatorToken, // leftParenthesis
+            value[2]?.elementAt(0) as List<Type> ?? <Type>[], // types
+            value[2]?.elementAt(1) as List<OperatorToken> ??
+                <OperatorToken>[], // commata
+            value[4] as OperatorToken, // rightParenthesis
+          ]);
+  // ignore: unnecessary_cast
+  static final functionTypeReceiver = (userType as Parser<Type>) | groupType;
 
   static final tupleType = (LexerGrammar.LPAREN &
           LexerGrammar.NLs &
@@ -172,7 +224,7 @@ class ParserGrammar {
         },
       )
       // unary prefix
-      ..prefix(LexerGrammar.EXCLAMATION |
+      ..prefixExpression(LexerGrammar.EXCLAMATION |
           LexerGrammar.TILDE |
           LexerGrammar.PLUS_PLUS |
           LexerGrammar.MINUS_MINUS |
@@ -224,7 +276,7 @@ class ParserGrammar {
       // logical implication
       ..leftExpression(LexerGrammar.DASH_GREATER | LexerGrammar.LESS_DASH)
       // spread
-      ..prefix(LexerGrammar.DOT_DOT_DOT)
+      ..prefixExpression(LexerGrammar.DOT_DOT_DOT)
       // assignment
       ..right(LexerGrammar.EQUALS |
           LexerGrammar.ASTERISK_EQUALS |
@@ -383,10 +435,14 @@ extension on ExpressionBuilder {
   }) =>
       group().postfix<T, Expression>(postfix, mapper);
 
-  void prefix(Parser<OperatorToken> operator) {
-    group().prefix<OperatorToken, Expression>(
+  void prefix<O, T>(Parser<O> operator, {@required T Function(O, T) mapper}) {
+    group().prefix<O, T>(operator, mapper);
+  }
+
+  void prefixExpression(Parser<OperatorToken> operator) {
+    prefix<OperatorToken, Expression>(
       operator,
-      (operator, operand) =>
+      mapper: (operator, operand) =>
           PrefixExpression(operatorToken: operator, operand: operand),
     );
   }

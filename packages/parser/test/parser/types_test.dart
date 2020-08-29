@@ -177,6 +177,110 @@ void main() {
       ),
     },
   );
+
+  tableTestTypeParser<FunctionType>(
+    'FunctionType',
+    table: {
+      '() => Foo.Bar': FunctionType(
+        leftParenthesis:
+            OperatorToken(OperatorTokenType.lparen, span: SourceSpan(0, 1)),
+        parameterTypes: [],
+        parameterCommata: [],
+        rightParenthesis:
+            OperatorToken(OperatorTokenType.rparen, span: SourceSpan(1, 2)),
+        arrow: OperatorToken(
+          OperatorTokenType.equalsGreater,
+          span: SourceSpan(3, 5),
+        ),
+        returnType: createTypeFooBar(6),
+      ),
+      '(Foo.Bar) => Foo.Bar': FunctionType(
+        leftParenthesis:
+            OperatorToken(OperatorTokenType.lparen, span: SourceSpan(0, 1)),
+        parameterTypes: [createTypeFooBar(1)],
+        parameterCommata: [],
+        rightParenthesis:
+            OperatorToken(OperatorTokenType.rparen, span: SourceSpan(8, 9)),
+        arrow: OperatorToken(
+          OperatorTokenType.equalsGreater,
+          span: SourceSpan(10, 12),
+        ),
+        returnType: createTypeFooBar(13),
+      ),
+      'Foo.Bar.() => Foo.Bar': FunctionType(
+        receiver: createTypeFooBar(),
+        receiverDot:
+            OperatorToken(OperatorTokenType.dot, span: SourceSpan(7, 8)),
+        leftParenthesis:
+            OperatorToken(OperatorTokenType.lparen, span: SourceSpan(8, 9)),
+        parameterTypes: [],
+        parameterCommata: [],
+        rightParenthesis:
+            OperatorToken(OperatorTokenType.rparen, span: SourceSpan(9, 10)),
+        arrow: OperatorToken(
+          OperatorTokenType.equalsGreater,
+          span: SourceSpan(11, 13),
+        ),
+        returnType: createTypeFooBar(14),
+      ),
+    },
+  );
+
+  tableTestTypeParser(
+    'complex',
+    table: {
+      '(Foo.Bar & Foo.Bar).(Foo.Bar, (Foo.Bar, Foo.Bar)) => Foo.Bar | Foo.Bar':
+          FunctionType(
+        receiver: GroupType(
+          leftParenthesis:
+              OperatorToken(OperatorTokenType.lparen, span: SourceSpan(0, 1)),
+          type: IntersectionType(
+            leftType: createTypeFooBar(1),
+            ampersand: OperatorToken(
+              OperatorTokenType.ampersand,
+              span: SourceSpan(9, 10),
+            ),
+            rightType: createTypeFooBar(11),
+          ),
+          rightParenthesis:
+              OperatorToken(OperatorTokenType.rparen, span: SourceSpan(18, 19)),
+        ),
+        receiverDot:
+            OperatorToken(OperatorTokenType.dot, span: SourceSpan(19, 20)),
+        leftParenthesis:
+            OperatorToken(OperatorTokenType.lparen, span: SourceSpan(20, 21)),
+        parameterTypes: [
+          createTypeFooBar(21),
+          TupleType(
+            leftParenthesis: OperatorToken(
+              OperatorTokenType.lparen,
+              span: SourceSpan(30, 31),
+            ),
+            types: [createTypeFooBar(31), createTypeFooBar(40)],
+            commata: [
+              OperatorToken(OperatorTokenType.comma, span: SourceSpan(38, 39)),
+            ],
+            rightParenthesis: OperatorToken(OperatorTokenType.rparen,
+                span: SourceSpan(47, 48)),
+          ),
+        ],
+        parameterCommata: [
+          OperatorToken(OperatorTokenType.comma, span: SourceSpan(28, 29)),
+        ],
+        rightParenthesis:
+            OperatorToken(OperatorTokenType.rparen, span: SourceSpan(48, 49)),
+        arrow: OperatorToken(
+          OperatorTokenType.equalsGreater,
+          span: SourceSpan(50, 52),
+        ),
+        returnType: UnionType(
+          leftType: createTypeFooBar(53),
+          bar: OperatorToken(OperatorTokenType.bar, span: SourceSpan(61, 62)),
+          rightType: createTypeFooBar(63),
+        ),
+      ),
+    },
+  );
 }
 
 @isTestGroup
@@ -184,9 +288,11 @@ void tableTestTypeParser<T extends Type>(
   String description, {
   @required Map<String, T> table,
 }) {
-  forAllMap<String, T>(
-    table: table,
-    tester: (source, result) =>
-        testParser(source, result: result, parser: ParserGrammar.type),
-  );
+  group(description, () {
+    forAllMap<String, T>(
+      table: table,
+      tester: (source, result) =>
+          testParser(source, result: result, parser: ParserGrammar.type),
+    );
+  });
 }
