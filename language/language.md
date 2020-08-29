@@ -657,3 +657,4 @@ This also provides what is known as Interface Delegation in Kotlin.
 - implicit multiplication: a literal number before an identifier creates an implicit multiplication: `2 apples` is equivalent to `2 * apples`
   - `2 to -2` is equivalent to `2.to(-2)`, not `2 * to - 2`?
   - what about `1 / 2 foo`?
+  - or rather postfix functions? `2 seconds + 3 minutes` and `2.50 euro`
