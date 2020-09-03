@@ -732,3 +732,13 @@ This also provides what is known as Interface Delegation in Kotlin.
   - `2 to -2` is equivalent to `2.to(-2)`, not `2 * to - 2`?
   - what about `1 / 2 foo`?
   - or rather postfix functions? `2 seconds + 3 minutes` and `2.50 euro`
+- for in collection literals:
+  ```dart
+  [
+    for (i in myList.indices) i * i,
+    if (true)
+      for (i in myList.indices) i
+    else 2,
+  ]
+  ```
+- optional lifetimes → for compilation to Rust/LLVM/etc.
