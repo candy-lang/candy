@@ -23,10 +23,10 @@ method(param1)
 - [7. Annotations](#7-annotations)
 - [8. Expressions](#8-expressions)
   - [8.1. Operators](#81-operators)
-  - [8.2. Labels](#82-labels)
-  - [8.3. If](#83-if)
-  - [8.4. When/Match](#84-whenmatch)
-  - [8.5. Try?](#85-try)
+  - [8.2. Literals](#82-literals)
+    - [8.2.1. Strings](#821-strings)
+  - [8.3. Labels](#83-labels)
+  - [8.4. If](#84-if)
 - [9. Statements](#9-statements)
   - [9.1. For?](#91-for)
   - [9.2. While?](#92-while)
@@ -376,8 +376,23 @@ Point(tuple.x, tuple.y)
 Point(...tuple)
 ```
 
+### 8.2. Literals
 
-### 8.2. Labels
+#### 8.2.1. Strings
+
+```rust
+"foo" // foo
+"foo {bar}" // foo <bar's value>
+"foo {bar.baz}" // foo <bar.baz's value>
+r"foo {bar.baz}" // foo {bar.baz}
+##"foo " "# bar {bar}"## // foo " "# bar <bar's value>
+r##"foo " "# bar {bar}"## // foo " "# bar {bar}
+```
+
+Line breaks within multi-line string literals get normalized to a single line feed each.
+
+
+### 8.3. Labels
 
 Loops and lambdas can be prefixed by an optional label. This can then be used by `continue`, `break` and `return` statements:
 
@@ -397,7 +412,7 @@ fun bar() {
 }
 ```
 
-### 8.3. If
+### 8.4. If
 
 TODO: If-let
 
@@ -420,8 +435,6 @@ if (…) … else …
 ```
 
 
-### 8.4. When/Match
-### 8.5. Try?
 
 ## 9. Statements
 
