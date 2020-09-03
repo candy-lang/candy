@@ -441,6 +441,15 @@ if (…) … else …
 - `use`: import a module
 - `public use`: import & export a module
 
+```rust
+use date_time
+use firebase/core show FirebaseError
+use firebase/firestore as fs
+use firebase/firestore.queries
+use logging
+use math hide BigInt
+```
+
 File structure of a project `foo`:
 
 - `src`: folder with all source code

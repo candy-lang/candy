@@ -1,5 +1,5 @@
-use core: math
-use currency
+use math
+use money
 
 public fun main() {
   print("Hello world!")
