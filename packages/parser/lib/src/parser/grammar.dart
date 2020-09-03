@@ -25,6 +25,10 @@ class ParserGrammar {
 
   // SECTION: declarations
 
+  static final declaration =
+      // ignore: unnecessary_cast
+      (functionDeclaration as Parser<Declaration>) | propertyDeclaration;
+
   static final functionDeclaration = (modifiers.optional() &
           LexerGrammar.FUN &
           LexerGrammar.NLs &
@@ -57,6 +61,84 @@ class ParserGrammar {
       body: (value[11] as List<dynamic>)?.elementAt(1) as Block,
     );
   });
+
+  static final propertyDeclaration = (modifiers.optional() &
+          LexerGrammar.LET &
+          (LexerGrammar.NLs & LexerGrammar.MUT).optional() &
+          LexerGrammar.NLs &
+          LexerGrammar.Identifier &
+          LexerGrammar.NLs &
+          LexerGrammar.COLON &
+          LexerGrammar.NLs &
+          type &
+          (LexerGrammar.NLs &
+                  LexerGrammar.EQUALS &
+                  LexerGrammar.NLs &
+                  expression)
+              .optional() &
+          (LexerGrammar.NLs & propertyAccessors).optional())
+      .map<PropertyDeclaration>((value) {
+    final initializerDeclaration = value[9] as List<dynamic>;
+    return PropertyDeclaration(
+      modifiers: (value[0] as List<dynamic>)?.cast<ModifierToken>() ?? [],
+      letKeyword: value[1] as LetKeywordToken,
+      mutKeyword: (value[2] as List<dynamic>)?.elementAt(1) as MutKeywordToken,
+      name: value[4] as IdentifierToken,
+      colon: value[6] as OperatorToken,
+      type: value[8] as Type,
+      equals: initializerDeclaration?.elementAt(1) as OperatorToken,
+      initializer: initializerDeclaration?.elementAt(3) as Expression,
+      accessors: (value[10] as List<dynamic>)?.elementAt(1)
+              as List<PropertyAccessor> ??
+          [],
+    );
+  });
+  static final propertyAccessors = (propertyAccessor &
+          (LexerGrammar.NLs & propertyAccessor)
+              .map<PropertyAccessor>((v) => v[1] as PropertyAccessor)
+              .star())
+      .map((value) => [
+            value[0] as PropertyAccessor,
+            ...value[1] as List<PropertyAccessor>,
+          ]);
+  static final propertyAccessor =
+      // ignore: unnecessary_cast
+      (propertyGetter as Parser<PropertyAccessor>) | propertySetter;
+  static final propertyGetter = (LexerGrammar.GET &
+          (LexerGrammar.NLs & LexerGrammar.COLON & LexerGrammar.NLs & type)
+              .optional() &
+          (LexerGrammar.NLs & block).optional())
+      .map<GetterPropertyAccessor>((value) {
+    final returnTypeDeclaration = value[1] as List<dynamic>;
+    return PropertyAccessor.getter(
+      keyword: value[0] as GetKeywordToken,
+      colon: returnTypeDeclaration?.elementAt(1) as OperatorToken,
+      returnType: returnTypeDeclaration?.elementAt(3) as Type,
+      body: (value[2] as List<dynamic>)?.elementAt(1) as Block,
+    ) as GetterPropertyAccessor;
+  });
+  static final propertySetter = (LexerGrammar.SET &
+          (LexerGrammar.LPAREN &
+                  LexerGrammar.NLs &
+                  valueParameter.optional() &
+                  LexerGrammar.NLs &
+                  (LexerGrammar.COMMA & LexerGrammar.NLs).optional() &
+                  LexerGrammar.RPAREN)
+              .optional() &
+          (LexerGrammar.NLs & block).optional())
+      .map<SetterPropertyAccessor>((value) {
+    final parameterDeclaration = value[1] as List<dynamic>;
+    return PropertyAccessor.setter(
+      keyword: value[0] as SetKeywordToken,
+      leftParenthesis: parameterDeclaration?.elementAt(0) as OperatorToken,
+      valueParameter: parameterDeclaration?.elementAt(2) as ValueParameter,
+      valueParameterComma: (parameterDeclaration?.elementAt(4) as List<dynamic>)
+          ?.elementAt(0) as OperatorToken,
+      rightParenthesis: parameterDeclaration?.elementAt(5) as OperatorToken,
+      body: (value[2] as List<dynamic>)?.elementAt(1) as Block,
+    ) as SetterPropertyAccessor;
+  });
+
   static final valueParameter = (LexerGrammar.Identifier &
           LexerGrammar.NLs &
           LexerGrammar.COLON &
@@ -418,13 +500,9 @@ class ParserGrammar {
 
   // SECTION: modifiers
 
-  static final modifier =
-      // ignore: unnecessary_cast
-      ((functionModifier as Parser<ModifierToken>) & LexerGrammar.NLs)
-          .map((value) => value[0] as ModifierToken);
-
-  static final functionModifier = LexerGrammar.EXTERNAL;
-
+  static final modifiers = modifier.plus();
+  static final modifier = (LexerGrammar.EXTERNAL & LexerGrammar.NLs)
+      .map((value) => value[0] as ModifierToken);
 }
 
 extension<T> on Parser<T> {

@@ -132,6 +132,14 @@ class LexerGrammar {
 
   static final FUN = string('fun')
       .tokenize((_, span) => KeywordToken.fun(span: span) as FunKeywordToken);
+  static final LET = string('let')
+      .tokenize((_, span) => KeywordToken.let(span: span) as LetKeywordToken);
+  static final MUT = string('mut')
+      .tokenize((_, span) => KeywordToken.mut(span: span) as MutKeywordToken);
+  static final GET = string('get')
+      .tokenize((_, span) => KeywordToken.get(span: span) as GetKeywordToken);
+  static final SET = string('set')
+      .tokenize((_, span) => KeywordToken.set(span: span) as SetKeywordToken);
 
   // SECTION: lexicalModifiers
 
