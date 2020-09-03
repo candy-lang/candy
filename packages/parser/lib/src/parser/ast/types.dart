@@ -53,7 +53,7 @@ abstract class GroupType extends Type implements _$GroupType {
 @freezed
 abstract class FunctionType extends Type implements _$FunctionType {
   const factory FunctionType({
-    // Must be a [GroupType] or [UserType].
+    // Must be a [UserType], [GroupType], or [TupleType].
     Type receiver,
     OperatorToken receiverDot,
     @required OperatorToken leftParenthesis,
