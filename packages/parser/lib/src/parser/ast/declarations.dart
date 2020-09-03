@@ -22,8 +22,8 @@ abstract class FunctionDeclaration extends AstNode
         List<FunctionValueParameter> valueParameters,
     @Default(<OperatorToken>[]) List<OperatorToken> valueParameterCommata,
     @required OperatorToken rightParenthesis,
-    @required OperatorToken colon,
-    @required Type returnType,
+    OperatorToken colon,
+    Type returnType,
     Block body,
   }) = _FunctionDeclaration;
   const FunctionDeclaration._();
