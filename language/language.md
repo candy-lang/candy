@@ -12,7 +12,7 @@ method(param1)
 
 
 - [1. Visibility Modifiers](#1-visibility-modifiers)
-- [2. Variables](#2-variables)
+- [2. Properties](#2-properties)
 - [3. Functions](#3-functions)
 - [4. Classes](#4-classes)
   - [4.1. Abstract classes](#41-abstract-classes)
@@ -65,12 +65,32 @@ method(param1)
 
 By default, everything has the lowest possible visibility modifier (usually `private`).
 
-## 2. Variables
+
+## 2. Properties
 
 ```rust
 const constant: Int = 0
 let readonly: Int = 0
 let mut mutable: Int = 0
+
+let mut whoosh: Int = bazfoo
+  private get
+let mut floop: Int
+  private set
+let mut blub: Int
+  private get: Int => blub * 5
+  private get: Float => blub / 2 // recursion?
+  private get: String => blub.toString()
+  private get: Bytes => '${(blub + 1) / 2.0 * blub}$blub'.toUtf8()
+  private get: Int => blub > 5 ? blub.length : blub.sum();
+  private set => field = value + 1
+let blab: Int
+  get: Float => field
+
+lateinit let baz: Int
+
+let computed: Int
+  private get => foo.length
 ```
 
 
@@ -170,29 +190,6 @@ class FieldClass {
   let foo: Int
   let mut bar: Int
   let mut withDefault: Int = foo
-
-  let mut whoosh: Int = bazfoo
-    private get
-  let mut floop: Int
-    private set
-  let mut blub: Int
-    private get: int => blub * 5
-    private get: double => blub / 2 // recursion?
-    private get: String => blub.toString()
-    private get: Bytes => '${(blub + 1) / 2.0 * blub}$blub'.toUtf8()
-    private get: int => blub > 5 ? blub.length : blub.sum();
-    private get: T => blub.as<T>()
-    private set => field = value + 1
-    private set(value: T) => blub = value / 2
-  let blab: Int
-    get: double => field
-
-  lateinit let baz: Int
-
-  let computed: Int
-    private get => foo.length
-
-  private get computed: Int => foo.length;
 
   // methods:
   fun doFoo(param1: Param1Type): ReturnType {
