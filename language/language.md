@@ -25,6 +25,7 @@ method(param1)
   - [8.1. Operators](#81-operators)
   - [8.2. Literals](#82-literals)
     - [8.2.1. Strings](#821-strings)
+    - [8.2.2. Collections](#822-collections)
   - [8.3. Labels](#83-labels)
   - [8.4. If](#84-if)
 - [9. Statements](#9-statements)
@@ -390,6 +391,32 @@ r##"foo " "# bar {bar}"## // foo " "# bar {bar}
 ```
 
 Line breaks within multi-line string literals get normalized to a single line feed each.
+
+#### 8.2.2. Collections
+
+List literal: `[1, 2, 3]`
+Set literal: `{1, 2, 3}`
+Map literal: `{1 to 1, 2 to 2, 3 to 3}`
+
+If the values are compile-time inferred to be `Map.Entry`s, the literal creates a map. You can change it to be a set by:
+- explicitly specifying type arguments (`<Map.Entry<Key, Value>>{ … }`)
+- explicitly specifying its type (`let a: Set<Map.Entry<Key, Value>> = { … }`)
+
+You can also use `if` expressions without an `else` branch, as well as safe/unsafe unwrapping (`?`/`!`).
+
+```dart
+let a: Optional<Iterable<Int>>
+let b: Iterable<Optional<Int>>
+let c: Iterable<Int> = [
+  if (true) 1 else 2,
+  if (false) 2,
+  if (false) ...[1, 2],
+  ...myList.indices.map { it * it },
+  if (true) ...myList.indices.map { it * it } else 2,
+  ...a?,
+  ...b.whereNotNone,
+]
+```
 
 
 ### 8.3. Labels
