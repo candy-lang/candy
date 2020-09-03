@@ -5,6 +5,7 @@ import 'package:petitparser/petitparser.dart'
 import '../lexer/lexer.dart';
 import '../syntactic_entity.dart';
 import '../utils.dart';
+import 'ast/declarations.dart';
 import 'ast/expressions/expression.dart';
 import 'ast/statements.dart';
 import 'ast/types.dart';
@@ -21,6 +22,61 @@ class ParserGrammar {
   }
 
   static bool _isInitialized = false;
+
+  // SECTION: declarations
+
+  static final functionDeclaration = (modifiers.optional() &
+          LexerGrammar.FUN &
+          LexerGrammar.NLs &
+          LexerGrammar.Identifier &
+          LexerGrammar.NLs &
+          LexerGrammar.LPAREN &
+          LexerGrammar.NLs &
+          functionValueParameter.fullCommaSeparatedList().optional() &
+          LexerGrammar.NLs &
+          LexerGrammar.RPAREN &
+          LexerGrammar.NLs &
+          LexerGrammar.COLON &
+          LexerGrammar.NLs &
+          type &
+          (LexerGrammar.NLs & block).optional())
+      .map<FunctionDeclaration>((value) {
+    final parameterList = value[7] as List<dynamic>;
+    return FunctionDeclaration(
+      modifiers: (value[0] as List<dynamic>)?.cast<ModifierToken>() ?? [],
+      funKeyword: value[1] as KeywordToken,
+      name: value[3] as IdentifierToken,
+      leftParenthesis: value[5] as OperatorToken,
+      valueParameters:
+          parameterList?.elementAt(0) as List<FunctionValueParameter> ?? [],
+      valueParameterCommata:
+          parameterList?.elementAt(1) as List<OperatorToken> ?? [],
+      rightParenthesis: value[9] as OperatorToken,
+      colon: value[11] as OperatorToken,
+      returnType: value[13] as Type,
+      body: (value[14] as List<dynamic>)?.elementAt(1) as Block,
+    );
+  });
+  static final functionValueParameter = (LexerGrammar.Identifier &
+          LexerGrammar.NLs &
+          LexerGrammar.COLON &
+          LexerGrammar.NLs &
+          type &
+          (LexerGrammar.NLs &
+                  LexerGrammar.EQUALS &
+                  LexerGrammar.NLs &
+                  expression)
+              .optional())
+      .map<FunctionValueParameter>((value) {
+    final defaultValueDeclaration = value[5] as List<dynamic>;
+    return FunctionValueParameter(
+      name: value[0] as IdentifierToken,
+      colon: value[2] as OperatorToken,
+      type: value[4] as Type,
+      equals: defaultValueDeclaration?.elementAt(1) as OperatorToken,
+      defaultValue: defaultValueDeclaration?.elementAt(3) as Expression,
+    );
+  });
 
   // SECTION: types
 
@@ -359,6 +415,16 @@ class ParserGrammar {
     LexerGrammar.IntegerLiteral.map((l) => Literal<int>(l)),
     LexerGrammar.BooleanLiteral.map((l) => Literal<bool>(l)),
   ]);
+
+  // SECTION: modifiers
+
+  static final modifier =
+      // ignore: unnecessary_cast
+      ((functionModifier as Parser<ModifierToken>) & LexerGrammar.NLs)
+          .map((value) => value[0] as ModifierToken);
+
+  static final functionModifier = LexerGrammar.EXTERNAL;
+
 }
 
 extension<T> on Parser<T> {

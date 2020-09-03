@@ -17,11 +17,18 @@ abstract class OperatorToken extends Token with _$OperatorToken {
 }
 
 @freezed
-abstract class IdentifierToken extends Token with _$IdentifierToken {
-  const factory IdentifierToken(
-    String name, {
-    @required SourceSpan span,
-  }) = _IdentifierToken;
+abstract class KeywordToken extends Token with _$KeywordToken {
+  const factory KeywordToken.fun({@required SourceSpan span}) =
+      _FunKeywordToken;
+}
+
+abstract class ModifierToken extends Token {}
+
+@freezed
+abstract class FunctionModifierToken extends ModifierToken
+    with _$FunctionModifierToken {
+  const factory FunctionModifierToken.external({@required SourceSpan span}) =
+      _ExternalFunctionModifierToken;
 }
 
 abstract class LiteralToken<T> extends Token {
@@ -47,12 +54,23 @@ abstract class BooleanLiteralToken extends LiteralToken<bool>
   }) = _BooleanLiteralToken;
 }
 
+@freezed
+abstract class IdentifierToken extends Token with _$IdentifierToken {
+  const factory IdentifierToken(
+    String name, {
+    @required SourceSpan span,
+  }) = _IdentifierToken;
+}
+
 enum OperatorTokenType {
   /// `.`
   dot,
 
   /// `,`
   comma,
+
+  /// `:`
+  colon,
 
   /// `=>`
   equalsGreater,

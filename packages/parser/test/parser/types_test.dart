@@ -33,27 +33,6 @@ void main() {
     },
   );
 
-  Type createTypeFooBar([int offset = 0]) {
-    return UserType(
-      simpleTypes: [
-        SimpleUserType(IdentifierToken(
-          'Foo',
-          span: SourceSpan.fromStartLength(offset + 0, 3),
-        )),
-        SimpleUserType(IdentifierToken(
-          'Bar',
-          span: SourceSpan.fromStartLength(offset + 4, 3),
-        )),
-      ],
-      dots: [
-        OperatorToken(
-          OperatorTokenType.dot,
-          span: SourceSpan.fromStartLength(offset + 3, 1),
-        ),
-      ],
-    );
-  }
-
   tableTestTypeParser<GroupType>(
     'GroupType',
     table: {
@@ -295,4 +274,25 @@ void tableTestTypeParser<T extends Type>(
           testParser(source, result: result, parser: ParserGrammar.type),
     );
   });
+}
+
+Type createTypeFooBar([int offset = 0]) {
+  return UserType(
+    simpleTypes: [
+      SimpleUserType(IdentifierToken(
+        'Foo',
+        span: SourceSpan.fromStartLength(offset + 0, 3),
+      )),
+      SimpleUserType(IdentifierToken(
+        'Bar',
+        span: SourceSpan.fromStartLength(offset + 4, 3),
+      )),
+    ],
+    dots: [
+      OperatorToken(
+        OperatorTokenType.dot,
+        span: SourceSpan.fromStartLength(offset + 3, 1),
+      ),
+    ],
+  );
 }

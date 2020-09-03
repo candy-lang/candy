@@ -24,7 +24,9 @@ class LexerGrammar {
 
   static final DOT = _operator('.', OperatorTokenType.dot);
   static final COMMA = _operator(',', OperatorTokenType.comma);
-  static final EQUALS_GREATER = _operator('=>', OperatorTokenType.colon);
+  static final COLON = _operator(':', OperatorTokenType.colon);
+  static final EQUALS_GREATER =
+      _operator('=>', OperatorTokenType.equalsGreater);
 
   static final LPAREN = _operator('(', OperatorTokenType.lparen);
   static final RPAREN = _operator(')', OperatorTokenType.rparen);
@@ -125,6 +127,16 @@ class LexerGrammar {
           String operator, OperatorTokenType type) =>
       string(operator)
           .tokenize((lexeme, span) => OperatorToken(type, span: span));
+
+  // SECTION: keywords
+
+  static final FUN =
+      string('fun').tokenize((_, span) => KeywordToken.fun(span: span));
+
+  // SECTION: lexicalModifiers
+
+  static final EXTERNAL = string('external')
+      .tokenize((_, span) => FunctionModifierToken.external(span: span));
 
   // SECTION: literals
 

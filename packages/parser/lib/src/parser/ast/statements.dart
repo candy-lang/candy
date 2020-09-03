@@ -11,7 +11,7 @@ part 'statements.freezed.dart';
 abstract class Block extends AstNode implements _$Block {
   const factory Block({
     @required OperatorToken leftBrace,
-    @required List<Statement> statements,
+    @Default(<Statement>[]) List<Statement> statements,
     @required OperatorToken rightBrace,
   }) = _Block;
   const Block._();
