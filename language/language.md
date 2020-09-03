@@ -39,15 +39,16 @@ method(param1)
   - [9.8. Continue](#98-continue)
   - [9.9. Yield & Yield-Each](#99-yield--yield-each)
   - [9.10. Assert](#910-assert)
-- [10. Modules & Scripts](#10-modules--scripts)
-- [11. Types](#11-types)
-  - [11.1. Function Types](#111-function-types)
-  - [11.2. Value Constraints](#112-value-constraints)
-  - [11.3. Implicit Casts](#113-implicit-casts)
-- [12. Comments](#12-comments)
-- [13. Decisions](#13-decisions)
-  - [13.1. Differentiate between immutable list & immutable view](#131-differentiate-between-immutable-list--immutable-view)
-- [14. Ideas for the future](#14-ideas-for-the-future)
+- [10. Patterns](#10-patterns)
+- [11. Modules & Scripts](#11-modules--scripts)
+- [12. Types](#12-types)
+  - [12.1. Function Types](#121-function-types)
+  - [12.2. Value Constraints](#122-value-constraints)
+  - [12.3. Implicit Casts](#123-implicit-casts)
+- [13. Comments](#13-comments)
+- [14. Decisions](#14-decisions)
+  - [14.1. Differentiate between immutable list & immutable view](#141-differentiate-between-immutable-list--immutable-view)
+- [15. Ideas for the future](#15-ideas-for-the-future)
 
 
 ## 1. Visibility Modifiers
@@ -473,7 +474,34 @@ if (…) … else …
 ### 9.9. Yield & Yield-Each
 ### 9.10. Assert
 
-## 10. Modules & Scripts
+## 10. Patterns
+
+```rust
+match x {
+  1 => "exactly 1"
+  2 | 3 => "2 or 3"
+  a: Int if a.isEven => "is even"
+  (1, a) => "tuple of 1 and {b}"
+  ("abc", a = 1 | 2) => #"("abc", 1) or ("abc", 2) (and a captures the value)"#
+  ("abc", a: Int) => #"Tuple of "abc" and an integer ({a})"#
+  a = 4 | 5 => "is 4 or 5 and captured in a"
+  a in 6..8 => "is within 6 and 8 and captured in a"
+  a: Int => "is of type Int and captured in a"
+  Option.Some(a) => "Some of {a}"
+  _: Option<a = Int | UInt> => "Option<{a}>"
+  _: Option<T> => "Option<{T}>"
+  _: ((Int) => String) => "Function from Int to String"
+  _ => "default"
+}
+
+let (a, b) = (1, 2)
+if let .Some(a) = x { … }
+for k, v in myMap { … }
+for .Some(a) in myList { … }
+```
+
+
+## 11. Modules & Scripts
 
 - `use`: import a module
 - `public use`: import & export a module
@@ -627,7 +655,7 @@ Compiler Plugin:
 - when providing a configuration, `impl Json: TryTo<Config>` and `impl Config: To<Json>` must be available
 
 
-## 11. Types
+## 12. Types
 
 Primitive types:
 - `Bool`
@@ -645,13 +673,13 @@ Primitive types:
 - `(P1, …, Pn) -> R ≡ Function<P1, …, Pn, R>` ()
 - `Type<T>` (potentially)
 
-### 11.1. Function Types
+### 12.1. Function Types
 
 ```kotlin
 R.(T1 t1, T2 t2, …, Tn tn = dn) -> T
 ```
 
-### 11.2. Value Constraints
+### 12.2. Value Constraints
 
 ```kotlin
 fun a(Pair<Int, Int> pair)
@@ -661,26 +689,26 @@ fun a(Pair<Int, Int> pair)
 ```
 
 
-### 11.3. Implicit Casts
+### 12.3. Implicit Casts
 
 By implementing `As<T>` for `Foo`, you can implicitly (or explicitly) use `Foo` as `T`. This doesn't work transitively, though you could write `Foo as T as R`.
 
 This also provides what is known as Interface Delegation in Kotlin.
 
 
-## 12. Comments
+## 13. Comments
 
 - automatic line wrapping
 
 
-## 13. Decisions
+## 14. Decisions
 
-### 13.1. Differentiate between immutable list & immutable view
+### 14.1. Differentiate between immutable list & immutable view
 
 - just provide an immutable trait, since anybody could still implement an immutable list trait on a mutable one
 
 
-## 14. Ideas for the future
+## 15. Ideas for the future
 
 - allow dependencies in default parameter values in any order, as long as these dependencies form a DAG (i.e., they don't contain any cycles)
 - syntactic sugar for the `As<T>` trait
