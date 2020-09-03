@@ -1,14 +1,15 @@
 use core: math
 use currency
 
-pub fun main() {
+public fun main() {
   print("Hello world!")
   main1()
   main2()
   main3()
 }
 
-@mem pure fun fibonacci(n: Uint) -> Uint {
+@Remember(cacheSize = 30)
+pure fun fibonacci(n: UInt): UInt {
   /// Returns the [n]th fibonacci number.
   return match n {
     0 => 0
@@ -24,15 +25,15 @@ fun main1() {
 
 @data class Fruit {
   let name: String
-  let cost: Currency
-  let ripeness: Ripeness
+  let cost: Money
+  let ripeness: Ripeness = .unripe
 }
 
 enum Ripeness { ripe, unripe }
 
 const apple = Fruit("apple", 2.euro)
 const banana = Fruit("banana", 5.20.euro)
-const kiwi = Fruit("kiwi", 7.euro)
+const kiwi = Fruit("kiwi", 7.euro, ripeness = .ripe)
 const smoothieIngredients = [apple, banana, kiwi, apple, kiwi]
 
 fun main2() {
@@ -42,45 +43,46 @@ fun main2() {
 class Cart {
   /// A shopping cart than can contain items.
 
+  trait Item {
+    let cost: Money
+  }
+
   let items: MutableList<Item> = []
   /// The items currently in the cart.
 
-  trait Item {
-    let cost: Int
-  }
+  let cost: Money
+    get => items.cost
 
-  get cost => items.cost
-
-  fun buy() {
-    TODO()
-  }
+  fun buy() = TODO
 }
 
-impl List<Item>: Item {
+impl Iterable<Item>: Item {
   /// Simplifies getting the cost of a list of items.
 
-  get cost => map{ it.cost }.sum()
+  let cost: Money
+    get => sumBy { it.cost }
 }
 
 impl Fruit: Cart.Item
 
-@data class Box<T: Cart.Item> {
+@data class Box<Item: Cart.Item> {
   /// A beautiful, handcrafted, wooden box.
 
-  static const cost: Uint = 30 euro
+  static const cost: Money = 30.euro
   /// A box is very expensive.
 
-  let content: List<T>
+  let content: List<Item>
 }
 
-impl Box<T>: Cart.Item {
-  get cost => content.map{ it.cost }.sum() + Box.cost
+impl<Item> Box<Item>: Cart.Item {
+  let cost: Money
+    get => content.cost + Box.cost
 }
 
 const cart = Cart([
   kiwi,
   ...smoothieIngredients,
-  Box([apple, 2 times banana])
+  Box([apple, 2 times banana]),
 ])
 
 void main3() {
@@ -90,7 +92,7 @@ void main3() {
 impl Fruit {
   let yumminess: Int
     /// Computes a yumminess score for this [Fruit] using a secret formula.
-    get => fibonacci(cost) + name.bytes.sum() + match ripeness {
+    get => fibonacci(cost.value as UInt) + name.bytes.sum() + match ripeness {
       ripe => 0
       unripe => -20
     }
@@ -104,12 +106,12 @@ void main4() {
 
 class Human {
   fun eat(fruits: List<Fruit>): Result<Burp, ThrowUp> {
-    var fullness = 0
+    let mut fullness = 0
     for fruit in fruits {
       if fullness < 10 || randomBool() {
         fullness++
       } else {
-        throw up
+        return ThrowUp()
       }
     }
     burp
@@ -117,7 +119,6 @@ class Human {
 }
 
 /*
-- var
 - abstract classes
 - labels
 - try
@@ -126,7 +127,7 @@ class Human {
 - continue
 - yield & yield each
 - modules
-- function types
+- function types, tuple types
 - value constraints
-- implicit casts
+- implication operator
 */
