@@ -18,6 +18,9 @@ abstract class OperatorToken extends Token with _$OperatorToken {
 
 @freezed
 abstract class KeywordToken extends Token with _$KeywordToken {
+  // ignore: non_constant_identifier_names
+  const factory KeywordToken.class_({@required SourceSpan span}) =
+      ClassKeywordToken;
   const factory KeywordToken.fun({@required SourceSpan span}) = FunKeywordToken;
   const factory KeywordToken.let({@required SourceSpan span}) = LetKeywordToken;
   const factory KeywordToken.mut({@required SourceSpan span}) = MutKeywordToken;
@@ -29,6 +32,11 @@ abstract class KeywordToken extends Token with _$KeywordToken {
 abstract class ModifierToken extends Token with _$ModifierToken {
   const factory ModifierToken.external({@required SourceSpan span}) =
       _ExternalModifierToken;
+  const factory ModifierToken.abstract({@required SourceSpan span}) =
+      _AbstractModifierToken;
+  // ignore: non_constant_identifier_names
+  const factory ModifierToken.const_({@required SourceSpan span}) =
+      _ConstModifierToken;
 }
 
 abstract class LiteralToken<T> extends Token {

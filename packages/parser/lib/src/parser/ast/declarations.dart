@@ -15,6 +15,65 @@ abstract class Declaration extends AstNode {
 }
 
 @freezed
+abstract class ClassDeclaration extends Declaration
+    implements _$ClassDeclaration {
+  const factory ClassDeclaration({
+    @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
+    @required ClassKeywordToken classKeyword,
+    @required IdentifierToken name,
+    OperatorToken colon,
+    ConstructorInvocation parentConstructorInvocation,
+    ClassBody body,
+  }) = _ClassDeclaration;
+  const ClassDeclaration._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [
+        ...modifiers,
+        classKeyword,
+        name,
+        if (colon != null) colon,
+        if (parentConstructorInvocation != null) parentConstructorInvocation,
+        if (body != null) body,
+      ];
+}
+
+@freezed
+abstract class ClassBody extends AstNode implements _$ClassBody {
+  const factory ClassBody({
+    @required OperatorToken leftBrace,
+    @Default(<Declaration>[]) List<Declaration> declarations,
+    @required OperatorToken rightBrace,
+  }) = _ClassBody;
+  const ClassBody._();
+
+  @override
+  Iterable<SyntacticEntity> get children =>
+      [leftBrace, ...declarations, rightBrace];
+}
+
+@freezed
+abstract class ConstructorInvocation extends AstNode
+    implements _$ConstructorInvocation {
+  const factory ConstructorInvocation({
+    @required UserType type,
+    @required OperatorToken leftParenthesis,
+    @required List<Argument> arguments,
+    @required List<OperatorToken> argumentCommata,
+    @required OperatorToken rightParenthesis,
+  }) = _ConstructorInvocation;
+  const ConstructorInvocation._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [
+        type,
+        leftParenthesis,
+        ...interleave(arguments, argumentCommata),
+        rightParenthesis,
+      ];
+}
+
+@freezed
 abstract class FunctionDeclaration extends Declaration
     implements _$FunctionDeclaration {
   const factory FunctionDeclaration({

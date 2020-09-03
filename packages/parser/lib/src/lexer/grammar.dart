@@ -130,6 +130,8 @@ class LexerGrammar {
 
   // SECTION: keywords
 
+  static final CLASS = string('class').tokenize(
+      (_, span) => KeywordToken.class_(span: span) as ClassKeywordToken);
   static final FUN = string('fun')
       .tokenize((_, span) => KeywordToken.fun(span: span) as FunKeywordToken);
   static final LET = string('let')
@@ -145,6 +147,10 @@ class LexerGrammar {
 
   static final EXTERNAL = string('external')
       .tokenize((_, span) => ModifierToken.external(span: span));
+  static final ABSTRACT = string('abstract')
+      .tokenize((_, span) => ModifierToken.abstract(span: span));
+  static final CONST =
+      string('const').tokenize((_, span) => ModifierToken.const_(span: span));
 
   // SECTION: literals
 

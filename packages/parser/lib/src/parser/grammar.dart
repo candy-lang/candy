@@ -17,6 +17,7 @@ class ParserGrammar {
     assert(!_isInitialized, 'Already initialized.');
     _isInitialized = true;
 
+    _initDeclaration();
     _initType();
     _initExpression();
   }
@@ -25,9 +26,61 @@ class ParserGrammar {
 
   // SECTION: declarations
 
-  static final declaration =
-      // ignore: unnecessary_cast
-      (functionDeclaration as Parser<Declaration>) | propertyDeclaration;
+  static final declarations =
+      (declaration & semis.optional()).map((v) => v[0] as Declaration).star();
+  static final _declaration = undefined<Declaration>();
+  static Parser<Declaration> get declaration => _declaration;
+  static void _initDeclaration() {
+    // ignore: unnecessary_cast
+    _declaration.set((classDeclaration as Parser<Declaration>) |
+        functionDeclaration |
+        propertyDeclaration);
+  }
+
+  static final Parser<ClassDeclaration> classDeclaration = (modifiers
+              .optional() &
+          LexerGrammar.CLASS &
+          LexerGrammar.NLs &
+          LexerGrammar.Identifier &
+          (LexerGrammar.NLs &
+                  LexerGrammar.COLON &
+                  LexerGrammar.NLs &
+                  constructorInvocation)
+              .optional() &
+          (LexerGrammar.NLs & classBody).optional())
+      .map<ClassDeclaration>((value) {
+    final parentConstructorInvocation = value[4] as List<dynamic>;
+    return ClassDeclaration(
+      modifiers: value[0] as List<ModifierToken> ?? [],
+      classKeyword: value[1] as ClassKeywordToken,
+      name: value[3] as IdentifierToken,
+      colon: parentConstructorInvocation?.elementAt(1) as OperatorToken,
+      parentConstructorInvocation:
+          parentConstructorInvocation?.elementAt(3) as ConstructorInvocation,
+      body: (value[5] as List<dynamic>)?.elementAt(1) as ClassBody,
+    );
+  });
+  static final classBody = (LexerGrammar.LCURL &
+          LexerGrammar.NLs &
+          declarations &
+          LexerGrammar.NLs &
+          LexerGrammar.RCURL)
+      .map((value) => ClassBody(
+            leftBrace: value[0] as OperatorToken,
+            declarations: value[2] as List<Declaration>,
+            rightBrace: value[4] as OperatorToken,
+          ));
+  static final constructorInvocation =
+      (userType & invocationPostfix).map<ConstructorInvocation>((value) {
+    final invocationPostfix = value[1] as List<dynamic>;
+    return ConstructorInvocation(
+      type: value[0] as UserType,
+      leftParenthesis: invocationPostfix[0] as OperatorToken,
+      arguments: invocationPostfix[1] as List<Argument>,
+      argumentCommata: invocationPostfix[2] as List<OperatorToken>,
+      rightParenthesis: invocationPostfix[3] as OperatorToken,
+    );
+  });
 
   static final functionDeclaration = (modifiers.optional() &
           LexerGrammar.FUN &
@@ -47,7 +100,7 @@ class ParserGrammar {
     final parameterList = value[7] as List<dynamic>;
     final returnTypeDeclaration = value[10] as List<dynamic>;
     return FunctionDeclaration(
-      modifiers: (value[0] as List<dynamic>)?.cast<ModifierToken>() ?? [],
+      modifiers: (value[0] as List<ModifierToken>) ?? [],
       funKeyword: value[1] as FunKeywordToken,
       name: value[3] as IdentifierToken,
       leftParenthesis: value[5] as OperatorToken,
@@ -80,7 +133,7 @@ class ParserGrammar {
       .map<PropertyDeclaration>((value) {
     final initializerDeclaration = value[9] as List<dynamic>;
     return PropertyDeclaration(
-      modifiers: (value[0] as List<dynamic>)?.cast<ModifierToken>() ?? [],
+      modifiers: (value[0] as List<ModifierToken>) ?? [],
       letKeyword: value[1] as LetKeywordToken,
       mutKeyword: (value[2] as List<dynamic>)?.elementAt(1) as MutKeywordToken,
       name: value[4] as IdentifierToken,
@@ -339,7 +392,7 @@ class ParserGrammar {
           );
         },
       )
-      ..complexPostfix<List<SyntacticEntity>, CallExpression>(
+      ..complexPostfix<List<dynamic>, CallExpression>(
         invocationPostfix,
         mapper: (expression, postfix) {
           return CallExpression(
@@ -451,18 +504,20 @@ class ParserGrammar {
           valueArguments &
           LexerGrammar.NLs &
           LexerGrammar.RPAREN)
-      .map<List<SyntacticEntity>>((value) {
-    return [
+      .map<List<dynamic>>((value) {
+    final arguments = value[1] as List<dynamic>;
+    return <dynamic>[
       value[0] as OperatorToken, // leftParenthesis
-      ...value[1] as List<Argument>, // arguments
+      arguments[0] as List<Argument>, // arguments
+      arguments[1] as List<OperatorToken>, // argumentCommata
       value[3] as OperatorToken, // rightParenthesis
     ];
   });
 
   static final valueArguments = (LexerGrammar.NLs &
-          valueArgument.commaSeparatedList().optional() &
+          valueArgument.fullCommaSeparatedList().optional() &
           LexerGrammar.NLs)
-      .map((value) => value[1] as List<Argument> ?? []);
+      .map((value) => value[1] as List<dynamic> ?? <dynamic>[]);
 
   static final valueArgument = (LexerGrammar.NLs &
           (LexerGrammar.Identifier &
@@ -501,8 +556,10 @@ class ParserGrammar {
   // SECTION: modifiers
 
   static final modifiers = modifier.plus();
-  static final modifier = (LexerGrammar.EXTERNAL & LexerGrammar.NLs)
-      .map((value) => value[0] as ModifierToken);
+  static final modifier =
+      ((LexerGrammar.EXTERNAL | LexerGrammar.ABSTRACT | LexerGrammar.CONST) &
+              LexerGrammar.NLs)
+          .map((value) => value[0] as ModifierToken);
 }
 
 extension<T> on Parser<T> {
