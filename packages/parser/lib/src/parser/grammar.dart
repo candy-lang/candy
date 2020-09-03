@@ -44,7 +44,7 @@ class ParserGrammar {
     final returnTypeDeclaration = value[10] as List<dynamic>;
     return FunctionDeclaration(
       modifiers: (value[0] as List<dynamic>)?.cast<ModifierToken>() ?? [],
-      funKeyword: value[1] as KeywordToken,
+      funKeyword: value[1] as FunKeywordToken,
       name: value[3] as IdentifierToken,
       leftParenthesis: value[5] as OperatorToken,
       valueParameters:

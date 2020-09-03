@@ -18,8 +18,7 @@ abstract class OperatorToken extends Token with _$OperatorToken {
 
 @freezed
 abstract class KeywordToken extends Token with _$KeywordToken {
-  const factory KeywordToken.fun({@required SourceSpan span}) =
-      _FunKeywordToken;
+  const factory KeywordToken.fun({@required SourceSpan span}) = FunKeywordToken;
 }
 
 abstract class ModifierToken extends Token {}

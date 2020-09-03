@@ -16,7 +16,8 @@ void main() {
     forAllMap<String, FunctionDeclaration>(
       table: {
         'fun foo(): Foo.Bar {}': FunctionDeclaration(
-          funKeyword: KeywordToken.fun(span: SourceSpan(0, 3)),
+          funKeyword:
+              KeywordToken.fun(span: SourceSpan(0, 3)) as FunKeywordToken,
           name: IdentifierToken('foo', span: SourceSpan(4, 7)),
           leftParenthesis:
               OperatorToken(OperatorTokenType.lparen, span: SourceSpan(7, 8)),
@@ -39,7 +40,8 @@ void main() {
         'external fun foo(bar: Foo.Bar, baz: Foo.Bar = defaultBaz): Foo.Bar':
             FunctionDeclaration(
           modifiers: [FunctionModifierToken.external(span: SourceSpan(0, 8))],
-          funKeyword: KeywordToken.fun(span: SourceSpan(9, 12)),
+          funKeyword:
+              KeywordToken.fun(span: SourceSpan(9, 12)) as FunKeywordToken,
           name: IdentifierToken('foo', span: SourceSpan(13, 16)),
           leftParenthesis: OperatorToken(
             OperatorTokenType.lparen,

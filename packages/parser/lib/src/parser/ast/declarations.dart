@@ -15,7 +15,7 @@ abstract class FunctionDeclaration extends AstNode
     implements _$FunctionDeclaration {
   const factory FunctionDeclaration({
     @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
-    @required KeywordToken funKeyword,
+    @required FunKeywordToken funKeyword,
     @required IdentifierToken name,
     @required OperatorToken leftParenthesis,
     @Default(<FunctionValueParameter>[])

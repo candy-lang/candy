@@ -130,8 +130,8 @@ class LexerGrammar {
 
   // SECTION: keywords
 
-  static final FUN =
-      string('fun').tokenize((_, span) => KeywordToken.fun(span: span));
+  static final FUN = string('fun')
+      .tokenize((_, span) => KeywordToken.fun(span: span) as FunKeywordToken);
 
   // SECTION: lexicalModifiers
 
