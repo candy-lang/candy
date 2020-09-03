@@ -136,7 +136,7 @@ class LexerGrammar {
   // SECTION: lexicalModifiers
 
   static final EXTERNAL = string('external')
-      .tokenize((_, span) => FunctionModifierToken.external(span: span));
+      .tokenize((_, span) => ModifierToken.external(span: span));
 
   // SECTION: literals
 

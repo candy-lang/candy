@@ -21,13 +21,10 @@ abstract class KeywordToken extends Token with _$KeywordToken {
   const factory KeywordToken.fun({@required SourceSpan span}) = FunKeywordToken;
 }
 
-abstract class ModifierToken extends Token {}
-
 @freezed
-abstract class FunctionModifierToken extends ModifierToken
-    with _$FunctionModifierToken {
-  const factory FunctionModifierToken.external({@required SourceSpan span}) =
-      _ExternalFunctionModifierToken;
+abstract class ModifierToken extends Token with _$ModifierToken {
+  const factory ModifierToken.external({@required SourceSpan span}) =
+      _ExternalModifierToken;
 }
 
 abstract class LiteralToken<T> extends Token {

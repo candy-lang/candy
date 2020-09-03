@@ -32,7 +32,7 @@ class ParserGrammar {
           LexerGrammar.NLs &
           LexerGrammar.LPAREN &
           LexerGrammar.NLs &
-          functionValueParameter.fullCommaSeparatedList().optional() &
+          valueParameter.fullCommaSeparatedList().optional() &
           LexerGrammar.NLs &
           LexerGrammar.RPAREN &
           (LexerGrammar.NLs & LexerGrammar.COLON & LexerGrammar.NLs & type)
@@ -48,7 +48,7 @@ class ParserGrammar {
       name: value[3] as IdentifierToken,
       leftParenthesis: value[5] as OperatorToken,
       valueParameters:
-          parameterList?.elementAt(0) as List<FunctionValueParameter> ?? [],
+          parameterList?.elementAt(0) as List<ValueParameter> ?? [],
       valueParameterCommata:
           parameterList?.elementAt(1) as List<OperatorToken> ?? [],
       rightParenthesis: value[9] as OperatorToken,
@@ -57,7 +57,7 @@ class ParserGrammar {
       body: (value[11] as List<dynamic>)?.elementAt(1) as Block,
     );
   });
-  static final functionValueParameter = (LexerGrammar.Identifier &
+  static final valueParameter = (LexerGrammar.Identifier &
           LexerGrammar.NLs &
           LexerGrammar.COLON &
           LexerGrammar.NLs &
@@ -67,9 +67,9 @@ class ParserGrammar {
                   LexerGrammar.NLs &
                   expression)
               .optional())
-      .map<FunctionValueParameter>((value) {
+      .map<ValueParameter>((value) {
     final defaultValueDeclaration = value[5] as List<dynamic>;
-    return FunctionValueParameter(
+    return ValueParameter(
       name: value[0] as IdentifierToken,
       colon: value[2] as OperatorToken,
       type: value[4] as Type,

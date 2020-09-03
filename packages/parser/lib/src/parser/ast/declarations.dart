@@ -18,8 +18,7 @@ abstract class FunctionDeclaration extends AstNode
     @required FunKeywordToken funKeyword,
     @required IdentifierToken name,
     @required OperatorToken leftParenthesis,
-    @Default(<FunctionValueParameter>[])
-        List<FunctionValueParameter> valueParameters,
+    @Default(<ValueParameter>[]) List<ValueParameter> valueParameters,
     @Default(<OperatorToken>[]) List<OperatorToken> valueParameterCommata,
     @required OperatorToken rightParenthesis,
     OperatorToken colon,
@@ -43,16 +42,15 @@ abstract class FunctionDeclaration extends AstNode
 }
 
 @freezed
-abstract class FunctionValueParameter extends AstNode
-    implements _$FunctionValueParameter {
-  const factory FunctionValueParameter({
+abstract class ValueParameter extends AstNode implements _$ValueParameter {
+  const factory ValueParameter({
     @required IdentifierToken name,
     @required OperatorToken colon,
     @required Type type,
     OperatorToken equals,
     Expression defaultValue,
-  }) = _FunctionValueParameter;
-  const FunctionValueParameter._();
+  }) = _ValueParameter;
+  const ValueParameter._();
 
   @override
   Iterable<SyntacticEntity> get children => [

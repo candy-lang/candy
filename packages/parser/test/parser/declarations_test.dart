@@ -39,7 +39,7 @@ void main() {
         ),
         'external fun foo(bar: Foo.Bar, baz: Foo.Bar = defaultBaz): Foo.Bar':
             FunctionDeclaration(
-          modifiers: [FunctionModifierToken.external(span: SourceSpan(0, 8))],
+          modifiers: [ModifierToken.external(span: SourceSpan(0, 8))],
           funKeyword:
               KeywordToken.fun(span: SourceSpan(9, 12)) as FunKeywordToken,
           name: IdentifierToken('foo', span: SourceSpan(13, 16)),
@@ -48,7 +48,7 @@ void main() {
             span: SourceSpan(16, 17),
           ),
           valueParameters: [
-            FunctionValueParameter(
+            ValueParameter(
               name: IdentifierToken('bar', span: SourceSpan(17, 20)),
               colon: OperatorToken(
                 OperatorTokenType.colon,
@@ -56,7 +56,7 @@ void main() {
               ),
               type: createTypeFooBar(22),
             ),
-            FunctionValueParameter(
+            ValueParameter(
               name: IdentifierToken('baz', span: SourceSpan(31, 34)),
               colon: OperatorToken(
                 OperatorTokenType.colon,
