@@ -7,8 +7,12 @@ import 'node.dart';
 
 part 'statements.freezed.dart';
 
+abstract class Statement extends AstNode {
+  const Statement();
+}
+
 @freezed
-abstract class Block extends AstNode implements _$Block {
+abstract class Block extends Statement implements _$Block {
   const factory Block({
     @required OperatorToken leftBrace,
     @Default(<Statement>[]) List<Statement> statements,
@@ -17,19 +21,6 @@ abstract class Block extends AstNode implements _$Block {
   const Block._();
 
   @override
-  Iterable<SyntacticEntity> get children => [
-        leftBrace,
-        ...statements,
-        rightBrace,
-      ];
-}
-
-@freezed
-abstract class Statement extends AstNode implements _$Statement {
-  const factory Statement.expression(Expression expression) =
-      _ExpressionStatement;
-  const Statement._();
-
-  @override
-  Iterable<SyntacticEntity> get children => [when(expression: (e) => e)];
+  Iterable<SyntacticEntity> get children =>
+      [leftBrace, ...statements, rightBrace];
 }

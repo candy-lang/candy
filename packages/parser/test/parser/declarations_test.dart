@@ -8,6 +8,7 @@ import 'package:parser/src/parser/grammar.dart';
 import 'package:parser/src/source_span.dart';
 import 'package:test/test.dart';
 
+import 'statements_test.dart';
 import 'types_test.dart';
 import 'utils.dart';
 
@@ -131,11 +132,7 @@ void main() {
                 OperatorTokenType.lcurl,
                 span: SourceSpan(39, 40),
               ),
-              statements: [
-                Statement.expression(Literal<int>(
-                  IntegerLiteralToken(123, span: SourceSpan(40, 43)),
-                )),
-              ],
+              statements: [createStatement123(40)],
               rightBrace: OperatorToken(
                 OperatorTokenType.rcurl,
                 span: SourceSpan(43, 44),
@@ -155,11 +152,7 @@ void main() {
                 OperatorTokenType.lcurl,
                 span: SourceSpan(60, 61),
               ),
-              statements: [
-                Statement.expression(Literal<int>(
-                  IntegerLiteralToken(123, span: SourceSpan(61, 64)),
-                )),
-              ],
+              statements: [createStatement123(61)],
               rightBrace: OperatorToken(
                 OperatorTokenType.rcurl,
                 span: SourceSpan(64, 65),

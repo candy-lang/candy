@@ -2,6 +2,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../../lexer/token.dart';
 import '../../../syntactic_entity.dart';
+import '../../../utils.dart';
 import '../node.dart';
 
 part 'expression.freezed.dart';
@@ -123,6 +124,7 @@ abstract class CallExpression extends Expression implements _$CallExpression {
     @required Expression target,
     @required OperatorToken leftParenthesis,
     @required List<Argument> arguments,
+    @Default(<Argument>[]) List<Argument> arguments,
     @required OperatorToken rightParenthesis,
   }) = _InvocationExpression;
   const CallExpression._();

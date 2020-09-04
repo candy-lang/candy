@@ -14,14 +14,6 @@ void main() {
     testParser('', result: <Statement>[], parser: ParserGrammar.statements);
   });
 
-  Statement createStatement123([int offset = 0]) {
-    return Statement.expression(
-      Literal<int>(
-        IntegerLiteralToken(123, span: SourceSpan.fromStartLength(offset, 3)),
-      ),
-    );
-  }
-
   group('expressions', () {
     forAllMap<String, List<Statement>>(
       table: {
@@ -64,4 +56,10 @@ void main() {
           testParser(source, result: result, parser: ParserGrammar.block),
     );
   });
+}
+
+Statement createStatement123([int offset = 0]) {
+  return Literal<int>(
+    IntegerLiteralToken(123, span: SourceSpan.fromStartLength(offset, 3)),
+  );
 }

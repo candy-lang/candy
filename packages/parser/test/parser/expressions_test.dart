@@ -201,6 +201,15 @@ void main() {
                         ),
                       ),
                     ],
+                    argumentCommata: [
+                      OperatorToken(
+                        OperatorTokenType.comma,
+                        span: SourceSpan.fromStartLength(
+                          targetSource.length + 1 + arg1Source.length,
+                          1,
+                        ),
+                      ),
+                    ],
                     rightParenthesis: OperatorToken(
                       OperatorTokenType.rparen,
                       span: SourceSpan.fromStartLength(

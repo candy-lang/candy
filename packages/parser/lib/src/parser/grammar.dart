@@ -330,8 +330,7 @@ class ParserGrammar {
                   .optional() &
               semis.optional())
           .map((values) => values[0] as List<Statement> ?? []);
-  static final Parser<Statement> statement =
-      expression.map($Statement.expression);
+  static final Parser<Statement> statement = expression;
 
   static final block = (LexerGrammar.LCURL &
           LexerGrammar.NLs &
@@ -397,9 +396,10 @@ class ParserGrammar {
         mapper: (expression, postfix) {
           return CallExpression(
             target: expression,
-            leftParenthesis: postfix.first as OperatorToken,
-            arguments: postfix.sublist(1, postfix.length - 1).cast<Argument>(),
-            rightParenthesis: postfix.last as OperatorToken,
+            leftParenthesis: postfix[0] as OperatorToken,
+            arguments: postfix[1] as List<Argument> ?? [],
+            argumentCommata: postfix[2] as List<OperatorToken> ?? [],
+            rightParenthesis: postfix[3] as OperatorToken,
           );
         },
       )
@@ -508,8 +508,8 @@ class ParserGrammar {
     final arguments = value[1] as List<dynamic>;
     return <dynamic>[
       value[0] as OperatorToken, // leftParenthesis
-      arguments[0] as List<Argument>, // arguments
-      arguments[1] as List<OperatorToken>, // argumentCommata
+      arguments?.elementAt(0) as List<Argument>, // arguments
+      arguments?.elementAt(1) as List<OperatorToken>, // argumentCommata
       value[3] as OperatorToken, // rightParenthesis
     ];
   });
@@ -517,7 +517,7 @@ class ParserGrammar {
   static final valueArguments = (LexerGrammar.NLs &
           valueArgument.fullCommaSeparatedList().optional() &
           LexerGrammar.NLs)
-      .map((value) => value[1] as List<dynamic> ?? <dynamic>[]);
+      .map((value) => value[1] as List<dynamic>);
 
   static final valueArgument = (LexerGrammar.NLs &
           (LexerGrammar.Identifier &
