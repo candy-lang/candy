@@ -21,11 +21,18 @@ abstract class KeywordToken extends Token with _$KeywordToken {
   // ignore: non_constant_identifier_names
   const factory KeywordToken.class_({@required SourceSpan span}) =
       ClassKeywordToken;
+  // Declarations:
   const factory KeywordToken.fun({@required SourceSpan span}) = FunKeywordToken;
   const factory KeywordToken.let({@required SourceSpan span}) = LetKeywordToken;
   const factory KeywordToken.mut({@required SourceSpan span}) = MutKeywordToken;
   const factory KeywordToken.get({@required SourceSpan span}) = GetKeywordToken;
   const factory KeywordToken.set({@required SourceSpan span}) = SetKeywordToken;
+  // Statements:
+  // ignore: non_constant_identifier_names
+  const factory KeywordToken.if_({@required SourceSpan span}) = IfKeywordToken;
+  // ignore: non_constant_identifier_names
+  const factory KeywordToken.else_({@required SourceSpan span}) =
+      ElseKeywordToken;
 }
 
 @freezed

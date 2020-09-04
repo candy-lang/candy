@@ -143,6 +143,11 @@ class LexerGrammar {
   static final SET = string('set')
       .tokenize((_, span) => KeywordToken.set(span: span) as SetKeywordToken);
 
+  static final IF = string('if')
+      .tokenize((_, span) => KeywordToken.if_(span: span) as IfKeywordToken);
+  static final ELSE = string('else').tokenize(
+      (_, span) => KeywordToken.else_(span: span) as ElseKeywordToken);
+
   // SECTION: lexicalModifiers
 
   static final EXTERNAL = string('external')

@@ -19,6 +19,7 @@ class ParserGrammar {
 
     _initDeclaration();
     _initType();
+    _initStatement();
     _initExpression();
   }
 
@@ -330,7 +331,12 @@ class ParserGrammar {
                   .optional() &
               semis.optional())
           .map((values) => values[0] as List<Statement> ?? []);
-  static final Parser<Statement> statement = expression;
+  static final _statement = undefined<Statement>();
+  static Parser<Statement> get statement => _statement;
+  static void _initStatement() {
+    // ignore: unnecessary_cast
+    _statement.set((expression as Parser<Statement>) | block);
+  }
 
   static final block = (LexerGrammar.LCURL &
           LexerGrammar.NLs &
@@ -483,7 +489,28 @@ class ParserGrammar {
           LexerGrammar.BAR_BAR_EQUALS |
           LexerGrammar.LESS_LESS_EQUALS |
           LexerGrammar.GREATER_GREATER_EQUALS |
-          LexerGrammar.GREATER_GREATER_GREATER_EQUALS);
+          LexerGrammar.GREATER_GREATER_GREATER_EQUALS)
+      // conditional
+      ..complexGrouping<List<dynamic>, Expression, List<dynamic>>(
+        LexerGrammar.IF & LexerGrammar.NLs,
+        LexerGrammar.NLs &
+            statement &
+            (LexerGrammar.NLs &
+                    LexerGrammar.ELSE &
+                    LexerGrammar.NLs &
+                    statement)
+                .optional(),
+        mapper: (left, value, right) {
+          final elsePart = right[2] as List<dynamic>;
+          return IfExpression(
+            ifKeyword: left[0] as IfKeywordToken,
+            condition: value,
+            thenStatement: right[1] as Statement,
+            elseKeyword: elsePart?.elementAt(1) as ElseKeywordToken,
+            elseStatement: elsePart?.elementAt(3) as Statement,
+          );
+        },
+      );
 
     _expression.set(builder.build().map((dynamic e) => e as Expression));
   }
@@ -614,6 +641,19 @@ extension<T> on Parser<T> {
 
 extension on ExpressionBuilder {
   void primitive<T>(Parser<T> primitive) => group().primitive<T>(primitive);
+
+  void complexGrouping<Left, T, Right>(
+    Parser<Left> left,
+    Parser<Right> right, {
+    @required T Function(Left, T, Right) mapper,
+  }) {
+    group().wrapper<dynamic, T>(
+      left,
+      right,
+      (dynamic left, value, dynamic right) =>
+          mapper(left as Left, value, right as Right),
+    );
+  }
 
   void grouping<T>(
     Parser<OperatorToken> left,

@@ -4,10 +4,11 @@ import '../../../lexer/token.dart';
 import '../../../syntactic_entity.dart';
 import '../../../utils.dart';
 import '../node.dart';
+import '../statements.dart';
 
 part 'expression.freezed.dart';
 
-abstract class Expression extends AstNode {
+abstract class Expression extends Statement {
   const Expression();
 }
 
@@ -123,10 +124,10 @@ abstract class CallExpression extends Expression implements _$CallExpression {
   const factory CallExpression({
     @required Expression target,
     @required OperatorToken leftParenthesis,
-    @required List<Argument> arguments,
     @Default(<Argument>[]) List<Argument> arguments,
+    @Default(<OperatorToken>[]) List<OperatorToken> argumentCommata,
     @required OperatorToken rightParenthesis,
-  }) = _InvocationExpression;
+  }) = _CallExpression;
   const CallExpression._();
 
   @override
@@ -134,7 +135,7 @@ abstract class CallExpression extends Expression implements _$CallExpression {
         target,
         if (leftParenthesis != null)
           leftParenthesis,
-        ...arguments,
+        ...interleave(arguments, argumentCommata),
         if (rightParenthesis != null)
           rightParenthesis,
       ];
@@ -148,6 +149,7 @@ abstract class Argument extends AstNode implements _$Argument {
     @required Expression expression,
   }) = _Argument;
   const Argument._();
+  //     assert((name != null) == (equals != null)),
 
   @override
   Iterable<SyntacticEntity> get children => [
@@ -170,4 +172,25 @@ abstract class IndexExpression extends Expression implements _$IndexExpression {
   @override
   Iterable<SyntacticEntity> get children =>
       [target, leftSquareBracket, ...indices, rightSquareBracket];
+}
+
+@freezed
+abstract class IfExpression extends Expression implements _$IfExpression {
+  const factory IfExpression({
+    @required IfKeywordToken ifKeyword,
+    @required Expression condition,
+    @required Statement thenStatement,
+    ElseKeywordToken elseKeyword,
+    Statement elseStatement,
+  }) = _IfExpression;
+  const IfExpression._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [
+        ifKeyword,
+        condition,
+        thenStatement,
+        if (elseKeyword != null) elseKeyword,
+        if (elseStatement != null) elseStatement,
+      ];
 }
