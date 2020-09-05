@@ -254,6 +254,27 @@ void main() {
             KeywordToken.class_(span: SourceSpan(0, 5)) as ClassKeywordToken,
         name: IdentifierToken('Foo', span: SourceSpan(6, 9)),
       ),
+      'class Foo<T: Foo.Bar>': ClassDeclaration(
+        classKeyword:
+            KeywordToken.class_(span: SourceSpan(0, 5)) as ClassKeywordToken,
+        name: IdentifierToken('Foo', span: SourceSpan(6, 9)),
+        typeParameters: TypeParameters(
+          leftAngle:
+              OperatorToken(OperatorTokenType.langle, span: SourceSpan(9, 10)),
+          parameters: [
+            TypeParameter(
+              name: IdentifierToken('T', span: SourceSpan(10, 11)),
+              colon: OperatorToken(
+                OperatorTokenType.colon,
+                span: SourceSpan(11, 12),
+              ),
+              bound: createTypeFooBar(13),
+            ),
+          ],
+          rightAngle:
+              OperatorToken(OperatorTokenType.rangle, span: SourceSpan(20, 21)),
+        ),
+      ),
       'const class Foo {}': ClassDeclaration(
         modifiers: [ModifierToken.const_(span: SourceSpan(0, 5))],
         classKeyword:

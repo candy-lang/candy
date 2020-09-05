@@ -43,6 +43,7 @@ class ParserGrammar {
           LexerGrammar.CLASS &
           LexerGrammar.NLs &
           LexerGrammar.Identifier &
+          (LexerGrammar.NLs & typeParameters).optional() &
           (LexerGrammar.NLs &
                   LexerGrammar.COLON &
                   LexerGrammar.NLs &
@@ -50,15 +51,17 @@ class ParserGrammar {
               .optional() &
           (LexerGrammar.NLs & classBody).optional())
       .map<ClassDeclaration>((value) {
-    final parentConstructorCall = value[4] as List<dynamic>;
+    final parentConstructorCall = value[5] as List<dynamic>;
     return ClassDeclaration(
       modifiers: value[0] as List<ModifierToken> ?? [],
       classKeyword: value[1] as ClassKeywordToken,
       name: value[3] as IdentifierToken,
-      body: (value[5] as List<dynamic>)?.elementAt(1) as ClassBody,
+      typeParameters:
+          (value[4] as List<dynamic>)?.elementAt(1) as TypeParameters,
       colon: parentConstructorCall?.elementAt(1) as OperatorToken,
       parentConstructorCall:
           parentConstructorCall?.elementAt(3) as ConstructorCall,
+      body: (value[6] as List<dynamic>)?.elementAt(1) as ClassBody,
     );
   });
   static final classBody = (LexerGrammar.LCURL &
