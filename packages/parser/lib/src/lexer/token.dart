@@ -45,6 +45,8 @@ abstract class ModifierToken extends Token with _$ModifierToken {
       _ExternalModifierToken;
   const factory ModifierToken.abstract({@required SourceSpan span}) =
       _AbstractModifierToken;
+  const factory ModifierToken.override({@required SourceSpan span}) =
+      _OverrideModifierToken;
   // ignore: non_constant_identifier_names
   const factory ModifierToken.const_({@required SourceSpan span}) =
       _ConstModifierToken;

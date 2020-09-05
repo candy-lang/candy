@@ -689,10 +689,12 @@ class ParserGrammar {
   // SECTION: modifiers
 
   static final modifiers = modifier.plus();
-  static final modifier =
-      ((LexerGrammar.EXTERNAL | LexerGrammar.ABSTRACT | LexerGrammar.CONST) &
-              LexerGrammar.NLs)
-          .map((value) => value[0] as ModifierToken);
+  static final modifier = ((LexerGrammar.EXTERNAL |
+              LexerGrammar.ABSTRACT |
+              LexerGrammar.OVERRIDE |
+              LexerGrammar.CONST) &
+          LexerGrammar.NLs)
+      .map((value) => value[0] as ModifierToken);
 }
 
 extension<T> on Parser<T> {

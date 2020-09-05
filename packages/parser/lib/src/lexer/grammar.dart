@@ -160,6 +160,8 @@ class LexerGrammar {
       .tokenize((_, span) => ModifierToken.external(span: span));
   static final ABSTRACT = string('abstract')
       .tokenize((_, span) => ModifierToken.abstract(span: span));
+  static final OVERRIDE = string('override')
+      .tokenize((_, span) => ModifierToken.override(span: span));
   static final CONST =
       string('const').tokenize((_, span) => ModifierToken.const_(span: span));
 
