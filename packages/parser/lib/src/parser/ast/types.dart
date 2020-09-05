@@ -123,6 +123,36 @@ abstract class IntersectionType extends Type implements _$IntersectionType {
 }
 
 @freezed
+abstract class TypeParameters extends AstNode implements _$TypeParameters {
+  const factory TypeParameters({
+    @required OperatorToken leftAngle,
+    @Default(<TypeParameter>[]) List<TypeParameter> parameters,
+    @Default(<OperatorToken>[]) List<OperatorToken> commata,
+    @required OperatorToken rightAngle,
+  }) = _TypeParameters;
+  const TypeParameters._();
+
+  @override
+  Iterable<SyntacticEntity> get children =>
+      [leftAngle, ...interleave(parameters, commata), rightAngle];
+}
+
+@freezed
+abstract class TypeParameter extends AstNode implements _$TypeParameter {
+  const factory TypeParameter({
+    @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
+    @required IdentifierToken name,
+    OperatorToken colon,
+    Type bound,
+  }) = _TypeParameter;
+  const TypeParameter._();
+
+  @override
+  Iterable<SyntacticEntity> get children =>
+      [...modifiers, name, if (colon != null) colon, if (bound != null) bound];
+}
+
+@freezed
 abstract class TypeArguments extends AstNode implements _$TypeArguments {
   const factory TypeArguments({
     @required OperatorToken leftAngle,

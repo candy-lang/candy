@@ -81,6 +81,36 @@ void main() {
         colon: OperatorToken(OperatorTokenType.colon, span: SourceSpan(57, 58)),
         returnType: createTypeFooBar(59),
       ),
+      'external fun foo<T, R: Foo.Bar>()': FunctionDeclaration(
+        modifiers: [ModifierToken.external(span: SourceSpan(0, 8))],
+        funKeyword:
+            KeywordToken.fun(span: SourceSpan(9, 12)) as FunKeywordToken,
+        name: IdentifierToken('foo', span: SourceSpan(13, 16)),
+        typeParameters: TypeParameters(
+          leftAngle:
+              OperatorToken(OperatorTokenType.langle, span: SourceSpan(16, 17)),
+          parameters: [
+            TypeParameter(name: IdentifierToken('T', span: SourceSpan(17, 18))),
+            TypeParameter(
+              name: IdentifierToken('R', span: SourceSpan(20, 21)),
+              colon: OperatorToken(
+                OperatorTokenType.colon,
+                span: SourceSpan(21, 22),
+              ),
+              bound: createTypeFooBar(23),
+            ),
+          ],
+          commata: [
+            OperatorToken(OperatorTokenType.comma, span: SourceSpan(18, 19)),
+          ],
+          rightAngle:
+              OperatorToken(OperatorTokenType.rangle, span: SourceSpan(30, 31)),
+        ),
+        leftParenthesis:
+            OperatorToken(OperatorTokenType.lparen, span: SourceSpan(31, 32)),
+        rightParenthesis:
+            OperatorToken(OperatorTokenType.rparen, span: SourceSpan(32, 33)),
+      ),
     },
   );
 
@@ -249,7 +279,7 @@ void main() {
             KeywordToken.class_(span: SourceSpan(9, 14)) as ClassKeywordToken,
         name: IdentifierToken('Foo', span: SourceSpan(15, 18)),
         colon: OperatorToken(OperatorTokenType.colon, span: SourceSpan(18, 19)),
-        parentConstructorInvocation: ConstructorInvocation(
+        parentConstructorCall: ConstructorCall(
           type: UserType(simpleTypes: [
             SimpleUserType(IdentifierToken('Bar', span: SourceSpan(20, 23))),
           ]),

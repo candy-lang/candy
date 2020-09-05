@@ -87,6 +87,7 @@ class ParserGrammar {
           LexerGrammar.FUN &
           LexerGrammar.NLs &
           LexerGrammar.Identifier &
+          (LexerGrammar.NLs & typeParameters).optional() &
           LexerGrammar.NLs &
           LexerGrammar.LPAREN &
           LexerGrammar.NLs &
@@ -98,21 +99,23 @@ class ParserGrammar {
           // (LexerGrammar.NLs & typeConstraints).optional() &
           (LexerGrammar.NLs & block).optional())
       .map<FunctionDeclaration>((value) {
-    final parameterList = value[7] as List<dynamic>;
-    final returnTypeDeclaration = value[10] as List<dynamic>;
+    final parameterList = value[8] as List<dynamic>;
+    final returnTypeDeclaration = value[11] as List<dynamic>;
     return FunctionDeclaration(
       modifiers: (value[0] as List<ModifierToken>) ?? [],
       funKeyword: value[1] as FunKeywordToken,
       name: value[3] as IdentifierToken,
-      leftParenthesis: value[5] as OperatorToken,
+      typeParameters:
+          (value[4] as List<dynamic>)?.elementAt(1) as TypeParameters,
+      leftParenthesis: value[6] as OperatorToken,
       valueParameters:
           parameterList?.elementAt(0) as List<ValueParameter> ?? [],
       valueParameterCommata:
           parameterList?.elementAt(1) as List<OperatorToken> ?? [],
-      rightParenthesis: value[9] as OperatorToken,
+      rightParenthesis: value[10] as OperatorToken,
       colon: returnTypeDeclaration?.elementAt(1) as OperatorToken,
       returnType: returnTypeDeclaration?.elementAt(3) as Type,
-      body: (value[11] as List<dynamic>)?.elementAt(1) as Block,
+      body: (value[12] as List<dynamic>)?.elementAt(1) as Block,
     );
   });
 

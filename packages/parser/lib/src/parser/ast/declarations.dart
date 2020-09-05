@@ -79,6 +79,7 @@ abstract class FunctionDeclaration extends Declaration
     @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
     @required FunKeywordToken funKeyword,
     @required IdentifierToken name,
+    TypeParameters typeParameters,
     @required OperatorToken leftParenthesis,
     @Default(<ValueParameter>[]) List<ValueParameter> valueParameters,
     @Default(<OperatorToken>[]) List<OperatorToken> valueParameterCommata,
@@ -94,11 +95,12 @@ abstract class FunctionDeclaration extends Declaration
         ...modifiers,
         funKeyword,
         name,
+        if (typeParameters != null) typeParameters,
         leftParenthesis,
         ...interleave(valueParameters, valueParameterCommata),
         rightParenthesis,
-        colon,
-        returnType,
+        if (colon != null) colon,
+        if (returnType != null) returnType,
         if (body != null) body,
       ];
 }
