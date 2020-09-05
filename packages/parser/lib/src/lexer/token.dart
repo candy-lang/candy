@@ -18,6 +18,7 @@ abstract class OperatorToken extends Token with _$OperatorToken {
 
 @freezed
 abstract class KeywordToken extends Token with _$KeywordToken {
+  const factory KeywordToken.use({@required SourceSpan span}) = UseKeywordToken;
   // Declarations:
   const factory KeywordToken.trait({@required SourceSpan span}) =
       TraitKeywordToken;

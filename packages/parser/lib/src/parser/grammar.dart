@@ -7,6 +7,7 @@ import '../syntactic_entity.dart';
 import '../utils.dart';
 import 'ast/declarations.dart';
 import 'ast/expressions/expression.dart';
+import 'ast/general.dart';
 import 'ast/statements.dart';
 import 'ast/types.dart';
 
@@ -24,6 +25,36 @@ class ParserGrammar {
   }
 
   static bool _isInitialized = false;
+
+  // SECTION: general
+
+  static final useLines =
+      (useLine & semi).map<UseLine>((v) => v[1] as UseLine).star();
+  static final useLine = (LexerGrammar.USE &
+          (LexerGrammar.NLs &
+                  LexerGrammar.Identifier &
+                  LexerGrammar.NLs &
+                  LexerGrammar.SLASH)
+              .optional() &
+          LexerGrammar.NLs &
+          LexerGrammar.Identifier &
+          (LexerGrammar.NLs &
+                  LexerGrammar.DOT &
+                  LexerGrammar.NLs &
+                  LexerGrammar.Identifier)
+              .optional())
+      .map<UseLine>((value) {
+    final publisherPart = value[1] as List<dynamic>;
+    final modulePart = value[4] as List<dynamic>;
+    return UseLine(
+      useKeyword: value[0] as UseKeywordToken,
+      publisherName: publisherPart?.elementAt(1) as IdentifierToken,
+      slash: publisherPart?.elementAt(3) as OperatorToken,
+      packageName: value[3] as IdentifierToken,
+      dot: modulePart?.elementAt(1) as OperatorToken,
+      moduleName: modulePart?.elementAt(3) as IdentifierToken,
+    );
+  });
 
   // SECTION: declarations
 
