@@ -18,10 +18,12 @@ abstract class OperatorToken extends Token with _$OperatorToken {
 
 @freezed
 abstract class KeywordToken extends Token with _$KeywordToken {
+  // Declarations:
+  const factory KeywordToken.trait({@required SourceSpan span}) =
+      TraitKeywordToken;
   // ignore: non_constant_identifier_names
   const factory KeywordToken.class_({@required SourceSpan span}) =
       ClassKeywordToken;
-  // Declarations:
   const factory KeywordToken.fun({@required SourceSpan span}) = FunKeywordToken;
   const factory KeywordToken.let({@required SourceSpan span}) = LetKeywordToken;
   const factory KeywordToken.mut({@required SourceSpan span}) = MutKeywordToken;

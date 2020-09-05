@@ -15,6 +15,32 @@ abstract class Declaration extends AstNode {
 }
 
 @freezed
+abstract class TraitDeclaration extends Declaration
+    implements _$TraitDeclaration {
+  const factory TraitDeclaration({
+    @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
+    @required TraitKeywordToken traitKeyword,
+    @required IdentifierToken name,
+    TypeParameters typeParameters,
+    OperatorToken colon,
+    Type bound,
+    BlockDeclarationBody body,
+  }) = _TraitDeclaration;
+  const TraitDeclaration._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [
+        ...modifiers,
+        traitKeyword,
+        name,
+        if (typeParameters != null) typeParameters,
+        if (colon != null) colon,
+        if (bound != null) bound,
+        if (body != null) body,
+      ];
+}
+
+@freezed
 abstract class ClassDeclaration extends Declaration
     implements _$ClassDeclaration {
   const factory ClassDeclaration({
@@ -23,8 +49,8 @@ abstract class ClassDeclaration extends Declaration
     @required IdentifierToken name,
     TypeParameters typeParameters,
     OperatorToken colon,
-    ClassBody body,
     ConstructorCall parentConstructorCall,
+    BlockDeclarationBody body,
   }) = _ClassDeclaration;
   const ClassDeclaration._();
 
@@ -41,13 +67,14 @@ abstract class ClassDeclaration extends Declaration
 }
 
 @freezed
-abstract class ClassBody extends AstNode implements _$ClassBody {
-  const factory ClassBody({
+abstract class BlockDeclarationBody extends AstNode
+    implements _$BlockDeclarationBody {
+  const factory BlockDeclarationBody({
     @required OperatorToken leftBrace,
     @Default(<Declaration>[]) List<Declaration> declarations,
     @required OperatorToken rightBrace,
-  }) = _ClassBody;
-  const ClassBody._();
+  }) = _BlockDeclarationBody;
+  const BlockDeclarationBody._();
 
   @override
   Iterable<SyntacticEntity> get children =>

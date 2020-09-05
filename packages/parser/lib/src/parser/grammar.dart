@@ -33,11 +33,35 @@ class ParserGrammar {
   static Parser<Declaration> get declaration => _declaration;
   static void _initDeclaration() {
     // ignore: unnecessary_cast
-    _declaration.set((classDeclaration as Parser<Declaration>) |
+    _declaration.set((traitDeclaration as Parser<Declaration>) |
+        classDeclaration |
         functionDeclaration |
         propertyDeclaration);
   }
 
+  static final Parser<TraitDeclaration> traitDeclaration =
+      (modifiers.optional() &
+              LexerGrammar.TRAIT &
+              LexerGrammar.NLs &
+              LexerGrammar.Identifier &
+              (LexerGrammar.NLs & typeParameters).optional() &
+              (LexerGrammar.NLs & LexerGrammar.COLON & LexerGrammar.NLs & type)
+                  .optional() &
+              // (LexerGrammar.NLs & typeConstraints).optional() &
+              (LexerGrammar.NLs & blockDeclarationBody).optional())
+          .map<TraitDeclaration>((value) {
+    final bound = value[5] as List<dynamic>;
+    return TraitDeclaration(
+      modifiers: value[0] as List<ModifierToken> ?? [],
+      traitKeyword: value[1] as TraitKeywordToken,
+      name: value[3] as IdentifierToken,
+      typeParameters:
+          (value[4] as List<dynamic>)?.elementAt(1) as TypeParameters,
+      colon: bound?.elementAt(1) as OperatorToken,
+      bound: bound?.elementAt(3) as Type,
+      body: (value[6] as List<dynamic>)?.elementAt(1) as BlockDeclarationBody,
+    );
+  });
   static final Parser<ClassDeclaration> classDeclaration = (modifiers
               .optional() &
           LexerGrammar.CLASS &
@@ -49,7 +73,7 @@ class ParserGrammar {
                   LexerGrammar.NLs &
                   constructorCall)
               .optional() &
-          (LexerGrammar.NLs & classBody).optional())
+          (LexerGrammar.NLs & blockDeclarationBody).optional())
       .map<ClassDeclaration>((value) {
     final parentConstructorCall = value[5] as List<dynamic>;
     return ClassDeclaration(
@@ -61,19 +85,21 @@ class ParserGrammar {
       colon: parentConstructorCall?.elementAt(1) as OperatorToken,
       parentConstructorCall:
           parentConstructorCall?.elementAt(3) as ConstructorCall,
-      body: (value[6] as List<dynamic>)?.elementAt(1) as ClassBody,
+      body: (value[6] as List<dynamic>)?.elementAt(1) as BlockDeclarationBody,
     );
   });
-  static final classBody = (LexerGrammar.LCURL &
+
+  static final blockDeclarationBody = (LexerGrammar.LCURL &
           LexerGrammar.NLs &
           declarations &
           LexerGrammar.NLs &
           LexerGrammar.RCURL)
-      .map((value) => ClassBody(
+      .map((value) => BlockDeclarationBody(
             leftBrace: value[0] as OperatorToken,
             declarations: value[2] as List<Declaration>,
             rightBrace: value[4] as OperatorToken,
           ));
+
   static final constructorCall =
       (userType & callPostfix).map<ConstructorCall>((value) {
     final callPostfix = value[1] as List<dynamic>;
@@ -197,6 +223,35 @@ class ParserGrammar {
       rightParenthesis: parameterDeclaration?.elementAt(5) as OperatorToken,
       body: (value[2] as List<dynamic>)?.elementAt(1) as Block,
     ) as SetterPropertyAccessor;
+  });
+
+  static final typeParameters = (LexerGrammar.LANGLE &
+          LexerGrammar.NLs &
+          typeParameter.fullCommaSeparatedList() &
+          LexerGrammar.NLs &
+          LexerGrammar.RANGLE)
+      .map<TypeParameters>((value) {
+    final parameters = value[2] as List<dynamic>;
+    return TypeParameters(
+      leftAngle: value[0] as OperatorToken,
+      parameters: parameters[0] as List<TypeParameter>,
+      commata: parameters[1] as List<OperatorToken>,
+      rightAngle: value[4] as OperatorToken,
+    );
+  });
+  static final typeParameter = (modifiers.optional() &
+          LexerGrammar.NLs &
+          LexerGrammar.Identifier &
+          (LexerGrammar.NLs & LexerGrammar.COLON & LexerGrammar.NLs & type)
+              .optional())
+      .map<TypeParameter>((value) {
+    final boundBlock = value[3] as List<dynamic>;
+    return TypeParameter(
+      modifiers: value[0] as List<ModifierToken> ?? [],
+      name: value[2] as IdentifierToken,
+      colon: boundBlock?.elementAt(1) as OperatorToken,
+      bound: boundBlock?.elementAt(3) as Type,
+    );
   });
 
   static final typeArguments = (LexerGrammar.LANGLE &

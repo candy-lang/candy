@@ -132,6 +132,8 @@ class LexerGrammar {
 
   // SECTION: keywords
 
+  static final TRAIT = string('trait').tokenize(
+      (_, span) => KeywordToken.trait(span: span) as TraitKeywordToken);
   static final CLASS = string('class').tokenize(
       (_, span) => KeywordToken.class_(span: span) as ClassKeywordToken);
   static final FUN = string('fun')
