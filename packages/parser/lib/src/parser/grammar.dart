@@ -193,6 +193,26 @@ class ParserGrammar {
     ) as SetterPropertyAccessor;
   });
 
+  static final typeArguments = (LexerGrammar.LANGLE &
+          LexerGrammar.NLs &
+          typeArgument.fullCommaSeparatedList() &
+          LexerGrammar.NLs &
+          LexerGrammar.RANGLE)
+      .map<TypeArguments>((value) {
+    final arguments = value[2] as List<dynamic>;
+    return TypeArguments(
+      leftAngle: value[0] as OperatorToken,
+      arguments: arguments[0] as List<TypeArgument>,
+      commata: arguments[1] as List<OperatorToken>,
+      rightAngle: value[4] as OperatorToken,
+    );
+  });
+  static final typeArgument = (modifiers.optional() & LexerGrammar.NLs & type)
+      .map((value) => TypeArgument(
+            modifiers: value[0] as List<ModifierToken> ?? [],
+            type: value[2] as Type,
+          ));
+
   static final valueParameter = (LexerGrammar.Identifier &
           LexerGrammar.NLs &
           LexerGrammar.COLON &
@@ -255,11 +275,17 @@ class ParserGrammar {
     _type.set(builder.build().map((dynamic t) => t as Type));
   }
 
-  static final userType =
-      simpleUserType.separatedList(LexerGrammar.DOT).map((values) => UserType(
-            simpleTypes: values.first as List<SimpleUserType>,
-            dots: values[1] as List<OperatorToken>,
-          ));
+  static final userType = (simpleUserType.separatedList(LexerGrammar.DOT) &
+          LexerGrammar.NLs &
+          typeArguments.optional())
+      .map<UserType>((value) {
+    final simpleTypes = value[0] as List<dynamic>;
+    return UserType(
+      simpleTypes: simpleTypes[0] as List<SimpleUserType>,
+      dots: simpleTypes[1] as List<OperatorToken>,
+      arguments: value[2] as TypeArguments,
+    );
+  });
   static final Parser<SimpleUserType> simpleUserType =
       LexerGrammar.Identifier.map($SimpleUserType);
 

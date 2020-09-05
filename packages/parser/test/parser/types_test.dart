@@ -30,6 +30,42 @@ void main() {
           OperatorToken(OperatorTokenType.dot, span: SourceSpan(9, 10)),
         ],
       ),
+      'My.Type<With, Arguments>': UserType(
+        simpleTypes: [
+          SimpleUserType(IdentifierToken('My', span: SourceSpan(0, 2))),
+          SimpleUserType(IdentifierToken('Type', span: SourceSpan(3, 7))),
+        ],
+        dots: [OperatorToken(OperatorTokenType.dot, span: SourceSpan(2, 3))],
+        arguments: TypeArguments(
+          leftAngle:
+              OperatorToken(OperatorTokenType.langle, span: SourceSpan(7, 8)),
+          arguments: [
+            TypeArgument(
+              type: UserType(
+                simpleTypes: [
+                  SimpleUserType(
+                    IdentifierToken('With', span: SourceSpan(8, 12)),
+                  ),
+                ],
+              ),
+            ),
+            TypeArgument(
+              type: UserType(
+                simpleTypes: [
+                  SimpleUserType(
+                    IdentifierToken('Arguments', span: SourceSpan(14, 23)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          commata: [
+            OperatorToken(OperatorTokenType.comma, span: SourceSpan(12, 13)),
+          ],
+          rightAngle:
+              OperatorToken(OperatorTokenType.rangle, span: SourceSpan(23, 24)),
+        ),
+      ),
     },
   );
 

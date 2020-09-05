@@ -108,6 +108,12 @@ enum OperatorTokenType {
   /// `}`
   rcurl,
 
+  /// `<`
+  langle,
+
+  /// `>`
+  rangle,
+
   /// `++`
   plusPlus,
 

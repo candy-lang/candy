@@ -16,13 +16,17 @@ abstract class UserType extends Type implements _$UserType {
   const factory UserType({
     @required List<SimpleUserType> simpleTypes,
     @Default(<OperatorToken>[]) List<OperatorToken> dots,
+    TypeArguments arguments,
   }) = _UserType;
   const UserType._();
 
   @override
   Iterable<SyntacticEntity> get children {
     assert(simpleTypes.length == dots.length + 1);
-    return interleave(simpleTypes, dots);
+    return [
+      ...interleave(simpleTypes, dots),
+      if (arguments != null) arguments,
+    ];
   }
 }
 
@@ -116,4 +120,31 @@ abstract class IntersectionType extends Type implements _$IntersectionType {
 
   @override
   Iterable<SyntacticEntity> get children => [leftType, ampersand, rightType];
+}
+
+@freezed
+abstract class TypeArguments extends AstNode implements _$TypeArguments {
+  const factory TypeArguments({
+    @required OperatorToken leftAngle,
+    @Default(<TypeArgument>[]) List<TypeArgument> arguments,
+    @Default(<OperatorToken>[]) List<OperatorToken> commata,
+    @required OperatorToken rightAngle,
+  }) = _TypeArguments;
+  const TypeArguments._();
+
+  @override
+  Iterable<SyntacticEntity> get children =>
+      [leftAngle, ...interleave(arguments, commata), rightAngle];
+}
+
+@freezed
+abstract class TypeArgument extends AstNode implements _$TypeArgument {
+  const factory TypeArgument({
+    @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
+    @required Type type,
+  }) = _TypeArgument;
+  const TypeArgument._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [...modifiers, type];
 }

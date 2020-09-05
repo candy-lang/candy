@@ -34,6 +34,8 @@ class LexerGrammar {
   static final RSQUARE = _operator(']', OperatorTokenType.rsquare);
   static final LCURL = _operator('{', OperatorTokenType.lcurl);
   static final RCURL = _operator('}', OperatorTokenType.rcurl);
+  static final LANGLE = _operator('<', OperatorTokenType.langle);
+  static final RANGLE = _operator('>', OperatorTokenType.rangle);
 
   static final PLUS_PLUS = _operator('++', OperatorTokenType.plusPlus);
   static final MINUS_MINUS = _operator('--', OperatorTokenType.minusMinus);
