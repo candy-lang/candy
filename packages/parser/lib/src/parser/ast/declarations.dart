@@ -41,6 +41,32 @@ abstract class TraitDeclaration extends Declaration
 }
 
 @freezed
+abstract class ImplDeclaration extends Declaration
+    implements _$ImplDeclaration {
+  const factory ImplDeclaration({
+    @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
+    @required ImplKeywordToken implKeyword,
+    TypeParameters typeParameters,
+    @required Type type,
+    OperatorToken colon,
+    Type trait,
+    BlockDeclarationBody body,
+  }) = _ImplDeclaration;
+  const ImplDeclaration._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [
+        ...modifiers,
+        implKeyword,
+        if (typeParameters != null) typeParameters,
+        type,
+        if (colon != null) colon,
+        if (trait != null) trait,
+        if (body != null) body,
+      ];
+}
+
+@freezed
 abstract class ClassDeclaration extends Declaration
     implements _$ClassDeclaration {
   const factory ClassDeclaration({

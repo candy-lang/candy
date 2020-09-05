@@ -39,17 +39,15 @@ class ParserGrammar {
         propertyDeclaration);
   }
 
-  static final Parser<TraitDeclaration> traitDeclaration =
-      (modifiers.optional() &
-              LexerGrammar.TRAIT &
-              LexerGrammar.NLs &
-              LexerGrammar.Identifier &
-              (LexerGrammar.NLs & typeParameters).optional() &
-              (LexerGrammar.NLs & LexerGrammar.COLON & LexerGrammar.NLs & type)
-                  .optional() &
-              // (LexerGrammar.NLs & typeConstraints).optional() &
-              (LexerGrammar.NLs & blockDeclarationBody).optional())
-          .map<TraitDeclaration>((value) {
+  static final traitDeclaration = (modifiers.optional() &
+          LexerGrammar.TRAIT &
+          LexerGrammar.NLs &
+          LexerGrammar.Identifier &
+          (LexerGrammar.NLs & typeParameters).optional() &
+          (LexerGrammar.NLs & LexerGrammar.COLON & LexerGrammar.NLs & type)
+              .optional() &
+          (LexerGrammar.NLs & blockDeclarationBody).optional())
+      .map<TraitDeclaration>((value) {
     final bound = value[5] as List<dynamic>;
     return TraitDeclaration(
       modifiers: value[0] as List<ModifierToken> ?? [],
@@ -62,8 +60,28 @@ class ParserGrammar {
       body: (value[6] as List<dynamic>)?.elementAt(1) as BlockDeclarationBody,
     );
   });
-  static final Parser<ClassDeclaration> classDeclaration = (modifiers
+  static final implDeclaration = (modifiers.optional() &
+          LexerGrammar.IMPL &
+          (LexerGrammar.NLs & typeParameters).optional() &
+          LexerGrammar.NLs &
+          type &
+          (LexerGrammar.NLs & LexerGrammar.COLON & LexerGrammar.NLs & type)
               .optional() &
+          (LexerGrammar.NLs & blockDeclarationBody).optional())
+      .map<ImplDeclaration>((value) {
+    final trait = value[5] as List<dynamic>;
+    return ImplDeclaration(
+      modifiers: value[0] as List<ModifierToken> ?? [],
+      implKeyword: value[1] as ImplKeywordToken,
+      typeParameters:
+          (value[2] as List<dynamic>)?.elementAt(1) as TypeParameters,
+      type: value[4] as Type,
+      colon: trait?.elementAt(1) as OperatorToken,
+      trait: trait?.elementAt(3) as Type,
+      body: (value[6] as List<dynamic>)?.elementAt(1) as BlockDeclarationBody,
+    );
+  });
+  static final classDeclaration = (modifiers.optional() &
           LexerGrammar.CLASS &
           LexerGrammar.NLs &
           LexerGrammar.Identifier &

@@ -21,6 +21,8 @@ abstract class KeywordToken extends Token with _$KeywordToken {
   // Declarations:
   const factory KeywordToken.trait({@required SourceSpan span}) =
       TraitKeywordToken;
+  const factory KeywordToken.impl({@required SourceSpan span}) =
+      ImplKeywordToken;
   // ignore: non_constant_identifier_names
   const factory KeywordToken.class_({@required SourceSpan span}) =
       ClassKeywordToken;
