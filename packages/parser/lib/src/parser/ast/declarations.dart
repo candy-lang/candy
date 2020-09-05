@@ -22,8 +22,8 @@ abstract class ClassDeclaration extends Declaration
     @required ClassKeywordToken classKeyword,
     @required IdentifierToken name,
     OperatorToken colon,
-    ConstructorInvocation parentConstructorInvocation,
     ClassBody body,
+    ConstructorCall parentConstructorCall,
   }) = _ClassDeclaration;
   const ClassDeclaration._();
 
@@ -33,7 +33,7 @@ abstract class ClassDeclaration extends Declaration
         classKeyword,
         name,
         if (colon != null) colon,
-        if (parentConstructorInvocation != null) parentConstructorInvocation,
+        if (parentConstructorCall != null) parentConstructorCall,
         if (body != null) body,
       ];
 }
@@ -53,16 +53,15 @@ abstract class ClassBody extends AstNode implements _$ClassBody {
 }
 
 @freezed
-abstract class ConstructorInvocation extends AstNode
-    implements _$ConstructorInvocation {
-  const factory ConstructorInvocation({
+abstract class ConstructorCall extends AstNode implements _$ConstructorCall {
+  const factory ConstructorCall({
     @required UserType type,
     @required OperatorToken leftParenthesis,
     @required List<Argument> arguments,
     @required List<OperatorToken> argumentCommata,
     @required OperatorToken rightParenthesis,
-  }) = _ConstructorInvocation;
-  const ConstructorInvocation._();
+  }) = _ConstructorCall;
+  const ConstructorCall._();
 
   @override
   Iterable<SyntacticEntity> get children => [

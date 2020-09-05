@@ -46,19 +46,19 @@ class ParserGrammar {
           (LexerGrammar.NLs &
                   LexerGrammar.COLON &
                   LexerGrammar.NLs &
-                  constructorInvocation)
+                  constructorCall)
               .optional() &
           (LexerGrammar.NLs & classBody).optional())
       .map<ClassDeclaration>((value) {
-    final parentConstructorInvocation = value[4] as List<dynamic>;
+    final parentConstructorCall = value[4] as List<dynamic>;
     return ClassDeclaration(
       modifiers: value[0] as List<ModifierToken> ?? [],
       classKeyword: value[1] as ClassKeywordToken,
       name: value[3] as IdentifierToken,
-      colon: parentConstructorInvocation?.elementAt(1) as OperatorToken,
-      parentConstructorInvocation:
-          parentConstructorInvocation?.elementAt(3) as ConstructorInvocation,
       body: (value[5] as List<dynamic>)?.elementAt(1) as ClassBody,
+      colon: parentConstructorCall?.elementAt(1) as OperatorToken,
+      parentConstructorCall:
+          parentConstructorCall?.elementAt(3) as ConstructorCall,
     );
   });
   static final classBody = (LexerGrammar.LCURL &
@@ -71,15 +71,15 @@ class ParserGrammar {
             declarations: value[2] as List<Declaration>,
             rightBrace: value[4] as OperatorToken,
           ));
-  static final constructorInvocation =
-      (userType & invocationPostfix).map<ConstructorInvocation>((value) {
-    final invocationPostfix = value[1] as List<dynamic>;
-    return ConstructorInvocation(
+  static final constructorCall =
+      (userType & callPostfix).map<ConstructorCall>((value) {
+    final callPostfix = value[1] as List<dynamic>;
+    return ConstructorCall(
       type: value[0] as UserType,
-      leftParenthesis: invocationPostfix[0] as OperatorToken,
-      arguments: invocationPostfix[1] as List<Argument>,
-      argumentCommata: invocationPostfix[2] as List<OperatorToken>,
-      rightParenthesis: invocationPostfix[3] as OperatorToken,
+      leftParenthesis: callPostfix[0] as OperatorToken,
+      arguments: callPostfix[1] as List<Argument>,
+      argumentCommata: callPostfix[2] as List<OperatorToken>,
+      rightParenthesis: callPostfix[3] as OperatorToken,
     );
   });
 
@@ -424,7 +424,7 @@ class ParserGrammar {
         },
       )
       ..complexPostfix<List<dynamic>, CallExpression>(
-        invocationPostfix,
+        callPostfix,
         mapper: (expression, postfix) {
           return CallExpression(
             target: expression,
@@ -553,7 +553,7 @@ class ParserGrammar {
   });
 
   // TODO(JonasWanke): typeArguments? valueArguments? annotatedLambda | typeArguments? valueArguments
-  static final invocationPostfix = (LexerGrammar.LPAREN &
+  static final callPostfix = (LexerGrammar.LPAREN &
           valueArguments &
           LexerGrammar.NLs &
           LexerGrammar.RPAREN)

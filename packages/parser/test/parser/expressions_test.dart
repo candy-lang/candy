@@ -130,7 +130,7 @@ void main() {
       });
     });
 
-    group('invocation', () {
+    group('call', () {
       group('positional', () {
         group('0 args', () {
           forPrimitives(tester: (targetSource, targetFactory) {
