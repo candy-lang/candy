@@ -424,14 +424,16 @@ class ParserGrammar {
         },
       )
       ..complexPostfix<List<dynamic>, CallExpression>(
-        callPostfix,
+        typeArguments.optional() & callPostfix,
         mapper: (expression, postfix) {
+          final valueArguments = postfix[1] as List<dynamic>;
           return CallExpression(
             target: expression,
-            leftParenthesis: postfix[0] as OperatorToken,
-            arguments: postfix[1] as List<Argument> ?? [],
-            argumentCommata: postfix[2] as List<OperatorToken> ?? [],
-            rightParenthesis: postfix[3] as OperatorToken,
+            typeArguments: postfix[0] as TypeArguments,
+            leftParenthesis: valueArguments[0] as OperatorToken,
+            arguments: valueArguments[1] as List<Argument> ?? [],
+            argumentCommata: valueArguments[2] as List<OperatorToken> ?? [],
+            rightParenthesis: valueArguments[3] as OperatorToken,
           );
         },
       )
@@ -571,7 +573,6 @@ class ParserGrammar {
           valueArgument.fullCommaSeparatedList().optional() &
           LexerGrammar.NLs)
       .map((value) => value[1] as List<dynamic>);
-
   static final valueArgument = (LexerGrammar.NLs &
           (LexerGrammar.Identifier &
                   LexerGrammar.NLs &

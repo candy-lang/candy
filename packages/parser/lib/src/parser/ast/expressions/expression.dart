@@ -5,6 +5,7 @@ import '../../../syntactic_entity.dart';
 import '../../../utils.dart';
 import '../node.dart';
 import '../statements.dart';
+import '../types.dart';
 
 part 'expression.freezed.dart';
 
@@ -123,6 +124,7 @@ abstract class NavigationExpression extends Expression
 abstract class CallExpression extends Expression implements _$CallExpression {
   const factory CallExpression({
     @required Expression target,
+    TypeArguments typeArguments,
     @required OperatorToken leftParenthesis,
     @Default(<Argument>[]) List<Argument> arguments,
     @Default(<OperatorToken>[]) List<OperatorToken> argumentCommata,
@@ -133,11 +135,10 @@ abstract class CallExpression extends Expression implements _$CallExpression {
   @override
   Iterable<SyntacticEntity> get children => [
         target,
-        if (leftParenthesis != null)
-          leftParenthesis,
+        if (typeArguments != null) typeArguments,
+        if (leftParenthesis != null) leftParenthesis,
         ...interleave(arguments, argumentCommata),
-        if (rightParenthesis != null)
-          rightParenthesis,
+        if (rightParenthesis != null) rightParenthesis,
       ];
 }
 

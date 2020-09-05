@@ -2,6 +2,7 @@ import 'package:meta/meta.dart';
 import 'package:parser/src/lexer/lexer.dart';
 import 'package:parser/src/parser/ast/expressions/expression.dart';
 import 'package:parser/src/parser/ast/statements.dart';
+import 'package:parser/src/parser/ast/types.dart';
 import 'package:parser/src/parser/grammar.dart';
 import 'package:parser/src/source_span.dart';
 import 'package:parser/src/syntactic_entity.dart';
@@ -9,6 +10,7 @@ import 'package:petitparser/parser.dart';
 import 'package:test/test.dart';
 
 import 'statements_test.dart';
+import 'types_test.dart';
 import 'utils.dart';
 
 void main() {
@@ -142,7 +144,6 @@ void main() {
                   OperatorTokenType.lparen,
                   span: SourceSpan.fromStartLength(targetSource.length, 1),
                 ),
-                arguments: [],
                 rightParenthesis: OperatorToken(
                   OperatorTokenType.rparen,
                   span: SourceSpan.fromStartLength(
@@ -229,6 +230,47 @@ void main() {
               });
             });
           });
+        });
+      });
+      group('with type arguments', () {
+        forPrimitives(tester: (targetSource, targetFactory) {
+          testExpressionParser(
+            '$targetSource<Foo.Bar, Foo.Bar>()',
+            expression: CallExpression(
+              target: targetFactory(0),
+              typeArguments: TypeArguments(
+                leftAngle: OperatorToken(
+                  OperatorTokenType.langle,
+                  span: SourceSpan.fromStartLength(targetSource.length, 1),
+                ),
+                arguments: [
+                  TypeArgument(type: createTypeFooBar(targetSource.length + 1)),
+                  TypeArgument(
+                    type: createTypeFooBar(targetSource.length + 10),
+                  ),
+                ],
+                commata: [
+                  OperatorToken(
+                    OperatorTokenType.comma,
+                    span:
+                        SourceSpan.fromStartLength(targetSource.length + 8, 1),
+                  ),
+                ],
+                rightAngle: OperatorToken(
+                  OperatorTokenType.rangle,
+                  span: SourceSpan.fromStartLength(targetSource.length + 17, 1),
+                ),
+              ),
+              leftParenthesis: OperatorToken(
+                OperatorTokenType.lparen,
+                span: SourceSpan.fromStartLength(targetSource.length + 18, 1),
+              ),
+              rightParenthesis: OperatorToken(
+                OperatorTokenType.rparen,
+                span: SourceSpan.fromStartLength(targetSource.length + 19, 1),
+              ),
+            ),
+          );
         });
       });
     });
