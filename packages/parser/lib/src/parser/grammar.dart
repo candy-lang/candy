@@ -28,6 +28,12 @@ class ParserGrammar {
 
   // SECTION: general
 
+  static final candyFile =
+      (useLines & LexerGrammar.NLs & declarations).map((value) => CandyFile(
+            useLines: value[0] as List<UseLine>,
+            declarations: value[2] as List<Declaration>,
+          ));
+
   static final useLines =
       (useLine & semi).map<UseLine>((v) => v[1] as UseLine).star();
   static final useLine = (LexerGrammar.USE &
@@ -65,6 +71,7 @@ class ParserGrammar {
   static void _initDeclaration() {
     // ignore: unnecessary_cast
     _declaration.set((traitDeclaration as Parser<Declaration>) |
+        implDeclaration |
         classDeclaration |
         functionDeclaration |
         propertyDeclaration);
