@@ -359,7 +359,7 @@ The behavior of named/positional type arguments is the same as that of function 
 | 10           | infix function      | `simpleIdentifier`                                                                     | left to right |
 | 9            | null coalescing     | `??`                                                                                   | left to right |
 | 8            | named checks        | `in` `!in` `is` `!is`                                                                  |               |
-| 7            | comparison          | `<` `<=` `>` `>=`                                                                      | left to right |
+| 7            | comparison          | `<` `<=` `>` `>=` `<=>`                                                                |       —       |
 | 6            | equality            | `==` `!=` `===` `!==`                                                                  | left to right |
 | 5            | logical and         | `&&`                                                                                   | left to right |
 | 4            | logical or          | `||`                                                                                   | left to right |
