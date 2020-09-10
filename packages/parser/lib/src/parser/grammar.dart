@@ -35,7 +35,7 @@ class ParserGrammar {
           ));
 
   static final useLines =
-      (useLine & semi).map<UseLine>((v) => v[1] as UseLine).star();
+      (useLine & semi).map<UseLine>((v) => v[0] as UseLine).star();
   static final useLine = (LexerGrammar.USE &
           (LexerGrammar.NLs &
                   LexerGrammar.Identifier &
