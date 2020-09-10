@@ -104,15 +104,14 @@ Hence: OOP without inheritance for classes, and with traits/impls
 ## 3. Properties
 
 ```rust
-const constant: Int = 0
 let readonly: Int = 0
-let mut mutable: Int = 0
+mut let mutable: Int = 0
 
-let mut whoosh: Int = bazfoo
+mut let whoosh: Int = bazfoo
   private get
-let mut floop: Int
+mut let floop: Int
   private set
-let mut blub: Int
+mut let blub: Int
   private get: Int => blub * 5
   private get: Float => blub / 2 // recursion?
   private get: String => blub.toString()
@@ -133,8 +132,6 @@ let computed: Int
 
 ```kotlin
 fun abc(a: Int, b: String = "abc"): Foo {
-  /// Parameters may have default values that don't need to be `const`.
-
   /// After a parameter with a default value, all following parameters need to
   /// have a default value as well.
 
@@ -174,9 +171,9 @@ class Matrix {
 ## 5. Classes
 
 ```kotlin
-const class VerySimpleClass
+class VerySimpleClass
 
-const class SimpleClass1 {
+class SimpleClass1 {
   let foo: String
   let bar: Int = 0
 }
@@ -224,8 +221,8 @@ class FieldClass {
 
   // properties:
   let foo: Int
-  let mut bar: Int
-  let mut withDefault: Int = foo
+  mut let bar: Int
+  mut let withDefault: Int = foo
 
   // methods:
   fun doFoo(param1: Param1Type): ReturnType {
@@ -372,11 +369,11 @@ The behavior of named/positional type arguments is the same as that of function 
 Elements can be annotated with constructor calls of constant classes as well as constant property:
 
 ```kotlin
-const class MyConstClass
-const myConstProperty = MyConstClass()
+annotation class MyAnnotationClass
+annotation let myAnnotationProperty = MyAnnotationClass()
 
-@MyConstClass()
-@myConstProperty
+@MyAnnotationClass()
+@myAnnotationProperty
 class Foo
 ```
 
@@ -386,8 +383,8 @@ You can define custom keywords like this:
 
 ```kotlin
 // Annotation & keyword declaration:
-const class DataClass
-keyword const data = DataClass()
+annotation class DataClass
+keyword let data = DataClass()
 
 // Usage:
 data class MyDataClass
@@ -626,22 +623,22 @@ plugins:
 
 - `README.md`
 - `src`: folder with all source code
-  - `default.candy`: `const class Serializable`
+  - `default.candy`: `class Serializable`
   - `json`
-    - `module.candy`: `const class JsonName`
+    - `module.candy`: `class JsonName`
     - `plugin.candy`
   - `yaml`
-    - `module.candy`: `const class YamlName`
+    - `module.candy`: `class YamlName`
     - `plugin.candy`
   - `config.candy`:
     ```kotlin
     @Serializable()
-    const class Config {
+    class Config {
       let json: JsonConfig = JsonConfig()
     }
 
     @Serializable()
-    const class JsonConfig {
+    class JsonConfig {
       let defaultCasing: Casing = Casing.lowerPascal
     }
     ```
@@ -687,7 +684,7 @@ use serializable
 @Serializable()
 class Foo {
   @json.JsonName("foo_bar")
-  let mut fooBar
+  mut let fooBar
 }
 ```
 
@@ -698,7 +695,7 @@ use serializable.json
 @Serializable()
 class Foo {
   @JsonName("foo_bar")
-  let mut fooBar
+  mut let fooBar
 }
 ```
 
