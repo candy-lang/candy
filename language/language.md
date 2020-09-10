@@ -11,47 +11,91 @@ method(param1)
 ```
 
 
-- [1. Visibility Modifiers](#1-visibility-modifiers)
-- [2. Properties](#2-properties)
-- [3. Functions](#3-functions)
-- [4. Classes](#4-classes)
-  - [4.1. Abstract classes](#41-abstract-classes)
-  - [4.2. Traits](#42-traits)
-  - [4.3. `impl`](#43-impl)
-- [5. Enums](#5-enums)
-- [6. Generics](#6-generics)
-- [7. Annotations](#7-annotations)
-- [8. Expressions](#8-expressions)
-  - [8.1. Operators](#81-operators)
-  - [8.2. Literals](#82-literals)
-    - [8.2.1. Strings](#821-strings)
-    - [8.2.2. Collections](#822-collections)
-  - [8.3. Labels](#83-labels)
-  - [8.4. If](#84-if)
-- [9. Statements](#9-statements)
-  - [9.1. For?](#91-for)
-  - [9.2. While?](#92-while)
-  - [9.3. Do-While?](#93-do-while)
-  - [9.4. Rethrow?](#94-rethrow)
-  - [9.5. Return](#95-return)
-  - [9.6. Labels](#96-labels)
+- [1. About](#1-about)
+  - [1.1. Goals](#11-goals)
+  - [1.2. Vision](#12-vision)
+  - [1.3. Paradigms](#13-paradigms)
+- [2. Visibility Modifiers](#2-visibility-modifiers)
+- [3. Properties](#3-properties)
+- [4. Functions](#4-functions)
+- [5. Classes](#5-classes)
+  - [5.1. Traits](#51-traits)
+  - [5.2. `impl`](#52-impl)
+- [6. Enums](#6-enums)
+- [7. Generics](#7-generics)
+- [8. Annotations](#8-annotations)
+- [9. Expressions](#9-expressions)
+  - [9.1. Operators](#91-operators)
+  - [9.2. Literals](#92-literals)
+    - [9.2.1. Strings](#921-strings)
+    - [9.2.2. Collections](#922-collections)
+  - [9.3. Labels](#93-labels)
+  - [9.4. If](#94-if)
+  - [9.5. Match](#95-match)
+  - [9.6. Return](#96-return)
   - [9.7. Break](#97-break)
   - [9.8. Continue](#98-continue)
-  - [9.9. Yield & Yield-Each](#99-yield--yield-each)
-  - [9.10. Assert](#910-assert)
-- [10. Patterns](#10-patterns)
-- [11. Modules & Scripts](#11-modules--scripts)
-- [12. Types](#12-types)
-  - [12.1. Function Types](#121-function-types)
-  - [12.2. Value Constraints](#122-value-constraints)
-  - [12.3. Implicit Casts](#123-implicit-casts)
-- [13. Comments](#13-comments)
-- [14. Decisions](#14-decisions)
-  - [14.1. Differentiate between immutable list & immutable view](#141-differentiate-between-immutable-list--immutable-view)
-- [15. Ideas for the future](#15-ideas-for-the-future)
+  - [9.9. Throw](#99-throw)
+  - [9.10. Try?](#910-try)
+  - [9.11. Rethrow?](#911-rethrow)
+  - [9.12. Yield & Yield-Each](#912-yield--yield-each)
+- [10. Statements](#10-statements)
+  - [10.1. For](#101-for)
+  - [10.2. Loop](#102-loop)
+  - [10.3. While](#103-while)
+- [11. Patterns](#11-patterns)
+- [12. Modules & Scripts](#12-modules--scripts)
+- [13. Types](#13-types)
+  - [13.1. Function Types](#131-function-types)
+  - [13.2. Value Constraints](#132-value-constraints)
+  - [13.3. Implicit Casts](#133-implicit-casts)
+- [14. Comments](#14-comments)
+- [15. Decisions](#15-decisions)
+  - [15.1. Differentiate between immutable list & immutable view](#151-differentiate-between-immutable-list--immutable-view)
+- [16. Ideas for the future](#16-ideas-for-the-future)
 
 
-## 1. Visibility Modifiers
+## 1. About
+
+### 1.1. Goals
+
+- compiles to/supports:
+  - Flutter (Dart)
+  - native (LLVM)
+  - web (WASM; JS via Dart)
+  - Kotlin\
+  → interoperability between programming languages
+- no manual memory management
+- can run on microcontrollers
+  - memory management via compiler-inferred alloc/free plus GC for remaining cases
+- easy to learn, but easily extensible
+- rich standard library
+- curated package ecosystem including recommended packages for common use-cases (logging, serialization, etc.)
+- concise syntax
+- great static analysis
+- compiler plugin support
+- epic tooling: hot reload, website with APIs, editor extensions, GitHub Actions, CLI tools, automatic diagrams & stats
+
+### 1.2. Vision
+
+A simple, extensible language enabling everyone to focus on getting things done.
+
+### 1.3. Paradigms
+
+OOP Pros:
+- familiar
+- typical inheritance examples / intuitive
+
+Rust-like Pros:
+- no "one size fits all"
+  - forces you to define better interfaces
+- mix and match / composition over inheritance
+- simple (not so simple to abuse)
+
+Hence: OOP without inheritance for classes, and with traits/impls
+
+
+## 2. Visibility Modifiers
 
 - `private`: functions/methods only callable in the same `class` and `impl`s
 - `internal`: visible in the same file
@@ -67,7 +111,7 @@ method(param1)
 By default, everything has the lowest possible visibility modifier (usually `private`).
 
 
-## 2. Properties
+## 3. Properties
 
 ```rust
 const constant: Int = 0
@@ -95,12 +139,12 @@ let computed: Int
 ```
 
 
-## 3. Functions
 
 TODO:
   fun doBar() => computeFoo()
   fun doBar() = methodReference
 
+## 4. Functions
 
 ```kotlin
 fun abc(a: Int, b: String = "abc"): Foo {
@@ -135,7 +179,7 @@ class Matrix {
 ```
 
 
-## 4. Classes
+## 5. Classes
 
 ```kotlin
 const class VerySimpleClass
@@ -204,7 +248,6 @@ let unit: VerySimpleClass = VerySimpleClass()
 let field: FieldClass = FieldClass(foo: 1, bar: 2)
 ```
 
-### 4.1. Abstract classes
 
 ```kotlin
 abstract class Foo
@@ -212,7 +255,7 @@ abstract class Foo
 
 - cannot be instantiated
 
-### 4.2. Traits
+### 5.1. Traits
 
 ```kotlin
 trait Foo
@@ -220,7 +263,7 @@ trait Foo
 
 - cannot be instantiated
 
-### 4.3. `impl`
+### 5.2. `impl`
 
 `trait`s can be implemented:
 
@@ -288,7 +331,7 @@ impl String {
 ```
 
 
-## 5. Enums
+## 6. Enums
 
 ```kotlin
 enum Foo1 { // implicitly extends `Enum<Void>`
@@ -320,7 +363,7 @@ enum Barcode {
 example usage: `Foo1.Bar`, `Foo2.FooBar.value`, `Barcode.Upc((1, 2, 3, 4))`
 
 
-## 6. Generics
+## 7. Generics
 
 ```rust
 trait Abc<T1, T2, …, Tn: Foo = Bar>
@@ -333,14 +376,14 @@ impl Abc<Foo, Tn: Bar, T2: Baz> for MyStruct
 The behavior of named/positional type arguments is the same as that of function calls.
 
 
-## 7. Annotations
+## 8. Annotations
 
-## 8. Expressions
+## 9. Expressions
 
 - Implicit member access (see Swift)
 
 
-### 8.1. Operators
+### 9.1. Operators
 
 | Precedence   | Description         | Operators                                                                              | Associativity |
 | :----------- | :------------------ | :------------------------------------------------------------------------------------- | :-----------: |
@@ -375,9 +418,10 @@ Point(tuple.x, tuple.y)
 Point(...tuple)
 ```
 
-### 8.2. Literals
 
-#### 8.2.1. Strings
+### 9.2. Literals
+
+#### 9.2.1. Strings
 
 ```rust
 "foo" // foo
@@ -390,7 +434,7 @@ r##"foo " "# bar {bar}"## // foo " "# bar {bar}
 
 Line breaks within multi-line string literals get normalized to a single line feed each.
 
-#### 8.2.2. Collections
+#### 9.2.2. Collections
 
 List literal: `[1, 2, 3]`
 Set literal: `{1, 2, 3}`
@@ -417,7 +461,7 @@ let c: Iterable<Int> = [
 ```
 
 
-### 8.3. Labels
+### 9.3. Labels
 
 Loops and lambdas can be prefixed by an optional label. This can then be used by `continue`, `break` and `return` statements:
 
@@ -437,7 +481,7 @@ fun bar() {
 }
 ```
 
-### 8.4. If
+### 9.4. If
 
 TODO: If-let
 
@@ -461,20 +505,24 @@ if (…) … else …
 
 
 
-## 9. Statements
-
-### 9.1. For?
-### 9.2. While?
-### 9.3. Do-While?
-### 9.4. Rethrow?
-### 9.5. Return
-### 9.6. Labels
+### 9.5. Match
+### 9.6. Return
 ### 9.7. Break
 ### 9.8. Continue
-### 9.9. Yield & Yield-Each
-### 9.10. Assert
+### 9.9. Throw
+### 9.10. Try?
+### 9.11. Rethrow?
+### 9.12. Yield & Yield-Each
 
-## 10. Patterns
+
+## 10. Statements
+
+### 10.1. For
+### 10.2. Loop
+### 10.3. While
+
+
+## 11. Patterns
 
 ```rust
 match x {
@@ -501,7 +549,7 @@ for .Some(a) in myList { … }
 ```
 
 
-## 11. Modules & Scripts
+## 12. Modules & Scripts
 
 - `use`: import a module
 - `public use`: import & export a module
@@ -655,7 +703,7 @@ Compiler Plugin:
 - when providing a configuration, `impl Json: TryTo<Config>` and `impl Config: To<Json>` must be available
 
 
-## 12. Types
+## 13. Types
 
 Primitive types:
 - `Bool`
@@ -673,13 +721,13 @@ Primitive types:
 - `(P1, …, Pn) -> R ≡ Function<P1, …, Pn, R>` ()
 - `Type<T>` (potentially)
 
-### 12.1. Function Types
+### 13.1. Function Types
 
 ```kotlin
 R.(T1 t1, T2 t2, …, Tn tn = dn) -> T
 ```
 
-### 12.2. Value Constraints
+### 13.2. Value Constraints
 
 ```kotlin
 fun a(Pair<Int, Int> pair)
@@ -689,26 +737,26 @@ fun a(Pair<Int, Int> pair)
 ```
 
 
-### 12.3. Implicit Casts
+### 13.3. Implicit Casts
 
 By implementing `As<T>` for `Foo`, you can implicitly (or explicitly) use `Foo` as `T`. This doesn't work transitively, though you could write `Foo as T as R`.
 
 This also provides what is known as Interface Delegation in Kotlin.
 
 
-## 13. Comments
+## 14. Comments
 
 - automatic line wrapping
 
 
-## 14. Decisions
+## 15. Decisions
 
-### 14.1. Differentiate between immutable list & immutable view
+### 15.1. Differentiate between immutable list & immutable view
 
 - just provide an immutable trait, since anybody could still implement an immutable list trait on a mutable one
 
 
-## 15. Ideas for the future
+## 16. Ideas for the future
 
 - allow dependencies in default parameter values in any order, as long as these dependencies form a DAG (i.e., they don't contain any cycles)
 - syntactic sugar for the `As<T>` trait
