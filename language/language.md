@@ -428,9 +428,7 @@ Point(...tuple)
 "foo" // foo
 "foo {bar}" // foo <bar's value>
 "foo {bar.baz}" // foo <bar.baz's value>
-r"foo {bar.baz}" // foo {bar.baz}
-##"foo " "# bar {bar}"## // foo " "# bar <bar's value>
-r##"foo " "# bar {bar}"## // foo " "# bar {bar}
+##"foo " "# bar {{{bar}}}"## // foo " "# bar <bar's value>
 ```
 
 Line breaks within multi-line string literals get normalized to a single line feed each.
