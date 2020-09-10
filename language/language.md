@@ -437,6 +437,13 @@ Point(tuple.x, tuple.y)
 Point(...tuple)
 ```
 
+Safe unwrap in arguments:
+
+```kotlin
+let value: Option<Int> = Option.None
+let point /* Option<Point> */ = Point(value?, 0)
+```
+
 
 ### 9.2. Literals
 
