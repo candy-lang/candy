@@ -15,7 +15,7 @@ method(param1)
   - [1.1. Goals](#11-goals)
   - [1.2. Vision](#12-vision)
   - [1.3. Paradigms](#13-paradigms)
-- [2. Visibility Modifiers](#2-visibility-modifiers)
+- [2. Visibility Modifier](#2-visibility-modifier)
 - [3. Properties](#3-properties)
 - [4. Functions](#4-functions)
 - [5. Classes](#5-classes)
@@ -96,20 +96,9 @@ Rust-like Pros:
 Hence: OOP without inheritance for classes, and with traits/impls
 
 
-## 2. Visibility Modifiers
+## 2. Visibility Modifier
 
-- `private`: functions/methods only callable in the same `class` and `impl`s
-- `internal`: visible in the same file
-- `protected`: visible in the class, subclasses, and impls
-- `public`: visible everywhere
-
-| keyword     | same `class`/`impl` | same file | direct outer scope | subclasses | everywhere |
-| :---------- | :-----------------: | :-------: | :----------------: | :--------: | :--------: |
-| `private`   |          ✅          |     ❌     |         ✅          |     ❌      |     ❌      |
-| `protected` |          ✅          |     ❌     |         ✅          |     ✅      |     ❌      |
-| `public`    |          ✅          |     ✅     |         ✅          |     ✅      |     ✅      |
-
-By default, everything has the lowest possible visibility modifier (usually `private`).
+`public`: can be exported from the module. By default, everything is private and only visible within the containing module.
 
 
 ## 3. Properties
