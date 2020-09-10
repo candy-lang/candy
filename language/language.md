@@ -126,8 +126,8 @@ let mut blub: Int
   private get: Int => blub * 5
   private get: Float => blub / 2 // recursion?
   private get: String => blub.toString()
-  private get: Bytes => '${(blub + 1) / 2.0 * blub}$blub'.toUtf8()
-  private get: Int => blub > 5 ? blub.length : blub.sum();
+  private get: Bytes => "{(blub + 1) / 2.0 * blub}{blub}".toUtf8()
+  private get: Int => if (blub > 5) blub.length else blub.sum()
   private set => field = value + 1
 let blab: Int
   get: Float => field
@@ -138,11 +138,6 @@ let computed: Int
   private get => foo.length
 ```
 
-
-
-TODO:
-  fun doBar() => computeFoo()
-  fun doBar() = methodReference
 
 ## 4. Functions
 
@@ -156,12 +151,19 @@ fun abc(a: Int, b: String = "abc"): Foo {
   // Can be called like:
   abc(0)
   abc(0, "abc")
-  abc(a: 0, b: "abc")
-  abc(0, b: "abc")
-  abc(a: 0, "abc")
+  abc(a = 0, b = "abc")
+  abc(0, b = "abc")
+  abc(a = 0, "abc")
 
   return Foo()
 }
+```
+
+Expression bodies:
+
+```kotlin
+fun doBar() => computeFoo()
+fun doBar() = methodReference
 ```
 
 The default return type (if not specified) is `Unit`. When using an expression body or delegating to a different function, the return type is inferred.
@@ -245,7 +247,7 @@ class FieldClass {
 
 ```rust
 let unit: VerySimpleClass = VerySimpleClass()
-let field: FieldClass = FieldClass(foo: 1, bar: 2)
+let field: FieldClass = FieldClass(foo = 1, bar = 2)
 ```
 
 
@@ -334,7 +336,7 @@ impl String {
 ## 6. Enums
 
 ```kotlin
-enum Foo1 { // implicitly extends `Enum<Void>`
+enum Foo1 { // implicitly extends `Enum<Unit>`
   Bar,
   Baz,
   FooBar,
@@ -351,14 +353,22 @@ enum Foo3: String {
 }
 enum Barcode {
   // generates: class Barcode<T : (Int, Int, Int, Int) | String> : Enum<T>
-  Upc = (Int, Int, Int, Int),
+  Upc: (Int, Int, Int, Int),
   // generates: class Upc : Barcode<(Int, Int, Int, Int)>
-  QrCode = String,
+  QrCode: String,
   // generates: class QrCode : Barcode<String>
 }
 ```
 
-(with `class Enum<T>(let value: T, name: String)`)
+with:
+
+```rust
+trait Enum<T> {
+  let value: T
+  let name: String
+}
+impl<T> Enum<T>: As<T> { … }
+```
 
 example usage: `Foo1.Bar`, `Foo2.FooBar.value`, `Barcode.Upc((1, 2, 3, 4))`
 
@@ -724,7 +734,7 @@ Primitive types:
 ### 13.1. Function Types
 
 ```kotlin
-R.(T1 t1, T2 t2, …, Tn tn = dn) -> T
+R.(T1 t1, T2 t2, …, Tn tn = dn) => T
 ```
 
 ### 13.2. Value Constraints
