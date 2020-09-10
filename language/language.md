@@ -748,6 +748,36 @@ This also provides what is known as Interface Delegation in Kotlin.
 
 - automatic line wrapping
 
+```kotlin
+fun foo(bar: Int): Result<Int, MyError> {
+  /// A short sentence describes this item.
+  ///
+  /// Longer paragraphs may be written below. They can describe the function in
+  /// more detail. They can also reference parameters like `bar`.
+  ///
+  /// # Complexity/Performance
+  ///
+  /// This function runs in $O(bar)$ and consumes constant space.
+  ///
+  /// # Errors
+  ///
+  /// `MyError` is returned when an even number is passed in.
+  ///
+  /// # Exceptions
+  ///
+  /// The following exceptions may be thrown:
+  ///
+  /// - `IndexOutOfRangeException`: If `bar` is `-1`.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// let result = foo(1)
+  /// assert(result == .Ok(2))
+  /// ```
+}
+```
+
 
 ## 15. Decisions
 
