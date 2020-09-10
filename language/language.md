@@ -24,6 +24,7 @@ method(param1)
 - [6. Enums](#6-enums)
 - [7. Generics](#7-generics)
 - [8. Annotations](#8-annotations)
+  - [8.1. Keywords](#81-keywords)
 - [9. Expressions](#9-expressions)
   - [9.1. Operators](#91-operators)
   - [9.2. Literals](#92-literals)
@@ -378,6 +379,34 @@ The behavior of named/positional type arguments is the same as that of function 
 
 
 ## 8. Annotations
+
+Elements can be annotated with constructor calls of constant classes as well as constant property:
+
+```kotlin
+const class MyConstClass
+const myConstProperty = MyConstClass()
+
+@MyConstClass()
+@myConstProperty
+class Foo
+```
+
+### 8.1. Keywords
+
+You can define custom keywords like this:
+
+```kotlin
+// Annotation & keyword declaration:
+const class DataClass
+keyword const data = DataClass()
+
+// Usage:
+data class MyDataClass
+// Instead of:
+@DataClass()
+class MyDataClass
+```
+
 
 ## 9. Expressions
 
