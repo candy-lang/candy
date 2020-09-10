@@ -227,7 +227,6 @@ class Class5 {
 }
 ```
 
-
 ```kotlin
 class FieldClass {
   // constructors:
@@ -244,18 +243,10 @@ class FieldClass {
 }
 ```
 
-
 ```rust
 let unit: VerySimpleClass = VerySimpleClass()
 let field: FieldClass = FieldClass(foo = 1, bar = 2)
 ```
-
-
-```kotlin
-abstract class Foo
-```
-
-- cannot be instantiated
 
 ### 5.1. Traits
 
