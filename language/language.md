@@ -603,10 +603,10 @@ plugins:
 - `src`: folder with all source code
   - `default.candy`: `const class Serializable`
   - `json`
-    - `mod.candy`: `const class JsonName`
+    - `module.candy`: `const class JsonName`
     - `plugin.candy`
   - `yaml`
-    - `mod.candy`: `const class YamlName`
+    - `module.candy`: `const class YamlName`
     - `plugin.candy`
   - `config.candy`:
     ```kotlin
