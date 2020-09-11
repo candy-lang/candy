@@ -2,15 +2,6 @@
 
 
 
-```
-val instance = FieldClass()
-
-users.map(User::toJson)
-val method: (param1: Param1Type) -> ReturnType = instance.doFoo
-method(param1)
-```
-
-
 - [1. About](#1-about)
   - [1.1. Goals](#11-goals)
   - [1.2. Vision](#12-vision)
@@ -103,6 +94,8 @@ Hence: OOP without inheritance for classes, and with traits/impls
 
 ## 3. Properties
 
+Properties are named storage slots, whether global, in classes or in functions.
+
 ```rust
 let readonly: Int = 0
 mut let mutable: Int = 0
@@ -112,14 +105,10 @@ mut let whoosh: Int = bazfoo
 mut let floop: Int
   private set
 mut let blub: Int
-  private get: Int => blub * 5
-  private get: Float => blub / 2 // recursion?
-  private get: String => blub.toString()
-  private get: Bytes => "{(blub + 1) / 2.0 * blub}{blub}".toUtf8()
-  private get: Int => if (blub > 5) blub.length else blub.sum()
+  private get => field * 5
   private set => field = value + 1
 let blab: Int
-  get: Float => field
+  get => field
 
 lateinit let baz: Int
 
@@ -130,6 +119,8 @@ let computed: Int
 
 ## 4. Functions
 
+Functions contain code that can be executed.
+
 ```kotlin
 fun abc(a: Int, b: String = "abc"): Foo {
   /// After a parameter with a default value, all following parameters need to
@@ -137,6 +128,7 @@ fun abc(a: Int, b: String = "abc"): Foo {
 
   // Can be called like:
   abc(0)
+  abc(a = 0)
   abc(0, "abc")
   abc(a = 0, b = "abc")
   abc(0, b = "abc")
@@ -173,15 +165,10 @@ class Matrix {
 ```kotlin
 class VerySimpleClass
 
+// Implicitly generates constructor with parameters foo and bar, where bar is optional.
 class SimpleClass1 {
   let foo: String
   let bar: Int = 0
-}
-
-// Implicitly generates constructor with parameters foo and bar, where foo is optional.
-class VerySimpleClass {
-  let foo: Int = 0
-  let bar: String
 }
 
 // Defines a constructor, so there's no default constructor any more.
@@ -201,6 +188,7 @@ class SimpleClass3 {
   let foo: String = "blub"
   let bar: Int = -1
 }
+
 class SimpleClass4 {
   private constructor
   // This uses the default constructor, but changes its visibility.
@@ -209,7 +197,7 @@ class SimpleClass4 {
   let bar: Int = 0
 }
 
-class Class5 {
+class SimpleClass5 {
   class NestedClass
 }
 ```
@@ -221,7 +209,7 @@ class FieldClass {
 
   // properties:
   let foo: Int
-  mut let bar: Int
+  mut let bar: This // Inside classes, you can use `This` to refer to the class itself.
   mut let withDefault: Int = foo
 
   // methods:
@@ -237,11 +225,14 @@ let field: FieldClass = FieldClass(foo = 1, bar = 2)
 
 ### 5.1. Traits
 
+Traits can define an API (available properties and functions), but they cannot be instantiated.
+
 ```kotlin
-trait Foo
+trait Foo {
+  fun baz(): Int
+}
 ```
 
-- cannot be instantiated
 
 ### 5.2. `impl`
 
@@ -251,7 +242,7 @@ trait Foo
 impl Foo: Bar {
   // Implement trait [Bar] for type [Foo].
 
-  fun baz() {}
+  fun baz() => 5
 }
 
 // Implementations for all cases must be provided. The same goes for abstract
@@ -266,24 +257,23 @@ impl MyEnum: Foo
 impl MyClass: Foo
 ```
 
-`impl`s may only contain the functions specified by the implemented `trait`s.
-
 You can also overload the `impl` based on the `trait`s type parameters – so `Foo` can implement both `List<Int>` and `List<String>`.
 
 Visibility (can't have an explicit modifier): that of the base class, as long as the package defining the trait is a dependency (no `use` for the trait necessary)
 
 You can also implement `trait`s anonymously inline. The following creates an anonymous class implementing the trait `Foo` and passes it to the method `doWithFoo`:
 
-```
+```kotlin
 dooWithFoo(impl : Foo {
   fun foo() {}
   fun bar() {}
 })
 ```
 
-For implementing multiple `trait`s, shorten your code like the following:
+For implementing multiple (usually related) `trait`s, you can shorten your code like the following:
 
 ```rust
+// Implement algebra stuff.
 impl Int: Add<Int, Int>, Subtract<Int, Int> {
   fun add(other: Int): Int {}
   fun subtract(other: Int): Int {}
@@ -366,7 +356,7 @@ The behavior of named/positional type arguments is the same as that of function 
 
 ## 8. Annotations
 
-Elements can be annotated with constructor calls of constant classes as well as constant property:
+You can define annotations using the `annotation` keyword before a `class` or `let` declaration.
 
 ```kotlin
 annotation class MyAnnotationClass
@@ -449,6 +439,8 @@ let point /* Option<Point> */ = Point(value?, 0)
 ```rust
 "foo" // foo
 "foo {bar}" // foo <bar's value>
+#"foo {bar}"# // foo {bar}
+#"foo {{bar}}"# // foo <bar's value> (unnecessarily nested)
 "foo {bar.baz}" // foo <bar.baz's value>
 ##"foo " "# bar {{{bar}}}"## // foo " "# bar <bar's value>
 ```
@@ -525,7 +517,6 @@ if (…) … else …
 ```
 
 
-
 ### 9.5. Match
 ### 9.6. Return
 ### 9.7. Break
@@ -548,16 +539,16 @@ if (…) … else …
 ```rust
 match x {
   1 => "exactly 1"
-  2 | 3 => "2 or 3"
+  2 | 3 => "2 or 3: {it}"
   a: Int if a.isEven => "is even"
-  (1, a) => "tuple of 1 and {b}"
+  (1, a) => "tuple of 1 and {a}"
   ("abc", a = 1 | 2) => #"("abc", 1) or ("abc", 2) (and a captures the value)"#
-  ("abc", a: Int) => #"Tuple of "abc" and an integer ({a})"#
+  ("abc", a: Int) => #"Tuple of "abc" and an integer ({{a}})"#
   a = 4 | 5 => "is 4 or 5 and captured in a"
   a in 6..8 => "is within 6 and 8 and captured in a"
   a: Int => "is of type Int and captured in a"
   Option.Some(a) => "Some of {a}"
-  _: Option<a = Int | UInt> => "Option<{a}>"
+  _: Option<T = Int | UInt> => "Option<{T}>"
   _: Option<T> => "Option<{T}>"
   _: ((Int) => String) => "Function from Int to String"
   _ => "default"
@@ -827,10 +818,9 @@ fun foo(bar: Int): Result<Int, MyError> {
 - static initializer block
 - overflow operators
 - chained comparison
-- implicit multiplication: a literal number before an identifier creates an implicit multiplication: `2 apples` is equivalent to `2 * apples`
+- implicit multiplication: a literal number before an identifier creates an implicit multiplication: `2 apples` is equivalent to `2 * apples`. Works gracefully for units: `2 days + 3 minutes`, `2.50 euro`
   - `2 to -2` is equivalent to `2.to(-2)`, not `2 * to - 2`?
   - what about `1 / 2 foo`?
-  - or rather postfix functions? `2 seconds + 3 minutes` and `2.50 euro`
 - for in collection literals:
   ```dart
   [
