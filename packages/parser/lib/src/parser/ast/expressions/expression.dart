@@ -3,6 +3,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../lexer/token.dart';
 import '../../../syntactic_entity.dart';
 import '../../../utils.dart';
+import '../declarations.dart';
 import '../node.dart';
 import '../statements.dart';
 import '../types.dart';
@@ -23,6 +24,28 @@ abstract class Literal<T> extends Expression implements _$Literal<T> {
 }
 
 @freezed
+abstract class LambdaLiteral extends Expression implements _$LambdaLiteral {
+  const factory LambdaLiteral({
+    @required OperatorToken leftBrace,
+    @Default(<ValueParameter>[]) List<ValueParameter> valueParameters,
+    @Default(<OperatorToken>[]) List<OperatorToken> valueParameterCommata,
+    OperatorToken arrow,
+    @Default(<Statement>[]) List<Statement> statements,
+    @required OperatorToken rightBrace,
+  }) = _LambdaLiteral;
+  const LambdaLiteral._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [
+        leftBrace,
+        ...interleave(valueParameters, valueParameterCommata),
+        if (arrow != null) arrow,
+        ...statements,
+        rightBrace,
+      ];
+}
+
+@freezed
 abstract class Identifier extends Expression implements _$Identifier {
   const factory Identifier(IdentifierToken value) = _Identifier;
   const Identifier._();
@@ -39,8 +62,6 @@ abstract class GroupExpression extends Expression implements _$GroupExpression {
     @required OperatorToken rightParenthesis,
   }) = _ParenthesizedExpression;
   const GroupExpression._();
-
-  // assert(leftParenthesis.type == OperatorTokenType.lparen),
 
   @override
   Iterable<SyntacticEntity> get children => [

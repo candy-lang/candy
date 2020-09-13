@@ -164,8 +164,8 @@ abstract class FunctionDeclaration extends Declaration
 abstract class ValueParameter extends AstNode implements _$ValueParameter {
   const factory ValueParameter({
     @required IdentifierToken name,
-    @required OperatorToken colon,
-    @required Type type,
+    OperatorToken colon,
+    Type type,
     OperatorToken equals,
     Expression defaultValue,
   }) = _ValueParameter;

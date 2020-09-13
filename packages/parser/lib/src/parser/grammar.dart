@@ -331,21 +331,20 @@ class ParserGrammar {
           ));
 
   static final valueParameter = (LexerGrammar.Identifier &
-          LexerGrammar.NLs &
-          LexerGrammar.COLON &
-          LexerGrammar.NLs &
-          type &
+          (LexerGrammar.NLs & LexerGrammar.COLON & LexerGrammar.NLs & type)
+              .optional() &
           (LexerGrammar.NLs &
                   LexerGrammar.EQUALS &
                   LexerGrammar.NLs &
                   expression)
               .optional())
       .map<ValueParameter>((value) {
-    final defaultValueDeclaration = value[5] as List<dynamic>;
+    final typeDeclaration = value[1] as List<dynamic>;
+    final defaultValueDeclaration = value[2] as List<dynamic>;
     return ValueParameter(
       name: value[0] as IdentifierToken,
-      colon: value[2] as OperatorToken,
-      type: value[4] as Type,
+      colon: typeDeclaration?.elementAt(1) as OperatorToken,
+      type: typeDeclaration?.elementAt(3) as Type,
       equals: defaultValueDeclaration?.elementAt(1) as OperatorToken,
       defaultValue: defaultValueDeclaration?.elementAt(3) as Expression,
     );
@@ -514,6 +513,7 @@ class ParserGrammar {
       ..primitive<Expression>(
           // ignore: unnecessary_cast, Without the cast the compiler complains…
           (literalConstant as Parser<Expression>) |
+              lambdaLiteral |
               LexerGrammar.Identifier.map((t) => Identifier(t)))
       // grouping
       ..grouping<Expression>(
@@ -723,6 +723,28 @@ class ParserGrammar {
     LexerGrammar.IntegerLiteral.map((l) => Literal<int>(l)),
     LexerGrammar.BooleanLiteral.map((l) => Literal<bool>(l)),
   ]);
+  static final lambdaLiteral = (LexerGrammar.LCURL &
+          (LexerGrammar.NLs &
+                  valueParameter.fullCommaSeparatedList().optional() &
+                  LexerGrammar.NLs &
+                  LexerGrammar.EQUALS_GREATER)
+              .optional() &
+          LexerGrammar.NLs &
+          statements &
+          LexerGrammar.NLs &
+          LexerGrammar.RCURL)
+      .map<LambdaLiteral>((value) {
+    final parameterSection = value[1] as List<dynamic>;
+    final parameters = parameterSection?.elementAt(1) as List<dynamic>;
+    return LambdaLiteral(
+        leftBrace: value[0] as OperatorToken,
+        valueParameters: parameters?.elementAt(0) as List<ValueParameter> ?? [],
+        valueParameterCommata:
+            parameters?.elementAt(1) as List<OperatorToken> ?? [],
+        arrow: parameterSection?.elementAt(3) as OperatorToken,
+        statements: value[3] as List<Statement>,
+        rightBrace: value[5] as OperatorToken);
+  });
 
   // SECTION: modifiers
 

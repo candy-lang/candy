@@ -1,4 +1,5 @@
 import 'package:meta/meta.dart';
+import 'package:parser/parser.dart';
 import 'package:parser/src/lexer/lexer.dart';
 import 'package:parser/src/parser/ast/expressions/expression.dart';
 import 'package:parser/src/parser/ast/statements.dart';
@@ -45,6 +46,77 @@ void main() {
             Literal(BooleanLiteralToken(value, span: fullSpan)),
       );
     });
+
+    tableTestExpressionParser<LambdaLiteral, LambdaLiteral>(
+      'lambda literals',
+      table: {
+        '{}': LambdaLiteral(
+          leftBrace:
+              OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(0, 1)),
+          rightBrace:
+              OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(1, 2)),
+        ),
+        '{ it }': LambdaLiteral(
+          leftBrace:
+              OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(0, 1)),
+          statements: [
+            Identifier(IdentifierToken('it', span: SourceSpan(2, 4))),
+          ],
+          rightBrace:
+              OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(5, 6)),
+        ),
+        '{ foo => foo }': LambdaLiteral(
+          leftBrace:
+              OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(0, 1)),
+          valueParameters: [
+            ValueParameter(
+              name: IdentifierToken('foo', span: SourceSpan(2, 5)),
+            ),
+          ],
+          arrow: OperatorToken(
+            OperatorTokenType.equalsGreater,
+            span: SourceSpan(6, 8),
+          ),
+          statements: [
+            Identifier(IdentifierToken('foo', span: SourceSpan(9, 12))),
+          ],
+          rightBrace:
+              OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(13, 14)),
+        ),
+        '{ foo: Foo, bar => foo }': LambdaLiteral(
+          leftBrace:
+              OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(0, 1)),
+          valueParameters: [
+            ValueParameter(
+              name: IdentifierToken('foo', span: SourceSpan(2, 5)),
+              colon: OperatorToken(
+                OperatorTokenType.colon,
+                span: SourceSpan(5, 6),
+              ),
+              type: UserType(simpleTypes: [
+                SimpleUserType(IdentifierToken('Foo', span: SourceSpan(7, 10))),
+              ]),
+            ),
+            ValueParameter(
+              name: IdentifierToken('bar', span: SourceSpan(12, 15)),
+            ),
+          ],
+          valueParameterCommata: [
+            OperatorToken(OperatorTokenType.comma, span: SourceSpan(10, 11)),
+          ],
+          arrow: OperatorToken(
+            OperatorTokenType.equalsGreater,
+            span: SourceSpan(16, 18),
+          ),
+          statements: [
+            Identifier(IdentifierToken('foo', span: SourceSpan(19, 22))),
+          ],
+          rightBrace:
+              OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(23, 24)),
+        ),
+      },
+      nodeMapper: (value, _) => value,
+    );
 
     tableTestExpressionParser<String, Identifier>(
       'identifiers',
