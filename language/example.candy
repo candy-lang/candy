@@ -9,21 +9,20 @@ public fun main() {
 }
 
 @Remember(cacheSize = 30)
-pure fun fibonacci(n: UInt): UInt {
+fun fibonacci(n: UInt): UInt {
   /// Returns the [n]th fibonacci number.
   return match n {
-    0 => 0
-    1 => 1
+    0 | 1 => it
     n => fibonacci(n - 1) + fibonacci(n - 2)
   }
 }
 
 fun main1() {
   assert(fibonacci(10) == 55)
-  print("The 100th fibonacci number is ${fibonacci(100)}")
+  print("The 100th fibonacci number is {fibonacci(100)}.")
 }
 
-@data class Fruit {
+data class Fruit {
   let name: String
   let cost: Money
   let ripeness: Ripeness = .unripe
@@ -33,7 +32,7 @@ enum Ripeness { ripe, unripe }
 
 const apple = Fruit("apple", 2.euro)
 const banana = Fruit("banana", 5.20.euro)
-const kiwi = Fruit("kiwi", 7.euro, ripeness = .ripe)
+const kiwi = Fruit("kiwi", apple.cost + banana.cost, ripeness = .ripe)
 const smoothieIngredients = [apple, banana, kiwi, apple, kiwi]
 
 fun main2() {
@@ -47,11 +46,10 @@ class Cart {
     let cost: Money
   }
 
-  let items: MutableList<Item> = []
+  mut let items = <Item>[]
   /// The items currently in the cart.
 
-  let cost: Money
-    get => items.cost
+  let cost: Money => items.cost
 
   fun buy() = TODO
 }
@@ -59,13 +57,12 @@ class Cart {
 impl Iterable<Item>: Item {
   /// Simplifies getting the cost of a list of items.
 
-  let cost: Money
-    get => sumBy { it.cost }
+  let cost => sumBy { it.cost }
 }
 
 impl Fruit: Cart.Item
 
-@data class Box<Item: Cart.Item> {
+data class Box<Item: Cart.Item> {
   /// A beautiful, handcrafted, wooden box.
 
   static const cost: Money = 30.euro
@@ -75,27 +72,29 @@ impl Fruit: Cart.Item
 }
 
 impl<Item> Box<Item>: Cart.Item {
-  let cost: Money
-    get => content.cost + Box.cost
+  let cost => content.cost + Box.cost
 }
 
 const cart = Cart([
   kiwi,
   ...smoothieIngredients,
-  Box([apple, 2 times banana]),
+  Box([apple, banana, banana]),
 ])
 
 void main3() {
-  print("The cart costs ${cart.cost}")
+  print("The cart costs {cart.cost}.")
 }
 
 impl Fruit {
-  let yumminess: Int
+  let yumminess: Int {
     /// Computes a yumminess score for this [Fruit] using a secret formula.
-    get => fibonacci(cost.value as UInt) + name.bytes.sum() + match ripeness {
-      ripe => 0
-      unripe => -20
+    fun get() {
+      return fibonacci(cost.value as UInt) + name.bytes.sum() + match ripeness {
+        ripe => 0
+        unripe => -20
+      }
     }
+  }
 }
 
 void main4() {
@@ -106,11 +105,11 @@ void main4() {
 
 class Human {
   fun eat(fruits: List<Fruit>): Result<Burp, ThrowUp> {
-    let mut fullness = 0
+    mut let fullness = 0
     for fruit in fruits {
-      if fullness < 10 || randomBool() {
+      if fullness < 10 {
         fullness++
-      } else {
+      } else if randomBool() {
         return ThrowUp()
       }
     }
