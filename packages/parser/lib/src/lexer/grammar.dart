@@ -158,6 +158,8 @@ class LexerGrammar {
 
   // SECTION: lexicalModifiers
 
+  static final PUBLIC =
+      string('public').tokenize((_, span) => ModifierToken.public(span: span));
   static final EXTERNAL = string('external')
       .tokenize((_, span) => ModifierToken.external(span: span));
   static final OVERRIDE = string('override')

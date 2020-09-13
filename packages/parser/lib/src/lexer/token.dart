@@ -42,6 +42,8 @@ abstract class KeywordToken extends Token with _$KeywordToken {
 
 @freezed
 abstract class ModifierToken extends Token with _$ModifierToken {
+  const factory ModifierToken.public({@required SourceSpan span}) =
+      _PublicModifierToken;
   const factory ModifierToken.external({@required SourceSpan span}) =
       _ExternalModifierToken;
   const factory ModifierToken.override({@required SourceSpan span}) =
