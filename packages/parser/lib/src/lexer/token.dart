@@ -44,8 +44,6 @@ abstract class KeywordToken extends Token with _$KeywordToken {
 abstract class ModifierToken extends Token with _$ModifierToken {
   const factory ModifierToken.external({@required SourceSpan span}) =
       _ExternalModifierToken;
-  const factory ModifierToken.abstract({@required SourceSpan span}) =
-      _AbstractModifierToken;
   const factory ModifierToken.override({@required SourceSpan span}) =
       _OverrideModifierToken;
   // ignore: non_constant_identifier_names
