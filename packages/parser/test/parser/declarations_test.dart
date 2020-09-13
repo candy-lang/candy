@@ -503,89 +503,57 @@ void main() {
           ),
         ),
       ),
-      'abstract class Foo: Bar(baz = 1, false) {\n'
-          '  abstract let foo: Int\n'
+      'class Foo {\n'
+          '  let foo: Int\n'
           '  fun bar() {}\n'
           '}': ClassDeclaration(
-        modifiers: [ModifierToken.abstract(span: SourceSpan(0, 8))],
         classKeyword:
-            KeywordToken.class_(span: SourceSpan(9, 14)) as ClassKeywordToken,
-        name: IdentifierToken('Foo', span: SourceSpan(15, 18)),
-        colon: OperatorToken(OperatorTokenType.colon, span: SourceSpan(18, 19)),
-        parentConstructorCall: ConstructorCall(
-          type: UserType(simpleTypes: [
-            SimpleUserType(IdentifierToken('Bar', span: SourceSpan(20, 23))),
-          ]),
-          leftParenthesis:
-              OperatorToken(OperatorTokenType.lparen, span: SourceSpan(23, 24)),
-          arguments: [
-            Argument(
-              name: IdentifierToken('baz', span: SourceSpan(24, 27)),
-              equals: OperatorToken(
-                OperatorTokenType.equals,
-                span: SourceSpan(28, 29),
-              ),
-              expression: Literal<int>(
-                IntegerLiteralToken(1, span: SourceSpan(30, 31)),
-              ),
-            ),
-            Argument(
-              expression: Literal<bool>(
-                BooleanLiteralToken(false, span: SourceSpan(33, 38)),
-              ),
-            ),
-          ],
-          argumentCommata: [
-            OperatorToken(OperatorTokenType.comma, span: SourceSpan(31, 32)),
-          ],
-          rightParenthesis:
-              OperatorToken(OperatorTokenType.rparen, span: SourceSpan(38, 39)),
-        ),
+            KeywordToken.class_(span: SourceSpan(0, 5)) as ClassKeywordToken,
+        name: IdentifierToken('Foo', span: SourceSpan(6, 9)),
         body: BlockDeclarationBody(
           leftBrace:
-              OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(40, 41)),
+              OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(10, 11)),
           declarations: [
             PropertyDeclaration(
-              modifiers: [ModifierToken.abstract(span: SourceSpan(44, 52))],
               letKeyword:
-                  KeywordToken.let(span: SourceSpan(53, 56)) as LetKeywordToken,
-              name: IdentifierToken('foo', span: SourceSpan(57, 60)),
+                  KeywordToken.let(span: SourceSpan(14, 17)) as LetKeywordToken,
+              name: IdentifierToken('foo', span: SourceSpan(18, 21)),
               colon: OperatorToken(
                 OperatorTokenType.colon,
-                span: SourceSpan(60, 61),
+                span: SourceSpan(21, 22),
               ),
               type: UserType(simpleTypes: [
                 SimpleUserType(
-                  IdentifierToken('Int', span: SourceSpan(62, 65)),
+                  IdentifierToken('Int', span: SourceSpan(23, 26)),
                 ),
               ]),
             ),
             FunctionDeclaration(
               funKeyword:
-                  KeywordToken.fun(span: SourceSpan(68, 71)) as FunKeywordToken,
-              name: IdentifierToken('bar', span: SourceSpan(72, 75)),
+                  KeywordToken.fun(span: SourceSpan(29, 32)) as FunKeywordToken,
+              name: IdentifierToken('bar', span: SourceSpan(33, 36)),
               leftParenthesis: OperatorToken(
                 OperatorTokenType.lparen,
-                span: SourceSpan(75, 76),
+                span: SourceSpan(36, 37),
               ),
               rightParenthesis: OperatorToken(
                 OperatorTokenType.rparen,
-                span: SourceSpan(76, 77),
+                span: SourceSpan(37, 38),
               ),
               body: Block(
                 leftBrace: OperatorToken(
                   OperatorTokenType.lcurl,
-                  span: SourceSpan(78, 79),
+                  span: SourceSpan(39, 40),
                 ),
                 rightBrace: OperatorToken(
                   OperatorTokenType.rcurl,
-                  span: SourceSpan(79, 80),
+                  span: SourceSpan(40, 41),
                 ),
               ),
             ),
           ],
           rightBrace:
-              OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(81, 82)),
+              OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(42, 43)),
         ),
       ),
     },

@@ -74,8 +74,6 @@ abstract class ClassDeclaration extends Declaration
     @required ClassKeywordToken classKeyword,
     @required IdentifierToken name,
     TypeParameters typeParameters,
-    OperatorToken colon,
-    ConstructorCall parentConstructorCall,
     BlockDeclarationBody body,
   }) = _ClassDeclaration;
   const ClassDeclaration._();
@@ -86,8 +84,6 @@ abstract class ClassDeclaration extends Declaration
         classKeyword,
         name,
         if (typeParameters != null) typeParameters,
-        if (colon != null) colon,
-        if (parentConstructorCall != null) parentConstructorCall,
         if (body != null) body,
       ];
 }
