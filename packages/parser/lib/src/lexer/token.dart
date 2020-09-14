@@ -6,7 +6,9 @@ import '../syntactic_entity.dart';
 
 part 'token.freezed.dart';
 
-abstract class Token extends SyntacticEntity {}
+abstract class Token extends SyntacticEntity {
+  const Token();
+}
 
 @freezed
 abstract class OperatorToken extends Token with _$OperatorToken {

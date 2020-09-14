@@ -3,7 +3,7 @@ import 'package:parser/src/utils.dart';
 
 import '../../lexer/lexer.dart';
 import '../../syntactic_entity.dart';
-import 'expressions/expression.dart';
+import 'expressions/expressions.dart';
 import 'node.dart';
 import 'statements.dart';
 import 'types.dart';

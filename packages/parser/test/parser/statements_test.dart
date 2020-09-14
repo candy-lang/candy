@@ -1,5 +1,5 @@
 import 'package:parser/src/lexer/lexer.dart';
-import 'package:parser/src/parser/ast/expressions/expression.dart';
+import 'package:parser/src/parser/ast/expressions/expressions.dart';
 import 'package:parser/src/parser/ast/statements.dart';
 import 'package:parser/src/parser/grammar.dart';
 import 'package:parser/src/source_span.dart';

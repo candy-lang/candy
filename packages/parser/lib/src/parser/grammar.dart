@@ -6,7 +6,7 @@ import '../lexer/lexer.dart';
 import '../syntactic_entity.dart';
 import '../utils.dart';
 import 'ast/declarations.dart';
-import 'ast/expressions/expression.dart';
+import 'ast/expressions/expressions.dart';
 import 'ast/general.dart';
 import 'ast/statements.dart';
 import 'ast/types.dart';

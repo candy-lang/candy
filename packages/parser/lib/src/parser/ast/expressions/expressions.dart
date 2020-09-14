@@ -8,7 +8,7 @@ import '../node.dart';
 import '../statements.dart';
 import '../types.dart';
 
-part 'expression.freezed.dart';
+part 'expressions.freezed.dart';
 
 abstract class Expression extends Statement {
   const Expression();
@@ -171,7 +171,6 @@ abstract class Argument extends AstNode implements _$Argument {
     @required Expression expression,
   }) = _Argument;
   const Argument._();
-  //     assert((name != null) == (equals != null)),
 
   @override
   Iterable<SyntacticEntity> get children => [
