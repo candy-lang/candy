@@ -100,20 +100,27 @@ Properties are named storage slots, whether global, in classes or in functions.
 let readonly: Int = 0
 mut let mutable: Int = 0
 
-mut let whoosh: Int = bazfoo
-  private get
-mut let floop: Int
-  private set
+// Custom Getters:
+let foo1: Int => 1
+let foo2: Int {
+  return 1
+}
+let foo3: Int
+  get => 1
 mut let blub: Int
-  private get => field * 5
-  private set => field = value + 1
-let blab: Int
-  get => field
+  get => field * 5
+  set => field = value + 1
+
+// Delegation:
+let bar: Int by vetoable { old, new => TODO() }
+
+// Default value:
+mut let whoosh: Int = bazfoo
+let yumminess: Int = impl { // Trait is inferred
+  fun foo() => 1
+}
 
 lateinit let baz: Int
-
-let computed: Int
-  private get => foo.length
 ```
 
 
