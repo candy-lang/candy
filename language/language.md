@@ -31,6 +31,7 @@
   - [9.10. Try?](#910-try)
   - [9.11. Rethrow?](#911-rethrow)
   - [9.12. Yield & Yield-Each](#912-yield--yield-each)
+  - [9.13. Embedded languages](#913-embedded-languages)
 - [10. Statements](#10-statements)
   - [10.1. For](#101-for)
   - [10.2. Loop](#102-loop)
@@ -480,7 +481,6 @@ let c: Iterable<Int> = [
 ]
 ```
 
-
 ### 9.3. Labels
 
 Loops and lambdas can be prefixed by an optional label. This can then be used by `continue`, `break` and `return` statements:
@@ -523,7 +523,6 @@ else if … {
 if (…) … else …
 ```
 
-
 ### 9.5. Match
 ### 9.6. Return
 ### 9.7. Break
@@ -532,6 +531,22 @@ if (…) … else …
 ### 9.10. Try?
 ### 9.11. Rethrow?
 ### 9.12. Yield & Yield-Each
+
+### 9.13. Embedded languages
+
+```rust
+let json: Json = {
+  "foo": 123,
+  "null": null, // with `let null = Null()` and `pub class Null { constructor }`
+}
+let css: Css = `css:
+  body {
+    color: rgba(0, 0, 0, 0);
+  }
+`
+let sql: Sql = `sql:SELECT * FROM people WHERE name=@name`
+let regex: RegEx = `regex:abc[\w\d]+`
+```
 
 
 ## 10. Statements
