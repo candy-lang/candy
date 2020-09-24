@@ -6,7 +6,7 @@ import 'src/parser/ast/general.dart';
 
 export 'src/lexer/token.dart';
 export 'src/parser/ast/declarations.dart';
-export 'src/parser/ast/expressions/expression.dart';
+export 'src/parser/ast/expressions/expressions.dart';
 export 'src/parser/ast/expressions/operator.dart';
 export 'src/parser/ast/general.dart';
 export 'src/parser/ast/statements.dart';

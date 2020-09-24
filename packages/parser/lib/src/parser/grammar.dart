@@ -70,13 +70,26 @@ class ParserGrammar {
   static Parser<Declaration> get declaration => _declaration;
   static void _initDeclaration() {
     // ignore: unnecessary_cast
-    _declaration.set((traitDeclaration as Parser<Declaration>) |
+    _declaration.set((moduleDeclaration as Parser<Declaration>) |
+        traitDeclaration |
         implDeclaration |
         classDeclaration |
         functionDeclaration |
         propertyDeclaration);
   }
 
+  static final moduleDeclaration = (modifiers.optional() &
+          LexerGrammar.MODULE &
+          LexerGrammar.NLs &
+          LexerGrammar.Identifier &
+          (LexerGrammar.NLs & blockDeclarationBody).optional())
+      .map((value) => ModuleDeclaration(
+            modifiers: value[0] as List<ModifierToken> ?? [],
+            moduleKeyword: value[1] as ModuleKeywordToken,
+            name: value[3] as IdentifierToken,
+            body: (value[4] as List<dynamic>)?.elementAt(1)
+                as BlockDeclarationBody,
+          ));
   static final traitDeclaration = (modifiers.optional() &
           LexerGrammar.TRAIT &
           LexerGrammar.NLs &

@@ -22,6 +22,8 @@ abstract class OperatorToken extends Token with _$OperatorToken {
 abstract class KeywordToken extends Token with _$KeywordToken {
   const factory KeywordToken.use({@required SourceSpan span}) = UseKeywordToken;
   // Declarations:
+  const factory KeywordToken.module({@required SourceSpan span}) =
+      ModuleKeywordToken;
   const factory KeywordToken.trait({@required SourceSpan span}) =
       TraitKeywordToken;
   const factory KeywordToken.impl({@required SourceSpan span}) =
@@ -56,6 +58,8 @@ abstract class ModifierToken extends Token with _$ModifierToken {
 }
 
 abstract class LiteralToken<T> extends Token {
+  const LiteralToken();
+
   T get value;
 }
 

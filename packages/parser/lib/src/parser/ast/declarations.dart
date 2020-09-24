@@ -15,6 +15,22 @@ abstract class Declaration extends AstNode {
 }
 
 @freezed
+abstract class ModuleDeclaration extends Declaration
+    implements _$ModuleDeclaration {
+  const factory ModuleDeclaration({
+    @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
+    @required ModuleKeywordToken moduleKeyword,
+    @required IdentifierToken name,
+    @required BlockDeclarationBody body,
+  }) = _ModuleDeclaration;
+  const ModuleDeclaration._();
+
+  @override
+  Iterable<SyntacticEntity> get children =>
+      [...modifiers, moduleKeyword, name, body];
+}
+
+@freezed
 abstract class TraitDeclaration extends Declaration
     implements _$TraitDeclaration {
   const factory TraitDeclaration({
@@ -208,7 +224,8 @@ abstract class PropertyDeclaration extends Declaration
 }
 
 @freezed
-abstract class PropertyAccessor extends AstNode implements _$PropertyAccessor {
+abstract class PropertyAccessor extends Declaration
+    implements _$PropertyAccessor {
   const factory PropertyAccessor.getter({
     @required GetKeywordToken keyword,
     OperatorToken colon,
