@@ -1,3 +1,4 @@
+import 'package:dartx/dartx.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../ast/parser.dart';
@@ -15,6 +16,14 @@ abstract class DeclarationId implements _$DeclarationId {
   factory DeclarationId.fromJson(Map<String, dynamic> json) =>
       _$DeclarationIdFromJson(json);
   const DeclarationId._();
+
+  Iterable<DeclarationPathData> get simplePath => path.map((d) => d.data);
+
+  DeclarationId inner(DeclarationPathData innerPath, [int disambiguator = 0]) {
+    final disambiguatedInnerPath =
+        DisambiguatedDeclarationPathData(innerPath, disambiguator);
+    return copyWith(path: path + [disambiguatedInnerPath]);
+  }
 }
 
 @freezed
@@ -70,4 +79,44 @@ abstract class DeclarationLocalId implements _$DeclarationLocalId {
   factory DeclarationLocalId.fromJson(Map<String, dynamic> json) =>
       _$DeclarationLocalIdFromJson(json);
   const DeclarationLocalId._();
+}
+
+@freezed
+abstract class ModuleId implements _$ModuleId {
+  const factory ModuleId(PackageId packageId, List<String> path) = _ModuleId;
+  factory ModuleId.fromJson(Map<String, dynamic> json) =>
+      _$ModuleIdFromJson(json);
+  const ModuleId._();
+
+  static const corePrimitives = ModuleId(PackageId.core, ['primitives']);
+
+  static const thisSegment = 'this';
+  static const superSegment = 'super';
+
+  bool get hasParent => normalized.path.isNotEmpty;
+  bool get hasNoParent => !hasParent;
+  ModuleId get parent =>
+      hasParent ? normalized.copyWith(path: normalized.path.dropLast(1)) : null;
+
+  ModuleId get normalized {
+    final result = <String>[];
+    for (final rawSegment in path) {
+      final segment = rawSegment.trim();
+
+      if (segment == thisSegment) continue;
+      if (segment == superSegment) {
+        assert(
+          result.isNotEmpty,
+          'ModuleId containing `super` navigates out of the package.',
+        );
+        result.removeLast();
+        continue;
+      }
+      result.add(segment);
+    }
+    return ModuleId(packageId, result);
+  }
+
+  ModuleId nested(List<String> innerPath) =>
+      copyWith(path: path + innerPath).normalized;
 }

@@ -134,6 +134,8 @@ class LexerGrammar {
 
   static final USE = string('use')
       .tokenize((_, span) => KeywordToken.use(span: span) as UseKeywordToken);
+  static final MODULE = string('module').tokenize(
+      (_, span) => KeywordToken.module(span: span) as ModuleKeywordToken);
   static final TRAIT = string('trait').tokenize(
       (_, span) => KeywordToken.trait(span: span) as TraitKeywordToken);
   static final IMPL = string('impl')

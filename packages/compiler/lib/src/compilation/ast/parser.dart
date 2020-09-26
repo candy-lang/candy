@@ -65,6 +65,14 @@ final doesResourceExist = Query<ResourceId, bool>(
     return file.existsSync();
   },
 );
+final doesResourceDirectoryExist = Query<ResourceId, bool>(
+  'doesResourceDirectoryExist',
+  evaluateAlways: true,
+  provider: (context, resourceId) {
+    final directory = Directory(context.callQuery(getResourcePath, resourceId));
+    return directory.existsSync();
+  },
+);
 
 final getSourceCode = Query<ResourceId, String>(
   'getSourceCode',

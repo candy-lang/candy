@@ -1,9 +1,20 @@
 import 'package:parser/parser.dart' as ast;
 
-import '../../query.dart';
-import '../hir/ids.dart';
-import 'parser.dart';
+import '../../../query.dart';
+import '../../ast/parser.dart';
+import '../../hir/ids.dart';
 
+final doesDeclarationExist = Query<DeclarationId, bool>(
+  'doesDeclarationExist',
+  provider: (context, declarationId) {
+    assert(declarationId.path.isEmpty, 'Unsupported path in declaration ID.');
+
+    final ast = context.callQuery(getAst, declarationId.resourceId);
+    final declaration =
+        _findDeclarationAst(ast.declarations, declarationId.path);
+    return declaration != null;
+  },
+);
 final getDeclarationAst = Query<DeclarationId, ast.Declaration>(
   'getDeclarationAst',
   provider: (context, declarationId) {
