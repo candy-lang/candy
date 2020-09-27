@@ -41,13 +41,13 @@ final doesResourceExist = Query<ResourceId, bool>(
   'doesResourceExist',
   evaluateAlways: true,
   provider: (context, resourceId) =>
-      context.resourceProvider.fileExists(resourceId),
+      context.config.resourceProvider.fileExists(resourceId),
 );
 final doesResourceDirectoryExist = Query<ResourceId, bool>(
   'doesResourceDirectoryExist',
   evaluateAlways: true,
   provider: (context, resourceId) =>
-      context.resourceProvider.directoryExists(resourceId),
+      context.config.resourceProvider.directoryExists(resourceId),
 );
 
 final getSourceCode = Query<ResourceId, String>(
@@ -55,7 +55,7 @@ final getSourceCode = Query<ResourceId, String>(
   evaluateAlways: true,
   provider: (context, resourceId) {
     assert(resourceId.isCandyFile);
-    return context.resourceProvider.getContent(resourceId);
+    return context.config.resourceProvider.getContent(resourceId);
   },
 );
 

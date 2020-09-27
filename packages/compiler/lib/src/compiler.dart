@@ -4,13 +4,15 @@ import 'compilation/ast_hir_lowering.dart';
 import 'compilation/hir.dart' as hir;
 import 'compilation/hir/ids.dart';
 import 'compilation/ids.dart';
+import 'errors.dart';
 import 'query.dart';
 import 'resource_provider.dart';
 
 Future<void> compile(Directory directory) async {
-  final context = QueryContext(
+  final config = QueryConfig(
     resourceProvider: ResourceProvider.default_(directory),
   );
+  final context = config.createContext();
 
   final mainFunctionId =
       context.callQuery(getMainFunction, ModuleId(PackageId.this_, ['main']));
@@ -35,8 +37,26 @@ final getMainFunction = Query<ModuleId, DeclarationId>(
       }
       return true;
     }).toList();
-    assert(possibleFunctions.isNotEmpty, 'Main function not found.');
-    assert(possibleFunctions.length <= 1, 'Multiple main functions found.');
+
+    if (possibleFunctions.isEmpty) {
+      throw CompilerError.noMainFunction(
+        'Main function not found.',
+        location: ErrorLocation(
+          context.callQuery(moduleIdToDeclarationId, moduleId).resourceId,
+        ),
+      );
+    } else if (possibleFunctions.length > 1) {
+      throw CompilerError.multipleMainFunctions(
+        'Multiple main functions found.',
+        location: ErrorLocation(
+          context.callQuery(moduleIdToDeclarationId, moduleId).resourceId,
+          context
+              .callQuery(getFunctionDeclarationAst, possibleFunctions.first)
+              .name
+              .span,
+        ),
+      );
+    }
 
     return possibleFunctions.single;
   },

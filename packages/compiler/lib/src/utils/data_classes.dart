@@ -20,6 +20,8 @@ abstract class Option<T> implements _$Option<T> {
       },
     );
   }
+
+  T get valueOrNull => when(some: (value) => value, none: () => null);
 }
 
 @freezed

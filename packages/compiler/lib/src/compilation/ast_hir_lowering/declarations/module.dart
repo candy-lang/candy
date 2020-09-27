@@ -3,6 +3,7 @@ import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
 
 import '../../../constants.dart';
+import '../../../errors.dart';
 import '../../../query.dart';
 import '../../../utils.dart';
 import '../../ast/parser.dart';
@@ -65,7 +66,9 @@ final moduleIdToDeclarationId = Query<ModuleId, DeclarationId>(
   provider: (context, moduleId) {
     final declarationId =
         context.callQuery(moduleIdToOptionalDeclarationId, moduleId);
-    assert(declarationId.isSome, 'Module `$moduleId` not found.');
+    if (declarationId.isNone) {
+      throw CompilerError.moduleNotFound('Module `$moduleId` not found.');
+    }
     return declarationId.value;
   },
 );

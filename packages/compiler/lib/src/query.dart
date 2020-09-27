@@ -1,7 +1,23 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dartx/dartx.dart';
 import 'package:meta/meta.dart';
 
+import 'compilation/ast/parser.dart';
+import 'errors.dart';
 import 'resource_provider.dart';
+import 'utils.dart';
+
+@immutable
+class QueryConfig {
+  const QueryConfig({
+    @required this.resourceProvider,
+  }) : assert(resourceProvider != null);
+
+  final ResourceProvider resourceProvider;
+
+  // ignore: use_to_and_as_if_applicable
+  GlobalQueryContext createContext() => GlobalQueryContext(this);
+}
 
 typedef QueryProvider<K, R> = R Function(QueryContext context, K key);
 
@@ -38,12 +54,68 @@ class Query<K, R> {
 }
 
 @immutable
-class QueryContext {
-  const QueryContext({
-    @required this.resourceProvider,
-  }) : assert(resourceProvider != null);
+class GlobalQueryContext {
+  GlobalQueryContext(this.config) : assert(config != null);
 
-  final ResourceProvider resourceProvider;
+  final QueryConfig config;
 
-  R callQuery<K, R>(Query<K, R> query, K key) => query(this, key);
+  Option<R> callQuery<K, R>(Query<K, R> query, K key) {
+    final innerContext = QueryContext(this);
+    try {
+      return Option.some(innerContext.callQuery(query, key));
+    } on _QueryFailedException {
+      return Option.none();
+    }
+  }
+
+  final Map<Tuple2<String, dynamic>, List<ReportedCompilerError>>
+      _reportedErrors = {};
+  Iterable<ReportedCompilerError> get reportedErrors =>
+      _reportedErrors.values.flatten();
+  Map<ResourceId, List<ReportedCompilerError>> get reportedErrorsByResourceId =>
+      reportedErrors.groupBy((e) => e.location?.resourceId);
+  void _reportErrors(
+    String queryName,
+    Object key,
+    List<ReportedCompilerError> errors,
+  ) {
+    if (errors.isNotEmpty) {
+      _reportedErrors[Tuple2(queryName, key)] = errors;
+    } else {
+      _reportedErrors.remove(Tuple2(queryName, key));
+    }
+  }
 }
+
+class QueryContext {
+  QueryContext(this.globalContext) : assert(globalContext != null);
+
+  final GlobalQueryContext globalContext;
+  QueryConfig get config => globalContext.config;
+
+  R callQuery<K, R>(Query<K, R> query, K key) =>
+      QueryContext(globalContext)._execute(query, key);
+  R _execute<K, R>(Query<K, R> query, K key) {
+    void reportErrors() =>
+        globalContext._reportErrors(query.name, key, _reportedErrors);
+
+    try {
+      final result = query(this, key);
+      reportErrors();
+      return result;
+    } on ReportedCompilerError catch (e) {
+      _reportedErrors.add(e);
+      reportErrors();
+      throw _QueryFailedException();
+    } catch (e) {
+      _reportedErrors.add(CompilerError.internalError(e.toString()));
+      reportErrors();
+      throw _QueryFailedException();
+    }
+  }
+
+  final _reportedErrors = <ReportedCompilerError>[];
+  void reportError(ReportedCompilerError error) => _reportedErrors.add(error);
+}
+
+class _QueryFailedException implements Exception {}
