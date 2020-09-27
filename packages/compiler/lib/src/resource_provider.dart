@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:compiler/compiler.dart';
 import 'package:meta/meta.dart';
 import 'package:path/path.dart' as p;
 

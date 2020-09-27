@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import '../analysis_server.dart';
 import '../generated/lsp_protocol/protocol_generated.dart';
 import '../generated/lsp_protocol/protocol_special.dart';
@@ -18,7 +20,6 @@ class InitializeMessageHandler
 
   @override
   Method get handlesMessage => Method.initialize;
-
   @override
   LspJsonHandler<InitializeParams> get jsonHandler =>
       InitializeParams.jsonHandler;
@@ -32,6 +33,7 @@ class InitializeMessageHandler
       ..handleClientConnection(
         params.capabilities,
         params.initializationOptions,
+        Directory.fromUri(Uri.parse(params.rootUri)),
       )
       ..messageHandler = InitializingStateMessageHandler(server);
 

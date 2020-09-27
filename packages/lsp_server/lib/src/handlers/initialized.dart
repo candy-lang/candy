@@ -9,7 +9,6 @@ class IntializedMessageHandler extends MessageHandler<InitializedParams, void> {
 
   @override
   Method get handlesMessage => Method.initialized;
-
   @override
   LspJsonHandler<InitializedParams> get jsonHandler =>
       InitializedParams.jsonHandler;
@@ -46,6 +45,24 @@ class IntializedMessageHandler extends MessageHandler<InitializedParams, void> {
 
     final textCapabilities = server.clientCapabilities?.textDocument;
 
+    register(
+      textCapabilities?.synchronization?.dynamicRegistration,
+      Method.textDocument_didOpen,
+      TextDocumentRegistrationOptions([candyFiles]),
+    );
+    register(
+      textCapabilities?.synchronization?.dynamicRegistration,
+      Method.textDocument_didClose,
+      TextDocumentRegistrationOptions([candyFiles]),
+    );
+    register(
+      textCapabilities?.synchronization?.dynamicRegistration,
+      Method.textDocument_didChange,
+      TextDocumentChangeRegistrationOptions(
+        TextDocumentSyncKind.Incremental,
+        [candyFiles],
+      ),
+    );
     register(
       textCapabilities?.foldingRange?.dynamicRegistration,
       Method.textDocument_foldingRange,

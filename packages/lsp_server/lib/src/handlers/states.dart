@@ -14,6 +14,7 @@ import 'handlers.dart';
 import 'initialize.dart';
 import 'initialized.dart';
 import 'shutdown.dart';
+import 'text_synchronization.dart';
 
 class UninitializedStateMessageHandler extends ServerStateMessageHandler {
   UninitializedStateMessageHandler(AnalysisServer server) : super(server) {
@@ -74,6 +75,9 @@ class InitializedStateMessageHandler extends ServerStateMessageHandler {
     );
     registerHandler(ShutdownMessageHandler(server));
     registerHandler(ExitMessageHandler(server));
+    registerHandler(TextDocumentOpenHandler(server));
+    registerHandler(TextDocumentChangeHandler(server));
+    registerHandler(TextDocumentCloseHandler(server));
     registerHandler(FoldingHandler(server));
   }
 }

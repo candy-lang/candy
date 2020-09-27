@@ -1,7 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 
-import 'package:parser/parser.dart';
+import 'package:compiler/compiler.dart';
 
 import '../analysis_server.dart';
 import '../generated/lsp_protocol/protocol_generated.dart';
@@ -25,18 +24,11 @@ class FoldingHandler
     FoldingRangeParams params,
     CancellationToken token,
   ) async {
-    final uri = params.textDocument.uri;
-    if (!isCandyDocument(uri)) {
-      return error(
-        ErrorCodes.InvalidParams,
-        'File $uri is not a Candy source file.',
-      );
-    }
+    final resourceId = server.fileUriToResourceId(params.textDocument.uri);
+    final source = server.queryContext.callQuery(getSourceCode, resourceId);
+    final ast = server.queryContext.callQuery(getAst, resourceId);
 
-    final source = File.fromUri(Uri.parse(uri)).readAsStringSync();
-    final ast = parseCandySource(source);
     final foldingRanges = <FoldingRange>[];
-
     if (ast.useLines.length > 1) {
       final useLinesStart = positionOf(source, ast.useLines.first.span.start);
       final useLinesEnd = positionOf(source, ast.useLines.last.span.end);

@@ -12,6 +12,8 @@ dependencies:
   args: ^1.6.0
   basics: ^0.4.0
   collection: ^1.14.12
+  compiler:
+    path: ../compiler
   extra_pedantic: ^1.2.0
   freezed_annotation: ^0.11.0+1
   meta: ^1.1.8

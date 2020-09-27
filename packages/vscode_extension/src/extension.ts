@@ -35,7 +35,7 @@ export function deactivate(): Thenable<void> | undefined {
 
 // The following code is taken (and slightly modified) from https://github.com/Dart-Code/Dart-Code
 function spawnServer(): Promise<StreamInfo> {
-  const process = safeSpawn(undefined, "C:\\Program Files\\Dart\\dart-sdk\\bin\\dart.exe", ["D:/p/candy/packages/lsp_server/lib/main.dart"], {});
+  const process = safeSpawn(undefined, "C:\\Program Files\\Dart\\dart-sdk\\bin\\dart.exe", ["D:/p/candy/packages/lsp_server/bin/main.dart"], {});
   console.info(`    PID: ${process.pid}`);
 
   const reader = process.stdout.pipe(new LoggingTransform("<=="));

@@ -14,7 +14,6 @@ class CancelRequestHandler extends MessageHandler<CancelParams, void> {
 
   @override
   Method get handlesMessage => Method.cancelRequest;
-
   @override
   LspJsonHandler<CancelParams> get jsonHandler => CancelParams.jsonHandler;
 

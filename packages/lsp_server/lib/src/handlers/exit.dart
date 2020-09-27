@@ -22,7 +22,6 @@ class ExitMessageHandler extends MessageHandler<void, void> {
 
   @override
   Method get handlesMessage => Method.exit;
-
   @override
   LspJsonHandler<void> get jsonHandler => NullJsonHandler;
 

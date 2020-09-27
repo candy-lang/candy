@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:analyzer/exception/exception.dart';
+import 'package:compiler/compiler.dart';
+import 'package:path/path.dart' as p;
 
 import 'channel.dart';
 import 'error_codes.dart';
@@ -8,13 +11,14 @@ import 'generated/lsp_protocol/protocol_generated.dart';
 import 'generated/lsp_protocol/protocol_special.dart';
 import 'handlers/handlers.dart';
 import 'handlers/states.dart';
+import 'overlay_resource_provider.dart';
 
 class AnalysisServer {
   // Section: Lifecycle
 
   /// Initialize a newly created server to send and receive messages to the
   /// given [channel].
-  AnalysisServer(this.channel) {
+  AnalysisServer(this.channel) : assert(channel != null) {
     messageHandler = UninitializedStateMessageHandler(this);
 
     channel
@@ -46,9 +50,15 @@ class AnalysisServer {
   void handleClientConnection(
     ClientCapabilities capabilities,
     dynamic initializationOptions,
+    Directory projectDirectory,
   ) {
     _clientCapabilities = capabilities;
     _initializationOptions = LspInitializationOptions(initializationOptions);
+    _projectDirectory = projectDirectory;
+    _resourceProvider = OverlayResourceProvider(
+      ResourceProvider.default_(projectDirectory),
+    );
+    _queryContext = QueryContext(resourceProvider: resourceProvider);
   }
 
   /// Capabilities of the server. Will be null prior to initialization as
@@ -73,16 +83,13 @@ class AnalysisServer {
   int nextRequestId = 1;
   final completers = <int, Completer<ResponseMessage>>{};
 
-  void sendNotification(NotificationMessage notification) =>
-      channel.sendNotification(notification);
   void publishDiagnostics(String path, List<Diagnostic> errors) {
     final params = PublishDiagnosticsParams(Uri.file(path).toString(), errors);
-    final message = NotificationMessage(
+    channel.sendNotification(NotificationMessage(
       Method.textDocument_publishDiagnostics,
       params,
       jsonRpcVersion,
-    );
-    sendNotification(message);
+    ));
   }
 
   void sendMessageToUser(MessageType type, String message) {
@@ -95,6 +102,14 @@ class AnalysisServer {
 
   void sendErrorMessageToUser(String message) =>
       sendMessageToUser(MessageType.Error, message);
+
+  void sendLogMessage(String message, [MessageType type = MessageType.Info]) {
+    channel.sendNotification(NotificationMessage(
+      Method.window_logMessage,
+      LogMessageParams(type, message),
+      jsonRpcVersion,
+    ));
+  }
 
   // Section: Requests & Responses
 
@@ -262,6 +277,29 @@ class AnalysisServer {
   void sendSocketErrorNotification(dynamic error, StackTrace stack) {
     // Don't send to instrumentation service; not an internal error.
     sendServerErrorNotification('Socket error', error, stack);
+  }
+
+  // Section: Analysis
+
+  Directory _projectDirectory;
+  Directory get projectDirectory => _projectDirectory;
+  OverlayResourceProvider _resourceProvider;
+  OverlayResourceProvider get resourceProvider => _resourceProvider;
+  QueryContext _queryContext;
+  QueryContext get queryContext => _queryContext;
+
+  ResourceId fileUriToResourceId(String uri) {
+    final file = File.fromUri(Uri.parse(uri));
+    assert(p.extension(file.path) == candyFileExtension);
+
+    final sourceDirectory = p.join(
+      projectDirectory.absolute.path,
+      ResourceProvider.srcDirectoryName,
+    );
+    assert(p.isWithin(sourceDirectory, file.path));
+
+    final relativePath = p.relative(file.path, from: sourceDirectory);
+    return ResourceId(PackageId.this_, relativePath);
   }
 }
 

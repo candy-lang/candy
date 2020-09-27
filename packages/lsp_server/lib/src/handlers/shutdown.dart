@@ -10,9 +10,9 @@ import 'states.dart';
 
 class ShutdownMessageHandler extends MessageHandler<void, void> {
   ShutdownMessageHandler(AnalysisServer server) : super(server);
+
   @override
   Method get handlesMessage => Method.shutdown;
-
   @override
   LspJsonHandler<void> get jsonHandler => NullJsonHandler;
 

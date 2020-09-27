@@ -2,8 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:lsp_server/src/analysis_server.dart';
-
-import 'src/channel.dart';
+import 'package:lsp_server/src/channel.dart';
 
 Future<void> main(List<String> arguments) async {
   final channel = LspByteStreamServerChannel(stdin, stdout.nonBlocking);
