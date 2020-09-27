@@ -11,12 +11,12 @@ abstract class Declaration implements _$Declaration {
   const factory Declaration.module({
     ModuleId parent,
     @required String name,
-    @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarations,
+    @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
   }) = ModuleDeclaration;
 
   const factory Declaration.trait(
     String name, {
-    @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarations,
+    @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
   }) = TraitDeclaration;
 
   const factory Declaration.function({

@@ -35,4 +35,7 @@ abstract class CandyType with _$CandyType {
   static const int = CandyType.user(ModuleId.corePrimitives, 'Int');
   static const float = CandyType.user(ModuleId.corePrimitives, 'Float');
   static const string = CandyType.user(ModuleId.corePrimitives, 'String');
+
+  factory CandyType.list(CandyType itemType) =>
+      CandyType.user(ModuleId.coreCollections, 'List', arguments: [itemType]);
 }

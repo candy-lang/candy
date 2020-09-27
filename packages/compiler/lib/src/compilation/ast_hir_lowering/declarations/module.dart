@@ -20,6 +20,7 @@ extension ModuleResourceId on ResourceId {
 extension ModuleDeclarationId on DeclarationId {
   bool get isModule =>
       path.isEmpty || path.last.data is ModuleDeclarationPathData;
+  bool get isNotModule => !isModule;
 }
 
 final getModuleDeclarationAst = Query<ModuleId, ast.ModuleDeclaration>(
@@ -27,7 +28,6 @@ final getModuleDeclarationAst = Query<ModuleId, ast.ModuleDeclaration>(
   provider: (context, moduleId) {
     final declarationId = context.callQuery(moduleIdToDeclarationId, moduleId);
     final declaration = context.callQuery(getDeclarationAst, declarationId);
-    assert(declaration != null, 'Module $moduleId not found.');
     assert(declaration is ast.ModuleDeclaration, 'Wrong return type.');
     return declaration as ast.ModuleDeclaration;
   },
@@ -35,21 +35,21 @@ final getModuleDeclarationAst = Query<ModuleId, ast.ModuleDeclaration>(
 final getModuleDeclarationHir = Query<ModuleId, hir.ModuleDeclaration>(
   'getModuleDeclarationHir',
   provider: (context, moduleId) {
-    final declarationId = context.callQuery(moduleIdToDeclarationId, moduleId);
-    assert(declarationId != null);
-
-    final ast = context.callQuery(getModuleDeclarationAst, declarationId);
+    final ast = context.callQuery(getModuleDeclarationAst, moduleId);
     return hir.ModuleDeclaration(
-      parent: moduleId.parent,
+      parent: moduleId.parentOrNull,
       name: ast.name.name,
-      // TODO(JonasWanke): child declarations
+      innerDeclarationIds: context.callQuery(
+        getInnerDeclarationIds,
+        context.callQuery(moduleIdToDeclarationId, moduleId),
+      ),
     );
   },
 );
 
 final declarationIdToModuleId = Query<DeclarationId, ModuleId>(
   'declarationIdToModuleId',
-  evaluateAlways: true,
+  persist: false,
   provider: (context, declarationId) {
     final innerPath = declarationId.simplePath
         .whereType<ModuleDeclarationPathData>()
@@ -62,34 +62,50 @@ final declarationIdToModuleId = Query<DeclarationId, ModuleId>(
 );
 final moduleIdToDeclarationId = Query<ModuleId, DeclarationId>(
   'moduleIdToDeclarationId',
+  provider: (context, moduleId) {
+    final declarationId =
+        context.callQuery(moduleIdToOptionalDeclarationId, moduleId);
+    assert(declarationId.isSome, 'Module `$moduleId` not found.');
+    return declarationId.value;
+  },
+);
+final moduleIdToOptionalDeclarationId = Query<ModuleId, Option<DeclarationId>>(
+  'moduleIdToOptionalDeclarationId',
   provider: (context, rawModuleId) {
     final moduleId = rawModuleId.normalized;
     final packageId = moduleId.packageId;
     var path = '.';
     final remainingPath = moduleId.path.toList();
 
-    while (context.callQuery(
+    assert(context.callQuery(
       doesResourceDirectoryExist,
       ResourceId(packageId, path),
-    )) {
+    ));
+    while (remainingPath.isNotEmpty &&
+        context.callQuery(
+          doesResourceDirectoryExist,
+          ResourceId(packageId, '$path/${remainingPath.first}'),
+        )) {
       // ignore: use_string_buffers
       path += '/${remainingPath.removeAt(0)}';
     }
 
-    final fileResourceId = ResourceId(
-      packageId,
-      '$path/${remainingPath.first}$candyFileExtension',
-    );
-    final moduleResourceId = ResourceId(
-      packageId,
-      '$path/$moduleFileName',
-    );
+    final moduleResourceId = ResourceId(packageId, '$path/$moduleFileName');
     ResourceId resourceId;
-    if (context.callQuery(doesResourceExist, fileResourceId)) {
-      resourceId = fileResourceId;
-    } else {
-      assert(context.callQuery(doesResourceExist, moduleResourceId));
+    if (context.callQuery(doesResourceExist, moduleResourceId)) {
       resourceId = moduleResourceId;
+    } else {
+      final fileResourceId = ResourceId(
+        packageId,
+        '$path/${remainingPath.first}$candyFileExtension',
+      );
+      if (remainingPath.isNotEmpty &&
+          context.callQuery(doesResourceExist, fileResourceId)) {
+        resourceId = resourceId = fileResourceId;
+        remainingPath.removeAt(0);
+      } else {
+        return Option.none();
+      }
     }
 
     final declarationId = DeclarationId(
@@ -102,13 +118,13 @@ final moduleIdToDeclarationId = Query<ModuleId, DeclarationId>(
           .toList(),
     );
     return context.callQuery(doesDeclarationExist, declarationId)
-        ? declarationId
-        : null;
+        ? Option.some(declarationId)
+        : Option.none();
   },
 );
 final resourceIdToModuleId = Query<ResourceId, ModuleId>(
   'resourceIdToModuleId',
-  evaluateAlways: true,
+  persist: false,
   provider: (context, resourceId) {
     assert(resourceId.isCandyFile);
 
@@ -133,17 +149,18 @@ final resolveUseLine = Query<Tuple2<ResourceId, ast.UseLine>, ModuleId>(
     final currentModuleId = context.callQuery(resourceIdToModuleId, resourceId);
     final relativeModuleId = currentModuleId.nested(modulePathSegments);
     final relativeDeclarationId =
-        context.callQuery(moduleIdToDeclarationId, relativeModuleId);
-    if (relativeDeclarationId != null) return relativeModuleId;
+        context.callQuery(moduleIdToOptionalDeclarationId, relativeModuleId);
+    if (relativeDeclarationId.isSome) return relativeModuleId;
 
     final absoluteModuleId = ModuleId(
       PackageId(modulePathSegments.first),
       modulePathSegments.skip(1).toList(),
     );
     final absoluteDeclarationId =
-        context.callQuery(moduleIdToDeclarationId, absoluteModuleId);
-    if (absoluteDeclarationId != null) return absoluteModuleId;
+        context.callQuery(moduleIdToOptionalDeclarationId, absoluteModuleId);
+    if (absoluteDeclarationId.isSome) return absoluteModuleId;
 
+    assert(false, "Use line `$inputs` couldn't be resolved.");
     return null;
   },
 );

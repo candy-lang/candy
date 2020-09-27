@@ -116,12 +116,13 @@ final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>, DeclarationId>(
       }
 
       if (moduleId.hasNoParent) break;
-      moduleId = moduleId.parent;
+      moduleId = moduleId.parentOrNull;
       moduleDeclarationId =
           context.callQuery(moduleIdToDeclarationId, moduleId);
     }
 
     // TODO(JonasWank): Search imports.
+    assert(false, "Type may be in imports, but those aren't resolved yet.");
     return null;
   },
 );

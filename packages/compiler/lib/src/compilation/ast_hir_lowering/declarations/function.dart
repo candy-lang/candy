@@ -10,6 +10,7 @@ import 'module.dart';
 
 extension FunctionDeclarationId on DeclarationId {
   bool get isFunction => path.last.data is FunctionDeclarationPathData;
+  bool get isNotFunction => !isFunction;
 }
 
 final getFunctionDeclarationAst = Query<DeclarationId, ast.FunctionDeclaration>(
@@ -18,7 +19,6 @@ final getFunctionDeclarationAst = Query<DeclarationId, ast.FunctionDeclaration>(
     assert(declarationId.isFunction);
 
     final declaration = context.callQuery(getDeclarationAst, declarationId);
-    assert(declaration != null, 'Function $declarationId not found.');
     assert(declaration is ast.FunctionDeclaration, 'Wrong return type.');
     return declaration as ast.FunctionDeclaration;
   },
@@ -37,8 +37,12 @@ final getFunctionDeclarationHir = Query<DeclarationId, hir.FunctionDeclaration>(
                 type: context.callQuery(astTypeToHirType, Tuple2(moduleId, p)),
               ))
           .toList(),
-      returnType:
-          context.callQuery(astTypeToHirType, Tuple2(moduleId, ast.returnType)),
+      returnType: ast.returnType != null
+          ? context.callQuery(
+              astTypeToHirType,
+              Tuple2(moduleId, ast.returnType),
+            )
+          : hir.CandyType.unit,
       // TODO(JonasWanke): child declarations
     );
   },

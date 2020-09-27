@@ -46,7 +46,8 @@ abstract class DeclarationPathData implements _$DeclarationPathData {
 
   const factory DeclarationPathData.trait(String name) =
       TraitDeclarationPathData;
-  const factory DeclarationPathData.impl(String name) = ImplDeclarationPathData;
+  const factory DeclarationPathData.impl([String name]) =
+      ImplDeclarationPathData;
   // ignore: non_constant_identifier_names
   const factory DeclarationPathData.class_(String name) =
       ClassDeclarationPathData;
@@ -89,13 +90,14 @@ abstract class ModuleId implements _$ModuleId {
   const ModuleId._();
 
   static const corePrimitives = ModuleId(PackageId.core, ['primitives']);
+  static const coreCollections = ModuleId(PackageId.core, ['collections']);
 
   static const thisSegment = 'this';
   static const superSegment = 'super';
 
   bool get hasParent => normalized.path.isNotEmpty;
   bool get hasNoParent => !hasParent;
-  ModuleId get parent =>
+  ModuleId get parentOrNull =>
       hasParent ? normalized.copyWith(path: normalized.path.dropLast(1)) : null;
 
   ModuleId get normalized {
