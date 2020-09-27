@@ -10,6 +10,7 @@ dependencies:
   analyzer: ^0.39.5
   analyzer_plugin: ^0.3.0
   args: ^1.6.0
+  async: ^2.4.2
   basics: ^0.4.0
   collection: ^1.14.12
   compiler:

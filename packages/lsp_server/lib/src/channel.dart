@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:async/async.dart';
+
 import 'analysis_server.dart';
 import 'generated/lsp_protocol/protocol_generated.dart';
 import 'generated/lsp_protocol/protocol_special.dart';
@@ -43,25 +45,34 @@ abstract class LspServerCommunicationChannel {
 /// [LspServerCommunicationChannel] that uses a stream and a sink (typically,
 /// standard input and standard output) to communicate with clients.
 class LspByteStreamServerChannel implements LspServerCommunicationChannel {
-  LspByteStreamServerChannel(this._input, this._output);
+  LspByteStreamServerChannel(this._input, this._output)
+      : _outputController = StreamController<Map<String, dynamic>>() {
+    _outputQueue = StreamQueue<Map<String, dynamic>>(_outputController.stream);
+    _send();
+  }
 
   final Stream<List<int>> _input;
   final IOSink _output;
+  final StreamController<Map<String, dynamic>> _outputController;
+  StreamQueue<Map<String, dynamic>> _outputQueue;
 
   /// Completer that will be signalled when the input stream is closed.
   final _closed = Completer<void>();
-
-  /// True if [close] has been called.
-  bool _closeRequested = false;
 
   /// Future that will be completed when the input stream is closed.
   @override
   Future<void> get closed => _closed.future;
 
+  /// True if [close] has been called.
+  bool _closeRequested = false;
+
   @override
-  void close() {
+  Future<void> close() async {
     if (!_closeRequested) {
       _closeRequested = true;
+
+      await _outputQueue.cancel();
+
       assert(!_closed.isCompleted);
       _closed.complete();
     }
@@ -85,13 +96,13 @@ class LspByteStreamServerChannel implements LspServerCommunicationChannel {
 
   @override
   void sendNotification(NotificationMessage notification) =>
-      _sendLsp(notification.toJson());
-
+      _outputController.add(notification.toJson());
   @override
-  void sendRequest(RequestMessage request) => _sendLsp(request.toJson());
-
+  void sendRequest(RequestMessage request) =>
+      _outputController.add(request.toJson());
   @override
-  void sendResponse(ResponseMessage response) => _sendLsp(response.toJson());
+  void sendResponse(ResponseMessage response) =>
+      _outputController.add(response.toJson());
 
   /// Read a request from the given [data] and use the given function to handle
   /// the message.
@@ -112,6 +123,12 @@ class LspByteStreamServerChannel implements LspServerCommunicationChannel {
     }
   }
 
+  Future<void> _send() async {
+    while (!_closed.isCompleted) {
+      _sendLsp(await _outputQueue.next);
+    }
+  }
+
   /// Sends a message prefixed with the required LSP headers.
   void _sendLsp(Map<String, dynamic> json) {
     // Don't send any further responses after the communication channel is
@@ -120,8 +137,7 @@ class LspByteStreamServerChannel implements LspServerCommunicationChannel {
       return;
     }
 
-    final jsonEncodedBody = jsonEncode(json);
-    final utf8EncodedBody = utf8.encode(jsonEncodedBody);
+    final utf8EncodedBody = utf8.encode(jsonEncode(json));
     final header = 'Content-Length: ${utf8EncodedBody.length}\r\n'
         'Content-Type: application/vscode-jsonrpc; charset=utf-8\r\n\r\n';
     final asciiEncodedHeader = ascii.encode(header);

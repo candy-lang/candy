@@ -23,6 +23,7 @@ class TextDocumentOpenHandler
   ) {
     final resourceId = server.fileUriToResourceId(params.textDocument.uri);
     server.resourceProvider.addOverlay(resourceId, params.textDocument.text);
+    server.onFileChanged();
     return success();
   }
 }
@@ -53,6 +54,7 @@ class TextDocumentChangeHandler
 
     final changeError = server.resourceProvider
         .updateOverlay(resourceId, params.contentChanges);
+    server.onFileChanged();
     return changeError ?? success();
   }
 }

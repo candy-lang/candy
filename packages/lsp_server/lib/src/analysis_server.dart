@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:analyzer/exception/exception.dart';
+import 'package:collection/collection.dart';
 import 'package:compiler/compiler.dart';
+import 'package:dartx/dartx.dart' hide Range;
 import 'package:path/path.dart' as p;
 
 import 'channel.dart';
@@ -12,6 +14,7 @@ import 'generated/lsp_protocol/protocol_special.dart';
 import 'handlers/handlers.dart';
 import 'handlers/states.dart';
 import 'overlay_resource_provider.dart';
+import 'utils.dart';
 
 class AnalysisServer {
   // Section: Lifecycle
@@ -58,7 +61,7 @@ class AnalysisServer {
     _resourceProvider = OverlayResourceProvider(
       ResourceProvider.default_(projectDirectory),
     );
-    _queryContext = QueryContext(resourceProvider: resourceProvider);
+    _queryConfig = QueryConfig(resourceProvider: resourceProvider);
   }
 
   /// Capabilities of the server. Will be null prior to initialization as
@@ -82,15 +85,6 @@ class AnalysisServer {
 
   int nextRequestId = 1;
   final completers = <int, Completer<ResponseMessage>>{};
-
-  void publishDiagnostics(String path, List<Diagnostic> errors) {
-    final params = PublishDiagnosticsParams(Uri.file(path).toString(), errors);
-    channel.sendNotification(NotificationMessage(
-      Method.textDocument_publishDiagnostics,
-      params,
-      jsonRpcVersion,
-    ));
-  }
 
   void sendMessageToUser(MessageType type, String message) {
     channel.sendNotification(NotificationMessage(
@@ -285,8 +279,48 @@ class AnalysisServer {
   Directory get projectDirectory => _projectDirectory;
   OverlayResourceProvider _resourceProvider;
   OverlayResourceProvider get resourceProvider => _resourceProvider;
-  QueryContext _queryContext;
-  QueryContext get queryContext => _queryContext;
+  QueryConfig _queryConfig;
+  QueryConfig get queryConfig => _queryConfig;
+
+  Map<ResourceId, List<ReportedCompilerError>> _errors = {};
+  void onFileChanged() {
+    final context = queryConfig.createContext();
+    final result =
+        context.callQuery(getMainFunction, ModuleId(PackageId.this_, ['main']));
+    sendLogMessage('Result: $result');
+    _updateErrors(context.reportedErrorsByResourceId);
+  }
+
+  void _updateErrors(Map<ResourceId, List<ReportedCompilerError>> errors) {
+    sendLogMessage('New errors: $errors');
+    final equality = DeepCollectionEquality.unordered();
+    for (final resourceId in (_errors.keys + errors.keys).toSet()) {
+      // TODO(JonasWanke): handle errors without a location
+      if (resourceId == null) continue;
+
+      final oldErrors = _errors[resourceId];
+      final newErrors = errors[resourceId];
+      if (equality.equals(oldErrors, newErrors)) continue;
+
+      final diagnostics = newErrors
+          .where((e) => e.location.span != null)
+          .map((e) => Diagnostic(
+                e.location.span.toRange(this, resourceId),
+                DiagnosticSeverity.Error,
+                e.error.id,
+                'candy',
+                e.message,
+                [],
+              ))
+          .toList();
+      channel.sendNotification(NotificationMessage(
+        Method.textDocument_publishDiagnostics,
+        PublishDiagnosticsParams(resourceIdToFileUri(resourceId), diagnostics),
+        jsonRpcVersion,
+      ));
+    }
+    _errors = errors;
+  }
 
   ResourceId fileUriToResourceId(String uri) {
     final file = File.fromUri(Uri.parse(uri));
@@ -300,6 +334,16 @@ class AnalysisServer {
 
     final relativePath = p.relative(file.path, from: sourceDirectory);
     return ResourceId(PackageId.this_, relativePath);
+  }
+
+  String resourceIdToFileUri(ResourceId resourceId) {
+    final path = p.join(
+      projectDirectory.absolute.path,
+      ResourceProvider.srcDirectoryName,
+      resourceId.path,
+    );
+
+    return File(path).absolute.uri.toString();
   }
 }
 

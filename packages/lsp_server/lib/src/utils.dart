@@ -1,20 +1,29 @@
+import 'package:compiler/compiler.dart';
+import 'package:parser/parser.dart' hide Token;
 import 'package:petitparser/petitparser.dart';
 
+import 'analysis_server.dart';
 import 'generated/lsp_protocol/protocol_generated.dart';
 
 bool isCandyDocument(String uri) => uri.endsWith('.candy');
+
+extension SourceSpanToRange on SourceSpan {
+  Range toRange(AnalysisServer server, ResourceId resourceId) {
+    final source = server.resourceProvider.getContent(resourceId);
+    return Range(positionOf(source, start), positionOf(source, end));
+  }
+}
 
 Position positionOf(String buffer, int offset) {
   var line = 0;
   var column = 0;
   for (final token in Token.newlineParser().token().matchesSkipping(buffer)) {
-    if (offset < token.stop) {
-      return Position(line, offset - column + 1);
-    }
+    if (offset < token.stop) return Position(line, offset - column);
+
     line++;
     column = token.stop;
   }
-  return Position(line, offset - column + 1);
+  return Position(line, offset - column);
 }
 
 /// Combines the [Object.hashCode] values of an arbitrary number of objects

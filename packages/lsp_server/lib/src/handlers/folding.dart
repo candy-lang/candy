@@ -25,8 +25,24 @@ class FoldingHandler
     CancellationToken token,
   ) async {
     final resourceId = server.fileUriToResourceId(params.textDocument.uri);
-    final source = server.queryContext.callQuery(getSourceCode, resourceId);
-    final ast = server.queryContext.callQuery(getAst, resourceId);
+    final queryContext = server.queryConfig.createContext();
+
+    final source =
+        queryContext.callQuery(getSourceCode, resourceId).valueOrNull;
+    if (source == null) {
+      return error(
+        ErrorCodes.InternalError,
+        "Couldn't access source of `$resourceId`.",
+      );
+    }
+
+    final ast = queryContext.callQuery(getAst, resourceId).valueOrNull;
+    if (ast == null) {
+      return error(
+        ErrorCodes.InternalError,
+        "Couldn't parse AST of `$resourceId`.",
+      );
+    }
 
     final foldingRanges = <FoldingRange>[];
     if (ast.useLines.length > 1) {
