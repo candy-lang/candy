@@ -1,6 +1,8 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:meta/meta.dart';
 
+import 'resource_provider.dart';
+
 typedef QueryProvider<K, R> = R Function(QueryContext context, K key);
 
 class Query<K, R> {
@@ -26,6 +28,13 @@ class Query<K, R> {
   }
 }
 
+@immutable
 class QueryContext {
+  const QueryContext({
+    @required this.resourceProvider,
+  }) : assert(resourceProvider != null);
+
+  final ResourceProvider resourceProvider;
+
   R callQuery<K, R>(Query<K, R> query, K key) => query(this, key);
 }

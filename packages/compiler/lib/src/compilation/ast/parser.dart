@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:parser/parser.dart';
 import 'package:path/path.dart' as p;
@@ -39,39 +37,17 @@ abstract class ResourceId implements _$ResourceId {
   ResourceId child(String name) => ResourceId(packageId, '$path/$name');
 }
 
-final getPackageSrcPath = Query<PackageId, String>(
-  'getPackageSrcPath',
-  evaluateAlways: true,
-  provider: (_, packageId) {
-    if (packageId.isThis) return File('.').absolute.path;
-
-    return 'unknown_packages/${packageId.name}';
-  },
-);
-final getResourcePath = Query<ResourceId, String>(
-  'getResourcePath',
-  evaluateAlways: true,
-  provider: (context, resourceId) {
-    final srcPath = context.callQuery(getPackageSrcPath, resourceId.packageId);
-    return p.join(srcPath, resourceId.path);
-  },
-);
-
 final doesResourceExist = Query<ResourceId, bool>(
   'doesResourceExist',
   evaluateAlways: true,
-  provider: (context, resourceId) {
-    final file = File(context.callQuery(getResourcePath, resourceId));
-    return file.existsSync();
-  },
+  provider: (context, resourceId) =>
+      context.resourceProvider.fileExists(resourceId),
 );
 final doesResourceDirectoryExist = Query<ResourceId, bool>(
   'doesResourceDirectoryExist',
   evaluateAlways: true,
-  provider: (context, resourceId) {
-    final directory = Directory(context.callQuery(getResourcePath, resourceId));
-    return directory.existsSync();
-  },
+  provider: (context, resourceId) =>
+      context.resourceProvider.directoryExists(resourceId),
 );
 
 final getSourceCode = Query<ResourceId, String>(
@@ -79,11 +55,7 @@ final getSourceCode = Query<ResourceId, String>(
   evaluateAlways: true,
   provider: (context, resourceId) {
     assert(resourceId.isCandyFile);
-
-    final file = File(context.callQuery(getResourcePath, resourceId));
-    assert(context.callQuery(doesResourceExist, resourceId));
-
-    return file.readAsStringSync();
+    return context.resourceProvider.getContent(resourceId);
   },
 );
 
@@ -91,6 +63,6 @@ final getAst = Query<ResourceId, CandyFile>(
   'getAst',
   provider: (context, resourceId) {
     final source = context.callQuery(getSourceCode, resourceId);
-    return parseCandySource(source);
+    return parseCandySource(resourceId.fileNameWithoutExtension, source);
   },
 );
