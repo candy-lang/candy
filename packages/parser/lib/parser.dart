@@ -1,8 +1,9 @@
 import 'dart:io';
 
-import 'package:parser/src/parser/grammar.dart';
+import 'package:path/path.dart' as p;
 
 import 'src/parser/ast/general.dart';
+import 'src/parser/grammar.dart';
 
 export 'src/lexer/token.dart';
 export 'src/parser/ast/declarations.dart';
@@ -18,11 +19,13 @@ CandyFile parseCandyFile(File file) {
     throw Exception("File ${file.absolute.path} doesn't exist.");
   }
 
-  return parseCandySource(file.readAsStringSync());
+  return parseCandySource(
+    p.basenameWithoutExtension(file.path),
+    file.readAsStringSync(),
+  );
 }
 
-CandyFile parseCandySource(String sourceCode) {
-  final result = ParserGrammar.candyFile.parse(sourceCode);
+CandyFile parseCandySource(String fileNameWithoutExtension, String sourceCode) {
   // TODO(JonasWanke): Better error handling for parser exceptions.
-  return result.value;
+  return ParserGrammar.parse(fileNameWithoutExtension, sourceCode);
 }

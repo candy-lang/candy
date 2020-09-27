@@ -11,12 +11,14 @@ part 'general.freezed.dart';
 abstract class CandyFile extends AstNode implements _$CandyFile {
   const factory CandyFile({
     @Default(<UseLine>[]) List<UseLine> useLines,
-    @Default(<Declaration>[]) List<Declaration> declarations,
+
+    /// Only a virtual wrapper around all declarations of this file.
+    ModuleDeclaration declaration,
   }) = _CandyFile;
   const CandyFile._();
 
   @override
-  Iterable<SyntacticEntity> get children => [...useLines, ...declarations];
+  Iterable<SyntacticEntity> get children => [...useLines, declaration];
 }
 
 @freezed

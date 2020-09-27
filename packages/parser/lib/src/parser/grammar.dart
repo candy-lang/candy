@@ -14,8 +14,13 @@ import 'ast/types.dart';
 // ignore: avoid_classes_with_only_static_members
 @immutable
 class ParserGrammar {
-  static void init() {
-    assert(!_isInitialized, 'Already initialized.');
+  static CandyFile parse(String fileNameWithoutExtension, String source) {
+    _init();
+    return _candyFile(fileNameWithoutExtension).parse(source).value;
+  }
+
+  static void _init() {
+    if (_isInitialized) return;
     _isInitialized = true;
 
     _initDeclaration();
@@ -28,11 +33,22 @@ class ParserGrammar {
 
   // SECTION: general
 
-  static final candyFile =
-      (useLines & LexerGrammar.NLs & declarations).map((value) => CandyFile(
-            useLines: value[0] as List<UseLine>,
-            declarations: value[2] as List<Declaration>,
-          ));
+  static Parser<CandyFile> _candyFile(String fileNameWithoutExtension) {
+    return (useLines & LexerGrammar.NLs & declarations)
+        .end()
+        .map((value) => CandyFile(
+              useLines: value[0] as List<UseLine>,
+              declaration: ModuleDeclaration(
+                moduleKeyword: ModuleKeywordToken(),
+                name: IdentifierToken(fileNameWithoutExtension),
+                body: BlockDeclarationBody(
+                  leftBrace: OperatorToken(OperatorTokenType.lcurl),
+                  declarations: value[2] as List<Declaration>,
+                  rightBrace: OperatorToken(OperatorTokenType.rcurl),
+                ),
+              ),
+            ));
+  }
 
   static final useLines =
       (useLine & semi).map<UseLine>((v) => v[0] as UseLine).star();

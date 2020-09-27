@@ -12,18 +12,15 @@ abstract class Token extends SyntacticEntity {
 
 @freezed
 abstract class OperatorToken extends Token with _$OperatorToken {
-  const factory OperatorToken(
-    OperatorTokenType type, {
-    @required SourceSpan span,
-  }) = _OperatorToken;
+  const factory OperatorToken(OperatorTokenType type, {SourceSpan span}) =
+      _OperatorToken;
 }
 
 @freezed
 abstract class KeywordToken extends Token with _$KeywordToken {
   const factory KeywordToken.use({@required SourceSpan span}) = UseKeywordToken;
   // Declarations:
-  const factory KeywordToken.module({@required SourceSpan span}) =
-      ModuleKeywordToken;
+  const factory KeywordToken.module({SourceSpan span}) = ModuleKeywordToken;
   const factory KeywordToken.trait({@required SourceSpan span}) =
       TraitKeywordToken;
   const factory KeywordToken.impl({@required SourceSpan span}) =
@@ -84,10 +81,8 @@ abstract class BooleanLiteralToken extends LiteralToken<bool>
 
 @freezed
 abstract class IdentifierToken extends Token with _$IdentifierToken {
-  const factory IdentifierToken(
-    String name, {
-    @required SourceSpan span,
-  }) = _IdentifierToken;
+  const factory IdentifierToken(String name, {SourceSpan span}) =
+      _IdentifierToken;
 }
 
 enum OperatorTokenType {
