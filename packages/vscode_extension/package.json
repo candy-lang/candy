@@ -23,7 +23,8 @@
         ],
         "aliases": [
           "Candy"
-        ]
+        ],
+        "configuration": "./declarative/language-configuration.json"
       }
     ]
   },
