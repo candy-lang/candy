@@ -20,6 +20,8 @@ abstract class CompilerError implements _$CompilerError {
       CompilerError._create('multipleMainFunctions');
   static const multipleTypesWithSameName =
       CompilerError._create('multipleTypesWithSameName');
+  static const undefinedIdentifier =
+      CompilerError._create('undefinedIdentifier');
   static const unsupportedFeature = CompilerError._create('unsupportedFeature');
   static const moduleNotFound = CompilerError._create('moduleNotFound');
 }
