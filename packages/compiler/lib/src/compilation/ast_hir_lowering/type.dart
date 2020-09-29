@@ -1,12 +1,14 @@
 import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
 
+import '../../errors.dart';
 import '../../query.dart';
 import '../../utils.dart';
 import '../hir.dart' as hir;
 import '../hir/ids.dart';
 import 'declarations/declarations.dart';
 import 'declarations/module.dart';
+import 'declarations/trait.dart';
 
 /// Resolves an AST-type in the given module to a HIR-type.
 ///
@@ -20,33 +22,31 @@ final Query<Tuple2<ModuleId, ast.Type>, hir.CandyType> astTypeToHirType =
     final type = inputs.second;
 
     hir.CandyType map(ast.Type type) =>
-        context.callQuery(astTypeToHirType, Tuple2(moduleId, type));
+        astTypeToHirType(context, Tuple2(moduleId, type));
     List<hir.CandyType> mapTypes(Iterable<ast.Type> types) =>
         types.map(map).toList();
 
     if (type is ast.UserType) {
-      final declarationId =
-          context.callQuery(resolveAstUserType, Tuple2(moduleId, type));
+      final declarationId = resolveAstUserType(context, Tuple2(moduleId, type));
       final name = declarationId.simplePath
           .lastWhile((d) => !(d is ModuleDeclarationPathData))
-          .map((d) => (d as ModuleDeclarationPathData).name)
+          .cast<ModuleDeclarationPathData>()
+          .map((d) => d.name)
           .join('.');
 
       final arguments = mapTypes(type.arguments.arguments.map((a) => a.type));
       return hir.CandyType.user(
-        context.callQuery(declarationIdToModuleId, declarationId),
+        declarationIdToModuleId(context, declarationId),
         name,
         arguments: arguments,
       );
     } else if (type is ast.GroupType) {
-      return context.callQuery(astTypeToHirType, type.type);
+      return map(type.type);
     } else if (type is ast.FunctionType) {
       return hir.CandyType.function(
-        receiverType: type.receiver == null
-            ? null
-            : context.callQuery(astTypeToHirType, type.receiver),
+        receiverType: type.receiver == null ? null : map(type.receiver),
         parameterTypes: mapTypes(type.parameterTypes),
-        returnType: context.callQuery(astTypeToHirType, type.returnType),
+        returnType: map(type.returnType),
       );
     } else if (type is ast.TupleType) {
       return hir.CandyType.tuple(mapTypes(type.types));
@@ -90,7 +90,7 @@ final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>, DeclarationId>(
     final type = inputs.second;
 
     final currentModuleDeclarationId =
-        context.callQuery(moduleIdToDeclarationId, currentModuleId);
+        moduleIdToDeclarationId(context, currentModuleId);
     final currentResourceId = currentModuleDeclarationId.resourceId;
 
     // Step 1: Look for traits/classes in outer modules in the same file.
@@ -100,25 +100,36 @@ final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>, DeclarationId>(
       final simpleTypes = type.simpleTypes.map((t) => t.name.name);
       var declarationId = moduleDeclarationId;
       for (final simpleType in simpleTypes) {
-        declarationId =
+        final traitId =
             declarationId.inner(DeclarationPathData.trait(simpleType));
-        if (context.callQuery(doesDeclarationExist, declarationId)) continue;
+        final hasTrait = doesDeclarationExist(context, declarationId);
 
         // TODO(JonasWanke): traits in classes/enums allowed?
-        declarationId =
+        final classId =
             declarationId.inner(DeclarationPathData.class_(simpleType));
-        if (context.callQuery(doesDeclarationExist, declarationId)) continue;
+        final hasClass = doesDeclarationExist(context, declarationId);
 
-        break;
+        if (hasTrait && hasClass) {
+          context.reportError(CompilerError.multipleTypesWithSameName(
+            'Multiple types have the same name: `$simpleType` in module `$moduleId`.',
+            location: ErrorLocation(
+              currentResourceId,
+              getTraitDeclarationAst(context, traitId).name.span,
+            ),
+          ));
+        }
+        if (!hasTrait && !hasClass) {
+          declarationId = null;
+          break;
+        }
+
+        declarationId = hasTrait ? traitId : classId;
       }
-      if (context.callQuery(doesDeclarationExist, declarationId)) {
-        return declarationId;
-      }
+      if (declarationId != null) return declarationId;
 
       if (moduleId.hasNoParent) break;
       moduleId = moduleId.parentOrNull;
-      moduleDeclarationId =
-          context.callQuery(moduleIdToDeclarationId, moduleId);
+      moduleDeclarationId = moduleIdToDeclarationId(context, moduleId);
     }
 
     // TODO(JonasWank): Search imports.

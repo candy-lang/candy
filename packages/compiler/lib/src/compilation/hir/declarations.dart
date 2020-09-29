@@ -16,12 +16,14 @@ abstract class Declaration implements _$Declaration {
 
   const factory Declaration.trait(
     String name, {
+    @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
+    @required CandyType upperBound,
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
   }) = TraitDeclaration;
 
   const factory Declaration.function({
     @required String name,
-    @Default(<FunctionParameter>[]) List<FunctionParameter> parameters,
+    @Default(<ValueParameter>[]) List<ValueParameter> parameters,
     @required CandyType returnType,
   }) = FunctionDeclaration;
 
@@ -31,13 +33,25 @@ abstract class Declaration implements _$Declaration {
 }
 
 @freezed
-abstract class FunctionParameter implements _$FunctionParameter {
-  const factory FunctionParameter({
+abstract class TypeParameter implements _$TypeParameter {
+  const factory TypeParameter({
+    @required String name,
+    @required CandyType upperBound,
+    CandyType defaultValue,
+  }) = _TypeParameter;
+  factory TypeParameter.fromJson(Map<String, dynamic> json) =>
+      _$TypeParameterFromJson(json);
+  const TypeParameter._();
+}
+
+@freezed
+abstract class ValueParameter implements _$ValueParameter {
+  const factory ValueParameter({
     @required String name,
     @required CandyType type,
     // TODO(JonasWanke): default value
-  }) = _FunctionParameter;
-  factory FunctionParameter.fromJson(Map<String, dynamic> json) =>
-      _$FunctionParameterFromJson(json);
-  const FunctionParameter._();
+  }) = _ValueParameter;
+  factory ValueParameter.fromJson(Map<String, dynamic> json) =>
+      _$ValueParameterFromJson(json);
+  const ValueParameter._();
 }

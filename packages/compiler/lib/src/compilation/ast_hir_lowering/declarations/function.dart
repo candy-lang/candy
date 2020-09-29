@@ -18,7 +18,7 @@ final getFunctionDeclarationAst = Query<DeclarationId, ast.FunctionDeclaration>(
   provider: (context, declarationId) {
     assert(declarationId.isFunction);
 
-    final declaration = context.callQuery(getDeclarationAst, declarationId);
+    final declaration = getDeclarationAst(context, declarationId);
     assert(declaration is ast.FunctionDeclaration, 'Wrong return type.');
     return declaration as ast.FunctionDeclaration;
   },
@@ -26,22 +26,18 @@ final getFunctionDeclarationAst = Query<DeclarationId, ast.FunctionDeclaration>(
 final getFunctionDeclarationHir = Query<DeclarationId, hir.FunctionDeclaration>(
   'getFunctionDeclarationHir',
   provider: (context, declarationId) {
-    final moduleId = context.callQuery(declarationIdToModuleId, declarationId);
-
-    final ast = context.callQuery(getFunctionDeclarationAst, declarationId);
+    final ast = getFunctionDeclarationAst(context, declarationId);
+    final moduleId = declarationIdToModuleId(context, declarationId);
     return hir.FunctionDeclaration(
       name: ast.name.name,
       parameters: ast.valueParameters
-          .map((p) => hir.FunctionParameter(
+          .map((p) => hir.ValueParameter(
                 name: p.name.name,
-                type: context.callQuery(astTypeToHirType, Tuple2(moduleId, p)),
+                type: astTypeToHirType(context, Tuple2(moduleId, p.type)),
               ))
           .toList(),
       returnType: ast.returnType != null
-          ? context.callQuery(
-              astTypeToHirType,
-              Tuple2(moduleId, ast.returnType),
-            )
+          ? astTypeToHirType(context, Tuple2(moduleId, ast.returnType))
           : hir.CandyType.unit,
       // TODO(JonasWanke): child declarations
     );
