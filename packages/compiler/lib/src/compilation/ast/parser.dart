@@ -62,7 +62,9 @@ final getSourceCode = Query<ResourceId, String>(
 final getAst = Query<ResourceId, CandyFile>(
   'getAst',
   provider: (context, resourceId) {
-    final source = context.callQuery(getSourceCode, resourceId);
-    return parseCandySource(resourceId.fileNameWithoutExtension, source);
+    return parseCandySource(
+      resourceId.fileNameWithoutExtension,
+      getSourceCode(context, resourceId),
+    );
   },
 );

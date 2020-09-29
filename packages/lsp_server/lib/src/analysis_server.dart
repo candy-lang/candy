@@ -254,8 +254,8 @@ class AnalysisServer {
 
   void sendServerErrorNotification(
     String message,
-    dynamic exception,
-    StackTrace stackTrace, {
+    dynamic exception, {
+    StackTrace stackTrace,
     bool fatal = false,
   }) {
     message = exception == null ? message : '$message: $exception';
@@ -270,7 +270,7 @@ class AnalysisServer {
   /// read.
   void sendSocketErrorNotification(dynamic error, StackTrace stack) {
     // Don't send to instrumentation service; not an internal error.
-    sendServerErrorNotification('Socket error', error, stack);
+    sendServerErrorNotification('Socket error', error, stackTrace: stack);
   }
 
   // Section: Analysis
@@ -285,9 +285,9 @@ class AnalysisServer {
   Map<ResourceId, List<ReportedCompilerError>> _errors = {};
   void onFileChanged() {
     final context = queryConfig.createContext();
-    final result =
+    final mainFunctionId =
         context.callQuery(getMainFunction, ModuleId(PackageId.this_, ['main']));
-    sendLogMessage('Result: $result');
+    sendLogMessage('Main functions `DeclarationId`: $mainFunctionId');
     _updateErrors(context.reportedErrorsByResourceId);
   }
 

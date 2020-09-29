@@ -2,7 +2,7 @@ import 'package:parser/parser.dart' as ast;
 
 import '../../../query.dart';
 import '../../../utils.dart';
-import '../../ast/parser.dart';
+import '../../ast.dart';
 import '../../hir/ids.dart';
 
 final doesDeclarationExist = Query<DeclarationId, bool>(

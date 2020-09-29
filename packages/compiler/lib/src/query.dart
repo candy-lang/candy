@@ -2,7 +2,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:dartx/dartx.dart';
 import 'package:meta/meta.dart';
 
-import 'compilation/ast/parser.dart';
+import 'compilation/ast.dart';
 import 'errors.dart';
 import 'resource_provider.dart';
 import 'utils.dart';

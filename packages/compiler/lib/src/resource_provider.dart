@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:meta/meta.dart';
 import 'package:path/path.dart' as p;
 
-import 'compilation/ast/parser.dart';
+import 'compilation/ast.dart';
 
 abstract class ResourceProvider {
   const ResourceProvider();

@@ -1,7 +1,7 @@
 import 'package:dartx/dartx.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import '../ast/parser.dart';
+import '../ast.dart';
 import '../ids.dart';
 
 part 'ids.freezed.dart';

@@ -1,7 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:parser/parser.dart';
 
-import 'compilation/ast/parser.dart';
+import 'compilation/ast.dart';
 
 part 'errors.freezed.dart';
 
