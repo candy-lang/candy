@@ -287,6 +287,8 @@ class AnalysisServer {
     final context = queryConfig.createContext();
     final mainFunctionId =
         context.callQuery(getMainFunction, ModuleId(PackageId.this_, ['main']));
+    if (mainFunctionId.isSome) context.callQuery(getBody, mainFunctionId.value);
+
     sendLogMessage('Main functions `DeclarationId`: $mainFunctionId');
     _updateErrors(context.reportedErrorsByResourceId);
   }

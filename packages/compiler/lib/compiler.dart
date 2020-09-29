@@ -1,4 +1,5 @@
 export 'src/compilation/ast/parser.dart';
+export 'src/compilation/ast_hir_lowering.dart';
 export 'src/compilation/hir.dart';
 export 'src/compilation/hir/ids.dart';
 export 'src/compilation/ids.dart';
