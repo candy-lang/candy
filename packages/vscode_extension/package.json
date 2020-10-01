@@ -15,6 +15,13 @@
   "main": "./out/extension.js",
   "contributes": {
     "commands": [],
+    "grammars": [
+      {
+        "language": "candy",
+        "scopeName": "source.candy",
+        "path": "./declarative/tmLanguage.json"
+      }
+    ],
     "languages": [
       {
         "id": "candy",

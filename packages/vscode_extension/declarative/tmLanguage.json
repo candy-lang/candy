@@ -1,0 +1,291 @@
+{
+  "name": "Candy",
+  "scopeName": "source.candy",
+  "fileTypes": ["candy"],
+  "patterns": [
+    {
+      "name": "meta.import.candy",
+      "begin": "^\\w*\\b(use)\\b",
+      "beginCaptures": {
+        "0": { "name": "keyword.other.import.candy" }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "name": "variable.other.readwrite.alias.candy",
+          "match": "\\b([a-zA-Z][a-zA-Z0-9]*)\\b"
+        },
+        {
+          "name": "punctuation.dot.candy",
+          "match": "\\."
+        },
+        { "include": "#comments" },
+        {
+          "match": "\\b(as|show|hide)\\b",
+          "name": "keyword.other.import.candy"
+        }
+      ]
+    },
+    { "include": "#comments" },
+    { "include": "#punctuation" },
+    { "include": "#annotations" },
+    { "include": "#keywords" },
+    { "include": "#constants-and-special-vars" },
+    { "include": "#strings" }
+  ],
+  "repository": {
+    "annotations": {
+      "patterns": [
+        {
+          "match": "@[a-zA-Z]+",
+          "name": "storage.type.annotation.candy"
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "captures": {
+            "0": { "name": "punctuation.definition.comment.candy" }
+          },
+          "match": "/\\*\\*/",
+          "name": "comment.block.empty.candy"
+        },
+        { "include": "#comments-doc" },
+        { "include": "#comments-inline" }
+      ]
+    },
+    "comments-doc": {
+      "patterns": [
+        {
+          "begin": "///",
+          "while": "^\\s*///",
+          "patterns": [{ "include": "#candydoc" }],
+          "name": "comment.block.documentation.candy"
+        }
+      ]
+    },
+    "comments-inline": {
+      "patterns": [
+        { "include": "#comments-block" },
+        {
+          "captures": {
+            "1": { "name": "comment.line.double-slash.candy" }
+          },
+          "match": "((//).*)$"
+        }
+      ]
+    },
+    "comments-block": {
+      "patterns": [
+        {
+          "begin": "/\\*",
+          "end": "\\*/",
+          "name": "comment.block.candy",
+          "patterns": [{ "include": "#comments-block" }]
+        }
+      ]
+    },
+    "constants-and-special-vars": {
+      "patterns": [
+        {
+          "match": "(?<!\\$)\\b(true|false)\\b(?!\\$)",
+          "name": "constant.language.candy"
+        },
+        {
+          "match": "(?<!\\$)\\b(field|it|super|this)\\b(?!\\$)",
+          "name": "variable.language.candy"
+        },
+        {
+          "match": "(?<!\\$)\\b((0(x|X)[0-9a-fA-F]*)|(([0-9]+\\.?[0-9]*)|(\\.[0-9]+))((e|E)(\\+|-)?[0-9]+)?)\\b(?!\\$)",
+          "name": "constant.numeric.candy"
+        },
+        {
+          "match": "(?<![a-zA-Z0-9_])[A-Z_][a-zA-Z0-9_]*",
+          "name": "support.class.candy"
+        },
+        {
+          "match": "([a-z_][a-zA-Z0-9_]*)(<|\\(|\\s+=>)",
+          "captures": {
+            "1": { "name": "entity.name.function.candy" }
+          }
+        }
+      ]
+    },
+    "candydoc": {
+      "patterns": [
+        {
+          "match": "(\\[.*?\\])",
+          "captures": {
+            "0": { "name": "variable.name.source.candy" }
+          }
+        },
+        {
+          "match": "^ {4,}(?![ \\*]).*",
+          "captures": {
+            "0": { "name": "variable.name.source.candy" }
+          }
+        },
+        {
+          "begin": "```.*?$",
+          "end": "```",
+          "contentName": "variable.other.source.candy"
+        },
+        {
+          "match": "(`.*?`)",
+          "captures": {
+            "0": { "name": "variable.other.source.candy" }
+          }
+        },
+        {
+          "match": "(`.*?`)",
+          "captures": {
+            "0": { "name": "variable.other.source.candy" }
+          }
+        },
+        {
+          "match": "(\\* ((    ).*))$",
+          "captures": {
+            "2": { "name": "variable.other.source.candy" }
+          }
+        },
+        { "match": "(\\*    .*)$" }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "match": "(?<!\\$)\\b(try|catch|finally|throw|rethrow)\\b(?!\\$)",
+          "name": "keyword.control.catch-exception.candy"
+        },
+        {
+          "match": "(?<!\\$)\\b(break|continue|else|for|if|\\!?in|loop|match|return|while)\\b(?!\\$)",
+          "name": "keyword.control.candy"
+        },
+        {
+          "match": "(?<!\\$)\\bassert\\b(?!\\$)",
+          "name": "keyword.control.candy"
+        },
+        {
+          "match": "(?<!\\$)\\b(class|enum|external|impl|get|set|trait|type)\\b(?!\\$)",
+          "name": "keyword.declaration.candy"
+        },
+        {
+          "match": "(?<!\\$)\\b(\\!?is)\\b(?!\\$)",
+          "name": "keyword.operator.candy"
+        },
+        {
+          "match": "(=)",
+          "name": "keyword.operator.assignment.candy"
+        },
+        {
+          "match": "(\\-|\\+|\\*|\\/|\\~\\/|%)",
+          "name": "keyword.operator.arithmetic.candy"
+        },
+        {
+          "match": "((\\-|\\+|\\*|\\/|\\~\\/|%)=)",
+          "name": "keyword.operator.assignment.arithmetic.candy"
+        },
+        {
+          "match": "(<<|>>>?|~|\\^|\\||&)",
+          "name": "keyword.operator.bitwise.candy"
+        },
+        {
+          "match": "((&|\\^|\\||<<|>>>?)=)",
+          "name": "keyword.operator.assignment.bitwise.candy"
+        },
+        {
+          "match": "(?<!\\$)\\bas[?!]\\b(?!\\$)",
+          "name": "keyword.operator.cast.candy"
+        },
+        {
+          "match": "(==|!=|===|!==|<=?|>=?)",
+          "name": "keyword.operator.comparison.candy"
+        },
+        {
+          "match": "(\\-\\-|\\+\\+)",
+          "name": "keyword.operator.increment-decrement.candy"
+        },
+        {
+          "match": "(!|&&|\\|\\||\\->|<\\-)",
+          "name": "keyword.operator.logical.candy"
+        },
+        {
+          "match": "((!|&&|\\|\\||\\->|<\\-)=)",
+          "name": "keyword.operator.assignment.logical.candy"
+        },
+        {
+          "match": "(?<!\\$)\\b(data|late|mut|public|static)\\b(?!\\$)",
+          "name": "storage.modifier.candy"
+        },
+        {
+          "match": "(?<!\\$)\\bfun\\b(?!\\$)",
+          "name": "storage.type.function.candy"
+        },
+        {
+          "match": "(?<!\\$)\\blet\\b(?!\\$)",
+          "name": "storage.type.primitive.candy"
+        }
+      ]
+    },
+    "string-interp": {
+      "patterns": [
+        {
+          "match": "\\{([^{}]+)\\}",
+          "captures": {
+            "1": { "name": "variable.parameter.candy" }
+          }
+        },
+        {
+          "match": "\\\\.",
+          "name": "constant.character.escape.candy"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "begin": "(?<!r)\"\"\"",
+          "end": "\"\"\"(?!\")",
+          "name": "string.interpolated.triple.double.candy",
+          "patterns": [{ "include": "#string-interp" }]
+        },
+        {
+          "begin": "(?<!#)\"",
+          "end": "\"",
+          "name": "string.interpolated.double.candy",
+          "patterns": [
+            {
+              "match": "\\n",
+              "name": "invalid.string.newline"
+            },
+            { "include": "#string-interp" }
+          ]
+        },
+        {
+          "begin": "(#*)\"",
+          "end": "\"$1",
+          "name": "string.quoted.double.candy",
+          "patterns": [
+            {
+              "match": "\\n",
+              "name": "invalid.string.newline"
+            }
+          ]
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "match": ",",
+          "name": "punctuation.comma.candy"
+        },
+        {
+          "match": "\\.",
+          "name": "punctuation.dot.candy"
+        }
+      ]
+    }
+  }
+}
