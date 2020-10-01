@@ -23,11 +23,11 @@ const mainFunctionName = 'main';
 final getMainFunction = Query<ModuleId, DeclarationId>(
   'getMainFunction',
   provider: (context, moduleId) {
-    final module = context.callQuery(getModuleDeclarationHir, moduleId);
+    final module = getModuleDeclarationHir(context, moduleId);
 
     final possibleFunctions =
         module.innerDeclarationIds.where((id) => id.isFunction).where((id) {
-      final function = context.callQuery(getFunctionDeclarationHir, id);
+      final function = getFunctionDeclarationHir(context, id);
       if (function.name != mainFunctionName) return false;
       if (function.parameters.length > 1) return false;
       if (function.parameters.length == 1 &&
@@ -42,19 +42,27 @@ final getMainFunction = Query<ModuleId, DeclarationId>(
       throw CompilerError.noMainFunction(
         'Main function not found.',
         location: ErrorLocation(
-          context.callQuery(moduleIdToDeclarationId, moduleId).resourceId,
+          moduleIdToDeclarationId(context, moduleId).resourceId,
         ),
       );
     } else if (possibleFunctions.length > 1) {
+      final resourceId = moduleIdToDeclarationId(context, moduleId).resourceId;
       throw CompilerError.multipleMainFunctions(
         'Multiple main functions found.',
         location: ErrorLocation(
-          context.callQuery(moduleIdToDeclarationId, moduleId).resourceId,
-          context
-              .callQuery(getFunctionDeclarationAst, possibleFunctions.first)
-              .name
-              .span,
+          resourceId,
+          getFunctionDeclarationAst(context, possibleFunctions.first).name.span,
         ),
+        relatedInformation: [
+          for (final declarationId in possibleFunctions.skip(1))
+            ErrorRelatedInformation(
+              location: ErrorLocation(
+                resourceId,
+                getFunctionDeclarationAst(context, declarationId).name.span,
+              ),
+              message: 'Another function with a matching signature.',
+            ),
+        ],
       );
     }
 

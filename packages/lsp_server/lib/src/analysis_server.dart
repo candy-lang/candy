@@ -307,12 +307,18 @@ class AnalysisServer {
       final diagnostics = newErrors
           .where((e) => e.location.span != null)
           .map((e) => Diagnostic(
-                e.location.span.toRange(this, resourceId),
+                e.location.toRange(this),
                 DiagnosticSeverity.Error,
                 e.error.id,
                 'candy',
                 e.message,
-                [],
+                [
+                  for (final related in e.relatedInformation)
+                    DiagnosticRelatedInformation(
+                      related.location.toLocation(this),
+                      related.message,
+                    ),
+                ],
               ))
           .toList();
       channel.sendNotification(NotificationMessage(

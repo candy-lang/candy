@@ -14,6 +14,15 @@ extension SourceSpanToRange on SourceSpan {
   }
 }
 
+extension ErrorLocationConversion on ErrorLocation {
+  Location toLocation(AnalysisServer server) =>
+      Location(server.resourceIdToFileUri(resourceId), toRange(server));
+  Range toRange(AnalysisServer server) {
+    final source = server.resourceProvider.getContent(resourceId);
+    return Range(positionOf(source, span.start), positionOf(source, span.end));
+  }
+}
+
 Position positionOf(String buffer, int offset) {
   var line = 0;
   var column = 0;

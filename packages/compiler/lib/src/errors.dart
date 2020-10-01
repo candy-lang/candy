@@ -10,8 +10,18 @@ abstract class CompilerError implements _$CompilerError {
   const factory CompilerError._create(String id) = _CompilerError;
   const CompilerError._();
 
-  ReportedCompilerError call(String message, {ErrorLocation location}) =>
-      ReportedCompilerError(this, message, location: location);
+  ReportedCompilerError call(
+    String message, {
+    ErrorLocation location,
+    List<ErrorRelatedInformation> relatedInformation = const [],
+  }) {
+    return ReportedCompilerError(
+      this,
+      message,
+      location: location,
+      relatedInformation: relatedInformation,
+    );
+  }
 
   static const values = [internalError, noMainFunction, multipleMainFunctions];
   static const internalError = CompilerError._create('internalError');
@@ -34,7 +44,19 @@ abstract class ReportedCompilerError
     CompilerError error,
     String message, {
     ErrorLocation location,
+    @Default(<ErrorRelatedInformation>[])
+        List<ErrorRelatedInformation> relatedInformation,
   }) = _ReportedCompilerError;
+}
+
+@freezed
+abstract class ErrorRelatedInformation
+    with _$ErrorRelatedInformation
+    implements Exception {
+  const factory ErrorRelatedInformation({
+    @required ErrorLocation location,
+    @required String message,
+  }) = _ErrorRelatedInformation;
 }
 
 @freezed
