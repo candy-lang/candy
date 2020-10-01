@@ -27,11 +27,9 @@
   - [9.6. Return](#96-return)
   - [9.7. Break](#97-break)
   - [9.8. Continue](#98-continue)
-  - [9.9. Throw](#99-throw)
-  - [9.10. Try?](#910-try)
-  - [9.11. Rethrow?](#911-rethrow)
-  - [9.12. Yield & Yield-Each](#912-yield--yield-each)
-  - [9.13. Embedded languages](#913-embedded-languages)
+  - [9.9. Throw, Try & Catch](#99-throw-try--catch)
+  - [9.10. Yield & Yield-Each](#910-yield--yield-each)
+  - [9.11. Embedded languages](#911-embedded-languages)
 - [10. Statements](#10-statements)
   - [10.1. For](#101-for)
   - [10.2. Loop](#102-loop)
@@ -527,12 +525,49 @@ if (…) … else …
 ### 9.6. Return
 ### 9.7. Break
 ### 9.8. Continue
-### 9.9. Throw
-### 9.10. Try?
-### 9.11. Rethrow?
-### 9.12. Yield & Yield-Each
 
-### 9.13. Embedded languages
+### 9.9. Throw, Try & Catch
+
+```kotlin
+try {
+  problematicFunction()
+} catch MyError { // it: CaughtError<MyError>
+  if (!canHandle(it.error)) throw e
+  handleMyError(it)
+} catch Any { // it: CaughtError<Any>
+  handle(it)
+}
+```
+
+With the following types:
+
+```kotlin
+public class CaughtError<E> {
+  external constructor
+
+  let error: E
+  let stackTrace: StackTrace
+
+  let cause: Option<CaughtError<E>>
+}
+
+public class StackTrace {
+  external constructor
+
+  let items: List<Item>
+
+  class Item {
+    let fileName: String
+    let position: Position // line + column
+    let typeName: String
+    let methodName: String
+  }
+}
+```
+
+### 9.10. Yield & Yield-Each
+
+### 9.11. Embedded languages
 
 ```rust
 let json: Json = {
