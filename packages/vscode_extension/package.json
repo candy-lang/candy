@@ -7,7 +7,9 @@
     "vscode": "^1.48.0"
   },
   "categories": [
-    "Other"
+    "Programming Languages",
+    "Linters",
+    "Snippets"
   ],
   "activationEvents": [
     "onLanguage:candy"
@@ -32,6 +34,12 @@
           "Candy"
         ],
         "configuration": "./declarative/language-configuration.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "candy",
+        "path": "./declarative/snippets.json"
       }
     ]
   },
