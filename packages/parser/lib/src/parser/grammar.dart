@@ -265,40 +265,18 @@ class ParserGrammar {
   static final propertyAccessor =
       // ignore: unnecessary_cast
       (propertyGetter as Parser<PropertyAccessor>) | propertySetter;
-  static final propertyGetter = (LexerGrammar.GET &
-          (LexerGrammar.NLs & LexerGrammar.COLON & LexerGrammar.NLs & type)
-              .optional() &
-          (LexerGrammar.NLs & block).optional())
-      .map<GetterPropertyAccessor>((value) {
-    final returnTypeDeclaration = value[1] as List<dynamic>;
-    return PropertyAccessor.getter(
-      keyword: value[0] as GetKeywordToken,
-      colon: returnTypeDeclaration?.elementAt(1) as OperatorToken,
-      returnType: returnTypeDeclaration?.elementAt(3) as Type,
-      body: (value[2] as List<dynamic>)?.elementAt(1) as Block,
-    ) as GetterPropertyAccessor;
-  });
-  static final propertySetter = (LexerGrammar.SET &
-          (LexerGrammar.LPAREN &
-                  LexerGrammar.NLs &
-                  valueParameter.optional() &
-                  LexerGrammar.NLs &
-                  (LexerGrammar.COMMA & LexerGrammar.NLs).optional() &
-                  LexerGrammar.RPAREN)
-              .optional() &
-          (LexerGrammar.NLs & block).optional())
-      .map<SetterPropertyAccessor>((value) {
-    final parameterDeclaration = value[1] as List<dynamic>;
-    return PropertyAccessor.setter(
-      keyword: value[0] as SetKeywordToken,
-      leftParenthesis: parameterDeclaration?.elementAt(0) as OperatorToken,
-      valueParameter: parameterDeclaration?.elementAt(2) as ValueParameter,
-      valueParameterComma: (parameterDeclaration?.elementAt(4) as List<dynamic>)
-          ?.elementAt(0) as OperatorToken,
-      rightParenthesis: parameterDeclaration?.elementAt(5) as OperatorToken,
-      body: (value[2] as List<dynamic>)?.elementAt(1) as Block,
-    ) as SetterPropertyAccessor;
-  });
+  static final propertyGetter =
+      (LexerGrammar.GET & (LexerGrammar.NLs & block).optional())
+          .map((value) => PropertyAccessor.getter(
+                keyword: value[0] as GetKeywordToken,
+                body: (value[1] as List<dynamic>)?.elementAt(1) as Block,
+              ) as GetterPropertyAccessor);
+  static final propertySetter =
+      (LexerGrammar.SET & (LexerGrammar.NLs & block).optional())
+          .map<SetterPropertyAccessor>((value) => PropertyAccessor.setter(
+                keyword: value[0] as SetKeywordToken,
+                body: (value[1] as List<dynamic>)?.elementAt(1) as Block,
+              ) as SetterPropertyAccessor);
 
   static final typeParameters = (LexerGrammar.LANGLE &
           LexerGrammar.NLs &

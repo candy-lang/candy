@@ -136,10 +136,8 @@ void main() {
       'let mut foo: Foo.Bar = 123\n'
           '  get\n'
           '  get {123}\n'
-          '  get: Foo.Bar {123}\n'
           '  set\n'
-          '  set {}\n'
-          '  set(value: Foo.Bar,) {}': PropertyDeclaration(
+          '  set {}': PropertyDeclaration(
         letKeyword: KeywordToken.let(span: SourceSpan(0, 3)) as LetKeywordToken,
         mutKeyword: KeywordToken.mut(span: SourceSpan(4, 7)) as MutKeywordToken,
         name: IdentifierToken('foo', span: SourceSpan(8, 11)),
@@ -169,75 +167,21 @@ void main() {
               ),
             ),
           ),
-          PropertyAccessor.getter(
+          PropertyAccessor.setter(
             keyword:
-                KeywordToken.get(span: SourceSpan(47, 50)) as GetKeywordToken,
-            colon: OperatorToken(
-              OperatorTokenType.colon,
-              span: SourceSpan(50, 51),
-            ),
-            returnType: createTypeFooBar(52),
-            body: Block(
-              leftBrace: OperatorToken(
-                OperatorTokenType.lcurl,
-                span: SourceSpan(60, 61),
-              ),
-              statements: [createStatement123(61)],
-              rightBrace: OperatorToken(
-                OperatorTokenType.rcurl,
-                span: SourceSpan(64, 65),
-              ),
-            ),
+                KeywordToken.set(span: SourceSpan(47, 50)) as SetKeywordToken,
           ),
           PropertyAccessor.setter(
             keyword:
-                KeywordToken.set(span: SourceSpan(68, 71)) as SetKeywordToken,
-          ),
-          PropertyAccessor.setter(
-            keyword:
-                KeywordToken.set(span: SourceSpan(74, 77)) as SetKeywordToken,
+                KeywordToken.set(span: SourceSpan(53, 56)) as SetKeywordToken,
             body: Block(
               leftBrace: OperatorToken(
                 OperatorTokenType.lcurl,
-                span: SourceSpan(78, 79),
+                span: SourceSpan(57, 58),
               ),
               rightBrace: OperatorToken(
                 OperatorTokenType.rcurl,
-                span: SourceSpan(79, 80),
-              ),
-            ),
-          ),
-          PropertyAccessor.setter(
-            keyword:
-                KeywordToken.set(span: SourceSpan(83, 86)) as SetKeywordToken,
-            leftParenthesis: OperatorToken(
-              OperatorTokenType.lparen,
-              span: SourceSpan(86, 87),
-            ),
-            valueParameter: ValueParameter(
-              name: IdentifierToken('value', span: SourceSpan(87, 92)),
-              colon: OperatorToken(
-                OperatorTokenType.colon,
-                span: SourceSpan(92, 93),
-              ),
-              type: createTypeFooBar(94),
-            ),
-            valueParameterComma: OperatorToken(
-              OperatorTokenType.comma,
-              span: SourceSpan(101, 102),
-            ),
-            rightParenthesis: OperatorToken(
-              OperatorTokenType.rparen,
-              span: SourceSpan(102, 103),
-            ),
-            body: Block(
-              leftBrace: OperatorToken(
-                OperatorTokenType.lcurl,
-                span: SourceSpan(104, 105),
-              ),
-              rightBrace: OperatorToken(
-                OperatorTokenType.rcurl,
-                span: SourceSpan(105, 106),
+                span: SourceSpan(58, 59),
               ),
             ),
           ),

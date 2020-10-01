@@ -1,8 +1,9 @@
+import 'package:dartx/dartx.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:parser/src/utils.dart';
 
 import '../../lexer/lexer.dart';
 import '../../syntactic_entity.dart';
+import '../../utils.dart';
 import 'expressions/expressions.dart';
 import 'node.dart';
 import 'statements.dart';
@@ -221,6 +222,11 @@ abstract class PropertyDeclaration extends Declaration
         if (initializer != null) initializer,
         ...accessors,
       ];
+
+  GetterPropertyAccessor get getter =>
+      accessors.whereType<GetterPropertyAccessor>().firstOrNull;
+  SetterPropertyAccessor get setter =>
+      accessors.whereType<SetterPropertyAccessor>().firstOrNull;
 }
 
 @freezed
@@ -228,38 +234,17 @@ abstract class PropertyAccessor extends Declaration
     implements _$PropertyAccessor {
   const factory PropertyAccessor.getter({
     @required GetKeywordToken keyword,
-    OperatorToken colon,
-    Type returnType,
     Block body,
   }) = GetterPropertyAccessor;
   const factory PropertyAccessor.setter({
     @required SetKeywordToken keyword,
-    OperatorToken leftParenthesis,
-    // May not have a default value.
-    ValueParameter valueParameter,
-    OperatorToken valueParameterComma,
-    OperatorToken rightParenthesis,
     Block body,
   }) = SetterPropertyAccessor;
   const PropertyAccessor._();
 
   @override
   Iterable<SyntacticEntity> get children => when(
-        getter: (keyword, colon, returnType, _) => [
-          keyword,
-          if (colon != null) colon,
-          if (returnType != null) returnType,
-          if (body != null) body,
-        ],
-        setter: (keyword, leftParenthesis, valueParameter, valueParameterComma,
-                rightParenthesis, _) =>
-            [
-          keyword,
-          if (leftParenthesis != null) leftParenthesis,
-          if (valueParameter != null) valueParameter,
-          if (valueParameterComma != null) valueParameterComma,
-          if (rightParenthesis != null) rightParenthesis,
-          if (body != null) body,
-        ],
+        getter: (keyword, _) => [keyword, if (body != null) body],
+        setter: (keyword, _) => [keyword, if (body != null) body],
       );
 }
