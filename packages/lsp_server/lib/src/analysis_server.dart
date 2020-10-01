@@ -301,7 +301,7 @@ class AnalysisServer {
       if (resourceId == null) continue;
 
       final oldErrors = _errors[resourceId];
-      final newErrors = errors[resourceId];
+      final newErrors = errors[resourceId] ?? [];
       if (equality.equals(oldErrors, newErrors)) continue;
 
       final diagnostics = newErrors

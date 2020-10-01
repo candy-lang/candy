@@ -26,18 +26,18 @@ final getFunctionDeclarationAst = Query<DeclarationId, ast.FunctionDeclaration>(
 final getFunctionDeclarationHir = Query<DeclarationId, hir.FunctionDeclaration>(
   'getFunctionDeclarationHir',
   provider: (context, declarationId) {
-    final ast = getFunctionDeclarationAst(context, declarationId);
+    final functionAst = getFunctionDeclarationAst(context, declarationId);
     final moduleId = declarationIdToModuleId(context, declarationId);
     return hir.FunctionDeclaration(
-      name: ast.name.name,
-      parameters: ast.valueParameters
+      name: functionAst.name.name,
+      parameters: functionAst.valueParameters
           .map((p) => hir.ValueParameter(
                 name: p.name.name,
                 type: astTypeToHirType(context, Tuple2(moduleId, p.type)),
               ))
           .toList(),
-      returnType: ast.returnType != null
-          ? astTypeToHirType(context, Tuple2(moduleId, ast.returnType))
+      returnType: functionAst.returnType != null
+          ? astTypeToHirType(context, Tuple2(moduleId, functionAst.returnType))
           : hir.CandyType.unit,
       // TODO(JonasWanke): child declarations
     );

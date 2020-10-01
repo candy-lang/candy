@@ -1,5 +1,6 @@
 import 'package:parser/parser.dart' as ast;
 
+import '../../../errors.dart';
 import '../../../query.dart';
 import '../../../utils.dart';
 import '../../ast.dart';
@@ -24,7 +25,11 @@ final getDeclarationAst = Query<DeclarationId, ast.Declaration>(
     final ast = context.callQuery(getAst, declarationId.resourceId);
     final declaration =
         _findDeclarationAst(ast.declaration, declarationId.path);
-    assert(declaration.isSome, 'Declaration $declarationId not found.');
+    if (declaration.isNone) {
+      throw CompilerError.internalError(
+        "Couldn't find declaration `$declarationId`. Maybe call `doesDeclarationExist` first.\n\n${StackTrace.current}",
+      );
+    }
     return declaration.value;
   },
 );
@@ -61,53 +66,61 @@ final getInnerDeclarationIds = Query<DeclarationId, List<DeclarationId>>(
     final declarationAst = context.callQuery(getDeclarationAst, declarationId);
 
     final declarationIds = <DeclarationId>[];
-    var moduleDisambiguator = 0;
-    var traitDisambiguator = 0;
-    var implDisambiguator = 0;
-    var classDisambiguator = 0;
-    var functionDisambiguator = 0;
-    var propertyDisambiguator = 0;
+    final moduleDisambiguator = <String, int>{};
+    final traitDisambiguator = <String, int>{};
+    final implDisambiguator = <String, int>{};
+    final classDisambiguator = <String, int>{};
+    final functionDisambiguator = <String, int>{};
+    final propertyDisambiguator = <String, int>{};
     var propertyGetterDisambiguator = 0;
     var propertySetterDisambiguator = 0;
     for (final declaration in declarationAst.innerDeclarations) {
       if (declaration is ast.ModuleDeclaration) {
+        final name = declaration.name.name;
         declarationIds.add(declarationId.inner(
-          DeclarationPathData.module(declaration.name.name),
-          moduleDisambiguator++,
+          DeclarationPathData.module(name),
+          moduleDisambiguator[name] = (moduleDisambiguator[name] ?? -1) + 1,
         ));
       } else if (declaration is ast.TraitDeclaration) {
+        final name = declaration.name.name;
         declarationIds.add(declarationId.inner(
-          DeclarationPathData.trait(declaration.name.name),
-          traitDisambiguator++,
+          DeclarationPathData.trait(name),
+          traitDisambiguator[name] = (traitDisambiguator[name] ?? -1) + 1,
         ));
       } else if (declaration is ast.ImplDeclaration) {
+        final name = declaration.trait?.toString();
         declarationIds.add(declarationId.inner(
-          DeclarationPathData.impl(declaration.trait?.toString()),
-          implDisambiguator++,
+          DeclarationPathData.impl(name),
+          implDisambiguator[name] = (implDisambiguator[name] ?? -1) + 1,
         ));
       } else if (declaration is ast.ClassDeclaration) {
+        final name = declaration.name.name;
         declarationIds.add(declarationId.inner(
-          DeclarationPathData.class_(declaration.name.name),
-          classDisambiguator++,
+          DeclarationPathData.class_(name),
+          classDisambiguator[name] = (classDisambiguator[name] ?? -1) + 1,
         ));
       } else if (declaration is ast.FunctionDeclaration) {
+        final name = declaration.name.name;
         declarationIds.add(declarationId.inner(
-          DeclarationPathData.function(declaration.name.name),
-          functionDisambiguator++,
+          DeclarationPathData.function(name),
+          functionDisambiguator[name] = (functionDisambiguator[name] ?? -1) + 1,
         ));
       } else if (declaration is ast.PropertyDeclaration) {
+        final name = declaration.name.name;
         declarationIds.add(declarationId.inner(
-          DeclarationPathData.property(declaration.name.name),
-          propertyDisambiguator++,
+          DeclarationPathData.property(name),
+          propertyDisambiguator[name] = (propertyDisambiguator[name] ?? -1) + 1,
         ));
       } else if (declaration is ast.GetterPropertyAccessor) {
         declarationIds.add(declarationId.inner(
-            DeclarationPathData.propertyGetter(),
-            propertyGetterDisambiguator++));
+          DeclarationPathData.propertyGetter(),
+          propertyGetterDisambiguator++,
+        ));
       } else if (declaration is ast.SetterPropertyAccessor) {
         declarationIds.add(declarationId.inner(
-            DeclarationPathData.propertySetter(),
-            propertySetterDisambiguator++));
+          DeclarationPathData.propertySetter(),
+          propertySetterDisambiguator++,
+        ));
       } else {
         assert(false);
       }
