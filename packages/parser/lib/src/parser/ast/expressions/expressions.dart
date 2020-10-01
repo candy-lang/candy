@@ -16,7 +16,7 @@ abstract class Expression extends Statement {
 
 @freezed
 abstract class Literal<T> extends Expression implements _$Literal<T> {
-  const factory Literal(LiteralToken<T> value) = _Literal<T>;
+  const factory Literal(int id, LiteralToken<T> value) = _Literal<T>;
   const Literal._();
 
   @override
@@ -25,7 +25,8 @@ abstract class Literal<T> extends Expression implements _$Literal<T> {
 
 @freezed
 abstract class LambdaLiteral extends Expression implements _$LambdaLiteral {
-  const factory LambdaLiteral({
+  const factory LambdaLiteral(
+    int id, {
     @required OperatorToken leftBrace,
     @Default(<ValueParameter>[]) List<ValueParameter> valueParameters,
     @Default(<OperatorToken>[]) List<OperatorToken> valueParameterCommata,
@@ -47,7 +48,7 @@ abstract class LambdaLiteral extends Expression implements _$LambdaLiteral {
 
 @freezed
 abstract class Identifier extends Expression implements _$Identifier {
-  const factory Identifier(IdentifierToken value) = _Identifier;
+  const factory Identifier(int id, IdentifierToken value) = _Identifier;
   const Identifier._();
 
   @override
@@ -56,7 +57,8 @@ abstract class Identifier extends Expression implements _$Identifier {
 
 @freezed
 abstract class GroupExpression extends Expression implements _$GroupExpression {
-  const factory GroupExpression({
+  const factory GroupExpression(
+    int id, {
     @required OperatorToken leftParenthesis,
     @required Expression expression,
     @required OperatorToken rightParenthesis,
@@ -89,7 +91,8 @@ abstract class UnaryExpression extends OperatorExpression {
 @freezed
 abstract class PrefixExpression extends UnaryExpression
     implements _$PrefixExpression {
-  const factory PrefixExpression({
+  const factory PrefixExpression(
+    int id, {
     @required OperatorToken operatorToken,
     @required Expression operand,
   }) = _PrefixExpression;
@@ -102,7 +105,8 @@ abstract class PrefixExpression extends UnaryExpression
 @freezed
 abstract class PostfixExpression extends UnaryExpression
     implements _$PostfixExpression {
-  const factory PostfixExpression({
+  const factory PostfixExpression(
+    int id, {
     @required Expression operand,
     @required OperatorToken operatorToken,
   }) = _PostfixExpression;
@@ -116,6 +120,7 @@ abstract class PostfixExpression extends UnaryExpression
 abstract class BinaryExpression extends OperatorExpression
     implements _$BinaryExpression {
   const factory BinaryExpression(
+    int id,
     Expression leftOperand,
     OperatorToken operatorToken,
     Expression rightOperand,
@@ -130,7 +135,8 @@ abstract class BinaryExpression extends OperatorExpression
 @freezed
 abstract class NavigationExpression extends Expression
     implements _$NavigationExpression {
-  const factory NavigationExpression({
+  const factory NavigationExpression(
+    int id, {
     @required Expression target,
     @required OperatorToken dot,
     @required IdentifierToken name,
@@ -143,7 +149,8 @@ abstract class NavigationExpression extends Expression
 
 @freezed
 abstract class CallExpression extends Expression implements _$CallExpression {
-  const factory CallExpression({
+  const factory CallExpression(
+    int id, {
     @required Expression target,
     TypeArguments typeArguments,
     @required OperatorToken leftParenthesis,
@@ -182,7 +189,8 @@ abstract class Argument extends AstNode implements _$Argument {
 
 @freezed
 abstract class IndexExpression extends Expression implements _$IndexExpression {
-  const factory IndexExpression({
+  const factory IndexExpression(
+    int id, {
     @required Expression target,
     @required OperatorToken leftSquareBracket,
     @required List<Expression> indices,
@@ -197,7 +205,8 @@ abstract class IndexExpression extends Expression implements _$IndexExpression {
 
 @freezed
 abstract class IfExpression extends Expression implements _$IfExpression {
-  const factory IfExpression({
+  const factory IfExpression(
+    int id, {
     @required IfKeywordToken ifKeyword,
     @required Expression condition,
     @required Statement thenStatement,

@@ -15,7 +15,7 @@ import 'types_test.dart';
 import 'utils.dart';
 
 void main() {
-  setUpAll(ParserGrammar.init);
+  setUp(ParserGrammar.init);
 
   group('primitive', () {
     group('literals', () {
@@ -24,26 +24,26 @@ void main() {
           'decimal',
           table: validDecIntegerLiterals,
           nodeMapper: (value, fullSpan) =>
-              Literal(IntegerLiteralToken(value, span: fullSpan)),
+              Literal(0, IntegerLiteralToken(value, span: fullSpan)),
         );
         tableTestExpressionParser<int, Literal<int>>(
           'hexadecimal',
           table: validHexIntegerLiterals,
           nodeMapper: (value, fullSpan) =>
-              Literal(IntegerLiteralToken(value, span: fullSpan)),
+              Literal(0, IntegerLiteralToken(value, span: fullSpan)),
         );
         tableTestExpressionParser<int, Literal<int>>(
           'binary',
           table: validBinIntegerLiterals,
           nodeMapper: (value, fullSpan) =>
-              Literal(IntegerLiteralToken(value, span: fullSpan)),
+              Literal(0, IntegerLiteralToken(value, span: fullSpan)),
         );
       });
       tableTestExpressionParser<bool, Literal<bool>>(
         'BooleanLiteral',
         table: validBooleanLiterals,
         nodeMapper: (value, fullSpan) =>
-            Literal(BooleanLiteralToken(value, span: fullSpan)),
+            Literal(0, BooleanLiteralToken(value, span: fullSpan)),
       );
     });
 
@@ -51,21 +51,24 @@ void main() {
       'lambda literals',
       table: {
         '{}': LambdaLiteral(
+          0,
           leftBrace:
               OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(0, 1)),
           rightBrace:
               OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(1, 2)),
         ),
         '{ it }': LambdaLiteral(
+          1,
           leftBrace:
               OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(0, 1)),
           statements: [
-            Identifier(IdentifierToken('it', span: SourceSpan(2, 4))),
+            Identifier(0, IdentifierToken('it', span: SourceSpan(2, 4))),
           ],
           rightBrace:
               OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(5, 6)),
         ),
         '{ foo => foo }': LambdaLiteral(
+          1,
           leftBrace:
               OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(0, 1)),
           valueParameters: [
@@ -78,12 +81,13 @@ void main() {
             span: SourceSpan(6, 8),
           ),
           statements: [
-            Identifier(IdentifierToken('foo', span: SourceSpan(9, 12))),
+            Identifier(0, IdentifierToken('foo', span: SourceSpan(9, 12))),
           ],
           rightBrace:
               OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(13, 14)),
         ),
         '{ foo: Foo, bar => foo }': LambdaLiteral(
+          1,
           leftBrace:
               OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(0, 1)),
           valueParameters: [
@@ -109,7 +113,7 @@ void main() {
             span: SourceSpan(16, 18),
           ),
           statements: [
-            Identifier(IdentifierToken('foo', span: SourceSpan(19, 22))),
+            Identifier(0, IdentifierToken('foo', span: SourceSpan(19, 22))),
           ],
           rightBrace:
               OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(23, 24)),
@@ -122,17 +126,19 @@ void main() {
       'identifiers',
       table: Map.fromIterable(validIdentifiers),
       nodeMapper: (value, fullSpan) =>
-          Identifier(IdentifierToken(value, span: fullSpan)),
+          Identifier(0, IdentifierToken(value, span: fullSpan)),
     );
   });
 
   group('grouping', () {
     forPrimitives(
+      0,
       tester: (source, primitiveFactory) {
         final primitive = primitiveFactory(1);
         testExpressionParser(
           '($source)',
           expression: GroupExpression(
+            1,
             leftParenthesis:
                 OperatorToken(OperatorTokenType.lparen, span: SourceSpan(0, 1)),
             expression: primitive,
@@ -157,10 +163,11 @@ void main() {
         },
         tester: (operatorSource, operatorType) {
           group(operatorType.toString(), () {
-            forPrimitives(tester: (primitiveSource, primitiveFactory) {
+            forPrimitives(0, tester: (primitiveSource, primitiveFactory) {
               testExpressionParser(
                 '$primitiveSource$operatorSource',
                 expression: PostfixExpression(
+                  1,
                   operand: primitiveFactory(0),
                   operatorToken: OperatorToken(
                     operatorType,
@@ -178,13 +185,14 @@ void main() {
     });
 
     group('navigation', () {
-      forPrimitives(tester: (primitiveSource, primitiveFactory) {
+      forPrimitives(0, tester: (primitiveSource, primitiveFactory) {
         forAll<String>(
           table: validIdentifiers,
           tester: (identifier) {
             testExpressionParser(
               '$primitiveSource.$identifier',
               expression: NavigationExpression(
+                1,
                 target: primitiveFactory(0),
                 dot: OperatorToken(
                   OperatorTokenType.dot,
@@ -207,10 +215,11 @@ void main() {
     group('call', () {
       group('positional', () {
         group('0 args', () {
-          forPrimitives(tester: (targetSource, targetFactory) {
+          forPrimitives(0, tester: (targetSource, targetFactory) {
             testExpressionParser(
               '$targetSource()',
               expression: CallExpression(
+                1,
                 target: targetFactory(0),
                 leftParenthesis: OperatorToken(
                   OperatorTokenType.lparen,
@@ -229,11 +238,12 @@ void main() {
         });
 
         group('1 arg', () {
-          forPrimitives(tester: (targetSource, targetFactory) {
-            forPrimitives(tester: (arg1Source, arg1Factory) {
+          forPrimitives(0, tester: (targetSource, targetFactory) {
+            forPrimitives(1, tester: (arg1Source, arg1Factory) {
               testExpressionParser(
                 '$targetSource($arg1Source)',
                 expression: CallExpression(
+                  2,
                   target: targetFactory(0),
                   leftParenthesis: OperatorToken(
                     OperatorTokenType.lparen,
@@ -256,12 +266,13 @@ void main() {
         });
 
         group('2 args', () {
-          forPrimitives(tester: (targetSource, targetFactory) {
-            forPrimitives(tester: (arg1Source, arg1Factory) {
-              forPrimitives(tester: (arg2Source, arg2Factory) {
+          forPrimitives(0, tester: (targetSource, targetFactory) {
+            forPrimitives(1, tester: (arg1Source, arg1Factory) {
+              forPrimitives(2, tester: (arg2Source, arg2Factory) {
                 testExpressionParser(
                   '$targetSource($arg1Source, $arg2Source)',
                   expression: CallExpression(
+                    3,
                     target: targetFactory(0),
                     leftParenthesis: OperatorToken(
                       OperatorTokenType.lparen,
@@ -305,10 +316,11 @@ void main() {
         });
       });
       group('with type arguments', () {
-        forPrimitives(tester: (targetSource, targetFactory) {
+        forPrimitives(0, tester: (targetSource, targetFactory) {
           testExpressionParser(
             '$targetSource<Foo.Bar, Foo.Bar>()',
             expression: CallExpression(
+              1,
               target: targetFactory(0),
               typeArguments: TypeArguments(
                 leftAngle: OperatorToken(
@@ -360,10 +372,11 @@ void main() {
         },
         tester: (operatorSource, operatorType) {
           group(operatorType.toString(), () {
-            forPrimitives(tester: (primitiveSource, primitiveFactory) {
+            forPrimitives(0, tester: (primitiveSource, primitiveFactory) {
               testExpressionParser(
                 '$operatorSource$primitiveSource',
                 expression: PrefixExpression(
+                  1,
                   operatorToken: OperatorToken(
                     operatorType,
                     span: SourceSpan(0, operatorSource.length),
@@ -382,49 +395,61 @@ void main() {
     'if',
     table: {
       'if (true) 123': IfExpression(
+        3,
         ifKeyword: KeywordToken.if_(span: SourceSpan(0, 2)) as IfKeywordToken,
         condition: GroupExpression(
+          1,
           leftParenthesis:
               OperatorToken(OperatorTokenType.lparen, span: SourceSpan(3, 4)),
-          expression:
-              Literal<bool>(BooleanLiteralToken(true, span: SourceSpan(4, 8))),
+          expression: Literal<bool>(
+            0,
+            BooleanLiteralToken(true, span: SourceSpan(4, 8)),
+          ),
           rightParenthesis:
               OperatorToken(OperatorTokenType.rparen, span: SourceSpan(8, 9)),
         ),
-        thenStatement: createStatement123(10),
+        thenStatement: createStatement123(2, 10),
       ),
       'if true { 123 }': IfExpression(
+        3,
         ifKeyword: KeywordToken.if_(span: SourceSpan(0, 2)) as IfKeywordToken,
         condition:
-            Literal<bool>(BooleanLiteralToken(true, span: SourceSpan(3, 7))),
+            Literal<bool>(0, BooleanLiteralToken(true, span: SourceSpan(3, 7))),
         thenStatement: Block(
+          3,
           leftBrace:
               OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(8, 9)),
-          statements: [createStatement123(10)],
+          statements: [createStatement123(2, 10)],
           rightBrace:
               OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(14, 15)),
         ),
       ),
       'if (true) 123 else 123': IfExpression(
+        4,
         ifKeyword: KeywordToken.if_(span: SourceSpan(0, 2)) as IfKeywordToken,
         condition: GroupExpression(
+          1,
           leftParenthesis:
               OperatorToken(OperatorTokenType.lparen, span: SourceSpan(3, 4)),
-          expression:
-              Literal<bool>(BooleanLiteralToken(true, span: SourceSpan(4, 8))),
+          expression: Literal<bool>(
+            0,
+            BooleanLiteralToken(true, span: SourceSpan(4, 8)),
+          ),
           rightParenthesis:
               OperatorToken(OperatorTokenType.rparen, span: SourceSpan(8, 9)),
         ),
-        thenStatement: createStatement123(10),
+        thenStatement: createStatement123(2, 10),
         elseKeyword:
             KeywordToken.else_(span: SourceSpan(14, 18)) as ElseKeywordToken,
-        elseStatement: createStatement123(19),
+        elseStatement: createStatement123(3, 19),
       ),
       'if true { 123 } else { 123 }': IfExpression(
+        5,
         ifKeyword: KeywordToken.if_(span: SourceSpan(0, 2)) as IfKeywordToken,
         condition:
-            Literal<bool>(BooleanLiteralToken(true, span: SourceSpan(3, 7))),
+            Literal<bool>(0, BooleanLiteralToken(true, span: SourceSpan(3, 7))),
         thenStatement: Block(
+          0,
           leftBrace:
               OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(8, 9)),
           statements: [createStatement123(10)],
@@ -434,6 +459,7 @@ void main() {
         elseKeyword:
             KeywordToken.else_(span: SourceSpan(16, 20)) as ElseKeywordToken,
         elseStatement: Block(
+          0,
           leftBrace:
               OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(21, 22)),
           statements: [createStatement123(23)],
@@ -442,12 +468,14 @@ void main() {
         ),
       ),
       'if (true) 123 else if false { 123 } else 123': IfExpression(
+        0,
         ifKeyword: KeywordToken.if_(span: SourceSpan(0, 2)) as IfKeywordToken,
         condition: GroupExpression(
+          0,
           leftParenthesis:
               OperatorToken(OperatorTokenType.lparen, span: SourceSpan(3, 4)),
-          expression:
-              Literal<bool>(BooleanLiteralToken(true, span: SourceSpan(4, 8))),
+          expression: Literal<bool>(
+              0, BooleanLiteralToken(true, span: SourceSpan(4, 8))),
           rightParenthesis:
               OperatorToken(OperatorTokenType.rparen, span: SourceSpan(8, 9)),
         ),
@@ -455,11 +483,15 @@ void main() {
         elseKeyword:
             KeywordToken.else_(span: SourceSpan(14, 18)) as ElseKeywordToken,
         elseStatement: IfExpression(
+          0,
           ifKeyword:
               KeywordToken.if_(span: SourceSpan(19, 21)) as IfKeywordToken,
           condition: Literal<bool>(
-              BooleanLiteralToken(false, span: SourceSpan(22, 27))),
+            0,
+            BooleanLiteralToken(false, span: SourceSpan(22, 27)),
+          ),
           thenStatement: Block(
+            0,
             leftBrace: OperatorToken(
               OperatorTokenType.lcurl,
               span: SourceSpan(28, 29),
@@ -571,7 +603,7 @@ typedef PrimitiveTester = void Function(
   PrimitiveFactory primitiveFactory,
 );
 @isTestGroup
-void forPrimitives({@required PrimitiveTester tester}) {
+void forPrimitives(int id, {@required PrimitiveTester tester}) {
   assert(tester != null);
 
   final integerLiterals =
@@ -579,6 +611,7 @@ void forPrimitives({@required PrimitiveTester tester}) {
     return MapEntry(
       source,
       (offset) => Literal<int>(
+        id,
         IntegerLiteralToken(
           value,
           span: SourceSpan(0, source.length).plus(offset),
@@ -591,6 +624,7 @@ void forPrimitives({@required PrimitiveTester tester}) {
     return MapEntry(
       source,
       (offset) => Literal<bool>(
+        id,
         BooleanLiteralToken(
           value,
           span: SourceSpan(0, source.length).plus(offset),
@@ -602,6 +636,7 @@ void forPrimitives({@required PrimitiveTester tester}) {
     someValidIdentifiers,
     value: (dynamic source) => (offset) {
       return Identifier(
+        id,
         IdentifierToken(
           source as String,
           span: SourceSpan(0, (source as String).length).plus(offset),

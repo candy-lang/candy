@@ -8,11 +8,14 @@ part 'statements.freezed.dart';
 
 abstract class Statement extends AstNode {
   const Statement();
+
+  int get id;
 }
 
 @freezed
 abstract class Block extends Statement implements _$Block {
-  const factory Block({
+  const factory Block(
+    int id, {
     @required OperatorToken leftBrace,
     @Default(<Statement>[]) List<Statement> statements,
     @required OperatorToken rightBrace,

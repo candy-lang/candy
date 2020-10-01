@@ -13,7 +13,7 @@ import 'types_test.dart';
 import 'utils.dart';
 
 void main() {
-  setUpAll(ParserGrammar.init);
+  setUp(ParserGrammar.init);
 
   tableTestDeclarationParser<FunctionDeclaration>(
     'FunctionDeclaration',
@@ -28,6 +28,7 @@ void main() {
         colon: OperatorToken(OperatorTokenType.colon, span: SourceSpan(9, 10)),
         returnType: createTypeFooBar(11),
         body: Block(
+          0,
           leftBrace: OperatorToken(
             OperatorTokenType.lcurl,
             span: SourceSpan(19, 20),
@@ -69,6 +70,7 @@ void main() {
               span: SourceSpan(44, 45),
             ),
             defaultValue: Identifier(
+              0,
               IdentifierToken('defaultBaz', span: SourceSpan(46, 56)),
             ),
           ),
@@ -146,7 +148,7 @@ void main() {
         equals:
             OperatorToken(OperatorTokenType.equals, span: SourceSpan(21, 22)),
         initializer:
-            Literal<int>(IntegerLiteralToken(123, span: SourceSpan(23, 26))),
+            Literal<int>(0, IntegerLiteralToken(123, span: SourceSpan(23, 26))),
         accessors: [
           PropertyAccessor.getter(
             keyword:
@@ -156,11 +158,12 @@ void main() {
             keyword:
                 KeywordToken.get(span: SourceSpan(35, 38)) as GetKeywordToken,
             body: Block(
+              2,
               leftBrace: OperatorToken(
                 OperatorTokenType.lcurl,
                 span: SourceSpan(39, 40),
               ),
-              statements: [createStatement123(40)],
+              statements: [createStatement123(1, 40)],
               rightBrace: OperatorToken(
                 OperatorTokenType.rcurl,
                 span: SourceSpan(43, 44),
@@ -175,6 +178,7 @@ void main() {
             keyword:
                 KeywordToken.set(span: SourceSpan(53, 56)) as SetKeywordToken,
             body: Block(
+              3,
               leftBrace: OperatorToken(
                 OperatorTokenType.lcurl,
                 span: SourceSpan(57, 58),
@@ -485,6 +489,7 @@ void main() {
                 span: SourceSpan(37, 38),
               ),
               body: Block(
+                0,
                 leftBrace: OperatorToken(
                   OperatorTokenType.lcurl,
                   span: SourceSpan(39, 40),

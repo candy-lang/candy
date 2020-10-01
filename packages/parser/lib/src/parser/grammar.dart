@@ -15,11 +15,13 @@ import 'ast/types.dart';
 @immutable
 class ParserGrammar {
   static CandyFile parse(String fileNameWithoutExtension, String source) {
-    _init();
+    init();
     return _candyFile(fileNameWithoutExtension).parse(source).value;
   }
 
-  static void _init() {
+  @visibleForTesting
+  static void init() {
+    _id = 0;
     if (_isInitialized) return;
     _isInitialized = true;
 
@@ -28,6 +30,10 @@ class ParserGrammar {
     _initStatement();
     _initExpression();
   }
+
+  // This is really ugly. Fortunately, we'll rewrite the whole thing in Candy
+  // soon.
+  static var _id = 0;
 
   static bool _isInitialized = false;
 
@@ -464,7 +470,7 @@ class ParserGrammar {
 
   // SECTION: statements
 
-  static final Parser<List<Statement>> statements =
+  static final statements =
       ((statement & (semis & statement).map((v) => v[1] as Statement).star())
                   .map((v) => [v[0] as Statement, ...v[1] as List<Statement>])
                   .optional() &
@@ -483,6 +489,7 @@ class ParserGrammar {
           LexerGrammar.NLs &
           LexerGrammar.RCURL)
       .map((values) => Block(
+            _id++,
             leftBrace: values.first as OperatorToken,
             statements: values[2] as List<Statement>,
             rightBrace: values[4] as OperatorToken,
@@ -511,12 +518,13 @@ class ParserGrammar {
           // ignore: unnecessary_cast, Without the cast the compiler complains…
           (literalConstant as Parser<Expression>) |
               lambdaLiteral |
-              LexerGrammar.Identifier.map((t) => Identifier(t)))
+              LexerGrammar.Identifier.map((t) => Identifier(_id++, t)))
       // grouping
       ..grouping<Expression>(
         LexerGrammar.LPAREN,
         LexerGrammar.RPAREN,
         mapper: (left, expression, right) => GroupExpression(
+          _id++,
           leftParenthesis: left,
           expression: expression,
           rightParenthesis: right,
@@ -531,6 +539,7 @@ class ParserGrammar {
         navigationPostfix,
         mapper: (expression, postfix) {
           return NavigationExpression(
+            _id++,
             target: expression,
             dot: postfix.first as OperatorToken,
             name: postfix[1] as IdentifierToken,
@@ -542,6 +551,7 @@ class ParserGrammar {
         mapper: (expression, postfix) {
           final valueArguments = postfix[1] as List<dynamic>;
           return CallExpression(
+            _id++,
             target: expression,
             typeArguments: postfix[0] as TypeArguments,
             leftParenthesis: valueArguments[0] as OperatorToken,
@@ -555,6 +565,7 @@ class ParserGrammar {
         indexingPostfix,
         mapper: (expression, postfix) {
           return IndexExpression(
+            _id++,
             target: expression,
             leftSquareBracket: postfix.first as OperatorToken,
             indices: postfix.sublist(1, postfix.length - 2) as List<Expression>,
@@ -645,6 +656,7 @@ class ParserGrammar {
         mapper: (left, value, right) {
           final elsePart = right[2] as List<dynamic>;
           return IfExpression(
+            _id++,
             ifKeyword: left[0] as IfKeywordToken,
             condition: value,
             thenStatement: right[1] as Statement,
@@ -717,8 +729,8 @@ class ParserGrammar {
   });
 
   static final literalConstant = ChoiceParser<Literal<dynamic>>([
-    LexerGrammar.IntegerLiteral.map((l) => Literal<int>(l)),
-    LexerGrammar.BooleanLiteral.map((l) => Literal<bool>(l)),
+    LexerGrammar.IntegerLiteral.map((l) => Literal<int>(_id++, l)),
+    LexerGrammar.BooleanLiteral.map((l) => Literal<bool>(_id++, l)),
   ]);
   static final lambdaLiteral = (LexerGrammar.LCURL &
           (LexerGrammar.NLs &
@@ -734,13 +746,15 @@ class ParserGrammar {
     final parameterSection = value[1] as List<dynamic>;
     final parameters = parameterSection?.elementAt(1) as List<dynamic>;
     return LambdaLiteral(
-        leftBrace: value[0] as OperatorToken,
-        valueParameters: parameters?.elementAt(0) as List<ValueParameter> ?? [],
-        valueParameterCommata:
-            parameters?.elementAt(1) as List<OperatorToken> ?? [],
-        arrow: parameterSection?.elementAt(3) as OperatorToken,
-        statements: value[3] as List<Statement>,
-        rightBrace: value[5] as OperatorToken);
+      _id++,
+      leftBrace: value[0] as OperatorToken,
+      valueParameters: parameters?.elementAt(0) as List<ValueParameter> ?? [],
+      valueParameterCommata:
+          parameters?.elementAt(1) as List<OperatorToken> ?? [],
+      arrow: parameterSection?.elementAt(3) as OperatorToken,
+      statements: value[3] as List<Statement>,
+      rightBrace: value[5] as OperatorToken,
+    );
   });
 
   // SECTION: modifiers
@@ -830,8 +844,11 @@ extension on ExpressionBuilder {
   void postfix(Parser<OperatorToken> operator) {
     group().postfix<OperatorToken, Expression>(
       operator,
-      (operand, operator) =>
-          PostfixExpression(operand: operand, operatorToken: operator),
+      (operand, operator) => PostfixExpression(
+        ParserGrammar._id++,
+        operand: operand,
+        operatorToken: operator,
+      ),
     );
   }
 
@@ -848,8 +865,11 @@ extension on ExpressionBuilder {
   void prefixExpression(Parser<OperatorToken> operator) {
     prefix<OperatorToken, Expression>(
       operator,
-      mapper: (operator, operand) =>
-          PrefixExpression(operatorToken: operator, operand: operand),
+      mapper: (operator, operand) => PrefixExpression(
+        ParserGrammar._id++,
+        operatorToken: operator,
+        operand: operand,
+      ),
     );
   }
 
@@ -867,14 +887,15 @@ extension on ExpressionBuilder {
     left<Expression>(
       operator,
       mapper: (left, operator, right) =>
-          BinaryExpression(left, operator, right),
+          BinaryExpression(ParserGrammar._id++, left, operator, right),
     );
   }
 
   void right(Parser<OperatorToken> operator) {
     group().right<OperatorToken, Expression>(
       operator,
-      (left, operator, right) => BinaryExpression(left, operator, right),
+      (left, operator, right) =>
+          BinaryExpression(ParserGrammar._id++, left, operator, right),
     );
   }
 }
