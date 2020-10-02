@@ -26,8 +26,9 @@ class BuildArtifactManager {
   String get _buildDirectory =>
       p.join(projectDirectory.path, buildDirectoryName);
 
-  void clear() {
-    final dir = Directory(_buildDirectory);
+  void delete([BuildArtifactId directoryId]) {
+    final path = directoryId?.path ?? _buildDirectory;
+    final dir = Directory(path);
     if (dir.existsSync()) dir.deleteSync(recursive: true);
   }
 

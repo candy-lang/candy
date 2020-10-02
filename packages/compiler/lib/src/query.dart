@@ -20,10 +20,7 @@ class QueryConfig {
   final BuildArtifactManager buildArtifactManager;
 
   // ignore: use_to_and_as_if_applicable
-  GlobalQueryContext createContext() {
-    buildArtifactManager.clear();
-    return GlobalQueryContext(this);
-  }
+  GlobalQueryContext createContext() => GlobalQueryContext(this);
 }
 
 typedef QueryProvider<K, R> = R Function(QueryContext context, K key);

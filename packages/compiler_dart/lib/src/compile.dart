@@ -10,6 +10,8 @@ final compile = Query<Unit, Unit>(
   'dart.compile',
   evaluateAlways: true,
   provider: (context, _) {
+    context.config.buildArtifactManager.delete(dartBuildArtifactId);
+
     final pubspec = generatePubspec(context, Unit());
     context.config.buildArtifactManager.setContent(
       dartBuildArtifactId.child(pubspecFile),
