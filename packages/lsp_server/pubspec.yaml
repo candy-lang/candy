@@ -15,6 +15,8 @@ dependencies:
   collection: ^1.14.12
   compiler:
     path: ../compiler
+  compiler_dart:
+    path: ../compiler_dart
   extra_pedantic: ^1.2.0
   freezed_annotation: ^0.11.0+1
   meta: ^1.1.8

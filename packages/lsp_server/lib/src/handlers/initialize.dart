@@ -3,6 +3,8 @@ import 'dart:io';
 import '../analysis_server.dart';
 import '../generated/lsp_protocol/protocol_generated.dart';
 import '../generated/lsp_protocol/protocol_special.dart';
+import 'code_action.dart';
+import 'execute_command.dart';
 import 'handlers.dart';
 import 'states.dart';
 
@@ -37,6 +39,9 @@ class InitializeMessageHandler
       )
       ..messageHandler = InitializingStateMessageHandler(server);
 
+    final codeActionLiteralSupport =
+        params.capabilities.textDocument?.codeAction?.codeActionLiteralSupport;
+
     final dynamicRegistrations =
         ClientDynamicRegistrations(params.capabilities);
 
@@ -69,7 +74,16 @@ class InitializeMessageHandler
       null,
       null,
       null,
-      null,
+      // "The `CodeActionOptions` return type is only valid if the client
+      // signals code action literal support via the property
+      // `textDocument.codeAction.codeActionLiteralSupport`."
+      dynamicRegistrations.codeActions
+          ? null
+          : codeActionLiteralSupport != null
+              ? Either2<bool, CodeActionOptions>.t2(
+                  CodeActionOptions(CandyCodeActionKind.serverSupportedKinds),
+                )
+              : Either2<bool, CodeActionOptions>.t1(true),
       null,
       null,
       null,
@@ -79,7 +93,7 @@ class InitializeMessageHandler
       null,
       dynamicRegistrations.folding ? null : true, // foldingRangeProvider
       null, // declarationProvider
-      null,
+      ExecuteCommandOptions(Commands.all),
       null,
       null,
     );

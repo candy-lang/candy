@@ -26,6 +26,7 @@ linter:
     cascade_invocations: true
     comment_references: true
     constant_identifier_names: true
+    curly_braces_in_flow_control_structures: false
     flutter_style_todos: true
     literal_only_boolean_expressions: false
     non_constant_identifier_names: true

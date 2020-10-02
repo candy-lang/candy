@@ -1,6 +1,7 @@
 import '../analysis_server.dart';
 import '../generated/lsp_protocol/protocol_generated.dart';
 import '../generated/lsp_protocol/protocol_special.dart';
+import 'code_action.dart';
 import 'handlers.dart';
 import 'states.dart';
 
@@ -61,6 +62,14 @@ class IntializedMessageHandler extends MessageHandler<InitializedParams, void> {
       TextDocumentChangeRegistrationOptions(
         TextDocumentSyncKind.Incremental,
         [candyFiles],
+      ),
+    );
+    register(
+      server.clientCapabilities?.textDocument?.codeAction?.dynamicRegistration,
+      Method.textDocument_codeAction,
+      CodeActionRegistrationOptions(
+        [candyFiles],
+        CandyCodeActionKind.serverSupportedKinds,
       ),
     );
     register(
