@@ -61,7 +61,10 @@ class AnalysisServer {
     _resourceProvider = OverlayResourceProvider(
       ResourceProvider.default_(projectDirectory),
     );
-    _queryConfig = QueryConfig(resourceProvider: resourceProvider);
+    _queryConfig = QueryConfig(
+      resourceProvider: resourceProvider,
+      buildArtifactManager: BuildArtifactManager(projectDirectory),
+    );
   }
 
   /// Capabilities of the server. Will be null prior to initialization as

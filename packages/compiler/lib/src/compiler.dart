@@ -1,9 +1,10 @@
 import 'dart:io';
 
+import 'build_artifacts.dart';
 import 'compilation/ast_hir_lowering.dart';
 import 'compilation/hir.dart' as hir;
 import 'compilation/hir/ids.dart';
-import 'compilation/ids.dart';
+import 'constants.dart';
 import 'errors.dart';
 import 'query.dart';
 import 'resource_provider.dart';
@@ -11,11 +12,11 @@ import 'resource_provider.dart';
 Future<void> compile(Directory directory) async {
   final config = QueryConfig(
     resourceProvider: ResourceProvider.default_(directory),
+    buildArtifactManager: BuildArtifactManager(directory),
   );
   final context = config.createContext();
 
-  final mainFunctionId =
-      context.callQuery(getMainFunction, ModuleId(PackageId.this_, ['main']));
+  final mainFunctionId = context.callQuery(getMainFunction, mainModuleId);
   print(mainFunctionId);
 }
 

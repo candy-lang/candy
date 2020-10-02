@@ -1,7 +1,8 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:dartx/dartx.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:meta/meta.dart';
 
+import 'build_artifacts.dart';
 import 'compilation/ast.dart';
 import 'errors.dart';
 import 'resource_provider.dart';
@@ -11,12 +12,18 @@ import 'utils.dart';
 class QueryConfig {
   const QueryConfig({
     @required this.resourceProvider,
-  }) : assert(resourceProvider != null);
+    @required this.buildArtifactManager,
+  })  : assert(resourceProvider != null),
+        assert(buildArtifactManager != null);
 
   final ResourceProvider resourceProvider;
+  final BuildArtifactManager buildArtifactManager;
 
   // ignore: use_to_and_as_if_applicable
-  GlobalQueryContext createContext() => GlobalQueryContext(this);
+  GlobalQueryContext createContext() {
+    buildArtifactManager.clear();
+    return GlobalQueryContext(this);
+  }
 }
 
 typedef QueryProvider<K, R> = R Function(QueryContext context, K key);
