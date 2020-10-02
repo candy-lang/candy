@@ -17,6 +17,14 @@
   "main": "./out/extension.js",
   "contributes": {
     "commands": [],
+    "configurationDefaults": {
+      "[candy]": {
+        "editor.detectIndentation": false,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.suggest.insertMode": "replace"
+      }
+    },
     "grammars": [
       {
         "language": "candy",
