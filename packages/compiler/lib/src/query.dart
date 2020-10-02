@@ -114,8 +114,8 @@ class QueryContext {
       _reportedErrors.add(e);
       reportErrors();
       throw _QueryFailedException();
-    } catch (e) {
-      _reportedErrors.add(CompilerError.internalError(e.toString()));
+    } catch (e, st) {
+      _reportedErrors.add(CompilerError.internalError('$e\n\n$st'));
       reportErrors();
       throw _QueryFailedException();
     }
