@@ -1,3 +1,4 @@
+import 'package:compiler/compiler.dart';
 import 'package:dartx/dartx.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -76,10 +77,24 @@ abstract class HirId implements _$HirId {
 
 @freezed
 abstract class DeclarationLocalId implements _$DeclarationLocalId {
-  const factory DeclarationLocalId(int value) = _DeclarationLocalId;
+  const factory DeclarationLocalId(DeclarationId declarationId, int value) =
+      _DeclarationLocalId;
   factory DeclarationLocalId.fromJson(Map<String, dynamic> json) =>
       _$DeclarationLocalIdFromJson(json);
   const DeclarationLocalId._();
+}
+
+@freezed
+abstract class BodyAstToHirIds implements _$BodyAstToHirIds {
+  const factory BodyAstToHirIds([
+    @Default(<int, DeclarationLocalId>{}) Map<int, DeclarationLocalId> map,
+  ]) = _BodyAstToHirIds;
+  factory BodyAstToHirIds.fromJson(Map<String, dynamic> json) =>
+      _$BodyAstToHirIdsFromJson(json);
+  const BodyAstToHirIds._();
+
+  BodyAstToHirIds withMapping(int astId, DeclarationLocalId hirId) =>
+      BodyAstToHirIds({...map, astId: hirId});
 }
 
 @freezed

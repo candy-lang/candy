@@ -7,10 +7,14 @@ part 'expressions.g.dart';
 
 @freezed
 abstract class Expression implements _$Expression {
-  const factory Expression.identifier(Identifier identifier) =
-      IdentifierExpression;
-  const factory Expression.literal(Literal literal) = LiteralExpression;
+  const factory Expression.identifier(
+    DeclarationLocalId id,
+    Identifier identifier,
+  ) = IdentifierExpression;
+  const factory Expression.literal(DeclarationLocalId id, Literal literal) =
+      LiteralExpression;
   const factory Expression.call(
+    DeclarationLocalId id,
     Expression target,
     List<ValueArgument> valueArguments,
   ) = CallExpression;

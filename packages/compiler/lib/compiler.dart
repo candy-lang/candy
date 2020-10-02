@@ -1,3 +1,4 @@
+export 'src/build_artifacts.dart';
 export 'src/compilation/ast/parser.dart';
 export 'src/compilation/ast_hir_lowering.dart';
 export 'src/compilation/hir.dart';
@@ -8,3 +9,4 @@ export 'src/constants.dart';
 export 'src/errors.dart';
 export 'src/query.dart';
 export 'src/resource_provider.dart';
+export 'src/utils.dart';
