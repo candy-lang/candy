@@ -3,6 +3,11 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'data_classes.freezed.dart';
 
 @freezed
+abstract class Unit with _$Unit {
+  const factory Unit() = _Unit;
+}
+
+@freezed
 abstract class Option<T> implements _$Option<T> {
   const factory Option.some(T value) = OptionSome<T>;
   const factory Option.none() = OptionNone<T>;

@@ -1,0 +1,47 @@
+include: package:extra_pedantic/analysis_options.yaml
+
+analyzer:
+  strong-mode:
+    implicit-casts: false
+    implicit-dynamic: true
+  exclude:
+    - build/**
+    - lib/**.g.dart
+    - lib/**.freezed.dart
+    - lib/generated/**
+
+linter:
+  rules:
+    always_put_required_named_parameters_first: false
+    avoid_bool_literals_in_conditional_expressions: true
+    avoid_classes_with_only_static_members: true
+    avoid_field_initializers_in_const_classes: true
+    avoid_function_literals_in_foreach_calls: true
+    avoid_positional_boolean_parameters: true
+    avoid_setters_without_getters: true
+    avoid_types_on_closure_parameters: true
+    camel_case_extensions: true
+    camel_case_types: true
+    cascade_invocations: true
+    comment_references: true
+    constant_identifier_names: true
+    flutter_style_todos: true
+    literal_only_boolean_expressions: false
+    non_constant_identifier_names: true
+    omit_local_variable_types: true
+    one_member_abstracts: true
+    overridden_fields: true
+    prefer_const_constructors: false
+    prefer_constructors_over_static_methods: true
+    prefer_function_declarations_over_variables: true
+    prefer_int_literals: true
+    prefer_interpolation_to_compose_strings: true
+    prefer_mixin: true
+    prefer_single_quotes: true
+    sort_constructors_first: true
+    type_annotate_public_apis: false
+    unnecessary_brace_in_string_interps: true
+    unnecessary_lambdas: true
+    unnecessary_statements: true
+    unnecessary_this: true
+    use_setters_to_change_properties: true
