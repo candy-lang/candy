@@ -7,3 +7,5 @@ const libDirectoryName = 'lib';
 const srcDirectoryName = 'src';
 
 const packageName = 'candy_project';
+
+const dartCoreUrl = 'dart:core';
