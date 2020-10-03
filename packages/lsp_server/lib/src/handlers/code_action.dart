@@ -6,8 +6,9 @@ import '../generated/lsp_protocol/protocol_special.dart';
 import 'handlers.dart';
 
 abstract class CandyCodeActionKind {
-  static const serverSupportedKinds = [build];
+  static const serverSupportedKinds = [build, run];
   static const build = CodeActionKind('build');
+  static const run = CodeActionKind('run');
 }
 
 class CodeActionHandler extends MessageHandler<CodeActionParams,
@@ -26,7 +27,8 @@ class CodeActionHandler extends MessageHandler<CodeActionParams,
     CancellationToken token,
   ) async {
     return success([
-      Either2.t1(Command('Build', 'build', null)),
+      Either2.t1(Command('Build', CandyCodeActionKind.build.toString(), null)),
+      Either2.t1(Command('Run', CandyCodeActionKind.run.toString(), null)),
     ]);
   }
 }
