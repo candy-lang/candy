@@ -112,6 +112,12 @@ abstract class ModuleId implements _$ModuleId {
 
   bool get hasParent => normalized.path.isNotEmpty;
   bool get hasNoParent => !hasParent;
+  ModuleId get parent {
+    final parent = parentOrNull;
+    assert(parent != null);
+    return parent;
+  }
+
   ModuleId get parentOrNull =>
       hasParent ? normalized.copyWith(path: normalized.path.dropLast(1)) : null;
 

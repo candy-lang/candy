@@ -132,34 +132,42 @@ final resourceIdToModuleId = Query<ResourceId, ModuleId>(
   },
 );
 
-/// Resolves a module given a base [ResourceId] and a [String] as used in a
-/// use-line.
+/// Resolves a module given a base [ResourceId] and an [ast.UseLine].
 final resolveUseLine = Query<Tuple2<ResourceId, ast.UseLine>, ModuleId>(
   'resolveUseLine',
   provider: (context, inputs) {
     final resourceId = inputs.first;
     final useLine = inputs.second;
     // TODO(JonasWanke): packages with slashes
-    final modulePathSegments = [
-      useLine.packageName.name,
-      if (useLine.moduleName != null) useLine.moduleName.name,
-    ];
 
-    final currentModuleId = resourceIdToModuleId(context, resourceId);
-    final relativeModuleId = currentModuleId.nested(modulePathSegments);
-    final relativeDeclarationId =
-        moduleIdToOptionalDeclarationId(context, relativeModuleId);
-    if (relativeDeclarationId.isSome) return relativeModuleId;
+    return useLine.map(
+      localAbsolute: (useLine) => ModuleId(
+        PackageId.this_,
+        useLine.pathSegments.map((s) => s.name).toList(),
+      ),
+      localRelative: (useLine) {
+        var resolved = resourceIdToModuleId(context, resourceId);
+        assert(useLine.leadingDots.isNotEmpty);
+        for (var i = 0; i < useLine.leadingDots.length - 1; i++) {
+          resolved = resolved.parent;
+        }
+        return resolved
+            .nested(useLine.pathSegments.map((s) => s.name).toList());
+      },
+      global: (useLine) {
+        if (useLine.moduleName != null) {
+          throw CompilerError.unsupportedFeature(
+            'Module imports from other packages are not yet supported.',
+          );
+        }
+        if (useLine.packagePathSegments.length > 1) {
+          throw CompilerError.unsupportedFeature(
+            'Scoped packages are not yet supported.',
+          );
+        }
 
-    final absoluteModuleId = ModuleId(
-      PackageId(modulePathSegments.first),
-      modulePathSegments.skip(1).toList(),
+        return ModuleId(PackageId(useLine.packagePathSegments.single.name), []);
+      },
     );
-    final absoluteDeclarationId =
-        moduleIdToOptionalDeclarationId(context, absoluteModuleId);
-    if (absoluteDeclarationId.isSome) return absoluteModuleId;
-
-    assert(false, "Use line `$inputs` couldn't be resolved.");
-    return null;
   },
 );
