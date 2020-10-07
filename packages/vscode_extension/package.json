@@ -1,8 +1,14 @@
 {
   "name": "candy",
   "displayName": "Candy",
-  "description": "",
+  "description": "Candy language support",
+  "publisher": "Candy",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JonasWanke/candy.git",
+    "directory": "packages/vscode_extension"
+  },
   "engines": {
     "vscode": "^1.48.0"
   },
