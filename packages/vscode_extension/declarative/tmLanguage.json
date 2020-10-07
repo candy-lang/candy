@@ -5,7 +5,7 @@
   "patterns": [
     {
       "name": "meta.import.candy",
-      "begin": "^\\w*\\b(use)\\b",
+      "begin": "\\b(use)\\b",
       "beginCaptures": {
         "0": { "name": "keyword.other.import.candy" }
       },
@@ -18,6 +18,10 @@
         {
           "name": "punctuation.dot.candy",
           "match": "\\."
+        },
+        {
+          "name": "punctuation.slash.candy",
+          "match": "/"
         },
         { "include": "#comments" },
         {
