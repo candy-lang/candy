@@ -1,5 +1,6 @@
 generated/
 local/
+temp/
 
 # ANTLR
 .antlr/
