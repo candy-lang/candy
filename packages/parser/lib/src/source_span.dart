@@ -1,19 +1,22 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:meta/meta.dart';
 
 import 'utils.dart';
 
-@immutable
-class SourceSpan {
-  const SourceSpan(this.start, this.end)
-      : assert(start != null),
-        assert(start >= 0),
-        assert(end != null),
-        assert(start <= end);
-  const SourceSpan.fromStartLength(int start, int length)
-      : this(start, start + length);
+part 'source_span.freezed.dart';
+part 'source_span.g.dart';
 
-  final int start;
-  final int end;
+@freezed
+abstract class SourceSpan implements _$SourceSpan {
+  const factory SourceSpan(int start, int end) = _SourceSpan;
+  factory SourceSpan.fromJson(Map<String, dynamic> json) =>
+      _$SourceSpanFromJson(json);
+  const SourceSpan._();
+
+  // ignore: prefer_constructors_over_static_methods
+  static SourceSpan fromStartLength(int start, int length) =>
+      SourceSpan(start, start + length);
+
   int get length => end - start;
 
   SourceSpan plus(int offset) {
