@@ -148,7 +148,7 @@ void main() {
         equals:
             OperatorToken(OperatorTokenType.equals, span: SourceSpan(21, 22)),
         initializer:
-            Literal<int>(0, IntegerLiteralToken(123, span: SourceSpan(23, 26))),
+            Literal<int>(0, IntLiteralToken(123, span: SourceSpan(23, 26))),
         accessors: [
           PropertyAccessor.getter(
             keyword:

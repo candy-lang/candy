@@ -12,26 +12,48 @@ void main() {
   group('use lines', () {
     forAllMap<String, UseLine>(
       table: {
-        'use date_time': UseLine(
+        'use crate.utils': UseLine.localAbsolute(
           useKeyword:
               KeywordToken.use(span: SourceSpan(0, 3)) as UseKeywordToken,
-          packageName: IdentifierToken('date_time', span: SourceSpan(4, 13)),
+          crateKeyword: CrateKeywordToken(span: SourceSpan(4, 9)),
+          dots: [
+            OperatorToken(OperatorTokenType.dot, span: SourceSpan(9, 10)),
+          ],
+          pathSegments: [IdentifierToken('utils', span: SourceSpan(10, 15))],
         ),
-        'use firebase/core': UseLine(
+        'use ...utils.primitives': UseLine.localRelative(
           useKeyword:
               KeywordToken.use(span: SourceSpan(0, 3)) as UseKeywordToken,
-          publisherName: IdentifierToken('firebase', span: SourceSpan(4, 12)),
-          slash:
-              OperatorToken(OperatorTokenType.slash, span: SourceSpan(12, 13)),
-          packageName: IdentifierToken('core', span: SourceSpan(13, 17)),
+          leadingDots: [
+            OperatorToken(OperatorTokenType.dot, span: SourceSpan(4, 5)),
+            OperatorToken(OperatorTokenType.dot, span: SourceSpan(5, 6)),
+            OperatorToken(OperatorTokenType.dot, span: SourceSpan(6, 7)),
+          ],
+          dots: [
+            OperatorToken(OperatorTokenType.dot, span: SourceSpan(12, 13)),
+          ],
+          pathSegments: [
+            IdentifierToken('utils', span: SourceSpan(7, 12)),
+            IdentifierToken('primitives', span: SourceSpan(13, 23)),
+          ],
         ),
-        'use serialization.json': UseLine(
-          useKeyword:
-              KeywordToken.use(span: SourceSpan(0, 3)) as UseKeywordToken,
-          packageName:
-              IdentifierToken('serialization', span: SourceSpan(4, 17)),
+        'use date_time': UseLine.global(
+          useKeyword: UseKeywordToken(span: SourceSpan(0, 3)),
+          packagePathSegments: [
+            IdentifierToken('date_time', span: SourceSpan(4, 13)),
+          ],
+        ),
+        'use firebase/core.errors': UseLine.global(
+          useKeyword: UseKeywordToken(span: SourceSpan(0, 3)),
+          packagePathSegments: [
+            IdentifierToken('firebase', span: SourceSpan(4, 12)),
+            IdentifierToken('core', span: SourceSpan(13, 17)),
+          ],
+          slashes: [
+            OperatorToken(OperatorTokenType.slash, span: SourceSpan(12, 13)),
+          ],
           dot: OperatorToken(OperatorTokenType.dot, span: SourceSpan(17, 18)),
-          moduleName: IdentifierToken('json', span: SourceSpan(18, 22)),
+          moduleName: IdentifierToken('errors', span: SourceSpan(18, 24)),
         ),
       },
       tester: (source, result) =>

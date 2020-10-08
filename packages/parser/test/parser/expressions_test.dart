@@ -19,31 +19,31 @@ void main() {
 
   group('primitive', () {
     group('literals', () {
-      group('IntegerLiteral', () {
+      group('IntLiteral', () {
         tableTestExpressionParser<int, Literal<int>>(
           'decimal',
-          table: validDecIntegerLiterals,
+          table: validDecIntLiterals,
           nodeMapper: (value, fullSpan) =>
-              Literal(0, IntegerLiteralToken(value, span: fullSpan)),
+              Literal(0, IntLiteralToken(value, span: fullSpan)),
         );
         tableTestExpressionParser<int, Literal<int>>(
           'hexadecimal',
-          table: validHexIntegerLiterals,
+          table: validHexIntLiterals,
           nodeMapper: (value, fullSpan) =>
-              Literal(0, IntegerLiteralToken(value, span: fullSpan)),
+              Literal(0, IntLiteralToken(value, span: fullSpan)),
         );
         tableTestExpressionParser<int, Literal<int>>(
           'binary',
-          table: validBinIntegerLiterals,
+          table: validBinIntLiterals,
           nodeMapper: (value, fullSpan) =>
-              Literal(0, IntegerLiteralToken(value, span: fullSpan)),
+              Literal(0, IntLiteralToken(value, span: fullSpan)),
         );
       });
       tableTestExpressionParser<bool, Literal<bool>>(
-        'BooleanLiteral',
-        table: validBooleanLiterals,
+        'BoolLiteral',
+        table: validBoolLiterals,
         nodeMapper: (value, fullSpan) =>
-            Literal(0, BooleanLiteralToken(value, span: fullSpan)),
+            Literal(0, BoolLiteralToken(value, span: fullSpan)),
       );
     });
 
@@ -403,7 +403,7 @@ void main() {
               OperatorToken(OperatorTokenType.lparen, span: SourceSpan(3, 4)),
           expression: Literal<bool>(
             0,
-            BooleanLiteralToken(true, span: SourceSpan(4, 8)),
+            BoolLiteralToken(true, span: SourceSpan(4, 8)),
           ),
           rightParenthesis:
               OperatorToken(OperatorTokenType.rparen, span: SourceSpan(8, 9)),
@@ -414,7 +414,7 @@ void main() {
         3,
         ifKeyword: KeywordToken.if_(span: SourceSpan(0, 2)) as IfKeywordToken,
         condition:
-            Literal<bool>(0, BooleanLiteralToken(true, span: SourceSpan(3, 7))),
+            Literal<bool>(0, BoolLiteralToken(true, span: SourceSpan(3, 7))),
         thenStatement: Block(
           3,
           leftBrace:
@@ -433,7 +433,7 @@ void main() {
               OperatorToken(OperatorTokenType.lparen, span: SourceSpan(3, 4)),
           expression: Literal<bool>(
             0,
-            BooleanLiteralToken(true, span: SourceSpan(4, 8)),
+            BoolLiteralToken(true, span: SourceSpan(4, 8)),
           ),
           rightParenthesis:
               OperatorToken(OperatorTokenType.rparen, span: SourceSpan(8, 9)),
@@ -447,7 +447,7 @@ void main() {
         5,
         ifKeyword: KeywordToken.if_(span: SourceSpan(0, 2)) as IfKeywordToken,
         condition:
-            Literal<bool>(0, BooleanLiteralToken(true, span: SourceSpan(3, 7))),
+            Literal<bool>(0, BoolLiteralToken(true, span: SourceSpan(3, 7))),
         thenStatement: Block(
           0,
           leftBrace:
@@ -474,8 +474,8 @@ void main() {
           0,
           leftParenthesis:
               OperatorToken(OperatorTokenType.lparen, span: SourceSpan(3, 4)),
-          expression: Literal<bool>(
-              0, BooleanLiteralToken(true, span: SourceSpan(4, 8))),
+          expression:
+              Literal<bool>(0, BoolLiteralToken(true, span: SourceSpan(4, 8))),
           rightParenthesis:
               OperatorToken(OperatorTokenType.rparen, span: SourceSpan(8, 9)),
         ),
@@ -488,7 +488,7 @@ void main() {
               KeywordToken.if_(span: SourceSpan(19, 21)) as IfKeywordToken,
           condition: Literal<bool>(
             0,
-            BooleanLiteralToken(false, span: SourceSpan(22, 27)),
+            BoolLiteralToken(false, span: SourceSpan(22, 27)),
           ),
           thenStatement: Block(
             0,
@@ -512,13 +512,13 @@ void main() {
   );
 }
 
-final someValidDecIntegerLiterals = {
+final someValidDecIntLiterals = {
   '0': 0,
   '1': 1,
   '1000': 1000,
 };
-final validDecIntegerLiterals = {
-  ...someValidDecIntegerLiterals,
+final validDecIntLiterals = {
+  ...someValidDecIntLiterals,
   '01': 1,
   '2': 2,
   '10': 10,
@@ -528,12 +528,12 @@ final validDecIntegerLiterals = {
   '1_0_0': 100,
   '1_000': 1000,
 };
-final someValidHexIntegerLiterals = {
+final someValidHexIntLiterals = {
   '0x0': 0,
   '0x10': 0x10,
 };
-final validHexIntegerLiterals = {
-  ...someValidHexIntegerLiterals,
+final validHexIntLiterals = {
+  ...someValidHexIntLiterals,
   '0x1': 1,
   '0x2': 2,
   '0x1_0': 0x10,
@@ -543,12 +543,12 @@ final validHexIntegerLiterals = {
   '0x1000': 0x1000,
   '0x1_000': 0x1000,
 };
-final someValidBinIntegerLiterals = {
+final someValidBinIntLiterals = {
   '0b0': 0x0,
   '0b10': 0x2,
 };
-final validBinIntegerLiterals = {
-  ...someValidBinIntegerLiterals,
+final validBinIntLiterals = {
+  ...someValidBinIntLiterals,
   '0b1': 0x1,
   '0b1_0': 0x2,
   '0b100': 0x4,
@@ -557,20 +557,20 @@ final validBinIntegerLiterals = {
   '0b1000': 0x8,
   '0b1_000': 0x8,
 };
-final someValidIntegerLiterals = {
-  ...someValidDecIntegerLiterals,
+final someValidIntLiterals = {
+  ...someValidDecIntLiterals,
   // Hexadecimal and binary are completely removed for performance reasons.
 };
-final validIntegerLiterals = {
-  ...validDecIntegerLiterals,
-  ...validHexIntegerLiterals,
-  ...validBinIntegerLiterals,
+final validIntLiterals = {
+  ...validDecIntLiterals,
+  ...validHexIntLiterals,
+  ...validBinIntLiterals,
 };
-final someValidBooleanLiterals = {
+final someValidBoolLiterals = {
   'true': true,
 };
-final validBooleanLiterals = {
-  ...someValidBooleanLiterals,
+final validBoolLiterals = {
+  ...someValidBoolLiterals,
   'false': false,
 };
 final someValidIdentifiers = [
@@ -606,26 +606,26 @@ typedef PrimitiveTester = void Function(
 void forPrimitives(int id, {@required PrimitiveTester tester}) {
   assert(tester != null);
 
-  final integerLiterals =
-      someValidIntegerLiterals.map<String, PrimitiveFactory>((source, value) {
+  final intLiterals =
+      someValidIntLiterals.map<String, PrimitiveFactory>((source, value) {
     return MapEntry(
       source,
       (offset) => Literal<int>(
         id,
-        IntegerLiteralToken(
+        IntLiteralToken(
           value,
           span: SourceSpan(0, source.length).plus(offset),
         ),
       ),
     );
   });
-  final booleanLiterals =
-      someValidBooleanLiterals.map<String, PrimitiveFactory>((source, value) {
+  final boolLiterals =
+      someValidBoolLiterals.map<String, PrimitiveFactory>((source, value) {
     return MapEntry(
       source,
       (offset) => Literal<bool>(
         id,
-        BooleanLiteralToken(
+        BoolLiteralToken(
           value,
           span: SourceSpan(0, source.length).plus(offset),
         ),
@@ -647,8 +647,8 @@ void forPrimitives(int id, {@required PrimitiveTester tester}) {
 
   forAll<MapEntry<String, PrimitiveFactory>>(
     table: <String, PrimitiveFactory>{
-      ...integerLiterals,
-      ...booleanLiterals,
+      ...intLiterals,
+      ...boolLiterals,
       ...identifierLiterals,
     }.entries,
     tester: (entry) => tester(entry.key, entry.value),

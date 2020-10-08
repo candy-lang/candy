@@ -63,6 +63,6 @@ void main() {
 Statement createStatement123(int id, [int offset = 0]) {
   return Literal<int>(
     id,
-    IntegerLiteralToken(123, span: SourceSpan.fromStartLength(offset, 3)),
+    IntLiteralToken(123, span: SourceSpan.fromStartLength(offset, 3)),
   );
 }
