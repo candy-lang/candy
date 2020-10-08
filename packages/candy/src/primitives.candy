@@ -1,0 +1,18 @@
+use .operators
+
+public external class Any
+public external class Unit
+public external class Nothing
+
+public external class Bool
+
+public trait Number: AddOperator<This, This> & SubtractOperator<This, This>
+
+public external class Int
+external impl Int: Number
+
+public external class Float
+external impl Float: Number
+
+public class String
+external impl String: PlusOperator<This, This>

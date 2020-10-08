@@ -12,7 +12,7 @@ abstract class ResourceProvider {
   // ignore: non_constant_identifier_names
   factory ResourceProvider.default_(Directory projectDirectory) =>
       SimpleResourceProvider(
-        coreDirectory: Directory(p.join(_candyDirectory.path, 'core')),
+        coreDirectory: Directory(p.join(_candyDirectory.path, 'candy')),
         projectDirectory: projectDirectory,
         packagesDirectory: _candyDirectory,
       );
