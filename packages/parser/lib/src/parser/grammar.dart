@@ -58,27 +58,55 @@ class ParserGrammar {
 
   static final useLines =
       (useLine & semi).map<UseLine>((v) => v[0] as UseLine).star();
-  static final useLine = (LexerGrammar.USE &
-          (LexerGrammar.NLs &
-                  LexerGrammar.Identifier &
-                  LexerGrammar.NLs &
-                  LexerGrammar.SLASH)
-              .optional() &
+  // ignore: unnecessary_cast
+  static final useLine = (localAbsoluteUseLine as Parser<UseLine>) |
+      localRelativeUseLine |
+      globalUseLine;
+  static final localAbsoluteUseLine = (LexerGrammar.USE &
           LexerGrammar.NLs &
-          LexerGrammar.Identifier &
+          LexerGrammar.CRATE &
+          LexerGrammar.NLs &
+          LexerGrammar.DOT &
+          LexerGrammar.NLs &
+          LexerGrammar.Identifier.separatedList(LexerGrammar.DOT))
+      .map<UseLine>((value) {
+    final path = value[6] as List<dynamic>;
+    return UseLine.localAbsolute(
+      useKeyword: value[0] as UseKeywordToken,
+      crateKeyword: value[2] as CrateKeywordToken,
+      dots: [value[4] as OperatorToken, ...path[1] as List<OperatorToken>],
+      pathSegments: path[0] as List<IdentifierToken>,
+    );
+  });
+  static final localRelativeUseLine = (LexerGrammar.USE &
+          LexerGrammar.NLs &
+          LexerGrammar.DOT.plus() &
+          LexerGrammar.NLs &
+          LexerGrammar.Identifier.separatedList(LexerGrammar.DOT))
+      .map<UseLine>((value) {
+    final path = value[4] as List<dynamic>;
+    return UseLine.localRelative(
+      useKeyword: value[0] as UseKeywordToken,
+      leadingDots: value[2] as List<OperatorToken>,
+      pathSegments: path[0] as List<IdentifierToken>,
+      dots: path[1] as List<OperatorToken>,
+    );
+  });
+  static final globalUseLine = (LexerGrammar.USE &
+          LexerGrammar.NLs &
+          LexerGrammar.Identifier.separatedList(LexerGrammar.SLASH) &
           (LexerGrammar.NLs &
                   LexerGrammar.DOT &
                   LexerGrammar.NLs &
                   LexerGrammar.Identifier)
               .optional())
       .map<UseLine>((value) {
-    final publisherPart = value[1] as List<dynamic>;
-    final modulePart = value[4] as List<dynamic>;
-    return UseLine(
+    final packagePart = value[2] as List<dynamic>;
+    final modulePart = value[3] as List<dynamic>;
+    return UseLine.global(
       useKeyword: value[0] as UseKeywordToken,
-      publisherName: publisherPart?.elementAt(1) as IdentifierToken,
-      slash: publisherPart?.elementAt(3) as OperatorToken,
-      packageName: value[3] as IdentifierToken,
+      packagePathSegments: packagePart[0] as List<IdentifierToken>,
+      slashes: packagePart[1] as List<OperatorToken>,
       dot: modulePart?.elementAt(1) as OperatorToken,
       moduleName: modulePart?.elementAt(3) as IdentifierToken,
     );

@@ -2,6 +2,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../lexer/lexer.dart';
 import '../../syntactic_entity.dart';
+import '../../utils.dart';
 import 'declarations.dart';
 import 'node.dart';
 
@@ -23,23 +24,44 @@ abstract class CandyFile extends AstNode implements _$CandyFile {
 
 @freezed
 abstract class UseLine extends AstNode implements _$UseLine {
-  const factory UseLine({
+  const factory UseLine.localAbsolute({
     @required UseKeywordToken useKeyword,
-    IdentifierToken publisherName,
-    OperatorToken slash,
-    @required IdentifierToken packageName,
+    @required CrateKeywordToken crateKeyword,
+    @Default(<OperatorToken>[]) List<OperatorToken> dots,
+    @Default(<IdentifierToken>[]) List<IdentifierToken> pathSegments,
+  }) = LocalAbsoluteUseLine;
+  const factory UseLine.localRelative({
+    @required UseKeywordToken useKeyword,
+    @Default(<OperatorToken>[]) List<OperatorToken> leadingDots,
+    @Default(<IdentifierToken>[]) List<IdentifierToken> pathSegments,
+    @Default(<OperatorToken>[]) List<OperatorToken> dots,
+  }) = LocalRelativeUseLine;
+  const factory UseLine.global({
+    @required UseKeywordToken useKeyword,
+    @Default(<IdentifierToken>[]) List<IdentifierToken> packagePathSegments,
+    @Default(<OperatorToken>[]) List<OperatorToken> slashes,
     OperatorToken dot,
     IdentifierToken moduleName,
-  }) = _UseLine;
+  }) = GlobalUseLine;
   const UseLine._();
 
   @override
-  Iterable<SyntacticEntity> get children => [
-        useKeyword,
-        if (publisherName != null) publisherName,
-        if (slash != null) slash,
-        packageName,
-        if (dot != null) dot,
-        if (moduleName != null) moduleName,
-      ];
+  Iterable<SyntacticEntity> get children => when(
+        localAbsolute: (useKeyword, crateKeyword, dots, pathSegments) => [
+          useKeyword,
+          crateKeyword,
+          ...interleave(dots, pathSegments),
+        ],
+        localRelative: (useKeyword, leadingDots, pathSegments, dots) => [
+          useKeyword,
+          ...leadingDots,
+          ...interleave(dots, pathSegments),
+        ],
+        global: (useKeyword, packagePathSegments, slashes, dot, moduleName) => [
+          useKeyword,
+          ...interleave(packagePathSegments, slashes),
+          if (dot != null) dot,
+          if (moduleName != null) moduleName,
+        ],
+      );
 }

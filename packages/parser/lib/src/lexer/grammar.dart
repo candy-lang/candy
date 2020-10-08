@@ -134,6 +134,8 @@ class LexerGrammar {
 
   static final USE = string('use')
       .tokenize((_, span) => KeywordToken.use(span: span) as UseKeywordToken);
+  static final CRATE = string('crate').tokenize(
+      (_, span) => KeywordToken.crate(span: span) as CrateKeywordToken);
   static final MODULE = string('module').tokenize(
       (_, span) => KeywordToken.module(span: span) as ModuleKeywordToken);
   static final TRAIT = string('trait').tokenize(
