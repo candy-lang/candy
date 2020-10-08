@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:dartx/dartx.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:meta/meta.dart';
@@ -7,6 +10,9 @@ import 'compilation/ast.dart';
 import 'errors.dart';
 import 'resource_provider.dart';
 import 'utils.dart';
+
+part 'query.freezed.dart';
+part 'query.g.dart';
 
 @immutable
 class QueryConfig {
@@ -51,6 +57,12 @@ class Query<K, R> {
   final QueryProvider<K, R> provider;
 
   R call(QueryContext context, K key) {
+    final result = context.callQuery(this, key);
+    assert(result != null);
+    return result;
+  }
+
+  R execute(QueryContext context, K key) {
     final result = provider(context, key);
     assert(result != null);
     return result;
@@ -64,12 +76,21 @@ class GlobalQueryContext {
   final QueryConfig config;
 
   Option<R> callQuery<K, R>(Query<K, R> query, K key) {
-    final innerContext = QueryContext(this);
+    RecordedQueryCall result;
     try {
-      return Option.some(innerContext.callQuery(query, key));
-    } on _QueryFailedException {
-      return Option.none();
+      result = QueryContext(this)._execute(query, key);
+    } on _QueryFailedException catch (e) {
+      result = e.recordedCall;
     }
+
+    final dateTime = DateTime.now().toIso8601String().replaceAll(':', '-');
+    final file = File('D:/p/candy/temp/call-${query.name}-$dateTime.json');
+    final encoder = JsonEncoder.withIndent('  ', (object) => object.toString());
+    file
+      ..createSync(recursive: true)
+      ..writeAsStringSync(encoder.convert(result.toJson()));
+
+    return result.result != null ? Some(result.result as R) : None();
   }
 
   final Map<Tuple2<String, dynamic>, List<ReportedCompilerError>>
@@ -97,29 +118,79 @@ class QueryContext {
   final GlobalQueryContext globalContext;
   QueryConfig get config => globalContext.config;
 
-  R callQuery<K, R>(Query<K, R> query, K key) =>
-      QueryContext(globalContext)._execute(query, key);
-  R _execute<K, R>(Query<K, R> query, K key) {
+  R callQuery<K, R>(Query<K, R> query, K key) {
+    final result = QueryContext(globalContext)._execute(query, key);
+    _innerCalls.add(result);
+    if (result.result == null) {
+      throw _QueryFailedException(result);
+    }
+    return result.result as R;
+  }
+
+  RecordedQueryCall _execute<K, R>(Query<K, R> query, K key) {
     void reportErrors() =>
         globalContext._reportErrors(query.name, key, _reportedErrors);
+    RecordedQueryCall onErrors(dynamic error) {
+      reportErrors();
+      return RecordedQueryCall(
+        name: query.name,
+        key: key,
+        innerCalls: _innerCalls,
+        thrownErrors: error is _QueryFailedException
+            ? error.recordedCall.thrownErrors
+            : error is Iterable<ReportedCompilerError>
+                ? error.toList()
+                : [error as ReportedCompilerError],
+      );
+    }
 
     try {
-      final result = query(this, key);
+      final result = query.execute(this, key);
       reportErrors();
-      return result;
+      return RecordedQueryCall(
+        name: query.name,
+        key: key,
+        innerCalls: _innerCalls,
+        result: result,
+      );
     } on ReportedCompilerError catch (e) {
-      _reportedErrors.add(e);
-      reportErrors();
-      throw _QueryFailedException();
+      return onErrors(e);
+    } on Iterable<ReportedCompilerError> catch (e) {
+      return onErrors(e);
     } catch (e, st) {
-      _reportedErrors.add(CompilerError.internalError('$e\n\n$st'));
-      reportErrors();
-      throw _QueryFailedException();
+      return onErrors(e is _QueryFailedException
+          ? e
+          : CompilerError.internalError('$e\n\n$st'));
     }
   }
 
   final _reportedErrors = <ReportedCompilerError>[];
   void reportError(ReportedCompilerError error) => _reportedErrors.add(error);
+
+  final _innerCalls = <RecordedQueryCall>[];
 }
 
-class _QueryFailedException implements Exception {}
+@freezed
+abstract class _QueryFailedException
+    implements _$_QueryFailedException, Exception {
+  const factory _QueryFailedException(RecordedQueryCall recordedCall) =
+      __QueryFailedException;
+  factory _QueryFailedException.fromJson(Map<String, dynamic> json) =>
+      _$_QueryFailedExceptionFromJson(json);
+  const _QueryFailedException._();
+}
+
+@freezed
+abstract class RecordedQueryCall implements _$RecordedQueryCall {
+  const factory RecordedQueryCall({
+    @required String name,
+    @required Object key,
+    @required List<RecordedQueryCall> innerCalls,
+    Object result,
+    List<ReportedCompilerError> thrownErrors,
+  }) = _RecordedQueryCall;
+  factory RecordedQueryCall.fromJson(Map<String, dynamic> json) =>
+      _$RecordedQueryCallFromJson(json);
+  const RecordedQueryCall._();
+}
+
