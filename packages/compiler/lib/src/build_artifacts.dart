@@ -32,15 +32,14 @@ class BuildArtifactManager {
     if (dir.existsSync()) dir.deleteSync(recursive: true);
   }
 
-  bool fileExists(BuildArtifactId id) => File(_resolve(id)).existsSync();
+  bool fileExists(BuildArtifactId id) => File(toPath(id)).existsSync();
 
-  String getContent(BuildArtifactId id) =>
-      File(_resolve(id)).readAsStringSync();
+  String getContent(BuildArtifactId id) => File(toPath(id)).readAsStringSync();
   void setContent(BuildArtifactId id, String content) {
-    File(_resolve(id))
+    File(toPath(id))
       ..createSync(recursive: true)
       ..writeAsStringSync(content);
   }
 
-  String _resolve(BuildArtifactId id) => p.join(_buildDirectory, id.path);
+  String toPath(BuildArtifactId id) => p.join(_buildDirectory, id.path);
 }
