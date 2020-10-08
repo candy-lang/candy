@@ -185,6 +185,9 @@ abstract class Argument extends AstNode implements _$Argument {
         if (equals != null) equals,
         expression,
       ];
+
+  bool get isNamed => name != null;
+  bool get isPositional => !isNamed;
 }
 
 @freezed

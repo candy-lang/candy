@@ -210,7 +210,7 @@ class LexerGrammar {
   static final _BinDigitOrSeparator = _BinDigit | char('_');
 
   static final BooleanLiteral = (string('true') | string('false')).tokenize(
-      (lexeme, span) => BooleanLiteralToken(lexeme == 'true', span: span));
+      (lexeme, span) => BoolLiteralToken(lexeme == 'true', span: span));
 
   // SECTION: lexicalIdentifiers
 
@@ -240,12 +240,12 @@ extension on Parser<String> {
     OperatorTokenType type,
   ) =>
       tokenize((lexeme, span) => OperatorToken(type, span: span));
-  Parser<IntegerLiteralToken> tokenizeInteger({
+  Parser<IntLiteralToken> tokenizeInteger({
     int radix = 10,
     bool hasPrefix = false,
   }) {
-    return tokenize<IntegerLiteralToken>((lexeme, span) {
-      return IntegerLiteralToken(
+    return tokenize<IntLiteralToken>((lexeme, span) {
+      return IntLiteralToken(
         int.parse(
           lexeme.substring(hasPrefix ? 2 : 0).replaceAll('_', ''),
           radix: radix,

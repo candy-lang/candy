@@ -61,22 +61,22 @@ abstract class LiteralToken<T> extends Token {
 }
 
 @freezed
-abstract class IntegerLiteralToken extends LiteralToken<int>
-    with _$IntegerLiteralToken {
-  const factory IntegerLiteralToken(
+abstract class IntLiteralToken extends LiteralToken<int>
+    with _$IntLiteralToken {
+  const factory IntLiteralToken(
     int value, {
     @required SourceSpan span,
-  }) = _IntegerLiteralToken;
+  }) = _IntLiteralToken;
 }
 
 @freezed
-abstract class BooleanLiteralToken extends LiteralToken<bool>
-    with _$BooleanLiteralToken {
-  const factory BooleanLiteralToken(
+abstract class BoolLiteralToken extends LiteralToken<bool>
+    with _$BoolLiteralToken {
+  const factory BoolLiteralToken(
     // ignore: avoid_positional_boolean_parameters
     bool value, {
     @required SourceSpan span,
-  }) = _BooleanLiteralToken;
+  }) = _BoolLiteralToken;
 }
 
 @freezed
