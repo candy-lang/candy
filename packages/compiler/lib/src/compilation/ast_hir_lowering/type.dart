@@ -1,11 +1,12 @@
-import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
 
 import '../../errors.dart';
 import '../../query.dart';
 import '../../utils.dart';
+import '../ast.dart';
 import '../hir.dart' as hir;
 import '../hir/ids.dart';
+import '../ids.dart';
 import 'declarations/declarations.dart';
 import 'declarations/module.dart';
 import 'declarations/trait.dart';
@@ -28,13 +29,10 @@ final Query<Tuple2<ModuleId, ast.Type>, hir.CandyType> astTypeToHirType =
 
     if (type is ast.UserType) {
       final declarationId = resolveAstUserType(context, Tuple2(moduleId, type));
-      final name = declarationId.simplePath
-          .lastWhile((d) => !(d is ModuleDeclarationPathData))
-          .cast<ModuleDeclarationPathData>()
-          .map((d) => d.name)
-          .join('.');
+      final name = type.simpleTypes.single.name.name;
 
-      final arguments = mapTypes(type.arguments.arguments.map((a) => a.type));
+      final arguments =
+          mapTypes((type.arguments?.arguments ?? []).map((a) => a.type));
       return hir.CandyType.user(
         declarationIdToModuleId(context, declarationId),
         name,
@@ -88,6 +86,12 @@ final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>, DeclarationId>(
   provider: (context, inputs) {
     final currentModuleId = inputs.first;
     final type = inputs.second;
+
+    if (type.simpleTypes.length > 1) {
+      throw CompilerError.unsupportedFeature(
+        'Nested types are not yet supported.',
+      );
+    }
 
     final currentModuleDeclarationId =
         moduleIdToDeclarationId(context, currentModuleId);
