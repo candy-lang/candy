@@ -4,10 +4,13 @@ import 'package:parser/parser.dart';
 import 'compilation/ast.dart';
 
 part 'errors.freezed.dart';
+part 'errors.g.dart';
 
 @freezed
 abstract class CompilerError implements _$CompilerError {
   const factory CompilerError._create(String id) = _CompilerError;
+  factory CompilerError.fromJson(Map<String, dynamic> json) =>
+      _$CompilerErrorFromJson(json);
   const CompilerError._();
 
   ReportedCompilerError call(
@@ -24,16 +27,22 @@ abstract class CompilerError implements _$CompilerError {
   }
 
   static const values = [internalError, noMainFunction, multipleMainFunctions];
+  static const ambiguousExpression =
+      CompilerError._create('ambiguousExpression');
   static const internalError = CompilerError._create('internalError');
-  static const noMainFunction = CompilerError._create('noMainFunction');
+  static const invalidArgumentType =
+      CompilerError._create('invalidArgumentType');
+  static const moduleNotFound = CompilerError._create('moduleNotFound');
   static const multipleMainFunctions =
       CompilerError._create('multipleMainFunctions');
   static const multipleTypesWithSameName =
       CompilerError._create('multipleTypesWithSameName');
+  static const noMainFunction = CompilerError._create('noMainFunction');
   static const undefinedIdentifier =
       CompilerError._create('undefinedIdentifier');
+  static const unexpectedPositionalArgument =
+      CompilerError._create('unexpectedPositionalArgument');
   static const unsupportedFeature = CompilerError._create('unsupportedFeature');
-  static const moduleNotFound = CompilerError._create('moduleNotFound');
 }
 
 @freezed
@@ -47,6 +56,8 @@ abstract class ReportedCompilerError
     @Default(<ErrorRelatedInformation>[])
         List<ErrorRelatedInformation> relatedInformation,
   }) = _ReportedCompilerError;
+  factory ReportedCompilerError.fromJson(Map<String, dynamic> json) =>
+      _$ReportedCompilerErrorFromJson(json);
 }
 
 @freezed
@@ -57,10 +68,14 @@ abstract class ErrorRelatedInformation
     @required ErrorLocation location,
     @required String message,
   }) = _ErrorRelatedInformation;
+  factory ErrorRelatedInformation.fromJson(Map<String, dynamic> json) =>
+      _$ErrorRelatedInformationFromJson(json);
 }
 
 @freezed
 abstract class ErrorLocation with _$ErrorLocation implements Exception {
   const factory ErrorLocation(ResourceId resourceId, [SourceSpan span]) =
       _ErrorLocation;
+  factory ErrorLocation.fromJson(Map<String, dynamic> json) =>
+      _$ErrorLocationFromJson(json);
 }

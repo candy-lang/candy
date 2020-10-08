@@ -87,6 +87,13 @@ final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>, DeclarationId>(
     final currentModuleId = inputs.first;
     final type = inputs.second;
 
+    if (type.simpleTypes.length == 1 &&
+        type.simpleTypes.single.name.name == 'Any') {
+      // TODO(JonasWanke): remove this when we have Any in the standard library
+      return DeclarationId(ResourceId(PackageId.core, 'primitives.candy'), [])
+          .inner(TraitDeclarationPathData('Any'));
+    }
+
     if (type.simpleTypes.length > 1) {
       throw CompilerError.unsupportedFeature(
         'Nested types are not yet supported.',

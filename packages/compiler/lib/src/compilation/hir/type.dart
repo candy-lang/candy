@@ -22,7 +22,7 @@ abstract class CandyType with _$CandyType {
   const factory CandyType.function({
     CandyType receiverType,
     @Default(<CandyType>[]) List<CandyType> parameterTypes,
-    CandyType returnType,
+    @required CandyType returnType,
   }) = FunctionCandyType;
   const factory CandyType.union(List<CandyType> types) = UnionCandyType;
   const factory CandyType.intersection(List<CandyType> types) =
@@ -54,6 +54,7 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
     final parent = inputs.second;
 
     if (child == parent) return true;
+    if (parent == CandyType.any) return true;
     if (child == CandyType.any) return false;
 
     return child.when(

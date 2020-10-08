@@ -9,8 +9,8 @@ abstract class Unit with _$Unit {
 
 @freezed
 abstract class Option<T> implements _$Option<T> {
-  const factory Option.some(T value) = OptionSome<T>;
-  const factory Option.none() = OptionNone<T>;
+  const factory Option.some(T value) = Some<T>;
+  const factory Option.none() = None<T>;
   const Option._();
 
   bool get isSome => when(some: (_) => true, none: () => false);
@@ -27,6 +27,28 @@ abstract class Option<T> implements _$Option<T> {
   }
 
   T get valueOrNull => when(some: (value) => value, none: () => null);
+}
+
+@freezed
+abstract class Result<T, E> implements _$Result<T, E> {
+  const factory Result.ok(T value) = Ok<T, E>;
+  const factory Result.error(E error) = Error<T, E>;
+  const Result._();
+
+  T get value => when(
+        ok: (value) => value,
+        error: (_) {
+          assert(false);
+          return null;
+        },
+      );
+  E get error => when(
+        ok: (_) {
+          assert(false);
+          return null;
+        },
+        error: (error) => error,
+      );
 }
 
 @freezed

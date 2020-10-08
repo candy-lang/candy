@@ -1,3 +1,5 @@
+import 'package:compiler/compiler.dart';
+import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
 
 import '../../errors.dart';
@@ -8,6 +10,8 @@ import '../hir.dart' as hir;
 import '../hir/ids.dart';
 import 'declarations/declarations.dart';
 import 'declarations/function.dart';
+import 'declarations/module.dart';
+import 'type.dart';
 
 final getBody = Query<DeclarationId, List<hir.Statement>>(
   'getBody',
@@ -19,37 +23,30 @@ final getBodyAstToHirIds = Query<DeclarationId, BodyAstToHirIds>(
   provider: (context, declarationId) =>
       lowerBodyAstToHir(context, declarationId).second,
 );
-final lowerBodyAstToHir =
+final Query<DeclarationId, Tuple2<List<hir.Statement>, BodyAstToHirIds>>
+    lowerBodyAstToHir =
     Query<DeclarationId, Tuple2<List<hir.Statement>, BodyAstToHirIds>>(
   'lowerBodyAstToHir',
   provider: (context, declarationId) {
     if (declarationId.isFunction) {
       final functionAst = getFunctionDeclarationAst(context, declarationId);
 
-      var nextValue = 0;
-      var idMap = BodyAstToHirIds();
-      DeclarationLocalId idProvider(int astId) {
-        final id = DeclarationLocalId(declarationId, nextValue);
-        idMap = idMap.withMapping(astId, id);
-        nextValue++;
-        return id;
-      }
-
-      final identifiers = <String, hir.Identifier>{
-        for (final parameter in functionAst.valueParameters)
-          parameter.name.name: hir.Identifier.parameter(parameter.name.name, 0),
-      };
+      final localContext = _LocalContext.forFunction(
+        context,
+        declarationId,
+        Option.none(),
+        functionAst,
+      );
       final statements =
           functionAst.body.statements.map<hir.Statement>((statement) {
         if (statement is ast.Expression) {
+          final result = localContext.lowerToUnambiguous(statement);
+          // ignore: only_throw_errors, Iterables of errors are also handled.
+          if (result is Error) throw result.error;
+
           return hir.Statement.expression(
-            idProvider(statement.id),
-            _mapExpression(
-              idProvider,
-              statement,
-              identifiers,
-              declarationId.resourceId,
-            ),
+            localContext.getId(statement),
+            result.value,
           );
         } else {
           throw CompilerError.unsupportedFeature(
@@ -58,7 +55,7 @@ final lowerBodyAstToHir =
           );
         }
       }).toList();
-      return Tuple2(statements, idMap);
+      return Tuple2(statements, localContext.idMap);
     } else {
       throw CompilerError.unsupportedFeature(
         'Unsupported body.',
@@ -73,62 +70,305 @@ final lowerBodyAstToHir =
 
 typedef IdProvider = DeclarationLocalId Function(int astId);
 
-hir.Expression _mapExpression(
-  IdProvider idProvider,
-  ast.Expression expression,
-  Map<String, hir.Identifier> identifiers,
-  ResourceId resourceId,
-) {
-  hir.Expression map(ast.Expression expression) =>
-      _mapExpression(idProvider, expression, identifiers, resourceId);
+class _LocalContext {
+  _LocalContext._(
+    this.queryContext,
+    this.declarationId,
+    this.returnType,
+    this.localIdentifiers,
+  )   : assert(queryContext != null),
+        assert(declarationId != null),
+        assert(returnType != null),
+        assert(localIdentifiers != null);
 
-  if (expression is ast.Literal) {
-    return hir.Expression.literal(
-      idProvider(expression.id),
-      _mapLiteral(expression.value, resourceId),
+  factory _LocalContext.forFunction(
+    QueryContext context,
+    DeclarationId declarationId,
+    Option<hir.CandyType> returnType,
+    ast.FunctionDeclaration functionAst,
+  ) {
+    final moduleId = declarationIdToModuleId(context, declarationId);
+    return _LocalContext._(
+      context,
+      declarationId,
+      returnType,
+      <String, hir.Identifier>{
+        for (final parameter in functionAst.valueParameters)
+          parameter.name.name: hir.Identifier.parameter(
+            parameter.name.name,
+            0,
+            astTypeToHirType(context, Tuple2(moduleId, parameter.type)),
+          ),
+      },
     );
-  } else if (expression is ast.Identifier) {
-    final identifier = expression.value.name;
-    final known = identifiers[identifier];
-    if (known != null) {
-      return hir.Expression.identifier(idProvider(expression.id), known);
+  }
+
+  final QueryContext queryContext;
+
+  final DeclarationId declarationId;
+  ResourceId get resourceId => declarationId.resourceId;
+
+  var _nextId = 0;
+  var idMap = BodyAstToHirIds();
+  DeclarationLocalId getId(ast.Statement statement) {
+    final id = DeclarationLocalId(declarationId, _nextId++);
+    idMap = idMap.withMapping(statement.id, id);
+    return id;
+  }
+
+  final Map<String, hir.Identifier> localIdentifiers;
+
+  final Option<hir.CandyType> returnType;
+  bool isValidReturnType(hir.CandyType type) {
+    if (returnType.isNone) return true;
+    return hir.isAssignableTo(queryContext, Tuple2(type, returnType.value));
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lower(
+    ast.Expression expression, [
+    Option<hir.CandyType> returnType = const Option.none(),
+  ]) {
+    final innerContext = _LocalContext._(
+      queryContext,
+      declarationId,
+      returnType,
+      localIdentifiers,
+    );
+    try {
+      final result = innerContext._lowerExpression(expression);
+      assert(returnType.isNone ||
+          result is Error ||
+          result.value.every((e) => hir.isAssignableTo(
+              queryContext, Tuple2(e.type, returnType.value))));
+      // if (!isEmpty)
+      return result;
+    } on _LoweringFailedException catch (e) {
+      return Error(e.errors);
     }
 
-    if (identifier == 'print') {
-      return hir.Expression.identifier(
-        idProvider(expression.id),
-        hir.Identifier.printFunction(),
+    // Step 2: Retry with implicit cast of the whole expression
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerExpression(
+    ast.Expression expression,
+  ) {
+    Result<List<hir.Expression>, List<ReportedCompilerError>> result;
+    if (expression is ast.Literal) {
+      result = _lowerLiteral(this, expression);
+    } else if (expression is ast.Identifier) {
+      result = _lowerIdentifier(this, expression);
+    } else if (expression is ast.CallExpression) {
+      result = _lowerCall(this, expression);
+    } else {
+      throw CompilerError.unsupportedFeature(
+        'Unsupported expression.',
+        location: ErrorLocation(resourceId, expression.span),
       );
     }
-    throw CompilerError.undefinedIdentifier(
-      "Couldn't resolve identifier `$identifier`",
-      location: ErrorLocation(resourceId, expression.value.span),
-    );
-  } else if (expression is ast.CallExpression) {
-    return hir.Expression.call(
-      idProvider(expression.id),
-      map(expression.target),
-      expression.arguments
-          .map((argument) => hir.ValueArgument(
-                name: argument.name?.name,
-                expression: map(argument.expression),
-              ))
-          .toList(),
-    );
-  } else {
-    throw CompilerError.unsupportedFeature(
-      'Unsupported expression.',
-      location: ErrorLocation(resourceId, expression.span),
-    );
+
+    assert(result != null);
+    return result;
+  }
+
+  List<hir.Expression> requireLowering(
+    ast.Expression expression, [
+    Option<hir.CandyType> returnType = const Option.none(),
+  ]) {
+    final result = lower(expression, returnType);
+    if (result is Error) {
+      throw _LoweringFailedException(result.error);
+    }
+
+    return result.value;
+  }
+
+  Result<hir.Expression, List<ReportedCompilerError>> lowerToUnambiguous(
+    ast.Expression expression, [
+    Option<hir.CandyType> returnType = const Option.none(),
+  ]) {
+    final result = lower(expression, returnType);
+    if (result is Error) return Error(result.error);
+
+    assert(result.value.isNotEmpty);
+    if (result.value.length > 1) {
+      return Error([
+        CompilerError.ambiguousExpression(
+          'Expression is ambiguous.',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    }
+    return Ok(result.value.single);
   }
 }
 
-hir.Literal _mapLiteral(
-    ast.LiteralToken<dynamic> token, ResourceId resourceId) {
-  if (token is ast.BooleanLiteralToken) return hir.Literal.boolean(token.value);
-  if (token is ast.IntegerLiteralToken) return hir.Literal.integer(token.value);
-  throw CompilerError.unsupportedFeature(
-    'Unsupported literal.',
-    location: ErrorLocation(resourceId, token.span),
+Result<List<hir.Expression>, List<ReportedCompilerError>> _mergeResults(
+  Iterable<Result<List<hir.Expression>, List<ReportedCompilerError>>> results,
+) {
+  final oks = results
+      .whereType<Ok<List<hir.Expression>, List<ReportedCompilerError>>>();
+  if (oks.isNotEmpty) return Ok(oks.expand((ok) => ok.value).toList());
+
+  return oks
+      .whereType<Error<List<hir.Expression>, List<ReportedCompilerError>>>()
+      .first;
+}
+
+class _LoweringFailedException implements Exception {
+  const _LoweringFailedException(this.errors) : assert(errors != null);
+
+  final List<ReportedCompilerError> errors;
+}
+
+Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerLiteral(
+  _LocalContext context,
+  ast.Literal<dynamic> expression,
+) {
+  final token = expression.value;
+  hir.Literal literal;
+  if (token is ast.BoolLiteralToken) {
+    if (!context.isValidReturnType(hir.CandyType.bool)) return Ok([]);
+    literal = hir.Literal.boolean(token.value);
+  } else if (token is ast.IntLiteralToken) {
+    if (!context.isValidReturnType(hir.CandyType.int)) return Ok([]);
+    literal = hir.Literal.integer(token.value);
+  } else {
+    throw CompilerError.unsupportedFeature(
+      'Unsupported literal.',
+      location: ErrorLocation(context.resourceId, token.span),
+    );
+  }
+  return Ok([hir.Expression.literal(context.getId(expression), literal)]);
+}
+
+Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerIdentifier(
+  _LocalContext context,
+  ast.Identifier expression,
+) {
+  final identifier = expression.value.name;
+  final localIdentifier = context.localIdentifiers[identifier];
+  if (localIdentifier != null) {
+    final result = hir.Expression.identifier(
+      context.getId(expression),
+      localIdentifier,
+    );
+    return Ok([result]);
+  }
+
+  if (context.returnType.isNone && identifier == 'print') {
+    return Ok([
+      hir.Expression.identifier(
+        context.getId(expression),
+        hir.Identifier.property(
+          DeclarationId(ResourceId(PackageId.this_, 'main.candy'), [])
+              .inner(DeclarationPathData.function('print')),
+          hir.CandyType.function(
+            parameterTypes: [hir.CandyType.any],
+            returnType: hir.CandyType.unit,
+          ),
+        ),
+      ),
+    ]);
+  }
+  throw CompilerError.undefinedIdentifier(
+    "Couldn't resolve identifier `$identifier`.",
+    location: ErrorLocation(context.resourceId, expression.value.span),
   );
+}
+
+Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerCall(
+  _LocalContext context,
+  ast.CallExpression expression,
+) {
+  final targetVariants = context.requireLowering(expression.target);
+
+  final results = targetVariants.map((target) {
+    if (target is hir.IdentifierExpression &&
+        target.identifier is hir.PropertyIdentifier) {
+      final identifier = target.identifier as hir.PropertyIdentifier;
+      if (identifier.id.isFunction) {
+        return _lowerFunctionCall(context, expression, target, identifier);
+      }
+    }
+
+    throw CompilerError.unsupportedFeature(
+      'Callable expressions are not yet supported.',
+      location: ErrorLocation(context.resourceId, expression.span),
+    );
+  });
+  return _mergeResults(results);
+}
+
+Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerFunctionCall(
+  _LocalContext context,
+  ast.CallExpression expression,
+  hir.IdentifierExpression target,
+  hir.PropertyIdentifier targetIdentifier,
+) {
+  final functionHir =
+      getFunctionDeclarationHir(context.queryContext, targetIdentifier.id);
+  if (!context.isValidReturnType(functionHir.returnType)) return null;
+
+  final errors = <ReportedCompilerError>[];
+
+  final parameters = functionHir.parameters;
+  final parametersByName = parameters.associateBy((p) => p.name);
+  final arguments = expression.arguments;
+  final outOfOrderNamedArguments = <ast.Argument>[];
+  final astArgumentMap = <String, ast.Argument>{};
+  for (var i = 0; i < arguments.length; i++) {
+    final argument = arguments[i];
+    if (outOfOrderNamedArguments.isNotEmpty && argument.isPositional) {
+      errors.add(CompilerError.unexpectedPositionalArgument(
+        'At least one of the preceding arguments was named and not in the '
+        'default order, hence positional arguments can no longer be used.',
+        location: ErrorLocation(context.resourceId, argument.span),
+        relatedInformation: [
+          for (final arg in outOfOrderNamedArguments)
+            ErrorRelatedInformation(
+              location: ErrorLocation(context.resourceId, arg.span),
+              message: "A named argument that's not in the default order.",
+            ),
+        ],
+      ));
+      continue;
+    }
+
+    final parameter = parameters[i];
+    if (argument.isPositional) {
+      astArgumentMap[parameter.name] = argument;
+    } else {
+      assert(argument.name.name != null);
+      astArgumentMap[argument.name.name] = argument;
+      if (parameter.name != argument.name.name) {
+        outOfOrderNamedArguments.add(argument);
+      }
+    }
+  }
+  if (errors.isNotEmpty) return Error(errors);
+
+  final hirArgumentMap = <String, hir.Expression>{};
+  for (final entry in astArgumentMap.entries) {
+    final name = entry.key;
+    final value = entry.value.expression;
+    final lowered = context.lowerToUnambiguous(
+      value,
+      Option.some(parametersByName[name].type),
+    );
+    if (lowered is Error) {
+      errors.addAll(lowered.error);
+      continue;
+    }
+
+    hirArgumentMap[name] = lowered.value;
+  }
+  if (errors.isNotEmpty) return Error(errors);
+
+  return Ok([
+    hir.Expression.functionCall(
+      context.getId(expression),
+      target,
+      hirArgumentMap,
+    ),
+  ]);
 }
