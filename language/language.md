@@ -281,7 +281,7 @@ For implementing multiple (usually related) `trait`s, you can shorten your code 
 
 ```rust
 // Implement algebra stuff.
-impl Int: Add<Int, Int>, Subtract<Int, Int> {
+impl Int: AddOperator<Int, Int> & SubtractOperator<Int, Int> {
   fun add(other: Int): Int {}
   fun subtract(other: Int): Int {}
 }
