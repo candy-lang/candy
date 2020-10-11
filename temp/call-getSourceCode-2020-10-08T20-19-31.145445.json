@@ -1,6 +1,0 @@
-{
-  "name": "getSourceCode",
-  "key": "this:main.candy",
-  "innerCalls": [],
-  "result": "fun main() {\r\n  print(123)\r\n}\r\n\r\nexternal fun print(object: Any)\r\n"
-}
