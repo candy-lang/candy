@@ -639,6 +639,12 @@ use logging
 use math hide BigInt
 ```
 
+If there are multiple, conflicting module declarations, the precedence is as follows (high to low):
+
+- `foo/module.candy`
+- `foo.candy`
+- `mod foo` in `module.candy`
+
 File structure of a project `foo`:
 
 - `src`: folder with all source code
