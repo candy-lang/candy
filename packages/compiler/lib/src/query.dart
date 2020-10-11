@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:dartx/dartx.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -84,11 +83,11 @@ class GlobalQueryContext {
     }
 
     final dateTime = DateTime.now().toIso8601String().replaceAll(':', '-');
-    final file = File('D:/p/candy/temp/call-${query.name}-$dateTime.json');
     final encoder = JsonEncoder.withIndent('  ', (object) => object.toString());
-    file
-      ..createSync(recursive: true)
-      ..writeAsStringSync(encoder.convert(result.toJson()));
+    config.buildArtifactManager.setContent(
+      BuildArtifactId('query-traces/${query.name}-$dateTime.json'),
+      encoder.convert(result.toJson()),
+    );
 
     return result.result != null ? Some(result.result as R) : None();
   }
