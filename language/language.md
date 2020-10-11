@@ -885,7 +885,7 @@ fun foo(bar: Int): Result<Int, MyError> {
 - overloading classes/traits based on type parameters
 - use abstract class as trait by ignoring implementations depending on private fields
 - static initializer block
-- overflow operators
+- overflow operators: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html
 - chained comparison
 - implicit multiplication: a literal number before an identifier creates an implicit multiplication: `2 apples` is equivalent to `2 * apples`. Works gracefully for units: `2 days + 3 minutes`, `2.50 euro`
   - `2 to -2` is equivalent to `2.to(-2)`, not `2 * to - 2`?
@@ -900,3 +900,7 @@ fun foo(bar: Int): Result<Int, MyError> {
   ]
   ```
 - optional lifetimes → for compilation to Rust/LLVM/etc.
+- scripting support
+  - different file ending?
+  - specify dependencies in the file itself
+  - top-level statements?
