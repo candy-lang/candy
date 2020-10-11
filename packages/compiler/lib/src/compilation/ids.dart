@@ -16,4 +16,7 @@ abstract class PackageId implements _$PackageId {
   // ignore: constant_identifier_names
   static const this_ = PackageId('this');
   bool get isThis => this == this_;
+
+  @override
+  String toString() => name;
 }

@@ -35,6 +35,9 @@ abstract class ResourceId implements _$ResourceId {
   ResourceId sibling(String name) =>
       ResourceId(packageId, '${p.dirname(path)}/$name');
   ResourceId child(String name) => ResourceId(packageId, '$path/$name');
+
+  @override
+  String toString() => '$packageId:$path';
 }
 
 final doesResourceExist = Query<ResourceId, bool>(

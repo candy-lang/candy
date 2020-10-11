@@ -25,6 +25,9 @@ abstract class DeclarationId implements _$DeclarationId {
         DisambiguatedDeclarationPathData(innerPath, disambiguator);
     return copyWith(path: path + [disambiguatedInnerPath]);
   }
+
+  @override
+  String toString() => '$resourceId:${path.join('.')}';
 }
 
 @freezed
@@ -38,6 +41,10 @@ abstract class DisambiguatedDeclarationPathData
           Map<String, dynamic> json) =>
       _$DisambiguatedDeclarationPathDataFromJson(json);
   const DisambiguatedDeclarationPathData._();
+
+  @override
+  String toString() =>
+      disambiguator == 0 ? data.toString() : '$data#$disambiguator';
 }
 
 @freezed
@@ -65,14 +72,20 @@ abstract class DeclarationPathData implements _$DeclarationPathData {
   factory DeclarationPathData.fromJson(Map<String, dynamic> json) =>
       _$DeclarationPathDataFromJson(json);
   const DeclarationPathData._();
-}
 
-@freezed
-abstract class HirId implements _$HirId {
-  const factory HirId(DeclarationId declarationId, DeclarationLocalId localId) =
-      _HirId;
-  factory HirId.fromJson(Map<String, dynamic> json) => _$HirIdFromJson(json);
-  const HirId._();
+  @override
+  String toString() {
+    return when(
+      module: (name) => 'mod($name)',
+      trait: (name) => 'trait($name)',
+      impl: (name) => 'impl($name)',
+      class_: (name) => 'class($name)',
+      function: (name) => 'fun($name)',
+      property: (name) => 'prop($name)',
+      propertyGetter: () => 'get',
+      propertySetter: () => 'set',
+    );
+  }
 }
 
 @freezed
@@ -82,6 +95,9 @@ abstract class DeclarationLocalId implements _$DeclarationLocalId {
   factory DeclarationLocalId.fromJson(Map<String, dynamic> json) =>
       _$DeclarationLocalIdFromJson(json);
   const DeclarationLocalId._();
+
+  @override
+  String toString() => '$declarationId+$value';
 }
 
 @freezed
@@ -142,4 +158,7 @@ abstract class ModuleId implements _$ModuleId {
 
   ModuleId nested(List<String> innerPath) =>
       copyWith(path: path + innerPath).normalized;
+
+  @override
+  String toString() => '$packageId:${path.join('.')}';
 }
