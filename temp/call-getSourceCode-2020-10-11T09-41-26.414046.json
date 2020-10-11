@@ -1,6 +1,0 @@
-{
-  "name": "getSourceCode",
-  "key": "this:..\\..\\packages\\candy\\src\\operators.candy",
-  "innerCalls": [],
-  "result": "trait BinaryPlus<Other, Result> {\r\n  fun binaryPlus(other: Other): Result\r\n}\r\ntrait AddOperator<Other, Result>: BinaryAdd<Other, Result> {\r\n  fun addOperator(other: Other): Result\r\n  fun binaryPlus(other: Other) = addOperator\r\n}\r\n\r\ntrait BinaryMinus<Other, Result> {\r\n  fun binaryMinus(other: Other): Result\r\n}\r\ntrait SubtractOperator<Other, Result>: BinarySubtract<Other, Result> {\r\n  fun subtractOperator(other: Other): Result\r\n  fun binaryMinus(other: Other) = minusOperator\r\n}\r\n\r\ntrait PrefixMinus<Result> {\r\n  fun prefixMinus(): Result\r\n}\r\ntrait ArithmeticNegateOperator<Result>: PrefixArithmeticNegate<Result> {\r\n  fun arithmeticNegate(): Result\r\n  fun prefixMinus() = arithmeticNegate\r\n}\r\n"
-}
