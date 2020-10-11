@@ -219,6 +219,10 @@
           "name": "keyword.operator.assignment.logical.candy"
         },
         {
+          "match": "\\bmodule\\b",
+          "name": "keyword.other.module.candy"
+        },
+        {
           "match": "(?<!\\$)\\b(data|late|mut|public|static)\\b(?!\\$)",
           "name": "storage.modifier.candy"
         },
