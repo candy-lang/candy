@@ -74,10 +74,12 @@ A simple, extensible language enabling everyone to focus on getting things done.
 ### 1.3. Paradigms
 
 OOP Pros:
+
 - familiar
 - typical inheritance examples / intuitive
 
 Rust-like Pros:
+
 - no "one size fits all"
   - forces you to define better interfaces
 - mix and match / composition over inheritance
@@ -238,7 +240,6 @@ trait Foo {
   fun baz(): Int
 }
 ```
-
 
 ### 5.2. `impl`
 
@@ -460,6 +461,7 @@ Set literal: `{1, 2, 3}`
 Map literal: `{1 to 1, 2 to 2, 3 to 3}`
 
 If the values are compile-time inferred to be `Map.Entry`s, the literal creates a map. You can change it to be a set by:
+
 - explicitly specifying type arguments (`<Map.Entry<Key, Value>>{ … }`)
 - explicitly specifying its type (`let a: Set<Map.Entry<Key, Value>> = { … }`)
 
@@ -522,8 +524,11 @@ if (…) … else …
 ```
 
 ### 9.5. Match
+
 ### 9.6. Return
+
 ### 9.7. Break
+
 ### 9.8. Continue
 
 ### 9.9. Throw, Try & Catch
@@ -587,7 +592,9 @@ let regex: RegEx = `regex:abc[\w\d]+`
 ## 10. Statements
 
 ### 10.1. For
+
 ### 10.2. Loop
+
 ### 10.3. While
 
 
@@ -641,7 +648,6 @@ File structure of a project `foo`:
 - package config
 - `README.md`
 - `.git`, etc.
-
 
 ```yaml
 # specifying targets isn't necessary unless you want to configure them
@@ -725,7 +731,6 @@ dependencies:
           defaultCasing: snake
 ```
 
-
 ```rust
 use serializable
 
@@ -765,6 +770,7 @@ class Foo
 </details>
 
 Compiler Plugin:
+
 - runs in separate process; communication via stdin/stdout → TODO: protocol
 - can request execution per class, per function
   - can be filtered to classes/methods with specific annotations
@@ -775,6 +781,7 @@ Compiler Plugin:
 ## 13. Types
 
 Primitive types:
+
 - `Bool`
 - `Number`:
   - integers:
@@ -801,10 +808,9 @@ R.(T1 t1, T2 t2, …, Tn tn = dn) => T
 ```kotlin
 fun a(Pair<Int, Int> pair)
     where pair.first <= pair.second {
-  
+
 }
 ```
-
 
 ### 13.3. Implicit Casts
 
