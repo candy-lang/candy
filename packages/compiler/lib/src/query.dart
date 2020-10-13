@@ -82,10 +82,12 @@ class GlobalQueryContext {
       result = e.recordedCall;
     }
 
-    final dateTime = DateTime.now().toIso8601String().replaceAll(':', '-');
+    var dateTime = DateTime.now().toIso8601String();
+    dateTime =
+        dateTime.substring(0, dateTime.indexOf('.')).replaceAll(':', '-');
     final encoder = JsonEncoder.withIndent('  ', (object) => object.toString());
     config.buildArtifactManager.setContent(
-      BuildArtifactId('query-traces/${query.name}-$dateTime.json'),
+      BuildArtifactId('query-traces/$dateTime ${query.name}.json'),
       encoder.convert(result.toJson()),
     );
 
