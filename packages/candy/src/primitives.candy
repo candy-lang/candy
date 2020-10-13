@@ -1,18 +1,24 @@
 use .operators
 
-public external class Any
-public external class Unit
-public external class Nothing
+public builtin trait Any
+builtin impl Any: ToString
 
-public external class Bool
+public trait ToString {
+  fun toString(): String
+}
+
+public builtin class Unit
+public builtin class Nothing
+
+public builtin class Bool
 
 public trait Number: AddOperator<This, This> & SubtractOperator<This, This>
 
-public external class Int
-external impl Int: Number
+public builtin class Int
+builtin impl Int: Number
 
-public external class Float
-external impl Float: Number
+public builtin class Float
+builtin impl Float: Number
 
 public class String
-external impl String: PlusOperator<This, This>
+builtin impl String: PlusOperator<This, This>

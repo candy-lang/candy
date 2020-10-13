@@ -1,1 +1,1 @@
-external fun print(object: Any): Unit
+builtin fun print(object: Any): Unit

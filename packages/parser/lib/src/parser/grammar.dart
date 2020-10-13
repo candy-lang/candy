@@ -789,6 +789,7 @@ class ParserGrammar {
 
   static final modifiers = modifier.plus();
   static final modifier = ((LexerGrammar.PUBLIC |
+              LexerGrammar.BUILTIN |
               LexerGrammar.EXTERNAL |
               LexerGrammar.OVERRIDE |
               LexerGrammar.CONST) &

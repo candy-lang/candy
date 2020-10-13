@@ -13,6 +13,9 @@ part 'declarations.freezed.dart';
 
 abstract class Declaration extends AstNode {
   const Declaration();
+
+  List<ModifierToken> get modifiers;
+  bool get isBuiltin => modifiers.any((m) => m is BuiltinModifierToken);
 }
 
 @freezed
@@ -233,10 +236,12 @@ abstract class PropertyDeclaration extends Declaration
 abstract class PropertyAccessor extends Declaration
     implements _$PropertyAccessor {
   const factory PropertyAccessor.getter({
+    @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
     @required GetKeywordToken keyword,
     Block body,
   }) = GetterPropertyAccessor;
   const factory PropertyAccessor.setter({
+    @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
     @required SetKeywordToken keyword,
     Block body,
   }) = SetterPropertyAccessor;
@@ -244,7 +249,9 @@ abstract class PropertyAccessor extends Declaration
 
   @override
   Iterable<SyntacticEntity> get children => when(
-        getter: (keyword, _) => [keyword, if (body != null) body],
-        setter: (keyword, _) => [keyword, if (body != null) body],
+        getter: (modifiers, keyword, _) =>
+            [...modifiers, keyword, if (body != null) body],
+        setter: (modifiers, keyword, _) =>
+            [...modifiers, keyword, if (body != null) body],
       );
 }
