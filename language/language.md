@@ -110,7 +110,7 @@ let foo3: Int
   get => 1
 mut let blub: Int
   get => field * 5
-  set => field = value + 1
+  set => field = it + 1
 
 // Delegation:
 let bar: Int by vetoable { old, new => TODO() }
