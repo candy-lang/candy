@@ -90,7 +90,7 @@ final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>, DeclarationId>(
     if (type.simpleTypes.length == 1 &&
         type.simpleTypes.single.name.name == 'Any') {
       // TODO(JonasWanke): remove this when we have Any in the standard library
-      return DeclarationId(ResourceId(PackageId.core, 'primitives.candy'), [])
+      return DeclarationId(ResourceId(PackageId.core, 'primitives.candy'))
           .inner(TraitDeclarationPathData('Any'));
     }
 

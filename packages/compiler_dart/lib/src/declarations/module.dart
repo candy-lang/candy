@@ -21,9 +21,12 @@ final compileModule = Query<ModuleId, Unit>(
       }
     });
 
+    final source = _dartFmt.format(
+      library.accept(dart.DartEmitter(_PrefixedAllocator())).toString(),
+    );
     context.config.buildArtifactManager.setContent(
       moduleIdToBuildArtifactId(context, moduleId),
-      _dartFmt.format(library.accept(dart.DartEmitter.scoped()).toString()),
+      source,
     );
 
     return Unit();
@@ -40,16 +43,6 @@ final moduleIdToBuildArtifactId = Query<ModuleId, BuildArtifactId>(
         .child(moduleIdToPath(context, moduleId));
   },
 );
-final moduleIdToRelativePath = Query<Tuple2<ModuleId, ModuleId>, String>(
-  'dart.moduleIdToPath',
-  evaluateAlways: true,
-  provider: (context, params) {
-    final current = moduleIdToPath(context, params.first);
-    final other = moduleIdToPath(context, params.second);
-
-    return p.posix.relative('/$other', from: '/$current');
-  },
-);
 final moduleIdToPath = Query<ModuleId, String>(
   'dart.moduleIdToPath',
   evaluateAlways: true,
@@ -60,6 +53,34 @@ final moduleIdToPath = Query<ModuleId, String>(
       );
     }
 
-    return '${moduleId.path.join('.')}$dartFileExtension';
+    return '${moduleId.path.join('/')}$dartFileExtension';
   },
 );
+final moduleIdToImportUrl = Query<ModuleId, String>(
+  'dart.moduleIdToImportUrl',
+  evaluateAlways: true,
+  provider: (context, moduleId) =>
+      'package:$packageName/src/${moduleId.path.join('/')}$dartFileExtension',
+);
+
+/// Copy of `code_builder`'s _PrefixedAllocator that also prefixes core imports.
+class _PrefixedAllocator implements dart.Allocator {
+  final _imports = <String, int>{};
+  var _keys = 1;
+
+  @override
+  String allocate(dart.Reference reference) {
+    final symbol = reference.symbol;
+    if (reference.url == null) {
+      return symbol;
+    }
+    return '_i${_imports.putIfAbsent(reference.url, _nextKey)}.$symbol';
+  }
+
+  int _nextKey() => _keys++;
+
+  @override
+  Iterable<dart.Directive> get imports => _imports.keys.map(
+        (u) => dart.Directive.import(u, as: '_i${_imports[u]}'),
+      );
+}

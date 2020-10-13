@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../utils.dart';
 import 'ids.dart';
 import 'type.dart';
 
@@ -48,15 +49,17 @@ abstract class Identifier implements _$Identifier {
   const factory Identifier.super_(CandyType type) = SuperIdentifier;
   const factory Identifier.it(CandyType type) = ItIdentifier;
   const factory Identifier.field(CandyType type) = FieldIdentifier;
-  const factory Identifier.trait(DeclarationId id, CandyType type) =
-      TraitIdentifier;
+  const factory Identifier.module(ModuleId id) = ModuleIdentifier;
+  const factory Identifier.trait(DeclarationId id) = TraitIdentifier;
   // ignore: non_constant_identifier_names
-  const factory Identifier.class_(DeclarationId id, CandyType type) =
-      ClassIdentifier;
+  const factory Identifier.class_(DeclarationId id) = ClassIdentifier;
 
   /// A property or function.
-  const factory Identifier.property(DeclarationId id, CandyType type) =
-      PropertyIdentifier;
+  const factory Identifier.property(
+    Expression target,
+    String name,
+    CandyType type,
+  ) = PropertyIdentifier;
 
   const factory Identifier.parameter(
     String name,
@@ -67,6 +70,18 @@ abstract class Identifier implements _$Identifier {
   factory Identifier.fromJson(Map<String, dynamic> json) =>
       _$IdentifierFromJson(json);
   const Identifier._();
+
+  CandyType get type => when(
+        this_: (type) => type,
+        super_: (type) => type,
+        it: (type) => type,
+        field: (type) => type,
+        trait: (_) => CandyType.declaration,
+        class_: (_) => CandyType.declaration,
+        module: (_) => CandyType.declaration,
+        property: (_, __, type) => type,
+        parameter: (_, __, type) => type,
+      );
 }
 
 @freezed

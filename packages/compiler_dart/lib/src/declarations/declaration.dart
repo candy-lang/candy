@@ -1,12 +1,18 @@
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 
+import '../builtins.dart';
 import 'function.dart';
 import 'module.dart';
 
 final compileDeclaration = Query<DeclarationId, Option<dart.Spec>>(
   'dart.compileDeclaration',
   provider: (context, declarationId) {
+    final declaration = getDeclarationAst(context, declarationId);
+    if (declaration.isBuiltin) {
+      return compileBuiltin(context, declarationId);
+    }
+
     if (declarationId.isModule) {
       compileModule(context, declarationIdToModuleId(context, declarationId));
       return Option.none();

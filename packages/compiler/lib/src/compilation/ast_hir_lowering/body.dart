@@ -260,8 +260,11 @@ Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerIdentifier(
       hir.Expression.identifier(
         context.getId(expression),
         hir.Identifier.property(
-          DeclarationId(ResourceId(PackageId.this_, 'main.candy'), [])
-              .inner(DeclarationPathData.function('print')),
+          hir.Expression.identifier(
+            context.getId(expression),
+            hir.Identifier.module(ModuleId(PackageId.this_, ['main'])),
+          ),
+          'print',
           hir.CandyType.function(
             parameterTypes: [hir.CandyType.any],
             returnType: hir.CandyType.unit,
@@ -286,7 +289,11 @@ Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerCall(
     if (target is hir.IdentifierExpression &&
         target.identifier is hir.PropertyIdentifier) {
       final identifier = target.identifier as hir.PropertyIdentifier;
-      if (identifier.id.isFunction) {
+      final declarationId = getPropertyIdentifierDeclarationId(
+        context.queryContext,
+        identifier,
+      );
+      if (declarationId.isFunction) {
         return _lowerFunctionCall(context, expression, target, identifier);
       }
     }
@@ -299,14 +306,48 @@ Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerCall(
   return _mergeResults(results);
 }
 
+final getPropertyIdentifierDeclarationId =
+    Query<hir.PropertyIdentifier, DeclarationId>(
+  'getPropertyIdentifierDeclarationId',
+  provider: (context, identifier) {
+    final target = identifier.target;
+    if (target is! hir.IdentifierExpression) {
+      throw CompilerError.unsupportedFeature(
+        'Properties of instances are not yet supported.',
+      );
+    }
+
+    final targetIdentifier = (target as hir.IdentifierExpression).identifier;
+    List<DeclarationId> innerDeclarationIds;
+    if (targetIdentifier is hir.ModuleIdentifier) {
+      innerDeclarationIds =
+          getModuleDeclarationHir(context, targetIdentifier.id)
+              .innerDeclarationIds;
+    } else if (targetIdentifier is hir.TraitIdentifier) {
+      innerDeclarationIds = getTraitDeclarationHir(context, targetIdentifier.id)
+          .innerDeclarationIds;
+    } else {
+      assert(false);
+      return null;
+    }
+    return innerDeclarationIds
+        .firstWhere((id) => id.simplePath.last.nameOrNull == identifier.name);
+  },
+);
+
 Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerFunctionCall(
   _LocalContext context,
   ast.CallExpression expression,
   hir.IdentifierExpression target,
   hir.PropertyIdentifier targetIdentifier,
 ) {
+  final functionDeclarationId = getPropertyIdentifierDeclarationId(
+    context.queryContext,
+    targetIdentifier,
+  );
+  assert(functionDeclarationId.isFunction);
   final functionHir =
-      getFunctionDeclarationHir(context.queryContext, targetIdentifier.id);
+      getFunctionDeclarationHir(context.queryContext, functionDeclarationId);
   if (!context.isValidReturnType(functionHir.returnType)) return null;
 
   final errors = <ReportedCompilerError>[];

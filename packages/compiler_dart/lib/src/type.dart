@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 
 import 'constants.dart';
+import 'declarations/module.dart';
 
 final compileType = Query<CandyType, dart.TypeReference>(
   'dart.compileType',
@@ -10,14 +11,18 @@ final compileType = Query<CandyType, dart.TypeReference>(
     return type.map(
       user: (type) {
         if (type == CandyType.any) return _createDartType('Object');
-        if (type == CandyType.unit) return _createDartType('void');
+        if (type == CandyType.unit) return _createDartType('void', url: null);
         if (type == CandyType.nothing) return _createDartType('dynamic');
         if (type == CandyType.bool) return _createDartType('bool');
         if (type == CandyType.number) return _createDartType('Num');
         if (type == CandyType.int) return _createDartType('int');
         if (type == CandyType.float) return _createDartType('double');
         if (type == CandyType.string) return _createDartType('String');
-        return _unsupportedType(type);
+
+        return _createDartType(
+          type.name,
+          url: moduleIdToImportUrl(context, type.moduleId),
+        );
       },
       tuple: _unsupportedType,
       function: _unsupportedType,

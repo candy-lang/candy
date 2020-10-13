@@ -2,6 +2,8 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 
 import 'constants.dart';
+import 'declarations/module.dart';
+import 'type.dart';
 
 final compileBody = Query<DeclarationId, dart.Code>(
   'dart.compileBody',
@@ -28,11 +30,26 @@ dart.Expression _compile(QueryContext context, Expression expression) {
       super_: (_) => dart.refer('super'),
       it: null,
       field: null,
+      module: (id) => ModuleExpression(context, id),
       trait: null,
       class_: null,
-      property: null,
+      property: (target, name, _) {
+        final compiledTarget = _compile(context, target);
+        if (compiledTarget is ModuleExpression) {
+          final currentModuleId =
+              declarationIdToModuleId(context, expression.id.declarationId);
+          if (compiledTarget.moduleId == currentModuleId) {
+            return dart.refer(name);
+          }
+
+          return dart.refer(
+            name,
+            moduleIdToImportUrl(context, compiledTarget.moduleId),
+          );
+        }
+        return compiledTarget.property(name);
+      },
       parameter: null,
-      printFunction: (_) => dart.refer('print', dartCoreUrl),
     ),
     literal: (id, literal) => literal.when(
       boolean: dart.literalBool,
@@ -45,7 +62,10 @@ dart.Expression _compile(QueryContext context, Expression expression) {
       [],
     ),
     functionCall: (id, target, arguments) {
-      final functionId = (target.identifier as PropertyIdentifier).id;
+      final functionId = getPropertyIdentifierDeclarationId(
+        context,
+        target.identifier as PropertyIdentifier,
+      );
       final parameters =
           getFunctionDeclarationHir(context, functionId).parameters;
       return dart.InvokeExpression.newOf(
@@ -59,4 +79,18 @@ dart.Expression _compile(QueryContext context, Expression expression) {
       );
     },
   );
+}
+
+class ModuleExpression extends dart.InvokeExpression {
+  ModuleExpression(QueryContext context, this.moduleId)
+      : assert(context != null),
+        assert(moduleId != null),
+        super.constOf(
+          compileType(context, CandyType.moduleDeclaration),
+          [dart.literalString(moduleId.toString())],
+          {},
+          [],
+        );
+
+  final ModuleId moduleId;
 }

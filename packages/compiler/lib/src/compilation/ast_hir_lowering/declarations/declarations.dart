@@ -140,16 +140,6 @@ extension on DeclarationPathData {
         propertyGetter: () => DeclarationType.propertyGetter,
         propertySetter: () => DeclarationType.propertySetter,
       );
-  String get nameOrNull => when(
-        module: (name) => name,
-        trait: (name) => name,
-        impl: (name) => name,
-        class_: (name) => name,
-        function: (name) => name,
-        property: (name) => name,
-        propertyGetter: () => null,
-        propertySetter: () => null,
-      );
 }
 
 extension on DeclarationType {}

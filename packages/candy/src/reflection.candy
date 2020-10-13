@@ -1,0 +1,4 @@
+trait Declaration
+
+builtin class ModuleDeclaration
+builtin impl ModuleDeclaration: Declaration

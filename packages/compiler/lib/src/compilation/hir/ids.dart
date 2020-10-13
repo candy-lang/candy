@@ -11,9 +11,10 @@ part 'ids.g.dart';
 @freezed
 abstract class DeclarationId implements _$DeclarationId {
   const factory DeclarationId(
-    ResourceId resourceId,
-    List<DisambiguatedDeclarationPathData> path,
-  ) = _DeclarationId;
+    ResourceId resourceId, [
+    @Default(<DisambiguatedDeclarationPathData>[])
+        List<DisambiguatedDeclarationPathData> path,
+  ]) = _DeclarationId;
   factory DeclarationId.fromJson(Map<String, dynamic> json) =>
       _$DeclarationIdFromJson(json);
   const DeclarationId._();
@@ -73,6 +74,17 @@ abstract class DeclarationPathData implements _$DeclarationPathData {
       _$DeclarationPathDataFromJson(json);
   const DeclarationPathData._();
 
+  String get nameOrNull => when(
+        module: (name) => name,
+        trait: (name) => name,
+        impl: (name) => name,
+        class_: (name) => name,
+        function: (name) => name,
+        property: (name) => name,
+        propertyGetter: () => null,
+        propertySetter: () => null,
+      );
+
   @override
   String toString() {
     return when(
@@ -121,6 +133,7 @@ abstract class ModuleId implements _$ModuleId {
   const ModuleId._();
 
   static const corePrimitives = ModuleId(PackageId.core, ['primitives']);
+  static const coreReflection = ModuleId(PackageId.core, ['reflection']);
   static const coreCollections = ModuleId(PackageId.core, ['collections']);
 
   static const thisSegment = 'this';
