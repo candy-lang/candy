@@ -171,7 +171,7 @@
           "name": "keyword.control.candy"
         },
         {
-          "match": "(?<!\\$)\\b(builtin|ss|enum|external|impl|get|set|trait|type)\\b(?!\\$)",
+          "match": "(?<!\\$)\\b(builtin|class|enum|external|impl|get|set|trait|type)\\b(?!\\$)",
           "name": "keyword.declaration.candy"
         },
         {
