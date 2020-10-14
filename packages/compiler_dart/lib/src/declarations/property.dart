@@ -10,6 +10,9 @@ final compileProperty = Query<DeclarationId, dart.Field>(
   provider: (context, declarationId) {
     final property = getPropertyDeclarationHir(context, declarationId);
     return dart.Field((b) => b
+      ..modifier = property.isMutable
+          ? dart.FieldModifier.var$
+          : dart.FieldModifier.final$
       ..name = property.name
       ..type = compileType(context, property.type)
       ..assignment = property.initializer != null
