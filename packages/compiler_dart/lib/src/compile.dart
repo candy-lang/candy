@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:compiler/compiler.dart';
 import 'package:path/path.dart' as p;
+import 'package:pubspec/pubspec.dart';
 
 import 'constants.dart';
 import 'declarations/module.dart';
@@ -15,10 +16,10 @@ final compile = Query<Unit, Unit>(
     context.config.buildArtifactManager.delete(dartBuildArtifactId);
 
     final pubspec = generatePubspec(context, Unit());
-    context.config.buildArtifactManager.setContent(
-      dartBuildArtifactId.child(pubspecFile),
-      jsonEncode(pubspec.toJson()),
-    );
+    final ioSink = _SimpleIoSink();
+    YamlToString().writeYamlString(pubspec.toJson(), ioSink);
+    context.config.buildArtifactManager
+        .setContent(dartBuildArtifactId.child(pubspecFile), ioSink.toString());
 
     compileModule(context, mainModuleId);
 
@@ -31,14 +32,14 @@ final runPubGet = Query<Unit, Unit>(
   evaluateAlways: true,
   provider: (context, _) {
     final result = Process.runSync(
-      'pub',
+      'pub.bat',
       ['get'],
       workingDirectory:
           context.config.buildArtifactManager.toPath(dartBuildArtifactId),
     );
     if (result.exitCode != 0) {
       throw CompilerError.internalError(
-        'Error running `pub get`: ${result.stdout}',
+        'Error running `pub get`:\n${result.stdout}\n${result.stderr}',
       );
     }
 
@@ -65,3 +66,46 @@ final run = Query<Unit, String>(
     ].join('\n');
   },
 );
+
+class _SimpleIoSink implements IOSink {
+  _SimpleIoSink() : _buffer = StringBuffer();
+
+  final StringBuffer _buffer;
+  @override
+  Encoding encoding = utf8;
+
+  @override
+  void add(List<int> data) {
+    throw UnimplementedError();
+  }
+
+  @override
+  void addError(Object error, [StackTrace stackTrace]) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> addStream(Stream<List<int>> stream) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> close() async {}
+  @override
+  Future<void> get done => Future.value();
+  @override
+  Future<void> flush() => Future.value();
+
+  @override
+  void write(Object obj) => _buffer.write(obj);
+  @override
+  void writeAll(Iterable<Object> objects, [String separator = '']) =>
+      _buffer.writeAll(objects, separator);
+  @override
+  void writeCharCode(int charCode) => _buffer.writeCharCode(charCode);
+  @override
+  void writeln([Object obj = '']) => _buffer.writeln(obj);
+
+  @override
+  String toString() => _buffer.toString();
+}

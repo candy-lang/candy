@@ -1,7 +1,6 @@
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 import 'package:dart_style/dart_style.dart';
-import 'package:path/path.dart' as p;
 
 import '../constants.dart';
 import 'declaration.dart';
