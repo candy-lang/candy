@@ -27,6 +27,8 @@ abstract class Option<T> implements _$Option<T> {
   }
 
   T get valueOrNull => when(some: (value) => value, none: () => null);
+
+  List<T> toList() => when(some: (value) => [value], none: () => []);
 }
 
 @freezed
@@ -54,4 +56,15 @@ abstract class Result<T, E> implements _$Result<T, E> {
 @freezed
 abstract class Tuple2<T1, T2> with _$Tuple2<T1, T2> {
   const factory Tuple2(T1 first, T2 second) = _Tuple2<T1, T2>;
+}
+
+@freezed
+abstract class Tuple3<T1, T2, T3> with _$Tuple3<T1, T2, T3> {
+  const factory Tuple3(T1 first, T2 second, T3 third) = _Tuple3<T1, T2, T3>;
+}
+
+@freezed
+abstract class Tuple4<T1, T2, T3, T4> with _$Tuple4<T1, T2, T3, T4> {
+  const factory Tuple4(T1 first, T2 second, T3 third, T4 fourth) =
+      _Tuple4<T1, T2, T3, T4>;
 }

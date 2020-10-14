@@ -2,6 +2,7 @@ import 'package:dartx/dartx.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../lexer/lexer.dart';
+import '../../source_span.dart';
 import '../../syntactic_entity.dart';
 import '../../utils.dart';
 import 'expressions/expressions.dart';
@@ -16,6 +17,8 @@ abstract class Declaration extends AstNode {
 
   List<ModifierToken> get modifiers;
   bool get isBuiltin => modifiers.any((m) => m is BuiltinModifierToken);
+
+  SourceSpan get representativeSpan;
 }
 
 @freezed
@@ -32,6 +35,9 @@ abstract class ModuleDeclaration extends Declaration
   @override
   Iterable<SyntacticEntity> get children =>
       [...modifiers, moduleKeyword, name, body];
+
+  @override
+  SourceSpan get representativeSpan => name.span;
 }
 
 @freezed
@@ -58,6 +64,9 @@ abstract class TraitDeclaration extends Declaration
         if (bound != null) bound,
         if (body != null) body,
       ];
+
+  @override
+  SourceSpan get representativeSpan => name.span;
 }
 
 @freezed
@@ -84,6 +93,9 @@ abstract class ImplDeclaration extends Declaration
         if (trait != null) trait,
         if (body != null) body,
       ];
+
+  @override
+  SourceSpan get representativeSpan => type.span;
 }
 
 @freezed
@@ -106,6 +118,9 @@ abstract class ClassDeclaration extends Declaration
         if (typeParameters != null) typeParameters,
         if (body != null) body,
       ];
+
+  @override
+  SourceSpan get representativeSpan => name.span;
 }
 
 @freezed
@@ -174,6 +189,9 @@ abstract class FunctionDeclaration extends Declaration
         if (returnType != null) returnType,
         if (body != null) body,
       ];
+
+  @override
+  SourceSpan get representativeSpan => name.span;
 }
 
 @freezed
@@ -203,10 +221,9 @@ abstract class PropertyDeclaration extends Declaration
   const factory PropertyDeclaration({
     @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
     @required LetKeywordToken letKeyword,
-    MutKeywordToken mutKeyword,
     @required IdentifierToken name,
-    @required OperatorToken colon,
-    @required Type type,
+    OperatorToken colon,
+    Type type,
     OperatorToken equals,
     Expression initializer,
     @Default(<PropertyAccessor>[]) List<PropertyAccessor> accessors,
@@ -217,7 +234,6 @@ abstract class PropertyDeclaration extends Declaration
   Iterable<SyntacticEntity> get children => [
         ...modifiers,
         letKeyword,
-        if (mutKeyword != null) mutKeyword,
         name,
         colon,
         type,
@@ -225,6 +241,11 @@ abstract class PropertyDeclaration extends Declaration
         if (initializer != null) initializer,
         ...accessors,
       ];
+
+  bool get isMutable => modifiers.any((m) => m is MutModifierToken);
+
+  @override
+  SourceSpan get representativeSpan => name.span;
 
   GetterPropertyAccessor get getter =>
       accessors.whereType<GetterPropertyAccessor>().firstOrNull;
@@ -253,5 +274,11 @@ abstract class PropertyAccessor extends Declaration
             [...modifiers, keyword, if (body != null) body],
         setter: (modifiers, keyword, _) =>
             [...modifiers, keyword, if (body != null) body],
+      );
+
+  @override
+  SourceSpan get representativeSpan => when(
+        getter: (_, keyword, __) => keyword.span,
+        setter: (_, keyword, __) => keyword.span,
       );
 }

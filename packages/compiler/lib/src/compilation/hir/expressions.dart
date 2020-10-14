@@ -30,12 +30,12 @@ abstract class Expression implements _$Expression {
       _$ExpressionFromJson(json);
   const Expression._();
 
-  CandyType get type => map(
-        identifier: (it) => it.type,
-        literal: (it) => it.type,
-        call: (it) => null,
-        functionCall: (it) {
-          final functionType = it.target.type as FunctionCandyType;
+  CandyType get type => when(
+        identifier: (_, identifier) => identifier.type,
+        literal: (_, literal) => literal.type,
+        call: (_, __, ___) => null,
+        functionCall: (_, target, __) {
+          final functionType = target.type as FunctionCandyType;
           return functionType.returnType;
         },
       );

@@ -62,7 +62,8 @@ class ParserGrammar {
   static final useLine = (localAbsoluteUseLine as Parser<UseLine>) |
       localRelativeUseLine |
       globalUseLine;
-  static final localAbsoluteUseLine = (LexerGrammar.USE &
+  static final localAbsoluteUseLine = (modifiers.optional() &
+          LexerGrammar.USE &
           LexerGrammar.NLs &
           LexerGrammar.CRATE &
           LexerGrammar.NLs &
@@ -70,29 +71,33 @@ class ParserGrammar {
           LexerGrammar.NLs &
           LexerGrammar.Identifier.separatedList(LexerGrammar.DOT))
       .map<UseLine>((value) {
-    final path = value[6] as List<dynamic>;
+    final path = value[7] as List<dynamic>;
     return UseLine.localAbsolute(
-      useKeyword: value[0] as UseKeywordToken,
-      crateKeyword: value[2] as CrateKeywordToken,
-      dots: [value[4] as OperatorToken, ...path[1] as List<OperatorToken>],
+      modifiers: value[0] as List<ModifierToken> ?? [],
+      useKeyword: value[1] as UseKeywordToken,
+      crateKeyword: value[3] as CrateKeywordToken,
+      dots: [value[5] as OperatorToken, ...path[1] as List<OperatorToken>],
       pathSegments: path[0] as List<IdentifierToken>,
     );
   });
-  static final localRelativeUseLine = (LexerGrammar.USE &
+  static final localRelativeUseLine = (modifiers.optional() &
+          LexerGrammar.USE &
           LexerGrammar.NLs &
           LexerGrammar.DOT.plus() &
           LexerGrammar.NLs &
           LexerGrammar.Identifier.separatedList(LexerGrammar.DOT))
       .map<UseLine>((value) {
-    final path = value[4] as List<dynamic>;
+    final path = value[5] as List<dynamic>;
     return UseLine.localRelative(
-      useKeyword: value[0] as UseKeywordToken,
-      leadingDots: value[2] as List<OperatorToken>,
+      modifiers: value[0] as List<ModifierToken> ?? [],
+      useKeyword: value[1] as UseKeywordToken,
+      leadingDots: value[3] as List<OperatorToken>,
       pathSegments: path[0] as List<IdentifierToken>,
       dots: path[1] as List<OperatorToken>,
     );
   });
-  static final globalUseLine = (LexerGrammar.USE &
+  static final globalUseLine = (modifiers.optional() &
+          LexerGrammar.USE &
           LexerGrammar.NLs &
           LexerGrammar.Identifier.separatedList(LexerGrammar.SLASH) &
           (LexerGrammar.NLs &
@@ -101,10 +106,11 @@ class ParserGrammar {
                   LexerGrammar.Identifier)
               .optional())
       .map<UseLine>((value) {
-    final packagePart = value[2] as List<dynamic>;
-    final modulePart = value[3] as List<dynamic>;
+    final packagePart = value[3] as List<dynamic>;
+    final modulePart = value[4] as List<dynamic>;
     return UseLine.global(
-      useKeyword: value[0] as UseKeywordToken,
+      modifiers: value[0] as List<ModifierToken> ?? [],
+      useKeyword: value[1] as UseKeywordToken,
       packagePathSegments: packagePart[0] as List<IdentifierToken>,
       slashes: packagePart[1] as List<OperatorToken>,
       dot: modulePart?.elementAt(1) as OperatorToken,
@@ -259,13 +265,10 @@ class ParserGrammar {
 
   static final propertyDeclaration = (modifiers.optional() &
           LexerGrammar.LET &
-          (LexerGrammar.NLs & LexerGrammar.MUT).optional() &
           LexerGrammar.NLs &
           LexerGrammar.Identifier &
-          LexerGrammar.NLs &
-          LexerGrammar.COLON &
-          LexerGrammar.NLs &
-          type &
+          (LexerGrammar.NLs & LexerGrammar.COLON & LexerGrammar.NLs & type)
+              .optional() &
           (LexerGrammar.NLs &
                   LexerGrammar.EQUALS &
                   LexerGrammar.NLs &
@@ -273,19 +276,19 @@ class ParserGrammar {
               .optional() &
           (LexerGrammar.NLs & propertyAccessors).optional())
       .map<PropertyDeclaration>((value) {
-    final initializerDeclaration = value[9] as List<dynamic>;
+    final typeDeclaration = value[4] as List<dynamic>;
+    final initializerDeclaration = value[5] as List<dynamic>;
     return PropertyDeclaration(
       modifiers: (value[0] as List<ModifierToken>) ?? [],
       letKeyword: value[1] as LetKeywordToken,
-      mutKeyword: (value[2] as List<dynamic>)?.elementAt(1) as MutKeywordToken,
-      name: value[4] as IdentifierToken,
-      colon: value[6] as OperatorToken,
-      type: value[8] as Type,
+      name: value[3] as IdentifierToken,
+      colon: typeDeclaration?.elementAt(1) as OperatorToken,
+      type: typeDeclaration?.elementAt(3) as Type,
       equals: initializerDeclaration?.elementAt(1) as OperatorToken,
       initializer: initializerDeclaration?.elementAt(3) as Expression,
-      accessors: (value[10] as List<dynamic>)?.elementAt(1)
-              as List<PropertyAccessor> ??
-          [],
+      accessors:
+          (value[6] as List<dynamic>)?.elementAt(1) as List<PropertyAccessor> ??
+              [],
     );
   });
   static final propertyAccessors = (propertyAccessor &
@@ -788,7 +791,9 @@ class ParserGrammar {
   // SECTION: modifiers
 
   static final modifiers = modifier.plus();
-  static final modifier = ((LexerGrammar.PUBLIC |
+  // ignore: unnecessary_cast
+  static final modifier = (((LexerGrammar.PUBLIC as Parser<ModifierToken>) |
+              LexerGrammar.MUT |
               LexerGrammar.BUILTIN |
               LexerGrammar.EXTERNAL |
               LexerGrammar.OVERRIDE |

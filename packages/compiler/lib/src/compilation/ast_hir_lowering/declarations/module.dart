@@ -9,7 +9,6 @@ import '../../../utils.dart';
 import '../../ast/parser.dart';
 import '../../hir.dart' as hir;
 import '../../hir/ids.dart';
-import '../../ids.dart';
 import 'declarations.dart';
 
 const moduleFileName = 'module$candyFileExtension';
@@ -72,8 +71,7 @@ final moduleIdToDeclarationId = Query<ModuleId, DeclarationId>(
 );
 final moduleIdToOptionalDeclarationId = Query<ModuleId, Option<DeclarationId>>(
   'moduleIdToOptionalDeclarationId',
-  provider: (context, rawModuleId) {
-    final moduleId = rawModuleId.normalized;
+  provider: (context, moduleId) {
     final packageId = moduleId.packageId;
     var path = '';
     String pathAnd(String newSegment) =>
@@ -93,18 +91,19 @@ final moduleIdToOptionalDeclarationId = Query<ModuleId, Option<DeclarationId>>(
     ResourceId resourceId;
     if (doesResourceExist(context, moduleResourceId)) {
       resourceId = moduleResourceId;
-    } else {
+    } else if (remainingPath.isNotEmpty) {
       final fileResourceId = ResourceId(
         packageId,
         pathAnd('${remainingPath.first}$candyFileExtension'),
       );
-      if (remainingPath.isNotEmpty &&
-          doesResourceExist(context, fileResourceId)) {
+      if (doesResourceExist(context, fileResourceId)) {
         resourceId = resourceId = fileResourceId;
         remainingPath.removeAt(0);
       } else {
         return Option.none();
       }
+    } else {
+      return Option.none();
     }
 
     final declarationId = DeclarationId(
@@ -128,46 +127,6 @@ final resourceIdToModuleId = Query<ResourceId, ModuleId>(
     assert(resourceId.isCandyFile);
 
     final path = resourceId.path.removeSuffix(candyFileExtension).split('/');
-    return ModuleId(resourceId.packageId, path).normalized;
-  },
-);
-
-/// Resolves a module given a base [ResourceId] and an [ast.UseLine].
-final resolveUseLine = Query<Tuple2<ResourceId, ast.UseLine>, ModuleId>(
-  'resolveUseLine',
-  provider: (context, inputs) {
-    final resourceId = inputs.first;
-    final useLine = inputs.second;
-    // TODO(JonasWanke): packages with slashes
-
-    return useLine.map(
-      localAbsolute: (useLine) => ModuleId(
-        PackageId.this_,
-        useLine.pathSegments.map((s) => s.name).toList(),
-      ),
-      localRelative: (useLine) {
-        var resolved = resourceIdToModuleId(context, resourceId);
-        assert(useLine.leadingDots.isNotEmpty);
-        for (var i = 0; i < useLine.leadingDots.length - 1; i++) {
-          resolved = resolved.parent;
-        }
-        return resolved
-            .nested(useLine.pathSegments.map((s) => s.name).toList());
-      },
-      global: (useLine) {
-        if (useLine.moduleName != null) {
-          throw CompilerError.unsupportedFeature(
-            'Module imports from other packages are not yet supported.',
-          );
-        }
-        if (useLine.packagePathSegments.length > 1) {
-          throw CompilerError.unsupportedFeature(
-            'Scoped packages are not yet supported.',
-          );
-        }
-
-        return ModuleId(PackageId(useLine.packagePathSegments.single.name), []);
-      },
-    );
+    return ModuleId(resourceId.packageId, path);
   },
 );

@@ -32,12 +32,15 @@ abstract class CompilerError implements _$CompilerError {
   static const internalError = CompilerError._create('internalError');
   static const invalidArgumentType =
       CompilerError._create('invalidArgumentType');
+  static const invalidUseLine = CompilerError._create('invalidUseLine');
   static const moduleNotFound = CompilerError._create('moduleNotFound');
   static const multipleMainFunctions =
       CompilerError._create('multipleMainFunctions');
   static const multipleTypesWithSameName =
       CompilerError._create('multipleTypesWithSameName');
   static const noMainFunction = CompilerError._create('noMainFunction');
+  static const propertyTypeOrValueRequired =
+      CompilerError._create('propertyTypeOrValueRequired');
   static const undefinedIdentifier =
       CompilerError._create('undefinedIdentifier');
   static const unexpectedPositionalArgument =

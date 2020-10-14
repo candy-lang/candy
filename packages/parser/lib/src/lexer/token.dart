@@ -32,7 +32,6 @@ abstract class KeywordToken extends Token with _$KeywordToken {
       ClassKeywordToken;
   const factory KeywordToken.fun({@required SourceSpan span}) = FunKeywordToken;
   const factory KeywordToken.let({@required SourceSpan span}) = LetKeywordToken;
-  const factory KeywordToken.mut({@required SourceSpan span}) = MutKeywordToken;
   const factory KeywordToken.get({@required SourceSpan span}) = GetKeywordToken;
   const factory KeywordToken.set({@required SourceSpan span}) = SetKeywordToken;
   // Statements:
@@ -46,16 +45,18 @@ abstract class KeywordToken extends Token with _$KeywordToken {
 @freezed
 abstract class ModifierToken extends Token with _$ModifierToken {
   const factory ModifierToken.public({@required SourceSpan span}) =
-      _PublicModifierToken;
+      PublicModifierToken;
+  const factory ModifierToken.mut({@required SourceSpan span}) =
+      MutModifierToken;
   const factory ModifierToken.builtin({@required SourceSpan span}) =
       BuiltinModifierToken;
   const factory ModifierToken.external({@required SourceSpan span}) =
-      _ExternalModifierToken;
+      ExternalModifierToken;
   const factory ModifierToken.override({@required SourceSpan span}) =
-      _OverrideModifierToken;
+      OverrideModifierToken;
   // ignore: non_constant_identifier_names
   const factory ModifierToken.const_({@required SourceSpan span}) =
-      _ConstModifierToken;
+      ConstModifierToken;
 }
 
 abstract class LiteralToken<T> extends Token {

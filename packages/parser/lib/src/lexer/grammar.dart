@@ -148,8 +148,6 @@ class LexerGrammar {
       .tokenize((_, span) => KeywordToken.fun(span: span) as FunKeywordToken);
   static final LET = string('let')
       .tokenize((_, span) => KeywordToken.let(span: span) as LetKeywordToken);
-  static final MUT = string('mut')
-      .tokenize((_, span) => KeywordToken.mut(span: span) as MutKeywordToken);
   static final GET = string('get')
       .tokenize((_, span) => KeywordToken.get(span: span) as GetKeywordToken);
   static final SET = string('set')
@@ -163,13 +161,15 @@ class LexerGrammar {
   // SECTION: lexicalModifiers
 
   static final PUBLIC =
-      string('public').tokenize((_, span) => ModifierToken.public(span: span));
-  static final BUILTIN = string('builtin')
-      .tokenize((_, span) => ModifierToken.builtin(span: span));
+      string('public').tokenize((_, span) => PublicModifierToken(span: span));
+  static final MUT =
+      string('mut').tokenize((_, span) => MutModifierToken(span: span));
+  static final BUILTIN =
+      string('builtin').tokenize((_, span) => BuiltinModifierToken(span: span));
   static final EXTERNAL = string('external')
-      .tokenize((_, span) => ModifierToken.external(span: span));
+      .tokenize((_, span) => ExternalModifierToken(span: span));
   static final OVERRIDE = string('override')
-      .tokenize((_, span) => ModifierToken.override(span: span));
+      .tokenize((_, span) => OverrideModifierToken(span: span));
   static final CONST =
       string('const').tokenize((_, span) => ModifierToken.const_(span: span));
 

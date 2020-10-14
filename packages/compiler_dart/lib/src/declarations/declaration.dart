@@ -4,6 +4,7 @@ import 'package:compiler/compiler.dart';
 import '../builtins.dart';
 import 'function.dart';
 import 'module.dart';
+import 'property.dart';
 
 final compileDeclaration = Query<DeclarationId, Option<dart.Spec>>(
   'dart.compileDeclaration',
@@ -18,6 +19,8 @@ final compileDeclaration = Query<DeclarationId, Option<dart.Spec>>(
       return Option.none();
     } else if (declarationId.isFunction) {
       return Option.some(compileFunction(context, declarationId));
+    } else if (declarationId.isProperty) {
+      return Option.some(compileProperty(context, declarationId));
     } else {
       throw CompilerError.unsupportedFeature(
         'Unsupported declaration for Dart compiler: `$declarationId`.',

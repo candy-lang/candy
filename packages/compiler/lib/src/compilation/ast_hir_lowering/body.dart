@@ -11,6 +11,7 @@ import '../hir/ids.dart';
 import 'declarations/declarations.dart';
 import 'declarations/function.dart';
 import 'declarations/module.dart';
+import 'declarations/property.dart';
 import 'type.dart';
 
 final getBody = Query<DeclarationId, List<hir.Statement>>(
@@ -56,6 +57,35 @@ final Query<DeclarationId, Tuple2<List<hir.Statement>, BodyAstToHirIds>>
         }
       }).toList();
       return Tuple2(statements, localContext.idMap);
+    } else if (declarationId.isProperty) {
+      final propertyAst = getPropertyDeclarationAst(context, declarationId);
+      if (propertyAst.initializer == null) {
+        throw CompilerError.internalError(
+          '`lowerBodyAstToHir` called on a property without an initializer.',
+          location:
+              ErrorLocation(declarationId.resourceId, propertyAst.name.span),
+        );
+      }
+
+      var type = Option<hir.CandyType>.none();
+      if (propertyAst.type != null) {
+        final moduleId = declarationIdToModuleId(context, declarationId);
+        type = Option.some(
+          astTypeToHirType(context, Tuple2(moduleId, propertyAst.type)),
+        );
+      }
+      final localContext =
+          _LocalContext.forProperty(context, declarationId, type);
+
+      final result = localContext.lowerToUnambiguous(propertyAst.initializer);
+      // ignore: only_throw_errors, Iterables of errors are also handled.
+      if (result is Error) throw result.error;
+
+      final statement = hir.Statement.expression(
+        localContext.getId(propertyAst.initializer),
+        result.value,
+      );
+      return Tuple2([statement], localContext.idMap);
     } else {
       throw CompilerError.unsupportedFeature(
         'Unsupported body.',
@@ -74,9 +104,9 @@ class _LocalContext {
   _LocalContext._(
     this.queryContext,
     this.declarationId,
-    this.returnType,
-    this.localIdentifiers,
-  )   : assert(queryContext != null),
+    this.returnType, [
+    this.localIdentifiers = const {},
+  ])  : assert(queryContext != null),
         assert(declarationId != null),
         assert(returnType != null),
         assert(localIdentifiers != null);
@@ -101,6 +131,13 @@ class _LocalContext {
           ),
       },
     );
+  }
+  factory _LocalContext.forProperty(
+    QueryContext context,
+    DeclarationId declarationId,
+    Option<hir.CandyType> returnType,
+  ) {
+    return _LocalContext._(context, declarationId, returnType);
   }
 
   final QueryContext queryContext;
@@ -326,6 +363,9 @@ final getPropertyIdentifierDeclarationId =
     } else if (targetIdentifier is hir.TraitIdentifier) {
       innerDeclarationIds = getTraitDeclarationHir(context, targetIdentifier.id)
           .innerDeclarationIds;
+      // } else if (targetIdentifier is hir.ClassIdentifier) {
+      //   innerDeclarationIds = getClassDeclarationHir(context, targetIdentifier.id)
+      //       .innerDeclarationIds;
     } else {
       assert(false);
       return null;

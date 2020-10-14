@@ -25,18 +25,21 @@ abstract class CandyFile extends AstNode implements _$CandyFile {
 @freezed
 abstract class UseLine extends AstNode implements _$UseLine {
   const factory UseLine.localAbsolute({
+    @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
     @required UseKeywordToken useKeyword,
     @required CrateKeywordToken crateKeyword,
     @Default(<OperatorToken>[]) List<OperatorToken> dots,
     @Default(<IdentifierToken>[]) List<IdentifierToken> pathSegments,
   }) = LocalAbsoluteUseLine;
   const factory UseLine.localRelative({
+    @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
     @required UseKeywordToken useKeyword,
     @Default(<OperatorToken>[]) List<OperatorToken> leadingDots,
     @Default(<IdentifierToken>[]) List<IdentifierToken> pathSegments,
     @Default(<OperatorToken>[]) List<OperatorToken> dots,
   }) = LocalRelativeUseLine;
   const factory UseLine.global({
+    @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
     @required UseKeywordToken useKeyword,
     @Default(<IdentifierToken>[]) List<IdentifierToken> packagePathSegments,
     @Default(<OperatorToken>[]) List<OperatorToken> slashes,
@@ -47,21 +50,30 @@ abstract class UseLine extends AstNode implements _$UseLine {
 
   @override
   Iterable<SyntacticEntity> get children => when(
-        localAbsolute: (useKeyword, crateKeyword, dots, pathSegments) => [
+        localAbsolute:
+            (modifiers, useKeyword, crateKeyword, dots, pathSegments) => [
+          ...modifiers,
           useKeyword,
           crateKeyword,
           ...interleave(dots, pathSegments),
         ],
-        localRelative: (useKeyword, leadingDots, pathSegments, dots) => [
+        localRelative:
+            (modifiers, useKeyword, leadingDots, pathSegments, dots) => [
+          ...modifiers,
           useKeyword,
           ...leadingDots,
           ...interleave(dots, pathSegments),
         ],
-        global: (useKeyword, packagePathSegments, slashes, dot, moduleName) => [
+        global: (modifiers, useKeyword, packagePathSegments, slashes, dot,
+                moduleName) =>
+            [
+          ...modifiers,
           useKeyword,
           ...interleave(packagePathSegments, slashes),
           if (dot != null) dot,
           if (moduleName != null) moduleName,
         ],
       );
+
+  bool get isPublic => modifiers.any((m) => m is PublicModifierToken);
 }

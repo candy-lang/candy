@@ -1,10 +1,20 @@
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 
-import 'constants.dart';
 import 'declarations/module.dart';
 import 'type.dart';
 
+final compilePropertyInitializer = Query<DeclarationId, dart.Code>(
+  'dart.compilePropertyInitializer',
+  evaluateAlways: true,
+  provider: (context, declarationId) {
+    assert(declarationId.isProperty);
+    final hir = getPropertyDeclarationHir(context, declarationId);
+    assert(hir.initializer != null);
+
+    return dart.ToCodeExpression(_compile(context, hir.initializer));
+  },
+);
 final compileBody = Query<DeclarationId, dart.Code>(
   'dart.compileBody',
   evaluateAlways: true,

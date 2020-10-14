@@ -39,7 +39,6 @@ final getFunctionDeclarationHir = Query<DeclarationId, hir.FunctionDeclaration>(
       returnType: functionAst.returnType != null
           ? astTypeToHirType(context, Tuple2(moduleId, functionAst.returnType))
           : hir.CandyType.unit,
-      // TODO(JonasWanke): child declarations
     );
   },
 );

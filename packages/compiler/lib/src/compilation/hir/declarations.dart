@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'expressions.dart';
 import 'ids.dart';
 import 'type.dart';
 
@@ -26,6 +27,14 @@ abstract class Declaration implements _$Declaration {
     @Default(<ValueParameter>[]) List<ValueParameter> parameters,
     @required CandyType returnType,
   }) = FunctionDeclaration;
+
+  const factory Declaration.property({
+    @required String name,
+    @required CandyType type,
+    @required bool isMutable,
+    Expression initializer,
+    @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
+  }) = PropertyDeclaration;
 
   factory Declaration.fromJson(Map<String, dynamic> json) =>
       _$DeclarationFromJson(json);

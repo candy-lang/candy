@@ -10,6 +10,7 @@ import '../ids.dart';
 import 'declarations/declarations.dart';
 import 'declarations/module.dart';
 import 'declarations/trait.dart';
+import 'general.dart';
 
 /// Resolves an AST-type in the given module to a HIR-type.
 ///
@@ -84,15 +85,8 @@ final Query<Tuple2<ModuleId, ast.Type>, hir.CandyType> astTypeToHirType =
 final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>, DeclarationId>(
   'resolveAstUserType',
   provider: (context, inputs) {
-    final currentModuleId = inputs.first;
+    final moduleId = inputs.first;
     final type = inputs.second;
-
-    if (type.simpleTypes.length == 1 &&
-        type.simpleTypes.single.name.name == 'Any') {
-      // TODO(JonasWanke): remove this when we have Any in the standard library
-      return DeclarationId(ResourceId(PackageId.core, 'primitives.candy'))
-          .inner(TraitDeclarationPathData('Any'));
-    }
 
     if (type.simpleTypes.length > 1) {
       throw CompilerError.unsupportedFeature(
@@ -100,51 +94,71 @@ final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>, DeclarationId>(
       );
     }
 
-    final currentModuleDeclarationId =
-        moduleIdToDeclarationId(context, currentModuleId);
-    final currentResourceId = currentModuleDeclarationId.resourceId;
-
     // Step 1: Look for traits/classes in outer modules in the same file.
-    var moduleId = currentModuleId;
-    var moduleDeclarationId = currentModuleDeclarationId;
-    while (moduleDeclarationId.resourceId == currentResourceId) {
-      final simpleTypes = type.simpleTypes.map((t) => t.name.name);
-      var declarationId = moduleDeclarationId;
-      for (final simpleType in simpleTypes) {
-        final traitId =
-            declarationId.inner(DeclarationPathData.trait(simpleType));
-        final hasTrait = doesDeclarationExist(context, declarationId);
-
-        // TODO(JonasWanke): traits in classes/enums allowed?
-        final classId =
-            declarationId.inner(DeclarationPathData.class_(simpleType));
-        final hasClass = doesDeclarationExist(context, declarationId);
-
-        if (hasTrait && hasClass) {
-          context.reportError(CompilerError.multipleTypesWithSameName(
-            'Multiple types have the same name: `$simpleType` in module `$moduleId`.',
-            location: ErrorLocation(
-              currentResourceId,
-              getTraitDeclarationAst(context, traitId).name.span,
-            ),
-          ));
-        }
-        if (!hasTrait && !hasClass) {
-          declarationId = null;
-          break;
-        }
-
-        declarationId = hasTrait ? traitId : classId;
-      }
-      if (declarationId != null) return declarationId;
-
-      if (moduleId.hasNoParent) break;
-      moduleId = moduleId.parentOrNull;
-      moduleDeclarationId = moduleIdToDeclarationId(context, moduleId);
-    }
+    final localResult = _resolveAstUserTypeInFile(context, moduleId, type);
+    if (localResult.isSome) return localResult.value;
 
     // TODO(JonasWank): Search imports.
+    final resourceId = moduleIdToDeclarationId(context, moduleId).resourceId;
+    final simpleType = type.simpleTypes.first.name;
+    final importedModules = findModuleInUseLines(
+      context,
+      Tuple4(resourceId, simpleType.name, simpleType.span, false),
+    );
+    // TODO(JonasWanke): handle virtual module
+
     assert(false, "Type may be in imports, but those aren't resolved yet.");
     return null;
   },
 );
+
+Option<DeclarationId> _resolveAstUserTypeInFile(
+  QueryContext context,
+  ModuleId moduleId,
+  ast.UserType type,
+) {
+  final moduleDeclarationId = moduleIdToDeclarationId(context, moduleId);
+
+  var currentModuleId = moduleId;
+  var currentModuleDeclarationId = moduleDeclarationId;
+  while (
+      currentModuleDeclarationId.resourceId == moduleDeclarationId.resourceId) {
+    final simpleTypes = type.simpleTypes.map((t) => t.name.name);
+    var declarationId = currentModuleDeclarationId;
+    for (final simpleType in simpleTypes) {
+      final traitId =
+          declarationId.inner(DeclarationPathData.trait(simpleType));
+      final hasTrait = doesDeclarationExist(context, traitId);
+
+      // TODO(JonasWanke): traits in classes/enums allowed?
+      final classId =
+          declarationId.inner(DeclarationPathData.class_(simpleType));
+      final hasClass = doesDeclarationExist(context, classId);
+
+      if (hasTrait && hasClass) {
+        context.reportError(CompilerError.multipleTypesWithSameName(
+          'Multiple types have the same name: `$simpleType` in module `$currentModuleId`.',
+          location: ErrorLocation(
+            moduleDeclarationId.resourceId,
+            getTraitDeclarationAst(context, traitId).name.span,
+          ),
+        ));
+      }
+      if (!hasTrait && !hasClass) {
+        declarationId = null;
+        break;
+      }
+
+      declarationId = hasTrait ? traitId : classId;
+    }
+    if (declarationId != null) return Option.some(declarationId);
+
+    if (currentModuleId.hasNoParent) break;
+    currentModuleId = currentModuleId.parentOrNull;
+    final newDeclarationId =
+        moduleIdToOptionalDeclarationId(context, currentModuleId);
+    if (newDeclarationId is None) break;
+    currentModuleDeclarationId = newDeclarationId.value;
+  }
+  return Option.none();
+}
