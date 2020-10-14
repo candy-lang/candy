@@ -22,6 +22,13 @@ abstract class Declaration implements _$Declaration {
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
   }) = TraitDeclaration;
 
+  // ignore: non_constant_identifier_names
+  const factory Declaration.class_({
+    @required String name,
+    @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
+    @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
+  }) = ClassDeclaration;
+
   const factory Declaration.function({
     @required bool isStatic,
     @required String name,

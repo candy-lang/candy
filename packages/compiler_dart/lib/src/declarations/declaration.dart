@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 
 import '../builtins.dart';
+import 'class.dart';
 import 'function.dart';
 import 'module.dart';
 import 'property.dart';
@@ -17,6 +18,8 @@ final compileDeclaration = Query<DeclarationId, Option<dart.Spec>>(
     if (declarationId.isModule) {
       compileModule(context, declarationIdToModuleId(context, declarationId));
       return Option.none();
+    } else if (declarationId.isClass) {
+      return Option.some(compileClass(context, declarationId));
     } else if (declarationId.isFunction) {
       return Option.some(compileFunction(context, declarationId));
     } else if (declarationId.isProperty) {
