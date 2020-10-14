@@ -30,6 +30,7 @@ final Query<Tuple4<ResourceId, String, ast.SourceSpan, bool>, Option<ModuleId>>
 
       // TODO(JonasWanke): Ignore non-public declarations.
       final directMatches = getInnerDeclarationIds(context, declarationId)
+          .where((id) => id.isModule || id.isTrait || id.isClass)
           .where((id) => id.simplePath.first.nameOrNull == moduleName);
       if (directMatches.isNotEmpty) {
         return directMatches.map((d) => declarationIdToModuleId(context, d));
@@ -72,7 +73,7 @@ final lowerUseLinesAstToHir = Query<ResourceId, List<hir.UseLine>>(
     var modules = useLines
         .map((l) => lowerUseLineAstToHir(context, Tuple2(resourceId, l)))
         .toList();
-    if (modules.any((m) => m.moduleId.packageId == PackageId.core)) {
+    if (modules.none((m) => m.moduleId.packageId == PackageId.core)) {
       modules = modules + [hir.UseLine(ModuleId.core, isPublic: false)];
     }
 

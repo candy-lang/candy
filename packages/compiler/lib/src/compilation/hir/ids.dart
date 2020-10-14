@@ -27,6 +27,11 @@ abstract class DeclarationId implements _$DeclarationId {
     return copyWith(path: path + [disambiguatedInnerPath]);
   }
 
+  DeclarationId get parent {
+    assert(path.isNotEmpty);
+    return copyWith(path: path.dropLast(1));
+  }
+
   @override
   String toString() => '$resourceId:${path.join('.')}';
 }

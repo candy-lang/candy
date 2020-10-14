@@ -3,10 +3,9 @@ import 'package:parser/parser.dart' as ast;
 import '../../errors.dart';
 import '../../query.dart';
 import '../../utils.dart';
-import '../ast.dart';
 import '../hir.dart' as hir;
 import '../hir/ids.dart';
-import '../ids.dart';
+import 'declarations/class.dart';
 import 'declarations/declarations.dart';
 import 'declarations/module.dart';
 import 'declarations/trait.dart';
@@ -35,7 +34,7 @@ final Query<Tuple2<ModuleId, ast.Type>, hir.CandyType> astTypeToHirType =
       final arguments =
           mapTypes((type.arguments?.arguments ?? []).map((a) => a.type));
       return hir.CandyType.user(
-        declarationIdToModuleId(context, declarationId),
+        declarationIdToModuleId(context, declarationId.parent),
         name,
         arguments: arguments,
       );
@@ -98,17 +97,30 @@ final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>, DeclarationId>(
     final localResult = _resolveAstUserTypeInFile(context, moduleId, type);
     if (localResult.isSome) return localResult.value;
 
-    // TODO(JonasWank): Search imports.
+    // Step 2: Search use-lines.
     final resourceId = moduleIdToDeclarationId(context, moduleId).resourceId;
     final simpleType = type.simpleTypes.first.name;
     final importedModules = findModuleInUseLines(
       context,
       Tuple4(resourceId, simpleType.name, simpleType.span, false),
     );
-    // TODO(JonasWanke): handle virtual module
+    if (importedModules is None) {
+      throw CompilerError.typeNotFound(
+        'Type `${simpleType.name}` could not be resolved.',
+        location: ErrorLocation(resourceId, type.simpleTypes.first.span),
+      );
+    }
 
-    assert(false, "Type may be in imports, but those aren't resolved yet.");
-    return null;
+    final declarationId =
+        moduleIdToDeclarationId(context, importedModules.value);
+    if (declarationId.isModule) {
+      throw CompilerError.typeNotFound(
+        'Type `${simpleType.name}` could not be resolved.',
+        location: ErrorLocation(resourceId, type.simpleTypes.first.span),
+      );
+    }
+    assert(declarationId.isTrait || declarationId.isClass);
+    return declarationId;
   },
 );
 

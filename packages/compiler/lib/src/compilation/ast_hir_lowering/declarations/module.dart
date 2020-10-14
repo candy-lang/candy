@@ -51,10 +51,12 @@ final declarationIdToModuleId = Query<DeclarationId, ModuleId>(
   'declarationIdToModuleId',
   persist: false,
   provider: (context, declarationId) {
-    final innerPath = declarationId.simplePath
-        .whereType<ModuleDeclarationPathData>()
-        .map((d) => d.name)
-        .toList();
+    final innerPath = declarationId.simplePath.mapNotNull((pathData) {
+      if (pathData is ModuleDeclarationPathData) return pathData.name;
+      if (pathData is TraitDeclarationPathData) return pathData.name;
+      if (pathData is ClassDeclarationPathData) return pathData.name;
+      return null;
+    }).toList();
     final base = resourceIdToModuleId(context, declarationId.resourceId);
     return base.nested(innerPath);
   },
@@ -87,11 +89,8 @@ final moduleIdToOptionalDeclarationId = Query<ModuleId, Option<DeclarationId>>(
       path = pathAnd(remainingPath.removeAt(0));
     }
 
-    final moduleResourceId = ResourceId(packageId, pathAnd(moduleFileName));
     ResourceId resourceId;
-    if (doesResourceExist(context, moduleResourceId)) {
-      resourceId = moduleResourceId;
-    } else if (remainingPath.isNotEmpty) {
+    if (remainingPath.isNotEmpty) {
       final fileResourceId = ResourceId(
         packageId,
         pathAnd('${remainingPath.first}$candyFileExtension'),
@@ -99,25 +98,45 @@ final moduleIdToOptionalDeclarationId = Query<ModuleId, Option<DeclarationId>>(
       if (doesResourceExist(context, fileResourceId)) {
         resourceId = resourceId = fileResourceId;
         remainingPath.removeAt(0);
-      } else {
-        return Option.none();
       }
-    } else {
+    }
+    if (resourceId == null) {
+      final moduleResourceId = ResourceId(packageId, pathAnd(moduleFileName));
+      if (doesResourceExist(context, moduleResourceId)) {
+        resourceId = moduleResourceId;
+      }
+    }
+    if (resourceId == null) {
       return Option.none();
     }
+    assert(doesResourceExist(context, resourceId));
 
-    final declarationId = DeclarationId(
-      resourceId,
-      remainingPath
-          .map((segment) => DisambiguatedDeclarationPathData(
-                DeclarationPathData.module(segment),
-                0,
-              ))
-          .toList(),
-    );
-    return doesDeclarationExist(context, declarationId)
-        ? Option.some(declarationId)
-        : Option.none();
+    var declarationId = DeclarationId(resourceId);
+    while (remainingPath.isNotEmpty) {
+      final name = remainingPath.first;
+
+      final moduleId = declarationId.inner(DeclarationPathData.module(name));
+      if (doesDeclarationExist(context, moduleId)) {
+        declarationId = moduleId;
+        remainingPath.removeAt(0);
+        continue;
+      }
+      final traitId = declarationId.inner(DeclarationPathData.trait(name));
+      if (doesDeclarationExist(context, traitId)) {
+        declarationId = traitId;
+        remainingPath.removeAt(0);
+        continue;
+      }
+      final classId = declarationId.inner(DeclarationPathData.class_(name));
+      if (doesDeclarationExist(context, classId)) {
+        declarationId = classId;
+        remainingPath.removeAt(0);
+        continue;
+      }
+
+      return Option.none();
+    }
+    return Option.some(declarationId);
   },
 );
 final resourceIdToModuleId = Query<ResourceId, ModuleId>(
@@ -126,7 +145,8 @@ final resourceIdToModuleId = Query<ResourceId, ModuleId>(
   provider: (context, resourceId) {
     assert(resourceId.isCandyFile);
 
-    final path = resourceId.path.removeSuffix(candyFileExtension).split('/');
+    var path = resourceId.path.removeSuffix(candyFileExtension).split('/');
+    if (resourceId.isModuleFile) path = path.dropLast(1);
     return ModuleId(resourceId.packageId, path);
   },
 );
