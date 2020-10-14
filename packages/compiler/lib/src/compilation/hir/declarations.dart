@@ -28,6 +28,9 @@ abstract class Declaration implements _$Declaration {
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
   }) = ClassDeclaration;
+  const factory Declaration.constructor({
+    @Default(<ValueParameter>[]) List<ValueParameter> parameters,
+  }) = ConstructorDeclaration;
 
   const factory Declaration.function({
     @required bool isStatic,
@@ -67,7 +70,7 @@ abstract class ValueParameter implements _$ValueParameter {
   const factory ValueParameter({
     @required String name,
     @required CandyType type,
-    // TODO(JonasWanke): default value
+    Expression defaultValue,
   }) = _ValueParameter;
   factory ValueParameter.fromJson(Map<String, dynamic> json) =>
       _$ValueParameterFromJson(json);

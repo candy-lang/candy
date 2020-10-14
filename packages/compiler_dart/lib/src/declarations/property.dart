@@ -9,6 +9,9 @@ final compileProperty = Query<DeclarationId, dart.Field>(
   evaluateAlways: true,
   provider: (context, declarationId) {
     final property = getPropertyDeclarationHir(context, declarationId);
+    final isInsideClass =
+        declarationId.hasParent && declarationId.parent.isClass;
+
     return dart.Field((b) => b
       ..static = property.isStatic
       ..modifier = property.isMutable
@@ -16,7 +19,8 @@ final compileProperty = Query<DeclarationId, dart.Field>(
           : dart.FieldModifier.final$
       ..name = property.name
       ..type = compileType(context, property.type)
-      ..assignment = property.initializer != null
+      // In classes, the constructor is reponsible for handling defaults.
+      ..assignment = !isInsideClass && property.initializer != null
           ? compilePropertyInitializer(context, declarationId)
           : null);
   },

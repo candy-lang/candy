@@ -11,7 +11,8 @@ import 'declarations.dart';
 import 'module.dart';
 
 extension PropertyDeclarationId on DeclarationId {
-  bool get isProperty => path.last.data is PropertyDeclarationPathData;
+  bool get isProperty =>
+      path.isNotEmpty && path.last.data is PropertyDeclarationPathData;
   bool get isNotProperty => !isProperty;
 }
 

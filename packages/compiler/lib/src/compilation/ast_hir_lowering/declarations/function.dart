@@ -9,7 +9,8 @@ import 'declarations.dart';
 import 'module.dart';
 
 extension FunctionDeclarationId on DeclarationId {
-  bool get isFunction => path.last.data is FunctionDeclarationPathData;
+  bool get isFunction =>
+      path.isNotEmpty && path.last.data is FunctionDeclarationPathData;
   bool get isNotFunction => !isFunction;
 }
 

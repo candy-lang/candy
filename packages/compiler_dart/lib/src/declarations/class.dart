@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 
 import '../constants.dart';
+import 'constructor.dart';
 import 'function.dart';
 import 'property.dart';
 
@@ -21,6 +22,10 @@ final compileClass = Query<DeclarationId, dart.Class>(
     return dart.Class((b) => b
       ..annotations.add(dart.refer('sealed', packageMetaUrl))
       ..name = class_.name
+      ..constructors.addAll(compileConstructor(
+        context,
+        declarationId.inner(DeclarationPathData.constructor()),
+      ))
       ..fields.addAll(properties)
       ..methods.addAll(methods));
   },

@@ -32,6 +32,11 @@ final compileBody = Query<DeclarationId, dart.Code>(
     });
   },
 );
+final compileExpression = Query<Expression, dart.Expression>(
+  'dart.compileExpression',
+  evaluateAlways: true,
+  provider: _compile,
+);
 
 dart.Expression _compile(QueryContext context, Expression expression) {
   return expression.when(

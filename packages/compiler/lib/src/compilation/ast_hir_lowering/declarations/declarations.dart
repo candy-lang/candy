@@ -135,14 +135,13 @@ extension on DeclarationPathData {
         trait: (_) => DeclarationType.trait,
         impl: (_) => DeclarationType.impl,
         class_: (_) => DeclarationType.class_,
+        constructor: () => DeclarationType.constructor,
         function: (_) => DeclarationType.function,
         property: (_) => DeclarationType.property,
         propertyGetter: () => DeclarationType.propertyGetter,
         propertySetter: () => DeclarationType.propertySetter,
       );
 }
-
-extension on DeclarationType {}
 
 extension on ast.Declaration {
   String get nameOrNull {
@@ -221,6 +220,7 @@ enum DeclarationType {
   impl,
   // ignore: constant_identifier_names
   class_,
+  constructor,
   function,
   property,
   propertyGetter,

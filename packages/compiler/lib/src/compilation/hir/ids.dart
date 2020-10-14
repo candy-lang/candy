@@ -27,8 +27,9 @@ abstract class DeclarationId implements _$DeclarationId {
     return copyWith(path: path + [disambiguatedInnerPath]);
   }
 
+  bool get hasParent => path.isNotEmpty;
   DeclarationId get parent {
-    assert(path.isNotEmpty);
+    assert(hasParent);
     return copyWith(path: path.dropLast(1));
   }
 
@@ -65,6 +66,8 @@ abstract class DeclarationPathData implements _$DeclarationPathData {
   // ignore: non_constant_identifier_names
   const factory DeclarationPathData.class_(String name) =
       ClassDeclarationPathData;
+  const factory DeclarationPathData.constructor() =
+      ConstructorDeclarationPathData;
 
   const factory DeclarationPathData.function(String name) =
       FunctionDeclarationPathData;
@@ -84,6 +87,7 @@ abstract class DeclarationPathData implements _$DeclarationPathData {
         trait: (name) => name,
         impl: (name) => name,
         class_: (name) => name,
+        constructor: () => null,
         function: (name) => name,
         property: (name) => name,
         propertyGetter: () => null,
@@ -97,6 +101,7 @@ abstract class DeclarationPathData implements _$DeclarationPathData {
       trait: (name) => 'trait($name)',
       impl: (name) => 'impl($name)',
       class_: (name) => 'class($name)',
+      constructor: () => 'constructor',
       function: (name) => 'fun($name)',
       property: (name) => 'prop($name)',
       propertyGetter: () => 'get',

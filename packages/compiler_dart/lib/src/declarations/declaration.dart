@@ -20,6 +20,10 @@ final compileDeclaration = Query<DeclarationId, Option<dart.Spec>>(
       return Option.none();
     } else if (declarationId.isClass) {
       return Option.some(compileClass(context, declarationId));
+    } else if (declarationId.isConstructor) {
+      // Constructors are manually compiled within classes as they don't inherit
+      // from [Spec].
+      return Option.none();
     } else if (declarationId.isFunction) {
       return Option.some(compileFunction(context, declarationId));
     } else if (declarationId.isProperty) {

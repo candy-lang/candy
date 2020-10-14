@@ -9,7 +9,8 @@ import 'declarations.dart';
 import 'module.dart';
 
 extension ClassDeclarationId on DeclarationId {
-  bool get isClass => path.last.data is ClassDeclarationPathData;
+  bool get isClass =>
+      path.isNotEmpty && path.last.data is ClassDeclarationPathData;
   bool get isNotClass => !isClass;
 }
 
@@ -26,10 +27,11 @@ final getClassDeclarationAst = Query<DeclarationId, ast.ClassDeclaration>(
 final getClassDeclarationHir = Query<DeclarationId, hir.ClassDeclaration>(
   'getClassDeclarationHir',
   provider: (context, declarationId) {
-    final ast = context.callQuery(getClassDeclarationAst, declarationId);
-    final moduleId = context.callQuery(declarationIdToModuleId, declarationId);
+    final ast = getClassDeclarationAst(context, declarationId);
+    final moduleId = declarationIdToModuleId(context, declarationId);
     return hir.ClassDeclaration(
       name: ast.name.name,
+      // ignore: can_be_null_after_null_aware
       typeParameters: ast.typeParameters?.parameters.orEmpty
           .map((p) => hir.TypeParameter(
                 name: p.name.name,
@@ -38,9 +40,10 @@ final getClassDeclarationHir = Query<DeclarationId, hir.ClassDeclaration>(
               ))
           .toList(),
       innerDeclarationIds: getInnerDeclarationIds(
-        context,
-        moduleIdToDeclarationId(context, moduleId),
-      ),
+            context,
+            moduleIdToDeclarationId(context, moduleId),
+          ) +
+          [declarationId.inner(DeclarationPathData.constructor())],
     );
   },
 );
