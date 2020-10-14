@@ -23,6 +23,8 @@ final compile = Query<Unit, Unit>(
 
     compileModule(context, mainModuleId);
 
+    runPubGet(context, Unit());
+
     return Unit();
   },
 );
