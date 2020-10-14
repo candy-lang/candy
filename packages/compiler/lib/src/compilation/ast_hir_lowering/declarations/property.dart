@@ -48,11 +48,12 @@ final getPropertyDeclarationHir = Query<DeclarationId, hir.PropertyDeclaration>(
     }
 
     return hir.PropertyDeclaration(
+      isStatic: propertyAst.isStatic,
+      isMutable: propertyAst.isMutable,
       name: propertyAst.name.name,
       type: propertyAst.type != null
           ? astTypeToHirType(context, Tuple2(moduleId, propertyAst.type))
           : initializer.type,
-      isMutable: propertyAst.isMutable,
       initializer: initializer,
       innerDeclarationIds: getInnerDeclarationIds(context, declarationId),
     );

@@ -29,6 +29,7 @@ final getFunctionDeclarationHir = Query<DeclarationId, hir.FunctionDeclaration>(
     final functionAst = getFunctionDeclarationAst(context, declarationId);
     final moduleId = declarationIdToModuleId(context, declarationId);
     return hir.FunctionDeclaration(
+      isStatic: functionAst.isStatic,
       name: functionAst.name.name,
       parameters: functionAst.valueParameters
           .map((p) => hir.ValueParameter(

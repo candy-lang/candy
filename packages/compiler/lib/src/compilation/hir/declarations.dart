@@ -23,15 +23,17 @@ abstract class Declaration implements _$Declaration {
   }) = TraitDeclaration;
 
   const factory Declaration.function({
+    @required bool isStatic,
     @required String name,
     @Default(<ValueParameter>[]) List<ValueParameter> parameters,
     @required CandyType returnType,
   }) = FunctionDeclaration;
 
   const factory Declaration.property({
+    @required bool isStatic,
+    @required bool isMutable,
     @required String name,
     @required CandyType type,
-    @required bool isMutable,
     Expression initializer,
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
   }) = PropertyDeclaration;

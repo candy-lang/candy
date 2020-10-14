@@ -170,13 +170,13 @@ extension on ast.Declaration {
 
   List<ast.Declaration> get innerDeclarations {
     if (this is ast.ModuleDeclaration) {
-      return (this as ast.ModuleDeclaration).body.declarations;
+      return (this as ast.ModuleDeclaration).body?.declarations ?? [];
     } else if (this is ast.TraitDeclaration) {
-      return (this as ast.TraitDeclaration).body.declarations;
+      return (this as ast.TraitDeclaration).body?.declarations ?? [];
     } else if (this is ast.ImplDeclaration) {
-      return (this as ast.ImplDeclaration).body.declarations;
+      return (this as ast.ImplDeclaration).body?.declarations ?? [];
     } else if (this is ast.ClassDeclaration) {
-      return (this as ast.ClassDeclaration).body.declarations;
+      return (this as ast.ClassDeclaration).body?.declarations ?? [];
     } else if (this is ast.FunctionDeclaration) {
       return [];
     } else if (this is ast.PropertyDeclaration) {

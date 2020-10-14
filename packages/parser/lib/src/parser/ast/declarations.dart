@@ -192,6 +192,8 @@ abstract class FunctionDeclaration extends Declaration
 
   @override
   SourceSpan get representativeSpan => name.span;
+
+  bool get isStatic => modifiers.any((m) => m is StaticModifierToken);
 }
 
 @freezed
@@ -242,6 +244,7 @@ abstract class PropertyDeclaration extends Declaration
         ...accessors,
       ];
 
+  bool get isStatic => modifiers.any((m) => m is StaticModifierToken);
   bool get isMutable => modifiers.any((m) => m is MutModifierToken);
 
   @override

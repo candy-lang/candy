@@ -10,6 +10,7 @@ final compileFunction = Query<DeclarationId, dart.Method>(
   provider: (context, declarationId) {
     final function = getFunctionDeclarationHir(context, declarationId);
     return dart.Method((b) => b
+      ..static = function.isStatic
       ..name = function.name
       ..returns = compileType(context, function.returnType)
       ..body = compileBody(context, declarationId));

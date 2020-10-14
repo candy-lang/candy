@@ -164,6 +164,8 @@ class LexerGrammar {
       string('public').tokenize((_, span) => PublicModifierToken(span: span));
   static final MUT =
       string('mut').tokenize((_, span) => MutModifierToken(span: span));
+  static final STATIC =
+      string('static').tokenize((_, span) => StaticModifierToken(span: span));
   static final BUILTIN =
       string('builtin').tokenize((_, span) => BuiltinModifierToken(span: span));
   static final EXTERNAL = string('external')

@@ -794,6 +794,7 @@ class ParserGrammar {
   // ignore: unnecessary_cast
   static final modifier = (((LexerGrammar.PUBLIC as Parser<ModifierToken>) |
               LexerGrammar.MUT |
+              LexerGrammar.STATIC |
               LexerGrammar.BUILTIN |
               LexerGrammar.EXTERNAL |
               LexerGrammar.OVERRIDE |

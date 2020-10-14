@@ -48,6 +48,8 @@ abstract class ModifierToken extends Token with _$ModifierToken {
       PublicModifierToken;
   const factory ModifierToken.mut({@required SourceSpan span}) =
       MutModifierToken;
+  const factory ModifierToken.static({@required SourceSpan span}) =
+      StaticModifierToken;
   const factory ModifierToken.builtin({@required SourceSpan span}) =
       BuiltinModifierToken;
   const factory ModifierToken.external({@required SourceSpan span}) =
