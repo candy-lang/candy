@@ -167,7 +167,7 @@
           "name": "keyword.control.candy"
         },
         {
-          "match": "(?<!\\$)\\bassert\\b(?!\\$)",
+          "match": "(?<!\\$)\\b(assert|todo)\\b(?!\\$)",
           "name": "keyword.control.candy"
         },
         {
