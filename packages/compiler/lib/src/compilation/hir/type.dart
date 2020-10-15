@@ -34,7 +34,7 @@ abstract class CandyType with _$CandyType {
 
   static const any = CandyType.user(ModuleId.corePrimitives, 'Any');
   static const unit = CandyType.user(ModuleId.corePrimitives, 'Unit');
-  static const nothing = CandyType.user(ModuleId.corePrimitives, 'Nothing');
+  static const never = CandyType.user(ModuleId.corePrimitives, 'Never');
 
   static const bool = CandyType.user(ModuleId.corePrimitives, 'Bool');
   static const number = CandyType.user(ModuleId.corePrimitives, 'Number');
