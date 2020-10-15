@@ -14,6 +14,13 @@ class ClientDynamicRegistrations {
   ClientDynamicRegistrations(this._capabilities);
 
   final ClientCapabilities _capabilities;
+
+  bool get textSync =>
+      _capabilities.textDocument?.synchronization?.dynamicRegistration ?? false;
+  bool get folding =>
+      _capabilities.textDocument?.foldingRange?.dynamicRegistration ?? false;
+  bool get codeActions =>
+      _capabilities.textDocument?.foldingRange?.dynamicRegistration ?? false;
 }
 
 class InitializeMessageHandler
