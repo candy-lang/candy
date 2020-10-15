@@ -1,4 +1,3 @@
-import 'package:compiler/src/compilation/ast_hir_lowering.dart';
 import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
 
