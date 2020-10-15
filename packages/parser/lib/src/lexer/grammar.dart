@@ -1,4 +1,5 @@
 import 'package:meta/meta.dart';
+import 'package:characters/characters.dart';
 import 'package:petitparser/petitparser.dart'
     hide ChoiceParserExtension, Token, SequenceParserExtension;
 
@@ -241,11 +242,36 @@ class LexerGrammar {
   static final BooleanLiteral = (string('true') | string('false')).tokenize(
       (lexeme, span) => BoolLiteralToken(lexeme == 'true', span: span));
 
-  static final LiteralStringToken_ = (QUOTE | LCURL)
-      .neg()
-      .plus()
-      .tokenize<LiteralStringToken>(
-          (lexeme, span) => LiteralStringToken(lexeme, span: span));
+  static final LiteralStringToken_ =
+      (QUOTE | LCURL).neg().plus().tokenize<LiteralStringToken>((lexeme, span) {
+    final content = StringBuffer();
+    var isEscaped = false;
+    for (final char in lexeme.characters) {
+      if (!isEscaped) {
+        if (char == r'\') {
+          isEscaped = true;
+          continue;
+        }
+        content.write(char);
+        continue;
+      }
+
+      final code = {
+        'n': '\n',
+        'r': '\r',
+        't': '\t',
+        r'\': '\\',
+      }[char];
+      if (code == null) {
+        throw Exception('Invalid escaped character: `$char`.');
+      }
+
+      content.write(code);
+      isEscaped = false;
+    }
+
+    return LiteralStringToken(content.toString(), span: span);
+  });
 
   // SECTION: lexicalIdentifiers
 
