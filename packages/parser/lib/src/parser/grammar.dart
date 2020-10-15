@@ -695,7 +695,15 @@ class ParserGrammar {
             elseStatement: elsePart?.elementAt(3) as Statement,
           );
         },
-      );
+      )
+      ..prefix<ReturnKeywordToken, Expression>(LexerGrammar.RETURN,
+          mapper: (keyword, expression) {
+        return ReturnExpression(
+          _id++,
+          returnKeyword: keyword,
+          expression: expression,
+        );
+      });
 
     _expression.set(builder.build().map((dynamic e) => e as Expression));
   }

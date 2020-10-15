@@ -227,3 +227,17 @@ abstract class IfExpression extends Expression implements _$IfExpression {
         if (elseStatement != null) elseStatement,
       ];
 }
+
+@freezed
+abstract class ReturnExpression extends Expression
+    implements _$ReturnExpression {
+  const factory ReturnExpression(
+    int id, {
+    @required ReturnKeywordToken returnKeyword,
+    @required Expression expression,
+  }) = _ReturnExpression;
+  const ReturnExpression._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [returnKeyword, expression];
+}

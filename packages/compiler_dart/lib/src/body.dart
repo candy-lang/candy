@@ -93,6 +93,7 @@ dart.Expression _compile(QueryContext context, Expression expression) {
         [],
       );
     },
+    return_: (id, expression) => _compile(context, expression).returned,
   );
 }
 
