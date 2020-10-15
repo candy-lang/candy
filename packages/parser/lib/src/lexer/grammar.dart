@@ -46,6 +46,8 @@ class LexerGrammar {
   static final DOT = _operator('.', OperatorTokenType.dot);
   static final COMMA = _operator(',', OperatorTokenType.comma);
   static final COLON = _operator(':', OperatorTokenType.colon);
+  static final HASHTAG = _operator('#', OperatorTokenType.hashtag);
+  static final QUOTE = _operator('"', OperatorTokenType.quote);
   static final EQUALS_GREATER =
       _operator('=>', OperatorTokenType.equalsGreater);
 
@@ -238,6 +240,12 @@ class LexerGrammar {
 
   static final BooleanLiteral = (string('true') | string('false')).tokenize(
       (lexeme, span) => BoolLiteralToken(lexeme == 'true', span: span));
+
+  static final LiteralStringToken_ = (QUOTE | LCURL)
+      .neg()
+      .plus()
+      .tokenize<LiteralStringToken>(
+          (lexeme, span) => LiteralStringToken(lexeme, span: span));
 
   // SECTION: lexicalIdentifiers
 

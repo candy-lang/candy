@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../../lexer/token.dart';
+import '../../../source_span.dart';
 import '../../../syntactic_entity.dart';
 import '../../../utils.dart';
 import '../declarations.dart';
@@ -21,6 +22,50 @@ abstract class Literal<T> extends Expression implements _$Literal<T> {
 
   @override
   Iterable<SyntacticEntity> get children => [value];
+}
+
+@freezed
+abstract class StringLiteral extends Expression implements _$StringLiteral {
+  const factory StringLiteral(
+    int id, {
+    @required OperatorToken leadingQuote,
+    @required List<StringLiteralPart> parts,
+    @required OperatorToken trailingQuote,
+  }) = _StringLiteral;
+  const StringLiteral._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [
+        ...leadingHashtags,
+        leadingQuote,
+        ...parts,
+        trailingQuote,
+        ...trailingHashtags
+      ];
+}
+
+@freezed
+abstract class StringLiteralPart extends AstNode
+    implements _$StringLiteralPart {
+  const factory StringLiteralPart.literal(
+    int id,
+    LiteralStringToken value, {
+    SourceSpan span,
+  }) = LiteralStringLiteralPart;
+  const factory StringLiteralPart.interpolated(
+    int id, {
+    @required OperatorToken leadingBrace,
+    @required Expression expression,
+    @required OperatorToken trailingBrace,
+  }) = InterpolatedStringLiteralPart;
+  const StringLiteralPart._();
+
+  @override
+  Iterable<SyntacticEntity> get children => when(
+        literal: (_, value, __) => [value],
+        interpolated: (_, leadingBrace, expression, trailingBrace) =>
+            [leadingBrace, expression, trailingBrace],
+      );
 }
 
 @freezed

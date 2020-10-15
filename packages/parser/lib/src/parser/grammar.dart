@@ -25,6 +25,8 @@ class ParserGrammar {
     if (_isInitialized) return;
     _isInitialized = true;
 
+    LexerGrammar.init();
+
     _initDeclaration();
     _initType();
     _initStatement();
@@ -548,6 +550,7 @@ class ParserGrammar {
       ..primitive<Expression>(
           // ignore: unnecessary_cast, Without the cast the compiler complains…
           (literalConstant as Parser<Expression>) |
+              stringLiteral |
               lambdaLiteral |
               LexerGrammar.Identifier.map((t) => Identifier(_id++, t)))
       // grouping
@@ -763,6 +766,29 @@ class ParserGrammar {
     LexerGrammar.IntegerLiteral.map((l) => Literal<int>(_id++, l)),
     LexerGrammar.BooleanLiteral.map((l) => Literal<bool>(_id++, l)),
   ]);
+  static final stringLiteral =
+      (LexerGrammar.QUOTE & stringLiteralPart.star() & LexerGrammar.QUOTE)
+          .map((value) => StringLiteral(
+                _id++,
+                leadingQuote: value[0] as OperatorToken,
+                parts: value[1] as List<StringLiteralPart>,
+                trailingQuote: value[2] as OperatorToken,
+              ));
+  static final stringLiteralPart =
+      literalStringLiteralPart | interpolatedStringLiteralPart;
+  static final literalStringLiteralPart = LexerGrammar.LiteralStringToken_.map(
+      (value) => StringLiteralPart.literal(_id++, value));
+  static final interpolatedStringLiteralPart = (LexerGrammar.LCURL &
+          LexerGrammar.NLs &
+          expression &
+          LexerGrammar.NLs &
+          LexerGrammar.RCURL)
+      .map((value) => StringLiteralPart.interpolated(
+            _id++,
+            leadingBrace: value[0] as OperatorToken,
+            expression: value[2] as Expression,
+            trailingBrace: value[4] as OperatorToken,
+          ));
   static final lambdaLiteral = (LexerGrammar.LCURL &
           (LexerGrammar.NLs &
                   valueParameter.fullCommaSeparatedList().optional() &

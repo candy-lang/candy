@@ -1,6 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import '../../utils.dart';
 import 'ids.dart';
 import 'type.dart';
 
@@ -89,6 +88,7 @@ abstract class Literal implements _$Literal {
   // ignore: avoid_positional_boolean_parameters
   const factory Literal.boolean(bool value) = BoolLiteral;
   const factory Literal.integer(int value) = IntLiteral;
+  const factory Literal.string(List<StringLiteralPart> parts) = StringLiteral;
 
   factory Literal.fromJson(Map<String, dynamic> json) =>
       _$LiteralFromJson(json);
@@ -97,5 +97,18 @@ abstract class Literal implements _$Literal {
   CandyType get type => map(
         boolean: (_) => CandyType.bool,
         integer: (_) => CandyType.int,
+        string: (_) => CandyType.string,
       );
+}
+
+@freezed
+abstract class StringLiteralPart implements _$StringLiteralPart {
+  const factory StringLiteralPart.literal(String value) =
+      LiteralStringLiteralPart;
+  const factory StringLiteralPart.interpolated(Expression value) =
+      InterpolatedStringLiteralPart;
+
+  factory StringLiteralPart.fromJson(Map<String, dynamic> json) =>
+      _$StringLiteralPartFromJson(json);
+  const StringLiteralPart._();
 }
