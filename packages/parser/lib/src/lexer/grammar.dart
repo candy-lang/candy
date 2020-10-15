@@ -11,12 +11,33 @@ import 'token.dart';
 // ignore: avoid_classes_with_only_static_members
 @immutable
 class LexerGrammar {
+  static void init() {
+    if (_isInitialized) return;
+    _isInitialized = true;
+
+    _initDelimitedComment();
+  }
+
+  static bool _isInitialized = false;
+
   // SECTION: lexicalGeneral
+
+  static final _DelimitedComment = undefined<void>();
+  static Parser<void> get DelimitedComment => _DelimitedComment;
+  static void _initDelimitedComment() {
+    _DelimitedComment.set(string('/*') &
+        (DelimitedComment | any()).starLazy(string('*/')).flatten() &
+        string('*/'));
+  }
+
+  static final Parser<void> LineComment =
+      string('//') & NL.neg().star().ignore();
 
   static final Parser<void> WS = (char(' ') | char('\t')).plus().ignore();
   static final Parser<void> NL =
       (char('\n') | char('\r') & char('\n').optional()).ignore();
-  static final Parser<void> NLs = (NL | WS).star();
+  static final Parser<void> NLs =
+      (NL | WS | DelimitedComment | (LineComment & NL)).star();
 
   // SECTION: separatorsAndOperations
 
@@ -235,6 +256,10 @@ typedef LiteralMapper<T extends Token> = T Function(
   String lexeme,
   SourceSpan span,
 );
+
+extension on Parser<void> {
+  Parser<void> operator &(Parser<void> other) => SequenceParser([this, other]);
+}
 
 extension on Parser<String> {
   Parser<T> tokenize<T extends Token>(LiteralMapper<T> mapper) {
