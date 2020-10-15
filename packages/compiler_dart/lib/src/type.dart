@@ -12,7 +12,7 @@ final compileType = Query<CandyType, dart.TypeReference>(
       user: (type) {
         if (type == CandyType.any) return _createDartType('Object');
         if (type == CandyType.unit) return _createDartType('void', url: null);
-        if (type == CandyType.nothing) return _createDartType('dynamic');
+        if (type == CandyType.never) return _createDartType('dynamic');
         if (type == CandyType.bool) return _createDartType('bool');
         if (type == CandyType.number) return _createDartType('Num');
         if (type == CandyType.int) return _createDartType('int');
