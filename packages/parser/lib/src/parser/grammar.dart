@@ -699,14 +699,19 @@ class ParserGrammar {
           );
         },
       )
-      ..prefix<ReturnKeywordToken, Expression>(LexerGrammar.RETURN,
-          mapper: (keyword, expression) {
-        return ReturnExpression(
-          _id++,
-          returnKeyword: keyword,
-          expression: expression,
-        );
-      });
+      // return
+      ..prefix<ReturnKeywordToken, Expression>(
+        (LexerGrammar.RETURN & LexerGrammar.NLs)
+            .map((value) => value.first as ReturnKeywordToken),
+        mapper: (keyword, expression) {
+          print('Mapper called: $keyword, $expression');
+          return ReturnExpression(
+            _id++,
+            returnKeyword: keyword,
+            expression: expression,
+          );
+        },
+      );
 
     _expression.set(builder.build().map((dynamic e) => e as Expression));
   }

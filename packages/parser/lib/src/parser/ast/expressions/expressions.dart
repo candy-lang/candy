@@ -36,11 +36,9 @@ abstract class StringLiteral extends Expression implements _$StringLiteral {
 
   @override
   Iterable<SyntacticEntity> get children => [
-        ...leadingHashtags,
         leadingQuote,
         ...parts,
         trailingQuote,
-        ...trailingHashtags
       ];
 }
 

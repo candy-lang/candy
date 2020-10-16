@@ -22,9 +22,9 @@ final compileBody = Query<DeclarationId, dart.Code>(
   provider: (context, declarationId) {
     final statements = getBody(context, declarationId);
 
-  final compiled =
-      statements.map((statement) => _compileStatement(context, statement));
-  return dart.Block((b) => b.statements.addAll(compiled));
+    final compiled =
+        statements.map((statement) => _compileStatement(context, statement));
+    return dart.Block((b) => b.statements.addAll(compiled));
   },
 );
 final compileExpression = Query<Expression, dart.Expression>(
@@ -93,7 +93,8 @@ dart.Expression _compileExpression(
         [],
       );
     },
-    return_: (id, expression) => _compile(context, expression).returned,
+    return_: (id, expression) =>
+        _compileExpression(context, expression).returned,
   );
 }
 

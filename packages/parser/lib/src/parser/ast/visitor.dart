@@ -1,4 +1,4 @@
-import '../../lexer/lexer.dart';
+/*import '../../lexer/lexer.dart';
 
 import 'declarations.dart';
 import 'general.dart';
@@ -30,4 +30,4 @@ abstract class AstVisitor<R> {
   R visitModifierToken(ModifierToken token) {}
   R visitLiteralToken(LiteralToken<dynamic> token) {}
   R visitIdentifierToken(IdentifierToken token) {}
-}
+}*/
