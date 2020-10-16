@@ -34,11 +34,11 @@ export function deactivate(): Thenable<void> | undefined {
 }
 
 // The following code is taken (and slightly modified) from https://github.com/Dart-Code/Dart-Code
-function spawnServer(): Promise<StreamInfo> {
+async function spawnServer(): Promise<StreamInfo> {
   const process = safeSpawn(
     undefined,
     "C:\\Program Files\\Dart\\dart-sdk\\bin\\dart.exe",
-    ["D:/p/candy/packages/lsp_server/bin/main.dart"],
+    ["--observe", "D:/p/candy/packages/lsp_server/bin/main.dart"],
     {}
   );
   console.info(`    PID: ${process.pid}`);
@@ -49,7 +49,7 @@ function spawnServer(): Promise<StreamInfo> {
 
   process.stderr.on("data", (data) => console.error(data.toString()));
 
-  return Promise.resolve({ reader, writer });
+  return { reader, writer };
 }
 
 type SpawnedProcess = child_process.ChildProcess & {
@@ -97,6 +97,12 @@ class LoggingTransform extends stream.Transform {
     callback: () => void
   ): void {
     let value = (chunk as Buffer).toString();
+    if (value.startsWith("Observatory listening on")) {
+      console.warn(value);
+      callback();
+      return;
+    }
+
     let toLog = this.onlyShowJson
       ? value
           .split("\r\n")
