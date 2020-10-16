@@ -12,14 +12,15 @@ class OverlayResourceProvider extends ResourceProvider {
   final _overlays = <ResourceId, String>{};
 
   @override
-  bool fileExists(ResourceId id) =>
-      _overlays.containsKey(id) || baseProvider.fileExists(id);
+  bool fileExists(QueryContext context, ResourceId id) =>
+      _overlays.containsKey(id) || baseProvider.fileExists(context, id);
   @override
-  bool directoryExists(ResourceId id) => baseProvider.directoryExists(id);
+  bool directoryExists(QueryContext context, ResourceId id) =>
+      baseProvider.directoryExists(context, id);
 
   @override
-  String getContent(ResourceId id) =>
-      _overlays[id] ?? baseProvider.getContent(id);
+  String getContent(QueryContext context, ResourceId id) =>
+      _overlays[id] ?? baseProvider.getContent(context, id);
 
   void addOverlay(ResourceId id, String content) => _overlays[id] = content;
   ErrorOr<void> updateOverlay(

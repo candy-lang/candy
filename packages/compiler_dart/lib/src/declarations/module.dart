@@ -1,5 +1,5 @@
 import 'package:code_builder/code_builder.dart' as dart;
-import 'package:compiler/compiler.dart';
+import 'package:compiler/compiler.dart' hide srcDirectoryName;
 import 'package:dart_style/dart_style.dart';
 
 import '../constants.dart';
@@ -58,8 +58,10 @@ final moduleIdToPath = Query<ModuleId, String>(
 final moduleIdToImportUrl = Query<ModuleId, String>(
   'dart.moduleIdToImportUrl',
   evaluateAlways: true,
-  provider: (context, moduleId) =>
-      'package:$packageName/src/${moduleId.path.join('/')}$dartFileExtension',
+  provider: (context, moduleId) {
+    final packageName = getCandyspec(context, PackageId.this_).name;
+    return 'package:$packageName/$srcDirectoryName/${moduleId.path.join('/')}$dartFileExtension';
+  },
 );
 
 /// Copy of `code_builder`'s _PrefixedAllocator that also prefixes core imports.

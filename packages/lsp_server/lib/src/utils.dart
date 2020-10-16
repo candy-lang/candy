@@ -9,7 +9,8 @@ bool isCandyDocument(String uri) => uri.endsWith('.candy');
 
 extension SourceSpanToRange on SourceSpan {
   Range toRange(AnalysisServer server, ResourceId resourceId) {
-    final source = server.resourceProvider.getContent(resourceId);
+    final context = QueryContext(server.queryConfig.createContext());
+    final source = server.resourceProvider.getContent(context, resourceId);
     return Range(positionOf(source, start), positionOf(source, end));
   }
 }
@@ -18,7 +19,8 @@ extension ErrorLocationConversion on ErrorLocation {
   Location toLocation(AnalysisServer server) =>
       Location(server.resourceIdToFileUri(resourceId), toRange(server));
   Range toRange(AnalysisServer server) {
-    final source = server.resourceProvider.getContent(resourceId);
+    final context = QueryContext(server.queryConfig.createContext());
+    final source = server.resourceProvider.getContent(context, resourceId);
     return Range(positionOf(source, span.start), positionOf(source, span.end));
   }
 }

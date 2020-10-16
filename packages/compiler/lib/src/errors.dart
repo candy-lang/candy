@@ -29,6 +29,7 @@ abstract class CompilerError implements _$CompilerError {
   static const values = [internalError, noMainFunction, multipleMainFunctions];
   static const ambiguousExpression =
       CompilerError._create('ambiguousExpression');
+  static const candyspecMissing = CompilerError._create('candyspecMissing');
   static const internalError = CompilerError._create('internalError');
   static const invalidArgumentType =
       CompilerError._create('invalidArgumentType');
@@ -46,6 +47,7 @@ abstract class CompilerError implements _$CompilerError {
       CompilerError._create('undefinedIdentifier');
   static const unexpectedPositionalArgument =
       CompilerError._create('unexpectedPositionalArgument');
+  static const unknownPackage = CompilerError._create('unknownPackage');
   static const unsupportedFeature = CompilerError._create('unsupportedFeature');
 }
 

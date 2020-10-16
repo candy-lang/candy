@@ -6,7 +6,5 @@ const pubspecFile = 'pubspec.yaml';
 const libDirectoryName = 'lib';
 const srcDirectoryName = 'src';
 
-const packageName = 'candy_project';
-
 const dartCoreUrl = 'dart:core';
 const packageMetaUrl = 'package:meta/meta.dart';
