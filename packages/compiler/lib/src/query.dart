@@ -62,7 +62,10 @@ class Query<K, R> {
   }
 
   R execute(QueryContext context, K key) {
-    final result = provider(context, key);
+    final result = Timeline.timeSync(
+      '$name($key)',
+      () => provider(context, key),
+    );
     assert(result != null);
     return result;
   }
