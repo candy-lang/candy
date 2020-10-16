@@ -18,7 +18,9 @@
     "Snippets"
   ],
   "activationEvents": [
-    "onLanguage:candy"
+    "onLanguage:candy",
+    "workspaceContains:**/*.candy",
+    "workspaceContains:**/candyspec.yml"
   ],
   "main": "./out/extension.js",
   "contributes": {
