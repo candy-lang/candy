@@ -229,7 +229,7 @@ class _LocalContext {
     ast.Expression expression, [
     Option<hir.CandyType> expressionType = const Option.none(),
   ]) {
-    final result = lower(expression, expressionType, returnType);
+    final result = lower(expression, expressionType);
     if (result is Error) {
       throw _LoweringFailedException(result.error);
     }
@@ -241,7 +241,7 @@ class _LocalContext {
     ast.Expression expression, [
     Option<hir.CandyType> expressionType = const Option.none(),
   ]) {
-    final result = lower(expression, expressionType, returnType);
+    final result = lower(expression, expressionType);
     if (result is Error) return Error(result.error);
 
     assert(result.value.isNotEmpty);
