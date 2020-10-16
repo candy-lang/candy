@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:compiler/compiler.dart';
 import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
@@ -35,7 +37,6 @@ final Query<DeclarationId, Tuple2<List<hir.Statement>, BodyAstToHirIds>>
       final localContext = _LocalContext.forFunction(
         context,
         declarationId,
-        Option.none(),
         functionAst,
       );
       final statements =
@@ -104,24 +105,30 @@ class _LocalContext {
   _LocalContext._(
     this.queryContext,
     this.declarationId,
+    this.expressionType,
     this.returnType, [
     this.localIdentifiers = const {},
   ])  : assert(queryContext != null),
         assert(declarationId != null),
-        assert(returnType != null),
+        assert(expressionType != null),
         assert(localIdentifiers != null);
 
   factory _LocalContext.forFunction(
     QueryContext context,
     DeclarationId declarationId,
-    Option<hir.CandyType> returnType,
     ast.FunctionDeclaration functionAst,
   ) {
     final moduleId = declarationIdToModuleId(context, declarationId);
     return _LocalContext._(
       context,
       declarationId,
-      returnType,
+      Option.none(),
+      Option.some(
+        functionAst.returnType == null
+            ? CandyType.unit
+            : astTypeToHirType(
+                context, Tuple2(moduleId, functionAst.returnType)),
+      ),
       <String, hir.Identifier>{
         for (final parameter in functionAst.valueParameters)
           parameter.name.name: hir.Identifier.parameter(
@@ -135,9 +142,10 @@ class _LocalContext {
   factory _LocalContext.forProperty(
     QueryContext context,
     DeclarationId declarationId,
-    Option<hir.CandyType> returnType,
+    Option<hir.CandyType> expressionType,
   ) {
-    return _LocalContext._(context, declarationId, returnType);
+    return _LocalContext._(
+        context, declarationId, expressionType, Option.none());
   }
 
   final QueryContext queryContext;
@@ -155,6 +163,12 @@ class _LocalContext {
 
   final Map<String, hir.Identifier> localIdentifiers;
 
+  final Option<hir.CandyType> expressionType;
+  bool isValidExpressionType(hir.CandyType type) {
+    if (expressionType.isNone) return true;
+    return hir.isAssignableTo(queryContext, Tuple2(type, expressionType.value));
+  }
+
   final Option<hir.CandyType> returnType;
   bool isValidReturnType(hir.CandyType type) {
     if (returnType.isNone) return true;
@@ -163,11 +177,13 @@ class _LocalContext {
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lower(
     ast.Expression expression, [
+    Option<hir.CandyType> expressionType = const Option.none(),
     Option<hir.CandyType> returnType = const Option.none(),
   ]) {
     final innerContext = _LocalContext._(
       queryContext,
       declarationId,
+      expressionType,
       returnType,
       localIdentifiers,
     );
@@ -198,6 +214,8 @@ class _LocalContext {
       result = _lowerIdentifier(this, expression);
     } else if (expression is ast.CallExpression) {
       result = _lowerCall(this, expression);
+    } else if (expression is ast.ReturnExpression) {
+      result = _lowerReturn(this, expression);
     } else {
       throw CompilerError.unsupportedFeature(
         'Unsupported expression.',
@@ -211,9 +229,11 @@ class _LocalContext {
 
   List<hir.Expression> requireLowering(
     ast.Expression expression, [
-    Option<hir.CandyType> returnType = const Option.none(),
+    Option<hir.CandyType> expressionType = const Option.none(),
+    Option<hir.CandyType> returnType,
   ]) {
-    final result = lower(expression, returnType);
+    final result =
+        lower(expression, expressionType, returnType ?? this.returnType);
     if (result is Error) {
       throw _LoweringFailedException(result.error);
     }
@@ -223,9 +243,11 @@ class _LocalContext {
 
   Result<hir.Expression, List<ReportedCompilerError>> lowerToUnambiguous(
     ast.Expression expression, [
-    Option<hir.CandyType> returnType = const Option.none(),
+    Option<hir.CandyType> expressionType = const Option.none(),
+    Option<hir.CandyType> returnType,
   ]) {
-    final result = lower(expression, returnType);
+    final result =
+        lower(expression, expressionType, returnType ?? this.returnType);
     if (result is Error) return Error(result.error);
 
     assert(result.value.isNotEmpty);
@@ -265,10 +287,10 @@ Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerLiteral(
   final token = expression.value;
   hir.Literal literal;
   if (token is ast.BoolLiteralToken) {
-    if (!context.isValidReturnType(hir.CandyType.bool)) return Ok([]);
+    if (!context.isValidExpressionType(hir.CandyType.bool)) return Ok([]);
     literal = hir.Literal.boolean(token.value);
   } else if (token is ast.IntLiteralToken) {
-    if (!context.isValidReturnType(hir.CandyType.int)) return Ok([]);
+    if (!context.isValidExpressionType(hir.CandyType.int)) return Ok([]);
     literal = hir.Literal.integer(token.value);
   } else {
     throw CompilerError.unsupportedFeature(
@@ -320,7 +342,7 @@ Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerIdentifier(
     return Ok([result]);
   }
 
-  if (context.returnType.isNone && identifier == 'print') {
+  if (context.expressionType.isNone && identifier == 'print') {
     return Ok([
       hir.Expression.identifier(
         context.getId(expression),
@@ -371,6 +393,23 @@ Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerCall(
   return _mergeResults(results);
 }
 
+Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerReturn(
+  _LocalContext context,
+  ast.ReturnExpression expression,
+) {
+  if (!context.isValidExpressionType(hir.CandyType.never)) return Ok([]);
+  stderr.write('The return type is ${context.returnType}.');
+  if (context.returnType == Option<CandyType>.none()) {
+    throw CompilerError.returnNotInFunction(
+        'The return expression is not in a function.');
+  }
+  return context
+      .lowerToUnambiguous(expression.expression, context.returnType)
+      .mapValue((type) => [
+            hir.ReturnExpression(context.getId(expression), type),
+          ]);
+}
+
 final getPropertyIdentifierDeclarationId =
     Query<hir.PropertyIdentifier, DeclarationId>(
   'getPropertyIdentifierDeclarationId',
@@ -416,7 +455,7 @@ Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerFunctionCall(
   assert(functionDeclarationId.isFunction);
   final functionHir =
       getFunctionDeclarationHir(context.queryContext, functionDeclarationId);
-  if (!context.isValidReturnType(functionHir.returnType)) return null;
+  if (!context.isValidExpressionType(functionHir.returnType)) return null;
 
   final errors = <ReportedCompilerError>[];
 
