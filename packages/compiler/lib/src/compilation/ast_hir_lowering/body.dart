@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:compiler/compiler.dart';
 import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
@@ -111,6 +109,7 @@ class _LocalContext {
   ])  : assert(queryContext != null),
         assert(declarationId != null),
         assert(expressionType != null),
+        assert(returnType != null),
         assert(localIdentifiers != null);
 
   factory _LocalContext.forFunction(
@@ -230,10 +229,8 @@ class _LocalContext {
   List<hir.Expression> requireLowering(
     ast.Expression expression, [
     Option<hir.CandyType> expressionType = const Option.none(),
-    Option<hir.CandyType> returnType,
   ]) {
-    final result =
-        lower(expression, expressionType, returnType ?? this.returnType);
+    final result = lower(expression, expressionType, returnType);
     if (result is Error) {
       throw _LoweringFailedException(result.error);
     }
@@ -244,10 +241,8 @@ class _LocalContext {
   Result<hir.Expression, List<ReportedCompilerError>> lowerToUnambiguous(
     ast.Expression expression, [
     Option<hir.CandyType> expressionType = const Option.none(),
-    Option<hir.CandyType> returnType,
   ]) {
-    final result =
-        lower(expression, expressionType, returnType ?? this.returnType);
+    final result = lower(expression, expressionType, returnType);
     if (result is Error) return Error(result.error);
 
     assert(result.value.isNotEmpty);
@@ -398,15 +393,14 @@ Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerReturn(
   ast.ReturnExpression expression,
 ) {
   if (!context.isValidExpressionType(hir.CandyType.never)) return Ok([]);
-  stderr.write('The return type is ${context.returnType}.');
   if (context.returnType == Option<CandyType>.none()) {
     throw CompilerError.returnNotInFunction(
         'The return expression is not in a function.');
   }
   return context
       .lowerToUnambiguous(expression.expression, context.returnType)
-      .mapValue((type) => [
-            hir.ReturnExpression(context.getId(expression), type),
+      .mapValue((hirExpression) => [
+            hir.ReturnExpression(context.getId(expression), hirExpression),
           ]);
 }
 

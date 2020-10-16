@@ -127,8 +127,10 @@ abstract class ServerStateMessageHandler {
       return token.isCancellationRequested ? cancelled() : result;
     } catch (e, st) {
       stderr.write('An error occurred while handling the message: $e\n$st');
-      return error(ErrorCodes.InternalError,
-          'An error occurred while handling the message: $e\n$st');
+      return error(
+        ErrorCodes.InternalError,
+        'An error occurred while handling the message: $e\n$st',
+      );
     } finally {
       _cancelHandler.clearToken(requestMessage);
     }
