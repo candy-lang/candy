@@ -42,6 +42,8 @@ abstract class CompilerError implements _$CompilerError {
   static const propertyTypeOrValueRequired =
       CompilerError._create('propertyTypeOrValueRequired');
   static const typeNotFound = CompilerError._create('typeNotFound');
+  static const returnNotInFunction =
+      CompilerError._create('returnNotInFunction');
   static const undefinedIdentifier =
       CompilerError._create('undefinedIdentifier');
   static const unexpectedPositionalArgument =
