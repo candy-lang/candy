@@ -41,21 +41,11 @@ final Query<DeclarationId, Tuple2<List<hir.Statement>, BodyAstToHirIds>>
       );
       final statements =
           functionAst.body.statements.map<hir.Statement>((statement) {
-        if (statement is ast.Expression) {
-          final result = localContext.lowerToUnambiguous(statement);
-          // ignore: only_throw_errors, Iterables of errors are also handled.
-          if (result is Error) throw result.error;
-
-          return hir.Statement.expression(
-            localContext.getId(statement),
-            result.value,
-          );
-        } else {
-          throw CompilerError.unsupportedFeature(
-            'Unsupported statement.',
-            location: ErrorLocation(declarationId.resourceId, statement.span),
-          );
-        }
+        return localContext._lowerStatement(statement).when(
+              ok: (value) => value,
+              // ignore: only_throw_errors, Iterables of errors are also handled
+              error: (error) => throw error,
+            );
       }).toList();
       return Tuple2(statements, localContext.idMap);
     } else if (declarationId.isProperty) {
@@ -202,6 +192,25 @@ class _LocalContext {
     // Step 2: Retry with implicit cast of the whole expression
   }
 
+  Result<hir.Statement, List<ReportedCompilerError>> _lowerStatement(
+    ast.Statement statement,
+  ) {
+    if (statement is ast.Expression) {
+      final result = lowerToUnambiguous(statement);
+      // ignore: only_throw_errors, Iterables of errors are also handled.
+      if (result is Error) throw result.error;
+
+      return Ok(hir.Statement.expression(getId(statement), result.value));
+    } else {
+      return Error([
+        CompilerError.unsupportedFeature(
+          'Unsupported statement.',
+          location: ErrorLocation(declarationId.resourceId, statement.span),
+        )
+      ]);
+    }
+  }
+
   Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerExpression(
     ast.Expression expression,
   ) {
@@ -214,11 +223,13 @@ class _LocalContext {
       result = _lowerIdentifier(this, expression);
     } else if (expression is ast.CallExpression) {
       result = _lowerCall(this, expression);
+    } else if (expression is ast.LoopExpression) {
+      result = _lowerLoop(this, expression);
     } else if (expression is ast.ReturnExpression) {
       result = _lowerReturn(this, expression);
     } else {
       throw CompilerError.unsupportedFeature(
-        'Unsupported expression.',
+        'Unsupported expression: $expression (`${expression.runtimeType}`).',
         location: ErrorLocation(resourceId, expression.span),
       );
     }
@@ -393,6 +404,15 @@ Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerCall(
   return _mergeResults(results);
 }
 
+Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerLoop(
+  _LocalContext context,
+  ast.LoopExpression expression,
+) {
+  return context._lowerStatement(expression.statement).mapValue((statement) => [
+        hir.LoopExpression(context.getId(expression), statement),
+      ]);
+}
+
 Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerReturn(
   _LocalContext context,
   ast.ReturnExpression expression,
@@ -405,8 +425,8 @@ Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerReturn(
   }
   return context
       .lowerToUnambiguous(expression.expression, context.returnType)
-      .mapValue((type) => [
-            hir.ReturnExpression(context.getId(expression), type),
+      .mapValue((e) => [
+            hir.ReturnExpression(context.getId(expression), e),
           ]);
 }
 

@@ -181,6 +181,8 @@ class LexerGrammar {
       .tokenize((_, span) => KeywordToken.if_(span: span) as IfKeywordToken);
   static final ELSE = string('else').tokenize(
       (_, span) => KeywordToken.else_(span: span) as ElseKeywordToken);
+  static final LOOP = string('loop')
+      .tokenize((_, span) => KeywordToken.loop(span: span) as LoopKeywordToken);
   static final RETURN = string('return').tokenize(
       (_, span) => KeywordToken.return_(span: span) as ReturnKeywordToken);
 

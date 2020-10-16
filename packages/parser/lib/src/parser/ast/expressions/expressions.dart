@@ -272,6 +272,19 @@ abstract class IfExpression extends Expression implements _$IfExpression {
 }
 
 @freezed
+abstract class LoopExpression extends Expression implements _$LoopExpression {
+  const factory LoopExpression(
+    int id, {
+    @required LoopKeywordToken loopKeyword,
+    @required Statement statement,
+  }) = _LoopExpression;
+  const LoopExpression._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [loopKeyword, statement];
+}
+
+@freezed
 abstract class ReturnExpression extends Expression
     implements _$ReturnExpression {
   const factory ReturnExpression(

@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'ids.dart';
+import 'statements.dart';
 import 'type.dart';
 
 part 'expressions.freezed.dart';
@@ -24,6 +25,10 @@ abstract class Expression implements _$Expression {
     IdentifierExpression target,
     Map<String, Expression> valueArguments,
   ) = FunctionCallExpression;
+  const factory Expression.loop(
+    DeclarationLocalId id,
+    Statement statement,
+  ) = LoopExpression;
   // ignore: non_constant_identifier_names
   const factory Expression.return_(
     DeclarationLocalId id,
@@ -42,6 +47,7 @@ abstract class Expression implements _$Expression {
           final functionType = target.type as FunctionCandyType;
           return functionType.returnType;
         },
+        loop: (_, __) => CandyType.unit,
         return_: (_, __) => CandyType.never,
       );
 }

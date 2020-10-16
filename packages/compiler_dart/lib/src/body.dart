@@ -93,6 +93,18 @@ dart.Expression _compileExpression(
         [],
       );
     },
+    loop: (id, statement) {
+      final block = dart.Block(
+        (b) => b
+          ..statements.addAll([
+            dart.Code('while (true) {'),
+            _compileStatement(context, statement),
+            dart.Code('}'),
+            dart.literalNull.returned.code,
+          ]),
+      );
+      return dart.Method((b) => b..body = block).closure.call([], {}, []);
+    },
     return_: (id, expression) =>
         _compileExpression(context, expression).returned,
   );
