@@ -38,7 +38,7 @@ async function spawnServer(): Promise<StreamInfo> {
   const process = safeSpawn(
     undefined,
     "C:\\Program Files\\Dart\\dart-sdk\\bin\\dart.exe",
-    ["C:/projects/candy/packages/lsp_server/bin/main.dart"],
+    ["C:/p/candy/packages/lsp_server/bin/main.dart"],
     {}
   );
   console.info(`    PID: ${process.pid}`);
