@@ -37,7 +37,7 @@ export function deactivate(): Thenable<void> | undefined {
 async function spawnServer(): Promise<StreamInfo> {
   const process = safeSpawn(
     undefined,
-    "C:\\src\\flutter\\bin\\dart.bat",
+    "C:\\Program Files\\Dart\\dart-sdk\\bin\\dart.exe",
     ["C:/projects/candy/packages/lsp_server/bin/main.dart"],
     {}
   );

@@ -177,7 +177,6 @@ class _LocalContext {
   Result<List<hir.Expression>, List<ReportedCompilerError>> lower(
     ast.Expression expression, [
     Option<hir.CandyType> expressionType = const Option.none(),
-    Option<hir.CandyType> returnType = const Option.none(),
   ]) {
     final innerContext = _LocalContext._(
       queryContext,
@@ -392,7 +391,9 @@ Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerReturn(
   _LocalContext context,
   ast.ReturnExpression expression,
 ) {
-  if (!context.isValidExpressionType(hir.CandyType.never)) return Ok([]);
+  // The type of a `ReturnExpression` is `Never` and never is, by definition,
+  // assignable to anything because it's a bottom type. So, we don't need to
+  // check that.
   if (context.returnType == Option<CandyType>.none()) {
     throw CompilerError.returnNotInFunction(
         'The return expression is not in a function.');
