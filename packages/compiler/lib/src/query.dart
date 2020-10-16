@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer';
 
 import 'package:dartx/dartx.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -200,4 +201,3 @@ abstract class RecordedQueryCall implements _$RecordedQueryCall {
       _$RecordedQueryCallFromJson(json);
   const RecordedQueryCall._();
 }
-
