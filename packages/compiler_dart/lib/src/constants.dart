@@ -1,6 +1,12 @@
 import 'package:compiler/compiler.dart';
 
-const dartBuildArtifactId = BuildArtifactId('dart');
+const dartBuildArtifactPath = 'dart';
+
+extension DartBuildArtifact on PackageId {
+  BuildArtifactId get dartBuildArtifactId =>
+      BuildArtifactId(this, dartBuildArtifactPath);
+}
+
 const dartFileExtension = '.dart';
 const pubspecFile = 'pubspec.yaml';
 const libDirectoryName = 'lib';

@@ -327,7 +327,7 @@ Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerIdentifier(
         hir.Identifier.property(
           hir.Expression.identifier(
             context.getId(expression),
-            hir.Identifier.module(ModuleId(PackageId.this_, ['main'])),
+            hir.Identifier.module(ModuleId(PackageId.core, ['stdio'])),
           ),
           'print',
           hir.CandyType.function(

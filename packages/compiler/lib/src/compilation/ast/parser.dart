@@ -21,6 +21,7 @@ abstract class ResourceId implements _$ResourceId {
   const ResourceId._();
 
   String get extension => p.extension(path);
+  bool get isInSrcDirectory => path.startsWith(srcDirectoryName);
   bool get isCandyFile => extension == candyFileExtension;
 
   String get fileName => p.basename(path);

@@ -3,7 +3,7 @@ use .operators
 public builtin trait Any
 builtin impl Any: ToString
 
-public trait ToString {
+public builtin trait ToString {
   fun toString(): String
 }
 
@@ -12,7 +12,7 @@ public builtin class Nothing
 
 public builtin class Bool
 
-public trait Number: AddOperator<This, This> & SubtractOperator<This, This>
+public builtin trait Number: AddOperator<This, This> & SubtractOperator<This, This>
 
 public builtin class Int
 builtin impl Int: Number
@@ -20,5 +20,5 @@ builtin impl Int: Number
 public builtin class Float
 builtin impl Float: Number
 
-public class String
+public builtin class String
 builtin impl String: PlusOperator<This, This>

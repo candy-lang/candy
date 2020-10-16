@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:analyzer/source/line_info.dart';
 import 'package:compiler/compiler.dart';
 
@@ -9,7 +11,22 @@ class OverlayResourceProvider extends ResourceProvider {
   OverlayResourceProvider(this.baseProvider) : assert(baseProvider != null);
 
   final ResourceProvider baseProvider;
+
+  @override
+  Directory get candyDirectory => baseProvider.candyDirectory;
+  @override
+  Directory get projectDirectory => baseProvider.projectDirectory;
+
   final _overlays = <ResourceId, String>{};
+
+  @override
+  List<ResourceId> getAllFileResourceIds(
+    QueryContext context,
+    PackageId packageId,
+  ) {
+    // TODO: check overlays
+    return baseProvider.getAllFileResourceIds(context, packageId);
+  }
 
   @override
   bool fileExists(QueryContext context, ResourceId id) =>

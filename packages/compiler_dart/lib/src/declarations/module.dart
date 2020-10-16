@@ -24,6 +24,7 @@ final compileModule = Query<ModuleId, Unit>(
       library.accept(dart.DartEmitter(_PrefixedAllocator())).toString(),
     );
     context.config.buildArtifactManager.setContent(
+      context,
       moduleIdToBuildArtifactId(context, moduleId),
       source,
     );
@@ -36,30 +37,19 @@ final moduleIdToBuildArtifactId = Query<ModuleId, BuildArtifactId>(
   'dart.moduleIdToBuildArtifactId',
   evaluateAlways: true,
   provider: (context, moduleId) {
-    return dartBuildArtifactId
+    return moduleId.packageId.dartBuildArtifactId
         .child(libDirectoryName)
         .child(srcDirectoryName)
-        .child(moduleIdToPath(context, moduleId));
-  },
-);
-final moduleIdToPath = Query<ModuleId, String>(
-  'dart.moduleIdToPath',
-  evaluateAlways: true,
-  provider: (context, moduleId) {
-    if (moduleId.packageId != PackageId.this_) {
-      throw CompilerError.unsupportedFeature(
-        'Compiling dependencies to Dart is not yet supported.',
-      );
-    }
-
-    return '${moduleId.path.join('/')}$dartFileExtension';
+        .child('${moduleId.path.join('/')}$dartFileExtension');
   },
 );
 final moduleIdToImportUrl = Query<ModuleId, String>(
   'dart.moduleIdToImportUrl',
   evaluateAlways: true,
   provider: (context, moduleId) {
-    final packageName = getCandyspec(context, PackageId.this_).name;
+    final packageName = moduleId.packageId.isThis
+        ? getCandyspec(context, PackageId.this_).name
+        : moduleId.packageId.name;
     return 'package:$packageName/$srcDirectoryName/${moduleId.path.join('/')}$dartFileExtension';
   },
 );
