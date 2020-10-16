@@ -85,14 +85,17 @@ class GlobalQueryContext {
       result = e.recordedCall;
     }
 
-    var dateTime = DateTime.now().toIso8601String();
-    dateTime =
-        dateTime.substring(0, dateTime.indexOf('.')).replaceAll(':', '-');
-    final encoder = JsonEncoder.withIndent('  ', (object) => object.toString());
-    config.buildArtifactManager.setContent(
-      BuildArtifactId('query-traces/$dateTime ${query.name}.json'),
-      encoder.convert(result.toJson()),
-    );
+    if (query.name.startsWith('dart.') || query.name == 'getAst') {
+      var dateTime = DateTime.now().toIso8601String();
+      dateTime =
+          dateTime.substring(0, dateTime.indexOf('.')).replaceAll(':', '-');
+      final encoder =
+          JsonEncoder.withIndent('  ', (object) => object.toString());
+      config.buildArtifactManager.setContent(
+        BuildArtifactId('query-traces/$dateTime ${query.name}.json'),
+        encoder.convert(result.toJson()),
+      );
+    }
 
     return result.result != null ? Some(result.result as R) : None();
   }
