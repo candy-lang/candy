@@ -4,10 +4,13 @@ import 'package:compiler/compiler.dart';
 import 'constants.dart';
 import 'declarations/module.dart';
 
-final compileType = Query<CandyType, dart.TypeReference>(
+final Query<CandyType, dart.Reference> compileType =
+    Query<CandyType, dart.Reference>(
   'dart.compileType',
   evaluateAlways: true,
   provider: (context, type) {
+    dart.Reference compile(CandyType type) => compileType(context, type);
+
     return type.map(
       user: (type) {
         if (type == CandyType.any) return _createDartType('Object');
@@ -25,7 +28,16 @@ final compileType = Query<CandyType, dart.TypeReference>(
         );
       },
       tuple: _unsupportedType,
-      function: _unsupportedType,
+      function: (type) {
+        return dart.FunctionType((b) {
+          if (type.receiverType != null) {
+            b.requiredParameters.add(compile(type.receiverType));
+          }
+          b
+            ..requiredParameters.addAll(type.parameterTypes.map(compile))
+            ..returnType = compile(type.returnType);
+        });
+      },
       union: _unsupportedType,
       intersection: _unsupportedType,
     );

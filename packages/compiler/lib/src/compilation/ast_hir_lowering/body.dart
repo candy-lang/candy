@@ -192,6 +192,8 @@ class _LocalContext {
     Result<List<hir.Expression>, List<ReportedCompilerError>> result;
     if (expression is ast.Literal) {
       result = _lowerLiteral(this, expression);
+    } else if (expression is ast.StringLiteral) {
+      result = _lowerStringLiteral(this, expression);
     } else if (expression is ast.Identifier) {
       result = _lowerIdentifier(this, expression);
     } else if (expression is ast.CallExpression) {
@@ -239,16 +241,15 @@ class _LocalContext {
   }
 }
 
-Result<List<hir.Expression>, List<ReportedCompilerError>> _mergeResults(
-  Iterable<Result<List<hir.Expression>, List<ReportedCompilerError>>> results,
+Result<List<T>, List<ReportedCompilerError>> _mergeResults<T>(
+  Iterable<Result<List<T>, List<ReportedCompilerError>>> results,
 ) {
-  final oks = results
-      .whereType<Ok<List<hir.Expression>, List<ReportedCompilerError>>>();
-  if (oks.isNotEmpty) return Ok(oks.expand((ok) => ok.value).toList());
+  final errors =
+      results.whereType<Error<List<T>, List<ReportedCompilerError>>>();
+  if (errors.isNotEmpty) errors.first;
 
-  return oks
-      .whereType<Error<List<hir.Expression>, List<ReportedCompilerError>>>()
-      .first;
+  final oks = results.whereType<Ok<List<T>, List<ReportedCompilerError>>>();
+  return Ok(oks.expand((ok) => ok.value).toList());
 }
 
 class _LoweringFailedException implements Exception {
@@ -276,6 +277,33 @@ Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerLiteral(
     );
   }
   return Ok([hir.Expression.literal(context.getId(expression), literal)]);
+}
+
+Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerStringLiteral(
+  _LocalContext context,
+  ast.StringLiteral expression,
+) {
+  final parts = expression.parts
+      .map<Result<List<hir.StringLiteralPart>, List<ReportedCompilerError>>>(
+          (part) {
+    if (part is ast.LiteralStringLiteralPart) {
+      return Ok([hir.StringLiteralPart.literal(part.value.value)]);
+    } else if (part is ast.InterpolatedStringLiteralPart) {
+      return context.lowerToUnambiguous(part.expression).mapValue(
+          (expression) => [hir.StringLiteralPart.interpolated(expression)]);
+    } else {
+      throw CompilerError.unsupportedFeature(
+        'Unsupported String literal part.',
+        location: ErrorLocation(context.resourceId, part.span),
+      );
+    }
+  });
+  return _mergeResults(parts).mapValue((parts) => [
+        hir.Expression.literal(
+          context.getId(expression),
+          hir.StringLiteral(parts),
+        ),
+      ]);
 }
 
 Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerIdentifier(

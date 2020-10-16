@@ -4,22 +4,24 @@ import 'package:compiler_dart/src/constants.dart';
 
 import '../body.dart';
 
-final compileConstructor = Query<DeclarationId, Iterable<dart.Constructor>>(
+final compileConstructor = Query<DeclarationId, List<dart.Constructor>>(
   'dart.compileConstructor',
   evaluateAlways: true,
-  provider: (context, declarationId) sync* {
+  provider: (context, declarationId) {
     assert(true);
     final constructor = getConstructorDeclarationHir(context, declarationId);
     final parameters = constructor.parameters;
 
     if (parameters.every((p) => p.defaultValue == null)) {
-      yield _compileWithoutDefaults(parameters);
+      return [_compileWithoutDefaults(parameters)];
     } else {
       final className =
           (declarationId.parent.simplePath.last as ClassDeclarationPathData)
               .name;
-      yield _compileWithDefaultsPublic(context, className, parameters);
-      yield _compileWithDefaultsPrivate(parameters);
+      return [
+        _compileWithDefaultsPublic(context, className, parameters),
+        _compileWithDefaultsPrivate(parameters),
+      ];
     }
   },
 );

@@ -162,6 +162,13 @@ class LspByteStreamServerChannel implements LspServerCommunicationChannel {
   }
 
   /// Send [bytes] to [_output].
-  void _write(List<int> bytes) =>
-      runZonedGuarded(() => _output.add(bytes), (e, s) => close());
+  void _write(List<int> bytes) {
+    runZonedGuarded(
+      () => _output.add(bytes),
+      (e, st) {
+        stderr.write('An error happened: $e\n$st');
+        return close();
+      },
+    );
+  }
 }

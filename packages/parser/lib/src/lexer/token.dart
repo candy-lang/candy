@@ -71,6 +71,16 @@ abstract class LiteralToken<T> extends Token {
 }
 
 @freezed
+abstract class BoolLiteralToken extends LiteralToken<bool>
+    with _$BoolLiteralToken {
+  const factory BoolLiteralToken(
+    // ignore: avoid_positional_boolean_parameters
+    bool value, {
+    @required SourceSpan span,
+  }) = _BoolLiteralToken;
+}
+
+@freezed
 abstract class IntLiteralToken extends LiteralToken<int>
     with _$IntLiteralToken {
   const factory IntLiteralToken(
@@ -80,13 +90,9 @@ abstract class IntLiteralToken extends LiteralToken<int>
 }
 
 @freezed
-abstract class BoolLiteralToken extends LiteralToken<bool>
-    with _$BoolLiteralToken {
-  const factory BoolLiteralToken(
-    // ignore: avoid_positional_boolean_parameters
-    bool value, {
-    @required SourceSpan span,
-  }) = _BoolLiteralToken;
+abstract class LiteralStringToken extends Token with _$LiteralStringToken {
+  const factory LiteralStringToken(String value, {SourceSpan span}) =
+      _LiteralStringToken;
 }
 
 @freezed
@@ -104,6 +110,12 @@ enum OperatorTokenType {
 
   /// `:`
   colon,
+
+  /// `#`
+  hashtag,
+
+  /// `"`
+  quote,
 
   /// `=>`
   equalsGreater,

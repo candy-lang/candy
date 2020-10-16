@@ -1,4 +1,5 @@
 import 'package:meta/meta.dart';
+import 'package:characters/characters.dart';
 import 'package:petitparser/petitparser.dart'
     hide ChoiceParserExtension, Token, SequenceParserExtension;
 
@@ -46,6 +47,8 @@ class LexerGrammar {
   static final DOT = _operator('.', OperatorTokenType.dot);
   static final COMMA = _operator(',', OperatorTokenType.comma);
   static final COLON = _operator(':', OperatorTokenType.colon);
+  static final HASHTAG = _operator('#', OperatorTokenType.hashtag);
+  static final QUOTE = _operator('"', OperatorTokenType.quote);
   static final EQUALS_GREATER =
       _operator('=>', OperatorTokenType.equalsGreater);
 
@@ -240,6 +243,37 @@ class LexerGrammar {
 
   static final BooleanLiteral = (string('true') | string('false')).tokenize(
       (lexeme, span) => BoolLiteralToken(lexeme == 'true', span: span));
+
+  static final LiteralStringToken_ =
+      (QUOTE | LCURL).neg().plus().tokenize<LiteralStringToken>((lexeme, span) {
+    final content = StringBuffer();
+    var isEscaped = false;
+    for (final char in lexeme.characters) {
+      if (!isEscaped) {
+        if (char == r'\') {
+          isEscaped = true;
+          continue;
+        }
+        content.write(char);
+        continue;
+      }
+
+      final code = {
+        'n': '\n',
+        'r': '\r',
+        't': '\t',
+        r'\': '\\',
+      }[char];
+      if (code == null) {
+        throw Exception('Invalid escaped character: `$char`.');
+      }
+
+      content.write(code);
+      isEscaped = false;
+    }
+
+    return LiteralStringToken(content.toString(), span: span);
+  });
 
   // SECTION: lexicalIdentifiers
 
