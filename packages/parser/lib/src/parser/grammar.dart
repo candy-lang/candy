@@ -699,7 +699,10 @@ class ParserGrammar {
           );
         },
       )
-      ..prefix<ReturnKeywordToken, Expression>(LexerGrammar.RETURN,
+      ..prefix<ReturnKeywordToken, Expression>(
+          (LexerGrammar.RETURN & LexerGrammar.NLs)
+              .map((value) => value.first as ReturnKeywordToken),
+          // ..prefix<ReturnKeywordToken, Expression>(LexerGrammar.RETURN,
           mapper: (keyword, expression) {
         return ReturnExpression(
           _id++,
