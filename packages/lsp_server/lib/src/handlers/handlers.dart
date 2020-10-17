@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:async';
+import 'dart:io';
 
 import '../analysis_server.dart';
 import '../generated/lsp_protocol/protocol_generated.dart';
@@ -124,6 +125,12 @@ abstract class ServerStateMessageHandler {
       // can be quite large).
       await Future<void>.delayed(Duration.zero);
       return token.isCancellationRequested ? cancelled() : result;
+    } catch (e, st) {
+      stderr.write('An error occurred while handling the message: $e\n$st');
+      return error(
+        ErrorCodes.InternalError,
+        'An error occurred while handling the message: $e\n$st',
+      );
     } finally {
       _cancelHandler.clearToken(requestMessage);
     }

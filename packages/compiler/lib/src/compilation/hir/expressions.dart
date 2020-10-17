@@ -24,6 +24,11 @@ abstract class Expression implements _$Expression {
     IdentifierExpression target,
     Map<String, Expression> valueArguments,
   ) = FunctionCallExpression;
+  // ignore: non_constant_identifier_names
+  const factory Expression.return_(
+    DeclarationLocalId id,
+    Expression expression,
+  ) = ReturnExpression;
 
   factory Expression.fromJson(Map<String, dynamic> json) =>
       _$ExpressionFromJson(json);
@@ -37,6 +42,7 @@ abstract class Expression implements _$Expression {
           final functionType = target.type as FunctionCandyType;
           return functionType.returnType;
         },
+        return_: (_, __) => CandyType.never,
       );
 }
 

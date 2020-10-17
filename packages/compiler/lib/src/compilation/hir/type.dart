@@ -49,6 +49,25 @@ abstract class CandyType with _$CandyType {
 
   factory CandyType.list(CandyType itemType) =>
       CandyType.user(ModuleId.coreCollections, 'List', arguments: [itemType]);
+
+  @override
+  String toString() {
+    return map(
+      user: (type) {
+        var name = '${type.moduleId}:${type.name}';
+        if (type.arguments.isNotEmpty) name += '<${type.arguments.join(', ')}>';
+        return name;
+      },
+      tuple: (type) => '(${type.items.join(', ')})',
+      function: (type) {
+        var name = '(${type.parameterTypes.join(', ')}) => ${type.returnType}';
+        if (type.receiverType != null) name = '${type.receiverType}.$name';
+        return name;
+      },
+      union: (type) => type.types.join(' | '),
+      intersection: (type) => type.types.join(' & '),
+    );
+  }
 }
 
 final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =

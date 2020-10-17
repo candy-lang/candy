@@ -3,7 +3,7 @@ import '../../lexer/lexer.dart';
 import 'declarations.dart';
 import 'general.dart';
 
-abstract class AstVisitor<R> {
+/*abstract class AstVisitor<R> {
   const AstVisitor();
 
   R visit(CandyFile file) {
@@ -30,4 +30,4 @@ abstract class AstVisitor<R> {
   R visitModifierToken(ModifierToken token) {}
   R visitLiteralToken(LiteralToken<dynamic> token) {}
   R visitIdentifierToken(IdentifierToken token) {}
-}
+}*/
