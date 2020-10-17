@@ -30,10 +30,10 @@ data class Fruit {
 
 enum Ripeness { ripe, unripe }
 
-const apple = Fruit("apple", 2.euro)
-const banana = Fruit("banana", 5.20.euro)
-const kiwi = Fruit("kiwi", apple.cost + banana.cost, ripeness = .ripe)
-const smoothieIngredients = [apple, banana, kiwi, apple, kiwi]
+let apple = Fruit("apple", 2.euro)
+let banana = Fruit("banana", 5.20.euro)
+let kiwi = Fruit("kiwi", apple.cost + banana.cost, ripeness = .ripe)
+let smoothieIngredients = [apple, banana, kiwi, apple, kiwi]
 
 fun main2() {
   let expensiveIngredients = smoothieIngredients.where { it.cost > 3 }
@@ -51,7 +51,7 @@ class Cart {
 
   let cost: Money => items.cost
 
-  fun buy() = TODO
+  fun buy() = todo
 }
 
 impl Iterable<Item>: Item {
@@ -65,7 +65,7 @@ impl Fruit: Cart.Item
 data class Box<Item: Cart.Item> {
   /// A beautiful, handcrafted, wooden box.
 
-  static const cost: Money = 30.euro
+  static let cost: Money = 30.euro
   /// A box is very expensive.
 
   let content: List<Item>
@@ -75,31 +75,29 @@ impl<Item> Box<Item>: Cart.Item {
   let cost => content.cost + Box.cost
 }
 
-const cart = Cart([
+let cart = Cart([
   kiwi,
   ...smoothieIngredients,
   Box([apple, banana, banana]),
 ])
 
-void main3() {
+fun main3() {
   print("The cart costs {cart.cost}.")
 }
 
 impl Fruit {
   let yumminess: Int {
     /// Computes a yumminess score for this [Fruit] using a secret formula.
-    fun get() {
-      return fibonacci(cost.value as UInt) + name.bytes.sum() + match ripeness {
-        ripe => 0
-        unripe => -20
-      }
+    return fibonacci(cost.value as UInt) + name.bytes.sum() + match ripeness {
+      .ripe => 0
+      .unripe => -20
     }
   }
 }
 
-void main4() {
+fun main4() {
   for ingredient in smoothieIngredients {
-    TODO("Do something")
+    todo("Do something")
   }
 }
 
@@ -113,7 +111,7 @@ class Human {
         return ThrowUp()
       }
     }
-    burp
+    return Burp()
   }
 }
 

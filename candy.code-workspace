@@ -13,12 +13,19 @@
       "path": "packages\\compiler"
     },
     {
+      "name": "compiler_dart",
+      "path": "packages\\compiler_dart"
+    },
+    {
       "name": "lsp_server",
       "path": "packages\\lsp_server"
     },
     {
       "name": "vscode_extension",
       "path": "packages\\vscode_extension"
+    },
+    {
+      "path": "packages\\candy"
     }
   ],
   "launch": {

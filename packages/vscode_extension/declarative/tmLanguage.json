@@ -49,10 +49,10 @@
     "comments": {
       "patterns": [
         {
+          "match": "/\\*\\*/",
           "captures": {
             "0": { "name": "punctuation.definition.comment.candy" }
           },
-          "match": "/\\*\\*/",
           "name": "comment.block.empty.candy"
         },
         { "include": "#comments-doc" },
