@@ -337,10 +337,8 @@ class AnalysisServer {
     final file = File.fromUri(Uri.parse(uri));
     assert(p.extension(file.path) == candyFileExtension);
 
-    final sourceDirectory = p.join(
-      projectDirectory.absolute.path,
-      ResourceProvider.srcDirectoryName,
-    );
+    final sourceDirectory =
+        p.join(projectDirectory.absolute.path, srcDirectoryName);
     assert(p.isWithin(sourceDirectory, file.path));
 
     final relativePath = p.relative(file.path, from: sourceDirectory);
@@ -350,7 +348,7 @@ class AnalysisServer {
   String resourceIdToFileUri(ResourceId resourceId) {
     final path = p.join(
       projectDirectory.absolute.path,
-      ResourceProvider.srcDirectoryName,
+      srcDirectoryName,
       resourceId.path,
     );
 

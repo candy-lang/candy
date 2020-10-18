@@ -12,6 +12,7 @@ abstract class PackageId implements _$PackageId {
 
   static const core = PackageId('core');
   bool get isCore => this == core;
+  bool get isNotCore => !isCore;
 
   // ignore: constant_identifier_names
   static const this_ = PackageId('this');

@@ -11,35 +11,41 @@ part 'build_artifacts.g.dart';
 
 @freezed
 abstract class BuildArtifactId implements _$BuildArtifactId {
-  const factory BuildArtifactId(String path) = _BuildArtifactId;
+  const factory BuildArtifactId(PackageId packageId, String path) =
+      _BuildArtifactId;
   factory BuildArtifactId.fromJson(Map<String, dynamic> json) =>
       _$BuildArtifactIdFromJson(json);
   const BuildArtifactId._();
 
-  BuildArtifactId child(String name) => BuildArtifactId('$path/$name');
+  BuildArtifactId child(String name) => copyWith(path: '$path/$name');
 }
 
 class BuildArtifactManager {
   const BuildArtifactManager(this.projectDirectory);
 
   final Directory projectDirectory;
-  String get _buildDirectory =>
-      p.join(projectDirectory.path, buildDirectoryName);
 
-  void delete([BuildArtifactId directoryId]) {
-    final path = directoryId != null ? toPath(directoryId) : _buildDirectory;
+  void delete(QueryContext context, [BuildArtifactId directoryId]) {
+    final path =
+        toPath(context, directoryId ?? BuildArtifactId(PackageId.this_, ''));
     final dir = Directory(path);
     if (dir.existsSync()) dir.deleteSync(recursive: true);
   }
 
-  bool fileExists(BuildArtifactId id) => File(toPath(id)).existsSync();
+  bool fileExists(QueryContext context, BuildArtifactId id) =>
+      File(toPath(context, id)).existsSync();
 
-  String getContent(BuildArtifactId id) => File(toPath(id)).readAsStringSync();
-  void setContent(BuildArtifactId id, String content) {
-    File(toPath(id))
+  String getContent(QueryContext context, BuildArtifactId id) =>
+      File(toPath(context, id)).readAsStringSync();
+  void setContent(QueryContext context, BuildArtifactId id, String content) {
+    File(toPath(context, id))
       ..createSync(recursive: true)
       ..writeAsStringSync(content);
   }
 
-  String toPath(BuildArtifactId id) => p.join(_buildDirectory, id.path);
+  String toPath(QueryContext context, BuildArtifactId id) {
+    final packageDirectory = context.config.resourceProvider
+        .getPackageDirectory(context, id.packageId);
+    return p.join(packageDirectory.path, buildDirectoryName, id.path);
+  }
 }

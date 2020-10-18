@@ -88,7 +88,7 @@ final getInnerDeclarationIds = Query<DeclarationId, List<DeclarationId>>(
           traitDisambiguator[name] = (traitDisambiguator[name] ?? -1) + 1,
         ));
       } else if (declaration is ast.ImplDeclaration) {
-        final name = declaration.trait?.toString();
+        final name = declaration.type.toString();
         declarationIds.add(declarationId.inner(
           DeclarationPathData.impl(name),
           implDisambiguator[name] = (implDisambiguator[name] ?? -1) + 1,

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:analyzer/source/line_info.dart';
 import 'package:compiler/compiler.dart';
 
@@ -9,17 +11,33 @@ class OverlayResourceProvider extends ResourceProvider {
   OverlayResourceProvider(this.baseProvider) : assert(baseProvider != null);
 
   final ResourceProvider baseProvider;
+
+  @override
+  Directory get candyDirectory => baseProvider.candyDirectory;
+  @override
+  Directory get projectDirectory => baseProvider.projectDirectory;
+
   final _overlays = <ResourceId, String>{};
 
   @override
-  bool fileExists(ResourceId id) =>
-      _overlays.containsKey(id) || baseProvider.fileExists(id);
-  @override
-  bool directoryExists(ResourceId id) => baseProvider.directoryExists(id);
+  List<ResourceId> getAllFileResourceIds(
+    QueryContext context,
+    PackageId packageId,
+  ) {
+    // TODO: check overlays
+    return baseProvider.getAllFileResourceIds(context, packageId);
+  }
 
   @override
-  String getContent(ResourceId id) =>
-      _overlays[id] ?? baseProvider.getContent(id);
+  bool fileExists(QueryContext context, ResourceId id) =>
+      _overlays.containsKey(id) || baseProvider.fileExists(context, id);
+  @override
+  bool directoryExists(QueryContext context, ResourceId id) =>
+      baseProvider.directoryExists(context, id);
+
+  @override
+  String getContent(QueryContext context, ResourceId id) =>
+      _overlays[id] ?? baseProvider.getContent(context, id);
 
   void addOverlay(ResourceId id, String content) => _overlays[id] = content;
   ErrorOr<void> updateOverlay(

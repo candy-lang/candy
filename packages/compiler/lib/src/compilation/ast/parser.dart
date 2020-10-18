@@ -21,6 +21,7 @@ abstract class ResourceId implements _$ResourceId {
   const ResourceId._();
 
   String get extension => p.extension(path);
+  bool get isInSrcDirectory => path.startsWith(srcDirectoryName);
   bool get isCandyFile => extension == candyFileExtension;
 
   String get fileName => p.basename(path);
@@ -44,13 +45,13 @@ final doesResourceExist = Query<ResourceId, bool>(
   'doesResourceExist',
   evaluateAlways: true,
   provider: (context, resourceId) =>
-      context.config.resourceProvider.fileExists(resourceId),
+      context.config.resourceProvider.fileExists(context, resourceId),
 );
 final doesResourceDirectoryExist = Query<ResourceId, bool>(
   'doesResourceDirectoryExist',
   evaluateAlways: true,
   provider: (context, resourceId) =>
-      context.config.resourceProvider.directoryExists(resourceId),
+      context.config.resourceProvider.directoryExists(context, resourceId),
 );
 
 final getSourceCode = Query<ResourceId, String>(
@@ -58,7 +59,7 @@ final getSourceCode = Query<ResourceId, String>(
   evaluateAlways: true,
   provider: (context, resourceId) {
     assert(resourceId.isCandyFile);
-    return context.config.resourceProvider.getContent(resourceId);
+    return context.config.resourceProvider.getContent(context, resourceId);
   },
 );
 

@@ -74,7 +74,8 @@ final moduleIdToOptionalDeclarationId = Query<ModuleId, Option<DeclarationId>>(
   'moduleIdToOptionalDeclarationId',
   provider: (context, moduleId) {
     final packageId = moduleId.packageId;
-    var path = '';
+    var path = 'src';
+    // TODO(JonasWanke): simplify
     String pathAnd(String newSegment) =>
         path.isEmpty ? newSegment : '$path/$newSegment';
     final remainingPath = moduleId.path.toList();
@@ -144,7 +145,10 @@ final resourceIdToModuleId = Query<ResourceId, ModuleId>(
   provider: (context, resourceId) {
     assert(resourceId.isCandyFile);
 
-    var path = resourceId.path.removeSuffix(candyFileExtension).split('/');
+    var path = resourceId.path
+        .removePrefix('$srcDirectoryName/')
+        .removeSuffix(candyFileExtension)
+        .split('/');
     if (resourceId.isModuleFile) path = path.dropLast(1);
     return ModuleId(resourceId.packageId, path);
   },
