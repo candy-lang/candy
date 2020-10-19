@@ -35,6 +35,8 @@ abstract class CompilerError implements _$CompilerError {
   static const internalError = CompilerError._create('internalError');
   static const invalidArgumentType =
       CompilerError._create('invalidArgumentType');
+  static const invalidExpressionType =
+      CompilerError._create('invalidExpressionType');
   static const invalidImplTraitBound =
       CompilerError._create('invalidImplTraitBound');
   static const invalidUseLine = CompilerError._create('invalidUseLine');

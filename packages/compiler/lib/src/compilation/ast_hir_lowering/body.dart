@@ -239,8 +239,16 @@ class _LocalContext {
     final result = lower(expression, expressionType);
     if (result is Error) return Error(result.error);
 
-    assert(result.value.isNotEmpty);
-    if (result.value.length > 1) {
+    final value = result.value;
+    if (value.isEmpty) {
+      assert(expressionType is Some);
+      return Error([
+        CompilerError.invalidExpressionType(
+          'Expression could not be resolved to match type `${expressionType.value}`.',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    } else if (value.length > 1) {
       return Error([
         CompilerError.ambiguousExpression(
           'Expression is ambiguous.',
@@ -248,7 +256,7 @@ class _LocalContext {
         ),
       ]);
     }
-    return Ok(result.value.single);
+    return Ok(value.single);
   }
 }
 
