@@ -33,11 +33,14 @@ final getTraitDeclarationHir = Query<DeclarationId, hir.TraitDeclaration>(
       typeParameters: ast.typeParameters.parameters
           .map((p) => hir.TypeParameter(
                 name: p.name.name,
-                upperBound:
-                    astTypeToHirType(context, Tuple2(moduleId, p.bound)),
+                upperBound: p.bound != null
+                    ? astTypeToHirType(context, Tuple2(moduleId, p.bound))
+                    : null,
               ))
           .toList(),
-      upperBound: astTypeToHirType(context, Tuple2(moduleId, ast.bound)),
+      upperBound: ast.bound != null
+          ? astTypeToHirType(context, Tuple2(moduleId, ast.bound))
+          : null,
       innerDeclarationIds: getInnerDeclarationIds(
         context,
         moduleIdToDeclarationId(context, moduleId),
