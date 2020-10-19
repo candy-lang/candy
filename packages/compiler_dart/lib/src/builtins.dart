@@ -48,7 +48,7 @@ abstract class BuiltinCompiler<Output> {
   }
 
   List<Output> compilePrimitiveGhosts() {
-    return 1
+    return 2
         .rangeTo(10)
         .map(compileTuple)
         .mapNotNull((output) => output.valueOrNull)
