@@ -1,6 +1,7 @@
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:collection/collection.dart';
 import 'package:compiler/compiler.dart';
+import 'package:dartx/dartx.dart';
 
 import 'constants.dart' hide srcDirectoryName;
 
@@ -46,6 +47,14 @@ abstract class BuiltinCompiler<Output> {
     );
   }
 
+  List<Output> compilePrimitiveGhosts() {
+    return 1
+        .rangeTo(10)
+        .map(compileTuple)
+        .mapNotNull((output) => output.valueOrNull)
+        .toList();
+  }
+
   Option<Output> compileAny();
   Option<Output> compileToString();
 
@@ -59,6 +68,8 @@ abstract class BuiltinCompiler<Output> {
   Option<Output> compileFloat();
 
   Option<Output> compileString();
+
+  Option<Output> compileTuple(int size);
 
   Option<Output> compilePrint();
 }
@@ -115,6 +126,46 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
   Option<dart.Spec> compileString() {
     // `String` corresponds to `String`, hence nothing to do.
     return Option.none();
+  }
+
+  @override
+  Option<dart.Spec> compileTuple(int size) {
+    const fieldNames = [
+      'first',
+      'second',
+      'third',
+      'fourth',
+      'fifth',
+      'sixth',
+      'seventh',
+      'eight',
+      'nineth',
+      'tenth',
+    ];
+
+    final fields = 1.rangeTo(size).map((i) => fieldNames[i - 1]);
+
+    return Option.some(dart.Class((b) => b
+      ..annotations.add(dart.refer('sealed', packageMetaUrl))
+      ..name = 'Tuple$size'
+      ..types.addAll(1.rangeTo(size).map((number) => dart.refer('T$number')))
+      ..fields.addAll(fields.mapIndexed((index, name) => dart.Field((b) => b
+        ..modifier = dart.FieldModifier.final$
+        ..type = dart.refer('T${index + 1}')
+        ..name = name)))
+      ..constructors.add(dart.Constructor((b) => b
+        ..constant = true
+        ..requiredParameters.addAll(fields.map((name) => dart.Parameter((b) => b
+          ..toThis = true
+          ..name = name)))
+        ..initializers.addAll(fields.map((name) => dart.refer('assert').call(
+            [dart.refer(name).notEqualTo(dart.literalNull)], {}, []).code))))
+      ..methods.add(dart.Method((b) => b
+        ..annotations.add(dart.refer('override', dartCoreUrl))
+        ..returns = dart.refer('String', dartCoreUrl)
+        ..name = 'toString'
+        ..lambda = true
+        ..body = dart.Code("'(${fields.map((f) => '\$$f').join(', ')})'")))));
   }
 
   @override

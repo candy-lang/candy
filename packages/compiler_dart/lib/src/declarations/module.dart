@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart' hide srcDirectoryName;
 import 'package:dart_style/dart_style.dart';
 
+import '../builtins.dart';
 import '../constants.dart';
 import 'declaration.dart';
 
@@ -17,6 +18,10 @@ final compileModule = Query<ModuleId, Unit>(
       for (final declarationId in module.innerDeclarationIds) {
         final compiled = compileDeclaration(context, declarationId);
         if (compiled.isSome) b.body.add(compiled.value);
+      }
+
+      if (moduleId == ModuleId.corePrimitives) {
+        b.body.addAll(DartBuiltinCompiler().compilePrimitiveGhosts());
       }
     });
 
