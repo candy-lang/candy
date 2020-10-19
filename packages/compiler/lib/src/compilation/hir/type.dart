@@ -91,44 +91,60 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
     if (parent == CandyType.any) return true;
     if (child == CandyType.any) return false;
 
-    return child.when(
-      user: (moduleId, name, _) {
-        final declarationId = moduleIdToDeclarationId(context, moduleId);
-        if (declarationId.isTrait) {
-          final declaration = getTraitDeclarationHir(context, declarationId);
-          if (declaration.typeParameters.isNotEmpty) {
-            throw CompilerError.unsupportedFeature(
-              'Type parameters are not yet supported.',
+    return child.map(
+      user: (childType) {
+        return parent.map(
+          user: (parentType) {
+            final declarationId =
+                moduleIdToDeclarationId(context, childType.virtualModuleId);
+            if (declarationId.isTrait) {
+              final declaration =
+                  getTraitDeclarationHir(context, declarationId);
+              if (declaration.typeParameters.isNotEmpty) {
+                throw CompilerError.unsupportedFeature(
+                  'Type parameters are not yet supported.',
+                );
+              }
+              return declaration.upperBounds.any(
+                  (bound) => isAssignableTo(context, Tuple2(bound, parent)));
+            }
+
+            if (declarationId.isClass) {
+              if (parent is! UserCandyType) return false;
+
+              return getClassTraitImplId(context, inputs) is Some;
+            }
+
+            throw CompilerError.internalError(
+              'User type can only be a trait or a class.',
             );
-          }
-          return declaration.upperBounds
-              .any((bound) => isAssignableTo(context, Tuple2(bound, parent)));
-        }
-
-        if (declarationId.isClass) {
-          return getClassTraitImplId(context, inputs) is Some;
-        }
-
-        assert(false, 'User type can only be a trait or a class.');
-        // ignore: avoid_returning_null
-        return null;
+          },
+          tuple: (_) => false,
+          function: (_) => false,
+          union: (parentType) => parentType.types
+              .any((type) => isAssignableTo(context, Tuple2(childType, type))),
+          intersection: (parentType) => parentType.types.every(
+              (type) => isAssignableTo(context, Tuple2(childType, type))),
+        );
       },
-      tuple: (items) {
+      tuple: (type) {
         throw CompilerError.unsupportedFeature(
           'Trait implementations for tuples are not yet supported.',
         );
       },
-      function: (receiverType, parameterTypes, returnType) {
+      function: (type) {
         throw CompilerError.unsupportedFeature(
           'Trait implementations for functions are not yet supported.',
         );
       },
-      union: (items) {
+      union: (type) {
+        final items = type.types;
         assert(items.length >= 2);
         return items
             .every((type) => isAssignableTo(context, Tuple2(type, parent)));
       },
-      intersection: (items) {
+      intersection: (type) {
+        final items = type.types;
         assert(items.length >= 2);
         return items
             .any((type) => isAssignableTo(context, Tuple2(type, parent)));
