@@ -18,9 +18,16 @@ abstract class Declaration implements _$Declaration {
   const factory Declaration.trait(
     String name, {
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
-    @required CandyType upperBound,
+    @required List<UserCandyType> upperBounds,
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
   }) = TraitDeclaration;
+
+  const factory Declaration.impl({
+    @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
+    @required UserCandyType type,
+    @required List<UserCandyType> traits,
+    @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
+  }) = ImplDeclaration;
 
   // ignore: non_constant_identifier_names
   const factory Declaration.class_({

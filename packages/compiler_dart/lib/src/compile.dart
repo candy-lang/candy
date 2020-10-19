@@ -37,7 +37,7 @@ final compile = Query<PackageId, Unit>(
 
     final allResourceIds = context.config.resourceProvider
         .getAllFileResourceIds(context, packageId)
-        .where((id) => id.isInSrcDirectory && id.isCandyFile);
+        .where((id) => id.isCandySourceFile);
     for (final resourceId in allResourceIds) {
       compileModule(context, resourceIdToModuleId(context, resourceId));
     }

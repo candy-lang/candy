@@ -14,23 +14,24 @@ import 'declarations/module.dart';
 import 'declarations/property.dart';
 import 'type.dart';
 
-final getBody = Query<DeclarationId, List<hir.Statement>>(
+final getBody = Query<DeclarationId, Option<List<hir.Statement>>>(
   'getBody',
   provider: (context, declarationId) =>
-      lowerBodyAstToHir(context, declarationId).first,
+      lowerBodyAstToHir(context, declarationId).mapValue((v) => v.first),
 );
-final getBodyAstToHirIds = Query<DeclarationId, BodyAstToHirIds>(
+final getBodyAstToHirIds = Query<DeclarationId, Option<BodyAstToHirIds>>(
   'getBodyAstToHirIds',
   provider: (context, declarationId) =>
-      lowerBodyAstToHir(context, declarationId).second,
+      lowerBodyAstToHir(context, declarationId).mapValue((v) => v.second),
 );
-final Query<DeclarationId, Tuple2<List<hir.Statement>, BodyAstToHirIds>>
+final Query<DeclarationId, Option<Tuple2<List<hir.Statement>, BodyAstToHirIds>>>
     lowerBodyAstToHir =
-    Query<DeclarationId, Tuple2<List<hir.Statement>, BodyAstToHirIds>>(
+    Query<DeclarationId, Option<Tuple2<List<hir.Statement>, BodyAstToHirIds>>>(
   'lowerBodyAstToHir',
   provider: (context, declarationId) {
     if (declarationId.isFunction) {
       final functionAst = getFunctionDeclarationAst(context, declarationId);
+      if (functionAst.body == null) return None();
 
       final localContext = _LocalContext.forFunction(
         context,
@@ -55,16 +56,10 @@ final Query<DeclarationId, Tuple2<List<hir.Statement>, BodyAstToHirIds>>
           );
         }
       }).toList();
-      return Tuple2(statements, localContext.idMap);
+      return Some(Tuple2(statements, localContext.idMap));
     } else if (declarationId.isProperty) {
       final propertyAst = getPropertyDeclarationAst(context, declarationId);
-      if (propertyAst.initializer == null) {
-        throw CompilerError.internalError(
-          '`lowerBodyAstToHir` called on a property without an initializer.',
-          location:
-              ErrorLocation(declarationId.resourceId, propertyAst.name.span),
-        );
-      }
+      if (propertyAst.initializer == null) return None();
 
       var type = Option<hir.CandyType>.none();
       if (propertyAst.type != null) {
@@ -84,7 +79,7 @@ final Query<DeclarationId, Tuple2<List<hir.Statement>, BodyAstToHirIds>>
         localContext.getId(propertyAst.initializer),
         result.value,
       );
-      return Tuple2([statement], localContext.idMap);
+      return Some(Tuple2([statement], localContext.idMap));
     } else {
       throw CompilerError.unsupportedFeature(
         'Unsupported body.',
@@ -244,8 +239,16 @@ class _LocalContext {
     final result = lower(expression, expressionType);
     if (result is Error) return Error(result.error);
 
-    assert(result.value.isNotEmpty);
-    if (result.value.length > 1) {
+    final value = result.value;
+    if (value.isEmpty) {
+      assert(expressionType is Some);
+      return Error([
+        CompilerError.invalidExpressionType(
+          'Expression could not be resolved to match type `${expressionType.value}`.',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    } else if (value.length > 1) {
       return Error([
         CompilerError.ambiguousExpression(
           'Expression is ambiguous.',
@@ -253,7 +256,7 @@ class _LocalContext {
         ),
       ]);
     }
-    return Ok(result.value.single);
+    return Ok(value.single);
   }
 }
 
