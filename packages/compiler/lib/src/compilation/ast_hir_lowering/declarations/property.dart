@@ -43,7 +43,7 @@ final getPropertyDeclarationHir = Query<DeclarationId, hir.PropertyDeclaration>(
 
     hir.Expression initializer;
     if (propertyAst.initializer != null) {
-      final result = getBody(context, declarationId);
+      final result = getBody(context, declarationId).value;
       assert(result.length == 1 && result.single is hir.ExpressionStatement);
       initializer = (result.single as hir.ExpressionStatement).expression;
     }

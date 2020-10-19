@@ -5,26 +5,28 @@ import 'package:strings/strings.dart' as strings;
 import 'declarations/module.dart';
 import 'type.dart';
 
-final compilePropertyInitializer = Query<DeclarationId, dart.Code>(
+final compilePropertyInitializer = Query<DeclarationId, Option<dart.Code>>(
   'dart.compilePropertyInitializer',
   evaluateAlways: true,
   provider: (context, declarationId) {
     assert(declarationId.isProperty);
     final hir = getPropertyDeclarationHir(context, declarationId);
-    assert(hir.initializer != null);
+    if (hir.initializer == null) return None();
 
-    return _compileExpression(context, hir.initializer).code;
+    return Some(_compileExpression(context, hir.initializer).code);
   },
 );
-final compileBody = Query<DeclarationId, dart.Code>(
+final compileBody = Query<DeclarationId, Option<dart.Code>>(
   'dart.compileBody',
   evaluateAlways: true,
   provider: (context, declarationId) {
-    final statements = getBody(context, declarationId);
+    final body = getBody(context, declarationId);
+    if (body.isNone) return None();
+    final statements = body.value;
 
     final compiled =
         statements.map((statement) => _compileStatement(context, statement));
-    return dart.Block((b) => b.statements.addAll(compiled));
+    return Some(dart.Block((b) => b.statements.addAll(compiled)));
   },
 );
 final compileExpression = Query<Expression, dart.Expression>(

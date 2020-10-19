@@ -24,7 +24,7 @@ final Query<CandyType, dart.Reference> compileType =
 
         return _createDartType(
           type.name,
-          url: moduleIdToImportUrl(context, type.moduleId),
+          url: moduleIdToImportUrl(context, type.parentModuleId),
         );
       },
       tuple: _unsupportedType,

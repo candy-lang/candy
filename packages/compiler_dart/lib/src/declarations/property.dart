@@ -8,6 +8,8 @@ final compileProperty = Query<DeclarationId, dart.Field>(
   'dart.compileProperty',
   evaluateAlways: true,
   provider: (context, declarationId) {
+    // This is only for global properties and those in classes, not for
+    // properties in traits as they create getter/setter methods.
     final property = getPropertyDeclarationHir(context, declarationId);
     final isInsideClass =
         declarationId.hasParent && declarationId.parent.isClass;
@@ -20,8 +22,8 @@ final compileProperty = Query<DeclarationId, dart.Field>(
       ..name = property.name
       ..type = compileType(context, property.type)
       // In classes, the constructor is reponsible for handling defaults.
-      ..assignment = !isInsideClass && property.initializer != null
-          ? compilePropertyInitializer(context, declarationId)
-          : null);
+      ..assignment = isInsideClass
+          ? null
+          : compilePropertyInitializer(context, declarationId).valueOrNull);
   },
 );

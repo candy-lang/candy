@@ -6,6 +6,7 @@ import 'compilation/ids.dart';
 import 'constants.dart';
 import 'errors.dart';
 import 'query.dart';
+import 'utils.dart';
 
 part 'candyspec.freezed.dart';
 part 'candyspec.g.dart';
@@ -53,5 +54,13 @@ final getCandyspecFileContent = Query<PackageId, String>(
 
     return context.config.resourceProvider
         .getContent(context, packageId.candyspecId);
+  },
+);
+
+final getAllDependencies = Query<Unit, List<PackageId>>(
+  'getAllDependencies',
+  provider: (context, _) {
+    final candyspec = getCandyspec(context, PackageId.this_);
+    return candyspec.dependencies.keys.map((name) => PackageId(name)).toList();
   },
 );

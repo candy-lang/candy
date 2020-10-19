@@ -4,6 +4,7 @@ import '../../errors.dart';
 import '../../query.dart';
 import '../../utils.dart';
 import '../ast_hir_lowering.dart';
+import '../ast_hir_lowering/declarations/impl.dart';
 import 'ids.dart';
 
 part 'type.freezed.dart';
@@ -14,7 +15,7 @@ part 'type.g.dart';
 @freezed
 abstract class CandyType with _$CandyType {
   const factory CandyType.user(
-    ModuleId moduleId,
+    ModuleId parentModuleId,
     String name, {
     @Default(<CandyType>[]) List<CandyType> arguments,
   }) = UserCandyType;
@@ -50,11 +51,20 @@ abstract class CandyType with _$CandyType {
   factory CandyType.list(CandyType itemType) =>
       CandyType.user(ModuleId.coreCollections, 'List', arguments: [itemType]);
 
+  ModuleId get virtualModuleId => maybeWhen(
+        user: (moduleId, name, _) => moduleId.nested([name]),
+        orElse: () {
+          throw CompilerError.internalError(
+            '`virtualModuleId` called on non-user type `$runtimeType`.',
+          );
+        },
+      );
+
   @override
   String toString() {
     return map(
       user: (type) {
-        var name = '${type.moduleId}:${type.name}';
+        var name = '${type.parentModuleId}:${type.name}';
         if (type.arguments.isNotEmpty) name += '<${type.arguments.join(', ')}>';
         return name;
       },
@@ -83,25 +93,25 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
 
     return child.when(
       user: (moduleId, name, _) {
-        final moduleDeclarationId = moduleIdToDeclarationId(context, moduleId);
-        final traitId =
-            moduleDeclarationId.inner(TraitDeclarationPathData(name));
-        if (doesDeclarationExist(context, traitId)) {
-          final declaration = getTraitDeclarationHir(context, traitId);
+        final declarationId = moduleIdToDeclarationId(context, moduleId);
+        if (declarationId.isTrait) {
+          final declaration = getTraitDeclarationHir(context, declarationId);
           if (declaration.typeParameters.isNotEmpty) {
             throw CompilerError.unsupportedFeature(
               'Type parameters are not yet supported.',
             );
           }
-          return isAssignableTo(
-            context,
-            Tuple2(declaration.upperBound, parent),
-          );
+          return declaration.upperBounds
+              .any((bound) => isAssignableTo(context, Tuple2(bound, parent)));
         }
 
-        throw CompilerError.unsupportedFeature(
-          'Trait implementations for classes are not yet supported.',
-        );
+        if (declarationId.isClass) {
+          return getClassTraitImplId(context, inputs) is Some;
+        }
+
+        assert(false, 'User type can only be a trait or a class.');
+        // ignore: avoid_returning_null
+        return null;
       },
       tuple: (items) {
         throw CompilerError.unsupportedFeature(
@@ -124,5 +134,40 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
             .any((type) => isAssignableTo(context, Tuple2(type, parent)));
       },
     );
+  },
+);
+
+final getClassTraitImplId =
+    Query<Tuple2<CandyType, CandyType>, Option<DeclarationId>>(
+  'getClassTraitImplId',
+  provider: (context, inputs) {
+    assert(inputs.first is UserCandyType);
+    final child = inputs.first as UserCandyType;
+    assert(inputs.second is UserCandyType);
+    final parent = inputs.second as UserCandyType;
+
+    final implIds = {
+      child.parentModuleId.packageId,
+      parent.parentModuleId.packageId,
+    }
+        .expand((packageId) =>
+            getAllImplsForType(context, Tuple2(child, packageId)))
+        .where((implId) {
+      final impl = getImplDeclarationHir(context, implId);
+      return impl.traits.any((trait) => trait == parent);
+    });
+    if (implIds.length > 1) {
+      throw CompilerError.ambiguousImplsFound(
+        'Multiple impls found for class `$child` and trait `$parent`.',
+        location: ErrorLocation(
+          implIds.first.resourceId,
+          getImplDeclarationAst(context, implIds.first).representativeSpan,
+        ),
+        // TODO(JonasWanke): output other impl locations
+      );
+    }
+
+    if (implIds.isEmpty) return None();
+    return Some(implIds.single);
   },
 );
