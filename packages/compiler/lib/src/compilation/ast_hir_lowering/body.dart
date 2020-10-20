@@ -114,8 +114,8 @@ abstract class Context {
     Result<List<hir.Expression>, List<ReportedCompilerError>> result;
     if (expression is ast.Literal) {
       result = lowerLiteral(expression);
-      // } else if (expression is ast.StringLiteral) {
-      //   result = lowerStringLiteral(expression);
+    } else if (expression is ast.StringLiteral) {
+      result = lowerStringLiteral(expression);
       // }  else if (expression is ast.LambdaLiteral) {
       //   result = lowerLambdaLiteral(expression);
       // } else if (expression is ast.Identifier) {
@@ -165,13 +165,23 @@ abstract class Context {
   }
 }
 
-extension<T, E> on List<Result<T, List<E>>> {
+extension<T, E> on Iterable<Result<T, List<E>>> {
   Result<List<T>, List<E>> merge() {
     final errors = whereType<Error<T, List<E>>>();
     if (errors.isNotEmpty) return Error(errors.expand((e) => e.error).toList());
 
     final oks = whereType<Ok<T, List<E>>>();
     return Ok(oks.map((ok) => ok.value).toList());
+  }
+}
+
+extension<T, E> on Iterable<Result<List<T>, List<E>>> {
+  Result<List<T>, List<E>> merge() {
+    final errors = whereType<Error<List<T>, List<E>>>();
+    if (errors.isNotEmpty) return Error(errors.expand((e) => e.error).toList());
+
+    final oks = whereType<Ok<List<T>, List<E>>>();
+    return Ok(oks.expand((ok) => ok.value).toList());
   }
 }
 
@@ -493,6 +503,31 @@ extension on Context {
     return Ok([
       hir.Expression.literal(getId(expression), literal),
     ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerStringLiteral(
+    ast.StringLiteral expression,
+  ) {
+    final parts = expression.parts
+        .map<Result<List<hir.StringLiteralPart>, List<ReportedCompilerError>>>(
+            (part) {
+      if (part is ast.LiteralStringLiteralPart) {
+        return Ok([hir.StringLiteralPart.literal(part.value.value)]);
+      } else if (part is ast.InterpolatedStringLiteralPart) {
+        return innerExpressionContext()
+            .lowerUnambiguous(part.expression)
+            .mapValue((expression) =>
+                [hir.StringLiteralPart.interpolated(expression)]);
+      } else {
+        throw CompilerError.unsupportedFeature(
+          'Unsupported String literal part.',
+          location: ErrorLocation(resourceId, part.span),
+        );
+      }
+    });
+    return parts.merge().mapValue((parts) => [
+          hir.Expression.literal(getId(expression), hir.StringLiteral(parts)),
+        ]);
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerReturn(
