@@ -45,6 +45,14 @@ abstract class Expression implements _$Expression {
         },
         return_: (_, __, ___) => CandyType.never,
       );
+
+  T accept<T>(ExpressionVisitor<T> visitor) => map(
+        identifier: (e) => visitor.visitIdentifierExpression(e),
+        literal: (e) => visitor.visitLiteralExpression(e),
+        call: (e) => visitor.visitCallExpression(e),
+        functionCall: (e) => visitor.visitFunctionCallExpression(e),
+        return_: (e) => visitor.visitReturnExpression(e),
+      );
 }
 
 @freezed
@@ -94,6 +102,19 @@ abstract class Identifier implements _$Identifier {
         property: (_, __, type) => type,
         localProperty: (_, __, type) => type,
       );
+
+  T accept<T>(ExpressionVisitor<T> visitor) => map(
+        this_: (i) => visitor.visitThisIdentifier(i),
+        super_: (i) => visitor.visitSuperIdentifier(i),
+        it: (i) => visitor.visitItIdentifier(i),
+        field: (i) => visitor.visitFieldIdentifier(i),
+        module: (i) => visitor.visitModuleIdentifier(i),
+        trait: (i) => visitor.visitTraitIdentifier(i),
+        class_: (i) => visitor.visitClassIdentifier(i),
+        parameter: (i) => visitor.visitParameterIdentifier(i),
+        property: (i) => visitor.visitPropertyIdentifier(i),
+        localProperty: (i) => visitor.visitLocalPropertyIdentifier(i),
+      );
 }
 
 @freezed
@@ -129,4 +150,25 @@ abstract class StringLiteralPart implements _$StringLiteralPart {
   factory StringLiteralPart.fromJson(Map<String, dynamic> json) =>
       _$StringLiteralPartFromJson(json);
   const StringLiteralPart._();
+}
+
+abstract class ExpressionVisitor<T> {
+  const ExpressionVisitor();
+
+  T visitIdentifierExpression(IdentifierExpression node);
+  T visitLiteralExpression(LiteralExpression node);
+  T visitCallExpression(CallExpression node);
+  T visitFunctionCallExpression(FunctionCallExpression node);
+  T visitReturnExpression(ReturnExpression node);
+
+  T visitThisIdentifier(ThisIdentifier node);
+  T visitSuperIdentifier(SuperIdentifier node);
+  T visitItIdentifier(ItIdentifier node);
+  T visitFieldIdentifier(FieldIdentifier node);
+  T visitModuleIdentifier(ModuleIdentifier node);
+  T visitTraitIdentifier(TraitIdentifier node);
+  T visitClassIdentifier(ClassIdentifier node);
+  T visitParameterIdentifier(ParameterIdentifier node);
+  T visitPropertyIdentifier(PropertyIdentifier node);
+  T visitLocalPropertyIdentifier(LocalPropertyIdentifier node);
 }
