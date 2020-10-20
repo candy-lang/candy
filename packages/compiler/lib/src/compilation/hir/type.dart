@@ -19,6 +19,8 @@ abstract class CandyType with _$CandyType {
     String name, {
     @Default(<CandyType>[]) List<CandyType> arguments,
   }) = UserCandyType;
+  // ignore: non_constant_identifier_names
+  const factory CandyType.this_() = ThisCandyType;
   const factory CandyType.tuple(List<CandyType> items) = TupleCandyType;
   const factory CandyType.function({
     CandyType receiverType,
@@ -68,6 +70,7 @@ abstract class CandyType with _$CandyType {
         if (type.arguments.isNotEmpty) name += '<${type.arguments.join(', ')}>';
         return name;
       },
+      this_: (_) => 'This',
       tuple: (type) => '(${type.items.join(', ')})',
       function: (type) {
         var name = '(${type.parameterTypes.join(', ')}) => ${type.returnType}';
@@ -90,6 +93,12 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
     if (child == parent) return true;
     if (parent == CandyType.any) return true;
     if (child == CandyType.any) return false;
+
+    bool throwInvalidThisType() {
+      throw CompilerError.internalError(
+        '`isAssignableTo` was called without resolving the `This`-type first.',
+      );
+    }
 
     return child.map(
       user: (childType) {
@@ -119,6 +128,7 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
               'User type can only be a trait or a class.',
             );
           },
+          this_: (_) => throwInvalidThisType(),
           tuple: (_) => false,
           function: (_) => false,
           union: (parentType) => parentType.types
@@ -127,6 +137,7 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
               (type) => isAssignableTo(context, Tuple2(childType, type))),
         );
       },
+      this_: (_) => throwInvalidThisType(),
       tuple: (type) {
         throw CompilerError.unsupportedFeature(
           'Trait implementations for tuples are not yet supported.',

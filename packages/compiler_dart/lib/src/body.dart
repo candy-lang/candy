@@ -22,10 +22,10 @@ final compileBody = Query<DeclarationId, Option<dart.Code>>(
   provider: (context, declarationId) {
     final body = getBody(context, declarationId);
     if (body.isNone) return None();
-    final statements = body.value;
+    final expressions = body.value;
 
-    final compiled =
-        statements.map((statement) => _compileStatement(context, statement));
+    final compiled = expressions
+        .map((expression) => _compileExpression(context, expression).statement);
     return Some(dart.Block((b) => b.statements.addAll(compiled)));
   },
 );
@@ -35,24 +35,18 @@ final compileExpression = Query<Expression, dart.Expression>(
   provider: _compileExpression,
 );
 
-dart.Code _compileStatement(QueryContext context, Statement statement) {
-  return statement.when(
-    expression: (_, expression) =>
-        _compileExpression(context, expression).statement,
-  );
-}
-
 dart.Expression _compileExpression(
     QueryContext context, Expression expression) {
   return expression.when(
     identifier: (id, identifier) => identifier.when(
-      this_: (_) => dart.refer('this'),
+      this_: () => dart.refer('this'),
       super_: (_) => dart.refer('super'),
       it: null,
       field: null,
       module: (id) => ModuleExpression(context, id),
       trait: null,
       class_: null,
+      parameter: null,
       property: (target, name, _) {
         final compiledTarget = _compileExpression(context, target);
         if (compiledTarget is ModuleExpression) {
@@ -69,7 +63,7 @@ dart.Expression _compileExpression(
         }
         return compiledTarget.property(name);
       },
-      parameter: null,
+      localProperty: null,
     ),
     literal: (id, literal) => _compileLiteralString(context, literal),
     call: (id, target, valueArguments) => dart.InvokeExpression.newOf(
@@ -78,25 +72,11 @@ dart.Expression _compileExpression(
       {},
       [],
     ),
-    functionCall: (id, target, arguments) {
-      final functionId = getPropertyIdentifierDeclarationId(
-        context,
-        target.identifier as PropertyIdentifier,
-      );
-      final parameters =
-          getFunctionDeclarationHir(context, functionId).parameters;
-      return dart.InvokeExpression.newOf(
-        _compileExpression(context, target),
-        [
-          for (final parameter in parameters)
-            _compileExpression(context, arguments[parameter.name]),
-        ],
-        {},
-        [],
-      );
+    functionCall: null,
+    return_: (id, _, expression) {
+      // TODO(JonasWanke): non-local returns
+      return _compileExpression(context, expression).returned;
     },
-    return_: (id, expression) =>
-        _compileExpression(context, expression).returned,
   );
 }
 
@@ -135,6 +115,7 @@ dart.Expression _compileLiteralString(QueryContext context, Literal literal) {
 
       return dart.Method((b) => b..body = block).closure.call([], {}, []);
     },
+    lambda: null,
   );
 }
 

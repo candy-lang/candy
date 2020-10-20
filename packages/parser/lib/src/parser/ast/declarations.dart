@@ -197,7 +197,8 @@ abstract class FunctionDeclaration extends Declaration
 
 @freezed
 abstract class ValueParameter extends AstNode implements _$ValueParameter {
-  const factory ValueParameter({
+  const factory ValueParameter(
+    int id, {
     @required IdentifierToken name,
     OperatorToken colon,
     Type type,

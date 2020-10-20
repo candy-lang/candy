@@ -40,6 +40,8 @@ abstract class CompilerError implements _$CompilerError {
   static const invalidImplTraitBound =
       CompilerError._create('invalidImplTraitBound');
   static const invalidUseLine = CompilerError._create('invalidUseLine');
+  static const invalidReturnLabel = CompilerError._create('invalidReturnLabel');
+  static const missingReturn = CompilerError._create('missingReturn');
   static const moduleNotFound = CompilerError._create('moduleNotFound');
   static const multipleMainFunctions =
       CompilerError._create('multipleMainFunctions');

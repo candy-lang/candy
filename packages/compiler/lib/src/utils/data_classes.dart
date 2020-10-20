@@ -28,8 +28,10 @@ abstract class Option<T> implements _$Option<T> {
 
   T get valueOrNull => when(some: (value) => value, none: () => null);
 
-  Option<R> mapValue<R>(R Function(T) mapper) => when(
-        some: (value) => Some(mapper(value)),
+  Option<R> mapValue<R>(R Function(T) mapper) =>
+      flatMapValue((value) => Some(mapper(value)));
+  Option<R> flatMapValue<R>(Option<R> Function(T) mapper) => when(
+        some: (value) => mapper(value),
         none: () => None(),
       );
 
