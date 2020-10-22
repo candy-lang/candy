@@ -1,29 +1,31 @@
-// trait BinaryPlus<Other, Result> {
-//   fun binaryPlus(other: Other): Result
-// }
-// trait AddOperator<Other, Result>: BinaryAdd<Other, Result> {
-//   fun addOperator(other: Other): Result
-//   fun binaryPlus(other: Other) {
-//     addOperator(other)
-//   }
-// }
+/*
+trait BinaryPlus<Other, Result> {
+  fun binaryPlus(other: Other): Result
+}
+trait AddOperator<Other, Result>: BinaryAdd<Other, Result> {
+  fun addOperator(other: Other): Result
+  fun binaryPlus(other: Other) {
+    addOperator(other)
+  }
+}
 
-// trait BinaryMinus<Other, Result> {
-//   fun binaryMinus(other: Other): Result
-// }
-// trait SubtractOperator<Other, Result>: BinarySubtract<Other, Result> {
-//   fun subtractOperator(other: Other): Result
-//   fun binaryMinus(other: Other) {
-//     minusOperator(other)
-//   }
-// }
+trait BinaryMinus<Other, Result> {
+  fun binaryMinus(other: Other): Result
+}
+trait SubtractOperator<Other, Result>: BinarySubtract<Other, Result> {
+  fun subtractOperator(other: Other): Result
+  fun binaryMinus(other: Other) {
+    minusOperator(other)
+  }
+}
 
-// trait PrefixMinus<Result> {
-//   fun prefixMinus(): Result
-// }
-// trait ArithmeticNegateOperator<Result>: PrefixArithmeticNegate<Result> {
-//   fun arithmeticNegate(): Result
-//   fun prefixMinus() {
-//     arithmeticNegate
-//   }
-// }
+trait PrefixMinus<Result> {
+  fun prefixMinus(): Result
+}
+trait ArithmeticNegateOperator<Result>: PrefixArithmeticNegate<Result> {
+  fun arithmeticNegate(): Result
+  fun prefixMinus() {
+    arithmeticNegate
+  }
+}
+*/

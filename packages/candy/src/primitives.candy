@@ -3,9 +3,9 @@ use .operators
 public builtin trait Any
 // builtin impl Any: ToString
 
-public builtin trait ToString {
-  fun toString(): String
-}
+// public builtin trait ToString {
+//   fun toString(): String
+// }
 
 public builtin class Unit
 public builtin class Nothing

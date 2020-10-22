@@ -31,14 +31,20 @@ class LexerGrammar {
         string('*/'));
   }
 
-  static final Parser<void> LineComment =
-      string('//') & NL.neg().star().ignore();
+  static final Parser<void> LineComment = string('//') &
+      NL.neg().star().ignore() &
+      (NL | endOfInput()).and().ignore();
 
-  static final Parser<void> WS = (char(' ') | char('\t')).plus().ignore();
+  static final Parser<void> WS = (char(' ') |
+          char('\t') |
+          DelimitedComment.ignore() |
+          LineComment.ignore())
+      .plus()
+      .ignore();
   static final Parser<void> NL =
       (char('\n') | char('\r') & char('\n').optional()).ignore();
   static final Parser<void> NLs =
-      (NL | WS | DelimitedComment | (LineComment & NL)).star();
+      (NL | WS | DelimitedComment | LineComment).star();
 
   // SECTION: separatorsAndOperations
 
@@ -156,26 +162,26 @@ class LexerGrammar {
 
   // SECTION: keywords
 
-  static final USE = string('use')
-      .tokenize((_, span) => KeywordToken.use(span: span) as UseKeywordToken);
-  static final CRATE = string('crate').tokenize(
-      (_, span) => KeywordToken.crate(span: span) as CrateKeywordToken);
-  static final MODULE = string('module').tokenize(
-      (_, span) => KeywordToken.module(span: span) as ModuleKeywordToken);
-  static final TRAIT = string('trait').tokenize(
-      (_, span) => KeywordToken.trait(span: span) as TraitKeywordToken);
-  static final IMPL = string('impl')
-      .tokenize((_, span) => KeywordToken.impl(span: span) as ImplKeywordToken);
-  static final CLASS = string('class').tokenize(
-      (_, span) => KeywordToken.class_(span: span) as ClassKeywordToken);
-  static final FUN = string('fun')
-      .tokenize((_, span) => KeywordToken.fun(span: span) as FunKeywordToken);
-  static final LET = string('let')
-      .tokenize((_, span) => KeywordToken.let(span: span) as LetKeywordToken);
-  static final GET = string('get')
-      .tokenize((_, span) => KeywordToken.get(span: span) as GetKeywordToken);
-  static final SET = string('set')
-      .tokenize((_, span) => KeywordToken.set(span: span) as SetKeywordToken);
+  static final USE =
+      string('use').tokenize((_, span) => UseKeywordToken(span: span));
+  static final CRATE =
+      string('crate').tokenize((_, span) => CrateKeywordToken(span: span));
+  static final MODULE =
+      string('module').tokenize((_, span) => ModuleKeywordToken(span: span));
+  static final TRAIT =
+      string('trait').tokenize((_, span) => TraitKeywordToken(span: span));
+  static final IMPL =
+      string('impl').tokenize((_, span) => ImplKeywordToken(span: span));
+  static final CLASS =
+      string('class').tokenize((_, span) => ClassKeywordToken(span: span));
+  static final FUN =
+      string('fun').tokenize((_, span) => FunKeywordToken(span: span));
+  static final LET =
+      string('let').tokenize((_, span) => LetKeywordToken(span: span));
+  static final GET =
+      string('get').tokenize((_, span) => GetKeywordToken(span: span));
+  static final SET =
+      string('set').tokenize((_, span) => SetKeywordToken(span: span));
 
   static final IF = string('if')
       .tokenize((_, span) => KeywordToken.if_(span: span) as IfKeywordToken);
@@ -183,8 +189,8 @@ class LexerGrammar {
       (_, span) => KeywordToken.else_(span: span) as ElseKeywordToken);
   static final LOOP = string('loop')
       .tokenize((_, span) => KeywordToken.loop(span: span) as LoopKeywordToken);
-  static final RETURN = string('return').tokenize(
-      (_, span) => KeywordToken.return_(span: span) as ReturnKeywordToken);
+  static final RETURN =
+      string('return').tokenize((_, span) => ReturnKeywordToken(span: span));
 
   // SECTION: lexicalModifiers
 
