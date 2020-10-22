@@ -8,7 +8,6 @@ import '../utils.dart';
 import 'ast/declarations.dart';
 import 'ast/expressions/expressions.dart';
 import 'ast/general.dart';
-import 'ast/statements.dart';
 import 'ast/types.dart';
 
 // ignore: avoid_classes_with_only_static_members
@@ -29,7 +28,6 @@ class ParserGrammar {
 
     _initDeclaration();
     _initType();
-    _initStatement();
     _initExpression();
   }
 
@@ -243,7 +241,7 @@ class ParserGrammar {
           (LexerGrammar.NLs & LexerGrammar.COLON & LexerGrammar.NLs & type)
               .optional() &
           // (LexerGrammar.NLs & typeConstraints).optional() &
-          (LexerGrammar.NLs & block).optional())
+          (LexerGrammar.NLs & lambdaLiteral).optional())
       .map<FunctionDeclaration>((value) {
     final parameterList = value[8] as List<dynamic>;
     final returnTypeDeclaration = value[11] as List<dynamic>;
@@ -261,7 +259,7 @@ class ParserGrammar {
       rightParenthesis: value[10] as OperatorToken,
       colon: returnTypeDeclaration?.elementAt(1) as OperatorToken,
       returnType: returnTypeDeclaration?.elementAt(3) as Type,
-      body: (value[12] as List<dynamic>)?.elementAt(1) as Block,
+      body: (value[12] as List<dynamic>)?.elementAt(1) as LambdaLiteral,
     );
   });
 
@@ -304,18 +302,18 @@ class ParserGrammar {
   static final propertyAccessor =
       // ignore: unnecessary_cast
       (propertyGetter as Parser<PropertyAccessor>) | propertySetter;
-  static final propertyGetter =
-      (LexerGrammar.GET & (LexerGrammar.NLs & block).optional())
-          .map((value) => PropertyAccessor.getter(
-                keyword: value[0] as GetKeywordToken,
-                body: (value[1] as List<dynamic>)?.elementAt(1) as Block,
-              ) as GetterPropertyAccessor);
-  static final propertySetter =
-      (LexerGrammar.SET & (LexerGrammar.NLs & block).optional())
-          .map<SetterPropertyAccessor>((value) => PropertyAccessor.setter(
-                keyword: value[0] as SetKeywordToken,
-                body: (value[1] as List<dynamic>)?.elementAt(1) as Block,
-              ) as SetterPropertyAccessor);
+  static final propertyGetter = (LexerGrammar.GET &
+          (LexerGrammar.NLs & lambdaLiteral).optional())
+      .map((value) => PropertyAccessor.getter(
+            keyword: value[0] as GetKeywordToken,
+            body: (value[1] as List<dynamic>)?.elementAt(1) as LambdaLiteral,
+          ) as GetterPropertyAccessor);
+  static final propertySetter = (LexerGrammar.SET &
+          (LexerGrammar.NLs & lambdaLiteral).optional())
+      .map<SetterPropertyAccessor>((value) => PropertyAccessor.setter(
+            keyword: value[0] as SetKeywordToken,
+            body: (value[1] as List<dynamic>)?.elementAt(1) as LambdaLiteral,
+          ) as SetterPropertyAccessor);
 
   static final typeParameters = (LexerGrammar.LANGLE &
           LexerGrammar.NLs &
@@ -501,45 +499,6 @@ class ParserGrammar {
             rightParenthesis: value[4] as OperatorToken,
           ));
 
-  // SECTION: statements
-
-  static final statements =
-      ((statement & (semis & statement).map((v) => v[1] as Statement).star())
-                  .map((v) => [v[0] as Statement, ...v[1] as List<Statement>])
-                  .optional() &
-              semis.optional())
-          .map((values) => values[0] as List<Statement> ?? []);
-  static final _statement = undefined<Statement>();
-  static Parser<Statement> get statement => _statement;
-  static void _initStatement() {
-    // ignore: unnecessary_cast
-    _statement.set((expression as Parser<Statement>) | block);
-  }
-
-  static final block = (LexerGrammar.LCURL &
-          LexerGrammar.NLs &
-          statements &
-          LexerGrammar.NLs &
-          LexerGrammar.RCURL)
-      .map((values) => Block(
-            _id++,
-            leftBrace: values.first as OperatorToken,
-            statements: values[2] as List<Statement>,
-            rightBrace: values[4] as OperatorToken,
-          ));
-
-  // ignore: unnecessary_cast
-  static final Parser<void> semi = (LexerGrammar.WS.optional() &
-          (LexerGrammar.SEMICOLON | LexerGrammar.NL) &
-          LexerGrammar.NLs as Parser<void>) |
-      endOfInput();
-  static final Parser<void> semis =
-      // ignore: unnecessary_cast
-      ((LexerGrammar.WS.optional() &
-                  (LexerGrammar.SEMICOLON | LexerGrammar.NL) &
-                  LexerGrammar.WS.optional())
-              .plus() as Parser<void>) |
-          endOfInput();
 
   // SECTION: expressions
 
@@ -681,11 +640,11 @@ class ParserGrammar {
       ..complexGrouping<List<dynamic>, Expression, List<dynamic>>(
         LexerGrammar.IF & LexerGrammar.NLs,
         LexerGrammar.NLs &
-            statement &
+            expression &
             (LexerGrammar.NLs &
                     LexerGrammar.ELSE &
                     LexerGrammar.NLs &
-                    statement)
+                    expression)
                 .optional(),
         mapper: (left, value, right) {
           final elsePart = right[2] as List<dynamic>;
@@ -693,9 +652,9 @@ class ParserGrammar {
             _id++,
             ifKeyword: left[0] as IfKeywordToken,
             condition: value,
-            thenStatement: right[1] as Statement,
+            thenExpression: right[1] as Expression,
             elseKeyword: elsePart?.elementAt(1) as ElseKeywordToken,
-            elseStatement: elsePart?.elementAt(3) as Statement,
+            elseExpression: elsePart?.elementAt(3) as Expression,
           );
         },
       )
@@ -712,7 +671,6 @@ class ParserGrammar {
       ..prefix<ReturnKeywordToken, Expression>(
           (LexerGrammar.RETURN & LexerGrammar.NLs)
               .map((value) => value.first as ReturnKeywordToken),
-          // ..prefix<ReturnKeywordToken, Expression>(LexerGrammar.RETURN,
           mapper: (keyword, expression) {
         return ReturnExpression(
           _id++,
@@ -817,7 +775,7 @@ class ParserGrammar {
                   LexerGrammar.EQUALS_GREATER)
               .optional() &
           LexerGrammar.NLs &
-          statements &
+          lambdaExpressions &
           LexerGrammar.NLs &
           LexerGrammar.RCURL)
       .map<LambdaLiteral>((value) {
@@ -830,10 +788,28 @@ class ParserGrammar {
       valueParameterCommata:
           parameters?.elementAt(1) as List<OperatorToken> ?? [],
       arrow: parameterSection?.elementAt(3) as OperatorToken,
-      statements: value[3] as List<Statement>,
+      expressions: value[3] as List<Expression>,
       rightBrace: value[5] as OperatorToken,
     );
   });
+  static final lambdaExpressions =
+      ((expression & (semis & expression).map((v) => v[1] as Expression).star())
+                  .map((v) => [v[0] as Expression, ...v[1] as List<Expression>])
+                  .optional() &
+              semis.optional())
+          .map((values) => values[0] as List<Expression> ?? []);
+  // ignore: unnecessary_cast
+  static final Parser<void> semi = (LexerGrammar.WS.optional() &
+          (LexerGrammar.SEMICOLON | LexerGrammar.NL) &
+          LexerGrammar.NLs as Parser<void>) |
+      endOfInput();
+  static final Parser<void> semis =
+      // ignore: unnecessary_cast
+      ((LexerGrammar.WS.optional() &
+                  (LexerGrammar.SEMICOLON | LexerGrammar.NL) &
+                  LexerGrammar.WS.optional())
+              .plus() as Parser<void>) |
+          endOfInput();
 
   // SECTION: modifiers
 

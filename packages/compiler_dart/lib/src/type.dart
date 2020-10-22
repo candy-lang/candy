@@ -24,10 +24,17 @@ final Query<CandyType, dart.Reference> compileType =
 
         return _createDartType(
           type.name,
-          url: moduleIdToImportUrl(context, type.moduleId),
+          url: moduleIdToImportUrl(context, type.parentModuleId),
         );
       },
-      tuple: _unsupportedType,
+      tuple: (type) {
+        final url = moduleIdToImportUrl(context, ModuleId.corePrimitives);
+        return dart.TypeReference((b) => b
+          ..symbol = 'Tuple${type.items.length}'
+          ..url = url
+          ..types.addAll(type.items.map((i) => compileType(context, i)))
+          ..isNullable = false);
+      },
       function: (type) {
         return dart.FunctionType((b) {
           if (type.receiverType != null) {
@@ -38,8 +45,8 @@ final Query<CandyType, dart.Reference> compileType =
             ..returnType = compile(type.returnType);
         });
       },
-      union: _unsupportedType,
-      intersection: _unsupportedType,
+      union: (_) => dart.refer('dynamic', dartCoreUrl),
+      intersection: (_) => dart.refer('dynamic', dartCoreUrl),
     );
   },
 );

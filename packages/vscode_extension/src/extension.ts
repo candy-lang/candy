@@ -37,8 +37,8 @@ export function deactivate(): Thenable<void> | undefined {
 async function spawnServer(): Promise<StreamInfo> {
   const process = safeSpawn(
     undefined,
-    "C:\\src\\flutter\\bin\\dart.bat",
-    ["C:/projects/candy/packages/lsp_server/bin/main.dart"],
+    "C:\\Program Files\\Dart\\dart-sdk\\bin\\dart.exe",
+    ["--observe", "D:/p/candy/packages/lsp_server/bin/main.dart"],
     {}
   );
   console.info(`    PID: ${process.pid}`);

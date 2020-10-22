@@ -6,6 +6,7 @@ import 'class.dart';
 import 'function.dart';
 import 'module.dart';
 import 'property.dart';
+import 'trait.dart';
 
 final compileDeclaration = Query<DeclarationId, Option<dart.Spec>>(
   'dart.compileDeclaration',
@@ -17,6 +18,11 @@ final compileDeclaration = Query<DeclarationId, Option<dart.Spec>>(
 
     if (declarationId.isModule) {
       compileModule(context, declarationIdToModuleId(context, declarationId));
+      return Option.none();
+    } else if (declarationId.isTrait) {
+      return Option.some(compileTrait(context, declarationId));
+    } else if (declarationId.isImpl) {
+      // All impls are generated in the final class itself.
       return Option.none();
     } else if (declarationId.isClass) {
       return Option.some(compileClass(context, declarationId));

@@ -1,7 +1,8 @@
 import 'package:code_builder/code_builder.dart' as dart;
-import 'package:compiler/compiler.dart';
+import 'package:compiler/compiler.dart' hide srcDirectoryName;
 import 'package:dart_style/dart_style.dart';
 
+import '../builtins.dart';
 import '../constants.dart';
 import 'declaration.dart';
 
@@ -18,12 +19,17 @@ final compileModule = Query<ModuleId, Unit>(
         final compiled = compileDeclaration(context, declarationId);
         if (compiled.isSome) b.body.add(compiled.value);
       }
+
+      if (moduleId == ModuleId.corePrimitives) {
+        b.body.addAll(DartBuiltinCompiler().compilePrimitiveGhosts());
+      }
     });
 
     final source = _dartFmt.format(
       library.accept(dart.DartEmitter(_PrefixedAllocator())).toString(),
     );
     context.config.buildArtifactManager.setContent(
+      context,
       moduleIdToBuildArtifactId(context, moduleId),
       source,
     );
@@ -36,30 +42,29 @@ final moduleIdToBuildArtifactId = Query<ModuleId, BuildArtifactId>(
   'dart.moduleIdToBuildArtifactId',
   evaluateAlways: true,
   provider: (context, moduleId) {
-    return dartBuildArtifactId
+    return moduleId.packageId.dartBuildArtifactId
         .child(libDirectoryName)
         .child(srcDirectoryName)
-        .child(moduleIdToPath(context, moduleId));
+        .child('${moduleId.path.join('/')}$dartFileExtension');
   },
 );
-final moduleIdToPath = Query<ModuleId, String>(
-  'dart.moduleIdToPath',
+final declarationIdToImportUrl = Query<DeclarationId, String>(
+  'dart.declarationIdToImportUrl',
   evaluateAlways: true,
-  provider: (context, moduleId) {
-    if (moduleId.packageId != PackageId.this_) {
-      throw CompilerError.unsupportedFeature(
-        'Compiling dependencies to Dart is not yet supported.',
-      );
-    }
-
-    return '${moduleId.path.join('/')}$dartFileExtension';
+  provider: (context, declarationId) {
+    final moduleId = declarationIdToModuleId(context, declarationId);
+    return moduleIdToImportUrl(context, moduleId);
   },
 );
 final moduleIdToImportUrl = Query<ModuleId, String>(
   'dart.moduleIdToImportUrl',
   evaluateAlways: true,
-  provider: (context, moduleId) =>
-      'package:$packageName/src/${moduleId.path.join('/')}$dartFileExtension',
+  provider: (context, moduleId) {
+    final packageName = moduleId.packageId.isThis
+        ? getCandyspec(context, PackageId.this_).name
+        : moduleId.packageId.name;
+    return 'package:$packageName/$srcDirectoryName/${moduleId.path.join('/')}$dartFileExtension';
+  },
 );
 
 /// Copy of `code_builder`'s _PrefixedAllocator that also prefixes core imports.

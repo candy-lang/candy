@@ -6,13 +6,14 @@ import '../../../syntactic_entity.dart';
 import '../../../utils.dart';
 import '../declarations.dart';
 import '../node.dart';
-import '../statements.dart';
 import '../types.dart';
 
 part 'expressions.freezed.dart';
 
-abstract class Expression extends Statement {
+abstract class Expression extends AstNode {
   const Expression();
+
+  int get id;
 }
 
 @freezed
@@ -74,7 +75,7 @@ abstract class LambdaLiteral extends Expression implements _$LambdaLiteral {
     @Default(<ValueParameter>[]) List<ValueParameter> valueParameters,
     @Default(<OperatorToken>[]) List<OperatorToken> valueParameterCommata,
     OperatorToken arrow,
-    @Default(<Statement>[]) List<Statement> statements,
+    @Default(<Expression>[]) List<Expression> expressions,
     @required OperatorToken rightBrace,
   }) = _LambdaLiteral;
   const LambdaLiteral._();
@@ -84,7 +85,7 @@ abstract class LambdaLiteral extends Expression implements _$LambdaLiteral {
         leftBrace,
         ...interleave(valueParameters, valueParameterCommata),
         if (arrow != null) arrow,
-        ...statements,
+        ...expressions,
         rightBrace,
       ];
 }
@@ -255,9 +256,9 @@ abstract class IfExpression extends Expression implements _$IfExpression {
     int id, {
     @required IfKeywordToken ifKeyword,
     @required Expression condition,
-    @required Statement thenStatement,
+    @required Expression thenExpression,
     ElseKeywordToken elseKeyword,
-    Statement elseStatement,
+    Expression elseExpression,
   }) = _IfExpression;
   const IfExpression._();
 
@@ -265,9 +266,9 @@ abstract class IfExpression extends Expression implements _$IfExpression {
   Iterable<SyntacticEntity> get children => [
         ifKeyword,
         condition,
-        thenStatement,
+        thenExpression,
         if (elseKeyword != null) elseKeyword,
-        if (elseStatement != null) elseStatement,
+        if (elseExpression != null) elseExpression,
       ];
 }
 

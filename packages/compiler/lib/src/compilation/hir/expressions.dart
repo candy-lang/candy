@@ -1,7 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'ids.dart';
-import 'statements.dart';
 import 'type.dart';
 
 part 'expressions.freezed.dart';
@@ -15,6 +14,12 @@ abstract class Expression implements _$Expression {
   ) = IdentifierExpression;
   const factory Expression.literal(DeclarationLocalId id, Literal literal) =
       LiteralExpression;
+  const factory Expression.navigation(
+    DeclarationLocalId id,
+    Expression target,
+    DeclarationId property,
+    CandyType type,
+  ) = NavigationExpression;
   const factory Expression.call(
     DeclarationLocalId id,
     Expression target,
@@ -22,16 +27,17 @@ abstract class Expression implements _$Expression {
   ) = CallExpression;
   const factory Expression.functionCall(
     DeclarationLocalId id,
-    IdentifierExpression target,
+    Expression target,
     Map<String, Expression> valueArguments,
   ) = FunctionCallExpression;
   const factory Expression.loop(
     DeclarationLocalId id,
-    Statement statement,
+    Expression body,
   ) = LoopExpression;
   // ignore: non_constant_identifier_names
   const factory Expression.return_(
     DeclarationLocalId id,
+    DeclarationLocalId scopeId,
     Expression expression,
   ) = ReturnExpression;
 
@@ -42,56 +48,67 @@ abstract class Expression implements _$Expression {
   CandyType get type => when(
         identifier: (_, identifier) => identifier.type,
         literal: (_, literal) => literal.type,
+        navigation: (_, __, ___, type) => type,
         call: (_, __, ___) => null,
         functionCall: (_, target, __) {
           final functionType = target.type as FunctionCandyType;
           return functionType.returnType;
         },
-        loop: (_, __) => CandyType.unit,
-        return_: (_, __) => CandyType.never,
+        return_: (_, __, ___) => CandyType.never,
+      );
+
+  T accept<T>(ExpressionVisitor<T> visitor) => map(
+        identifier: (e) => visitor.visitIdentifierExpression(e),
+        literal: (e) => visitor.visitLiteralExpression(e),
+        navigation: (e) => visitor.visitNavigationExpression(e),
+        call: (e) => visitor.visitCallExpression(e),
+        functionCall: (e) => visitor.visitFunctionCallExpression(e),
+        return_: (e) => visitor.visitReturnExpression(e),
       );
 }
 
 @freezed
 abstract class Identifier implements _$Identifier {
   // ignore: non_constant_identifier_names
-  const factory Identifier.this_(CandyType type) = ThisIdentifier;
+  const factory Identifier.this_() = ThisIdentifier;
   // ignore: non_constant_identifier_names
-  const factory Identifier.super_(CandyType type) = SuperIdentifier;
-  const factory Identifier.it(CandyType type) = ItIdentifier;
-  const factory Identifier.field(CandyType type) = FieldIdentifier;
+  const factory Identifier.super_(UserCandyType type) = SuperIdentifier;
   const factory Identifier.module(ModuleId id) = ModuleIdentifier;
   const factory Identifier.trait(DeclarationId id) = TraitIdentifier;
   // ignore: non_constant_identifier_names
   const factory Identifier.class_(DeclarationId id) = ClassIdentifier;
 
-  /// A property or function.
-  const factory Identifier.property(
-    Expression target,
-    String name,
-    CandyType type,
-  ) = PropertyIdentifier;
-
   const factory Identifier.parameter(
+    DeclarationLocalId id,
     String name,
-    int disambiguator,
     CandyType type,
   ) = ParameterIdentifier;
+
+  /// A property or function.
+  const factory Identifier.property(
+    DeclarationId id,
+    CandyType type, [
+    Expression target,
+  ]) = PropertyIdentifier;
+  const factory Identifier.localProperty(
+    DeclarationLocalId id,
+    String name,
+    CandyType type,
+  ) = LocalPropertyIdentifier;
 
   factory Identifier.fromJson(Map<String, dynamic> json) =>
       _$IdentifierFromJson(json);
   const Identifier._();
 
   CandyType get type => when(
-        this_: (type) => type,
+        this_: () => CandyType.this_(),
         super_: (type) => type,
-        it: (type) => type,
-        field: (type) => type,
         trait: (_) => CandyType.declaration,
         class_: (_) => CandyType.declaration,
         module: (_) => CandyType.declaration,
-        property: (_, __, type) => type,
         parameter: (_, __, type) => type,
+        property: (_, type, __) => type,
+        localProperty: (_, __, type) => type,
       );
 }
 
@@ -101,16 +118,36 @@ abstract class Literal implements _$Literal {
   const factory Literal.boolean(bool value) = BoolLiteral;
   const factory Literal.integer(int value) = IntLiteral;
   const factory Literal.string(List<StringLiteralPart> parts) = StringLiteral;
+  const factory Literal.lambda(
+    List<LambdaLiteralParameter> parameters,
+    List<Expression> expressions,
+    CandyType returnType, [
+    CandyType receiverType,
+  ]) = LambdaLiteral;
 
   factory Literal.fromJson(Map<String, dynamic> json) =>
       _$LiteralFromJson(json);
   const Literal._();
 
-  CandyType get type => map(
+  CandyType get type => when(
         boolean: (_) => CandyType.bool,
         integer: (_) => CandyType.int,
         string: (_) => CandyType.string,
+        lambda: (parameters, _, returnType, receiverType) => CandyType.function(
+          receiverType: receiverType,
+          parameterTypes: parameters.map((p) => p.type).toList(),
+          returnType: returnType,
+        ),
       );
+}
+
+@freezed
+abstract class LambdaLiteralParameter implements _$LambdaLiteralParameter {
+  const factory LambdaLiteralParameter(String name, CandyType type) =
+      _LambdaLiteralParameter;
+  factory LambdaLiteralParameter.fromJson(Map<String, dynamic> json) =>
+      _$LambdaLiteralParameterFromJson(json);
+  const LambdaLiteralParameter._();
 }
 
 @freezed
@@ -123,4 +160,32 @@ abstract class StringLiteralPart implements _$StringLiteralPart {
   factory StringLiteralPart.fromJson(Map<String, dynamic> json) =>
       _$StringLiteralPartFromJson(json);
   const StringLiteralPart._();
+}
+
+abstract class ExpressionVisitor<T> {
+  const ExpressionVisitor();
+
+  T visitIdentifierExpression(IdentifierExpression node);
+  T visitLiteralExpression(LiteralExpression node);
+  T visitNavigationExpression(NavigationExpression node);
+  T visitCallExpression(CallExpression node);
+  T visitFunctionCallExpression(FunctionCallExpression node);
+  T visitReturnExpression(ReturnExpression node);
+}
+
+abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
+  const DoNothingExpressionVisitor();
+
+  @override
+  void visitIdentifierExpression(IdentifierExpression node) {}
+  @override
+  void visitLiteralExpression(LiteralExpression node) {}
+  @override
+  void visitNavigationExpression(NavigationExpression node) {}
+  @override
+  void visitCallExpression(CallExpression node) {}
+  @override
+  void visitFunctionCallExpression(FunctionCallExpression node) {}
+  @override
+  void visitReturnExpression(ReturnExpression node) {}
 }

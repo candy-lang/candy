@@ -1,8 +1,7 @@
-import 'dart:io';
-
 import 'package:compiler/compiler.dart';
 import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
+import 'package:parser/parser.dart' show SourceSpan;
 
 import '../../errors.dart';
 import '../../query.dart';
@@ -14,69 +13,144 @@ import 'declarations/declarations.dart';
 import 'declarations/function.dart';
 import 'declarations/module.dart';
 import 'declarations/property.dart';
+import 'general.dart';
 import 'type.dart';
 
-final getBody = Query<DeclarationId, List<hir.Statement>>(
+final getExpression = Query<DeclarationLocalId, Option<hir.Expression>>(
+  'getExpression',
+  provider: (context, id) {
+    final body = getBody(context, id.declarationId);
+    if (body is None) return None();
+
+    final visitor = IdFinderVisitor(id);
+    for (final expression in body.value) {
+      final result = expression.accept(visitor);
+      if (result is Some) return result;
+    }
+    return None();
+  },
+);
+
+class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
+  const IdFinderVisitor(this.id) : assert(id != null);
+
+  final DeclarationLocalId id;
+
+  @override
+  Option<hir.Expression> visitIdentifierExpression(IdentifierExpression node) {
+    if (node.id == id) return Some(node);
+    if (node.identifier is hir.PropertyIdentifier) {
+      final target = (node.identifier as hir.PropertyIdentifier).target;
+      if (target != null) return target.accept(this);
+    }
+    return None();
+  }
+
+  @override
+  Option<hir.Expression> visitLiteralExpression(LiteralExpression node) {
+    if (node.id == id) return Some(node);
+    if (node.literal is hir.StringLiteral) {
+      final literal = node.literal as hir.StringLiteral;
+      for (final part in literal.parts) {
+        if (part is hir.InterpolatedStringLiteralPart) {
+          final result = part.value.accept(this);
+          if (result is Some) return result;
+        }
+      }
+    }
+    if (node.literal is hir.LambdaLiteral) {
+      final literal = node.literal as hir.LambdaLiteral;
+      for (final expression in literal.expressions) {
+        final result = expression.accept(this);
+        if (result is Some) return result;
+      }
+    }
+    return None();
+  }
+
+  @override
+  Option<hir.Expression> visitNavigationExpression(NavigationExpression node) {
+    if (node.id == id) return Some(node);
+    return node.target.accept(this);
+  }
+
+  @override
+  Option<hir.Expression> visitCallExpression(CallExpression node) {
+    if (node.id == id) return Some(node);
+    for (final argument in node.valueArguments) {
+      final result = argument.accept(this);
+      if (result is Some) return result;
+    }
+    return node.target.accept(this);
+  }
+
+  @override
+  Option<hir.Expression> visitFunctionCallExpression(
+    FunctionCallExpression node,
+  ) {
+    if (node.id == id) return Some(node);
+    for (final argument in node.valueArguments.values) {
+      final result = argument.accept(this);
+      if (result is Some) return result;
+    }
+    return node.target.accept(this);
+  }
+
+  @override
+  Option<hir.Expression> visitReturnExpression(ReturnExpression node) {
+    if (node.id == id) return Some(node);
+    return node.expression.accept(this);
+  }
+}
+
+final getBody = Query<DeclarationId, Option<List<hir.Expression>>>(
   'getBody',
   provider: (context, declarationId) =>
-      lowerBodyAstToHir(context, declarationId).first,
+      lowerBodyAstToHir(context, declarationId).mapValue((v) => v.first),
 );
-final getBodyAstToHirIds = Query<DeclarationId, BodyAstToHirIds>(
+final getBodyAstToHirIds = Query<DeclarationId, Option<BodyAstToHirIds>>(
   'getBodyAstToHirIds',
   provider: (context, declarationId) =>
-      lowerBodyAstToHir(context, declarationId).second,
+      lowerBodyAstToHir(context, declarationId).mapValue((v) => v.second),
 );
-final Query<DeclarationId, Tuple2<List<hir.Statement>, BodyAstToHirIds>>
+final Query<DeclarationId,
+        Option<Tuple2<List<hir.Expression>, BodyAstToHirIds>>>
     lowerBodyAstToHir =
-    Query<DeclarationId, Tuple2<List<hir.Statement>, BodyAstToHirIds>>(
+    Query<DeclarationId, Option<Tuple2<List<hir.Expression>, BodyAstToHirIds>>>(
   'lowerBodyAstToHir',
   provider: (context, declarationId) {
     if (declarationId.isFunction) {
       final functionAst = getFunctionDeclarationAst(context, declarationId);
+      if (functionAst.body == null) return None();
 
-      final localContext = _LocalContext.forFunction(
-        context,
-        declarationId,
-        functionAst,
-      );
-      final statements =
-          functionAst.body.statements.map<hir.Statement>((statement) {
-        return localContext._lowerStatement(statement).when(
-              ok: (value) => value,
-              // ignore: only_throw_errors, Iterables of errors are also handled
-              error: (error) => throw error,
-            );
-      }).toList();
-      return Tuple2(statements, localContext.idMap);
-    } else if (declarationId.isProperty) {
-      final propertyAst = getPropertyDeclarationAst(context, declarationId);
-      if (propertyAst.initializer == null) {
-        throw CompilerError.internalError(
-          '`lowerBodyAstToHir` called on a property without an initializer.',
-          location:
-              ErrorLocation(declarationId.resourceId, propertyAst.name.span),
-        );
-      }
-
-      var type = Option<hir.CandyType>.none();
-      if (propertyAst.type != null) {
-        final moduleId = declarationIdToModuleId(context, declarationId);
-        type = Option.some(
-          astTypeToHirType(context, Tuple2(moduleId, propertyAst.type)),
-        );
-      }
-      final localContext =
-          _LocalContext.forProperty(context, declarationId, type);
-
-      final result = localContext.lowerToUnambiguous(propertyAst.initializer);
+      final result = FunctionContext.lowerFunction(context, declarationId);
       // ignore: only_throw_errors, Iterables of errors are also handled.
       if (result is Error) throw result.error;
 
-      final statement = hir.Statement.expression(
-        localContext.getId(propertyAst.initializer),
-        result.value,
-      );
-      return Tuple2([statement], localContext.idMap);
+      return Some(result.value);
+      // } else if (declarationId.isProperty) {
+      //   final propertyAst = getPropertyDeclarationAst(context, declarationId);
+      //   if (propertyAst.initializer == null) return None();
+
+      //   var type = Option<hir.CandyType>.none();
+      //   if (propertyAst.type != null) {
+      //     final moduleId = declarationIdToModuleId(context, declarationId);
+      //     type = Option.some(
+      //       astTypeToHirType(context, Tuple2(moduleId, propertyAst.type)),
+      //     );
+      //   }
+      //   final localContext =
+      //       _LocalContext.forProperty(context, declarationId, type);
+
+      //   final result = localContext.lowerToUnambiguous(propertyAst.initializer);
+      //   // ignore: only_throw_errors, Iterables of errors are also handled.
+      //   if (result is Error) throw result.error;
+
+      //   final statement = hir.Statement.expression(
+      //     localContext.getId(propertyAst.initializer),
+      //     result.value,
+      //   );
+      //   return Some(Tuple2([statement], localContext.idMap));
     } else {
       throw CompilerError.unsupportedFeature(
         'Unsupported body.',
@@ -89,144 +163,57 @@ final Query<DeclarationId, Tuple2<List<hir.Statement>, BodyAstToHirIds>>
   },
 );
 
-typedef IdProvider = DeclarationLocalId Function(int astId);
-
-class _LocalContext {
-  _LocalContext._(
-    this.queryContext,
-    this.declarationId,
-    this.expressionType,
-    this.returnType, [
-    this.localIdentifiers = const {},
-  ])  : assert(queryContext != null),
-        assert(declarationId != null),
-        assert(expressionType != null),
-        assert(localIdentifiers != null);
-
-  factory _LocalContext.forFunction(
-    QueryContext context,
-    DeclarationId declarationId,
-    ast.FunctionDeclaration functionAst,
-  ) {
-    final moduleId = declarationIdToModuleId(context, declarationId);
-    return _LocalContext._(
-      context,
-      declarationId,
-      Option.none(),
-      Option.some(
-        functionAst.returnType == null
-            ? CandyType.unit
-            : astTypeToHirType(
-                context, Tuple2(moduleId, functionAst.returnType)),
-      ),
-      <String, hir.Identifier>{
-        for (final parameter in functionAst.valueParameters)
-          parameter.name.name: hir.Identifier.parameter(
-            parameter.name.name,
-            0,
-            astTypeToHirType(context, Tuple2(moduleId, parameter.type)),
-          ),
-      },
-    );
-  }
-  factory _LocalContext.forProperty(
-    QueryContext context,
-    DeclarationId declarationId,
-    Option<hir.CandyType> expressionType,
-  ) {
-    return _LocalContext._(
-        context, declarationId, expressionType, Option.none());
-  }
-
-  final QueryContext queryContext;
-
-  final DeclarationId declarationId;
+abstract class Context {
+  QueryContext get queryContext;
+  DeclarationId get declarationId;
+  ModuleId get moduleId => declarationIdToModuleId(queryContext, declarationId);
   ResourceId get resourceId => declarationId.resourceId;
 
-  var _nextId = 0;
-  var idMap = BodyAstToHirIds();
-  DeclarationLocalId getId(ast.Statement statement) {
-    final id = DeclarationLocalId(declarationId, _nextId++);
-    idMap = idMap.withMapping(statement.id, id);
-    return id;
-  }
+  Option<Context> get parent;
 
-  final Map<String, hir.Identifier> localIdentifiers;
-
-  final Option<hir.CandyType> expressionType;
+  Option<hir.CandyType> get expressionType;
   bool isValidExpressionType(hir.CandyType type) {
-    if (expressionType.isNone) return true;
-    return hir.isAssignableTo(queryContext, Tuple2(type, expressionType.value));
+    return expressionType.when(
+      some: (expressionType) =>
+          isAssignableTo(queryContext, Tuple2(type, expressionType)),
+      none: () => true,
+    );
   }
 
-  final Option<hir.CandyType> returnType;
-  bool isValidReturnType(hir.CandyType type) {
-    if (returnType.isNone) return true;
-    return hir.isAssignableTo(queryContext, Tuple2(type, returnType.value));
-  }
+  DeclarationLocalId getId([
+    dynamic /* ast.Expression | ast.ValueParameter */ expressionOrParameter,
+  ]);
+  BodyAstToHirIds get idMap;
+
+  List<hir.Identifier> resolveIdentifier(String name);
+  void addIdentifier(hir.LocalPropertyIdentifier identifier);
+
+  Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveReturn(
+    Option<String> label,
+  );
+
+  Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveBreak(
+    Option<String> label,
+  );
+  Option<DeclarationLocalId> resolveContinue(Option<String> label) =>
+      resolveBreak(label).mapValue((values) => values.first);
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lower(
-    ast.Expression expression, [
-    Option<hir.CandyType> expressionType = const Option.none(),
-    Option<hir.CandyType> returnType = const Option.none(),
-  ]) {
-    final innerContext = _LocalContext._(
-      queryContext,
-      declarationId,
-      expressionType,
-      returnType,
-      localIdentifiers,
-    );
-    try {
-      final result = innerContext._lowerExpression(expression);
-      assert(returnType.isNone ||
-          result is Error ||
-          result.value.every((e) => hir.isAssignableTo(
-              queryContext, Tuple2(e.type, returnType.value))));
-      // if (!isEmpty)
-      return result;
-    } on _LoweringFailedException catch (e) {
-      return Error(e.errors);
-    }
-
-    // Step 2: Retry with implicit cast of the whole expression
-  }
-
-  Result<hir.Statement, List<ReportedCompilerError>> _lowerStatement(
-    ast.Statement statement,
-  ) {
-    if (statement is ast.Expression) {
-      final result = lowerToUnambiguous(statement);
-      // ignore: only_throw_errors, Iterables of errors are also handled.
-      if (result is Error) throw result.error;
-
-      return Ok(hir.Statement.expression(getId(statement), result.value));
-    } else {
-      return Error([
-        CompilerError.unsupportedFeature(
-          'Unsupported statement.',
-          location: ErrorLocation(declarationId.resourceId, statement.span),
-        )
-      ]);
-    }
-  }
-
-  Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerExpression(
     ast.Expression expression,
   ) {
     Result<List<hir.Expression>, List<ReportedCompilerError>> result;
     if (expression is ast.Literal) {
-      result = _lowerLiteral(this, expression);
+      result = lowerLiteral(expression);
     } else if (expression is ast.StringLiteral) {
-      result = _lowerStringLiteral(this, expression);
+      result = lowerStringLiteral(expression);
+    } else if (expression is ast.LambdaLiteral) {
+      result = lowerLambdaLiteral(expression);
     } else if (expression is ast.Identifier) {
-      result = _lowerIdentifier(this, expression);
+      result = lowerIdentifier(expression);
     } else if (expression is ast.CallExpression) {
-      result = _lowerCall(this, expression);
-    } else if (expression is ast.LoopExpression) {
-      result = _lowerLoop(this, expression);
+      result = lowerCall(expression);
     } else if (expression is ast.ReturnExpression) {
-      result = _lowerReturn(this, expression);
+      result = lowerReturn(expression);
     } else {
       throw CompilerError.unsupportedFeature(
         'Unsupported expression: $expression (`${expression.runtimeType}`).',
@@ -235,34 +222,28 @@ class _LocalContext {
     }
 
     assert(result != null);
+    assert(result is Error ||
+        result.value.isNotEmpty &&
+            result.value.every((r) => isValidExpressionType(r.type)));
+    assert(result is Ok || result.error.isNotEmpty);
     return result;
   }
 
-  List<hir.Expression> requireLowering(
-    ast.Expression expression, [
-    Option<hir.CandyType> expressionType = const Option.none(),
-    Option<hir.CandyType> returnType,
-  ]) {
-    final result =
-        lower(expression, expressionType, returnType ?? this.returnType);
-    if (result is Error) {
-      throw _LoweringFailedException(result.error);
-    }
-
-    return result.value;
-  }
-
-  Result<hir.Expression, List<ReportedCompilerError>> lowerToUnambiguous(
-    ast.Expression expression, [
-    Option<hir.CandyType> expressionType = const Option.none(),
-    Option<hir.CandyType> returnType,
-  ]) {
-    final result =
-        lower(expression, expressionType, returnType ?? this.returnType);
+  Result<hir.Expression, List<ReportedCompilerError>> lowerUnambiguous(
+    ast.Expression expression,
+  ) {
+    final result = lower(expression);
     if (result is Error) return Error(result.error);
 
-    assert(result.value.isNotEmpty);
-    if (result.value.length > 1) {
+    if (result.value.isEmpty) {
+      assert(expressionType is Some);
+      return Error([
+        CompilerError.invalidExpressionType(
+          'Expression could not be resolved to match type `${expressionType.value}`.',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    } else if (result.value.length > 1) {
       return Error([
         CompilerError.ambiguousExpression(
           'Expression is ambiguous.',
@@ -274,269 +255,803 @@ class _LocalContext {
   }
 }
 
-Result<List<T>, List<ReportedCompilerError>> _mergeResults<T>(
-  Iterable<Result<List<T>, List<ReportedCompilerError>>> results,
-) {
-  final errors =
-      results.whereType<Error<List<T>, List<ReportedCompilerError>>>();
-  if (errors.isNotEmpty) errors.first;
+extension<T, E> on Iterable<Result<T, List<E>>> {
+  Result<List<T>, List<E>> merge() {
+    final errors = whereType<Error<T, List<E>>>();
+    if (errors.isNotEmpty) return Error(errors.expand((e) => e.error).toList());
 
-  final oks = results.whereType<Ok<List<T>, List<ReportedCompilerError>>>();
-  return Ok(oks.expand((ok) => ok.value).toList());
-}
-
-class _LoweringFailedException implements Exception {
-  const _LoweringFailedException(this.errors) : assert(errors != null);
-
-  final List<ReportedCompilerError> errors;
-}
-
-Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerLiteral(
-  _LocalContext context,
-  ast.Literal<dynamic> expression,
-) {
-  final token = expression.value;
-  hir.Literal literal;
-  if (token is ast.BoolLiteralToken) {
-    if (!context.isValidExpressionType(hir.CandyType.bool)) return Ok([]);
-    literal = hir.Literal.boolean(token.value);
-  } else if (token is ast.IntLiteralToken) {
-    if (!context.isValidExpressionType(hir.CandyType.int)) return Ok([]);
-    literal = hir.Literal.integer(token.value);
-  } else {
-    throw CompilerError.unsupportedFeature(
-      'Unsupported literal.',
-      location: ErrorLocation(context.resourceId, token.span),
-    );
+    final oks = whereType<Ok<T, List<E>>>();
+    return Ok(oks.map((ok) => ok.value).toList());
   }
-  return Ok([hir.Expression.literal(context.getId(expression), literal)]);
 }
 
-Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerStringLiteral(
-  _LocalContext context,
-  ast.StringLiteral expression,
-) {
-  final parts = expression.parts
-      .map<Result<List<hir.StringLiteralPart>, List<ReportedCompilerError>>>(
-          (part) {
-    if (part is ast.LiteralStringLiteralPart) {
-      return Ok([hir.StringLiteralPart.literal(part.value.value)]);
-    } else if (part is ast.InterpolatedStringLiteralPart) {
-      return context.lowerToUnambiguous(part.expression).mapValue(
-          (expression) => [hir.StringLiteralPart.interpolated(expression)]);
-    } else {
-      throw CompilerError.unsupportedFeature(
-        'Unsupported String literal part.',
-        location: ErrorLocation(context.resourceId, part.span),
+extension<T, E> on Iterable<Result<List<T>, List<E>>> {
+  Result<List<T>, List<E>> merge() {
+    final errors = whereType<Error<List<T>, List<E>>>();
+    if (errors.isNotEmpty) return Error(errors.expand((e) => e.error).toList());
+
+    final oks = whereType<Ok<List<T>, List<E>>>();
+    return Ok(oks.expand((ok) => ok.value).toList());
+  }
+}
+
+abstract class InnerContext extends Context {
+  InnerContext(Context parent)
+      : assert(parent != null),
+        parent = Some(parent);
+
+  @override
+  QueryContext get queryContext => parent.value.queryContext;
+  @override
+  DeclarationId get declarationId => parent.value.declarationId;
+
+  @override
+  final Option<Context> parent;
+
+  @override
+  Option<hir.CandyType> get expressionType => parent.value.expressionType;
+
+  @override
+  DeclarationLocalId getId([
+    dynamic /* ast.Expression | ast.ValueParameter */ expressionOrParameter,
+  ]) =>
+      parent.value.getId(expressionOrParameter);
+  @override
+  BodyAstToHirIds get idMap => parent.value.idMap;
+
+  @override
+  List<hir.Identifier> resolveIdentifier(String name) =>
+      parent.value.resolveIdentifier(name);
+  @override
+  Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveReturn(
+    Option<String> label,
+  ) =>
+      parent.value.resolveReturn(label);
+
+  @override
+  Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveBreak(
+    Option<String> label,
+  ) =>
+      parent.value.resolveBreak(label);
+}
+
+class ContextContext extends Context {
+  ContextContext(this.queryContext, this.declarationId)
+      : assert(queryContext != null),
+        assert(declarationId != null);
+
+  @override
+  final QueryContext queryContext;
+  @override
+  final DeclarationId declarationId;
+
+  @override
+  Option<Context> get parent => None();
+  @override
+  Option<hir.CandyType> get expressionType => None();
+
+  var _nextId = 0;
+  var _idMap = BodyAstToHirIds();
+  @override
+  BodyAstToHirIds get idMap => _idMap;
+  @override
+  DeclarationLocalId getId([
+    dynamic /* ast.Expression | ast.ValueParameter */ expressionOrParameter,
+  ]) {
+    int astId;
+    if (expressionOrParameter is ast.Expression) {
+      astId = expressionOrParameter.id;
+    } else if (expressionOrParameter is ast.ValueParameter) {
+      astId = expressionOrParameter.id;
+    } else if (expressionOrParameter != null) {
+      throw CompilerError.internalError(
+        '`ContextContext.getId()` called with an invalid `expressionOrParameter` argument: `$expressionOrParameter`.',
       );
     }
-  });
-  return _mergeResults(parts).mapValue((parts) => [
-        hir.Expression.literal(
-          context.getId(expression),
-          hir.StringLiteral(parts),
-        ),
-      ]);
-}
 
-Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerIdentifier(
-  _LocalContext context,
-  ast.Identifier expression,
-) {
-  final identifier = expression.value.name;
-  final localIdentifier = context.localIdentifiers[identifier];
-  if (localIdentifier != null) {
-    final result = hir.Expression.identifier(
-      context.getId(expression),
-      localIdentifier,
-    );
-    return Ok([result]);
+    final existing = _idMap.map[astId];
+    if (existing != null) return existing;
+
+    final id = DeclarationLocalId(declarationId, _nextId++);
+    if (expressionOrParameter == null) return id;
+
+    _idMap = _idMap.withMapping(astId, id);
+    return id;
   }
 
-  if (context.expressionType.isNone && identifier == 'print') {
+  @override
+  List<hir.Identifier> resolveIdentifier(String name) {
+    // resolve `this`
+    if (name == 'this') {
+      if (declarationId.isConstructor) {
+        return [];
+      } else if (declarationId.isFunction) {
+        final function = getFunctionDeclarationHir(queryContext, declarationId);
+        if (function.isStatic) return [];
+      } else if (declarationId.isProperty) {
+        final function = getPropertyDeclarationHir(queryContext, declarationId);
+        if (function.isStatic) return [];
+      } else {
+        throw CompilerError.internalError(
+          '`ContextContext` is not within a constructor, function or property: `$declarationId`.',
+        );
+      }
+
+      if (!declarationId.hasParent) return [];
+      final parent = declarationId.parent;
+      if (parent.isTrait || parent.isImpl || parent.isClass) {
+        return [hir.Identifier.this_()];
+      }
+      return [];
+    }
+
+    // resolve `field` in a getter/setter
+    // TODO(JonasWanke): resolve `field` in property accessors
+
+    // TODO: check whether properties/functions are static or not and whether we have an instance
+
+    hir.Identifier convertDeclarationId(DeclarationId id) {
+      hir.CandyType type;
+      if (id.isFunction) {
+        final functionHir = getFunctionDeclarationHir(queryContext, id);
+        type = hir.CandyType.function(
+          parameterTypes: [
+            for (final parameter in functionHir.parameters) parameter.type,
+          ],
+          returnType: functionHir.returnType,
+        );
+      } else if (id.isProperty) {
+        type = getPropertyDeclarationHir(queryContext, id).type;
+      } else {
+        throw CompilerError.unsupportedFeature(
+          "Matched identifier `$name`, but it's neither a function nor a property.",
+        );
+      }
+      return hir.Identifier.property(id, type);
+    }
+
+    // search the current file (from the curent module to the root)
+    assert(declarationId.hasParent);
+    var moduleId = declarationIdToModuleId(queryContext, declarationId.parent);
+    while (true) {
+      final innerIds =
+          getModuleDeclarationHir(queryContext, moduleId).innerDeclarationIds;
+
+      final matches = innerIds
+          .where((id) => id.simplePath.last.nameOrNull == name)
+          .map(convertDeclarationId);
+      if (matches.isNotEmpty) return matches.toList();
+
+      if (moduleId.hasNoParent) break;
+      moduleId = moduleId.parent;
+      final declarationId =
+          moduleIdToOptionalDeclarationId(queryContext, moduleId);
+      if (declarationId is None ||
+          declarationId.value.resourceId != resourceId) {
+        break;
+      }
+    }
+
+    // search use-lines
+    return findIdentifierInUseLines(
+      queryContext,
+      Tuple4(resourceId, name, false, false),
+    ).map(convertDeclarationId).toList();
+  }
+
+  @override
+  void addIdentifier(hir.LocalPropertyIdentifier identifier) {
+    throw CompilerError.internalError(
+      "Can't add an identifier to a `ContextContext`.",
+    );
+  }
+
+  @override
+  Option<Tuple2<DeclarationLocalId, Option<CandyType>>> resolveReturn(
+    Option<String> label,
+  ) =>
+      None();
+  @override
+  Option<Tuple2<DeclarationLocalId, Option<CandyType>>> resolveBreak(
+    Option<String> label,
+  ) =>
+      None();
+}
+
+class FunctionContext extends InnerContext {
+  factory FunctionContext._create(QueryContext queryContext, DeclarationId id) {
+    final parent = ContextContext(queryContext, id);
+    final ast = getFunctionDeclarationAst(queryContext, id);
+    final identifiers = {
+      for (final parameter in ast.valueParameters)
+        parameter.name.name: hir.Identifier.parameter(
+          parent.getId(parameter),
+          parameter.name.name,
+          astTypeToHirType(
+            parent.queryContext,
+            Tuple2(
+              declarationIdToModuleId(
+                parent.queryContext,
+                parent.declarationId,
+              ),
+              parameter.type,
+            ),
+          ),
+        ),
+    };
+
+    return FunctionContext._(
+      parent,
+      identifiers,
+      getFunctionDeclarationHir(queryContext, id).returnType,
+      ast.body,
+    );
+  }
+  FunctionContext._(
+    Context parent,
+    this._identifiers,
+    this.returnType,
+    this.body,
+  )   : assert(_identifiers != null),
+        assert(returnType != null),
+        assert(body != null),
+        super(parent);
+
+  static Result<Tuple2<List<hir.Expression>, BodyAstToHirIds>,
+      List<ReportedCompilerError>> lowerFunction(
+    QueryContext queryContext,
+    DeclarationId id,
+  ) =>
+      FunctionContext._create(queryContext, id)._lowerBody();
+
+  final Map<String, hir.Identifier> _identifiers;
+  final hir.CandyType returnType;
+  final ast.LambdaLiteral body;
+
+  @override
+  void addIdentifier(hir.LocalPropertyIdentifier identifier) {
+    _identifiers[identifier.name] = identifier;
+  }
+
+  @override
+  List<Identifier> resolveIdentifier(String name) {
+    final result = _identifiers[name];
+    if (result != null) return [result];
+    return parent.value.resolveIdentifier(name);
+  }
+
+  @override
+  Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveReturn(
+    Option<String> label,
+  ) {
+    if (label is None ||
+        label == Some(declarationId.simplePath.last.nameOrNull)) {
+      return Some(Tuple2(getId(body), Some(returnType)));
+    }
+    return None();
+  }
+
+  Result<Tuple2<List<hir.Expression>, BodyAstToHirIds>,
+      List<ReportedCompilerError>> _lowerBody() {
+    final returnsUnit = returnType == hir.CandyType.unit;
+
+    if (!returnsUnit && body.expressions.isEmpty) {
+      return Error([
+        CompilerError.missingReturn(
+          "Function has a return type (different than `Unit`) but doesn't contain any expressions.",
+          location: ErrorLocation(
+            resourceId,
+            getFunctionDeclarationAst(queryContext, declarationId)
+                .representativeSpan,
+          ),
+        ),
+      ]);
+    }
+
+    final results = <Result<hir.Expression, List<ReportedCompilerError>>>[];
+
+    for (final expression in body.expressions.dropLast(returnsUnit ? 0 : 1)) {
+      final lowered = innerExpressionContext(forwardsIdentifiers: true)
+          .lowerUnambiguous(expression);
+      results.add(lowered);
+    }
+
+    if (!returnsUnit) {
+      final lowered = innerExpressionContext(expressionType: Some(returnType))
+          .lowerUnambiguous(body.expressions.last);
+      if (lowered is Error) {
+        results.add(lowered);
+      } else if (lowered.value is hir.ReturnExpression) {
+        results.add(lowered);
+      } else {
+        results.add(Ok(
+          hir.Expression.return_(getId(), getId(body), lowered.value),
+        ));
+      }
+    }
+    return results
+        .merge()
+        .mapValue((expressions) => Tuple2(expressions, idMap));
+  }
+}
+
+class LambdaContext extends InnerContext {
+  LambdaContext(
+    Context parent,
+    this.id,
+    this.label,
+    this._identifiers,
+  )   : assert(id != null),
+        assert(label != null),
+        assert(_identifiers != null),
+        super(parent);
+
+  final DeclarationLocalId id;
+  final Option<String> label;
+  final Map<String, hir.Identifier> _identifiers;
+
+  @override
+  void addIdentifier(hir.LocalPropertyIdentifier identifier) {
+    _identifiers[identifier.name] = identifier;
+  }
+
+  @override
+  List<Identifier> resolveIdentifier(String name) {
+    final result = _identifiers[name];
+    if (result != null) return [result];
+    return parent.value.resolveIdentifier(name);
+  }
+
+  @override
+  Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveReturn(
+    Option<String> label,
+  ) {
+    if (label is None || label == this.label) {
+      final returnType = parent.value.expressionType
+          .mapValue((type) => (type as hir.FunctionCandyType).returnType);
+
+      return Some(Tuple2(id, returnType));
+    }
+    return None();
+  }
+}
+
+class ReturnExpressionVisitor extends DoNothingExpressionVisitor {
+  final returnTypes = <hir.CandyType>{};
+
+  @override
+  void visitReturnExpression(ReturnExpression node) {
+    returnTypes.add(node.expression.type);
+  }
+}
+
+class ExpressionContext extends InnerContext {
+  ExpressionContext(
+    Context parent, {
+    this.expressionType = const None(),
+    this.forwardsIdentifiers = false,
+  })  : assert(expressionType != null),
+        assert(forwardsIdentifiers != null),
+        super(parent);
+
+  @override
+  final Option<hir.CandyType> expressionType;
+
+  final bool forwardsIdentifiers;
+
+  @override
+  void addIdentifier(LocalPropertyIdentifier identifier) {
+    if (!forwardsIdentifiers) return;
+
+    parent.value.addIdentifier(identifier);
+  }
+}
+
+extension on Context {
+  ExpressionContext innerExpressionContext({
+    Option<hir.CandyType> expressionType = const None(),
+    bool forwardsIdentifiers = false,
+  }) {
+    return ExpressionContext(
+      this,
+      expressionType: expressionType,
+      forwardsIdentifiers: forwardsIdentifiers,
+    );
+  }
+}
+
+extension on Context {
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerLiteral(
+    ast.Literal<dynamic> expression,
+  ) {
+    final token = expression.value;
+    hir.Literal literal;
+    if (token is ast.BoolLiteralToken) {
+      if (!isValidExpressionType(hir.CandyType.bool)) {
+        return Error([
+          CompilerError.invalidExpressionType(
+            'Expected type `${expressionType.value}`, got `Bool`',
+            location: ErrorLocation(resourceId, expression.span),
+          ),
+        ]);
+      }
+      literal = hir.Literal.boolean(token.value);
+    } else if (token is ast.IntLiteralToken) {
+      if (!isValidExpressionType(hir.CandyType.int)) {
+        return Error([
+          CompilerError.invalidExpressionType(
+            'Expected type `${expressionType.value}`, got `Int`',
+            location: ErrorLocation(resourceId, expression.span),
+          ),
+        ]);
+      }
+      literal = hir.Literal.integer(token.value);
+    } else {
+      throw CompilerError.unsupportedFeature(
+        'Unsupported literal.',
+        location: ErrorLocation(resourceId, token.span),
+      );
+    }
     return Ok([
-      hir.Expression.identifier(
-        context.getId(expression),
-        hir.Identifier.property(
-          hir.Expression.identifier(
-            context.getId(expression),
-            hir.Identifier.module(ModuleId(PackageId.this_, ['main'])),
+      hir.Expression.literal(getId(expression), literal),
+    ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerStringLiteral(
+    ast.StringLiteral expression,
+  ) {
+    final parts = expression.parts
+        .map<Result<List<hir.StringLiteralPart>, List<ReportedCompilerError>>>(
+            (part) {
+      if (part is ast.LiteralStringLiteralPart) {
+        return Ok([hir.StringLiteralPart.literal(part.value.value)]);
+      } else if (part is ast.InterpolatedStringLiteralPart) {
+        return innerExpressionContext()
+            .lowerUnambiguous(part.expression)
+            .mapValue((expression) =>
+                [hir.StringLiteralPart.interpolated(expression)]);
+      } else {
+        throw CompilerError.unsupportedFeature(
+          'Unsupported String literal part.',
+          location: ErrorLocation(resourceId, part.span),
+        );
+      }
+    });
+    return parts.merge().mapValue((parts) => [
+          hir.Expression.literal(getId(expression), hir.StringLiteral(parts)),
+        ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerLambdaLiteral(
+    ast.LambdaLiteral expression,
+  ) {
+    final type = expressionType;
+    if (type is Some && type.value is! hir.FunctionCandyType) {
+      return Error([
+        CompilerError.invalidExpressionType(
+          'Lambda literal found, but non-function-type `${type.value}` expected.',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    }
+    final functionType = type.mapValue((t) => t as hir.FunctionCandyType);
+
+    final parameters = <String, hir.CandyType>{};
+    final declaredParameters = expression.valueParameters;
+    final errors = <ReportedCompilerError>[];
+    if (functionType.isSome) {
+      final typeParameters = functionType.value.parameterTypes;
+      if (typeParameters.length == 1 && declaredParameters.isEmpty) {
+        parameters['it'] = typeParameters.single;
+      } else if (declaredParameters.isNotEmpty) {
+        if (declaredParameters.length != typeParameters.length) {
+          return Error([
+            CompilerError.invalidExpressionType(
+              'Function with ${typeParameters.length} parameters expected, but ${declaredParameters.length} are declared.',
+              location: ErrorLocation(
+                resourceId,
+                SourceSpan(
+                  declaredParameters.first.span.start,
+                  declaredParameters.last.span.end,
+                ),
+              ),
+            ),
+          ]);
+        }
+
+        for (final i in typeParameters.indices) {
+          final typeParameter = typeParameters[i];
+          final declaredParameter = declaredParameters[i];
+          final name = declaredParameter.name.name;
+
+          if (declaredParameter.type != null) {
+            final hirType = astTypeToHirType(
+              queryContext,
+              Tuple2(moduleId, declaredParameter.type),
+            );
+            if (!isAssignableTo(queryContext, Tuple2(typeParameter, hirType))) {
+              errors.add(CompilerError.invalidExpressionType(
+                'Declared type `$hirType` is not assignable to expected type `${declaredParameter.type}`.',
+                location:
+                    ErrorLocation(resourceId, declaredParameter.type.span),
+              ));
+            }
+
+            parameters[name] = hirType;
+          } else {
+            parameters[name] = typeParameter;
+          }
+        }
+      } else {
+        return Error([
+          CompilerError.lambdaParametersMissing(
+            "Lambda was inferred to have ${typeParameters.length} parameters, but those aren't declared.",
+            location: ErrorLocation(resourceId, expression.span),
           ),
-          'print',
-          hir.CandyType.function(
-            parameterTypes: [hir.CandyType.any],
-            returnType: hir.CandyType.unit,
-          ),
+        ]);
+      }
+    } else {
+      for (final parameter in declaredParameters) {
+        var type = hir.CandyType.any;
+        if (parameter.type == null) {
+          errors.add(CompilerError.lambdaParameterTypeRequired(
+            "Lambda parameter type can't be inferred.",
+            location: ErrorLocation(resourceId, parameter.span),
+          ));
+        } else {
+          type =
+              astTypeToHirType(queryContext, Tuple2(moduleId, parameter.type));
+        }
+        parameters[parameter.name.name] = type;
+      }
+    }
+    if (errors.isNotEmpty) return Error(errors);
+
+    final identifiers = {
+      ...parameters,
+      if (functionType.value.receiverType != null)
+        'this': functionType.value.receiverType,
+    }.mapValues((k, v) => hir.Identifier.parameter(getId(expression), k, v));
+    final lambdaContext =
+        LambdaContext(this, getId(expression), None(), identifiers);
+
+    final returnType = functionType.mapValue((t) => t.returnType);
+    final astExpressions = expression.expressions;
+    final hirExpressions =
+        <Result<hir.Expression, List<ReportedCompilerError>>>[];
+    for (var i = 0; i < astExpressions.length; i++) {
+      final astExpression = astExpressions[i];
+
+      if (i == astExpressions.length - 1) {
+        var lowered = lambdaContext
+            .innerExpressionContext(expressionType: Some(returnType.value))
+            .lowerUnambiguous(astExpression);
+        if (lowered is Ok && lowered.value.type != hir.CandyType.never) {
+          lowered = Ok(
+            hir.Expression.return_(getId(), getId(expression), lowered.value),
+          );
+        }
+        hirExpressions.add(lowered);
+        break;
+      }
+
+      final result = lambdaContext
+          .innerExpressionContext(forwardsIdentifiers: true)
+          .lowerUnambiguous(astExpression);
+      hirExpressions.add(result);
+    }
+
+    final mergedExpressions = hirExpressions.merge();
+    if (mergedExpressions is Error) return mergedExpressions;
+    final expressions = mergedExpressions.value;
+
+    var actualReturnType = returnType.valueOrNull;
+    if (actualReturnType == null) {
+      final visitor = ReturnExpressionVisitor();
+      for (final expression in expressions) {
+        expression.accept(visitor);
+      }
+      actualReturnType = hir.CandyType.union(visitor.returnTypes.toList());
+    }
+
+    return Ok([
+      hir.Expression.literal(
+        getId(expression),
+        hir.Literal.lambda(
+          // This only works because Dart maintains the insertion order of
+          // maps.
+          parameters.entries
+              .map((e) => hir.LambdaLiteralParameter(e.key, e.value))
+              .toList(),
+          expressions,
+          actualReturnType,
+          functionType.value.receiverType,
         ),
       ),
     ]);
   }
-  throw CompilerError.undefinedIdentifier(
-    "Couldn't resolve identifier `$identifier`.",
-    location: ErrorLocation(context.resourceId, expression.value.span),
-  );
-}
 
-Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerCall(
-  _LocalContext context,
-  ast.CallExpression expression,
-) {
-  final targetVariants = context.requireLowering(expression.target);
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerIdentifier(
+    ast.Identifier expression,
+  ) {
+    final name = expression.value.name;
 
-  final results = targetVariants.map((target) {
-    if (target is hir.IdentifierExpression &&
-        target.identifier is hir.PropertyIdentifier) {
-      final identifier = target.identifier as hir.PropertyIdentifier;
-      final declarationId = getPropertyIdentifierDeclarationId(
-        context.queryContext,
-        identifier,
+    final identifiers = resolveIdentifier(name);
+    if (identifiers.isEmpty) {
+      throw CompilerError.undefinedIdentifier(
+        "Couldn't resolve identifier `$name`.",
+        location: ErrorLocation(resourceId, expression.value.span),
       );
-      if (declarationId.isFunction) {
-        return _lowerFunctionCall(context, expression, target, identifier);
-      }
     }
 
-    throw CompilerError.unsupportedFeature(
-      'Callable expressions are not yet supported.',
-      location: ErrorLocation(context.resourceId, expression.span),
-    );
-  });
-  return _mergeResults(results);
-}
-
-Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerLoop(
-  _LocalContext context,
-  ast.LoopExpression expression,
-) {
-  return context._lowerStatement(expression.statement).mapValue((statement) => [
-        hir.LoopExpression(context.getId(expression), statement),
-      ]);
-}
-
-Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerReturn(
-  _LocalContext context,
-  ast.ReturnExpression expression,
-) {
-  if (!context.isValidExpressionType(hir.CandyType.never)) return Ok([]);
-  stderr.write('The return type is ${context.returnType}.');
-  if (context.returnType == Option<CandyType>.none()) {
-    throw CompilerError.returnNotInFunction(
-        'The return expression is not in a function.');
+    return Ok([
+      for (final identifier in identifiers)
+        hir.Expression.identifier(getId(expression), identifier),
+    ]);
   }
-  return context
-      .lowerToUnambiguous(expression.expression, context.returnType)
-      .mapValue((e) => [
-            hir.ReturnExpression(context.getId(expression), e),
-          ]);
-}
 
-final getPropertyIdentifierDeclarationId =
-    Query<hir.PropertyIdentifier, DeclarationId>(
-  'getPropertyIdentifierDeclarationId',
-  provider: (context, identifier) {
-    final target = identifier.target;
-    if (target is! hir.IdentifierExpression) {
+  Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerLoop(
+    ast.LoopExpression expression,
+  ) {
+    // TODO: implement loop
+    // return lowerExpression(expression.statement).mapValue((statement) => [
+    //       hir.LoopExpression(context.getId(expression), statement),
+    //     ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerCall(
+    ast.CallExpression expression,
+  ) {
+    final targetVariants = innerExpressionContext().lower(expression.target);
+    if (targetVariants is Error) return targetVariants;
+
+    final results = targetVariants.value.map((target) {
+      if (target is hir.IdentifierExpression &&
+          target.identifier is hir.PropertyIdentifier) {
+        final identifier = target.identifier as hir.PropertyIdentifier;
+        if (identifier.id.isFunction) {
+          return lowerFunctionCall(expression, target);
+        }
+      }
+
       throw CompilerError.unsupportedFeature(
-        'Properties of instances are not yet supported.',
+        'Callable expressions are not yet supported.',
+        location: ErrorLocation(resourceId, expression.span),
       );
+    });
+    return results.merge();
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerFunctionCall(
+    ast.CallExpression expression,
+    hir.IdentifierExpression target,
+  ) {
+    assert(target.identifier is hir.PropertyIdentifier);
+    final identifier = target.identifier as hir.PropertyIdentifier;
+
+    final functionId = identifier.id;
+    assert(functionId.isFunction);
+    final functionHir = getFunctionDeclarationHir(queryContext, functionId);
+    if (!isValidExpressionType(functionHir.returnType)) {
+      return Error([
+        CompilerError.invalidExpressionType(
+          'Function has an invalid return type.',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
     }
 
-    final targetIdentifier = (target as hir.IdentifierExpression).identifier;
-    List<DeclarationId> innerDeclarationIds;
-    if (targetIdentifier is hir.ModuleIdentifier) {
-      innerDeclarationIds =
-          getModuleDeclarationHir(context, targetIdentifier.id)
-              .innerDeclarationIds;
-    } else if (targetIdentifier is hir.TraitIdentifier) {
-      innerDeclarationIds = getTraitDeclarationHir(context, targetIdentifier.id)
-          .innerDeclarationIds;
-      // } else if (targetIdentifier is hir.ClassIdentifier) {
-      //   innerDeclarationIds = getClassDeclarationHir(context, targetIdentifier.id)
-      //       .innerDeclarationIds;
-    } else {
-      assert(false);
-      return null;
-    }
-    return innerDeclarationIds
-        .firstWhere((id) => id.simplePath.last.nameOrNull == identifier.name);
-  },
-);
+    final errors = <ReportedCompilerError>[];
 
-Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerFunctionCall(
-  _LocalContext context,
-  ast.CallExpression expression,
-  hir.IdentifierExpression target,
-  hir.PropertyIdentifier targetIdentifier,
-) {
-  final functionDeclarationId = getPropertyIdentifierDeclarationId(
-    context.queryContext,
-    targetIdentifier,
-  );
-  assert(functionDeclarationId.isFunction);
-  final functionHir =
-      getFunctionDeclarationHir(context.queryContext, functionDeclarationId);
-  if (!context.isValidExpressionType(functionHir.returnType)) return null;
+    // Attention: The map containing lowered arguments must retain their order
+    // from the source code/AST. This currently works, because Dart's map
+    // maintains insertion order.
 
-  final errors = <ReportedCompilerError>[];
+    final parameters = functionHir.parameters;
+    final parametersByName = parameters.associateBy((p) => p.name);
+    final arguments = expression.arguments;
+    final outOfOrderNamedArguments = <ast.Argument>[];
+    final astArgumentMap = <String, ast.Argument>{};
+    for (var i = 0; i < arguments.length; i++) {
+      final argument = arguments[i];
+      if (outOfOrderNamedArguments.isNotEmpty && argument.isPositional) {
+        errors.add(CompilerError.unexpectedPositionalArgument(
+          'At least one of the preceding arguments was named and not in the '
+          'default order, hence positional arguments can no longer be used.',
+          location: ErrorLocation(resourceId, argument.span),
+          relatedInformation: [
+            for (final arg in outOfOrderNamedArguments)
+              ErrorRelatedInformation(
+                location: ErrorLocation(resourceId, arg.span),
+                message: "A named argument that's not in the default order.",
+              ),
+          ],
+        ));
+        continue;
+      }
 
-  final parameters = functionHir.parameters;
-  final parametersByName = parameters.associateBy((p) => p.name);
-  final arguments = expression.arguments;
-  final outOfOrderNamedArguments = <ast.Argument>[];
-  final astArgumentMap = <String, ast.Argument>{};
-  for (var i = 0; i < arguments.length; i++) {
-    final argument = arguments[i];
-    if (outOfOrderNamedArguments.isNotEmpty && argument.isPositional) {
-      errors.add(CompilerError.unexpectedPositionalArgument(
-        'At least one of the preceding arguments was named and not in the '
-        'default order, hence positional arguments can no longer be used.',
-        location: ErrorLocation(context.resourceId, argument.span),
-        relatedInformation: [
-          for (final arg in outOfOrderNamedArguments)
-            ErrorRelatedInformation(
-              location: ErrorLocation(context.resourceId, arg.span),
-              message: "A named argument that's not in the default order.",
-            ),
-        ],
-      ));
-      continue;
-    }
+      if (i >= parameters.length) {
+        errors.add(CompilerError.tooManyArguments(
+          'Too many arguments.',
+          location: ErrorLocation(resourceId, argument.span),
+        ));
+        continue;
+      }
 
-    final parameter = parameters[i];
-    if (argument.isPositional) {
-      astArgumentMap[parameter.name] = argument;
-    } else {
-      assert(argument.name.name != null);
-      astArgumentMap[argument.name.name] = argument;
-      if (parameter.name != argument.name.name) {
-        outOfOrderNamedArguments.add(argument);
+      final parameter = parameters[i];
+      if (argument.isPositional) {
+        astArgumentMap[parameter.name] = argument;
+      } else {
+        final parameterName = argument.name.name;
+        assert(parameterName != null);
+        if (astArgumentMap.containsKey(parameterName)) {
+          errors.add(CompilerError.duplicateArgument(
+            'Argument `$parameterName` was already given.',
+            location: ErrorLocation(resourceId, argument.span),
+          ));
+          continue;
+        }
+
+        astArgumentMap[parameterName] = argument;
+        if (parameter.name != parameterName) {
+          outOfOrderNamedArguments.add(argument);
+        }
       }
     }
-  }
-  if (errors.isNotEmpty) return Error(errors);
+    if (errors.isNotEmpty) return Error(errors);
 
-  final hirArgumentMap = <String, hir.Expression>{};
-  for (final entry in astArgumentMap.entries) {
-    final name = entry.key;
-    final value = entry.value.expression;
-    final lowered = context.lowerToUnambiguous(
-      value,
-      Option.some(parametersByName[name].type),
-    );
-    if (lowered is Error) {
-      errors.addAll(lowered.error);
-      continue;
+    final hirArgumentMap = <String, hir.Expression>{};
+    for (final entry in astArgumentMap.entries) {
+      final name = entry.key;
+      final value = entry.value.expression;
+
+      final innerContext = innerExpressionContext(
+        expressionType: Option.some(parametersByName[name].type),
+      );
+      final lowered = innerContext.lowerUnambiguous(value);
+      if (lowered is Error) {
+        errors.addAll(lowered.error);
+        continue;
+      }
+
+      hirArgumentMap[name] = lowered.value;
+    }
+    if (errors.isNotEmpty) return Error(errors);
+
+    return Ok([
+      hir.Expression.functionCall(
+        getId(expression),
+        target,
+        hirArgumentMap,
+      ),
+    ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerReturn(
+    ast.ReturnExpression expression,
+  ) {
+    // The type of a `ReturnExpression` is `Never` and that is, by definition,
+    // assignable to anything because it's a bottom type. So, we don't need to
+    // check that.
+
+    final resolvedScope = resolveReturn(None());
+    if (resolvedScope is None) {
+      return Error([
+        CompilerError.invalidReturnLabel(
+          'Return label is invalid.',
+          location: ErrorLocation(resourceId, expression.returnKeyword.span),
+        ),
+      ]);
     }
 
-    hirArgumentMap[name] = lowered.value;
+    return innerExpressionContext(expressionType: resolvedScope.value.second)
+        .lowerUnambiguous(expression.expression)
+        .mapValue((hirExpression) => [
+              hir.Expression.return_(
+                getId(expression),
+                resolvedScope.value.first,
+                hirExpression,
+              ),
+            ]);
   }
-  if (errors.isNotEmpty) return Error(errors);
-
-  return Ok([
-    hir.Expression.functionCall(
-      context.getId(expression),
-      target,
-      hirArgumentMap,
-    ),
-  ]);
 }

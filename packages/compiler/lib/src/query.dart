@@ -7,6 +7,7 @@ import 'package:meta/meta.dart';
 
 import 'build_artifacts.dart';
 import 'compilation/ast.dart';
+import 'compilation/ids.dart';
 import 'errors.dart';
 import 'resource_provider.dart';
 import 'utils.dart';
@@ -93,7 +94,11 @@ class GlobalQueryContext {
       final encoder =
           JsonEncoder.withIndent('  ', (object) => object.toString());
       config.buildArtifactManager.setContent(
-        BuildArtifactId('query-traces/$dateTime ${query.name}.json'),
+        QueryContext(this),
+        BuildArtifactId(
+          PackageId.this_,
+          'query-traces/$dateTime ${query.name}.json',
+        ),
         encoder.convert(result.toJson()),
       );
     }

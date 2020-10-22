@@ -1,4 +1,5 @@
 export 'src/build_artifacts.dart';
+export 'src/candyspec.dart';
 export 'src/compilation/ast/parser.dart';
 export 'src/compilation/ast_hir_lowering.dart';
 export 'src/compilation/hir.dart';

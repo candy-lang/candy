@@ -9,35 +9,54 @@ import 'constants.dart';
 import 'declarations/module.dart';
 import 'pubspec.dart';
 
-final compile = Query<Unit, Unit>(
+final compile = Query<PackageId, Unit>(
   'dart.compile',
   evaluateAlways: true,
-  provider: (context, _) {
-    context.config.buildArtifactManager.delete(dartBuildArtifactId);
+  provider: (context, packageId) {
+    if (packageId.isThis) {
+      // TODO(JonasWanke): compile transitive dependencies when they're supported
+      compile(context, PackageId.core);
 
-    final pubspec = generatePubspec(context, Unit());
+      final dependencies = getCandyspec(context, packageId).dependencies;
+      for (final dependency in dependencies.keys) {
+        compile(context, PackageId(dependency));
+      }
+    }
+
+    final buildArtifactId = packageId.dartBuildArtifactId;
+    context.config.buildArtifactManager.delete(context, buildArtifactId);
+
+    final pubspec = generatePubspec(context, packageId);
     final ioSink = _SimpleIoSink();
     YamlToString().writeYamlString(pubspec.toJson(), ioSink);
-    context.config.buildArtifactManager
-        .setContent(dartBuildArtifactId.child(pubspecFile), ioSink.toString());
+    context.config.buildArtifactManager.setContent(
+      context,
+      buildArtifactId.child(pubspecFile),
+      ioSink.toString(),
+    );
 
-    compileModule(context, mainModuleId);
+    final allResourceIds = context.config.resourceProvider
+        .getAllFileResourceIds(context, packageId)
+        .where((id) => id.isCandySourceFile);
+    for (final resourceId in allResourceIds) {
+      compileModule(context, resourceIdToModuleId(context, resourceId));
+    }
 
-    runPubGet(context, Unit());
+    runPubGet(context, packageId);
 
     return Unit();
   },
 );
 
-final runPubGet = Query<Unit, Unit>(
+final runPubGet = Query<PackageId, Unit>(
   'dart.runPubGet',
   evaluateAlways: true,
-  provider: (context, _) {
+  provider: (context, packageId) {
     final result = Process.runSync(
       'pub.bat',
       ['get'],
-      workingDirectory:
-          context.config.buildArtifactManager.toPath(dartBuildArtifactId),
+      workingDirectory: context.config.buildArtifactManager
+          .toPath(context, packageId.dartBuildArtifactId),
     );
     if (result.exitCode != 0) {
       throw CompilerError.internalError(
@@ -48,16 +67,18 @@ final runPubGet = Query<Unit, Unit>(
     return Unit();
   },
 );
-final run = Query<Unit, String>(
+final run = Query<PackageId, String>(
   'dart.run',
   evaluateAlways: true,
-  provider: (context, _) {
+  provider: (context, packageId) {
+    final buildArtifactId = packageId.dartBuildArtifactId;
     final directory =
-        context.config.buildArtifactManager.toPath(dartBuildArtifactId);
+        context.config.buildArtifactManager.toPath(context, buildArtifactId);
     final path = p.relative(
       context.config.buildArtifactManager
-          .toPath(moduleIdToBuildArtifactId(context, mainModuleId)),
-      from: context.config.buildArtifactManager.toPath(dartBuildArtifactId),
+          .toPath(context, moduleIdToBuildArtifactId(context, mainModuleId)),
+      from:
+          context.config.buildArtifactManager.toPath(context, buildArtifactId),
     );
     final result = Process.runSync('dart', [path], workingDirectory: directory);
 
