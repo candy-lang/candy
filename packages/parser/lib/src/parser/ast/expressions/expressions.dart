@@ -277,12 +277,12 @@ abstract class LoopExpression extends Expression implements _$LoopExpression {
   const factory LoopExpression(
     int id, {
     @required LoopKeywordToken loopKeyword,
-    @required Statement statement,
+    @required Expression body,
   }) = _LoopExpression;
   const LoopExpression._();
 
   @override
-  Iterable<SyntacticEntity> get children => [loopKeyword, statement];
+  Iterable<SyntacticEntity> get children => [loopKeyword, body];
 }
 
 @freezed
