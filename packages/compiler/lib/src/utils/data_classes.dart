@@ -12,6 +12,7 @@ abstract class Option<T> implements _$Option<T> {
   const factory Option.some(T value) = Some<T>;
   const factory Option.none() = None<T>;
   const Option._();
+  factory Option.of(T value) => value == null ? None() : Some(value);
 
   bool get isSome => when(some: (_) => true, none: () => false);
   bool get isNone => !isSome;

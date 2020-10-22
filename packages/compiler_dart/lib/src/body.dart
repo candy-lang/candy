@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 import 'package:strings/strings.dart' as strings;
@@ -125,7 +123,24 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       module: null,
       trait: referTraitOrClass,
       class_: referTraitOrClass,
-      parameter: (id, name, _) => _saveSingle(node, dart.refer(name)),
+      parameter: (id, name, _) {
+        if (name == 'this') {
+          final expression = getExpression(context, id);
+
+          if (expression is Some &&
+              expression.value is LiteralExpression &&
+              (expression.value as LiteralExpression).literal
+                  is LambdaLiteral) {
+            return _saveSingle(
+              node,
+              dart.refer(
+                _lambdaThisName(expression.value as LiteralExpression),
+              ),
+            );
+          }
+        }
+        return _saveSingle(node, dart.refer(name));
+      },
       property: (id, _, target) {
         final name = id.simplePath.last.nameOrNull;
 
@@ -185,16 +200,28 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
         return lowered;
       },
-      lambda: (expressions, _) {
-        final loweredExpressions = expressions.expand((e) => e.accept(this));
-        final closure = dart.Method((b) => b
-              ..body =
-                  dart.Block((b) => b.statements.addAll(loweredExpressions)))
-            .closure;
+      lambda: (parameters, expressions, returnType, receiverType) {
+        final closure = dart.Method((b) {
+          if (receiverType != null) {
+            b.requiredParameters
+                .add(dart.Parameter((b) => b..name = _lambdaThisName(node)));
+          }
+
+          final params = parameters.map((p) => dart.Parameter((b) => b
+            ..type = compileType(context, p.type)
+            ..name = p.name));
+          b.requiredParameters.addAll(params);
+
+          final loweredExpressions = expressions.expand((e) => e.accept(this));
+          b.body = dart.Block((b) => b.statements.addAll(loweredExpressions));
+        }).closure;
         return [_save(node, closure)];
       },
     );
   }
+
+  String _lambdaThisName(LiteralExpression lambdaExpression) =>
+      '${_name(lambdaExpression)}_this';
 
   @override
   List<dart.Code> visitNavigationExpression(NavigationExpression node) => [];

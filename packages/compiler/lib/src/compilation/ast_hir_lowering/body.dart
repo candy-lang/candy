@@ -1,6 +1,7 @@
 import 'package:compiler/compiler.dart';
 import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
+import 'package:parser/parser.dart' show SourceSpan;
 
 import '../../errors.dart';
 import '../../query.dart';
@@ -14,6 +15,93 @@ import 'declarations/module.dart';
 import 'declarations/property.dart';
 import 'general.dart';
 import 'type.dart';
+
+final getExpression = Query<DeclarationLocalId, Option<hir.Expression>>(
+  'getExpression',
+  provider: (context, id) {
+    final body = getBody(context, id.declarationId);
+    if (body is None) return None();
+
+    final visitor = IdFinderVisitor(id);
+    for (final expression in body.value) {
+      final result = expression.accept(visitor);
+      if (result is Some) return result;
+    }
+    return None();
+  },
+);
+
+class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
+  const IdFinderVisitor(this.id) : assert(id != null);
+
+  final DeclarationLocalId id;
+
+  @override
+  Option<hir.Expression> visitIdentifierExpression(IdentifierExpression node) {
+    if (node.id == id) return Some(node);
+    if (node.identifier is hir.PropertyIdentifier) {
+      final target = (node.identifier as hir.PropertyIdentifier).target;
+      if (target != null) return target.accept(this);
+    }
+    return None();
+  }
+
+  @override
+  Option<hir.Expression> visitLiteralExpression(LiteralExpression node) {
+    if (node.id == id) return Some(node);
+    if (node.literal is hir.StringLiteral) {
+      final literal = node.literal as hir.StringLiteral;
+      for (final part in literal.parts) {
+        if (part is hir.InterpolatedStringLiteralPart) {
+          final result = part.value.accept(this);
+          if (result is Some) return result;
+        }
+      }
+    }
+    if (node.literal is hir.LambdaLiteral) {
+      final literal = node.literal as hir.LambdaLiteral;
+      for (final expression in literal.expressions) {
+        final result = expression.accept(this);
+        if (result is Some) return result;
+      }
+    }
+    return None();
+  }
+
+  @override
+  Option<hir.Expression> visitNavigationExpression(NavigationExpression node) {
+    if (node.id == id) return Some(node);
+    return node.target.accept(this);
+  }
+
+  @override
+  Option<hir.Expression> visitCallExpression(CallExpression node) {
+    if (node.id == id) return Some(node);
+    for (final argument in node.valueArguments) {
+      final result = argument.accept(this);
+      if (result is Some) return result;
+    }
+    return node.target.accept(this);
+  }
+
+  @override
+  Option<hir.Expression> visitFunctionCallExpression(
+    FunctionCallExpression node,
+  ) {
+    if (node.id == id) return Some(node);
+    for (final argument in node.valueArguments.values) {
+      final result = argument.accept(this);
+      if (result is Some) return result;
+    }
+    return node.target.accept(this);
+  }
+
+  @override
+  Option<hir.Expression> visitReturnExpression(ReturnExpression node) {
+    if (node.id == id) return Some(node);
+    return node.expression.accept(this);
+  }
+}
 
 final getBody = Query<DeclarationId, Option<List<hir.Expression>>>(
   'getBody',
@@ -78,6 +166,7 @@ final Query<DeclarationId,
 abstract class Context {
   QueryContext get queryContext;
   DeclarationId get declarationId;
+  ModuleId get moduleId => declarationIdToModuleId(queryContext, declarationId);
   ResourceId get resourceId => declarationId.resourceId;
 
   Option<Context> get parent;
@@ -117,8 +206,8 @@ abstract class Context {
       result = lowerLiteral(expression);
     } else if (expression is ast.StringLiteral) {
       result = lowerStringLiteral(expression);
-      // }  else if (expression is ast.LambdaLiteral) {
-      //   result = lowerLambdaLiteral(expression);
+    } else if (expression is ast.LambdaLiteral) {
+      result = lowerLambdaLiteral(expression);
     } else if (expression is ast.Identifier) {
       result = lowerIdentifier(expression);
     } else if (expression is ast.CallExpression) {
@@ -249,22 +338,23 @@ class ContextContext extends Context {
   DeclarationLocalId getId([
     dynamic /* ast.Expression | ast.ValueParameter */ expressionOrParameter,
   ]) {
-    final existing = _idMap.map[expressionOrParameter];
-    if (existing != null) return existing;
-
-    final id = DeclarationLocalId(declarationId, _nextId++);
-    if (expressionOrParameter == null) return id;
-
     int astId;
     if (expressionOrParameter is ast.Expression) {
       astId = expressionOrParameter.id;
     } else if (expressionOrParameter is ast.ValueParameter) {
       astId = expressionOrParameter.id;
-    } else {
+    } else if (expressionOrParameter != null) {
       throw CompilerError.internalError(
         '`ContextContext.getId()` called with an invalid `expressionOrParameter` argument: `$expressionOrParameter`.',
       );
     }
+
+    final existing = _idMap.map[astId];
+    if (existing != null) return existing;
+
+    final id = DeclarationLocalId(declarationId, _nextId++);
+    if (expressionOrParameter == null) return id;
+
     _idMap = _idMap.withMapping(astId, id);
     return id;
   }
@@ -485,6 +575,56 @@ class FunctionContext extends InnerContext {
   }
 }
 
+class LambdaContext extends InnerContext {
+  LambdaContext(
+    Context parent,
+    this.id,
+    this.label,
+    this._identifiers,
+  )   : assert(id != null),
+        assert(label != null),
+        assert(_identifiers != null),
+        super(parent);
+
+  final DeclarationLocalId id;
+  final Option<String> label;
+  final Map<String, hir.Identifier> _identifiers;
+
+  @override
+  void addIdentifier(hir.LocalPropertyIdentifier identifier) {
+    _identifiers[identifier.name] = identifier;
+  }
+
+  @override
+  List<Identifier> resolveIdentifier(String name) {
+    final result = _identifiers[name];
+    if (result != null) return [result];
+    return parent.value.resolveIdentifier(name);
+  }
+
+  @override
+  Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveReturn(
+    Option<String> label,
+  ) {
+    if (label is None || label == this.label) {
+      final returnType = parent.value.expressionType
+          .mapValue((type) => (type as hir.FunctionCandyType).returnType);
+
+      return Some(Tuple2(id, returnType));
+    }
+    return None();
+  }
+}
+
+class ReturnExpressionVisitor extends DoNothingExpressionVisitor {
+  final returnTypes = <hir.CandyType>{};
+
+  @override
+  void visitReturnExpression(ReturnExpression node) {
+    returnTypes.add(node.expression.type);
+  }
+}
+
 class ExpressionContext extends InnerContext {
   ExpressionContext(
     Context parent, {
@@ -580,6 +720,155 @@ extension on Context {
     return parts.merge().mapValue((parts) => [
           hir.Expression.literal(getId(expression), hir.StringLiteral(parts)),
         ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerLambdaLiteral(
+    ast.LambdaLiteral expression,
+  ) {
+    final type = expressionType;
+    if (type is Some && type.value is! hir.FunctionCandyType) {
+      return Error([
+        CompilerError.invalidExpressionType(
+          'Lambda literal found, but non-function-type `${type.value}` expected.',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    }
+    final functionType = type.mapValue((t) => t as hir.FunctionCandyType);
+
+    final parameters = <String, hir.CandyType>{};
+    final declaredParameters = expression.valueParameters;
+    final errors = <ReportedCompilerError>[];
+    if (functionType.isSome) {
+      final typeParameters = functionType.value.parameterTypes;
+      if (typeParameters.length == 1 && declaredParameters.isEmpty) {
+        parameters['it'] = typeParameters.single;
+      } else if (declaredParameters.isNotEmpty) {
+        if (declaredParameters.length != typeParameters.length) {
+          return Error([
+            CompilerError.invalidExpressionType(
+              'Function with ${typeParameters.length} parameters expected, but ${declaredParameters.length} are declared.',
+              location: ErrorLocation(
+                resourceId,
+                SourceSpan(
+                  declaredParameters.first.span.start,
+                  declaredParameters.last.span.end,
+                ),
+              ),
+            ),
+          ]);
+        }
+
+        for (final i in typeParameters.indices) {
+          final typeParameter = typeParameters[i];
+          final declaredParameter = declaredParameters[i];
+          final name = declaredParameter.name.name;
+
+          if (declaredParameter.type != null) {
+            final hirType = astTypeToHirType(
+              queryContext,
+              Tuple2(moduleId, declaredParameter.type),
+            );
+            if (!isAssignableTo(queryContext, Tuple2(typeParameter, hirType))) {
+              errors.add(CompilerError.invalidExpressionType(
+                'Declared type `$hirType` is not assignable to expected type `${declaredParameter.type}`.',
+                location:
+                    ErrorLocation(resourceId, declaredParameter.type.span),
+              ));
+            }
+
+            parameters[name] = hirType;
+          } else {
+            parameters[name] = typeParameter;
+          }
+        }
+      } else {
+        return Error([
+          CompilerError.lambdaParametersMissing(
+            "Lambda was inferred to have ${typeParameters.length} parameters, but those aren't declared.",
+            location: ErrorLocation(resourceId, expression.span),
+          ),
+        ]);
+      }
+    } else {
+      for (final parameter in declaredParameters) {
+        var type = hir.CandyType.any;
+        if (parameter.type == null) {
+          errors.add(CompilerError.lambdaParameterTypeRequired(
+            "Lambda parameter type can't be inferred.",
+            location: ErrorLocation(resourceId, parameter.span),
+          ));
+        } else {
+          type =
+              astTypeToHirType(queryContext, Tuple2(moduleId, parameter.type));
+        }
+        parameters[parameter.name.name] = type;
+      }
+    }
+    if (errors.isNotEmpty) return Error(errors);
+
+    final identifiers = {
+      ...parameters,
+      if (functionType.value.receiverType != null)
+        'this': functionType.value.receiverType,
+    }.mapValues((k, v) => hir.Identifier.parameter(getId(expression), k, v));
+    final lambdaContext =
+        LambdaContext(this, getId(expression), None(), identifiers);
+
+    final returnType = functionType.mapValue((t) => t.returnType);
+    final astExpressions = expression.expressions;
+    final hirExpressions =
+        <Result<hir.Expression, List<ReportedCompilerError>>>[];
+    for (var i = 0; i < astExpressions.length; i++) {
+      final astExpression = astExpressions[i];
+
+      if (i == astExpressions.length - 1) {
+        var lowered = lambdaContext
+            .innerExpressionContext(expressionType: Some(returnType.value))
+            .lowerUnambiguous(astExpression);
+        if (lowered is Ok && lowered.value.type != hir.CandyType.never) {
+          lowered = Ok(
+            hir.Expression.return_(getId(), getId(expression), lowered.value),
+          );
+        }
+        hirExpressions.add(lowered);
+        break;
+      }
+
+      final result = lambdaContext
+          .innerExpressionContext(forwardsIdentifiers: true)
+          .lowerUnambiguous(astExpression);
+      hirExpressions.add(result);
+    }
+
+    final mergedExpressions = hirExpressions.merge();
+    if (mergedExpressions is Error) return mergedExpressions;
+    final expressions = mergedExpressions.value;
+
+    var actualReturnType = returnType.valueOrNull;
+    if (actualReturnType == null) {
+      final visitor = ReturnExpressionVisitor();
+      for (final expression in expressions) {
+        expression.accept(visitor);
+      }
+      actualReturnType = hir.CandyType.union(visitor.returnTypes.toList());
+    }
+
+    return Ok([
+      hir.Expression.literal(
+        getId(expression),
+        hir.Literal.lambda(
+          // This only works because Dart maintains the insertion order of
+          // maps.
+          parameters.entries
+              .map((e) => hir.LambdaLiteralParameter(e.key, e.value))
+              .toList(),
+          expressions,
+          actualReturnType,
+          functionType.value.receiverType,
+        ),
+      ),
+    ]);
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerIdentifier(

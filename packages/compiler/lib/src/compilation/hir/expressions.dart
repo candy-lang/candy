@@ -115,9 +115,11 @@ abstract class Literal implements _$Literal {
   const factory Literal.integer(int value) = IntLiteral;
   const factory Literal.string(List<StringLiteralPart> parts) = StringLiteral;
   const factory Literal.lambda(
+    List<LambdaLiteralParameter> parameters,
     List<Expression> expressions,
-    FunctionCandyType type,
-  ) = LambdaLiteral;
+    CandyType returnType, [
+    CandyType receiverType,
+  ]) = LambdaLiteral;
 
   factory Literal.fromJson(Map<String, dynamic> json) =>
       _$LiteralFromJson(json);
@@ -127,8 +129,21 @@ abstract class Literal implements _$Literal {
         boolean: (_) => CandyType.bool,
         integer: (_) => CandyType.int,
         string: (_) => CandyType.string,
-        lambda: (_, type) => type,
+        lambda: (parameters, _, returnType, receiverType) => CandyType.function(
+          receiverType: receiverType,
+          parameterTypes: parameters.map((p) => p.type).toList(),
+          returnType: returnType,
+        ),
       );
+}
+
+@freezed
+abstract class LambdaLiteralParameter implements _$LambdaLiteralParameter {
+  const factory LambdaLiteralParameter(String name, CandyType type) =
+      _LambdaLiteralParameter;
+  factory LambdaLiteralParameter.fromJson(Map<String, dynamic> json) =>
+      _$LambdaLiteralParameterFromJson(json);
+  const LambdaLiteralParameter._();
 }
 
 @freezed
@@ -152,4 +167,21 @@ abstract class ExpressionVisitor<T> {
   T visitCallExpression(CallExpression node);
   T visitFunctionCallExpression(FunctionCallExpression node);
   T visitReturnExpression(ReturnExpression node);
+}
+
+abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
+  const DoNothingExpressionVisitor();
+
+  @override
+  void visitIdentifierExpression(IdentifierExpression node) {}
+  @override
+  void visitLiteralExpression(LiteralExpression node) {}
+  @override
+  void visitNavigationExpression(NavigationExpression node) {}
+  @override
+  void visitCallExpression(CallExpression node) {}
+  @override
+  void visitFunctionCallExpression(FunctionCallExpression node) {}
+  @override
+  void visitReturnExpression(ReturnExpression node) {}
 }
