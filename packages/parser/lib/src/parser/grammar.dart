@@ -376,6 +376,7 @@ class ParserGrammar {
     final typeDeclaration = value[1] as List<dynamic>;
     final defaultValueDeclaration = value[2] as List<dynamic>;
     return ValueParameter(
+      _id++,
       name: value[0] as IdentifierToken,
       colon: typeDeclaration?.elementAt(1) as OperatorToken,
       type: typeDeclaration?.elementAt(3) as Type,
