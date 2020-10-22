@@ -12,6 +12,7 @@ abstract class Option<T> implements _$Option<T> {
   const factory Option.some(T value) = Some<T>;
   const factory Option.none() = None<T>;
   const Option._();
+  factory Option.of(T value) => value == null ? None() : Some(value);
 
   bool get isSome => when(some: (_) => true, none: () => false);
   bool get isNone => !isSome;
@@ -28,8 +29,10 @@ abstract class Option<T> implements _$Option<T> {
 
   T get valueOrNull => when(some: (value) => value, none: () => null);
 
-  Option<R> mapValue<R>(R Function(T) mapper) => when(
-        some: (value) => Some(mapper(value)),
+  Option<R> mapValue<R>(R Function(T) mapper) =>
+      flatMapValue((value) => Some(mapper(value)));
+  Option<R> flatMapValue<R>(Option<R> Function(T) mapper) => when(
+        some: (value) => mapper(value),
         none: () => None(),
       );
 
@@ -77,4 +80,10 @@ abstract class Tuple3<T1, T2, T3> with _$Tuple3<T1, T2, T3> {
 abstract class Tuple4<T1, T2, T3, T4> with _$Tuple4<T1, T2, T3, T4> {
   const factory Tuple4(T1 first, T2 second, T3 third, T4 fourth) =
       _Tuple4<T1, T2, T3, T4>;
+}
+
+@freezed
+abstract class Tuple5<T1, T2, T3, T4, T5> with _$Tuple5<T1, T2, T3, T4, T5> {
+  const factory Tuple5(T1 first, T2 second, T3 third, T4 fourth, T5 fifth) =
+      _Tuple5<T1, T2, T3, T4, T5>;
 }

@@ -170,9 +170,10 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
 
   @override
   Option<dart.Spec> compilePrint() {
-    return Option.some(dart.Method((b) => b
+    return Option.some(dart.Method.returnsVoid((b) => b
       ..name = 'print'
-      ..requiredParameters.add(dart.Parameter((b) => b
+      ..optionalParameters.add(dart.Parameter((b) => b
+        ..named = true
         ..name = 'object'
         ..type = dart.refer('Object', dartCoreUrl)))
       ..body = dart.Block(

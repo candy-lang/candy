@@ -7,7 +7,6 @@ import '../../syntactic_entity.dart';
 import '../../utils.dart';
 import 'expressions/expressions.dart';
 import 'node.dart';
-import 'statements.dart';
 import 'types.dart';
 
 part 'declarations.freezed.dart';
@@ -172,7 +171,7 @@ abstract class FunctionDeclaration extends Declaration
     @required OperatorToken rightParenthesis,
     OperatorToken colon,
     Type returnType,
-    Block body,
+    LambdaLiteral body,
   }) = _FunctionDeclaration;
   const FunctionDeclaration._();
 
@@ -198,7 +197,8 @@ abstract class FunctionDeclaration extends Declaration
 
 @freezed
 abstract class ValueParameter extends AstNode implements _$ValueParameter {
-  const factory ValueParameter({
+  const factory ValueParameter(
+    int id, {
     @required IdentifierToken name,
     OperatorToken colon,
     Type type,
@@ -262,12 +262,12 @@ abstract class PropertyAccessor extends Declaration
   const factory PropertyAccessor.getter({
     @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
     @required GetKeywordToken keyword,
-    Block body,
+    LambdaLiteral body,
   }) = GetterPropertyAccessor;
   const factory PropertyAccessor.setter({
     @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
     @required SetKeywordToken keyword,
-    Block body,
+    LambdaLiteral body,
   }) = SetterPropertyAccessor;
   const PropertyAccessor._();
 
