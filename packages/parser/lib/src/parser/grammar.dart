@@ -376,6 +376,7 @@ class ParserGrammar {
     final typeDeclaration = value[1] as List<dynamic>;
     final defaultValueDeclaration = value[2] as List<dynamic>;
     return ValueParameter(
+      _id++,
       name: value[0] as IdentifierToken,
       colon: typeDeclaration?.elementAt(1) as OperatorToken,
       type: typeDeclaration?.elementAt(3) as Type,
@@ -506,6 +507,12 @@ class ParserGrammar {
   static Parser<Expression> get expression => _expression;
   static void _initExpression() {
     final builder = ExpressionBuilder()
+      ..primitive(LexerGrammar.RETURN
+          .map((value) => ReturnExpression(_id++, returnKeyword: value)))
+      ..primitive(LexerGrammar.BREAK
+          .map((value) => BreakExpression(_id++, breakKeyword: value)))
+      ..primitive(LexerGrammar.CONTINUE
+          .map((value) => ContinueExpression(_id++, continueKeyword: value)))
       ..primitive<Expression>(
           // ignore: unnecessary_cast, Without the cast the compiler complains…
           (literalConstant as Parser<Expression>) |
@@ -665,6 +672,16 @@ class ParserGrammar {
         return ReturnExpression(
           _id++,
           returnKeyword: keyword,
+          expression: expression,
+        );
+      })
+      ..prefix<BreakKeywordToken, Expression>(
+          (LexerGrammar.RETURN & LexerGrammar.NLs)
+              .map((value) => value.first as BreakKeywordToken),
+          mapper: (keyword, expression) {
+        return BreakExpression(
+          _id++,
+          breakKeyword: keyword,
           expression: expression,
         );
       });

@@ -1,3 +1,4 @@
+/*
 trait BinaryPlus<Other, Result> {
   fun binaryPlus(other: Other): Result
 }
@@ -27,3 +28,4 @@ trait ArithmeticNegateOperator<Result>: PrefixArithmeticNegate<Result> {
     arithmeticNegate
   }
 }
+*/
