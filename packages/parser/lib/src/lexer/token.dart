@@ -43,6 +43,12 @@ abstract class KeywordToken extends Token with _$KeywordToken {
   // ignore: non_constant_identifier_names
   const factory KeywordToken.return_({@required SourceSpan span}) =
       ReturnKeywordToken;
+  // ignore: non_constant_identifier_names
+  const factory KeywordToken.break_({@required SourceSpan span}) =
+      BreakKeywordToken;
+  // ignore: non_constant_identifier_names
+  const factory KeywordToken.continue_({@required SourceSpan span}) =
+      ContinueKeywordToken;
 }
 
 @freezed

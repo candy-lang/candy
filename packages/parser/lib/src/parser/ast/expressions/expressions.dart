@@ -278,10 +278,38 @@ abstract class ReturnExpression extends Expression
   const factory ReturnExpression(
     int id, {
     @required ReturnKeywordToken returnKeyword,
-    @required Expression expression,
+    Expression expression,
   }) = _ReturnExpression;
   const ReturnExpression._();
 
   @override
-  Iterable<SyntacticEntity> get children => [returnKeyword, expression];
+  Iterable<SyntacticEntity> get children =>
+      [returnKeyword, if (expression != null) expression];
+}
+
+@freezed
+abstract class BreakExpression extends Expression implements _$BreakExpression {
+  const factory BreakExpression(
+    int id, {
+    @required BreakKeywordToken breakKeyword,
+    Expression expression,
+  }) = _BreakExpression;
+  const BreakExpression._();
+
+  @override
+  Iterable<SyntacticEntity> get children =>
+      [breakKeyword, if (expression != null) expression];
+}
+
+@freezed
+abstract class ContinueExpression extends Expression
+    implements _$ContinueExpression {
+  const factory ContinueExpression(
+    int id, {
+    @required ContinueKeywordToken continueKeyword,
+  }) = _ContinueExpression;
+  const ContinueExpression._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [continueKeyword];
 }
