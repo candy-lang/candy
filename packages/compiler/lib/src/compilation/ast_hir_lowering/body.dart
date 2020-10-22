@@ -95,7 +95,7 @@ abstract class Context {
   ]);
   BodyAstToHirIds get idMap;
 
-  Option<hir.Identifier> resolveIdentifier(String name);
+  List<hir.Identifier> resolveIdentifier(String name);
   void addIdentifier(hir.LocalPropertyIdentifier identifier);
 
   Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveReturn(
@@ -210,7 +210,7 @@ abstract class InnerContext extends Context {
   BodyAstToHirIds get idMap => parent.value.idMap;
 
   @override
-  Option<hir.Identifier> resolveIdentifier(String name) =>
+  List<hir.Identifier> resolveIdentifier(String name) =>
       parent.value.resolveIdentifier(name);
   @override
   Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveReturn(
@@ -269,32 +269,72 @@ class ContextContext extends Context {
   }
 
   @override
-  Option<hir.Identifier> resolveIdentifier(String name) {
+  List<hir.Identifier> resolveIdentifier(String name) {
+    // resolve `this`
     if (name == 'this') {
       if (declarationId.isConstructor) {
-        return None();
+        return [];
       } else if (declarationId.isFunction) {
         final function = getFunctionDeclarationHir(queryContext, declarationId);
-        if (function.isStatic) return None();
+        if (function.isStatic) return [];
       } else if (declarationId.isProperty) {
         final function = getPropertyDeclarationHir(queryContext, declarationId);
-        if (function.isStatic) return None();
+        if (function.isStatic) return [];
       } else {
         throw CompilerError.internalError(
           '`ContextContext` is not within a constructor, function or property: `$declarationId`.',
         );
       }
 
-      if (!declarationId.hasParent) return None();
+      if (!declarationId.hasParent) return [];
       final parent = declarationId.parent;
       if (parent.isTrait || parent.isImpl || parent.isClass) {
-        return Some(hir.Identifier.this_());
+        return [hir.Identifier.this_()];
       }
-      return None();
+      return [];
     }
 
+    // resolve `field` in a getter/setter
     // TODO(JonasWanke): resolve `field` in property accessors
-    return None();
+
+    // TODO: check whether properties/functions are static or not and whether we have an instance
+
+    // search the current file (from the curent module to the root)
+    assert(declarationId.hasParent);
+    var moduleId = declarationIdToModuleId(queryContext, declarationId.parent);
+    while (moduleIdToDeclarationId(queryContext, moduleId).resourceId ==
+        resourceId) {
+      final innerIds =
+          getModuleDeclarationHir(queryContext, moduleId).innerDeclarationIds;
+
+      final matches = innerIds
+          .where((id) => id.simplePath.last.nameOrNull == name)
+          .map((id) {
+        hir.CandyType type;
+        if (id.isFunction) {
+          final functionHir = getFunctionDeclarationHir(queryContext, id);
+          type = hir.CandyType.function(
+            parameterTypes: [
+              for (final parameter in functionHir.parameters) parameter.type,
+            ],
+            returnType: functionHir.returnType,
+          );
+        } else if (id.isProperty) {
+          type = getPropertyDeclarationHir(queryContext, id).type;
+        } else {
+          throw CompilerError.unsupportedFeature(
+            "Matched identifier `$name`, but it's neither a function nor a property.",
+          );
+        }
+        return hir.Identifier.property(id, type);
+      });
+      if (matches.isNotEmpty) return matches.toList();
+
+      if (moduleId.hasNoParent) break;
+      moduleId = moduleId.parent;
+    }
+
+    return [];
   }
 
   @override
@@ -372,9 +412,9 @@ class FunctionContext extends InnerContext {
   }
 
   @override
-  Option<Identifier> resolveIdentifier(String name) {
+  List<Identifier> resolveIdentifier(String name) {
     final result = _identifiers[name];
-    if (result != null) return Some(result);
+    if (result != null) return [result];
     return parent.value.resolveIdentifier(name);
   }
 
@@ -533,9 +573,9 @@ extension on Context {
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerIdentifier(
     ast.Identifier expression,
   ) {
-    final identifier = expression.value.name;
+    final name = expression.value.name;
 
-    if (expressionType.isNone && identifier == 'print') {
+    if (expressionType.isNone && name == 'print') {
       return Ok([
         hir.Expression.identifier(
           getId(expression),
@@ -551,10 +591,18 @@ extension on Context {
       ]);
     }
 
-    throw CompilerError.undefinedIdentifier(
-      "Couldn't resolve identifier `$identifier`.",
-      location: ErrorLocation(resourceId, expression.value.span),
-    );
+    final identifiers = resolveIdentifier(name);
+    if (identifiers.isEmpty) {
+      throw CompilerError.undefinedIdentifier(
+        "Couldn't resolve identifier `$name`.",
+        location: ErrorLocation(resourceId, expression.value.span),
+      );
+    }
+
+    return Ok([
+      for (final identifier in identifiers)
+        hir.Expression.identifier(getId(expression), identifier),
+    ]);
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerCall(
