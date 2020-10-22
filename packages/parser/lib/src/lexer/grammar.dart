@@ -31,14 +31,20 @@ class LexerGrammar {
         string('*/'));
   }
 
-  static final Parser<void> LineComment =
-      string('//') & NL.neg().star().ignore();
+  static final Parser<void> LineComment = string('//') &
+      NL.neg().star().ignore() &
+      (NL | endOfInput()).and().ignore();
 
-  static final Parser<void> WS = (char(' ') | char('\t')).plus().ignore();
+  static final Parser<void> WS = (char(' ') |
+          char('\t') |
+          DelimitedComment.ignore() |
+          LineComment.ignore())
+      .plus()
+      .ignore();
   static final Parser<void> NL =
       (char('\n') | char('\r') & char('\n').optional()).ignore();
   static final Parser<void> NLs =
-      (NL | WS | DelimitedComment | (LineComment & NL)).star();
+      (NL | WS | DelimitedComment | LineComment).star();
 
   // SECTION: separatorsAndOperations
 
