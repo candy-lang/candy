@@ -1,7 +1,7 @@
 use .operators
 
 public builtin trait Any
-builtin impl Any: ToString
+// builtin impl Any: ToString
 
 public builtin trait ToString {
   fun toString(): String
@@ -12,13 +12,13 @@ public builtin class Nothing
 
 public builtin class Bool
 
-public builtin trait Number: AddOperator<This, This> & SubtractOperator<This, This>
+// public builtin trait Number: AddOperator<This, This> & SubtractOperator<This, This>
 
 public builtin class Int
-builtin impl Int: Number
+// builtin impl Int: Number
 
 public builtin class Float
-builtin impl Float: Number
+// builtin impl Float: Number
 
 public builtin class String
-builtin impl String: PlusOperator<This, This>
+// builtin impl String: PlusOperator<This, This>

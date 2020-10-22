@@ -1,4 +1,3 @@
-import 'package:compiler/compiler.dart';
 import 'package:parser/parser.dart' as ast;
 
 import '../../../candyspec.dart';
@@ -7,9 +6,11 @@ import '../../../query.dart';
 import '../../../utils.dart';
 import '../../hir.dart' as hir;
 import '../../hir/ids.dart';
+import '../../ids.dart';
 import '../type.dart';
 import 'declarations.dart';
 import 'module.dart';
+import 'trait.dart';
 
 extension ImplDeclarationId on DeclarationId {
   bool get isImpl =>
@@ -47,7 +48,7 @@ final getImplDeclarationHir = Query<DeclarationId, hir.ImplDeclaration>(
               ))
           .toList(),
       type: astTypeToHirType(context, Tuple2(moduleId, ast.type))
-          as UserCandyType,
+          as hir.UserCandyType,
       traits: hirTypeToUserTypes(
         context,
         trait,
