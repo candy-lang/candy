@@ -12,6 +12,7 @@ import 'declarations/declarations.dart';
 import 'declarations/function.dart';
 import 'declarations/module.dart';
 import 'declarations/property.dart';
+import 'general.dart';
 import 'type.dart';
 
 final getBody = Query<DeclarationId, Option<List<hir.Expression>>>(
@@ -299,42 +300,53 @@ class ContextContext extends Context {
 
     // TODO: check whether properties/functions are static or not and whether we have an instance
 
+    hir.Identifier convertDeclarationId(DeclarationId id) {
+      hir.CandyType type;
+      if (id.isFunction) {
+        final functionHir = getFunctionDeclarationHir(queryContext, id);
+        type = hir.CandyType.function(
+          parameterTypes: [
+            for (final parameter in functionHir.parameters) parameter.type,
+          ],
+          returnType: functionHir.returnType,
+        );
+      } else if (id.isProperty) {
+        type = getPropertyDeclarationHir(queryContext, id).type;
+      } else {
+        throw CompilerError.unsupportedFeature(
+          "Matched identifier `$name`, but it's neither a function nor a property.",
+        );
+      }
+      return hir.Identifier.property(id, type);
+    }
+
     // search the current file (from the curent module to the root)
     assert(declarationId.hasParent);
     var moduleId = declarationIdToModuleId(queryContext, declarationId.parent);
-    while (moduleIdToDeclarationId(queryContext, moduleId).resourceId ==
-        resourceId) {
+    while (true) {
       final innerIds =
           getModuleDeclarationHir(queryContext, moduleId).innerDeclarationIds;
 
       final matches = innerIds
           .where((id) => id.simplePath.last.nameOrNull == name)
-          .map((id) {
-        hir.CandyType type;
-        if (id.isFunction) {
-          final functionHir = getFunctionDeclarationHir(queryContext, id);
-          type = hir.CandyType.function(
-            parameterTypes: [
-              for (final parameter in functionHir.parameters) parameter.type,
-            ],
-            returnType: functionHir.returnType,
-          );
-        } else if (id.isProperty) {
-          type = getPropertyDeclarationHir(queryContext, id).type;
-        } else {
-          throw CompilerError.unsupportedFeature(
-            "Matched identifier `$name`, but it's neither a function nor a property.",
-          );
-        }
-        return hir.Identifier.property(id, type);
-      });
+          .map(convertDeclarationId);
       if (matches.isNotEmpty) return matches.toList();
 
       if (moduleId.hasNoParent) break;
       moduleId = moduleId.parent;
+      final declarationId =
+          moduleIdToOptionalDeclarationId(queryContext, moduleId);
+      if (declarationId is None ||
+          declarationId.value.resourceId != resourceId) {
+        break;
+      }
     }
 
-    return [];
+    // search use-lines
+    return findIdentifierInUseLines(
+      queryContext,
+      Tuple4(resourceId, name, false, false),
+    ).map(convertDeclarationId).toList();
   }
 
   @override
@@ -574,22 +586,6 @@ extension on Context {
     ast.Identifier expression,
   ) {
     final name = expression.value.name;
-
-    if (expressionType.isNone && name == 'print') {
-      return Ok([
-        hir.Expression.identifier(
-          getId(expression),
-          hir.Identifier.property(
-            DeclarationId(ResourceId(PackageId.core, 'src/stdio.candy'))
-                .inner(DeclarationPathData.function('print')),
-            hir.CandyType.function(
-              parameterTypes: [hir.CandyType.any],
-              returnType: hir.CandyType.unit,
-            ),
-          ),
-        ),
-      ]);
-    }
 
     final identifiers = resolveIdentifier(name);
     if (identifiers.isEmpty) {

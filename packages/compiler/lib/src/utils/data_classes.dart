@@ -80,3 +80,9 @@ abstract class Tuple4<T1, T2, T3, T4> with _$Tuple4<T1, T2, T3, T4> {
   const factory Tuple4(T1 first, T2 second, T3 third, T4 fourth) =
       _Tuple4<T1, T2, T3, T4>;
 }
+
+@freezed
+abstract class Tuple5<T1, T2, T3, T4, T5> with _$Tuple5<T1, T2, T3, T4, T5> {
+  const factory Tuple5(T1 first, T2 second, T3 third, T4 fourth, T5 fifth) =
+      _Tuple5<T1, T2, T3, T4, T5>;
+}

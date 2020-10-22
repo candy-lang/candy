@@ -15,39 +15,17 @@ final Query<Tuple4<ResourceId, String, ast.SourceSpan, bool>, Option<ModuleId>>
     Query<Tuple4<ResourceId, String, ast.SourceSpan, bool>, Option<ModuleId>>(
   'findModuleInUseLines',
   provider: (context, inputs) {
-    final resourceId = inputs.first;
-    final moduleName = inputs.second;
-    final moduleNameSpan = inputs.third;
-    final onlySearchPublic = inputs.fourth;
+    final results = findIdentifierInUseLines(
+      context,
+      Tuple4(inputs.first, inputs.second, inputs.fourth, true),
+    );
 
-    var useLines = lowerUseLinesAstToHir(context, resourceId);
-    if (onlySearchPublic) useLines = useLines.where((u) => u.isPublic).toList();
-    if (useLines.isEmpty) return Option.none();
-
-    final matches = useLines.flatMap((useLine) {
-      final declarationId = moduleIdToDeclarationId(context, useLine.moduleId);
-      assert(declarationId.path.isEmpty);
-
-      // TODO(JonasWanke): Ignore non-public declarations.
-      final directMatches = getInnerDeclarationIds(context, declarationId)
-          .where((id) => id.isModule || id.isTrait || id.isClass)
-          .where((id) => id.simplePath.first.nameOrNull == moduleName);
-      if (directMatches.isNotEmpty) {
-        return directMatches.map((d) => declarationIdToModuleId(context, d));
-      }
-
-      return findModuleInUseLines(
-        context,
-        Tuple4(declarationId.resourceId, moduleName, moduleNameSpan, true),
-      ).toList();
-    });
-
-    if (matches.length > 1) {
+    if (results.isEmpty) return None();
+    if (results.length > 1) {
       throw CompilerError.ambiguousExpression(
-        'Identifier `$moduleName` found in multiple places.',
-        location: ErrorLocation(resourceId, moduleNameSpan),
-        relatedInformation: matches.map((match) {
-          final declarationId = moduleIdToDeclarationId(context, match);
+        'Identifier `${inputs.second}` found in multiple places.',
+        location: ErrorLocation(inputs.first, inputs.third),
+        relatedInformation: results.map((declarationId) {
           final ast = getDeclarationAst(context, declarationId);
           return ErrorRelatedInformation(
             location:
@@ -56,11 +34,45 @@ final Query<Tuple4<ResourceId, String, ast.SourceSpan, bool>, Option<ModuleId>>
           );
         }).toList(),
       );
-    } else if (matches.isNotEmpty) {
-      return Option.some(matches.single);
-    } else {
-      return Option.none();
     }
+    return Some(declarationIdToModuleId(context, results.single));
+  },
+);
+
+final Query<Tuple4<ResourceId, String, bool, bool>, List<DeclarationId>>
+    findIdentifierInUseLines =
+    Query<Tuple4<ResourceId, String, bool, bool>, List<DeclarationId>>(
+  'findIdentifierInUseLines',
+  provider: (context, inputs) {
+    final resourceId = inputs.first;
+    final identifier = inputs.second;
+    final onlySearchPublic = inputs.third;
+    final onlyFindModules = inputs.fourth;
+
+    var useLines = lowerUseLinesAstToHir(context, resourceId);
+    if (onlySearchPublic) useLines = useLines.where((u) => u.isPublic).toList();
+    if (useLines.isEmpty) return [];
+
+    final matches = useLines.flatMap((useLine) {
+      final declarationId = moduleIdToDeclarationId(context, useLine.moduleId);
+      assert(declarationId.path.isEmpty);
+
+      // TODO(JonasWanke): Ignore non-public declarations.
+      final directMatches = getInnerDeclarationIds(context, declarationId)
+          .where((id) =>
+              !onlyFindModules || id.isModule || id.isTrait || id.isClass)
+          .where((id) => id.simplePath.first.nameOrNull == identifier);
+      if (directMatches.isNotEmpty) {
+        return directMatches;
+      }
+
+      return findIdentifierInUseLines(
+        context,
+        inputs.copyWith(first: declarationId.resourceId, third: true),
+      );
+    });
+
+    return matches.toList();
   },
 );
 
