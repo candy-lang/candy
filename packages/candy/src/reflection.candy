@@ -1,4 +1,4 @@
-trait Declaration
+// trait Declaration
 
-builtin class ModuleDeclaration
-builtin impl ModuleDeclaration: Declaration
+// builtin class ModuleDeclaration
+// builtin impl ModuleDeclaration: Declaration
