@@ -32,6 +32,7 @@ abstract class CompilerError implements _$CompilerError {
   static const ambiguousImplsFound =
       CompilerError._create('ambiguousImplsFound');
   static const candyspecMissing = CompilerError._create('candyspecMissing');
+  static const duplicateArgument = CompilerError._create('duplicateArgument');
   static const internalError = CompilerError._create('internalError');
   static const invalidArgumentType =
       CompilerError._create('invalidArgumentType');
@@ -50,6 +51,7 @@ abstract class CompilerError implements _$CompilerError {
   static const noMainFunction = CompilerError._create('noMainFunction');
   static const propertyTypeOrValueRequired =
       CompilerError._create('propertyTypeOrValueRequired');
+  static const tooManyArguments = CompilerError._create('tooManyArguments');
   static const typeNotFound = CompilerError._create('typeNotFound');
   static const returnNotInFunction =
       CompilerError._create('returnNotInFunction');

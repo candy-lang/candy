@@ -112,8 +112,48 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   final QueryContext context;
 
   @override
-  List<dart.Code> visitIdentifierExpression(IdentifierExpression node) =>
-      node.accept(this);
+  List<dart.Code> visitIdentifierExpression(IdentifierExpression node) {
+    List<dart.Code> referTraitOrClass(DeclarationId id) {
+      final importUrl = declarationIdToImportUrl(context, id);
+      final refer = dart.refer(id.simplePath.last.nameOrNull, importUrl);
+      return _saveSingle(node, refer);
+    }
+
+    return node.identifier.when(
+      this_: () => _saveSingle(node, dart.refer('this')),
+      super_: null,
+      module: null,
+      trait: referTraitOrClass,
+      class_: referTraitOrClass,
+      parameter: (id, name, _) => _saveSingle(node, dart.refer(name)),
+      property: (id, _, target) {
+        final name = id.simplePath.last.nameOrNull;
+
+        // Generated Dart-functions always use named arguments, which our type
+        // system can't express. Hence we don't manually add the type in this
+        // case.
+        final explicitType = id.isNotFunction;
+
+        return [
+          if (target != null) ...[
+            ...target.accept(this),
+            _save(
+              node,
+              _refer(target).property(name),
+              explicitType: explicitType,
+            ),
+          ] else
+            _save(
+              node,
+              dart.refer(name, declarationIdToImportUrl(context, id.parent)),
+              explicitType: explicitType,
+            ),
+        ];
+      },
+      localProperty: null,
+    );
+  }
+
   @override
   List<dart.Code> visitLiteralExpression(LiteralExpression node) {
     return node.literal.when(
@@ -157,45 +197,39 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   }
 
   @override
+  List<dart.Code> visitNavigationExpression(NavigationExpression node) => [];
+  @override
   List<dart.Code> visitCallExpression(CallExpression node) => [];
   @override
-  List<dart.Code> visitFunctionCallExpression(FunctionCallExpression node) =>
-      [];
+  List<dart.Code> visitFunctionCallExpression(FunctionCallExpression node) {
+    final arguments = {
+      for (final entry in node.valueArguments.entries)
+        entry.key: _refer(entry.value),
+    };
+    return [
+      ...node.target.accept(this),
+      for (final argument in node.valueArguments.values)
+        ...argument.accept(this),
+      _save(node, _refer(node.target).call([], arguments, [])),
+    ];
+  }
+
   @override
   List<dart.Code> visitReturnExpression(ReturnExpression node) => [
         ...node.expression.accept(this),
         _refer(node.expression).returned.statement,
       ];
 
-  @override
-  List<dart.Code> visitThisIdentifier(ThisIdentifier node) => [];
-  @override
-  List<dart.Code> visitSuperIdentifier(SuperIdentifier node) => [];
-  @override
-  List<dart.Code> visitItIdentifier(ItIdentifier node) => [];
-  @override
-  List<dart.Code> visitFieldIdentifier(FieldIdentifier node) => [];
-  @override
-  List<dart.Code> visitModuleIdentifier(ModuleIdentifier node) => [];
-  @override
-  List<dart.Code> visitTraitIdentifier(TraitIdentifier node) => [];
-  @override
-  List<dart.Code> visitClassIdentifier(ClassIdentifier node) => [];
-  @override
-  List<dart.Code> visitParameterIdentifier(ParameterIdentifier node) => [];
-  @override
-  List<dart.Code> visitPropertyIdentifier(PropertyIdentifier node) => [];
-  @override
-  List<dart.Code> visitLocalPropertyIdentifier(LocalPropertyIdentifier node) =>
-      [];
-
   String _name(Expression expression) => '_${expression.id.value}';
   dart.Expression _refer(Expression expression) =>
       dart.refer(_name(expression));
-  dart.Code _save(Expression source, dart.Expression lowered) {
-    return lowered
-        .assignFinal(_name(source), compileType(context, source.type))
-        .statement;
+  dart.Code _save(
+    Expression source,
+    dart.Expression lowered, {
+    bool explicitType = true,
+  }) {
+    final type = explicitType ? compileType(context, source.type) : null;
+    return lowered.assignFinal(_name(source), type).statement;
   }
 
   List<dart.Code> _saveSingle(Expression source, dart.Expression lowered) =>

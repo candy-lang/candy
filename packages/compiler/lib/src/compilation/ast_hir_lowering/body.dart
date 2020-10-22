@@ -118,10 +118,10 @@ abstract class Context {
       result = lowerStringLiteral(expression);
       // }  else if (expression is ast.LambdaLiteral) {
       //   result = lowerLambdaLiteral(expression);
-      // } else if (expression is ast.Identifier) {
-      //   result = lowerIdentifier(expression);
-      // } else if (expression is ast.CallExpression) {
-      //   result = lowerCall(expression);
+    } else if (expression is ast.Identifier) {
+      result = lowerIdentifier(expression);
+    } else if (expression is ast.CallExpression) {
+      result = lowerCall(expression);
     } else if (expression is ast.ReturnExpression) {
       result = lowerReturn(expression);
     } else {
@@ -528,6 +528,161 @@ extension on Context {
     return parts.merge().mapValue((parts) => [
           hir.Expression.literal(getId(expression), hir.StringLiteral(parts)),
         ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerIdentifier(
+    ast.Identifier expression,
+  ) {
+    final identifier = expression.value.name;
+
+    if (expressionType.isNone && identifier == 'print') {
+      return Ok([
+        hir.Expression.identifier(
+          getId(expression),
+          hir.Identifier.property(
+            DeclarationId(ResourceId(PackageId.core, 'src/stdio.candy'))
+                .inner(DeclarationPathData.function('print')),
+            hir.CandyType.function(
+              parameterTypes: [hir.CandyType.any],
+              returnType: hir.CandyType.unit,
+            ),
+          ),
+        ),
+      ]);
+    }
+
+    throw CompilerError.undefinedIdentifier(
+      "Couldn't resolve identifier `$identifier`.",
+      location: ErrorLocation(resourceId, expression.value.span),
+    );
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerCall(
+    ast.CallExpression expression,
+  ) {
+    final targetVariants = innerExpressionContext().lower(expression.target);
+    if (targetVariants is Error) return targetVariants;
+
+    final results = targetVariants.value.map((target) {
+      if (target is hir.IdentifierExpression &&
+          target.identifier is hir.PropertyIdentifier) {
+        final identifier = target.identifier as hir.PropertyIdentifier;
+        if (identifier.id.isFunction) {
+          return lowerFunctionCall(expression, target);
+        }
+      }
+
+      throw CompilerError.unsupportedFeature(
+        'Callable expressions are not yet supported.',
+        location: ErrorLocation(resourceId, expression.span),
+      );
+    });
+    return results.merge();
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerFunctionCall(
+    ast.CallExpression expression,
+    hir.IdentifierExpression target,
+  ) {
+    assert(target.identifier is hir.PropertyIdentifier);
+    final identifier = target.identifier as hir.PropertyIdentifier;
+
+    final functionId = identifier.id;
+    assert(functionId.isFunction);
+    final functionHir = getFunctionDeclarationHir(queryContext, functionId);
+    if (!isValidExpressionType(functionHir.returnType)) {
+      return Error([
+        CompilerError.invalidExpressionType(
+          'Function has an invalid return type.',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    }
+
+    final errors = <ReportedCompilerError>[];
+
+    // Attention: The map containing lowered arguments must retain their order
+    // from the source code/AST. This currently works, because Dart's map
+    // maintains insertion order.
+
+    final parameters = functionHir.parameters;
+    final parametersByName = parameters.associateBy((p) => p.name);
+    final arguments = expression.arguments;
+    final outOfOrderNamedArguments = <ast.Argument>[];
+    final astArgumentMap = <String, ast.Argument>{};
+    for (var i = 0; i < arguments.length; i++) {
+      final argument = arguments[i];
+      if (outOfOrderNamedArguments.isNotEmpty && argument.isPositional) {
+        errors.add(CompilerError.unexpectedPositionalArgument(
+          'At least one of the preceding arguments was named and not in the '
+          'default order, hence positional arguments can no longer be used.',
+          location: ErrorLocation(resourceId, argument.span),
+          relatedInformation: [
+            for (final arg in outOfOrderNamedArguments)
+              ErrorRelatedInformation(
+                location: ErrorLocation(resourceId, arg.span),
+                message: "A named argument that's not in the default order.",
+              ),
+          ],
+        ));
+        continue;
+      }
+
+      if (i >= parameters.length) {
+        errors.add(CompilerError.tooManyArguments(
+          'Too many arguments.',
+          location: ErrorLocation(resourceId, argument.span),
+        ));
+        continue;
+      }
+
+      final parameter = parameters[i];
+      if (argument.isPositional) {
+        astArgumentMap[parameter.name] = argument;
+      } else {
+        final parameterName = argument.name.name;
+        assert(parameterName != null);
+        if (astArgumentMap.containsKey(parameterName)) {
+          errors.add(CompilerError.duplicateArgument(
+            'Argument `$parameterName` was already given.',
+            location: ErrorLocation(resourceId, argument.span),
+          ));
+          continue;
+        }
+
+        astArgumentMap[parameterName] = argument;
+        if (parameter.name != parameterName) {
+          outOfOrderNamedArguments.add(argument);
+        }
+      }
+    }
+    if (errors.isNotEmpty) return Error(errors);
+
+    final hirArgumentMap = <String, hir.Expression>{};
+    for (final entry in astArgumentMap.entries) {
+      final name = entry.key;
+      final value = entry.value.expression;
+
+      final innerContext = innerExpressionContext(
+        expressionType: Option.some(parametersByName[name].type),
+      );
+      final lowered = innerContext.lowerUnambiguous(value);
+      if (lowered is Error) {
+        errors.addAll(lowered.error);
+        continue;
+      }
+
+      hirArgumentMap[name] = lowered.value;
+    }
+    if (errors.isNotEmpty) return Error(errors);
+
+    return Ok([
+      hir.Expression.functionCall(
+        getId(expression),
+        target,
+        hirArgumentMap,
+      ),
+    ]);
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerReturn(

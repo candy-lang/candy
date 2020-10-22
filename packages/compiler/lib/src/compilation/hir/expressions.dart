@@ -14,6 +14,12 @@ abstract class Expression implements _$Expression {
   ) = IdentifierExpression;
   const factory Expression.literal(DeclarationLocalId id, Literal literal) =
       LiteralExpression;
+  const factory Expression.navigation(
+    DeclarationLocalId id,
+    Expression target,
+    DeclarationId property,
+    CandyType type,
+  ) = NavigationExpression;
   const factory Expression.call(
     DeclarationLocalId id,
     Expression target,
@@ -21,7 +27,7 @@ abstract class Expression implements _$Expression {
   ) = CallExpression;
   const factory Expression.functionCall(
     DeclarationLocalId id,
-    IdentifierExpression target,
+    Expression target,
     Map<String, Expression> valueArguments,
   ) = FunctionCallExpression;
   // ignore: non_constant_identifier_names
@@ -38,6 +44,7 @@ abstract class Expression implements _$Expression {
   CandyType get type => when(
         identifier: (_, identifier) => identifier.type,
         literal: (_, literal) => literal.type,
+        navigation: (_, __, ___, type) => type,
         call: (_, __, ___) => null,
         functionCall: (_, target, __) {
           final functionType = target.type as FunctionCandyType;
@@ -49,6 +56,7 @@ abstract class Expression implements _$Expression {
   T accept<T>(ExpressionVisitor<T> visitor) => map(
         identifier: (e) => visitor.visitIdentifierExpression(e),
         literal: (e) => visitor.visitLiteralExpression(e),
+        navigation: (e) => visitor.visitNavigationExpression(e),
         call: (e) => visitor.visitCallExpression(e),
         functionCall: (e) => visitor.visitFunctionCallExpression(e),
         return_: (e) => visitor.visitReturnExpression(e),
@@ -60,9 +68,7 @@ abstract class Identifier implements _$Identifier {
   // ignore: non_constant_identifier_names
   const factory Identifier.this_() = ThisIdentifier;
   // ignore: non_constant_identifier_names
-  const factory Identifier.super_(CandyType type) = SuperIdentifier;
-  const factory Identifier.it(CandyType type) = ItIdentifier;
-  const factory Identifier.field(CandyType type) = FieldIdentifier;
+  const factory Identifier.super_(UserCandyType type) = SuperIdentifier;
   const factory Identifier.module(ModuleId id) = ModuleIdentifier;
   const factory Identifier.trait(DeclarationId id) = TraitIdentifier;
   // ignore: non_constant_identifier_names
@@ -76,10 +82,10 @@ abstract class Identifier implements _$Identifier {
 
   /// A property or function.
   const factory Identifier.property(
+    DeclarationId id,
+    CandyType type, [
     Expression target,
-    String name,
-    CandyType type,
-  ) = PropertyIdentifier;
+  ]) = PropertyIdentifier;
   const factory Identifier.localProperty(
     DeclarationLocalId id,
     String name,
@@ -93,27 +99,12 @@ abstract class Identifier implements _$Identifier {
   CandyType get type => when(
         this_: () => CandyType.this_(),
         super_: (type) => type,
-        it: (type) => type,
-        field: (type) => type,
         trait: (_) => CandyType.declaration,
         class_: (_) => CandyType.declaration,
         module: (_) => CandyType.declaration,
         parameter: (_, __, type) => type,
-        property: (_, __, type) => type,
+        property: (_, type, __) => type,
         localProperty: (_, __, type) => type,
-      );
-
-  T accept<T>(ExpressionVisitor<T> visitor) => map(
-        this_: (i) => visitor.visitThisIdentifier(i),
-        super_: (i) => visitor.visitSuperIdentifier(i),
-        it: (i) => visitor.visitItIdentifier(i),
-        field: (i) => visitor.visitFieldIdentifier(i),
-        module: (i) => visitor.visitModuleIdentifier(i),
-        trait: (i) => visitor.visitTraitIdentifier(i),
-        class_: (i) => visitor.visitClassIdentifier(i),
-        parameter: (i) => visitor.visitParameterIdentifier(i),
-        property: (i) => visitor.visitPropertyIdentifier(i),
-        localProperty: (i) => visitor.visitLocalPropertyIdentifier(i),
       );
 }
 
@@ -157,18 +148,8 @@ abstract class ExpressionVisitor<T> {
 
   T visitIdentifierExpression(IdentifierExpression node);
   T visitLiteralExpression(LiteralExpression node);
+  T visitNavigationExpression(NavigationExpression node);
   T visitCallExpression(CallExpression node);
   T visitFunctionCallExpression(FunctionCallExpression node);
   T visitReturnExpression(ReturnExpression node);
-
-  T visitThisIdentifier(ThisIdentifier node);
-  T visitSuperIdentifier(SuperIdentifier node);
-  T visitItIdentifier(ItIdentifier node);
-  T visitFieldIdentifier(FieldIdentifier node);
-  T visitModuleIdentifier(ModuleIdentifier node);
-  T visitTraitIdentifier(TraitIdentifier node);
-  T visitClassIdentifier(ClassIdentifier node);
-  T visitParameterIdentifier(ParameterIdentifier node);
-  T visitPropertyIdentifier(PropertyIdentifier node);
-  T visitLocalPropertyIdentifier(LocalPropertyIdentifier node);
 }

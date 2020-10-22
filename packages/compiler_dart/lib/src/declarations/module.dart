@@ -48,6 +48,14 @@ final moduleIdToBuildArtifactId = Query<ModuleId, BuildArtifactId>(
         .child('${moduleId.path.join('/')}$dartFileExtension');
   },
 );
+final declarationIdToImportUrl = Query<DeclarationId, String>(
+  'dart.declarationIdToImportUrl',
+  evaluateAlways: true,
+  provider: (context, declarationId) {
+    final moduleId = declarationIdToModuleId(context, declarationId);
+    return moduleIdToImportUrl(context, moduleId);
+  },
+);
 final moduleIdToImportUrl = Query<ModuleId, String>(
   'dart.moduleIdToImportUrl',
   evaluateAlways: true,
