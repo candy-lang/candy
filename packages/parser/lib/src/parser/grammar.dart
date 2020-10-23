@@ -671,7 +671,7 @@ class ParserGrammar {
         return LoopExpression(
           _id++,
           loopKeyword: keyword,
-          body: body,
+          body: body as LambdaLiteral,
         );
       })
       ..complexGrouping<List<dynamic>, Expression, List<dynamic>>(
