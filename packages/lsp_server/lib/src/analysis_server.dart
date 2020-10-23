@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:analyzer/exception/exception.dart';
 import 'package:collection/collection.dart';
 import 'package:compiler/compiler.dart';
+import 'package:compiler_dart/compiler_dart.dart';
 import 'package:dartx/dartx.dart' hide Range;
 import 'package:path/path.dart' as p;
 
@@ -292,13 +293,9 @@ class AnalysisServer {
   QueryConfig get queryConfig => _queryConfig;
 
   Map<ResourceId, List<ReportedCompilerError>> _errors = {};
-  void onFileChanged() {
-    final context = queryConfig.createContext();
-    final mainFunctionId =
-        context.callQuery(getMainFunction, ModuleId(PackageId.this_, ['main']));
-    if (mainFunctionId.isSome) context.callQuery(getBody, mainFunctionId.value);
-
-    sendLogMessage('Main functions `DeclarationId`: $mainFunctionId');
+  void onFileChanged(ResourceId resourceId) {
+    final context = queryConfig.createContext()
+      ..callQuery(calculateFullHir, resourceId);
     _updateErrors(context.reportedErrorsByResourceId);
   }
 
@@ -343,21 +340,17 @@ class AnalysisServer {
     final file = File.fromUri(Uri.parse(uri));
     assert(p.extension(file.path) == candyFileExtension);
 
-    final sourceDirectory =
-        p.join(projectDirectory.absolute.path, srcDirectoryName);
-    assert(p.isWithin(sourceDirectory, file.path));
+    assert(p.isWithin(projectDirectory.path, file.path));
 
-    final relativePath = p.relative(file.path, from: sourceDirectory);
+    final relativePath = p
+        .relative(file.path, from: projectDirectory.path)
+        .split('\\')
+        .join('/');
     return ResourceId(PackageId.this_, relativePath);
   }
 
   String resourceIdToFileUri(ResourceId resourceId) {
-    final path = p.join(
-      projectDirectory.absolute.path,
-      srcDirectoryName,
-      resourceId.path,
-    );
-
+    final path = p.join(projectDirectory.absolute.path, resourceId.path);
     return File(path).absolute.uri.toString();
   }
 }

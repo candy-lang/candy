@@ -87,7 +87,7 @@ class GlobalQueryContext {
       result = e.recordedCall;
     }
 
-    if (query.name.startsWith('dart.') || query.name == 'getAst') {
+    if (query.name.startsWith('dart.') || query.name == 'calculateFullHir') {
       var dateTime = DateTime.now().toIso8601String();
       dateTime =
           dateTime.substring(0, dateTime.indexOf('.')).replaceAll(':', '-');
