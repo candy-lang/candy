@@ -1023,8 +1023,7 @@ extension on Context {
     if (loweredCondition is Error) return loweredCondition.mapValue((e) => [e]);
     final condition = loweredCondition.value;
 
-    final loweredBody =
-        (whileLoop.body as ast.LambdaLiteral).expressions.map((expression) {
+    final loweredBody = whileLoop.body.expressions.map((expression) {
       return loopContext
           .innerExpressionContext(forwardsIdentifiers: true)
           .lowerUnambiguous(expression);

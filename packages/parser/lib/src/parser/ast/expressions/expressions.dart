@@ -291,7 +291,7 @@ abstract class WhileExpression extends Expression implements _$WhileExpression {
     int id, {
     @required WhileKeywordToken whileKeyword,
     @required Expression condition,
-    @required Expression body,
+    @required LambdaLiteral body,
   }) = _WhileExpression;
   const WhileExpression._();
 

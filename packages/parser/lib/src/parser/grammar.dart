@@ -682,7 +682,7 @@ class ParserGrammar {
             _id++,
             whileKeyword: left[0] as WhileKeywordToken,
             condition: value,
-            body: right[1] as Expression,
+            body: right[1] as LambdaLiteral,
           );
         },
       )
