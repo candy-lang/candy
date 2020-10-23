@@ -53,6 +53,8 @@ abstract class CompilerError implements _$CompilerError {
   static const multipleTypesWithSameName =
       CompilerError._create('multipleTypesWithSameName');
   static const noMainFunction = CompilerError._create('noMainFunction');
+  static const propertyInitializerMissing =
+      CompilerError._create('propertyInitializerMissing');
   static const propertyTypeOrValueRequired =
       CompilerError._create('propertyTypeOrValueRequired');
   static const tooManyArguments = CompilerError._create('tooManyArguments');

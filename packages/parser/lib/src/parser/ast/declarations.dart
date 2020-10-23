@@ -219,8 +219,9 @@ abstract class ValueParameter extends AstNode implements _$ValueParameter {
 
 @freezed
 abstract class PropertyDeclaration extends Declaration
-    implements _$PropertyDeclaration {
-  const factory PropertyDeclaration({
+    implements Expression, _$PropertyDeclaration {
+  const factory PropertyDeclaration(
+    int id, {
     @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
     @required LetKeywordToken letKeyword,
     @required IdentifierToken name,
