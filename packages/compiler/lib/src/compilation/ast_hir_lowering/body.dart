@@ -1077,6 +1077,18 @@ extension on Context {
     }
     if (errors.isNotEmpty) return Error(errors);
 
+    final missingArguments =
+        parametersByName.keys.where((p) => !astArgumentMap.containsKey(p));
+    if (missingArguments.isNotEmpty) {
+      final argsMessage = missingArguments.map((a) => '`$a`').join(', ');
+      return Error([
+        CompilerError.missingArguments(
+          'The following arguments were not supplied: $argsMessage.',
+          location: ErrorLocation(resourceId, expression.leftParenthesis.span),
+        ),
+      ]);
+    }
+
     final hirArgumentMap = <String, hir.Expression>{};
     for (final entry in astArgumentMap.entries) {
       final name = entry.key;
