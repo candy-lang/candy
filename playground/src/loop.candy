@@ -1,0 +1,10 @@
+fun main(): Int {
+  return loop {
+    print("Hello, world!")
+    break 5
+  }
+  return loop {
+    continue
+    print("blub")
+  }
+}
