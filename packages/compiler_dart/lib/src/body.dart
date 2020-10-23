@@ -264,9 +264,9 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   List<dart.Code> visitBreakExpression(BreakExpression node) => [
         if (node.expression != null) ...[
           ...node.expression.accept(this),
-          _refer(node.expression.id).assign(_refer(node.scopeId)).statement,
-        ] else
-          dart.Code('break ${_label(node.scopeId)};'),
+          _refer(node.scopeId).assign(_refer(node.expression.id)).statement,
+        ],
+        dart.Code('break ${_label(node.scopeId)};'),
       ];
   @override
   List<dart.Code> visitContinueExpression(ContinueExpression node) => [

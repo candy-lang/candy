@@ -674,8 +674,7 @@ class ParserGrammar {
         );
       })
       ..prefix<ReturnKeywordToken, Expression>(
-          (LexerGrammar.RETURN & LexerGrammar.NLs)
-              .map((value) => value.first as ReturnKeywordToken),
+          (LexerGrammar.RETURN & LexerGrammar.NLs).map((value) => value.first as ReturnKeywordToken),
           mapper: (keyword, expression) {
         return ReturnExpression(
           _id++,
@@ -684,9 +683,8 @@ class ParserGrammar {
         );
       })
       ..prefix<BreakKeywordToken, Expression>(
-          (LexerGrammar.RETURN & LexerGrammar.NLs)
-              .map((value) => value.first as BreakKeywordToken),
-          mapper: (keyword, expression) {
+          (LexerGrammar.BREAK & LexerGrammar.NLs)
+              .map((value) => value.first as BreakKeywordToken), mapper: (keyword, expression) {
         return BreakExpression(
           _id++,
           breakKeyword: keyword,

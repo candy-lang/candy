@@ -642,7 +642,7 @@ class LambdaContext extends InnerContext {
 
       return Some(Tuple2(id, returnType));
     }
-    return None();
+    return parent.flatMapValue((context) => context.resolveReturn(label));
   }
 }
 
