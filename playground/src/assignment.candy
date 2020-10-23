@@ -1,0 +1,6 @@
+fun main(): Int {
+  mut let a = 5
+  print("Hello")
+  a = 3
+  return a
+}

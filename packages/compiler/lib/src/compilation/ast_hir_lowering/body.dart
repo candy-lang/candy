@@ -1,4 +1,3 @@
-import 'package:compiler/compiler.dart';
 import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
 import 'package:parser/parser.dart' show SourceSpan;
@@ -8,11 +7,16 @@ import '../../query.dart';
 import '../../utils.dart';
 import '../ast.dart';
 import '../hir.dart' as hir;
+import '../hir.dart';
 import '../hir/ids.dart';
+import 'declarations/class.dart';
+import 'declarations/constructor.dart';
 import 'declarations/declarations.dart';
 import 'declarations/function.dart';
+import 'declarations/impl.dart';
 import 'declarations/module.dart';
 import 'declarations/property.dart';
+import 'declarations/trait.dart';
 import 'general.dart';
 import 'type.dart';
 
@@ -142,6 +146,14 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
     if (node.id == id) return Some(node);
     return None();
   }
+
+  @override
+  Option<hir.Expression> visitAssignmentExpression(AssignmentExpression node) {
+    if (node.id == id) return Some(node);
+    node.right.accept(this);
+
+    return None();
+  }
 }
 
 final getBody = Query<DeclarationId, Option<List<hir.Expression>>>(
@@ -265,6 +277,8 @@ abstract class Context {
       result = lowerBreak(expression);
     } else if (expression is ast.ContinueExpression) {
       result = lowerContinue(expression);
+    } else if (expression is ast.BinaryExpression) {
+      result = lowerBinaryExpression(expression);
     } else {
       throw CompilerError.unsupportedFeature(
         'Unsupported expression: $expression (`${expression.runtimeType}`).',
@@ -1294,5 +1308,54 @@ extension on Context {
     return Ok([
       hir.Expression.continue_(getId(expression), resolvedScope.value),
     ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>>
+      lowerBinaryExpression(
+    ast.BinaryExpression expression,
+  ) {
+    final operatorType = expression.operatorToken.type;
+
+    if (operatorType == ast.OperatorTokenType.equals) {
+      return lowerAssignment(expression);
+    } else {
+      return Error([
+        CompilerError.unsupportedFeature('Unsupported binary operator: '
+            '${expression.operatorToken.type}'),
+      ]);
+    }
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerAssignment(
+    ast.BinaryExpression expression,
+  ) {
+    final leftExpression = lowerUnambiguous(expression.leftOperand);
+    if (leftExpression is Error) return Error(leftExpression.error);
+    final leftSome = leftExpression.value;
+    if (leftSome is! IdentifierExpression) {
+      return Error([
+        CompilerError.invalidExpressionType("Can't assign to this expression: "
+            '${leftSome.runtimeType} ($leftSome)'),
+      ]);
+    }
+    final left = leftSome as IdentifierExpression;
+    final identifier = left.identifier;
+    if (identifier is PropertyIdentifier) {
+      // TODO: assert that it's mutable.
+    } else if (identifier is LocalPropertyIdentifier) {
+      // TODO: assert that it's mutable.
+    } else {
+      return Error([
+        CompilerError.invalidExpressionType('This is not a property.'),
+      ]);
+    }
+
+    final rightExpression =
+        innerExpressionContext(expressionType: Some(left.type))
+            .lowerUnambiguous(expression.rightOperand);
+    if (rightExpression is Error) return Error(rightExpression.error);
+    final right = rightExpression.value;
+
+    return Ok([hir.AssignmentExpression(getId(expression), identifier, right)]);
   }
 }

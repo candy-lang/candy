@@ -69,6 +69,11 @@ abstract class Expression implements _$Expression {
     DeclarationLocalId id,
     DeclarationLocalId scopeId,
   ) = ContinueExpression;
+  const factory Expression.assignment(
+    DeclarationLocalId id,
+    Identifier left,
+    Expression right,
+  ) = AssignmentExpression;
 
   factory Expression.fromJson(Map<String, dynamic> json) =>
       _$ExpressionFromJson(json);
@@ -89,6 +94,7 @@ abstract class Expression implements _$Expression {
         while_: (_, __, ___, type) => type,
         break_: (_, __, ___) => CandyType.never,
         continue_: (_, __) => CandyType.never,
+        assignment: (_, left, __) => left.type,
       );
 
   T accept<T>(ExpressionVisitor<T> visitor) => map(
@@ -103,6 +109,7 @@ abstract class Expression implements _$Expression {
         while_: (e) => visitor.visitWhileExpression(e),
         break_: (e) => visitor.visitBreakExpression(e),
         continue_: (e) => visitor.visitContinueExpression(e),
+        assignment: (e) => visitor.visitAssignmentExpression(e),
       );
 }
 
@@ -215,6 +222,7 @@ abstract class ExpressionVisitor<T> {
   T visitWhileExpression(WhileExpression node);
   T visitBreakExpression(BreakExpression node);
   T visitContinueExpression(ContinueExpression node);
+  T visitAssignmentExpression(AssignmentExpression node);
 }
 
 abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
@@ -242,4 +250,6 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   void visitBreakExpression(BreakExpression node) {}
   @override
   void visitContinueExpression(ContinueExpression node) {}
+  @override
+  void visitAssignmentExpression(AssignmentExpression node) {}
 }

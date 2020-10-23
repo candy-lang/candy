@@ -285,9 +285,28 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         ],
         dart.Code('break ${_label(node.scopeId)};'),
       ];
+
   @override
   List<dart.Code> visitContinueExpression(ContinueExpression node) => [
         dart.Code('continue ${_label(node.scopeId)};'),
+      ];
+
+  @override
+  List<dart.Code> visitAssignmentExpression(AssignmentExpression node) => [
+        ...node.right.accept(this),
+        node.left
+            .maybeMap(
+              property: (prop) => throw CompilerError.unsupportedFeature('For '
+                  'now, the left side of an assignment can only be a local '
+                  'property identifier.'),
+              localProperty: (prop) => _refer(prop.id),
+              orElse: () => throw CompilerError.internalError('Left side of '
+                  'assignment can only be property or local property '
+                  'identifier, but was ${node.left.runtimeType} '
+                  '(${node.left})'),
+            )
+            .assign(_refer(node.right.id))
+            .statement,
       ];
 
   String _name(DeclarationLocalId id) => '_${id.value}';
