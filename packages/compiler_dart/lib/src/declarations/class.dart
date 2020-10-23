@@ -7,6 +7,7 @@ import '../body.dart';
 import '../constants.dart';
 import '../type.dart';
 import 'constructor.dart';
+import 'declaration.dart';
 import 'function.dart';
 import 'property.dart';
 
@@ -16,12 +17,6 @@ final compileClass = Query<DeclarationId, dart.Class>(
   provider: (context, declarationId) {
     // ignore: non_constant_identifier_names
     final classHir = getClassDeclarationHir(context, declarationId);
-
-    final typeParameters =
-        classHir.typeParameters.map((p) => dart.TypeReference((b) => b
-          ..symbol = p.name
-          ..bound = compileType(context, p.upperBound)
-          ..isNullable = false));
 
     final impls = getAllImplsForClass(context, declarationId)
         .map((id) => getImplDeclarationHir(context, id));
@@ -56,7 +51,7 @@ final compileClass = Query<DeclarationId, dart.Class>(
         ..returns = compileType(context, function.returnType)
         ..name = function.name
         ..optionalParameters
-            .addAll(compileParameters(context, function.parameters))
+            .addAll(compileParameters(context, function.valueParameters))
         ..body = compileBody(context, id).value);
     });
     // Super calls for all methods that aren't overriden in the impl.
@@ -76,14 +71,16 @@ final compileClass = Query<DeclarationId, dart.Class>(
         .map((id) => Tuple2(id, getFunctionDeclarationHir(context, id)))
         .map((inputs) {
           final id = inputs.first;
-          final function = inputs.second;
+          final functionHir = inputs.second;
 
           return dart.Method((b) => b
             ..annotations.add(dart.refer('override', dartCoreUrl))
-            ..returns = compileType(context, function.returnType)
-            ..name = function.name
+            ..returns = compileType(context, functionHir.returnType)
+            ..name = functionHir.name
+            ..types.addAll(functionHir.typeParameters
+                .map((p) => compileTypeParameter(context, p)))
             ..optionalParameters
-                .addAll(compileParameters(context, function.parameters))
+                .addAll(compileParameters(context, functionHir.valueParameters))
             ..body = compileBody(context, id).value);
         });
 
@@ -96,7 +93,8 @@ final compileClass = Query<DeclarationId, dart.Class>(
     return dart.Class((b) => b
       ..annotations.add(dart.refer('sealed', packageMetaUrl))
       ..name = classHir.name
-      ..types.addAll(typeParameters)
+      ..types.addAll(
+          classHir.typeParameters.map((p) => compileTypeParameter(context, p)))
       ..implements.addAll(implements)
       ..constructors.addAll(compileConstructor(
         context,

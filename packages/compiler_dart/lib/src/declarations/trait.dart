@@ -3,6 +3,7 @@ import 'package:compiler/compiler.dart';
 import 'package:parser/parser.dart';
 
 import '../type.dart';
+import 'declaration.dart';
 import 'function.dart';
 
 class Foo<T extends List<dynamic>> {}
@@ -14,12 +15,6 @@ final compileTrait = Query<DeclarationId, dart.Class>(
     // ignore: non_constant_identifier_names
     final traitHir = getTraitDeclarationHir(context, declarationId);
 
-    final typeParameters =
-        traitHir.typeParameters.map((p) => dart.TypeReference((b) => b
-          ..symbol = p.name
-          ..bound = compileType(context, p.upperBound)
-          ..isNullable = false));
-
     final properties = traitHir.innerDeclarationIds
         .where((id) => id.isProperty)
         .expand((id) => compilePropertyInsideTrait(context, id));
@@ -29,7 +24,8 @@ final compileTrait = Query<DeclarationId, dart.Class>(
     return dart.Class((b) => b
       ..abstract = true
       ..name = traitHir.name
-      ..types.addAll(typeParameters)
+      ..types.addAll(
+          traitHir.typeParameters.map((p) => compileTypeParameter(context, p)))
       ..constructors.add(dart.Constructor((b) => b..constant = true))
       ..methods.addAll(properties)
       ..methods.addAll(methods));

@@ -5,6 +5,7 @@ import 'package:parser/parser.dart' hide ValueParameter;
 import '../body.dart';
 import '../constants.dart';
 import '../type.dart';
+import 'declaration.dart';
 
 final compileFunction = Query<DeclarationId, dart.Method>(
   'dart.compileFunction',
@@ -31,8 +32,10 @@ final compileFunction = Query<DeclarationId, dart.Method>(
       ..static = functionHir.isStatic
       ..returns = compileType(context, functionHir.returnType)
       ..name = functionHir.name
+      ..types.addAll(functionHir.typeParameters
+          .map((p) => compileTypeParameter(context, p)))
       ..optionalParameters
-          .addAll(compileParameters(context, functionHir.parameters))
+          .addAll(compileParameters(context, functionHir.valueParameters))
       ..body = compileBody(context, declarationId).valueOrNull);
   },
 );

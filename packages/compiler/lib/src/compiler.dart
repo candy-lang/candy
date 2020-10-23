@@ -38,9 +38,9 @@ final getMainFunction = Query<ModuleId, DeclarationId>(
         module.innerDeclarationIds.where((id) => id.isFunction).where((id) {
       final function = getFunctionDeclarationHir(context, id);
       if (function.name != mainFunctionName) return false;
-      if (function.parameters.length > 1) return false;
-      if (function.parameters.length == 1 &&
-          function.parameters.single.type !=
+      if (function.valueParameters.length > 1) return false;
+      if (function.valueParameters.length == 1 &&
+          function.valueParameters.single.type !=
               hir.CandyType.list(hir.CandyType.string)) {
         return false;
       }

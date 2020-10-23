@@ -47,6 +47,7 @@ final Query<CandyType, dart.Reference> compileType =
       },
       union: (_) => dart.refer('dynamic', dartCoreUrl),
       intersection: (_) => dart.refer('dynamic', dartCoreUrl),
+      parameter: (type) => dart.refer(type.name),
     );
   },
 );
@@ -61,10 +62,4 @@ dart.TypeReference _createDartType(
     ..url = url
     ..types.addAll(typeArguments)
     ..isNullable = false);
-}
-
-dart.TypeReference _unsupportedType(CandyType type) {
-  throw CompilerError.unsupportedFeature(
-    'Compiling type `$type` to Dart is not yet supported.',
-  );
 }

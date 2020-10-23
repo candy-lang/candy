@@ -424,7 +424,7 @@ class ContextContext extends Context {
         final functionHir = getFunctionDeclarationHir(queryContext, id);
         type = hir.CandyType.function(
           parameterTypes: [
-            for (final parameter in functionHir.parameters) parameter.type,
+            for (final parameter in functionHir.valueParameters) parameter.type,
           ],
           returnType: functionHir.returnType,
         );
@@ -470,10 +470,10 @@ class ContextContext extends Context {
 
       if (moduleId.hasNoParent) break;
       moduleId = moduleId.parent;
-      final declarationId =
+      final newDeclarationId =
           moduleIdToOptionalDeclarationId(queryContext, moduleId);
-      if (declarationId is None ||
-          declarationId.value.resourceId != resourceId) {
+      if (newDeclarationId is None ||
+          newDeclarationId.value.resourceId != resourceId) {
         break;
       }
     }
@@ -1024,7 +1024,7 @@ extension on Context {
     // from the source code/AST. This currently works, because Dart's map
     // maintains insertion order.
 
-    final parameters = functionHir.parameters;
+    final parameters = functionHir.valueParameters;
     final parametersByName = parameters.associateBy((p) => p.name);
     final arguments = expression.arguments;
     final outOfOrderNamedArguments = <ast.Argument>[];

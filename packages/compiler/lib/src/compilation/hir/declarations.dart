@@ -42,7 +42,8 @@ abstract class Declaration implements _$Declaration {
   const factory Declaration.function({
     @required bool isStatic,
     @required String name,
-    @Default(<ValueParameter>[]) List<ValueParameter> parameters,
+    @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
+    @Default(<ValueParameter>[]) List<ValueParameter> valueParameters,
     @required CandyType returnType,
   }) = FunctionDeclaration;
 
