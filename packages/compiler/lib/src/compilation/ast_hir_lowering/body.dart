@@ -979,8 +979,7 @@ extension on Context {
     ast.LoopExpression loop,
   ) {
     final loopContext = LoopContext(this, getId(loop), None());
-    final loweredBody =
-        (loop.body as ast.LambdaLiteral).expressions.map((expression) {
+    final loweredBody = loop.body.expressions.map((expression) {
       return loopContext
           .innerExpressionContext(forwardsIdentifiers: true)
           .lowerUnambiguous(expression);

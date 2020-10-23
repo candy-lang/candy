@@ -277,7 +277,7 @@ abstract class LoopExpression extends Expression implements _$LoopExpression {
   const factory LoopExpression(
     int id, {
     @required LoopKeywordToken loopKeyword,
-    @required Expression body,
+    @required LambdaLiteral body,
   }) = _LoopExpression;
   const LoopExpression._();
 
