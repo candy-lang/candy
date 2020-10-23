@@ -21,7 +21,9 @@ class AnalysisServer {
 
   /// Initialize a newly created server to send and receive messages to the
   /// given [channel].
-  AnalysisServer(this.channel) : assert(channel != null) {
+  AnalysisServer(this.channel, this.candyDirectory)
+      : assert(channel != null),
+        assert(candyDirectory != null) {
     messageHandler = UninitializedStateMessageHandler(this);
 
     channel
@@ -37,6 +39,7 @@ class AnalysisServer {
   /// The channel from which messages are received and to which responses should
   /// be sent.
   final LspServerCommunicationChannel channel;
+  final Directory candyDirectory;
 
   ServerStateMessageHandler messageHandler;
 
@@ -59,7 +62,10 @@ class AnalysisServer {
     _initializationOptions = LspInitializationOptions(initializationOptions);
     _projectDirectory = projectDirectory;
     _resourceProvider = OverlayResourceProvider(
-      ResourceProvider.default_(projectDirectory),
+      ResourceProvider.default_(
+        candyDirectory: candyDirectory,
+        projectDirectory: projectDirectory,
+      ),
     );
     _queryConfig = QueryConfig(
       resourceProvider: resourceProvider,

@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:meta/meta.dart';
+
 import 'build_artifacts.dart';
 import 'compilation/ast_hir_lowering.dart';
 import 'compilation/hir.dart' as hir;
@@ -9,10 +11,16 @@ import 'errors.dart';
 import 'query.dart';
 import 'resource_provider.dart';
 
-Future<void> compile(Directory directory) async {
+Future<void> compile({
+  @required Directory candyDirectory,
+  @required Directory projectDirectory,
+}) async {
   final config = QueryConfig(
-    resourceProvider: ResourceProvider.default_(directory),
-    buildArtifactManager: BuildArtifactManager(directory),
+    resourceProvider: ResourceProvider.default_(
+      candyDirectory: candyDirectory,
+      projectDirectory: projectDirectory,
+    ),
+    buildArtifactManager: BuildArtifactManager(projectDirectory),
   );
   final context = config.createContext();
 

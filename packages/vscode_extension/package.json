@@ -25,6 +25,22 @@
   "main": "./out/extension.js",
   "contributes": {
     "commands": [],
+    "configuration": {
+      "title": "🍭 Candy",
+      "properties": {
+        "candy.candyPath": {
+          "type": "string",
+          "description": "Path to the 🍭 Candy standard library.",
+          "scope": "machine-overridable"
+        },
+        "candy.languageServerCommand": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Command to start the 🍭 Candy language server. If empty, we'll attempt to find the 🍭 Candy executable in the `PATH` environment variable.",
+          "scope": "machine-overridable"
+        }
+      }
+    },
     "configurationDefaults": {
       "[candy]": {
         "editor.detectIndentation": false,
