@@ -17,6 +17,12 @@ Future<void> main(List<String> arguments) async {
 }
 
 class BuildCommand extends Command<void> {
+  BuildCommand() {
+    argParser.addFlag(_optionCandyDirectory);
+  }
+
+  static const _optionCandyDirectory = 'candy-path';
+
   @override
   String get name => 'build';
 
@@ -32,16 +38,29 @@ class BuildCommand extends Command<void> {
         'candy build .',
       );
     }
-    final directory = Directory(rest[0]);
-    final validationResult =
-        SimpleResourceProvider.isValidProjectDirectory(directory);
-    if (validationResult != null) {
+
+    final candyDirectory =
+        Directory(argResults[_optionCandyDirectory] as String);
+    if (!candyDirectory.existsSync()) {
       throw UsageException(
-        '${directory.absolute.path} is not a valid project directory:\n$validationResult',
-        'candy build ./my_project',
+        "Candy directory `${candyDirectory.absolute.path}` doesn't exist.",
+        'candy build ./my_project --candy-directory /candy/directory',
       );
     }
 
-    compile(directory);
+    final projectDirectory = Directory(rest[0]);
+    final validationResult =
+        SimpleResourceProvider.isValidProjectDirectory(projectDirectory);
+    if (validationResult != null) {
+      throw UsageException(
+        '${projectDirectory.absolute.path} is not a valid project directory:\n$validationResult',
+        'candy build ./my_project --candy-directory /candy/directory',
+      );
+    }
+
+    compile(
+      candyDirectory: candyDirectory,
+      projectDirectory: projectDirectory,
+    );
   }
 }

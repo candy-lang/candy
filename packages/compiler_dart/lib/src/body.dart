@@ -165,7 +165,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             ),
         ];
       },
-      localProperty: null,
+      localProperty: (id, _, __) => _saveSingle(node, _refer(id)),
     );
   }
 
@@ -224,6 +224,14 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       '${_name(lambdaExpression.id)}_this';
 
   @override
+  List<dart.Code> visitPropertyExpression(PropertyExpression node) {
+    return [
+      ...node.initializer.accept(this),
+      _save(node, _refer(node.initializer.id), isMutable: node.isMutable),
+    ];
+  }
+
+  @override
   List<dart.Code> visitNavigationExpression(NavigationExpression node) => [];
   @override
   List<dart.Code> visitCallExpression(CallExpression node) => [];
@@ -279,9 +287,15 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     Expression source,
     dart.Expression lowered, {
     bool explicitType = true,
+    bool isMutable = false,
   }) {
     final type = explicitType ? compileType(context, source.type) : null;
-    return lowered.assignFinal(_name(source.id), type).statement;
+
+    if (isMutable) {
+      return lowered.assignVar(_name(source.id), type).statement;
+    } else {
+      return lowered.assignFinal(_name(source.id), type).statement;
+    }
   }
 
   List<dart.Code> _saveSingle(Expression source, dart.Expression lowered) =>

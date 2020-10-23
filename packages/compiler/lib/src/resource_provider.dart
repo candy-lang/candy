@@ -14,13 +14,10 @@ abstract class ResourceProvider {
 
   @experimental
   // ignore: non_constant_identifier_names
-  factory ResourceProvider.default_(Directory projectDirectory) =>
-      SimpleResourceProvider(
-        candyDirectory: _candyDirectory,
-        projectDirectory: projectDirectory,
-      );
-
-  static final _candyDirectory = Directory('D:/p/candy/packages/candy');
+  factory ResourceProvider.default_({
+    Directory candyDirectory,
+    Directory projectDirectory,
+  }) = SimpleResourceProvider;
 
   Directory get candyDirectory;
   Directory get projectDirectory;

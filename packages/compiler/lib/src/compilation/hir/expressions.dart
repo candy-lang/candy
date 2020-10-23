@@ -14,12 +14,22 @@ abstract class Expression implements _$Expression {
   ) = IdentifierExpression;
   const factory Expression.literal(DeclarationLocalId id, Literal literal) =
       LiteralExpression;
+
+  const factory Expression.property(
+    DeclarationLocalId id,
+    String name,
+    CandyType type,
+    Expression initializer, {
+    @required bool isMutable,
+  }) = PropertyExpression;
+
   const factory Expression.navigation(
     DeclarationLocalId id,
     Expression target,
     DeclarationId property,
     CandyType type,
   ) = NavigationExpression;
+
   const factory Expression.call(
     DeclarationLocalId id,
     Expression target,
@@ -60,6 +70,7 @@ abstract class Expression implements _$Expression {
   CandyType get type => when(
         identifier: (_, identifier) => identifier.type,
         literal: (_, literal) => literal.type,
+        property: (_, __, type, ___, ____) => type,
         navigation: (_, __, ___, type) => type,
         call: (_, __, ___) => null,
         functionCall: (_, target, __) {
@@ -75,6 +86,7 @@ abstract class Expression implements _$Expression {
   T accept<T>(ExpressionVisitor<T> visitor) => map(
         identifier: (e) => visitor.visitIdentifierExpression(e),
         literal: (e) => visitor.visitLiteralExpression(e),
+        property: (e) => visitor.visitPropertyExpression(e),
         navigation: (e) => visitor.visitNavigationExpression(e),
         call: (e) => visitor.visitCallExpression(e),
         functionCall: (e) => visitor.visitFunctionCallExpression(e),
@@ -185,6 +197,7 @@ abstract class ExpressionVisitor<T> {
 
   T visitIdentifierExpression(IdentifierExpression node);
   T visitLiteralExpression(LiteralExpression node);
+  T visitPropertyExpression(PropertyExpression node);
   T visitNavigationExpression(NavigationExpression node);
   T visitCallExpression(CallExpression node);
   T visitFunctionCallExpression(FunctionCallExpression node);
@@ -201,6 +214,8 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   void visitIdentifierExpression(IdentifierExpression node) {}
   @override
   void visitLiteralExpression(LiteralExpression node) {}
+  @override
+  void visitPropertyExpression(PropertyExpression node) {}
   @override
   void visitNavigationExpression(NavigationExpression node) {}
   @override
