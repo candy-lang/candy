@@ -35,12 +35,7 @@ export function deactivate(): Thenable<void> | undefined {
 
 // The following code is taken (and slightly modified) from https://github.com/Dart-Code/Dart-Code
 async function spawnServer(): Promise<StreamInfo> {
-  const process = safeSpawn(
-    undefined,
-    "C:\\Program Files\\Dart\\dart-sdk\\bin\\dart.exe",
-    ["--observe", "D:/p/candy/packages/lsp_server/bin/main.dart"],
-    {}
-  );
+  const process = safeSpawn();
   console.info(`    PID: ${process.pid}`);
 
   const reader = process.stdout.pipe(new LoggingTransform("<=="));
@@ -57,29 +52,26 @@ type SpawnedProcess = child_process.ChildProcess & {
   stdout: stream.Readable;
   stderr: stream.Readable;
 };
-function safeSpawn(
-  workingDirectory: string | undefined,
-  binPath: string,
-  args: string[],
-  env: {
-    envOverrides?: { [key: string]: string | undefined };
-    toolEnv?: { [key: string]: string | undefined };
-  }
-): SpawnedProcess {
-  // Spawning processes on Windows with funny symbols in the path requires quoting. However if you quote an
-  // executable with a space in its path and an argument also has a space, you have to then quote all of the
-  // arguments too!\
-  // https://github.com/nodejs/node/issues/7367
-  const customEnv = Object.assign(
-    {},
-    process.env,
-    env.toolEnv,
-    env.envOverrides
+function safeSpawn(): SpawnedProcess {
+  const configuration = vs.workspace.getConfiguration("candy");
+
+  let command: [string, string[]] = ["candy.exe", ["lsp"]];
+  const languageServerCommand = configuration.get<string>(
+    "languageServerCommand"
   );
-  const quotedArgs = args.map((a) => `"${a.replace(/"/g, `\\"`)}"`);
-  return child_process.spawn(`"${binPath}"`, quotedArgs, {
-    cwd: workingDirectory,
-    env: customEnv,
+  if (
+    languageServerCommand != null &&
+    languageServerCommand.trim().length !== 0
+  ) {
+    const parts = languageServerCommand.split(" ");
+    command = [parts[0], parts.slice(1)];
+  }
+
+  const candyPath = configuration.get<string | null>("candyPath");
+  command[1].push(`--candy-path="${candyPath}"`);
+
+  return child_process.spawn(command[0], command[1], {
+    env: process.env,
     shell: true,
   }) as SpawnedProcess;
 }
