@@ -665,8 +665,7 @@ class ParserGrammar {
         },
       )
       ..prefix<LoopKeywordToken, Expression>(
-          (LexerGrammar.LOOP & LexerGrammar.NLs)
-              .map((value) => value.first as LoopKeywordToken),
+          (LexerGrammar.LOOP & LexerGrammar.NLs).map((value) => value.first as LoopKeywordToken),
           mapper: (keyword, body) {
         return LoopExpression(
           _id++,

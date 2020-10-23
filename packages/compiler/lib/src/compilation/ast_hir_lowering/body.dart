@@ -104,6 +104,16 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
+  Option<hir.Expression> visitLoopExpression(LoopExpression node) {
+    if (node.id == id) return Some(node);
+    for (final expression in node.body) {
+      final result = expression.accept(this);
+      if (result is Some) return result;
+    }
+    return None();
+  }
+
+  @override
   Option<hir.Expression> visitBreakExpression(BreakExpression node) {
     if (node.id == id) return Some(node);
     if (node.expression != null) return node.expression.accept(this);
@@ -228,6 +238,8 @@ abstract class Context {
       result = lowerCall(expression);
     } else if (expression is ast.ReturnExpression) {
       result = lowerReturn(expression);
+    } else if (expression is ast.LoopExpression) {
+      result = lowerLoop(expression);
     } else if (expression is ast.BreakExpression) {
       result = lowerBreak(expression);
     } else if (expression is ast.ContinueExpression) {
@@ -665,6 +677,53 @@ class ExpressionContext extends InnerContext {
   }
 }
 
+class LoopContext extends InnerContext {
+  LoopContext(
+    Context parent,
+    this.id,
+    this.label,
+  )   : assert(id != null),
+        assert(label != null),
+        super(parent);
+
+  final DeclarationLocalId id;
+  final Option<String> label;
+  final _identifiers = <String, hir.Identifier>{};
+
+  @override
+  void addIdentifier(hir.LocalPropertyIdentifier identifier) {
+    _identifiers[identifier.name] = identifier;
+  }
+
+  @override
+  List<Identifier> resolveIdentifier(String name) {
+    final result = _identifiers[name];
+    if (result != null) return [result];
+    return parent.value.resolveIdentifier(name);
+  }
+
+  @override
+  Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveBreak(
+    Option<String> label,
+  ) {
+    if (label is None ||
+        label == this.label ||
+        this.label is None && label == Some('loop')) {
+      return Some(Tuple2(id, parent.value.expressionType));
+    }
+    return parent.flatMapValue((context) => context.resolveBreak(label));
+  }
+}
+
+class BreakExpressionVisitor extends DoNothingExpressionVisitor {
+  final breakTypes = <hir.CandyType>{};
+
+  @override
+  void visitBreakExpression(BreakExpression node) {
+    breakTypes.add(node.expression.type);
+  }
+}
+
 extension on Context {
   ExpressionContext innerExpressionContext({
     Option<hir.CandyType> expressionType = const None(),
@@ -908,13 +967,30 @@ extension on Context {
     ]);
   }
 
-  Result<List<hir.Expression>, List<ReportedCompilerError>> _lowerLoop(
-    ast.LoopExpression expression,
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerLoop(
+    ast.LoopExpression loop,
   ) {
-    // TODO: implement loop
-    // return lowerExpression(expression.statement).mapValue((statement) => [
-    //       hir.LoopExpression(context.getId(expression), statement),
-    //     ]);
+    final loopContext = LoopContext(this, getId(loop), None());
+    final loweredBody =
+        (loop.body as ast.LambdaLiteral).expressions.map((expression) {
+      return loopContext
+          .innerExpressionContext(forwardsIdentifiers: true)
+          .lowerUnambiguous(expression);
+    }).merge();
+    if (loweredBody is Error) return loweredBody;
+    final body = loweredBody.value;
+
+    var type = expressionType.valueOrNull;
+    if (type == null) {
+      final visitor = BreakExpressionVisitor();
+      for (final expression in body) {
+        expression.accept(visitor);
+      }
+      type = hir.CandyType.union(visitor.breakTypes.toList());
+    }
+
+    return Ok([hir.LoopExpression(getId(loop), body, type)]);
+    // TODO: here
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerCall(
