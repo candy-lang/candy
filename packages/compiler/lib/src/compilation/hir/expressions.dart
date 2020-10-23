@@ -37,9 +37,20 @@ abstract class Expression implements _$Expression {
   // ignore: non_constant_identifier_names
   const factory Expression.return_(
     DeclarationLocalId id,
-    DeclarationLocalId scopeId,
+    DeclarationLocalId scopeId, [
     Expression expression,
-  ) = ReturnExpression;
+  ]) = ReturnExpression;
+  // ignore: non_constant_identifier_names
+  const factory Expression.break_(
+    DeclarationLocalId id,
+    DeclarationLocalId scopeId, [
+    Expression expression,
+  ]) = BreakExpression;
+  // ignore: non_constant_identifier_names
+  const factory Expression.continue_(
+    DeclarationLocalId id,
+    DeclarationLocalId scopeId,
+  ) = ContinueExpression;
 
   factory Expression.fromJson(Map<String, dynamic> json) =>
       _$ExpressionFromJson(json);
@@ -55,6 +66,8 @@ abstract class Expression implements _$Expression {
           return functionType.returnType;
         },
         return_: (_, __, ___) => CandyType.never,
+        break_: (_, __, ___) => CandyType.never,
+        continue_: (_, __) => CandyType.never,
       );
 
   T accept<T>(ExpressionVisitor<T> visitor) => map(
@@ -64,6 +77,8 @@ abstract class Expression implements _$Expression {
         call: (e) => visitor.visitCallExpression(e),
         functionCall: (e) => visitor.visitFunctionCallExpression(e),
         return_: (e) => visitor.visitReturnExpression(e),
+        break_: (e) => visitor.visitBreakExpression(e),
+        continue_: (e) => visitor.visitContinueExpression(e),
       );
 }
 
@@ -171,6 +186,8 @@ abstract class ExpressionVisitor<T> {
   T visitCallExpression(CallExpression node);
   T visitFunctionCallExpression(FunctionCallExpression node);
   T visitReturnExpression(ReturnExpression node);
+  T visitBreakExpression(BreakExpression node);
+  T visitContinueExpression(ContinueExpression node);
 }
 
 abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
@@ -188,4 +205,8 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   void visitFunctionCallExpression(FunctionCallExpression node) {}
   @override
   void visitReturnExpression(ReturnExpression node) {}
+  @override
+  void visitBreakExpression(BreakExpression node) {}
+  @override
+  void visitContinueExpression(ContinueExpression node) {}
 }

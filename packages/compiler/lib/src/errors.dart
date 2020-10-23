@@ -40,8 +40,8 @@ abstract class CompilerError implements _$CompilerError {
       CompilerError._create('invalidExpressionType');
   static const invalidImplTraitBound =
       CompilerError._create('invalidImplTraitBound');
+  static const invalidLabel = CompilerError._create('invalidLabel');
   static const invalidUseLine = CompilerError._create('invalidUseLine');
-  static const invalidReturnLabel = CompilerError._create('invalidReturnLabel');
   static const lambdaParameterTypeRequired =
       CompilerError._create('lambdaParameterTypeRequired');
   static const lambdaParametersMissing =
