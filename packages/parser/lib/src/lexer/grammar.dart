@@ -183,12 +183,16 @@ class LexerGrammar {
   static final SET =
       string('set').tokenize((_, span) => SetKeywordToken(span: span));
 
-  static final IF = string('if')
-      .tokenize((_, span) => KeywordToken.if_(span: span) as IfKeywordToken);
-  static final ELSE = string('else').tokenize(
-      (_, span) => KeywordToken.else_(span: span) as ElseKeywordToken);
+  static final IF =
+      string('if').tokenize((_, span) => IfKeywordToken(span: span));
+  static final ELSE =
+      string('else').tokenize((_, span) => ElseKeywordToken(span: span));
   static final RETURN =
       string('return').tokenize((_, span) => ReturnKeywordToken(span: span));
+  static final BREAK =
+      string('break').tokenize((_, span) => BreakKeywordToken(span: span));
+  static final CONTINUE =
+      string('return').tokenize((_, span) => ContinueKeywordToken(span: span));
 
   // SECTION: lexicalModifiers
 

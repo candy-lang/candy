@@ -500,7 +500,6 @@ class ParserGrammar {
             rightParenthesis: value[4] as OperatorToken,
           ));
 
-
   // SECTION: expressions
 
   static final _expression = undefined<Expression>();

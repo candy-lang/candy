@@ -154,7 +154,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             ...target.accept(this),
             _save(
               node,
-              _refer(target).property(name),
+              _refer(target.id).property(name),
               explicitType: explicitType,
             ),
           ] else
@@ -193,7 +193,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         final content = parts
             .map((p) => p.when(
                   literal: (value) => value,
-                  interpolated: (expression) => '\$${_name(expression)}',
+                  interpolated: (expression) => '\$${_name(expression.id)}',
                 ))
             .join();
         lowered.add(_save(node, dart.literalString(content)));
@@ -221,7 +221,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   }
 
   String _lambdaThisName(LiteralExpression lambdaExpression) =>
-      '${_name(lambdaExpression)}_this';
+      '${_name(lambdaExpression.id)}_this';
 
   @override
   List<dart.Code> visitNavigationExpression(NavigationExpression node) => [];
@@ -231,36 +231,62 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   List<dart.Code> visitFunctionCallExpression(FunctionCallExpression node) {
     final arguments = {
       for (final entry in node.valueArguments.entries)
-        entry.key: _refer(entry.value),
+        entry.key: _refer(entry.value.id),
     };
     return [
       ...node.target.accept(this),
       for (final argument in node.valueArguments.values)
         ...argument.accept(this),
-      _save(node, _refer(node.target).call([], arguments, [])),
+      _save(node, _refer(node.target.id).call([], arguments, [])),
     ];
   }
 
   @override
   List<dart.Code> visitReturnExpression(ReturnExpression node) => [
-        ...node.expression.accept(this),
-        _refer(node.expression).returned.statement,
+        // TODO(JonasWanke): support labeled returns
+        if (node.expression != null) ...[
+          ...node.expression.accept(this),
+          _refer(node.expression.id).returned.statement,
+        ] else
+          dart.Code('return;'),
       ];
 
-  String _name(Expression expression) => '_${expression.id.value}';
-  dart.Expression _refer(Expression expression) =>
-      dart.refer(_name(expression));
+  // @override
+  // List<dart.Code> visitLoopExpression(LoopExpression node) => [
+  //       if (node.type != CandyType.unit)
+  //         dart.literalNull.assignVar(_refer(node.id)),
+  //       dart.Code('${_label(node.id)}: while (true) {'),
+  //       for (final expression in node.expressions) ...expression.accept(this),
+  //       dart.Code('}'),
+  //     ];
+  @override
+  List<dart.Code> visitBreakExpression(BreakExpression node) => [
+        if (node.expression != null) ...[
+          ...node.expression.accept(this),
+          _refer(node.expression.id).assign(_refer(node.scopeId)).statement,
+        ] else
+          dart.Code('break ${_label(node.scopeId)};'),
+      ];
+  @override
+  List<dart.Code> visitContinueExpression(ContinueExpression node) => [
+        dart.Code('continue ${_label(node.scopeId)};'),
+      ];
+
+  String _name(DeclarationLocalId id) => '_${id.value}';
+  dart.Expression _refer(DeclarationLocalId id) => dart.refer(_name(id));
   dart.Code _save(
     Expression source,
     dart.Expression lowered, {
     bool explicitType = true,
   }) {
     final type = explicitType ? compileType(context, source.type) : null;
-    return lowered.assignFinal(_name(source), type).statement;
+    return lowered.assignFinal(_name(source.id), type).statement;
   }
 
   List<dart.Code> _saveSingle(Expression source, dart.Expression lowered) =>
       [_save(source, lowered)];
+
+  String _label(DeclarationLocalId id) => '_label_${id.value}';
 }
 
 class ModuleExpression extends dart.InvokeExpression {

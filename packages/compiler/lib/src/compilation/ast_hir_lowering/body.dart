@@ -99,7 +99,21 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   @override
   Option<hir.Expression> visitReturnExpression(ReturnExpression node) {
     if (node.id == id) return Some(node);
-    return node.expression.accept(this);
+    if (node.expression != null) return node.expression.accept(this);
+    return None();
+  }
+
+  @override
+  Option<hir.Expression> visitBreakExpression(BreakExpression node) {
+    if (node.id == id) return Some(node);
+    if (node.expression != null) return node.expression.accept(this);
+    return None();
+  }
+
+  @override
+  Option<hir.Expression> visitContinueExpression(ContinueExpression node) {
+    if (node.id == id) return Some(node);
+    return None();
   }
 }
 
@@ -214,6 +228,10 @@ abstract class Context {
       result = lowerCall(expression);
     } else if (expression is ast.ReturnExpression) {
       result = lowerReturn(expression);
+    } else if (expression is ast.BreakExpression) {
+      result = lowerBreak(expression);
+    } else if (expression is ast.ContinueExpression) {
+      result = lowerContinue(expression);
     } else {
       throw CompilerError.unsupportedFeature(
         'Unsupported expression.',
@@ -1028,10 +1046,16 @@ extension on Context {
     final resolvedScope = resolveReturn(None());
     if (resolvedScope is None) {
       return Error([
-        CompilerError.invalidReturnLabel(
+        CompilerError.invalidLabel(
           'Return label is invalid.',
           location: ErrorLocation(resourceId, expression.returnKeyword.span),
         ),
+      ]);
+    }
+
+    if (expression.expression == null) {
+      return Ok([
+        hir.Expression.return_(getId(expression), resolvedScope.value.first),
       ]);
     }
 
@@ -1044,5 +1068,61 @@ extension on Context {
                 hirExpression,
               ),
             ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerBreak(
+    ast.BreakExpression expression,
+  ) {
+    // The type of a `BreakExpression` is `Never` and that is, by definition,
+    // assignable to anything because it's a bottom type. So, we don't need to
+    // check that.
+
+    final resolvedScope = resolveBreak(None());
+    if (resolvedScope is None) {
+      return Error([
+        CompilerError.invalidLabel(
+          'Break label is invalid.',
+          location: ErrorLocation(resourceId, expression.breakKeyword.span),
+        ),
+      ]);
+    }
+
+    if (expression.expression == null) {
+      return Ok([
+        hir.Expression.break_(getId(expression), resolvedScope.value.first),
+      ]);
+    }
+
+    return innerExpressionContext(expressionType: resolvedScope.value.second)
+        .lowerUnambiguous(expression.expression)
+        .mapValue((hirExpression) => [
+              hir.Expression.break_(
+                getId(expression),
+                resolvedScope.value.first,
+                hirExpression,
+              ),
+            ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerContinue(
+    ast.ContinueExpression expression,
+  ) {
+    // The type of a `ContinueExpression` is `Never` and that is, by definition,
+    // assignable to anything because it's a bottom type. So, we don't need to
+    // check that.
+
+    final resolvedScope = resolveContinue(None());
+    if (resolvedScope is None) {
+      return Error([
+        CompilerError.invalidLabel(
+          'Continue label is invalid.',
+          location: ErrorLocation(resourceId, expression.continueKeyword.span),
+        ),
+      ]);
+    }
+
+    return Ok([
+      hir.Expression.continue_(getId(expression), resolvedScope.value),
+    ]);
   }
 }
