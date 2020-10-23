@@ -50,7 +50,7 @@ final getTraitDeclarationHir = Query<DeclarationId, hir.TraitDeclaration>(
                 name: p.name.name,
                 upperBound: p.bound != null
                     ? astTypeToHirType(context, Tuple2(moduleId, p.bound))
-                    : null,
+                    : hir.CandyType.any,
               ))
           .toList(),
       upperBounds: upperBounds,

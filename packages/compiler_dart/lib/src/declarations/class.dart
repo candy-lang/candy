@@ -15,7 +15,13 @@ final compileClass = Query<DeclarationId, dart.Class>(
   evaluateAlways: true,
   provider: (context, declarationId) {
     // ignore: non_constant_identifier_names
-    final class_ = getClassDeclarationHir(context, declarationId);
+    final classHir = getClassDeclarationHir(context, declarationId);
+
+    final typeParameters =
+        classHir.typeParameters.map((p) => dart.TypeReference((b) => b
+          ..symbol = p.name
+          ..bound = compileType(context, p.upperBound)
+          ..isNullable = false));
 
     final impls = getAllImplsForClass(context, declarationId)
         .map((id) => getImplDeclarationHir(context, id));
@@ -81,15 +87,16 @@ final compileClass = Query<DeclarationId, dart.Class>(
             ..body = compileBody(context, id).value);
         });
 
-    final properties = class_.innerDeclarationIds
+    final properties = classHir.innerDeclarationIds
         .where((id) => id.isProperty)
         .map((id) => compileProperty(context, id));
-    final methods = class_.innerDeclarationIds
+    final methods = classHir.innerDeclarationIds
         .where((id) => id.isFunction)
         .map((id) => compileFunction(context, id));
     return dart.Class((b) => b
       ..annotations.add(dart.refer('sealed', packageMetaUrl))
-      ..name = class_.name
+      ..name = classHir.name
+      ..types.addAll(typeParameters)
       ..implements.addAll(implements)
       ..constructors.addAll(compileConstructor(
         context,

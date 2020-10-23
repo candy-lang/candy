@@ -7,6 +7,7 @@ import '../hir.dart' as hir;
 import '../hir/ids.dart';
 import 'declarations/class.dart';
 import 'declarations/declarations.dart';
+import 'declarations/impl.dart';
 import 'declarations/module.dart';
 import 'declarations/trait.dart';
 import 'general.dart';
@@ -28,15 +29,12 @@ final Query<Tuple2<ModuleId, ast.Type>, hir.CandyType> astTypeToHirType =
         types.map(map).toList();
 
     if (type is ast.UserType) {
-      final declarationId = resolveAstUserType(context, Tuple2(moduleId, type));
-      final name = type.simpleTypes.single.name.name;
+      final result = resolveAstUserType(context, Tuple2(moduleId, type));
+      if (result is! hir.UserCandyType) return result;
 
-      final arguments =
-          mapTypes((type.arguments?.arguments ?? []).map((a) => a.type));
-      return hir.CandyType.user(
-        declarationIdToModuleId(context, declarationId.parent),
-        name,
-        arguments: arguments,
+      return (result as hir.UserCandyType).copyWith(
+        arguments:
+            mapTypes((type.arguments?.arguments ?? []).map((a) => a.type)),
       );
     } else if (type is ast.GroupType) {
       return map(type.type);
@@ -81,7 +79,8 @@ final Query<Tuple2<ModuleId, ast.Type>, hir.CandyType> astTypeToHirType =
   },
 );
 
-final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>, DeclarationId>(
+final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>,
+    hir.CandyType /*hir.UserCandyType | hir.ParameterCandyType */ >(
   'resolveAstUserType',
   provider: (context, inputs) {
     final moduleId = inputs.first;
@@ -120,16 +119,44 @@ final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>, DeclarationId>(
       );
     }
     assert(declarationId.isTrait || declarationId.isClass);
-    return declarationId;
+    return hir.CandyType.user(
+      importedModules.value.parent,
+      declarationId.simplePath.last.nameOrNull,
+    );
   },
 );
 
-Option<DeclarationId> _resolveAstUserTypeInFile(
+Option<hir.CandyType /*hir.UserCandyType | hir.ParameterCandyType */ >
+    _resolveAstUserTypeInFile(
   QueryContext context,
   ModuleId moduleId,
   ast.UserType type,
 ) {
   final moduleDeclarationId = moduleIdToDeclarationId(context, moduleId);
+  if (type.simpleTypes.length == 1) {
+    final name = type.simpleTypes.single.name.name;
+
+    List<hir.TypeParameter> typeParameters;
+    if (moduleDeclarationId.isTrait) {
+      final traitHir = getTraitDeclarationHir(context, moduleDeclarationId);
+      typeParameters = traitHir.typeParameters;
+    } else if (moduleDeclarationId.isImpl) {
+      final implHir = getImplDeclarationHir(context, moduleDeclarationId);
+      typeParameters = implHir.typeParameters;
+    } else if (moduleDeclarationId.isClass) {
+      final classHir = getClassDeclarationHir(context, moduleDeclarationId);
+      typeParameters = classHir.typeParameters;
+    }
+
+    if (typeParameters != null) {
+      final matches = typeParameters.where((p) => p.name == name);
+      assert(matches.length <= 1);
+
+      if (matches.isNotEmpty) {
+        return Some(hir.CandyType.parameter(name, moduleDeclarationId));
+      }
+    }
+  }
 
   var currentModuleId = moduleId;
   var currentModuleDeclarationId = moduleDeclarationId;
@@ -163,7 +190,12 @@ Option<DeclarationId> _resolveAstUserTypeInFile(
 
       declarationId = hasTrait ? traitId : classId;
     }
-    if (declarationId != null) return Option.some(declarationId);
+    if (declarationId != null) {
+      return Option.some(hir.CandyType.user(
+        currentModuleId.parent,
+        simpleTypes.last,
+      ));
+    }
 
     if (currentModuleId.hasNoParent) break;
     currentModuleId = currentModuleId.parentOrNull;

@@ -10,11 +10,11 @@ final compileFunction = Query<DeclarationId, dart.Method>(
   'dart.compileFunction',
   evaluateAlways: true,
   provider: (context, declarationId) {
-    final function = getFunctionDeclarationHir(context, declarationId);
+    final functionHir = getFunctionDeclarationHir(context, declarationId);
     final isInsideTrait =
         declarationId.hasParent && declarationId.parent.isTrait;
 
-    if (isInsideTrait && function.isStatic) {
+    if (isInsideTrait && functionHir.isStatic) {
       throw CompilerError.unsupportedFeature(
         'Static functions in traits are not yet supported.',
         location: ErrorLocation(
@@ -28,11 +28,11 @@ final compileFunction = Query<DeclarationId, dart.Method>(
     }
 
     return dart.Method((b) => b
-      ..static = function.isStatic
-      ..returns = compileType(context, function.returnType)
-      ..name = function.name
+      ..static = functionHir.isStatic
+      ..returns = compileType(context, functionHir.returnType)
+      ..name = functionHir.name
       ..optionalParameters
-          .addAll(compileParameters(context, function.parameters))
+          .addAll(compileParameters(context, functionHir.parameters))
       ..body = compileBody(context, declarationId).valueOrNull);
   },
 );

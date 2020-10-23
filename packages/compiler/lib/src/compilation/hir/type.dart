@@ -5,6 +5,7 @@ import '../../query.dart';
 import '../../utils.dart';
 import '../ast_hir_lowering.dart';
 import '../ast_hir_lowering/declarations/impl.dart';
+import 'declarations.dart';
 import 'ids.dart';
 
 part 'type.freezed.dart';
@@ -30,6 +31,8 @@ abstract class CandyType with _$CandyType {
   const factory CandyType.union(List<CandyType> types) = UnionCandyType;
   const factory CandyType.intersection(List<CandyType> types) =
       IntersectionCandyType;
+  const factory CandyType.parameter(String name, DeclarationId declarationId) =
+      ParameterCandyType;
 
   factory CandyType.fromJson(Map<String, dynamic> json) =>
       _$CandyTypeFromJson(json);
@@ -79,9 +82,33 @@ abstract class CandyType with _$CandyType {
       },
       union: (type) => type.types.join(' | '),
       intersection: (type) => type.types.join(' & '),
+      parameter: (type) => type.name,
     );
   }
 }
+
+final getTypeParameterBound = Query<ParameterCandyType, CandyType>(
+  'getTypeParameterBound',
+  provider: (context, parameter) {
+    List<TypeParameter> parameters;
+    if (parameter.declarationId.isTrait) {
+      parameters = getTraitDeclarationHir(context, parameter.declarationId)
+          .typeParameters;
+    } else if (parameter.declarationId.isImpl) {
+      parameters = getImplDeclarationHir(context, parameter.declarationId)
+          .typeParameters;
+    } else if (parameter.declarationId.isClass) {
+      parameters = getClassDeclarationHir(context, parameter.declarationId)
+          .typeParameters;
+    } else {
+      throw CompilerError.internalError(
+        'Type parameter comes from neither a trait, nor an impl or a class.',
+      );
+    }
+
+    return parameters.singleWhere((p) => p.name == parameter.name).upperBound;
+  },
+);
 
 final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
     Query<Tuple2<CandyType, CandyType>, bool>(
@@ -135,6 +162,10 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
               .any((type) => isAssignableTo(context, Tuple2(childType, type))),
           intersection: (parentType) => parentType.types.every(
               (type) => isAssignableTo(context, Tuple2(childType, type))),
+          parameter: (type) {
+            final bound = getTypeParameterBound(context, type);
+            return isAssignableTo(context, Tuple2(child, type));
+          },
         );
       },
       this_: (_) => throwInvalidThisType(),
@@ -159,6 +190,10 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
         assert(items.length >= 2);
         return items
             .any((type) => isAssignableTo(context, Tuple2(type, parent)));
+      },
+      parameter: (type) {
+        final bound = getTypeParameterBound(context, type);
+        return isAssignableTo(context, Tuple2(bound, parent));
       },
     );
   },

@@ -35,8 +35,9 @@ final getClassDeclarationHir = Query<DeclarationId, hir.ClassDeclaration>(
       typeParameters: ast.typeParameters?.parameters.orEmpty
           .map((p) => hir.TypeParameter(
                 name: p.name.name,
-                upperBound:
-                    astTypeToHirType(context, Tuple2(moduleId, p.bound)),
+                upperBound: p.bound != null
+                    ? astTypeToHirType(context, Tuple2(moduleId, p.bound))
+                    : hir.CandyType.any,
               ))
           .toList(),
       innerDeclarationIds: getInnerDeclarationIds(
