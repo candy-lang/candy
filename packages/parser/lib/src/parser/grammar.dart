@@ -674,6 +674,18 @@ class ParserGrammar {
           body: body,
         );
       })
+      ..complexGrouping<List<dynamic>, Expression, List<dynamic>>(
+        LexerGrammar.WHILE & LexerGrammar.NLs,
+        LexerGrammar.NLs & expression,
+        mapper: (left, value, right) {
+          return WhileExpression(
+            _id++,
+            whileKeyword: left[0] as WhileKeywordToken,
+            condition: value,
+            body: right[1] as Expression,
+          );
+        },
+      )
       ..prefix<ReturnKeywordToken, Expression>(
           (LexerGrammar.RETURN & LexerGrammar.NLs).map((value) => value.first as ReturnKeywordToken),
           mapper: (keyword, expression) {

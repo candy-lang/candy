@@ -1,0 +1,6 @@
+fun main() {
+  while true {
+    print("Hello, world!")
+    continue
+  }
+}
