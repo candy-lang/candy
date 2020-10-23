@@ -728,7 +728,7 @@ class BreakExpressionVisitor extends DoNothingExpressionVisitor {
 
   @override
   void visitBreakExpression(BreakExpression node) {
-    breakTypes.add(node.expression.type);
+    breakTypes.add(node.expression?.type ?? hir.CandyType.unit);
   }
 }
 
@@ -997,7 +997,6 @@ extension on Context {
     }
 
     return Ok([hir.LoopExpression(getId(loop), body, type)]);
-    // TODO: here
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerProperty(
