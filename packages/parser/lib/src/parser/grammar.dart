@@ -279,6 +279,7 @@ class ParserGrammar {
     final typeDeclaration = value[4] as List<dynamic>;
     final initializerDeclaration = value[5] as List<dynamic>;
     return PropertyDeclaration(
+      _id++,
       modifiers: (value[0] as List<ModifierToken>) ?? [],
       letKeyword: value[1] as LetKeywordToken,
       name: value[3] as IdentifierToken,
@@ -675,7 +676,7 @@ class ParserGrammar {
         );
       })
       ..prefix<BreakKeywordToken, Expression>(
-          (LexerGrammar.RETURN & LexerGrammar.NLs)
+          (LexerGrammar.BREAK & LexerGrammar.NLs)
               .map((value) => value.first as BreakKeywordToken),
           mapper: (keyword, expression) {
         return BreakExpression(
@@ -683,7 +684,31 @@ class ParserGrammar {
           breakKeyword: keyword,
           expression: expression,
         );
-      });
+      })
+      ..prefix<List<dynamic>, Expression>(
+        modifiers.optional() &
+            LexerGrammar.LET &
+            LexerGrammar.NLs &
+            LexerGrammar.Identifier &
+            (LexerGrammar.NLs & LexerGrammar.COLON & LexerGrammar.NLs & type)
+                .optional() &
+            LexerGrammar.NLs &
+            LexerGrammar.EQUALS &
+            LexerGrammar.NLs,
+        mapper: (prefix, expression) {
+          final typeDeclaration = prefix[4] as List<dynamic>;
+          return PropertyDeclaration(
+            _id++,
+            modifiers: (prefix[0] as List<ModifierToken>) ?? [],
+            letKeyword: prefix[1] as LetKeywordToken,
+            name: prefix[3] as IdentifierToken,
+            colon: typeDeclaration?.elementAt(1) as OperatorToken,
+            type: typeDeclaration?.elementAt(3) as Type,
+            equals: prefix[6] as OperatorToken,
+            initializer: expression,
+          );
+        },
+      );
 
     _expression.set(builder.build().map((dynamic e) => e as Expression));
   }

@@ -69,6 +69,12 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
+  Option<Expression> visitPropertyExpression(PropertyExpression node) {
+    if (node.id == id) return Some(node);
+    return node.initializer.accept(this);
+  }
+
+  @override
   Option<hir.Expression> visitNavigationExpression(NavigationExpression node) {
     if (node.id == id) return Some(node);
     return node.target.accept(this);
@@ -224,6 +230,8 @@ abstract class Context {
       result = lowerLambdaLiteral(expression);
     } else if (expression is ast.Identifier) {
       result = lowerIdentifier(expression);
+    } else if (expression is ast.PropertyDeclaration) {
+      result = lowerProperty(expression);
     } else if (expression is ast.CallExpression) {
       result = lowerCall(expression);
     } else if (expression is ast.ReturnExpression) {
@@ -827,7 +835,7 @@ extension on Context {
 
     final identifiers = {
       ...parameters,
-      if (functionType.value.receiverType != null)
+      if (functionType.valueOrNull?.receiverType != null)
         'this': functionType.value.receiverType,
     }.mapValues((k, v) => hir.Identifier.parameter(getId(expression), k, v));
     final lambdaContext =
@@ -883,7 +891,7 @@ extension on Context {
               .toList(),
           expressions,
           actualReturnType,
-          functionType.value.receiverType,
+          functionType.valueOrNull?.receiverType,
         ),
       ),
     ]);
@@ -906,6 +914,47 @@ extension on Context {
       for (final identifier in identifiers)
         hir.Expression.identifier(getId(expression), identifier),
     ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerProperty(
+    ast.PropertyDeclaration expression,
+  ) {
+    if (expression.accessors.isNotEmpty) {
+      throw CompilerError.unsupportedFeature(
+        'Accessors for local properties are not yet supported.',
+        location: ErrorLocation(resourceId, expression.representativeSpan),
+      );
+    }
+
+    final type = expression.type != null
+        ? astTypeToHirType(queryContext, Tuple2(moduleId, expression.type))
+        : null;
+
+    final initializer = expression.initializer;
+    if (initializer == null) {
+      throw CompilerError.propertyInitializerMissing(
+        'Local properties must have an initializer.',
+        location: ErrorLocation(resourceId, expression.representativeSpan),
+      );
+    }
+
+    return innerExpressionContext(expressionType: Option.of(type))
+        .lowerUnambiguous(initializer)
+        .mapValue((initializer) {
+      final id = getId(expression);
+      final name = expression.name.name;
+      final actualType = type ?? initializer.type;
+
+      addIdentifier(hir.LocalPropertyIdentifier(id, name, actualType));
+      final result = hir.Expression.property(
+        id,
+        name,
+        actualType,
+        initializer,
+        isMutable: expression.isMutable,
+      );
+      return [result];
+    });
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerCall(
