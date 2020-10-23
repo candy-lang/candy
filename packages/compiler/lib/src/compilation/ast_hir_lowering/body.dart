@@ -208,6 +208,8 @@ abstract class Context {
   List<hir.Identifier> resolveIdentifier(String name);
   void addIdentifier(hir.LocalPropertyIdentifier identifier);
 
+  // hir.CandyType resolveType(hir.CandyType type);
+
   Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveReturn(
     Option<String> label,
   );
@@ -440,8 +442,26 @@ class ContextContext extends Context {
     assert(declarationId.hasParent);
     var moduleId = declarationIdToModuleId(queryContext, declarationId.parent);
     while (true) {
-      final innerIds =
-          getModuleDeclarationHir(queryContext, moduleId).innerDeclarationIds;
+      final declarationId = moduleIdToDeclarationId(queryContext, moduleId);
+      List<DeclarationId> innerIds;
+      if (declarationId.isModule) {
+        innerIds =
+            getModuleDeclarationHir(queryContext, moduleId).innerDeclarationIds;
+      } else if (declarationId.isTrait) {
+        innerIds = getTraitDeclarationHir(queryContext, declarationId)
+            .innerDeclarationIds;
+      } else if (declarationId.isImpl) {
+        innerIds = getImplDeclarationHir(queryContext, declarationId)
+            .innerDeclarationIds;
+      } else if (declarationId.isClass) {
+        innerIds = getClassDeclarationHir(queryContext, declarationId)
+            .innerDeclarationIds;
+      } else {
+        throw CompilerError.internalError(
+          'Lowered a body whose declaration was not inside a module, trait, impl or class.',
+          location: ErrorLocation(resourceId),
+        );
+      }
 
       final matches = innerIds
           .where((id) => id.simplePath.last.nameOrNull == name)
@@ -495,13 +515,7 @@ class FunctionContext extends InnerContext {
           parameter.name.name,
           astTypeToHirType(
             parent.queryContext,
-            Tuple2(
-              declarationIdToModuleId(
-                parent.queryContext,
-                parent.declarationId,
-              ),
-              parameter.type,
-            ),
+            Tuple2(parent.declarationId, parameter.type),
           ),
         ),
     };
@@ -793,7 +807,7 @@ extension on Context {
           if (declaredParameter.type != null) {
             final hirType = astTypeToHirType(
               queryContext,
-              Tuple2(moduleId, declaredParameter.type),
+              Tuple2(declarationId, declaredParameter.type),
             );
             if (!isAssignableTo(queryContext, Tuple2(typeParameter, hirType))) {
               errors.add(CompilerError.invalidExpressionType(
@@ -825,8 +839,10 @@ extension on Context {
             location: ErrorLocation(resourceId, parameter.span),
           ));
         } else {
-          type =
-              astTypeToHirType(queryContext, Tuple2(moduleId, parameter.type));
+          type = astTypeToHirType(
+            queryContext,
+            Tuple2(declarationId, parameter.type),
+          );
         }
         parameters[parameter.name.name] = type;
       }
@@ -927,7 +943,10 @@ extension on Context {
     }
 
     final type = expression.type != null
-        ? astTypeToHirType(queryContext, Tuple2(moduleId, expression.type))
+        ? astTypeToHirType(
+            queryContext,
+            Tuple2(declarationId, expression.type),
+          )
         : null;
 
     final initializer = expression.initializer;

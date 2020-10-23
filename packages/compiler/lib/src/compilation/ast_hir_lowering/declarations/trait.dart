@@ -28,28 +28,27 @@ final getTraitDeclarationAst = Query<DeclarationId, ast.TraitDeclaration>(
 final getTraitDeclarationHir = Query<DeclarationId, hir.TraitDeclaration>(
   'getTraitDeclarationHir',
   provider: (context, declarationId) {
-    final ast = context.callQuery(getTraitDeclarationAst, declarationId);
-    final moduleId = context.callQuery(declarationIdToModuleId, declarationId);
+    final traitAst = context.callQuery(getTraitDeclarationAst, declarationId);
 
     List<hir.UserCandyType> upperBounds;
-    if (ast.bound != null) {
+    if (traitAst.bound != null) {
       final upperBoundType =
-          astTypeToHirType(context, Tuple2(moduleId, ast.bound));
+          astTypeToHirType(context, Tuple2(declarationId, traitAst.bound));
       upperBounds = hirTypeToUserTypes(
         context,
         upperBoundType,
-        ErrorLocation(declarationId.resourceId, ast.bound.span),
+        ErrorLocation(declarationId.resourceId, traitAst.bound.span),
       );
     }
 
     return hir.TraitDeclaration(
-      ast.name.name,
+      traitAst.name.name,
       // ignore: can_be_null_after_null_aware
-      typeParameters: ast.typeParameters?.parameters.orEmpty
+      typeParameters: traitAst.typeParameters?.parameters.orEmpty
           .map((p) => hir.TypeParameter(
                 name: p.name.name,
                 upperBound: p.bound != null
-                    ? astTypeToHirType(context, Tuple2(moduleId, p.bound))
+                    ? astTypeToHirType(context, Tuple2(declarationId, p.bound))
                     : hir.CandyType.any,
               ))
           .toList(),
