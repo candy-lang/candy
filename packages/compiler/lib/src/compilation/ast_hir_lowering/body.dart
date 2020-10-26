@@ -120,6 +120,17 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
+  Option<hir.Expression> visitWhileExpression(WhileExpression node) {
+    if (node.id == id) return Some(node);
+    node.condition.accept(this);
+    for (final expression in node.body) {
+      final result = expression.accept(this);
+      if (result is Some) return result;
+    }
+    return None();
+  }
+
+  @override
   Option<hir.Expression> visitBreakExpression(BreakExpression node) {
     if (node.id == id) return Some(node);
     if (node.expression != null) return node.expression.accept(this);
@@ -232,6 +243,8 @@ abstract class Context {
       result = lowerReturn(expression);
     } else if (expression is ast.LoopExpression) {
       result = lowerLoop(expression);
+    } else if (expression is ast.WhileExpression) {
+      result = lowerWhile(expression);
     } else if (expression is ast.BreakExpression) {
       result = lowerBreak(expression);
     } else if (expression is ast.ContinueExpression) {
@@ -1039,6 +1052,31 @@ extension on Context {
     }
 
     return Ok([hir.LoopExpression(getId(loop), body, type)]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerWhile(
+    ast.WhileExpression whileLoop,
+  ) {
+    final loopContext = LoopContext(this, getId(whileLoop), None());
+
+    final loweredCondition = loopContext
+        .innerExpressionContext(expressionType: Some(CandyType.bool))
+        .lowerUnambiguous(whileLoop.condition);
+    if (loweredCondition is Error) return loweredCondition.mapValue((e) => [e]);
+    final condition = loweredCondition.value;
+
+    final loweredBody = whileLoop.body.expressions.map((expression) {
+      return loopContext
+          .innerExpressionContext(forwardsIdentifiers: true)
+          .lowerUnambiguous(expression);
+    }).merge();
+    if (loweredBody is Error) return loweredBody;
+    final body = loweredBody.value;
+
+    // TODO(marcelgarus): Implement while-else constructs that can also evaluate to something other than unit.
+    return Ok([
+      hir.WhileExpression(getId(whileLoop), condition, body, CandyType.unit),
+    ]);
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerProperty(

@@ -46,6 +46,13 @@ abstract class Expression implements _$Expression {
     CandyType type,
   ) = LoopExpression;
   // ignore: non_constant_identifier_names
+  const factory Expression.while_(
+    DeclarationLocalId id,
+    Expression condition,
+    List<Expression> body,
+    CandyType type,
+  ) = WhileExpression;
+  // ignore: non_constant_identifier_names
   const factory Expression.return_(
     DeclarationLocalId id,
     DeclarationLocalId scopeId, [
@@ -79,6 +86,7 @@ abstract class Expression implements _$Expression {
         },
         return_: (_, __, ___) => CandyType.never,
         loop: (_, __, type) => type,
+        while_: (_, __, ___, type) => type,
         break_: (_, __, ___) => CandyType.never,
         continue_: (_, __) => CandyType.never,
       );
@@ -92,6 +100,7 @@ abstract class Expression implements _$Expression {
         functionCall: (e) => visitor.visitFunctionCallExpression(e),
         return_: (e) => visitor.visitReturnExpression(e),
         loop: (e) => visitor.visitLoopExpression(e),
+        while_: (e) => visitor.visitWhileExpression(e),
         break_: (e) => visitor.visitBreakExpression(e),
         continue_: (e) => visitor.visitContinueExpression(e),
       );
@@ -203,6 +212,7 @@ abstract class ExpressionVisitor<T> {
   T visitFunctionCallExpression(FunctionCallExpression node);
   T visitReturnExpression(ReturnExpression node);
   T visitLoopExpression(LoopExpression node);
+  T visitWhileExpression(WhileExpression node);
   T visitBreakExpression(BreakExpression node);
   T visitContinueExpression(ContinueExpression node);
 }
@@ -226,6 +236,8 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   void visitReturnExpression(ReturnExpression node) {}
   @override
   void visitLoopExpression(LoopExpression node) {}
+  @override
+  void visitWhileExpression(WhileExpression node) {}
   @override
   void visitBreakExpression(BreakExpression node) {}
   @override

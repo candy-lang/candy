@@ -191,6 +191,8 @@ class LexerGrammar {
       string('return').tokenize((_, span) => ReturnKeywordToken(span: span));
   static final LOOP =
       string('loop').tokenize((_, span) => LoopKeywordToken(span: span));
+  static final WHILE =
+      string('while').tokenize((_, span) => WhileKeywordToken(span: span));
   static final BREAK =
       string('break').tokenize((_, span) => BreakKeywordToken(span: span));
   static final CONTINUE = string('continue')
