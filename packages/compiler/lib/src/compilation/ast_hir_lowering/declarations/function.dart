@@ -6,6 +6,7 @@ import '../../hir.dart' as hir;
 import '../../hir/ids.dart';
 import '../type.dart';
 import 'declarations.dart';
+import 'module.dart';
 
 extension FunctionDeclarationId on DeclarationId {
   bool get isFunction =>
@@ -29,7 +30,7 @@ final getFunctionDeclarationHir = Query<DeclarationId, hir.FunctionDeclaration>(
     final functionAst = getFunctionDeclarationAst(context, declarationId);
 
     return hir.FunctionDeclaration(
-      isStatic: functionAst.isStatic,
+      isStatic: functionAst.isStatic || declarationId.parent.isModule,
       name: functionAst.name.name,
       // ignore: can_be_null_after_null_aware
       typeParameters: functionAst.typeParameters?.parameters.orEmpty

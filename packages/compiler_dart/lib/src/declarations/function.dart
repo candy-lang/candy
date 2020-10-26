@@ -29,7 +29,7 @@ final compileFunction = Query<DeclarationId, dart.Method>(
     }
 
     return dart.Method((b) => b
-      ..static = functionHir.isStatic
+      ..static = functionHir.isStatic && declarationId.parent.isNotModule
       ..returns = compileType(context, functionHir.returnType)
       ..name = functionHir.name
       ..types.addAll(functionHir.typeParameters

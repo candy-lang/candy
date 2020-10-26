@@ -47,7 +47,7 @@ final getPropertyDeclarationHir = Query<DeclarationId, hir.PropertyDeclaration>(
     }
 
     return hir.PropertyDeclaration(
-      isStatic: propertyAst.isStatic,
+      isStatic: propertyAst.isStatic || declarationId.parent.isModule,
       isMutable: propertyAst.isMutable,
       name: propertyAst.name.name,
       type: propertyAst.type != null
