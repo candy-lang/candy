@@ -665,9 +665,17 @@ class ParserGrammar {
           );
         },
       )
+      ..prefix<LoopKeywordToken, Expression>(
+          (LexerGrammar.LOOP & LexerGrammar.NLs).map((value) => value.first as LoopKeywordToken),
+          mapper: (keyword, body) {
+        return LoopExpression(
+          _id++,
+          loopKeyword: keyword,
+          body: body as LambdaLiteral,
+        );
+      })
       ..prefix<ReturnKeywordToken, Expression>(
-          (LexerGrammar.RETURN & LexerGrammar.NLs)
-              .map((value) => value.first as ReturnKeywordToken),
+          (LexerGrammar.RETURN & LexerGrammar.NLs).map((value) => value.first as ReturnKeywordToken),
           mapper: (keyword, expression) {
         return ReturnExpression(
           _id++,
@@ -677,8 +685,7 @@ class ParserGrammar {
       })
       ..prefix<BreakKeywordToken, Expression>(
           (LexerGrammar.BREAK & LexerGrammar.NLs)
-              .map((value) => value.first as BreakKeywordToken),
-          mapper: (keyword, expression) {
+              .map((value) => value.first as BreakKeywordToken), mapper: (keyword, expression) {
         return BreakExpression(
           _id++,
           breakKeyword: keyword,
