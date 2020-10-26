@@ -133,18 +133,28 @@ abstract class Identifier implements _$Identifier {
   /// A property or function.
   const factory Identifier.property(
     DeclarationId id,
-    CandyType type, [
+    CandyType type,
+    // ignore: avoid_positional_boolean_parameters
+    bool isMutable, [
     Expression target,
   ]) = PropertyIdentifier;
   const factory Identifier.localProperty(
     DeclarationLocalId id,
     String name,
     CandyType type,
+    // ignore: avoid_positional_boolean_parameters
+    bool isMutable,
   ) = LocalPropertyIdentifier;
 
   factory Identifier.fromJson(Map<String, dynamic> json) =>
       _$IdentifierFromJson(json);
   const Identifier._();
+
+  bool get isMutableOrNull => maybeMap(
+        property: (prop) => prop.isMutable,
+        localProperty: (prop) => prop.isMutable,
+        orElse: () => null,
+      );
 
   CandyType get type => when(
         this_: () => CandyType.this_(),
@@ -153,8 +163,8 @@ abstract class Identifier implements _$Identifier {
         class_: (_) => CandyType.declaration,
         module: (_) => CandyType.declaration,
         parameter: (_, __, type) => type,
-        property: (_, type, __) => type,
-        localProperty: (_, __, type) => type,
+        property: (_, type, __, ___) => type,
+        localProperty: (_, __, type, ___) => type,
       );
 }
 

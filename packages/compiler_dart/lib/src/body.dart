@@ -88,7 +88,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         }
         return _saveSingle(node, dart.refer(name));
       },
-      property: (id, _, target) {
+      property: (id, _, __, target) {
         final name = id.simplePath.last.nameOrNull;
 
         // Generated Dart-functions always use named arguments, which our type
@@ -112,7 +112,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             ),
         ];
       },
-      localProperty: (id, _, __) => _saveSingle(node, _refer(id)),
+      localProperty: (id, _, __, ___) => _saveSingle(node, _refer(id)),
     );
   }
 
@@ -241,7 +241,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   @override
   List<dart.Code> visitAssignmentExpression(AssignmentExpression node) => [
         ...node.right.accept(this),
-        node.left
+        node.left.identifier
             .maybeMap(
               property: (property) => dart.refer(
                   property.id.simplePath.last.nameOrNull ??

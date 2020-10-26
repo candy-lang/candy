@@ -441,6 +441,7 @@ class ContextContext extends Context {
 
     hir.Identifier convertDeclarationId(DeclarationId id) {
       hir.CandyType type;
+      bool isMutable = false;
       if (id.isFunction) {
         final functionHir = getFunctionDeclarationHir(queryContext, id);
         type = hir.CandyType.function(
@@ -450,13 +451,15 @@ class ContextContext extends Context {
           returnType: functionHir.returnType,
         );
       } else if (id.isProperty) {
-        type = getPropertyDeclarationHir(queryContext, id).type;
+        final hir = getPropertyDeclarationHir(queryContext, id);
+        type = hir.type;
+        isMutable = hir.isMutable;
       } else {
         throw CompilerError.unsupportedFeature(
           "Matched identifier `$name`, but it's neither a function nor a property.",
         );
       }
-      return hir.Identifier.property(id, type);
+      return hir.Identifier.property(id, type, isMutable);
     }
 
     // search the current file (from the curent module to the root)
@@ -1122,7 +1125,8 @@ extension on Context {
       final name = expression.name.name;
       final actualType = type ?? initializer.type;
 
-      addIdentifier(hir.LocalPropertyIdentifier(id, name, actualType));
+      addIdentifier(hir.LocalPropertyIdentifier(
+          id, name, actualType, expression.isMutable));
       final result = hir.Expression.property(
         id,
         name,
@@ -1386,6 +1390,12 @@ extension on Context {
       return Error([
         CompilerError.invalidExpressionType('This is not a property.'),
       ]);
+    }
+
+    final isMutable = left.identifier.isMutableOrNull;
+    if (!isMutable) {
+      throw CompilerError.assignmentToImmutable(
+          "Can't assign to immutable property.");
     }
 
     final rightExpression =
