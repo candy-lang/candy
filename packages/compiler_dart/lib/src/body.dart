@@ -66,8 +66,16 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
     return node.identifier.when(
       this_: () => _saveSingle(node, dart.refer('this')),
-      super_: null,
-      module: null,
+      super_: (_) {
+        throw CompilerError.internalError(
+          '`super` is not yet supported in Dart compiler.',
+        );
+      },
+      module: (_) {
+        throw CompilerError.internalError(
+          'Modules are not yet supported in Dart compiler.',
+        );
+      },
       trait: referTraitOrClass,
       class_: referTraitOrClass,
       parameter: (id, name, _) {
