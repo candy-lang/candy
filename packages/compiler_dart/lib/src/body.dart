@@ -215,6 +215,25 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       ];
 
   @override
+  List<dart.Code> visitIfExpression(IfExpression node) {
+    List<dart.Code> visitBody(List<Expression> body) => [
+          for (final expression in body) ...expression.accept(this),
+          if (body.isNotEmpty && body.last.type != CandyType.unit)
+            _refer(node.id).assign(_refer(body.last.id)).statement,
+        ];
+
+    return [
+      ...node.condition.accept(this),
+      dart.literalNull.assignVar(_name(node.id)).statement,
+      dart.Code('\nif (${_name(node.condition.id)}) {'),
+      ...visitBody(node.thenBody),
+      dart.Code('} else {'),
+      ...visitBody(node.elseBody),
+      dart.Code('}'),
+    ];
+  }
+
+  @override
   List<dart.Code> visitLoopExpression(LoopExpression node) => [
         dart.literalNull.assignVar(_name(node.id)).statement,
         dart.Code('${_label(node.id)}:\nwhile (true) {'),

@@ -114,6 +114,22 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
+  Option<hir.Expression> visitIfExpression(IfExpression node) {
+    if (node.id == id) return Some(node);
+    final result = node.condition.accept(this);
+    if (result is Some) return result;
+    for (final expression in node.thenBody) {
+      final result = expression.accept(this);
+      if (result is Some) return result;
+    }
+    for (final expression in node.elseBody) {
+      final result = expression.accept(this);
+      if (result is Some) return result;
+    }
+    return None();
+  }
+
+  @override
   Option<hir.Expression> visitLoopExpression(LoopExpression node) {
     if (node.id == id) return Some(node);
     for (final expression in node.body) {
@@ -254,6 +270,8 @@ abstract class Context {
       result = lowerCall(expression);
     } else if (expression is ast.ReturnExpression) {
       result = lowerReturn(expression);
+    } else if (expression is ast.IfExpression) {
+      result = lowerIf(expression);
     } else if (expression is ast.LoopExpression) {
       result = lowerLoop(expression);
     } else if (expression is ast.WhileExpression) {
@@ -758,6 +776,32 @@ class ExpressionContext extends InnerContext {
   }
 }
 
+class IfContext extends InnerContext {
+  IfContext(
+    Context parent,
+    this.id,
+    this.label,
+  )   : assert(id != null),
+        assert(label != null),
+        super(parent);
+
+  final DeclarationLocalId id;
+  final Option<String> label;
+  final _identifiers = <String, hir.Identifier>{};
+
+  @override
+  void addIdentifier(hir.LocalPropertyIdentifier identifier) {
+    _identifiers[identifier.name] = identifier;
+  }
+
+  @override
+  List<Identifier> resolveIdentifier(String name) {
+    final result = _identifiers[name];
+    if (result != null) return [result];
+    return parent.value.resolveIdentifier(name);
+  }
+}
+
 class LoopContext extends InnerContext {
   LoopContext(
     Context parent,
@@ -1045,6 +1089,48 @@ extension on Context {
     return Ok([
       for (final identifier in identifiers)
         hir.Expression.identifier(getId(expression), identifier),
+    ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerIf(
+    ast.IfExpression theIf,
+  ) {
+    final loweredCondition =
+        innerExpressionContext(expressionType: Some(CandyType.bool))
+            .lowerUnambiguous(theIf.condition);
+    if (loweredCondition is Error) return Error(loweredCondition.error);
+    final condition = loweredCondition.value;
+
+    final thenContext = IfContext(this, getId(theIf), None());
+    final loweredThenBody = theIf.thenBody.expressions.map((expression) {
+      return thenContext
+          .innerExpressionContext(forwardsIdentifiers: true)
+          .lowerUnambiguous(expression);
+    }).merge();
+    if (loweredThenBody is Error) return loweredThenBody;
+    final thenBody = loweredThenBody.value;
+
+    final elseBody = <Expression>[];
+    if (theIf.elseKeyword != null) {
+      assert(theIf.elseBody != null);
+      final thenContext = IfContext(this, getId(theIf), None());
+      final loweredThenBody = theIf.thenBody.expressions.map((expression) {
+        return thenContext
+            .innerExpressionContext(forwardsIdentifiers: true)
+            .lowerUnambiguous(expression);
+      }).merge();
+      if (loweredThenBody is Error) return loweredThenBody;
+      elseBody.addAll(loweredThenBody.value);
+    }
+
+    final type = expressionType.valueOrNull ??
+        hir.CandyType.union([
+          if (thenBody.isNotEmpty) thenBody.last.type,
+          if (elseBody.isNotEmpty) elseBody.last.type,
+        ]);
+
+    return Ok([
+      hir.IfExpression(getId(theIf), condition, thenBody, elseBody, type),
     ]);
   }
 
