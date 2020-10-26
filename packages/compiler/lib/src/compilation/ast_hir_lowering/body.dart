@@ -126,7 +126,8 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   @override
   Option<hir.Expression> visitWhileExpression(WhileExpression node) {
     if (node.id == id) return Some(node);
-    node.condition.accept(this);
+    final result = node.condition.accept(this);
+    if (result is Some) return result;
     for (final expression in node.body) {
       final result = expression.accept(this);
       if (result is Some) return result;
