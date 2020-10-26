@@ -273,6 +273,33 @@ abstract class IfExpression extends Expression implements _$IfExpression {
 }
 
 @freezed
+abstract class LoopExpression extends Expression implements _$LoopExpression {
+  const factory LoopExpression(
+    int id, {
+    @required LoopKeywordToken loopKeyword,
+    @required LambdaLiteral body,
+  }) = _LoopExpression;
+  const LoopExpression._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [loopKeyword, body];
+}
+
+@freezed
+abstract class WhileExpression extends Expression implements _$WhileExpression {
+  const factory WhileExpression(
+    int id, {
+    @required WhileKeywordToken whileKeyword,
+    @required Expression condition,
+    @required LambdaLiteral body,
+  }) = _WhileExpression;
+  const WhileExpression._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [whileKeyword, condition, body];
+}
+
+@freezed
 abstract class ReturnExpression extends Expression
     implements _$ReturnExpression {
   const factory ReturnExpression(

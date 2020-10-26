@@ -9,6 +9,7 @@ import '../body.dart';
 import '../type.dart';
 import 'declarations.dart';
 import 'module.dart';
+import 'trait.dart';
 
 extension PropertyDeclarationId on DeclarationId {
   bool get isProperty =>
@@ -36,6 +37,15 @@ final getPropertyDeclarationHir = Query<DeclarationId, hir.PropertyDeclaration>(
         'Property `${propertyAst.name.name}` is declared without an explicit type or a default value.',
         location:
             ErrorLocation(declarationId.resourceId, propertyAst.name.span),
+      );
+    }
+    if (propertyAst.initializer == null && declarationId.parent.isNotTrait) {
+      throw CompilerError.propertyInitializerMissing(
+        'Properties must have a default value, unless they are declared within a trait.',
+        location: ErrorLocation(
+          declarationId.resourceId,
+          propertyAst.representativeSpan,
+        ),
       );
     }
 

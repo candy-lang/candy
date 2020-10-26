@@ -115,6 +115,27 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
+  Option<hir.Expression> visitLoopExpression(LoopExpression node) {
+    if (node.id == id) return Some(node);
+    for (final expression in node.body) {
+      final result = expression.accept(this);
+      if (result is Some) return result;
+    }
+    return None();
+  }
+
+  @override
+  Option<hir.Expression> visitWhileExpression(WhileExpression node) {
+    if (node.id == id) return Some(node);
+    node.condition.accept(this);
+    for (final expression in node.body) {
+      final result = expression.accept(this);
+      if (result is Some) return result;
+    }
+    return None();
+  }
+
+  @override
   Option<hir.Expression> visitBreakExpression(BreakExpression node) {
     if (node.id == id) return Some(node);
     if (node.expression != null) return node.expression.accept(this);
@@ -151,31 +172,15 @@ final Query<DeclarationId,
       final result = FunctionContext.lowerFunction(context, declarationId);
       // ignore: only_throw_errors, Iterables of errors are also handled.
       if (result is Error) throw result.error;
-
       return Some(result.value);
-      // } else if (declarationId.isProperty) {
-      //   final propertyAst = getPropertyDeclarationAst(context, declarationId);
-      //   if (propertyAst.initializer == null) return None();
+    } else if (declarationId.isProperty) {
+      final propertyAst = getPropertyDeclarationAst(context, declarationId);
+      if (propertyAst.initializer == null) return None();
 
-      //   var type = Option<hir.CandyType>.none();
-      //   if (propertyAst.type != null) {
-      //     final moduleId = declarationIdToModuleId(context, declarationId);
-      //     type = Option.some(
-      //       astTypeToHirType(context, Tuple2(moduleId, propertyAst.type)),
-      //     );
-      //   }
-      //   final localContext =
-      //       _LocalContext.forProperty(context, declarationId, type);
-
-      //   final result = localContext.lowerToUnambiguous(propertyAst.initializer);
-      //   // ignore: only_throw_errors, Iterables of errors are also handled.
-      //   if (result is Error) throw result.error;
-
-      //   final statement = hir.Statement.expression(
-      //     localContext.getId(propertyAst.initializer),
-      //     result.value,
-      //   );
-      //   return Some(Tuple2([statement], localContext.idMap));
+      final result = PropertyContext.lowerProperty(context, declarationId);
+      // ignore: only_throw_errors, Iterables of errors are also handled.
+      if (result is Error) throw result.error;
+      return Some(Tuple2([result.value.first], result.value.second));
     } else {
       throw CompilerError.unsupportedFeature(
         'Unsupported body.',
@@ -245,13 +250,17 @@ abstract class Context {
       result = lowerCall(expression);
     } else if (expression is ast.ReturnExpression) {
       result = lowerReturn(expression);
+    } else if (expression is ast.LoopExpression) {
+      result = lowerLoop(expression);
+    } else if (expression is ast.WhileExpression) {
+      result = lowerWhile(expression);
     } else if (expression is ast.BreakExpression) {
       result = lowerBreak(expression);
     } else if (expression is ast.ContinueExpression) {
       result = lowerContinue(expression);
     } else {
       throw CompilerError.unsupportedFeature(
-        'Unsupported expression.',
+        'Unsupported expression: $expression (`${expression.runtimeType}`).',
         location: ErrorLocation(resourceId, expression.span),
       );
     }
@@ -618,6 +627,46 @@ class FunctionContext extends InnerContext {
   }
 }
 
+class PropertyContext extends InnerContext {
+  factory PropertyContext._create(QueryContext queryContext, DeclarationId id) {
+    final parent = ContextContext(queryContext, id);
+    final ast = getPropertyDeclarationAst(queryContext, id);
+
+    final type = Option.of(ast.type).mapValue(
+        (t) => astTypeToHirType(queryContext, Tuple2(parent.moduleId, t)));
+
+    return PropertyContext._(parent, type, ast.initializer);
+  }
+  PropertyContext._(
+    Context parent,
+    this.type,
+    this.initializer,
+  )   : assert(type != null),
+        assert(initializer != null),
+        super(parent);
+
+  static Result<Tuple2<hir.Expression, BodyAstToHirIds>,
+      List<ReportedCompilerError>> lowerProperty(
+    QueryContext queryContext,
+    DeclarationId id,
+  ) =>
+      PropertyContext._create(queryContext, id)._lowerInitializer();
+
+  final Option<hir.CandyType> type;
+  final ast.Expression initializer;
+
+  @override
+  void addIdentifier(LocalPropertyIdentifier identifier) {}
+
+  Result<Tuple2<hir.Expression, BodyAstToHirIds>, List<ReportedCompilerError>>
+      _lowerInitializer() {
+    final lowered = innerExpressionContext(expressionType: type)
+        .lowerUnambiguous(initializer);
+
+    return lowered.mapValue((e) => Tuple2(e, idMap));
+  }
+}
+
 class LambdaContext extends InnerContext {
   LambdaContext(
     Context parent,
@@ -655,7 +704,7 @@ class LambdaContext extends InnerContext {
 
       return Some(Tuple2(id, returnType));
     }
-    return None();
+    return parent.flatMapValue((context) => context.resolveReturn(label));
   }
 }
 
@@ -687,6 +736,53 @@ class ExpressionContext extends InnerContext {
     if (!forwardsIdentifiers) return;
 
     parent.value.addIdentifier(identifier);
+  }
+}
+
+class LoopContext extends InnerContext {
+  LoopContext(
+    Context parent,
+    this.id,
+    this.label,
+  )   : assert(id != null),
+        assert(label != null),
+        super(parent);
+
+  final DeclarationLocalId id;
+  final Option<String> label;
+  final _identifiers = <String, hir.Identifier>{};
+
+  @override
+  void addIdentifier(hir.LocalPropertyIdentifier identifier) {
+    _identifiers[identifier.name] = identifier;
+  }
+
+  @override
+  List<Identifier> resolveIdentifier(String name) {
+    final result = _identifiers[name];
+    if (result != null) return [result];
+    return parent.value.resolveIdentifier(name);
+  }
+
+  @override
+  Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveBreak(
+    Option<String> label,
+  ) {
+    if (label is None ||
+        label == this.label ||
+        this.label is None && label == Some('loop')) {
+      return Some(Tuple2(id, parent.value.expressionType));
+    }
+    return parent.flatMapValue((context) => context.resolveBreak(label));
+  }
+}
+
+class BreakExpressionVisitor extends DoNothingExpressionVisitor {
+  final breakTypes = <hir.CandyType>{};
+
+  @override
+  void visitBreakExpression(BreakExpression node) {
+    breakTypes.add(node.expression?.type ?? hir.CandyType.unit);
   }
 }
 
@@ -932,6 +1028,55 @@ extension on Context {
     return Ok([
       for (final identifier in identifiers)
         hir.Expression.identifier(getId(expression), identifier),
+    ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerLoop(
+    ast.LoopExpression loop,
+  ) {
+    final loopContext = LoopContext(this, getId(loop), None());
+    final loweredBody = loop.body.expressions.map((expression) {
+      return loopContext
+          .innerExpressionContext(forwardsIdentifiers: true)
+          .lowerUnambiguous(expression);
+    }).merge();
+    if (loweredBody is Error) return loweredBody;
+    final body = loweredBody.value;
+
+    var type = expressionType.valueOrNull;
+    if (type == null) {
+      final visitor = BreakExpressionVisitor();
+      for (final expression in body) {
+        expression.accept(visitor);
+      }
+      type = hir.CandyType.union(visitor.breakTypes.toList());
+    }
+
+    return Ok([hir.LoopExpression(getId(loop), body, type)]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerWhile(
+    ast.WhileExpression whileLoop,
+  ) {
+    final loopContext = LoopContext(this, getId(whileLoop), None());
+
+    final loweredCondition = loopContext
+        .innerExpressionContext(expressionType: Some(CandyType.bool))
+        .lowerUnambiguous(whileLoop.condition);
+    if (loweredCondition is Error) return loweredCondition.mapValue((e) => [e]);
+    final condition = loweredCondition.value;
+
+    final loweredBody = whileLoop.body.expressions.map((expression) {
+      return loopContext
+          .innerExpressionContext(forwardsIdentifiers: true)
+          .lowerUnambiguous(expression);
+    }).merge();
+    if (loweredBody is Error) return loweredBody;
+    final body = loweredBody.value;
+
+    // TODO(marcelgarus): Implement while-else constructs that can also evaluate to something other than unit.
+    return Ok([
+      hir.WhileExpression(getId(whileLoop), condition, body, CandyType.unit),
     ]);
   }
 
