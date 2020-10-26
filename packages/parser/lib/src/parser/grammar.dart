@@ -659,9 +659,9 @@ class ParserGrammar {
             _id++,
             ifKeyword: left[0] as IfKeywordToken,
             condition: value,
-            thenExpression: right[1] as Expression,
+            thenBody: right[1] as LambdaLiteral,
             elseKeyword: elsePart?.elementAt(1) as ElseKeywordToken,
-            elseExpression: elsePart?.elementAt(3) as Expression,
+            elseBody: elsePart?.elementAt(3) as LambdaLiteral,
           );
         },
       )
