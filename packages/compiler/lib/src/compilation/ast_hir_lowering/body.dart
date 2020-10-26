@@ -633,7 +633,7 @@ class PropertyContext extends InnerContext {
     final ast = getPropertyDeclarationAst(queryContext, id);
 
     final type = Option.of(ast.type).mapValue(
-        (t) => astTypeToHirType(queryContext, Tuple2(parent.moduleId, t)));
+        (t) => astTypeToHirType(queryContext, Tuple2(parent.declarationId, t)));
 
     return PropertyContext._(parent, type, ast.initializer);
   }
