@@ -94,7 +94,7 @@ abstract class Expression implements _$Expression {
         while_: (_, __, ___, type) => type,
         break_: (_, __, ___) => CandyType.never,
         continue_: (_, __) => CandyType.never,
-        assignment: (_, left, __) => left.type,
+        assignment: (_, left, __) => right.type,
       );
 
   T accept<T>(ExpressionVisitor<T> visitor) => map(
