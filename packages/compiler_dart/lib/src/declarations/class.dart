@@ -50,7 +50,7 @@ final compileClass = Query<DeclarationId, dart.Class>(
         ..annotations.add(dart.refer('override', dartCoreUrl))
         ..returns = compileType(context, function.returnType)
         ..name = function.name
-        ..optionalParameters
+        ..requiredParameters
             .addAll(compileParameters(context, function.valueParameters))
         ..body = compileBody(context, id).value);
     });
@@ -79,7 +79,7 @@ final compileClass = Query<DeclarationId, dart.Class>(
             ..name = functionHir.name
             ..types.addAll(functionHir.typeParameters
                 .map((p) => compileTypeParameter(context, p)))
-            ..optionalParameters
+            ..requiredParameters
                 .addAll(compileParameters(context, functionHir.valueParameters))
             ..body = compileBody(context, id).value);
         });

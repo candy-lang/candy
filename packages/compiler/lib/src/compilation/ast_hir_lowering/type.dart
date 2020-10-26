@@ -11,6 +11,7 @@ import 'declarations/function.dart';
 import 'declarations/impl.dart';
 import 'declarations/module.dart';
 import 'declarations/trait.dart';
+import 'declarations/property.dart';
 import 'general.dart';
 
 /// Resolves an AST-type in the given module to a HIR-type.
@@ -133,33 +134,8 @@ Option<hir.CandyType /*hir.UserCandyType | hir.ParameterCandyType */ >
   DeclarationId declarationId,
   ast.UserType type,
 ) {
-  if (type.simpleTypes.length == 1) {
-    final name = type.simpleTypes.single.name.name;
-
-    List<hir.TypeParameter> typeParameters;
-    if (declarationId.isTrait) {
-      final traitHir = getTraitDeclarationHir(context, declarationId);
-      typeParameters = traitHir.typeParameters;
-    } else if (declarationId.isImpl) {
-      final implHir = getImplDeclarationHir(context, declarationId);
-      typeParameters = implHir.typeParameters;
-    } else if (declarationId.isClass) {
-      final classHir = getClassDeclarationHir(context, declarationId);
-      typeParameters = classHir.typeParameters;
-    } else if (declarationId.isFunction) {
-      final functionHir = getFunctionDeclarationHir(context, declarationId);
-      typeParameters = functionHir.typeParameters;
-    }
-
-    if (typeParameters != null) {
-      final matches = typeParameters.where((p) => p.name == name);
-      assert(matches.length <= 1);
-
-      if (matches.isNotEmpty) {
-        return Some(hir.CandyType.parameter(name, declarationId));
-      }
-    }
-  }
+  final result = _resolveAstUserTypeInParameters(context, declarationId, type);
+  if (result.isSome) return result;
 
   final resourceId = declarationId.resourceId;
   var currentModuleId = declarationIdToModuleId(context, declarationId);
@@ -209,4 +185,61 @@ Option<hir.CandyType /*hir.UserCandyType | hir.ParameterCandyType */ >
     currentModuleDeclarationId = newDeclarationId.value;
   }
   return Option.none();
+}
+
+Option<hir.ParameterCandyType> _resolveAstUserTypeInParameters(
+  QueryContext context,
+  DeclarationId declarationId,
+  ast.UserType type,
+) {
+  if (type.simpleTypes.length == 1) {
+    final name = type.simpleTypes.single.name.name;
+
+    var typeParameters = <hir.TypeParameter>[];
+    if (declarationId.isTrait) {
+      final traitHir = getTraitDeclarationHir(context, declarationId);
+      typeParameters = traitHir.typeParameters;
+    } else if (declarationId.isImpl) {
+      final implHir = getImplDeclarationHir(context, declarationId);
+      typeParameters = implHir.typeParameters;
+    } else if (declarationId.isClass) {
+      final classHir = getClassDeclarationHir(context, declarationId);
+      typeParameters = classHir.typeParameters;
+    } else if (declarationId.isFunction) {
+      final functionHir = getFunctionDeclarationHir(context, declarationId);
+      typeParameters = functionHir.typeParameters;
+    }
+
+    var matches = typeParameters.where((p) => p.name == name);
+    if (matches.isNotEmpty) {
+      return Some(hir.ParameterCandyType(name, declarationId));
+    }
+
+    DeclarationId parentId;
+    if (declarationId.isFunction) {
+      final functionHir = getFunctionDeclarationHir(context, declarationId);
+      if (!functionHir.isStatic) parentId = declarationId.parent;
+    } else if (declarationId.isProperty) {
+      final propertyHir = getPropertyDeclarationHir(context, declarationId);
+      if (!propertyHir.isStatic) parentId = declarationId.parent;
+    }
+    if (parentId == null) return None();
+
+    if (parentId.isTrait) {
+      final traitHir = getTraitDeclarationHir(context, parentId);
+      typeParameters = traitHir.typeParameters;
+    } else if (parentId.isImpl) {
+      final implHir = getImplDeclarationHir(context, parentId);
+      typeParameters = implHir.typeParameters;
+    } else if (parentId.isClass) {
+      final classHir = getClassDeclarationHir(context, parentId);
+      typeParameters = classHir.typeParameters;
+    }
+
+    matches = typeParameters.where((p) => p.name == name);
+    if (matches.isNotEmpty) {
+      return Some(hir.ParameterCandyType(name, declarationId));
+    }
+    return None();
+  }
 }

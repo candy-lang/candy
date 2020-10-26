@@ -97,10 +97,10 @@ abstract class Identifier implements _$Identifier {
   const factory Identifier.this_() = ThisIdentifier;
   // ignore: non_constant_identifier_names
   const factory Identifier.super_(UserCandyType type) = SuperIdentifier;
-  const factory Identifier.module(ModuleId id) = ModuleIdentifier;
-  const factory Identifier.trait(DeclarationId id) = TraitIdentifier;
-  // ignore: non_constant_identifier_names
-  const factory Identifier.class_(DeclarationId id) = ClassIdentifier;
+  const factory Identifier.reflection(
+    DeclarationId id, [
+    IdentifierExpression base,
+  ]) = ReflectionIdentifier;
 
   const factory Identifier.parameter(
     DeclarationLocalId id,
@@ -111,9 +111,10 @@ abstract class Identifier implements _$Identifier {
   /// A property or function.
   const factory Identifier.property(
     DeclarationId id,
-    CandyType type, [
-    Expression target,
-  ]) = PropertyIdentifier;
+    CandyType type, {
+    Expression base,
+    Expression receiver,
+  }) = PropertyIdentifier;
   const factory Identifier.localProperty(
     DeclarationLocalId id,
     String name,
@@ -127,11 +128,9 @@ abstract class Identifier implements _$Identifier {
   CandyType get type => when(
         this_: () => CandyType.this_(),
         super_: (type) => type,
-        trait: (_) => CandyType.declaration,
-        class_: (_) => CandyType.declaration,
-        module: (_) => CandyType.declaration,
+        reflection: (declarationId, _) => CandyType.reflection(declarationId),
         parameter: (_, __, type) => type,
-        property: (_, type, __) => type,
+        property: (_, type, __, ___) => type,
         localProperty: (_, __, type) => type,
       );
 }

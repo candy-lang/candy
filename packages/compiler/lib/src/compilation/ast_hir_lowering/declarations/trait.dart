@@ -30,7 +30,7 @@ final getTraitDeclarationHir = Query<DeclarationId, hir.TraitDeclaration>(
   provider: (context, declarationId) {
     final traitAst = context.callQuery(getTraitDeclarationAst, declarationId);
 
-    List<hir.UserCandyType> upperBounds;
+    var upperBounds = <hir.UserCandyType>[];
     if (traitAst.bound != null) {
       final upperBoundType =
           astTypeToHirType(context, Tuple2(declarationId, traitAst.bound));

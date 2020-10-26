@@ -39,9 +39,14 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   @override
   Option<hir.Expression> visitIdentifierExpression(IdentifierExpression node) {
     if (node.id == id) return Some(node);
-    if (node.identifier is hir.PropertyIdentifier) {
-      final target = (node.identifier as hir.PropertyIdentifier).target;
-      if (target != null) return target.accept(this);
+    if (node.identifier is hir.ReflectionIdentifier) {
+      final base = (node.identifier as hir.ReflectionIdentifier).base;
+      if (base != null) return base.accept(this);
+    } else if (node.identifier is hir.PropertyIdentifier) {
+      final base = (node.identifier as hir.PropertyIdentifier).base;
+      if (base != null) return base.accept(this);
+      final receiver = (node.identifier as hir.PropertyIdentifier).receiver;
+      if (receiver != null) return receiver.accept(this);
     }
     return None();
   }
@@ -234,6 +239,8 @@ abstract class Context {
       result = lowerIdentifier(expression);
     } else if (expression is ast.PropertyDeclaration) {
       result = lowerProperty(expression);
+    } else if (expression is ast.NavigationExpression) {
+      result = lowerNavigation(expression);
     } else if (expression is ast.CallExpression) {
       result = lowerCall(expression);
     } else if (expression is ast.ReturnExpression) {
@@ -419,23 +426,19 @@ class ContextContext extends Context {
     // TODO: check whether properties/functions are static or not and whether we have an instance
 
     hir.Identifier convertDeclarationId(DeclarationId id) {
-      hir.CandyType type;
-      if (id.isFunction) {
+      if (id.isModule || id.isTrait || id.isClass) {
+        return hir.Identifier.reflection(id);
+      } else if (id.isFunction) {
         final functionHir = getFunctionDeclarationHir(queryContext, id);
-        type = hir.CandyType.function(
-          parameterTypes: [
-            for (final parameter in functionHir.valueParameters) parameter.type,
-          ],
-          returnType: functionHir.returnType,
-        );
+        return hir.Identifier.property(id, functionHir.functionType);
       } else if (id.isProperty) {
-        type = getPropertyDeclarationHir(queryContext, id).type;
+        final propertyHir = getPropertyDeclarationHir(queryContext, id);
+        return hir.Identifier.property(id, propertyHir.type);
       } else {
         throw CompilerError.unsupportedFeature(
-          "Matched identifier `$name`, but it's neither a function nor a property.",
+          "Matched identifier `$name`, but it's not a module, trait, class, function, or a property.",
         );
       }
-      return hir.Identifier.property(id, type);
     }
 
     // search the current file (from the curent module to the root)
@@ -974,6 +977,233 @@ extension on Context {
       );
       return [result];
     });
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerNavigation(
+    ast.NavigationExpression expression,
+  ) {
+    final loweredTarget =
+        innerExpressionContext().lowerUnambiguous(expression.target);
+    if (loweredTarget is Error) return Error(loweredTarget.error);
+    final target = loweredTarget.value;
+    final name = expression.name.name;
+
+    List<hir.PropertyIdentifier> getMatchesForType(hir.UserCandyType type) {
+      final receiverId =
+          moduleIdToDeclarationId(queryContext, type.virtualModuleId);
+      return getInnerDeclarationIds(queryContext, receiverId)
+          .where((id) => id.simplePath.last.nameOrNull == name)
+          .mapNotNull((id) {
+        if (id.isModule || id.isTrait || id.isClass) return null;
+        if (id.isProperty) {
+          final propertyHir = getPropertyDeclarationHir(queryContext, id);
+          if (propertyHir.isStatic) return null;
+          return hir.PropertyIdentifier(
+            id,
+            propertyHir.type,
+            base: target,
+            receiver: target,
+          );
+        } else if (id.isFunction) {
+          final functionHir = getFunctionDeclarationHir(queryContext, id);
+          if (functionHir.isStatic) return null;
+          return hir.PropertyIdentifier(
+            id,
+            functionHir.functionType,
+            base: target,
+            receiver: target,
+          );
+        } else {
+          throw CompilerError.internalError(
+            'Identifier resolved to an invalid declaration type: `$id`.',
+            location: ErrorLocation(resourceId, expression.name.span),
+          );
+        }
+      }).toList();
+    }
+
+    Result<List<hir.Expression>, List<ReportedCompilerError>> lower(
+        hir.CandyType type) {
+      return type.map(
+        user: (type) {
+          final matches = getMatchesForType(type)
+              .map((m) => hir.IdentifierExpression(getId(expression), m));
+          if (matches.isEmpty) {
+            final receiverId =
+                moduleIdToDeclarationId(queryContext, type.virtualModuleId);
+            return Error([
+              CompilerError.unknownInnerDeclaration(
+                // TODO(JonasWanke): better error description
+                "Declaration `$receiverId` doesn't contain an instance declaration called '$name'.",
+                location: ErrorLocation(resourceId, expression.name.span),
+              ),
+            ]);
+          }
+          return Ok(matches.toList());
+        },
+        this_: (_) {
+          final type =
+              getPropertyDeclarationParentAsType(queryContext, declarationId)
+                  .value;
+          final matches = getMatchesForType(type)
+              .map((m) => hir.IdentifierExpression(getId(expression), m));
+          if (matches.isEmpty) {
+            return Error([
+              CompilerError.unknownInnerDeclaration(
+                // TODO(JonasWanke): better error description
+                "`This` doesn't contain an instance declaration called '$name'.",
+                location: ErrorLocation(resourceId, expression.name.span),
+              ),
+            ]);
+          }
+          return Ok(matches.toList());
+        },
+        tuple: (type) {
+          const fieldNames = [
+            'first',
+            'second',
+            'third',
+            'fourth',
+            'fifth',
+            'sixth',
+            'seventh',
+            'eight',
+            'nineth',
+            'tenth',
+          ];
+          final fieldIndex = fieldNames.indexOf(name);
+          final tupleSize = type.items.length;
+          if (fieldIndex >= 0 && fieldIndex < tupleSize) {
+            return Ok([
+              hir.Expression.identifier(
+                getId(expression),
+                hir.Identifier.property(
+                  DeclarationId(ResourceId(
+                    PackageId.core,
+                    '$srcDirectoryName/primitives$candyFileExtension',
+                  ))
+                      .inner(DeclarationPathData.class_('Tuple$tupleSize'))
+                      .inner(DeclarationPathData.property(name)),
+                  type.items[fieldIndex],
+                  base: target,
+                  receiver: target,
+                ),
+              ),
+            ]);
+          }
+
+          return Error([
+            CompilerError.unsupportedFeature(
+              "Tuple type `$type` doesn't contain a property called '$name'.",
+              location: ErrorLocation(resourceId, expression.name.span),
+            ),
+          ]);
+        },
+        function: (type) {
+          return Error([
+            CompilerError.unsupportedFeature(
+              "Function type `$type` doesn't contain a property called '$name'.",
+              location: ErrorLocation(resourceId, expression.name.span),
+            ),
+          ]);
+        },
+        union: (type) {
+          return Error([
+            CompilerError.unsupportedFeature(
+              "Union type `$type` doesn't contain a property called '$name'.",
+              location: ErrorLocation(resourceId, expression.name.span),
+            ),
+          ]);
+        },
+        intersection: (type) {
+          if (type.types.any((t) => t is! hir.UserCandyType)) {
+            return Error([
+              CompilerError.unsupportedFeature(
+                'Property access on expressions whose type is a non-simple intersection type is not yet supported.',
+                location: ErrorLocation(resourceId, expression.name.span),
+              ),
+            ]);
+          }
+
+          final matches = type.types
+              .map((t) => getMatchesForType(type as hir.UserCandyType));
+          final nonEmptyMatches = matches.where((m) => m.isNotEmpty);
+          if (nonEmptyMatches.isEmpty) {
+            return Error([
+              CompilerError.unsupportedFeature(
+                'No variants of the intersection type define a property or function with that name, which is not supported yet.',
+                location: ErrorLocation(resourceId, expression.name.span),
+              ),
+            ]);
+          } else if (nonEmptyMatches.length > 1) {
+            return Error([
+              CompilerError.unsupportedFeature(
+                'Multiple variants of the intersection type define properties/functions with this name, which is not supported yet.',
+                location: ErrorLocation(resourceId, expression.name.span),
+              ),
+            ]);
+          }
+
+          final finalMatches = nonEmptyMatches.single
+              .map((i) => hir.Expression.identifier(getId(expression), i))
+              .toList();
+          return Ok(finalMatches);
+        },
+        parameter: (type) => lower(getTypeParameterBound(queryContext, type)),
+        reflection: (targetType) {
+          final targetId = targetType.declarationId;
+          // Only `IdentifierExpression`s containing a `ReflectionIdentifier` can
+          // lead to a reflection type.
+          final reflectionTarget = target as hir.IdentifierExpression;
+
+          final innerIds = getInnerDeclarationIds(queryContext, targetId);
+          final matches = innerIds
+              .where((id) => id.simplePath.last.nameOrNull == name)
+              .map((id) {
+            hir.Identifier identifier;
+            if (id.isModule || id.isTrait || id.isClass) {
+              identifier = hir.Identifier.reflection(id, reflectionTarget);
+            } else if (id.isProperty) {
+              final propertyHir = getPropertyDeclarationHir(queryContext, id);
+              identifier = propertyHir.isStatic
+                  ? hir.Identifier.property(
+                      id,
+                      propertyHir.type,
+                      base: reflectionTarget,
+                    )
+                  : hir.Identifier.reflection(id, reflectionTarget);
+            } else if (id.isFunction) {
+              final functionHir = getFunctionDeclarationHir(queryContext, id);
+              identifier = functionHir.isStatic
+                  ? hir.Identifier.property(
+                      id,
+                      functionHir.functionType,
+                      base: reflectionTarget,
+                    )
+                  : hir.Identifier.reflection(id, reflectionTarget);
+            } else {
+              throw CompilerError.internalError(
+                'Identifier resolved to an invalid declaration type: `$id`.',
+                location: ErrorLocation(resourceId, expression.name.span),
+              );
+            }
+            return hir.Expression.identifier(getId(expression), identifier);
+          });
+          if (matches.isEmpty) {
+            return Error([
+              CompilerError.unknownInnerDeclaration(
+                // TODO(JonasWanke): better error description
+                "Declaration `$targetId` doesn't contain an inner declaration called '$name'.",
+                location: ErrorLocation(resourceId, expression.name.span),
+              ),
+            ]);
+          }
+          return Ok(matches.toList());
+        },
+      );
+    }
+
+    return lower(target.type);
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerCall(
