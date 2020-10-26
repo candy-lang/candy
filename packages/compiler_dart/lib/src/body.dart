@@ -43,66 +43,13 @@ dart.Expression _compileExpression(
   assert(expressions.isNotEmpty);
   assert(expressions.last is dart.ToCodeExpression);
 
-  return dart.Method(
-          (b) => b..body = dart.Block((b) => b.statements.addAll(expressions)))
-      .closure
-      .call([], {}, []);
+  final returnStatement =
+      DartExpressionVisitor._refer(expression.id).returned.statement;
+  return dart.Method((b) => b
+    ..body = dart.Block((b) => b
+      ..statements.addAll(expressions)
+      ..statements.add(returnStatement))).closure.call([], {}, []);
 }
-
-// dart.Expression _compileExpression(
-//     QueryContext context, Expression expression) {
-//   return expression.when(
-//     identifier: (id, identifier) => identifier.when(
-//       this_: () => dart.refer('this'),
-//       super_: (_) => dart.refer('super'),
-//       it: null,
-//       field: null,
-//       module: (id) => ModuleExpression(context, id),
-//       trait: null,
-//       class_: null,
-//       parameter: null,
-//       property: (target, name, _) {
-//         final compiledTarget = _compileExpression(context, target);
-//         if (compiledTarget is ModuleExpression) {
-//           final currentModuleId =
-//               declarationIdToModuleId(context, expression.id.declarationId);
-//           if (compiledTarget.moduleId == currentModuleId) {
-//             return dart.refer(name);
-//           }
-
-//           return dart.refer(
-//             name,
-//             moduleIdToImportUrl(context, compiledTarget.moduleId),
-//           );
-//         }
-//         return compiledTarget.property(name);
-//       },
-//       localProperty: null,
-//     ),
-//     functionCall: null,
-//     // functionCall: (id, target, arguments) {
-//     //   final functionId = getPropertyIdentifierDeclarationId(
-//     //     context,
-//     //     target.identifier as PropertyIdentifier,
-//     //   );
-//     //   final parameters =
-//     //       getFunctionDeclarationHir(context, functionId).parameters;
-//     //   return dart.InvokeExpression.newOf(
-//     //     _compileExpression(context, target),
-//     //     [
-//     //       for (final parameter in parameters)
-//     //         _compileExpression(context, arguments[parameter.name]),
-//     //     ],
-//     //     {},
-//     //     [],
-//     //   );
-//     // },
-//     return_: (id, _, expression) {
-//       // TODO(JonasWanke): non-local returns
-//       return _compileExpression(context, expression).returned;
-//     },
-//   );
-// }
 
 class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   const DartExpressionVisitor(this.context) : assert(context != null);
@@ -281,8 +228,8 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         dart.Code('continue ${_label(node.scopeId)};'),
       ];
 
-  String _name(DeclarationLocalId id) => '_${id.value}';
-  dart.Expression _refer(DeclarationLocalId id) => dart.refer(_name(id));
+  static String _name(DeclarationLocalId id) => '_${id.value}';
+  static dart.Expression _refer(DeclarationLocalId id) => dart.refer(_name(id));
   dart.Code _save(
     Expression source,
     dart.Expression lowered, {
