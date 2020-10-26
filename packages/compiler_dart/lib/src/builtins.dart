@@ -20,8 +20,8 @@ abstract class BuiltinCompiler<Output> {
       return compileToString();
     } else if (moduleId == ModuleId.corePrimitives.nested(['Unit'])) {
       return compileUnit();
-    } else if (moduleId == ModuleId.corePrimitives.nested(['Nothing'])) {
-      return compileNothing();
+    } else if (moduleId == ModuleId.corePrimitives.nested(['Never'])) {
+      return compileNever();
     } else if (moduleId == ModuleId.corePrimitives.nested(['Bool'])) {
       return compileBool();
     } else if (moduleId == ModuleId.corePrimitives.nested(['Number'])) {
@@ -59,7 +59,7 @@ abstract class BuiltinCompiler<Output> {
   Option<Output> compileToString();
 
   Option<Output> compileUnit();
-  Option<Output> compileNothing();
+  Option<Output> compileNever();
 
   Option<Output> compileBool();
 
@@ -77,54 +77,54 @@ abstract class BuiltinCompiler<Output> {
 class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
   @override
   Option<dart.Spec> compileAny() {
-    // `Any` corresponds to `Object`, hence nothing to do.
+    // `Any` corresponds to `Object`, hence Never to do.
     return Option.none();
   }
 
   @override
   Option<dart.Spec> compileToString() {
-    // `ToString` is given by Dart's `Object`, hence nothing to do.
+    // `ToString` is given by Dart's `Object`, hence Never to do.
     return Option.none();
   }
 
   @override
   Option<dart.Spec> compileUnit() {
-    // `Unit` corresponds to `void`, hence nothing to do.
+    // `Unit` corresponds to `void`, hence Never to do.
     return Option.none();
   }
 
   @override
-  Option<dart.Spec> compileNothing() {
-    return Option.some(dart.Class((b) => b..name = 'Nothing'));
+  Option<dart.Spec> compileNever() {
+    return Option.some(dart.Class((b) => b..name = 'Never'));
   }
 
   @override
   Option<dart.Spec> compileBool() {
-    // `Bool` corresponds to `bool`, hence nothing to do.
+    // `Bool` corresponds to `bool`, hence Never to do.
     return Option.none();
   }
 
   @override
   Option<dart.Spec> compileNumber() {
-    // `Number` corresponds to `num`, hence nothing to do.
+    // `Number` corresponds to `num`, hence Never to do.
     return Option.none();
   }
 
   @override
   Option<dart.Spec> compileInt() {
-    // `Int` corresponds to `int`, hence nothing to do.
+    // `Int` corresponds to `int`, hence Never to do.
     return Option.none();
   }
 
   @override
   Option<dart.Spec> compileFloat() {
-    // `Float` corresponds to `double`, hence nothing to do.
+    // `Float` corresponds to `double`, hence Never to do.
     return Option.none();
   }
 
   @override
   Option<dart.Spec> compileString() {
-    // `String` corresponds to `String`, hence nothing to do.
+    // `String` corresponds to `String`, hence Never to do.
     return Option.none();
   }
 
