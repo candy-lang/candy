@@ -51,7 +51,10 @@ final getPropertyDeclarationHir = Query<DeclarationId, hir.PropertyDeclaration>(
       isMutable: propertyAst.isMutable,
       name: propertyAst.name.name,
       type: propertyAst.type != null
-          ? astTypeToHirType(context, Tuple2(declarationId, propertyAst.type))
+          ? astTypeToHirType(
+              context,
+              Tuple2(declarationId.parent, propertyAst.type),
+            )
           : initializer.type,
       initializer: initializer,
       innerDeclarationIds: getInnerDeclarationIds(context, declarationId),
