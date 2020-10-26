@@ -243,10 +243,13 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         ...node.right.accept(this),
         node.left
             .maybeMap(
-              property: (prop) => throw CompilerError.unsupportedFeature('For '
-                  'now, the left side of an assignment can only be a local '
-                  'property identifier.'),
-              localProperty: (prop) => _refer(prop.id),
+              property: (property) => dart.refer(
+                  property.id.simplePath.last.nameOrNull ??
+                      (throw CompilerError.internalError(
+                          'Path must be path to property.')),
+                  declarationIdToImportUrl(context, property.id.parent)),
+              localProperty: (property) =>
+                  _refer(getExpression(context, property.id).value.id),
               orElse: () => throw CompilerError.internalError('Left side of '
                   'assignment can only be property or local property '
                   'identifier, but was ${node.left.runtimeType} '

@@ -71,7 +71,7 @@ abstract class Expression implements _$Expression {
   ) = ContinueExpression;
   const factory Expression.assignment(
     DeclarationLocalId id,
-    Identifier left,
+    IdentifierExpression left,
     Expression right,
   ) = AssignmentExpression;
 

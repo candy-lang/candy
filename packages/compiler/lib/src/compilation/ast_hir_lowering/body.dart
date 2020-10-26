@@ -1381,12 +1381,8 @@ extension on Context {
       ]);
     }
     final left = leftSome as IdentifierExpression;
-    final identifier = left.identifier;
-    if (identifier is PropertyIdentifier) {
-      // TODO: assert that it's mutable.
-    } else if (identifier is LocalPropertyIdentifier) {
-      // TODO: assert that it's mutable.
-    } else {
+    if (left.identifier is! hir.PropertyIdentifier &&
+        left.identifier is! hir.LocalPropertyIdentifier) {
       return Error([
         CompilerError.invalidExpressionType('This is not a property.'),
       ]);
@@ -1398,6 +1394,6 @@ extension on Context {
     if (rightExpression is Error) return Error(rightExpression.error);
     final right = rightExpression.value;
 
-    return Ok([hir.AssignmentExpression(getId(expression), identifier, right)]);
+    return Ok([hir.AssignmentExpression(getId(expression), left, right)]);
   }
 }
