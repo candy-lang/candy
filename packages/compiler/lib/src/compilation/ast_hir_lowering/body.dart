@@ -266,11 +266,26 @@ abstract class Context {
     }
 
     assert(result != null);
-    assert(result is Error ||
-        result.value.isNotEmpty &&
-            result.value.every((r) => isValidExpressionType(r.type)));
-    assert(result is Ok || result.error.isNotEmpty);
-    return result;
+    if (result is Error) {
+      assert(result.error.isNotEmpty);
+      return result;
+    }
+
+    assert(result.value.isNotEmpty);
+    final actualResults =
+        result.value.where((r) => isValidExpressionType(r.type));
+    if (actualResults.isEmpty) {
+      final possibleTypes = {
+        for (final variant in result.value) variant.type,
+      }.map((t) => '`$t`').toList().join(' or ');
+      return Error([
+        CompilerError.invalidExpressionType(
+          'Expected type `${expressionType.value}`, got $possibleTypes.',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    }
+    return Ok(actualResults.toList());
   }
 
   Result<hir.Expression, List<ReportedCompilerError>> lowerUnambiguous(
@@ -806,24 +821,8 @@ extension on Context {
     final token = expression.value;
     hir.Literal literal;
     if (token is ast.BoolLiteralToken) {
-      if (!isValidExpressionType(hir.CandyType.bool)) {
-        return Error([
-          CompilerError.invalidExpressionType(
-            'Expected type `${expressionType.value}`, got `Bool`',
-            location: ErrorLocation(resourceId, expression.span),
-          ),
-        ]);
-      }
       literal = hir.Literal.boolean(token.value);
     } else if (token is ast.IntLiteralToken) {
-      if (!isValidExpressionType(hir.CandyType.int)) {
-        return Error([
-          CompilerError.invalidExpressionType(
-            'Expected type `${expressionType.value}`, got `Int`',
-            location: ErrorLocation(resourceId, expression.span),
-          ),
-        ]);
-      }
       literal = hir.Literal.integer(token.value);
     } else {
       throw CompilerError.unsupportedFeature(
