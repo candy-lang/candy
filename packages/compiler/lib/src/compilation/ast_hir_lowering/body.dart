@@ -179,31 +179,15 @@ final Query<DeclarationId,
       final result = FunctionContext.lowerFunction(context, declarationId);
       // ignore: only_throw_errors, Iterables of errors are also handled.
       if (result is Error) throw result.error;
-
       return Some(result.value);
-      // } else if (declarationId.isProperty) {
-      //   final propertyAst = getPropertyDeclarationAst(context, declarationId);
-      //   if (propertyAst.initializer == null) return None();
+    } else if (declarationId.isProperty) {
+      final propertyAst = getPropertyDeclarationAst(context, declarationId);
+      if (propertyAst.initializer == null) return None();
 
-      //   var type = Option<hir.CandyType>.none();
-      //   if (propertyAst.type != null) {
-      //     final moduleId = declarationIdToModuleId(context, declarationId);
-      //     type = Option.some(
-      //       astTypeToHirType(context, Tuple2(moduleId, propertyAst.type)),
-      //     );
-      //   }
-      //   final localContext =
-      //       _LocalContext.forProperty(context, declarationId, type);
-
-      //   final result = localContext.lowerToUnambiguous(propertyAst.initializer);
-      //   // ignore: only_throw_errors, Iterables of errors are also handled.
-      //   if (result is Error) throw result.error;
-
-      //   final statement = hir.Statement.expression(
-      //     localContext.getId(propertyAst.initializer),
-      //     result.value,
-      //   );
-      //   return Some(Tuple2([statement], localContext.idMap));
+      final result = PropertyContext.lowerProperty(context, declarationId);
+      // ignore: only_throw_errors, Iterables of errors are also handled.
+      if (result is Error) throw result.error;
+      return Some(Tuple2([result.value.first], result.value.second));
     } else {
       throw CompilerError.unsupportedFeature(
         'Unsupported body.',
@@ -479,8 +463,26 @@ class ContextContext extends Context {
     assert(declarationId.hasParent);
     var moduleId = declarationIdToModuleId(queryContext, declarationId.parent);
     while (true) {
-      final innerIds =
-          getModuleDeclarationHir(queryContext, moduleId).innerDeclarationIds;
+      final declarationId = moduleIdToDeclarationId(queryContext, moduleId);
+      List<DeclarationId> innerIds;
+      if (declarationId.isModule) {
+        innerIds =
+            getModuleDeclarationHir(queryContext, moduleId).innerDeclarationIds;
+      } else if (declarationId.isTrait) {
+        innerIds = getTraitDeclarationHir(queryContext, declarationId)
+            .innerDeclarationIds;
+      } else if (declarationId.isImpl) {
+        innerIds = getImplDeclarationHir(queryContext, declarationId)
+            .innerDeclarationIds;
+      } else if (declarationId.isClass) {
+        innerIds = getClassDeclarationHir(queryContext, declarationId)
+            .innerDeclarationIds;
+      } else {
+        throw CompilerError.internalError(
+          'Lowered a body whose declaration was not inside a module, trait, impl or class.',
+          location: ErrorLocation(resourceId),
+        );
+      }
 
       final matches = innerIds
           .where((id) => id.simplePath.last.nameOrNull == name)
@@ -489,10 +491,10 @@ class ContextContext extends Context {
 
       if (moduleId.hasNoParent) break;
       moduleId = moduleId.parent;
-      final declarationId =
+      final newDeclarationId =
           moduleIdToOptionalDeclarationId(queryContext, moduleId);
-      if (declarationId is None ||
-          declarationId.value.resourceId != resourceId) {
+      if (newDeclarationId is None ||
+          newDeclarationId.value.resourceId != resourceId) {
         break;
       }
     }
@@ -637,6 +639,46 @@ class FunctionContext extends InnerContext {
     return results
         .merge()
         .mapValue((expressions) => Tuple2(expressions, idMap));
+  }
+}
+
+class PropertyContext extends InnerContext {
+  factory PropertyContext._create(QueryContext queryContext, DeclarationId id) {
+    final parent = ContextContext(queryContext, id);
+    final ast = getPropertyDeclarationAst(queryContext, id);
+
+    final type = Option.of(ast.type).mapValue(
+        (t) => astTypeToHirType(queryContext, Tuple2(parent.moduleId, t)));
+
+    return PropertyContext._(parent, type, ast.initializer);
+  }
+  PropertyContext._(
+    Context parent,
+    this.type,
+    this.initializer,
+  )   : assert(type != null),
+        assert(initializer != null),
+        super(parent);
+
+  static Result<Tuple2<hir.Expression, BodyAstToHirIds>,
+      List<ReportedCompilerError>> lowerProperty(
+    QueryContext queryContext,
+    DeclarationId id,
+  ) =>
+      PropertyContext._create(queryContext, id)._lowerInitializer();
+
+  final Option<hir.CandyType> type;
+  final ast.Expression initializer;
+
+  @override
+  void addIdentifier(LocalPropertyIdentifier identifier) {}
+
+  Result<Tuple2<hir.Expression, BodyAstToHirIds>, List<ReportedCompilerError>>
+      _lowerInitializer() {
+    final lowered = innerExpressionContext(expressionType: type)
+        .lowerUnambiguous(initializer);
+
+    return lowered.mapValue((e) => Tuple2(e, idMap));
   }
 }
 
