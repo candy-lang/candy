@@ -225,7 +225,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     return [
       ...node.condition.accept(this),
       dart.literalNull.assignVar(_name(node.id)).statement,
-      dart.Code('\nif (${_name(node.condition.id)}) {'),
+      dart.Code('if (${_name(node.condition.id)}) {'),
       ...visitBody(node.thenBody),
       dart.Code('} else {'),
       ...visitBody(node.elseBody),
