@@ -1,6 +1,7 @@
-fun main(): Int {
-  mut let a = 5
-  print("Hello")
-  a = 3
-  return a
+mut let a = "Hello"
+
+fun main() {
+  mut let b = 1
+  a = "blub"
+  b = 3
 }
