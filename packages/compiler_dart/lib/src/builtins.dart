@@ -174,6 +174,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
       ..name = 'print'
       ..optionalParameters.add(dart.Parameter((b) => b
         ..named = true
+        ..annotations.add(dart.refer('required', packageMetaUrl))
         ..name = 'object'
         ..type = dart.refer('Object', dartCoreUrl)))
       ..body = dart.Block(
