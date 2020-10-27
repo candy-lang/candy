@@ -1,2 +1,3 @@
+public use .operators
 public use .primitives
 public use .stdio
