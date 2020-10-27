@@ -42,7 +42,8 @@ abstract class Declaration implements _$Declaration {
   const factory Declaration.function({
     @required bool isStatic,
     @required String name,
-    @Default(<ValueParameter>[]) List<ValueParameter> parameters,
+    @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
+    @Default(<ValueParameter>[]) List<ValueParameter> valueParameters,
     @required CandyType returnType,
   }) = FunctionDeclaration;
 
@@ -58,6 +59,16 @@ abstract class Declaration implements _$Declaration {
   factory Declaration.fromJson(Map<String, dynamic> json) =>
       _$DeclarationFromJson(json);
   const Declaration._();
+
+  FunctionCandyType get functionType {
+    assert(this is FunctionDeclaration);
+    final function = this as FunctionDeclaration;
+    return FunctionCandyType(
+      // TODO(JonasWanke): generics
+      parameterTypes: function.valueParameters.map((p) => p.type).toList(),
+      returnType: function.returnType,
+    );
+  }
 }
 
 @freezed

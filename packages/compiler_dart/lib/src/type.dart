@@ -52,6 +52,41 @@ final Query<CandyType, dart.Reference> compileType =
       },
       union: (_) => dart.refer('dynamic', dartCoreUrl),
       intersection: (_) => dart.refer('dynamic', dartCoreUrl),
+      parameter: (type) => dart.refer(type.name),
+      reflection: (type) {
+        final url = moduleIdToImportUrl(context, ModuleId.coreReflection);
+        final id = type.declarationId;
+        if (id.isModule) {
+          return dart.refer('Module', url);
+        } else if (id.isTrait || id.isClass) {
+          return dart.refer('Type', url);
+        } else if (id.isProperty) {
+          final propertyHir = getPropertyDeclarationHir(context, id);
+          assert(!propertyHir.isStatic);
+          return compileType(
+            context,
+            CandyType.function(
+              receiverType:
+                  getPropertyDeclarationParentAsType(context, id).value,
+              returnType: propertyHir.type,
+            ),
+          );
+        } else if (id.isFunction) {
+          final functionHir = getFunctionDeclarationHir(context, id);
+          assert(!functionHir.isStatic);
+          return compileType(
+            context,
+            functionHir.functionType.copyWith(
+              receiverType:
+                  getPropertyDeclarationParentAsType(context, id).value,
+            ),
+          );
+        } else {
+          throw CompilerError.internalError(
+            'Invalid reflection target for compiling type: `$id`.',
+          );
+        }
+      },
     );
   },
 );
@@ -66,10 +101,4 @@ dart.TypeReference _createDartType(
     ..url = url
     ..types.addAll(typeArguments)
     ..isNullable = false);
-}
-
-dart.TypeReference _unsupportedType(CandyType type) {
-  throw CompilerError.unsupportedFeature(
-    'Compiling type `$type` to Dart is not yet supported.',
-  );
 }

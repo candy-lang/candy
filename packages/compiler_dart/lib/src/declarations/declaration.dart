@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 
 import '../builtins.dart';
+import '../type.dart';
 import 'class.dart';
 import 'function.dart';
 import 'module.dart';
@@ -39,5 +40,17 @@ final compileDeclaration = Query<DeclarationId, Option<dart.Spec>>(
         'Unsupported declaration for Dart compiler: `$declarationId`.',
       );
     }
+  },
+);
+
+final Query<TypeParameter, dart.TypeReference> compileTypeParameter =
+    Query<TypeParameter, dart.TypeReference>(
+  'dart.compileType',
+  evaluateAlways: true,
+  provider: (context, parameter) {
+    return dart.TypeReference((b) => b
+      ..symbol = parameter.name
+      ..bound = compileType(context, parameter.upperBound)
+      ..isNullable = false);
   },
 );

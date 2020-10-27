@@ -28,18 +28,38 @@ final getFunctionDeclarationHir = Query<DeclarationId, hir.FunctionDeclaration>(
   'getFunctionDeclarationHir',
   provider: (context, declarationId) {
     final functionAst = getFunctionDeclarationAst(context, declarationId);
-    final moduleId = declarationIdToModuleId(context, declarationId);
+
     return hir.FunctionDeclaration(
-      isStatic: functionAst.isStatic,
+      isStatic: functionAst.isStatic || declarationId.parent.isModule,
       name: functionAst.name.name,
-      parameters: functionAst.valueParameters
+      // ignore: can_be_null_after_null_aware
+      typeParameters: functionAst.typeParameters?.parameters.orEmpty
+          .map((p) => hir.TypeParameter(
+                name: p.name.name,
+                upperBound: p.bound != null
+                    ? astTypeToHirType(
+                        context,
+                        Tuple2(
+                          declarationId.parent,
+                          p.bound,
+                        ))
+                    : hir.CandyType.any,
+              ))
+          .toList(),
+      valueParameters: functionAst.valueParameters
           .map((p) => hir.ValueParameter(
                 name: p.name.name,
-                type: astTypeToHirType(context, Tuple2(moduleId, p.type)),
+                type: astTypeToHirType(
+                  context,
+                  Tuple2(declarationId.parent, p.type),
+                ),
               ))
           .toList(),
       returnType: functionAst.returnType != null
-          ? astTypeToHirType(context, Tuple2(moduleId, functionAst.returnType))
+          ? astTypeToHirType(
+              context,
+              Tuple2(declarationId.parent, functionAst.returnType),
+            )
           : hir.CandyType.unit,
     );
   },

@@ -3,18 +3,18 @@ import 'package:compiler/compiler.dart';
 import 'package:parser/parser.dart' hide ValueParameter;
 
 import '../body.dart';
-import '../constants.dart';
 import '../type.dart';
+import 'declaration.dart';
 
 final compileFunction = Query<DeclarationId, dart.Method>(
   'dart.compileFunction',
   evaluateAlways: true,
   provider: (context, declarationId) {
-    final function = getFunctionDeclarationHir(context, declarationId);
+    final functionHir = getFunctionDeclarationHir(context, declarationId);
     final isInsideTrait =
         declarationId.hasParent && declarationId.parent.isTrait;
 
-    if (isInsideTrait && function.isStatic) {
+    if (isInsideTrait && functionHir.isStatic) {
       throw CompilerError.unsupportedFeature(
         'Static functions in traits are not yet supported.',
         location: ErrorLocation(
@@ -28,11 +28,13 @@ final compileFunction = Query<DeclarationId, dart.Method>(
     }
 
     return dart.Method((b) => b
-      ..static = function.isStatic
-      ..returns = compileType(context, function.returnType)
-      ..name = function.name
-      ..optionalParameters
-          .addAll(compileParameters(context, function.parameters))
+      ..static = functionHir.isStatic && declarationId.parent.isNotModule
+      ..returns = compileType(context, functionHir.returnType)
+      ..name = functionHir.name
+      ..types.addAll(functionHir.typeParameters
+          .map((p) => compileTypeParameter(context, p)))
+      ..requiredParameters
+          .addAll(compileParameters(context, functionHir.valueParameters))
       ..body = compileBody(context, declarationId).valueOrNull);
   },
 );
@@ -42,8 +44,6 @@ Iterable<dart.Parameter> compileParameters(
   List<ValueParameter> parameters,
 ) {
   return parameters.map((p) => dart.Parameter((b) => b
-    ..named = true
-    ..annotations.add(dart.refer('required', packageMetaUrl))
     ..type = compileType(context, p.type)
     ..name = p.name));
 }

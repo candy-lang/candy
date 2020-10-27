@@ -31,8 +31,6 @@ final getPropertyDeclarationHir = Query<DeclarationId, hir.PropertyDeclaration>(
   'getPropertyDeclarationHir',
   provider: (context, declarationId) {
     final propertyAst = getPropertyDeclarationAst(context, declarationId);
-    // if (propertyAst.)
-    final moduleId = declarationIdToModuleId(context, declarationId);
 
     if (propertyAst.type == null && propertyAst.initializer == null) {
       throw CompilerError.propertyTypeOrValueRequired(
@@ -59,11 +57,14 @@ final getPropertyDeclarationHir = Query<DeclarationId, hir.PropertyDeclaration>(
     }
 
     return hir.PropertyDeclaration(
-      isStatic: propertyAst.isStatic,
+      isStatic: propertyAst.isStatic || declarationId.parent.isModule,
       isMutable: propertyAst.isMutable,
       name: propertyAst.name.name,
       type: propertyAst.type != null
-          ? astTypeToHirType(context, Tuple2(moduleId, propertyAst.type))
+          ? astTypeToHirType(
+              context,
+              Tuple2(declarationId.parent, propertyAst.type),
+            )
           : initializer.type,
       initializer: initializer,
       innerDeclarationIds: getInnerDeclarationIds(context, declarationId),

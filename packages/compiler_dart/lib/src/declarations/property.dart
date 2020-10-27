@@ -15,7 +15,7 @@ final compileProperty = Query<DeclarationId, dart.Field>(
         declarationId.hasParent && declarationId.parent.isClass;
 
     return dart.Field((b) => b
-      ..static = property.isStatic
+      ..static = property.isStatic && declarationId.parent.isNotModule
       ..modifier = property.isMutable
           ? dart.FieldModifier.var$
           : dart.FieldModifier.final$

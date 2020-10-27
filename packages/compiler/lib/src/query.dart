@@ -87,7 +87,7 @@ class GlobalQueryContext {
       result = e.recordedCall;
     }
 
-    if (query.name.startsWith('dart.') || query.name == 'getAst') {
+    if (query.name.startsWith('dart.') || query.name == 'calculateFullHir') {
       var dateTime = DateTime.now().toIso8601String();
       dateTime =
           dateTime.substring(0, dateTime.indexOf('.')).replaceAll(':', '-');
@@ -144,16 +144,19 @@ class QueryContext {
     void reportErrors() =>
         globalContext._reportErrors(query.name, key, _reportedErrors);
     RecordedQueryCall onErrors(dynamic error) {
+      final errors = error is _QueryFailedException
+          ? error.recordedCall.thrownErrors
+          : error is Iterable<ReportedCompilerError>
+              ? error.toList()
+              : [error as ReportedCompilerError];
+      this.reportErrors(errors);
       reportErrors();
+
       return RecordedQueryCall(
         name: query.name,
         key: key,
         innerCalls: _innerCalls,
-        thrownErrors: error is _QueryFailedException
-            ? error.recordedCall.thrownErrors
-            : error is Iterable<ReportedCompilerError>
-                ? error.toList()
-                : [error as ReportedCompilerError],
+        thrownErrors: errors,
       );
     }
 
@@ -179,6 +182,8 @@ class QueryContext {
 
   final _reportedErrors = <ReportedCompilerError>[];
   void reportError(ReportedCompilerError error) => _reportedErrors.add(error);
+  void reportErrors(List<ReportedCompilerError> errors) =>
+      _reportedErrors.addAll(errors);
 
   final _innerCalls = <RecordedQueryCall>[];
 }

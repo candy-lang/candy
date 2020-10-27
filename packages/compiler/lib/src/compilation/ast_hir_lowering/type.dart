@@ -7,36 +7,36 @@ import '../hir.dart' as hir;
 import '../hir/ids.dart';
 import 'declarations/class.dart';
 import 'declarations/declarations.dart';
+import 'declarations/function.dart';
+import 'declarations/impl.dart';
 import 'declarations/module.dart';
 import 'declarations/trait.dart';
+import 'declarations/property.dart';
 import 'general.dart';
 
 /// Resolves an AST-type in the given module to a HIR-type.
 ///
 /// Nested union and intersection types (including intermediate group types) are
 /// flattened.
-final Query<Tuple2<ModuleId, ast.Type>, hir.CandyType> astTypeToHirType =
-    Query<Tuple2<ModuleId, ast.Type>, hir.CandyType>(
+final Query<Tuple2<DeclarationId, ast.Type>, hir.CandyType> astTypeToHirType =
+    Query<Tuple2<DeclarationId, ast.Type>, hir.CandyType>(
   'astTypeToHirType',
   provider: (context, inputs) {
-    final moduleId = inputs.first;
+    final declarationId = inputs.first;
     final type = inputs.second;
 
     hir.CandyType map(ast.Type type) =>
-        astTypeToHirType(context, Tuple2(moduleId, type));
+        astTypeToHirType(context, Tuple2(declarationId, type));
     List<hir.CandyType> mapTypes(Iterable<ast.Type> types) =>
         types.map(map).toList();
 
     if (type is ast.UserType) {
-      final declarationId = resolveAstUserType(context, Tuple2(moduleId, type));
-      final name = type.simpleTypes.single.name.name;
+      final result = resolveAstUserType(context, Tuple2(declarationId, type));
+      if (result is! hir.UserCandyType) return result;
 
-      final arguments =
-          mapTypes((type.arguments?.arguments ?? []).map((a) => a.type));
-      return hir.CandyType.user(
-        declarationIdToModuleId(context, declarationId.parent),
-        name,
-        arguments: arguments,
+      return (result as hir.UserCandyType).copyWith(
+        arguments:
+            mapTypes((type.arguments?.arguments ?? []).map((a) => a.type)),
       );
     } else if (type is ast.GroupType) {
       return map(type.type);
@@ -81,10 +81,11 @@ final Query<Tuple2<ModuleId, ast.Type>, hir.CandyType> astTypeToHirType =
   },
 );
 
-final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>, DeclarationId>(
+final resolveAstUserType = Query<Tuple2<DeclarationId, ast.UserType>,
+    hir.CandyType /*hir.UserCandyType | hir.ParameterCandyType */ >(
   'resolveAstUserType',
   provider: (context, inputs) {
-    final moduleId = inputs.first;
+    final declarationId = inputs.first;
     final type = inputs.second;
 
     if (type.simpleTypes.length > 1) {
@@ -94,11 +95,11 @@ final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>, DeclarationId>(
     }
 
     // Step 1: Look for traits/classes in outer modules in the same file.
-    final localResult = _resolveAstUserTypeInFile(context, moduleId, type);
+    final localResult = _resolveAstUserTypeInFile(context, declarationId, type);
     if (localResult.isSome) return localResult.value;
 
     // Step 2: Search use-lines.
-    final resourceId = moduleIdToDeclarationId(context, moduleId).resourceId;
+    final resourceId = declarationId.resourceId;
     final simpleType = type.simpleTypes.first.name;
     final importedModules = findModuleInUseLines(
       context,
@@ -111,30 +112,36 @@ final resolveAstUserType = Query<Tuple2<ModuleId, ast.UserType>, DeclarationId>(
       );
     }
 
-    final declarationId =
+    final resultDeclarationId =
         moduleIdToDeclarationId(context, importedModules.value);
-    if (declarationId.isModule) {
+    if (resultDeclarationId.isModule) {
       throw CompilerError.typeNotFound(
         'Type `${simpleType.name}` could not be resolved.',
         location: ErrorLocation(resourceId, type.simpleTypes.first.span),
       );
     }
-    assert(declarationId.isTrait || declarationId.isClass);
-    return declarationId;
+    assert(resultDeclarationId.isTrait || resultDeclarationId.isClass);
+    return hir.CandyType.user(
+      importedModules.value.parent,
+      resultDeclarationId.simplePath.last.nameOrNull,
+    );
   },
 );
 
-Option<DeclarationId> _resolveAstUserTypeInFile(
+Option<hir.CandyType /*hir.UserCandyType | hir.ParameterCandyType */ >
+    _resolveAstUserTypeInFile(
   QueryContext context,
-  ModuleId moduleId,
+  DeclarationId declarationId,
   ast.UserType type,
 ) {
-  final moduleDeclarationId = moduleIdToDeclarationId(context, moduleId);
+  final result = _resolveAstUserTypeInParameters(context, declarationId, type);
+  if (result.isSome) return result;
 
-  var currentModuleId = moduleId;
-  var currentModuleDeclarationId = moduleDeclarationId;
-  while (
-      currentModuleDeclarationId.resourceId == moduleDeclarationId.resourceId) {
+  final resourceId = declarationId.resourceId;
+  var currentModuleId = declarationIdToModuleId(context, declarationId);
+  var currentModuleDeclarationId =
+      moduleIdToDeclarationId(context, currentModuleId);
+  while (currentModuleDeclarationId.resourceId == resourceId) {
     final simpleTypes = type.simpleTypes.map((t) => t.name.name);
     var declarationId = currentModuleDeclarationId;
     for (final simpleType in simpleTypes) {
@@ -151,7 +158,7 @@ Option<DeclarationId> _resolveAstUserTypeInFile(
         context.reportError(CompilerError.multipleTypesWithSameName(
           'Multiple types have the same name: `$simpleType` in module `$currentModuleId`.',
           location: ErrorLocation(
-            moduleDeclarationId.resourceId,
+            resourceId,
             getTraitDeclarationAst(context, traitId).name.span,
           ),
         ));
@@ -163,7 +170,12 @@ Option<DeclarationId> _resolveAstUserTypeInFile(
 
       declarationId = hasTrait ? traitId : classId;
     }
-    if (declarationId != null) return Option.some(declarationId);
+    if (declarationId != null) {
+      return Option.some(hir.CandyType.user(
+        currentModuleId.parent,
+        simpleTypes.last,
+      ));
+    }
 
     if (currentModuleId.hasNoParent) break;
     currentModuleId = currentModuleId.parentOrNull;
@@ -173,4 +185,61 @@ Option<DeclarationId> _resolveAstUserTypeInFile(
     currentModuleDeclarationId = newDeclarationId.value;
   }
   return Option.none();
+}
+
+Option<hir.ParameterCandyType> _resolveAstUserTypeInParameters(
+  QueryContext context,
+  DeclarationId declarationId,
+  ast.UserType type,
+) {
+  if (type.simpleTypes.length == 1) {
+    final name = type.simpleTypes.single.name.name;
+
+    var typeParameters = <hir.TypeParameter>[];
+    if (declarationId.isTrait) {
+      final traitHir = getTraitDeclarationHir(context, declarationId);
+      typeParameters = traitHir.typeParameters;
+    } else if (declarationId.isImpl) {
+      final implHir = getImplDeclarationHir(context, declarationId);
+      typeParameters = implHir.typeParameters;
+    } else if (declarationId.isClass) {
+      final classHir = getClassDeclarationHir(context, declarationId);
+      typeParameters = classHir.typeParameters;
+    } else if (declarationId.isFunction) {
+      final functionHir = getFunctionDeclarationHir(context, declarationId);
+      typeParameters = functionHir.typeParameters;
+    }
+
+    var matches = typeParameters.where((p) => p.name == name);
+    if (matches.isNotEmpty) {
+      return Some(hir.ParameterCandyType(name, declarationId));
+    }
+
+    DeclarationId parentId;
+    if (declarationId.isFunction) {
+      final functionHir = getFunctionDeclarationHir(context, declarationId);
+      if (!functionHir.isStatic) parentId = declarationId.parent;
+    } else if (declarationId.isProperty) {
+      final propertyHir = getPropertyDeclarationHir(context, declarationId);
+      if (!propertyHir.isStatic) parentId = declarationId.parent;
+    }
+    if (parentId == null) return None();
+
+    if (parentId.isTrait) {
+      final traitHir = getTraitDeclarationHir(context, parentId);
+      typeParameters = traitHir.typeParameters;
+    } else if (parentId.isImpl) {
+      final implHir = getImplDeclarationHir(context, parentId);
+      typeParameters = implHir.typeParameters;
+    } else if (parentId.isClass) {
+      final classHir = getClassDeclarationHir(context, parentId);
+      typeParameters = classHir.typeParameters;
+    }
+
+    matches = typeParameters.where((p) => p.name == name);
+    if (matches.isNotEmpty) {
+      return Some(hir.ParameterCandyType(name, declarationId));
+    }
+    return None();
+  }
 }

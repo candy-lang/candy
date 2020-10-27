@@ -6,7 +6,6 @@ import '../../hir.dart' as hir;
 import '../../hir/ids.dart';
 import '../type.dart';
 import 'declarations.dart';
-import 'module.dart';
 
 extension ClassDeclarationId on DeclarationId {
   bool get isClass =>
@@ -27,22 +26,20 @@ final getClassDeclarationAst = Query<DeclarationId, ast.ClassDeclaration>(
 final getClassDeclarationHir = Query<DeclarationId, hir.ClassDeclaration>(
   'getClassDeclarationHir',
   provider: (context, declarationId) {
-    final ast = getClassDeclarationAst(context, declarationId);
-    final moduleId = declarationIdToModuleId(context, declarationId);
+    final classAst = getClassDeclarationAst(context, declarationId);
+
     return hir.ClassDeclaration(
-      name: ast.name.name,
+      name: classAst.name.name,
       // ignore: can_be_null_after_null_aware
-      typeParameters: ast.typeParameters?.parameters.orEmpty
+      typeParameters: classAst.typeParameters?.parameters.orEmpty
           .map((p) => hir.TypeParameter(
                 name: p.name.name,
-                upperBound:
-                    astTypeToHirType(context, Tuple2(moduleId, p.bound)),
+                upperBound: p.bound != null
+                    ? astTypeToHirType(context, Tuple2(declarationId, p.bound))
+                    : hir.CandyType.any,
               ))
           .toList(),
-      innerDeclarationIds: getInnerDeclarationIds(
-            context,
-            moduleIdToDeclarationId(context, moduleId),
-          ) +
+      innerDeclarationIds: getInnerDeclarationIds(context, declarationId) +
           [declarationId.inner(DeclarationPathData.constructor())],
     );
   },

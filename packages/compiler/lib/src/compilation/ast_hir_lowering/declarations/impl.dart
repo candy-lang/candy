@@ -31,28 +31,29 @@ final getImplDeclarationAst = Query<DeclarationId, ast.ImplDeclaration>(
 final getImplDeclarationHir = Query<DeclarationId, hir.ImplDeclaration>(
   'getImplDeclarationHir',
   provider: (context, declarationId) {
-    final ast = context.callQuery(getImplDeclarationAst, declarationId);
-    final moduleId = context.callQuery(declarationIdToModuleId, declarationId);
+    final implAst = context.callQuery(getImplDeclarationAst, declarationId);
 
-    final trait = astTypeToHirType(context, Tuple2(moduleId, ast.trait));
+    final trait =
+        astTypeToHirType(context, Tuple2(declarationId, implAst.trait));
 
     // TODO(JonasWanke): check impl validity (required methods available, correct package)
 
     return hir.ImplDeclaration(
       // ignore: can_be_null_after_null_aware
-      typeParameters: ast.typeParameters?.parameters.orEmpty
+      typeParameters: implAst.typeParameters?.parameters.orEmpty
           .map((p) => hir.TypeParameter(
                 name: p.name.name,
-                upperBound:
-                    astTypeToHirType(context, Tuple2(moduleId, p.bound)),
+                upperBound: p.bound != null
+                    ? astTypeToHirType(context, Tuple2(declarationId, p.bound))
+                    : hir.CandyType.any,
               ))
           .toList(),
-      type: astTypeToHirType(context, Tuple2(moduleId, ast.type))
+      type: astTypeToHirType(context, Tuple2(declarationId, implAst.type))
           as hir.UserCandyType,
       traits: hirTypeToUserTypes(
         context,
         trait,
-        ErrorLocation(declarationId.resourceId, ast.trait.span),
+        ErrorLocation(declarationId.resourceId, implAst.trait.span),
       ),
       innerDeclarationIds: getInnerDeclarationIds(context, declarationId),
     );

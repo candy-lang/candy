@@ -48,6 +48,7 @@ abstract class CompilerError implements _$CompilerError {
       CompilerError._create('lambdaParameterTypeRequired');
   static const lambdaParametersMissing =
       CompilerError._create('lambdaParametersMissing');
+  static const missingArguments = CompilerError._create('missingArguments');
   static const missingReturn = CompilerError._create('missingReturn');
   static const moduleNotFound = CompilerError._create('moduleNotFound');
   static const multipleMainFunctions =
@@ -67,6 +68,8 @@ abstract class CompilerError implements _$CompilerError {
       CompilerError._create('undefinedIdentifier');
   static const unexpectedPositionalArgument =
       CompilerError._create('unexpectedPositionalArgument');
+  static const unknownInnerDeclaration =
+      CompilerError._create('unknownInnerDeclaration');
   static const unknownPackage = CompilerError._create('unknownPackage');
   static const unsupportedFeature = CompilerError._create('unsupportedFeature');
 }

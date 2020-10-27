@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:meta/meta.dart';
 
 import 'build_artifacts.dart';
+import 'compilation/ast.dart';
 import 'compilation/ast_hir_lowering.dart';
 import 'compilation/hir.dart' as hir;
 import 'compilation/hir/ids.dart';
@@ -10,6 +11,7 @@ import 'constants.dart';
 import 'errors.dart';
 import 'query.dart';
 import 'resource_provider.dart';
+import 'utils.dart';
 
 Future<void> compile({
   @required Directory candyDirectory,
@@ -38,9 +40,9 @@ final getMainFunction = Query<ModuleId, DeclarationId>(
         module.innerDeclarationIds.where((id) => id.isFunction).where((id) {
       final function = getFunctionDeclarationHir(context, id);
       if (function.name != mainFunctionName) return false;
-      if (function.parameters.length > 1) return false;
-      if (function.parameters.length == 1 &&
-          function.parameters.single.type !=
+      if (function.valueParameters.length > 1) return false;
+      if (function.valueParameters.length == 1 &&
+          function.valueParameters.single.type !=
               hir.CandyType.list(hir.CandyType.string)) {
         return false;
       }
@@ -78,3 +80,40 @@ final getMainFunction = Query<ModuleId, DeclarationId>(
     return possibleFunctions.single;
   },
 );
+
+final calculateFullHir = Query<ResourceId, Unit>(
+  'calculateFullHir',
+  provider: (context, resourceId) {
+    _compileFull(context, DeclarationId(resourceId));
+    return Unit();
+  },
+);
+
+void _compileFull(QueryContext context, DeclarationId id) {
+  List<DeclarationId> nextIds;
+  if (id.isModule) {
+    nextIds =
+        getModuleDeclarationHir(context, declarationIdToModuleId(context, id))
+            .innerDeclarationIds;
+  } else if (id.isTrait) {
+    nextIds = getTraitDeclarationHir(context, id).innerDeclarationIds;
+  } else if (id.isImpl) {
+    nextIds = getImplDeclarationHir(context, id).innerDeclarationIds;
+  } else if (id.isClass) {
+    nextIds = getClassDeclarationHir(context, id).innerDeclarationIds;
+  } else if (id.isConstructor) {
+    getConstructorDeclarationHir(context, id);
+  } else if (id.isFunction) {
+    getFunctionDeclarationHir(context, id);
+    getBody(context, id);
+  } else if (id.isProperty) {
+    getPropertyDeclarationHir(context, id);
+    getBody(context, id);
+  } else {
+    assert(false);
+  }
+
+  for (final id in nextIds.orEmpty) {
+    _compileFull(context, id);
+  }
+}

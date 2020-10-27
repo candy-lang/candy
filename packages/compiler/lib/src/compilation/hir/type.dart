@@ -5,6 +5,7 @@ import '../../query.dart';
 import '../../utils.dart';
 import '../ast_hir_lowering.dart';
 import '../ast_hir_lowering/declarations/impl.dart';
+import 'declarations.dart';
 import 'ids.dart';
 
 part 'type.freezed.dart';
@@ -30,6 +31,10 @@ abstract class CandyType with _$CandyType {
   const factory CandyType.union(List<CandyType> types) = UnionCandyType;
   const factory CandyType.intersection(List<CandyType> types) =
       IntersectionCandyType;
+  const factory CandyType.parameter(String name, DeclarationId declarationId) =
+      ParameterCandyType;
+  const factory CandyType.reflection(DeclarationId declarationId) =
+      ReflectionCandyType;
 
   factory CandyType.fromJson(Map<String, dynamic> json) =>
       _$CandyTypeFromJson(json);
@@ -45,10 +50,8 @@ abstract class CandyType with _$CandyType {
   static const float = CandyType.user(ModuleId.corePrimitives, 'Float');
   static const string = CandyType.user(ModuleId.corePrimitives, 'String');
 
-  static const declaration =
-      CandyType.user(ModuleId.coreReflection, 'Declaration');
-  static const moduleDeclaration =
-      CandyType.user(ModuleId.coreReflection, 'ModuleDeclaration');
+  static const type = CandyType.user(ModuleId.coreReflection, 'Type');
+  static const module = CandyType.user(ModuleId.coreReflection, 'Module');
 
   factory CandyType.list(CandyType itemType) =>
       CandyType.user(ModuleId.coreCollections, 'List', arguments: [itemType]);
@@ -79,9 +82,43 @@ abstract class CandyType with _$CandyType {
       },
       union: (type) => type.types.join(' | '),
       intersection: (type) => type.types.join(' & '),
+      parameter: (type) => type.name,
+      reflection: (type) {
+        final id = type.declarationId;
+        if (id.isModule) return 'Module<$id>';
+        if (id.isTrait || id.isClass) return 'Type<$id>';
+        if (id.isFunction) return 'Function<$id>';
+        if (id.isProperty) return 'Property<$id>';
+        throw CompilerError.internalError(
+          'Invalid reflection target in `CandyType.toString()`: `$id`.',
+        );
+      },
     );
   }
 }
+
+final getTypeParameterBound = Query<ParameterCandyType, CandyType>(
+  'getTypeParameterBound',
+  provider: (context, parameter) {
+    List<TypeParameter> parameters;
+    if (parameter.declarationId.isTrait) {
+      parameters = getTraitDeclarationHir(context, parameter.declarationId)
+          .typeParameters;
+    } else if (parameter.declarationId.isImpl) {
+      parameters = getImplDeclarationHir(context, parameter.declarationId)
+          .typeParameters;
+    } else if (parameter.declarationId.isClass) {
+      parameters = getClassDeclarationHir(context, parameter.declarationId)
+          .typeParameters;
+    } else {
+      throw CompilerError.internalError(
+        'Type parameter comes from neither a trait, nor an impl or a class.',
+      );
+    }
+
+    return parameters.singleWhere((p) => p.name == parameter.name).upperBound;
+  },
+);
 
 final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
     Query<Tuple2<CandyType, CandyType>, bool>(
@@ -102,42 +139,79 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
       );
     }
 
+    CandyType getResultingType(ReflectionCandyType type) {
+      final id = type.declarationId;
+      if (id.isModule) return CandyType.module;
+      if (id.isTrait || id.isClass) return CandyType.type;
+
+      if (id.isFunction) {
+        final functionHir = getFunctionDeclarationHir(context, id);
+
+        return functionHir.functionType.copyWith(
+          receiverType:
+              getPropertyDeclarationParentAsType(context, id).valueOrNull,
+        );
+      }
+      if (id.isProperty) {
+        final propertyHir = getPropertyDeclarationHir(context, id);
+        if (propertyHir.isStatic) return propertyHir.type;
+
+        return FunctionCandyType(
+          receiverType:
+              getPropertyDeclarationParentAsType(context, id).valueOrNull,
+          returnType: propertyHir.type,
+        );
+      }
+      throw CompilerError.internalError(
+        'Invalid reflection target: `$id`.',
+      );
+    }
+
     return child.map(
       user: (childType) {
         return parent.map(
-          user: (parentType) {
-            final declarationId =
-                moduleIdToDeclarationId(context, childType.virtualModuleId);
-            if (declarationId.isTrait) {
-              final declaration =
-                  getTraitDeclarationHir(context, declarationId);
-              if (declaration.typeParameters.isNotEmpty) {
-                throw CompilerError.unsupportedFeature(
-                  'Type parameters are not yet supported.',
-                );
+            user: (parentType) {
+              final declarationId =
+                  moduleIdToDeclarationId(context, childType.virtualModuleId);
+              if (declarationId.isTrait) {
+                final declaration =
+                    getTraitDeclarationHir(context, declarationId);
+                if (declaration.typeParameters.isNotEmpty) {
+                  throw CompilerError.unsupportedFeature(
+                    'Type parameters are not yet supported.',
+                  );
+                }
+                return declaration.upperBounds.any(
+                    (bound) => isAssignableTo(context, Tuple2(bound, parent)));
               }
-              return declaration.upperBounds.any(
-                  (bound) => isAssignableTo(context, Tuple2(bound, parent)));
-            }
 
-            if (declarationId.isClass) {
-              if (parent is! UserCandyType) return false;
+              if (declarationId.isClass) {
+                if (parent is! UserCandyType) return false;
 
-              return getClassTraitImplId(context, inputs) is Some;
-            }
+                return getClassTraitImplId(context, inputs) is Some;
+              }
 
-            throw CompilerError.internalError(
-              'User type can only be a trait or a class.',
-            );
-          },
-          this_: (_) => throwInvalidThisType(),
-          tuple: (_) => false,
-          function: (_) => false,
-          union: (parentType) => parentType.types
-              .any((type) => isAssignableTo(context, Tuple2(childType, type))),
-          intersection: (parentType) => parentType.types.every(
-              (type) => isAssignableTo(context, Tuple2(childType, type))),
-        );
+              throw CompilerError.internalError(
+                'User type can only be a trait or a class.',
+              );
+            },
+            this_: (_) => throwInvalidThisType(),
+            tuple: (_) => false,
+            function: (_) => false,
+            union: (parentType) => parentType.types.any(
+                (type) => isAssignableTo(context, Tuple2(childType, type))),
+            intersection: (parentType) => parentType.types.every(
+                (type) => isAssignableTo(context, Tuple2(childType, type))),
+            parameter: (type) {
+              final bound = getTypeParameterBound(context, type);
+              return isAssignableTo(context, Tuple2(child, bound));
+            },
+            reflection: (type) {
+              return isAssignableTo(
+                context,
+                Tuple2(getResultingType(type), parent),
+              );
+            });
       },
       this_: (_) => throwInvalidThisType(),
       tuple: (type) {
@@ -162,6 +236,12 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
         return items
             .any((type) => isAssignableTo(context, Tuple2(type, parent)));
       },
+      parameter: (type) {
+        final bound = getTypeParameterBound(context, type);
+        return isAssignableTo(context, Tuple2(bound, parent));
+      },
+      reflection: (type) =>
+          isAssignableTo(context, Tuple2(getResultingType(type), parent)),
     );
   },
 );
@@ -198,5 +278,51 @@ final getClassTraitImplId =
 
     if (implIds.isEmpty) return None();
     return Some(implIds.single);
+  },
+);
+
+final getPropertyDeclarationParentAsType =
+    Query<DeclarationId, Option<UserCandyType>>(
+  'getPropertyDeclarationParentAsType',
+  provider: (context, declarationId) {
+    final parentId = declarationId.parent;
+    if (parentId.isTrait) {
+      final parentHir = getTraitDeclarationHir(context, parentId);
+      if (parentHir.typeParameters.isNotEmpty) {
+        throw CompilerError.unsupportedFeature(
+          'References to instance methods of traits with type parameters are not yet supported.',
+        );
+      }
+      return Some(UserCandyType(
+        declarationIdToModuleId(context, parentId.parent),
+        parentHir.name,
+      ));
+    } else if (parentId.isImpl) {
+      final parentHir = getImplDeclarationHir(context, parentId);
+      if (parentHir.typeParameters.isNotEmpty ||
+          parentHir.type.arguments.isNotEmpty) {
+        throw CompilerError.unsupportedFeature(
+          'References to instance methods of impls with type parameters (or for a type with type arguments) are not yet supported.',
+        );
+      }
+      return Some(UserCandyType(
+        declarationIdToModuleId(context, parentId.parent),
+        parentHir.type.name,
+      ));
+    } else if (parentId.isClass) {
+      final parentHir = getClassDeclarationHir(context, parentId);
+      if (parentHir.typeParameters.isNotEmpty) {
+        throw CompilerError.unsupportedFeature(
+          'References to instance methods of classes with type parameters are not yet supported.',
+        );
+      }
+      return Some(UserCandyType(
+        declarationIdToModuleId(context, parentId.parent),
+        parentHir.name,
+      ));
+    } else {
+      assert(parentId.isModule);
+      return None();
+    }
   },
 );

@@ -58,12 +58,6 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
   @override
   List<dart.Code> visitIdentifierExpression(IdentifierExpression node) {
-    List<dart.Code> referTraitOrClass(DeclarationId id) {
-      final importUrl = declarationIdToImportUrl(context, id);
-      final refer = dart.refer(id.simplePath.last.nameOrNull, importUrl);
-      return _saveSingle(node, refer);
-    }
-
     return node.identifier.when(
       this_: () => _saveSingle(node, dart.refer('this')),
       super_: (_) {
@@ -71,13 +65,65 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           '`super` is not yet supported in Dart compiler.',
         );
       },
-      module: (_) {
+      reflection: (id, __) {
+        if (id.isModule) {
+          throw CompilerError.internalError(
+            'Reflection identifiers pointing to modules are not yet supported in Dart compiler.; `$id`',
+          );
+        } else if (id.isTrait || id.isClass || id.isProperty || id.isFunction) {
+          dart.Expression expression;
+          if (id.isProperty || id.isFunction) {
+            assert(id.parent.isNotModule);
+
+            final propertyType = compileType(
+              context,
+              id.isProperty
+                  ? getPropertyDeclarationHir(context, id).type
+                  : getFunctionDeclarationHir(context, id).returnType,
+            );
+
+            final propertyName = id.simplePath.last.nameOrNull;
+
+            final valueParameters = id.isFunction
+                ? getFunctionDeclarationHir(context, id).valueParameters
+                : <ValueParameter>[];
+            var body = dart.refer('instance').property(propertyName);
+            if (id.isFunction) {
+              body = body.call(
+                [
+                  for (final parameter in valueParameters)
+                    dart.refer(parameter.name),
+                ],
+                {},
+                [],
+              );
+            }
+
+            expression = dart.Method((b) => b
+              ..returns = propertyType
+              ..requiredParameters.add(dart.Parameter((b) => b
+                ..type = compileType(
+                  context,
+                  getPropertyDeclarationParentAsType(context, id).value,
+                )
+                ..name = 'instance'))
+              ..requiredParameters
+                  .addAll(valueParameters.map((p) => dart.Parameter((b) => b
+                    ..type = compileType(context, p.type)
+                    ..name = p.name)))
+              ..body = body.code).closure;
+          } else {
+            expression = dart.refer(
+              id.simplePath.last.nameOrNull,
+              declarationIdToImportUrl(context, id.parent),
+            );
+          }
+          return _saveSingle(node, expression);
+        }
         throw CompilerError.internalError(
-          'Modules are not yet supported in Dart compiler.',
+          'Invalid reflection target for Dart compiler: `$id`.',
         );
       },
-      trait: referTraitOrClass,
-      class_: referTraitOrClass,
       parameter: (id, name, _) {
         if (name == 'this') {
           final expression = getExpression(context, id);
@@ -96,29 +142,33 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         }
         return _saveSingle(node, dart.refer(name));
       },
-      property: (id, _, __, target) {
+      property: (id, type, _, __, receiver) {
         final name = id.simplePath.last.nameOrNull;
 
-        // Generated Dart-functions always use named arguments, which our type
-        // system can't express. Hence we don't manually add the type in this
-        // case.
-        final explicitType = id.isNotFunction;
+        if (receiver != null) {
+          return [
+            ...receiver.accept(this),
+            _save(node, _refer(receiver.id).property(name)),
+          ];
+        }
 
-        return [
-          if (target != null) ...[
-            ...target.accept(this),
-            _save(
-              node,
-              _refer(target.id).property(name),
-              explicitType: explicitType,
-            ),
-          ] else
-            _save(
-              node,
-              dart.refer(name, declarationIdToImportUrl(context, id.parent)),
-              explicitType: explicitType,
-            ),
-        ];
+        dart.Expression lowered;
+        if ((id.isProperty || id.isFunction) && id.parent.isNotModule) {
+          final parentName =
+              id.simplePath.toList()[id.path.length - 2].nameOrNull;
+          lowered = dart
+              .refer(
+                parentName,
+                declarationIdToImportUrl(context, id.parent.parent),
+              )
+              .property(name);
+        } else {
+          lowered = dart.refer(
+            id.simplePath.last.nameOrNull,
+            declarationIdToImportUrl(context, id.parent),
+          );
+        }
+        return _saveSingle(node, lowered);
       },
       localProperty: (id, _, __, ___) => _saveSingle(node, _refer(id)),
     );
@@ -192,15 +242,21 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   List<dart.Code> visitCallExpression(CallExpression node) => [];
   @override
   List<dart.Code> visitFunctionCallExpression(FunctionCallExpression node) {
-    final arguments = {
-      for (final entry in node.valueArguments.entries)
-        entry.key: _refer(entry.value.id),
-    };
     return [
       ...node.target.accept(this),
       for (final argument in node.valueArguments.values)
         ...argument.accept(this),
-      _save(node, _refer(node.target.id).call([], arguments, [])),
+      _save(
+        node,
+        _refer(node.target.id).call(
+          [
+            for (final entry in node.valueArguments.entries)
+              _refer(entry.value.id),
+          ],
+          {},
+          [],
+        ),
+      ),
     ];
   }
 
@@ -292,11 +348,9 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   dart.Code _save(
     Expression source,
     dart.Expression lowered, {
-    bool explicitType = true,
     bool isMutable = false,
   }) {
-    final type = explicitType ? compileType(context, source.type) : null;
-
+    final type = compileType(context, source.type);
     if (isMutable) {
       return lowered.assignVar(_name(source.id), type).statement;
     } else {
@@ -304,8 +358,12 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     }
   }
 
-  List<dart.Code> _saveSingle(Expression source, dart.Expression lowered) =>
-      [_save(source, lowered)];
+  List<dart.Code> _saveSingle(
+    Expression source,
+    dart.Expression lowered, {
+    bool isMutable = false,
+  }) =>
+      [_save(source, lowered, isMutable: isMutable)];
 
   String _label(DeclarationLocalId id) => '_label_${id.value}';
 }
@@ -315,7 +373,7 @@ class ModuleExpression extends dart.InvokeExpression {
       : assert(context != null),
         assert(moduleId != null),
         super.constOf(
-          compileType(context, CandyType.moduleDeclaration),
+          compileType(context, CandyType.module),
           [dart.literalString(moduleId.toString())],
           {},
           [],

@@ -1,0 +1,26 @@
+fun main() {
+  let barFoo = Bar.foo
+  let barBar = Bar.bar
+
+  let bazBar = Baz.bar
+
+  let blubBlubBar = blub.Blub.bar
+
+  let blubBar = blub.bar
+}
+
+class Bar {
+  static fun foo(foo: Int, bar: String): Int {1}
+  fun bar(foo: Int, bar: String): Int {1}
+}
+trait Baz {
+  fun bar(foo: Int, bar: String): Int {1}
+}
+
+module blub {
+  trait Blub {
+    fun bar(foo: Int, bar: String): Int {1}
+  }
+
+  fun bar(foo: Int, bar: String): Int {1}
+}

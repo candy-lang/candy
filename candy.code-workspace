@@ -26,6 +26,9 @@
     },
     {
       "path": "packages\\candy"
+    },
+    {
+      "path": "playground"
     }
   ],
   "launch": {
