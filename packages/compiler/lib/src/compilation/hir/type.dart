@@ -5,6 +5,7 @@ import '../../query.dart';
 import '../../utils.dart';
 import '../ast_hir_lowering.dart';
 import '../ast_hir_lowering/declarations/impl.dart';
+import '../ids.dart';
 import 'declarations.dart';
 import 'ids.dart';
 
@@ -110,9 +111,12 @@ final getTypeParameterBound = Query<ParameterCandyType, CandyType>(
     } else if (parameter.declarationId.isClass) {
       parameters = getClassDeclarationHir(context, parameter.declarationId)
           .typeParameters;
+    } else if (parameter.declarationId.isFunction) {
+      parameters = getFunctionDeclarationHir(context, parameter.declarationId)
+          .typeParameters;
     } else {
       throw CompilerError.internalError(
-        'Type parameter comes from neither a trait, nor an impl or a class.',
+        'Type parameter comes from neither a trait, nor an impl, class, or a function.',
       );
     }
 
