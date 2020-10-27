@@ -1,10 +1,13 @@
+import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
 
 import '../../../errors.dart';
 import '../../../query.dart';
 import '../../../utils.dart';
 import '../../ast.dart';
+import '../../hir.dart' as hir;
 import '../../hir/ids.dart';
+import '../type.dart';
 
 final doesDeclarationExist = Query<DeclarationId, bool>(
   'doesDeclarationExist',
@@ -225,4 +228,22 @@ enum DeclarationType {
   property,
   propertyGetter,
   propertySetter,
+}
+
+hir.CandyType resolveTypeWithTypeParameters(
+  QueryContext context,
+  DeclarationId declarationId,
+  ast.Type type,
+  List<hir.TypeParameter> typeParameters,
+) {
+  if (type is ast.UserType && type.simpleTypes.length == 1) {
+    final name = type.simpleTypes.single.name.name;
+    final typeParameterResult =
+        typeParameters.firstOrNullWhere((p) => p.name == name);
+    if (typeParameterResult != null) {
+      return hir.CandyType.parameter(name, declarationId);
+    }
+  }
+
+  return astTypeToHirType(context, Tuple2(declarationId.parent, type));
 }

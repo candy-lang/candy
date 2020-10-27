@@ -26,8 +26,9 @@ class BuildArtifactManager {
   final Directory projectDirectory;
 
   void delete(QueryContext context, [BuildArtifactId directoryId]) {
-    final path =
-        toPath(context, directoryId ?? BuildArtifactId(PackageId.this_, ''));
+    directoryId ??= BuildArtifactId(context.config.packageId, '');
+
+    final path = toPath(context, directoryId);
     final dir = Directory(path);
     if (dir.existsSync()) dir.deleteSync(recursive: true);
   }

@@ -7,6 +7,7 @@ import '../../hir.dart' as hir;
 import '../../hir/ids.dart';
 import '../body.dart';
 import '../type.dart';
+import 'class.dart';
 import 'declarations.dart';
 import 'module.dart';
 import 'trait.dart';
@@ -39,9 +40,11 @@ final getPropertyDeclarationHir = Query<DeclarationId, hir.PropertyDeclaration>(
             ErrorLocation(declarationId.resourceId, propertyAst.name.span),
       );
     }
-    if (propertyAst.initializer == null && declarationId.parent.isNotTrait) {
+    if (propertyAst.initializer == null &&
+        declarationId.parent.isNotTrait &&
+        declarationId.parent.isNotClass) {
       throw CompilerError.propertyInitializerMissing(
-        'Properties must have a default value, unless they are declared within a trait.',
+        'Properties must have a default value, unless they are declared within a trait or class.',
         location: ErrorLocation(
           declarationId.resourceId,
           propertyAst.representativeSpan,

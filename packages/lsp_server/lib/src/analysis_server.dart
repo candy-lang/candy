@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:analyzer/exception/exception.dart';
 import 'package:collection/collection.dart';
 import 'package:compiler/compiler.dart';
-import 'package:compiler_dart/compiler_dart.dart';
 import 'package:dartx/dartx.dart' hide Range;
 import 'package:path/path.dart' as p;
 
@@ -69,6 +68,7 @@ class AnalysisServer {
       ),
     );
     _queryConfig = QueryConfig(
+      packageName: 'playground',
       resourceProvider: resourceProvider,
       buildArtifactManager: BuildArtifactManager(projectDirectory),
     );
@@ -346,7 +346,7 @@ class AnalysisServer {
         .relative(file.path, from: projectDirectory.path)
         .split('\\')
         .join('/');
-    return ResourceId(PackageId.this_, relativePath);
+    return ResourceId(queryConfig.packageId, relativePath);
   }
 
   String resourceIdToFileUri(ResourceId resourceId) {

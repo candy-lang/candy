@@ -57,7 +57,7 @@ class BuildCommandHandler extends CommandHandler<ExecuteCommandParams, Object> {
   @override
   Future<ErrorOr<void>> handle(List<dynamic> arguments) async {
     final context = server.queryConfig.createContext()
-      ..callQuery(dart.compile, PackageId.this_);
+      ..callQuery(dart.compile, Unit());
     if (context.reportedErrors.isNotEmpty) {
       return error(
         ErrorCodes.InternalError,
@@ -77,8 +77,8 @@ class RunCommandHandler extends CommandHandler<ExecuteCommandParams, Object> {
   @override
   Future<ErrorOr<void>> handle(List<dynamic> arguments) async {
     final context = server.queryConfig.createContext()
-      ..callQuery(dart.compile, PackageId.this_);
-    final output = context.callQuery(dart.run, PackageId.this_);
+      ..callQuery(dart.compile, Unit());
+    final output = context.callQuery(dart.run, Unit());
     if (context.reportedErrors.isNotEmpty) {
       return error(
         ErrorCodes.InternalError,

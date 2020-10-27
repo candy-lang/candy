@@ -18,14 +18,14 @@ final Query<CandyType, dart.Reference> compileType =
         );
       },
       user: (type) {
-        if (type == CandyType.any) return _createDartType('Object');
-        if (type == CandyType.unit) return _createDartType('void', url: null);
-        if (type == CandyType.never) return _createDartType('dynamic');
-        if (type == CandyType.bool) return _createDartType('bool');
-        if (type == CandyType.number) return _createDartType('Num');
-        if (type == CandyType.int) return _createDartType('int');
-        if (type == CandyType.float) return _createDartType('double');
-        if (type == CandyType.string) return _createDartType('String');
+        if (type == CandyType.any) return _createType('Object');
+        if (type == CandyType.unit) return _createType('void', url: null);
+        if (type == CandyType.never) return _createType('dynamic');
+        if (type == CandyType.bool) return _createType('bool');
+        if (type == CandyType.number) return _createType('Num');
+        if (type == CandyType.int) return _createType('int');
+        if (type == CandyType.float) return _createType('double');
+        if (type == CandyType.string) return _createType('String');
 
         return _createDartType(
           type.name,
@@ -50,9 +50,9 @@ final Query<CandyType, dart.Reference> compileType =
             ..returnType = compile(type.returnType);
         });
       },
-      union: (_) => dart.refer('dynamic', dartCoreUrl),
-      intersection: (_) => dart.refer('dynamic', dartCoreUrl),
-      parameter: (type) => dart.refer(type.name),
+      union: (_) => _createType('dynamic'),
+      intersection: (_) => _createType('dynamic'),
+      parameter: (type) => _createType(type.name, url: null),
       reflection: (type) {
         final url = moduleIdToImportUrl(context, ModuleId.coreReflection);
         final id = type.declarationId;
@@ -91,10 +91,10 @@ final Query<CandyType, dart.Reference> compileType =
   },
 );
 
-dart.TypeReference _createDartType(
+dart.Reference _createType(
   String name, {
   String url = dartCoreUrl,
-  List<dart.TypeReference> typeArguments = const [],
+  List<dart.Reference> typeArguments = const [],
 }) {
   return dart.TypeReference((b) => b
     ..symbol = name

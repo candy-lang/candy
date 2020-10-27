@@ -1,5 +1,5 @@
-import 'package:parser/parser.dart' as ast;
 import 'package:dartx/dartx.dart';
+import 'package:parser/parser.dart' as ast;
 
 import '../../errors.dart';
 import '../../query.dart';
@@ -85,7 +85,9 @@ final lowerUseLinesAstToHir = Query<ResourceId, List<hir.UseLine>>(
     var modules = useLines
         .map((l) => lowerUseLineAstToHir(context, Tuple2(resourceId, l)))
         .toList();
-    if (modules.none((m) => m.moduleId.packageId == PackageId.core)) {
+
+    if (resourceId.packageId.isNotCore &&
+        modules.none((m) => m.moduleId.packageId == PackageId.core)) {
       modules = modules + [hir.UseLine(ModuleId.core, isPublic: false)];
     }
 
@@ -104,7 +106,7 @@ final lowerUseLineAstToHir =
 
     final moduleId = useLine.map(
       localAbsolute: (useLine) => ModuleId(
-        PackageId.this_,
+        resourceId.packageId,
         useLine.pathSegments.map((s) => s.name).toList(),
       ),
       localRelative: (useLine) {

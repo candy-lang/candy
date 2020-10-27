@@ -9,20 +9,30 @@ import 'constants.dart';
 import 'declarations/module.dart';
 import 'pubspec.dart';
 
-final compile = Query<PackageId, Unit>(
+final compile = Query<Unit, Unit>(
   'dart.compile',
   evaluateAlways: true,
-  provider: (context, packageId) {
-    if (packageId.isThis) {
-      // TODO(JonasWanke): compile transitive dependencies when they're supported
-      compile(context, PackageId.core);
+  provider: (context, _) {
+    final packageId = context.config.packageId;
 
-      final dependencies = getCandyspec(context, packageId).dependencies;
-      for (final dependency in dependencies.keys) {
-        compile(context, PackageId(dependency));
-      }
+    // TODO(JonasWanke): compile transitive dependencies when they're supported
+    compilePackage(context, PackageId.core);
+
+    final dependencies = getCandyspec(context, packageId).dependencies;
+    for (final dependency in dependencies.keys) {
+      compilePackage(context, PackageId(dependency));
     }
 
+    compilePackage(context, packageId);
+
+    return Unit();
+  },
+);
+
+final compilePackage = Query<PackageId, Unit>(
+  'dart.compilePackage',
+  evaluateAlways: true,
+  provider: (context, packageId) {
     final buildArtifactId = packageId.dartBuildArtifactId;
     context.config.buildArtifactManager.delete(context, buildArtifactId);
 
@@ -67,13 +77,15 @@ final runPubGet = Query<PackageId, Unit>(
     return Unit();
   },
 );
-final run = Query<PackageId, String>(
+final run = Query<Unit, String>(
   'dart.run',
   evaluateAlways: true,
-  provider: (context, packageId) {
+  provider: (context, _) {
+    final packageId = context.config.packageId;
     final buildArtifactId = packageId.dartBuildArtifactId;
     final directory =
         context.config.buildArtifactManager.toPath(context, buildArtifactId);
+    final mainModuleId = ModuleId(packageId, ['main']);
     final path = p.relative(
       context.config.buildArtifactManager
           .toPath(context, moduleIdToBuildArtifactId(context, mainModuleId)),

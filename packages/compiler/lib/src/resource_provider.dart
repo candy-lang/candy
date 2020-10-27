@@ -33,11 +33,11 @@ abstract class ResourceProvider {
   String getContent(QueryContext context, ResourceId id);
 
   Directory getPackageDirectory(QueryContext context, PackageId packageId) {
-    if (packageId.isThis) return projectDirectory;
+    if (packageId == context.config.packageId) return projectDirectory;
     if (packageId.isCore) return candyDirectory;
 
     // TODO(JonasWanke): resolve all dependencies
-    final candyspec = getCandyspec(context, PackageId.this_);
+    final candyspec = getCandyspec(context, context.config.packageId);
     final dependency = candyspec.dependencies[packageId.name];
     if (dependency == null) {
       throw CompilerError.unknownPackage(

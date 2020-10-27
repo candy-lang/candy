@@ -1,4 +1,5 @@
 import 'package:parser/parser.dart' as ast;
+import 'package:dartx/dartx.dart';
 
 import '../../../query.dart';
 import '../../../utils.dart';
@@ -29,36 +30,33 @@ final getFunctionDeclarationHir = Query<DeclarationId, hir.FunctionDeclaration>(
   provider: (context, declarationId) {
     final functionAst = getFunctionDeclarationAst(context, declarationId);
 
+    // ignore: can_be_null_after_null_aware
+    final typeParameters = functionAst.typeParameters?.parameters.orEmpty
+        .map((p) => hir.TypeParameter(
+              name: p.name.name,
+              upperBound: p.bound != null
+                  ? astTypeToHirType(
+                      context,
+                      Tuple2(declarationId.parent, p.bound),
+                    )
+                  : hir.CandyType.any,
+            ))
+        .toList();
+
     return hir.FunctionDeclaration(
       isStatic: functionAst.isStatic || declarationId.parent.isModule,
       name: functionAst.name.name,
-      // ignore: can_be_null_after_null_aware
-      typeParameters: functionAst.typeParameters?.parameters.orEmpty
-          .map((p) => hir.TypeParameter(
-                name: p.name.name,
-                upperBound: p.bound != null
-                    ? astTypeToHirType(
-                        context,
-                        Tuple2(
-                          declarationId.parent,
-                          p.bound,
-                        ))
-                    : hir.CandyType.any,
-              ))
-          .toList(),
+      typeParameters: typeParameters,
       valueParameters: functionAst.valueParameters
           .map((p) => hir.ValueParameter(
                 name: p.name.name,
-                type: astTypeToHirType(
-                  context,
-                  Tuple2(declarationId.parent, p.type),
-                ),
+                type: astTypeToHirType(context, Tuple2(declarationId, p.type)),
               ))
           .toList(),
       returnType: functionAst.returnType != null
           ? astTypeToHirType(
               context,
-              Tuple2(declarationId.parent, functionAst.returnType),
+              Tuple2(declarationId, functionAst.returnType),
             )
           : hir.CandyType.unit,
     );

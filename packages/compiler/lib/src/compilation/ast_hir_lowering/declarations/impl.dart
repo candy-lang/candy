@@ -33,26 +33,25 @@ final getImplDeclarationHir = Query<DeclarationId, hir.ImplDeclaration>(
   provider: (context, declarationId) {
     final implAst = context.callQuery(getImplDeclarationAst, declarationId);
 
-    final trait =
-        astTypeToHirType(context, Tuple2(declarationId, implAst.trait));
+    // ignore: can_be_null_after_null_aware
+    final typeParameters = implAst.typeParameters?.parameters.orEmpty
+        .map((p) => hir.TypeParameter(
+              name: p.name.name,
+              upperBound: p.bound != null
+                  ? astTypeToHirType(context, Tuple2(declarationId, p.bound))
+                  : hir.CandyType.any,
+            ))
+        .toList();
 
     // TODO(JonasWanke): check impl validity (required methods available, correct package)
 
     return hir.ImplDeclaration(
-      // ignore: can_be_null_after_null_aware
-      typeParameters: implAst.typeParameters?.parameters.orEmpty
-          .map((p) => hir.TypeParameter(
-                name: p.name.name,
-                upperBound: p.bound != null
-                    ? astTypeToHirType(context, Tuple2(declarationId, p.bound))
-                    : hir.CandyType.any,
-              ))
-          .toList(),
+      typeParameters: typeParameters,
       type: astTypeToHirType(context, Tuple2(declarationId, implAst.type))
           as hir.UserCandyType,
       traits: hirTypeToUserTypes(
         context,
-        trait,
+        astTypeToHirType(context, Tuple2(declarationId, implAst.trait)),
         ErrorLocation(declarationId.resourceId, implAst.trait.span),
       ),
       innerDeclarationIds: getInnerDeclarationIds(context, declarationId),
@@ -95,7 +94,7 @@ final getAllImplsForClass = Query<DeclarationId, List<DeclarationId>>(
   'getAllImplsForClass',
   provider: (context, declarationId) {
     return getAllDependencies(context, Unit())
-        .followedBy([PackageId.this_])
+        .followedBy([context.config.packageId])
         .expand((packageId) => context.config.resourceProvider
             .getAllFileResourceIds(context, packageId))
         .where((resourceId) => resourceId.isCandySourceFile)

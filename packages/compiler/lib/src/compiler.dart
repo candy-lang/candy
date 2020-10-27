@@ -1,34 +1,10 @@
-import 'dart:io';
-
-import 'package:meta/meta.dart';
-
-import 'build_artifacts.dart';
 import 'compilation/ast.dart';
 import 'compilation/ast_hir_lowering.dart';
 import 'compilation/hir.dart' as hir;
 import 'compilation/hir/ids.dart';
-import 'constants.dart';
 import 'errors.dart';
 import 'query.dart';
-import 'resource_provider.dart';
 import 'utils.dart';
-
-Future<void> compile({
-  @required Directory candyDirectory,
-  @required Directory projectDirectory,
-}) async {
-  final config = QueryConfig(
-    resourceProvider: ResourceProvider.default_(
-      candyDirectory: candyDirectory,
-      projectDirectory: projectDirectory,
-    ),
-    buildArtifactManager: BuildArtifactManager(projectDirectory),
-  );
-  final context = config.createContext();
-
-  final mainFunctionId = context.callQuery(getMainFunction, mainModuleId);
-  print(mainFunctionId);
-}
 
 const mainFunctionName = 'main';
 final getMainFunction = Query<ModuleId, DeclarationId>(

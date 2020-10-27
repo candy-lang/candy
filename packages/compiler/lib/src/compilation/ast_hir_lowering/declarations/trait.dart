@@ -30,6 +30,19 @@ final getTraitDeclarationHir = Query<DeclarationId, hir.TraitDeclaration>(
   provider: (context, declarationId) {
     final traitAst = context.callQuery(getTraitDeclarationAst, declarationId);
 
+    // ignore: can_be_null_after_null_aware
+    final typeParameters = traitAst.typeParameters?.parameters.orEmpty
+        .map((p) => hir.TypeParameter(
+              name: p.name.name,
+              upperBound: p.bound != null
+                  ? astTypeToHirType(
+                      context,
+                      Tuple2(declarationId.parent, p.bound),
+                    )
+                  : hir.CandyType.any,
+            ))
+        .toList();
+
     var upperBounds = <hir.UserCandyType>[];
     if (traitAst.bound != null) {
       final upperBoundType =
@@ -43,15 +56,7 @@ final getTraitDeclarationHir = Query<DeclarationId, hir.TraitDeclaration>(
 
     return hir.TraitDeclaration(
       traitAst.name.name,
-      // ignore: can_be_null_after_null_aware
-      typeParameters: traitAst.typeParameters?.parameters.orEmpty
-          .map((p) => hir.TypeParameter(
-                name: p.name.name,
-                upperBound: p.bound != null
-                    ? astTypeToHirType(context, Tuple2(declarationId, p.bound))
-                    : hir.CandyType.any,
-              ))
-          .toList(),
+      typeParameters: typeParameters,
       upperBounds: upperBounds,
       innerDeclarationIds: getInnerDeclarationIds(context, declarationId),
     );

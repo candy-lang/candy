@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:core';
+import 'dart:core' as core;
 import 'dart:developer';
 
 import 'package:dartx/dartx.dart';
@@ -18,10 +20,15 @@ part 'query.g.dart';
 @immutable
 class QueryConfig {
   const QueryConfig({
+    @required this.packageName,
     @required this.resourceProvider,
     @required this.buildArtifactManager,
-  })  : assert(resourceProvider != null),
+  })  : assert(packageName != null),
+        assert(resourceProvider != null),
         assert(buildArtifactManager != null);
+
+  final String packageName;
+  PackageId get packageId => PackageId(packageName);
 
   final ResourceProvider resourceProvider;
   final BuildArtifactManager buildArtifactManager;
@@ -87,16 +94,21 @@ class GlobalQueryContext {
       result = e.recordedCall;
     }
 
-    if (query.name.startsWith('dart.') || query.name == 'calculateFullHir') {
+    if (query.name.startsWith('dart.')) {
       var dateTime = DateTime.now().toIso8601String();
       dateTime =
           dateTime.substring(0, dateTime.indexOf('.')).replaceAll(':', '-');
-      final encoder =
-          JsonEncoder.withIndent('  ', (object) => object.toString());
+      final encoder = JsonEncoder.withIndent('  ', (object) {
+        try {
+          return object.toString();
+        } catch (_) {
+          return core.Error.safeToString(object);
+        }
+      });
       config.buildArtifactManager.setContent(
         QueryContext(this),
         BuildArtifactId(
-          PackageId.this_,
+          config.packageId,
           'query-traces/$dateTime ${query.name}.json',
         ),
         encoder.convert(result.toJson()),
