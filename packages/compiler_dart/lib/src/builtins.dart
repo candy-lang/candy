@@ -20,8 +20,8 @@ abstract class BuiltinCompiler<Output> {
       return compileToString();
     } else if (moduleId == ModuleId.corePrimitives.nested(['Unit'])) {
       return compileUnit();
-    } else if (moduleId == ModuleId.corePrimitives.nested(['Nothing'])) {
-      return compileNothing();
+    } else if (moduleId == ModuleId.corePrimitives.nested(['Never'])) {
+      return compileNever();
     } else if (moduleId == ModuleId.corePrimitives.nested(['Bool'])) {
       return compileBool();
     } else if (moduleId == ModuleId.corePrimitives.nested(['Number'])) {
@@ -59,7 +59,7 @@ abstract class BuiltinCompiler<Output> {
   Option<Output> compileToString();
 
   Option<Output> compileUnit();
-  Option<Output> compileNothing();
+  Option<Output> compileNever();
 
   Option<Output> compileBool();
 
@@ -94,8 +94,8 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
   }
 
   @override
-  Option<dart.Spec> compileNothing() {
-    return Option.some(dart.Class((b) => b..name = 'Nothing'));
+  Option<dart.Spec> compileNever() {
+    return Option.some(dart.Class((b) => b..name = 'Never'));
   }
 
   @override

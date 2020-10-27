@@ -1,0 +1,10 @@
+fun main() {
+  if true {
+    print("Hello, world!")
+  }
+  let a = if false {
+    2
+  } else {
+    5
+  }
+}

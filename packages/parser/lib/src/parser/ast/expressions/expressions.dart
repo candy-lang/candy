@@ -256,9 +256,9 @@ abstract class IfExpression extends Expression implements _$IfExpression {
     int id, {
     @required IfKeywordToken ifKeyword,
     @required Expression condition,
-    @required Expression thenExpression,
+    @required LambdaLiteral thenBody,
     ElseKeywordToken elseKeyword,
-    Expression elseExpression,
+    LambdaLiteral elseBody,
   }) = _IfExpression;
   const IfExpression._();
 
@@ -266,9 +266,9 @@ abstract class IfExpression extends Expression implements _$IfExpression {
   Iterable<SyntacticEntity> get children => [
         ifKeyword,
         condition,
-        thenExpression,
+        thenBody,
         if (elseKeyword != null) elseKeyword,
-        if (elseExpression != null) elseExpression,
+        if (elseBody != null) elseBody,
       ];
 }
 

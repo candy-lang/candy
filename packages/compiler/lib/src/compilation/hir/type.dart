@@ -130,6 +130,8 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
     if (child == parent) return true;
     if (parent == CandyType.any) return true;
     if (child == CandyType.any) return false;
+    if (child == CandyType.never) return true;
+    if (parent == CandyType.never) return false;
 
     bool throwInvalidThisType() {
       throw CompilerError.internalError(
