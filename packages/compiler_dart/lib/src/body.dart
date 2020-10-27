@@ -271,10 +271,11 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         node.left.identifier
             .maybeMap(
               property: (property) => dart.refer(
-                  property.id.simplePath.last.nameOrNull ??
-                      (throw CompilerError.internalError(
-                          'Path must be path to property.')),
-                  declarationIdToImportUrl(context, property.id.parent)),
+                property.id.simplePath.last.nameOrNull ??
+                    (throw CompilerError.internalError(
+                        'Path must be path to property.')),
+                declarationIdToImportUrl(context, property.id.parent),
+              ),
               localProperty: (property) =>
                   _refer(getExpression(context, property.id).value.id),
               orElse: () => throw CompilerError.internalError('Left side of '

@@ -167,6 +167,8 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   @override
   Option<hir.Expression> visitAssignmentExpression(AssignmentExpression node) {
     if (node.id == id) return Some(node);
+    final result = node.left.accept(this);
+    if (result is Some) return result;
     return node.right.accept(this);
   }
 }
@@ -458,7 +460,7 @@ class ContextContext extends Context {
 
     hir.Identifier convertDeclarationId(DeclarationId id) {
       hir.CandyType type;
-      bool isMutable = false;
+      var isMutable = false;
       if (id.isFunction) {
         final functionHir = getFunctionDeclarationHir(queryContext, id);
         type = hir.CandyType.function(
@@ -1491,8 +1493,12 @@ extension on Context {
 
     final isMutable = left.identifier.isMutableOrNull;
     if (!isMutable) {
-      throw CompilerError.assignmentToImmutable(
-          "Can't assign to immutable property.");
+      return Error([
+        CompilerError.assignmentToImmutable(
+          "Can't assign to an immutable property.",
+          location: ErrorLocation(resourceId, expression.operatorToken.span),
+        ),
+      ]);
     }
 
     final rightExpression =
