@@ -8,7 +8,7 @@ public builtin trait Any
 // }
 
 public builtin class Unit
-public builtin class Nothing
+public builtin class Never
 
 public builtin class Bool
 

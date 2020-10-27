@@ -66,8 +66,16 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
     return node.identifier.when(
       this_: () => _saveSingle(node, dart.refer('this')),
-      super_: null,
-      module: null,
+      super_: (_) {
+        throw CompilerError.internalError(
+          '`super` is not yet supported in Dart compiler.',
+        );
+      },
+      module: (_) {
+        throw CompilerError.internalError(
+          'Modules are not yet supported in Dart compiler.',
+        );
+      },
       trait: referTraitOrClass,
       class_: referTraitOrClass,
       parameter: (id, name, _) {
@@ -205,6 +213,25 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         ] else
           dart.Code('return;'),
       ];
+
+  @override
+  List<dart.Code> visitIfExpression(IfExpression node) {
+    List<dart.Code> visitBody(List<Expression> body) => [
+          for (final expression in body) ...expression.accept(this),
+          if (body.isNotEmpty && node.type != CandyType.unit)
+            _refer(node.id).assign(_refer(body.last.id)).statement,
+        ];
+
+    return [
+      ...node.condition.accept(this),
+      dart.literalNull.assignVar(_name(node.id)).statement,
+      dart.Code('if (${_name(node.condition.id)}) {'),
+      ...visitBody(node.thenBody),
+      dart.Code('} else {'),
+      ...visitBody(node.elseBody),
+      dart.Code('}'),
+    ];
+  }
 
   @override
   List<dart.Code> visitLoopExpression(LoopExpression node) => [

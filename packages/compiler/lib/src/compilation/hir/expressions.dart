@@ -40,6 +40,14 @@ abstract class Expression implements _$Expression {
     Expression target,
     Map<String, Expression> valueArguments,
   ) = FunctionCallExpression;
+  // ignore: non_constant_identifier_names
+  const factory Expression.if_(
+    DeclarationLocalId id,
+    Expression condition,
+    List<Expression> thenBody,
+    List<Expression> elseBody,
+    CandyType type,
+  ) = IfExpression;
   const factory Expression.loop(
     DeclarationLocalId id,
     List<Expression> body,
@@ -90,6 +98,7 @@ abstract class Expression implements _$Expression {
           return functionType.returnType;
         },
         return_: (_, __, ___) => CandyType.never,
+        if_: (_, __, ___, ____, type) => type,
         loop: (_, __, type) => type,
         while_: (_, __, ___, type) => type,
         break_: (_, __, ___) => CandyType.never,
@@ -105,6 +114,7 @@ abstract class Expression implements _$Expression {
         call: (e) => visitor.visitCallExpression(e),
         functionCall: (e) => visitor.visitFunctionCallExpression(e),
         return_: (e) => visitor.visitReturnExpression(e),
+        if_: (e) => visitor.visitIfExpression(e),
         loop: (e) => visitor.visitLoopExpression(e),
         while_: (e) => visitor.visitWhileExpression(e),
         break_: (e) => visitor.visitBreakExpression(e),
@@ -228,6 +238,7 @@ abstract class ExpressionVisitor<T> {
   T visitCallExpression(CallExpression node);
   T visitFunctionCallExpression(FunctionCallExpression node);
   T visitReturnExpression(ReturnExpression node);
+  T visitIfExpression(IfExpression node);
   T visitLoopExpression(LoopExpression node);
   T visitWhileExpression(WhileExpression node);
   T visitBreakExpression(BreakExpression node);
@@ -252,6 +263,8 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   void visitFunctionCallExpression(FunctionCallExpression node) {}
   @override
   void visitReturnExpression(ReturnExpression node) {}
+  @override
+  void visitIfExpression(IfExpression node) {}
   @override
   void visitLoopExpression(LoopExpression node) {}
   @override
