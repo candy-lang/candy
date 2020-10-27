@@ -1,0 +1,17 @@
+use ....primitives
+
+public class ArrayList<Item> {
+  builtin static fun of1<Item>(first: Item): ArrayList<Item>
+  builtin static fun of2<Item>(first: Item, second: Item): ArrayList<Item>
+  builtin static fun of3<Item>(first: Item, second: Item, third: Item): ArrayList<Item>
+  builtin static fun of4<Item>(first: Item, second: Item, third: Item, fourth: Item): ArrayList<Item>
+  builtin static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): ArrayList<Item>
+
+  let items: Array<Item>
+}
+
+builtin class Array<Item> {
+  let length: Int
+
+  fun get(index: Int /* UInt */): Item
+}

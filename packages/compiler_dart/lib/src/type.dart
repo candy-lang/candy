@@ -26,10 +26,19 @@ final Query<CandyType, dart.Reference> compileType =
         if (type == CandyType.int) return _createType('int');
         if (type == CandyType.float) return _createType('double');
         if (type == CandyType.string) return _createType('String');
+        if (type.virtualModuleId == CandyType.arrayModuleId) {
+          assert(type.arguments.length == 1);
+          return _createType(
+            'List',
+            typeArguments: [compileType(context, type.arguments.single)],
+          );
+        }
 
-        return _createDartType(
+        return _createType(
           type.name,
           url: moduleIdToImportUrl(context, type.parentModuleId),
+          typeArguments:
+              type.arguments.map((a) => compileType(context, a)).toList(),
         );
       },
       tuple: (type) {

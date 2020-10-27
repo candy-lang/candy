@@ -51,11 +51,23 @@ abstract class CandyType with _$CandyType {
   static const float = CandyType.user(ModuleId.corePrimitives, 'Float');
   static const string = CandyType.user(ModuleId.corePrimitives, 'String');
 
+  factory CandyType.list(CandyType itemType) => CandyType.user(
+        ModuleId.coreCollections.nested(['list']),
+        'List',
+        arguments: [itemType],
+      );
+  factory CandyType.arrayList(CandyType itemType) => CandyType.user(
+        ModuleId.coreCollections.nested(['list', 'array']),
+        'Array',
+        arguments: [itemType],
+      );
+  static const arrayListModuleId =
+      ModuleId(PackageId.core, ['collections', 'list', 'array', 'ArrayList']);
+  static const arrayModuleId =
+      ModuleId(PackageId.core, ['collections', 'list', 'array', 'Array']);
+
   static const type = CandyType.user(ModuleId.coreReflection, 'Type');
   static const module = CandyType.user(ModuleId.coreReflection, 'Module');
-
-  factory CandyType.list(CandyType itemType) =>
-      CandyType.user(ModuleId.coreCollections, 'List', arguments: [itemType]);
 
   ModuleId get virtualModuleId => maybeWhen(
         user: (moduleId, name, _) => moduleId.nested([name]),
