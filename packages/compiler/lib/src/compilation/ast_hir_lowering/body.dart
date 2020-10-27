@@ -798,6 +798,18 @@ class IfContext extends InnerContext {
     if (result != null) return [result];
     return parent.value.resolveIdentifier(name);
   }
+
+  @override
+  Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveReturn(
+    Option<String> label,
+  ) {
+    if (label is None ||
+        label == this.label ||
+        this.label is None && label == Some('if')) {
+      return Some(Tuple2(id, parent.value.expressionType));
+    }
+    return parent.flatMapValue((context) => context.resolveBreak(label));
+  }
 }
 
 class LoopContext extends InnerContext {
