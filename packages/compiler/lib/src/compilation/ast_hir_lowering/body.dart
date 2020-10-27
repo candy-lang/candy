@@ -1118,7 +1118,7 @@ extension on Context {
             .lowerUnambiguous(expression);
       }).merge();
       if (loweredElseBody is Error) return loweredElseBody;
-      elseBody.addAll(loweredThenBody.value);
+      elseBody.addAll(loweredElseBody.value);
     }
 
     final type = expressionType.valueOrNull ??
