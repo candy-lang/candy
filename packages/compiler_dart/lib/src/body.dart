@@ -88,7 +88,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         }
         return _saveSingle(node, dart.refer(name));
       },
-      property: (id, _, target) {
+      property: (id, _, __, target) {
         final name = id.simplePath.last.nameOrNull;
 
         // Generated Dart-functions always use named arguments, which our type
@@ -112,7 +112,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             ),
         ];
       },
-      localProperty: (id, _, __) => _saveSingle(node, _refer(id)),
+      localProperty: (id, _, __, ___) => _saveSingle(node, _refer(id)),
     );
   }
 
@@ -232,9 +232,32 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         ],
         dart.Code('break ${_label(node.scopeId)};'),
       ];
+
   @override
   List<dart.Code> visitContinueExpression(ContinueExpression node) => [
         dart.Code('continue ${_label(node.scopeId)};'),
+      ];
+
+  @override
+  List<dart.Code> visitAssignmentExpression(AssignmentExpression node) => [
+        ...node.right.accept(this),
+        node.left.identifier
+            .maybeMap(
+              property: (property) => dart.refer(
+                property.id.simplePath.last.nameOrNull ??
+                    (throw CompilerError.internalError(
+                        'Path must be path to property.')),
+                declarationIdToImportUrl(context, property.id.parent),
+              ),
+              localProperty: (property) =>
+                  _refer(getExpression(context, property.id).value.id),
+              orElse: () => throw CompilerError.internalError('Left side of '
+                  'assignment can only be property or local property '
+                  'identifier, but was ${node.left.runtimeType} '
+                  '(${node.left})'),
+            )
+            .assign(_refer(node.right.id))
+            .statement,
       ];
 
   static String _name(DeclarationLocalId id) => '_${id.value}';

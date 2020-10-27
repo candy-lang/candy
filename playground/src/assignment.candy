@@ -1,0 +1,7 @@
+mut let a = "Hello"
+
+fun main() {
+  mut let b = 1
+  a = "blub"
+  b = 3
+}

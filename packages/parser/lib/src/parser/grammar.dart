@@ -1001,7 +1001,7 @@ extension on ExpressionBuilder {
 
   void right(Parser<OperatorToken> operator) {
     group().right<OperatorToken, Expression>(
-      operator,
+      (LexerGrammar.NLs & operator & LexerGrammar.NLs).map((value) => value[1] as OperatorToken),
       (left, operator, right) =>
           BinaryExpression(ParserGrammar._id++, left, operator, right),
     );

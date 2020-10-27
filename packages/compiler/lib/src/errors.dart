@@ -31,6 +31,8 @@ abstract class CompilerError implements _$CompilerError {
       CompilerError._create('ambiguousExpression');
   static const ambiguousImplsFound =
       CompilerError._create('ambiguousImplsFound');
+  static const assignmentToImmutable =
+      CompilerError._create('assignmentToImmutable');
   static const candyspecMissing = CompilerError._create('candyspecMissing');
   static const duplicateArgument = CompilerError._create('duplicateArgument');
   static const internalError = CompilerError._create('internalError');

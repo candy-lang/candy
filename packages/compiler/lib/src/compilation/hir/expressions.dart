@@ -69,6 +69,11 @@ abstract class Expression implements _$Expression {
     DeclarationLocalId id,
     DeclarationLocalId scopeId,
   ) = ContinueExpression;
+  const factory Expression.assignment(
+    DeclarationLocalId id,
+    IdentifierExpression left,
+    Expression right,
+  ) = AssignmentExpression;
 
   factory Expression.fromJson(Map<String, dynamic> json) =>
       _$ExpressionFromJson(json);
@@ -89,6 +94,7 @@ abstract class Expression implements _$Expression {
         while_: (_, __, ___, type) => type,
         break_: (_, __, ___) => CandyType.never,
         continue_: (_, __) => CandyType.never,
+        assignment: (_, left, __) => right.type,
       );
 
   T accept<T>(ExpressionVisitor<T> visitor) => map(
@@ -103,6 +109,7 @@ abstract class Expression implements _$Expression {
         while_: (e) => visitor.visitWhileExpression(e),
         break_: (e) => visitor.visitBreakExpression(e),
         continue_: (e) => visitor.visitContinueExpression(e),
+        assignment: (e) => visitor.visitAssignmentExpression(e),
       );
 }
 
@@ -126,18 +133,28 @@ abstract class Identifier implements _$Identifier {
   /// A property or function.
   const factory Identifier.property(
     DeclarationId id,
-    CandyType type, [
+    CandyType type,
+    // ignore: avoid_positional_boolean_parameters
+    bool isMutable, [
     Expression target,
   ]) = PropertyIdentifier;
   const factory Identifier.localProperty(
     DeclarationLocalId id,
     String name,
     CandyType type,
+    // ignore: avoid_positional_boolean_parameters
+    bool isMutable,
   ) = LocalPropertyIdentifier;
 
   factory Identifier.fromJson(Map<String, dynamic> json) =>
       _$IdentifierFromJson(json);
   const Identifier._();
+
+  bool get isMutableOrNull => maybeMap(
+        property: (prop) => prop.isMutable,
+        localProperty: (prop) => prop.isMutable,
+        orElse: () => null,
+      );
 
   CandyType get type => when(
         this_: () => CandyType.this_(),
@@ -146,8 +163,8 @@ abstract class Identifier implements _$Identifier {
         class_: (_) => CandyType.declaration,
         module: (_) => CandyType.declaration,
         parameter: (_, __, type) => type,
-        property: (_, type, __) => type,
-        localProperty: (_, __, type) => type,
+        property: (_, type, __, ___) => type,
+        localProperty: (_, __, type, ___) => type,
       );
 }
 
@@ -215,6 +232,7 @@ abstract class ExpressionVisitor<T> {
   T visitWhileExpression(WhileExpression node);
   T visitBreakExpression(BreakExpression node);
   T visitContinueExpression(ContinueExpression node);
+  T visitAssignmentExpression(AssignmentExpression node);
 }
 
 abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
@@ -242,4 +260,6 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   void visitBreakExpression(BreakExpression node) {}
   @override
   void visitContinueExpression(ContinueExpression node) {}
+  @override
+  void visitAssignmentExpression(AssignmentExpression node) {}
 }
