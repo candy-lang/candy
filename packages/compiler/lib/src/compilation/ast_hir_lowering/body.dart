@@ -218,8 +218,6 @@ abstract class Context {
   List<hir.Identifier> resolveIdentifier(String name);
   void addIdentifier(hir.LocalPropertyIdentifier identifier);
 
-  // hir.CandyType resolveType(hir.CandyType type);
-
   Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveReturn(
     Option<String> label,
   );
