@@ -60,7 +60,7 @@ final getCandyspecFileContent = Query<PackageId, String>(
 final getAllDependencies = Query<Unit, List<PackageId>>(
   'getAllDependencies',
   provider: (context, _) {
-    final candyspec = getCandyspec(context, PackageId.this_);
+    final candyspec = getCandyspec(context, context.config.packageId);
     return candyspec.dependencies.keys.map((name) => PackageId(name)).toList();
   },
 );

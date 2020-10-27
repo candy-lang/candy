@@ -1,5 +1,5 @@
-import 'package:parser/parser.dart' as ast;
 import 'package:dartx/dartx.dart';
+import 'package:parser/parser.dart' as ast;
 
 import '../../errors.dart';
 import '../../query.dart';
@@ -104,7 +104,7 @@ final lowerUseLineAstToHir =
 
     final moduleId = useLine.map(
       localAbsolute: (useLine) => ModuleId(
-        PackageId.this_,
+        resourceId.packageId,
         useLine.pathSegments.map((s) => s.name).toList(),
       ),
       localRelative: (useLine) {

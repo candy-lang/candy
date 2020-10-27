@@ -60,10 +60,7 @@ final moduleIdToImportUrl = Query<ModuleId, String>(
   'dart.moduleIdToImportUrl',
   evaluateAlways: true,
   provider: (context, moduleId) {
-    final packageName = moduleId.packageId.isThis
-        ? getCandyspec(context, PackageId.this_).name
-        : moduleId.packageId.name;
-    return 'package:$packageName/$srcDirectoryName/${moduleId.path.join('/')}$dartFileExtension';
+    return 'package:${moduleId.packageId.name}/$srcDirectoryName/${moduleId.path.join('/')}$dartFileExtension';
   },
 );
 

@@ -20,10 +20,15 @@ part 'query.g.dart';
 @immutable
 class QueryConfig {
   const QueryConfig({
+    @required this.packageName,
     @required this.resourceProvider,
     @required this.buildArtifactManager,
-  })  : assert(resourceProvider != null),
+  })  : assert(packageName != null),
+        assert(resourceProvider != null),
         assert(buildArtifactManager != null);
+
+  final String packageName;
+  PackageId get packageId => PackageId(packageName);
 
   final ResourceProvider resourceProvider;
   final BuildArtifactManager buildArtifactManager;
@@ -103,7 +108,7 @@ class GlobalQueryContext {
       config.buildArtifactManager.setContent(
         QueryContext(this),
         BuildArtifactId(
-          PackageId.this_,
+          config.packageId,
           'query-traces/$dateTime ${query.name}.json',
         ),
         encoder.convert(result.toJson()),
