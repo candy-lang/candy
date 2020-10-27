@@ -167,9 +167,7 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   @override
   Option<hir.Expression> visitAssignmentExpression(AssignmentExpression node) {
     if (node.id == id) return Some(node);
-    node.right.accept(this);
-
-    return None();
+    return node.right.accept(this);
   }
 }
 
@@ -1113,21 +1111,21 @@ extension on Context {
     final elseBody = <Expression>[];
     if (theIf.elseKeyword != null) {
       assert(theIf.elseBody != null);
-      final thenContext = IfContext(this, getId(theIf), None());
-      final loweredThenBody = theIf.thenBody.expressions.map((expression) {
-        return thenContext
+      final elseContext = IfContext(this, getId(theIf), None());
+      final loweredElseBody = theIf.elseBody.expressions.map((expression) {
+        return elseContext
             .innerExpressionContext(forwardsIdentifiers: true)
             .lowerUnambiguous(expression);
       }).merge();
-      if (loweredThenBody is Error) return loweredThenBody;
+      if (loweredElseBody is Error) return loweredElseBody;
       elseBody.addAll(loweredThenBody.value);
     }
 
     final type = expressionType.valueOrNull ??
-        hir.CandyType.union([
+        hir.CandyType.union({
           if (thenBody.isNotEmpty) thenBody.last.type,
           if (elseBody.isNotEmpty) elseBody.last.type,
-        ]);
+        }.toList());
 
     return Ok([
       hir.IfExpression(getId(theIf), condition, thenBody, elseBody, type),

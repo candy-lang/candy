@@ -218,7 +218,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   List<dart.Code> visitIfExpression(IfExpression node) {
     List<dart.Code> visitBody(List<Expression> body) => [
           for (final expression in body) ...expression.accept(this),
-          if (body.isNotEmpty && body.last.type != CandyType.unit)
+          if (body.isNotEmpty && node.type != CandyType.unit)
             _refer(node.id).assign(_refer(body.last.id)).statement,
         ];
 
