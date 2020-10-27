@@ -10,14 +10,25 @@ import 'declarations/declarations.dart';
 import 'declarations/function.dart';
 import 'declarations/impl.dart';
 import 'declarations/module.dart';
-import 'declarations/trait.dart';
 import 'declarations/property.dart';
+import 'declarations/trait.dart';
 import 'general.dart';
 
-/// Resolves an AST-type in the given module to a HIR-type.
+/// Resolves an AST-type in the given declaration (necessary to find type
+/// parameters) to a HIR-type.
 ///
 /// Nested union and intersection types (including intermediate group types) are
 /// flattened.
+// final Query<Tuple2<DeclarationId, ast.Type>, hir.CandyType> astTypeToHirType =
+//     Query<Tuple2<DeclarationId, ast.Type>, hir.CandyType>(
+//   'astTypeToHirType',
+//   provider: (context, inputs) {
+//     final declarationId = inputs.first;
+//     final astType = inputs.second;
+//     return lowerType(context, Tuple3(declarationId, second, third))
+//   },
+// );
+
 final Query<Tuple2<DeclarationId, ast.Type>, hir.CandyType> astTypeToHirType =
     Query<Tuple2<DeclarationId, ast.Type>, hir.CandyType>(
   'astTypeToHirType',
@@ -171,10 +182,7 @@ Option<hir.CandyType /*hir.UserCandyType | hir.ParameterCandyType */ >
       declarationId = hasTrait ? traitId : classId;
     }
     if (declarationId != null) {
-      return Option.some(hir.CandyType.user(
-        currentModuleId.parent,
-        simpleTypes.last,
-      ));
+      return Option.some(hir.CandyType.user(currentModuleId, simpleTypes.last));
     }
 
     if (currentModuleId.hasNoParent) break;
@@ -192,54 +200,46 @@ Option<hir.ParameterCandyType> _resolveAstUserTypeInParameters(
   DeclarationId declarationId,
   ast.UserType type,
 ) {
-  if (type.simpleTypes.length == 1) {
-    final name = type.simpleTypes.single.name.name;
+  if (type.simpleTypes.length != 1) return None();
+  final name = type.simpleTypes.single.name.name;
 
-    var typeParameters = <hir.TypeParameter>[];
-    if (declarationId.isTrait) {
-      final traitHir = getTraitDeclarationHir(context, declarationId);
-      typeParameters = traitHir.typeParameters;
-    } else if (declarationId.isImpl) {
-      final implHir = getImplDeclarationHir(context, declarationId);
-      typeParameters = implHir.typeParameters;
-    } else if (declarationId.isClass) {
-      final classHir = getClassDeclarationHir(context, declarationId);
-      typeParameters = classHir.typeParameters;
-    } else if (declarationId.isFunction) {
-      final functionHir = getFunctionDeclarationHir(context, declarationId);
-      typeParameters = functionHir.typeParameters;
-    }
-
-    var matches = typeParameters.where((p) => p.name == name);
-    if (matches.isNotEmpty) {
-      return Some(hir.ParameterCandyType(name, declarationId));
-    }
-
-    DeclarationId parentId;
-    if (declarationId.isFunction) {
-      final functionHir = getFunctionDeclarationHir(context, declarationId);
-      if (!functionHir.isStatic) parentId = declarationId.parent;
+  final astTypeParameters = <Tuple2<DeclarationId, ast.TypeParameters>>[];
+  void addTypeParametersOf(DeclarationId id) {
+    if (id.isTrait) {
+      final traitAst = getTraitDeclarationAst(context, id);
+      if (traitAst.typeParameters != null) {
+        astTypeParameters.add(Tuple2(id, traitAst.typeParameters));
+      }
+    } else if (id.isImpl) {
+      final implAst = getImplDeclarationAst(context, id);
+      if (implAst.typeParameters != null) {
+        astTypeParameters.add(Tuple2(id, implAst.typeParameters));
+      }
+    } else if (id.isClass) {
+      final classAst = getClassDeclarationAst(context, id);
+      if (classAst.typeParameters != null) {
+        astTypeParameters.add(Tuple2(id, classAst.typeParameters));
+      }
     } else if (declarationId.isProperty) {
-      final propertyHir = getPropertyDeclarationHir(context, declarationId);
-      if (!propertyHir.isStatic) parentId = declarationId.parent;
+      final propertyAst = getPropertyDeclarationAst(context, declarationId);
+      if (!propertyAst.isStatic) addTypeParametersOf(id.parent);
+    } else if (declarationId.isFunction) {
+      final functionAst = getFunctionDeclarationAst(context, declarationId);
+      if (functionAst.typeParameters != null) {
+        astTypeParameters.add(Tuple2(id, functionAst.typeParameters));
+      }
+      if (!functionAst.isStatic) addTypeParametersOf(id.parent);
     }
-    if (parentId == null) return None();
-
-    if (parentId.isTrait) {
-      final traitHir = getTraitDeclarationHir(context, parentId);
-      typeParameters = traitHir.typeParameters;
-    } else if (parentId.isImpl) {
-      final implHir = getImplDeclarationHir(context, parentId);
-      typeParameters = implHir.typeParameters;
-    } else if (parentId.isClass) {
-      final classHir = getClassDeclarationHir(context, parentId);
-      typeParameters = classHir.typeParameters;
-    }
-
-    matches = typeParameters.where((p) => p.name == name);
-    if (matches.isNotEmpty) {
-      return Some(hir.ParameterCandyType(name, declarationId));
-    }
-    return None();
   }
+
+  final typeParameters = astTypeParameters.expand(
+      (t) => t.second.parameters.map((p) => Tuple2(t.first, p.name.name)));
+
+  addTypeParametersOf(declarationId);
+
+  final matches = typeParameters.where((t) => t.second == name);
+  if (matches.isNotEmpty) {
+    return Some(hir.ParameterCandyType(name, matches.first.first));
+  }
+  return None();
 }
