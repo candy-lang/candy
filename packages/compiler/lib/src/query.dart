@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:core';
+import 'dart:core' as core;
 import 'dart:developer';
 
 import 'package:dartx/dartx.dart';
@@ -87,12 +89,17 @@ class GlobalQueryContext {
       result = e.recordedCall;
     }
 
-    if (query.name.startsWith('dart.') || query.name == 'calculateFullHir') {
+    if (query.name.startsWith('dart.')) {
       var dateTime = DateTime.now().toIso8601String();
       dateTime =
           dateTime.substring(0, dateTime.indexOf('.')).replaceAll(':', '-');
-      final encoder =
-          JsonEncoder.withIndent('  ', (object) => object.toString());
+      final encoder = JsonEncoder.withIndent('  ', (object) {
+        try {
+          return object.toString();
+        } catch (_) {
+          return core.Error.safeToString(object);
+        }
+      });
       config.buildArtifactManager.setContent(
         QueryContext(this),
         BuildArtifactId(
