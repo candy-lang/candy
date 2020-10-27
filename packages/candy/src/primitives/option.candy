@@ -1,0 +1,9 @@
+public trait Option<Value>
+
+public class Some<Value> {
+  let value: Value
+}
+impl<Value> Some<Value>: Option<Value>
+
+public class None
+impl<Value> None: Option<Value>
