@@ -85,7 +85,9 @@ final lowerUseLinesAstToHir = Query<ResourceId, List<hir.UseLine>>(
     var modules = useLines
         .map((l) => lowerUseLineAstToHir(context, Tuple2(resourceId, l)))
         .toList();
-    if (modules.none((m) => m.moduleId.packageId == PackageId.core)) {
+
+    if (resourceId.packageId.isNotCore &&
+        modules.none((m) => m.moduleId.packageId == PackageId.core)) {
       modules = modules + [hir.UseLine(ModuleId.core, isPublic: false)];
     }
 
