@@ -9,19 +9,21 @@ import 'constants.dart';
 import 'declarations/module.dart';
 import 'pubspec.dart';
 
-final compile = Query<PackageId, Unit>(
+final compile = Query<Unit, Unit>(
   'dart.compile',
   evaluateAlways: true,
-  provider: (context, packageId) {
+  provider: (context, _) {
+    final packageId = context.config.packageId;
+
     // TODO(JonasWanke): compile transitive dependencies when they're supported
-    compile(context, PackageId.core);
+    compilePackage(context, PackageId.core);
 
     final dependencies = getCandyspec(context, packageId).dependencies;
     for (final dependency in dependencies.keys) {
-      compile(context, PackageId(dependency));
+      compilePackage(context, PackageId(dependency));
     }
 
-    compile(context, context.config.packageId);
+    compilePackage(context, packageId);
 
     return Unit();
   },

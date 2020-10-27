@@ -58,9 +58,10 @@ class BuildCommand extends Command<void> {
       );
     }
 
-    compile(
-      candyDirectory: candyDirectory,
-      projectDirectory: projectDirectory,
-    );
+    // compile(
+    //   packageName: p.basename(projectDirectory.absolute.path),
+    //   candyDirectory: candyDirectory,
+    //   projectDirectory: projectDirectory,
+    // );
   }
 }

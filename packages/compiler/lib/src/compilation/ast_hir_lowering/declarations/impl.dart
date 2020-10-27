@@ -94,7 +94,7 @@ final getAllImplsForClass = Query<DeclarationId, List<DeclarationId>>(
   'getAllImplsForClass',
   provider: (context, declarationId) {
     return getAllDependencies(context, Unit())
-        .followedBy([PackageId.this_])
+        .followedBy([context.config.packageId])
         .expand((packageId) => context.config.resourceProvider
             .getAllFileResourceIds(context, packageId))
         .where((resourceId) => resourceId.isCandySourceFile)
