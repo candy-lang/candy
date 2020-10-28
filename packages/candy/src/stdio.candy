@@ -1,1 +1,3 @@
+use ..primitives
+
 builtin fun print(object: Any): Unit

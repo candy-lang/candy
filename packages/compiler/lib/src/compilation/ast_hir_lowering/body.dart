@@ -1,4 +1,3 @@
-
 import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
 import 'package:parser/parser.dart' show SourceSpan;
@@ -290,6 +289,8 @@ abstract class Context {
       result = lowerBreak(expression);
     } else if (expression is ast.ContinueExpression) {
       result = lowerContinue(expression);
+    } else if (expression is ast.PrefixExpression) {
+      result = lowerPrefixExpression(expression);
     } else if (expression is ast.BinaryExpression) {
       result = lowerBinaryExpression(expression);
     } else {
@@ -566,7 +567,6 @@ class ContextContext extends Context {
         );
       }
     }
-
 
     final matches = getInstanceDeclarations()
         .toSet()
@@ -1784,6 +1784,47 @@ extension on Context {
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>>
+      lowerPrefixExpression(
+    ast.PrefixExpression expression,
+  ) {
+    final operatorType = expression.operatorToken.type;
+
+    if (operatorType == ast.OperatorTokenType.exclamation) {
+      final operand =
+          innerExpressionContext(expressionType: Some(hir.CandyType.opposite))
+              .lowerUnambiguous(expression.operand);
+      if (operand is Error) return Error(operand.error);
+
+      return Ok([
+        hir.Expression.functionCall(
+          getId(expression),
+          hir.Expression.identifier(
+            getId(expression),
+            hir.Identifier.property(
+              moduleIdToDeclarationId(
+                queryContext,
+                hir.CandyType.opposite.virtualModuleId,
+              ).inner(DeclarationPathData.function('opposite')),
+              hir.CandyType.function(returnType: hir.CandyType.this_()),
+              isMutable: false,
+              base: operand.value,
+              receiver: operand.value,
+            ),
+          ),
+          {},
+        ),
+      ]);
+    } else {
+      return Error([
+        CompilerError.unsupportedFeature(
+          'Unsupported prefix operator: ${expression.operatorToken.type}',
+          location: ErrorLocation(resourceId, expression.operatorToken.span),
+        ),
+      ]);
+    }
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>>
       lowerBinaryExpression(
     ast.BinaryExpression expression,
   ) {
@@ -1793,8 +1834,10 @@ extension on Context {
       return lowerAssignment(expression);
     } else {
       return Error([
-        CompilerError.unsupportedFeature('Unsupported binary operator: '
-            '${expression.operatorToken.type}'),
+        CompilerError.unsupportedFeature(
+          'Unsupported binary operator: ${expression.operatorToken.type}',
+          location: ErrorLocation(resourceId, expression.operatorToken.span),
+        ),
       ]);
     }
   }

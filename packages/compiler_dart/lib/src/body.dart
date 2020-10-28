@@ -248,11 +248,11 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     if (target is IdentifierExpression &&
         target.identifier is PropertyIdentifier) {
       final identifier = target.identifier as PropertyIdentifier;
+      final parentModuleId =
+          declarationIdToModuleId(context, identifier.id.parent);
 
-      if (declarationIdToModuleId(context, identifier.id.parent) ==
-          CandyType.arrayModuleId) {
+      if (parentModuleId == CandyType.arrayModuleId) {
         final name = identifier.id.simplePath.last.nameOrNull;
-        stderr.write(name);
         if (name == 'get' || name == 'set') {
           final array = identifier.receiver;
           final index = node.valueArguments['index'];
@@ -268,6 +268,14 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
               ...item.accept(this),
               _save(node, indexed.assign(_refer(item.id))),
             ],
+          ];
+        }
+      } else if (parentModuleId == CandyType.opposite.virtualModuleId) {
+        final receiver = identifier.receiver;
+        if (isAssignableTo(context, Tuple2(receiver.type, CandyType.bool))) {
+          return [
+            ...receiver.accept(this),
+            _save(node, _refer(receiver.id).negate()),
           ];
         }
       }

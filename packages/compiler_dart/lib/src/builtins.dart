@@ -13,6 +13,8 @@ final compileBuiltin = Query<DeclarationId, Option<dart.Spec>>(
 
 abstract class BuiltinCompiler<Output> {
   Option<Output> compile(QueryContext context, DeclarationId declarationId) {
+    if (declarationId.isImpl) return None();
+
     final moduleId = declarationIdToModuleId(context, declarationId);
     if (moduleId ==
         ModuleId.coreCollections.nested(['list', 'array', 'Array'])) {

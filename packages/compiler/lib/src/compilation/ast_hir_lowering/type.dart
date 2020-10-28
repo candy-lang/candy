@@ -42,6 +42,11 @@ final Query<Tuple2<DeclarationId, ast.Type>, hir.CandyType> astTypeToHirType =
         types.map(map).toList();
 
     if (type is ast.UserType) {
+      if (type.simpleTypes.length == 1 &&
+          type.simpleTypes.single.name.name == 'This') {
+        return hir.CandyType.this_();
+      }
+
       final result = resolveAstUserType(context, Tuple2(declarationId, type));
       if (result is! hir.UserCandyType) return result;
 
@@ -220,15 +225,15 @@ Option<hir.ParameterCandyType> _resolveAstUserTypeInParameters(
       if (classAst.typeParameters != null) {
         astTypeParameters.add(Tuple2(id, classAst.typeParameters));
       }
-    } else if (declarationId.isProperty) {
-      final propertyAst = getPropertyDeclarationAst(context, declarationId);
-      if (!propertyAst.isStatic) addTypeParametersOf(id.parent);
-    } else if (declarationId.isFunction) {
-      final functionAst = getFunctionDeclarationAst(context, declarationId);
+    } else if (id.isProperty) {
+      final propertyAst = getPropertyDeclarationAst(context, id);
+      if (!propertyAst.isStatic && id.hasParent) addTypeParametersOf(id.parent);
+    } else if (id.isFunction) {
+      final functionAst = getFunctionDeclarationAst(context, id);
       if (functionAst.typeParameters != null) {
         astTypeParameters.add(Tuple2(id, functionAst.typeParameters));
       }
-      if (!functionAst.isStatic) addTypeParametersOf(id.parent);
+      if (!functionAst.isStatic && id.hasParent) addTypeParametersOf(id.parent);
     }
   }
 
