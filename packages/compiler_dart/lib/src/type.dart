@@ -27,7 +27,7 @@ final Query<CandyType, dart.Reference> compileType =
         if (type == CandyType.float) return _createType('double');
         if (type == CandyType.string) return _createType('String');
 
-        return _createDartType(
+        return _createType(
           type.name,
           url: moduleIdToImportUrl(context, type.parentModuleId),
         );
