@@ -1,4 +1,5 @@
 use ....primitives
+use ...list
 
 public class ArrayList<Item> {
   builtin static fun of1<Item>(first: Item): ArrayList<Item>
@@ -14,4 +15,5 @@ builtin class Array<Item> {
   let length: Int
 
   fun get(index: Int /* UInt */): Item
+  fun set(index: Int /* UInt */, item: Item)
 }

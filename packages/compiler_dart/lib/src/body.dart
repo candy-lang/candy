@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 import 'package:strings/strings.dart' as strings;
@@ -242,6 +244,35 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   List<dart.Code> visitCallExpression(CallExpression node) => [];
   @override
   List<dart.Code> visitFunctionCallExpression(FunctionCallExpression node) {
+    final target = node.target;
+    if (target is IdentifierExpression &&
+        target.identifier is PropertyIdentifier) {
+      final identifier = target.identifier as PropertyIdentifier;
+
+      if (declarationIdToModuleId(context, identifier.id.parent) ==
+          CandyType.arrayModuleId) {
+        final name = identifier.id.simplePath.last.nameOrNull;
+        stderr.write(name);
+        if (name == 'get' || name == 'set') {
+          final array = identifier.receiver;
+          final index = node.valueArguments['index'];
+          final item = node.valueArguments['item'];
+          final indexed = _refer(array.id).index(_refer(index.id));
+
+          return [
+            ...array.accept(this),
+            ...index.accept(this),
+            if (name == 'get')
+              _save(node, indexed)
+            else ...[
+              ...item.accept(this),
+              _save(node, indexed.assign(_refer(item.id))),
+            ],
+          ];
+        }
+      }
+    }
+
     return [
       ...node.target.accept(this),
       for (final argument in node.valueArguments.values)
