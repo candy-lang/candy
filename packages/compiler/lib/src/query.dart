@@ -155,12 +155,17 @@ class QueryContext {
   RecordedQueryCall _execute<K, R>(Query<K, R> query, K key) {
     void reportErrors() =>
         globalContext._reportErrors(query.name, key, _reportedErrors);
-    RecordedQueryCall onErrors(dynamic error) {
-      final errors = error is _QueryFailedException
+    RecordedQueryCall onErrors(dynamic error, StackTrace stackTrace) {
+      var errors = error is _QueryFailedException
           ? error.recordedCall.thrownErrors
           : error is Iterable<ReportedCompilerError>
               ? error.toList()
               : [error as ReportedCompilerError];
+      errors = errors
+          .map((e) => e.error == CompilerError.internalError
+              ? e.copyWith(message: '${e.message}\n\n$stackTrace')
+              : e)
+          .toList();
       this.reportErrors(errors);
       reportErrors();
 
@@ -181,14 +186,17 @@ class QueryContext {
         innerCalls: _innerCalls,
         result: result,
       );
-    } on ReportedCompilerError catch (e) {
-      return onErrors(e);
-    } on Iterable<ReportedCompilerError> catch (e) {
-      return onErrors(e);
+    } on ReportedCompilerError catch (e, st) {
+      return onErrors(e, st);
+    } on Iterable<ReportedCompilerError> catch (e, st) {
+      return onErrors(e, st);
     } catch (e, st) {
-      return onErrors(e is _QueryFailedException
-          ? e
-          : CompilerError.internalError('$e\n\n$st'));
+      return onErrors(
+        e is _QueryFailedException
+            ? e
+            : CompilerError.internalError(e.toString()),
+        st,
+      );
     }
   }
 
