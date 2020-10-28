@@ -1178,10 +1178,12 @@ extension on Context {
 
     final identifiers = resolveIdentifier(name);
     if (identifiers.isEmpty) {
-      throw CompilerError.undefinedIdentifier(
-        "Couldn't resolve identifier `$name`.",
-        location: ErrorLocation(resourceId, expression.value.span),
-      );
+      return Error([
+        CompilerError.undefinedIdentifier(
+          "Couldn't resolve identifier `$name`.",
+          location: ErrorLocation(resourceId, expression.value.span),
+        ),
+      ]);
     }
 
     return Ok([
