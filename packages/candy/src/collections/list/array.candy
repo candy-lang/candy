@@ -1,26 +1,182 @@
 use ....primitives
 use ...list
 
-public class ArrayList<Item> {
-  builtin static fun of1<Item>(first: Item): ArrayList<Item>
-  builtin static fun of2<Item>(first: Item, second: Item): ArrayList<Item>
-  builtin static fun of3<Item>(first: Item, second: Item, third: Item): ArrayList<Item>
-  builtin static fun of4<Item>(first: Item, second: Item, third: Item, fourth: Item): ArrayList<Item>
-  builtin static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): ArrayList<Item>
-
-  let items: Array<Item>
-}
-// impl<Item> ArrayList<Item>: MutableList<Item> {
-//   fun size(): Int /* UInt */ { items.length }
-
-//   // fun get(index: Int /* UInt */): Option<Item> {
-    
-//   // }
-// }
-
 builtin class Array<Item> {
+  /// A builtin structure that holds a fixed number of `Item`s.
+  
+  static fun fill<Item>(length: Int /* UInt */, item: Item): Array<Item>
+  /// Creates a new `Array` of the given `length`, where every slot is filled with the same `item`.
+
   let length: Int
 
   fun get(index: Int /* UInt */): Item
   fun set(index: Int /* UInt */, item: Item)
+}
+
+// TODO(marcelgarus): For now, this never shrinks. We should implement that later, although a very
+// conservative shrinking heuristic is probably enough (we don't want to shrink too early).
+public class ArrayList<Item> {
+  /// A wrapper around `Array` that can grow dynamically.
+
+  // static fun empty<Item>(): ArrayList<Item> {
+  //   create()
+  // }
+  // public static fun of1<Item>(first: Item): ArrayList<Item> {
+  //   let list = create(1)
+  //   list.add(first)
+  //   list
+  // }
+  // public static fun of2<Item>(first: Item, second: Item): ArrayList<Item> {
+  //   let list = create(2)
+  //   list.add(first)
+  //   list.add(second)
+  //   list
+  // }
+  // public static fun of3<Item>(first: Item, second: Item, third: Item): ArrayList<Item> {
+  //   let list = create(3)
+  //   list.add(first)
+  //   list.add(second)
+  //   list.add(third)
+  //   list
+  // }
+  // public static fun of4<Item>(first: Item, second: Item, third: Item, fourth: Item): ArrayList<Item> {
+  //   let list = create(4)
+  //   list.add(first)
+  //   list.add(second)
+  //   list.add(third)
+  //   list.add(fourth)
+  //   list
+  // }
+  // public static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): ArrayList<Item> {
+  //   let list = create(5)
+  //   list.add(first)
+  //   list.add(second)
+  //   list.add(third)
+  //   list.add(fourth)
+  //   list.add(fifth)
+  //   list
+  // }
+
+  static fun create<Item>(capacity: Int /* Uint */ = 8): ArrayList<Item> {
+    /// Creates a new, empty `ArrayList` with the given capacity.
+
+    ArrayList<Item>(
+      Array.fill<Option<Item>>(capacity, None()),
+      0,
+    )
+  }
+
+  mut let items: Array<Option<Item>>
+  mut let length: Int /* UInt */
+
+  // TODO(marcelgarus): Getterize!
+  fun capacity(): Int /* UInt */ {
+    items.length
+  }
+
+  // fun grow() {
+  //   /// Increases the capacity.
+
+  //   let newItems: Array.fill<Option<Item>>(2 * capacity(), None)
+  //   mut let index = 0
+  //   while index < length {
+  //     newItems.set(items.get(index))
+  //     index = index + 1
+  //   }
+  // }
+}
+
+impl<Item> ArrayList<Item>: List<Item> {
+  // // let length: Int /* UInt */
+
+  // let isEmpty(): Bool {
+  //   length == 0
+  // }
+
+  // fun get(index: Int /* UInt */): Item {
+  //   if index < length {
+  //     // TODO(marcelgarus): Error.
+  //   }
+  //   items.get(index).unwrap()
+  // }
+
+  // fun contains(item: Item): Bool {
+  //   indexOf(item) != None()
+  // }
+
+  // fun indexOf(item: Item): Option<Int> /* Option<UInt> */ {
+  //   // TODO(marcelgarus): Use for.
+  //   mut let index = 0
+  //   while index < length {
+  //     if get(index) == item {
+  //       return Some(index)
+  //     }
+  //     index = index + 1
+  //   }
+  //   return None()
+  // }
+
+  // fun lastIndexOf(item: Item): Option<Int> /* Option<UInt> */ {
+  //   // TODO(marcelgarus): Use for.
+  //   mut let index = length - 1
+  //   while index >= 0 {
+  //     if get(index) == item {
+  //       return Some(index)
+  //     }
+  //     index = index - 1
+  //   }
+  //   return None()
+  // }
+}
+
+impl<Item> ArrayList<Item>: MutableList<Item> {
+  // fun set(index: Int /* UInt */, item: Item) {
+  //   if length <= index {
+  //     // TODO(marcelgarus): Error.
+  //   }
+  //   items.set(index, Some(item))
+  // }
+
+  // fun add(item: Item) {
+  //   if capacity() <= length {
+  //     grow()
+  //   }
+  //   items.set(length, Some(item))
+  //   length = length + 1
+  // }
+
+  // fun remove(item: Item): Bool {
+  //   mut let index = indexOf(item)
+  //   if index == None() {
+  //     false
+  //   } else {
+  //     removeAt(index.unwrap())
+  //     true
+  //   }
+  // }
+
+  // fun removeAt(index: Int /* UInt */): Item {
+  //   if index >= length {
+  //     // TODO(marcelgarus): Error.
+  //   }
+  //   let removedItem = items.get(index).unwrap()
+  //   mut let index = index
+  //   while index < length - 1 {
+  //     items.set(index, items.get(index + 1))
+  //     index = index + 1
+  //   }
+  //   // Prevent the last item from being referenced two times. This is necessary for garbage
+  //   // collection.
+  //   items.set(length - 1, None())
+  //   length = length - 1
+  //   removedItem
+  // }
+
+  // fun removeLast(): Item {
+  //   removeAt(length - 1)
+  // }
+
+  // fun clear() {
+  //   length = 0
+  // }
 }
