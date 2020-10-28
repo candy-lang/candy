@@ -1,6 +1,10 @@
 public use .option
 
 public builtin trait Any
+/// Could be anything, from an Int8 to a String to a three-legged chicken.
+///
+/// All types are assignable to `Any`.
+
 // builtin impl Any: ToString
 
 // public builtin trait ToString {
@@ -8,9 +12,37 @@ public builtin trait Any
 // }
 
 public builtin class Unit
+/// A type with only one instance, `unit`.
+///
+/// Because there's only one instance, it carries no information. This type is used as the default
+/// type for expressions that don't have an explicit result.
+///
+/// Here are a few examples of expressions that evaluate to `Unit`:
+///
+/// * `let a = 5`
+/// * `print("Hello, world!")`
+
 public builtin class Never
+/// A type with no instance.
+///
+/// This type can never be created. It's still useful to specify that an expression will never
+/// evaluate. More specifically, this is the case if
+///
+/// * an expression runs endlessly, or
+/// * an expression aborts the current control flow.
+///
+/// Here are a few examples for expressions that evaluate to `Never`:
+///
+/// * `return 5`
+/// * `break`
+/// * `throw "blub"`
+///
+/// Because all instances of `Never` (there are none) can be converted to all other types loslessly,
+/// you can assign `Never` to anything: `let a: Int = return 5` works, because the result of
+/// `return 5` is never created..
 
 public builtin class Bool
+/// A type that can be either `true` or `false`.
 
 // public builtin trait Number: AddOperator<This, This> & SubtractOperator<This, This>
 

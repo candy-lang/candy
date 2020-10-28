@@ -1,4 +1,5 @@
 public trait Option<Value>
+/// Represents a value that either exists or doesn't.
 
 public class Some<Value> {
   let value: Value
