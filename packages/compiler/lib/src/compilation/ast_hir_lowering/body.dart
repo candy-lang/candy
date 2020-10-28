@@ -1,4 +1,3 @@
-
 import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
 import 'package:parser/parser.dart' show SourceSpan;
@@ -566,7 +565,6 @@ class ContextContext extends Context {
         );
       }
     }
-
 
     final matches = getInstanceDeclarations()
         .toSet()
@@ -1566,6 +1564,49 @@ extension on Context {
         if (identifier.id.isFunction) {
           return lowerFunctionCall(expression, target);
         }
+      }
+
+      if (target is hir.IdentifierExpression &&
+          target.identifier is hir.ReflectionIdentifier) {
+        // This is a constructor call.
+
+        // ignore: non_constant_identifier_names
+        final class_ = getClassDeclarationHir(
+            queryContext, (target.identifier as hir.ReflectionIdentifier).id);
+        final fields = class_.innerDeclarationIds
+            .where((id) => id.isProperty)
+            .map((id) => getPropertyDeclarationHir(queryContext, id))
+            .toList();
+
+        if (expression.arguments.length < fields.length) {
+          throw CompilerError.missingArguments(
+            'You passed too few arguments to the constructor call.',
+          );
+        } else if (expression.arguments.length > fields.length) {
+          throw CompilerError.tooManyArguments(
+            'You passed too many arguments to the constructor call.',
+          );
+        }
+
+        final argumentValues = [
+          for (var i = 0; i < fields.length; i++)
+            innerExpressionContext(
+              expressionType: Option.some(fields[i].type),
+            ).lowerUnambiguous(expression.arguments[i].expression)
+        ].merge();
+        if (argumentValues is Error) return argumentValues;
+        final arguments = argumentValues.value;
+
+        return Ok<List<Expression>, List<ReportedCompilerError>>([
+          FunctionCallExpression(
+            getId(expression),
+            target,
+            <String, Expression>{
+              for (var i = 0; i < fields.length; i++)
+                fields[i].name: arguments[i],
+            },
+          )
+        ]);
       }
 
       throw CompilerError.unsupportedFeature(

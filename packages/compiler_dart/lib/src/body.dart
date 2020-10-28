@@ -274,7 +274,10 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     }
 
     return [
-      ...node.target.accept(this),
+      // Don't try to save the constructor locally.
+      if (target is! IdentifierExpression ||
+          (target as IdentifierExpression).identifier is! ReflectionIdentifier)
+        ...node.target.accept(this),
       for (final argument in node.valueArguments.values)
         ...argument.accept(this),
       _save(
