@@ -29,6 +29,7 @@ final getTraitDeclarationHir = Query<DeclarationId, hir.TraitDeclaration>(
   'getTraitDeclarationHir',
   provider: (context, declarationId) {
     final traitAst = context.callQuery(getTraitDeclarationAst, declarationId);
+    final name = traitAst.name.name;
 
     // ignore: can_be_null_after_null_aware
     final typeParameters = traitAst.typeParameters?.parameters.orEmpty
@@ -55,7 +56,15 @@ final getTraitDeclarationHir = Query<DeclarationId, hir.TraitDeclaration>(
     }
 
     return hir.TraitDeclaration(
-      traitAst.name.name,
+      name,
+      thisType: hir.UserCandyType(
+        declarationIdToModuleId(context, declarationId).parent,
+        name,
+        // ignore: can_be_null_after_null_aware
+        arguments: traitAst.typeParameters?.parameters.orEmpty
+            .map((p) => hir.CandyType.parameter(p.name.name, declarationId))
+            .toList(),
+      ),
       typeParameters: typeParameters,
       upperBounds: upperBounds,
       innerDeclarationIds: getInnerDeclarationIds(context, declarationId),

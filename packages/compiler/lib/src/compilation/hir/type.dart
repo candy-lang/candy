@@ -85,6 +85,31 @@ abstract class CandyType with _$CandyType {
         },
       );
 
+  CandyType bakeThisType(CandyType thisType) {
+    if (thisType == null) return this;
+
+    return map(
+      user: (type) => type.copyWith(
+          arguments:
+              type.arguments.map((a) => a.bakeThisType(thisType)).toList()),
+      this_: (_) => thisType,
+      tuple: (type) => type.copyWith(
+          items: type.items.map((i) => i.bakeThisType(thisType)).toList()),
+      function: (type) => type.copyWith(
+        receiverType: type.receiverType.bakeThisType(thisType),
+        parameterTypes:
+            type.parameterTypes.map((p) => p.bakeThisType(thisType)).toList(),
+        returnType: type.returnType.bakeThisType(thisType),
+      ),
+      union: (type) => type.copyWith(
+          types: type.types.map((t) => t.bakeThisType(thisType)).toList()),
+      intersection: (type) => type.copyWith(
+          types: type.types.map((t) => t.bakeThisType(thisType)).toList()),
+      parameter: (type) => type,
+      reflection: (type) => type,
+    );
+  }
+
   @override
   String toString() {
     return map(
@@ -156,9 +181,9 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
     if (child == CandyType.never) return true;
     if (parent == CandyType.never) return false;
 
-    bool throwInvalidThisType() {
-      throw CompilerError.internalError(
-        '`isAssignableTo` was called without resolving the `This`-type first.',
+    ReportedCompilerError invalidThisType() {
+      return CompilerError.internalError(
+        '`isAssignableTo` was called with an invalid `This`-type.',
       );
     }
 
@@ -185,61 +210,63 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
           returnType: propertyHir.type,
         );
       }
-      throw CompilerError.internalError(
-        'Invalid reflection target: `$id`.',
-      );
+      throw CompilerError.internalError('Invalid reflection target: `$id`.');
     }
 
     return child.map(
       user: (childType) {
         return parent.map(
-            user: (parentType) {
-              final declarationId =
-                  moduleIdToDeclarationId(context, childType.virtualModuleId);
-              if (declarationId.isTrait) {
-                final declaration =
-                    getTraitDeclarationHir(context, declarationId);
-                if (declaration.typeParameters.isNotEmpty) {
-                  throw CompilerError.unsupportedFeature(
-                    'Type parameters are not yet supported.',
-                  );
-                }
-                return declaration.upperBounds.any(
-                    (bound) => isAssignableTo(context, Tuple2(bound, parent)));
+          user: (parentType) {
+            final declarationId =
+                moduleIdToDeclarationId(context, childType.virtualModuleId);
+            if (declarationId.isTrait) {
+              final declaration =
+                  getTraitDeclarationHir(context, declarationId);
+              if (declaration.typeParameters.isNotEmpty) {
+                throw CompilerError.unsupportedFeature(
+                  'Type parameters are not yet supported.',
+                );
               }
 
-              if (declarationId.isClass) {
-                if (parent is! UserCandyType) return false;
-
-                return getClassTraitImplId(
+              return declaration.upperBounds.any((bound) {
+                return isAssignableTo(
                   context,
-                  Tuple2(childType, parentType),
-                ) is Some;
-              }
+                  Tuple2(bound, parent),
+                );
+              });
+            }
 
-              throw CompilerError.internalError(
-                'User type can only be a trait or a class.',
-              );
-            },
-            this_: (_) => throwInvalidThisType(),
-            tuple: (_) => false,
-            function: (_) => false,
-            union: (parentType) => parentType.types.any(
-                (type) => isAssignableTo(context, Tuple2(childType, type))),
-            intersection: (parentType) => parentType.types.every(
-                (type) => isAssignableTo(context, Tuple2(childType, type))),
-            parameter: (type) {
-              final bound = getTypeParameterBound(context, type);
-              return isAssignableTo(context, Tuple2(child, bound));
-            },
-            reflection: (type) {
-              return isAssignableTo(
+            if (declarationId.isClass) {
+              if (parent is! UserCandyType) return false;
+
+              return getClassTraitImplId(
                 context,
-                Tuple2(getResultingType(type), parent),
-              );
-            });
+                Tuple2(childType, parentType),
+              ) is Some;
+            }
+
+            throw CompilerError.internalError(
+              'User type can only be a trait or a class.',
+            );
+          },
+          this_: (_) => throw invalidThisType(),
+          tuple: (_) => false,
+          function: (_) => false,
+          union: (parentType) => parentType.types
+              .any((type) => isAssignableTo(context, Tuple2(childType, type))),
+          intersection: (parentType) => parentType.types.every(
+              (type) => isAssignableTo(context, Tuple2(childType, type))),
+          parameter: (type) {
+            final bound = getTypeParameterBound(context, type);
+            return isAssignableTo(context, Tuple2(child, bound));
+          },
+          reflection: (type) => isAssignableTo(
+            context,
+            Tuple2(getResultingType(type), parent),
+          ),
+        );
       },
-      this_: (_) => throwInvalidThisType(),
+      this_: (_) => throw invalidThisType(),
       tuple: (type) {
         throw CompilerError.unsupportedFeature(
           'Trait implementations for tuples are not yet supported.',
