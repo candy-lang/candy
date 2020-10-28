@@ -1308,15 +1308,19 @@ extension on Context {
       );
     }
 
+    final id = getId(expression);
+    final name = expression.name.name;
     return innerExpressionContext(expressionType: Option.of(type))
         .lowerUnambiguous(initializer)
         .mapValue((initializer) {
-      final id = getId(expression);
-      final name = expression.name.name;
       final actualType = type ?? initializer.type;
 
       addIdentifier(hir.LocalPropertyIdentifier(
-          id, name, actualType, expression.isMutable));
+        id,
+        name,
+        actualType,
+        expression.isMutable,
+      ));
       final result = hir.Expression.property(
         id,
         name,
@@ -1325,6 +1329,14 @@ extension on Context {
         isMutable: expression.isMutable,
       );
       return [result];
+    }).mapError((error) {
+      addIdentifier(hir.LocalPropertyIdentifier(
+        id,
+        name,
+        type ?? hir.CandyType.any,
+        expression.isMutable,
+      ));
+      return error;
     });
   }
 
