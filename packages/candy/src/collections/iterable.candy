@@ -1,7 +1,9 @@
 use ...primitives
 
 public trait Iterable<Item> {
-  let iterator: Iterator<Item>
+  fun /* let */ iterator(): Iterator<Item>
+
+  fun get(index: Int /* UInt */): Option<Item>
   // TODO(JonasWanke): let first: Option<Item>
   // TODO(JonasWanke): let second: Option<Item>
   // TODO(JonasWanke): let third: Option<Item>

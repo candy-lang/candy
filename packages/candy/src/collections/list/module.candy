@@ -20,8 +20,8 @@ public trait List<Item>: Collection<Item> {
 // impl<Item> List<Item>: GetOperator<Int, Item> /* GetOperator<UInt, Item> */
 // TODO(JonasWanke): impl List<Item>: GetOperator<Range<UInt>, List<Item>>
 
-// public trait MutableCollection<Item>: Collection<Item> {
+public trait MutableList<Item>: List<Item> & MutableCollection<Item> {
   // fun add(item: Item)
   // TODO(JonasWanke): addAll?
   // fun clear()
-// }
+}

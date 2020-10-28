@@ -10,6 +10,13 @@ public class ArrayList<Item> {
 
   let items: Array<Item>
 }
+// impl<Item> ArrayList<Item>: MutableList<Item> {
+//   fun size(): Int /* UInt */ { items.length }
+
+//   // fun get(index: Int /* UInt */): Option<Item> {
+    
+//   // }
+// }
 
 builtin class Array<Item> {
   let length: Int
