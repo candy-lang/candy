@@ -12,11 +12,7 @@ final Query<CandyType, dart.Reference> compileType =
     dart.Reference compile(CandyType type) => compileType(context, type);
 
     return type.map(
-      this_: (_) {
-        throw CompilerError.unsupportedFeature(
-          'Compiling the `This`-type to Dart is not yet supported.',
-        );
-      },
+      this_: (_) => _createType('dynamic'),
       user: (type) {
         if (type == CandyType.any) return _createType('Object');
         if (type == CandyType.unit) return _createType('void', url: null);
