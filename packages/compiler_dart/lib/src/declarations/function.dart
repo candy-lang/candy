@@ -71,14 +71,3 @@ dart.Code _compileArrayListOf(FunctionDeclaration functionHir) {
 
   return dart.refer('ArrayList<Item>').call([list], {}, []).code;
 }
-// dart.Method _compileArrayFrom() {
-//   return dart.Method((b) => b
-//     ..static = true
-//     ..returns = dart.Reference('ArrayList<Item>')
-//     ..name = 'of$length'
-//     ..types.add(dart.refer('Item'))
-//     ..requiredParameters.addAll(items.map((i) => dart.Parameter((b) => b
-//       ..type = dart.refer('Item')
-//       ..name = i)))
-//     ..body = dart.literalList(items.map(dart.refer), dart.refer('Item')).code);
-// }

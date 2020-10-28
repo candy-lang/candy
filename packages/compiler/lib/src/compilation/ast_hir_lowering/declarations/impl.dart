@@ -59,15 +59,13 @@ final getImplDeclarationHir = Query<DeclarationId, hir.ImplDeclaration>(
   },
 );
 
-final getAllImplsForType =
-    Query<Tuple2<hir.CandyType, PackageId>, List<DeclarationId>>(
+final getAllImplsForType = Query<hir.CandyType, List<DeclarationId>>(
   'getAllImplsForType',
-  provider: (context, inputs) {
-    final type = inputs.first;
-    final packageId = inputs.second;
-
-    return context.config.resourceProvider
-        .getAllFileResourceIds(context, packageId)
+  provider: (context, type) {
+    return getAllDependencies(context, Unit())
+        .followedBy([context.config.packageId])
+        .expand((packageId) => context.config.resourceProvider
+            .getAllFileResourceIds(context, packageId))
         .where((resourceId) => resourceId.isCandySourceFile)
         .expand((resourceId) =>
             _getImplDeclarationIds(context, DeclarationId(resourceId)))
@@ -90,8 +88,8 @@ Iterable<DeclarationId> _getImplDeclarationIds(
   }
 }
 
-final getAllImplsForClass = Query<DeclarationId, List<DeclarationId>>(
-  'getAllImplsForClass',
+final getAllImplsForTraitOrClass = Query<DeclarationId, List<DeclarationId>>(
+  'getAllImplsForTraitOrClass',
   provider: (context, declarationId) {
     return getAllDependencies(context, Unit())
         .followedBy([context.config.packageId])

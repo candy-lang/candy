@@ -18,7 +18,7 @@ final compileClass = Query<DeclarationId, dart.Class>(
     // ignore: non_constant_identifier_names
     final classHir = getClassDeclarationHir(context, declarationId);
 
-    final impls = getAllImplsForClass(context, declarationId)
+    final impls = getAllImplsForTraitOrClass(context, declarationId)
         .map((id) => getImplDeclarationHir(context, id));
     final implements = impls
         .expand((impl) => impl.traits)

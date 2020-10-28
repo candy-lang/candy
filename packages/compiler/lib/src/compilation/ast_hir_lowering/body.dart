@@ -1,3 +1,4 @@
+
 import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
 import 'package:parser/parser.dart' show SourceSpan;
@@ -480,9 +481,10 @@ class ContextContext extends Context {
     // resolve `field` in a getter/setter
     // TODO(JonasWanke): resolve `field` in property accessors
 
-    // TODO: check whether properties/functions are static or not and whether we have an instance
-
-    hir.Identifier convertDeclarationId(DeclarationId id) {
+    hir.Identifier convertDeclarationId(
+      DeclarationId id, [
+      hir.Expression receiver,
+    ]) {
       if (id.isModule || id.isTrait || id.isClass) {
         return hir.Identifier.reflection(id);
       } else if (id.isFunction) {
@@ -491,6 +493,7 @@ class ContextContext extends Context {
           id,
           functionHir.functionType,
           isMutable: false,
+          receiver: receiver,
         );
       } else if (id.isProperty) {
         final propertyHir = getPropertyDeclarationHir(queryContext, id);
@@ -498,13 +501,91 @@ class ContextContext extends Context {
           id,
           propertyHir.type,
           isMutable: propertyHir.isMutable,
+          receiver: receiver,
         );
       } else {
         throw CompilerError.unsupportedFeature(
-          "Matched identifier `$name`, but it's not a module, trait, class, function, or a property.",
+          "Matched identifier `$name`, but it's not a module, trait, class, function, or property.",
         );
       }
     }
+
+    // search properties/functions available on `this`
+    // TODO(JonasWanke): cleaner implementation, like `query fun getAllInstanceIdentifiersForType(type: hir.CandyType)`
+    Iterable<DeclarationId> getInstanceDeclarations() sync* {
+      if (declarationId.isFunction) {
+        final functionHir =
+            getFunctionDeclarationHir(queryContext, declarationId);
+        if (functionHir.isStatic) return;
+      } else if (declarationId.isProperty) {
+        final propertyHir =
+            getPropertyDeclarationHir(queryContext, declarationId);
+        if (propertyHir.isStatic) return;
+      } else {
+        throw CompilerError.unsupportedFeature(
+          "Tried lowering an identifier in a body that's neither in a function nor in a property.",
+          location: ErrorLocation(resourceId),
+        );
+      }
+
+      assert(declarationId.hasParent);
+      final parentId = declarationId.parent;
+      assert(parentId.isTrait || parentId.isImpl || parentId.isClass);
+      yield parentId;
+
+      Iterable<DeclarationId> walkHierarchy(DeclarationId typeId) sync* {
+        assert(typeId.isTrait || typeId.isClass);
+        yield typeId;
+
+        final impls = getAllImplsForTraitOrClass(queryContext, parentId);
+        yield* impls;
+
+        yield* impls
+            .map((impl) => getImplDeclarationHir(queryContext, impl))
+            .expand((impl) => impl.traits)
+            .map((trait) =>
+                moduleIdToDeclarationId(queryContext, trait.virtualModuleId))
+            .expand(walkHierarchy);
+
+        if (typeId.isTrait) {
+          final traitHir = getTraitDeclarationHir(queryContext, parentId);
+          yield* traitHir.upperBounds
+              .map((b) =>
+                  moduleIdToDeclarationId(queryContext, b.virtualModuleId))
+              .expand(walkHierarchy);
+        }
+      }
+
+      if (parentId.isTrait || parentId.isClass) {
+        yield* walkHierarchy(parentId);
+      } else {
+        assert(parentId.isImpl);
+        final implHir = getImplDeclarationHir(queryContext, parentId);
+        yield* walkHierarchy(
+          moduleIdToDeclarationId(queryContext, implHir.type.virtualModuleId),
+        );
+      }
+    }
+
+
+    final matches = getInstanceDeclarations()
+        .toSet()
+        .expand((id) => getInnerDeclarationIds(queryContext, id))
+        .where((id) {
+      if (id.isProperty) {
+        final propertyHir = getPropertyDeclarationHir(queryContext, id);
+        return propertyHir.name == name && !propertyHir.isStatic;
+      } else if (id.isFunction) {
+        final functionHir = getFunctionDeclarationHir(queryContext, id);
+        return functionHir.name == name && !functionHir.isStatic;
+      } else {
+        return false;
+      }
+    }).map((id) => convertDeclarationId(
+              id,
+              hir.Expression.identifier(getId(), hir.Identifier.this_()),
+            ));
+    if (matches.isNotEmpty) return matches.toList();
 
     // search the current file (from the curent module to the root)
     assert(declarationId.hasParent);

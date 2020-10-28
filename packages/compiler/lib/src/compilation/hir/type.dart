@@ -204,7 +204,10 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
               if (declarationId.isClass) {
                 if (parent is! UserCandyType) return false;
 
-                return getClassTraitImplId(context, inputs) is Some;
+                return getClassTraitImplId(
+                  context,
+                  Tuple2(childType, parentType),
+                ) is Some;
               }
 
               throw CompilerError.internalError(
@@ -263,21 +266,13 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
 );
 
 final getClassTraitImplId =
-    Query<Tuple2<CandyType, CandyType>, Option<DeclarationId>>(
+    Query<Tuple2<UserCandyType, UserCandyType>, Option<DeclarationId>>(
   'getClassTraitImplId',
   provider: (context, inputs) {
-    assert(inputs.first is UserCandyType);
-    final child = inputs.first as UserCandyType;
-    assert(inputs.second is UserCandyType);
-    final parent = inputs.second as UserCandyType;
+    final child = inputs.first;
+    final parent = inputs.second;
 
-    final implIds = {
-      child.parentModuleId.packageId,
-      parent.parentModuleId.packageId,
-    }
-        .expand((packageId) =>
-            getAllImplsForType(context, Tuple2(child, packageId)))
-        .where((implId) {
+    final implIds = getAllImplsForType(context, child).where((implId) {
       final impl = getImplDeclarationHir(context, implId);
       return impl.traits.any((trait) => trait == parent);
     });
