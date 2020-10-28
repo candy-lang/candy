@@ -73,10 +73,13 @@
       "patterns": [
         { "include": "#comments-block" },
         {
-          "captures": {
+          "begin": "(//)",
+          "end": "$",
+          "beginCaptures": {
             "1": { "name": "comment.line.double-slash.candy" }
           },
-          "match": "((//).*)$"
+          "name": "comment.line.candy",
+          "patterns": [{ "include": "#candydoc" }]
         }
       ]
     },
@@ -86,7 +89,10 @@
           "begin": "/\\*",
           "end": "\\*/",
           "name": "comment.block.candy",
-          "patterns": [{ "include": "#comments-block" }]
+          "patterns": [
+            { "include": "#comments-block" },
+            { "include": "#candydoc" }
+          ]
         }
       ]
     },

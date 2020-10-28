@@ -1,3 +1,4 @@
+use ..operators
 public use .option
 
 public builtin trait Any
@@ -11,6 +12,7 @@ public builtin class Unit
 public builtin class Never
 
 public builtin class Bool
+builtin impl Bool: Opposite
 
 // public builtin trait Number: AddOperator<This, This> & SubtractOperator<This, This>
 

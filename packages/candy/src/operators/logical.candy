@@ -1,0 +1,12 @@
+use ...primitives
+
+// trait PrefixExclamation<Result> {
+//   fun exclamation(): Result
+// }
+
+trait Opposite /* : PrefixExclamation<This> */ {
+  fun opposite(): This
+}
+// impl Opposite: PrefixExclamation<This> {
+//   fun exclamation(): This { opposite() }
+// }

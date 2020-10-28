@@ -41,6 +41,7 @@ abstract class CandyType with _$CandyType {
       _$CandyTypeFromJson(json);
   const CandyType._();
 
+  // primitives
   static const any = CandyType.user(ModuleId.corePrimitives, 'Any');
   static const unit = CandyType.user(ModuleId.corePrimitives, 'Unit');
   static const never = CandyType.user(ModuleId.corePrimitives, 'Never');
@@ -51,6 +52,7 @@ abstract class CandyType with _$CandyType {
   static const float = CandyType.user(ModuleId.corePrimitives, 'Float');
   static const string = CandyType.user(ModuleId.corePrimitives, 'String');
 
+  // collections
   factory CandyType.list(CandyType itemType) => CandyType.user(
         ModuleId.coreCollections.nested(['list']),
         'List',
@@ -66,6 +68,11 @@ abstract class CandyType with _$CandyType {
   static const arrayModuleId =
       ModuleId(PackageId.core, ['collections', 'list', 'array', 'Array']);
 
+  // operators
+  static const opposite =
+      CandyType.user(ModuleId.coreOperatorsLogical, 'Opposite');
+
+  // reflection
   static const type = CandyType.user(ModuleId.coreReflection, 'Type');
   static const module = CandyType.user(ModuleId.coreReflection, 'Module');
 
