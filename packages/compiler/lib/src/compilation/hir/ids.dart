@@ -148,6 +148,8 @@ abstract class ModuleId implements _$ModuleId {
   static const core = ModuleId(PackageId.core);
   static const coreCollections = ModuleId(PackageId.core, ['collections']);
   static const coreOperators = ModuleId(PackageId.core, ['operators']);
+  static const coreOperatorsEquality =
+      ModuleId(PackageId.core, ['operators', 'equality']);
   static const coreOperatorsLogical =
       ModuleId(PackageId.core, ['operators', 'logical']);
   static const corePrimitives = ModuleId(PackageId.core, ['primitives']);

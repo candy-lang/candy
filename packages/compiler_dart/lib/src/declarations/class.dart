@@ -46,10 +46,16 @@ final compileClass = Query<DeclarationId, dart.Class>(
         );
       }
 
+      var name = function.name;
+      if (declarationIdToModuleId(context, id) ==
+          CandyType.equals.virtualModuleId) {
+        name = 'operator ==';
+      }
+
       return dart.Method((b) => b
         ..annotations.add(dart.refer('override', dartCoreUrl))
         ..returns = compileType(context, function.returnType)
-        ..name = function.name
+        ..name = name
         ..requiredParameters
             .addAll(compileParameters(context, function.valueParameters))
         ..body = compileBody(context, id).value);

@@ -24,10 +24,14 @@ final compileFunction = Query<DeclarationId, dart.Method>(
     }
     body ??= compileBody(context, declarationId).valueOrNull;
 
+    var name = functionHir.name;
+    // TODO(JonasWanke): make this safer
+    if (name == 'equals') name = 'operator ==';
+
     return dart.Method((b) => b
       ..static = functionHir.isStatic && declarationId.parent.isNotModule
       ..returns = compileType(context, functionHir.returnType)
-      ..name = functionHir.name
+      ..name = name
       ..types.addAll(functionHir.typeParameters
           .map((p) => compileTypeParameter(context, p)))
       ..requiredParameters

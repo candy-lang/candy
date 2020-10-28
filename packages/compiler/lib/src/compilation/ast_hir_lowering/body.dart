@@ -1892,6 +1892,41 @@ extension on Context {
 
     if (operatorType == ast.OperatorTokenType.equals) {
       return lowerAssignment(expression);
+    } else if (operatorType == ast.OperatorTokenType.equalsEquals) {
+      final leftResult =
+          innerExpressionContext(expressionType: Some(hir.CandyType.equals))
+              .lowerUnambiguous(expression.leftOperand);
+      if (leftResult is Error) return Error(leftResult.error);
+      final left = leftResult.value;
+
+      // TODO(JonasWanke): find a supertype that satisfies this trait
+      final right = innerExpressionContext(expressionType: Some(left.type))
+          .lowerUnambiguous(expression.rightOperand);
+      if (right is Error) return Error(right.error);
+
+      return Ok([
+        hir.Expression.functionCall(
+          getId(expression),
+          hir.Expression.identifier(
+            getId(expression),
+            hir.Identifier.property(
+              moduleIdToDeclarationId(
+                queryContext,
+                hir.CandyType.equals.virtualModuleId,
+              ).inner(DeclarationPathData.function('equals')),
+              hir.CandyType.function(
+                receiverType: left.type,
+                parameterTypes: [left.type],
+                returnType: hir.CandyType.bool,
+              ),
+              isMutable: false,
+              base: left,
+              receiver: left,
+            ),
+          ),
+          {'other': right.value},
+        ),
+      ]);
     } else {
       return Error([
         CompilerError.unsupportedFeature(

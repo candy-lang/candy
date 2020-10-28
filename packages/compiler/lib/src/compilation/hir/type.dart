@@ -69,6 +69,8 @@ abstract class CandyType with _$CandyType {
       ModuleId(PackageId.core, ['collections', 'list', 'array', 'Array']);
 
   // operators
+  static final equals =
+      CandyType.user(ModuleId.coreOperatorsEquality, 'Equals');
   static const opposite =
       CandyType.user(ModuleId.coreOperatorsLogical, 'Opposite');
 
