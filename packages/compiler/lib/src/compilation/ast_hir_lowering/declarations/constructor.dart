@@ -22,6 +22,7 @@ final getConstructorDeclarationHir =
         .where((id) => id.isProperty);
 
     return hir.ConstructorDeclaration(
+      declarationId,
       parameters: propertyIds
           .map((id) => getPropertyDeclarationHir(context, id))
           .where((p) => !p.isStatic)

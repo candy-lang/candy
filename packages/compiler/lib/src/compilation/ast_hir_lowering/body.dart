@@ -276,7 +276,7 @@ abstract class Context {
     } else if (expression is ast.NavigationExpression) {
       result = lowerNavigation(expression);
     } else if (expression is ast.CallExpression) {
-      result = lowerCall(expression);
+      result = lowerCall(expression).mapValue((value) => [value]);
     } else if (expression is ast.ReturnExpression) {
       result = lowerReturn(expression);
     } else if (expression is ast.IfExpression) {
@@ -1257,9 +1257,13 @@ extension on Context {
     List<hir.PropertyIdentifier> getMatchesForType(hir.UserCandyType type) {
       final receiverId =
           moduleIdToDeclarationId(queryContext, type.virtualModuleId);
-      return getInnerDeclarationIds(queryContext, receiverId)
-          .where((id) => id.simplePath.last.nameOrNull == name)
-          .mapNotNull((id) {
+      return [
+        ...getInnerDeclarationIds(queryContext, receiverId),
+        ...getAllImplsForType(
+          queryContext,
+          Tuple2(type, receiverId.resourceId.packageId),
+        ).expand((implId) => getInnerDeclarationIds(queryContext, implId)),
+      ].where((id) => id.simplePath.last.nameOrNull == name).mapNotNull((id) {
         if (id.isModule || id.isTrait || id.isClass) return null;
         if (id.isProperty) {
           final propertyHir = getPropertyDeclarationHir(queryContext, id);
@@ -1472,11 +1476,11 @@ extension on Context {
     return lower(target.type);
   }
 
-  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerCall(
+  Result<hir.Expression, List<ReportedCompilerError>> lowerCall(
     ast.CallExpression expression,
   ) {
     final targetVariants = innerExpressionContext().lower(expression.target);
-    if (targetVariants is Error) return targetVariants;
+    if (targetVariants is Error) return Error(targetVariants.error);
 
     final results = targetVariants.value.map((target) {
       if (target is hir.IdentifierExpression &&
@@ -1492,7 +1496,36 @@ extension on Context {
         location: ErrorLocation(resourceId, expression.span),
       );
     });
-    return results.merge();
+
+    final candidates = results
+        .whereType<Ok<List<Expression>, dynamic>>()
+        .map((result) => result.value)
+        .flatten();
+
+    if (candidates.length == 1) {
+      return Ok(candidates.single);
+    } else if (candidates.length > 1) {
+      return Error([
+        CompilerError.ambiguousExpression(
+          'This function call is ambiguous.',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    } else {
+      // No matching candidates found. For better developer experience, show the
+      // errors explaining why the found functions don't match here.
+      assert(candidates.isEmpty);
+      if (results.isEmpty) {
+        return Error([
+          CompilerError.undefinedIdentifier(
+            "Can't find this function.",
+            location: ErrorLocation(resourceId, expression.span),
+          ),
+        ]);
+      } else {
+        return Error(results.merge().error);
+      }
+    }
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerFunctionCall(

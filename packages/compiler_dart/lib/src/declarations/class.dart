@@ -20,9 +20,18 @@ final compileClass = Query<DeclarationId, dart.Class>(
 
     final impls = getAllImplsForClass(context, declarationId)
         .map((id) => getImplDeclarationHir(context, id));
-    final implements = impls
-        .expand((impl) => impl.traits)
-        .map((trait) => compileType(context, trait));
+    // The implemented traits, where traits that got implemented multiple times
+    // (with potentially different type parameters) are grouped together.
+    final traitsByType = impls.expand((impl) => impl.traits).groupBy(
+        (trait) => moduleIdToDeclarationId(context, trait.virtualModuleId));
+    final implements = traitsByType.values
+        .map((traitWithSameType) =>
+            compileType(context, traitWithSameType.first))
+        .toList();
+    final traitsWithMultipleImpls = traitsByType.entries
+        .where((entry) => entry.value.length > 1)
+        .map((e) => e.value.first.virtualModuleId)
+        .toSet();
     final implInnerDeclarationIds =
         impls.expand((impl) => impl.innerDeclarationIds);
     final implMethodIds =
@@ -46,14 +55,58 @@ final compileClass = Query<DeclarationId, dart.Class>(
         );
       }
 
-      return dart.Method((b) => b
-        ..annotations.add(dart.refer('override', dartCoreUrl))
-        ..returns = compileType(context, function.returnType)
-        ..name = function.name
-        ..requiredParameters
-            .addAll(compileParameters(context, function.valueParameters))
-        ..body = compileBody(context, id).value);
+      final isFromTraitWithMultipleImpls = traitsWithMultipleImpls
+          .intersection(
+            getImplDeclarationHir(context, function.id.parent)
+                .traits
+                .map((trait) => trait.virtualModuleId)
+                .toSet(),
+          )
+          .isNotEmpty;
+      if (isFromTraitWithMultipleImpls) {
+        return dart.Method((b) => b
+          ..returns = compileType(context, function.returnType)
+          ..name = '${function.name}\$'
+          ..requiredParameters
+              .addAll(compileParameters(context, function.valueParameters))
+          ..body = compileBody(context, id).value);
+      } else {
+        return dart.Method((b) => b
+          ..annotations.add(dart.refer('override', dartCoreUrl))
+          ..returns = compileType(context, function.returnType)
+          ..name = function.name
+          ..requiredParameters
+              .addAll(compileParameters(context, function.valueParameters))
+          ..body = compileBody(context, id).value);
+      }
     });
+    final dispatchMethods = traitsWithMultipleImpls
+        .expand((traitModule) {
+          final trait = getTraitDeclarationHir(
+              context, moduleIdToDeclarationId(context, traitModule));
+          return trait.innerDeclarationIds;
+        })
+        .where((id) => id.isFunction)
+        .map((id) => getFunctionDeclarationHir(context, id))
+        .expand((function) {
+          return [
+            dart.Method((b) => b
+              ..annotations.add(dart.refer('override', dartCoreUrl))
+              ..returns = compileType(context, function.returnType)
+              ..name = function.name
+              ..requiredParameters
+                  .addAll(compileParameters(context, function.valueParameters))
+              ..body = dart.Code(
+                  'assert(false, "You shouldn\'t use this method directly.");')),
+            dart.Method((b) => b
+              ..returns = compileType(context, function.returnType)
+              ..name = '${function.name}\$_typed'
+              ..requiredParameters
+                  .addAll(compileParameters(context, function.valueParameters))
+              ..body = dart.Code(
+                  'assert(false, "You shouldn\'t use this method directly.");')),
+          ];
+        });
     // Super calls for all methods that aren't overriden in the impl.
     final methodDelegations = impls
         .expand((impl) => impl.traits)
@@ -102,7 +155,35 @@ final compileClass = Query<DeclarationId, dart.Class>(
       ))
       ..fields.addAll(properties)
       ..methods.addAll(methods)
+      ..methods.addAll(dispatchMethods)
       ..methods.addAll(methodOverrides)
       ..methods.addAll(methodDelegations));
   },
 );
+
+/*
+
+  _i1.int foo$Foo$Int() {
+    final _i1.int _0 = 3;
+    return _0;
+  }
+
+  _i1.bool foo$Foo$Bool() {
+    final _i1.bool _0 = true;
+    return _0;
+  }
+
+  _i1.dynamic foo$_typed<$Foo>() {
+    if ($Foo == _i1.int) {
+      return foo$Foo$Int();
+    } else if ($Foo == _i1.bool) {
+      return foo$Foo$Bool();
+    }
+    assert(false);
+  }
+
+  @_i1.override
+  _i1.dynamic foo() {
+    assert(false);
+  }
+*/

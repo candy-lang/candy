@@ -220,15 +220,19 @@ Option<hir.ParameterCandyType> _resolveAstUserTypeInParameters(
       if (classAst.typeParameters != null) {
         astTypeParameters.add(Tuple2(id, classAst.typeParameters));
       }
-    } else if (declarationId.isProperty) {
-      final propertyAst = getPropertyDeclarationAst(context, declarationId);
-      if (!propertyAst.isStatic) addTypeParametersOf(id.parent);
-    } else if (declarationId.isFunction) {
-      final functionAst = getFunctionDeclarationAst(context, declarationId);
+    } else if (id.isProperty) {
+      final propertyAst = getPropertyDeclarationAst(context, id);
+      if (!propertyAst.isStatic && id.isNotModule) {
+        addTypeParametersOf(id.parent);
+      }
+    } else if (id.isFunction) {
+      final functionAst = getFunctionDeclarationAst(context, id);
       if (functionAst.typeParameters != null) {
         astTypeParameters.add(Tuple2(id, functionAst.typeParameters));
       }
-      if (!functionAst.isStatic) addTypeParametersOf(id.parent);
+      if (!functionAst.isStatic && id.isNotModule) {
+        addTypeParametersOf(id.parent);
+      }
     }
   }
 

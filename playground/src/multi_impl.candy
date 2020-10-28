@@ -1,0 +1,23 @@
+trait Foo<T> {
+  fun foo(): T
+}
+
+class A {}
+
+impl A: Foo<Int> {
+  fun foo(): Int {
+    3
+  }
+}
+
+impl A: Foo<Bool> {
+  fun foo(): Bool {
+    true
+  }
+}
+
+fun main(a: A) {
+  let b: Int = a.foo()
+  let c: Bool = a.foo()
+  // let d = a.foo()
+}

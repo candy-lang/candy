@@ -9,7 +9,8 @@ part 'declarations.g.dart';
 
 @freezed
 abstract class Declaration implements _$Declaration {
-  const factory Declaration.module({
+  const factory Declaration.module(
+    DeclarationId id, {
     ModuleId parent,
     @required String name,
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
@@ -22,7 +23,8 @@ abstract class Declaration implements _$Declaration {
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
   }) = TraitDeclaration;
 
-  const factory Declaration.impl({
+  const factory Declaration.impl(
+    DeclarationId id, {
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
     @required UserCandyType type,
     @required List<UserCandyType> traits,
@@ -30,16 +32,19 @@ abstract class Declaration implements _$Declaration {
   }) = ImplDeclaration;
 
   // ignore: non_constant_identifier_names
-  const factory Declaration.class_({
+  const factory Declaration.class_(
+    DeclarationId id, {
     @required String name,
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
   }) = ClassDeclaration;
-  const factory Declaration.constructor({
+  const factory Declaration.constructor(
+    DeclarationId id, {
     @Default(<ValueParameter>[]) List<ValueParameter> parameters,
   }) = ConstructorDeclaration;
 
-  const factory Declaration.function({
+  const factory Declaration.function(
+    DeclarationId id, {
     @required bool isStatic,
     @required String name,
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
@@ -47,7 +52,8 @@ abstract class Declaration implements _$Declaration {
     @required CandyType returnType,
   }) = FunctionDeclaration;
 
-  const factory Declaration.property({
+  const factory Declaration.property(
+    DeclarationId id, {
     @required bool isStatic,
     @required bool isMutable,
     @required String name,

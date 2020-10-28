@@ -44,6 +44,7 @@ final getFunctionDeclarationHir = Query<DeclarationId, hir.FunctionDeclaration>(
         .toList();
 
     return hir.FunctionDeclaration(
+      declarationId,
       isStatic: functionAst.isStatic || declarationId.parent.isModule,
       name: functionAst.name.name,
       typeParameters: typeParameters,

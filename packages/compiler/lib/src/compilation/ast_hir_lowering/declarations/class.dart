@@ -29,6 +29,7 @@ final getClassDeclarationHir = Query<DeclarationId, hir.ClassDeclaration>(
     final classAst = getClassDeclarationAst(context, declarationId);
 
     return hir.ClassDeclaration(
+      declarationId,
       name: classAst.name.name,
       // ignore: can_be_null_after_null_aware
       typeParameters: classAst.typeParameters?.parameters.orEmpty
