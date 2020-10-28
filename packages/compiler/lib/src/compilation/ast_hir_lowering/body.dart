@@ -1628,7 +1628,19 @@ extension on Context {
 
     final functionId = identifier.id;
     assert(functionId.isFunction);
+
     final functionHir = getFunctionDeclarationHir(queryContext, functionId);
+    if (functionHir.typeParameters.length !=
+        (expression.typeArguments?.arguments?.length ?? 0)) {
+      return Error([
+        CompilerError.wrongNumberOfTypeArguments(
+          'Function expected ${functionHir.typeParameters.length} parameters, '
+          'but you provided ${expression.typeArguments?.arguments?.length ?? 0}.',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    }
+
     if (!isValidExpressionType(functionHir.returnType)) {
       return Error([
         CompilerError.invalidExpressionType(
