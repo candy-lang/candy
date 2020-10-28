@@ -228,7 +228,7 @@ Option<hir.ParameterCandyType> _resolveAstUserTypeInParameters(
       if (functionAst.typeParameters != null) {
         astTypeParameters.add(Tuple2(id, functionAst.typeParameters));
       }
-      if (!functionAst.isStatic) addTypeParametersOf(id.parent);
+      if (!functionAst.isStatic && id.hasParent) addTypeParametersOf(id.parent);
     }
   }
 
