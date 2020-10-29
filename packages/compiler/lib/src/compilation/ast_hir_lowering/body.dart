@@ -283,6 +283,8 @@ abstract class Context {
       result = lowerLambdaLiteral(expression);
     } else if (expression is ast.Identifier) {
       result = lowerIdentifier(expression);
+    } else if (expression is ast.GroupExpression) {
+      result = lower(expression.expression);
     } else if (expression is ast.PropertyDeclaration) {
       result = lowerProperty(expression);
     } else if (expression is ast.NavigationExpression) {
