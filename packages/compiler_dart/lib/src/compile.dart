@@ -16,7 +16,7 @@ final compile = Query<Unit, Unit>(
     final packageId = context.config.packageId;
 
     // TODO(JonasWanke): compile transitive dependencies when they're supported
-    compilePackage(context, PackageId.core);
+    if (packageId != PackageId.core) compilePackage(context, PackageId.core);
 
     final dependencies = getCandyspec(context, packageId).dependencies;
     for (final dependency in dependencies.keys) {
