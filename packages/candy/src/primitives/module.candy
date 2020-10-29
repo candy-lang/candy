@@ -17,9 +17,11 @@ builtin impl Bool: Equals & Opposite
 // public builtin trait Number: AddOperator<This, This> & SubtractOperator<This, This>
 
 public builtin class Int
+builtin impl Int: Equals & Comparable
 // builtin impl Int: Number
 
 public builtin class Float
+builtin impl Int: Equals & Comparable
 // builtin impl Float: Number
 
 public builtin class String

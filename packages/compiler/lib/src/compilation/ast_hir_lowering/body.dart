@@ -558,7 +558,7 @@ class ContextContext extends Context {
         assert(typeId.isTrait || typeId.isClass);
         yield typeId;
 
-        final impls = getAllImplsForTraitOrClass(queryContext, parentId);
+        final impls = getAllImplsForTraitOrClass(queryContext, typeId);
         yield* impls;
 
         yield* impls
@@ -569,7 +569,7 @@ class ContextContext extends Context {
             .expand(walkHierarchy);
 
         if (typeId.isTrait) {
-          final traitHir = getTraitDeclarationHir(queryContext, parentId);
+          final traitHir = getTraitDeclarationHir(queryContext, typeId);
           yield* traitHir.upperBounds
               .map((b) =>
                   moduleIdToDeclarationId(queryContext, b.virtualModuleId))
@@ -1900,8 +1900,51 @@ extension on Context {
   ) {
     final operatorType = expression.operatorToken.type;
 
+    const comparisonOperators = {
+      ast.OperatorTokenType.less: 'lessThan',
+      ast.OperatorTokenType.lessEquals: 'lessThanOrEqual',
+      ast.OperatorTokenType.greater: 'greaterThan',
+      ast.OperatorTokenType.greaterEquals: 'greaterThanOrEqual',
+    };
+
     if (operatorType == ast.OperatorTokenType.equals) {
       return lowerAssignment(expression);
+    } else if (comparisonOperators.keys.contains(operatorType)) {
+      final leftResult =
+          innerExpressionContext(expressionType: Some(hir.CandyType.comparable))
+              .lowerUnambiguous(expression.leftOperand);
+      if (leftResult is Error) return Error(leftResult.error);
+      final left = leftResult.value;
+
+      // TODO(JonasWanke): find a supertype that satisfies this trait
+      final right = innerExpressionContext(expressionType: Some(left.type))
+          .lowerUnambiguous(expression.rightOperand);
+      if (right is Error) return Error(right.error);
+
+      final methodName = comparisonOperators[operatorType];
+      return Ok([
+        hir.Expression.functionCall(
+          getId(expression),
+          hir.Expression.identifier(
+            getId(expression),
+            hir.Identifier.property(
+              moduleIdToDeclarationId(
+                queryContext,
+                hir.CandyType.comparable.virtualModuleId,
+              ).inner(DeclarationPathData.function(methodName)),
+              hir.CandyType.function(
+                receiverType: left.type,
+                parameterTypes: [left.type],
+                returnType: hir.CandyType.bool,
+              ),
+              isMutable: false,
+              base: left,
+              receiver: left,
+            ),
+          ),
+          {'other': right.value},
+        ),
+      ]);
     } else if (operatorType == ast.OperatorTokenType.equalsEquals) {
       final leftResult =
           innerExpressionContext(expressionType: Some(hir.CandyType.equals))

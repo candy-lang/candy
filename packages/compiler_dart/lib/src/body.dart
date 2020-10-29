@@ -291,7 +291,31 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             _save(node, _refer(receiver.id).negate()),
           ];
         }
+      } else if (parentModuleId == CandyType.comparable.virtualModuleId) {
+        final relevantMethods = [
+          'lessThan',
+          'lessThanOrEqual',
+          'greaterThan',
+          'greaterThanOrEqual',
+        ];
+        if (relevantMethods.contains(methodName)) {
+          final left = identifier.receiver;
+          final right = node.valueArguments['other'];
+          return [
+            ...left.accept(this),
+            ...right.accept(this),
+            if (methodName == 'lessThan')
+              _save(node, _refer(left.id).lessThan(_refer(right.id)))
+            else if (methodName == 'lessThanOrEqual')
+              _save(node, _refer(left.id).lessOrEqualTo(_refer(right.id)))
+            else if (methodName == 'greaterThan')
+              _save(node, _refer(left.id).greaterThan(_refer(right.id)))
+            else
+              _save(node, _refer(left.id).greaterOrEqualTo(_refer(right.id))),
+          ];
+        }
       } else if (parentModuleId == CandyType.equals.virtualModuleId) {
+        assert(methodName == 'equals' || methodName == 'notEquals');
         final left = identifier.receiver;
         final right = node.valueArguments['other'];
         return [

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 import 'package:parser/parser.dart';
@@ -20,16 +22,24 @@ final compileClass = Query<DeclarationId, dart.Class>(
 
     final impls = getAllImplsForTraitOrClass(context, declarationId)
         .map((id) => getImplDeclarationHir(context, id));
-    final implements = impls
-        .expand((impl) => impl.traits)
-        .map((trait) => compileType(context, trait));
-    final implInnerDeclarationIds =
-        impls.expand((impl) => impl.innerDeclarationIds);
-    final implMethodIds =
-        implInnerDeclarationIds.where((id) => id.isFunction).toList();
+    final traits = impls.expand((impl) => impl.traits);
+    final implements = traits.map((it) {
+      if (traits.any((it) => it == CandyType.comparable)) {
+        return dart.TypeReference((b) => b
+          ..symbol = 'Comparable'
+          ..url = dartCoreUrl
+          ..types.add(compileType(context, classHir.thisType)));
+      }
+      return compileType(context, it);
+    });
+
+    final implMethodIds = impls
+        .expand((impl) => impl.innerDeclarationIds)
+        .where((id) => id.isFunction)
+        .toList();
     final methodOverrides = implMethodIds
         .map((id) => Tuple2(id, getFunctionDeclarationHir(context, id)))
-        .map((values) {
+        .expand((values) sync* {
       final id = values.first;
       final function = values.second;
 
@@ -46,13 +56,80 @@ final compileClass = Query<DeclarationId, dart.Class>(
         );
       }
 
+      final implHir = getImplDeclarationHir(context, id.parent);
+      final trait = implHir.traits.single;
       var name = function.name;
-      if (declarationIdToModuleId(context, id) ==
-          CandyType.equals.virtualModuleId) {
+      if (trait == CandyType.comparable) {
+        if (name == 'compareTo') {
+          name = 'compareToTyped';
+
+          final parameter = function.valueParameters.single;
+          final comparableId =
+              ModuleId.coreOperatorsComparison.nested(['Comparable']);
+          final variants = {
+            'Less': -1,
+            'Equal': 0,
+            'Greater': 1,
+          };
+          final statements = [
+            dart
+                .refer('this')
+                .property('compareToTyped')
+                .call([dart.refer(parameter.name)], {}, [])
+                .assignFinal(
+                  'result',
+                  compileType(context, function.returnType),
+                )
+                .statement,
+            for (final entry in variants.entries)
+              dart.Block.of([
+                dart.Code('if ('),
+                dart
+                    .refer('result')
+                    .isA(compileType(
+                      context,
+                      CandyType.user(comparableId, entry.key),
+                    ))
+                    .code,
+                dart.Code(') {'),
+                dart.literalNum(entry.value).returned.statement,
+                dart.Code('}'),
+              ]),
+            dart
+                .refer('StateError', dartCoreUrl)
+                .call(
+                  [
+                    dart.literalString(
+                      '`compareToTyped` returned an invalid object: `\$result`.',
+                    )
+                  ],
+                  {},
+                  [],
+                )
+                .thrown
+                .statement,
+          ];
+          yield dart.Method((b) => b
+            ..annotations.add(dart.refer('override', dartCoreUrl))
+            ..returns = compileType(context, CandyType.int)
+            ..name = 'compareTo'
+            ..requiredParameters
+                .addAll(compileParameters(context, function.valueParameters))
+            ..body = dart.Block((b) => b.statements.addAll(statements)));
+        } else {
+          const names = {
+            'lessThan': 'operator <',
+            'lessThanOrEqual': 'operator <=',
+            'greaterThan': 'operator >',
+            'greaterThanOrEqual': 'operator >=',
+          };
+          name = names[function.name];
+        }
+      } else if (trait == CandyType.equals) {
         name = 'operator ==';
       }
 
-      return dart.Method((b) => b
+      yield dart.Method((b) => b
         ..annotations.add(dart.refer('override', dartCoreUrl))
         ..returns = compileType(context, function.returnType)
         ..name = name
