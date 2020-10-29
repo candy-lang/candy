@@ -15,7 +15,8 @@ final compilePropertyInitializer = Query<DeclarationId, Option<dart.Code>>(
     final hir = getPropertyDeclarationHir(context, declarationId);
     if (hir.initializer == null) return None();
 
-    return Some(_compileExpression(context, hir.initializer).code);
+    return Some(
+        _compileExpression(context, declarationId, hir.initializer).code);
   },
 );
 final compileBody = Query<DeclarationId, Option<dart.Code>>(
@@ -26,22 +27,29 @@ final compileBody = Query<DeclarationId, Option<dart.Code>>(
     if (body.isNone) return None();
     final expressions = body.value;
 
-    final visitor = DartExpressionVisitor(context);
+    final visitor = DartExpressionVisitor(context, declarationId);
     final compiled = expressions.expand((e) => e.accept(visitor));
     return Some(dart.Block((b) => b.statements.addAll(compiled)));
   },
 );
-final compileExpression = Query<Expression, dart.Expression>(
+final compileExpression =
+    Query<Tuple2<DeclarationId, Expression>, dart.Expression>(
   'dart.compileExpression',
   evaluateAlways: true,
-  provider: _compileExpression,
+  provider: (context, inputs) {
+    final declarationId = inputs.first;
+    final expression = inputs.second;
+    return _compileExpression(context, declarationId, expression);
+  },
 );
 
 dart.Expression _compileExpression(
   QueryContext context,
+  DeclarationId declarationId,
   Expression expression,
 ) {
-  final expressions = expression.accept(DartExpressionVisitor(context));
+  final expressions =
+      expression.accept(DartExpressionVisitor(context, declarationId));
   assert(expressions.isNotEmpty);
   assert(expressions.last is dart.ToCodeExpression);
 
@@ -54,9 +62,13 @@ dart.Expression _compileExpression(
 }
 
 class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
-  const DartExpressionVisitor(this.context) : assert(context != null);
+  const DartExpressionVisitor(this.context, this.declarationId)
+      : assert(context != null),
+        assert(declarationId != null);
 
   final QueryContext context;
+  final DeclarationId declarationId;
+  ResourceId get resourceId => declarationId.resourceId;
 
   @override
   List<dart.Code> visitIdentifierExpression(IdentifierExpression node) {
@@ -394,6 +406,39 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             .statement,
       ];
 
+  @override
+  List<dart.Code> visitIsExpression(IsExpression node) {
+    final instance = _refer(node.instance.id);
+    final check = _compileIs(instance, node.typeToCheck);
+    return [
+      ...node.instance.accept(this),
+      _save(node, node.isNegated ? check.parenthesized.negate() : check),
+    ];
+  }
+
+  dart.Expression _compileIs(dart.Expression instance, CandyType type) {
+    dart.Expression compileSimple() => instance.isA(compileType(context, type));
+
+    return type.map(
+      user: (_) => compileSimple(),
+      this_: (_) => throw CompilerError.internalError(
+        "`This`-type wasn't resolved before compiling it to Dart.",
+      ),
+      tuple: (_) => compileSimple(),
+      function: (_) => compileSimple(),
+      union: (type) => type.types
+          .map((t) => _compileIs(instance, t))
+          .reduce((value, element) => value.or(element))
+          .parenthesized,
+      intersection: (type) => type.types
+          .map((t) => _compileIs(instance, t))
+          .reduce((value, element) => value.and(element))
+          .parenthesized,
+      parameter: (_) => compileSimple(),
+      reflection: (_) => compileSimple(),
+    );
+  }
+
   static String _name(DeclarationLocalId id) => '_${id.value}';
   static dart.Expression _refer(DeclarationLocalId id) => dart.refer(_name(id));
   dart.Code _save(
@@ -431,4 +476,12 @@ class ModuleExpression extends dart.InvokeExpression {
         );
 
   final ModuleId moduleId;
+}
+
+extension on dart.Expression {
+  dart.Expression get parenthesized => dart.CodeExpression(dart.Block.of([
+        const dart.Code('('),
+        code,
+        const dart.Code(')'),
+      ]));
 }

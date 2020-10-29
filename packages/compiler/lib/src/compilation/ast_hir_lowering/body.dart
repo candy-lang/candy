@@ -178,6 +178,12 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
     if (result is Some) return result;
     return node.right.accept(this);
   }
+
+  @override
+  Option<hir.Expression> visitIsExpression(IsExpression node) {
+    if (node.id == id) return Some(node);
+    return node.instance.accept(this);
+  }
 }
 
 final getBody = Query<DeclarationId, Option<List<hir.Expression>>>(
@@ -299,6 +305,8 @@ abstract class Context {
       result = lowerPrefixExpression(expression);
     } else if (expression is ast.BinaryExpression) {
       result = lowerBinaryExpression(expression);
+    } else if (expression is ast.IsExpression) {
+      result = lowerIsExpression(expression);
     } else {
       throw CompilerError.unsupportedFeature(
         'Unsupported expression: $expression (`${expression.runtimeType}`).',
@@ -1935,6 +1943,28 @@ extension on Context {
         ),
       ]);
     }
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerIsExpression(
+    ast.IsExpression expression,
+  ) {
+    final instanceResult =
+        innerExpressionContext().lowerUnambiguous(expression.instance);
+    if (instanceResult is Error) return Error(instanceResult.error);
+    final instance = instanceResult.value;
+
+    final type =
+        astTypeToHirType(queryContext, Tuple2(declarationId, expression.type))
+            .bakeThisType(thisType.valueOrNull);
+
+    return Ok([
+      hir.Expression.is_(
+        getId(expression),
+        instance,
+        type,
+        isNegated: expression.isNegated,
+      ),
+    ]);
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerAssignment(

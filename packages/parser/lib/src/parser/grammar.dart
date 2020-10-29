@@ -531,13 +531,14 @@ class ParserGrammar {
         ),
       )
       // unary postfix
-      ..postfix(LexerGrammar.PLUS_PLUS |
+      ..postfixExpression(LexerGrammar.PLUS_PLUS |
           LexerGrammar.MINUS_MINUS |
           LexerGrammar.QUESTION |
-          LexerGrammar.EXCLAMATION)
-      ..complexPostfix<List<SyntacticEntity>, NavigationExpression>(
+          LexerGrammar.EXCLAMATION);
+    builder.group()
+      ..postfix<List<SyntacticEntity>, Expression>(
         navigationPostfix,
-        mapper: (expression, postfix) {
+        (expression, postfix) {
           return NavigationExpression(
             _id++,
             target: expression,
@@ -546,9 +547,9 @@ class ParserGrammar {
           );
         },
       )
-      ..complexPostfix<List<dynamic>, CallExpression>(
+      ..postfix<List<dynamic>, Expression>(
         typeArguments.optional() & callPostfix,
-        mapper: (expression, postfix) {
+        (expression, postfix) {
           final valueArguments = postfix[1] as List<dynamic>;
           return CallExpression(
             _id++,
@@ -561,9 +562,9 @@ class ParserGrammar {
           );
         },
       )
-      ..complexPostfix<List<SyntacticEntity>, IndexExpression>(
+      ..postfix<List<SyntacticEntity>, Expression>(
         indexingPostfix,
-        mapper: (expression, postfix) {
+        (expression, postfix) {
           return IndexExpression(
             _id++,
             target: expression,
@@ -572,7 +573,8 @@ class ParserGrammar {
             rightSquareBracket: postfix.last as OperatorToken,
           );
         },
-      )
+      );
+    builder
       // unary prefix
       ..prefixExpression(LexerGrammar.EXCLAMATION |
           LexerGrammar.TILDE |
@@ -605,10 +607,19 @@ class ParserGrammar {
       // infix function
       // TODO(JonasWanke): infix function
       // named checks
-      ..leftExpression(LexerGrammar.IN |
-          LexerGrammar.EXCLAMATION_IN |
-          LexerGrammar.IS |
-          LexerGrammar.EXCLAMATION_IS)
+      ..postfix<List<dynamic>, Expression>(
+        LexerGrammar.NLs &
+            (LexerGrammar.IS | LexerGrammar.EXCLAMATION_IS) &
+            LexerGrammar.NLs &
+            type,
+        mapper: (instance, postfix) => IsExpression(
+          _id++,
+          instance: instance,
+          isOperator: postfix[1] as OperatorToken,
+          type: postfix[3] as Type,
+        ),
+      )
+      ..leftExpression(LexerGrammar.IN | LexerGrammar.EXCLAMATION_IN)
       // comparison
       ..leftExpression(LexerGrammar.LESS |
           LexerGrammar.LESS_EQUAL |
@@ -687,7 +698,8 @@ class ParserGrammar {
         },
       )
       ..prefix<ReturnKeywordToken, Expression>(
-          (LexerGrammar.RETURN & LexerGrammar.NLs).map((value) => value.first as ReturnKeywordToken),
+          (LexerGrammar.RETURN & LexerGrammar.NLs)
+              .map((value) => value.first as ReturnKeywordToken),
           mapper: (keyword, expression) {
         return ReturnExpression(
           _id++,
@@ -696,8 +708,8 @@ class ParserGrammar {
         );
       })
       ..prefix<BreakKeywordToken, Expression>(
-          (LexerGrammar.BREAK & LexerGrammar.NLs)
-              .map((value) => value.first as BreakKeywordToken), mapper: (keyword, expression) {
+          (LexerGrammar.BREAK & LexerGrammar.NLs).map((value) => value.first as BreakKeywordToken),
+          mapper: (keyword, expression) {
         return BreakExpression(
           _id++,
           breakKeyword: keyword,
@@ -949,22 +961,20 @@ extension on ExpressionBuilder {
   }) =>
       group().wrapper<OperatorToken, T>(left, right, mapper);
 
-  void postfix(Parser<OperatorToken> operator) {
-    group().postfix<OperatorToken, Expression>(
+  void postfix<O, T>(Parser<O> operator, {@required T Function(T, O) mapper}) {
+    group().postfix<O, T>(operator, mapper);
+  }
+
+  void postfixExpression(Parser<OperatorToken> operator) {
+    postfix<OperatorToken, Expression>(
       operator,
-      (operand, operator) => PostfixExpression(
+      mapper: (operand, operator) => PostfixExpression(
         ParserGrammar._id++,
         operand: operand,
         operatorToken: operator,
       ),
     );
   }
-
-  void complexPostfix<T, R>(
-    Parser<T> postfix, {
-    @required R Function(Expression expression, T postfix) mapper,
-  }) =>
-      group().postfix<T, Expression>(postfix, mapper);
 
   void prefix<O, T>(Parser<O> operator, {@required T Function(O, T) mapper}) {
     group().prefix<O, T>(operator, mapper);
@@ -986,7 +996,7 @@ extension on ExpressionBuilder {
     @required T Function(T, OperatorToken, T) mapper,
   }) =>
       group().left<List<dynamic>, T>(
-        LexerGrammar.WS.optional() & operator & LexerGrammar.NLs,
+        LexerGrammar.NLs & operator & LexerGrammar.NLs,
         (left, operator, right) =>
             mapper(left, operator[1] as OperatorToken, right),
       );
@@ -1001,7 +1011,8 @@ extension on ExpressionBuilder {
 
   void right(Parser<OperatorToken> operator) {
     group().right<OperatorToken, Expression>(
-      (LexerGrammar.NLs & operator & LexerGrammar.NLs).map((value) => value[1] as OperatorToken),
+      (LexerGrammar.NLs & operator & LexerGrammar.NLs)
+          .map((value) => value[1] as OperatorToken),
       (left, operator, right) =>
           BinaryExpression(ParserGrammar._id++, left, operator, right),
     );
