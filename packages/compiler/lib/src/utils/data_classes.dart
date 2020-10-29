@@ -64,6 +64,10 @@ abstract class Result<T, E> implements _$Result<T, E> {
         ok: (value) => Ok(mapper(value)),
         error: (error) => Error(error),
       );
+  Result<T, R> mapError<R>(R Function(E) mapper) => when(
+        ok: (value) => Ok(value),
+        error: (error) => Error(mapper(error)),
+      );
 }
 
 @freezed

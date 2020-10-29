@@ -6,6 +6,7 @@ import '../../hir.dart' as hir;
 import '../../hir/ids.dart';
 import '../type.dart';
 import 'declarations.dart';
+import 'module.dart';
 
 extension ClassDeclarationId on DeclarationId {
   bool get isClass =>
@@ -27,9 +28,18 @@ final getClassDeclarationHir = Query<DeclarationId, hir.ClassDeclaration>(
   'getClassDeclarationHir',
   provider: (context, declarationId) {
     final classAst = getClassDeclarationAst(context, declarationId);
+    final name = classAst.name.name;
 
     return hir.ClassDeclaration(
-      name: classAst.name.name,
+      name: name,
+      thisType: hir.UserCandyType(
+        declarationIdToModuleId(context, declarationId).parent,
+        name,
+        // ignore: can_be_null_after_null_aware
+        arguments: classAst.typeParameters?.parameters.orEmpty
+            .map((p) => hir.CandyType.parameter(p.name.name, declarationId))
+            .toList(),
+      ),
       // ignore: can_be_null_after_null_aware
       typeParameters: classAst.typeParameters?.parameters.orEmpty
           .map((p) => hir.TypeParameter(

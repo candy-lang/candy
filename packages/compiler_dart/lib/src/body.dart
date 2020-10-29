@@ -250,10 +250,10 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       final identifier = target.identifier as PropertyIdentifier;
       final parentModuleId =
           declarationIdToModuleId(context, identifier.id.parent);
+      final methodName = identifier.id.simplePath.last.nameOrNull;
 
       if (parentModuleId == CandyType.arrayModuleId) {
-        final name = identifier.id.simplePath.last.nameOrNull;
-        if (name == 'get' || name == 'set') {
+        if (methodName == 'get' || methodName == 'set') {
           final array = identifier.receiver;
           final index = node.valueArguments['index'];
           final item = node.valueArguments['item'];
@@ -262,7 +262,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           return [
             ...array.accept(this),
             ...index.accept(this),
-            if (name == 'get')
+            if (methodName == 'get')
               _save(node, indexed)
             else ...[
               ...item.accept(this),
@@ -271,6 +271,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           ];
         }
       } else if (parentModuleId == CandyType.opposite.virtualModuleId) {
+        assert(methodName == 'opposite');
         final receiver = identifier.receiver;
         if (isAssignableTo(context, Tuple2(receiver.type, CandyType.bool))) {
           return [
@@ -278,6 +279,17 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             _save(node, _refer(receiver.id).negate()),
           ];
         }
+      } else if (parentModuleId == CandyType.equals.virtualModuleId) {
+        final left = identifier.receiver;
+        final right = node.valueArguments['other'];
+        return [
+          ...left.accept(this),
+          ...right.accept(this),
+          if (methodName == 'equals')
+            _save(node, _refer(left.id).equalTo(_refer(right.id)))
+          else
+            _save(node, _refer(left.id).notEqualTo(_refer(right.id))),
+        ];
       }
     }
 

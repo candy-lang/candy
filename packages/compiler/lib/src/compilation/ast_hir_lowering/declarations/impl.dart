@@ -6,7 +6,6 @@ import '../../../query.dart';
 import '../../../utils.dart';
 import '../../hir.dart' as hir;
 import '../../hir/ids.dart';
-import '../../ids.dart';
 import '../type.dart';
 import 'declarations.dart';
 import 'module.dart';
