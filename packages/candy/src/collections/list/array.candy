@@ -1,16 +1,16 @@
 use ....primitives
 use ...list
 
-builtin class Array<Item> {
-  /// A builtin structure that holds a fixed number of `Item`s.
+builtin class Array<Blub> {
+  /// A builtin structure that holds a fixed number of `Blub`s.
   
-  static fun fill<Item>(length: Int /* UInt */, item: Item): Array<Item>
+  static fun fill<Blub>(length: Int /* UInt */, item: Blub): Array<Blub>
   /// Creates a new `Array` of the given `length`, where every slot is filled with the same `item`.
 
   let length: Int
 
-  fun get(index: Int /* UInt */): Item
-  fun set(index: Int /* UInt */, item: Item)
+  fun get(index: Int /* UInt */): Blub
+  fun set(index: Int /* UInt */, item: Blub)
 }
 
 // TODO(marcelgarus): For now, this never shrinks. We should implement that later, although a very

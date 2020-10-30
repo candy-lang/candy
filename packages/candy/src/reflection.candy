@@ -2,3 +2,5 @@
 
 // builtin class ModuleDeclaration
 // builtin impl ModuleDeclaration: Declaration
+
+class Type
