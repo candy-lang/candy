@@ -76,6 +76,8 @@ abstract class ModifierToken extends Token with _$ModifierToken {
   // ignore: non_constant_identifier_names
   const factory ModifierToken.const_({@required SourceSpan span}) =
       ConstModifierToken;
+  const factory ModifierToken.data({@required SourceSpan span}) =
+      DataModifierToken;
 }
 
 abstract class LiteralToken<T> extends Token {

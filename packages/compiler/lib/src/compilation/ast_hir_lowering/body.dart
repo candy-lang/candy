@@ -208,6 +208,11 @@ final Query<DeclarationId,
     Query<DeclarationId, Option<Tuple2<List<hir.Expression>, BodyAstToHirIds>>>(
   'lowerBodyAstToHir',
   provider: (context, declarationId) {
+    if (!doesDeclarationExist(context, declarationId)) {
+      final body = getSyntheticMethod(context, declarationId).second;
+      return Some(Tuple2(body, BodyAstToHirIds()));
+    }
+
     if (declarationId.isFunction) {
       final functionAst = getFunctionDeclarationAst(context, declarationId);
       if (functionAst.body == null) return None();
@@ -761,7 +766,6 @@ class FunctionContext extends InnerContext {
     }
   }
 
-  @override
   final Map<String, hir.Identifier> _identifiers;
   final hir.CandyType returnType;
   final ast.LambdaLiteral body;
@@ -1682,7 +1686,7 @@ extension on Context {
     if (!isValidExpressionType(functionHir.returnType)) {
       return Error([
         CompilerError.invalidExpressionType(
-          'Function has an invalid return type.',
+          'Function call has an invalid return type: `${functionHir.returnType}`, expected: `${expressionType.value}`.',
           location: ErrorLocation(resourceId, expression.span),
         ),
       ]);

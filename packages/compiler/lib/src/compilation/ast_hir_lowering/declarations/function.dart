@@ -1,12 +1,13 @@
 import 'package:parser/parser.dart' as ast;
-import 'package:dartx/dartx.dart';
 
 import '../../../query.dart';
 import '../../../utils.dart';
 import '../../hir.dart' as hir;
 import '../../hir/ids.dart';
 import '../type.dart';
+import 'class.dart';
 import 'declarations.dart';
+import 'impl.dart';
 import 'module.dart';
 
 extension FunctionDeclarationId on DeclarationId {
@@ -28,6 +29,10 @@ final getFunctionDeclarationAst = Query<DeclarationId, ast.FunctionDeclaration>(
 final getFunctionDeclarationHir = Query<DeclarationId, hir.FunctionDeclaration>(
   'getFunctionDeclarationHir',
   provider: (context, declarationId) {
+    if (!doesDeclarationExist(context, declarationId)) {
+      return getSyntheticMethod(context, declarationId).first;
+    }
+
     final functionAst = getFunctionDeclarationAst(context, declarationId);
 
     // ignore: can_be_null_after_null_aware
@@ -62,3 +67,19 @@ final getFunctionDeclarationHir = Query<DeclarationId, hir.FunctionDeclaration>(
     );
   },
 );
+
+Tuple2<hir.FunctionDeclaration, List<hir.Expression>> getSyntheticMethod(
+  QueryContext context,
+  DeclarationId declarationId,
+) {
+  final implId = declarationId.parent;
+  assert(implId.isImpl);
+  final classId = implId.parent;
+  assert(classId.isClass);
+  final classHir = getClassDeclarationHir(context, classId);
+
+  final implIndex = implId.path.last.disambiguator;
+  final syntheticImpl = classHir.syntheticImpls[implIndex];
+  final methodName = declarationId.simplePath.last.nameOrNull;
+  return syntheticImpl.methods.singleWhere((it) => it.first.name == methodName);
+}

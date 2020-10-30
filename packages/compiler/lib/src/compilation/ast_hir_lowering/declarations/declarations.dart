@@ -79,37 +79,37 @@ final getInnerDeclarationIds = Query<DeclarationId, List<DeclarationId>>(
     var propertySetterDisambiguator = 0;
     for (final declaration in declarationAst.innerDeclarations) {
       if (declaration is ast.ModuleDeclaration) {
-        final name = declaration.name.name;
+        final name = declaration.nameOrNull;
         declarationIds.add(declarationId.inner(
           DeclarationPathData.module(name),
           moduleDisambiguator[name] = (moduleDisambiguator[name] ?? -1) + 1,
         ));
       } else if (declaration is ast.TraitDeclaration) {
-        final name = declaration.name.name;
+        final name = declaration.nameOrNull;
         declarationIds.add(declarationId.inner(
           DeclarationPathData.trait(name),
           traitDisambiguator[name] = (traitDisambiguator[name] ?? -1) + 1,
         ));
       } else if (declaration is ast.ImplDeclaration) {
-        final name = declaration.type.toString();
+        final name = declaration.nameOrNull;
         declarationIds.add(declarationId.inner(
           DeclarationPathData.impl(name),
           implDisambiguator[name] = (implDisambiguator[name] ?? -1) + 1,
         ));
       } else if (declaration is ast.ClassDeclaration) {
-        final name = declaration.name.name;
+        final name = declaration.nameOrNull;
         declarationIds.add(declarationId.inner(
           DeclarationPathData.class_(name),
           classDisambiguator[name] = (classDisambiguator[name] ?? -1) + 1,
         ));
       } else if (declaration is ast.FunctionDeclaration) {
-        final name = declaration.name.name;
+        final name = declaration.nameOrNull;
         declarationIds.add(declarationId.inner(
           DeclarationPathData.function(name),
           functionDisambiguator[name] = (functionDisambiguator[name] ?? -1) + 1,
         ));
       } else if (declaration is ast.PropertyDeclaration) {
-        final name = declaration.name.name;
+        final name = declaration.nameOrNull;
         declarationIds.add(declarationId.inner(
           DeclarationPathData.property(name),
           propertyDisambiguator[name] = (propertyDisambiguator[name] ?? -1) + 1,
@@ -153,7 +153,8 @@ extension on ast.Declaration {
     } else if (this is ast.TraitDeclaration) {
       return (this as ast.TraitDeclaration).name.name;
     } else if (this is ast.ImplDeclaration) {
-      return (this as ast.ImplDeclaration).type.toString();
+      final type = (this as ast.ImplDeclaration).type as ast.UserType;
+      return type.simpleTypes.map((it) => it.name.name).join('.');
     } else if (this is ast.ClassDeclaration) {
       return (this as ast.ClassDeclaration).name.name;
     } else if (this is ast.FunctionDeclaration) {
