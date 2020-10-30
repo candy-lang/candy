@@ -766,7 +766,6 @@ class FunctionContext extends InnerContext {
     }
   }
 
-  @override
   final Map<String, hir.Identifier> _identifiers;
   final hir.CandyType returnType;
   final ast.LambdaLiteral body;
@@ -1687,7 +1686,7 @@ extension on Context {
     if (!isValidExpressionType(functionHir.returnType)) {
       return Error([
         CompilerError.invalidExpressionType(
-          'Function has an invalid return type.',
+          'Function call has an invalid return type: `${functionHir.returnType}`, expected: `${expressionType.value}`.',
           location: ErrorLocation(resourceId, expression.span),
         ),
       ]);
