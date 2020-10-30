@@ -135,7 +135,7 @@ abstract class Expression implements _$Expression {
 @freezed
 abstract class Identifier implements _$Identifier {
   // ignore: non_constant_identifier_names
-  const factory Identifier.this_() = ThisIdentifier;
+  const factory Identifier.this_(CandyType type) = ThisIdentifier;
   // ignore: non_constant_identifier_names
   const factory Identifier.super_(UserCandyType type) = SuperIdentifier;
   const factory Identifier.reflection(
@@ -176,7 +176,7 @@ abstract class Identifier implements _$Identifier {
       );
 
   CandyType get type => when(
-        this_: () => CandyType.this_(),
+        this_: (type) => type,
         super_: (type) => type,
         reflection: (declarationId, _) => CandyType.reflection(declarationId),
         parameter: (_, __, type) => type,

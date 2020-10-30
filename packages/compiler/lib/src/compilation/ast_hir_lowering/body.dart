@@ -428,16 +428,17 @@ abstract class InnerContext extends Context {
 }
 
 class ContextContext extends Context {
-  ContextContext(this.queryContext, this.declarationId)
+  ContextContext(this.queryContext, this.declarationId, this.thisType)
       : assert(queryContext != null),
-        assert(declarationId != null);
+        assert(declarationId != null),
+        assert(thisType != null);
 
   @override
   final QueryContext queryContext;
   @override
   final DeclarationId declarationId;
   @override
-  Option<hir.CandyType> get thisType => None();
+  final Option<hir.CandyType> thisType;
 
   @override
   Option<Context> get parent => None();
@@ -475,6 +476,21 @@ class ContextContext extends Context {
 
   @override
   List<hir.Identifier> resolveIdentifier(String name) {
+    hir.CandyType thisTypeOrResolved() {
+      final parent = declarationId.parent;
+      if (parent.isClass) return thisType.value;
+      if (parent.isImpl) {
+        final typeModuleId =
+            getImplDeclarationHir(queryContext, parent).type.virtualModuleId;
+        if (moduleIdToDeclarationId(
+          queryContext,
+          typeModuleId,
+        ).isClass) return thisType.value;
+      } else if (parent.isTrait || parent.isImpl) {
+        return hir.CandyType.this_();
+      }
+    }
+
     // resolve `this`
     if (name == 'this') {
       if (declarationId.isConstructor) {
@@ -492,9 +508,10 @@ class ContextContext extends Context {
       }
 
       if (!declarationId.hasParent) return [];
+
       final parent = declarationId.parent;
       if (parent.isTrait || parent.isImpl || parent.isClass) {
-        return [hir.Identifier.this_()];
+        return [hir.Identifier.this_(thisTypeOrResolved())];
       }
       return [];
     }
@@ -603,7 +620,10 @@ class ContextContext extends Context {
       }
     }).map((id) => convertDeclarationId(
               id,
-              hir.Expression.identifier(getId(), hir.Identifier.this_()),
+              hir.Expression.identifier(
+                getId(),
+                hir.Identifier.this_(thisTypeOrResolved()),
+              ),
             ));
     if (matches.isNotEmpty) return matches.toList();
 
@@ -675,7 +695,12 @@ class ContextContext extends Context {
 
 class FunctionContext extends InnerContext {
   factory FunctionContext._create(QueryContext queryContext, DeclarationId id) {
-    final parent = ContextContext(queryContext, id);
+    final functionHir = getFunctionDeclarationHir(queryContext, id);
+    final parent = ContextContext(
+      queryContext,
+      id,
+      functionHir.isStatic ? None() : getThisType(queryContext, id.parent),
+    );
     final functionAst = getFunctionDeclarationAst(queryContext, id);
     final identifiers = {
       for (final parameter in functionAst.valueParameters)
@@ -688,11 +713,9 @@ class FunctionContext extends InnerContext {
           ),
         ),
     };
-    final functionHir = getFunctionDeclarationHir(queryContext, id);
 
     return FunctionContext._(
       parent,
-      functionHir.isStatic ? None() : getThisType(queryContext, id.parent),
       identifiers,
       functionHir.returnType,
       functionAst.body,
@@ -700,12 +723,10 @@ class FunctionContext extends InnerContext {
   }
   FunctionContext._(
     Context parent,
-    this.thisType,
     this._identifiers,
     this.returnType,
     this.body,
-  )   : assert(thisType != null),
-        assert(_identifiers != null),
+  )   : assert(_identifiers != null),
         assert(returnType != null),
         assert(body != null),
         super(parent);
@@ -733,7 +754,6 @@ class FunctionContext extends InnerContext {
   }
 
   @override
-  final Option<hir.CandyType> thisType;
   final Map<String, hir.Identifier> _identifiers;
   final hir.CandyType returnType;
   final ast.LambdaLiteral body;
@@ -807,7 +827,11 @@ class FunctionContext extends InnerContext {
 
 class PropertyContext extends InnerContext {
   factory PropertyContext._create(QueryContext queryContext, DeclarationId id) {
-    final parent = ContextContext(queryContext, id);
+    final parent = ContextContext(
+      queryContext,
+      id,
+      FunctionContext.getThisType(queryContext, id.parent),
+    );
     final ast = getPropertyDeclarationAst(queryContext, id);
 
     final type = Option.of(ast.type).mapValue(
@@ -815,18 +839,15 @@ class PropertyContext extends InnerContext {
 
     return PropertyContext._(
       parent,
-      FunctionContext.getThisType(queryContext, id.parent),
       type,
       ast.initializer,
     );
   }
   PropertyContext._(
     Context parent,
-    this.thisType,
     this.type,
     this.initializer,
-  )   : assert(thisType != null),
-        assert(type != null),
+  )   : assert(type != null),
         assert(initializer != null),
         super(parent);
 
@@ -837,8 +858,6 @@ class PropertyContext extends InnerContext {
   ) =>
       PropertyContext._create(queryContext, id)._lowerInitializer();
 
-  @override
-  final Option<hir.CandyType> thisType;
   final Option<hir.CandyType> type;
   final ast.Expression initializer;
 
@@ -1866,14 +1885,14 @@ extension on Context {
         hir.Expression.functionCall(
           getId(expression),
           hir.Expression.identifier(
-            getId(expression),
+            getId(),
             hir.Identifier.property(
               moduleIdToDeclarationId(
                 queryContext,
                 hir.CandyType.opposite.virtualModuleId,
               ).inner(DeclarationPathData.function('opposite')),
               hir.CandyType.function(
-                parameterTypes: [operand.type],
+                parameterTypes: [],
                 returnType: operand.type,
               ),
               isMutable: false,
@@ -1900,6 +1919,44 @@ extension on Context {
   ) {
     final operatorType = expression.operatorToken.type;
 
+    Result<List<hir.Expression>, List<ReportedCompilerError>> handle(
+      hir.CandyType type,
+      String functionName,
+    ) {
+      final leftResult = innerExpressionContext(expressionType: Some(type))
+          .lowerUnambiguous(expression.leftOperand);
+      if (leftResult is Error) return Error(leftResult.error);
+      final left = leftResult.value;
+
+      // TODO(JonasWanke): find a supertype that satisfies this trait
+      final right = innerExpressionContext(expressionType: Some(left.type))
+          .lowerUnambiguous(expression.rightOperand);
+      if (right is Error) return Error(right.error);
+      return Ok([
+        hir.Expression.functionCall(
+          getId(expression),
+          hir.Expression.identifier(
+            getId(),
+            hir.Identifier.property(
+              moduleIdToDeclarationId(
+                queryContext,
+                type.virtualModuleId,
+              ).inner(DeclarationPathData.function(functionName)),
+              hir.CandyType.function(
+                receiverType: left.type,
+                parameterTypes: [left.type],
+                returnType: hir.CandyType.bool,
+              ),
+              isMutable: false,
+              base: left,
+              receiver: left,
+            ),
+          ),
+          {'other': right.value},
+        ),
+      ]);
+    }
+
     const comparisonOperators = {
       ast.OperatorTokenType.less: 'lessThan',
       ast.OperatorTokenType.lessEquals: 'lessThanOrEqual',
@@ -1910,76 +1967,19 @@ extension on Context {
     if (operatorType == ast.OperatorTokenType.equals) {
       return lowerAssignment(expression);
     } else if (comparisonOperators.keys.contains(operatorType)) {
-      final leftResult =
-          innerExpressionContext(expressionType: Some(hir.CandyType.comparable))
-              .lowerUnambiguous(expression.leftOperand);
-      if (leftResult is Error) return Error(leftResult.error);
-      final left = leftResult.value;
-
-      // TODO(JonasWanke): find a supertype that satisfies this trait
-      final right = innerExpressionContext(expressionType: Some(left.type))
-          .lowerUnambiguous(expression.rightOperand);
-      if (right is Error) return Error(right.error);
-
       final methodName = comparisonOperators[operatorType];
-      return Ok([
-        hir.Expression.functionCall(
-          getId(expression),
-          hir.Expression.identifier(
-            getId(expression),
-            hir.Identifier.property(
-              moduleIdToDeclarationId(
-                queryContext,
-                hir.CandyType.comparable.virtualModuleId,
-              ).inner(DeclarationPathData.function(methodName)),
-              hir.CandyType.function(
-                receiverType: left.type,
-                parameterTypes: [left.type],
-                returnType: hir.CandyType.bool,
-              ),
-              isMutable: false,
-              base: left,
-              receiver: left,
-            ),
-          ),
-          {'other': right.value},
-        ),
-      ]);
+      return handle(hir.CandyType.comparable, methodName);
     } else if (operatorType == ast.OperatorTokenType.equalsEquals) {
-      final leftResult =
-          innerExpressionContext(expressionType: Some(hir.CandyType.equals))
-              .lowerUnambiguous(expression.leftOperand);
-      if (leftResult is Error) return Error(leftResult.error);
-      final left = leftResult.value;
-
-      // TODO(JonasWanke): find a supertype that satisfies this trait
-      final right = innerExpressionContext(expressionType: Some(left.type))
-          .lowerUnambiguous(expression.rightOperand);
-      if (right is Error) return Error(right.error);
-
-      return Ok([
-        hir.Expression.functionCall(
-          getId(expression),
-          hir.Expression.identifier(
-            getId(expression),
-            hir.Identifier.property(
-              moduleIdToDeclarationId(
-                queryContext,
-                hir.CandyType.equals.virtualModuleId,
-              ).inner(DeclarationPathData.function('equals')),
-              hir.CandyType.function(
-                receiverType: left.type,
-                parameterTypes: [left.type],
-                returnType: hir.CandyType.bool,
-              ),
-              isMutable: false,
-              base: left,
-              receiver: left,
-            ),
-          ),
-          {'other': right.value},
-        ),
-      ]);
+      return handle(hir.CandyType.equals, 'equals');
+    } else if (operatorType == ast.OperatorTokenType.exclamationEquals) {
+      return handle(hir.CandyType.equals, 'notEquals');
+    } else if (operatorType == ast.OperatorTokenType.ampersandAmpersand) {
+      return handle(hir.CandyType.and, 'and');
+    } else if (operatorType == ast.OperatorTokenType.barBar) {
+      return handle(hir.CandyType.or, 'or');
+    } else if (operatorType == ast.OperatorTokenType.dashGreater) {
+      final result = handle(hir.CandyType.implies, 'implies');
+      return result;
     } else {
       return Error([
         CompilerError.unsupportedFeature(

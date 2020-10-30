@@ -48,17 +48,15 @@ dart.Expression _compileExpression(
   DeclarationId declarationId,
   Expression expression,
 ) {
-  final expressions =
+  final statements =
       expression.accept(DartExpressionVisitor(context, declarationId));
-  assert(expressions.isNotEmpty);
-  assert(expressions.last is dart.ToCodeExpression);
+  assert(statements.isNotEmpty);
+  assert(statements.last is dart.ToCodeExpression);
 
-  final returnStatement =
-      DartExpressionVisitor._refer(expression.id).returned.statement;
-  return dart.Method((b) => b
-    ..body = dart.Block((b) => b
-      ..statements.addAll(expressions)
-      ..statements.add(returnStatement))).closure.call([], {}, []);
+  return lambdaOf([
+    ...statements,
+    DartExpressionVisitor._refer(expression.id).returned.statement,
+  ]).call([], {}, []);
 }
 
 class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
@@ -73,7 +71,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   @override
   List<dart.Code> visitIdentifierExpression(IdentifierExpression node) {
     return node.identifier.when(
-      this_: () => _saveSingle(node, dart.refer('this')),
+      this_: (_) => _saveSingle(node, dart.refer('this')),
       super_: (_) {
         throw CompilerError.internalError(
           '`super` is not yet supported in Dart compiler.',
@@ -264,6 +262,40 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           declarationIdToModuleId(context, identifier.id.parent);
       final methodName = identifier.id.simplePath.last.nameOrNull;
 
+      List<dart.Code> lazyBoolExpression(
+        String name,
+        dart.Expression Function(dart.Expression left, dart.Expression right)
+            binaryBuilder,
+      ) {
+        assert(name == methodName);
+
+        final left = identifier.receiver;
+        final right = node.valueArguments['other'];
+
+        if (isAssignableTo(context, Tuple2(left.type, CandyType.bool))) {
+          final rightCompiled = lambdaOf([
+            ...right.accept(this),
+            _refer(right.id).returned.statement,
+          ]);
+          return [
+            ...left.accept(this),
+            _save(
+              node,
+              binaryBuilder(_refer(left.id), rightCompiled.call([], {}, [])),
+            ),
+          ];
+        } else {
+          return [
+            ...left.accept(this),
+            ...right.accept(this),
+            _save(
+              node,
+              _refer(left.id).property(name).call([_refer(right.id)], {}, []),
+            ),
+          ];
+        }
+      }
+
       if (parentModuleId == CandyType.arrayModuleId) {
         if (methodName == 'get' || methodName == 'set') {
           final array = identifier.receiver;
@@ -282,6 +314,12 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             ],
           ];
         }
+      } else if (parentModuleId == CandyType.and.virtualModuleId) {
+        return lazyBoolExpression('and', (l, r) => l.and(r));
+      } else if (parentModuleId == CandyType.or.virtualModuleId) {
+        return lazyBoolExpression('or', (l, r) => l.or(r));
+      } else if (parentModuleId == CandyType.implies.virtualModuleId) {
+        return lazyBoolExpression('implies', (l, r) => l.negate().or(r));
       } else if (parentModuleId == CandyType.opposite.virtualModuleId) {
         assert(methodName == 'opposite');
         final receiver = identifier.receiver;
@@ -508,4 +546,9 @@ extension on dart.Expression {
         code,
         const dart.Code(')'),
       ]));
+}
+
+dart.Expression lambdaOf(List<dart.Code> code) {
+  final body = dart.Block((b) => b..statements.addAll(code));
+  return dart.Method((b) => b..body = body).closure;
 }
