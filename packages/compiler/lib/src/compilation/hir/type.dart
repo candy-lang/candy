@@ -123,7 +123,7 @@ abstract class CandyType with _$CandyType {
       tuple: (type) => type.copyWith(
           items: type.items.map((i) => i.bakeThisType(thisType)).toList()),
       function: (type) => type.copyWith(
-        receiverType: type.receiverType.bakeThisType(thisType),
+        receiverType: type.receiverType?.bakeThisType(thisType),
         parameterTypes:
             type.parameterTypes.map((p) => p.bakeThisType(thisType)).toList(),
         returnType: type.returnType.bakeThisType(thisType),
@@ -147,7 +147,7 @@ abstract class CandyType with _$CandyType {
       tuple: (type) => type.copyWith(
           items: type.items.map((i) => i.bakeGenerics(types)).toList()),
       function: (type) => type.copyWith(
-        receiverType: type.receiverType.bakeGenerics(types),
+        receiverType: type.receiverType?.bakeGenerics(types),
         parameterTypes:
             type.parameterTypes.map((p) => p.bakeGenerics(types)).toList(),
         returnType: type.returnType.bakeGenerics(types),
