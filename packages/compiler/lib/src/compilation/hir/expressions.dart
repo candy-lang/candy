@@ -1,3 +1,4 @@
+import 'package:compiler/compiler.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'ids.dart';
@@ -41,6 +42,12 @@ abstract class Expression implements _$Expression {
     List<CandyType> typeArguments,
     Map<String, Expression> valueArguments,
   ) = FunctionCallExpression;
+  const factory Expression.constructorCall(
+    DeclarationLocalId id,
+    ClassDeclaration class_,
+    List<CandyType> typeArguments,
+    Map<String, Expression> valueArguments,
+  ) = ConstructorCallExpression;
   // ignore: non_constant_identifier_names
   const factory Expression.if_(
     DeclarationLocalId id,
@@ -96,9 +103,10 @@ abstract class Expression implements _$Expression {
         call: (_, __, ___) => null,
         functionCall: (_, target, typeParameters, __) {
           final functionType = target.type as FunctionCandyType;
-          // TODO(marcelgarus): Bake type.
+          // TODO(marcelgarus): Bake type based on the type parameters.
           return functionType.returnType;
         },
+        constructorCall: (_, class_, __, ___) => class_.thisType,
         return_: (_, __, ___) => CandyType.never,
         if_: (_, __, ___, ____, type) => type,
         loop: (_, __, type) => type,
@@ -115,6 +123,7 @@ abstract class Expression implements _$Expression {
         navigation: (e) => visitor.visitNavigationExpression(e),
         call: (e) => visitor.visitCallExpression(e),
         functionCall: (e) => visitor.visitFunctionCallExpression(e),
+        constructorCall: (e) => visitor.visitConstructorCallExpression(e),
         return_: (e) => visitor.visitReturnExpression(e),
         if_: (e) => visitor.visitIfExpression(e),
         loop: (e) => visitor.visitLoopExpression(e),
@@ -237,6 +246,7 @@ abstract class ExpressionVisitor<T> {
   T visitNavigationExpression(NavigationExpression node);
   T visitCallExpression(CallExpression node);
   T visitFunctionCallExpression(FunctionCallExpression node);
+  T visitConstructorCallExpression(ConstructorCallExpression node);
   T visitReturnExpression(ReturnExpression node);
   T visitIfExpression(IfExpression node);
   T visitLoopExpression(LoopExpression node);
@@ -261,6 +271,8 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   void visitCallExpression(CallExpression node) {}
   @override
   void visitFunctionCallExpression(FunctionCallExpression node) {}
+  @override
+  void visitConstructorCallExpression(ConstructorCallExpression node) {}
   @override
   void visitReturnExpression(ReturnExpression node) {}
   @override

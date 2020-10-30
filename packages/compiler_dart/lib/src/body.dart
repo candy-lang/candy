@@ -294,15 +294,32 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     }
 
     return [
-      // Don't try to save the constructor locally.
-      if (target is! IdentifierExpression ||
-          (target as IdentifierExpression).identifier is! ReflectionIdentifier)
-        ...node.target.accept(this),
+      ...node.target.accept(this),
       for (final argument in node.valueArguments.values)
         ...argument.accept(this),
       _save(
         node,
         _refer(node.target.id).call(
+          [
+            for (final entry in node.valueArguments.entries)
+              _refer(entry.value.id),
+          ],
+          {},
+          [],
+        ),
+      ),
+    ];
+  }
+
+  @override
+  List<dart.Code> visitConstructorCallExpression(
+      ConstructorCallExpression node) {
+    return [
+      for (final argument in node.valueArguments.values)
+        ...argument.accept(this),
+      _save(
+        node,
+        _refer(getId(node.class_.id)).call(
           [
             for (final entry in node.valueArguments.entries)
               _refer(entry.value.id),
