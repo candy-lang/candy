@@ -621,10 +621,10 @@ class ParserGrammar {
       )
       ..leftExpression(LexerGrammar.IN | LexerGrammar.EXCLAMATION_IN)
       // comparison
-      ..leftExpression(LexerGrammar.LESS |
-          LexerGrammar.LESS_EQUAL |
-          LexerGrammar.GREATER |
-          LexerGrammar.GREATER_EQUAL)
+      ..leftExpression(LexerGrammar.LESS_EQUAL |
+          LexerGrammar.LESS |
+          LexerGrammar.GREATER_EQUAL |
+          LexerGrammar.GREATER)
       // equality
       ..leftExpression(LexerGrammar.EQUALS_EQUALS |
           LexerGrammar.EXCLAMATION_EQUALS_EQUALS |
