@@ -73,8 +73,14 @@ abstract class CandyType with _$CandyType {
   // operators
   static final equals =
       CandyType.user(ModuleId.coreOperatorsEquality, 'Equals');
+  static final comparable =
+      CandyType.user(ModuleId.coreOperatorsComparison, 'Comparable');
+  static const and = CandyType.user(ModuleId.coreOperatorsLogical, 'And');
+  static const or = CandyType.user(ModuleId.coreOperatorsLogical, 'Or');
   static const opposite =
       CandyType.user(ModuleId.coreOperatorsLogical, 'Opposite');
+  static const implies =
+      CandyType.user(ModuleId.coreOperatorsLogical, 'Implies');
 
   // reflection
   static const type = CandyType.user(ModuleId.coreReflection, 'Type');

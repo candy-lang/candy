@@ -1,0 +1,27 @@
+fun main() {
+  print(true && true)
+  print(true || true)
+  print(!true)
+  print(true -> true)
+}
+
+class Foo {
+  fun main() {
+    print(this && this)
+    print(this || this)
+    print(!this)
+    print(this -> this)
+  }
+}
+impl Foo: And {
+  fun and(other: This): Bool { true }
+}
+impl Foo: Or {
+  fun or(other: This): Bool { true }
+}
+impl Foo: Opposite {
+  fun opposite(): This { this }
+}
+impl Foo: Implies {
+  fun implies(other: This): Bool { true }
+}

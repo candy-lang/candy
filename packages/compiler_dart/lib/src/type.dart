@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 
 import 'constants.dart';
+import 'declarations/declaration.dart';
 import 'declarations/module.dart';
 
 final Query<CandyType, dart.Reference> compileType =
@@ -30,9 +31,14 @@ final Query<CandyType, dart.Reference> compileType =
           );
         }
 
+        final declarationId =
+            moduleIdToDeclarationId(context, type.virtualModuleId);
+        assert(declarationId.isTrait || declarationId.isClass);
+
+        final reference = compileTypeName(context, declarationId);
         return _createType(
-          type.name,
-          url: moduleIdToImportUrl(context, type.parentModuleId),
+          reference.symbol,
+          url: reference.url,
           typeArguments:
               type.arguments.map((a) => compileType(context, a)).toList(),
         );

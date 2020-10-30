@@ -24,7 +24,10 @@ final generatePubspec = Query<PackageId, PubSpec>(
                 .toPath(context, PackageId(dependency).dartBuildArtifactId),
           ),
       },
-      environment: Environment(VersionConstraint.parse('>=2.7.0 <3.0.0'), {}),
+      environment: Environment(
+        VersionConstraint.parse('>=2.7.0 <3.0.0'),
+        <dynamic, dynamic>{},
+      ),
     );
   },
 );

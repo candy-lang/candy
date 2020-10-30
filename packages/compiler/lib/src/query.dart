@@ -118,6 +118,18 @@ class GlobalQueryContext {
     return result.result != null ? Some(result.result as R) : None();
   }
 
+  final Map<Tuple2<String, dynamic>, dynamic> _results = {};
+  void _reportResult(String queryName, Object key, Object result) {
+    final mapKey = Tuple2(queryName, key);
+    assert(!_results.containsKey(mapKey));
+    _results[mapKey] = result;
+  }
+
+  Option<R> getResult<R>(String queryName, Object key) {
+    final mapKey = Tuple2(queryName, key);
+    return Option.of(_results[mapKey] as R);
+  }
+
   final Map<Tuple2<String, dynamic>, List<ReportedCompilerError>>
       _reportedErrors = {};
   Iterable<ReportedCompilerError> get reportedErrors =>
@@ -129,10 +141,11 @@ class GlobalQueryContext {
     Object key,
     List<ReportedCompilerError> errors,
   ) {
+    final mapKey = Tuple2(queryName, key);
     if (errors.isNotEmpty) {
-      _reportedErrors[Tuple2(queryName, key)] = errors;
+      _reportedErrors[mapKey] = errors;
     } else {
-      _reportedErrors.remove(Tuple2(queryName, key));
+      _reportedErrors.remove(mapKey);
     }
   }
 }
@@ -144,6 +157,9 @@ class QueryContext {
   QueryConfig get config => globalContext.config;
 
   R callQuery<K, R>(Query<K, R> query, K key) {
+    final cachedResult = globalContext.getResult<R>(query.name, key);
+    if (cachedResult is Some) return cachedResult.value;
+
     final result = QueryContext(globalContext)._execute(query, key);
     _innerCalls.add(result);
     if (result.result == null) {
@@ -183,6 +199,7 @@ class QueryContext {
 
     try {
       final result = query.execute(this, key);
+      globalContext._reportResult(query.name, key, result);
       reportErrors();
       return RecordedQueryCall(
         name: query.name,

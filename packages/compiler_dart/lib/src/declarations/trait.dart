@@ -1,34 +1,63 @@
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
+import 'package:compiler_dart/src/constants.dart';
 import 'package:parser/parser.dart';
 
 import '../type.dart';
+import 'class.dart';
 import 'declaration.dart';
 import 'function.dart';
 
-class Foo<T extends List<dynamic>> {}
-
-final compileTrait = Query<DeclarationId, dart.Class>(
+final Query<DeclarationId, List<dart.Class>> compileTrait =
+    Query<DeclarationId, List<dart.Class>>(
   'dart.compileTrait',
   evaluateAlways: true,
   provider: (context, declarationId) {
     // ignore: non_constant_identifier_names
     final traitHir = getTraitDeclarationHir(context, declarationId);
 
+    final implements = <dart.Reference>[];
+
     final properties = traitHir.innerDeclarationIds
         .where((id) => id.isProperty)
         .expand((id) => compilePropertyInsideTrait(context, id));
     final methods = traitHir.innerDeclarationIds
         .where((id) => id.isFunction)
-        .map((id) => compileFunction(context, id));
-    return dart.Class((b) => b
-      ..abstract = true
-      ..name = traitHir.name
-      ..types.addAll(
-          traitHir.typeParameters.map((p) => compileTypeParameter(context, p)))
-      ..constructors.add(dart.Constructor((b) => b..constant = true))
-      ..methods.addAll(properties)
-      ..methods.addAll(methods));
+        .map((id) => compileFunction(context, id))
+        .toList();
+
+    final moduleId = declarationIdToModuleId(context, declarationId);
+    if (moduleId == CandyType.comparable.virtualModuleId) {
+      implements.add(dart.TypeReference((b) => b
+        ..symbol = 'Comparable'
+        ..url = dartCoreUrl
+        ..types.add(dart.refer('dynamic', dartCoreUrl))));
+      methods.add(dart.Method((b) => b
+        ..annotations.add(dart.refer('override', dartCoreUrl))
+        ..returns = dart.refer('int', dartCoreUrl)
+        ..name = 'compareTo'
+        ..requiredParameters.add(dart.Parameter((b) => b
+          ..type = dart.refer('dynamic', dartCoreUrl)
+          ..name = 'other'))));
+    }
+
+    return [
+      dart.Class((b) => b
+        ..abstract = true
+        ..name = compileTypeName(context, declarationId).symbol
+        ..types.addAll(traitHir.typeParameters
+            .map((p) => compileTypeParameter(context, p)))
+        ..implements.addAll(implements)
+        ..constructors.add(dart.Constructor((b) => b..constant = true))
+        ..methods.addAll(properties)
+        ..methods.addAll(methods)),
+      for (final classId
+          in traitHir.innerDeclarationIds.where((it) => it.isClass))
+        ...compileClass(context, classId),
+      for (final traitId
+          in traitHir.innerDeclarationIds.where((it) => it.isTrait))
+        ...compileTrait(context, traitId),
+    ];
   },
 );
 

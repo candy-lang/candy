@@ -4,6 +4,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 import 'package:strings/strings.dart' as strings;
 
+import 'declarations/declaration.dart';
 import 'declarations/module.dart';
 import 'type.dart';
 
@@ -15,7 +16,8 @@ final compilePropertyInitializer = Query<DeclarationId, Option<dart.Code>>(
     final hir = getPropertyDeclarationHir(context, declarationId);
     if (hir.initializer == null) return None();
 
-    return Some(_compileExpression(context, hir.initializer).code);
+    return Some(
+        _compileExpression(context, declarationId, hir.initializer).code);
   },
 );
 final compileBody = Query<DeclarationId, Option<dart.Code>>(
@@ -26,42 +28,51 @@ final compileBody = Query<DeclarationId, Option<dart.Code>>(
     if (body.isNone) return None();
     final expressions = body.value;
 
-    final visitor = DartExpressionVisitor(context);
+    final visitor = DartExpressionVisitor(context, declarationId);
     final compiled = expressions.expand((e) => e.accept(visitor));
     return Some(dart.Block((b) => b.statements.addAll(compiled)));
   },
 );
-final compileExpression = Query<Expression, dart.Expression>(
+final compileExpression =
+    Query<Tuple2<DeclarationId, Expression>, dart.Expression>(
   'dart.compileExpression',
   evaluateAlways: true,
-  provider: _compileExpression,
+  provider: (context, inputs) {
+    final declarationId = inputs.first;
+    final expression = inputs.second;
+    return _compileExpression(context, declarationId, expression);
+  },
 );
 
 dart.Expression _compileExpression(
   QueryContext context,
+  DeclarationId declarationId,
   Expression expression,
 ) {
-  final expressions = expression.accept(DartExpressionVisitor(context));
-  assert(expressions.isNotEmpty);
-  assert(expressions.last is dart.ToCodeExpression);
+  final statements =
+      expression.accept(DartExpressionVisitor(context, declarationId));
+  assert(statements.isNotEmpty);
+  assert(statements.last is dart.ToCodeExpression);
 
-  final returnStatement =
-      DartExpressionVisitor._refer(expression.id).returned.statement;
-  return dart.Method((b) => b
-    ..body = dart.Block((b) => b
-      ..statements.addAll(expressions)
-      ..statements.add(returnStatement))).closure.call([], {}, []);
+  return lambdaOf([
+    ...statements,
+    DartExpressionVisitor._refer(expression.id).returned.statement,
+  ]).call([], {}, []);
 }
 
 class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
-  const DartExpressionVisitor(this.context) : assert(context != null);
+  const DartExpressionVisitor(this.context, this.declarationId)
+      : assert(context != null),
+        assert(declarationId != null);
 
   final QueryContext context;
+  final DeclarationId declarationId;
+  ResourceId get resourceId => declarationId.resourceId;
 
   @override
   List<dart.Code> visitIdentifierExpression(IdentifierExpression node) {
     return node.identifier.when(
-      this_: () => _saveSingle(node, dart.refer('this')),
+      this_: (_) => _saveSingle(node, dart.refer('this')),
       super_: (_) {
         throw CompilerError.internalError(
           '`super` is not yet supported in Dart compiler.',
@@ -156,14 +167,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
         dart.Expression lowered;
         if ((id.isProperty || id.isFunction) && id.parent.isNotModule) {
-          final parentName =
-              id.simplePath.toList()[id.path.length - 2].nameOrNull;
-          lowered = dart
-              .refer(
-                parentName,
-                declarationIdToImportUrl(context, id.parent.parent),
-              )
-              .property(name);
+          lowered = compileTypeName(context, id.parent).property(name);
         } else {
           lowered = dart.refer(
             id.simplePath.last.nameOrNull,
@@ -252,6 +256,40 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           declarationIdToModuleId(context, identifier.id.parent);
       final methodName = identifier.id.simplePath.last.nameOrNull;
 
+      List<dart.Code> lazyBoolExpression(
+        String name,
+        dart.Expression Function(dart.Expression left, dart.Expression right)
+            binaryBuilder,
+      ) {
+        assert(name == methodName);
+
+        final left = identifier.receiver;
+        final right = node.valueArguments['other'];
+
+        if (isAssignableTo(context, Tuple2(left.type, CandyType.bool))) {
+          final rightCompiled = lambdaOf([
+            ...right.accept(this),
+            _refer(right.id).returned.statement,
+          ]);
+          return [
+            ...left.accept(this),
+            _save(
+              node,
+              binaryBuilder(_refer(left.id), rightCompiled.call([], {}, [])),
+            ),
+          ];
+        } else {
+          return [
+            ...left.accept(this),
+            ...right.accept(this),
+            _save(
+              node,
+              _refer(left.id).property(name).call([_refer(right.id)], {}, []),
+            ),
+          ];
+        }
+      }
+
       if (parentModuleId == CandyType.arrayModuleId) {
         if (methodName == 'get' || methodName == 'set') {
           final array = identifier.receiver;
@@ -270,6 +308,12 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             ],
           ];
         }
+      } else if (parentModuleId == CandyType.and.virtualModuleId) {
+        return lazyBoolExpression('and', (l, r) => l.and(r));
+      } else if (parentModuleId == CandyType.or.virtualModuleId) {
+        return lazyBoolExpression('or', (l, r) => l.or(r));
+      } else if (parentModuleId == CandyType.implies.virtualModuleId) {
+        return lazyBoolExpression('implies', (l, r) => l.negate().or(r));
       } else if (parentModuleId == CandyType.opposite.virtualModuleId) {
         assert(methodName == 'opposite');
         final receiver = identifier.receiver;
@@ -279,7 +323,31 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             _save(node, _refer(receiver.id).negate()),
           ];
         }
+      } else if (parentModuleId == CandyType.comparable.virtualModuleId) {
+        final relevantMethods = [
+          'lessThan',
+          'lessThanOrEqual',
+          'greaterThan',
+          'greaterThanOrEqual',
+        ];
+        if (relevantMethods.contains(methodName)) {
+          final left = identifier.receiver;
+          final right = node.valueArguments['other'];
+          return [
+            ...left.accept(this),
+            ...right.accept(this),
+            if (methodName == 'lessThan')
+              _save(node, _refer(left.id).lessThan(_refer(right.id)))
+            else if (methodName == 'lessThanOrEqual')
+              _save(node, _refer(left.id).lessOrEqualTo(_refer(right.id)))
+            else if (methodName == 'greaterThan')
+              _save(node, _refer(left.id).greaterThan(_refer(right.id)))
+            else
+              _save(node, _refer(left.id).greaterOrEqualTo(_refer(right.id))),
+          ];
+        }
       } else if (parentModuleId == CandyType.equals.virtualModuleId) {
+        assert(methodName == 'equals' || methodName == 'notEquals');
         final left = identifier.receiver;
         final right = node.valueArguments['other'];
         return [
@@ -414,6 +482,39 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             .statement,
       ];
 
+  @override
+  List<dart.Code> visitIsExpression(IsExpression node) {
+    final instance = _refer(node.instance.id);
+    final check = _compileIs(instance, node.typeToCheck);
+    return [
+      ...node.instance.accept(this),
+      _save(node, node.isNegated ? check.parenthesized.negate() : check),
+    ];
+  }
+
+  dart.Expression _compileIs(dart.Expression instance, CandyType type) {
+    dart.Expression compileSimple() => instance.isA(compileType(context, type));
+
+    return type.map(
+      user: (_) => compileSimple(),
+      this_: (_) => throw CompilerError.internalError(
+        "`This`-type wasn't resolved before compiling it to Dart.",
+      ),
+      tuple: (_) => compileSimple(),
+      function: (_) => compileSimple(),
+      union: (type) => type.types
+          .map((t) => _compileIs(instance, t))
+          .reduce((value, element) => value.or(element))
+          .parenthesized,
+      intersection: (type) => type.types
+          .map((t) => _compileIs(instance, t))
+          .reduce((value, element) => value.and(element))
+          .parenthesized,
+      parameter: (_) => compileSimple(),
+      reflection: (_) => compileSimple(),
+    );
+  }
+
   static String _name(DeclarationLocalId id) => '_${id.value}';
   static dart.Expression _refer(DeclarationLocalId id) => dart.refer(_name(id));
   dart.Code _save(
@@ -451,4 +552,17 @@ class ModuleExpression extends dart.InvokeExpression {
         );
 
   final ModuleId moduleId;
+}
+
+extension on dart.Expression {
+  dart.Expression get parenthesized => dart.CodeExpression(dart.Block.of([
+        const dart.Code('('),
+        code,
+        const dart.Code(')'),
+      ]));
+}
+
+dart.Expression lambdaOf(List<dart.Code> code) {
+  final body = dart.Block((b) => b..statements.addAll(code));
+  return dart.Method((b) => b..body = body).closure;
 }

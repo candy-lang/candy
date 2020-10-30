@@ -16,8 +16,7 @@ final compileModule = Query<ModuleId, Unit>(
 
     final library = dart.Library((b) {
       for (final declarationId in module.innerDeclarationIds) {
-        final compiled = compileDeclaration(context, declarationId);
-        if (compiled.isSome) b.body.add(compiled.value);
+        b.body.addAll(compileDeclaration(context, declarationId));
       }
 
       if (moduleId == ModuleId.corePrimitives) {

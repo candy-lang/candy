@@ -1,5 +1,6 @@
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
+import 'package:dartx/dartx.dart';
 
 import '../builtins.dart';
 import '../type.dart';
@@ -9,37 +10,60 @@ import 'module.dart';
 import 'property.dart';
 import 'trait.dart';
 
-final compileDeclaration = Query<DeclarationId, Option<dart.Spec>>(
+final compileDeclaration = Query<DeclarationId, List<dart.Spec>>(
   'dart.compileDeclaration',
   provider: (context, declarationId) {
     final declaration = getDeclarationAst(context, declarationId);
     if (declaration.isBuiltin) {
-      return compileBuiltin(context, declarationId);
+      final compiled = compileBuiltin(context, declarationId);
+      if (compiled is None) return [];
+      return [compiled.value];
     }
 
     if (declarationId.isModule) {
       compileModule(context, declarationIdToModuleId(context, declarationId));
-      return Option.none();
+      return [];
     } else if (declarationId.isTrait) {
-      return Option.some(compileTrait(context, declarationId));
+      return compileTrait(context, declarationId);
     } else if (declarationId.isImpl) {
       // All impls are generated in the final class itself.
-      return Option.none();
+      return [];
     } else if (declarationId.isClass) {
-      return Option.some(compileClass(context, declarationId));
+      return compileClass(context, declarationId);
     } else if (declarationId.isConstructor) {
       // Constructors are manually compiled within classes as they don't inherit
       // from [Spec].
-      return Option.none();
+      return [];
     } else if (declarationId.isFunction) {
-      return Option.some(compileFunction(context, declarationId));
+      return [compileFunction(context, declarationId)];
     } else if (declarationId.isProperty) {
-      return Option.some(compileProperty(context, declarationId));
+      return [compileProperty(context, declarationId)];
     } else {
       throw CompilerError.unsupportedFeature(
         'Unsupported declaration for Dart compiler: `$declarationId`.',
       );
     }
+  },
+);
+
+final compileTypeName = Query<DeclarationId, dart.Reference>(
+  'dart.compileTypeName',
+  provider: (context, declarationId) {
+    assert(declarationId.isTrait || declarationId.isClass);
+    final name = declarationId.simplePath
+        .where((it) =>
+            it is TraitDeclarationPathData || it is ClassDeclarationPathData)
+        .reversed
+        .map((it) => it.nameOrNull)
+        .reduce((value, element) => '${element}_$value');
+
+    var containingModule = declarationId.parent;
+    while (containingModule.isTrait || containingModule.isClass) {
+      containingModule = containingModule.parent;
+    }
+    final containingModuleId =
+        declarationIdToModuleId(context, containingModule);
+    return dart.refer(name, moduleIdToImportUrl(context, containingModuleId));
   },
 );
 

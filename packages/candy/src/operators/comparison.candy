@@ -1,0 +1,36 @@
+use ...primitives
+use ..equality
+
+// trait BinaryLessThan<Other, Result> {
+//   fun lessThan(other: Other): Result
+// }
+// trait BinaryLessThanOrEqual<Other, Result> {
+//   fun lessThanOrEqual(other: Other): Result
+// }
+
+// trait BinaryGreaterThan<Other, Result> {
+//   fun greaterThan(other: Other): Result
+// }
+// trait BinaryGreaterThanOrEqual<Other, Result> {
+//   fun greaterThanOrEqual(other: Other): Result
+// }
+
+trait Comparable: Equals {
+  // : BinaryLessThan<Other, Bool>
+  //   & BinaryLessThanOrEqual<Other, Bool>
+  //   & BinaryGreaterThan<Other, Bool>
+  //   & BinaryGreaterThanOrEqual<Other, Bool> {
+  fun compareTo(other: This): Less | Equal | Greater | Int
+
+  fun lessThan(other: This): Bool { compareTo(other) is Less }
+  fun lessThanOrEqual(other: This): Bool { compareTo(other) is Less | Equal }
+  fun greaterThan(other: This): Bool { compareTo(other) is Greater }
+  fun greaterThanOrEqual(other: This): Bool { compareTo(other) is Greater | Equal }
+
+  class Less
+  class Equal
+  class Greater
+}
+// impl<Other, Result> Comparable<Other, Result>: BinaryLessThan<Other, Result> {
+//   fun lessThan(other: Other): Result { add(other) }
+// }

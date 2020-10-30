@@ -90,6 +90,13 @@ abstract class Expression implements _$Expression {
     IdentifierExpression left,
     Expression right,
   ) = AssignmentExpression;
+  // ignore: non_constant_identifier_names
+  const factory Expression.is_(
+    DeclarationLocalId id,
+    Expression instance,
+    CandyType typeToCheck, {
+    bool isNegated,
+  }) = IsExpression;
 
   factory Expression.fromJson(Map<String, dynamic> json) =>
       _$ExpressionFromJson(json);
@@ -114,6 +121,7 @@ abstract class Expression implements _$Expression {
         break_: (_, __, ___) => CandyType.never,
         continue_: (_, __) => CandyType.never,
         assignment: (_, __, right) => right.type,
+        is_: (_, __, ___, ____) => CandyType.bool,
       );
 
   T accept<T>(ExpressionVisitor<T> visitor) => map(
@@ -131,13 +139,14 @@ abstract class Expression implements _$Expression {
         break_: (e) => visitor.visitBreakExpression(e),
         continue_: (e) => visitor.visitContinueExpression(e),
         assignment: (e) => visitor.visitAssignmentExpression(e),
+        is_: (e) => visitor.visitIsExpression(e),
       );
 }
 
 @freezed
 abstract class Identifier implements _$Identifier {
   // ignore: non_constant_identifier_names
-  const factory Identifier.this_() = ThisIdentifier;
+  const factory Identifier.this_(CandyType type) = ThisIdentifier;
   // ignore: non_constant_identifier_names
   const factory Identifier.super_(UserCandyType type) = SuperIdentifier;
   const factory Identifier.reflection(
@@ -178,7 +187,7 @@ abstract class Identifier implements _$Identifier {
       );
 
   CandyType get type => when(
-        this_: () => CandyType.this_(),
+        this_: (type) => type,
         super_: (type) => type,
         reflection: (declarationId, _) => CandyType.reflection(declarationId),
         parameter: (_, __, type) => type,
@@ -254,6 +263,7 @@ abstract class ExpressionVisitor<T> {
   T visitBreakExpression(BreakExpression node);
   T visitContinueExpression(ContinueExpression node);
   T visitAssignmentExpression(AssignmentExpression node);
+  T visitIsExpression(IsExpression node);
 }
 
 abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
@@ -287,4 +297,6 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   void visitContinueExpression(ContinueExpression node) {}
   @override
   void visitAssignmentExpression(AssignmentExpression node) {}
+  @override
+  void visitIsExpression(IsExpression node) {}
 }
