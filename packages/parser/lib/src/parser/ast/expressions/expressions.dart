@@ -356,3 +356,16 @@ abstract class ContinueExpression extends Expression
   @override
   Iterable<SyntacticEntity> get children => [continueKeyword];
 }
+
+@freezed
+abstract class ThrowExpression extends Expression implements _$ThrowExpression {
+  const factory ThrowExpression(
+    int id, {
+    @required ThrowKeywordToken throwKeyword,
+    @required Expression error,
+  }) = _ThrowExpression;
+  const ThrowExpression._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [throwKeyword, error];
+}

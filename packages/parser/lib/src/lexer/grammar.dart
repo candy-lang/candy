@@ -197,6 +197,8 @@ class LexerGrammar {
       string('break').tokenize((_, span) => BreakKeywordToken(span: span));
   static final CONTINUE = string('continue')
       .tokenize((_, span) => ContinueKeywordToken(span: span));
+  static final THROW =
+      string('throw').tokenize((_, span) => ThrowKeywordToken(span: span));
 
   // SECTION: lexicalModifiers
 

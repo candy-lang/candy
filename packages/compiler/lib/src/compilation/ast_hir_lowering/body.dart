@@ -168,8 +168,13 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
 
   @override
   Option<hir.Expression> visitContinueExpression(ContinueExpression node) {
+    return node.accept(this);
+  }
+
+  @override
+  Option<hir.Expression> visitThrowExpression(ThrowExpression node) {
     if (node.id == id) return Some(node);
-    return None();
+    return node.error.accept(this);
   }
 
   @override
@@ -304,6 +309,8 @@ abstract class Context {
       result = lowerBreak(expression);
     } else if (expression is ast.ContinueExpression) {
       result = lowerContinue(expression);
+    } else if (expression is ast.ThrowExpression) {
+      result = lowerThrow(expression);
     } else if (expression is ast.PrefixExpression) {
       result = lowerPrefixExpression(expression);
     } else if (expression is ast.BinaryExpression) {
@@ -1867,6 +1874,20 @@ extension on Context {
     return Ok([
       hir.Expression.continue_(getId(expression), resolvedScope.value),
     ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerThrow(
+    ast.ThrowExpression expression,
+  ) {
+    // The type of a `ThrowExpression` is `Never` and that is, by definition,
+    // assignable to anything because it's a bottom type. So, we don't need to
+    // check that.
+
+    return innerExpressionContext()
+        .lowerUnambiguous(expression.error)
+        .mapValue((error) => [
+              hir.Expression.throw_(getId(expression), error),
+            ]);
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>>
