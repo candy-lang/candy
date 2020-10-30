@@ -1,4 +1,5 @@
 import 'package:compiler/src/compilation/hir.dart';
+import 'package:dartx/dartx.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../errors.dart';
@@ -212,6 +213,17 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
       return CompilerError.internalError(
         '`isAssignableTo` was called with an invalid `This`-type.',
       );
+    }
+
+    // TODO(marcelgarus): This is ugly and hardcoded.
+    if (child is UserCandyType && parent is UserCandyType) {
+      if ((child.name == 'None' || child.name == 'Some') &&
+          parent.name == 'Option') {
+        return child.arguments
+            .zip(parent.arguments,
+                (a, CandyType b) => isAssignableTo(context, Tuple2(a, b)))
+            .every((it) => it);
+      }
     }
 
     CandyType getResultingType(ReflectionCandyType type) {
