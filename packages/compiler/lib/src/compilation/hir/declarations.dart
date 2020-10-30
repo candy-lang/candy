@@ -38,7 +38,8 @@ abstract class Declaration implements _$Declaration {
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
   }) = ClassDeclaration;
   const factory Declaration.constructor({
-    @Default(<ValueParameter>[]) List<ValueParameter> parameters,
+    @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
+    @Default(<ValueParameter>[]) List<ValueParameter> valueParameters,
   }) = ConstructorDeclaration;
 
   const factory Declaration.function({

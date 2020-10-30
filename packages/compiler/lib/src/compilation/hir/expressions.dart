@@ -38,6 +38,7 @@ abstract class Expression implements _$Expression {
   const factory Expression.functionCall(
     DeclarationLocalId id,
     Expression target,
+    List<CandyType> typeArguments,
     Map<String, Expression> valueArguments,
   ) = FunctionCallExpression;
   // ignore: non_constant_identifier_names
@@ -93,8 +94,9 @@ abstract class Expression implements _$Expression {
         property: (_, __, type, ___, ____) => type,
         navigation: (_, __, ___, type) => type,
         call: (_, __, ___) => null,
-        functionCall: (_, target, __) {
+        functionCall: (_, target, typeParameters, __) {
           final functionType = target.type as FunctionCandyType;
+          // TODO(marcelgarus): Bake type.
           return functionType.returnType;
         },
         return_: (_, __, ___) => CandyType.never,

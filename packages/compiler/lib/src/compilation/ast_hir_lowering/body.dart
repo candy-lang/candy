@@ -1926,6 +1926,7 @@ extension on Context {
               receiver: operand,
             ),
           ),
+          [],
           {},
         ),
       ]);
@@ -1979,6 +1980,7 @@ extension on Context {
               receiver: left,
             ),
           ),
+          [],
           {'other': right.value},
         ),
       ]);

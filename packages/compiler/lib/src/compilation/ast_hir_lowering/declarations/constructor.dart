@@ -17,12 +17,13 @@ final getConstructorDeclarationHir =
     final classId = declarationId.parent;
     assert(classId.isClass);
 
-    final propertyIds = getClassDeclarationHir(context, classId)
-        .innerDeclarationIds
-        .where((id) => id.isProperty);
+    final classHir = getClassDeclarationHir(context, classId);
+    final propertyIds =
+        classHir.innerDeclarationIds.where((id) => id.isProperty);
 
     return hir.ConstructorDeclaration(
-      parameters: propertyIds
+      typeParameters: classHir.typeParameters,
+      valueParameters: propertyIds
           .map((id) => getPropertyDeclarationHir(context, id))
           .where((p) => !p.isStatic)
           .map((property) => hir.ValueParameter(
