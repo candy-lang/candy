@@ -21,7 +21,7 @@ builtin impl Int: Equals & Comparable
 // builtin impl Int: Number
 
 public builtin class Float
-builtin impl Int: Equals & Comparable
+builtin impl Float: Equals & Comparable
 // builtin impl Float: Number
 
 public builtin class String

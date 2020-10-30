@@ -16,18 +16,38 @@ final Query<DeclarationId, List<dart.Class>> compileTrait =
     // ignore: non_constant_identifier_names
     final traitHir = getTraitDeclarationHir(context, declarationId);
 
+    final implements = <dart.Reference>[];
+
     final properties = traitHir.innerDeclarationIds
         .where((id) => id.isProperty)
         .expand((id) => compilePropertyInsideTrait(context, id));
     final methods = traitHir.innerDeclarationIds
         .where((id) => id.isFunction)
-        .map((id) => compileFunction(context, id));
+        .map((id) => compileFunction(context, id))
+        .toList();
+
+    final moduleId = declarationIdToModuleId(context, declarationId);
+    if (moduleId == CandyType.comparable.virtualModuleId) {
+      implements.add(dart.TypeReference((b) => b
+        ..symbol = 'Comparable'
+        ..url = dartCoreUrl
+        ..types.add(dart.refer('dynamic', dartCoreUrl))));
+      methods.add(dart.Method((b) => b
+        ..annotations.add(dart.refer('override', dartCoreUrl))
+        ..returns = dart.refer('int', dartCoreUrl)
+        ..name = 'compareTo'
+        ..requiredParameters.add(dart.Parameter((b) => b
+          ..type = dart.refer('dynamic', dartCoreUrl)
+          ..name = 'other'))));
+    }
+
     return [
       dart.Class((b) => b
         ..abstract = true
         ..name = compileTypeName(context, declarationId).symbol
         ..types.addAll(traitHir.typeParameters
             .map((p) => compileTypeParameter(context, p)))
+        ..implements.addAll(implements)
         ..constructors.add(dart.Constructor((b) => b..constant = true))
         ..methods.addAll(properties)
         ..methods.addAll(methods)),

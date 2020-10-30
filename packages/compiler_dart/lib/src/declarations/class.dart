@@ -23,15 +23,7 @@ final Query<DeclarationId, List<dart.Class>> compileClass =
     final impls = getAllImplsForTraitOrClass(context, declarationId)
         .map((id) => getImplDeclarationHir(context, id));
     final traits = impls.expand((impl) => impl.traits);
-    final implements = traits.map((it) {
-      if (traits.any((it) => it == CandyType.comparable)) {
-        return dart.TypeReference((b) => b
-          ..symbol = 'Comparable'
-          ..url = dartCoreUrl
-          ..types.add(compileType(context, classHir.thisType)));
-      }
-      return compileType(context, it);
-    });
+    final implements = traits.map((it) => compileType(context, it));
 
     final implMethodIds = impls
         .expand((impl) => impl.innerDeclarationIds)
@@ -60,71 +52,61 @@ final Query<DeclarationId, List<dart.Class>> compileClass =
       final trait = implHir.traits.single;
       var name = function.name;
       if (trait == CandyType.comparable) {
-        if (name == 'compareTo') {
-          name = 'compareToTyped';
+        name = 'compareToTyped';
 
-          final parameter = function.valueParameters.single;
-          final comparableId =
-              ModuleId.coreOperatorsComparison.nested(['Comparable']);
-          final variants = {
-            'Less': -1,
-            'Equal': 0,
-            'Greater': 1,
-          };
-          final statements = [
-            dart
-                .refer('this')
-                .property('compareToTyped')
-                .call([dart.refer(parameter.name)], {}, [])
-                .assignFinal(
-                  'result',
-                  compileType(context, function.returnType),
-                )
-                .statement,
-            for (final entry in variants.entries)
-              dart.Block.of([
-                dart.Code('if ('),
-                dart
-                    .refer('result')
-                    .isA(compileType(
-                      context,
-                      CandyType.user(comparableId, entry.key),
-                    ))
-                    .code,
-                dart.Code(') {'),
-                dart.literalNum(entry.value).returned.statement,
-                dart.Code('}'),
-              ]),
-            dart
-                .refer('StateError', dartCoreUrl)
-                .call(
-                  [
-                    dart.literalString(
-                      '`compareToTyped` returned an invalid object: `\$result`.',
-                    )
-                  ],
-                  {},
-                  [],
-                )
-                .thrown
-                .statement,
-          ];
-          yield dart.Method((b) => b
-            ..annotations.add(dart.refer('override', dartCoreUrl))
-            ..returns = compileType(context, CandyType.int)
-            ..name = 'compareTo'
-            ..requiredParameters
-                .addAll(compileParameters(context, function.valueParameters))
-            ..body = dart.Block((b) => b.statements.addAll(statements)));
-        } else {
-          const names = {
-            'lessThan': 'operator <',
-            'lessThanOrEqual': 'operator <=',
-            'greaterThan': 'operator >',
-            'greaterThanOrEqual': 'operator >=',
-          };
-          name = names[function.name];
-        }
+        final parameter = function.valueParameters.single;
+        final comparableId =
+            ModuleId.coreOperatorsComparison.nested(['Comparable']);
+        final variants = {
+          'Less': -1,
+          'Equal': 0,
+          'Greater': 1,
+        };
+        final statements = [
+          dart
+              .refer('this')
+              .property('compareToTyped')
+              .call([dart.refer(parameter.name)], {}, [])
+              .assignFinal(
+                'result',
+                compileType(context, function.returnType),
+              )
+              .statement,
+          for (final entry in variants.entries)
+            dart.Block.of([
+              dart.Code('if ('),
+              dart
+                  .refer('result')
+                  .isA(compileType(
+                    context,
+                    CandyType.user(comparableId, entry.key),
+                  ))
+                  .code,
+              dart.Code(') {'),
+              dart.literalNum(entry.value).returned.statement,
+              dart.Code('}'),
+            ]),
+          dart
+              .refer('StateError', dartCoreUrl)
+              .call(
+                [
+                  dart.literalString(
+                    '`compareToTyped` returned an invalid object: `\$result`.',
+                  )
+                ],
+                {},
+                [],
+              )
+              .thrown
+              .statement,
+        ];
+        yield dart.Method((b) => b
+          ..annotations.add(dart.refer('override', dartCoreUrl))
+          ..returns = compileType(context, CandyType.int)
+          ..name = 'compareTo'
+          ..requiredParameters
+              .addAll(compileParameters(context, function.valueParameters))
+          ..body = dart.Block((b) => b.statements.addAll(statements)));
       } else if (trait == CandyType.equals) {
         name = 'operator ==';
       }
@@ -156,10 +138,18 @@ final Query<DeclarationId, List<dart.Class>> compileClass =
           final id = inputs.first;
           final functionHir = inputs.second;
 
+          const operatorMethods = {
+            'lessThan': 'operator <',
+            'lessThanOrEqual': 'operator <=',
+            'greaterThan': 'operator >',
+            'greaterThanOrEqual': 'operator >=',
+          };
+          final name = operatorMethods[functionHir.name] ?? functionHir.name;
+
           return dart.Method((b) => b
             ..annotations.add(dart.refer('override', dartCoreUrl))
             ..returns = compileType(context, functionHir.returnType)
-            ..name = functionHir.name
+            ..name = name
             ..types.addAll(functionHir.typeParameters
                 .map((p) => compileTypeParameter(context, p)))
             ..requiredParameters

@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 
 import '../body.dart';
+import '../constants.dart';
 import '../type.dart';
 import 'declaration.dart';
 import 'module.dart';
@@ -24,11 +25,24 @@ final compileFunction = Query<DeclarationId, dart.Method>(
     }
     body ??= compileBody(context, declarationId).valueOrNull;
 
-    var name = functionHir.name;
     // TODO(JonasWanke): make this safer
-    if (name == 'equals') name = 'operator ==';
+    const operatorMethods = {
+      'equals': 'operator ==',
+      'compareTo': 'compareToTyped',
+      'lessThan': 'operator <',
+      'lessThanOrEqual': 'operator <=',
+      'greaterThan': 'operator >',
+      'greaterThanOrEqual': 'operator >=',
+    };
+    final name = operatorMethods[functionHir.name] ?? functionHir.name;
+
+    final annotations = <dart.Expression>[];
+    if (name == 'operator ==') {
+      annotations.add(dart.refer('override', dartCoreUrl));
+    }
 
     return dart.Method((b) => b
+      ..annotations.addAll(annotations)
       ..static = functionHir.isStatic && declarationId.parent.isNotModule
       ..returns = compileType(context, functionHir.returnType)
       ..name = name

@@ -1,0 +1,18 @@
+fun main() {
+  print(1 > 1)
+  print(1 >= 1)
+  print(1 < 1)
+  print(1 <= 1)
+}
+
+class Foo {
+  fun main() {
+    print(this > this)
+    print(this >= this)
+    print(this < this)
+    print(this <= this)
+  }
+}
+impl Foo: Comparable {
+  fun compareTo(other: This): Comparable.Less | Comparable.Equal | Comparable.Greater | Int { 1 }
+}
