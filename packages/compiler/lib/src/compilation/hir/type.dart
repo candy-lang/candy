@@ -240,8 +240,9 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
 
     // TODO(marcelgarus): This is ugly and hardcoded.
     if (child is UserCandyType && parent is UserCandyType) {
-      if ((child.name == 'None' || child.name == 'Some') &&
-          parent.name == 'Option') {
+      if (child.name == 'None' && parent.name == 'Option') {
+        return true;
+      } else if (child.name == 'Some' && parent.name == 'Option') {
         return child.arguments
             .zip(parent.arguments,
                 (a, CandyType b) => isAssignableTo(context, Tuple2(a, b)))
