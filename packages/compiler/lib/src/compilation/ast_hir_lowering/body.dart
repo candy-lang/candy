@@ -640,7 +640,8 @@ class ContextContext extends Context {
                 hir.Identifier.this_(thisTypeOrResolved()),
               ),
             ));
-    if (matches.isNotEmpty) return matches.toList();
+    // TODO(marcelgarus): Maybe be more careful when choosing a match.
+    if (matches.isNotEmpty) return [matches.first];
 
     // search the current file (from the curent module to the root)
     assert(declarationId.hasParent);
