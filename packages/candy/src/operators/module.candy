@@ -1,38 +1,9 @@
+public use .arithmetic
 public use .comparison
 public use .equality
 public use .logical
 
 /*
-trait BinaryPlus<Other, Result> {
-  fun plus(other: Other): Result
-}
-trait AddOperator<Other, Result>: BinaryPlus<Other, Result> {
-  fun add(other: Other): Result
-}
-impl<Other, Result> AddOperator<Other, Result>: BinaryPlus<Other, Result> {
-  fun plus(other: Other): Result { add(other) }
-}
-
-trait BinaryMinus<Other, Result> {
-  fun minus(other: Other): Result
-}
-trait SubtractOperator<Other, Result> {
-  fun subtract(other: Other): Result
-}
-impl<Other, Result> SubtractOperator<Other, Result>: BinaryMinus<Other, Result> {
-  fun minus(other: Other): Result { subtract(other) }
-}
-
-trait PrefixMinus<Result> {
-  fun prefixMinus(): Result
-}
-trait ArithmeticNegateOperator<Result> {
-  fun negate(): Result
-}
-impl<Result> ArithmeticNegateOperator<Result>: PrefixMinus<Result> {
-  fun prefixMinus(): Result { negate() }
-}
-
 trait PostfixIndexGet<Index, Result> {
   fun postfixIndexGet(index: Index): Result
 }

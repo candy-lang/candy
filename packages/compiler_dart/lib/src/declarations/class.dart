@@ -51,7 +51,19 @@ final Query<DeclarationId, List<dart.Class>> compileClass =
       final implHir = getImplDeclarationHir(context, id.parent);
       final trait = implHir.traits.single;
       var name = function.name;
-      if (trait == CandyType.comparable) {
+      if (trait == CandyType.add) {
+        name = 'operator +';
+      } else if (trait == CandyType.subtract) {
+        name = 'operator -';
+      } else if (trait == CandyType.multiply) {
+        name = 'operator *';
+      } else if (trait == CandyType.divide) {
+        name = 'operator /';
+      } else if (trait == CandyType.divideTruncating) {
+        name = 'operator ~/';
+      } else if (trait == CandyType.modulo) {
+        name = 'operator %';
+      } else if (trait == CandyType.comparable) {
         name = 'compareToTyped';
 
         final parameter = function.valueParameters.single;
