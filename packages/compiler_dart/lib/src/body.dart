@@ -256,6 +256,25 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           declarationIdToModuleId(context, identifier.id.parent);
       final methodName = identifier.id.simplePath.last.nameOrNull;
 
+      List<dart.Code> simpleBinaryExpression(
+        String name,
+        dart.Expression Function(dart.Expression left, dart.Expression right)
+            binaryBuilder,
+      ) {
+        assert(name == methodName);
+
+        final left = identifier.receiver;
+        final right = node.valueArguments['other'];
+        return [
+          ...left.accept(this),
+          ...right.accept(this),
+          _save(
+            node,
+            binaryBuilder(_refer(left.id), _refer(right.id)),
+          ),
+        ];
+      }
+
       List<dart.Code> lazyBoolExpression(
         String name,
         dart.Expression Function(dart.Expression left, dart.Expression right)
@@ -308,6 +327,39 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             ],
           ];
         }
+      } else if (parentModuleId == CandyType.add.virtualModuleId) {
+        return simpleBinaryExpression('add', (l, r) => l.operatorAdd(r));
+      } else if (parentModuleId == CandyType.subtract.virtualModuleId) {
+        return simpleBinaryExpression(
+          'subtract',
+          (l, r) => l.operatorSubstract(r),
+        );
+      } else if (parentModuleId == CandyType.negate.virtualModuleId) {
+        assert(methodName == 'negate');
+        final receiver = identifier.receiver;
+        if (isAssignableTo(context, Tuple2(receiver.type, CandyType.number))) {
+          return [
+            ...receiver.accept(this),
+            _save(node, _refer(receiver.id).operatorNegate()),
+          ];
+        }
+      } else if (parentModuleId == CandyType.multiply.virtualModuleId) {
+        return simpleBinaryExpression(
+          'multiply',
+          (l, r) => l.operatorMultiply(r),
+        );
+      } else if (parentModuleId == CandyType.divide.virtualModuleId) {
+        return simpleBinaryExpression('divide', (l, r) => l.operatorDivide(r));
+      } else if (parentModuleId == CandyType.divideTruncating.virtualModuleId) {
+        return simpleBinaryExpression(
+          'divideTruncating',
+          (l, r) => l.operatorDivideTruncating(r),
+        );
+      } else if (parentModuleId == CandyType.modulo.virtualModuleId) {
+        return simpleBinaryExpression(
+          'modulo',
+          (l, r) => l.operatorEuclideanModulo(r),
+        );
       } else if (parentModuleId == CandyType.and.virtualModuleId) {
         return lazyBoolExpression('and', (l, r) => l.and(r));
       } else if (parentModuleId == CandyType.or.virtualModuleId) {
@@ -559,6 +611,16 @@ extension on dart.Expression {
         const dart.Code('('),
         code,
         const dart.Code(')'),
+      ]));
+  dart.Expression operatorNegate() => dart.CodeExpression(dart.Block.of([
+        const dart.Code('-'),
+        code,
+      ]));
+  dart.Expression operatorDivideTruncating(dart.Expression other) =>
+      dart.CodeExpression(dart.Block.of([
+        code,
+        const dart.Code('~/'),
+        other.code,
       ]));
 }
 

@@ -1,0 +1,49 @@
+fun main() {
+  print(1 + 1)
+  print(1 - 1)
+  print(-1)
+  print(1 * 1)
+  print(1 / 1)
+  print(1 ~/ 1)
+  print(1 % 1)
+}
+
+class Foo {
+  fun main() {
+    print(this + this)
+    print(this - this)
+    print(-this)
+    print(this * this)
+    // print(this / this)
+    print(this ~/ this)
+    print(this % this)
+  }
+}
+
+impl Foo: Add {
+  fun add(other: This): This { this }
+}
+
+impl Foo: Subtract {
+  fun subtract(other: This): This { this }
+}
+
+impl Foo: Negate {
+  fun negate(): This { this }
+}
+
+impl Foo: Multiply {
+  fun multiply(other: This): This { this }
+}
+
+// impl Foo: Divide {
+//   fun divide(other: This): Float { 0 }
+// }
+
+impl Foo: DivideTruncating {
+  fun divideTruncating(other: This): Int { 1 }
+}
+
+impl Foo: Modulo {
+  fun modulo(other: This): This { this }
+}

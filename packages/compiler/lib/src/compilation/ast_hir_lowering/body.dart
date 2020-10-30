@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dartx/dartx.dart';
+import 'package:meta/meta.dart';
 import 'package:parser/parser.dart' as ast;
 import 'package:parser/parser.dart' show SourceSpan;
 
@@ -2022,10 +2023,13 @@ extension on Context {
   ) {
     final operatorType = expression.operatorToken.type;
 
-    if (operatorType == ast.OperatorTokenType.exclamation) {
-      final operandResult =
-          innerExpressionContext(expressionType: Some(hir.CandyType.opposite))
-              .lowerUnambiguous(expression.operand);
+    Result<List<hir.Expression>, List<ReportedCompilerError>> handle(
+      hir.CandyType type,
+      String functionName,
+    ) {
+      // TODO(JonasWanke): find a supertype that satisfies this trait
+      final operandResult = innerExpressionContext(expressionType: Some(type))
+          .lowerUnambiguous(expression.operand);
       if (operandResult is Error) return Error(operandResult.error);
       final operand = operandResult.value;
 
@@ -2037,10 +2041,9 @@ extension on Context {
             hir.Identifier.property(
               moduleIdToDeclarationId(
                 queryContext,
-                hir.CandyType.opposite.virtualModuleId,
-              ).inner(DeclarationPathData.function('opposite')),
+                type.virtualModuleId,
+              ).inner(DeclarationPathData.function(functionName)),
               hir.CandyType.function(
-                parameterTypes: [],
                 returnType: operand.type,
               ),
               isMutable: false,
@@ -2052,6 +2055,12 @@ extension on Context {
           {},
         ),
       ]);
+    }
+
+    if (operatorType == ast.OperatorTokenType.minus) {
+      return handle(hir.CandyType.negate, 'negate');
+    } else if (operatorType == ast.OperatorTokenType.exclamation) {
+      return handle(hir.CandyType.opposite, 'opposite');
     } else {
       return Error([
         CompilerError.unsupportedFeature(
@@ -2070,8 +2079,9 @@ extension on Context {
 
     Result<List<hir.Expression>, List<ReportedCompilerError>> handle(
       hir.CandyType type,
-      String functionName,
-    ) {
+      String functionName, {
+      @required hir.CandyType returnType,
+    }) {
       final leftResult = innerExpressionContext(expressionType: Some(type))
           .lowerUnambiguous(expression.leftOperand);
       if (leftResult is Error) return Error(leftResult.error);
@@ -2081,6 +2091,7 @@ extension on Context {
       final right = innerExpressionContext(expressionType: Some(left.type))
           .lowerUnambiguous(expression.rightOperand);
       if (right is Error) return Error(right.error);
+
       return Ok([
         hir.Expression.functionCall(
           getId(expression),
@@ -2094,7 +2105,7 @@ extension on Context {
               hir.CandyType.function(
                 receiverType: left.type,
                 parameterTypes: [left.type],
-                returnType: hir.CandyType.bool,
+                returnType: returnType.bakeThisType(left.type),
               ),
               isMutable: false,
               base: left,
@@ -2116,20 +2127,79 @@ extension on Context {
 
     if (operatorType == ast.OperatorTokenType.equals) {
       return lowerAssignment(expression);
+    } else if (operatorType == ast.OperatorTokenType.plus) {
+      return handle(
+        hir.CandyType.add,
+        'add',
+        returnType: hir.CandyType.this_(),
+      );
+    } else if (operatorType == ast.OperatorTokenType.minus) {
+      return handle(
+        hir.CandyType.subtract,
+        'subtract',
+        returnType: hir.CandyType.this_(),
+      );
+    } else if (operatorType == ast.OperatorTokenType.asterisk) {
+      return handle(
+        hir.CandyType.multiply,
+        'multiply',
+        returnType: hir.CandyType.this_(),
+      );
+    } else if (operatorType == ast.OperatorTokenType.slash) {
+      return handle(
+        hir.CandyType.divide,
+        'divide',
+        returnType: hir.CandyType.float,
+      );
+    } else if (operatorType == ast.OperatorTokenType.tildeSlash) {
+      return handle(
+        hir.CandyType.divideTruncating,
+        'divideTruncating',
+        returnType: hir.CandyType.int,
+      );
+    } else if (operatorType == ast.OperatorTokenType.percent) {
+      return handle(
+        hir.CandyType.modulo,
+        'modulo',
+        returnType: hir.CandyType.this_(),
+      );
     } else if (comparisonOperators.keys.contains(operatorType)) {
       final methodName = comparisonOperators[operatorType];
-      return handle(hir.CandyType.comparable, methodName);
+      return handle(
+        hir.CandyType.comparable,
+        methodName,
+        returnType: hir.CandyType.bool,
+      );
     } else if (operatorType == ast.OperatorTokenType.equalsEquals) {
-      return handle(hir.CandyType.equals, 'equals');
+      return handle(
+        hir.CandyType.equals,
+        'equals',
+        returnType: hir.CandyType.bool,
+      );
     } else if (operatorType == ast.OperatorTokenType.exclamationEquals) {
-      return handle(hir.CandyType.equals, 'notEquals');
+      return handle(
+        hir.CandyType.equals,
+        'notEquals',
+        returnType: hir.CandyType.bool,
+      );
     } else if (operatorType == ast.OperatorTokenType.ampersandAmpersand) {
-      return handle(hir.CandyType.and, 'and');
+      return handle(
+        hir.CandyType.and,
+        'and',
+        returnType: hir.CandyType.bool,
+      );
     } else if (operatorType == ast.OperatorTokenType.barBar) {
-      return handle(hir.CandyType.or, 'or');
+      return handle(
+        hir.CandyType.or,
+        'or',
+        returnType: hir.CandyType.bool,
+      );
     } else if (operatorType == ast.OperatorTokenType.dashGreater) {
-      final result = handle(hir.CandyType.implies, 'implies');
-      return result;
+      return handle(
+        hir.CandyType.implies,
+        'implies',
+        returnType: hir.CandyType.bool,
+      );
     } else {
       return Error([
         CompilerError.unsupportedFeature(

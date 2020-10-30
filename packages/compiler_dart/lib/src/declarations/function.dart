@@ -27,12 +27,18 @@ final compileFunction = Query<DeclarationId, dart.Method>(
 
     // TODO(JonasWanke): make this safer
     const operatorMethods = {
-      'equals': 'operator ==',
+      'add': 'operator +',
+      'subtract': 'operator -',
+      'multiply': 'operator *',
+      'divide': 'operator /',
+      'divideTruncating': 'operator ~/',
+      'modulo': 'operator %',
       'compareTo': 'compareToTyped',
       'lessThan': 'operator <',
       'lessThanOrEqual': 'operator <=',
       'greaterThan': 'operator >',
       'greaterThanOrEqual': 'operator >=',
+      'equals': 'operator ==',
     };
     final name = operatorMethods[functionHir.name] ?? functionHir.name;
 
