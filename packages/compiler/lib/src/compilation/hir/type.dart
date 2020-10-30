@@ -178,7 +178,7 @@ abstract class CandyType with _$CandyType {
       },
       union: (type) => type.types.join(' | '),
       intersection: (type) => type.types.join(' & '),
-      parameter: (type) => type.name,
+      parameter: (type) => '${type.name}@${type.declarationId}',
       reflection: (type) {
         final id = type.declarationId;
         if (id.isModule) return 'Module<$id>';
