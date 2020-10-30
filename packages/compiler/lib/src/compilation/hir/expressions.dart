@@ -41,12 +41,14 @@ abstract class Expression implements _$Expression {
     Expression target,
     List<CandyType> typeArguments,
     Map<String, Expression> valueArguments,
+    CandyType returnType,
   ) = FunctionCallExpression;
   const factory Expression.constructorCall(
     DeclarationLocalId id,
     ClassDeclaration class_,
     List<CandyType> typeArguments,
     Map<String, Expression> valueArguments,
+    CandyType returnType,
   ) = ConstructorCallExpression;
   // ignore: non_constant_identifier_names
   const factory Expression.if_(
@@ -102,26 +104,22 @@ abstract class Expression implements _$Expression {
       _$ExpressionFromJson(json);
   const Expression._();
 
-  CandyType get type => when(
-        identifier: (_, identifier) => identifier.type,
-        literal: (_, literal) => literal.type,
-        property: (_, __, type, ___, ____) => type,
-        navigation: (_, __, ___, type) => type,
-        call: (_, __, ___) => null,
-        functionCall: (_, target, typeParameters, __) {
-          final functionType = target.type as FunctionCandyType;
-          // TODO(marcelgarus): Bake type based on the type parameters.
-          return functionType.returnType;
-        },
-        constructorCall: (_, class_, __, ___) => class_.thisType,
-        return_: (_, __, ___) => CandyType.never,
-        if_: (_, __, ___, ____, type) => type,
-        loop: (_, __, type) => type,
-        while_: (_, __, ___, type) => type,
-        break_: (_, __, ___) => CandyType.never,
-        continue_: (_, __) => CandyType.never,
-        assignment: (_, __, right) => right.type,
-        is_: (_, __, ___, ____) => CandyType.bool,
+  CandyType get type => map(
+        identifier: (type) => type.identifier.type,
+        literal: (lit) => lit.literal.type,
+        property: (prop) => prop.type,
+        navigation: (nav) => nav.type,
+        call: (_) => null,
+        functionCall: (fn) => fn.returnType,
+        constructorCall: (constructor) => constructor.returnType,
+        return_: (_) => CandyType.never,
+        if_: (theIf) => theIf.type,
+        loop: (loop) => loop.type,
+        while_: (theWhile) => theWhile.type,
+        break_: (_) => CandyType.never,
+        continue_: (_) => CandyType.never,
+        assignment: (assignment) => assignment.right.type,
+        is_: (_) => CandyType.bool,
       );
 
   T accept<T>(ExpressionVisitor<T> visitor) => map(

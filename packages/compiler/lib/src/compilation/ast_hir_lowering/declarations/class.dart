@@ -31,6 +31,7 @@ final getClassDeclarationHir = Query<DeclarationId, hir.ClassDeclaration>(
     final name = classAst.name.name;
 
     return hir.ClassDeclaration(
+      id: declarationId,
       name: name,
       thisType: hir.UserCandyType(
         declarationIdToModuleId(context, declarationId).parent,

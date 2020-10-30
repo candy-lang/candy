@@ -433,13 +433,14 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
   @override
   List<dart.Code> visitConstructorCallExpression(
-      ConstructorCallExpression node) {
+    ConstructorCallExpression node,
+  ) {
     return [
       for (final argument in node.valueArguments.values)
         ...argument.accept(this),
       _save(
         node,
-        _refer(getId(node.class_.id)).call(
+        compileTypeName(context, node.class_.id).call(
           [
             for (final entry in node.valueArguments.entries)
               _refer(entry.value.id),

@@ -117,6 +117,18 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
+  Option<hir.Expression> visitConstructorCallExpression(
+    ConstructorCallExpression node,
+  ) {
+    if (node.id == id) return Some(node);
+    for (final argument in node.valueArguments.values) {
+      final result = argument.accept(this);
+      if (result is Some) return result;
+    }
+    return None();
+  }
+
+  @override
   Option<hir.Expression> visitReturnExpression(ReturnExpression node) {
     if (node.id == id) return Some(node);
     if (node.expression != null) return node.expression.accept(this);
@@ -1661,11 +1673,8 @@ extension on Context {
       // Constructor call.
       if (target is hir.IdentifierExpression &&
           target.identifier is hir.ReflectionIdentifier) {
-        final identifier = target.identifier as hir.ReflectionIdentifier;
-        // TODO: Ensure this is a constructor call.
-        // if (identifier.id.isConstructor) {
+        // TODO(marcelgarus): Ensure this is a constructor call.
         return lowerConstructorCall(expression, target);
-        // }
       }
 
       throw CompilerError.unsupportedFeature(
@@ -1687,7 +1696,7 @@ extension on Context {
     final functionId = identifier.id;
     assert(functionId.isFunction);
 
-    final functionHir = getFunctionDeclarationHir(queryContext, functionId);
+    var functionHir = getFunctionDeclarationHir(queryContext, functionId);
     if (functionHir.typeParameters.length !=
         (expression.typeArguments?.arguments?.length ?? 0)) {
       return Error([
@@ -1710,12 +1719,15 @@ extension on Context {
     final genericsMap = Map.fromEntries(
         typeParameters.zip<CandyType, MapEntry<CandyType, CandyType>>(
             typeArguments, (a, b) => MapEntry(a, b)));
-    stderr.writeln('The generics map is $genericsMap.');
-    stderr.writeln(
-        'Fresh from the oven: ${functionHir.returnType.bakeGenerics(genericsMap)}');
+    functionHir = functionHir.copyWith(
+      valueParameters: functionHir.valueParameters
+          .map((parameter) => parameter.copyWith(
+              type: parameter.type.bakeGenerics(genericsMap)))
+          .toList(),
+      returnType: functionHir.returnType.bakeGenerics(genericsMap),
+    );
 
-    if (!isValidExpressionType(
-        functionHir.returnType.bakeGenerics(genericsMap))) {
+    if (!isValidExpressionType(functionHir.returnType)) {
       return Error([
         CompilerError.internalError(
           'Function ${functionHir.name} has an invalid return type: ${functionHir.returnType}. '
@@ -1802,9 +1814,7 @@ extension on Context {
       final value = entry.value.expression;
 
       final innerContext = innerExpressionContext(
-        expressionType: Option.some(
-          parametersByName[name].type.bakeGenerics(genericsMap),
-        ),
+        expressionType: Option.some(parametersByName[name].type),
       );
       final lowered = innerContext.lowerUnambiguous(value);
       if (lowered is Error) {
@@ -1826,6 +1836,7 @@ extension on Context {
                 ?.toList() ??
             [],
         hirArgumentMap,
+        functionHir.returnType,
       ),
     ]);
   }
@@ -1915,14 +1926,15 @@ extension on Context {
     final arguments = loweredArguments.value;
 
     return Ok([
-      hir.Expression.functionCall(
+      hir.Expression.constructorCall(
         getId(expression),
-        target,
+        class_,
         typeArguments,
         {
           for (var i = 0; i < arguments.length; i++)
             fields[i].name: arguments[i],
         },
+        returnType,
       ),
     ]);
   }
@@ -2053,6 +2065,7 @@ extension on Context {
           ),
           [],
           {},
+          operand.type,
         ),
       ]);
     }
@@ -2114,6 +2127,7 @@ extension on Context {
           ),
           [],
           {'other': right.value},
+          returnType.bakeThisType(left.type),
         ),
       ]);
     }
