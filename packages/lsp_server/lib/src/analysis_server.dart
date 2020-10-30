@@ -68,7 +68,7 @@ class AnalysisServer {
       ),
     );
     _queryConfig = QueryConfig(
-      packageName: 'playground',
+      packageName: 'core',
       resourceProvider: resourceProvider,
       buildArtifactManager: BuildArtifactManager(projectDirectory),
     );
