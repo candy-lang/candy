@@ -1,0 +1,10 @@
+use ..primitives
+
+public fun todo(message: String = "Not implemented"): Never {
+  // TODO(JonasWanke): throw `TodoError`
+  throw "TODO: {message}"
+}
+
+public class TodoError {
+  let message: String
+}

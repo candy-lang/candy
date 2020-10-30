@@ -601,7 +601,14 @@ class ParserGrammar {
       // bitwise not
       ..leftExpression(LexerGrammar.BAR)
       // type check
-      ..leftExpression(LexerGrammar.AS | LexerGrammar.AS_SAFE)
+      ..leftComplex<OperatorToken, Expression>(
+        (LexerGrammar.WS &
+                (LexerGrammar.AS | LexerGrammar.AS_SAFE) &
+                LexerGrammar.WS)
+            .map((it) => it[1] as OperatorToken),
+        mapper: (left, operator, right) =>
+            BinaryExpression(_id++, left, operator, right),
+      )
       // range
       ..leftExpression(LexerGrammar.DOT_DOT | LexerGrammar.DOT_DOT_EQUALS)
       // infix function
@@ -698,8 +705,7 @@ class ParserGrammar {
         },
       )
       ..prefix<ReturnKeywordToken, Expression>(
-          (LexerGrammar.RETURN & LexerGrammar.NLs)
-              .map((value) => value.first as ReturnKeywordToken),
+          (LexerGrammar.RETURN & LexerGrammar.NLs).map((value) => value.first as ReturnKeywordToken),
           mapper: (keyword, expression) {
         return ReturnExpression(
           _id++,
@@ -714,6 +720,14 @@ class ParserGrammar {
           _id++,
           breakKeyword: keyword,
           expression: expression,
+        );
+      })
+      ..prefix<ThrowKeywordToken, Expression>(
+          (LexerGrammar.THROW & LexerGrammar.NLs).map((value) => value.first as ThrowKeywordToken), mapper: (keyword, expression) {
+        return ThrowExpression(
+          _id++,
+          throwKeyword: keyword,
+          error: expression,
         );
       })
       ..prefix<List<dynamic>, Expression>(
@@ -999,6 +1013,14 @@ extension on ExpressionBuilder {
         LexerGrammar.NLs & operator & LexerGrammar.NLs,
         (left, operator, right) =>
             mapper(left, operator[1] as OperatorToken, right),
+      );
+  void leftComplex<O, T>(
+    Parser<O> operator, {
+    @required T Function(T, O, T) mapper,
+  }) =>
+      group().left<O, T>(
+        operator,
+        (left, operator, right) => mapper(left, operator, right),
       );
 
   void leftExpression(Parser<OperatorToken> operator) {
