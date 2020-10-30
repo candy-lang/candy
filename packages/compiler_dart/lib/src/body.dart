@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 import 'package:strings/strings.dart' as strings;
@@ -169,8 +167,10 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         if ((id.isProperty || id.isFunction) && id.parent.isNotModule) {
           lowered = compileTypeName(context, id.parent).property(name);
         } else {
+          var name = id.simplePath.last.nameOrNull;
+          if (name == 'assert') name = 'assert_';
           lowered = dart.refer(
-            id.simplePath.last.nameOrNull,
+            name,
             declarationIdToImportUrl(context, id.parent),
           );
         }

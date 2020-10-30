@@ -1,0 +1,4 @@
+fun main() {
+  assert(true, "Test 1")
+  assert(false || true, "Test 2")
+}
