@@ -380,7 +380,16 @@ final getClassTraitImplId =
           implIds.first.resourceId,
           getImplDeclarationAst(context, implIds.first).representativeSpan,
         ),
-        // TODO(JonasWanke): output other impl locations
+        relatedInformation: [
+          for (final implId in implIds)
+            ErrorRelatedInformation(
+              location: ErrorLocation(
+                implIds.first.resourceId,
+                getImplDeclarationAst(context, implId).representativeSpan,
+              ),
+              message: 'An impl is here.',
+            ),
+        ],
       );
     }
 
