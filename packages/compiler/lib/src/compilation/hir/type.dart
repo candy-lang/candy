@@ -69,10 +69,27 @@ abstract class CandyType with _$CandyType {
       ModuleId(PackageId.core, ['collections', 'list', 'array', 'Array']);
 
   // operators
-  static final equals =
-      CandyType.user(ModuleId.coreOperatorsEquality, 'Equals');
+  // operators.arithmetic
+  static final add = CandyType.user(ModuleId.coreOperatorsArithmetic, 'Add');
+  static final subtract =
+      CandyType.user(ModuleId.coreOperatorsArithmetic, 'Subtract');
+  static final negate =
+      CandyType.user(ModuleId.coreOperatorsArithmetic, 'Negate');
+  static final multiply =
+      CandyType.user(ModuleId.coreOperatorsArithmetic, 'Multiply');
+  static final divide =
+      CandyType.user(ModuleId.coreOperatorsArithmetic, 'Divide');
+  static final divideTruncating =
+      CandyType.user(ModuleId.coreOperatorsArithmetic, 'DivideTruncating');
+  static final modulo =
+      CandyType.user(ModuleId.coreOperatorsArithmetic, 'Modulo');
+  // operators.comparison
   static final comparable =
       CandyType.user(ModuleId.coreOperatorsComparison, 'Comparable');
+  // operators.equality
+  static final equals =
+      CandyType.user(ModuleId.coreOperatorsEquality, 'Equals');
+  // operators.logical
   static const and = CandyType.user(ModuleId.coreOperatorsLogical, 'And');
   static const or = CandyType.user(ModuleId.coreOperatorsLogical, 'Or');
   static const opposite =

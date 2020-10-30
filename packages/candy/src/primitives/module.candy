@@ -14,14 +14,18 @@ public builtin class Never
 public builtin class Bool
 builtin impl Bool: Equals & And & Or & Opposite & Implies
 
-// public builtin trait Number: AddOperator<This, This> & SubtractOperator<This, This>
+public builtin trait Number
 
 public builtin class Int
+builtin impl Int: Number
 builtin impl Int: Equals & Comparable
+builtin impl Int: Add & Subtract & Negate & Multiply & Divide & DivideTruncating & Modulo
 // builtin impl Int: Number
 
 public builtin class Float
+builtin impl Float: Number
 builtin impl Float: Equals & Comparable
+builtin impl Float: Add & Subtract & Negate & Multiply & Divide & DivideTruncating & Modulo
 // builtin impl Float: Number
 
 public builtin class String

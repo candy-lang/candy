@@ -1,0 +1,44 @@
+use ...primitives
+
+// trait BinaryPlus<Other, Result> {
+//   fun plus(other: Other): Result
+// }
+trait Add {
+  fun add(other: This): This
+}
+// impl<Other, Result> Add<Other, Result>: BinaryPlus<Other, Result> {
+//   fun plus(other: Other): Result { add(other) }
+// }
+
+// trait BinaryMinus<Other, Result> {
+//   fun minus(other: Other): Result
+// }
+trait Subtract {
+  fun subtract(other: This): This
+}
+// impl<Other, Result> Subtract<Other, Result>: BinaryMinus<Other, Result> {
+//   fun minus(other: Other): Result { subtract(other) }
+// }
+
+// trait PrefixMinus<Result> {
+//   fun prefixMinus(): Result
+// }
+trait Negate {
+  fun negate(): This
+}
+// impl<Result> ArithmeticNegate<Result>: PrefixMinus<Result> {
+//   fun prefixMinus(): Result { negate() }
+// }
+
+trait Multiply {
+  fun multiply(other: This): This
+}
+trait Divide {
+  fun divide(other: This): Float
+}
+trait DivideTruncating {
+  fun divideTruncating(other: This): Int
+}
+trait Modulo {
+  fun modulo(other: This): This
+}
