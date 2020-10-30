@@ -17,6 +17,7 @@ abstract class Declaration implements _$Declaration {
 
   const factory Declaration.trait(
     String name, {
+    @required UserCandyType thisType,
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
     @required List<UserCandyType> upperBounds,
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
@@ -32,6 +33,7 @@ abstract class Declaration implements _$Declaration {
   // ignore: non_constant_identifier_names
   const factory Declaration.class_({
     @required String name,
+    @required UserCandyType thisType,
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
   }) = ClassDeclaration;

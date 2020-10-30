@@ -42,6 +42,11 @@ final Query<Tuple2<DeclarationId, ast.Type>, hir.CandyType> astTypeToHirType =
         types.map(map).toList();
 
     if (type is ast.UserType) {
+      if (type.simpleTypes.length == 1 &&
+          type.simpleTypes.single.name.name == 'This') {
+        return hir.CandyType.this_();
+      }
+
       final result = resolveAstUserType(context, Tuple2(declarationId, type));
       if (result is! hir.UserCandyType) return result;
 
@@ -99,12 +104,6 @@ final resolveAstUserType = Query<Tuple2<DeclarationId, ast.UserType>,
     final declarationId = inputs.first;
     final type = inputs.second;
 
-    if (type.simpleTypes.length > 1) {
-      throw CompilerError.unsupportedFeature(
-        'Nested types are not yet supported.',
-      );
-    }
-
     // Step 1: Look for traits/classes in outer modules in the same file.
     final localResult = _resolveAstUserTypeInFile(context, declarationId, type);
     if (localResult.isSome) return localResult.value;
@@ -112,19 +111,21 @@ final resolveAstUserType = Query<Tuple2<DeclarationId, ast.UserType>,
     // Step 2: Search use-lines.
     final resourceId = declarationId.resourceId;
     final simpleType = type.simpleTypes.first.name;
-    final importedModules = findModuleInUseLines(
+    final importedModuleResult = findModuleInUseLines(
       context,
       Tuple4(resourceId, simpleType.name, simpleType.span, false),
     );
-    if (importedModules is None) {
+    if (importedModuleResult is None) {
       throw CompilerError.typeNotFound(
         'Type `${simpleType.name}` could not be resolved.',
         location: ErrorLocation(resourceId, type.simpleTypes.first.span),
       );
     }
+    final importedModule = importedModuleResult.value;
+    final moduleId = importedModule
+        .nested(type.simpleTypes.skip(1).map((it) => it.name.name).toList());
 
-    final resultDeclarationId =
-        moduleIdToDeclarationId(context, importedModules.value);
+    final resultDeclarationId = moduleIdToDeclarationId(context, moduleId);
     if (resultDeclarationId.isModule) {
       throw CompilerError.typeNotFound(
         'Type `${simpleType.name}` could not be resolved.',
@@ -133,7 +134,7 @@ final resolveAstUserType = Query<Tuple2<DeclarationId, ast.UserType>,
     }
     assert(resultDeclarationId.isTrait || resultDeclarationId.isClass);
     return hir.CandyType.user(
-      importedModules.value.parent,
+      moduleId.parent,
       resultDeclarationId.simplePath.last.nameOrNull,
     );
   },
@@ -220,15 +221,15 @@ Option<hir.ParameterCandyType> _resolveAstUserTypeInParameters(
       if (classAst.typeParameters != null) {
         astTypeParameters.add(Tuple2(id, classAst.typeParameters));
       }
-    } else if (declarationId.isProperty) {
-      final propertyAst = getPropertyDeclarationAst(context, declarationId);
-      if (!propertyAst.isStatic) addTypeParametersOf(id.parent);
-    } else if (declarationId.isFunction) {
-      final functionAst = getFunctionDeclarationAst(context, declarationId);
+    } else if (id.isProperty) {
+      final propertyAst = getPropertyDeclarationAst(context, id);
+      if (!propertyAst.isStatic && id.hasParent) addTypeParametersOf(id.parent);
+    } else if (id.isFunction) {
+      final functionAst = getFunctionDeclarationAst(context, id);
       if (functionAst.typeParameters != null) {
         astTypeParameters.add(Tuple2(id, functionAst.typeParameters));
       }
-      if (!functionAst.isStatic) addTypeParametersOf(id.parent);
+      if (!functionAst.isStatic && id.hasParent) addTypeParametersOf(id.parent);
     }
   }
 

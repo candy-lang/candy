@@ -19,7 +19,12 @@ final compileConstructor = Query<DeclarationId, List<dart.Constructor>>(
           (declarationId.parent.simplePath.last as ClassDeclarationPathData)
               .name;
       return [
-        _compileWithDefaultsPublic(context, className, parameters),
+        _compileWithDefaultsPublic(
+          context,
+          declarationId,
+          className,
+          parameters,
+        ),
         _compileWithDefaultsPrivate(parameters),
       ];
     }
@@ -41,6 +46,7 @@ dart.Constructor _compileWithoutDefaults(List<ValueParameter> parameters) {
 
 dart.Constructor _compileWithDefaultsPublic(
   QueryContext context,
+  DeclarationId declarationId,
   String className,
   List<ValueParameter> parameters,
 ) {
@@ -53,7 +59,10 @@ dart.Constructor _compileWithDefaultsPublic(
       if (parameter.defaultValue == null) {
         b.addExpression(_nonNullAssert(paramRefer));
       } else {
-        final defaultValue = compileExpression(context, parameter.defaultValue);
+        final defaultValue = compileExpression(
+          context,
+          Tuple2(declarationId, parameter.defaultValue),
+        );
         b.addExpression(paramRefer.assignNullAware(defaultValue));
       }
     }

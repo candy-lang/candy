@@ -13,8 +13,13 @@ final compileBuiltin = Query<DeclarationId, Option<dart.Spec>>(
 
 abstract class BuiltinCompiler<Output> {
   Option<Output> compile(QueryContext context, DeclarationId declarationId) {
+    if (declarationId.isImpl) return None();
+
     final moduleId = declarationIdToModuleId(context, declarationId);
-    if (moduleId == ModuleId.corePrimitives.nested(['Any'])) {
+    if (moduleId ==
+        ModuleId.coreCollections.nested(['list', 'array', 'Array'])) {
+      return compileArray();
+    } else if (moduleId == ModuleId.corePrimitives.nested(['Any'])) {
       return compileAny();
     } else if (moduleId == ModuleId.corePrimitives.nested(['ToString'])) {
       return compileToString();
@@ -55,6 +60,12 @@ abstract class BuiltinCompiler<Output> {
         .toList();
   }
 
+  // collections
+  // collections.list
+  // collections.list.array
+  Option<Output> compileArray();
+
+  // primitives
   Option<Output> compileAny();
   Option<Output> compileToString();
 
@@ -71,10 +82,17 @@ abstract class BuiltinCompiler<Output> {
 
   Option<Output> compileTuple(int size);
 
+  // stdio
   Option<Output> compilePrint();
 }
 
 class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
+  @override
+  Option<dart.Spec> compileArray() {
+    // `Array<Value>` corresponds to `List<Value>`, hence nothing to do.
+    return Option.none();
+  }
+
   @override
   Option<dart.Spec> compileAny() {
     // `Any` corresponds to `Object`, hence nothing to do.

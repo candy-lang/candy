@@ -1,0 +1,16 @@
+use ...primitives
+
+public trait Iterable<Item> {
+  fun /* let */ iterator(): Iterator<Item>
+
+  fun get(index: Int /* UInt */): Option<Item>
+  // TODO(JonasWanke): let first: Option<Item>
+  // TODO(JonasWanke): let second: Option<Item>
+  // TODO(JonasWanke): let third: Option<Item>
+  // TODO(JonasWanke): let fourth: Option<Item>
+  // TODO(JonasWanke): let fifth: Option<Item>
+}
+
+public trait Iterator<Item> {
+  fun next(): Option<Item>
+}

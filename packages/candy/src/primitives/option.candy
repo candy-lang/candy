@@ -5,5 +5,6 @@ public class Some<Value> {
 }
 impl<Value> Some<Value>: Option<Value>
 
-public class None
-impl<Value> None: Option<Value>
+// TODO(JonasWanke): remove type parameter when multi-impls are supported
+public class None<Value>
+impl<Value> None<Value>: Option<Value>

@@ -1,3 +1,7 @@
+public use .comparison
+public use .equality
+public use .logical
+
 /*
 trait BinaryPlus<Other, Result> {
   fun plus(other: Other): Result

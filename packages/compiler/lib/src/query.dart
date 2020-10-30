@@ -118,6 +118,18 @@ class GlobalQueryContext {
     return result.result != null ? Some(result.result as R) : None();
   }
 
+  final Map<Tuple2<String, dynamic>, dynamic> _results = {};
+  void _reportResult(String queryName, Object key, Object result) {
+    final mapKey = Tuple2(queryName, key);
+    assert(!_results.containsKey(mapKey));
+    _results[mapKey] = result;
+  }
+
+  Option<R> getResult<R>(String queryName, Object key) {
+    final mapKey = Tuple2(queryName, key);
+    return Option.of(_results[mapKey] as R);
+  }
+
   final Map<Tuple2<String, dynamic>, List<ReportedCompilerError>>
       _reportedErrors = {};
   Iterable<ReportedCompilerError> get reportedErrors =>
@@ -129,10 +141,11 @@ class GlobalQueryContext {
     Object key,
     List<ReportedCompilerError> errors,
   ) {
+    final mapKey = Tuple2(queryName, key);
     if (errors.isNotEmpty) {
-      _reportedErrors[Tuple2(queryName, key)] = errors;
+      _reportedErrors[mapKey] = errors;
     } else {
-      _reportedErrors.remove(Tuple2(queryName, key));
+      _reportedErrors.remove(mapKey);
     }
   }
 }
@@ -144,6 +157,9 @@ class QueryContext {
   QueryConfig get config => globalContext.config;
 
   R callQuery<K, R>(Query<K, R> query, K key) {
+    final cachedResult = globalContext.getResult<R>(query.name, key);
+    if (cachedResult is Some) return cachedResult.value;
+
     final result = QueryContext(globalContext)._execute(query, key);
     _innerCalls.add(result);
     if (result.result == null) {
@@ -155,13 +171,22 @@ class QueryContext {
   RecordedQueryCall _execute<K, R>(Query<K, R> query, K key) {
     void reportErrors() =>
         globalContext._reportErrors(query.name, key, _reportedErrors);
-    RecordedQueryCall onErrors(dynamic error) {
-      final errors = error is _QueryFailedException
+    RecordedQueryCall onErrors(
+      dynamic error,
+      StackTrace stackTrace, {
+      bool shouldReport = true,
+    }) {
+      var errors = error is _QueryFailedException
           ? error.recordedCall.thrownErrors
           : error is Iterable<ReportedCompilerError>
               ? error.toList()
               : [error as ReportedCompilerError];
-      this.reportErrors(errors);
+      errors = errors
+          .map((e) => e.error == CompilerError.internalError
+              ? e.copyWith(message: '${e.message}\n\n$stackTrace')
+              : e)
+          .toList();
+      if (shouldReport) this.reportErrors(errors);
       reportErrors();
 
       return RecordedQueryCall(
@@ -174,6 +199,7 @@ class QueryContext {
 
     try {
       final result = query.execute(this, key);
+      globalContext._reportResult(query.name, key, result);
       reportErrors();
       return RecordedQueryCall(
         name: query.name,
@@ -181,14 +207,14 @@ class QueryContext {
         innerCalls: _innerCalls,
         result: result,
       );
-    } on ReportedCompilerError catch (e) {
-      return onErrors(e);
-    } on Iterable<ReportedCompilerError> catch (e) {
-      return onErrors(e);
+    } on ReportedCompilerError catch (e, st) {
+      return onErrors(e, st);
+    } on Iterable<ReportedCompilerError> catch (e, st) {
+      return onErrors(e, st);
+    } on _QueryFailedException catch (e, st) {
+      return onErrors(e, st, shouldReport: false);
     } catch (e, st) {
-      return onErrors(e is _QueryFailedException
-          ? e
-          : CompilerError.internalError('$e\n\n$st'));
+      return onErrors(CompilerError.internalError(e.toString()), st);
     }
   }
 

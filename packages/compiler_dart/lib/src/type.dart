@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 
 import 'constants.dart';
+import 'declarations/declaration.dart';
 import 'declarations/module.dart';
 
 final Query<CandyType, dart.Reference> compileType =
@@ -12,11 +13,7 @@ final Query<CandyType, dart.Reference> compileType =
     dart.Reference compile(CandyType type) => compileType(context, type);
 
     return type.map(
-      this_: (_) {
-        throw CompilerError.unsupportedFeature(
-          'Compiling the `This`-type to Dart is not yet supported.',
-        );
-      },
+      this_: (_) => _createType('dynamic'),
       user: (type) {
         if (type == CandyType.any) return _createType('Object');
         if (type == CandyType.unit) return _createType('void', url: null);
@@ -26,10 +23,24 @@ final Query<CandyType, dart.Reference> compileType =
         if (type == CandyType.int) return _createType('int');
         if (type == CandyType.float) return _createType('double');
         if (type == CandyType.string) return _createType('String');
+        if (type.virtualModuleId == CandyType.arrayModuleId) {
+          assert(type.arguments.length == 1);
+          return _createType(
+            'List',
+            typeArguments: [compileType(context, type.arguments.single)],
+          );
+        }
 
-        return _createDartType(
-          type.name,
-          url: moduleIdToImportUrl(context, type.parentModuleId),
+        final declarationId =
+            moduleIdToDeclarationId(context, type.virtualModuleId);
+        assert(declarationId.isTrait || declarationId.isClass);
+
+        final reference = compileTypeName(context, declarationId);
+        return _createType(
+          reference.symbol,
+          url: reference.url,
+          typeArguments:
+              type.arguments.map((a) => compileType(context, a)).toList(),
         );
       },
       tuple: (type) {

@@ -251,6 +251,22 @@ abstract class IndexExpression extends Expression implements _$IndexExpression {
 }
 
 @freezed
+abstract class IsExpression extends Expression implements _$IsExpression {
+  const factory IsExpression(
+    int id, {
+    @required Expression instance,
+    @required OperatorToken isOperator,
+    @required Type type,
+  }) = _IsExpression;
+  const IsExpression._();
+
+  @override
+  Iterable<SyntacticEntity> get children => [instance, isOperator, type];
+
+  bool get isNegated => isOperator.type == OperatorTokenType.exclamationIs;
+}
+
+@freezed
 abstract class IfExpression extends Expression implements _$IfExpression {
   const factory IfExpression(
     int id, {
