@@ -4,6 +4,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 import 'package:strings/strings.dart' as strings;
 
+import 'declarations/declaration.dart';
 import 'declarations/module.dart';
 import 'type.dart';
 
@@ -166,14 +167,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
         dart.Expression lowered;
         if ((id.isProperty || id.isFunction) && id.parent.isNotModule) {
-          final parentName =
-              id.simplePath.toList()[id.path.length - 2].nameOrNull;
-          lowered = dart
-              .refer(
-                parentName,
-                declarationIdToImportUrl(context, id.parent.parent),
-              )
-              .property(name);
+          lowered = compileTypeName(context, id.parent).property(name);
         } else {
           lowered = dart.refer(
             id.simplePath.last.nameOrNull,

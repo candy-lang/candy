@@ -1,9 +1,7 @@
-import 'dart:io';
-
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
-import 'package:parser/parser.dart';
 import 'package:dartx/dartx.dart';
+import 'package:parser/parser.dart';
 
 import '../body.dart';
 import '../constants.dart';
@@ -12,8 +10,10 @@ import 'constructor.dart';
 import 'declaration.dart';
 import 'function.dart';
 import 'property.dart';
+import 'trait.dart';
 
-final compileClass = Query<DeclarationId, dart.Class>(
+final Query<DeclarationId, List<dart.Class>> compileClass =
+    Query<DeclarationId, List<dart.Class>>(
   'dart.compileClass',
   evaluateAlways: true,
   provider: (context, declarationId) {
@@ -173,19 +173,27 @@ final compileClass = Query<DeclarationId, dart.Class>(
     final methods = classHir.innerDeclarationIds
         .where((id) => id.isFunction)
         .map((id) => compileFunction(context, id));
-    return dart.Class((b) => b
-      ..annotations.add(dart.refer('sealed', packageMetaUrl))
-      ..name = classHir.name
-      ..types.addAll(
-          classHir.typeParameters.map((p) => compileTypeParameter(context, p)))
-      ..implements.addAll(implements)
-      ..constructors.addAll(compileConstructor(
-        context,
-        declarationId.inner(DeclarationPathData.constructor()),
-      ))
-      ..fields.addAll(properties)
-      ..methods.addAll(methods)
-      ..methods.addAll(methodOverrides)
-      ..methods.addAll(methodDelegations));
+    return [
+      dart.Class((b) => b
+        ..annotations.add(dart.refer('sealed', packageMetaUrl))
+        ..name = compileTypeName(context, declarationId).symbol
+        ..types.addAll(classHir.typeParameters
+            .map((p) => compileTypeParameter(context, p)))
+        ..implements.addAll(implements)
+        ..constructors.addAll(compileConstructor(
+          context,
+          declarationId.inner(DeclarationPathData.constructor()),
+        ))
+        ..fields.addAll(properties)
+        ..methods.addAll(methods)
+        ..methods.addAll(methodOverrides)
+        ..methods.addAll(methodDelegations)),
+      for (final classId
+          in classHir.innerDeclarationIds.where((it) => it.isClass))
+        ...compileClass(context, classId),
+      for (final traitId
+          in classHir.innerDeclarationIds.where((it) => it.isTrait))
+        ...compileTrait(context, traitId),
+    ];
   },
 );

@@ -1,14 +1,15 @@
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
+import 'package:compiler_dart/src/constants.dart';
 import 'package:parser/parser.dart';
 
 import '../type.dart';
+import 'class.dart';
 import 'declaration.dart';
 import 'function.dart';
 
-class Foo<T extends List<dynamic>> {}
-
-final compileTrait = Query<DeclarationId, dart.Class>(
+final Query<DeclarationId, List<dart.Class>> compileTrait =
+    Query<DeclarationId, List<dart.Class>>(
   'dart.compileTrait',
   evaluateAlways: true,
   provider: (context, declarationId) {
@@ -21,14 +22,22 @@ final compileTrait = Query<DeclarationId, dart.Class>(
     final methods = traitHir.innerDeclarationIds
         .where((id) => id.isFunction)
         .map((id) => compileFunction(context, id));
-    return dart.Class((b) => b
-      ..abstract = true
-      ..name = traitHir.name
-      ..types.addAll(
-          traitHir.typeParameters.map((p) => compileTypeParameter(context, p)))
-      ..constructors.add(dart.Constructor((b) => b..constant = true))
-      ..methods.addAll(properties)
-      ..methods.addAll(methods));
+    return [
+      dart.Class((b) => b
+        ..abstract = true
+        ..name = compileTypeName(context, declarationId).symbol
+        ..types.addAll(traitHir.typeParameters
+            .map((p) => compileTypeParameter(context, p)))
+        ..constructors.add(dart.Constructor((b) => b..constant = true))
+        ..methods.addAll(properties)
+        ..methods.addAll(methods)),
+      for (final classId
+          in traitHir.innerDeclarationIds.where((it) => it.isClass))
+        ...compileClass(context, classId),
+      for (final traitId
+          in traitHir.innerDeclarationIds.where((it) => it.isTrait))
+        ...compileTrait(context, traitId),
+    ];
   },
 );
 
