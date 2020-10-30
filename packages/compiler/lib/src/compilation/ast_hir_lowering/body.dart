@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
 import 'package:parser/parser.dart' show SourceSpan;
@@ -777,6 +779,7 @@ class FunctionContext extends InnerContext {
     }
 
     if (!returnsUnit) {
+      // TODO(marcelgarus): Bake the return type.
       final lowered = innerExpressionContext(expressionType: Some(returnType))
           .lowerUnambiguous(body.expressions.last);
       if (lowered is Error) {
@@ -1616,6 +1619,7 @@ extension on Context {
     if (targetVariants is Error) return targetVariants;
 
     final results = targetVariants.value.map((target) {
+      // Function call.
       if (target is hir.IdentifierExpression &&
           target.identifier is hir.PropertyIdentifier) {
         final identifier = target.identifier as hir.PropertyIdentifier;
@@ -1624,51 +1628,18 @@ extension on Context {
         }
       }
 
+      // Constructor call.
       if (target is hir.IdentifierExpression &&
           target.identifier is hir.ReflectionIdentifier) {
-        // This is a constructor call.
-
-        // ignore: non_constant_identifier_names
-        final class_ = getClassDeclarationHir(
-            queryContext, (target.identifier as hir.ReflectionIdentifier).id);
-        final fields = class_.innerDeclarationIds
-            .where((id) => id.isProperty)
-            .map((id) => getPropertyDeclarationHir(queryContext, id))
-            .toList();
-
-        if (expression.arguments.length < fields.length) {
-          throw CompilerError.missingArguments(
-            'You passed too few arguments to the constructor call.',
-          );
-        } else if (expression.arguments.length > fields.length) {
-          throw CompilerError.tooManyArguments(
-            'You passed too many arguments to the constructor call.',
-          );
-        }
-
-        final argumentValues = [
-          for (var i = 0; i < fields.length; i++)
-            innerExpressionContext(
-              expressionType: Option.some(fields[i].type),
-            ).lowerUnambiguous(expression.arguments[i].expression)
-        ].merge();
-        if (argumentValues is Error) return argumentValues;
-        final arguments = argumentValues.value;
-
-        return Ok<List<Expression>, List<ReportedCompilerError>>([
-          FunctionCallExpression(
-            getId(expression),
-            target,
-            <String, Expression>{
-              for (var i = 0; i < fields.length; i++)
-                fields[i].name: arguments[i],
-            },
-          )
-        ]);
+        final identifier = target.identifier as hir.ReflectionIdentifier;
+        // TODO: Ensure this is a constructor call.
+        // if (identifier.id.isConstructor) {
+        return lowerConstructorCall(expression, target);
+        // }
       }
 
       throw CompilerError.unsupportedFeature(
-        'Callable expressions are not yet supported.',
+        'Callable expressions are not yet supported (target $target).',
         location: ErrorLocation(resourceId, expression.span),
       );
     });
@@ -1679,6 +1650,7 @@ extension on Context {
     ast.CallExpression expression,
     hir.IdentifierExpression target,
   ) {
+    assert(target != null);
     assert(target.identifier is hir.PropertyIdentifier);
     final identifier = target.identifier as hir.PropertyIdentifier;
 
@@ -1697,10 +1669,27 @@ extension on Context {
       ]);
     }
 
-    if (!isValidExpressionType(functionHir.returnType)) {
+    final typeParameters = functionHir.typeParameters
+        .map((p) => CandyType.parameter(p.name, functionId))
+        .toList();
+    final typeArguments = expression.typeArguments?.arguments
+            ?.map((a) =>
+                astTypeToHirType(queryContext, Tuple2(declarationId, a.type)))
+            ?.toList() ??
+        [];
+    final genericsMap = Map.fromEntries(
+        typeParameters.zip<CandyType, MapEntry<CandyType, CandyType>>(
+            typeArguments, (a, b) => MapEntry(a, b)));
+    stderr.writeln('The generics map is $genericsMap.');
+    stderr.writeln(
+        'Fresh from the oven: ${functionHir.returnType.bakeGenerics(genericsMap)}');
+
+    if (!isValidExpressionType(
+        functionHir.returnType.bakeGenerics(genericsMap))) {
       return Error([
-        CompilerError.invalidExpressionType(
-          'Function has an invalid return type.',
+        CompilerError.internalError(
+          'Function ${functionHir.name} has an invalid return type: ${functionHir.returnType}. '
+          'Expected: $expressionType',
           location: ErrorLocation(resourceId, expression.span),
         ),
       ]);
@@ -1783,7 +1772,9 @@ extension on Context {
       final value = entry.value.expression;
 
       final innerContext = innerExpressionContext(
-        expressionType: Option.some(parametersByName[name].type),
+        expressionType: Option.some(
+          parametersByName[name].type.bakeGenerics(genericsMap),
+        ),
       );
       final lowered = innerContext.lowerUnambiguous(value);
       if (lowered is Error) {
@@ -1799,7 +1790,109 @@ extension on Context {
       hir.Expression.functionCall(
         getId(expression),
         target,
+        expression.typeArguments?.arguments
+                ?.map((argument) => astTypeToHirType(
+                    queryContext, Tuple2(declarationId, argument.type)))
+                ?.toList() ??
+            [],
         hirArgumentMap,
+      ),
+    ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>>
+      lowerConstructorCall(
+    ast.CallExpression expression,
+    hir.IdentifierExpression target,
+  ) {
+    assert(target != null);
+    assert(target.identifier is hir.ReflectionIdentifier,
+        'target.identifier is not a ReflectionIdentifier: ${target.identifier}');
+
+    final classId = (target.identifier as hir.ReflectionIdentifier).id;
+    // ignore: non_constant_identifier_names
+    final class_ = getClassDeclarationHir(queryContext, classId);
+    final constructorId =
+        class_.innerDeclarationIds.singleWhere((id) => id.isConstructor);
+
+    final typeParameters = class_.typeParameters
+        .map((p) => CandyType.parameter(p.name, classId))
+        .toList();
+    final typeArguments = expression.typeArguments?.arguments
+            ?.map((a) =>
+                astTypeToHirType(queryContext, Tuple2(declarationId, a.type)))
+            ?.toList() ??
+        [];
+    final genericsMap = Map.fromEntries(
+        typeParameters.zip<CandyType, MapEntry<CandyType, CandyType>>(
+            typeArguments, (a, b) => MapEntry(a, b)));
+
+    final fields = class_.innerDeclarationIds
+        .where((id) => id.isProperty)
+        .map((id) => getPropertyDeclarationHir(queryContext, id))
+        .where((field) => !field.isStatic)
+        .toList();
+    final valueParameterTypes =
+        fields.map((field) => field.type.bakeGenerics(genericsMap)).toList();
+    final valueArguments = expression.arguments;
+
+    final returnType = class_.thisType.bakeGenerics(genericsMap);
+
+    if (typeParameters.length != (typeArguments?.length ?? 0)) {
+      return Error([
+        CompilerError.wrongNumberOfTypeArguments(
+          'Constructor expected ${typeParameters.length} type parameters, '
+          'but you provided ${typeArguments?.length ?? 0}.',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    }
+
+    if (!isValidExpressionType(returnType)) {
+      return Error([
+        CompilerError.invalidExpressionType(
+          'Constructor has an invalid return type: $returnType. Expected: $expressionType',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    }
+
+    if (valueParameterTypes.length < valueArguments.length) {
+      return Error([
+        CompilerError.tooManyArguments(
+          'Too many constructor arguments.',
+          location: ErrorLocation(resourceId, expression.span),
+        )
+      ]);
+    }
+
+    if (valueParameterTypes.length > valueArguments.length) {
+      return Error([
+        CompilerError.missingArguments(
+          'Too few constructor arguments.',
+          location: ErrorLocation(resourceId, expression.span),
+        )
+      ]);
+    }
+
+    final loweredArguments = [
+      for (var i = 0; i < valueArguments.length; i++)
+        innerExpressionContext(
+          expressionType: Option.some(valueParameterTypes[i]),
+        ).lowerUnambiguous(valueArguments[i].expression),
+    ].merge();
+    if (loweredArguments is Error) return loweredArguments;
+    final arguments = loweredArguments.value;
+
+    return Ok([
+      hir.Expression.functionCall(
+        getId(expression),
+        target,
+        typeArguments,
+        {
+          for (var i = 0; i < arguments.length; i++)
+            fields[i].name: arguments[i],
+        },
       ),
     ]);
   }
