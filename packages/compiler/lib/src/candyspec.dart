@@ -63,6 +63,8 @@ final getAllDependencies = Query<Unit, List<PackageId>>(
     final candyspec = getCandyspec(context, context.config.packageId);
     return candyspec.dependencies.keys
         .map((name) => PackageId(name))
-        .followedBy([PackageId.core]).toList();
+        .followedBy([
+      if (context.config.packageId != PackageId.core) PackageId.core,
+    ]).toList();
   },
 );
