@@ -1,4 +1,4 @@
-public use .comparison
+// public use .comparison
 public use .equality
 public use .logical
 
