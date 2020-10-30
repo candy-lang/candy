@@ -1,3 +1,4 @@
+import 'package:compiler/src/compilation/hir.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../errors.dart';
@@ -108,6 +109,30 @@ abstract class CandyType with _$CandyType {
       intersection: (type) => type.copyWith(
           types: type.types.map((t) => t.bakeThisType(thisType)).toList()),
       parameter: (type) => type,
+      reflection: (type) => type,
+    );
+  }
+
+  CandyType bakeGenerics(Map<CandyType, CandyType> types) {
+    if (types.isEmpty) return this;
+
+    return map(
+      user: (type) => type.copyWith(
+          arguments: type.arguments.map((a) => a.bakeGenerics(types)).toList()),
+      this_: (type) => type,
+      tuple: (type) => type.copyWith(
+          items: type.items.map((i) => i.bakeGenerics(types)).toList()),
+      function: (type) => type.copyWith(
+        receiverType: type.receiverType.bakeGenerics(types),
+        parameterTypes:
+            type.parameterTypes.map((p) => p.bakeGenerics(types)).toList(),
+        returnType: type.returnType.bakeGenerics(types),
+      ),
+      union: (type) => type.copyWith(
+          types: type.types.map((t) => t.bakeGenerics(types)).toList()),
+      intersection: (type) => type.copyWith(
+          types: type.types.map((t) => t.bakeGenerics(types)).toList()),
+      parameter: (type) => types[type] ?? type,
       reflection: (type) => type,
     );
   }
