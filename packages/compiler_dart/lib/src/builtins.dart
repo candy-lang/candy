@@ -16,7 +16,11 @@ abstract class BuiltinCompiler<Output> {
     if (declarationId.isImpl) return None();
 
     final moduleId = declarationIdToModuleId(context, declarationId);
-    if (moduleId ==
+    final name = declarationId.simplePath.last.nameOrNull;
+
+    if (moduleId == ModuleId.coreAssert) {
+      if (name == 'assert') return compileAssert();
+    } else if (moduleId ==
         ModuleId.coreCollections.nested(['list', 'array', 'Array'])) {
       return compileArray();
     } else if (moduleId == ModuleId.corePrimitives.nested(['Any'])) {
@@ -38,11 +42,7 @@ abstract class BuiltinCompiler<Output> {
     } else if (moduleId == ModuleId.corePrimitives.nested(['String'])) {
       return compileString();
     } else if (moduleId == ModuleId.coreStdio) {
-      final equ = DeepCollectionEquality();
-      final path = declarationId.simplePath;
-      if (equ.equals(path, [DeclarationPathData.function('print')])) {
-        return compilePrint();
-      }
+      if (name == 'print') return compilePrint();
     }
 
     final declaration = getDeclarationAst(context, declarationId);
@@ -59,6 +59,9 @@ abstract class BuiltinCompiler<Output> {
         .mapNotNull((output) => output.valueOrNull)
         .toList();
   }
+
+  // assert
+  Option<Output> compileAssert();
 
   // collections
   // collections.list
@@ -87,6 +90,26 @@ abstract class BuiltinCompiler<Output> {
 }
 
 class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
+  @override
+  Option<dart.Spec> compileAssert() {
+    return Option.some(dart.Method.returnsVoid((b) => b
+      ..name = 'assert_'
+      ..requiredParameters.add(dart.Parameter((b) => b
+        ..name = 'condition'
+        ..type = dart.refer('bool', dartCoreUrl)))
+      ..requiredParameters.add(dart.Parameter((b) => b
+        ..name = 'message'
+        ..type = dart.refer('String', dartCoreUrl)))
+      ..body = dart.Block(
+        (b) => b.addExpression(dart.InvokeExpression.newOf(
+          dart.refer('assert'),
+          [dart.refer('condition'), dart.refer('message')],
+          {},
+          [],
+        )),
+      )));
+  }
+
   @override
   Option<dart.Spec> compileArray() {
     // `Array<Value>` corresponds to `List<Value>`, hence nothing to do.
