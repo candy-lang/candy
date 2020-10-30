@@ -61,7 +61,7 @@ public class ArrayList<Item> {
     /// Creates a new, empty `ArrayList` with the given capacity.
 
     ArrayList<Item>(
-      Array.fill<Option<Item>>(capacity, None()),
+      Array.fill<Option<Item>>(capacity, None<Item>()),
       0,
     )
   }
