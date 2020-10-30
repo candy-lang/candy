@@ -11,7 +11,6 @@ import '../../query.dart';
 import '../../utils.dart';
 import '../ast.dart';
 import '../hir.dart' as hir;
-import '../hir.dart';
 import '../hir/ids.dart';
 import '../ids.dart';
 import 'declarations/class.dart';
@@ -46,7 +45,8 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   final DeclarationLocalId id;
 
   @override
-  Option<hir.Expression> visitIdentifierExpression(IdentifierExpression node) {
+  Option<hir.Expression> visitIdentifierExpression(
+      hir.IdentifierExpression node) {
     if (node.id == id) return Some(node);
     if (node.identifier is hir.ReflectionIdentifier) {
       final base = (node.identifier as hir.ReflectionIdentifier).base;
@@ -61,7 +61,7 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<hir.Expression> visitLiteralExpression(LiteralExpression node) {
+  Option<hir.Expression> visitLiteralExpression(hir.LiteralExpression node) {
     if (node.id == id) return Some(node);
     if (node.literal is hir.StringLiteral) {
       final literal = node.literal as hir.StringLiteral;
@@ -83,19 +83,20 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<Expression> visitPropertyExpression(PropertyExpression node) {
+  Option<hir.Expression> visitPropertyExpression(hir.PropertyExpression node) {
     if (node.id == id) return Some(node);
     return node.initializer.accept(this);
   }
 
   @override
-  Option<hir.Expression> visitNavigationExpression(NavigationExpression node) {
+  Option<hir.Expression> visitNavigationExpression(
+      hir.NavigationExpression node) {
     if (node.id == id) return Some(node);
     return node.target.accept(this);
   }
 
   @override
-  Option<hir.Expression> visitCallExpression(CallExpression node) {
+  Option<hir.Expression> visitCallExpression(hir.CallExpression node) {
     if (node.id == id) return Some(node);
     for (final argument in node.valueArguments) {
       final result = argument.accept(this);
@@ -106,7 +107,7 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
 
   @override
   Option<hir.Expression> visitFunctionCallExpression(
-    FunctionCallExpression node,
+    hir.FunctionCallExpression node,
   ) {
     if (node.id == id) return Some(node);
     for (final argument in node.valueArguments.values) {
@@ -118,7 +119,7 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
 
   @override
   Option<hir.Expression> visitConstructorCallExpression(
-    ConstructorCallExpression node,
+    hir.ConstructorCallExpression node,
   ) {
     if (node.id == id) return Some(node);
     for (final argument in node.valueArguments.values) {
@@ -129,14 +130,14 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<hir.Expression> visitReturnExpression(ReturnExpression node) {
+  Option<hir.Expression> visitReturnExpression(hir.ReturnExpression node) {
     if (node.id == id) return Some(node);
     if (node.expression != null) return node.expression.accept(this);
     return None();
   }
 
   @override
-  Option<hir.Expression> visitIfExpression(IfExpression node) {
+  Option<hir.Expression> visitIfExpression(hir.IfExpression node) {
     if (node.id == id) return Some(node);
     final result = node.condition.accept(this);
     if (result is Some) return result;
@@ -152,7 +153,7 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<hir.Expression> visitLoopExpression(LoopExpression node) {
+  Option<hir.Expression> visitLoopExpression(hir.LoopExpression node) {
     if (node.id == id) return Some(node);
     for (final expression in node.body) {
       final result = expression.accept(this);
@@ -162,7 +163,7 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<hir.Expression> visitWhileExpression(WhileExpression node) {
+  Option<hir.Expression> visitWhileExpression(hir.WhileExpression node) {
     if (node.id == id) return Some(node);
     final result = node.condition.accept(this);
     if (result is Some) return result;
@@ -174,25 +175,26 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<hir.Expression> visitBreakExpression(BreakExpression node) {
+  Option<hir.Expression> visitBreakExpression(hir.BreakExpression node) {
     if (node.id == id) return Some(node);
     if (node.expression != null) return node.expression.accept(this);
     return None();
   }
 
   @override
-  Option<hir.Expression> visitContinueExpression(ContinueExpression node) {
+  Option<hir.Expression> visitContinueExpression(hir.ContinueExpression node) {
     return node.accept(this);
   }
 
   @override
-  Option<hir.Expression> visitThrowExpression(ThrowExpression node) {
+  Option<hir.Expression> visitThrowExpression(hir.ThrowExpression node) {
     if (node.id == id) return Some(node);
     return node.error.accept(this);
   }
 
   @override
-  Option<hir.Expression> visitAssignmentExpression(AssignmentExpression node) {
+  Option<hir.Expression> visitAssignmentExpression(
+      hir.AssignmentExpression node) {
     if (node.id == id) return Some(node);
     final result = node.left.accept(this);
     if (result is Some) return result;
@@ -200,7 +202,7 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<hir.Expression> visitIsExpression(IsExpression node) {
+  Option<hir.Expression> visitIsExpression(hir.IsExpression node) {
     if (node.id == id) return Some(node);
     return node.instance.accept(this);
   }
@@ -262,7 +264,7 @@ abstract class Context {
   Option<hir.CandyType> get expressionType;
   bool isValidExpressionType(hir.CandyType type) {
     return expressionType.when(
-      some: (expressionType) => isAssignableTo(
+      some: (expressionType) => hir.isAssignableTo(
         queryContext,
         Tuple2(
           type.bakeThisType(thisType.valueOrNull),
@@ -571,13 +573,13 @@ class ContextContext extends Context {
         stderr.writeln('class = $class_');
 
         final typeParameters = class_.typeParameters
-            .map((p) => CandyType.parameter(p.name, classId))
+            .map((p) => hir.CandyType.parameter(p.name, classId))
             .toList();
         final typeArguments = impl.typeParameters
-            .map((it) => CandyType.parameter(it.name, declarationId.parent))
+            .map((it) => hir.CandyType.parameter(it.name, declarationId.parent))
             .toList();
-        final genericsMap = Map.fromEntries(
-            typeParameters.zip<CandyType, MapEntry<CandyType, CandyType>>(
+        final genericsMap = Map.fromEntries(typeParameters
+            .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
                 typeArguments, (a, b) => MapEntry(a, b)));
         stderr.writeln('genericsMap = $genericsMap');
         stderr.writeln('Baked type: ${type.bakeGenerics(genericsMap)}');
@@ -747,12 +749,12 @@ class ContextContext extends Context {
   }
 
   @override
-  Option<Tuple2<DeclarationLocalId, Option<CandyType>>> resolveReturn(
+  Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveReturn(
     Option<String> label,
   ) =>
       None();
   @override
-  Option<Tuple2<DeclarationLocalId, Option<CandyType>>> resolveBreak(
+  Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveBreak(
     Option<String> label,
   ) =>
       None();
@@ -829,7 +831,7 @@ class FunctionContext extends InnerContext {
   }
 
   @override
-  List<Identifier> resolveIdentifier(String name) {
+  List<hir.Identifier> resolveIdentifier(String name) {
     final result = _identifiers[name];
     if (result != null) return [result];
     return parent.value.resolveIdentifier(name);
@@ -928,7 +930,7 @@ class PropertyContext extends InnerContext {
   final ast.Expression initializer;
 
   @override
-  void addIdentifier(LocalPropertyIdentifier identifier) {}
+  void addIdentifier(hir.LocalPropertyIdentifier identifier) {}
 
   Result<Tuple2<hir.Expression, BodyAstToHirIds>, List<ReportedCompilerError>>
       _lowerInitializer() {
@@ -960,7 +962,7 @@ class LambdaContext extends InnerContext {
   }
 
   @override
-  List<Identifier> resolveIdentifier(String name) {
+  List<hir.Identifier> resolveIdentifier(String name) {
     final result = _identifiers[name];
     if (result != null) return [result];
     return parent.value.resolveIdentifier(name);
@@ -980,11 +982,11 @@ class LambdaContext extends InnerContext {
   }
 }
 
-class ReturnExpressionVisitor extends DoNothingExpressionVisitor {
+class ReturnExpressionVisitor extends hir.DoNothingExpressionVisitor {
   final returnTypes = <hir.CandyType>{};
 
   @override
-  void visitReturnExpression(ReturnExpression node) {
+  void visitReturnExpression(hir.ReturnExpression node) {
     returnTypes.add(node.expression.type);
   }
 }
@@ -1004,7 +1006,7 @@ class ExpressionContext extends InnerContext {
   final bool forwardsIdentifiers;
 
   @override
-  void addIdentifier(LocalPropertyIdentifier identifier) {
+  void addIdentifier(hir.LocalPropertyIdentifier identifier) {
     if (!forwardsIdentifiers) return;
 
     parent.value.addIdentifier(identifier);
@@ -1030,7 +1032,7 @@ class IfContext extends InnerContext {
   }
 
   @override
-  List<Identifier> resolveIdentifier(String name) {
+  List<hir.Identifier> resolveIdentifier(String name) {
     final result = _identifiers[name];
     if (result != null) return [result];
     return parent.value.resolveIdentifier(name);
@@ -1068,7 +1070,7 @@ class LoopContext extends InnerContext {
   }
 
   @override
-  List<Identifier> resolveIdentifier(String name) {
+  List<hir.Identifier> resolveIdentifier(String name) {
     final result = _identifiers[name];
     if (result != null) return [result];
     return parent.value.resolveIdentifier(name);
@@ -1087,11 +1089,11 @@ class LoopContext extends InnerContext {
   }
 }
 
-class BreakExpressionVisitor extends DoNothingExpressionVisitor {
+class BreakExpressionVisitor extends hir.DoNothingExpressionVisitor {
   final breakTypes = <hir.CandyType>{};
 
   @override
-  void visitBreakExpression(BreakExpression node) {
+  void visitBreakExpression(hir.BreakExpression node) {
     breakTypes.add(node.expression?.type ?? hir.CandyType.unit);
   }
 }
@@ -1204,7 +1206,8 @@ extension on Context {
             );
 
             // TODO(JonasWanke): resolve correct `This`-type
-            if (!isAssignableTo(queryContext, Tuple2(typeParameter, hirType))) {
+            if (!hir.isAssignableTo(
+                queryContext, Tuple2(typeParameter, hirType))) {
               errors.add(CompilerError.invalidExpressionType(
                 'Declared type `$hirType` is not assignable to expected type `${declaredParameter.type}`.',
                 location:
@@ -1333,7 +1336,7 @@ extension on Context {
     ast.IfExpression theIf,
   ) {
     final loweredCondition =
-        innerExpressionContext(expressionType: Some(CandyType.bool))
+        innerExpressionContext(expressionType: Some(hir.CandyType.bool))
             .lowerUnambiguous(theIf.condition);
     if (loweredCondition is Error) return Error(loweredCondition.error);
     final condition = loweredCondition.value;
@@ -1347,7 +1350,7 @@ extension on Context {
     if (loweredThenBody is Error) return loweredThenBody;
     final thenBody = loweredThenBody.value;
 
-    final elseBody = <Expression>[];
+    final elseBody = <hir.Expression>[];
     if (theIf.elseKeyword != null) {
       assert(theIf.elseBody != null);
       final elseContext = IfContext(this, getId(theIf), None());
@@ -1401,7 +1404,7 @@ extension on Context {
     final loopContext = LoopContext(this, getId(whileLoop), None());
 
     final loweredCondition = loopContext
-        .innerExpressionContext(expressionType: Some(CandyType.bool))
+        .innerExpressionContext(expressionType: Some(hir.CandyType.bool))
         .lowerUnambiguous(whileLoop.condition);
     if (loweredCondition is Error) return loweredCondition.mapValue((e) => [e]);
     final condition = loweredCondition.value;
@@ -1416,7 +1419,8 @@ extension on Context {
 
     // TODO(marcelgarus): Implement while-else constructs that can also evaluate to something other than unit.
     return Ok([
-      hir.WhileExpression(getId(whileLoop), condition, body, CandyType.unit),
+      hir.WhileExpression(
+          getId(whileLoop), condition, body, hir.CandyType.unit),
     ]);
   }
 
@@ -1540,9 +1544,9 @@ extension on Context {
           return Ok(matches.toList());
         },
         this_: (_) {
-          final type =
-              getPropertyDeclarationParentAsType(queryContext, declarationId)
-                  .value;
+          final type = hir
+              .getPropertyDeclarationParentAsType(queryContext, declarationId)
+              .value;
           final matches = getMatchesForType(type)
               .map((m) => hir.IdentifierExpression(getId(expression), m));
           if (matches.isEmpty) {
@@ -1647,7 +1651,8 @@ extension on Context {
               .toList();
           return Ok(finalMatches);
         },
-        parameter: (type) => lower(getTypeParameterBound(queryContext, type)),
+        parameter: (type) =>
+            lower(hir.getTypeParameterBound(queryContext, type)),
         reflection: (targetType) {
           final targetId = targetType.declarationId;
           // Only `IdentifierExpression`s containing a `ReflectionIdentifier` can
@@ -1759,15 +1764,15 @@ extension on Context {
     }
 
     final typeParameters = functionHir.typeParameters
-        .map((p) => CandyType.parameter(p.name, functionId))
+        .map((p) => hir.CandyType.parameter(p.name, functionId))
         .toList();
     final typeArguments = expression.typeArguments?.arguments
             ?.map((a) =>
                 astTypeToHirType(queryContext, Tuple2(declarationId, a.type)))
             ?.toList() ??
         [];
-    final genericsMap = Map.fromEntries(
-        typeParameters.zip<CandyType, MapEntry<CandyType, CandyType>>(
+    final genericsMap = Map.fromEntries(typeParameters
+        .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
             typeArguments, (a, b) => MapEntry(a, b)));
     functionHir = functionHir.copyWith(
       valueParameters: functionHir.valueParameters
@@ -1908,15 +1913,15 @@ extension on Context {
         class_.innerDeclarationIds.singleWhere((id) => id.isConstructor);
 
     final typeParameters = class_.typeParameters
-        .map((p) => CandyType.parameter(p.name, classId))
+        .map((p) => hir.CandyType.parameter(p.name, classId))
         .toList();
     final typeArguments = expression.typeArguments?.arguments
             ?.map((a) =>
                 astTypeToHirType(queryContext, Tuple2(declarationId, a.type)))
             ?.toList() ??
         [];
-    final genericsMap = Map.fromEntries(
-        typeParameters.zip<CandyType, MapEntry<CandyType, CandyType>>(
+    final genericsMap = Map.fromEntries(typeParameters
+        .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
             typeArguments, (a, b) => MapEntry(a, b)));
 
     final fields = class_.innerDeclarationIds
@@ -2317,13 +2322,13 @@ extension on Context {
     final leftExpression = lowerUnambiguous(expression.leftOperand);
     if (leftExpression is Error) return Error(leftExpression.error);
     final leftSome = leftExpression.value;
-    if (leftSome is! IdentifierExpression) {
+    if (leftSome is! hir.IdentifierExpression) {
       return Error([
         CompilerError.invalidExpressionType("Can't assign to this expression: "
             '${leftSome.runtimeType} ($leftSome)'),
       ]);
     }
-    final left = leftSome as IdentifierExpression;
+    final left = leftSome as hir.IdentifierExpression;
     if (left.identifier is! hir.PropertyIdentifier &&
         left.identifier is! hir.LocalPropertyIdentifier) {
       return Error([
