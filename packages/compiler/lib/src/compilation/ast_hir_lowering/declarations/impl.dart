@@ -1,3 +1,4 @@
+import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart' as ast;
 
 import '../../../candyspec.dart';
@@ -6,7 +7,9 @@ import '../../../query.dart';
 import '../../../utils.dart';
 import '../../hir.dart' as hir;
 import '../../hir/ids.dart';
+import '../../ids.dart';
 import '../type.dart';
+import 'class.dart';
 import 'declarations.dart';
 import 'module.dart';
 import 'trait.dart';
@@ -22,7 +25,7 @@ final getImplDeclarationAst = Query<DeclarationId, ast.ImplDeclaration>(
   provider: (context, declarationId) {
     assert(declarationId.isImpl);
 
-    final declaration = context.callQuery(getDeclarationAst, declarationId);
+    final declaration = getDeclarationAst(context, declarationId);
     assert(declaration is ast.ImplDeclaration, 'Wrong return type.');
     return declaration as ast.ImplDeclaration;
   },
@@ -30,7 +33,15 @@ final getImplDeclarationAst = Query<DeclarationId, ast.ImplDeclaration>(
 final getImplDeclarationHir = Query<DeclarationId, hir.ImplDeclaration>(
   'getImplDeclarationHir',
   provider: (context, declarationId) {
-    final implAst = context.callQuery(getImplDeclarationAst, declarationId);
+    if (!doesDeclarationExist(context, declarationId)) {
+      final classId = declarationId.parent;
+      assert(classId.isClass);
+      final classHir = getClassDeclarationHir(context, classId);
+
+      final index = declarationId.path.last.disambiguator;
+      return classHir.syntheticImpls[index].implHir;
+    }
+    final implAst = getImplDeclarationAst(context, declarationId);
 
     // ignore: can_be_null_after_null_aware
     final typeParameters = implAst.typeParameters?.parameters.orEmpty
@@ -61,15 +72,19 @@ final getImplDeclarationHir = Query<DeclarationId, hir.ImplDeclaration>(
 final getAllImplsForType = Query<hir.CandyType, List<DeclarationId>>(
   'getAllImplsForType',
   provider: (context, type) {
-    return getAllDependencies(context, Unit())
-        .followedBy([context.config.packageId])
-        .expand((packageId) => context.config.resourceProvider
-            .getAllFileResourceIds(context, packageId))
-        .where((resourceId) => resourceId.isCandySourceFile)
-        .expand((resourceId) =>
-            _getImplDeclarationIds(context, DeclarationId(resourceId)))
+    final impls = getAllImpl(context, Unit())
         .where((id) => getImplDeclarationHir(context, id).type == type)
         .toList();
+
+    if (type is hir.UserCandyType) {
+      final declarationId =
+          moduleIdToDeclarationId(context, type.virtualModuleId);
+      if (declarationId.isClass) {
+        impls.addAll(getSyntheticImplIdsForClass(context, declarationId));
+      }
+    }
+
+    return impls;
   },
 );
 
@@ -90,18 +105,43 @@ Iterable<DeclarationId> _getImplDeclarationIds(
 final getAllImplsForTraitOrClass = Query<DeclarationId, List<DeclarationId>>(
   'getAllImplsForTraitOrClass',
   provider: (context, declarationId) {
+    final impls = getAllImpl(context, Unit()).where((id) {
+      final moduleId = getImplDeclarationHir(context, id).type.virtualModuleId;
+      return moduleIdToDeclarationId(context, moduleId) == declarationId;
+    }).toList();
+
+    if (declarationId.isClass) {
+      impls.addAll(getSyntheticImplIdsForClass(context, declarationId));
+    }
+
+    return impls;
+  },
+);
+
+final getAllImpl = Query<Unit, List<DeclarationId>>(
+  'getAllImpl',
+  provider: (context, declarationId) {
     return getAllDependencies(context, Unit())
-        .followedBy([context.config.packageId])
+        .followedBy([
+          PackageId.core,
+          if (context.config.packageId != PackageId.core)
+            context.config.packageId,
+        ])
         .expand((packageId) => context.config.resourceProvider
             .getAllFileResourceIds(context, packageId))
         .where((resourceId) => resourceId.isCandySourceFile)
         .expand((resourceId) =>
             _getImplDeclarationIds(context, DeclarationId(resourceId)))
-        .where((id) {
-          final moduleId =
-              getImplDeclarationHir(context, id).type.virtualModuleId;
-          return moduleIdToDeclarationId(context, moduleId) == declarationId;
-        })
+        .toList();
+  },
+);
+final getSyntheticImplIdsForClass = Query<DeclarationId, List<DeclarationId>>(
+  'getSyntheticImplIdsForClass',
+  provider: (context, classId) {
+    assert(classId.isClass);
+    final classHir = getClassDeclarationHir(context, classId);
+    return classHir.syntheticImpls.indices
+        .map((it) => classId.inner(DeclarationPathData.impl('synthetic'), it))
         .toList();
   },
 );

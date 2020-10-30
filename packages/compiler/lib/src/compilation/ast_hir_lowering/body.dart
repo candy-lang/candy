@@ -208,6 +208,11 @@ final Query<DeclarationId,
     Query<DeclarationId, Option<Tuple2<List<hir.Expression>, BodyAstToHirIds>>>(
   'lowerBodyAstToHir',
   provider: (context, declarationId) {
+    if (!doesDeclarationExist(context, declarationId)) {
+      final body = getSyntheticMethod(context, declarationId).second;
+      return Some(Tuple2(body, BodyAstToHirIds()));
+    }
+
     if (declarationId.isFunction) {
       final functionAst = getFunctionDeclarationAst(context, declarationId);
       if (functionAst.body == null) return None();
