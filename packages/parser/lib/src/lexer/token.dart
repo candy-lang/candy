@@ -54,6 +54,9 @@ abstract class KeywordToken extends Token with _$KeywordToken {
   // ignore: non_constant_identifier_names
   const factory KeywordToken.continue_({@required SourceSpan span}) =
       ContinueKeywordToken;
+  // ignore: non_constant_identifier_names
+  const factory KeywordToken.throw_({@required SourceSpan span}) =
+      ThrowKeywordToken;
 }
 
 @freezed

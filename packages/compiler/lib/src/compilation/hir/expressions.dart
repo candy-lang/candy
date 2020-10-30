@@ -77,6 +77,11 @@ abstract class Expression implements _$Expression {
     DeclarationLocalId id,
     DeclarationLocalId scopeId,
   ) = ContinueExpression;
+  // ignore: non_constant_identifier_names
+  const factory Expression.throw_(
+    DeclarationLocalId id,
+    Expression error,
+  ) = ThrowExpression;
   const factory Expression.assignment(
     DeclarationLocalId id,
     IdentifierExpression left,
@@ -110,6 +115,7 @@ abstract class Expression implements _$Expression {
         while_: (_, __, ___, type) => type,
         break_: (_, __, ___) => CandyType.never,
         continue_: (_, __) => CandyType.never,
+        throw_: (_, __) => CandyType.never,
         assignment: (_, __, right) => right.type,
         is_: (_, __, ___, ____) => CandyType.bool,
       );
@@ -127,6 +133,7 @@ abstract class Expression implements _$Expression {
         while_: (e) => visitor.visitWhileExpression(e),
         break_: (e) => visitor.visitBreakExpression(e),
         continue_: (e) => visitor.visitContinueExpression(e),
+        throw_: (e) => visitor.visitThrowExpression(e),
         assignment: (e) => visitor.visitAssignmentExpression(e),
         is_: (e) => visitor.visitIsExpression(e),
       );
@@ -250,6 +257,7 @@ abstract class ExpressionVisitor<T> {
   T visitWhileExpression(WhileExpression node);
   T visitBreakExpression(BreakExpression node);
   T visitContinueExpression(ContinueExpression node);
+  T visitThrowExpression(ThrowExpression node);
   T visitAssignmentExpression(AssignmentExpression node);
   T visitIsExpression(IsExpression node);
 }
@@ -281,6 +289,8 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   void visitBreakExpression(BreakExpression node) {}
   @override
   void visitContinueExpression(ContinueExpression node) {}
+  @override
+  void visitThrowExpression(ThrowExpression node) {}
   @override
   void visitAssignmentExpression(AssignmentExpression node) {}
   @override

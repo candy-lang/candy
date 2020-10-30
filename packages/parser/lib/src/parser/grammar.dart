@@ -698,8 +698,7 @@ class ParserGrammar {
         },
       )
       ..prefix<ReturnKeywordToken, Expression>(
-          (LexerGrammar.RETURN & LexerGrammar.NLs)
-              .map((value) => value.first as ReturnKeywordToken),
+          (LexerGrammar.RETURN & LexerGrammar.NLs).map((value) => value.first as ReturnKeywordToken),
           mapper: (keyword, expression) {
         return ReturnExpression(
           _id++,
@@ -714,6 +713,14 @@ class ParserGrammar {
           _id++,
           breakKeyword: keyword,
           expression: expression,
+        );
+      })
+      ..prefix<ThrowKeywordToken, Expression>(
+          (LexerGrammar.THROW & LexerGrammar.NLs).map((value) => value.first as ThrowKeywordToken), mapper: (keyword, expression) {
+        return ThrowExpression(
+          _id++,
+          throwKeyword: keyword,
+          error: expression,
         );
       })
       ..prefix<List<dynamic>, Expression>(

@@ -439,6 +439,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           _refer(node.expression.id).returned.statement,
         ] else
           dart.Code('return;'),
+        _save(node, dart.literalNull),
       ];
 
   @override
@@ -485,12 +486,22 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           _refer(node.scopeId).assign(_refer(node.expression.id)).statement,
         ],
         dart.Code('break ${_label(node.scopeId)};'),
+        _save(node, dart.literalNull),
       ];
 
   @override
   List<dart.Code> visitContinueExpression(ContinueExpression node) => [
         dart.Code('continue ${_label(node.scopeId)};'),
+        _save(node, dart.literalNull),
       ];
+
+  @override
+  List<dart.Code> visitThrowExpression(ThrowExpression node) {
+    return [
+      ...node.error.accept(this),
+      _save(node, _refer(node.error.id).thrown),
+    ];
+  }
 
   @override
   List<dart.Code> visitAssignmentExpression(AssignmentExpression node) => [
