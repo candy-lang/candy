@@ -1493,6 +1493,23 @@ extension on Context {
     List<hir.PropertyIdentifier> getMatchesForType(hir.UserCandyType type) {
       final receiverId =
           moduleIdToDeclarationId(queryContext, type.virtualModuleId);
+      final typeParameters = () {
+        if (receiverId.isClass) {
+          return getClassDeclarationHir(queryContext, receiverId)
+              .typeParameters;
+        } else if (receiverId.isTrait) {
+          return getTraitDeclarationHir(queryContext, receiverId)
+              .typeParameters;
+        }
+      }()
+          .map((it) => hir.CandyType.parameter(it.name, receiverId))
+          .toList();
+      final typeArguments = type.arguments;
+      final genericsMap = Map.fromEntries(typeParameters
+          .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
+              typeArguments, (a, b) => MapEntry(a, b)));
+      stderr.writeln('genericsMap = $genericsMap');
+
       return getInnerDeclarationIds(queryContext, receiverId)
           .where((id) => id.simplePath.last.nameOrNull == name)
           .mapNotNull((id) {
@@ -1502,7 +1519,7 @@ extension on Context {
           if (propertyHir.isStatic) return null;
           return hir.PropertyIdentifier(
             id,
-            propertyHir.type.bakeThisType(type),
+            propertyHir.type.bakeThisType(type).bakeGenerics(genericsMap),
             base: target,
             receiver: target,
           );
@@ -1511,7 +1528,9 @@ extension on Context {
           if (functionHir.isStatic) return null;
           return hir.PropertyIdentifier(
             id,
-            functionHir.functionType.bakeThisType(type),
+            functionHir.functionType
+                .bakeThisType(type)
+                .bakeGenerics(genericsMap),
             base: target,
             receiver: target,
           );
@@ -1529,7 +1548,9 @@ extension on Context {
       return type.map(
         user: (type) {
           final matches = getMatchesForType(type)
-              .map((m) => hir.IdentifierExpression(getId(expression), m));
+              .map((m) => hir.IdentifierExpression(getId(expression), m))
+              .toList();
+          stderr.writeln('matches = $matches');
           if (matches.isEmpty) {
             final receiverId =
                 moduleIdToDeclarationId(queryContext, type.virtualModuleId);
@@ -1541,7 +1562,7 @@ extension on Context {
               ),
             ]);
           }
-          return Ok(matches.toList());
+          return Ok(matches);
         },
         this_: (_) {
           final type = hir
@@ -1763,6 +1784,13 @@ extension on Context {
       ]);
     }
 
+    /// The target type may contain baked information. For example, if we do
+    /// `Foo<A>().bar<T>(baz)`, then `baz`'s type and the return type of `bar`
+    /// might depend on `A` both `A` and `T`.
+    /// The `target` contains the (partially-)baked type of `bar` – for example,
+    /// `() => A`. So, now we merge those type information with the type
+    /// information given directly at `bar`s invocation (`T`).
+    final targetType = target.type as hir.FunctionCandyType;
     final typeParameters = functionHir.typeParameters
         .map((p) => hir.CandyType.parameter(p.name, functionId))
         .toList();
@@ -1775,11 +1803,13 @@ extension on Context {
         .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
             typeArguments, (a, b) => MapEntry(a, b)));
     functionHir = functionHir.copyWith(
-      valueParameters: functionHir.valueParameters
-          .map((parameter) => parameter.copyWith(
-              type: parameter.type.bakeGenerics(genericsMap)))
-          .toList(),
-      returnType: functionHir.returnType.bakeGenerics(genericsMap),
+      valueParameters: [
+        for (var i = 0; i < functionHir.valueParameters.length; i++)
+          functionHir.valueParameters[i].copyWith(
+            type: targetType.parameterTypes[i].bakeGenerics(genericsMap),
+          ),
+      ],
+      returnType: targetType.returnType.bakeGenerics(genericsMap),
     );
     stderr.writeln('Fresh from the oven: $functionHir');
 
