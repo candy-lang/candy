@@ -67,7 +67,7 @@ public class ArrayList<Item> {
   }
 
   mut let items: Array<Option<Item>>
-  mut let length: Int /* UInt */
+  mut let length_: Int /* UInt */
 
   // TODO(marcelgarus): Getterize!
   fun capacity(): Int /* UInt */ {
@@ -87,96 +87,14 @@ public class ArrayList<Item> {
 }
 
 impl<Item> ArrayList<Item>: List<Item> {
-  // // let length: Int /* UInt */
+  fun length(): Int { length_ }
+  fun isEmpty(): Bool { length() == 0 }
 
-  // let isEmpty(): Bool {
-  //   length == 0
-  // }
-
-  // fun get(index: Int /* UInt */): Item {
-  //   if index < length {
-  //     // TODO(marcelgarus): Error.
-  //   }
-  //   items.get(index).unwrap()
-  // }
-
-  // fun contains(item: Item): Bool {
-  //   indexOf(item) != None()
-  // }
-
-  // fun indexOf(item: Item): Option<Int> /* Option<UInt> */ {
-  //   // TODO(marcelgarus): Use for.
-  //   mut let index = 0
-  //   while index < length {
-  //     if get(index) == item {
-  //       return Some(index)
-  //     }
-  //     index = index + 1
-  //   }
-  //   return None()
-  // }
-
-  // fun lastIndexOf(item: Item): Option<Int> /* Option<UInt> */ {
-  //   // TODO(marcelgarus): Use for.
-  //   mut let index = length - 1
-  //   while index >= 0 {
-  //     if get(index) == item {
-  //       return Some(index)
-  //     }
-  //     index = index - 1
-  //   }
-  //   return None()
-  // }
-}
-
-impl<Item> ArrayList<Item>: MutableList<Item> {
-  // fun set(index: Int /* UInt */, item: Item) {
-  //   if length <= index {
-  //     // TODO(marcelgarus): Error.
-  //   }
-  //   items.set(index, Some(item))
-  // }
-
-  // fun add(item: Item) {
-  //   if capacity() <= length {
-  //     grow()
-  //   }
-  //   items.set(length, Some(item))
-  //   length = length + 1
-  // }
-
-  // fun remove(item: Item): Bool {
-  //   mut let index = indexOf(item)
-  //   if index == None() {
-  //     false
-  //   } else {
-  //     removeAt(index.unwrap())
-  //     true
-  //   }
-  // }
-
-  // fun removeAt(index: Int /* UInt */): Item {
-  //   if index >= length {
-  //     // TODO(marcelgarus): Error.
-  //   }
-  //   let removedItem = items.get(index).unwrap()
-  //   mut let index = index
-  //   while index < length - 1 {
-  //     items.set(index, items.get(index + 1))
-  //     index = index + 1
-  //   }
-  //   // Prevent the last item from being referenced two times. This is necessary for garbage
-  //   // collection.
-  //   items.set(length - 1, None())
-  //   length = length - 1
-  //   removedItem
-  // }
-
-  // fun removeLast(): Item {
-  //   removeAt(length - 1)
-  // }
-
-  // fun clear() {
-  //   length = 0
-  // }
+  fun get(index: Int /* UInt */): Item {
+    if index < length() {
+      // TODO(marcelgarus): Error.
+    }
+    let a: Int = items.get(index)
+    a.unwrap()
+  }
 }
