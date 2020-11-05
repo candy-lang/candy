@@ -3,6 +3,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../lexer/lexer.dart';
 import '../../syntactic_entity.dart';
 import '../../utils.dart';
+import '../../visitor.dart';
 import 'declarations.dart';
 import 'node.dart';
 
@@ -17,6 +18,9 @@ abstract class CandyFile extends AstNode implements _$CandyFile {
     ModuleDeclaration declaration,
   }) = _CandyFile;
   const CandyFile._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitCandyFile(this);
 
   @override
   Iterable<SyntacticEntity> get children => [...useLines, declaration];
@@ -47,6 +51,9 @@ abstract class UseLine extends AstNode implements _$UseLine {
     IdentifierToken moduleName,
   }) = GlobalUseLine;
   const UseLine._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitUseLine(this);
 
   @override
   Iterable<SyntacticEntity> get children => when(

@@ -3,6 +3,7 @@ import 'package:meta/meta.dart';
 
 import '../source_span.dart';
 import '../syntactic_entity.dart';
+import '../visitor.dart';
 
 part 'token.freezed.dart';
 
@@ -11,13 +12,17 @@ abstract class Token extends SyntacticEntity {
 }
 
 @freezed
-abstract class OperatorToken extends Token with _$OperatorToken {
+abstract class OperatorToken extends Token implements _$OperatorToken {
   const factory OperatorToken(OperatorTokenType type, {SourceSpan span}) =
       _OperatorToken;
+  const OperatorToken._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitOperatorToken(this);
 }
 
 @freezed
-abstract class KeywordToken extends Token with _$KeywordToken {
+abstract class KeywordToken extends Token implements _$KeywordToken {
   const factory KeywordToken.use({@required SourceSpan span}) = UseKeywordToken;
   const factory KeywordToken.crate({@required SourceSpan span}) =
       CrateKeywordToken;
@@ -57,10 +62,15 @@ abstract class KeywordToken extends Token with _$KeywordToken {
   // ignore: non_constant_identifier_names
   const factory KeywordToken.throw_({@required SourceSpan span}) =
       ThrowKeywordToken;
+
+  const KeywordToken._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitKeywordToken(this);
 }
 
 @freezed
-abstract class ModifierToken extends Token with _$ModifierToken {
+abstract class ModifierToken extends Token implements _$ModifierToken {
   const factory ModifierToken.public({@required SourceSpan span}) =
       PublicModifierToken;
   const factory ModifierToken.mut({@required SourceSpan span}) =
@@ -78,6 +88,10 @@ abstract class ModifierToken extends Token with _$ModifierToken {
       ConstModifierToken;
   const factory ModifierToken.data({@required SourceSpan span}) =
       DataModifierToken;
+  const ModifierToken._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitModifierToken(this);
 }
 
 abstract class LiteralToken<T> extends Token {
@@ -88,33 +102,50 @@ abstract class LiteralToken<T> extends Token {
 
 @freezed
 abstract class BoolLiteralToken extends LiteralToken<bool>
-    with _$BoolLiteralToken {
+    implements _$BoolLiteralToken {
   const factory BoolLiteralToken(
     // ignore: avoid_positional_boolean_parameters
     bool value, {
     @required SourceSpan span,
   }) = _BoolLiteralToken;
+  const BoolLiteralToken._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitBoolLiteralToken(this);
 }
 
 @freezed
 abstract class IntLiteralToken extends LiteralToken<int>
-    with _$IntLiteralToken {
+    implements _$IntLiteralToken {
   const factory IntLiteralToken(
     int value, {
     @required SourceSpan span,
   }) = _IntLiteralToken;
+  const IntLiteralToken._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitIntLiteralToken(this);
 }
 
 @freezed
-abstract class LiteralStringToken extends Token with _$LiteralStringToken {
+abstract class LiteralStringToken extends Token
+    implements _$LiteralStringToken {
   const factory LiteralStringToken(String value, {SourceSpan span}) =
       _LiteralStringToken;
+  const LiteralStringToken._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitLiteralStringToken(this);
 }
 
 @freezed
-abstract class IdentifierToken extends Token with _$IdentifierToken {
+abstract class IdentifierToken extends Token implements _$IdentifierToken {
   const factory IdentifierToken(String name, {SourceSpan span}) =
       _IdentifierToken;
+  const IdentifierToken._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitIdentifierToken(this);
 }
 
 enum OperatorTokenType {
