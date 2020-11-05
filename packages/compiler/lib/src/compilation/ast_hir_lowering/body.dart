@@ -37,6 +37,26 @@ final getExpression = Query<DeclarationLocalId, Option<hir.Expression>>(
     return None();
   },
 );
+final getExpressionFromAstId =
+    Query<Tuple2<ResourceId, int>, Option<hir.Expression>>(
+  'getExpressionFromAstId',
+  provider: (context, inputs) {
+    final resourceId = inputs.first;
+    final astId = inputs.second;
+    for (final declarationId in getAllDeclarationIds(context, resourceId)) {
+      if (declarationId.isFunction || declarationId.isProperty) {
+        final mapping = getBodyAstToHirIds(context, declarationId);
+        if (mapping is None) continue;
+
+        final id = mapping.value.map[astId];
+        if (id == null) continue;
+
+        return getExpression(context, id);
+      }
+    }
+    return None();
+  },
+);
 
 class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   const IdFinderVisitor(this.id) : assert(id != null);

@@ -1,5 +1,7 @@
 import 'package:compiler/compiler.dart';
+import 'package:compiler/compiler.dart' as hir;
 import 'package:parser/parser.dart' hide Token;
+import 'package:parser/parser.dart' as ast;
 import 'package:petitparser/petitparser.dart';
 
 import 'analysis_server.dart';
@@ -55,6 +57,29 @@ extension ErrorLocationConversion on ErrorLocation {
       span.end.toPosition(server, resourceId),
     );
   }
+}
+
+Option<hir.Expression> getExpressionAtOffset(
+  AnalysisServer server,
+  ResourceId resourceId,
+  Position position,
+) {
+  final context = server.queryConfig.createContext();
+
+  final fileAst = context.callQuery(getAst, resourceId).valueOrNull;
+  assert(fileAst != null);
+
+  final offset = position.toOffset(server, resourceId);
+  final nodeAst = NodeFinderVisitor.find(fileAst, offset);
+  if (nodeAst is! ast.Expression) return None();
+  final expressionAst = nodeAst as ast.Expression;
+
+  final nodeHir = context.callQuery(
+    getExpressionFromAstId,
+    Tuple2(resourceId, expressionAst.id),
+  );
+  assert(nodeHir is Some);
+  return nodeHir.flatMapValue((it) => it);
 }
 
 /// Combines the [Object.hashCode] values of an arbitrary number of objects
