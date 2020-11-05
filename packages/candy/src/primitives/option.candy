@@ -1,3 +1,4 @@
+// TODO(marcelgarus): Enumerize!
 public trait Option<Value> {
   fun unwrap(): Value
 }
