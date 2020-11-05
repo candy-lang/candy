@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 import 'package:strings/strings.dart' as strings;
 
+import 'constants.dart';
 import 'declarations/declaration.dart';
 import 'declarations/module.dart';
 import 'type.dart';
@@ -155,6 +156,35 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       },
       property: (id, type, _, __, receiver) {
         final name = id.simplePath.last.nameOrNull;
+
+        if (name == 'filled' &&
+            declarationIdToModuleId(context, id.parent) ==
+                CandyType.arrayModuleId) {
+          final listType =
+              (type as FunctionCandyType).returnType as UserCandyType;
+          final compiledItemType =
+              compileType(context, listType.arguments.single);
+
+          final body = dart.TypeReference((b) => b
+            ..symbol = 'List'
+            ..url = dartCoreUrl
+            ..types.add(compiledItemType)).property('filled').call(
+            [dart.refer('length'), dart.refer('item')],
+            {},
+            [],
+          );
+
+          final expression = dart.Method((b) => b
+            ..returns = compileType(context, listType)
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..type = compileType(context, CandyType.int)
+              ..name = 'length'))
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..type = compiledItemType
+              ..name = 'item'))
+            ..body = body.code).closure;
+          return _saveSingle(node, expression);
+        }
 
         if (receiver != null) {
           return [
