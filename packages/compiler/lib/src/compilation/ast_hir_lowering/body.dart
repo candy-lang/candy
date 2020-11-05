@@ -725,6 +725,7 @@ class ContextContext extends Context {
       }
 
       final matches = innerIds
+          .where((it) => it.isNotImpl)
           .where((id) => id.simplePath.last.nameOrNull == name)
           .map(convertDeclarationId);
       if (matches.isNotEmpty) return matches.toList();
@@ -743,7 +744,7 @@ class ContextContext extends Context {
     return findIdentifierInUseLines(
       queryContext,
       Tuple4(resourceId, name, false, false),
-    ).map(convertDeclarationId).toList();
+    ).where((it) => it.isNotImpl).map(convertDeclarationId).toList();
   }
 
   @override

@@ -105,8 +105,6 @@ abstract class Expression implements _$Expression {
     bool isNegated,
   }) = IsExpression;
 
-  factory Expression.fromJson(Map<String, dynamic> json) =>
-      _$ExpressionFromJson(json);
   const Expression._();
 
   CandyType get type => map(
@@ -181,8 +179,6 @@ abstract class Identifier implements _$Identifier {
     bool isMutable,
   ) = LocalPropertyIdentifier;
 
-  factory Identifier.fromJson(Map<String, dynamic> json) =>
-      _$IdentifierFromJson(json);
   const Identifier._();
 
   bool get isMutableOrNull => maybeMap(
@@ -214,8 +210,6 @@ abstract class Literal implements _$Literal {
     CandyType receiverType,
   ]) = LambdaLiteral;
 
-  factory Literal.fromJson(Map<String, dynamic> json) =>
-      _$LiteralFromJson(json);
   const Literal._();
 
   CandyType get type => when(
@@ -246,8 +240,6 @@ abstract class StringLiteralPart implements _$StringLiteralPart {
   const factory StringLiteralPart.interpolated(Expression value) =
       InterpolatedStringLiteralPart;
 
-  factory StringLiteralPart.fromJson(Map<String, dynamic> json) =>
-      _$StringLiteralPartFromJson(json);
   const StringLiteralPart._();
 }
 

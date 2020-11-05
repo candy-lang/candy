@@ -6,7 +6,6 @@ import 'ids.dart';
 import 'type.dart';
 
 part 'declarations.freezed.dart';
-part 'declarations.g.dart';
 
 @freezed
 abstract class Declaration implements _$Declaration {
@@ -92,8 +91,6 @@ abstract class TypeParameter implements _$TypeParameter {
     @required CandyType upperBound,
     CandyType defaultValue,
   }) = _TypeParameter;
-  factory TypeParameter.fromJson(Map<String, dynamic> json) =>
-      _$TypeParameterFromJson(json);
   const TypeParameter._();
 }
 
@@ -104,7 +101,5 @@ abstract class ValueParameter implements _$ValueParameter {
     @required CandyType type,
     Expression defaultValue,
   }) = _ValueParameter;
-  factory ValueParameter.fromJson(Map<String, dynamic> json) =>
-      _$ValueParameterFromJson(json);
   const ValueParameter._();
 }
