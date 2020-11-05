@@ -18,11 +18,11 @@ builtin class Array<Blub> {
 public class ArrayList<Item> {
   /// A wrapper around `Array` that can grow dynamically.
 
-  // static fun empty<Item>(): ArrayList<Item> {
-  //   create()
-  // }
+  static fun empty<Item>(): ArrayList<Item> {
+    create<Item>(8)
+  }
   // public static fun of1<Item>(first: Item): ArrayList<Item> {
-  //   let list = create(1)
+  //   let list = create<Item>(1)
   //   list.add(first)
   //   list
   // }
@@ -57,7 +57,7 @@ public class ArrayList<Item> {
   //   list
   // }
 
-  static fun create<Item>(capacity: Int /* Uint */ = 8): ArrayList<Item> {
+  static fun create<Item>(capacity: Int /* Uint */): ArrayList<Item> {
     /// Creates a new, empty `ArrayList` with the given capacity.
 
     ArrayList<Item>(
@@ -74,16 +74,17 @@ public class ArrayList<Item> {
     items.length
   }
 
-  // fun grow() {
-  //   /// Increases the capacity.
+  fun grow() {
+    /// Increases the capacity.
 
-  //   let newItems: Array.fill<Option<Item>>(2 * capacity(), None)
-  //   mut let index = 0
-  //   while index < length {
-  //     newItems.set(items.get(index))
-  //     index = index + 1
-  //   }
-  // }
+    let newItems = Array.filled<Option<Item>>(2 * capacity(), None<Item>())
+    mut let index = 0
+
+    while index < length() {
+      newItems.set(index, items.get(index))
+      index = index + 1
+    }
+  }
 }
 
 impl<Item> ArrayList<Item>: List<Item> {
@@ -95,5 +96,42 @@ impl<Item> ArrayList<Item>: List<Item> {
       // TODO(marcelgarus): Error.
     }
     items.get(index).unwrap()
+  }
+}
+
+impl<Item> ArrayList<Item>: MutableList<Item> {
+  fun set(index: Int /* UInt */, item: Item) {
+    items.set(index, Some<Item>(item))
+  }
+
+  fun add(item: Item) {
+    if length_ == capacity() {
+      grow()
+    }
+    items.set(length_, Some<Item>(item))
+    length_ = length_ + 1
+  }
+
+  fun removeAt(index: Int /* UInt */): Item {
+    mut let index = index
+    mut let removed = items.get(index).unwrap()
+    while index < length_ - 1 {
+      items.set(index, items.get(index))
+    }
+    items.set(index, None<Item>())
+    length_ = length_ - 1
+    removed
+  }
+  
+  fun removeLast(): Item {
+    removeAt(length_ - 1)
+  }
+  
+  fun clear() {
+    mut let index = 0
+    while index < length_ {
+      items.set(index, None<Item>())
+    }
+    length_ = 0
   }
 }
