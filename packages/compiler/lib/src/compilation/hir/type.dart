@@ -285,16 +285,16 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
             if (declarationId.isTrait) {
               final declaration =
                   getTraitDeclarationHir(context, declarationId);
-              if (declaration.typeParameters.isNotEmpty) {
-                throw CompilerError.unsupportedFeature(
-                  'Type parameters are not yet supported.',
-                );
-              }
 
               return declaration.upperBounds.any((bound) {
+                final bakedBound = bound.bakeGenerics({
+                  for (final index in childType.arguments.indices)
+                    CandyType.parameter(declaration.typeParameters[index].name,
+                        declarationId): childType.arguments[index],
+                });
                 return isAssignableTo(
                   context,
-                  Tuple2(bound, parent),
+                  Tuple2(bakedBound, parent),
                 );
               });
             }
