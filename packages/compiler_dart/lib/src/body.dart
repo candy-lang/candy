@@ -507,7 +507,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
     return [
       ...node.condition.accept(this),
-      dart.literalNull.assignVar(_name(node.id)).statement,
+      dart.Code('void ${_name(node.id)};'),
       dart.Code('if (${_name(node.condition.id)}) {'),
       ...visitBody(node.thenBody),
       dart.Code('} else {'),
@@ -518,7 +518,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
   @override
   List<dart.Code> visitLoopExpression(LoopExpression node) => [
-        dart.literalNull.assignVar(_name(node.id)).statement,
+        dart.Code('void ${_name(node.id)};'),
         dart.Code('${_label(node.id)}:\nwhile (true) {'),
         for (final expression in node.body) ...expression.accept(this),
         dart.Code('}'),
@@ -526,7 +526,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
   @override
   List<dart.Code> visitWhileExpression(WhileExpression node) => [
-        dart.literalNull.assignVar(_name(node.id)).statement,
+        dart.Code('void ${_name(node.id)};'),
         dart.Code('${_label(node.id)}:\nwhile (true) {'),
         ...node.condition.accept(this),
         dart.Code('if (!${_name(node.condition.id)}) break;'),
