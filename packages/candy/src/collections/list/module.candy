@@ -13,9 +13,10 @@ public trait List<Item>: Iterable<Item> {
   fun length(): Int /* UInt */
   // TODO(marcelgarus): Getterize!
   fun isEmpty(): Bool {
-    // TODO(marcelgarus): Enable as soon as == is supported.
-    // length == 0
-    true
+    length() == 0
+  }
+  fun isNotEmpty(): Bool {
+    !isEmpty()
   }
 
   fun get(index: Int /* UInt */): Item
