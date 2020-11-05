@@ -897,7 +897,8 @@ class ParserGrammar {
               LexerGrammar.BUILTIN |
               LexerGrammar.EXTERNAL |
               LexerGrammar.OVERRIDE |
-              LexerGrammar.CONST) &
+              LexerGrammar.CONST |
+              LexerGrammar.DATA) &
           LexerGrammar.NLs)
       .map((value) => value[0] as ModifierToken);
 }

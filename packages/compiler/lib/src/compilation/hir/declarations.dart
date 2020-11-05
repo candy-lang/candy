@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../utils.dart';
 import 'expressions.dart';
 import 'ids.dart';
 import 'type.dart';
@@ -37,6 +38,7 @@ abstract class Declaration implements _$Declaration {
     @required UserCandyType thisType,
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
+    @Default(<SyntheticImpl>[]) List<SyntheticImpl> syntheticImpls,
   }) = ClassDeclaration;
   const factory Declaration.constructor({
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
@@ -51,7 +53,8 @@ abstract class Declaration implements _$Declaration {
     @required CandyType returnType,
   }) = FunctionDeclaration;
 
-  const factory Declaration.property({
+  const factory Declaration.property(
+    DeclarationId id, {
     @required bool isStatic,
     @required bool isMutable,
     @required String name,
@@ -60,8 +63,6 @@ abstract class Declaration implements _$Declaration {
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
   }) = PropertyDeclaration;
 
-  factory Declaration.fromJson(Map<String, dynamic> json) =>
-      _$DeclarationFromJson(json);
   const Declaration._();
 
   FunctionCandyType get functionType {
@@ -73,6 +74,15 @@ abstract class Declaration implements _$Declaration {
       returnType: function.returnType,
     );
   }
+}
+
+@freezed
+abstract class SyntheticImpl implements _$SyntheticImpl {
+  const factory SyntheticImpl({
+    ImplDeclaration implHir,
+    List<Tuple2<FunctionDeclaration, List<Expression>>> methods,
+  }) = _SyntheticImpl;
+  const SyntheticImpl._();
 }
 
 @freezed

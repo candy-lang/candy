@@ -1,0 +1,4 @@
+data class Foo {
+  let bar: Int
+  let baz: Bool
+}

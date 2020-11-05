@@ -120,6 +120,8 @@ abstract class ClassDeclaration extends Declaration
 
   @override
   SourceSpan get representativeSpan => name.span;
+
+  bool get isData => modifiers.any((it) => it is DataModifierToken);
 }
 
 @freezed

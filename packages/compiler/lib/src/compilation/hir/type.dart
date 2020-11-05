@@ -72,36 +72,35 @@ abstract class CandyType with _$CandyType {
 
   // operators
   // operators.arithmetic
-  static final add = CandyType.user(ModuleId.coreOperatorsArithmetic, 'Add');
+  static final add = UserCandyType(ModuleId.coreOperatorsArithmetic, 'Add');
   static final subtract =
-      CandyType.user(ModuleId.coreOperatorsArithmetic, 'Subtract');
+      UserCandyType(ModuleId.coreOperatorsArithmetic, 'Subtract');
   static final negate =
-      CandyType.user(ModuleId.coreOperatorsArithmetic, 'Negate');
+      UserCandyType(ModuleId.coreOperatorsArithmetic, 'Negate');
   static final multiply =
-      CandyType.user(ModuleId.coreOperatorsArithmetic, 'Multiply');
+      UserCandyType(ModuleId.coreOperatorsArithmetic, 'Multiply');
   static final divide =
-      CandyType.user(ModuleId.coreOperatorsArithmetic, 'Divide');
+      UserCandyType(ModuleId.coreOperatorsArithmetic, 'Divide');
   static final divideTruncating =
-      CandyType.user(ModuleId.coreOperatorsArithmetic, 'DivideTruncating');
+      UserCandyType(ModuleId.coreOperatorsArithmetic, 'DivideTruncating');
   static final modulo =
-      CandyType.user(ModuleId.coreOperatorsArithmetic, 'Modulo');
+      UserCandyType(ModuleId.coreOperatorsArithmetic, 'Modulo');
   // operators.comparison
   static final comparable =
-      CandyType.user(ModuleId.coreOperatorsComparison, 'Comparable');
+      UserCandyType(ModuleId.coreOperatorsComparison, 'Comparable');
   // operators.equality
-  static final equals =
-      CandyType.user(ModuleId.coreOperatorsEquality, 'Equals');
+  static final equals = UserCandyType(ModuleId.coreOperatorsEquality, 'Equals');
   // operators.logical
-  static const and = CandyType.user(ModuleId.coreOperatorsLogical, 'And');
-  static const or = CandyType.user(ModuleId.coreOperatorsLogical, 'Or');
+  static const and = UserCandyType(ModuleId.coreOperatorsLogical, 'And');
+  static const or = UserCandyType(ModuleId.coreOperatorsLogical, 'Or');
   static const opposite =
-      CandyType.user(ModuleId.coreOperatorsLogical, 'Opposite');
+      UserCandyType(ModuleId.coreOperatorsLogical, 'Opposite');
   static const implies =
-      CandyType.user(ModuleId.coreOperatorsLogical, 'Implies');
+      UserCandyType(ModuleId.coreOperatorsLogical, 'Implies');
 
   // reflection
-  static const type = CandyType.user(ModuleId.coreReflection, 'Type');
-  static const module = CandyType.user(ModuleId.coreReflection, 'Module');
+  static const type = UserCandyType(ModuleId.coreReflection, 'Type');
+  static const module = UserCandyType(ModuleId.coreReflection, 'Module');
 
   ModuleId get virtualModuleId => maybeWhen(
         user: (moduleId, name, _) => moduleId.nested([name]),
