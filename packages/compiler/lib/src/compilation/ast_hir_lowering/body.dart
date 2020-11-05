@@ -552,30 +552,20 @@ class ContextContext extends Context {
       DeclarationId id, [
       hir.Expression receiver,
     ]) {
-      stderr.writeln('covertDeclarationId($id)');
-
       hir.CandyType bakeIfRequired(hir.CandyType type) {
-        stderr.writeln('bakeIfRequired');
-        stderr.writeln('declarationId = $declarationId');
-        stderr.writeln('id = $id');
-        stderr.writeln('type = $type');
-
         if (!declarationId.hasParent || !declarationId.parent.isImpl) {
           return type;
         }
 
         final impl = getImplDeclarationHir(queryContext, declarationId.parent);
-        stderr.writeln('impl = $impl');
         final classId =
             moduleIdToDeclarationId(queryContext, impl.type.virtualModuleId);
-        stderr.writeln('classId = $classId');
         if (id.parent.isNotClass || classId != id.parent) {
           // If the impl isn't exactly for the class, where the property is that
           // we want to convert, then just return its normal type.
           return type;
         }
         final class_ = getClassDeclarationHir(queryContext, classId);
-        stderr.writeln('class = $class_');
 
         final typeParameters = class_.typeParameters
             .map((p) => hir.CandyType.parameter(p.name, classId))
@@ -586,8 +576,6 @@ class ContextContext extends Context {
         final genericsMap = Map.fromEntries(typeParameters
             .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
                 typeArguments, (a, b) => MapEntry(a, b)));
-        stderr.writeln('genericsMap = $genericsMap');
-        stderr.writeln('Baked type: ${type.bakeGenerics(genericsMap)}');
 
         return type.bakeGenerics(genericsMap);
       }
@@ -596,8 +584,6 @@ class ContextContext extends Context {
         return hir.Identifier.reflection(id);
       } else if (id.isFunction) {
         final functionHir = getFunctionDeclarationHir(queryContext, id);
-        stderr.writeln(
-            'Baked function type: ${bakeIfRequired(functionHir.functionType)}');
         return hir.Identifier.property(
           id,
           bakeIfRequired(functionHir.functionType),
@@ -1513,7 +1499,6 @@ extension on Context {
       final genericsMap = Map.fromEntries(typeParameters
           .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
               typeArguments, (a, b) => MapEntry(a, b)));
-      stderr.writeln('genericsMap = $genericsMap');
 
       return getInnerDeclarationIds(queryContext, receiverId)
           .where((id) => id.simplePath.last.nameOrNull == name)
@@ -1555,7 +1540,6 @@ extension on Context {
           final matches = getMatchesForType(type)
               .map((m) => hir.IdentifierExpression(getId(expression), m))
               .toList();
-          stderr.writeln('matches = $matches');
           if (matches.isEmpty) {
             final receiverId =
                 moduleIdToDeclarationId(queryContext, type.virtualModuleId);
@@ -1816,7 +1800,6 @@ extension on Context {
       ],
       returnType: targetType.returnType.bakeGenerics(genericsMap),
     );
-    stderr.writeln('Fresh from the oven: $functionHir');
 
     if (!isValidExpressionType(functionHir.returnType)) {
       return Error([
