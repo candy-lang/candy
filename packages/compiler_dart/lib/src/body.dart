@@ -561,23 +561,45 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   @override
   List<dart.Code> visitAssignmentExpression(AssignmentExpression node) => [
         ...node.right.accept(this),
-        node.left.identifier
-            .maybeMap(
-              property: (property) => dart.refer(
-                property.id.simplePath.last.nameOrNull ??
-                    (throw CompilerError.internalError(
-                        'Path must be path to property.')),
-                declarationIdToImportUrl(context, property.id.parent),
-              ),
-              localProperty: (property) =>
-                  _refer(getExpression(context, property.id).value.id),
-              orElse: () => throw CompilerError.internalError('Left side of '
-                  'assignment can only be property or local property '
-                  'identifier, but was ${node.left.runtimeType} '
-                  '(${node.left})'),
-            )
-            .assign(_refer(node.right.id))
-            .statement,
+        ...node.left.identifier.maybeMap(
+          property: (property) {
+            final name = property.id.simplePath.last.nameOrNull ??
+                (throw CompilerError.internalError(
+                    'Path must be path to property.'));
+            final parent = property.id.parent;
+            if (parent.isModule) {
+              return [
+                dart
+                    .refer(name, declarationIdToImportUrl(context, parent))
+                    .assign(_refer(node.right.id))
+                    .statement
+              ];
+            } else if (getPropertyDeclarationHir(context, property.id)
+                .isStatic) {
+              return [
+                compileTypeName(context, parent)
+                    .property(name)
+                    .assign(_refer(node.right.id))
+                    .statement
+              ];
+            } else {
+              assert(property.receiver != null);
+              return [
+                ...property.receiver.accept(this),
+                dart.refer(name).assign(_refer(node.right.id)).statement,
+              ];
+            }
+          },
+          localProperty: (property) => [
+            _refer(getExpression(context, property.id).value.id)
+                .assign(_refer(node.right.id))
+                .statement
+          ],
+          orElse: () => throw CompilerError.internalError('Left side of '
+              'assignment can only be property or local property '
+              'identifier, but was ${node.left.runtimeType} '
+              '(${node.left})'),
+        ),
       ];
 
   @override
