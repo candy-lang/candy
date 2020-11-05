@@ -65,6 +65,11 @@ class IntializedMessageHandler extends MessageHandler<InitializedParams, void> {
       ),
     );
     register(
+      textCapabilities?.hover?.dynamicRegistration,
+      Method.textDocument_hover,
+      TextDocumentRegistrationOptions([candyFiles]),
+    );
+    register(
       server.clientCapabilities?.textDocument?.codeAction?.dynamicRegistration,
       Method.textDocument_codeAction,
       CodeActionRegistrationOptions(

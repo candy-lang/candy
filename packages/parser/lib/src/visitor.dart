@@ -2,7 +2,6 @@ import 'package:dartx/dartx.dart';
 import 'package:parser/parser.dart';
 
 import 'lexer/lexer.dart';
-
 import 'parser/ast/declarations.dart';
 import 'parser/ast/general.dart';
 import 'parser/ast/node.dart';
@@ -226,9 +225,11 @@ class NodeFinderVisitor extends GeneralizingAstVisitor<SyntacticEntity> {
   @override
   SyntacticEntity visitAstNode(AstNode node) {
     assert(node.span.contains(offset));
-    final childMatch = node.children
+
+    final childMatches = node.children
         .whereType<AstNode>()
-        .firstOrNullWhere((it) => it.span.contains(offset));
-    return childMatch?.accept(this) ?? node;
+        .where((it) => it.span.contains(offset));
+    assert(childMatches.length < 2);
+    return childMatches.firstOrNull?.accept(this) ?? node;
   }
 }

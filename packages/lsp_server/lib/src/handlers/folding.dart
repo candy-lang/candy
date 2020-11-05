@@ -14,7 +14,6 @@ class FoldingHandler
 
   @override
   Method get handlesMessage => Method.textDocument_foldingRange;
-
   @override
   LspJsonHandler<FoldingRangeParams> get jsonHandler =>
       FoldingRangeParams.jsonHandler;
@@ -27,15 +26,6 @@ class FoldingHandler
     final resourceId = server.fileUriToResourceId(params.textDocument.uri);
     final queryContext = server.queryConfig.createContext();
 
-    final source =
-        queryContext.callQuery(getSourceCode, resourceId).valueOrNull;
-    if (source == null) {
-      return error(
-        ErrorCodes.InternalError,
-        "Couldn't access source of `$resourceId`.",
-      );
-    }
-
     final ast = queryContext.callQuery(getAst, resourceId).valueOrNull;
     if (ast == null) {
       return error(
@@ -46,13 +36,12 @@ class FoldingHandler
 
     final foldingRanges = <FoldingRange>[];
     if (ast.useLines.length > 1) {
-      final useLinesStart = positionOf(source, ast.useLines.first.span.start);
-      final useLinesEnd = positionOf(source, ast.useLines.last.span.end);
+      final range = ast.useLines.last.span.toRange(server, resourceId);
       foldingRanges.add(FoldingRange(
-        useLinesStart.line,
-        useLinesStart.character,
-        useLinesEnd.line,
-        useLinesEnd.character,
+        range.start.line,
+        range.start.character,
+        range.end.line,
+        range.end.character,
         FoldingRangeKind.Imports,
       ));
     }
