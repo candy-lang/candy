@@ -27,7 +27,8 @@ public trait List<Item>: Iterable<Item> {
 
 public trait MutableList<Item>: List<Item> {
   fun set(index: Int /* UInt */, item: Item)
-  fun add(item: Item)
+  // TODO(marcelgarus): Rename to add as soon as the naming conflict with + is resolved.
+  fun append(item: Item)
   fun removeAt(index: Int /* UInt */): Item
   fun removeLast(): Item
   fun clear()

@@ -104,7 +104,7 @@ impl<Item> ArrayList<Item>: MutableList<Item> {
     items.set(index, Some<Item>(item))
   }
 
-  fun add(item: Item) {
+  fun append(item: Item) {
     if length_ == capacity() {
       grow()
     }
