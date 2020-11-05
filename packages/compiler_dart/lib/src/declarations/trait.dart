@@ -16,7 +16,9 @@ final Query<DeclarationId, List<dart.Class>> compileTrait =
     // ignore: non_constant_identifier_names
     final traitHir = getTraitDeclarationHir(context, declarationId);
 
-    final implements = <dart.Reference>[];
+    final implements = <dart.Reference>[
+      for (final bound in traitHir.upperBounds) compileType(context, bound)
+    ];
 
     final properties = traitHir.innerDeclarationIds
         .where((id) => id.isProperty)
