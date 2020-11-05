@@ -620,11 +620,10 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     dart.Expression lowered, {
     bool isMutable = false,
   }) {
-    final type = compileType(context, source.type);
     if (isMutable) {
-      return lowered.assignVar(_name(source.id), type).statement;
+      return lowered.assignVar(_name(source.id)).statement;
     } else {
-      return lowered.assignFinal(_name(source.id), type).statement;
+      return lowered.assignFinal(_name(source.id)).statement;
     }
   }
 
