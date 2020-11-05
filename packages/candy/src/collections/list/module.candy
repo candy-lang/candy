@@ -19,7 +19,7 @@ public trait List<Item>: Iterable<Item> {
     !isEmpty()
   }
 
-  fun get(index: Int /* UInt */): Item
+  fun get(index: Int /* UInt */): Option<Item>
 }
 
 // impl<Item> List<Item>: GetOperator<Int, Item> /* GetOperator<UInt, Item> */
@@ -29,7 +29,16 @@ public trait MutableList<Item>: List<Item> {
   fun set(index: Int /* UInt */, item: Item)
   // TODO(marcelgarus): Rename to add as soon as the naming conflict with + is resolved.
   fun append(item: Item)
+
   fun removeAt(index: Int /* UInt */): Item
-  fun removeLast(): Item
-  fun clear()
+
+  fun removeLast(): Item {
+    removeAt(length() - 1)
+  }
+
+  fun clear() {
+    while isNotEmpty() {
+      removeLast()
+    }
+  }
 }

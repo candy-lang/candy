@@ -1,4 +1,5 @@
 use ....primitives
+use ...iterable
 use ...list
 
 builtin class Array<Blub> {
@@ -87,15 +88,35 @@ public class ArrayList<Item> {
   }
 }
 
+// impl<Item> ArrayList<Item>: Iterable<Item> {
+//   fun iterator(): Iterator<Item> {
+//     ArrayListIterator<Item>(this)
+//   }
+// }
+
+class ArrayListIterator<Item> {
+  let arrayList: ArrayList<Item>
+  mut let index = 0
+}
+
+impl<Item> ArrayListIterator<Item>: Iterator<Item> {
+  fun next(): Option<Item> {
+    let element = arrayList.get(index)
+    index = index + 1
+    element
+  }
+}
+
 impl<Item> ArrayList<Item>: List<Item> {
   fun length(): Int { length_ }
   fun isEmpty(): Bool { length_ == 0 }
 
-  fun get(index: Int /* UInt */): Item {
-    if index < length_ {
-      // TODO(marcelgarus): Error.
+  fun get(index: Int /* UInt */): Option<Item> {
+    if index >= length_ {
+      None<Option<Item>>()
+    } else {
+      items.get(index)
     }
-    items.get(index).unwrap()
   }
 }
 
@@ -121,10 +142,6 @@ impl<Item> ArrayList<Item>: MutableList<Item> {
     items.set(index, None<Item>())
     length_ = length_ - 1
     removed
-  }
-  
-  fun removeLast(): Item {
-    removeAt(length_ - 1)
   }
   
   fun clear() {
