@@ -480,7 +480,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
               _refer(entry.value.id),
           ],
           {},
-          [],
+          node.typeArguments.map((it) => compileType(context, it)).toList(),
         ),
       ),
     ];
