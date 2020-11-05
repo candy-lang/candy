@@ -1786,7 +1786,7 @@ extension on Context {
 
     /// The target type may contain baked information. For example, if we do
     /// `Foo<A>().bar<T>(baz)`, then `baz`'s type and the return type of `bar`
-    /// might depend on `A` both `A` and `T`.
+    /// might depend on both `A` and `T`.
     /// The `target` contains the (partially-)baked type of `bar` – for example,
     /// `() => A`. So, now we merge those type information with the type
     /// information given directly at `bar`s invocation (`T`).
