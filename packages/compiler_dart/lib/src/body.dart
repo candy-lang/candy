@@ -160,30 +160,34 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         if (name == 'filled' &&
             declarationIdToModuleId(context, id.parent) ==
                 CandyType.arrayModuleId) {
-          final listType =
-              (type as FunctionCandyType).returnType as UserCandyType;
-          final compiledItemType =
-              compileType(context, listType.arguments.single);
-
-          final body = dart.TypeReference((b) => b
-            ..symbol = 'List'
-            ..url = dartCoreUrl
-            ..types.add(compiledItemType)).property('filled').call(
-            [dart.refer('length'), dart.refer('item')],
-            {},
-            [],
-          );
-
-          final expression = dart.Method((b) => b
-            ..returns = compileType(context, listType)
+          final t = dart.refer('T');
+          final name = _name(node.id);
+          final function = dart.Method((b) => b
+            ..name = name
+            ..returns = dart.TypeReference((b) => b
+              ..symbol = 'List'
+              ..url = dartCoreUrl
+              ..types.add(t))
+            ..types.add(t)
             ..requiredParameters.add(dart.Parameter((b) => b
               ..type = compileType(context, CandyType.int)
               ..name = 'length'))
             ..requiredParameters.add(dart.Parameter((b) => b
-              ..type = compiledItemType
+              ..type = t
               ..name = 'item'))
-            ..body = body.code).closure;
-          return _saveSingle(node, expression);
+            ..body = dart.TypeReference((b) => b
+                  ..symbol = 'List'
+                  ..url = dartCoreUrl
+                  ..types.add(t))
+                .property('filled')
+                .call(
+                  [dart.refer('length'), dart.refer('item')],
+                  {},
+                  [],
+                )
+                .returned
+                .code);
+          return [function.code];
         }
 
         if (receiver != null) {
