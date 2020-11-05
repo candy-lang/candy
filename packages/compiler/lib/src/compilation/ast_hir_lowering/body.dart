@@ -1254,7 +1254,9 @@ extension on Context {
       for (final expression in expressions) {
         expression.accept(visitor);
       }
-      actualReturnType = hir.CandyType.union(visitor.returnTypes.toList());
+      actualReturnType = visitor.returnTypes.isEmpty
+          ? hir.CandyType.unit
+          : hir.CandyType.union(visitor.returnTypes.toList());
     }
 
     return Ok([
