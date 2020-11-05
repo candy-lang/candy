@@ -319,10 +319,7 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
               .any((type) => isAssignableTo(context, Tuple2(childType, type))),
           intersection: (parentType) => parentType.types.every(
               (type) => isAssignableTo(context, Tuple2(childType, type))),
-          parameter: (type) {
-            final bound = getTypeParameterBound(context, type);
-            return isAssignableTo(context, Tuple2(child, bound));
-          },
+          parameter: (type) => false,
           reflection: (type) => isAssignableTo(
             context,
             Tuple2(getResultingType(type), parent),
