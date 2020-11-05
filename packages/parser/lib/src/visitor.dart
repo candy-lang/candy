@@ -233,3 +233,15 @@ class NodeFinderVisitor extends GeneralizingAstVisitor<SyntacticEntity> {
     return childMatches.firstOrNull?.accept(this) ?? node;
   }
 }
+
+abstract class TraversingAstVisitor extends GeneralizingAstVisitor<void> {
+  const TraversingAstVisitor();
+
+  @override
+  void visitSyntacticEntity(SyntacticEntity node) {}
+
+  @override
+  void visitAstNode(AstNode node) {
+    for (final innerNode in node.children) innerNode.accept(this);
+  }
+}
