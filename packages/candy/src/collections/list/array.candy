@@ -4,7 +4,7 @@ use ...list
 builtin class Array<Blub> {
   /// A builtin structure that holds a fixed number of `Blub`s.
   
-  static fun fill<Blub>(length: Int /* UInt */, item: Blub): Array<Blub>
+  static fun filled<Blub>(length: Int /* UInt */, item: Blub): Array<Blub>
   /// Creates a new `Array` of the given `length`, where every slot is filled with the same `item`.
 
   let length: Int
@@ -61,7 +61,7 @@ public class ArrayList<Item> {
     /// Creates a new, empty `ArrayList` with the given capacity.
 
     ArrayList<Item>(
-      Array.fill<Option<Item>>(capacity, None<Item>()),
+      Array.filled<Option<Item>>(capacity, None<Item>()),
       0,
     )
   }
@@ -94,7 +94,6 @@ impl<Item> ArrayList<Item>: List<Item> {
     if index < length() {
       // TODO(marcelgarus): Error.
     }
-    let a: Int = items.get(index)
-    a.unwrap()
+    items.get(index).unwrap()
   }
 }
