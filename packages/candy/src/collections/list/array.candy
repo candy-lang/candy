@@ -89,10 +89,10 @@ public class ArrayList<Item> {
 
 impl<Item> ArrayList<Item>: List<Item> {
   fun length(): Int { length_ }
-  fun isEmpty(): Bool { length() == 0 }
+  fun isEmpty(): Bool { length_ == 0 }
 
   fun get(index: Int /* UInt */): Item {
-    if index < length() {
+    if index < length_ {
       // TODO(marcelgarus): Error.
     }
     items.get(index).unwrap()
@@ -108,7 +108,7 @@ impl<Item> ArrayList<Item>: MutableList<Item> {
     if length_ == capacity() {
       grow()
     }
-    items.set(length_, Some<Item>(item))
+    set(length_, item)
     length_ = length_ + 1
   }
 
