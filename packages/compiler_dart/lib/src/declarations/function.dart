@@ -12,18 +12,8 @@ final compileFunction = Query<DeclarationId, dart.Method>(
   evaluateAlways: true,
   provider: (context, declarationId) {
     final functionHir = getFunctionDeclarationHir(context, declarationId);
-    final moduleId = declarationIdToModuleId(context, declarationId);
 
-    dart.Code body;
-    if (moduleId == ModuleId.coreCollections.nested(['list', 'List']) &&
-        declarationId.simplePath.last.nameOrNull.startsWith('of')) {
-      body = _compileListOf(context, functionHir);
-    } else if (moduleId ==
-            ModuleId.coreCollections.nested(['list', 'array', 'ArrayList']) &&
-        declarationId.simplePath.last.nameOrNull.startsWith('of')) {
-      body = _compileArrayListOf(functionHir);
-    }
-    body ??= compileBody(context, declarationId).valueOrNull;
+    final body = compileBody(context, declarationId).valueOrNull;
 
     // TODO(JonasWanke): make this safer
     const operatorMethods = {
