@@ -666,6 +666,39 @@ extension on dart.Expression {
       ]));
 }
 
+extension on dart.Method {
+  dart.Expression get expression => dart.CodeExpression(dart.Block.of([
+        returns.code,
+        dart.Code(name),
+        if (types.isNotEmpty) ...[
+          const dart.Code('<'),
+          for (final type in types) type.code,
+          const dart.Code('>'),
+        ],
+        const dart.Code('('),
+        for (final parameter in requiredParameters) ...[
+          parameter.type.code,
+          dart.Code(parameter.name),
+          const dart.Code(','),
+        ],
+        if (optionalParameters.isNotEmpty) ...[
+          dart.Code(optionalParameters.first.named ? '{' : '['),
+          for (final parameter in optionalParameters) ...[
+            parameter.type.code,
+            dart.Code(parameter.name),
+            const dart.Code(','),
+          ],
+          dart.Code(optionalParameters.first.named ? '}' : ']'),
+        ],
+        const dart.Code(')'),
+        const dart.Code('{'),
+        body,
+        const dart.Code(';'),
+        const dart.Code('}'),
+      ])).expression;
+  dart.Code get code => expression.code;
+}
+
 dart.Expression lambdaOf(List<dart.Code> code) {
   final body = dart.Block((b) => b..statements.addAll(code));
   return dart.Method((b) => b..body = body).closure;
