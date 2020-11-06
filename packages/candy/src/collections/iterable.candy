@@ -61,12 +61,13 @@ public trait Iterable<Item> {
   // TODO(marcelgarus): every
   // TODO(marcelgarus): expand
   // TODO(marcelgarus): firstWhere
-  // TODO(marcelgarus): fold
-  // TODO(marcelgarus): followedBy
+  // TODO(marcelgarus): foldLeft
+  // TODO(marcelgarus): foldRight
   // TODO(marcelgarus): lastWhere
   // TODO(marcelgarus): map
   // TODO(marcelgarus): enumerate
-  // TODO(marcelgarus): reduce
+  // TODO(marcelgarus): reduceLeft
+  // TODO(marcelgarus): reduceRight
   // TODO(marcelgarus): reversed
   // TODO(marcelgarus): singleWhere
   // TODO(marcelgarus): skip
@@ -77,6 +78,8 @@ public trait Iterable<Item> {
   // TODO(marcelgarus): where
   // TODO(marcelgarus): whereType
   // TODO(marcelgarus): zip
+
+  // TODO(marcelgarus): add operator
 
   // TODO(marcelgarus): dartx
   // TODO(marcelgarus): kotlin
