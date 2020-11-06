@@ -17,7 +17,7 @@ public trait Iterable<Item> {
     element
   }
 
-  // fun first(): Option<Item> { get(0) }
+  fun first(): Option<Item> { get(0) }
   // fun second(): Option<Item> { get(1) }
   // fun third(): Option<Item> { get(2) }
   // fun fourth(): Option<Item> { get(3) }
@@ -50,8 +50,8 @@ public trait Iterable<Item> {
   // TODO(marcelgarus): secondLast
   // TODO(marcelgarus): thirdLast
 
-  // fun isEmpty(): Bool { first() is None }
-  // fun isNotEmpty(): Bool { !isEmpty() }
+  fun isEmpty(): Bool { first() is None }
+  fun isNotEmpty(): Bool { !isEmpty() }
 
   // TODO(marcelgarus): length
   // TODO(marcelgarus): single
@@ -67,6 +67,7 @@ public trait Iterable<Item> {
   // TODO(marcelgarus): map
   // TODO(marcelgarus): enumerate
   // TODO(marcelgarus): reduce
+  // TODO(marcelgarus): reversed
   // TODO(marcelgarus): singleWhere
   // TODO(marcelgarus): skip
   // TODO(marcelgarus): skipWhile

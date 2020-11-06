@@ -107,7 +107,6 @@ impl<Item> ArrayListIterator<Item>: Iterator<Item> {
 
 impl<Item> ArrayList<Item>: List<Item> {
   fun length(): Int { length_ }
-  fun isEmpty(): Bool { length_ == 0 }
 
   fun get(index: Int /* UInt */): Option<Item> {
     if index >= length_ {

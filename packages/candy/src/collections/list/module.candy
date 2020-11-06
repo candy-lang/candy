@@ -12,12 +12,7 @@ public trait List<Item>: Iterable<Item> {
   // TODO(marcelgarus): Getterize!
   fun length(): Int /* UInt */
   // TODO(marcelgarus): Getterize!
-  fun isEmpty(): Bool {
-    length() == 0
-  }
-  fun isNotEmpty(): Bool {
-    !isEmpty()
-  }
+  fun isEmpty(): Bool { length() == 0 }
 
   fun get(index: Int /* UInt */): Option<Item>
 }
