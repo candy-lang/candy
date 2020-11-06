@@ -4,7 +4,7 @@ version: 0.0.1
 homepage: https://github.com/JonasWanke/candy
 
 environment:
-  sdk: ">=2.7.0 <3.0.0"
+  sdk: ">=2.10.0 <3.0.0"
 
 dependencies:
   args: ^1.6.0
