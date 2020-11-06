@@ -114,7 +114,8 @@ This lead to some conservative choices regarding concepts and syntax.
 Here are some of Dart's strengths:
 
 - A powerful code generator API.
-- A big standard library.
+- Powerful collection literals.
+- A rich and centralized package ecosystem.
 
 #### Kotlin
 
@@ -131,6 +132,7 @@ Of course, it enhances the experience using a whole fleet of syntactic sugar, he
 - custom getters & setters
 - functions with receivers
 - extension methods (note that these are only necessary because it uses the OOP approach)
+- A big standard library.
 
 #### Summary
 
@@ -139,8 +141,8 @@ So, what is Candy?
 It's a language that combines
 
 - Rust's type system and primitives,
-- Dart's code generator, comprehensive standard library, and curated package ecosystem, and
-- Kotlin's trailing lambdas, receiver functions.
+- Dart's code generator, collection literals, and curated package ecosystem, and
+- Kotlin's trailing lambdas, receiver functions, and comprehensive standard library.
 
 ### 1.3. Paradigms
 
