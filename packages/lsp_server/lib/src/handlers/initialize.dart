@@ -19,6 +19,8 @@ class ClientDynamicRegistrations {
       _capabilities.textDocument?.synchronization?.dynamicRegistration ?? false;
   bool get hover =>
       _capabilities.textDocument?.hover?.dynamicRegistration ?? false;
+  bool get definition =>
+      _capabilities.textDocument?.definition?.dynamicRegistration ?? false;
   bool get folding =>
       _capabilities.textDocument?.foldingRange?.dynamicRegistration ?? false;
   bool get codeActions =>
@@ -76,7 +78,7 @@ class InitializeMessageHandler
       dynamicRegistrations.hover ? null : true, // hoverProvider
       null,
       null,
-      null,
+      dynamicRegistrations.definition ? null : true, // definitionProvider
       null,
       null,
       null,

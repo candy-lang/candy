@@ -35,30 +35,35 @@ class HoverHandler extends MessageHandler<TextDocumentPositionParams, Hover> {
       );
     }
 
-    final offset = params.position.toOffset(server, resourceId);
-    final nodeAst = NodeFinderVisitor.find(fileAst, offset);
-    var content = 'AST: $nodeAst';
-    if (nodeAst is ast.Expression) {
-      final nodeHir = context.callQuery(
-        getExpressionFromAstId,
-        Tuple2(resourceId, nodeAst.id),
-      );
-      assert(nodeHir is Some);
-      final type = nodeHir.value.value.type.toString();
+    final astNodeResult =
+        getAstNodeAtPosition(server, resourceId, params.position);
+    if (astNodeResult is Error) {
+      return error(ErrorCodes.InternalError, astNodeResult.error);
+    }
+    final astNode = astNodeResult.value;
+    var content = 'AST: $astNode';
+
+    final expressionHirResult =
+        getExpressionHirAtPosition(server, resourceId, params.position);
+    if (expressionHirResult is Error) {
+      return error(ErrorCodes.InternalError, expressionHirResult.error);
+    }
+    final expressionHir = expressionHirResult.value;
+    if (expressionHir is Some) {
       content = '```candy\n'
-          '$type\n'
+          '${expressionHir.value.type}\n'
           '```\n'
           '\n'
           '---\n'
           '\n'
-          'HIR: $nodeHir\n'
+          'HIR: ${expressionHir.value}\n'
           '\n'
           '---\n'
           '\n'
           '$content';
     }
 
-    final range = nodeAst.span.toRange(server, resourceId);
+    final range = astNode.span.toRange(server, resourceId);
     return success(Hover(
       Either2.t2(MarkupContent(MarkupKind.Markdown, content)),
       range,

@@ -112,7 +112,9 @@ class _BodyPropertyVisitor extends ast.TraversingAstVisitor {
   final _labels = <TypeLabel>[];
 
   @override
-  void visitPropertyDeclaration(ast.PropertyDeclaration node) {
+  void visitPropertyDeclarationExpression(
+    ast.PropertyDeclarationExpression node,
+  ) {
     if (node.type == null) {
       final id = hirInfos.second.map[node.id];
       final hir = getExpression(context, id).value;
@@ -121,6 +123,6 @@ class _BodyPropertyVisitor extends ast.TraversingAstVisitor {
         hir.type.toString(),
       ));
     }
-    super.visitPropertyDeclaration(node);
+    super.visitPropertyDeclarationExpression(node);
   }
 }

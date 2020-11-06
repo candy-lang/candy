@@ -31,7 +31,7 @@ class FoldingHandler
     if (fileAst == null) {
       return error(
         ErrorCodes.InternalError,
-        "Couldn't parse AST of `$resourceId`.",
+        "Couldn't parse AST of `$resourceId`: ${context.reportedErrors}",
       );
     }
 
