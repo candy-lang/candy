@@ -87,6 +87,9 @@ class GlobalQueryContext {
   final QueryConfig config;
 
   Option<R> callQuery<K, R>(Query<K, R> query, K key) {
+    final cachedResult = getResult<R>(query.name, key);
+    if (cachedResult is Some) return cachedResult;
+
     RecordedQueryCall result;
     try {
       result = QueryContext(this)._execute(query, key);
