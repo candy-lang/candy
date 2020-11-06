@@ -161,9 +161,8 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             declarationIdToModuleId(context, id.parent) ==
                 CandyType.arrayModuleId) {
           final t = dart.refer('T');
-          final name = _name(node.id);
           final function = dart.Method((b) => b
-            ..name = name
+            ..name = _name(node.id)
             ..returns = dart.TypeReference((b) => b
               ..symbol = 'List'
               ..url = dartCoreUrl

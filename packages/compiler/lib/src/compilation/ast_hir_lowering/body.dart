@@ -1839,7 +1839,7 @@ extension on Context {
       }
 
       throw CompilerError.unsupportedFeature(
-        'Callable expressions are not yet supported (target $target).',
+        'Callable expressions are not yet supported (target: $target).',
         location: ErrorLocation(resourceId, expression.span),
       );
     });
@@ -2017,7 +2017,7 @@ extension on Context {
   ) {
     assert(target != null);
     assert(target.identifier is hir.ReflectionIdentifier,
-        'target.identifier is not a ReflectionIdentifier: ${target.identifier}');
+        'target.identifier is not a `ReflectionIdentifier`: ${target.identifier}');
 
     final classId = (target.identifier as hir.ReflectionIdentifier).id;
     // ignore: non_constant_identifier_names

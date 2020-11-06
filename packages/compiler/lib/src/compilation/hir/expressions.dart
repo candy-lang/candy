@@ -1,6 +1,6 @@
-import 'package:compiler/compiler.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../../compiler.dart';
 import 'ids.dart';
 import 'type.dart';
 
