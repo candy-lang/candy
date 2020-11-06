@@ -4,6 +4,7 @@ import '../../../lexer/token.dart';
 import '../../../source_span.dart';
 import '../../../syntactic_entity.dart';
 import '../../../utils.dart';
+import '../../../visitor.dart';
 import '../declarations.dart';
 import '../node.dart';
 import '../types.dart';
@@ -22,6 +23,9 @@ abstract class Literal<T> extends Expression implements _$Literal<T> {
   const Literal._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitLiteral(this);
+
+  @override
   Iterable<SyntacticEntity> get children => [value];
 }
 
@@ -34,6 +38,9 @@ abstract class StringLiteral extends Expression implements _$StringLiteral {
     @required OperatorToken trailingQuote,
   }) = _StringLiteral;
   const StringLiteral._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitStringLiteral(this);
 
   @override
   Iterable<SyntacticEntity> get children => [
@@ -60,6 +67,9 @@ abstract class StringLiteralPart extends AstNode
   const StringLiteralPart._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitStringLiteralPart(this);
+
+  @override
   Iterable<SyntacticEntity> get children => when(
         literal: (_, value, __) => [value],
         interpolated: (_, leadingBrace, expression, trailingBrace) =>
@@ -81,6 +91,9 @@ abstract class LambdaLiteral extends Expression implements _$LambdaLiteral {
   const LambdaLiteral._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitLambdaLiteral(this);
+
+  @override
   Iterable<SyntacticEntity> get children => [
         leftBrace,
         ...interleave(valueParameters, valueParameterCommata),
@@ -96,6 +109,9 @@ abstract class Identifier extends Expression implements _$Identifier {
   const Identifier._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitIdentifier(this);
+
+  @override
   Iterable<SyntacticEntity> get children => [value];
 }
 
@@ -108,6 +124,9 @@ abstract class GroupExpression extends Expression implements _$GroupExpression {
     @required OperatorToken rightParenthesis,
   }) = _ParenthesizedExpression;
   const GroupExpression._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitGroupExpression(this);
 
   @override
   Iterable<SyntacticEntity> get children => [
@@ -143,6 +162,9 @@ abstract class PrefixExpression extends UnaryExpression
   const PrefixExpression._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitPrefixExpression(this);
+
+  @override
   Iterable<SyntacticEntity> get children => [operatorToken, operand];
 }
 
@@ -155,6 +177,9 @@ abstract class PostfixExpression extends UnaryExpression
     @required OperatorToken operatorToken,
   }) = _PostfixExpression;
   const PostfixExpression._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitPostfixExpression(this);
 
   @override
   Iterable<SyntacticEntity> get children => [operand, operatorToken];
@@ -172,6 +197,9 @@ abstract class BinaryExpression extends OperatorExpression
   const BinaryExpression._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitBinaryExpression(this);
+
+  @override
   Iterable<SyntacticEntity> get children =>
       [leftOperand, operatorToken, rightOperand];
 }
@@ -186,6 +214,9 @@ abstract class NavigationExpression extends Expression
     @required IdentifierToken name,
   }) = _NavigationExpression;
   const NavigationExpression._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitNavigationExpression(this);
 
   @override
   Iterable<SyntacticEntity> get children => [target, dot, name];
@@ -205,6 +236,9 @@ abstract class CallExpression extends Expression implements _$CallExpression {
   const CallExpression._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitCallExpression(this);
+
+  @override
   Iterable<SyntacticEntity> get children => [
         target,
         if (typeArguments != null) typeArguments,
@@ -222,6 +256,9 @@ abstract class Argument extends AstNode implements _$Argument {
     @required Expression expression,
   }) = _Argument;
   const Argument._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitArgument(this);
 
   @override
   Iterable<SyntacticEntity> get children => [
@@ -246,6 +283,9 @@ abstract class IndexExpression extends Expression implements _$IndexExpression {
   const IndexExpression._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitIndexExpression(this);
+
+  @override
   Iterable<SyntacticEntity> get children =>
       [target, leftSquareBracket, ...indices, rightSquareBracket];
 }
@@ -259,6 +299,9 @@ abstract class IsExpression extends Expression implements _$IsExpression {
     @required Type type,
   }) = _IsExpression;
   const IsExpression._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitIsExpression(this);
 
   @override
   Iterable<SyntacticEntity> get children => [instance, isOperator, type];
@@ -277,6 +320,9 @@ abstract class IfExpression extends Expression implements _$IfExpression {
     LambdaLiteral elseBody,
   }) = _IfExpression;
   const IfExpression._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitIfExpression(this);
 
   @override
   Iterable<SyntacticEntity> get children => [
@@ -298,6 +344,9 @@ abstract class LoopExpression extends Expression implements _$LoopExpression {
   const LoopExpression._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitLoopExpression(this);
+
+  @override
   Iterable<SyntacticEntity> get children => [loopKeyword, body];
 }
 
@@ -310,6 +359,9 @@ abstract class WhileExpression extends Expression implements _$WhileExpression {
     @required LambdaLiteral body,
   }) = _WhileExpression;
   const WhileExpression._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitWhileExpression(this);
 
   @override
   Iterable<SyntacticEntity> get children => [whileKeyword, condition, body];
@@ -326,6 +378,9 @@ abstract class ReturnExpression extends Expression
   const ReturnExpression._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitReturnExpression(this);
+
+  @override
   Iterable<SyntacticEntity> get children =>
       [returnKeyword, if (expression != null) expression];
 }
@@ -338,6 +393,9 @@ abstract class BreakExpression extends Expression implements _$BreakExpression {
     Expression expression,
   }) = _BreakExpression;
   const BreakExpression._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitBreakExpression(this);
 
   @override
   Iterable<SyntacticEntity> get children =>
@@ -354,6 +412,9 @@ abstract class ContinueExpression extends Expression
   const ContinueExpression._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitContinueExpression(this);
+
+  @override
   Iterable<SyntacticEntity> get children => [continueKeyword];
 }
 
@@ -365,6 +426,9 @@ abstract class ThrowExpression extends Expression implements _$ThrowExpression {
     @required Expression error,
   }) = _ThrowExpression;
   const ThrowExpression._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitThrowExpression(this);
 
   @override
   Iterable<SyntacticEntity> get children => [throwKeyword, error];

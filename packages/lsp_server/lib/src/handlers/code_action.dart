@@ -14,9 +14,9 @@ abstract class CandyCodeActionKind {
 class CodeActionHandler extends MessageHandler<CodeActionParams,
     List<Either2<Command, CodeAction>>> {
   CodeActionHandler(AnalysisServer server) : super(server);
+
   @override
   Method get handlesMessage => Method.textDocument_codeAction;
-
   @override
   LspJsonHandler<CodeActionParams> get jsonHandler =>
       CodeActionParams.jsonHandler;

@@ -14,6 +14,7 @@ import 'generated/lsp_protocol/protocol_special.dart';
 import 'handlers/handlers.dart';
 import 'handlers/states.dart';
 import 'overlay_resource_provider.dart';
+import 'type_labels.dart';
 import 'utils.dart';
 
 class AnalysisServer {
@@ -26,14 +27,12 @@ class AnalysisServer {
         assert(candyDirectory != null) {
     messageHandler = UninitializedStateMessageHandler(this);
 
-    channel
-      ..listen(_handleMessage,
-          onDone: () {}, onError: sendSocketErrorNotification)
-      ..sendNotification(NotificationMessage(
-        Method.window_logMessage,
-        LogMessageParams(MessageType.Info, 'Started Candy LSP'),
-        jsonRpcVersion,
-      ));
+    channel.listen(
+      _handleMessage,
+      onDone: () {},
+      onError: sendSocketErrorNotification,
+    );
+    sendLogMessage('Started Candy LSP');
   }
 
   /// The channel from which messages are received and to which responses should
@@ -97,7 +96,7 @@ class AnalysisServer {
   final completers = <int, Completer<ResponseMessage>>{};
 
   void sendMessageToUser(MessageType type, String message) {
-    channel.sendNotification(NotificationMessage(
+    sendNotification(NotificationMessage(
       Method.window_showMessage,
       ShowMessageParams(type, message),
       jsonRpcVersion,
@@ -108,12 +107,15 @@ class AnalysisServer {
       sendMessageToUser(MessageType.Error, message);
 
   void sendLogMessage(String message, [MessageType type = MessageType.Info]) {
-    channel.sendNotification(NotificationMessage(
+    sendNotification(NotificationMessage(
       Method.window_logMessage,
       LogMessageParams(type, message),
       jsonRpcVersion,
     ));
   }
+
+  void sendNotification(NotificationMessage notification) =>
+      channel.sendNotification(notification);
 
   // Section: Requests & Responses
 
@@ -297,6 +299,7 @@ class AnalysisServer {
     final context = queryConfig.createContext()
       ..callQuery(calculateFullHir, resourceId);
     _updateErrors(context.reportedErrorsByResourceId);
+    updateTypeLabels(this, resourceId);
   }
 
   void _updateErrors(Map<ResourceId, List<ReportedCompilerError>> errors) {
@@ -327,7 +330,7 @@ class AnalysisServer {
                 ],
               ))
           .toList();
-      channel.sendNotification(NotificationMessage(
+      sendNotification(NotificationMessage(
         Method.textDocument_publishDiagnostics,
         PublishDiagnosticsParams(resourceIdToFileUri(resourceId), diagnostics),
         jsonRpcVersion,

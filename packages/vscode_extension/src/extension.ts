@@ -5,7 +5,8 @@ import {
   LanguageClient,
   LanguageClientOptions,
   StreamInfo,
-} from "vscode-languageclient";
+} from "vscode-languageclient/node";
+import { TypeLabelsDecorations } from "./type_labels";
 
 let client: LanguageClient;
 
@@ -22,8 +23,9 @@ export async function activate(context: vs.ExtensionContext) {
     spawnServer,
     clientOptions
   );
-
   client.start();
+
+  context.subscriptions.push(new TypeLabelsDecorations(client));
 }
 
 export function deactivate(): Thenable<void> | undefined {

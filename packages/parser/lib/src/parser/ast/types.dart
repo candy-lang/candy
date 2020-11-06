@@ -3,6 +3,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../lexer/token.dart';
 import '../../syntactic_entity.dart';
 import '../../utils.dart';
+import '../../visitor.dart';
 import 'node.dart';
 
 part 'types.freezed.dart';
@@ -21,6 +22,9 @@ abstract class UserType extends Type implements _$UserType {
   const UserType._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitUserType(this);
+
+  @override
   Iterable<SyntacticEntity> get children {
     assert(simpleTypes.length == dots.length + 1);
     return [
@@ -37,6 +41,9 @@ abstract class SimpleUserType extends Type implements _$SimpleUserType {
   const SimpleUserType._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitSimpleUserType(this);
+
+  @override
   Iterable<SyntacticEntity> get children => [name];
 }
 
@@ -48,6 +55,9 @@ abstract class GroupType extends Type implements _$GroupType {
     @required OperatorToken rightParenthesis,
   }) = _GroupType;
   const GroupType._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitGroupType(this);
 
   @override
   Iterable<SyntacticEntity> get children =>
@@ -68,6 +78,9 @@ abstract class FunctionType extends Type implements _$FunctionType {
     @required Type returnType,
   }) = _FunctionType;
   const FunctionType._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitFunctionType(this);
 
   @override
   Iterable<SyntacticEntity> get children => [
@@ -92,6 +105,9 @@ abstract class TupleType extends Type implements _$TupleType {
   const TupleType._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitTupleType(this);
+
+  @override
   Iterable<SyntacticEntity> get children =>
       [leftParenthesis, ...interleave(types, commata), rightParenthesis];
 }
@@ -104,6 +120,9 @@ abstract class UnionType extends Type implements _$UnionType {
     @required Type rightType,
   }) = _UnionType;
   const UnionType._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitUnionType(this);
 
   @override
   Iterable<SyntacticEntity> get children => [leftType, bar, rightType];
@@ -119,6 +138,9 @@ abstract class IntersectionType extends Type implements _$IntersectionType {
   const IntersectionType._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitIntersectionType(this);
+
+  @override
   Iterable<SyntacticEntity> get children => [leftType, ampersand, rightType];
 }
 
@@ -131,6 +153,9 @@ abstract class TypeParameters extends AstNode implements _$TypeParameters {
     @required OperatorToken rightAngle,
   }) = _TypeParameters;
   const TypeParameters._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitTypeParameters(this);
 
   @override
   Iterable<SyntacticEntity> get children =>
@@ -148,6 +173,9 @@ abstract class TypeParameter extends AstNode implements _$TypeParameter {
   const TypeParameter._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitTypeParameter(this);
+
+  @override
   Iterable<SyntacticEntity> get children =>
       [...modifiers, name, if (colon != null) colon, if (bound != null) bound];
 }
@@ -163,6 +191,9 @@ abstract class TypeArguments extends AstNode implements _$TypeArguments {
   const TypeArguments._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitTypeArguments(this);
+
+  @override
   Iterable<SyntacticEntity> get children =>
       [leftAngle, ...interleave(arguments, commata), rightAngle];
 }
@@ -174,6 +205,9 @@ abstract class TypeArgument extends AstNode implements _$TypeArgument {
     @required Type type,
   }) = _TypeArgument;
   const TypeArgument._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitTypeArgument(this);
 
   @override
   Iterable<SyntacticEntity> get children => [...modifiers, type];
