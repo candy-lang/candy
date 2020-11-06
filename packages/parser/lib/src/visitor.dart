@@ -70,6 +70,7 @@ abstract class AstVisitor<R> {
   R visitBreakExpression(BreakExpression node);
   R visitContinueExpression(ContinueExpression node);
   R visitThrowExpression(ThrowExpression node);
+  R visitPropertyDeclarationExpression(PropertyDeclarationExpression node);
 }
 
 abstract class GeneralizingAstVisitor<R> extends AstVisitor<R> {
@@ -202,28 +203,31 @@ abstract class GeneralizingAstVisitor<R> extends AstVisitor<R> {
   R visitContinueExpression(ContinueExpression node) => visitExpression(node);
   @override
   R visitThrowExpression(ThrowExpression node) => visitExpression(node);
+  @override
+  R visitPropertyDeclarationExpression(PropertyDeclarationExpression node) =>
+      visitExpression(node);
 }
 
-class NodeFinderVisitor extends GeneralizingAstVisitor<SyntacticEntity> {
+class NodeFinderVisitor extends GeneralizingAstVisitor<AstNode> {
   const NodeFinderVisitor._(this.offset) : assert(offset != null);
 
-  static SyntacticEntity find(CandyFile file, int offset) =>
+  static AstNode find(CandyFile file, int offset) =>
       file.accept(NodeFinderVisitor._(offset));
 
   final int offset;
 
   @override
-  SyntacticEntity visitSyntacticEntity(SyntacticEntity node) {
+  AstNode visitSyntacticEntity(SyntacticEntity node) {
     throw StateError('This should never be called.');
   }
 
   @override
-  SyntacticEntity visitToken(Token node) {
+  AstNode visitToken(Token node) {
     throw StateError('This should never be called.');
   }
 
   @override
-  SyntacticEntity visitAstNode(AstNode node) {
+  AstNode visitAstNode(AstNode node) {
     assert(node.span.contains(offset));
 
     final childMatches = node.children

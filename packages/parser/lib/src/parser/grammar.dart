@@ -279,7 +279,6 @@ class ParserGrammar {
     final typeDeclaration = value[4] as List<dynamic>;
     final initializerDeclaration = value[5] as List<dynamic>;
     return PropertyDeclaration(
-      _id++,
       modifiers: (value[0] as List<ModifierToken>) ?? [],
       letKeyword: value[1] as LetKeywordToken,
       name: value[3] as IdentifierToken,
@@ -742,7 +741,7 @@ class ParserGrammar {
             LexerGrammar.NLs,
         mapper: (prefix, expression) {
           final typeDeclaration = prefix[4] as List<dynamic>;
-          return PropertyDeclaration(
+          return PropertyDeclarationExpression(
             _id++,
             modifiers: (prefix[0] as List<ModifierToken>) ?? [],
             letKeyword: prefix[1] as LetKeywordToken,

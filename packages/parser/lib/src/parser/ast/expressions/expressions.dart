@@ -433,3 +433,36 @@ abstract class ThrowExpression extends Expression implements _$ThrowExpression {
   @override
   Iterable<SyntacticEntity> get children => [throwKeyword, error];
 }
+
+@freezed
+abstract class PropertyDeclarationExpression extends Expression
+    implements _$PropertyDeclarationExpression {
+  const factory PropertyDeclarationExpression(
+    int id, {
+    @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
+    @required LetKeywordToken letKeyword,
+    @required IdentifierToken name,
+    OperatorToken colon,
+    Type type,
+    OperatorToken equals,
+    Expression initializer,
+  }) = _PropertyDeclarationExpression;
+  const PropertyDeclarationExpression._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) =>
+      visitor.visitPropertyDeclarationExpression(this);
+
+  @override
+  Iterable<SyntacticEntity> get children => [
+        ...modifiers,
+        letKeyword,
+        name,
+        if (colon != null) colon,
+        if (type != null) type,
+        if (equals != null) equals,
+        if (initializer != null) initializer,
+      ];
+
+  bool get isMutable => modifiers.any((m) => m is MutModifierToken);
+}
