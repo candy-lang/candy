@@ -58,7 +58,7 @@ public class ArrayList<Item> {
   //   list
   // }
 
-  static fun create<Item>(capacity: Int /* Uint */): ArrayList<Item> {
+  static fun create<Item>(capacity: Int /* UInt */): ArrayList<Item> {
     /// Creates a new, empty `ArrayList` with the given capacity.
 
     ArrayList<Item>(
@@ -71,9 +71,7 @@ public class ArrayList<Item> {
   mut let length_: Int /* UInt */
 
   // TODO(marcelgarus): Getterize!
-  fun capacity(): Int /* UInt */ {
-    items.length
-  }
+  fun capacity(): Int /* UInt */ { items.length }
 
   fun grow() {
     /// Increases the capacity.
