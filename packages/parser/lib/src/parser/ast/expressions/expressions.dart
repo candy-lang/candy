@@ -53,11 +53,8 @@ abstract class StringLiteral extends Expression implements _$StringLiteral {
 @freezed
 abstract class StringLiteralPart extends AstNode
     implements _$StringLiteralPart {
-  const factory StringLiteralPart.literal(
-    int id,
-    LiteralStringToken value, {
-    SourceSpan span,
-  }) = LiteralStringLiteralPart;
+  const factory StringLiteralPart.literal(int id, LiteralStringToken value) =
+      LiteralStringLiteralPart;
   const factory StringLiteralPart.interpolated(
     int id, {
     @required OperatorToken leadingBrace,
@@ -71,7 +68,7 @@ abstract class StringLiteralPart extends AstNode
 
   @override
   Iterable<SyntacticEntity> get children => when(
-        literal: (_, value, __) => [value],
+        literal: (_, value) => [value],
         interpolated: (_, leadingBrace, expression, trailingBrace) =>
             [leadingBrace, expression, trailingBrace],
       );
