@@ -81,7 +81,7 @@ public class ArrayList<Item> {
     let newItems = Array.filled<Option<Item>>(2 * capacity(), None<Item>())
     mut let index = 0
 
-    while index < length() {
+    while index < length_ {
       newItems.set(index, items.get(index))
       index = index + 1
     }
@@ -143,7 +143,7 @@ impl<Item> ArrayList<Item>: MutableList<Item> {
     length_ = length_ - 1
     removed
   }
-  
+
   fun clear() {
     mut let index = 0
     while index < length_ {
