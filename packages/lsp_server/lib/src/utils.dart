@@ -2,7 +2,7 @@ import 'package:compiler/compiler.dart';
 import 'package:compiler/compiler.dart' as hir;
 import 'package:parser/parser.dart' hide Token;
 import 'package:parser/parser.dart' as ast;
-import 'package:petitparser/petitparser.dart';
+import 'package:petitparser/petitparser.dart' hide Result;
 
 import 'analysis_server.dart';
 import 'generated/lsp_protocol/protocol_generated.dart';
@@ -59,27 +59,46 @@ extension ErrorLocationConversion on ErrorLocation {
   }
 }
 
-Option<hir.Expression> getExpressionAtOffset(
+Result<ast.AstNode, String> getAstNodeAtPosition(
   AnalysisServer server,
   ResourceId resourceId,
   Position position,
 ) {
   final context = server.queryConfig.createContext();
-
   final fileAst = context.callQuery(getAst, resourceId).valueOrNull;
-  assert(fileAst != null);
+  if (fileAst == null) {
+    return Error(
+      "Couldn't parse AST of `$resourceId`: ${context.reportedErrors}",
+    );
+  }
 
   final offset = position.toOffset(server, resourceId);
-  final nodeAst = NodeFinderVisitor.find(fileAst, offset);
-  if (nodeAst is! ast.Expression) return None();
-  final expressionAst = nodeAst as ast.Expression;
+  return Ok(NodeFinderVisitor.find(fileAst, offset));
+}
 
-  final nodeHir = context.callQuery(
+Result<Option<hir.Expression>, String> getExpressionHirAtPosition(
+  AnalysisServer server,
+  ResourceId resourceId,
+  Position position,
+) {
+  final astNodeResult = getAstNodeAtPosition(server, resourceId, position);
+  if (astNodeResult is Error) return Error(astNodeResult.error);
+  final astNode = astNodeResult.value;
+  if (astNode is! ast.Expression) return Ok(None());
+  final expressionAst = astNode as ast.Expression;
+
+  final context = server.queryConfig.createContext();
+  final nodeHirResult = context.callQuery(
     getExpressionFromAstId,
     Tuple2(resourceId, expressionAst.id),
   );
-  assert(nodeHir is Some);
-  return nodeHir.flatMapValue((it) => it);
+  if (nodeHirResult is None) {
+    return Error(
+      "Couldn't get HIR of expression ${expressionAst.id}: ${context.reportedErrors}",
+    );
+  }
+  final nodeHir = nodeHirResult.value;
+  return Ok(nodeHir);
 }
 
 /// Combines the [Object.hashCode] values of an arbitrary number of objects

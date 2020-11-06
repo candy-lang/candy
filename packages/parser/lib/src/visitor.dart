@@ -249,3 +249,25 @@ abstract class TraversingAstVisitor extends GeneralizingAstVisitor<void> {
     for (final innerNode in node.children) innerNode.accept(this);
   }
 }
+
+class ExpressionFinderVisitor extends TraversingAstVisitor {
+  ExpressionFinderVisitor._(this.id) : assert(id != null);
+
+  static AstNode find(CandyFile file, int id) {
+    final visitor = ExpressionFinderVisitor._(id);
+    file.accept(visitor);
+    return visitor._result;
+  }
+
+  final int id;
+  Expression _result;
+
+  @override
+  void visitExpression(Expression node) {
+    if (node.id == id) {
+      _result = node;
+      return;
+    }
+    super.visitExpression(node);
+  }
+}
