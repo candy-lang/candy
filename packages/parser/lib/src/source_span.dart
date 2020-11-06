@@ -1,5 +1,4 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:meta/meta.dart';
 
 import 'utils.dart';
 
@@ -24,6 +23,8 @@ abstract class SourceSpan implements _$SourceSpan {
 
     return SourceSpan(start + offset, end + offset);
   }
+
+  bool contains(int offset) => start <= offset && offset < end;
 
   @override
   String toString() => '$start–$end';

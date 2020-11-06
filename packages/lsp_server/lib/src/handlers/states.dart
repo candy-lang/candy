@@ -13,6 +13,7 @@ import 'execute_command.dart';
 import 'exit.dart';
 import 'folding.dart';
 import 'handlers.dart';
+import 'hover.dart';
 import 'initialize.dart';
 import 'initialized.dart';
 import 'shutdown.dart';
@@ -80,6 +81,7 @@ class InitializedStateMessageHandler extends ServerStateMessageHandler {
     registerHandler(TextDocumentOpenHandler(server));
     registerHandler(TextDocumentChangeHandler(server));
     registerHandler(TextDocumentCloseHandler(server));
+    registerHandler(HoverHandler(server));
     registerHandler(CodeActionHandler(server));
     registerHandler(ExecuteCommandHandler(server));
     registerHandler(FoldingHandler(server));

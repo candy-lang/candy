@@ -29,7 +29,9 @@ abstract class CandyType with _$CandyType {
     @Default(<CandyType>[]) List<CandyType> parameterTypes,
     @required CandyType returnType,
   }) = FunctionCandyType;
+  @Assert('types.length > 0')
   const factory CandyType.union(List<CandyType> types) = UnionCandyType;
+  @Assert('types.length > 0')
   const factory CandyType.intersection(List<CandyType> types) =
       IntersectionCandyType;
   const factory CandyType.parameter(String name, DeclarationId declarationId) =

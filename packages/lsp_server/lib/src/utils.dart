@@ -1,5 +1,7 @@
 import 'package:compiler/compiler.dart';
+import 'package:compiler/compiler.dart' as hir;
 import 'package:parser/parser.dart' hide Token;
+import 'package:parser/parser.dart' as ast;
 import 'package:petitparser/petitparser.dart';
 
 import 'analysis_server.dart';
@@ -7,11 +9,42 @@ import 'generated/lsp_protocol/protocol_generated.dart';
 
 bool isCandyDocument(String uri) => uri.endsWith('.candy');
 
-extension SourceSpanToRange on SourceSpan {
-  Range toRange(AnalysisServer server, ResourceId resourceId) {
+extension PositionToOffset on Position {
+  int toOffset(AnalysisServer server, ResourceId resourceId) {
     final context = QueryContext(server.queryConfig.createContext());
     final source = server.resourceProvider.getContent(context, resourceId);
-    return Range(positionOf(source, start), positionOf(source, end));
+
+    final lineOffset = line == 0
+        ? 0
+        : Token.newlineParser().token().matchesSkipping(source)[line - 1].stop;
+    return lineOffset + character;
+  }
+}
+
+extension OffsetToPosition on int {
+  Position toPosition(AnalysisServer server, ResourceId resourceId) {
+    final context = QueryContext(server.queryConfig.createContext());
+    final source = server.resourceProvider.getContent(context, resourceId);
+
+    var line = 0;
+    var column = 0;
+    for (final lineToken
+        in Token.newlineParser().token().matchesSkipping(source)) {
+      if (this < lineToken.stop) return Position(line, this - column);
+
+      line++;
+      column = lineToken.stop;
+    }
+    return Position(line, this - column);
+  }
+}
+
+extension SourceSpanToRange on SourceSpan {
+  Range toRange(AnalysisServer server, ResourceId resourceId) {
+    return Range(
+      start.toPosition(server, resourceId),
+      end.toPosition(server, resourceId),
+    );
   }
 }
 
@@ -19,22 +52,34 @@ extension ErrorLocationConversion on ErrorLocation {
   Location toLocation(AnalysisServer server) =>
       Location(server.resourceIdToFileUri(resourceId), toRange(server));
   Range toRange(AnalysisServer server) {
-    final context = QueryContext(server.queryConfig.createContext());
-    final source = server.resourceProvider.getContent(context, resourceId);
-    return Range(positionOf(source, span.start), positionOf(source, span.end));
+    return Range(
+      span.start.toPosition(server, resourceId),
+      span.end.toPosition(server, resourceId),
+    );
   }
 }
 
-Position positionOf(String buffer, int offset) {
-  var line = 0;
-  var column = 0;
-  for (final token in Token.newlineParser().token().matchesSkipping(buffer)) {
-    if (offset < token.stop) return Position(line, offset - column);
+Option<hir.Expression> getExpressionAtOffset(
+  AnalysisServer server,
+  ResourceId resourceId,
+  Position position,
+) {
+  final context = server.queryConfig.createContext();
 
-    line++;
-    column = token.stop;
-  }
-  return Position(line, offset - column);
+  final fileAst = context.callQuery(getAst, resourceId).valueOrNull;
+  assert(fileAst != null);
+
+  final offset = position.toOffset(server, resourceId);
+  final nodeAst = NodeFinderVisitor.find(fileAst, offset);
+  if (nodeAst is! ast.Expression) return None();
+  final expressionAst = nodeAst as ast.Expression;
+
+  final nodeHir = context.callQuery(
+    getExpressionFromAstId,
+    Tuple2(resourceId, expressionAst.id),
+  );
+  assert(nodeHir is Some);
+  return nodeHir.flatMapValue((it) => it);
 }
 
 /// Combines the [Object.hashCode] values of an arbitrary number of objects

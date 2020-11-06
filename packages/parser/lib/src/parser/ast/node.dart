@@ -11,7 +11,13 @@ abstract class AstNode extends SyntacticEntity {
   SourceSpan get span {
     final childs = children;
     assert(childs.isNotEmpty);
-    return SourceSpan(childs.first.span.start, childs.last.span.end);
+
+    final start = childs.firstWhere((it) => it.span != null)?.span?.start;
+    final end = childs.lastWhere((it) => it.span != null)?.span?.end;
+    assert((start != null) == (end != null));
+    if (start == null) return null;
+
+    return SourceSpan(start, end);
   }
 
   Iterable<SyntacticEntity> get children => [];

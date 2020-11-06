@@ -24,6 +24,17 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "colors": [
+      {
+        "id": "candy.typeLabels",
+        "description": "The color of type annotations shown after properties without an explicit type. If not supplied, the color for `tab.inactiveForeground` will be used.",
+        "defaults": {
+          "dark": "tab.inactiveForeground",
+          "light": "tab.inactiveForeground",
+          "highContrast": "tab.inactiveForeground"
+        }
+      }
+    ],
     "commands": [],
     "configuration": {
       "title": "🍭 Candy",
@@ -84,7 +95,7 @@
     "test": "node ./out/test/runTest.js"
   },
   "dependencies": {
-    "vscode-languageclient": "^6.1.3"
+    "vscode-languageclient": "^7.0.0-next.12"
   },
   "devDependencies": {
     "@types/vscode": "^1.48.0",

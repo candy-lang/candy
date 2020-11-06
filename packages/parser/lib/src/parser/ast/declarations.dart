@@ -5,6 +5,7 @@ import '../../lexer/lexer.dart';
 import '../../source_span.dart';
 import '../../syntactic_entity.dart';
 import '../../utils.dart';
+import '../../visitor.dart';
 import 'expressions/expressions.dart';
 import 'node.dart';
 import 'types.dart';
@@ -32,6 +33,9 @@ abstract class ModuleDeclaration extends Declaration
   const ModuleDeclaration._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitModuleDeclaration(this);
+
+  @override
   Iterable<SyntacticEntity> get children =>
       [...modifiers, moduleKeyword, name, body];
 
@@ -52,6 +56,9 @@ abstract class TraitDeclaration extends Declaration
     BlockDeclarationBody body,
   }) = _TraitDeclaration;
   const TraitDeclaration._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitTraitDeclaration(this);
 
   @override
   Iterable<SyntacticEntity> get children => [
@@ -83,6 +90,9 @@ abstract class ImplDeclaration extends Declaration
   const ImplDeclaration._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitImplDeclaration(this);
+
+  @override
   Iterable<SyntacticEntity> get children => [
         ...modifiers,
         implKeyword,
@@ -110,6 +120,9 @@ abstract class ClassDeclaration extends Declaration
   const ClassDeclaration._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitClassDeclaration(this);
+
+  @override
   Iterable<SyntacticEntity> get children => [
         ...modifiers,
         classKeyword,
@@ -135,6 +148,9 @@ abstract class BlockDeclarationBody extends AstNode
   const BlockDeclarationBody._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitBlockDeclarationBody(this);
+
+  @override
   Iterable<SyntacticEntity> get children =>
       [leftBrace, ...declarations, rightBrace];
 }
@@ -149,6 +165,9 @@ abstract class ConstructorCall extends AstNode implements _$ConstructorCall {
     @required OperatorToken rightParenthesis,
   }) = _ConstructorCall;
   const ConstructorCall._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitConstructorCall(this);
 
   @override
   Iterable<SyntacticEntity> get children => [
@@ -176,6 +195,9 @@ abstract class FunctionDeclaration extends Declaration
     LambdaLiteral body,
   }) = _FunctionDeclaration;
   const FunctionDeclaration._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitFunctionDeclaration(this);
 
   @override
   Iterable<SyntacticEntity> get children => [
@@ -210,6 +232,9 @@ abstract class ValueParameter extends AstNode implements _$ValueParameter {
   const ValueParameter._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitValueParameter(this);
+
+  @override
   Iterable<SyntacticEntity> get children => [
         name,
         colon,
@@ -236,12 +261,15 @@ abstract class PropertyDeclaration extends Declaration
   const PropertyDeclaration._();
 
   @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitPropertyDeclaration(this);
+
+  @override
   Iterable<SyntacticEntity> get children => [
         ...modifiers,
         letKeyword,
         name,
-        colon,
-        type,
+        if (colon != null) colon,
+        if (type != null) type,
         if (equals != null) equals,
         if (initializer != null) initializer,
         ...accessors,
@@ -273,6 +301,9 @@ abstract class PropertyAccessor extends Declaration
     LambdaLiteral body,
   }) = SetterPropertyAccessor;
   const PropertyAccessor._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitPropertyAccessor(this);
 
   @override
   Iterable<SyntacticEntity> get children => when(

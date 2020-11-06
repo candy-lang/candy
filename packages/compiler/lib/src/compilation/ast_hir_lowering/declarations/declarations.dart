@@ -7,6 +7,13 @@ import '../../../utils.dart';
 import '../../ast.dart';
 import '../../hir.dart' as hir;
 import '../../hir/ids.dart';
+import 'module.dart';
+import 'trait.dart';
+import 'impl.dart';
+import 'class.dart';
+import 'property.dart';
+import 'function.dart';
+import 'constructor.dart';
 import '../type.dart';
 
 final doesDeclarationExist = Query<DeclarationId, bool>(
@@ -131,6 +138,42 @@ final getInnerDeclarationIds = Query<DeclarationId, List<DeclarationId>>(
     return declarationIds;
   },
 );
+
+final getAllDeclarationIds = Query<ResourceId, List<DeclarationId>>(
+  'getAllDeclarationIds',
+  provider: (context, resourceId) =>
+      _getAllInnerDeclarationIds(context, DeclarationId(resourceId, []))
+          .toList(),
+);
+Iterable<DeclarationId> _getAllInnerDeclarationIds(
+  QueryContext context,
+  DeclarationId id,
+) sync* {
+  List<DeclarationId> nextIds;
+  if (id.isModule) {
+    nextIds =
+        getModuleDeclarationHir(context, declarationIdToModuleId(context, id))
+            .innerDeclarationIds;
+  } else if (id.isTrait) {
+    nextIds = getTraitDeclarationHir(context, id).innerDeclarationIds;
+  } else if (id.isImpl) {
+    nextIds = getImplDeclarationHir(context, id).innerDeclarationIds;
+  } else if (id.isClass) {
+    nextIds = getClassDeclarationHir(context, id).innerDeclarationIds;
+  } else if (id.isConstructor) {
+  } else if (id.isFunction) {
+  } else if (id.isProperty) {
+    nextIds = getPropertyDeclarationHir(context, id).innerDeclarationIds;
+  } else {
+    assert(false);
+  }
+  if (nextIds == null) return;
+
+  yield* nextIds;
+  for (final nextId in nextIds) {
+    yield* _getAllInnerDeclarationIds(context, nextId);
+  }
+}
 
 extension on DeclarationPathData {
   DeclarationType get declarationType => when(
