@@ -22,41 +22,41 @@ public class ArrayList<Item> {
   static fun empty<Item>(): ArrayList<Item> {
     create<Item>(8)
   }
-  // public static fun of1<Item>(first: Item): ArrayList<Item> {
-  //   let list = create<Item>(1)
-  //   list.add(first)
-  //   list
-  // }
-  // public static fun of2<Item>(first: Item, second: Item): ArrayList<Item> {
-  //   let list = create(2)
-  //   list.add(first)
-  //   list.add(second)
-  //   list
-  // }
-  // public static fun of3<Item>(first: Item, second: Item, third: Item): ArrayList<Item> {
-  //   let list = create(3)
-  //   list.add(first)
-  //   list.add(second)
-  //   list.add(third)
-  //   list
-  // }
-  // public static fun of4<Item>(first: Item, second: Item, third: Item, fourth: Item): ArrayList<Item> {
-  //   let list = create(4)
-  //   list.add(first)
-  //   list.add(second)
-  //   list.add(third)
-  //   list.add(fourth)
-  //   list
-  // }
-  // public static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): ArrayList<Item> {
-  //   let list = create(5)
-  //   list.add(first)
-  //   list.add(second)
-  //   list.add(third)
-  //   list.add(fourth)
-  //   list.add(fifth)
-  //   list
-  // }
+  public static fun of1<Item>(first: Item): ArrayList<Item> {
+    let list = create<Item>(1)
+    list.append(first)
+    list
+  }
+  public static fun of2<Item>(first: Item, second: Item): ArrayList<Item> {
+    let list = create<Item>(2)
+    list.append(first)
+    list.append(second)
+    list
+  }
+  public static fun of3<Item>(first: Item, second: Item, third: Item): ArrayList<Item> {
+    let list = create<Item>(3)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list
+  }
+  public static fun of4<Item>(first: Item, second: Item, third: Item, fourth: Item): ArrayList<Item> {
+    let list = create<Item>(4)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list
+  }
+  public static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): ArrayList<Item> {
+    let list = create<Item>(5)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list
+  }
 
   static fun create<Item>(capacity: Int /* UInt */): ArrayList<Item> {
     /// Creates a new, empty `ArrayList` with the given capacity.
