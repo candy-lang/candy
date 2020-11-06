@@ -1227,7 +1227,7 @@ extension on Context {
 
       if (i == astExpressions.length - 1) {
         var lowered = lambdaContext
-            .innerExpressionContext(expressionType: Some(returnType.value))
+            .innerExpressionContext(expressionType: returnType)
             .lowerUnambiguous(astExpression);
         if (lowered is Ok && lowered.value.type != hir.CandyType.never) {
           lowered = Ok(

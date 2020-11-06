@@ -12,10 +12,17 @@ void updateTypeLabels(
   AnalysisServer server,
   ResourceId resourceId,
 ) {
-  final labels = server.queryConfig
-      .createContext()
-      .callQuery(_generateTypeLabels, Tuple2(server, resourceId))
-      .value;
+  final context = server.queryConfig.createContext();
+  final labelsResult =
+      context.callQuery(_generateTypeLabels, Tuple2(server, resourceId));
+  if (labelsResult is None) {
+    server.sendLogMessage(
+      'Error computing type labels: ${context.reportedErrors}',
+    );
+    return;
+  }
+  final labels = labelsResult.value;
+
   final params = PublishTypeLabelsParams(
     server.resourceIdToFileUri(resourceId),
     labels,

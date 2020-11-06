@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:compiler/compiler.dart';
+import 'package:parser/parser.dart' as ast;
 
 import '../analysis_server.dart';
 import '../generated/lsp_protocol/protocol_generated.dart';
@@ -24,28 +25,76 @@ class FoldingHandler
     CancellationToken token,
   ) async {
     final resourceId = server.fileUriToResourceId(params.textDocument.uri);
-    final queryContext = server.queryConfig.createContext();
+    final context = server.queryConfig.createContext();
 
-    final ast = queryContext.callQuery(getAst, resourceId).valueOrNull;
-    if (ast == null) {
+    final fileAst = context.callQuery(getAst, resourceId).valueOrNull;
+    if (fileAst == null) {
       return error(
         ErrorCodes.InternalError,
         "Couldn't parse AST of `$resourceId`.",
       );
     }
 
-    final foldingRanges = <FoldingRange>[];
-    if (ast.useLines.length > 1) {
-      final range = ast.useLines.last.span.toRange(server, resourceId);
-      foldingRanges.add(FoldingRange(
-        range.start.line,
-        range.start.character,
-        range.end.line,
-        range.end.character,
-        FoldingRangeKind.Imports,
-      ));
-    }
-
+    final foldingRanges = _FoldingAstVisitor.visit(server, resourceId, fileAst);
     return success(foldingRanges);
+  }
+}
+
+class _FoldingAstVisitor extends ast.TraversingAstVisitor {
+  _FoldingAstVisitor._(this.server, this.resourceId)
+      : assert(server != null),
+        assert(resourceId != null);
+  static List<FoldingRange> visit(
+    AnalysisServer server,
+    ResourceId resourceId,
+    ast.CandyFile fileAst,
+  ) {
+    final visitor = _FoldingAstVisitor._(server, resourceId);
+    fileAst.accept(visitor);
+    return visitor._ranges;
+  }
+
+  final AnalysisServer server;
+  final ResourceId resourceId;
+
+  final _ranges = <FoldingRange>[];
+  void _addRange(
+    ast.SourceSpan span, [
+    FoldingRangeKind kind = FoldingRangeKind.Region,
+  ]) {
+    final range = span.toRange(server, resourceId);
+    _ranges.add(FoldingRange(
+      range.start.line,
+      range.start.character,
+      range.end.line,
+      range.end.character,
+      kind,
+    ));
+  }
+
+  @override
+  void visitCandyFile(ast.CandyFile node) {
+    if (node.useLines.isNotEmpty) {
+      _addRange(
+        ast.SourceSpan(
+          node.useLines.first.span.start,
+          node.useLines.last.span.end,
+        ),
+        FoldingRangeKind.Imports,
+      );
+    }
+    super.visitCandyFile(node);
+  }
+
+  @override
+  void visitBlockDeclarationBody(ast.BlockDeclarationBody node) {
+    if (node.leftBrace.span != null) _addRange(node.span);
+    super.visitBlockDeclarationBody(node);
+  }
+
+  @override
+  void visitLambdaLiteral(ast.LambdaLiteral node) {
+    _addRange(node.span);
+    super.visitLambdaLiteral(node);
   }
 }
