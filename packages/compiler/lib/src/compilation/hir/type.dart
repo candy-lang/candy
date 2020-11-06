@@ -369,7 +369,8 @@ final getClassTraitImplId =
 
     final implIds = getAllImplsForType(context, child).where((implId) {
       final impl = getImplDeclarationHir(context, implId);
-      return impl.traits.any((trait) => trait == parent);
+      // TODO(marcelgarus): Constraints solving should go here.
+      return impl.traits.any((trait) => trait.name == parent.name);
     });
     if (implIds.length > 1) {
       throw CompilerError.ambiguousImplsFound(
