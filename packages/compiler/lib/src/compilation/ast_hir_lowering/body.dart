@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:dartx/dartx.dart';
 import 'package:meta/meta.dart';
 import 'package:parser/parser.dart' as ast;
@@ -1518,41 +1516,117 @@ extension on Context {
           .map((it) => hir.CandyType.parameter(it.name, receiverId))
           .toList();
       final typeArguments = type.arguments;
+
+      /// Consider the following case:
+      ///
+      /// ```
+      /// class Foo<F> {}
+      /// trait Bar<B> {
+      ///   fun hello(): B
+      /// }
+      /// impl<I> Foo<I>: Bar<I> {
+      ///   fun hello(): I
+      /// }
+      /// fun test() {
+      ///   let a = Foo<Bool>();
+      ///   let b = a.hello();
+      /// }
+      /// ```
+      ///
+      /// Here, the generics map at the `.hello` navigation should contain the
+      /// following entries:
+      ///
+      /// - `B@Bar` -> `I@impl`
+      /// - `I@impl` -> `F@Foo`
+      /// - `F@Foo` -> `Bool` (this is already in the generics map)
+      ///
+      /// Then, the types of functions and properties need to be baked three
+      /// times:
+      ///
+      /// 1. to get from trait to impl
+      /// 2. to get from impl to class
+      /// 3. to get from class to instance
+
+      // from class to instance
       final genericsMap = Map.fromEntries(typeParameters
           .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
               typeArguments, (a, b) => MapEntry(a, b)));
 
+      final impls = getAllImplsForTraitOrClass(queryContext, receiverId)
+          .map((implId) => getImplDeclarationHir(queryContext, implId))
+          .toList();
+      for (final impl in impls) {
+        // TODO(marcelgarus): This is an ugly workaround. An impl's generics can't be nested.
+
+        // from trait to impl
+        for (final traitType in impl.traits.whereType<hir.UserCandyType>()) {
+          final traitId =
+              moduleIdToDeclarationId(queryContext, traitType.virtualModuleId);
+          final trait = getTraitDeclarationHir(queryContext, traitId);
+          genericsMap.addAll(Map.fromEntries(trait.typeParameters
+              .map((it) => hir.CandyType.parameter(it.name, traitId))
+              .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
+                  traitType.arguments, (a, b) => MapEntry(a, b))));
+        }
+
+        // from impl to class
+        genericsMap.addAll(Map.fromEntries(impl.type.arguments
+            .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
+                typeParameters, (a, b) => MapEntry(a, b))));
+      }
+
       return getInnerDeclarationIds(queryContext, receiverId)
+          .followedBy(impls.expand((impl) {
+            // For each impl, return the inner declaration ids as well as the
+            // declaration ids of functions with default implementations in the
+            // corresponding traits.
+            return impl.innerDeclarationIds.followedBy(impl.traits
+                .map((it) => getTraitDeclarationHir(queryContext,
+                    moduleIdToDeclarationId(queryContext, it.virtualModuleId)))
+                .expand((trait) => trait.innerDeclarationIds)
+                .where((it) => it.isFunction)
+                .where((it) => getBody(queryContext, it) is Some));
+          }))
           .where((id) => id.simplePath.last.nameOrNull == name)
           .mapNotNull((id) {
-        if (id.isModule || id.isTrait || id.isClass) return null;
-        if (id.isProperty) {
-          final propertyHir = getPropertyDeclarationHir(queryContext, id);
-          if (propertyHir.isStatic) return null;
-          return hir.PropertyIdentifier(
-            id,
-            propertyHir.type.bakeThisType(type).bakeGenerics(genericsMap),
-            base: target,
-            receiver: target,
-          );
-        } else if (id.isFunction) {
-          final functionHir = getFunctionDeclarationHir(queryContext, id);
-          if (functionHir.isStatic) return null;
-          return hir.PropertyIdentifier(
-            id,
-            functionHir.functionType
-                .bakeThisType(type)
-                .bakeGenerics(genericsMap),
-            base: target,
-            receiver: target,
-          );
-        } else {
-          throw CompilerError.internalError(
-            'Identifier resolved to an invalid declaration type: `$id`.',
-            location: ErrorLocation(resourceId, expression.name.span),
-          );
-        }
-      }).toList();
+            if (id.isModule || id.isTrait || id.isClass) return null;
+            // Don't be confused by the three-time-baking. That corresponds to
+            // the three steps from the comment above.
+
+            if (id.isProperty) {
+              final propertyHir = getPropertyDeclarationHir(queryContext, id);
+              if (propertyHir.isStatic) return null;
+              return hir.PropertyIdentifier(
+                id,
+                propertyHir.type
+                    .bakeThisType(type)
+                    .bakeGenerics(genericsMap)
+                    .bakeGenerics(genericsMap)
+                    .bakeGenerics(genericsMap),
+                base: target,
+                receiver: target,
+              );
+            } else if (id.isFunction) {
+              final functionHir = getFunctionDeclarationHir(queryContext, id);
+              if (functionHir.isStatic) return null;
+              return hir.PropertyIdentifier(
+                id,
+                functionHir.functionType
+                    .bakeThisType(type)
+                    .bakeGenerics(genericsMap)
+                    .bakeGenerics(genericsMap)
+                    .bakeGenerics(genericsMap),
+                base: target,
+                receiver: target,
+              );
+            } else {
+              throw CompilerError.internalError(
+                'Identifier resolved to an invalid declaration type: `$id`.',
+                location: ErrorLocation(resourceId, expression.name.span),
+              );
+            }
+          })
+          .toList();
     }
 
     Result<List<hir.Expression>, List<ReportedCompilerError>> lower(
