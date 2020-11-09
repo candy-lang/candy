@@ -1,6 +1,8 @@
 // TODO(marcelgarus): Enumerize!
 public trait Option<Value> {
   fun unwrap(): Value
+  fun orElse(alternative: () => Value): Value
+  fun map<Out>(mapper: (Value) => Out): Option<Out>
 }
 
 public class Some<Value> {
@@ -8,10 +10,14 @@ public class Some<Value> {
 }
 impl<Value> Some<Value>: Option<Value> {
   fun unwrap(): Value { value }
+  fun orElse(alternative: () => Value) { value }
+  fun map<Out>(mapper: (Value) => Out): Option<Out> { Some<Out>(mapper(value)) }
 }
 
 // TODO(JonasWanke): remove type parameter when multi-impls are supported
 public class None<Value>
 impl<Value> None<Value>: Option<Value> {
   fun unwrap(): Value { throw "Unwrapped `None`." }
+  fun orElse(alternative: () => Value) { alternative() }
+  fun map<Out>(mapper: (Value) => Out): Option<Out> { None<Out>() }
 }
