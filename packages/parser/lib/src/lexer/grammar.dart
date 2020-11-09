@@ -235,7 +235,7 @@ class LexerGrammar {
   static final _DecDigit = digit();
   static final _DecDigitOrSeparator = _DecDigit | char('_');
 
-  // TODO: RealLiteral, FloatLiteral, DoubleLiteral
+  // TODO(JonasWanke): RealLiteral, FloatLiteral, DoubleLiteral
 
   // TODO(JonasWanke): disallow leading/trailing underscore
   // formerly: _hexLiteralPrefix & _HexDigit & (_HexDigitOrSeparator.star() & _HexDigit).optional()

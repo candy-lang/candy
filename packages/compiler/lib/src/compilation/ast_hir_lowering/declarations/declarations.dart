@@ -7,14 +7,14 @@ import '../../../utils.dart';
 import '../../ast.dart';
 import '../../hir.dart' as hir;
 import '../../hir/ids.dart';
-import 'module.dart';
-import 'trait.dart';
-import 'impl.dart';
-import 'class.dart';
-import 'property.dart';
-import 'function.dart';
-import 'constructor.dart';
 import '../type.dart';
+import 'class.dart';
+import 'constructor.dart';
+import 'function.dart';
+import 'impl.dart';
+import 'module.dart';
+import 'property.dart';
+import 'trait.dart';
 
 final doesDeclarationExist = Query<DeclarationId, bool>(
   'doesDeclarationExist',
