@@ -488,7 +488,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   List<dart.Code> visitExpressionCallExpression(
           ExpressionCallExpression node) =>
       [
-        // node.accept(this),
+        ...node.target.accept(this),
         for (final argument in node.valueArguments) ...argument.accept(this),
         _save(
           node,
