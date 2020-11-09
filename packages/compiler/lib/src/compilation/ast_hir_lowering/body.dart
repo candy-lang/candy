@@ -114,16 +114,6 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<hir.Expression> visitCallExpression(hir.CallExpression node) {
-    if (node.id == id) return Some(node);
-    for (final argument in node.valueArguments) {
-      final result = argument.accept(this);
-      if (result is Some) return result;
-    }
-    return node.target.accept(this);
-  }
-
-  @override
   Option<hir.Expression> visitFunctionCallExpression(
     hir.FunctionCallExpression node,
   ) {
@@ -145,6 +135,17 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
       if (result is Some) return result;
     }
     return None();
+  }
+
+  @override
+  Option<hir.Expression> visitExpressionCallExpression(
+      hir.ExpressionCallExpression node) {
+    if (node.id == id) return Some(node);
+    for (final argument in node.valueArguments) {
+      final result = argument.accept(this);
+      if (result is Some) return result;
+    }
+    return node.target.accept(this);
   }
 
   @override
@@ -1838,6 +1839,9 @@ extension on Context {
         return lowerConstructorCall(expression, target);
       }
 
+      if (target.type is hir.FunctionCandyType) {
+        return lowerExpressionCall(expression, target);
+      }
       throw CompilerError.unsupportedFeature(
         'Callable expressions are not yet supported (target: $target).',
         location: ErrorLocation(resourceId, expression.span),
@@ -2104,6 +2108,61 @@ extension on Context {
             fields[i].name: arguments[i],
         },
         returnType,
+      ),
+    ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerExpressionCall(
+    ast.CallExpression expression,
+    hir.Expression target,
+  ) {
+    assert(target != null);
+
+    final type = target.type as hir.FunctionCandyType;
+    final valueArguments = expression.arguments;
+
+    if (!isValidExpressionType(type.returnType)) {
+      return Error([
+        CompilerError.invalidExpressionType(
+          'Constructor has an invalid return type: ${type.returnType}. Expected: $expressionType',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    }
+
+    if (type.parameterTypes.length < valueArguments.length) {
+      return Error([
+        CompilerError.tooManyArguments(
+          'Too many expression call arguments.',
+          location: ErrorLocation(resourceId, expression.span),
+        )
+      ]);
+    }
+
+    if (type.parameterTypes.length > valueArguments.length) {
+      return Error([
+        CompilerError.missingArguments(
+          'Too few expression call arguments.',
+          location: ErrorLocation(resourceId, expression.span),
+        )
+      ]);
+    }
+
+    final loweredArguments = [
+      for (var i = 0; i < valueArguments.length; i++)
+        innerExpressionContext(
+          expressionType: Option.some(type.parameterTypes[i]),
+        ).lowerUnambiguous(valueArguments[i].expression),
+    ].merge();
+    if (loweredArguments is Error) return loweredArguments;
+    final arguments = loweredArguments.value;
+
+    return Ok([
+      hir.Expression.expressionCall(
+        getId(expression),
+        target,
+        arguments,
+        type.returnType,
       ),
     ]);
   }

@@ -277,8 +277,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
   @override
   List<dart.Code> visitNavigationExpression(NavigationExpression node) => [];
-  @override
-  List<dart.Code> visitCallExpression(CallExpression node) => [];
+
   @override
   List<dart.Code> visitFunctionCallExpression(FunctionCallExpression node) {
     final target = node.target;
@@ -484,6 +483,22 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       ),
     ];
   }
+
+  @override
+  List<dart.Code> visitExpressionCallExpression(
+          ExpressionCallExpression node) =>
+      [
+        // node.accept(this),
+        for (final argument in node.valueArguments) ...argument.accept(this),
+        _save(
+          node,
+          _refer(node.target.id).call(
+            [for (final value in node.valueArguments) _refer(value.id)],
+            {},
+            [],
+          ),
+        ),
+      ];
 
   @override
   List<dart.Code> visitReturnExpression(ReturnExpression node) => [
