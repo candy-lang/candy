@@ -6,7 +6,6 @@ import 'ids.dart';
 import 'type.dart';
 
 part 'declarations.freezed.dart';
-part 'declarations.g.dart';
 
 @freezed
 abstract class Declaration implements _$Declaration {
@@ -33,6 +32,7 @@ abstract class Declaration implements _$Declaration {
 
   // ignore: non_constant_identifier_names
   const factory Declaration.class_({
+    @required DeclarationId id,
     @required String name,
     @required UserCandyType thisType,
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
@@ -40,7 +40,8 @@ abstract class Declaration implements _$Declaration {
     @Default(<SyntheticImpl>[]) List<SyntheticImpl> syntheticImpls,
   }) = ClassDeclaration;
   const factory Declaration.constructor({
-    @Default(<ValueParameter>[]) List<ValueParameter> parameters,
+    @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
+    @Default(<ValueParameter>[]) List<ValueParameter> valueParameters,
   }) = ConstructorDeclaration;
 
   const factory Declaration.function({
@@ -90,8 +91,6 @@ abstract class TypeParameter implements _$TypeParameter {
     @required CandyType upperBound,
     CandyType defaultValue,
   }) = _TypeParameter;
-  factory TypeParameter.fromJson(Map<String, dynamic> json) =>
-      _$TypeParameterFromJson(json);
   const TypeParameter._();
 }
 
@@ -102,7 +101,5 @@ abstract class ValueParameter implements _$ValueParameter {
     @required CandyType type,
     Expression defaultValue,
   }) = _ValueParameter;
-  factory ValueParameter.fromJson(Map<String, dynamic> json) =>
-      _$ValueParameterFromJson(json);
   const ValueParameter._();
 }

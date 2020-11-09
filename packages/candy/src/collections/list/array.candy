@@ -1,26 +1,151 @@
 use ....primitives
+use ...iterable
 use ...list
 
-public class ArrayList<Item> {
-  builtin static fun of1<Item>(first: Item): ArrayList<Item>
-  builtin static fun of2<Item>(first: Item, second: Item): ArrayList<Item>
-  builtin static fun of3<Item>(first: Item, second: Item, third: Item): ArrayList<Item>
-  builtin static fun of4<Item>(first: Item, second: Item, third: Item, fourth: Item): ArrayList<Item>
-  builtin static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): ArrayList<Item>
-
-  let items: Array<Item>
-}
-// impl<Item> ArrayList<Item>: MutableList<Item> {
-//   fun size(): Int /* UInt */ { items.length }
-
-//   // fun get(index: Int /* UInt */): Option<Item> {
-    
-//   // }
-// }
-
 builtin class Array<Item> {
+  /// A builtin structure that holds a fixed number of `Item`s.
+  
+  static fun filled<Item>(length: Int /* UInt */, item: Item): Array<Item>
+  /// Creates a new `Array` of the given `length`, where every slot is filled with the same `item`.
+
   let length: Int
 
   fun get(index: Int /* UInt */): Item
   fun set(index: Int /* UInt */, item: Item)
+}
+
+// TODO(marcelgarus): For now, this never shrinks. We should implement that later, although a very
+// conservative shrinking heuristic is probably enough (we don't want to shrink too early).
+public class ArrayList<Item> {
+  /// A wrapper around `Array` that can grow dynamically.
+
+  static fun empty<Item>(): ArrayList<Item> {
+    create<Item>(8)
+  }
+  public static fun of1<Item>(first: Item): ArrayList<Item> {
+    let list = create<Item>(1)
+    list.append(first)
+    list
+  }
+  public static fun of2<Item>(first: Item, second: Item): ArrayList<Item> {
+    let list = create<Item>(2)
+    list.append(first)
+    list.append(second)
+    list
+  }
+  public static fun of3<Item>(first: Item, second: Item, third: Item): ArrayList<Item> {
+    let list = create<Item>(3)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list
+  }
+  public static fun of4<Item>(first: Item, second: Item, third: Item, fourth: Item): ArrayList<Item> {
+    let list = create<Item>(4)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list
+  }
+  public static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): ArrayList<Item> {
+    let list = create<Item>(5)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list
+  }
+
+  static fun create<Item>(capacity: Int /* UInt */): ArrayList<Item> {
+    /// Creates a new, empty `ArrayList` with the given capacity.
+
+    ArrayList<Item>(
+      Array.filled<Option<Item>>(capacity, None<Item>()),
+      0,
+    )
+  }
+
+  mut let items: Array<Option<Item>>
+  mut let length_: Int /* UInt */
+
+  // TODO(marcelgarus): Getterize!
+  fun capacity(): Int /* UInt */ { items.length }
+
+  fun grow() {
+    /// Increases the capacity.
+
+    let newItems = Array.filled<Option<Item>>(2 * capacity(), None<Item>())
+    mut let index = 0
+
+    while index < length_ {
+      newItems.set(index, items.get(index))
+      index = index + 1
+    }
+  }
+}
+
+// impl<Item> ArrayList<Item>: Iterable<Item> {
+//   fun iterator(): Iterator<Item> {
+//     ArrayListIterator<Item>(this)
+//   }
+// }
+
+class ArrayListIterator<Item> {
+  let arrayList: ArrayList<Item>
+  mut let index = 0
+}
+
+impl<Item> ArrayListIterator<Item>: Iterator<Item> {
+  fun next(): Option<Item> {
+    let element = arrayList.get(index)
+    index = index + 1
+    element
+  }
+}
+
+impl<Item> ArrayList<Item>: List<Item> {
+  fun length(): Int { length_ }
+
+  fun get(index: Int /* UInt */): Option<Item> {
+    if index >= length_ {
+      None<Option<Item>>()
+    } else {
+      items.get(index)
+    }
+  }
+}
+
+impl<Item> ArrayList<Item>: MutableList<Item> {
+  fun set(index: Int /* UInt */, item: Item) {
+    items.set(index, Some<Item>(item))
+  }
+
+  fun append(item: Item) {
+    if length_ == capacity() {
+      grow()
+    }
+    set(length_, item)
+    length_ = length_ + 1
+  }
+
+  fun removeAt(index: Int /* UInt */): Item {
+    mut let index = index
+    mut let removed = items.get(index).unwrap()
+    while index < length_ - 1 {
+      items.set(index, items.get(index))
+    }
+    items.set(index, None<Item>())
+    length_ = length_ - 1
+    removed
+  }
+
+  fun clear() {
+    mut let index = 0
+    while index < length_ {
+      items.set(index, None<Item>())
+    }
+    length_ = 0
+  }
 }

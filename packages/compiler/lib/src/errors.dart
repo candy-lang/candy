@@ -72,6 +72,8 @@ abstract class CompilerError implements _$CompilerError {
       CompilerError._create('unknownInnerDeclaration');
   static const unknownPackage = CompilerError._create('unknownPackage');
   static const unsupportedFeature = CompilerError._create('unsupportedFeature');
+  static const wrongNumberOfTypeArguments =
+      CompilerError._create('wrongNumberOfTypeArguments');
 }
 
 @freezed

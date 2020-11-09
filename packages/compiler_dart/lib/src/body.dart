@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 import 'package:strings/strings.dart' as strings;
 
+import 'constants.dart';
 import 'declarations/declaration.dart';
 import 'declarations/module.dart';
 import 'type.dart';
@@ -155,6 +156,38 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       },
       property: (id, type, _, __, receiver) {
         final name = id.simplePath.last.nameOrNull;
+
+        if (name == 'filled' &&
+            declarationIdToModuleId(context, id.parent) ==
+                CandyType.arrayModuleId) {
+          final t = dart.refer('T');
+          final function = dart.Method((b) => b
+            ..name = _name(node.id)
+            ..returns = dart.TypeReference((b) => b
+              ..symbol = 'List'
+              ..url = dartCoreUrl
+              ..types.add(t))
+            ..types.add(t)
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..type = compileType(context, CandyType.int)
+              ..name = 'length'))
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..type = t
+              ..name = 'item'))
+            ..body = dart.TypeReference((b) => b
+                  ..symbol = 'List'
+                  ..url = dartCoreUrl
+                  ..types.add(t))
+                .property('filled')
+                .call(
+                  [dart.refer('length'), dart.refer('item')],
+                  {},
+                  [],
+                )
+                .returned
+                .code);
+          return [function.code];
+        }
 
         if (receiver != null) {
           return [
@@ -425,7 +458,28 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
               _refer(entry.value.id),
           ],
           {},
-          [],
+          node.typeArguments.map((it) => compileType(context, it)).toList(),
+        ),
+      ),
+    ];
+  }
+
+  @override
+  List<dart.Code> visitConstructorCallExpression(
+    ConstructorCallExpression node,
+  ) {
+    return [
+      for (final argument in node.valueArguments.values)
+        ...argument.accept(this),
+      _save(
+        node,
+        compileTypeName(context, node.class_.id).call(
+          [
+            for (final entry in node.valueArguments.entries)
+              _refer(entry.value.id),
+          ],
+          {},
+          node.typeArguments.map((it) => compileType(context, it)).toList(),
         ),
       ),
     ];
@@ -447,12 +501,14 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     List<dart.Code> visitBody(List<Expression> body) => [
           for (final expression in body) ...expression.accept(this),
           if (body.isNotEmpty && node.type != CandyType.unit)
-            _refer(node.id).assign(_refer(body.last.id)).statement,
+            _refer(node.id).safeAssign(body.last).statement,
         ];
 
     return [
       ...node.condition.accept(this),
-      dart.literalNull.assignVar(_name(node.id)).statement,
+      dart.literalNull
+          .assignVar(_name(node.id), compileType(context, node.type))
+          .statement,
       dart.Code('if (${_name(node.condition.id)}) {'),
       ...visitBody(node.thenBody),
       dart.Code('} else {'),
@@ -463,7 +519,9 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
   @override
   List<dart.Code> visitLoopExpression(LoopExpression node) => [
-        dart.literalNull.assignVar(_name(node.id)).statement,
+        dart.literalNull
+            .assignVar(_name(node.id), compileType(context, node.type))
+            .statement,
         dart.Code('${_label(node.id)}:\nwhile (true) {'),
         for (final expression in node.body) ...expression.accept(this),
         dart.Code('}'),
@@ -471,7 +529,9 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
   @override
   List<dart.Code> visitWhileExpression(WhileExpression node) => [
-        dart.literalNull.assignVar(_name(node.id)).statement,
+        dart.literalNull
+            .assignVar(_name(node.id), compileType(context, node.type))
+            .statement,
         dart.Code('${_label(node.id)}:\nwhile (true) {'),
         ...node.condition.accept(this),
         dart.Code('if (!${_name(node.condition.id)}) break;'),
@@ -483,7 +543,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   List<dart.Code> visitBreakExpression(BreakExpression node) => [
         if (node.expression != null) ...[
           ...node.expression.accept(this),
-          _refer(node.scopeId).assign(_refer(node.expression.id)).statement,
+          _refer(node.scopeId).safeAssign(node.expression).statement,
         ],
         dart.Code('break ${_label(node.scopeId)};'),
         _save(node, dart.literalNull),
@@ -504,26 +564,37 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   }
 
   @override
-  List<dart.Code> visitAssignmentExpression(AssignmentExpression node) => [
-        ...node.right.accept(this),
-        node.left.identifier
-            .maybeMap(
-              property: (property) => dart.refer(
-                property.id.simplePath.last.nameOrNull ??
-                    (throw CompilerError.internalError(
-                        'Path must be path to property.')),
-                declarationIdToImportUrl(context, property.id.parent),
-              ),
-              localProperty: (property) =>
-                  _refer(getExpression(context, property.id).value.id),
-              orElse: () => throw CompilerError.internalError('Left side of '
-                  'assignment can only be property or local property '
-                  'identifier, but was ${node.left.runtimeType} '
-                  '(${node.left})'),
-            )
-            .assign(_refer(node.right.id))
-            .statement,
-      ];
+  List<dart.Code> visitAssignmentExpression(AssignmentExpression node) {
+    final code = [
+      ...node.right.accept(this),
+    ];
+    final left = node.left.identifier.maybeMap(
+      property: (property) {
+        final name = property.id.simplePath.last.nameOrNull ??
+            (throw CompilerError.internalError(
+                'Path must be path to property.'));
+        final parent = property.id.parent;
+        if (parent.isModule) {
+          return dart.refer(name, declarationIdToImportUrl(context, parent));
+        } else if (getPropertyDeclarationHir(context, property.id).isStatic) {
+          return compileTypeName(context, parent).property(name);
+        } else {
+          assert(property.receiver != null);
+          code.addAll(property.receiver.accept(this));
+          return dart.refer(name);
+        }
+      },
+      localProperty: (property) =>
+          _refer(getExpression(context, property.id).value.id),
+      orElse: () => throw CompilerError.internalError('Left side of '
+          'assignment can only be property or local property '
+          'identifier, but was ${node.left.runtimeType} '
+          '(${node.left})'),
+    );
+
+    code.add(left.safeAssign(node.right).statement);
+    return code;
+  }
 
   @override
   List<dart.Code> visitIsExpression(IsExpression node) {
@@ -565,11 +636,10 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     dart.Expression lowered, {
     bool isMutable = false,
   }) {
-    final type = compileType(context, source.type);
     if (isMutable) {
-      return lowered.assignVar(_name(source.id), type).statement;
+      return lowered.assignVar(_name(source.id)).statement;
     } else {
-      return lowered.assignFinal(_name(source.id), type).statement;
+      return lowered.assignFinal(_name(source.id)).statement;
     }
   }
 
@@ -613,6 +683,49 @@ extension on dart.Expression {
         const dart.Code('~/'),
         other.code,
       ]));
+
+  /// Assigns the `other` expression. If the type of the `other` expression is
+  /// `Unit`, assigns `null`.
+  /// Why? Candy's `Unit` is represented by Dart's `void` (type) and `null`
+  /// (value). In Dart, the result of a statement producing `void` can't be
+  /// assigned to anything, so we manually substitute `null` as the value.
+  dart.Expression safeAssign(Expression other) =>
+      assign(other.type == CandyType.unit
+          ? dart.literalNull
+          : DartExpressionVisitor._refer(other.id));
+}
+
+extension on dart.Method {
+  dart.Expression get expression => dart.CodeExpression(dart.Block.of([
+        returns.code,
+        dart.Code(name),
+        if (types.isNotEmpty) ...[
+          const dart.Code('<'),
+          for (final type in types) type.code,
+          const dart.Code('>'),
+        ],
+        const dart.Code('('),
+        for (final parameter in requiredParameters) ...[
+          parameter.type.code,
+          dart.Code(parameter.name),
+          const dart.Code(','),
+        ],
+        if (optionalParameters.isNotEmpty) ...[
+          dart.Code(optionalParameters.first.named ? '{' : '['),
+          for (final parameter in optionalParameters) ...[
+            parameter.type.code,
+            dart.Code(parameter.name),
+            const dart.Code(','),
+          ],
+          dart.Code(optionalParameters.first.named ? '}' : ']'),
+        ],
+        const dart.Code(')'),
+        const dart.Code('{'),
+        body,
+        const dart.Code(';'),
+        const dart.Code('}'),
+      ])).expression;
+  dart.Code get code => expression.code;
 }
 
 dart.Expression lambdaOf(List<dart.Code> code) {

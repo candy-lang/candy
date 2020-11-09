@@ -72,8 +72,12 @@ final getImplDeclarationHir = Query<DeclarationId, hir.ImplDeclaration>(
 final getAllImplsForType = Query<hir.CandyType, List<DeclarationId>>(
   'getAllImplsForType',
   provider: (context, type) {
+    assert(type is hir.UserCandyType);
     final impls = getAllImpl(context, Unit())
-        .where((id) => getImplDeclarationHir(context, id).type == type)
+        .where((id) =>
+            // TODO(marcelgarus): Constraint solving should go here.
+            getImplDeclarationHir(context, id).type.name ==
+            (type as hir.UserCandyType).name)
         .toList();
 
     if (type is hir.UserCandyType) {

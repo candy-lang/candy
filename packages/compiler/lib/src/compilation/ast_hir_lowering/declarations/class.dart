@@ -32,6 +32,7 @@ final getClassDeclarationHir = Query<DeclarationId, hir.ClassDeclaration>(
     final name = classAst.name.name;
 
     return hir.ClassDeclaration(
+      id: declarationId,
       name: name,
       thisType: createClassThisType(context, declarationId),
       // ignore: can_be_null_after_null_aware
@@ -166,7 +167,9 @@ hir.SyntheticImpl _generateEqualsImpl(
                         receiver: it.first,
                       ),
                     ),
+                    [],
                     {'other': it.second},
+                    hir.CandyType.bool,
                   ),
                 )
                 .reduce(
@@ -188,7 +191,9 @@ hir.SyntheticImpl _generateEqualsImpl(
                         receiver: value,
                       ),
                     ),
+                    [],
                     {'other': element},
+                    hir.CandyType.bool,
                   ),
                 ),
           ),

@@ -625,7 +625,9 @@ class ParserGrammar {
           type: postfix[3] as Type,
         ),
       )
-      ..leftExpression(LexerGrammar.IN | LexerGrammar.EXCLAMATION_IN)
+      ..leftExpression((LexerGrammar.WS &
+                (LexerGrammar.IN | LexerGrammar.EXCLAMATION_IN) &
+                LexerGrammar.WS).map((it) => it[1] as OperatorToken))
       // comparison
       ..leftExpression(LexerGrammar.LESS_EQUAL |
           LexerGrammar.LESS |

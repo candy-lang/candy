@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../../compiler.dart';
 import 'ids.dart';
 import 'type.dart';
 
@@ -38,8 +39,17 @@ abstract class Expression implements _$Expression {
   const factory Expression.functionCall(
     DeclarationLocalId id,
     Expression target,
+    List<CandyType> typeArguments,
     Map<String, Expression> valueArguments,
+    CandyType returnType,
   ) = FunctionCallExpression;
+  const factory Expression.constructorCall(
+    DeclarationLocalId id,
+    ClassDeclaration class_,
+    List<CandyType> typeArguments,
+    Map<String, Expression> valueArguments,
+    CandyType returnType,
+  ) = ConstructorCallExpression;
   // ignore: non_constant_identifier_names
   const factory Expression.if_(
     DeclarationLocalId id,
@@ -95,29 +105,25 @@ abstract class Expression implements _$Expression {
     bool isNegated,
   }) = IsExpression;
 
-  factory Expression.fromJson(Map<String, dynamic> json) =>
-      _$ExpressionFromJson(json);
   const Expression._();
 
-  CandyType get type => when(
-        identifier: (_, identifier) => identifier.type,
-        literal: (_, literal) => literal.type,
-        property: (_, __, type, ___, ____) => type,
-        navigation: (_, __, ___, type) => type,
-        call: (_, __, ___) => null,
-        functionCall: (_, target, __) {
-          final functionType = target.type as FunctionCandyType;
-          return functionType.returnType;
-        },
-        return_: (_, __, ___) => CandyType.never,
-        if_: (_, __, ___, ____, type) => type,
-        loop: (_, __, type) => type,
-        while_: (_, __, ___, type) => type,
-        break_: (_, __, ___) => CandyType.never,
-        continue_: (_, __) => CandyType.never,
-        throw_: (_, __) => CandyType.never,
-        assignment: (_, __, right) => right.type,
-        is_: (_, __, ___, ____) => CandyType.bool,
+  CandyType get type => map(
+        identifier: (type) => type.identifier.type,
+        literal: (lit) => lit.literal.type,
+        property: (prop) => prop.type,
+        navigation: (nav) => nav.type,
+        call: (_) => null,
+        functionCall: (fn) => fn.returnType,
+        constructorCall: (constructor) => constructor.returnType,
+        return_: (_) => CandyType.never,
+        if_: (theIf) => theIf.type,
+        loop: (loop) => loop.type,
+        while_: (theWhile) => theWhile.type,
+        break_: (_) => CandyType.never,
+        continue_: (_) => CandyType.never,
+        throw_: (_) => CandyType.never,
+        assignment: (assignment) => assignment.right.type,
+        is_: (_) => CandyType.bool,
       );
 
   T accept<T>(ExpressionVisitor<T> visitor) => map(
@@ -127,6 +133,7 @@ abstract class Expression implements _$Expression {
         navigation: (e) => visitor.visitNavigationExpression(e),
         call: (e) => visitor.visitCallExpression(e),
         functionCall: (e) => visitor.visitFunctionCallExpression(e),
+        constructorCall: (e) => visitor.visitConstructorCallExpression(e),
         return_: (e) => visitor.visitReturnExpression(e),
         if_: (e) => visitor.visitIfExpression(e),
         loop: (e) => visitor.visitLoopExpression(e),
@@ -172,8 +179,6 @@ abstract class Identifier implements _$Identifier {
     bool isMutable,
   ) = LocalPropertyIdentifier;
 
-  factory Identifier.fromJson(Map<String, dynamic> json) =>
-      _$IdentifierFromJson(json);
   const Identifier._();
 
   bool get isMutableOrNull => maybeMap(
@@ -205,8 +210,6 @@ abstract class Literal implements _$Literal {
     CandyType receiverType,
   ]) = LambdaLiteral;
 
-  factory Literal.fromJson(Map<String, dynamic> json) =>
-      _$LiteralFromJson(json);
   const Literal._();
 
   CandyType get type => when(
@@ -237,8 +240,6 @@ abstract class StringLiteralPart implements _$StringLiteralPart {
   const factory StringLiteralPart.interpolated(Expression value) =
       InterpolatedStringLiteralPart;
 
-  factory StringLiteralPart.fromJson(Map<String, dynamic> json) =>
-      _$StringLiteralPartFromJson(json);
   const StringLiteralPart._();
 }
 
@@ -251,6 +252,7 @@ abstract class ExpressionVisitor<T> {
   T visitNavigationExpression(NavigationExpression node);
   T visitCallExpression(CallExpression node);
   T visitFunctionCallExpression(FunctionCallExpression node);
+  T visitConstructorCallExpression(ConstructorCallExpression node);
   T visitReturnExpression(ReturnExpression node);
   T visitIfExpression(IfExpression node);
   T visitLoopExpression(LoopExpression node);
@@ -277,6 +279,8 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   void visitCallExpression(CallExpression node) {}
   @override
   void visitFunctionCallExpression(FunctionCallExpression node) {}
+  @override
+  void visitConstructorCallExpression(ConstructorCallExpression node) {}
   @override
   void visitReturnExpression(ReturnExpression node) {}
   @override

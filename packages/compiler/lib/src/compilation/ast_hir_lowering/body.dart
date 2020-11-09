@@ -9,7 +9,6 @@ import '../../query.dart';
 import '../../utils.dart';
 import '../ast.dart';
 import '../hir.dart' as hir;
-import '../hir.dart';
 import '../hir/ids.dart';
 import '../ids.dart';
 import 'declarations/class.dart';
@@ -64,7 +63,8 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   final DeclarationLocalId id;
 
   @override
-  Option<hir.Expression> visitIdentifierExpression(IdentifierExpression node) {
+  Option<hir.Expression> visitIdentifierExpression(
+      hir.IdentifierExpression node) {
     if (node.id == id) return Some(node);
     if (node.identifier is hir.ReflectionIdentifier) {
       final base = (node.identifier as hir.ReflectionIdentifier).base;
@@ -79,7 +79,7 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<hir.Expression> visitLiteralExpression(LiteralExpression node) {
+  Option<hir.Expression> visitLiteralExpression(hir.LiteralExpression node) {
     if (node.id == id) return Some(node);
     if (node.literal is hir.StringLiteral) {
       final literal = node.literal as hir.StringLiteral;
@@ -101,19 +101,20 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<Expression> visitPropertyExpression(PropertyExpression node) {
+  Option<hir.Expression> visitPropertyExpression(hir.PropertyExpression node) {
     if (node.id == id) return Some(node);
     return node.initializer.accept(this);
   }
 
   @override
-  Option<hir.Expression> visitNavigationExpression(NavigationExpression node) {
+  Option<hir.Expression> visitNavigationExpression(
+      hir.NavigationExpression node) {
     if (node.id == id) return Some(node);
     return node.target.accept(this);
   }
 
   @override
-  Option<hir.Expression> visitCallExpression(CallExpression node) {
+  Option<hir.Expression> visitCallExpression(hir.CallExpression node) {
     if (node.id == id) return Some(node);
     for (final argument in node.valueArguments) {
       final result = argument.accept(this);
@@ -124,7 +125,7 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
 
   @override
   Option<hir.Expression> visitFunctionCallExpression(
-    FunctionCallExpression node,
+    hir.FunctionCallExpression node,
   ) {
     if (node.id == id) return Some(node);
     for (final argument in node.valueArguments.values) {
@@ -135,14 +136,26 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<hir.Expression> visitReturnExpression(ReturnExpression node) {
+  Option<hir.Expression> visitConstructorCallExpression(
+    hir.ConstructorCallExpression node,
+  ) {
+    if (node.id == id) return Some(node);
+    for (final argument in node.valueArguments.values) {
+      final result = argument.accept(this);
+      if (result is Some) return result;
+    }
+    return None();
+  }
+
+  @override
+  Option<hir.Expression> visitReturnExpression(hir.ReturnExpression node) {
     if (node.id == id) return Some(node);
     if (node.expression != null) return node.expression.accept(this);
     return None();
   }
 
   @override
-  Option<hir.Expression> visitIfExpression(IfExpression node) {
+  Option<hir.Expression> visitIfExpression(hir.IfExpression node) {
     if (node.id == id) return Some(node);
     final result = node.condition.accept(this);
     if (result is Some) return result;
@@ -158,7 +171,7 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<hir.Expression> visitLoopExpression(LoopExpression node) {
+  Option<hir.Expression> visitLoopExpression(hir.LoopExpression node) {
     if (node.id == id) return Some(node);
     for (final expression in node.body) {
       final result = expression.accept(this);
@@ -168,7 +181,7 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<hir.Expression> visitWhileExpression(WhileExpression node) {
+  Option<hir.Expression> visitWhileExpression(hir.WhileExpression node) {
     if (node.id == id) return Some(node);
     final result = node.condition.accept(this);
     if (result is Some) return result;
@@ -180,25 +193,26 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<hir.Expression> visitBreakExpression(BreakExpression node) {
+  Option<hir.Expression> visitBreakExpression(hir.BreakExpression node) {
     if (node.id == id) return Some(node);
     if (node.expression != null) return node.expression.accept(this);
     return None();
   }
 
   @override
-  Option<hir.Expression> visitContinueExpression(ContinueExpression node) {
+  Option<hir.Expression> visitContinueExpression(hir.ContinueExpression node) {
     return node.accept(this);
   }
 
   @override
-  Option<hir.Expression> visitThrowExpression(ThrowExpression node) {
+  Option<hir.Expression> visitThrowExpression(hir.ThrowExpression node) {
     if (node.id == id) return Some(node);
     return node.error.accept(this);
   }
 
   @override
-  Option<hir.Expression> visitAssignmentExpression(AssignmentExpression node) {
+  Option<hir.Expression> visitAssignmentExpression(
+      hir.AssignmentExpression node) {
     if (node.id == id) return Some(node);
     final result = node.left.accept(this);
     if (result is Some) return result;
@@ -206,7 +220,7 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<hir.Expression> visitIsExpression(IsExpression node) {
+  Option<hir.Expression> visitIsExpression(hir.IsExpression node) {
     if (node.id == id) return Some(node);
     return node.instance.accept(this);
   }
@@ -273,7 +287,7 @@ abstract class Context {
   Option<hir.CandyType> get expressionType;
   bool isValidExpressionType(hir.CandyType type) {
     return expressionType.when(
-      some: (expressionType) => isAssignableTo(
+      some: (expressionType) => hir.isAssignableTo(
         queryContext,
         Tuple2(
           type.bakeThisType(thisType.valueOrNull),
@@ -556,13 +570,41 @@ class ContextContext extends Context {
       DeclarationId id, [
       hir.Expression receiver,
     ]) {
+      hir.CandyType bakeIfRequired(hir.CandyType type) {
+        if (!declarationId.hasParent || !declarationId.parent.isImpl) {
+          return type;
+        }
+
+        final impl = getImplDeclarationHir(queryContext, declarationId.parent);
+        final classId =
+            moduleIdToDeclarationId(queryContext, impl.type.virtualModuleId);
+        if (id.parent.isNotClass || classId != id.parent) {
+          // If the impl isn't exactly for the class, where the property is that
+          // we want to convert, then just return its normal type.
+          return type;
+        }
+        final class_ = getClassDeclarationHir(queryContext, classId);
+
+        final typeParameters = class_.typeParameters
+            .map((p) => hir.CandyType.parameter(p.name, classId))
+            .toList();
+        final typeArguments = impl.typeParameters
+            .map((it) => hir.CandyType.parameter(it.name, declarationId.parent))
+            .toList();
+        final genericsMap = Map.fromEntries(typeParameters
+            .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
+                typeArguments, (a, b) => MapEntry(a, b)));
+
+        return type.bakeGenerics(genericsMap);
+      }
+
       if (id.isModule || id.isTrait || id.isClass) {
         return hir.Identifier.reflection(id);
       } else if (id.isFunction) {
         final functionHir = getFunctionDeclarationHir(queryContext, id);
         return hir.Identifier.property(
           id,
-          functionHir.functionType,
+          bakeIfRequired(functionHir.functionType),
           isMutable: false,
           receiver: receiver,
         );
@@ -570,7 +612,7 @@ class ContextContext extends Context {
         final propertyHir = getPropertyDeclarationHir(queryContext, id);
         return hir.Identifier.property(
           id,
-          propertyHir.type,
+          bakeIfRequired(propertyHir.type),
           isMutable: propertyHir.isMutable,
           receiver: receiver,
         );
@@ -658,7 +700,8 @@ class ContextContext extends Context {
                 hir.Identifier.this_(thisTypeOrResolved()),
               ),
             ));
-    if (matches.isNotEmpty) return matches.toList();
+    // TODO(marcelgarus): Maybe be more careful when choosing a match.
+    if (matches.isNotEmpty) return [matches.first];
 
     // search the current file (from the curent module to the root)
     assert(declarationId.hasParent);
@@ -686,6 +729,7 @@ class ContextContext extends Context {
       }
 
       final matches = innerIds
+          .where((it) => it.isNotImpl)
           .where((id) => id.simplePath.last.nameOrNull == name)
           .map(convertDeclarationId);
       if (matches.isNotEmpty) return matches.toList();
@@ -704,7 +748,7 @@ class ContextContext extends Context {
     return findIdentifierInUseLines(
       queryContext,
       Tuple4(resourceId, name, false, false),
-    ).map(convertDeclarationId).toList();
+    ).where((it) => it.isNotImpl).map(convertDeclarationId).toList();
   }
 
   @override
@@ -715,12 +759,12 @@ class ContextContext extends Context {
   }
 
   @override
-  Option<Tuple2<DeclarationLocalId, Option<CandyType>>> resolveReturn(
+  Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveReturn(
     Option<String> label,
   ) =>
       None();
   @override
-  Option<Tuple2<DeclarationLocalId, Option<CandyType>>> resolveBreak(
+  Option<Tuple2<DeclarationLocalId, Option<hir.CandyType>>> resolveBreak(
     Option<String> label,
   ) =>
       None();
@@ -796,7 +840,7 @@ class FunctionContext extends InnerContext {
   }
 
   @override
-  List<Identifier> resolveIdentifier(String name) {
+  List<hir.Identifier> resolveIdentifier(String name) {
     final result = _identifiers[name];
     if (result != null) return [result];
     return parent.value.resolveIdentifier(name);
@@ -839,6 +883,7 @@ class FunctionContext extends InnerContext {
     }
 
     if (!returnsUnit) {
+      // TODO(marcelgarus): Bake the return type.
       final lowered = innerExpressionContext(expressionType: Some(returnType))
           .lowerUnambiguous(body.expressions.last);
       if (lowered is Error) {
@@ -894,7 +939,7 @@ class PropertyContext extends InnerContext {
   final ast.Expression initializer;
 
   @override
-  void addIdentifier(LocalPropertyIdentifier identifier) {}
+  void addIdentifier(hir.LocalPropertyIdentifier identifier) {}
 
   Result<Tuple2<hir.Expression, BodyAstToHirIds>, List<ReportedCompilerError>>
       _lowerInitializer() {
@@ -926,7 +971,7 @@ class LambdaContext extends InnerContext {
   }
 
   @override
-  List<Identifier> resolveIdentifier(String name) {
+  List<hir.Identifier> resolveIdentifier(String name) {
     final result = _identifiers[name];
     if (result != null) return [result];
     return parent.value.resolveIdentifier(name);
@@ -946,11 +991,11 @@ class LambdaContext extends InnerContext {
   }
 }
 
-class ReturnExpressionVisitor extends DoNothingExpressionVisitor {
+class ReturnExpressionVisitor extends hir.DoNothingExpressionVisitor {
   final returnTypes = <hir.CandyType>{};
 
   @override
-  void visitReturnExpression(ReturnExpression node) {
+  void visitReturnExpression(hir.ReturnExpression node) {
     returnTypes.add(node.expression.type);
   }
 }
@@ -970,7 +1015,7 @@ class ExpressionContext extends InnerContext {
   final bool forwardsIdentifiers;
 
   @override
-  void addIdentifier(LocalPropertyIdentifier identifier) {
+  void addIdentifier(hir.LocalPropertyIdentifier identifier) {
     if (!forwardsIdentifiers) return;
 
     parent.value.addIdentifier(identifier);
@@ -996,7 +1041,7 @@ class IfContext extends InnerContext {
   }
 
   @override
-  List<Identifier> resolveIdentifier(String name) {
+  List<hir.Identifier> resolveIdentifier(String name) {
     final result = _identifiers[name];
     if (result != null) return [result];
     return parent.value.resolveIdentifier(name);
@@ -1034,7 +1079,7 @@ class LoopContext extends InnerContext {
   }
 
   @override
-  List<Identifier> resolveIdentifier(String name) {
+  List<hir.Identifier> resolveIdentifier(String name) {
     final result = _identifiers[name];
     if (result != null) return [result];
     return parent.value.resolveIdentifier(name);
@@ -1053,11 +1098,11 @@ class LoopContext extends InnerContext {
   }
 }
 
-class BreakExpressionVisitor extends DoNothingExpressionVisitor {
+class BreakExpressionVisitor extends hir.DoNothingExpressionVisitor {
   final breakTypes = <hir.CandyType>{};
 
   @override
-  void visitBreakExpression(BreakExpression node) {
+  void visitBreakExpression(hir.BreakExpression node) {
     breakTypes.add(node.expression?.type ?? hir.CandyType.unit);
   }
 }
@@ -1170,7 +1215,8 @@ extension on Context {
             );
 
             // TODO(JonasWanke): resolve correct `This`-type
-            if (!isAssignableTo(queryContext, Tuple2(typeParameter, hirType))) {
+            if (!hir.isAssignableTo(
+                queryContext, Tuple2(typeParameter, hirType))) {
               errors.add(CompilerError.invalidExpressionType(
                 'Declared type `$hirType` is not assignable to expected type `${declaredParameter.type}`.',
                 location:
@@ -1301,7 +1347,7 @@ extension on Context {
     ast.IfExpression theIf,
   ) {
     final loweredCondition =
-        innerExpressionContext(expressionType: Some(CandyType.bool))
+        innerExpressionContext(expressionType: Some(hir.CandyType.bool))
             .lowerUnambiguous(theIf.condition);
     if (loweredCondition is Error) return Error(loweredCondition.error);
     final condition = loweredCondition.value;
@@ -1315,7 +1361,7 @@ extension on Context {
     if (loweredThenBody is Error) return loweredThenBody;
     final thenBody = loweredThenBody.value;
 
-    final elseBody = <Expression>[];
+    final elseBody = <hir.Expression>[];
     if (theIf.elseKeyword != null) {
       assert(theIf.elseBody != null);
       final elseContext = IfContext(this, getId(theIf), None());
@@ -1369,7 +1415,7 @@ extension on Context {
     final loopContext = LoopContext(this, getId(whileLoop), None());
 
     final loweredCondition = loopContext
-        .innerExpressionContext(expressionType: Some(CandyType.bool))
+        .innerExpressionContext(expressionType: Some(hir.CandyType.bool))
         .lowerUnambiguous(whileLoop.condition);
     if (loweredCondition is Error) return loweredCondition.mapValue((e) => [e]);
     final condition = loweredCondition.value;
@@ -1384,7 +1430,8 @@ extension on Context {
 
     // TODO(marcelgarus): Implement while-else constructs that can also evaluate to something other than unit.
     return Ok([
-      hir.WhileExpression(getId(whileLoop), condition, body, CandyType.unit),
+      hir.WhileExpression(
+          getId(whileLoop), condition, body, hir.CandyType.unit),
     ]);
   }
 
@@ -1450,35 +1497,129 @@ extension on Context {
     List<hir.PropertyIdentifier> getMatchesForType(hir.UserCandyType type) {
       final receiverId =
           moduleIdToDeclarationId(queryContext, type.virtualModuleId);
+      final typeParameters = () {
+        if (receiverId.isClass) {
+          return getClassDeclarationHir(queryContext, receiverId)
+              .typeParameters;
+        } else if (receiverId.isTrait) {
+          return getTraitDeclarationHir(queryContext, receiverId)
+              .typeParameters;
+        }
+      }()
+          .map((it) => hir.CandyType.parameter(it.name, receiverId))
+          .toList();
+      final typeArguments = type.arguments;
+
+      /// Consider the following case:
+      ///
+      /// ```
+      /// class Foo<F> {}
+      /// trait Bar<B> {
+      ///   fun hello(): B
+      /// }
+      /// impl<I> Foo<I>: Bar<I> {
+      ///   fun hello(): I
+      /// }
+      /// fun test() {
+      ///   let a = Foo<Bool>();
+      ///   let b = a.hello();
+      /// }
+      /// ```
+      ///
+      /// Here, the generics map at the `.hello` navigation should contain the
+      /// following entries:
+      ///
+      /// - `B@Bar` -> `I@impl`
+      /// - `I@impl` -> `F@Foo`
+      /// - `F@Foo` -> `Bool` (this is already in the generics map)
+      ///
+      /// Then, the types of functions and properties need to be baked three
+      /// times:
+      ///
+      /// 1. to get from trait to impl
+      /// 2. to get from impl to class
+      /// 3. to get from class to instance
+
+      // from class to instance
+      final genericsMap = Map.fromEntries(typeParameters
+          .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
+              typeArguments, (a, b) => MapEntry(a, b)));
+
+      final impls = getAllImplsForTraitOrClass(queryContext, receiverId)
+          .map((implId) => getImplDeclarationHir(queryContext, implId))
+          .toList();
+      for (final impl in impls) {
+        // TODO(marcelgarus): This is an ugly workaround. An impl's generics can't be nested.
+
+        // from trait to impl
+        for (final traitType in impl.traits.whereType<hir.UserCandyType>()) {
+          final traitId =
+              moduleIdToDeclarationId(queryContext, traitType.virtualModuleId);
+          final trait = getTraitDeclarationHir(queryContext, traitId);
+          genericsMap.addAll(Map.fromEntries(trait.typeParameters
+              .map((it) => hir.CandyType.parameter(it.name, traitId))
+              .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
+                  traitType.arguments, (a, b) => MapEntry(a, b))));
+        }
+
+        // from impl to class
+        genericsMap.addAll(Map.fromEntries(impl.type.arguments
+            .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
+                typeParameters, (a, b) => MapEntry(a, b))));
+      }
+
       return getInnerDeclarationIds(queryContext, receiverId)
+          .followedBy(impls.expand((impl) {
+            // For each impl, return the inner declaration ids as well as the
+            // declaration ids of functions with default implementations in the
+            // corresponding traits.
+            return impl.innerDeclarationIds.followedBy(impl.traits
+                .map((it) => getTraitDeclarationHir(queryContext,
+                    moduleIdToDeclarationId(queryContext, it.virtualModuleId)))
+                .expand((trait) => trait.innerDeclarationIds)
+                .where((it) => it.isFunction)
+                .where((it) => getBody(queryContext, it) is Some));
+          }))
           .where((id) => id.simplePath.last.nameOrNull == name)
           .mapNotNull((id) {
-        if (id.isModule || id.isTrait || id.isClass) return null;
-        if (id.isProperty) {
-          final propertyHir = getPropertyDeclarationHir(queryContext, id);
-          if (propertyHir.isStatic) return null;
-          return hir.PropertyIdentifier(
-            id,
-            propertyHir.type.bakeThisType(type),
-            base: target,
-            receiver: target,
-          );
-        } else if (id.isFunction) {
-          final functionHir = getFunctionDeclarationHir(queryContext, id);
-          if (functionHir.isStatic) return null;
-          return hir.PropertyIdentifier(
-            id,
-            functionHir.functionType.bakeThisType(type),
-            base: target,
-            receiver: target,
-          );
-        } else {
-          throw CompilerError.internalError(
-            'Identifier resolved to an invalid declaration type: `$id`.',
-            location: ErrorLocation(resourceId, expression.name.span),
-          );
-        }
-      }).toList();
+            if (id.isModule || id.isTrait || id.isClass) return null;
+            // Don't be confused by the three-time-baking. That corresponds to
+            // the three steps from the comment above.
+
+            if (id.isProperty) {
+              final propertyHir = getPropertyDeclarationHir(queryContext, id);
+              if (propertyHir.isStatic) return null;
+              return hir.PropertyIdentifier(
+                id,
+                propertyHir.type
+                    .bakeThisType(type)
+                    .bakeGenerics(genericsMap)
+                    .bakeGenerics(genericsMap)
+                    .bakeGenerics(genericsMap),
+                base: target,
+                receiver: target,
+              );
+            } else if (id.isFunction) {
+              final functionHir = getFunctionDeclarationHir(queryContext, id);
+              if (functionHir.isStatic) return null;
+              return hir.PropertyIdentifier(
+                id,
+                functionHir.functionType
+                    .bakeThisType(type)
+                    .bakeGenerics(genericsMap)
+                    .bakeGenerics(genericsMap)
+                    .bakeGenerics(genericsMap),
+                base: target,
+                receiver: target,
+              );
+            } else {
+              throw CompilerError.internalError(
+                'Identifier resolved to an invalid declaration type: `$id`.',
+                location: ErrorLocation(resourceId, expression.name.span),
+              );
+            }
+          })
+          .toList();
     }
 
     Result<List<hir.Expression>, List<ReportedCompilerError>> lower(
@@ -1486,7 +1627,8 @@ extension on Context {
       return type.map(
         user: (type) {
           final matches = getMatchesForType(type)
-              .map((m) => hir.IdentifierExpression(getId(expression), m));
+              .map((m) => hir.IdentifierExpression(getId(expression), m))
+              .toList();
           if (matches.isEmpty) {
             final receiverId =
                 moduleIdToDeclarationId(queryContext, type.virtualModuleId);
@@ -1498,12 +1640,12 @@ extension on Context {
               ),
             ]);
           }
-          return Ok(matches.toList());
+          return Ok(matches);
         },
         this_: (_) {
-          final type =
-              getPropertyDeclarationParentAsType(queryContext, declarationId)
-                  .value;
+          final type = hir
+              .getPropertyDeclarationParentAsType(queryContext, declarationId)
+              .value;
           final matches = getMatchesForType(type)
               .map((m) => hir.IdentifierExpression(getId(expression), m));
           if (matches.isEmpty) {
@@ -1608,7 +1750,8 @@ extension on Context {
               .toList();
           return Ok(finalMatches);
         },
-        parameter: (type) => lower(getTypeParameterBound(queryContext, type)),
+        parameter: (type) =>
+            lower(hir.getTypeParameterBound(queryContext, type)),
         reflection: (targetType) {
           final targetId = targetType.declarationId;
           // Only `IdentifierExpression`s containing a `ReflectionIdentifier` can
@@ -1672,6 +1815,7 @@ extension on Context {
     if (targetVariants is Error) return targetVariants;
 
     final results = targetVariants.value.map((target) {
+      // Function call.
       if (target is hir.IdentifierExpression &&
           target.identifier is hir.PropertyIdentifier) {
         final identifier = target.identifier as hir.PropertyIdentifier;
@@ -1680,8 +1824,15 @@ extension on Context {
         }
       }
 
+      // Constructor call.
+      if (target is hir.IdentifierExpression &&
+          target.identifier is hir.ReflectionIdentifier) {
+        // TODO(marcelgarus): Ensure this is a constructor call.
+        return lowerConstructorCall(expression, target);
+      }
+
       throw CompilerError.unsupportedFeature(
-        'Callable expressions are not yet supported.',
+        'Callable expressions are not yet supported (target: $target).',
         location: ErrorLocation(resourceId, expression.span),
       );
     });
@@ -1692,16 +1843,57 @@ extension on Context {
     ast.CallExpression expression,
     hir.IdentifierExpression target,
   ) {
+    assert(target != null);
     assert(target.identifier is hir.PropertyIdentifier);
     final identifier = target.identifier as hir.PropertyIdentifier;
 
     final functionId = identifier.id;
     assert(functionId.isFunction);
-    final functionHir = getFunctionDeclarationHir(queryContext, functionId);
+
+    var functionHir = getFunctionDeclarationHir(queryContext, functionId);
+    if (functionHir.typeParameters.length !=
+        (expression.typeArguments?.arguments?.length ?? 0)) {
+      return Error([
+        CompilerError.wrongNumberOfTypeArguments(
+          'Function expected ${functionHir.typeParameters.length} parameters, '
+          'but you provided ${expression.typeArguments?.arguments?.length ?? 0}.',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    }
+
+    /// The target type may contain baked information. For example, if we do
+    /// `Foo<A>().bar<T>(baz)`, then `baz`'s type and the return type of `bar`
+    /// might depend on both `A` and `T`.
+    /// The `target` contains the (partially-)baked type of `bar` – for example,
+    /// `() => A`. So, now we merge those type information with the type
+    /// information given directly at `bar`s invocation (`T`).
+    final targetType = target.type as hir.FunctionCandyType;
+    final typeParameters = functionHir.typeParameters
+        .map((p) => hir.CandyType.parameter(p.name, functionId))
+        .toList();
+    final typeArguments = expression.typeArguments?.arguments
+            ?.map((a) =>
+                astTypeToHirType(queryContext, Tuple2(declarationId, a.type)))
+            ?.toList() ??
+        [];
+    final genericsMap = Map.fromEntries(typeParameters
+        .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
+            typeArguments, (a, b) => MapEntry(a, b)));
+    functionHir = functionHir.copyWith(
+      valueParameters: [
+        for (var i = 0; i < functionHir.valueParameters.length; i++)
+          functionHir.valueParameters[i].copyWith(
+            type: targetType.parameterTypes[i].bakeGenerics(genericsMap),
+          ),
+      ],
+      returnType: targetType.returnType.bakeGenerics(genericsMap),
+    );
+
     if (!isValidExpressionType(functionHir.returnType)) {
       return Error([
         CompilerError.invalidExpressionType(
-          'Function call has an invalid return type: `${functionHir.returnType}`, expected: `${expressionType.value}`.',
+          'Function call ${functionHir.name} has an invalid return type: `${functionHir.returnType}`, expected: `${expressionType.value}`.',
           location: ErrorLocation(resourceId, expression.span),
         ),
       ]);
@@ -1800,7 +1992,111 @@ extension on Context {
       hir.Expression.functionCall(
         getId(expression),
         target,
+        expression.typeArguments?.arguments
+                ?.map((argument) => astTypeToHirType(
+                    queryContext, Tuple2(declarationId, argument.type)))
+                ?.toList() ??
+            [],
         hirArgumentMap,
+        functionHir.returnType,
+      ),
+    ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>>
+      lowerConstructorCall(
+    ast.CallExpression expression,
+    hir.IdentifierExpression target,
+  ) {
+    assert(target != null);
+    assert(target.identifier is hir.ReflectionIdentifier,
+        'target.identifier is not a `ReflectionIdentifier`: ${target.identifier}');
+
+    final classId = (target.identifier as hir.ReflectionIdentifier).id;
+    // ignore: non_constant_identifier_names
+    final class_ = getClassDeclarationHir(queryContext, classId);
+    final constructorId =
+        class_.innerDeclarationIds.singleWhere((id) => id.isConstructor);
+
+    final typeParameters = class_.typeParameters
+        .map((p) => hir.CandyType.parameter(p.name, classId))
+        .toList();
+    final typeArguments = expression.typeArguments?.arguments
+            ?.map((a) =>
+                astTypeToHirType(queryContext, Tuple2(declarationId, a.type)))
+            ?.toList() ??
+        [];
+    final genericsMap = Map.fromEntries(typeParameters
+        .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
+            typeArguments, (a, b) => MapEntry(a, b)));
+
+    final fields = class_.innerDeclarationIds
+        .where((id) => id.isProperty)
+        .map((id) => getPropertyDeclarationHir(queryContext, id))
+        .where((field) => !field.isStatic)
+        .toList();
+    final valueParameterTypes =
+        fields.map((field) => field.type.bakeGenerics(genericsMap)).toList();
+    final valueArguments = expression.arguments;
+
+    final returnType = class_.thisType.bakeGenerics(genericsMap);
+
+    if (typeParameters.length != (typeArguments?.length ?? 0)) {
+      return Error([
+        CompilerError.wrongNumberOfTypeArguments(
+          'Constructor expected ${typeParameters.length} type parameters, '
+          'but you provided ${typeArguments?.length ?? 0}.',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    }
+
+    if (!isValidExpressionType(returnType)) {
+      return Error([
+        CompilerError.invalidExpressionType(
+          'Constructor has an invalid return type: $returnType. Expected: $expressionType',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    }
+
+    if (valueParameterTypes.length < valueArguments.length) {
+      return Error([
+        CompilerError.tooManyArguments(
+          'Too many constructor arguments.',
+          location: ErrorLocation(resourceId, expression.span),
+        )
+      ]);
+    }
+
+    if (valueParameterTypes.length > valueArguments.length) {
+      return Error([
+        CompilerError.missingArguments(
+          'Too few constructor arguments.',
+          location: ErrorLocation(resourceId, expression.span),
+        )
+      ]);
+    }
+
+    final loweredArguments = [
+      for (var i = 0; i < valueArguments.length; i++)
+        innerExpressionContext(
+          expressionType: Option.some(valueParameterTypes[i]),
+        ).lowerUnambiguous(valueArguments[i].expression),
+    ].merge();
+    if (loweredArguments is Error) return loweredArguments;
+    final arguments = loweredArguments.value;
+
+    return Ok([
+      hir.Expression.constructorCall(
+        getId(expression),
+        class_,
+        typeArguments,
+        {
+          for (var i = 0; i < arguments.length; i++)
+            fields[i].name: arguments[i],
+        },
+        returnType,
       ),
     ]);
   }
@@ -1943,7 +2239,9 @@ extension on Context {
               receiver: operand,
             ),
           ),
+          [],
           {},
+          operand.type,
         ),
       ]);
     }
@@ -2003,7 +2301,9 @@ extension on Context {
               receiver: left,
             ),
           ),
+          [],
           {'other': right.value},
+          returnType.bakeThisType(left.type),
         ),
       ]);
     }
@@ -2128,13 +2428,13 @@ extension on Context {
     final leftExpression = lowerUnambiguous(expression.leftOperand);
     if (leftExpression is Error) return Error(leftExpression.error);
     final leftSome = leftExpression.value;
-    if (leftSome is! IdentifierExpression) {
+    if (leftSome is! hir.IdentifierExpression) {
       return Error([
         CompilerError.invalidExpressionType("Can't assign to this expression: "
             '${leftSome.runtimeType} ($leftSome)'),
       ]);
     }
-    final left = leftSome as IdentifierExpression;
+    final left = leftSome as hir.IdentifierExpression;
     if (left.identifier is! hir.PropertyIdentifier &&
         left.identifier is! hir.LocalPropertyIdentifier) {
       return Error([

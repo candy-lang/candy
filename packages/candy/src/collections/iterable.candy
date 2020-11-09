@@ -1,14 +1,89 @@
 use ...primitives
+use ..list.array
 
 public trait Iterable<Item> {
   fun /* let */ iterator(): Iterator<Item>
 
-  fun get(index: Int /* UInt */): Option<Item>
-  // TODO(JonasWanke): let first: Option<Item>
-  // TODO(JonasWanke): let second: Option<Item>
-  // TODO(JonasWanke): let third: Option<Item>
-  // TODO(JonasWanke): let fourth: Option<Item>
-  // TODO(JonasWanke): let fifth: Option<Item>
+  fun get(index: Int /* UInt */): Option<Item> {
+    /// Returns the [index]th element.
+    
+    let iter = iterator()
+    mut let i = 0
+    mut let element: Option<Item> = None<Item>()
+    while i <= index {
+      let element = iter.next()
+      i = i + 1
+    }
+    element
+  }
+
+  fun first(): Option<Item> { get(0) }
+  // fun second(): Option<Item> { get(1) }
+  // fun third(): Option<Item> { get(2) }
+  // fun fourth(): Option<Item> { get(3) }
+  // fun fifth(): Option<Item> { get(4) }
+  // fun sixth(): Option<Item> { get(5) }
+  // fun seventh(): Option<Item> { get(6) }
+
+  // fun nthLast(index: Int): Option<Item> {
+  //   // TODO(marcelgarus): Make this way more efficient.
+  //   let list = ArrayList.empty<Item>()
+  //   let iter = iterator()
+  //   loop {
+  //     let element = iter.next()
+  //     if element is None {
+  //       break
+  //     }
+  //     list.add(element)
+  //     if list.length() > index {
+  //       list.removeFirst()
+  //     }
+  //   }
+  //   if list.length() == index {
+  //     list.first()
+  //   } else {
+  //     None<Item>()
+  //   }
+  // }
+
+  // TODO(marcelgarus): last
+  // TODO(marcelgarus): secondLast
+  // TODO(marcelgarus): thirdLast
+
+  fun isEmpty(): Bool { first() is None }
+  fun isNotEmpty(): Bool { !isEmpty() }
+
+  // TODO(marcelgarus): length
+  // TODO(marcelgarus): single
+  // TODO(marcelgarus): any
+  // TODO(marcelgarus): cast
+  // TODO(marcelgarus): contains
+  // TODO(marcelgarus): every
+  // TODO(marcelgarus): expand
+  // TODO(marcelgarus): firstWhere
+  // TODO(marcelgarus): foldLeft
+  // TODO(marcelgarus): foldRight
+  // TODO(marcelgarus): lastWhere
+  // TODO(marcelgarus): map
+  // TODO(marcelgarus): enumerate
+  // TODO(marcelgarus): reduceLeft
+  // TODO(marcelgarus): reduceRight
+  // TODO(marcelgarus): reversed
+  // TODO(marcelgarus): singleWhere
+  // TODO(marcelgarus): skip
+  // TODO(marcelgarus): skipWhile
+  // TODO(marcelgarus): take
+  // TODO(marcelgarus): takeWhile
+  // TODO(marcelgarus): toList
+  // TODO(marcelgarus): where
+  // TODO(marcelgarus): whereType
+  // TODO(marcelgarus): zip
+
+  // TODO(marcelgarus): add operator
+
+  // TODO(marcelgarus): dartx
+  // TODO(marcelgarus): kotlin
+
 }
 
 public trait Iterator<Item> {

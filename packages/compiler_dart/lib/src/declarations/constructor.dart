@@ -10,7 +10,7 @@ final compileConstructor = Query<DeclarationId, List<dart.Constructor>>(
   provider: (context, declarationId) {
     assert(true);
     final constructor = getConstructorDeclarationHir(context, declarationId);
-    final parameters = constructor.parameters;
+    final parameters = constructor.valueParameters;
 
     if (parameters.every((p) => p.defaultValue == null)) {
       return [_compileWithoutDefaults(parameters)];

@@ -1,3 +1,5 @@
+import 'package:compiler/src/compilation/hir.dart';
+import 'package:dartx/dartx.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../errors.dart';
@@ -122,7 +124,7 @@ abstract class CandyType with _$CandyType {
       tuple: (type) => type.copyWith(
           items: type.items.map((i) => i.bakeThisType(thisType)).toList()),
       function: (type) => type.copyWith(
-        receiverType: type.receiverType.bakeThisType(thisType),
+        receiverType: type.receiverType?.bakeThisType(thisType),
         parameterTypes:
             type.parameterTypes.map((p) => p.bakeThisType(thisType)).toList(),
         returnType: type.returnType.bakeThisType(thisType),
@@ -132,6 +134,30 @@ abstract class CandyType with _$CandyType {
       intersection: (type) => type.copyWith(
           types: type.types.map((t) => t.bakeThisType(thisType)).toList()),
       parameter: (type) => type,
+      reflection: (type) => type,
+    );
+  }
+
+  CandyType bakeGenerics(Map<CandyType, CandyType> types) {
+    if (types.isEmpty) return this;
+
+    return map(
+      user: (type) => type.copyWith(
+          arguments: type.arguments.map((a) => a.bakeGenerics(types)).toList()),
+      this_: (type) => type,
+      tuple: (type) => type.copyWith(
+          items: type.items.map((i) => i.bakeGenerics(types)).toList()),
+      function: (type) => type.copyWith(
+        receiverType: type.receiverType?.bakeGenerics(types),
+        parameterTypes:
+            type.parameterTypes.map((p) => p.bakeGenerics(types)).toList(),
+        returnType: type.returnType.bakeGenerics(types),
+      ),
+      union: (type) => type.copyWith(
+          types: type.types.map((t) => t.bakeGenerics(types)).toList()),
+      intersection: (type) => type.copyWith(
+          types: type.types.map((t) => t.bakeGenerics(types)).toList()),
+      parameter: (type) => types[type] ?? type,
       reflection: (type) => type,
     );
   }
@@ -153,7 +179,7 @@ abstract class CandyType with _$CandyType {
       },
       union: (type) => type.types.join(' | '),
       intersection: (type) => type.types.join(' & '),
-      parameter: (type) => type.name,
+      parameter: (type) => '${type.name}@${type.declarationId}',
       reflection: (type) {
         final id = type.declarationId;
         if (id.isModule) return 'Module<$id>';
@@ -213,6 +239,18 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
       );
     }
 
+    // TODO(marcelgarus): This is ugly and hardcoded.
+    if (child is UserCandyType && parent is UserCandyType) {
+      if (child.name == 'None' && parent.name == 'Option') {
+        return true;
+      } else if (child.name == 'Some' && parent.name == 'Option') {
+        return child.arguments
+            .zip(parent.arguments,
+                (a, CandyType b) => isAssignableTo(context, Tuple2(a, b)))
+            .every((it) => it);
+      }
+    }
+
     CandyType getResultingType(ReflectionCandyType type) {
       final id = type.declarationId;
       if (id.isModule) return CandyType.module;
@@ -248,16 +286,16 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
             if (declarationId.isTrait) {
               final declaration =
                   getTraitDeclarationHir(context, declarationId);
-              if (declaration.typeParameters.isNotEmpty) {
-                throw CompilerError.unsupportedFeature(
-                  'Type parameters are not yet supported.',
-                );
-              }
 
               return declaration.upperBounds.any((bound) {
+                final bakedBound = bound.bakeGenerics({
+                  for (final index in childType.arguments.indices)
+                    CandyType.parameter(declaration.typeParameters[index].name,
+                        declarationId): childType.arguments[index],
+                });
                 return isAssignableTo(
                   context,
-                  Tuple2(bound, parent),
+                  Tuple2(bakedBound, parent),
                 );
               });
             }
@@ -282,10 +320,7 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
               .any((type) => isAssignableTo(context, Tuple2(childType, type))),
           intersection: (parentType) => parentType.types.every(
               (type) => isAssignableTo(context, Tuple2(childType, type))),
-          parameter: (type) {
-            final bound = getTypeParameterBound(context, type);
-            return isAssignableTo(context, Tuple2(child, bound));
-          },
+          parameter: (type) => false,
           reflection: (type) => isAssignableTo(
             context,
             Tuple2(getResultingType(type), parent),
@@ -334,7 +369,8 @@ final getClassTraitImplId =
 
     final implIds = getAllImplsForType(context, child).where((implId) {
       final impl = getImplDeclarationHir(context, implId);
-      return impl.traits.any((trait) => trait == parent);
+      // TODO(marcelgarus): Constraints solving should go here.
+      return impl.traits.any((trait) => trait.name == parent.name);
     });
     if (implIds.length > 1) {
       throw CompilerError.ambiguousImplsFound(
@@ -343,7 +379,16 @@ final getClassTraitImplId =
           implIds.first.resourceId,
           getImplDeclarationAst(context, implIds.first).representativeSpan,
         ),
-        // TODO(JonasWanke): output other impl locations
+        relatedInformation: [
+          for (final implId in implIds)
+            ErrorRelatedInformation(
+              location: ErrorLocation(
+                implIds.first.resourceId,
+                getImplDeclarationAst(context, implId).representativeSpan,
+              ),
+              message: 'An impl is here.',
+            ),
+        ],
       );
     }
 
