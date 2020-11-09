@@ -1,8 +1,15 @@
 use ...primitives
-use ..list.array
+use ..list
+use ...todo
+
+public trait Iterator<Item> {
+  fun next(): Option<Item>
+}
 
 public trait Iterable<Item> {
   fun /* let */ iterator(): Iterator<Item>
+
+  // Getters
 
   fun get(index: Int /* UInt */): Option<Item> {
     /// Returns the [index]th element.
@@ -11,81 +18,279 @@ public trait Iterable<Item> {
     mut let i = 0
     mut let element: Option<Item> = None<Item>()
     while i <= index {
-      let element = iter.next()
+      element = iter.next()
       i = i + 1
     }
     element
   }
 
   fun first(): Option<Item> { get(0) }
-  // fun second(): Option<Item> { get(1) }
-  // fun third(): Option<Item> { get(2) }
-  // fun fourth(): Option<Item> { get(3) }
-  // fun fifth(): Option<Item> { get(4) }
-  // fun sixth(): Option<Item> { get(5) }
-  // fun seventh(): Option<Item> { get(6) }
+  fun second(): Option<Item> { get(1) }
+  fun third(): Option<Item> { get(2) }
+  fun fourth(): Option<Item> { get(3) }
+  fun fifth(): Option<Item> { get(4) }
+  fun sixth(): Option<Item> { get(5) }
+  fun seventh(): Option<Item> { get(6) }
 
-  // fun nthLast(index: Int): Option<Item> {
-  //   // TODO(marcelgarus): Make this way more efficient.
-  //   let list = ArrayList.empty<Item>()
+  fun nthLast(index: Int): Option<Item> {
+    // TODO(marcelgarus): Implement this.
+    // TODO(marcelgarus): Make this way more efficient.
+    let list = ArrayList.empty<Item>()
+    let iter = iterator()
+    // loop {
+    //   break
+    // }
+    // loop {
+    //   let element = iter.next()
+    //   if element is End {
+    //     break
+    //   }
+    let a = 4
+    //   list.append(element.toOption().unwrap())
+    //   if list.length() > index {
+    //     list.removeFirst()
+    //   }
+    // }
+    // if list.length() == index {
+    //   list.first()
+    // } else {
+    // None<Item>()
+    // }
+    todo("Implement nthLast.")
+  }
+
+  fun last(): Option<Item> { nthLast(0) }
+  fun secondLast(): Option<Item> { nthLast(1) }
+  fun thirdLast(): Option<Item> { nthLast(2) }
+
+  fun single(): Option<Item> {
+    let iter = iterator()
+    let first = iter.next()
+    if first is None {
+      return None<Item>()
+    }
+    if iter.next() is Some<Item> {
+      return None<Item>()
+    }
+    first
+  }
+
+  // Properties.
+
+  // fun length(): Int {
   //   let iter = iterator()
-  //   loop {
-  //     let element = iter.next()
-  //     if element is None {
-  //       break
-  //     }
-  //     list.add(element)
-  //     if list.length() > index {
-  //       list.removeFirst()
-  //     }
+  //   mut let length = 0
+  //   while iter.next() is More<Item> {
+  //     length = length + 1
   //   }
-  //   if list.length() == index {
-  //     list.first()
-  //   } else {
-  //     None<Item>()
-  //   }
+  //   length
   // }
 
-  // TODO(marcelgarus): last
-  // TODO(marcelgarus): secondLast
-  // TODO(marcelgarus): thirdLast
+  // Boolean checks.
 
   fun isEmpty(): Bool { first() is None }
   fun isNotEmpty(): Bool { !isEmpty() }
 
-  // TODO(marcelgarus): length
-  // TODO(marcelgarus): single
+  // TODO(marcelgarus): Implement these as soon as for-loops work:
+  // TODO(marcelgarus): all
   // TODO(marcelgarus): any
-  // TODO(marcelgarus): cast
   // TODO(marcelgarus): contains
-  // TODO(marcelgarus): every
-  // TODO(marcelgarus): expand
-  // TODO(marcelgarus): firstWhere
+
+  // Reductions.
+
   // TODO(marcelgarus): foldLeft
   // TODO(marcelgarus): foldRight
-  // TODO(marcelgarus): lastWhere
-  // TODO(marcelgarus): map
-  // TODO(marcelgarus): enumerate
   // TODO(marcelgarus): reduceLeft
   // TODO(marcelgarus): reduceRight
-  // TODO(marcelgarus): reversed
+
+  // Searching.
+
+  // TODO(marcelgarus): firstWhere
+  // TODO(marcelgarus): lastWhere
   // TODO(marcelgarus): singleWhere
-  // TODO(marcelgarus): skip
-  // TODO(marcelgarus): skipWhile
-  // TODO(marcelgarus): take
-  // TODO(marcelgarus): takeWhile
-  // TODO(marcelgarus): toList
-  // TODO(marcelgarus): where
-  // TODO(marcelgarus): whereType
+  // TODO(marcelgarus): firstIndexWhere
+  // TODO(marcelgarus): lastIndexWhere
+
+  // Mapping transformations.
+  // These return an `Iterable` with the same length, but a different type.
+
+  fun map<Out>(mapper: (Item) => Out): Iterable<Out> {
+    MappedIterable<Item, Out>(this, mapper)
+  }
+
+  fun cast<Type>(): Iterable<Type> {
+    // TODO(marcelgarus): Enable as soon as "as" is supported.
+    // map<Type>({ it as Type })
+    todo("Implement cast.")
+  }
+
+  // // TODO(marcelgarus): Maybe rename this to `indexed`?
+  // fun enumerate(): Iterable<(Int, Item)> {
+  //   mut let index = 0
+  //   map<(Int, Item)>({
+  //      let result = (index, it)
+  //      index = index + 1
+  //      result
+  //   })
+  // }
+
+  // Selection transformations.
+  // These return an `Iterable` with a subset of the items.
+
+  fun where(checker: (Item) => Bool): Iterable<Item> {
+    WhereIterable<Item>(this, checker)
+  }
+
+  fun whereNot(checker: (Item) => Bool): Iterable<Item> {
+    where({ !checker(it) })
+  }
+
+  fun whereType<Result>(): Iterable<Item & Result> {
+    where({ it is Result }).cast<Item & Result>()
+  }
+
+  fun skip(n: Int): Iterable<Item> {
+    mut let counter = 0
+    where({
+      counter = counter + 1
+      counter > n
+    })
+  }
+
+  fun skipWhile(checker: (Item) => Bool): Iterable<Item> {
+    mut let skipping = true
+    where({
+      if !skipping {
+        return false
+      }
+      skipping = checker(it)
+      return skipping
+    })
+  }
+
+  fun slice(start: Int, end: Int): Iterable<Item> {
+    skip(start).take(end - start)
+  }
+
+  fun take(n: Int): Iterable<Item> {
+    mut let counter = 0
+    where({
+      counter = counter + 1
+      counter <= n
+    })
+  }
+
+  fun takeWhile(checker: (Item) => Bool): Iterable<Item> {
+    // TODO(marcelgarus): Implement more efficiently.
+
+    mut let taking = true
+    where({
+      if !taking {
+        return false
+      }
+      taking = checker(it)
+      return taking
+    })
+  }
+
+  // // Conversion transformations.
+  // // These do more complicated stuff.
+
+  // fun maybeMap<Out>(maybeMapper: (Item) => Option<Out>): Iterable<Out> {
+  //   // TODO(marcelgarus): As soon as implicit casts are available, maybe make the checker return a
+  //   // `MaybeMapResult`, which can be either `Map(value)` or `Drop`?
+
+  //   // TODO: Use `whereSome` as soon as that's available.
+  //   map<Option<Out>>(maybeMapper).whereType<Some>().map<Out>({ it.value })
+  // }
+
+  // TODO(marcelgarus): distinctBy
+  // TODO(marcelgarus): expand
+  // TODO(marcelgarus): flatMap
+  // TODO(marcelgarus): groupBy
+  // TODO(marcelgarus): reversed
   // TODO(marcelgarus): zip
 
-  // TODO(marcelgarus): add operator
+  // Conversions.
 
-  // TODO(marcelgarus): dartx
-  // TODO(marcelgarus): kotlin
+  fun toList(): List<Item> {
+    toMutableList()
+  }
 
+  fun toMutableList(): MutableList<Item> {
+    let iter = iterator()
+    let list = MutableList.empty<Item>()
+
+    loop {
+      let element = iter.next()
+      if element is None {
+        return list
+      } else {
+        list.append(element.unwrap())
+      }
+    }
+  }
+
+  // TODO(marcelgarus): toSet
+  // TODO(marcelgarus): toMutableSet
+
+  // Extras:
+
+  // TODO(marcelgarus): + operator for joining Iterables
+
+  // TODO(marcelgarus): for Iterable<T: Equals>: distinct, indexOf, lastIndexOf
+  // TODO(marcelgarus): for Iterable<(A, B)>: map with 2 args, unzip
+  // TODO(marcelgarus): for Iterable<Iterable<T>>: flatten
+  // TODO(marcelgarus): for Iterable<Number>: average, sum, min, max, minBy, maxBy
+  // TODO(marcelgarus): for Iterable<Option<T>>: whereSome, unwrapAll
 }
 
-public trait Iterator<Item> {
-  fun next(): Option<Item>
+class MappedIterable<In, Out> {
+  let parent: Iterable<In>
+  let mapper: (In) => Out
+}
+impl<In, Out> MappedIterable<In, Out>: Iterable<Out> {
+  fun iterator(): Iterator<Out> {
+    MappedIterator<In, Out>(parent.iterator(), mapper)
+  }
+}
+class MappedIterator<In, Out> {
+  let parent: Iterator<In>
+  let mapper: (In) => Out
+}
+impl<In, Out> MappedIterator<In, Out>: Iterator<Out> {
+  fun next(): Option<Out> {
+    parent.next().map<Out>(mapper)
+  }
+}
+
+// TODO(marcelgarus): As soon as implicit casts are available, maybe make the checker return a
+// `WhereResult`, which can be either `Keep` or `Drop`?
+class WhereIterable<Item> {
+  let parent: Iterable<Item>
+  let checker: (Item) => Bool
+}
+impl<Item> WhereIterable<Item>: Iterable<Item> {
+  fun iterator(): Iterator<Item> {
+    WhereIterator<Item>(parent.iterator(), checker)
+  }
+}
+class WhereIterator<Item> {
+  let parent: Iterator<Item>
+  let checker: (Item) => Bool
+}
+impl<Item> WhereIterator<Item>: Iterator<Item> {
+  fun next(): Option<Item> {
+    loop {
+      let element = parent.next()
+      if element is None {
+        return element
+      } else {
+        if checker(element.unwrap()) {
+          return element
+        }
+        todo("Implement WhereIterator.")
+      }
+    }
+  }
 }
