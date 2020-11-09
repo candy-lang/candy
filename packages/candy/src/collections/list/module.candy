@@ -32,6 +32,23 @@ public trait List<Item>: Iterable<Item> {
 // TODO(JonasWanke): impl List<Item>: GetOperator<Range<UInt>, List<Item>>
 
 public trait MutableList<Item>: List<Item> {
+  static fun empty<Item>(): MutableList<Item> { ArrayList.empty<Item>() }
+  static fun of1<Item>(first: Item): MutableList<Item> {
+    ArrayList.of1<Item>(first)
+  }
+  static fun of2<Item>(first: Item, second: Item): MutableList<Item> {
+    ArrayList.of2<Item>(first, second)
+  }
+  static fun of3<Item>(first: Item, second: Item, third: Item): MutableList<Item> {
+    ArrayList.of3<Item>(first, second, third)
+  }
+  static fun of4<Item>(first: Item, second: Item, third: Item, fourth: Item): MutableList<Item> {
+    ArrayList.of4<Item>(first, second, third, fourth)
+  }
+  static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): MutableList<Item> {
+    ArrayList.of5<Item>(first, second, third, fourth, fifth)
+  }
+  
   fun set(index: Int /* UInt */, item: Item)
   // TODO(marcelgarus): Rename to add as soon as the naming conflict with + is resolved.
   fun append(item: Item)
