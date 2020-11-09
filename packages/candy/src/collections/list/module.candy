@@ -25,7 +25,7 @@ public trait List<Item>: Iterable<Item> {
   // TODO(marcelgarus): Getterize!
   fun isEmpty(): Bool { length() == 0 }
 
-  fun get(index: Int /* UInt */): Option<Item>
+  fun get(index: Int /* UInt */): Maybe<Item>
 }
 
 // impl<Item> List<Item>: GetOperator<Int, Item> /* GetOperator<UInt, Item> */

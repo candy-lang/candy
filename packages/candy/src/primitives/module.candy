@@ -1,5 +1,5 @@
 use ..operators
-public use .option
+public use .maybe
 
 public builtin trait Any
 // builtin impl Any: ToString

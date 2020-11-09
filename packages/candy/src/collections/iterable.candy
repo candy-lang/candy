@@ -3,7 +3,7 @@ use ..list
 use ...todo
 
 public trait Iterator<Item> {
-  fun next(): Option<Item>
+  fun next(): Maybe<Item>
 }
 
 public trait Iterable<Item> {
@@ -11,12 +11,12 @@ public trait Iterable<Item> {
 
   // Getters
 
-  fun get(index: Int /* UInt */): Option<Item> {
+  fun get(index: Int /* UInt */): Maybe<Item> {
     /// Returns the [index]th element.
     
     let iter = iterator()
     mut let i = 0
-    mut let element: Option<Item> = None<Item>()
+    mut let element: Maybe<Item> = None<Item>()
     while i <= index {
       element = iter.next()
       i = i + 1
@@ -24,15 +24,15 @@ public trait Iterable<Item> {
     element
   }
 
-  fun first(): Option<Item> { get(0) }
-  fun second(): Option<Item> { get(1) }
-  fun third(): Option<Item> { get(2) }
-  fun fourth(): Option<Item> { get(3) }
-  fun fifth(): Option<Item> { get(4) }
-  fun sixth(): Option<Item> { get(5) }
-  fun seventh(): Option<Item> { get(6) }
+  fun first(): Maybe<Item> { get(0) }
+  fun second(): Maybe<Item> { get(1) }
+  fun third(): Maybe<Item> { get(2) }
+  fun fourth(): Maybe<Item> { get(3) }
+  fun fifth(): Maybe<Item> { get(4) }
+  fun sixth(): Maybe<Item> { get(5) }
+  fun seventh(): Maybe<Item> { get(6) }
 
-  fun nthLast(index: Int): Option<Item> {
+  fun nthLast(index: Int): Maybe<Item> {
     // TODO(marcelgarus): Implement this.
     // TODO(marcelgarus): Make this way more efficient.
     let list = ArrayList.empty<Item>()
@@ -46,7 +46,7 @@ public trait Iterable<Item> {
     //     break
     //   }
     let a = 4
-    //   list.append(element.toOption().unwrap())
+    //   list.append(element.toMaybe().unwrap())
     //   if list.length() > index {
     //     list.removeFirst()
     //   }
@@ -59,11 +59,11 @@ public trait Iterable<Item> {
     todo("Implement nthLast.")
   }
 
-  fun last(): Option<Item> { nthLast(0) }
-  fun secondLast(): Option<Item> { nthLast(1) }
-  fun thirdLast(): Option<Item> { nthLast(2) }
+  fun last(): Maybe<Item> { nthLast(0) }
+  fun secondLast(): Maybe<Item> { nthLast(1) }
+  fun thirdLast(): Maybe<Item> { nthLast(2) }
 
-  fun single(): Option<Item> {
+  fun single(): Maybe<Item> {
     let iter = iterator()
     let first = iter.next()
     if first is None {
@@ -196,12 +196,12 @@ public trait Iterable<Item> {
   // // Conversion transformations.
   // // These do more complicated stuff.
 
-  // fun maybeMap<Out>(maybeMapper: (Item) => Option<Out>): Iterable<Out> {
+  // fun maybeMap<Out>(maybeMapper: (Item) => Maybe<Out>): Iterable<Out> {
   //   // TODO(marcelgarus): As soon as implicit casts are available, maybe make the checker return a
   //   // `MaybeMapResult`, which can be either `Map(value)` or `Drop`?
 
   //   // TODO: Use `whereSome` as soon as that's available.
-  //   map<Option<Out>>(maybeMapper).whereType<Some>().map<Out>({ it.value })
+  //   map<Maybe<Out>>(maybeMapper).whereType<Some>().map<Out>({ it.value })
   // }
 
   // TODO(marcelgarus): distinctBy
@@ -242,7 +242,7 @@ public trait Iterable<Item> {
   // TODO(marcelgarus): for Iterable<(A, B)>: map with 2 args, unzip
   // TODO(marcelgarus): for Iterable<Iterable<T>>: flatten
   // TODO(marcelgarus): for Iterable<Number>: average, sum, min, max, minBy, maxBy
-  // TODO(marcelgarus): for Iterable<Option<T>>: whereSome, unwrapAll
+  // TODO(marcelgarus): for Iterable<Maybe<T>>: whereSome, unwrapAll
 }
 
 class MappedIterable<In, Out> {
@@ -259,7 +259,7 @@ class MappedIterator<In, Out> {
   let mapper: (In) => Out
 }
 impl<In, Out> MappedIterator<In, Out>: Iterator<Out> {
-  fun next(): Option<Out> {
+  fun next(): Maybe<Out> {
     parent.next().map<Out>(mapper)
   }
 }
@@ -280,7 +280,7 @@ class WhereIterator<Item> {
   let checker: (Item) => Bool
 }
 impl<Item> WhereIterator<Item>: Iterator<Item> {
-  fun next(): Option<Item> {
+  fun next(): Maybe<Item> {
     loop {
       let element = parent.next()
       if element is None {

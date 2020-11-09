@@ -62,12 +62,12 @@ public class ArrayList<Item> {
     /// Creates a new, empty `ArrayList` with the given capacity.
 
     ArrayList<Item>(
-      Array.filled<Option<Item>>(capacity, None<Item>()),
+      Array.filled<Maybe<Item>>(capacity, None<Item>()),
       0,
     )
   }
 
-  mut let items: Array<Option<Item>>
+  mut let items: Array<Maybe<Item>>
   mut let length_: Int /* UInt */
 
   // TODO(marcelgarus): Getterize!
@@ -76,7 +76,7 @@ public class ArrayList<Item> {
   fun grow() {
     /// Increases the capacity.
 
-    let newItems = Array.filled<Option<Item>>(2 * capacity(), None<Item>())
+    let newItems = Array.filled<Maybe<Item>>(2 * capacity(), None<Item>())
     mut let index = 0
 
     while index < length_ {
@@ -98,7 +98,7 @@ class ArrayListIterator<Item> {
 }
 
 impl<Item> ArrayListIterator<Item>: Iterator<Item> {
-  fun next(): Option<Item> {
+  fun next(): Maybe<Item> {
     let element = arrayList.get(index)
     index = index + 1
     element
@@ -108,9 +108,9 @@ impl<Item> ArrayListIterator<Item>: Iterator<Item> {
 impl<Item> ArrayList<Item>: List<Item> {
   fun length(): Int { length_ }
 
-  fun get(index: Int /* UInt */): Option<Item> {
+  fun get(index: Int /* UInt */): Maybe<Item> {
     if index >= length_ {
-      None<Option<Item>>()
+      None<Maybe<Item>>()
     } else {
       items.get(index)
     }

@@ -1,23 +1,22 @@
-// TODO(marcelgarus): Enumerize!
-public trait Option<Value> {
+public trait Maybe<Value> {
   fun unwrap(): Value
   fun orElse(alternative: () => Value): Value
-  fun map<Out>(mapper: (Value) => Out): Option<Out>
+  fun map<Out>(mapper: (Value) => Out): Maybe<Out>
 }
 
 public class Some<Value> {
   let value: Value
 }
-impl<Value> Some<Value>: Option<Value> {
+impl<Value> Some<Value>: Maybe<Value> {
   fun unwrap(): Value { value }
   fun orElse(alternative: () => Value) { value }
-  fun map<Out>(mapper: (Value) => Out): Option<Out> { Some<Out>(mapper(value)) }
+  fun map<Out>(mapper: (Value) => Out): Maybe<Out> { Some<Out>(mapper(value)) }
 }
 
 // TODO(JonasWanke): remove type parameter when multi-impls are supported
 public class None<Value>
-impl<Value> None<Value>: Option<Value> {
+impl<Value> None<Value>: Maybe<Value> {
   fun unwrap(): Value { throw "Unwrapped `None`." }
   fun orElse(alternative: () => Value) { alternative() }
-  fun map<Out>(mapper: (Value) => Out): Option<Out> { None<Out>() }
+  fun map<Out>(mapper: (Value) => Out): Maybe<Out> { None<Out>() }
 }
