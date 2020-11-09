@@ -1,5 +1,4 @@
 import 'package:code_builder/code_builder.dart' as dart;
-import 'package:collection/collection.dart';
 import 'package:compiler/compiler.dart';
 import 'package:dartx/dartx.dart';
 
