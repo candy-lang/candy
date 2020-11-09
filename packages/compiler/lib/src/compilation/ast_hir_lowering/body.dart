@@ -1376,7 +1376,7 @@ extension on Context {
     }
 
     final type = expressionType.valueOrNull ??
-        hir.CandyType.union({
+        _unionOrUnit({
           if (thenBody.isNotEmpty) thenBody.last.type,
           if (elseBody.isNotEmpty) elseBody.last.type,
         }.toList());
@@ -1404,7 +1404,7 @@ extension on Context {
       for (final expression in body) {
         expression.accept(visitor);
       }
-      type = hir.CandyType.union(visitor.breakTypes.toList());
+      type = _unionOrUnit(visitor.breakTypes.toList());
     }
 
     return Ok([hir.LoopExpression(getId(loop), body, type)]);
@@ -2026,8 +2026,6 @@ extension on Context {
     final classId = (target.identifier as hir.ReflectionIdentifier).id;
     // ignore: non_constant_identifier_names
     final class_ = getClassDeclarationHir(queryContext, classId);
-    final constructorId =
-        class_.innerDeclarationIds.singleWhere((id) => id.isConstructor);
 
     final typeParameters = class_.typeParameters
         .map((p) => hir.CandyType.parameter(p.name, classId))
@@ -2526,4 +2524,8 @@ extension on Context {
 
     return Ok([hir.AssignmentExpression(getId(expression), left, right)]);
   }
+}
+
+hir.CandyType _unionOrUnit(List<hir.CandyType> types) {
+  return types.isEmpty ? hir.CandyType.unit : hir.CandyType.union(types);
 }
