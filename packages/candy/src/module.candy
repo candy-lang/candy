@@ -2,5 +2,5 @@ public use .assert
 public use .collections
 public use .operators
 public use .primitives
-public use .stdio
+public use .io
 public use .todo

@@ -159,7 +159,7 @@ abstract class ModuleId implements _$ModuleId {
       ModuleId(PackageId.core, ['operators', 'logical']);
   static const corePrimitives = ModuleId(PackageId.core, ['primitives']);
   static const coreReflection = ModuleId(PackageId.core, ['reflection']);
-  static const coreStdio = ModuleId(PackageId.core, ['stdio']);
+  static const coreIo = ModuleId(PackageId.core, ['io']);
 
   bool get hasParent => path.isNotEmpty;
   bool get hasNoParent => !hasParent;
