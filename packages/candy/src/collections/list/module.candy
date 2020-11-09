@@ -55,9 +55,17 @@ public trait MutableList<Item>: List<Item> {
 
   fun removeAt(index: Int /* UInt */): Item
 
-  fun removeLast(): Item {
-    removeAt(length() - 1)
-  }
+  fun removeFirst(): Item { removeAt(0) }
+  fun removeSecond(): Item { removeAt(1) }
+  fun removeThird(): Item { removeAt(2) }
+  fun removeFourth(): Item { removeAt(3) }
+  fun removeFifth(): Item { removeAt(4) }
+  fun removeSixth(): Item { removeAt(5) }
+  fun removeSeventh(): Item { removeAt(6) }
+
+  fun removeLast(): Item { removeAt(length() - 1) }
+  fun removeSecondLast(): Item { removeAt(length() - 2) }
+  fun removeThirdLast(): Item { removeAt(length() - 2) }
 
   fun clear() {
     while isNotEmpty() {
