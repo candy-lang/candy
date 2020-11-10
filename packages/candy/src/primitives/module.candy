@@ -67,7 +67,7 @@ public builtin class String
 public fun run<T>(code: () => T): T {
   /// A function that simply runs the given lambda with no arguments.
   ///
-  /// Calling this function is the same like calling the `code` by adding parnethesis at the end,
+  /// Calling this function is the same like calling the `code` by adding parenthesis at the end,
   /// but it looks nicer:
   ///
   /// ```
