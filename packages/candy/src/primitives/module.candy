@@ -3,7 +3,7 @@ public use .maybe
 public use .result
 
 public builtin trait Any
-/// Could be anything, from an `Int8` to a `String` to a pancake with raspberries.
+/// Could be anything, from an `Int8` to a `String` to a raspberry cookie. 🍪
 ///
 /// All types are assignable to `Any`.
 
@@ -64,7 +64,7 @@ builtin impl Float: Add & Subtract & Negate & Multiply & Divide & DivideTruncati
 public builtin class String
 // builtin impl String: PlusOperator<This, This>
 
-fun run<T>(code: () => T): T {
+public fun run<T>(code: () => T): T {
   /// A function that simply runs the given lambda with no arguments.
   ///
   /// Calling this function is the same like calling the `code` by adding parnethesis at the end,
@@ -79,7 +79,7 @@ fun run<T>(code: () => T): T {
   code()
 }
 
-fun doNotRun(code: () => Unit) {
+public fun doNotRun(code: () => Unit) {
   /// A function that doesn't run the given lambda.
   ///
   /// This function is useful during the development phase do mark `code` that's not ready to run

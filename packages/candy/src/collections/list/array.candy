@@ -2,16 +2,16 @@ use ....primitives
 use ...iterable
 use ...list
 
-builtin class Array<Item> {
+public builtin class Array<Item> {
   /// A builtin structure that holds a fixed number of `Item`s.
   
-  static fun filled<Item>(length: Int /* UInt */, item: Item): Array<Item>
+  public static fun filled<Item>(length: Int /* UInt */, item: Item): Array<Item>
   /// Creates a new `Array` of the given `length`, where every slot is filled with the same `item`.
 
-  let length: Int
+  public let length: Int
 
-  fun get(index: Int /* UInt */): Item
-  fun set(index: Int /* UInt */, item: Item)
+  public fun get(index: Int /* UInt */): Item
+  public fun set(index: Int /* UInt */, item: Item)
 }
 
 // TODO(marcelgarus): For now, this never shrinks. We should implement that later, although a very
@@ -19,7 +19,7 @@ builtin class Array<Item> {
 public class ArrayList<Item> {
   /// A wrapper around `Array` that can grow dynamically.
 
-  static fun empty<Item>(): ArrayList<Item> {
+  public static fun empty<Item>(): ArrayList<Item> {
     create<Item>(8)
   }
   public static fun of1<Item>(first: Item): ArrayList<Item> {
@@ -71,7 +71,7 @@ public class ArrayList<Item> {
   mut let length_: Int /* UInt */
 
   // TODO(marcelgarus): Getterize!
-  fun capacity(): Int /* UInt */ { items.length }
+  public fun capacity(): Int /* UInt */ { items.length }
 
   fun grow() {
     /// Increases the capacity.
@@ -86,11 +86,12 @@ public class ArrayList<Item> {
   }
 }
 
-// impl<Item> ArrayList<Item>: Iterable<Item> {
-//   fun iterator(): Iterator<Item> {
-//     ArrayListIterator<Item>(this)
-//   }
-// }
+impl<Item> ArrayList<Item>: Iterable<Item> {
+  fun iterator(): Iterator<Item> {
+    // TODO(marcelgarus): Remove the second argument as soon as default arguments are supported.
+    ArrayListIterator<Item>(this, 0)
+  }
+}
 
 class ArrayListIterator<Item> {
   let arrayList: ArrayList<Item>
