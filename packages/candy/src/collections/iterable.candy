@@ -1,3 +1,4 @@
+use ...operators
 use ...primitives
 use ..list
 use ...todo
@@ -228,7 +229,6 @@ public trait Iterable<Item> {
 
   // TODO(marcelgarus): + operator for joining Iterables
 
-  // TODO(marcelgarus): for Iterable<T: Equals>: distinct, indexOf, lastIndexOf
   // TODO(marcelgarus): for Iterable<(A, B)>: map with 2 args, unzip
   // TODO(marcelgarus): for Iterable<Iterable<T>>: flatten
   // TODO(marcelgarus): for Iterable<Number>: average, sum, min, max, minBy, maxBy
@@ -283,3 +283,12 @@ impl<Item> WhereIterator<Item>: Iterator<Item> {
     }
   }
 }
+
+trait EqualsIterable<Item: Equals>: Iterable<Item> {
+  fun contains(item: Item): Bool {
+    todo("Implement Iterable<Equals>.contains")
+  }
+  
+  // TODO(marcelgarus): Implement distinct, indexOf, lastIndexOf
+}
+// impl<Item: Equals> Iterable<Item>: EqualsIterable<Item>
