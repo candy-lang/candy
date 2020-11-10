@@ -1,7 +1,7 @@
 use ....primitives
+use ....todo
 use ...iterable
 use ...list
-use ....todo
 
 public builtin class Array<Item> {
   /// A builtin structure that holds a fixed number of `Item`s.
@@ -101,10 +101,9 @@ class ArrayListIterator<Item> {
 
 impl<Item> ArrayListIterator<Item>: Iterator<Item> {
   fun next(): Maybe<Item> {
-    // let element = arrayList.get(index)
-    // index = index + 1
-    // element
-    todo("Implement ArrayListIterator.next")
+    let element = arrayList.get(index)
+    index = index + 1
+    element
   }
 }
 
