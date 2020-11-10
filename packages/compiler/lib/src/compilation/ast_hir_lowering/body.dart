@@ -331,7 +331,7 @@ abstract class Context {
       result = lowerIdentifier(expression);
     } else if (expression is ast.GroupExpression) {
       result = lower(expression.expression);
-    } else if (expression is ast.PropertyDeclaration) {
+    } else if (expression is ast.PropertyDeclarationExpression) {
       result = lowerProperty(expression);
     } else if (expression is ast.NavigationExpression) {
       result = lowerNavigation(expression);
@@ -1274,7 +1274,7 @@ extension on Context {
 
       if (i == astExpressions.length - 1) {
         var lowered = lambdaContext
-            .innerExpressionContext(expressionType: Some(returnType.value))
+            .innerExpressionContext(expressionType: returnType)
             .lowerUnambiguous(astExpression);
         if (lowered is Ok && lowered.value.type != hir.CandyType.never) {
           lowered = Ok(
@@ -1437,15 +1437,8 @@ extension on Context {
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerProperty(
-    ast.PropertyDeclaration expression,
+    ast.PropertyDeclarationExpression expression,
   ) {
-    if (expression.accessors.isNotEmpty) {
-      throw CompilerError.unsupportedFeature(
-        'Accessors for local properties are not yet supported.',
-        location: ErrorLocation(resourceId, expression.representativeSpan),
-      );
-    }
-
     final type = expression.type != null
         ? astTypeToHirType(
             queryContext,
@@ -1457,7 +1450,7 @@ extension on Context {
     if (initializer == null) {
       throw CompilerError.propertyInitializerMissing(
         'Local properties must have an initializer.',
-        location: ErrorLocation(resourceId, expression.representativeSpan),
+        location: ErrorLocation(resourceId, expression.name.span),
       );
     }
 

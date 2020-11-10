@@ -69,7 +69,80 @@
 
 ### 1.2. Vision
 
-A simple, extensible language enabling everyone to focus on getting things done.
+Here's Candy's vision:
+
+**A simple, extensible language enabling everyone to focus on getting things done.**
+
+Languages are shaped by the design decisions made while developing them, and Candy is no different.
+Those decisions are always made with the language's values in mind.
+Looking at Candy's vision, it values long-term developer experience over all other values.
+
+Let's constrast Candy's design to the three languages that influenced its design the most – Rust, Dart, and Kotlin.
+
+#### Rust
+
+Rust aims to be a language empowering everyone to build reliable and efficient software.
+Obviously, Rust values performance over development speed, and that's okay.
+
+Notably, those values result in different decisions being made.
+
+Here are some decisions that Candy didn't do:
+
+- In Rust, the value of performance leads to no garbage collection, leading to a whole class of new concepts – in particular, ownership, borrowing.
+- The programmer can explicitly define some parts of the code to run during compile-time. That leads to the concept of constness, including const blocks and const functions.
+- Compile-time code expansion in the form of macros is explicitly highlighted using a `!` at the end of macro invocations.
+- No getters and setters are allowed, because the programmer should always know whether code is executed.
+
+However, Rust's type system is interesting, so Candy adopts most of it:
+
+- Data (`struct`s in Rust) cannot inherit each other. Instead, you can only compose it.
+- Behavior (`trait`s) can depend on other behavior.
+- Behavior can be added to data after the fact at different places in the code. However, to guarantee uniqueness in implementation, this means that no transitive inheritance is possible.
+- There's no concept of nullability: Just wrap your type in an `Option` if you want to make it optional.
+
+#### Dart
+
+Dart aims to be a client-optimized language for fast apps on any platform.
+On it's website, it describes the values even further, including that it's a programming language that is easy to learn, with a familiar syntax.
+This lead to some conservative choices regarding concepts and syntax.
+
+- Dart writes the type before a variable or function instead of using special keywords.
+- Traditional OOP-approach.
+- custom getters & setters
+- Dart's formatter is not as opinionated as Rust's.
+
+Here are some of Dart's strengths:
+
+- A powerful code generator API.
+- Powerful collection literals.
+- A rich and centralized package ecosystem.
+
+#### Kotlin
+
+Kotlin aims to be a modern programming language that makes developers happier.
+However, it's also designed to be interoprable with Java, which comes with some drawbacks:
+
+- It's stuck with the traditional OOP approach.
+- Nullability is necessary on the language level (using the `?` operator)
+
+Of course, it enhances the experience using a whole fleet of syntactic sugar, here's just a tiny sample:
+
+- trailing lambdas
+- `by` delegation
+- custom getters & setters
+- functions with receivers
+- extension methods (note that these are only necessary because it uses the OOP approach)
+- A big standard library.
+
+#### Summary
+
+So, what is Candy?
+
+It's a language that combines
+
+- Rust's type system and primitives,
+- Dart's code generator, collection literals, and curated package ecosystem, and
+- Kotlin's trailing lambdas, receiver functions, and comprehensive standard library.
 
 ### 1.3. Paradigms
 

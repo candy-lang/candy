@@ -10,6 +10,7 @@ export 'src/parser/ast/declarations.dart';
 export 'src/parser/ast/expressions/expressions.dart';
 export 'src/parser/ast/expressions/operator.dart';
 export 'src/parser/ast/general.dart';
+export 'src/parser/ast/node.dart';
 export 'src/parser/ast/types.dart';
 export 'src/source_span.dart';
 export 'src/visitor.dart';

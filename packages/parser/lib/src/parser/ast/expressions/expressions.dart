@@ -53,11 +53,8 @@ abstract class StringLiteral extends Expression implements _$StringLiteral {
 @freezed
 abstract class StringLiteralPart extends AstNode
     implements _$StringLiteralPart {
-  const factory StringLiteralPart.literal(
-    int id,
-    LiteralStringToken value, {
-    SourceSpan span,
-  }) = LiteralStringLiteralPart;
+  const factory StringLiteralPart.literal(int id, LiteralStringToken value) =
+      LiteralStringLiteralPart;
   const factory StringLiteralPart.interpolated(
     int id, {
     @required OperatorToken leadingBrace,
@@ -71,7 +68,7 @@ abstract class StringLiteralPart extends AstNode
 
   @override
   Iterable<SyntacticEntity> get children => when(
-        literal: (_, value, __) => [value],
+        literal: (_, value) => [value],
         interpolated: (_, leadingBrace, expression, trailingBrace) =>
             [leadingBrace, expression, trailingBrace],
       );
@@ -432,4 +429,37 @@ abstract class ThrowExpression extends Expression implements _$ThrowExpression {
 
   @override
   Iterable<SyntacticEntity> get children => [throwKeyword, error];
+}
+
+@freezed
+abstract class PropertyDeclarationExpression extends Expression
+    implements _$PropertyDeclarationExpression {
+  const factory PropertyDeclarationExpression(
+    int id, {
+    @Default(<ModifierToken>[]) List<ModifierToken> modifiers,
+    @required LetKeywordToken letKeyword,
+    @required IdentifierToken name,
+    OperatorToken colon,
+    Type type,
+    OperatorToken equals,
+    Expression initializer,
+  }) = _PropertyDeclarationExpression;
+  const PropertyDeclarationExpression._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) =>
+      visitor.visitPropertyDeclarationExpression(this);
+
+  @override
+  Iterable<SyntacticEntity> get children => [
+        ...modifiers,
+        letKeyword,
+        name,
+        if (colon != null) colon,
+        if (type != null) type,
+        if (equals != null) equals,
+        if (initializer != null) initializer,
+      ];
+
+  bool get isMutable => modifiers.any((m) => m is MutModifierToken);
 }

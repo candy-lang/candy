@@ -12,10 +12,17 @@ void updateTypeLabels(
   AnalysisServer server,
   ResourceId resourceId,
 ) {
-  final labels = server.queryConfig
-      .createContext()
-      .callQuery(_generateTypeLabels, Tuple2(server, resourceId))
-      .value;
+  final context = server.queryConfig.createContext();
+  final labelsResult =
+      context.callQuery(_generateTypeLabels, Tuple2(server, resourceId));
+  if (labelsResult is None) {
+    server.sendLogMessage(
+      'Error computing type labels: ${context.reportedErrors}',
+    );
+    return;
+  }
+  final labels = labelsResult.value;
+
   final params = PublishTypeLabelsParams(
     server.resourceIdToFileUri(resourceId),
     labels,
@@ -105,7 +112,9 @@ class _BodyPropertyVisitor extends ast.TraversingAstVisitor {
   final _labels = <TypeLabel>[];
 
   @override
-  void visitPropertyDeclaration(ast.PropertyDeclaration node) {
+  void visitPropertyDeclarationExpression(
+    ast.PropertyDeclarationExpression node,
+  ) {
     if (node.type == null) {
       final id = hirInfos.second.map[node.id];
       final hir = getExpression(context, id).value;
@@ -114,6 +123,6 @@ class _BodyPropertyVisitor extends ast.TraversingAstVisitor {
         hir.type.toString(),
       ));
     }
-    super.visitPropertyDeclaration(node);
+    super.visitPropertyDeclarationExpression(node);
   }
 }

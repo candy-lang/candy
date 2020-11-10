@@ -70,6 +70,11 @@ class IntializedMessageHandler extends MessageHandler<InitializedParams, void> {
       TextDocumentRegistrationOptions([candyFiles]),
     );
     register(
+      server.clientCapabilities?.textDocument?.definition?.dynamicRegistration,
+      Method.textDocument_definition,
+      TextDocumentRegistrationOptions([candyFiles]),
+    );
+    register(
       server.clientCapabilities?.textDocument?.codeAction?.dynamicRegistration,
       Method.textDocument_codeAction,
       CodeActionRegistrationOptions(
