@@ -1,8 +1,9 @@
 use ..primitives
 
 public fun todo(message: String = "Not implemented"): Never {
-  // TODO(JonasWanke): throw `TodoError`
-  throw "TODO: {message}"
+  /// Always throws a `TodoError`.
+
+  throw TodoError(message)
 }
 
 public class TodoError {
