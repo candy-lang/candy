@@ -63,3 +63,32 @@ builtin impl Float: Add & Subtract & Negate & Multiply & Divide & DivideTruncati
 
 public builtin class String
 // builtin impl String: PlusOperator<This, This>
+
+fun run<T>(code: () => T): T {
+  /// A function that simply runs the given lambda with no arguments.
+  ///
+  /// Calling this function is the same like calling the `code` by adding parnethesis at the end,
+  /// but it looks nicer:
+  ///
+  /// ```
+  /// let a = run {
+  ///   // Some code that can create local variables without cluttering the surrounding namespace.
+  /// }
+  /// ```
+
+  code()
+}
+
+fun doNotRun(code: () => Unit) {
+  /// A function that doesn't run the given lambda.
+  ///
+  /// This function is useful during the development phase do mark `code` that's not ready to run
+  /// yet. In contrast to commenting out the `code`, the `code` is still part of the analyzed
+  /// program. This has the following effects:
+  ///
+  /// * Refactorings, like renaming of classes, also affect the `code`.
+  /// * Candy stops reporting linter warnings for fields and functions in the outer scope that are
+  ///   only used in the `code`.
+  /// * Making the `code` invalid (for example, by deleting needed classes, functions, or
+  ///   properties) results in compiler errors.
+}
