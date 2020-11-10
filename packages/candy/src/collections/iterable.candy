@@ -35,27 +35,17 @@ public trait Iterable<Item> {
   fun nthLast(index: Int): Maybe<Item> {
     // TODO(marcelgarus): Implement this.
     // TODO(marcelgarus): Make this way more efficient.
-    let list = ArrayList.empty<Item>()
-    let iter = iterator()
-    // loop {
-    //   break
-    // }
+    // let list = ArrayList.empty<Item>()
+    // let iter = iterator()
     // loop {
     //   let element = iter.next()
-    //   if element is End {
-    //     break
-    //   }
-    let a = 4
-    //   list.append(element.toMaybe().unwrap())
+    //   if element is None { break }
+    //   list.append(element.unwrap())
     //   if list.length() > index {
     //     list.removeFirst()
     //   }
     // }
-    // if list.length() == index {
-    //   list.first()
-    // } else {
-    // None<Item>()
-    // }
+    // if list.length() == index { list.first() } else { None<Item>() }
     todo("Implement nthLast.")
   }
 
@@ -289,7 +279,6 @@ impl<Item> WhereIterator<Item>: Iterator<Item> {
         if checker(element.unwrap()) {
           return element
         }
-        todo("Implement WhereIterator.")
       }
     }
   }
