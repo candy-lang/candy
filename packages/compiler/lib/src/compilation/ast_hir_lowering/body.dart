@@ -392,8 +392,10 @@ abstract class Context {
   ) {
     final result = lower(expression);
     if (result is Error) return Error(result.error);
+    final lowered =
+        result.value.distinctBy((it) => it.id.declarationId).toList();
 
-    if (result.value.isEmpty) {
+    if (lowered.isEmpty) {
       assert(expressionType is Some);
       return Error([
         CompilerError.invalidExpressionType(
@@ -401,15 +403,24 @@ abstract class Context {
           location: ErrorLocation(resourceId, expression.span),
         ),
       ]);
-    } else if (result.value.length > 1) {
+    } else if (lowered.length > 1) {
       return Error([
         CompilerError.ambiguousExpression(
           'Expression is ambiguous.',
           location: ErrorLocation(resourceId, expression.span),
+          relatedInformation: [
+            for (final it in lowered)
+              ErrorRelatedInformation(
+                message: 'This is one of the ambigous options: '
+                    '${it.id.declarationId}',
+                location: ErrorLocation(
+                    it.id.declarationId.resourceId, SourceSpan(0, 0)),
+              ),
+          ],
         ),
       ]);
     }
-    return Ok(result.value.single);
+    return Ok(lowered.single);
   }
 }
 
