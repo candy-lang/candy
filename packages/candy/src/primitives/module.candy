@@ -1,5 +1,6 @@
 use ..operators
 public use .maybe
+public use .result
 
 public builtin trait Any
 /// Could be anything, from an `Int8` to a `String` to a pancake with raspberries.

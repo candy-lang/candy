@@ -1,0 +1,20 @@
+trait Result<Success, ErrorType>
+/// The result of an operation that might fail.
+///
+/// The following cases exist:
+/// * In the success case, an `Ok` is returned, containing the returned value.
+/// * In the error case, an `Error` is returned, containing an error describing what went wrong.
+
+class Ok<Success> {
+  /// The result of an operation that succeeded.
+
+  let value: Success
+}
+impl<Success, ErrorType> Ok<Success>: Result<Success, ErrorType>
+
+class Error<ErrorType> {
+  /// The result of an operation that failed.
+
+  let error: ErrorType
+}
+impl<Success, ErrorType> Error<ErrorType>: Result<Success, ErrorType>
