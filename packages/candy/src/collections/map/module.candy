@@ -1,0 +1,38 @@
+use ...operators
+use ...primitives
+use ...todo
+use ..iterable
+
+public trait Map<Key: Equals, Value>: Iterable<(Key, Value)> {
+  fun length(): Int
+  fun isEmpty(): Bool { length() == 0 }
+
+  fun get(index: Key): Maybe<Value>
+  fun keys(): Iterable<Key>
+  fun values(): Iterable<Value>
+
+  fun containsKey(key: Key): Bool {
+    keys().contains(key)
+  }
+}
+
+// TODO(marcelgarus): impl Map<Key, Value>: GetOperator<Key, Maybe<Value>>
+
+public trait MutableMap<Key: Equals, Value>: Map<Key, Value> {
+  fun set(key: Key, value: Value)
+  fun putIfAbsent(key: Key, ifAbsent: () => Value): Value
+  fun remove(key: Key): Bool
+
+  fun clear() {
+    // TODO(marcelgarus): Implement
+    // for key in keys() {
+    //   remove(key)
+    // }
+    todo("Implement MutableMap.clear")
+  }
+
+  fun addAll(map: Map<Key, Value>)
+  fun cast<NewKey, NewValue>(): Map<NewKey, NewValue> {
+    todo("Implement MutableMap.cast")
+  }
+}
