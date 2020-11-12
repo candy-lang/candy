@@ -705,6 +705,18 @@ class ParserGrammar {
           );
         },
       )
+      ..complexGrouping<List<dynamic>, Expression, LambdaLiteral>(
+        LexerGrammar.FOR & LexerGrammar.NLs & LexerGrammar.Identifier & LexerGrammar.NLs & LexerGrammar.IN & LexerGrammar.NLs,
+        (LexerGrammar.NLs & lambdaLiteral).map((it) => it[1] as LambdaLiteral),
+        mapper: (left, value, right) => ForExpression(
+            _id++,
+            forKeyword: left[0] as ForKeywordToken,
+            variable: left[2] as IdentifierToken,
+            inKeyword: left[4] as OperatorToken,
+            iterable: value,
+            body: right,
+          ),
+      )
       ..prefix<ReturnKeywordToken, Expression>(
           (LexerGrammar.RETURN & LexerGrammar.NLs).map((value) => value.first as ReturnKeywordToken),
           mapper: (keyword, expression) {

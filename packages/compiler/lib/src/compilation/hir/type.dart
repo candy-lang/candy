@@ -56,7 +56,32 @@ abstract class CandyType with _$CandyType {
   static const float = CandyType.user(ModuleId.corePrimitives, 'Float');
   static const string = CandyType.user(ModuleId.corePrimitives, 'String');
 
+  factory CandyType.maybe(CandyType itemType) => CandyType.user(
+        ModuleId.corePrimitives.nested(['maybe']),
+        'Maybe',
+        arguments: [itemType],
+      );
+  factory CandyType.some(CandyType itemType) => CandyType.user(
+        ModuleId.corePrimitives.nested(['maybe']),
+        'Some',
+        arguments: [itemType],
+      );
+
   // collections
+  factory CandyType.iterator(CandyType itemType) => CandyType.user(
+        ModuleId.coreCollections.nested(['iterable']),
+        'Iterator',
+        arguments: [itemType],
+      );
+  static const iterableModuleId =
+      ModuleId(PackageId.core, ['collections', 'iterable', 'Iterable']);
+  factory CandyType.iterable(CandyType itemType) => CandyType.user(
+        ModuleId.coreCollections.nested(['iterable']),
+        'Iterable',
+        arguments: [itemType],
+      );
+  static const listModuleId =
+      ModuleId(PackageId.core, ['collections', 'list', 'List']);
   factory CandyType.list(CandyType itemType) => CandyType.user(
         ModuleId.coreCollections.nested(['list']),
         'List',

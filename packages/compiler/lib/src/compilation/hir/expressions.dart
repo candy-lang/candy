@@ -72,6 +72,14 @@ abstract class Expression implements _$Expression {
     CandyType type,
   ) = WhileExpression;
   // ignore: non_constant_identifier_names
+  const factory Expression.for_(
+    DeclarationLocalId id,
+    String variableName,
+    CandyType itemType,
+    Expression iterable,
+    List<Expression> body,
+  ) = ForExpression;
+  // ignore: non_constant_identifier_names
   const factory Expression.return_(
     DeclarationLocalId id,
     DeclarationLocalId scopeId, [
@@ -120,6 +128,7 @@ abstract class Expression implements _$Expression {
         if_: (theIf) => theIf.type,
         loop: (loop) => loop.type,
         while_: (theWhile) => theWhile.type,
+        for_: (_) => CandyType.unit,
         break_: (_) => CandyType.never,
         continue_: (_) => CandyType.never,
         throw_: (_) => CandyType.never,
@@ -139,6 +148,7 @@ abstract class Expression implements _$Expression {
         if_: (e) => visitor.visitIfExpression(e),
         loop: (e) => visitor.visitLoopExpression(e),
         while_: (e) => visitor.visitWhileExpression(e),
+        for_: (e) => visitor.visitForExpression(e),
         break_: (e) => visitor.visitBreakExpression(e),
         continue_: (e) => visitor.visitContinueExpression(e),
         throw_: (e) => visitor.visitThrowExpression(e),
@@ -258,6 +268,7 @@ abstract class ExpressionVisitor<T> {
   T visitIfExpression(IfExpression node);
   T visitLoopExpression(LoopExpression node);
   T visitWhileExpression(WhileExpression node);
+  T visitForExpression(ForExpression node);
   T visitBreakExpression(BreakExpression node);
   T visitContinueExpression(ContinueExpression node);
   T visitThrowExpression(ThrowExpression node);
@@ -290,6 +301,8 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   void visitLoopExpression(LoopExpression node) {}
   @override
   void visitWhileExpression(WhileExpression node) {}
+  @override
+  void visitForExpression(ForExpression node) {}
   @override
   void visitBreakExpression(BreakExpression node) {}
   @override

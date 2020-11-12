@@ -194,6 +194,18 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
+  Option<hir.Expression> visitForExpression(hir.ForExpression node) {
+    if (node.id == id) return Some(node);
+    final result = node.iterable.accept(this);
+    if (result is Some) return result;
+    for (final expression in node.body) {
+      final result = expression.accept(this);
+      if (result is Some) return result;
+    }
+    return None();
+  }
+
+  @override
   Option<hir.Expression> visitBreakExpression(hir.BreakExpression node) {
     if (node.id == id) return Some(node);
     if (node.expression != null) return node.expression.accept(this);
@@ -345,6 +357,8 @@ abstract class Context {
       result = lowerLoop(expression);
     } else if (expression is ast.WhileExpression) {
       result = lowerWhile(expression);
+    } else if (expression is ast.ForExpression) {
+      result = lowerFor(expression);
     } else if (expression is ast.BreakExpression) {
       result = lowerBreak(expression);
     } else if (expression is ast.ContinueExpression) {
@@ -1076,23 +1090,26 @@ class LoopContext extends InnerContext {
   LoopContext(
     Context parent,
     this.id,
-    this.label,
-  )   : assert(id != null),
+    this.label, {
+    Map<String, hir.Identifier> identifiers = const {},
+  })  : assert(id != null),
         assert(label != null),
+        assert(identifiers != null),
+        identifiers = Map.from(identifiers),
         super(parent);
 
   final DeclarationLocalId id;
   final Option<String> label;
-  final _identifiers = <String, hir.Identifier>{};
+  final Map<String, hir.Identifier> identifiers;
 
   @override
   void addIdentifier(hir.LocalPropertyIdentifier identifier) {
-    _identifiers[identifier.name] = identifier;
+    identifiers[identifier.name] = identifier;
   }
 
   @override
   List<hir.Identifier> resolveIdentifier(String name) {
-    final result = _identifiers[name];
+    final result = identifiers[name];
     if (result != null) return [result];
     return parent.value.resolveIdentifier(name);
   }
@@ -1444,6 +1461,55 @@ extension on Context {
     return Ok([
       hir.WhileExpression(
           getId(whileLoop), condition, body, hir.CandyType.unit),
+    ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerFor(
+    ast.ForExpression forLoop,
+  ) {
+    final loweredIterable =
+        innerExpressionContext().lowerUnambiguous(forLoop.iterable);
+    if (loweredIterable is Error) return loweredIterable.mapValue((e) => [e]);
+    final iterable = loweredIterable.value;
+
+    final iterableType = iterable.type;
+    const supportedCollectionTypesModuleIds = [
+      hir.CandyType.iterableModuleId,
+      hir.CandyType.listModuleId,
+    ];
+    if (iterableType is! hir.UserCandyType ||
+        !supportedCollectionTypesModuleIds
+            .contains((iterableType as hir.UserCandyType).virtualModuleId)) {
+      return Error([
+        CompilerError.unsupportedFeature(
+          'For-loops only support collections with a static type of `Iterable<T>` or `List<T>`, was: ${(iterableType as hir.UserCandyType).virtualModuleId}.',
+          location: ErrorLocation(resourceId, forLoop.iterable.span),
+        ),
+      ]);
+    }
+
+    final variableName = forLoop.variable.name;
+    final itemType = (iterableType as hir.UserCandyType).arguments.single;
+    final loopContext = LoopContext(
+      this,
+      getId(forLoop),
+      None(),
+      identifiers: {
+        variableName:
+            hir.Identifier.parameter(getId(forLoop), variableName, itemType),
+      },
+    );
+
+    final loweredBody = forLoop.body.expressions.map((expression) {
+      return loopContext
+          .innerExpressionContext(forwardsIdentifiers: true)
+          .lowerUnambiguous(expression);
+    }).merge();
+    if (loweredBody is Error) return loweredBody;
+    final body = loweredBody.value;
+
+    return Ok([
+      hir.ForExpression(getId(forLoop), variableName, itemType, iterable, body),
     ]);
   }
 
