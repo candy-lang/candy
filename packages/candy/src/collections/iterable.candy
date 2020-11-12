@@ -68,14 +68,14 @@ public trait Iterable<Item> {
 
   // Properties.
 
-  // fun length(): Int {
-  //   let iter = iterator()
-  //   mut let length = 0
-  //   while iter.next() is More<Item> {
-  //     length = length + 1
-  //   }
-  //   length
-  // }
+  fun length(): Int {
+    let iter = iterator()
+    mut let length = 0
+    while iter.next() is Some<Item> {
+      length = length + 1
+    }
+    length
+  }
 
   // Boolean checks.
 
