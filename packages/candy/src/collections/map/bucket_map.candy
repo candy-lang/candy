@@ -1,0 +1,24 @@
+use ....primitives
+use ...array
+use ...iterable
+use ...list
+use ...map
+
+class MapEntry<Key, Value> {
+  let key: Key
+  let value: Value
+}
+
+class Bucket<Key, Value> {
+  let entries: List<MapEntry<Key, Value>>
+}
+
+class BucketMap<Key, Value> {
+  let buckets: Array<List<Value>>
+}
+
+impl<Key, Value> BucketMap<Key, Value>: Map<Key, Value> {
+  fun get(key: Key): Maybe<Value>
+  fun keys(): Iterable<Key>
+  fun values(): Iterable<Value>
+}
