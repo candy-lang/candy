@@ -54,12 +54,12 @@ public trait MutableList<Item>: List<Item> {
   fun removeThird(): Item { removeAt(2) }
   fun removeFourth(): Item { removeAt(3) }
   fun removeFifth(): Item { removeAt(4) }
-  fun removeSixth(): Item { removeAt(5) }
-  fun removeSeventh(): Item { removeAt(6) }
 
   fun removeLast(): Item { removeAt(length() - 1) }
   fun removeSecondLast(): Item { removeAt(length() - 2) }
-  fun removeThirdLast(): Item { removeAt(length() - 2) }
+  fun removeThirdLast(): Item { removeAt(length() - 3) }
+  fun removeFourthLast(): Item { removeAt(length() - 4) }
+  fun removeFifthLast(): Item { removeAt(length() - 5) }
 
   fun clear() {
     while isNotEmpty() {
