@@ -612,6 +612,33 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   }
 
   @override
+  List<dart.Code> visitAsExpression(AsExpression node) {
+    final instance = _refer(node.instance.id);
+    final check = _compileAs(instance, node.typeToCheck);
+    return [
+      ...node.instance.accept(this),
+      _save(node, check),
+    ];
+  }
+
+  dart.Expression _compileAs(dart.Expression instance, CandyType type) {
+    dart.Expression compileSimple() => instance.asA(compileType(context, type));
+
+    return type.map(
+      user: (_) => compileSimple(),
+      this_: (_) => throw CompilerError.internalError(
+        "`This`-type wasn't resolved before compiling it to Dart.",
+      ),
+      tuple: (_) => compileSimple(),
+      function: (_) => compileSimple(),
+      union: (type) => dart.refer('dynamic', dartCoreUrl),
+      intersection: (type) => dart.refer('dynamic', dartCoreUrl),
+      parameter: (_) => compileSimple(),
+      reflection: (_) => compileSimple(),
+    );
+  }
+
+  @override
   List<dart.Code> visitIsExpression(IsExpression node) {
     final instance = _refer(node.instance.id);
     final check = _compileIs(instance, node.typeToCheck);

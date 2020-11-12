@@ -288,6 +288,23 @@ abstract class IndexExpression extends Expression implements _$IndexExpression {
 }
 
 @freezed
+abstract class AsExpression extends Expression implements _$AsExpression {
+  const factory AsExpression(
+    int id, {
+    @required Expression instance,
+    @required OperatorToken asOperator,
+    @required Type type,
+  }) = _AsExpression;
+  const AsExpression._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitAsExpression(this);
+
+  @override
+  Iterable<SyntacticEntity> get children => [instance, asOperator, type];
+}
+
+@freezed
 abstract class IsExpression extends Expression implements _$IsExpression {
   const factory IsExpression(
     int id, {

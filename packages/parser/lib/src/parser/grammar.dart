@@ -600,13 +600,14 @@ class ParserGrammar {
       // bitwise not
       ..leftExpression(LexerGrammar.BAR)
       // type check
-      ..leftComplex<OperatorToken, Expression>(
-        (LexerGrammar.WS &
+      ..postfix<List<dynamic>, Expression>(
+        LexerGrammar.NLs &
                 (LexerGrammar.AS | LexerGrammar.AS_SAFE) &
-                LexerGrammar.WS)
-            .map((it) => it[1] as OperatorToken),
-        mapper: (left, operator, right) =>
-            BinaryExpression(_id++, left, operator, right),
+                LexerGrammar.NLs &
+                type,
+        mapper: (instance, postfix) =>
+            AsExpression(_id++, instance: instance,
+            asOperator: postfix[1] as OperatorToken, type: postfix[3] as Type,),
       )
       // range
       ..leftExpression(LexerGrammar.DOT_DOT | LexerGrammar.DOT_DOT_EQUALS)
@@ -625,9 +626,8 @@ class ParserGrammar {
           type: postfix[3] as Type,
         ),
       )
-      ..leftExpression((LexerGrammar.WS &
-                (LexerGrammar.IN | LexerGrammar.EXCLAMATION_IN) &
-                LexerGrammar.WS).map((it) => it[1] as OperatorToken))
+      ..leftExpression((LexerGrammar.WS & (LexerGrammar.IN | LexerGrammar.EXCLAMATION_IN) & LexerGrammar.WS)
+          .map((it) => it[1] as OperatorToken))
       // comparison
       ..leftExpression(LexerGrammar.LESS_EQUAL |
           LexerGrammar.LESS |
@@ -723,8 +723,7 @@ class ParserGrammar {
           expression: expression,
         );
       })
-      ..prefix<ThrowKeywordToken, Expression>(
-          (LexerGrammar.THROW & LexerGrammar.NLs).map((value) => value.first as ThrowKeywordToken), mapper: (keyword, expression) {
+      ..prefix<ThrowKeywordToken, Expression>((LexerGrammar.THROW & LexerGrammar.NLs).map((value) => value.first as ThrowKeywordToken), mapper: (keyword, expression) {
         return ThrowExpression(
           _id++,
           throwKeyword: keyword,
