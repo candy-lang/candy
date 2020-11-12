@@ -12,7 +12,8 @@ public trait Map<Key: Equals, Value>: Iterable<(Key, Value)> {
   fun values(): Iterable<Value>
 
   fun containsKey(key: Key): Bool {
-    keys().contains(key)
+    // keys().contains(key)
+    todo("Implement Map.containsKey")
   }
 }
 
