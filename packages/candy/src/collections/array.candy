@@ -13,6 +13,7 @@ public builtin class Array<Item> {
   public fun set(index: Int /* UInt */, item: Item)
 }
 
+// TODO(marcelgarus): Make Array Iterable.
 // impl<Item> Array<Item>: Iterable<Item> {
 //   fun iterator(): Iterator<Item> {
 //     ArrayIterator<Item>(this, 0)

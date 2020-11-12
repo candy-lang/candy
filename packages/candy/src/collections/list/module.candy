@@ -22,15 +22,8 @@ public trait List<Item>: Iterable<Item> {
   }
 
   // TODO(marcelgarus): Getterize!
-  fun length(): Int /* UInt */
-  // TODO(marcelgarus): Getterize!
   fun isEmpty(): Bool { length() == 0 }
-
-  fun get(index: Int /* UInt */): Maybe<Item>
 }
-
-// impl<Item> List<Item>: GetOperator<Int, Item> /* GetOperator<UInt, Item> */
-// TODO(JonasWanke): impl List<Item>: GetOperator<Range<UInt>, List<Item>>
 
 public trait MutableList<Item>: List<Item> {
   static fun empty<Item>(): MutableList<Item> { ArrayList.empty<Item>() }
