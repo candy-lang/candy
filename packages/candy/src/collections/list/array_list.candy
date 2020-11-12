@@ -1,24 +1,13 @@
 use ....primitives
 use ....todo
+use ...array
 use ...iterable
 use ...list
-
-public builtin class Array<Item> {
-  /// A builtin structure that holds a fixed number of `Item`s.
-  
-  public static fun filled<Item>(length: Int /* UInt */, item: Item): Array<Item>
-  /// Creates a new `Array` of the given `length`, where every slot is filled with the same `item`.
-
-  public let length: Int
-
-  public fun get(index: Int /* UInt */): Item
-  public fun set(index: Int /* UInt */, item: Item)
-}
 
 // TODO(marcelgarus): For now, this never shrinks. We should implement that later, although a very
 // conservative shrinking heuristic is probably enough (we don't want to shrink too early).
 public class ArrayList<Item> {
-  /// A wrapper around `Array` that can grow dynamically.
+  /// A wrapper around `Array` that grows dynamically.
 
   public static fun empty<Item>(): ArrayList<Item> {
     create<Item>(8)

@@ -1,6 +1,7 @@
 use ...primitives
 use ..iterable
-public use .array
+use ..array
+use .array_list
 
 public trait List<Item>: Iterable<Item> {
   static fun empty<Item>(): List<Item> { ArrayList.empty<Item>() }
