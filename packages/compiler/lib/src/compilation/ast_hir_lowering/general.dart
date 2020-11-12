@@ -53,26 +53,28 @@ final Query<Tuple4<ResourceId, String, bool, bool>, List<DeclarationId>>
     if (onlySearchPublic) useLines = useLines.where((u) => u.isPublic).toList();
     if (useLines.isEmpty) return [];
 
-    final matches = useLines.flatMap((useLine) {
-      final declarationId = moduleIdToDeclarationId(context, useLine.moduleId);
-      assert(declarationId.path.isEmpty);
+    return useLines
+        .flatMap((useLine) {
+          final declarationId =
+              moduleIdToDeclarationId(context, useLine.moduleId);
+          assert(declarationId.path.isEmpty);
 
-      // TODO(JonasWanke): Ignore non-public declarations.
-      final directMatches = getInnerDeclarationIds(context, declarationId)
-          .where((id) =>
-              !onlyFindModules || id.isModule || id.isTrait || id.isClass)
-          .where((id) => id.simplePath.first.nameOrNull == identifier);
-      if (directMatches.isNotEmpty) {
-        return directMatches;
-      }
+          // TODO(JonasWanke): Ignore non-public declarations.
+          final directMatches = getInnerDeclarationIds(context, declarationId)
+              .where((id) =>
+                  !onlyFindModules || id.isModule || id.isTrait || id.isClass)
+              .where((id) => id.simplePath.first.nameOrNull == identifier);
+          if (directMatches.isNotEmpty) {
+            return directMatches;
+          }
 
-      return findIdentifierInUseLines(
-        context,
-        inputs.copyWith(first: declarationId.resourceId, third: true),
-      );
-    });
-
-    return matches.toList();
+          return findIdentifierInUseLines(
+            context,
+            inputs.copyWith(first: declarationId.resourceId, third: true),
+          );
+        })
+        .distinct()
+        .toList();
   },
 );
 

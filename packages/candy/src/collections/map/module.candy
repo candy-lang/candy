@@ -32,7 +32,7 @@ public trait MutableMap<Key: Equals, Value>: Map<Key, Value> {
     todo("Implement MutableMap.clear")
   }
 
-  fun addAll(map: Map<Key, Value>)
+  fun setAll(map: Map<Key, Value>)
   fun cast<NewKey, NewValue>(): Map<NewKey, NewValue> {
     todo("Implement MutableMap.cast")
   }
