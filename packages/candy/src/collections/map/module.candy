@@ -3,11 +3,12 @@ use ...primitives
 use ...todo
 use ..iterable
 
-public trait Map<Key: Equals, Value>: Iterable<(Key, Value)> {
-  fun length(): Int
+// TODO(marcelgarus): Create type alias `MapKey` for `Equals & Hash`.
+
+public trait Map<Key: Equals & Hash, Value>: Iterable<(Key, Value)> {
   fun isEmpty(): Bool { length() == 0 }
 
-  fun get(index: Key): Maybe<Value>
+  fun get(key: Key): Maybe<Value>
   fun keys(): Iterable<Key>
   fun values(): Iterable<Value>
 
