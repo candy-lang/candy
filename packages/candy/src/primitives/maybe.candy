@@ -1,0 +1,22 @@
+public trait Maybe<Value> {
+  fun unwrap(): Value
+  fun orElse(alternative: () => Value): Value
+  fun map<Out>(mapper: (Value) => Out): Maybe<Out>
+}
+
+public class Some<Value> {
+  let value: Value
+}
+impl<Value> Some<Value>: Maybe<Value> {
+  fun unwrap(): Value { value }
+  fun orElse(alternative: () => Value): Value { value }
+  fun map<Out>(mapper: (Value) => Out): Maybe<Out> { Some<Out>(mapper(value)) }
+}
+
+// TODO(JonasWanke): remove type parameter when multi-impls are supported
+public class None<Value>
+impl<Value> None<Value>: Maybe<Value> {
+  fun unwrap(): Value { throw "Unwrapped `None`." }
+  fun orElse(alternative: () => Value): Value { alternative() }
+  fun map<Out>(mapper: (Value) => Out): Maybe<Out> { None<Out>() }
+}

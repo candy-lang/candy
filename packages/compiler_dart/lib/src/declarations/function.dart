@@ -5,7 +5,6 @@ import '../body.dart';
 import '../constants.dart';
 import '../type.dart';
 import 'declaration.dart';
-import 'module.dart';
 
 final compileFunction = Query<DeclarationId, dart.Method>(
   'dart.compileFunction',
@@ -57,31 +56,4 @@ Iterable<dart.Parameter> compileParameters(
   return parameters.map((p) => dart.Parameter((b) => b
     ..type = compileType(context, p.type)
     ..name = p.name));
-}
-
-dart.Code _compileListOf(
-  QueryContext context,
-  FunctionDeclaration functionHir,
-) {
-  final itemType = functionHir.valueParameters.first.type;
-  return dart
-      .refer(
-        'ArrayList',
-        moduleIdToImportUrl(context, CandyType.arrayListModuleId.parent),
-      )
-      .property(functionHir.name)
-      .call(
-    functionHir.valueParameters.map((p) => dart.refer(p.name)).toList(),
-    {},
-    [compileType(context, itemType)],
-  ).code;
-}
-
-dart.Code _compileArrayListOf(FunctionDeclaration functionHir) {
-  final list = dart.literalList(
-    functionHir.valueParameters.map((p) => p.name).map(dart.refer),
-    dart.refer(functionHir.typeParameters.single.name),
-  );
-
-  return dart.refer('ArrayList<Item>').call([list], {}, []).code;
 }

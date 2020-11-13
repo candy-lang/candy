@@ -25,22 +25,47 @@ public trait List<Item>: Iterable<Item> {
   // TODO(marcelgarus): Getterize!
   fun isEmpty(): Bool { length() == 0 }
 
-  fun get(index: Int /* UInt */): Option<Item>
+  fun get(index: Int /* UInt */): Maybe<Item>
 }
 
 // impl<Item> List<Item>: GetOperator<Int, Item> /* GetOperator<UInt, Item> */
 // TODO(JonasWanke): impl List<Item>: GetOperator<Range<UInt>, List<Item>>
 
 public trait MutableList<Item>: List<Item> {
+  static fun empty<Item>(): MutableList<Item> { ArrayList.empty<Item>() }
+  static fun of1<Item>(first: Item): MutableList<Item> {
+    ArrayList.of1<Item>(first)
+  }
+  static fun of2<Item>(first: Item, second: Item): MutableList<Item> {
+    ArrayList.of2<Item>(first, second)
+  }
+  static fun of3<Item>(first: Item, second: Item, third: Item): MutableList<Item> {
+    ArrayList.of3<Item>(first, second, third)
+  }
+  static fun of4<Item>(first: Item, second: Item, third: Item, fourth: Item): MutableList<Item> {
+    ArrayList.of4<Item>(first, second, third, fourth)
+  }
+  static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): MutableList<Item> {
+    ArrayList.of5<Item>(first, second, third, fourth, fifth)
+  }
+  
   fun set(index: Int /* UInt */, item: Item)
   // TODO(marcelgarus): Rename to add as soon as the naming conflict with + is resolved.
   fun append(item: Item)
 
   fun removeAt(index: Int /* UInt */): Item
 
-  fun removeLast(): Item {
-    removeAt(length() - 1)
-  }
+  fun removeFirst(): Item { removeAt(0) }
+  fun removeSecond(): Item { removeAt(1) }
+  fun removeThird(): Item { removeAt(2) }
+  fun removeFourth(): Item { removeAt(3) }
+  fun removeFifth(): Item { removeAt(4) }
+  fun removeSixth(): Item { removeAt(5) }
+  fun removeSeventh(): Item { removeAt(6) }
+
+  fun removeLast(): Item { removeAt(length() - 1) }
+  fun removeSecondLast(): Item { removeAt(length() - 2) }
+  fun removeThirdLast(): Item { removeAt(length() - 2) }
 
   fun clear() {
     while isNotEmpty() {

@@ -114,16 +114,6 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
-  Option<hir.Expression> visitCallExpression(hir.CallExpression node) {
-    if (node.id == id) return Some(node);
-    for (final argument in node.valueArguments) {
-      final result = argument.accept(this);
-      if (result is Some) return result;
-    }
-    return node.target.accept(this);
-  }
-
-  @override
   Option<hir.Expression> visitFunctionCallExpression(
     hir.FunctionCallExpression node,
   ) {
@@ -145,6 +135,17 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
       if (result is Some) return result;
     }
     return None();
+  }
+
+  @override
+  Option<hir.Expression> visitExpressionCallExpression(
+      hir.ExpressionCallExpression node) {
+    if (node.id == id) return Some(node);
+    for (final argument in node.valueArguments) {
+      final result = argument.accept(this);
+      if (result is Some) return result;
+    }
+    return node.target.accept(this);
   }
 
   @override
@@ -391,8 +392,9 @@ abstract class Context {
   ) {
     final result = lower(expression);
     if (result is Error) return Error(result.error);
+    final lowered = result.value.toList();
 
-    if (result.value.isEmpty) {
+    if (lowered.isEmpty) {
       assert(expressionType is Some);
       return Error([
         CompilerError.invalidExpressionType(
@@ -400,15 +402,23 @@ abstract class Context {
           location: ErrorLocation(resourceId, expression.span),
         ),
       ]);
-    } else if (result.value.length > 1) {
+    } else if (lowered.length > 1) {
       return Error([
         CompilerError.ambiguousExpression(
           'Expression is ambiguous.',
           location: ErrorLocation(resourceId, expression.span),
+          relatedInformation: [
+            for (final it in lowered)
+              ErrorRelatedInformation(
+                message: 'This is one of the ambigous options: '
+                    '${it.id.declarationId}',
+                location: ErrorLocation(it.id.declarationId.resourceId),
+              ),
+          ],
         ),
       ]);
     }
-    return Ok(result.value.single);
+    return Ok(lowered.single);
   }
 }
 
@@ -1375,7 +1385,7 @@ extension on Context {
     }
 
     final type = expressionType.valueOrNull ??
-        hir.CandyType.union({
+        _unionOrUnit({
           if (thenBody.isNotEmpty) thenBody.last.type,
           if (elseBody.isNotEmpty) elseBody.last.type,
         }.toList());
@@ -1403,7 +1413,7 @@ extension on Context {
       for (final expression in body) {
         expression.accept(visitor);
       }
-      type = hir.CandyType.union(visitor.breakTypes.toList());
+      type = _unionOrUnit(visitor.breakTypes.toList());
     }
 
     return Ok([hir.LoopExpression(getId(loop), body, type)]);
@@ -1831,6 +1841,9 @@ extension on Context {
         return lowerConstructorCall(expression, target);
       }
 
+      if (target.type is hir.FunctionCandyType) {
+        return lowerExpressionCall(expression, target);
+      }
       throw CompilerError.unsupportedFeature(
         'Callable expressions are not yet supported (target: $target).',
         location: ErrorLocation(resourceId, expression.span),
@@ -2015,8 +2028,6 @@ extension on Context {
     final classId = (target.identifier as hir.ReflectionIdentifier).id;
     // ignore: non_constant_identifier_names
     final class_ = getClassDeclarationHir(queryContext, classId);
-    final constructorId =
-        class_.innerDeclarationIds.singleWhere((id) => id.isConstructor);
 
     final typeParameters = class_.typeParameters
         .map((p) => hir.CandyType.parameter(p.name, classId))
@@ -2097,6 +2108,61 @@ extension on Context {
             fields[i].name: arguments[i],
         },
         returnType,
+      ),
+    ]);
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerExpressionCall(
+    ast.CallExpression expression,
+    hir.Expression target,
+  ) {
+    assert(target != null);
+
+    final type = target.type as hir.FunctionCandyType;
+    final valueArguments = expression.arguments;
+
+    if (!isValidExpressionType(type.returnType)) {
+      return Error([
+        CompilerError.invalidExpressionType(
+          'Constructor has an invalid return type: ${type.returnType}. Expected: $expressionType',
+          location: ErrorLocation(resourceId, expression.span),
+        ),
+      ]);
+    }
+
+    if (type.parameterTypes.length < valueArguments.length) {
+      return Error([
+        CompilerError.tooManyArguments(
+          'Too many expression call arguments.',
+          location: ErrorLocation(resourceId, expression.span),
+        )
+      ]);
+    }
+
+    if (type.parameterTypes.length > valueArguments.length) {
+      return Error([
+        CompilerError.missingArguments(
+          'Too few expression call arguments.',
+          location: ErrorLocation(resourceId, expression.span),
+        )
+      ]);
+    }
+
+    final loweredArguments = [
+      for (var i = 0; i < valueArguments.length; i++)
+        innerExpressionContext(
+          expressionType: Option.some(type.parameterTypes[i]),
+        ).lowerUnambiguous(valueArguments[i].expression),
+    ].merge();
+    if (loweredArguments is Error) return loweredArguments;
+    final arguments = loweredArguments.value;
+
+    return Ok([
+      hir.Expression.expressionCall(
+        getId(expression),
+        target,
+        arguments,
+        type.returnType,
       ),
     ]);
   }
@@ -2460,4 +2526,8 @@ extension on Context {
 
     return Ok([hir.AssignmentExpression(getId(expression), left, right)]);
   }
+}
+
+hir.CandyType _unionOrUnit(List<hir.CandyType> types) {
+  return types.isEmpty ? hir.CandyType.unit : hir.CandyType.union(types);
 }

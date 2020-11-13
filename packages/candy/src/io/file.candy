@@ -1,0 +1,217 @@
+/*
+trait FileSystem {
+  // TODO(marcelgarus): Getterize!
+  builtin static fun default()
+
+  // TODO(marcelgarus): Give it a different value based on the platform.
+  public let separator = "/"
+  public let currentDirectorySymbol = "."
+  public let parentDirectorySymbol = ".."
+
+  public fun parseToPath(string: String): Result<Path> {
+    let segments = string.split(fileSystem.separator()).mutable()
+    let isAbsolute = segments.first == Some("")
+    if isAbsolute {
+      segments.removeFirst()
+    }
+
+    let segments = segments.map {
+      // TODO(marcelgarus): Matchify!
+      if it.isEmpty {
+        CurrentSegment(isEmpty = true)
+      } else if it == fileSystem.currentDirectorySymbol {
+        CurrentSegment()
+      } else if it == fileSystem.parentDirectorySymbol {
+        ParentSegment()
+      } else {
+        ChildSegment(it)
+      }
+    }.toList()
+
+    Path.fromSegments(segments, isAbsolute)
+  }
+
+  public fun stringifyPath(path: Path): String {
+    (if path.isAbsolute "/" else "") + path.segments.map { segment ->
+      // TODO(marcelgarus): Matchify!
+      if it is ChildSegment {
+        return it.name
+      } else if it is CurrentSegment {
+        if it.isEmpty "" else currentDirectorySymbol
+      } else {
+        assert(it is ParentSegment)
+        parentDirectorySymbol
+      }
+    }
+  }
+
+  fun get(path: Path): FileSystemEntity {}
+}
+
+class Path {
+  /// A slice of a path.
+  ///
+  /// This type is independent of the file system (if `/` or `\` is used). It supports a number of
+  /// operations for working with and inspecting a path, including getting the segments, extracting
+  /// the file name, and so on.
+  /// It ensures that the value is valid, e.g. if it's an absolute path, the path can't escape past
+  /// the root directory.
+
+  static fun unsafe(segments: List<Segment>, isAbsolute: Bool): Path {
+    /// Creates a Path instance without checking if it's valid.
+    todo()
+  }
+
+  public static fun fromSegments(segments: List<Segment>, isAbsolute: Bool): Result<Path, ...> {
+    if isAbsolute {
+      // Make sure the path doesn't escape the root directory.
+      mut let depth = 0
+      for segment in segments {
+        if segment is ChildSegment {
+          depth++
+        } else if segment is ParentSegment {
+          depth--
+          if depth < 0 {
+            return Error("An absolute path can't escape the root directory!")
+          }
+        }
+      }
+    }
+    Path.unsafe(segments, isAbsolute)
+  }
+
+  public static fun fromString(string: String, fileSystem: FileSystem = FileSystem.default()): Result<Path, ...> {
+    fileSystem.parsePath(string)
+  }
+
+  static fun join(first: Path, second: Path): Result<Path, ...> {
+    if first.isAbsolute && second.isAbsolute {
+      second
+    } else {
+      Path.fromSegments(
+        segments = first.segments + second.segments,
+        isAbsolute = first.isAbsolute && second.isAbsolute,
+      )
+    }
+  }
+
+  let segments: List<Segment>
+  let isAbsolute: Bool
+  /// Whether this `Path` is absolute, i.e., if it's independent of the current directory.
+
+  // TODO(marcelgarus): Getterize!
+  fun isRelative(): Bool { !isAbsolute }
+
+  fun depth(): Int {
+    mut let depth = 0
+    for segment in segments {
+      if segment is ChildSegment {
+        depth++
+      } else if segment is ParentSegment {
+        depth--
+      }
+    }
+    depth
+  }
+
+  fun normalized(): Path {
+    /// Returns a normalized version of this path that points to the same resource.
+
+    let normalized = MutableList<Segment>()
+    for segment in segments {
+      // TODO(marcelgarus): Matchify!
+      if segment is ChildSegment {
+        normalized.add(segment)
+      } else if segment is ParentSegment {
+        if normalized.isEmpty() {
+          normalized.add(ParentSegment())
+        } else {
+          normalized.removeLast()
+        }
+      }
+    }
+    Path.unsafe(normalized, isAbsolute)
+  }
+
+  // TODO(marcelgarus): Getterize!
+  fun parent(): Option<Path> {
+    let segments = segments.toMutableList()
+    while segments.last() is Option<CurrentSegment> {
+      segments.removeLast()
+    }
+    if depth() == 0 {
+      None()
+    } else {
+      Some(if segments.last() is Option<ParentSegment> {
+        Path.unsafe(segments() + List.of1(ParentSegment()), isAbsolute)
+      } else {
+        assert(segments.last() is Option<ChildSegment>)
+        Path.unsafe(segments.withoutLast(), isAbsolute)
+      })
+    }
+  }
+
+  // TODO(marcelgarus): Walk up the path.
+  fun ancestors(): Iterable<Path> {
+    todo()
+  }
+
+  fun startsWith(prefix: List<Segment>): Bool {
+    segments.startsWith(prefix)
+  }
+
+  fun commonDirectory(other: Path): Option<Path> {
+    if isAbsolute != other.isAbsolute {
+      None<Path>()
+    }
+    Path.unsafe(
+      normalized()
+        .segments
+        .zip(other.normalized().segments)
+        .takeWhile { a, b => a == b }
+        .map { it.first }
+        .toList()
+      isAbsolute,
+    )
+  }
+
+  // TODO(marcelgarus): Enumerize!
+  trait Segment
+
+  class ChildSegment {
+    let name: String
+  }
+  class CurrentSegment {
+    let isEmpty = false
+    /// The current path can be represented as "." (as in "some/./path") and "" (as in "some//path").
+  }
+  class ParentSegment
+}
+
+impl Path: OperatorSlash<Path>, ToString, Iterable<Path.Segment> {
+  fun slash(Path other): Path { Path.join(segments, other.segments) }
+  fun toString(fileSystem: FileSystem = FileSystem.default()): String {
+    fileSystem.stringifyPath(this)
+  }
+  fun iterator(): Iterator<Segment> => segments.iterator()
+}
+
+// TODO(marcelgarus): Enumerize!
+trait FileSystemNode {
+  let path: Path
+}
+
+trait File {
+  let path: Path
+
+  fun doesExist(): Result<Bool, ...>
+  fun read(): Result<String, ...>
+  fun write(content: String): Result<Unit, ...>
+}
+impl File: FileSystemNode
+
+trait Directory {
+  let path: Path
+}
+impl Directory: FileSystemNode
+*/

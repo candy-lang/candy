@@ -1,17 +1,18 @@
 use ....primitives
+use ....todo
 use ...iterable
 use ...list
 
-builtin class Array<Item> {
+public builtin class Array<Item> {
   /// A builtin structure that holds a fixed number of `Item`s.
   
-  static fun filled<Item>(length: Int /* UInt */, item: Item): Array<Item>
+  public static fun filled<Item>(length: Int /* UInt */, item: Item): Array<Item>
   /// Creates a new `Array` of the given `length`, where every slot is filled with the same `item`.
 
-  let length: Int
+  public let length: Int
 
-  fun get(index: Int /* UInt */): Item
-  fun set(index: Int /* UInt */, item: Item)
+  public fun get(index: Int /* UInt */): Item
+  public fun set(index: Int /* UInt */, item: Item)
 }
 
 // TODO(marcelgarus): For now, this never shrinks. We should implement that later, although a very
@@ -19,7 +20,7 @@ builtin class Array<Item> {
 public class ArrayList<Item> {
   /// A wrapper around `Array` that can grow dynamically.
 
-  static fun empty<Item>(): ArrayList<Item> {
+  public static fun empty<Item>(): ArrayList<Item> {
     create<Item>(8)
   }
   public static fun of1<Item>(first: Item): ArrayList<Item> {
@@ -62,12 +63,12 @@ public class ArrayList<Item> {
     /// Creates a new, empty `ArrayList` with the given capacity.
 
     ArrayList<Item>(
-      Array.filled<Option<Item>>(capacity, None<Item>()),
+      Array.filled<Maybe<Item>>(capacity, None<Item>()),
       0,
     )
   }
 
-  mut let items: Array<Option<Item>>
+  mut let items: Array<Maybe<Item>>
   mut let length_: Int /* UInt */
 
   // TODO(marcelgarus): Getterize!
@@ -76,7 +77,7 @@ public class ArrayList<Item> {
   fun grow() {
     /// Increases the capacity.
 
-    let newItems = Array.filled<Option<Item>>(2 * capacity(), None<Item>())
+    let newItems = Array.filled<Maybe<Item>>(2 * capacity(), None<Item>())
     mut let index = 0
 
     while index < length_ {
@@ -86,11 +87,12 @@ public class ArrayList<Item> {
   }
 }
 
-// impl<Item> ArrayList<Item>: Iterable<Item> {
-//   fun iterator(): Iterator<Item> {
-//     ArrayListIterator<Item>(this)
-//   }
-// }
+impl<Item> ArrayList<Item>: Iterable<Item> {
+  fun iterator(): Iterator<Item> {
+    // TODO(marcelgarus): Remove the second argument as soon as default arguments are supported.
+    ArrayListIterator<Item>(this, 0)
+  }
+}
 
 class ArrayListIterator<Item> {
   let arrayList: ArrayList<Item>
@@ -98,7 +100,7 @@ class ArrayListIterator<Item> {
 }
 
 impl<Item> ArrayListIterator<Item>: Iterator<Item> {
-  fun next(): Option<Item> {
+  fun next(): Maybe<Item> {
     let element = arrayList.get(index)
     index = index + 1
     element
@@ -108,9 +110,9 @@ impl<Item> ArrayListIterator<Item>: Iterator<Item> {
 impl<Item> ArrayList<Item>: List<Item> {
   fun length(): Int { length_ }
 
-  fun get(index: Int /* UInt */): Option<Item> {
+  fun get(index: Int /* UInt */): Maybe<Item> {
     if index >= length_ {
-      None<Option<Item>>()
+      None<Maybe<Item>>()
     } else {
       items.get(index)
     }

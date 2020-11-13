@@ -1,5 +1,4 @@
 import 'package:code_builder/code_builder.dart' as dart;
-import 'package:collection/collection.dart';
 import 'package:compiler/compiler.dart';
 import 'package:dartx/dartx.dart';
 
@@ -41,8 +40,8 @@ abstract class BuiltinCompiler<Output> {
       return compileFloat();
     } else if (moduleId == ModuleId.corePrimitives.nested(['String'])) {
       return compileString();
-    } else if (moduleId == ModuleId.coreStdio) {
-      if (name == 'print') return compilePrint();
+    } else if (moduleId == ModuleId.coreIoPrint && name == 'print') {
+      return compilePrint();
     }
 
     final declaration = getDeclarationAst(context, declarationId);

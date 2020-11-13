@@ -127,6 +127,8 @@ final Query<DeclarationId, List<dart.Class>> compileClass =
         ..annotations.add(dart.refer('override', dartCoreUrl))
         ..returns = compileType(context, function.returnType)
         ..name = name
+        ..types.addAll(function.typeParameters
+            .map((it) => compileTypeParameter(context, it)))
         ..requiredParameters
             .addAll(compileParameters(context, function.valueParameters))
         ..body = compileBody(context, id).value);

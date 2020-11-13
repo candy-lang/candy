@@ -24,7 +24,7 @@ class OverlayResourceProvider extends ResourceProvider {
     QueryContext context,
     PackageId packageId,
   ) {
-    // TODO: check overlays
+    // TODO(JonasWanke): check overlays
     return baseProvider.getAllFileResourceIds(context, packageId);
   }
 

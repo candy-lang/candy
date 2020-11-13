@@ -31,11 +31,6 @@ abstract class Expression implements _$Expression {
     CandyType type,
   ) = NavigationExpression;
 
-  const factory Expression.call(
-    DeclarationLocalId id,
-    Expression target,
-    List<Expression> valueArguments,
-  ) = CallExpression;
   const factory Expression.functionCall(
     DeclarationLocalId id,
     Expression target,
@@ -50,6 +45,12 @@ abstract class Expression implements _$Expression {
     Map<String, Expression> valueArguments,
     CandyType returnType,
   ) = ConstructorCallExpression;
+  const factory Expression.expressionCall(
+    DeclarationLocalId id,
+    Expression target,
+    List<Expression> valueArguments,
+    CandyType returnType,
+  ) = ExpressionCallExpression;
   // ignore: non_constant_identifier_names
   const factory Expression.if_(
     DeclarationLocalId id,
@@ -112,9 +113,9 @@ abstract class Expression implements _$Expression {
         literal: (lit) => lit.literal.type,
         property: (prop) => prop.type,
         navigation: (nav) => nav.type,
-        call: (_) => null,
         functionCall: (fn) => fn.returnType,
         constructorCall: (constructor) => constructor.returnType,
+        expressionCall: (call) => call.returnType,
         return_: (_) => CandyType.never,
         if_: (theIf) => theIf.type,
         loop: (loop) => loop.type,
@@ -131,9 +132,9 @@ abstract class Expression implements _$Expression {
         literal: (e) => visitor.visitLiteralExpression(e),
         property: (e) => visitor.visitPropertyExpression(e),
         navigation: (e) => visitor.visitNavigationExpression(e),
-        call: (e) => visitor.visitCallExpression(e),
         functionCall: (e) => visitor.visitFunctionCallExpression(e),
         constructorCall: (e) => visitor.visitConstructorCallExpression(e),
+        expressionCall: (e) => visitor.visitExpressionCallExpression(e),
         return_: (e) => visitor.visitReturnExpression(e),
         if_: (e) => visitor.visitIfExpression(e),
         loop: (e) => visitor.visitLoopExpression(e),
@@ -250,9 +251,9 @@ abstract class ExpressionVisitor<T> {
   T visitLiteralExpression(LiteralExpression node);
   T visitPropertyExpression(PropertyExpression node);
   T visitNavigationExpression(NavigationExpression node);
-  T visitCallExpression(CallExpression node);
   T visitFunctionCallExpression(FunctionCallExpression node);
   T visitConstructorCallExpression(ConstructorCallExpression node);
+  T visitExpressionCallExpression(ExpressionCallExpression node);
   T visitReturnExpression(ReturnExpression node);
   T visitIfExpression(IfExpression node);
   T visitLoopExpression(LoopExpression node);
@@ -276,11 +277,11 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   @override
   void visitNavigationExpression(NavigationExpression node) {}
   @override
-  void visitCallExpression(CallExpression node) {}
-  @override
   void visitFunctionCallExpression(FunctionCallExpression node) {}
   @override
   void visitConstructorCallExpression(ConstructorCallExpression node) {}
+  @override
+  void visitExpressionCallExpression(ExpressionCallExpression node) {}
   @override
   void visitReturnExpression(ReturnExpression node) {}
   @override
