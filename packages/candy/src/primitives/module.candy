@@ -26,8 +26,8 @@ public builtin class Unit
 /// * the explicit unit instance: `unit`
 
 public builtin class Never
-/// Can never be created. It's still useful to specify that an expression will never evaluate. More
-/// specifically, this is the case in the following cases:
+/// Can never be created. It's still useful to specify that an expression will never return
+/// directly. More specifically, this is the case in the following cases:
 ///
 /// * An expression runs endlessly.
 /// * An expression aborts the current control flow.

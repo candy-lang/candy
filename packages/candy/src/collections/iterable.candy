@@ -152,7 +152,7 @@ public trait Iterable<Item> {
     mut let skipping = true
     where({
       if !skipping {
-        return false
+        return true
       }
       skipping = checker(it)
       return skipping
