@@ -1,1 +1,1 @@
-public use ..print
+public use .print

@@ -40,7 +40,7 @@ abstract class BuiltinCompiler<Output> {
       return compileFloat();
     } else if (moduleId == ModuleId.corePrimitives.nested(['String'])) {
       return compileString();
-    } else if (moduleId == ModuleId.corePrint && name == 'print') {
+    } else if (moduleId == ModuleId.coreIoPrint && name == 'print') {
       return compilePrint();
     }
 

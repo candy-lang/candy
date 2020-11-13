@@ -406,8 +406,7 @@ abstract class Context {
   ) {
     final result = lower(expression);
     if (result is Error) return Error(result.error);
-    final lowered =
-        result.value.distinctBy((it) => it.id.declarationId).toList();
+    final lowered = result.value.toList();
 
     if (lowered.isEmpty) {
       assert(expressionType is Some);
@@ -427,8 +426,7 @@ abstract class Context {
               ErrorRelatedInformation(
                 message: 'This is one of the ambigous options: '
                     '${it.id.declarationId}',
-                location: ErrorLocation(
-                    it.id.declarationId.resourceId, SourceSpan(0, 0)),
+                location: ErrorLocation(it.id.declarationId.resourceId),
               ),
           ],
         ),
