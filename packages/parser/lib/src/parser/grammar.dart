@@ -601,13 +601,16 @@ class ParserGrammar {
       ..leftExpression(LexerGrammar.BAR)
       // type check
       ..postfix<List<dynamic>, Expression>(
-        LexerGrammar.NLs &
-                (LexerGrammar.AS | LexerGrammar.AS_SAFE) &
-                LexerGrammar.NLs &
-                type,
-        mapper: (instance, postfix) =>
-            AsExpression(_id++, instance: instance,
-            asOperator: postfix[1] as OperatorToken, type: postfix[3] as Type,),
+        LexerGrammar.WS &
+            (LexerGrammar.AS | LexerGrammar.AS_SAFE) &
+            LexerGrammar.WS &
+            type,
+        mapper: (instance, postfix) => AsExpression(
+          _id++,
+          instance: instance,
+          asOperator: postfix[1] as OperatorToken,
+          type: postfix[3] as Type,
+        ),
       )
       // range
       ..leftExpression(LexerGrammar.DOT_DOT | LexerGrammar.DOT_DOT_EQUALS)
@@ -615,9 +618,9 @@ class ParserGrammar {
       // TODO(JonasWanke): infix function
       // named checks
       ..postfix<List<dynamic>, Expression>(
-        LexerGrammar.NLs &
+        LexerGrammar.WS &
             (LexerGrammar.IS | LexerGrammar.EXCLAMATION_IS) &
-            LexerGrammar.NLs &
+            LexerGrammar.WS &
             type,
         mapper: (instance, postfix) => IsExpression(
           _id++,
