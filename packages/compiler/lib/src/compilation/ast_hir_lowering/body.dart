@@ -400,7 +400,8 @@ abstract class Context {
   ) {
     final result = lower(expression);
     if (result is Error) return Error(result.error);
-    final lowered = result.value.toList();
+    final lowered =
+        result.value.distinctBy((it) => it.id.declarationId).toList();
 
     if (lowered.isEmpty) {
       assert(expressionType is Some);
