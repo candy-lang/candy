@@ -365,6 +365,26 @@ abstract class WhileExpression extends Expression implements _$WhileExpression {
 }
 
 @freezed
+abstract class ForExpression extends Expression implements _$ForExpression {
+  const factory ForExpression(
+    int id, {
+    @required ForKeywordToken forKeyword,
+    @required IdentifierToken variable,
+    @required OperatorToken inKeyword,
+    @required Expression iterable,
+    @required LambdaLiteral body,
+  }) = _ForExpression;
+  const ForExpression._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitForExpression(this);
+
+  @override
+  Iterable<SyntacticEntity> get children =>
+      [forKeyword, variable, inKeyword, iterable, body];
+}
+
+@freezed
 abstract class ReturnExpression extends Expression
     implements _$ReturnExpression {
   const factory ReturnExpression(
