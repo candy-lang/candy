@@ -1,0 +1,7 @@
+fun main() {
+  assert(true, "foo")
+}
+
+test fun myTest() {
+  assert(true, "foo")
+}
