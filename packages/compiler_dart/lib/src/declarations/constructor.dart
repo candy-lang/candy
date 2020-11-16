@@ -85,7 +85,6 @@ dart.Constructor _compileWithDefaultsPrivate(List<ValueParameter> parameters) {
       ..name = parameter.name);
   });
   return dart.Constructor((b) => b
-    ..constant = true
     ..name = '_'
     ..requiredParameters.addAll(privateParameters));
 }
