@@ -136,6 +136,11 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           'Invalid reflection target for Dart compiler: `$id`.',
         );
       },
+      tuple: () {
+        throw CompilerError.internalError(
+          'Tried compiling a reference to `Tuple` directly.',
+        );
+      },
       parameter: (id, name, _) {
         if (name == 'this') {
           final expression = getExpression(context, id);
@@ -686,6 +691,21 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       parameter: (_) => compileSimple(),
       reflection: (_) => compileSimple(),
     );
+  }
+
+  @override
+  List<dart.Code> visitTupleExpression(TupleExpression node) {
+    return [
+      for (final argument in node.arguments) ...argument.accept(this),
+      _save(
+        node,
+        compileType(context, node.type).call(
+          node.arguments.map((it) => _refer(it.id)).toList(),
+          {},
+          [],
+        ),
+      ),
+    ];
   }
 
   static String _name(DeclarationLocalId id) => '_${id.value}';
