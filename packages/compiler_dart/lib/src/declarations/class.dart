@@ -12,8 +12,8 @@ import 'function.dart';
 import 'property.dart';
 import 'trait.dart';
 
-final Query<DeclarationId, List<dart.Class>> compileClass =
-    Query<DeclarationId, List<dart.Class>>(
+final Query<DeclarationId, List<dart.Spec>> compileClass =
+    Query<DeclarationId, List<dart.Spec>>(
   'dart.compileClass',
   evaluateAlways: true,
   provider: (context, declarationId) {
@@ -183,6 +183,13 @@ final Query<DeclarationId, List<dart.Class>> compileClass =
         ..name = compileTypeName(context, declarationId).symbol
         ..types.addAll(classHir.typeParameters
             .map((p) => compileTypeParameter(context, p)))
+        ..mixins.addAll(traits.map((it) {
+          final type = compileType(context, it);
+          return dart.TypeReference((b) => b
+            ..symbol = '${type.symbol}\$Default'
+            ..types.addAll(it.arguments.map((it) => compileType(context, it)))
+            ..url = type.url);
+        }))
         ..implements.addAll(implements)
         ..constructors.addAll(compileConstructor(
           context,
@@ -190,8 +197,7 @@ final Query<DeclarationId, List<dart.Class>> compileClass =
         ))
         ..fields.addAll(properties)
         ..methods.addAll(methods)
-        ..methods.addAll(methodOverrides)
-        ..methods.addAll(methodDelegations)),
+        ..methods.addAll(methodOverrides)),
       for (final classId
           in classHir.innerDeclarationIds.where((it) => it.isClass))
         ...compileClass(context, classId),

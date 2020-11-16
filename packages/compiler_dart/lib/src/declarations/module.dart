@@ -4,6 +4,7 @@ import 'package:dart_style/dart_style.dart';
 
 import '../builtins.dart';
 import '../constants.dart';
+import '../utils.dart';
 import 'declaration.dart';
 
 final _dartFmt = DartFormatter();
@@ -25,7 +26,7 @@ final compileModule = Query<ModuleId, Unit>(
     });
 
     final source = _dartFmt.format(
-      library.accept(dart.DartEmitter(_PrefixedAllocator())).toString(),
+      library.accept(FancyDartEmitter(_PrefixedAllocator())).toString(),
     );
     context.config.buildArtifactManager.setContent(
       context,
