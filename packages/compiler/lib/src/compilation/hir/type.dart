@@ -354,9 +354,14 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
       },
       this_: (_) => throw invalidThisType(),
       tuple: (type) {
-        throw CompilerError.unsupportedFeature(
-          'Trait implementations for tuples are not yet supported.',
-        );
+        if (parent is TupleCandyType) {
+          return type.items.length == parent.items.length &&
+              type.items
+                  .zip<CandyType, bool>(parent.items,
+                      (a, b) => isAssignableTo(context, Tuple2(a, b)))
+                  .every((it) => it);
+        }
+        return false;
       },
       function: (type) {
         throw CompilerError.unsupportedFeature(
