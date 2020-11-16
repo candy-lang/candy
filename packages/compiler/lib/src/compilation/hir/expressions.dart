@@ -113,6 +113,10 @@ abstract class Expression implements _$Expression {
     CandyType typeToCheck, {
     bool isNegated,
   }) = IsExpression;
+  const factory Expression.tuple(
+    DeclarationLocalId id,
+    List<Expression> arguments,
+  ) = TupleExpression;
 
   const Expression._();
 
@@ -134,6 +138,8 @@ abstract class Expression implements _$Expression {
         throw_: (_) => CandyType.never,
         assignment: (assignment) => assignment.right.type,
         is_: (_) => CandyType.bool,
+        tuple: (tuple) =>
+            CandyType.tuple(tuple.arguments.map((it) => it.type).toList()),
       );
 
   T accept<T>(ExpressionVisitor<T> visitor) => map(
@@ -154,6 +160,7 @@ abstract class Expression implements _$Expression {
         throw_: (e) => visitor.visitThrowExpression(e),
         assignment: (e) => visitor.visitAssignmentExpression(e),
         is_: (e) => visitor.visitIsExpression(e),
+        tuple: (e) => visitor.visitTupleExpression(e),
       );
 }
 
@@ -167,6 +174,7 @@ abstract class Identifier implements _$Identifier {
     DeclarationId id, [
     IdentifierExpression base,
   ]) = ReflectionIdentifier;
+  const factory Identifier.tuple() = TupleIdentifier;
 
   const factory Identifier.parameter(
     DeclarationLocalId id,
@@ -202,6 +210,13 @@ abstract class Identifier implements _$Identifier {
         this_: (type) => type,
         super_: (type) => type,
         reflection: (declarationId, _) => CandyType.reflection(declarationId),
+        tuple: () {
+          final resourceId =
+              ResourceId(PackageId.core, 'src/primitives/tuples.candy');
+          final declarationId = DeclarationId(resourceId)
+              .inner(DeclarationPathData.class_('TupleX'));
+          return CandyType.reflection(declarationId);
+        },
         parameter: (_, __, type) => type,
         property: (_, type, __, ___, ____) => type,
         localProperty: (_, __, type, ___) => type,
@@ -274,6 +289,7 @@ abstract class ExpressionVisitor<T> {
   T visitThrowExpression(ThrowExpression node);
   T visitAssignmentExpression(AssignmentExpression node);
   T visitIsExpression(IsExpression node);
+  T visitTupleExpression(TupleExpression node);
 }
 
 abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
@@ -313,4 +329,6 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   void visitAssignmentExpression(AssignmentExpression node) {}
   @override
   void visitIsExpression(IsExpression node) {}
+  @override
+  void visitTupleExpression(TupleExpression node) {}
 }

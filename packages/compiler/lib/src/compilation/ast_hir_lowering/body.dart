@@ -237,6 +237,16 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
     if (node.id == id) return Some(node);
     return node.instance.accept(this);
   }
+
+  @override
+  Option<hir.Expression> visitTupleExpression(hir.TupleExpression node) {
+    if (node.id == id) return Some(node);
+    for (final expression in node.arguments) {
+      final result = expression.accept(this);
+      if (result is Some) return result;
+    }
+    return None();
+  }
 }
 
 final getBody = Query<DeclarationId, Option<List<hir.Expression>>>(
@@ -767,6 +777,8 @@ class ContextContext extends Context {
         break;
       }
     }
+
+    if (name == 'Tuple') return [hir.Identifier.tuple()];
 
     // search use-lines
     return findIdentifierInUseLines(
@@ -1890,7 +1902,76 @@ extension on Context {
     final targetVariants = innerExpressionContext().lower(expression.target);
     if (targetVariants is Error) return targetVariants;
 
-    final results = targetVariants.value.map((target) {
+    final results = targetVariants.value
+        .map<Result<List<hir.Expression>, List<ReportedCompilerError>>>(
+            (target) {
+      // Tuple constructor.
+      if (target is hir.IdentifierExpression &&
+          target.identifier is hir.TupleIdentifier) {
+        final invalidArguments = expression.arguments.where((it) => it.isNamed);
+        if (invalidArguments.isNotEmpty) {
+          return Error([
+            CompilerError.unexpectedNamedArgument(
+              "Tuples can't be created with named arguments.",
+              location: ErrorLocation(resourceId, invalidArguments.first.span),
+            ),
+          ]);
+        }
+
+        if (expression.arguments.length < 2) {
+          return Error([
+            CompilerError.missingArguments(
+              'Tuples must have at least two elements.',
+              location:
+                  ErrorLocation(resourceId, expression.leftParenthesis.span),
+            ),
+          ]);
+        }
+
+        Result<List<hir.Expression>, List<ReportedCompilerError>>
+            argumentsResult;
+        if (expressionType is Some &&
+            expressionType.value is hir.TupleCandyType) {
+          final expectedType = expressionType.value as hir.TupleCandyType;
+          final expectedSize = expectedType.items.length;
+          final actualSize = expression.arguments.length;
+
+          if (actualSize != expectedSize) {
+            final errorType = actualSize < expectedSize
+                ? CompilerError.missingArguments
+                : CompilerError.tooManyArguments;
+            return Error([
+              errorType(
+                'Invalid tuple size: Expected $expectedSize-tuple, got $actualSize-tuple.',
+                location:
+                    ErrorLocation(resourceId, expression.leftParenthesis.span),
+              ),
+            ]);
+          }
+
+          argumentsResult = expression.arguments
+              .map((it) => it.expression)
+              .zip<hir.CandyType,
+                      Result<hir.Expression, List<ReportedCompilerError>>>(
+                  expectedType.items,
+                  (argument, type) =>
+                      innerExpressionContext(expressionType: Some(type))
+                          .lowerUnambiguous(argument))
+              .toList()
+              .merge();
+        } else {
+          argumentsResult = expression.arguments
+              .map((it) =>
+                  innerExpressionContext().lowerUnambiguous(it.expression))
+              .toList()
+              .merge();
+        }
+        if (argumentsResult is Error) return argumentsResult;
+        final arguments = argumentsResult.value;
+
+        return Ok([hir.Expression.tuple(getId(expression), arguments)]);
+      }
+
       // Function call.
       if (target is hir.IdentifierExpression &&
           target.identifier is hir.PropertyIdentifier) {
