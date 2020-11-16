@@ -1,4 +1,4 @@
-public trait Result<Success, ErrorType>
+/*public trait Result<Success, ErrorType>
 /// The result of an operation that might fail.
 ///
 /// The following cases exist:
@@ -17,4 +17,4 @@ public class Error<ErrorType> {
 
   public let error: ErrorType
 }
-impl<Success, ErrorType> Error<ErrorType>: Result<Success, ErrorType>
+impl<Success, ErrorType> Error<ErrorType>: Result<Success, ErrorType>*/
