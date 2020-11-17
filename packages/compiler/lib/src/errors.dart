@@ -66,6 +66,8 @@ abstract class CompilerError implements _$CompilerError {
       CompilerError._create('returnNotInFunction');
   static const undefinedIdentifier =
       CompilerError._create('undefinedIdentifier');
+  static const unexpectedNamedArgument =
+      CompilerError._create('unexpectedNamedArgument');
   static const unexpectedPositionalArgument =
       CompilerError._create('unexpectedPositionalArgument');
   static const unknownInnerDeclaration =

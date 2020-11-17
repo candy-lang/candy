@@ -51,6 +51,9 @@ abstract class KeywordToken extends Token implements _$KeywordToken {
   const factory KeywordToken.while_({@required SourceSpan span}) =
       WhileKeywordToken;
   // ignore: non_constant_identifier_names
+  const factory KeywordToken.for_({@required SourceSpan span}) =
+      ForKeywordToken;
+  // ignore: non_constant_identifier_names
   const factory KeywordToken.return_({@required SourceSpan span}) =
       ReturnKeywordToken;
   // ignore: non_constant_identifier_names

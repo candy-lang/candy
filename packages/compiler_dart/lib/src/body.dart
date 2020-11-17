@@ -136,6 +136,11 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           'Invalid reflection target for Dart compiler: `$id`.',
         );
       },
+      tuple: () {
+        throw CompilerError.internalError(
+          'Tried compiling a reference to `Tuple` directly.',
+        );
+      },
       parameter: (id, name, _) {
         if (name == 'this') {
           final expression = getExpression(context, id);
@@ -555,6 +560,50 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       ];
 
   @override
+  List<dart.Code> visitForExpression(ForExpression node) {
+    final iteratorName = '${_name(node.id)}_iterator';
+    final rawItemName = '${_name(node.id)}_rawItem';
+    return [
+      dart.literalNull
+          .assignVar(_name(node.id), compileType(context, node.type))
+          .statement,
+      ...node.iterable.accept(this),
+      _refer(node.iterable.id)
+          .property('iterator')
+          .call([], {}, [])
+          .assignFinal(iteratorName)
+          .statement,
+      dart.Code('${_label(node.id)}:\nwhile (true) {'),
+      dart
+          .refer(iteratorName)
+          .property('next')
+          .call([], {}, [])
+          .assignFinal(rawItemName)
+          .statement,
+      dart
+          .refer(rawItemName)
+          .isA(
+            dart.refer(
+              'None',
+              moduleIdToImportUrl(
+                context,
+                ModuleId.corePrimitives.nested(['maybe']),
+              ),
+            ),
+          )
+          .ifStatement(dart.Code('break;')),
+      dart
+          .refer(rawItemName)
+          .asA(compileType(context, CandyType.some(node.itemType)))
+          .property('value')
+          .assignFinal(node.variableName)
+          .statement,
+      for (final expression in node.body) ...expression.accept(this),
+      dart.Code('}'),
+    ];
+  }
+
+  @override
   List<dart.Code> visitBreakExpression(BreakExpression node) => [
         if (node.expression != null) ...[
           ...node.expression.accept(this),
@@ -671,6 +720,21 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     );
   }
 
+  @override
+  List<dart.Code> visitTupleExpression(TupleExpression node) {
+    return [
+      for (final argument in node.arguments) ...argument.accept(this),
+      _save(
+        node,
+        compileType(context, node.type).call(
+          node.arguments.map((it) => _refer(it.id)).toList(),
+          {},
+          [],
+        ),
+      ),
+    ];
+  }
+
   static String _name(DeclarationLocalId id) => '_${id.value}';
   static dart.Expression _refer(DeclarationLocalId id) => dart.refer(_name(id));
   dart.Code _save(
@@ -735,6 +799,14 @@ extension on dart.Expression {
       assign(other.type == CandyType.unit
           ? dart.literalNull
           : DartExpressionVisitor._refer(other.id));
+
+  dart.Code ifStatement(dart.Code body) => dart.Block.of([
+        const dart.Code('if ('),
+        code,
+        const dart.Code(') {'),
+        body,
+        const dart.Code('}'),
+      ]);
 }
 
 extension on dart.Method {
