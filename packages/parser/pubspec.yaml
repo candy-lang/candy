@@ -1,6 +1,6 @@
 name: parser
 description: "🍭 Source code parser for the Candy language"
-version: 0.0.1
+version: 0.1.0
 homepage: https://github.com/JonasWanke/candy
 
 environment:
