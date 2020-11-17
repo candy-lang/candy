@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart' hide srcDirectoryName;
 import 'package:dart_style/dart_style.dart';
 
+import '../body.dart';
 import '../builtins.dart';
 import '../constants.dart';
 import '../utils.dart';
@@ -25,14 +26,60 @@ final compileModule = Query<ModuleId, Unit>(
       }
     });
 
-    final source = _dartFmt.format(
-      library.accept(FancyDartEmitter(_PrefixedAllocator())).toString(),
-    );
-    context.config.buildArtifactManager.setContent(
-      context,
-      moduleIdToBuildArtifactId(context, moduleId),
-      source,
-    );
+    if (library.body.isNotEmpty) {
+      final source = _dartFmt.format(
+        library.accept(FancyDartEmitter(_PrefixedAllocator())).toString(),
+      );
+      context.config.buildArtifactManager.setContent(
+        context,
+        moduleIdToBuildArtifactId(context, moduleId),
+        source,
+      );
+    }
+
+    compileModuleTests(context, moduleId);
+
+    return Unit();
+  },
+);
+final compileModuleTests = Query<ModuleId, Unit>(
+  'dart.compileModuleTests',
+  evaluateAlways: true,
+  provider: (context, moduleId) {
+    final module = getModuleDeclarationHir(context, moduleId);
+
+    final testFunctions = module.innerDeclarationIds
+        .where((it) => it.isFunction)
+        .where((it) => getFunctionDeclarationHir(context, it).isTest)
+        .map((it) => Tuple2(it, compileBody(context, it)))
+        .where((it) => it.second is Some)
+        .map((it) {
+      final id = it.first;
+      final code = it.second.value;
+
+      return dart.refer('test', packageTestUrl).call(
+        [
+          dart.literalString(id.simplePath.last.nameOrNull),
+          dart.Method((b) => b.body = code).closure,
+        ],
+        {},
+        [],
+      ).statement;
+    });
+    if (testFunctions.isNotEmpty) {
+      final mainFunction = dart.Method((b) => b
+        ..name = 'main'
+        ..body = dart.Block((b) => b.statements.addAll(testFunctions)));
+      final library = dart.Library((b) => b..body.add(mainFunction));
+      final source = _dartFmt.format(
+        library.accept(FancyDartEmitter(_PrefixedAllocator())).toString(),
+      );
+      context.config.buildArtifactManager.setContent(
+        context,
+        moduleIdToTestBuildArtifactId(context, moduleId),
+        source,
+      );
+    }
 
     return Unit();
   },
@@ -45,6 +92,16 @@ final moduleIdToBuildArtifactId = Query<ModuleId, BuildArtifactId>(
     return moduleId.packageId.dartBuildArtifactId
         .child(libDirectoryName)
         .child(srcDirectoryName)
+        .child('${moduleId.path.join('/')}$dartFileExtension');
+  },
+);
+final moduleIdToTestBuildArtifactId = Query<ModuleId, BuildArtifactId>(
+  'dart.moduleIdToTestBuildArtifactId',
+  evaluateAlways: true,
+  provider: (context, moduleId) {
+    return moduleId.packageId.dartBuildArtifactId
+        .child(libDirectoryName)
+        .child(testDirectoryName)
         .child('${moduleId.path.join('/')}$dartFileExtension');
   },
 );

@@ -91,6 +91,8 @@ abstract class ModifierToken extends Token implements _$ModifierToken {
       ConstModifierToken;
   const factory ModifierToken.data({@required SourceSpan span}) =
       DataModifierToken;
+  const factory ModifierToken.test({@required SourceSpan span}) =
+      TestModifierToken;
   const ModifierToken._();
 
   @override

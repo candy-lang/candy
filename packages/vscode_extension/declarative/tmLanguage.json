@@ -229,7 +229,7 @@
           "name": "keyword.other.module.candy"
         },
         {
-          "match": "(?<!\\$)\\b(data|late|mut|public|static)\\b(?!\\$)",
+          "match": "(?<!\\$)\\b(data|late|mut|public|static|test)\\b(?!\\$)",
           "name": "storage.modifier.candy"
         },
         {
