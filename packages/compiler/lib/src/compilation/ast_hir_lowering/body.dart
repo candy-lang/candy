@@ -400,8 +400,7 @@ abstract class Context {
   ) {
     final result = lower(expression);
     if (result is Error) return Error(result.error);
-    final lowered =
-        result.value.distinctBy((it) => it.id.declarationId).toList();
+    final lowered = result.value.toList();
 
     if (lowered.isEmpty) {
       assert(expressionType is Some);
@@ -419,8 +418,7 @@ abstract class Context {
           relatedInformation: [
             for (final it in lowered)
               ErrorRelatedInformation(
-                message: 'This is one of the ambigous options: '
-                    '${it.id.declarationId}',
+                message: 'This is one of the ambigous options: $it',
                 location: ErrorLocation(it.id.declarationId.resourceId),
               ),
           ],
@@ -1638,6 +1636,16 @@ extension on Context {
               );
             }
           })
+          // If one method is defined in multiple places, but is actually the
+          // same one (like `next`, which is defined on both `ArrayList` and
+          // `Iterator`), the expression would be ambiguous. So, for now we work
+          // around this by only considering methods ambigious defined in the
+          // same group (and we just choose the first group, whatever that might
+          // be).
+          .groupBy((it) => it.id.parent)
+          .entries
+          .first
+          .value
           .toList();
     }
 
