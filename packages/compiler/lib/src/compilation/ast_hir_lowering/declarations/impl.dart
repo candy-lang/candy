@@ -127,7 +127,6 @@ final getAllImpl = Query<Unit, List<DeclarationId>>(
   provider: (context, declarationId) {
     return getAllDependencies(context, Unit())
         .followedBy([
-          PackageId.core,
           if (context.config.packageId != PackageId.core)
             context.config.packageId,
         ])
@@ -136,6 +135,7 @@ final getAllImpl = Query<Unit, List<DeclarationId>>(
         .where((resourceId) => resourceId.isCandySourceFile)
         .expand((resourceId) =>
             _getImplDeclarationIds(context, DeclarationId(resourceId)))
+        .distinct()
         .toList();
   },
 );
