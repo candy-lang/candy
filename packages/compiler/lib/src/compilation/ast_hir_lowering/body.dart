@@ -1639,7 +1639,7 @@ extension on Context {
           // If one method is defined in multiple places, but is actually the
           // same one (like `next`, which is defined on both `ArrayList` and
           // `Iterator`), the expression would be ambiguous. So, for now we work
-          // around this by only considering methods ambigious defined in the
+          // around this by only considering methods ambiguous defined in the
           // same group (and we just choose the first group, whatever that might
           // be).
           .groupBy((it) => it.id.parent)
