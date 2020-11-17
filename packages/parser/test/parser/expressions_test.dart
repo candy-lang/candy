@@ -2,7 +2,6 @@ import 'package:meta/meta.dart';
 import 'package:parser/parser.dart';
 import 'package:parser/src/lexer/lexer.dart';
 import 'package:parser/src/parser/ast/expressions/expressions.dart';
-import 'package:parser/src/parser/ast/statements.dart';
 import 'package:parser/src/parser/ast/types.dart';
 import 'package:parser/src/parser/grammar.dart';
 import 'package:parser/src/source_span.dart';
@@ -10,7 +9,6 @@ import 'package:parser/src/syntactic_entity.dart';
 import 'package:petitparser/parser.dart';
 import 'package:test/test.dart';
 
-import 'statements_test.dart';
 import 'types_test.dart';
 import 'utils.dart';
 
@@ -58,65 +56,14 @@ void main() {
               OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(1, 2)),
         ),
         '{ it }': LambdaLiteral(
-          1,
+          2,
           leftBrace:
               OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(0, 1)),
-          statements: [
-            Identifier(0, IdentifierToken('it', span: SourceSpan(2, 4))),
+          expressions: [
+            Identifier(1, IdentifierToken('it', span: SourceSpan(2, 4))),
           ],
           rightBrace:
               OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(5, 6)),
-        ),
-        '{ foo => foo }': LambdaLiteral(
-          1,
-          leftBrace:
-              OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(0, 1)),
-          valueParameters: [
-            ValueParameter(
-              name: IdentifierToken('foo', span: SourceSpan(2, 5)),
-            ),
-          ],
-          arrow: OperatorToken(
-            OperatorTokenType.equalsGreater,
-            span: SourceSpan(6, 8),
-          ),
-          statements: [
-            Identifier(0, IdentifierToken('foo', span: SourceSpan(9, 12))),
-          ],
-          rightBrace:
-              OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(13, 14)),
-        ),
-        '{ foo: Foo, bar => foo }': LambdaLiteral(
-          1,
-          leftBrace:
-              OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(0, 1)),
-          valueParameters: [
-            ValueParameter(
-              name: IdentifierToken('foo', span: SourceSpan(2, 5)),
-              colon: OperatorToken(
-                OperatorTokenType.colon,
-                span: SourceSpan(5, 6),
-              ),
-              type: UserType(simpleTypes: [
-                SimpleUserType(IdentifierToken('Foo', span: SourceSpan(7, 10))),
-              ]),
-            ),
-            ValueParameter(
-              name: IdentifierToken('bar', span: SourceSpan(12, 15)),
-            ),
-          ],
-          valueParameterCommata: [
-            OperatorToken(OperatorTokenType.comma, span: SourceSpan(10, 11)),
-          ],
-          arrow: OperatorToken(
-            OperatorTokenType.equalsGreater,
-            span: SourceSpan(16, 18),
-          ),
-          statements: [
-            Identifier(0, IdentifierToken('foo', span: SourceSpan(19, 22))),
-          ],
-          rightBrace:
-              OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(23, 24)),
         ),
       },
       nodeMapper: (value, _) => value,
@@ -394,117 +341,42 @@ void main() {
   tableTestExpressionParser<IfExpression, IfExpression>(
     'if',
     table: {
-      'if (true) 123': IfExpression(
-        3,
-        ifKeyword: KeywordToken.if_(span: SourceSpan(0, 2)) as IfKeywordToken,
-        condition: GroupExpression(
-          1,
-          leftParenthesis:
-              OperatorToken(OperatorTokenType.lparen, span: SourceSpan(3, 4)),
-          expression: Literal<bool>(
-            0,
-            BoolLiteralToken(true, span: SourceSpan(4, 8)),
-          ),
-          rightParenthesis:
-              OperatorToken(OperatorTokenType.rparen, span: SourceSpan(8, 9)),
-        ),
-        thenStatement: createStatement123(2, 10),
-      ),
       'if true { 123 }': IfExpression(
         3,
         ifKeyword: KeywordToken.if_(span: SourceSpan(0, 2)) as IfKeywordToken,
         condition:
             Literal<bool>(0, BoolLiteralToken(true, span: SourceSpan(3, 7))),
-        thenStatement: Block(
-          3,
+        thenBody: LambdaLiteral(
+          2,
           leftBrace:
               OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(8, 9)),
-          statements: [createStatement123(2, 10)],
+          expressions: [createExpression(1, 10)],
           rightBrace:
               OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(14, 15)),
         ),
-      ),
-      'if (true) 123 else 123': IfExpression(
-        4,
-        ifKeyword: KeywordToken.if_(span: SourceSpan(0, 2)) as IfKeywordToken,
-        condition: GroupExpression(
-          1,
-          leftParenthesis:
-              OperatorToken(OperatorTokenType.lparen, span: SourceSpan(3, 4)),
-          expression: Literal<bool>(
-            0,
-            BoolLiteralToken(true, span: SourceSpan(4, 8)),
-          ),
-          rightParenthesis:
-              OperatorToken(OperatorTokenType.rparen, span: SourceSpan(8, 9)),
-        ),
-        thenStatement: createStatement123(2, 10),
-        elseKeyword:
-            KeywordToken.else_(span: SourceSpan(14, 18)) as ElseKeywordToken,
-        elseStatement: createStatement123(3, 19),
       ),
       'if true { 123 } else { 123 }': IfExpression(
         5,
         ifKeyword: KeywordToken.if_(span: SourceSpan(0, 2)) as IfKeywordToken,
         condition:
             Literal<bool>(0, BoolLiteralToken(true, span: SourceSpan(3, 7))),
-        thenStatement: Block(
-          0,
+        thenBody: LambdaLiteral(
+          2,
           leftBrace:
               OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(8, 9)),
-          statements: [createStatement123(10)],
+          expressions: [createExpression(1, 10)],
           rightBrace:
               OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(14, 15)),
         ),
         elseKeyword:
             KeywordToken.else_(span: SourceSpan(16, 20)) as ElseKeywordToken,
-        elseStatement: Block(
-          0,
+        elseBody: LambdaLiteral(
+          4,
           leftBrace:
               OperatorToken(OperatorTokenType.lcurl, span: SourceSpan(21, 22)),
-          statements: [createStatement123(23)],
+          expressions: [createExpression(3, 23)],
           rightBrace:
               OperatorToken(OperatorTokenType.rcurl, span: SourceSpan(27, 28)),
-        ),
-      ),
-      'if (true) 123 else if false { 123 } else 123': IfExpression(
-        0,
-        ifKeyword: KeywordToken.if_(span: SourceSpan(0, 2)) as IfKeywordToken,
-        condition: GroupExpression(
-          0,
-          leftParenthesis:
-              OperatorToken(OperatorTokenType.lparen, span: SourceSpan(3, 4)),
-          expression:
-              Literal<bool>(0, BoolLiteralToken(true, span: SourceSpan(4, 8))),
-          rightParenthesis:
-              OperatorToken(OperatorTokenType.rparen, span: SourceSpan(8, 9)),
-        ),
-        thenStatement: createStatement123(10),
-        elseKeyword:
-            KeywordToken.else_(span: SourceSpan(14, 18)) as ElseKeywordToken,
-        elseStatement: IfExpression(
-          0,
-          ifKeyword:
-              KeywordToken.if_(span: SourceSpan(19, 21)) as IfKeywordToken,
-          condition: Literal<bool>(
-            0,
-            BoolLiteralToken(false, span: SourceSpan(22, 27)),
-          ),
-          thenStatement: Block(
-            0,
-            leftBrace: OperatorToken(
-              OperatorTokenType.lcurl,
-              span: SourceSpan(28, 29),
-            ),
-            statements: [createStatement123(30)],
-            rightBrace: OperatorToken(
-              OperatorTokenType.rcurl,
-              span: SourceSpan(34, 35),
-            ),
-          ),
-          elseKeyword:
-              KeywordToken.else_(span: SourceSpan(36, 40)) as ElseKeywordToken,
-          elseStatement: createStatement123(41),
         ),
       ),
     },
@@ -596,6 +468,13 @@ final validIdentifiers = [
   '_______________________________',
   '_______________________________123',
 ];
+
+Expression createExpression(int id, [int offset = 0]) {
+  return Literal<int>(
+    id,
+    IntLiteralToken(123, span: SourceSpan.fromStartLength(offset, 3)),
+  );
+}
 
 typedef PrimitiveFactory = Expression Function(int startOffset);
 typedef PrimitiveTester = void Function(
