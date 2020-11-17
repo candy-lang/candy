@@ -62,10 +62,12 @@ abstract class AstVisitor<R> {
   R visitCallExpression(CallExpression node);
   R visitArgument(Argument node);
   R visitIndexExpression(IndexExpression node);
+  R visitAsExpression(AsExpression node);
   R visitIsExpression(IsExpression node);
   R visitIfExpression(IfExpression node);
   R visitLoopExpression(LoopExpression node);
   R visitWhileExpression(WhileExpression node);
+  R visitForExpression(ForExpression node);
   R visitReturnExpression(ReturnExpression node);
   R visitBreakExpression(BreakExpression node);
   R visitContinueExpression(ContinueExpression node);
@@ -188,6 +190,8 @@ abstract class GeneralizingAstVisitor<R> extends AstVisitor<R> {
   @override
   R visitIndexExpression(IndexExpression node) => visitExpression(node);
   @override
+  R visitAsExpression(AsExpression node) => visitExpression(node);
+  @override
   R visitIsExpression(IsExpression node) => visitExpression(node);
   @override
   R visitIfExpression(IfExpression node) => visitExpression(node);
@@ -195,6 +199,8 @@ abstract class GeneralizingAstVisitor<R> extends AstVisitor<R> {
   R visitLoopExpression(LoopExpression node) => visitExpression(node);
   @override
   R visitWhileExpression(WhileExpression node) => visitExpression(node);
+  @override
+  R visitForExpression(ForExpression node) => visitExpression(node);
   @override
   R visitReturnExpression(ReturnExpression node) => visitExpression(node);
   @override

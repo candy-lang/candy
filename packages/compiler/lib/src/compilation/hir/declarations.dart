@@ -46,6 +46,7 @@ abstract class Declaration implements _$Declaration {
 
   const factory Declaration.function({
     @required bool isStatic,
+    @required bool isTest,
     @required String name,
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
     @Default(<ValueParameter>[]) List<ValueParameter> valueParameters,

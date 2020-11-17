@@ -1,8 +1,6 @@
 import 'dart:async';
 
 import 'package:compiler/compiler.dart';
-import 'package:parser/parser.dart' show NodeFinderVisitor, SourceSpan;
-import 'package:parser/parser.dart' as ast;
 
 import '../analysis_server.dart';
 import '../generated/lsp_protocol/protocol_generated.dart';

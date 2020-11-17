@@ -288,6 +288,23 @@ abstract class IndexExpression extends Expression implements _$IndexExpression {
 }
 
 @freezed
+abstract class AsExpression extends Expression implements _$AsExpression {
+  const factory AsExpression(
+    int id, {
+    @required Expression instance,
+    @required OperatorToken asOperator,
+    @required Type type,
+  }) = _AsExpression;
+  const AsExpression._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitAsExpression(this);
+
+  @override
+  Iterable<SyntacticEntity> get children => [instance, asOperator, type];
+}
+
+@freezed
 abstract class IsExpression extends Expression implements _$IsExpression {
   const factory IsExpression(
     int id, {
@@ -362,6 +379,26 @@ abstract class WhileExpression extends Expression implements _$WhileExpression {
 
   @override
   Iterable<SyntacticEntity> get children => [whileKeyword, condition, body];
+}
+
+@freezed
+abstract class ForExpression extends Expression implements _$ForExpression {
+  const factory ForExpression(
+    int id, {
+    @required ForKeywordToken forKeyword,
+    @required IdentifierToken variable,
+    @required OperatorToken inKeyword,
+    @required Expression iterable,
+    @required LambdaLiteral body,
+  }) = _ForExpression;
+  const ForExpression._();
+
+  @override
+  R accept<R>(AstVisitor<R> visitor) => visitor.visitForExpression(this);
+
+  @override
+  Iterable<SyntacticEntity> get children =>
+      [forKeyword, variable, inKeyword, iterable, body];
 }
 
 @freezed

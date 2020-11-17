@@ -35,6 +35,8 @@ final compileDeclaration = Query<DeclarationId, List<dart.Spec>>(
       // from [Spec].
       return [];
     } else if (declarationId.isFunction) {
+      final functionHir = getFunctionDeclarationHir(context, declarationId);
+      if (functionHir.isTest) return [];
       return [compileFunction(context, declarationId)];
     } else if (declarationId.isProperty) {
       return [compileProperty(context, declarationId)];

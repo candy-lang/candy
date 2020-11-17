@@ -194,6 +194,18 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
+  Option<hir.Expression> visitForExpression(hir.ForExpression node) {
+    if (node.id == id) return Some(node);
+    final result = node.iterable.accept(this);
+    if (result is Some) return result;
+    for (final expression in node.body) {
+      final result = expression.accept(this);
+      if (result is Some) return result;
+    }
+    return None();
+  }
+
+  @override
   Option<hir.Expression> visitBreakExpression(hir.BreakExpression node) {
     if (node.id == id) return Some(node);
     if (node.expression != null) return node.expression.accept(this);
@@ -221,9 +233,25 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
+  Option<hir.Expression> visitAsExpression(hir.AsExpression node) {
+    if (node.id == id) return Some(node);
+    return node.instance.accept(this);
+  }
+
+  @override
   Option<hir.Expression> visitIsExpression(hir.IsExpression node) {
     if (node.id == id) return Some(node);
     return node.instance.accept(this);
+  }
+
+  @override
+  Option<hir.Expression> visitTupleExpression(hir.TupleExpression node) {
+    if (node.id == id) return Some(node);
+    for (final expression in node.arguments) {
+      final result = expression.accept(this);
+      if (result is Some) return result;
+    }
+    return None();
   }
 }
 
@@ -345,6 +373,8 @@ abstract class Context {
       result = lowerLoop(expression);
     } else if (expression is ast.WhileExpression) {
       result = lowerWhile(expression);
+    } else if (expression is ast.ForExpression) {
+      result = lowerFor(expression);
     } else if (expression is ast.BreakExpression) {
       result = lowerBreak(expression);
     } else if (expression is ast.ContinueExpression) {
@@ -355,6 +385,8 @@ abstract class Context {
       result = lowerPrefixExpression(expression);
     } else if (expression is ast.BinaryExpression) {
       result = lowerBinaryExpression(expression);
+    } else if (expression is ast.AsExpression) {
+      result = lowerAsExpression(expression);
     } else if (expression is ast.IsExpression) {
       result = lowerIsExpression(expression);
     } else {
@@ -410,8 +442,7 @@ abstract class Context {
           relatedInformation: [
             for (final it in lowered)
               ErrorRelatedInformation(
-                message: 'This is one of the ambigous options: '
-                    '${it.id.declarationId}',
+                message: 'This is one of the ambigous options: $it',
                 location: ErrorLocation(it.id.declarationId.resourceId),
               ),
           ],
@@ -754,6 +785,8 @@ class ContextContext extends Context {
       }
     }
 
+    if (name == 'Tuple') return [hir.Identifier.tuple()];
+
     // search use-lines
     return findIdentifierInUseLines(
       queryContext,
@@ -1074,23 +1107,26 @@ class LoopContext extends InnerContext {
   LoopContext(
     Context parent,
     this.id,
-    this.label,
-  )   : assert(id != null),
+    this.label, {
+    Map<String, hir.Identifier> identifiers = const {},
+  })  : assert(id != null),
         assert(label != null),
+        assert(identifiers != null),
+        identifiers = Map.from(identifiers),
         super(parent);
 
   final DeclarationLocalId id;
   final Option<String> label;
-  final _identifiers = <String, hir.Identifier>{};
+  final Map<String, hir.Identifier> identifiers;
 
   @override
   void addIdentifier(hir.LocalPropertyIdentifier identifier) {
-    _identifiers[identifier.name] = identifier;
+    identifiers[identifier.name] = identifier;
   }
 
   @override
   List<hir.Identifier> resolveIdentifier(String name) {
-    final result = _identifiers[name];
+    final result = identifiers[name];
     if (result != null) return [result];
     return parent.value.resolveIdentifier(name);
   }
@@ -1445,6 +1481,55 @@ extension on Context {
     ]);
   }
 
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerFor(
+    ast.ForExpression forLoop,
+  ) {
+    final loweredIterable =
+        innerExpressionContext().lowerUnambiguous(forLoop.iterable);
+    if (loweredIterable is Error) return loweredIterable.mapValue((e) => [e]);
+    final iterable = loweredIterable.value;
+
+    final iterableType = iterable.type;
+    const supportedCollectionTypesModuleIds = [
+      hir.CandyType.iterableModuleId,
+      hir.CandyType.listModuleId,
+    ];
+    if (iterableType is! hir.UserCandyType ||
+        !supportedCollectionTypesModuleIds
+            .contains((iterableType as hir.UserCandyType).virtualModuleId)) {
+      return Error([
+        CompilerError.unsupportedFeature(
+          'For-loops only support collections with a static type of `Iterable<T>` or `List<T>`, was: ${(iterableType as hir.UserCandyType).virtualModuleId}.',
+          location: ErrorLocation(resourceId, forLoop.iterable.span),
+        ),
+      ]);
+    }
+
+    final variableName = forLoop.variable.name;
+    final itemType = (iterableType as hir.UserCandyType).arguments.single;
+    final loopContext = LoopContext(
+      this,
+      getId(forLoop),
+      None(),
+      identifiers: {
+        variableName:
+            hir.Identifier.parameter(getId(forLoop), variableName, itemType),
+      },
+    );
+
+    final loweredBody = forLoop.body.expressions.map((expression) {
+      return loopContext
+          .innerExpressionContext(forwardsIdentifiers: true)
+          .lowerUnambiguous(expression);
+    }).merge();
+    if (loweredBody is Error) return loweredBody;
+    final body = loweredBody.value;
+
+    return Ok([
+      hir.ForExpression(getId(forLoop), variableName, itemType, iterable, body),
+    ]);
+  }
+
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerProperty(
     ast.PropertyDeclarationExpression expression,
   ) {
@@ -1629,6 +1714,16 @@ extension on Context {
               );
             }
           })
+          // If one method is defined in multiple places, but is actually the
+          // same one (like `next`, which is defined on both `ArrayList` and
+          // `Iterator`), the expression would be ambiguous. So, for now we work
+          // around this by only considering methods ambiguous defined in the
+          // same group (and we just choose the first group, whatever that might
+          // be).
+          .groupBy((it) => it.id.parent)
+          .entries
+          .first
+          .value
           .toList();
     }
 
@@ -1824,7 +1919,76 @@ extension on Context {
     final targetVariants = innerExpressionContext().lower(expression.target);
     if (targetVariants is Error) return targetVariants;
 
-    final results = targetVariants.value.map((target) {
+    final results = targetVariants.value
+        .map<Result<List<hir.Expression>, List<ReportedCompilerError>>>(
+            (target) {
+      // Tuple constructor.
+      if (target is hir.IdentifierExpression &&
+          target.identifier is hir.TupleIdentifier) {
+        final invalidArguments = expression.arguments.where((it) => it.isNamed);
+        if (invalidArguments.isNotEmpty) {
+          return Error([
+            CompilerError.unexpectedNamedArgument(
+              "Tuples can't be created with named arguments.",
+              location: ErrorLocation(resourceId, invalidArguments.first.span),
+            ),
+          ]);
+        }
+
+        if (expression.arguments.length < 2) {
+          return Error([
+            CompilerError.missingArguments(
+              'Tuples must have at least two elements.',
+              location:
+                  ErrorLocation(resourceId, expression.leftParenthesis.span),
+            ),
+          ]);
+        }
+
+        Result<List<hir.Expression>, List<ReportedCompilerError>>
+            argumentsResult;
+        if (expressionType is Some &&
+            expressionType.value is hir.TupleCandyType) {
+          final expectedType = expressionType.value as hir.TupleCandyType;
+          final expectedSize = expectedType.items.length;
+          final actualSize = expression.arguments.length;
+
+          if (actualSize != expectedSize) {
+            final errorType = actualSize < expectedSize
+                ? CompilerError.missingArguments
+                : CompilerError.tooManyArguments;
+            return Error([
+              errorType(
+                'Invalid tuple size: Expected $expectedSize-tuple, got $actualSize-tuple.',
+                location:
+                    ErrorLocation(resourceId, expression.leftParenthesis.span),
+              ),
+            ]);
+          }
+
+          argumentsResult = expression.arguments
+              .map((it) => it.expression)
+              .zip<hir.CandyType,
+                      Result<hir.Expression, List<ReportedCompilerError>>>(
+                  expectedType.items,
+                  (argument, type) =>
+                      innerExpressionContext(expressionType: Some(type))
+                          .lowerUnambiguous(argument))
+              .toList()
+              .merge();
+        } else {
+          argumentsResult = expression.arguments
+              .map((it) =>
+                  innerExpressionContext().lowerUnambiguous(it.expression))
+              .toList()
+              .merge();
+        }
+        if (argumentsResult is Error) return argumentsResult;
+        final arguments = argumentsResult.value;
+
+        return Ok([hir.Expression.tuple(getId(expression), arguments)]);
+      }
+
       // Function call.
       if (target is hir.IdentifierExpression &&
           target.identifier is hir.PropertyIdentifier) {
@@ -2464,6 +2628,27 @@ extension on Context {
         ),
       ]);
     }
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerAsExpression(
+    ast.AsExpression expression,
+  ) {
+    final instanceResult =
+        innerExpressionContext().lowerUnambiguous(expression.instance);
+    if (instanceResult is Error) return Error(instanceResult.error);
+    final instance = instanceResult.value;
+
+    final type =
+        astTypeToHirType(queryContext, Tuple2(declarationId, expression.type))
+            .bakeThisType(thisType.valueOrNull);
+
+    return Ok([
+      hir.Expression.as_(
+        getId(expression),
+        instance,
+        type,
+      ),
+    ]);
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerIsExpression(
