@@ -146,8 +146,12 @@ Option<hir.CandyType /*hir.UserCandyType | hir.ParameterCandyType */ >
   DeclarationId declarationId,
   ast.UserType type,
 ) {
-  final result = _resolveAstUserTypeInParameters(context, declarationId, type);
-  if (result.isSome) return result;
+  if (type.simpleTypes.length == 1) {
+    final name = type.simpleTypes.first.name.name;
+    final result =
+        resolveAstUserTypeInParameters(context, Tuple2(declarationId, name));
+    if (result.isSome) return result;
+  }
 
   final resourceId = declarationId.resourceId;
   var currentModuleId = declarationIdToModuleId(context, declarationId);
@@ -196,51 +200,53 @@ Option<hir.CandyType /*hir.UserCandyType | hir.ParameterCandyType */ >
   return Option.none();
 }
 
-Option<hir.ParameterCandyType> _resolveAstUserTypeInParameters(
-  QueryContext context,
-  DeclarationId declarationId,
-  ast.UserType type,
-) {
-  if (type.simpleTypes.length != 1) return None();
-  final name = type.simpleTypes.single.name.name;
+final resolveAstUserTypeInParameters =
+    Query<Tuple2<DeclarationId, String>, Option<hir.ParameterCandyType>>(
+  'resolveAstUserTypeInParameters',
+  provider: (context, inputs) {
+    final declarationId = inputs.first;
+    final name = inputs.second;
 
-  final astTypeParameters = <Tuple2<DeclarationId, ast.TypeParameters>>[];
-  void addTypeParametersOf(DeclarationId id) {
-    if (id.isTrait) {
-      final traitAst = getTraitDeclarationAst(context, id);
-      if (traitAst.typeParameters != null) {
-        astTypeParameters.add(Tuple2(id, traitAst.typeParameters));
+    final astTypeParameters = <Tuple2<DeclarationId, ast.TypeParameters>>[];
+    void addTypeParametersOf(DeclarationId id) {
+      if (id.isTrait) {
+        final traitAst = getTraitDeclarationAst(context, id);
+        if (traitAst.typeParameters != null) {
+          astTypeParameters.add(Tuple2(id, traitAst.typeParameters));
+        }
+      } else if (id.isImpl) {
+        final implAst = getImplDeclarationAst(context, id);
+        if (implAst.typeParameters != null) {
+          astTypeParameters.add(Tuple2(id, implAst.typeParameters));
+        }
+      } else if (id.isClass) {
+        final classAst = getClassDeclarationAst(context, id);
+        if (classAst.typeParameters != null) {
+          astTypeParameters.add(Tuple2(id, classAst.typeParameters));
+        }
+      } else if (id.isProperty) {
+        final propertyAst = getPropertyDeclarationAst(context, id);
+        if (!propertyAst.isStatic && id.hasParent)
+          addTypeParametersOf(id.parent);
+      } else if (id.isFunction) {
+        final functionAst = getFunctionDeclarationAst(context, id);
+        if (functionAst.typeParameters != null) {
+          astTypeParameters.add(Tuple2(id, functionAst.typeParameters));
+        }
+        if (!functionAst.isStatic && id.hasParent)
+          addTypeParametersOf(id.parent);
       }
-    } else if (id.isImpl) {
-      final implAst = getImplDeclarationAst(context, id);
-      if (implAst.typeParameters != null) {
-        astTypeParameters.add(Tuple2(id, implAst.typeParameters));
-      }
-    } else if (id.isClass) {
-      final classAst = getClassDeclarationAst(context, id);
-      if (classAst.typeParameters != null) {
-        astTypeParameters.add(Tuple2(id, classAst.typeParameters));
-      }
-    } else if (id.isProperty) {
-      final propertyAst = getPropertyDeclarationAst(context, id);
-      if (!propertyAst.isStatic && id.hasParent) addTypeParametersOf(id.parent);
-    } else if (id.isFunction) {
-      final functionAst = getFunctionDeclarationAst(context, id);
-      if (functionAst.typeParameters != null) {
-        astTypeParameters.add(Tuple2(id, functionAst.typeParameters));
-      }
-      if (!functionAst.isStatic && id.hasParent) addTypeParametersOf(id.parent);
     }
-  }
 
-  final typeParameters = astTypeParameters.expand(
-      (t) => t.second.parameters.map((p) => Tuple2(t.first, p.name.name)));
+    final typeParameters = astTypeParameters.expand(
+        (t) => t.second.parameters.map((p) => Tuple2(t.first, p.name.name)));
 
-  addTypeParametersOf(declarationId);
+    addTypeParametersOf(declarationId);
 
-  final matches = typeParameters.where((t) => t.second == name);
-  if (matches.isNotEmpty) {
-    return Some(hir.ParameterCandyType(name, matches.first.first));
-  }
-  return None();
-}
+    final matches = typeParameters.where((t) => t.second == name);
+    if (matches.isNotEmpty) {
+      return Some(hir.ParameterCandyType(name, matches.first.first));
+    }
+    return None();
+  },
+);

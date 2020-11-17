@@ -552,9 +552,13 @@ class ContextContext extends Context {
           queryContext,
           typeModuleId,
         ).isClass) return thisType.value;
-      } else if (parent.isTrait || parent.isImpl) {
+      }
+      if (parent.isTrait || parent.isImpl) {
         return hir.CandyType.this_();
       }
+      throw CompilerError.internalError(
+        '`thisTypeOrResolved` called while not in an instance.',
+      );
     }
 
     // resolve `this`
@@ -584,6 +588,14 @@ class ContextContext extends Context {
 
     // resolve `field` in a getter/setter
     // TODO(JonasWanke): resolve `field` in property accessors
+
+    final parameterType = resolveAstUserTypeInParameters(
+      queryContext,
+      Tuple2(declarationId, name),
+    );
+    if (parameterType is Some) {
+      return [hir.Identifier.meta(parameterType.value)];
+    }
 
     hir.Identifier convertDeclarationId(
       DeclarationId id, [
@@ -617,7 +629,13 @@ class ContextContext extends Context {
         return type.bakeGenerics(genericsMap);
       }
 
-      if (id.isModule || id.isTrait || id.isClass) {
+      if (id.isTrait) {
+        final traitHir = getTraitDeclarationHir(queryContext, id);
+        return hir.Identifier.meta(traitHir.thisType);
+      } else if (id.isClass) {
+        final classHir = getClassDeclarationHir(queryContext, id);
+        return hir.Identifier.meta(classHir.thisType);
+      } else if (id.isModule) {
         return hir.Identifier.reflection(id);
       } else if (id.isFunction) {
         final functionHir = getFunctionDeclarationHir(queryContext, id);
@@ -1845,7 +1863,9 @@ extension on Context {
 
       // Constructor call.
       if (target is hir.IdentifierExpression &&
-          target.identifier is hir.ReflectionIdentifier) {
+          target.identifier is hir.MetaIdentifier &&
+          (target.identifier as hir.MetaIdentifier).referencedType
+              is hir.UserCandyType) {
         // TODO(marcelgarus): Ensure this is a constructor call.
         return lowerConstructorCall(expression, target);
       }
@@ -2031,10 +2051,16 @@ extension on Context {
     hir.IdentifierExpression target,
   ) {
     assert(target != null);
-    assert(target.identifier is hir.ReflectionIdentifier,
-        'target.identifier is not a `ReflectionIdentifier`: ${target.identifier}');
+    assert(
+      target.identifier is hir.MetaIdentifier,
+      'target.identifier is not a `MetaIdentifier`: ${target.identifier}',
+    );
+    final identifier = target.identifier as hir.MetaIdentifier;
+    assert(identifier.referencedType is hir.UserCandyType);
+    final referencedType = identifier.referencedType as hir.UserCandyType;
 
-    final classId = (target.identifier as hir.ReflectionIdentifier).id;
+    final classId =
+        moduleIdToDeclarationId(queryContext, referencedType.virtualModuleId);
     // ignore: non_constant_identifier_names
     final class_ = getClassDeclarationHir(queryContext, classId);
 
