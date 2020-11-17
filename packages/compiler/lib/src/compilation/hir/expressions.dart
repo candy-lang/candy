@@ -107,6 +107,12 @@ abstract class Expression implements _$Expression {
     Expression right,
   ) = AssignmentExpression;
   // ignore: non_constant_identifier_names
+  const factory Expression.as_(
+    DeclarationLocalId id,
+    Expression instance,
+    CandyType typeToCheck,
+  ) = AsExpression;
+  // ignore: non_constant_identifier_names
   const factory Expression.is_(
     DeclarationLocalId id,
     Expression instance,
@@ -137,6 +143,7 @@ abstract class Expression implements _$Expression {
         continue_: (_) => CandyType.never,
         throw_: (_) => CandyType.never,
         assignment: (assignment) => assignment.right.type,
+        as_: (theAs) => theAs.typeToCheck,
         is_: (_) => CandyType.bool,
         tuple: (tuple) =>
             CandyType.tuple(tuple.arguments.map((it) => it.type).toList()),
@@ -159,6 +166,7 @@ abstract class Expression implements _$Expression {
         continue_: (e) => visitor.visitContinueExpression(e),
         throw_: (e) => visitor.visitThrowExpression(e),
         assignment: (e) => visitor.visitAssignmentExpression(e),
+        as_: (e) => visitor.visitAsExpression(e),
         is_: (e) => visitor.visitIsExpression(e),
         tuple: (e) => visitor.visitTupleExpression(e),
       );
@@ -288,6 +296,7 @@ abstract class ExpressionVisitor<T> {
   T visitContinueExpression(ContinueExpression node);
   T visitThrowExpression(ThrowExpression node);
   T visitAssignmentExpression(AssignmentExpression node);
+  T visitAsExpression(AsExpression node);
   T visitIsExpression(IsExpression node);
   T visitTupleExpression(TupleExpression node);
 }
@@ -327,6 +336,8 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   void visitThrowExpression(ThrowExpression node) {}
   @override
   void visitAssignmentExpression(AssignmentExpression node) {}
+  @override
+  void visitAsExpression(AsExpression node) {}
   @override
   void visitIsExpression(IsExpression node) {}
   @override

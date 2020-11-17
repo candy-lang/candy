@@ -233,6 +233,12 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
   }
 
   @override
+  Option<hir.Expression> visitAsExpression(hir.AsExpression node) {
+    if (node.id == id) return Some(node);
+    return node.instance.accept(this);
+  }
+
+  @override
   Option<hir.Expression> visitIsExpression(hir.IsExpression node) {
     if (node.id == id) return Some(node);
     return node.instance.accept(this);
@@ -379,6 +385,8 @@ abstract class Context {
       result = lowerPrefixExpression(expression);
     } else if (expression is ast.BinaryExpression) {
       result = lowerBinaryExpression(expression);
+    } else if (expression is ast.AsExpression) {
+      result = lowerAsExpression(expression);
     } else if (expression is ast.IsExpression) {
       result = lowerIsExpression(expression);
     } else {
@@ -434,8 +442,7 @@ abstract class Context {
           relatedInformation: [
             for (final it in lowered)
               ErrorRelatedInformation(
-                message: 'This is one of the ambigous options: '
-                    '${it.id.declarationId}',
+                message: 'This is one of the ambigous options: $it',
                 location: ErrorLocation(it.id.declarationId.resourceId),
               ),
           ],
@@ -1707,6 +1714,16 @@ extension on Context {
               );
             }
           })
+          // If one method is defined in multiple places, but is actually the
+          // same one (like `next`, which is defined on both `ArrayList` and
+          // `Iterator`), the expression would be ambiguous. So, for now we work
+          // around this by only considering methods ambiguous defined in the
+          // same group (and we just choose the first group, whatever that might
+          // be).
+          .groupBy((it) => it.id.parent)
+          .entries
+          .first
+          .value
           .toList();
     }
 
@@ -2611,6 +2628,27 @@ extension on Context {
         ),
       ]);
     }
+  }
+
+  Result<List<hir.Expression>, List<ReportedCompilerError>> lowerAsExpression(
+    ast.AsExpression expression,
+  ) {
+    final instanceResult =
+        innerExpressionContext().lowerUnambiguous(expression.instance);
+    if (instanceResult is Error) return Error(instanceResult.error);
+    final instance = instanceResult.value;
+
+    final type =
+        astTypeToHirType(queryContext, Tuple2(declarationId, expression.type))
+            .bakeThisType(thisType.valueOrNull);
+
+    return Ok([
+      hir.Expression.as_(
+        getId(expression),
+        instance,
+        type,
+      ),
+    ]);
   }
 
   Result<List<hir.Expression>, List<ReportedCompilerError>> lowerIsExpression(

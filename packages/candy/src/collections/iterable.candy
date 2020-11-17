@@ -110,9 +110,7 @@ public trait Iterable<Item> {
   }
 
   fun cast<Type>(): Iterable<Type> {
-    // TODO(marcelgarus): Enable as soon as "as" is supported.
-    // map<Type>({ it as Type })
-    todo("Implement cast.")
+    map<Type>({ it as Type })
   }
 
   // // TODO(marcelgarus): Maybe rename this to `indexed`?
