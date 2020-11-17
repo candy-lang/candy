@@ -24,6 +24,11 @@ final generatePubspec = Query<PackageId, PubSpec>(
                 .toPath(context, PackageId(dependency).dartBuildArtifactId),
           ),
       },
+      devDependencies: {
+        'test': HostedReference(
+          VersionConstraint.compatibleWith(Version(1, 15, 5)),
+        ),
+      },
       environment: Environment(
         VersionConstraint.parse('>=2.7.0 <3.0.0'),
         <dynamic, dynamic>{},

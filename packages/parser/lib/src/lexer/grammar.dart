@@ -220,6 +220,8 @@ class LexerGrammar {
       string('const').tokenize((_, span) => ModifierToken.const_(span: span));
   static final DATA =
       string('data').tokenize((_, span) => ModifierToken.data(span: span));
+  static final TEST =
+      string('test').tokenize((_, span) => ModifierToken.test(span: span));
 
   // SECTION: literals
 
