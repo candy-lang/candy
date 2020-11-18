@@ -20,7 +20,7 @@ abstract class BuiltinCompiler<Output> {
     if (moduleId == ModuleId.coreAssert) {
       if (name == 'assert') return compileAssert();
     } else if (moduleId ==
-        ModuleId.coreCollections.nested(['list', 'array', 'Array'])) {
+        ModuleId.coreCollections.nested(['collections', 'array', 'Array'])) {
       return compileArray();
     } else if (moduleId == ModuleId.corePrimitives.nested(['Any'])) {
       return compileAny();
