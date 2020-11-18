@@ -8,6 +8,7 @@ use ..iterable
 
 public trait Map<Key: Equals & Hash, Value> {
   fun isEmpty(): Bool { length() == 0 }
+  fun isNotEmpty(): Bool { !isEmpty() }
 
   fun get(key: Key): Maybe<Value>
   fun keys(): Iterable<Key>
