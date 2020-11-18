@@ -11,7 +11,8 @@ trait Hasher<Result> {
   /// A trait for hashing an arbitrary stream of bytes.
 
   fun write(value: Int /* Uint8 */)
-  fun write(value: List<Int> /* List<Uint8> */)
+  // TODO(marcelgarus): Rename this to `write` as soon as we have some kind of name mangling.
+  fun writeList(value: List<Int> /* List<Uint8> */)
 
   fun finish(): Result
 }
@@ -25,7 +26,7 @@ impl DefaultHasher: Hasher<Int> {
     entropy = (entropy + value) % 100
   }
 
-  fun write(value: List<Int>) {
+  fun writeList(value: List<Int>) {
     for item in value {
       write(item)
     }
