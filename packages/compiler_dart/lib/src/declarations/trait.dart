@@ -64,7 +64,6 @@ final Query<DeclarationId, List<dart.Spec>> compileTrait =
         types: typeParameters,
         on: traitHir.upperBounds.map((it) => compileType(context, it)).toList(),
         implements: [
-          ...implements,
           dart.TypeReference((b) => b
             ..symbol = name
             ..types.addAll(

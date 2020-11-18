@@ -1887,11 +1887,32 @@ extension on Context {
 
           final typeDeclarationId =
               moduleIdToDeclarationId(queryContext, userType.virtualModuleId);
+          // Only `IdentifierExpression`s containing a `MetaIdentifier` can
+          // lead to a reflection type.
+          final base = target as hir.IdentifierExpression;
+
+          if (name == 'randomSample' && userType == hir.CandyType.int) {
+            return Ok([
+              hir.Expression.identifier(
+                getId(expression),
+                hir.Identifier.property(
+                  typeDeclarationId.parent
+                      .inner(DeclarationPathData.impl('Int'))
+                      .inner(DeclarationPathData.function('randomSample')),
+                  hir.CandyType.function(
+                    parameterTypes: [hir.CandyType.randomSource],
+                    returnType: hir.CandyType.int,
+                  ),
+                  isMutable: false,
+                  base: base,
+                ),
+              ),
+            ]);
+          }
+
           return searchInnerDeclarationsOfMetaOrReflection(
             typeDeclarationId,
-            // Only `IdentifierExpression`s containing a `MetaIdentifier` can
-            // lead to a reflection type.
-            target as hir.IdentifierExpression,
+            base,
           );
         },
         reflection: (targetType) {

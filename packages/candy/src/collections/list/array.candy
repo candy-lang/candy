@@ -112,7 +112,7 @@ impl<Item> ArrayList<Item>: List<Item> {
 
   fun get(index: Int /* UInt */): Maybe<Item> {
     if index >= length_ {
-      None<Maybe<Item>>()
+      None<Item>()
     } else {
       items.get(index)
     }

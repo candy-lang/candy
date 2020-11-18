@@ -191,7 +191,24 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
         dart.Expression lowered;
         if ((id.isProperty || id.isFunction) && id.parent.isNotModule) {
-          lowered = compileTypeName(context, id.parent).property(name);
+          final parentId = () {
+            if (id.parent.isTrait || id.parent.isClass) return id.parent;
+            if (id.parent.isImpl) {
+              final implHir = getImplDeclarationHir(context, id.parent);
+              final moduleId = implHir.type.virtualModuleId;
+              return moduleIdToDeclarationId(context, moduleId);
+            }
+            throw CompilerError.internalError(
+              "Property or function's parent is not a module, trait, impl or class: `$id`.",
+            );
+          }();
+
+          var typeName = compileTypeName(context, parentId);
+          if (name == 'randomSample') {
+            typeName =
+                dart.refer('${typeName.symbol}RandomExtension', typeName.url);
+          }
+          lowered = typeName.property(name);
         } else {
           var name = id.simplePath.last.nameOrNull;
           if (name == 'assert') name = 'assert_';

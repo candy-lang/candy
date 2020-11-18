@@ -172,6 +172,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
         on: dart.refer('int', dartCoreUrl),
         methods: [
           dart.Method((b) => b
+            ..static = true
             ..returns = dart.refer('int', dartCoreUrl)
             ..name = 'randomSample'
             ..requiredParameters.add(dart.Parameter((b) => b
