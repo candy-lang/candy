@@ -126,10 +126,7 @@ final getAllImpl = Query<Unit, List<DeclarationId>>(
   'getAllImpl',
   provider: (context, declarationId) {
     return getAllDependencies(context, Unit())
-        .followedBy([
-          if (context.config.packageId != PackageId.core)
-            context.config.packageId,
-        ])
+        .followedBy([context.config.packageId])
         .expand((packageId) => context.config.resourceProvider
             .getAllFileResourceIds(context, packageId))
         .where((resourceId) => resourceId.isCandySourceFile)
