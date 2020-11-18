@@ -666,7 +666,8 @@ class ContextContext extends Context {
 
     // search properties/functions available on `this`
     // TODO(JonasWanke): cleaner implementation, like `query fun getAllInstanceIdentifiersForType(type: hir.CandyType)`
-    Iterable<DeclarationId> getInstanceDeclarations() sync* {
+    // TODO(marcelgarus): Or, even better, using query fun with method syntax: someType.getAllInstanceIdentifiers()
+    Iterable<hir.Declaration> getInstanceDeclarations() sync* {
       if (declarationId.isFunction) {
         final functionHir =
             getFunctionDeclarationHir(queryContext, declarationId);
@@ -685,45 +686,66 @@ class ContextContext extends Context {
       assert(declarationId.hasParent);
       final parentId = declarationId.parent;
       assert(parentId.isTrait || parentId.isImpl || parentId.isClass);
-      yield parentId;
 
-      Iterable<DeclarationId> walkHierarchy(DeclarationId typeId) sync* {
-        assert(typeId.isTrait || typeId.isClass);
-        yield typeId;
+      final parent = parentId.getHir(queryContext);
+      yield parent;
 
-        final impls = getAllImplsForTraitOrClass(queryContext, typeId);
-        yield* impls;
+      Iterable<hir.Declaration> walkHierarchy(hir.Declaration type) sync* {
+        assert(type is hir.TraitDeclaration || type is hir.ClassDeclaration);
+        yield type;
 
-        yield* impls
-            .map((impl) => getImplDeclarationHir(queryContext, impl))
-            .expand((impl) => impl.traits)
-            .map((trait) =>
-                moduleIdToDeclarationId(queryContext, trait.virtualModuleId))
-            .expand(walkHierarchy);
+        final implIds = getAllImplsForTraitOrClass(queryContext, type.id);
+        for (final implId in implIds) {
+          final impl = implId.getHir(queryContext) as hir.ImplDeclaration;
+          yield impl;
 
-        if (typeId.isTrait) {
-          final traitHir = getTraitDeclarationHir(queryContext, typeId);
-          yield* traitHir.upperBounds
-              .map((b) =>
-                  moduleIdToDeclarationId(queryContext, b.virtualModuleId))
-              .expand(walkHierarchy);
+          for (final traitType in impl.traits) {
+            final trait =
+                moduleIdToDeclarationId(queryContext, traitType.virtualModuleId)
+                    .getHir(queryContext) as hir.TraitDeclaration;
+            final generics = Map.fromEntries(trait.typeParameters
+                .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
+                    traitType.arguments,
+                    (a, b) => MapEntry<hir.CandyType, hir.CandyType>(
+                        hir.ParameterCandyType(a.name, type.id), b)));
+            yield trait.bakeWithGenerics(generics);
+            yield* walkHierarchy(trait);
+          }
+        }
+
+        if (type is hir.TraitDeclaration) {
+          final traitHir = getTraitDeclarationHir(queryContext, type.id);
+
+          for (final upperBound in traitHir.upperBounds) {
+            final generics = Map.fromEntries(traitHir.typeParameters
+                .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
+                    upperBound.arguments,
+                    (a, b) => MapEntry<hir.CandyType, hir.CandyType>(
+                        hir.ParameterCandyType(a.name, type.id), b)));
+            // TODO(marcelgarus): Support functions, tuples, and parameter types as bounds.
+            final bound = moduleIdToDeclarationId(
+                    queryContext, upperBound.virtualModuleId)
+                .getHir(queryContext) as hir.TraitDeclaration;
+            yield* walkHierarchy(bound.bakeWithGenerics(generics));
+          }
         }
       }
 
       if (parentId.isTrait || parentId.isClass) {
-        yield* walkHierarchy(parentId);
+        yield* walkHierarchy(parent);
       } else {
         assert(parentId.isImpl);
         final implHir = getImplDeclarationHir(queryContext, parentId);
         yield* walkHierarchy(
-          moduleIdToDeclarationId(queryContext, implHir.type.virtualModuleId),
+          implHir,
+          // moduleIdToDeclarationId(queryContext, implHir.type.virtualModuleId),
         );
       }
     }
 
     final matches = getInstanceDeclarations()
         .toSet()
-        .expand((id) => getInnerDeclarationIds(queryContext, id))
+        .expand((it) => getInnerDeclarationIds(queryContext, it.id))
         .where((id) {
       if (id.isProperty) {
         final propertyHir = getPropertyDeclarationHir(queryContext, id);
@@ -2722,4 +2744,67 @@ extension on Context {
 
 hir.CandyType _unionOrUnit(List<hir.CandyType> types) {
   return types.isEmpty ? hir.CandyType.unit : hir.CandyType.union(types);
+}
+
+extension on hir.Declaration {
+  /// Returns a copy of this declaration with all types baked using the provided
+  /// `generics`.
+  hir.Declaration bakeWithGenerics(
+    Map<hir.CandyType, hir.CandyType> generics,
+  ) {
+    return maybeMap(
+      trait: (trait) {
+        return trait.copyWith(
+          thisType: trait.thisType.bakeGenerics(generics) as hir.UserCandyType,
+          typeParameters: trait.typeParameters.bakeGenerics(generics),
+          upperBounds: trait.upperBounds.bakeGenerics(generics),
+        );
+      },
+      class_: (class_) {
+        return class_.copyWith(
+          thisType: class_.thisType.bakeGenerics(generics) as hir.UserCandyType,
+          typeParameters: class_.typeParameters.bakeGenerics(generics),
+          // TODO(marcelgarus): Bake synthetic impls (not important right now).
+        );
+      },
+      impl: (impl) {
+        return impl.copyWith(
+          typeParameters: impl.typeParameters.bakeGenerics(generics),
+          type: impl.type.bakeGenerics(generics) as hir.UserCandyType,
+          traits: impl.traits.bakeGenerics(generics),
+        );
+      },
+      orElse: () {
+        throw CompilerError.internalError('Declaration.bakeWithGenerics called '
+            'on a declaration that is not a trait, class, or impl: $this');
+      },
+    );
+  }
+}
+
+extension on List<hir.UserCandyType> {
+  List<hir.UserCandyType> bakeGenerics(
+    Map<hir.CandyType, hir.CandyType> generics,
+  ) {
+    return map((it) => it.bakeGenerics(generics))
+        .cast<hir.UserCandyType>()
+        .toList();
+  }
+}
+
+extension on List<hir.TypeParameter> {
+  List<hir.TypeParameter> bakeGenerics(
+    Map<hir.CandyType, hir.CandyType> generics,
+  ) {
+    return map((it) => it.bakeGenerics(generics)).toList();
+  }
+}
+
+extension on hir.TypeParameter {
+  hir.TypeParameter bakeGenerics(Map<hir.CandyType, hir.CandyType> generics) {
+    return copyWith(
+      upperBound: upperBound.bakeGenerics(generics),
+      defaultValue: upperBound.bakeGenerics(generics),
+    );
+  }
 }
