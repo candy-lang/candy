@@ -6,12 +6,13 @@ use ..iterable
 
 // TODO(marcelgarus): Create type alias `MapKey` for `Equals & Hash`.
 
-public trait Map<Key: Equals & Hash, Value>: Iterable<(Key, Value)> {
+public trait Map<Key: Equals & Hash, Value> {
   fun isEmpty(): Bool { length() == 0 }
 
   fun get(key: Key): Maybe<Value>
   fun keys(): Iterable<Key>
   fun values(): Iterable<Value>
+  fun length(): Int
 
   fun containsKey(key: Key): Bool {
     // keys().contains(key)
