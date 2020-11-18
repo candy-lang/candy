@@ -44,8 +44,14 @@ impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: Map<Key, Value> {
   }
 }
 impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: MutableMap<Key, Value> {
-  fun set(key: Key, value: Value)
-  fun putIfAbsent(key: Key, ifAbsent: () => Value): Value
+  fun set(key: Key, value: Value) {
+    todo("Implement MutableMap.set")
+  }
+
+  // TODO(marcelgarus): Implement `putIfAbsent` more efficiently than the default one. We can do
+  // this by only hashing the `key` once and caching the bucket.
+  // fun putIfAbsent(key: Key, ifAbsent: () => Value): Value
+
   fun remove(key: Key): Bool
 
   fun clear() {
@@ -56,8 +62,8 @@ impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: MutableMap<Key, Value> {
     todo("Implement MutableMap.clear")
   }
 
-  fun setAll(map: Map<Key, Value>)
-  fun cast<NewKey, NewValue>(): Map<NewKey, NewValue> {
-    todo("Implement MutableMap.cast")
-  }
+  // TODO(marcelgarus): Implement `cast` more efficiently than the default one. We canc do this by
+  // using the precomputed `hash`es – regardless of the type, those won't change. That also means
+  // the buckets basically stay the same.
+  // fun cast<NewKey, NewValue>(): Map<NewKey, NewValue>
 }

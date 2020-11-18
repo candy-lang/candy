@@ -25,27 +25,30 @@ public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
   fun set(key: Key, value: Value)
 
   fun putIfAbsent(key: Key, ifAbsent: () => Value): Value {
-    let value = get(key)
-    if value is Some<Value> {
-      // value.unwrap()
-    } else {
-      let value = ifAbsent()
-      // set(key, value)
-      // value
-    }
+    // let value = get(key)
+    // if value is Some<Value> {
+    //   // value.unwrap()
+    // } else {
+    //   let value = ifAbsent()
+    //   // set(key, value)
+    //   // value
+    // }
+    todo("Implement putIfAbsent")
   }
 
   fun remove(key: Key): Bool
 
   fun clear() {
-    // TODO(marcelgarus): Implement
     // for key in keys() {
     //   remove(key)
     // }
     todo("Implement MutableMap.clear")
   }
 
-  fun setAll(map: Map<Key, Value>)
+  fun setAll(map: Map<Key, Value>) {
+    todo("Implement MutableMap.setAll")
+  }
+
   fun cast<NewKey, NewValue>(): Map<NewKey, NewValue> {
     todo("Implement MutableMap.cast")
   }
