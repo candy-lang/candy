@@ -1,5 +1,6 @@
 use ...operators
 use ...primitives
+use ...hash
 use ...todo
 use ..iterable
 

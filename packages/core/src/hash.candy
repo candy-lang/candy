@@ -1,0 +1,37 @@
+use ..collections
+use ..primitives
+
+trait Hash {
+  /// Implemented by types that can be hashed.
+
+  fun hash<Result>(hasher: Hasher<Result>)
+}
+
+trait Hasher<Result> {
+  /// A trait for hashing an arbitrary stream of bytes.
+
+  fun write(value: Int /* Uint8 */)
+  fun write(value: List<Int> /* List<Uint8> */)
+
+  fun finish(): Result
+}
+
+class DefaultHasher {
+  mut let entropy: Int
+}
+impl DefaultHasher: Hasher<Int> {
+  fun write(value: Int) {
+    // TODO(marcelgarus): Make this better. By a lot.
+    entropy = (entropy + value) % 100
+  }
+
+  fun write(value: List<Int>) {
+    for item in value {
+      write(item)
+    }
+  }
+
+  fun finish(): Int {
+    entropy
+  }
+}

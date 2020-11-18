@@ -1,4 +1,5 @@
 use ....primitives
+use ....hash
 use ...array
 use ...iterable
 use ...list

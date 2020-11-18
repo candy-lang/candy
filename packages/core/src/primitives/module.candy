@@ -1,5 +1,4 @@
 use ..operators
-public use .hash
 public use .maybe
 public use .result
 
