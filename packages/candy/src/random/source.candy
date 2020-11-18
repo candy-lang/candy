@@ -1,0 +1,14 @@
+use ...collections
+use ...primitives
+
+trait RandomSource {
+  fun generateIntegers(length: Int): List<Int>
+
+  // TODO(JonasWanke): use bytes when we have them
+  // fun generateBytes(length: Int): List<Int>
+}
+
+builtin class DefaultRandomSource {
+  static fun withSeed(seed: Int): This
+}
+builtin impl DefaultRandomSource: RandomSource

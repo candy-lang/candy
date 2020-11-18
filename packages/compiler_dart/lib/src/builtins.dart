@@ -5,6 +5,7 @@ import 'package:dartx/dartx.dart';
 import 'constants.dart' hide srcDirectoryName;
 import 'declarations/declaration.dart';
 import 'type.dart';
+import 'utils.dart';
 
 final compileBuiltin = Query<DeclarationId, List<dart.Spec>>(
   'dart.compileBuiltin',
@@ -46,6 +47,9 @@ abstract class BuiltinCompiler<Output> {
       return compileString();
     } else if (moduleId == ModuleId.coreIoPrint && name == 'print') {
       return compilePrint();
+    } else if (moduleId ==
+        ModuleId.coreRandomSource.nested(['DefaultRandomSource'])) {
+      return compileDefaultRandomSource();
     }
 
     final declaration = getDeclarationAst(context, declarationId);
@@ -86,6 +90,9 @@ abstract class BuiltinCompiler<Output> {
 
   // stdio
   List<Output> compilePrint();
+
+  // random.source
+  List<Output> compileDefaultRandomSource();
 }
 
 class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
@@ -233,6 +240,70 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             [],
           )),
         )),
+    ];
+  }
+
+  @override
+  List<dart.Spec> compileDefaultRandomSource() {
+    final int = compileType(context, CandyType.int);
+    final random = dart.refer('Random', dartMathUrl);
+    return [
+      // fun generateIntegers(length: Int): List<Int>
+      // static fun withSeed(seed: Int): This
+      dart.Class((b) => b
+        ..name = 'DefaultRandomSource'
+        ..implements.add(compileType(context, CandyType.randomSource))
+        ..constructors.add(dart.Constructor((b) => b
+          ..initializers
+              .add(dart.refer('_random').assign(random.call([], {}, [])).code)))
+        ..constructors.add(dart.Constructor((b) => b
+          ..name = 'withSeed'
+          ..requiredParameters.add(dart.Parameter((b) => b
+            ..type = int
+            ..name = 'seed'))
+          ..initializers.add(dart
+              .refer('_random')
+              .assign(random.call([dart.refer('seed')], {}, []))
+              .code)))
+        ..fields.add(dart.Field((b) => b
+          ..modifier = dart.FieldModifier.final$
+          ..type = random
+          ..name = '_random'))
+        ..methods.add(dart.Method((b) => b
+          ..annotations.add(dart.refer('override', dartCoreUrl))
+          ..returns = compileType(context, CandyType.list(CandyType.int))
+          ..name = 'generateIntegers'
+          ..requiredParameters.add(dart.Parameter((b) => b
+            ..type = int
+            ..name = 'length'))
+          ..body = dart.Block((b) => b
+            ..statements.add(compileTypeName(
+                    context,
+                    moduleIdToDeclarationId(
+                        context, CandyType.arrayListModuleId))
+                .property('create')
+                .call(
+                  [dart.refer('length')],
+                  {},
+                  [int],
+                )
+                .assignFinal('list')
+                .statement)
+            ..statements.add(dart.Block.of([
+              const dart.Code('for (var i = 0; i < length; i++) {'),
+              dart.refer('list').property('append').call(
+                [
+                  dart
+                      .refer('_random')
+                      .property('nextInt')
+                      .call([dart.literalNum(1 << 32)], {}, [])
+                ],
+                {},
+                [],
+              ).statement,
+              const dart.Code('}'),
+            ]))
+            ..statements.add(dart.refer('list').returned.statement)))))
     ];
   }
 }

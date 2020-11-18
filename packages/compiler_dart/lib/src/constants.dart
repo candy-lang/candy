@@ -13,4 +13,5 @@ const libDirectoryName = 'lib';
 const srcDirectoryName = 'src';
 
 const dartCoreUrl = 'dart:core';
+const dartMathUrl = 'dart:math';
 const packageMetaUrl = 'package:meta/meta.dart';

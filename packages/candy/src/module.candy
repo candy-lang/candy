@@ -3,4 +3,5 @@ public use .collections
 public use .operators
 public use .primitives
 public use .io
+public use .random
 public use .todo
