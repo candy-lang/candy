@@ -1,10 +1,10 @@
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
-import 'package:compiler_dart/src/constants.dart';
-import 'package:compiler_dart/src/utils.dart';
 import 'package:parser/parser.dart';
 
+import '../constants.dart';
 import '../type.dart';
+import '../utils.dart';
 import 'class.dart';
 import 'declaration.dart';
 import 'function.dart';

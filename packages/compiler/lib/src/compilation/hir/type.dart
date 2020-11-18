@@ -65,7 +65,7 @@ abstract class CandyType with _$CandyType {
       );
   factory CandyType.arrayList(CandyType itemType) => CandyType.user(
         ModuleId.coreCollections.nested(['list', 'array']),
-        'Array',
+        'ArrayList',
         arguments: [itemType],
       );
   static const arrayListModuleId =
