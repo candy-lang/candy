@@ -1716,18 +1716,8 @@ extension on Context {
             }
           });
       if (propertyIdentifiers.isEmpty) {
-        hir.CandyType receiverType;
-        if (receiverId.isClass) {
-          receiverType =
-              getClassDeclarationHir(queryContext, receiverId).thisType;
-        } else if (receiverId.isTrait) {
-          receiverType =
-              getTraitDeclarationHir(queryContext, receiverId).thisType;
-        }
-        throw CompilerError.methodNotFound(
-          "Couldn't find method $name on $receiverType.",
-          location: ErrorLocation(resourceId, expression.name.span),
-        );
+        // No matches found.
+        return [];
       }
 
       // If one method is defined in multiple places, but is actually the
