@@ -1660,7 +1660,64 @@ extension on Context {
     }
 
     Result<List<hir.Expression>, List<ReportedCompilerError>> lower(
-        hir.CandyType type) {
+      hir.CandyType type,
+    ) {
+      Result<List<hir.Expression>, List<ReportedCompilerError>>
+          searchInnerDeclarationsOfMetaOrReflection(
+        DeclarationId targetId,
+        hir.IdentifierExpression base,
+      ) {
+        final innerIds = getInnerDeclarationIds(queryContext, targetId);
+        final matches = innerIds
+            .where((id) => id.simplePath.last.nameOrNull == name)
+            .map((id) {
+          hir.Identifier identifier;
+          if (id.isModule) {
+            identifier = hir.Identifier.reflection(id, base);
+          } else if (id.isTrait) {
+            final type = getTraitDeclarationHir(queryContext, id).thisType;
+            identifier = hir.Identifier.meta(type, base);
+          } else if (id.isClass) {
+            final type = getClassDeclarationHir(queryContext, id).thisType;
+            identifier = hir.Identifier.meta(type, base);
+          } else if (id.isProperty) {
+            final propertyHir = getPropertyDeclarationHir(queryContext, id);
+            identifier = propertyHir.isStatic
+                ? hir.Identifier.property(
+                    id,
+                    propertyHir.type,
+                    base: base,
+                  )
+                : hir.Identifier.reflection(id, base);
+          } else if (id.isFunction) {
+            final functionHir = getFunctionDeclarationHir(queryContext, id);
+            identifier = functionHir.isStatic
+                ? hir.Identifier.property(
+                    id,
+                    functionHir.functionType,
+                    base: base,
+                  )
+                : hir.Identifier.reflection(id, base);
+          } else {
+            throw CompilerError.internalError(
+              'Identifier resolved to an invalid declaration type: `$id`.',
+              location: ErrorLocation(resourceId, expression.name.span),
+            );
+          }
+          return hir.Expression.identifier(getId(expression), identifier);
+        });
+        if (matches.isEmpty) {
+          return Error([
+            CompilerError.unknownInnerDeclaration(
+              // TODO(JonasWanke): better error description
+              "Declaration `$targetId` doesn't contain an inner declaration called '$name'. Note that static functions must be defined directly inside the trait/class and can't be inherited.",
+              location: ErrorLocation(resourceId, expression.name.span),
+            ),
+          ]);
+        }
+        return Ok(matches.toList());
+      }
+
       return type.map(
         user: (type) {
           final matches = getMatchesForType(type)
@@ -1789,55 +1846,61 @@ extension on Context {
         },
         parameter: (type) =>
             lower(hir.getTypeParameterBound(queryContext, type)),
-        reflection: (targetType) {
-          final targetId = targetType.declarationId;
-          // Only `IdentifierExpression`s containing a `ReflectionIdentifier` can
-          // lead to a reflection type.
-          final reflectionTarget = target as hir.IdentifierExpression;
+        meta: (targetType) {
+          final type = targetType.baseType;
+          final userType = () {
+            if (type is hir.UserCandyType) return type;
+            if (type is hir.ParameterCandyType) {
+              final typeParameters = () {
+                if (type.declarationId.isTrait) {
+                  final traitHir =
+                      getTraitDeclarationHir(queryContext, type.declarationId);
+                  return traitHir.typeParameters;
+                } else if (type.declarationId.isImpl) {
+                  final implHir =
+                      getImplDeclarationHir(queryContext, type.declarationId);
+                  return implHir.typeParameters;
+                } else if (type.declarationId.isClass) {
+                  final classHir =
+                      getClassDeclarationHir(queryContext, type.declarationId);
+                  return classHir.typeParameters;
+                } else if (type.declarationId.isFunction) {
+                  final functionHir = getFunctionDeclarationHir(
+                      queryContext, type.declarationId);
+                  return functionHir.typeParameters;
+                }
+                throw CompilerError.internalError(
+                  "Type parameter's declaration ID is neither a trait nor an impl, class or function: ${type.declarationId}.",
+                  location: ErrorLocation(resourceId, expression.span),
+                );
+              }();
 
-          final innerIds = getInnerDeclarationIds(queryContext, targetId);
-          final matches = innerIds
-              .where((id) => id.simplePath.last.nameOrNull == name)
-              .map((id) {
-            hir.Identifier identifier;
-            if (id.isModule || id.isTrait || id.isClass) {
-              identifier = hir.Identifier.reflection(id, reflectionTarget);
-            } else if (id.isProperty) {
-              final propertyHir = getPropertyDeclarationHir(queryContext, id);
-              identifier = propertyHir.isStatic
-                  ? hir.Identifier.property(
-                      id,
-                      propertyHir.type,
-                      base: reflectionTarget,
-                    )
-                  : hir.Identifier.reflection(id, reflectionTarget);
-            } else if (id.isFunction) {
-              final functionHir = getFunctionDeclarationHir(queryContext, id);
-              identifier = functionHir.isStatic
-                  ? hir.Identifier.property(
-                      id,
-                      functionHir.functionType,
-                      base: reflectionTarget,
-                    )
-                  : hir.Identifier.reflection(id, reflectionTarget);
-            } else {
-              throw CompilerError.internalError(
-                'Identifier resolved to an invalid declaration type: `$id`.',
-                location: ErrorLocation(resourceId, expression.name.span),
-              );
+              return typeParameters
+                  .singleWhere((it) => it.name == type.name)
+                  .upperBound;
             }
-            return hir.Expression.identifier(getId(expression), identifier);
-          });
-          if (matches.isEmpty) {
-            return Error([
-              CompilerError.unknownInnerDeclaration(
-                // TODO(JonasWanke): better error description
-                "Declaration `$targetId` doesn't contain an inner declaration called '$name'.",
-                location: ErrorLocation(resourceId, expression.name.span),
-              ),
-            ]);
-          }
-          return Ok(matches.toList());
+            throw CompilerError.internalError(
+              'Meta base type is not a user or parameter type: $type.',
+              location: ErrorLocation(resourceId, expression.span),
+            );
+          }();
+
+          final typeDeclarationId =
+              moduleIdToDeclarationId(queryContext, userType.virtualModuleId);
+          return searchInnerDeclarationsOfMetaOrReflection(
+            typeDeclarationId,
+            // Only `IdentifierExpression`s containing a `MetaIdentifier` can
+            // lead to a reflection type.
+            target as hir.IdentifierExpression,
+          );
+        },
+        reflection: (targetType) {
+          return searchInnerDeclarationsOfMetaOrReflection(
+            targetType.declarationId,
+            // Only `IdentifierExpression`s containing a `ReflectionIdentifier`
+            // can lead to a reflection type.
+            target as hir.IdentifierExpression,
+          );
         },
       );
     }

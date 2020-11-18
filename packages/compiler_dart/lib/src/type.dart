@@ -64,13 +64,15 @@ final Query<CandyType, dart.Reference> compileType =
       union: (_) => _createType('dynamic'),
       intersection: (_) => _createType('dynamic'),
       parameter: (type) => _createType(type.name, url: null),
+      meta: (type) {
+        final url = moduleIdToImportUrl(context, ModuleId.coreReflection);
+        return dart.refer('Type', url);
+      },
       reflection: (type) {
         final url = moduleIdToImportUrl(context, ModuleId.coreReflection);
         final id = type.declarationId;
         if (id.isModule) {
           return dart.refer('Module', url);
-        } else if (id.isTrait || id.isClass) {
-          return dart.refer('Type', url);
         } else if (id.isProperty) {
           final propertyHir = getPropertyDeclarationHir(context, id);
           assert(!propertyHir.isStatic);
