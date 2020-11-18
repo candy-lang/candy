@@ -164,9 +164,33 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
   }
 
   @override
-    // `Int` corresponds to `int`, hence nothing to do.
   List<dart.Spec> compileInt() {
-    return [];
+    // `Int` corresponds to `int`, hence nothing to do for the type itself.
+    return [
+      Extension(
+        name: 'IntRandomExtension',
+        on: dart.refer('int', dartCoreUrl),
+        methods: [
+          dart.Method((b) => b
+            ..returns = dart.refer('int', dartCoreUrl)
+            ..name = 'randomSample'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..type = compileType(context, CandyType.randomSource)
+              ..name = 'source'))
+            ..body = dart.Block((b) => b
+              ..statements.add(dart
+                  .refer('source')
+                  .property('generateIntegers')
+                  .call([dart.literalNum(1)], {}, [])
+                  .property('single')
+                  .call([], {}, [])
+                  .property('unwrap')
+                  .call([], {}, [])
+                  .returned
+                  .statement))),
+        ],
+      ),
+    ];
   }
 
   @override
