@@ -23,7 +23,7 @@ public trait Map<Key: Equals & Hash, Value> {
 
 // TODO(marcelgarus): impl Map<Key, Value>: GetOperator<Key, Maybe<Value>>
 
-public trait MutableMap<Key: Equals, Value>: Map<Key, Value> {
+public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
   fun set(key: Key, value: Value)
   fun putIfAbsent(key: Key, ifAbsent: () => Value): Value
   fun remove(key: Key): Bool
