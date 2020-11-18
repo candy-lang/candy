@@ -10,6 +10,10 @@ trait Hash {
 trait Hasher<Result> {
   /// A trait for hashing an arbitrary stream of bytes.
 
+  static fun default(): Hasher<Int> {
+    DefaultHasher(0)
+  }
+
   fun write(value: Int /* Uint8 */)
   // TODO(marcelgarus): Rename this to `write` as soon as we have some kind of name mangling.
   fun writeList(value: List<Int> /* List<Uint8> */)
