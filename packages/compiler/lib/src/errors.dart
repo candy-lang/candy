@@ -54,6 +54,7 @@ abstract class CompilerError implements _$CompilerError {
       CompilerError._create('lambdaParametersMissing');
   static const missingArguments = CompilerError._create('missingArguments');
   static const missingReturn = CompilerError._create('missingReturn');
+  static const methodNotFound = CompilerError._create('methodNotFound');
   static const moduleNotFound = CompilerError._create('moduleNotFound');
   static const multipleMainFunctions =
       CompilerError._create('multipleMainFunctions');

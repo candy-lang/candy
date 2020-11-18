@@ -1663,7 +1663,8 @@ extension on Context {
                 typeParameters, (a, b) => MapEntry(a, b))));
       }
 
-      return getInnerDeclarationIds(queryContext, receiverId)
+      final propertyIdentifiers = getInnerDeclarationIds(
+              queryContext, receiverId)
           .followedBy(impls.expand((impl) {
             // For each impl, return the inner declaration ids as well as the
             // declaration ids of functions with default implementations in the
@@ -1713,13 +1714,29 @@ extension on Context {
                 location: ErrorLocation(resourceId, expression.name.span),
               );
             }
-          })
-          // If one method is defined in multiple places, but is actually the
-          // same one (like `next`, which is defined on both `ArrayList` and
-          // `Iterator`), the expression would be ambiguous. So, for now we work
-          // around this by only considering methods ambiguous defined in the
-          // same group (and we just choose the first group, whatever that might
-          // be).
+          });
+      if (propertyIdentifiers.isEmpty) {
+        hir.CandyType receiverType;
+        if (receiverId.isClass) {
+          receiverType =
+              getClassDeclarationHir(queryContext, receiverId).thisType;
+        } else if (receiverId.isTrait) {
+          receiverType =
+              getTraitDeclarationHir(queryContext, receiverId).thisType;
+        }
+        throw CompilerError.methodNotFound(
+          "Couldn't find method $name on $receiverType.",
+          location: ErrorLocation(resourceId, expression.name.span),
+        );
+      }
+
+      // If one method is defined in multiple places, but is actually the
+      // same one (like `next`, which is defined on both `ArrayList` and
+      // `Iterator`), the expression would be ambiguous. So, for now we work
+      // around this by only considering methods ambiguous defined in the
+      // same group (and we just choose the first group, whatever that might
+      // be).
+      return propertyIdentifiers
           .groupBy((it) => it.id.parent)
           .entries
           .first
