@@ -3,7 +3,7 @@ use ...primitives
 use ...todo
 use ..iterable
 
-public trait Map<Key: Equals, Value>: Iterable<(Key, Value)> {
+/*public trait Map<Key: Equals, Value>: Iterable<(Key, Value)> {
   fun length(): Int
   fun isEmpty(): Bool { length() == 0 }
 
@@ -36,4 +36,4 @@ public trait MutableMap<Key: Equals, Value>: Map<Key, Value> {
   fun cast<NewKey, NewValue>(): Map<NewKey, NewValue> {
     todo("Implement MutableMap.cast")
   }
-}
+}*/
