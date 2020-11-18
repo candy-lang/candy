@@ -1,0 +1,4 @@
+fun main() {
+  let tuple = Tuple(123, "abc", true)
+  let tuple: (Int, String, Bool) = Tuple(123, "abc", true)
+}

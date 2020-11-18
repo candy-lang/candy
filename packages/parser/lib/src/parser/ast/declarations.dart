@@ -217,6 +217,7 @@ abstract class FunctionDeclaration extends Declaration
   SourceSpan get representativeSpan => name.span;
 
   bool get isStatic => modifiers.any((m) => m is StaticModifierToken);
+  bool get isTest => modifiers.any((m) => m is TestModifierToken);
 }
 
 @freezed

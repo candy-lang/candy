@@ -44,6 +44,10 @@ abstract class CompilerError implements _$CompilerError {
       CompilerError._create('invalidImplTraitBound');
   static const invalidLabel = CompilerError._create('invalidLabel');
   static const invalidUseLine = CompilerError._create('invalidUseLine');
+  static const invalidTypeParameterInTestFun =
+      CompilerError._create('invalidTypeParameterInTestFun');
+  static const invalidValueParameterInTestFun =
+      CompilerError._create('invalidValueParameterInTestFun');
   static const lambdaParameterTypeRequired =
       CompilerError._create('lambdaParameterTypeRequired');
   static const lambdaParametersMissing =
@@ -66,6 +70,8 @@ abstract class CompilerError implements _$CompilerError {
       CompilerError._create('returnNotInFunction');
   static const undefinedIdentifier =
       CompilerError._create('undefinedIdentifier');
+  static const unexpectedNamedArgument =
+      CompilerError._create('unexpectedNamedArgument');
   static const unexpectedPositionalArgument =
       CompilerError._create('unexpectedPositionalArgument');
   static const unknownInnerDeclaration =

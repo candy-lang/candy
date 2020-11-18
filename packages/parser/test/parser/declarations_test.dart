@@ -2,13 +2,11 @@ import 'package:meta/meta.dart';
 import 'package:parser/src/lexer/lexer.dart';
 import 'package:parser/src/parser/ast/declarations.dart';
 import 'package:parser/src/parser/ast/expressions/expressions.dart';
-import 'package:parser/src/parser/ast/statements.dart';
 import 'package:parser/src/parser/ast/types.dart';
 import 'package:parser/src/parser/grammar.dart';
 import 'package:parser/src/source_span.dart';
 import 'package:test/test.dart';
 
-import 'statements_test.dart';
 import 'types_test.dart';
 import 'utils.dart';
 
@@ -27,7 +25,7 @@ void main() {
             OperatorToken(OperatorTokenType.rparen, span: SourceSpan(8, 9)),
         colon: OperatorToken(OperatorTokenType.colon, span: SourceSpan(9, 10)),
         returnType: createTypeFooBar(11),
-        body: Block(
+        body: LambdaLiteral(
           0,
           leftBrace: OperatorToken(
             OperatorTokenType.lcurl,
@@ -38,50 +36,6 @@ void main() {
             span: SourceSpan(20, 21),
           ),
         ),
-      ),
-      'external fun foo(bar: Foo.Bar, baz: Foo.Bar = defaultBaz): Foo.Bar':
-          FunctionDeclaration(
-        modifiers: [ModifierToken.external(span: SourceSpan(0, 8))],
-        funKeyword:
-            KeywordToken.fun(span: SourceSpan(9, 12)) as FunKeywordToken,
-        name: IdentifierToken('foo', span: SourceSpan(13, 16)),
-        leftParenthesis: OperatorToken(
-          OperatorTokenType.lparen,
-          span: SourceSpan(16, 17),
-        ),
-        valueParameters: [
-          ValueParameter(
-            name: IdentifierToken('bar', span: SourceSpan(17, 20)),
-            colon: OperatorToken(
-              OperatorTokenType.colon,
-              span: SourceSpan(20, 21),
-            ),
-            type: createTypeFooBar(22),
-          ),
-          ValueParameter(
-            name: IdentifierToken('baz', span: SourceSpan(31, 34)),
-            colon: OperatorToken(
-              OperatorTokenType.colon,
-              span: SourceSpan(34, 35),
-            ),
-            type: createTypeFooBar(36),
-            equals: OperatorToken(
-              OperatorTokenType.equals,
-              span: SourceSpan(44, 45),
-            ),
-            defaultValue: Identifier(
-              0,
-              IdentifierToken('defaultBaz', span: SourceSpan(46, 56)),
-            ),
-          ),
-        ],
-        valueParameterCommata: [
-          OperatorToken(OperatorTokenType.comma, span: SourceSpan(29, 30)),
-        ],
-        rightParenthesis:
-            OperatorToken(OperatorTokenType.rparen, span: SourceSpan(56, 57)),
-        colon: OperatorToken(OperatorTokenType.colon, span: SourceSpan(57, 58)),
-        returnType: createTypeFooBar(59),
       ),
       'external fun foo<T, R: Foo.Bar>()': FunctionDeclaration(
         modifiers: [ModifierToken.external(span: SourceSpan(0, 8))],
@@ -124,72 +78,6 @@ void main() {
         name: IdentifierToken('foo', span: SourceSpan(4, 7)),
         colon: OperatorToken(OperatorTokenType.colon, span: SourceSpan(7, 8)),
         type: createTypeFooBar(9),
-      ),
-      'external let mut bar: Foo.Bar': PropertyDeclaration(
-        modifiers: [ModifierToken.external(span: SourceSpan(0, 8))],
-        letKeyword:
-            KeywordToken.let(span: SourceSpan(9, 12)) as LetKeywordToken,
-        mutKeyword:
-            KeywordToken.mut(span: SourceSpan(13, 16)) as MutKeywordToken,
-        name: IdentifierToken('bar', span: SourceSpan(17, 20)),
-        colon: OperatorToken(OperatorTokenType.colon, span: SourceSpan(20, 21)),
-        type: createTypeFooBar(22),
-      ),
-      'let mut foo: Foo.Bar = 123\n'
-          '  get\n'
-          '  get {123}\n'
-          '  set\n'
-          '  set {}': PropertyDeclaration(
-        letKeyword: KeywordToken.let(span: SourceSpan(0, 3)) as LetKeywordToken,
-        mutKeyword: KeywordToken.mut(span: SourceSpan(4, 7)) as MutKeywordToken,
-        name: IdentifierToken('foo', span: SourceSpan(8, 11)),
-        colon: OperatorToken(OperatorTokenType.colon, span: SourceSpan(11, 12)),
-        type: createTypeFooBar(13),
-        equals:
-            OperatorToken(OperatorTokenType.equals, span: SourceSpan(21, 22)),
-        initializer:
-            Literal<int>(0, IntLiteralToken(123, span: SourceSpan(23, 26))),
-        accessors: [
-          PropertyAccessor.getter(
-            keyword:
-                KeywordToken.get(span: SourceSpan(29, 32)) as GetKeywordToken,
-          ),
-          PropertyAccessor.getter(
-            keyword:
-                KeywordToken.get(span: SourceSpan(35, 38)) as GetKeywordToken,
-            body: Block(
-              2,
-              leftBrace: OperatorToken(
-                OperatorTokenType.lcurl,
-                span: SourceSpan(39, 40),
-              ),
-              statements: [createStatement123(1, 40)],
-              rightBrace: OperatorToken(
-                OperatorTokenType.rcurl,
-                span: SourceSpan(43, 44),
-              ),
-            ),
-          ),
-          PropertyAccessor.setter(
-            keyword:
-                KeywordToken.set(span: SourceSpan(47, 50)) as SetKeywordToken,
-          ),
-          PropertyAccessor.setter(
-            keyword:
-                KeywordToken.set(span: SourceSpan(53, 56)) as SetKeywordToken,
-            body: Block(
-              3,
-              leftBrace: OperatorToken(
-                OperatorTokenType.lcurl,
-                span: SourceSpan(57, 58),
-              ),
-              rightBrace: OperatorToken(
-                OperatorTokenType.rcurl,
-                span: SourceSpan(58, 59),
-              ),
-            ),
-          ),
-        ],
       ),
     },
   );
@@ -488,7 +376,7 @@ void main() {
                 OperatorTokenType.rparen,
                 span: SourceSpan(37, 38),
               ),
-              body: Block(
+              body: LambdaLiteral(
                 0,
                 leftBrace: OperatorToken(
                   OperatorTokenType.lcurl,

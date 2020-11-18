@@ -72,6 +72,14 @@ abstract class Expression implements _$Expression {
     CandyType type,
   ) = WhileExpression;
   // ignore: non_constant_identifier_names
+  const factory Expression.for_(
+    DeclarationLocalId id,
+    String variableName,
+    CandyType itemType,
+    Expression iterable,
+    List<Expression> body,
+  ) = ForExpression;
+  // ignore: non_constant_identifier_names
   const factory Expression.return_(
     DeclarationLocalId id,
     DeclarationLocalId scopeId, [
@@ -111,6 +119,10 @@ abstract class Expression implements _$Expression {
     CandyType typeToCheck, {
     bool isNegated,
   }) = IsExpression;
+  const factory Expression.tuple(
+    DeclarationLocalId id,
+    List<Expression> arguments,
+  ) = TupleExpression;
 
   const Expression._();
 
@@ -126,12 +138,15 @@ abstract class Expression implements _$Expression {
         if_: (theIf) => theIf.type,
         loop: (loop) => loop.type,
         while_: (theWhile) => theWhile.type,
+        for_: (_) => CandyType.unit,
         break_: (_) => CandyType.never,
         continue_: (_) => CandyType.never,
         throw_: (_) => CandyType.never,
         assignment: (assignment) => assignment.right.type,
         as_: (theAs) => theAs.typeToCheck,
         is_: (_) => CandyType.bool,
+        tuple: (tuple) =>
+            CandyType.tuple(tuple.arguments.map((it) => it.type).toList()),
       );
 
   T accept<T>(ExpressionVisitor<T> visitor) => map(
@@ -146,12 +161,14 @@ abstract class Expression implements _$Expression {
         if_: (e) => visitor.visitIfExpression(e),
         loop: (e) => visitor.visitLoopExpression(e),
         while_: (e) => visitor.visitWhileExpression(e),
+        for_: (e) => visitor.visitForExpression(e),
         break_: (e) => visitor.visitBreakExpression(e),
         continue_: (e) => visitor.visitContinueExpression(e),
         throw_: (e) => visitor.visitThrowExpression(e),
         assignment: (e) => visitor.visitAssignmentExpression(e),
         as_: (e) => visitor.visitAsExpression(e),
         is_: (e) => visitor.visitIsExpression(e),
+        tuple: (e) => visitor.visitTupleExpression(e),
       );
 }
 
@@ -169,6 +186,7 @@ abstract class Identifier implements _$Identifier {
     DeclarationId id, [
     IdentifierExpression base,
   ]) = ReflectionIdentifier;
+  const factory Identifier.tuple() = TupleIdentifier;
 
   const factory Identifier.parameter(
     DeclarationLocalId id,
@@ -205,6 +223,13 @@ abstract class Identifier implements _$Identifier {
         super_: (type) => type,
         meta: (type, _) => CandyType.meta(type),
         reflection: (declarationId, _) => CandyType.reflection(declarationId),
+        tuple: () {
+          final resourceId =
+              ResourceId(PackageId.core, 'src/primitives/tuples.candy');
+          final declarationId = DeclarationId(resourceId)
+              .inner(DeclarationPathData.class_('TupleX'));
+          return CandyType.reflection(declarationId);
+        },
         parameter: (_, __, type) => type,
         property: (_, type, __, ___, ____) => type,
         localProperty: (_, __, type, ___) => type,
@@ -271,12 +296,14 @@ abstract class ExpressionVisitor<T> {
   T visitIfExpression(IfExpression node);
   T visitLoopExpression(LoopExpression node);
   T visitWhileExpression(WhileExpression node);
+  T visitForExpression(ForExpression node);
   T visitBreakExpression(BreakExpression node);
   T visitContinueExpression(ContinueExpression node);
   T visitThrowExpression(ThrowExpression node);
   T visitAssignmentExpression(AssignmentExpression node);
   T visitAsExpression(AsExpression node);
   T visitIsExpression(IsExpression node);
+  T visitTupleExpression(TupleExpression node);
 }
 
 abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
@@ -305,6 +332,8 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   @override
   void visitWhileExpression(WhileExpression node) {}
   @override
+  void visitForExpression(ForExpression node) {}
+  @override
   void visitBreakExpression(BreakExpression node) {}
   @override
   void visitContinueExpression(ContinueExpression node) {}
@@ -316,4 +345,6 @@ abstract class DoNothingExpressionVisitor extends ExpressionVisitor<void> {
   void visitAsExpression(AsExpression node) {}
   @override
   void visitIsExpression(IsExpression node) {}
+  @override
+  void visitTupleExpression(TupleExpression node) {}
 }

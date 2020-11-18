@@ -1,5 +1,6 @@
 import 'package:parser/parser.dart' as ast;
 
+import '../../../errors.dart';
 import '../../../query.dart';
 import '../../../utils.dart';
 import '../../hir.dart' as hir;
@@ -35,6 +36,28 @@ final getFunctionDeclarationHir = Query<DeclarationId, hir.FunctionDeclaration>(
 
     final functionAst = getFunctionDeclarationAst(context, declarationId);
 
+    if (functionAst.isTest) {
+      if (functionAst.typeParameters != null &&
+          functionAst.typeParameters.parameters.isNotEmpty) {
+        throw CompilerError.invalidTypeParameterInTestFun(
+          'Test functions may not be declared with type parameters.',
+          location: ErrorLocation(
+            declarationId.resourceId,
+            functionAst.typeParameters.parameters.first.span,
+          ),
+        );
+      }
+      if (functionAst.valueParameters.isNotEmpty) {
+        throw CompilerError.invalidValueParameterInTestFun(
+          'Test functions may not be declared with parameters.',
+          location: ErrorLocation(
+            declarationId.resourceId,
+            functionAst.valueParameters.first.span,
+          ),
+        );
+      }
+    }
+
     // ignore: can_be_null_after_null_aware
     final typeParameters = functionAst.typeParameters?.parameters.orEmpty
         .map((p) => hir.TypeParameter(
@@ -49,7 +72,10 @@ final getFunctionDeclarationHir = Query<DeclarationId, hir.FunctionDeclaration>(
         .toList();
 
     return hir.FunctionDeclaration(
-      isStatic: functionAst.isStatic || declarationId.parent.isModule,
+      isStatic: functionAst.isStatic ||
+          functionAst.isTest ||
+          declarationId.parent.isModule,
+      isTest: functionAst.isTest,
       name: functionAst.name.name,
       typeParameters: typeParameters,
       valueParameters: functionAst.valueParameters

@@ -115,6 +115,7 @@ hir.SyntheticImpl _generateEqualsImpl(
       Tuple2(
         hir.FunctionDeclaration(
           isStatic: false,
+          isTest: false,
           name: 'equals',
           valueParameters: [
             hir.ValueParameter(name: 'other', type: hir.CandyType.this_()),

@@ -1,0 +1,6 @@
+fun main() {
+  let list = List.of2<Int>(2, 42)
+  for item in list {
+    print(item)
+  }
+}

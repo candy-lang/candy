@@ -193,6 +193,8 @@ class LexerGrammar {
       string('loop').tokenize((_, span) => LoopKeywordToken(span: span));
   static final WHILE =
       string('while').tokenize((_, span) => WhileKeywordToken(span: span));
+  static final FOR =
+      string('for').tokenize((_, span) => ForKeywordToken(span: span));
   static final BREAK =
       string('break').tokenize((_, span) => BreakKeywordToken(span: span));
   static final CONTINUE = string('continue')
@@ -218,6 +220,8 @@ class LexerGrammar {
       string('const').tokenize((_, span) => ModifierToken.const_(span: span));
   static final DATA =
       string('data').tokenize((_, span) => ModifierToken.data(span: span));
+  static final TEST =
+      string('test').tokenize((_, span) => ModifierToken.test(span: span));
 
   // SECTION: literals
 

@@ -233,8 +233,9 @@ final resolveAstUserTypeInParameters =
         if (functionAst.typeParameters != null) {
           astTypeParameters.add(Tuple2(id, functionAst.typeParameters));
         }
-        if (!functionAst.isStatic && id.hasParent)
+        if (!functionAst.isStatic && !functionAst.isTest && id.hasParent) {
           addTypeParametersOf(id.parent);
+        }
       }
     }
 

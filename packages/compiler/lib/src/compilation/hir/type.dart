@@ -57,7 +57,32 @@ abstract class CandyType with _$CandyType {
   static const float = CandyType.user(ModuleId.corePrimitives, 'Float');
   static const string = CandyType.user(ModuleId.corePrimitives, 'String');
 
+  factory CandyType.maybe(CandyType itemType) => CandyType.user(
+        ModuleId.corePrimitives.nested(['maybe']),
+        'Maybe',
+        arguments: [itemType],
+      );
+  factory CandyType.some(CandyType itemType) => CandyType.user(
+        ModuleId.corePrimitives.nested(['maybe']),
+        'Some',
+        arguments: [itemType],
+      );
+
   // collections
+  factory CandyType.iterator(CandyType itemType) => CandyType.user(
+        ModuleId.coreCollections.nested(['iterable']),
+        'Iterator',
+        arguments: [itemType],
+      );
+  static const iterableModuleId =
+      ModuleId(PackageId.core, ['collections', 'iterable', 'Iterable']);
+  factory CandyType.iterable(CandyType itemType) => CandyType.user(
+        ModuleId.coreCollections.nested(['iterable']),
+        'Iterable',
+        arguments: [itemType],
+      );
+  static const listModuleId =
+      ModuleId(PackageId.core, ['collections', 'list', 'List']);
   factory CandyType.list(CandyType itemType) => CandyType.user(
         ModuleId.coreCollections.nested(['list']),
         'List',
@@ -343,9 +368,14 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
       },
       this_: (_) => throw invalidThisType(),
       tuple: (type) {
-        throw CompilerError.unsupportedFeature(
-          'Trait implementations for tuples are not yet supported.',
-        );
+        if (parent is TupleCandyType) {
+          return type.items.length == parent.items.length &&
+              type.items
+                  .zip<CandyType, bool>(parent.items,
+                      (a, b) => isAssignableTo(context, Tuple2(a, b)))
+                  .every((it) => it);
+        }
+        return false;
       },
       function: (type) {
         throw CompilerError.unsupportedFeature(
