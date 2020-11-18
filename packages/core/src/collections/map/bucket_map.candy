@@ -14,6 +14,11 @@ class MapEntry<Key, Value> {
 
 class Bucket<Key: Equals & Hash, Value> {
   let entries: List<MapEntry<Key, Value>>
+
+  fun get(key: Key): Maybe<Value> {
+    let entries: Iterable<MapEntry<Key, Value>> = entries
+    entries.where({ it.key == key }).map<Value>({ it.value }).single()
+  }
 }
 
 class BucketMap<Key, Value> {
