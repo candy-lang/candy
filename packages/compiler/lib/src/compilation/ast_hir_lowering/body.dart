@@ -2039,7 +2039,7 @@ extension on Context {
         (expression.typeArguments?.arguments?.length ?? 0)) {
       return Error([
         CompilerError.wrongNumberOfTypeArguments(
-          'Function expected ${functionHir.typeParameters.length} parameters, '
+          'Function expected ${functionHir.typeParameters.length} type parameters, '
           'but you provided ${expression.typeArguments?.arguments?.length ?? 0}.',
           location: ErrorLocation(resourceId, expression.span),
         ),
