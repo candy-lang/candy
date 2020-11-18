@@ -20,7 +20,7 @@ abstract class BuiltinCompiler<Output> {
     if (moduleId == ModuleId.coreAssert) {
       if (name == 'assert') return compileAssert();
     } else if (moduleId ==
-        ModuleId.coreCollections.nested(['collections', 'array', 'Array'])) {
+        ModuleId.coreCollections.nested(['array', 'Array'])) {
       return compileArray();
     } else if (moduleId == ModuleId.corePrimitives.nested(['Any'])) {
       return compileAny();
@@ -46,7 +46,7 @@ abstract class BuiltinCompiler<Output> {
 
     final declaration = getDeclarationAst(context, declarationId);
     throw CompilerError.internalError(
-      'Unknown built-in declaration: `$declarationId`.',
+      'Unknown built-in declaration: `$declarationId` from module $moduleId.',
       location: ErrorLocation(declarationId.resourceId, declaration.span),
     );
   }
