@@ -14,11 +14,7 @@ final compileDeclaration = Query<DeclarationId, List<dart.Spec>>(
   'dart.compileDeclaration',
   provider: (context, declarationId) {
     final declaration = getDeclarationAst(context, declarationId);
-    if (declaration.isBuiltin) {
-      final compiled = compileBuiltin(context, declarationId);
-      if (compiled is None) return [];
-      return [compiled.value];
-    }
+    if (declaration.isBuiltin) return compileBuiltin(context, declarationId);
 
     if (declarationId.isModule) {
       compileModule(context, declarationIdToModuleId(context, declarationId));
