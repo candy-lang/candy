@@ -1,4 +1,5 @@
 use ....primitives
+use ....operators
 use ....hash
 use ...array
 use ...iterable
@@ -11,7 +12,7 @@ class MapEntry<Key, Value> {
   let value: Value
 }
 
-class Bucket<Key, Value> {
+class Bucket<Key: Equals & Hash, Value> {
   let entries: List<MapEntry<Key, Value>>
 }
 
