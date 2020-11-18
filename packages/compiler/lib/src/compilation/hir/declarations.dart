@@ -9,13 +9,15 @@ part 'declarations.freezed.dart';
 
 @freezed
 abstract class Declaration implements _$Declaration {
-  const factory Declaration.module({
+  const factory Declaration.module(
+    DeclarationId id, {
     ModuleId parent,
     @required String name,
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
   }) = ModuleDeclaration;
 
   const factory Declaration.trait(
+    DeclarationId id,
     String name, {
     @required UserCandyType thisType,
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
@@ -23,7 +25,8 @@ abstract class Declaration implements _$Declaration {
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
   }) = TraitDeclaration;
 
-  const factory Declaration.impl({
+  const factory Declaration.impl(
+    DeclarationId id, {
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
     @required UserCandyType type,
     @required List<UserCandyType> traits,
@@ -31,20 +34,22 @@ abstract class Declaration implements _$Declaration {
   }) = ImplDeclaration;
 
   // ignore: non_constant_identifier_names
-  const factory Declaration.class_({
-    @required DeclarationId id,
+  const factory Declaration.class_(
+    DeclarationId id, {
     @required String name,
     @required UserCandyType thisType,
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
     @Default(<DeclarationId>[]) List<DeclarationId> innerDeclarationIds,
     @Default(<SyntheticImpl>[]) List<SyntheticImpl> syntheticImpls,
   }) = ClassDeclaration;
-  const factory Declaration.constructor({
+  const factory Declaration.constructor(
+    DeclarationId id, {
     @Default(<TypeParameter>[]) List<TypeParameter> typeParameters,
     @Default(<ValueParameter>[]) List<ValueParameter> valueParameters,
   }) = ConstructorDeclaration;
 
-  const factory Declaration.function({
+  const factory Declaration.function(
+    DeclarationId id, {
     @required bool isStatic,
     @required bool isTest,
     @required String name,

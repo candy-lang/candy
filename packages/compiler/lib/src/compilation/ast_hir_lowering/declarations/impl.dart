@@ -56,6 +56,7 @@ final getImplDeclarationHir = Query<DeclarationId, hir.ImplDeclaration>(
     // TODO(JonasWanke): check impl validity (required methods available, correct package)
 
     return hir.ImplDeclaration(
+      declarationId,
       typeParameters: typeParameters,
       type: astTypeToHirType(context, Tuple2(declarationId, implAst.type))
           as hir.UserCandyType,

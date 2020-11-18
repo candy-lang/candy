@@ -32,7 +32,7 @@ final getClassDeclarationHir = Query<DeclarationId, hir.ClassDeclaration>(
     final name = classAst.name.name;
 
     return hir.ClassDeclaration(
-      id: declarationId,
+      declarationId,
       name: name,
       thisType: createClassThisType(context, declarationId),
       // ignore: can_be_null_after_null_aware
@@ -103,10 +103,11 @@ hir.SyntheticImpl _generateEqualsImpl(
     'other',
     thisType,
   );
-  final invalidId = DeclarationLocalId(methodId, -1);
+  final invalidLocalId = DeclarationLocalId(methodId, -1);
 
   return hir.SyntheticImpl(
     implHir: hir.ImplDeclaration(
+      implId,
       type: thisType,
       traits: [hir.CandyType.equals],
       innerDeclarationIds: [methodId],
@@ -114,6 +115,7 @@ hir.SyntheticImpl _generateEqualsImpl(
     methods: [
       Tuple2(
         hir.FunctionDeclaration(
+          methodId,
           isStatic: false,
           isTest: false,
           name: 'equals',
@@ -125,7 +127,7 @@ hir.SyntheticImpl _generateEqualsImpl(
         [
           hir.Expression.return_(
             id(),
-            invalidId,
+            invalidLocalId,
             properties
                 .map(
                   (it) {
