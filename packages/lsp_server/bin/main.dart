@@ -13,13 +13,15 @@ Future<void> main(List<String> arguments) async {
   final parser = ArgParser()..addOption(_optionCandyDirectory);
   final results = parser.parse(arguments);
 
-  final candyDirectory = Directory(results[_optionCandyDirectory]);
-  if (!candyDirectory.existsSync()) {
+  final corePath = results[_optionCandyDirectory];
+  final coreDirectory = Directory(corePath);
+  if (!coreDirectory.existsSync()) {
+    stderr.write('Core library not found at $corePath.');
     exit(HttpStatus.notFound);
   }
 
   final channel = LspByteStreamServerChannel(stdin, stdout);
-  final analysisServer = AnalysisServer(channel, candyDirectory);
+  final analysisServer = AnalysisServer(channel, coreDirectory);
   stderr.write('Started LSP.');
   await channel.closed;
 
