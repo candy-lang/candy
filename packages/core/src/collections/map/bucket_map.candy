@@ -22,11 +22,42 @@ class Bucket<Key: Equals & Hash, Value> {
 }
 
 class BucketMap<Key, Value> {
-  let buckets: Array<List<Value>>
-}
+  let buckets: Array<Bucket<Key, Value>>
+  let numEntries: Int
 
-impl<Key, Value> BucketMap<Key, Value>: Map<Key, Value> {
-  fun get(key: Key): Maybe<Value>
-  fun keys(): Iterable<Key>
-  fun values(): Iterable<Value>
+  fun bucketByHash(hash: Int): Bucket<Key, Value> {
+    let index = hash % buckets.length
+    buckets.get(index)
+  }
+}
+impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: Map<Key, Value> {
+  fun length(): Int { numEntries }
+
+  fun get(key: Key): Maybe<Value> {
+    let hash = key.hash<Int>(Hasher.default())
+    let bucket = bucketByHash(hash)
+    bucket.get(key)
+  }
+
+  fun entries(): Iterable<(Key, Value)> {
+    List.empty<Value>()
+  }
+}
+impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: MutableMap<Key, Value> {
+  fun set(key: Key, value: Value)
+  fun putIfAbsent(key: Key, ifAbsent: () => Value): Value
+  fun remove(key: Key): Bool
+
+  fun clear() {
+    // TODO(marcelgarus): Implement
+    // for key in keys() {
+    //   remove(key)
+    // }
+    todo("Implement MutableMap.clear")
+  }
+
+  fun setAll(map: Map<Key, Value>)
+  fun cast<NewKey, NewValue>(): Map<NewKey, NewValue> {
+    todo("Implement MutableMap.cast")
+  }
 }
