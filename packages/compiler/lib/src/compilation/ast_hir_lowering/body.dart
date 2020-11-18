@@ -1849,7 +1849,7 @@ extension on Context {
           }
 
           final matches = type.types
-              .map((t) => getMatchesForType(type as hir.UserCandyType));
+              .map((it) => getMatchesForType(it as hir.UserCandyType));
           final nonEmptyMatches = matches.where((m) => m.isNotEmpty);
           if (nonEmptyMatches.isEmpty) {
             return Error([
