@@ -4,7 +4,7 @@ use ..primitives
 trait Hash {
   /// Implemented by types that can be hashed.
 
-  fun hash<Result>(hasher: Hasher<Result>)
+  fun hash<Result>(hasher: Hasher<Result>): Result
 }
 
 trait Hasher<Result> {
