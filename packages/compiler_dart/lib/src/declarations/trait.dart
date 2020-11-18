@@ -1,15 +1,18 @@
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
-import 'package:compiler_dart/src/constants.dart';
 import 'package:parser/parser.dart';
 
+import '../constants.dart';
 import '../type.dart';
+import '../utils.dart';
 import 'class.dart';
 import 'declaration.dart';
 import 'function.dart';
 
-final Query<DeclarationId, List<dart.Class>> compileTrait =
-    Query<DeclarationId, List<dart.Class>>(
+/// Traits get compiled into an abstract class containing the method signatures
+/// and a mixin containing easily reusable default implementations.
+final Query<DeclarationId, List<dart.Spec>> compileTrait =
+    Query<DeclarationId, List<dart.Spec>>(
   'dart.compileTrait',
   evaluateAlways: true,
   provider: (context, declarationId) {
@@ -43,16 +46,33 @@ final Query<DeclarationId, List<dart.Class>> compileTrait =
           ..name = 'other'))));
     }
 
+    final name = compileTypeName(context, declarationId).symbol;
+    final typeParameters = traitHir.typeParameters
+        .map((p) => compileTypeParameter(context, p))
+        .toList();
     return [
       dart.Class((b) => b
         ..abstract = true
-        ..name = compileTypeName(context, declarationId).symbol
-        ..types.addAll(traitHir.typeParameters
-            .map((p) => compileTypeParameter(context, p)))
+        ..name = name
+        ..types.addAll(typeParameters)
         ..implements.addAll(implements)
         ..constructors.add(dart.Constructor((b) => b..constant = true))
         ..methods.addAll(properties)
         ..methods.addAll(methods)),
+      Mixin(
+        name: '$name\$Default',
+        types: typeParameters,
+        on: traitHir.upperBounds.map((it) => compileType(context, it)).toList(),
+        implements: [
+          ...implements,
+          dart.TypeReference((b) => b
+            ..symbol = name
+            ..types.addAll(
+              typeParameters.map((it) => it.rebuild((b) => b.bound = null)),
+            ))
+        ],
+        methods: methods,
+      ),
       for (final classId
           in traitHir.innerDeclarationIds.where((it) => it.isClass))
         ...compileClass(context, classId),

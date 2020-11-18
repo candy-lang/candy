@@ -5,6 +5,7 @@ import 'package:dart_style/dart_style.dart';
 import '../body.dart';
 import '../builtins.dart';
 import '../constants.dart';
+import '../utils.dart';
 import 'declaration.dart';
 
 final _dartFmt = DartFormatter();
@@ -27,7 +28,7 @@ final compileModule = Query<ModuleId, Unit>(
 
     if (library.body.isNotEmpty) {
       final source = _dartFmt.format(
-        library.accept(dart.DartEmitter(_PrefixedAllocator())).toString(),
+        library.accept(FancyDartEmitter(_PrefixedAllocator())).toString(),
       );
       context.config.buildArtifactManager.setContent(
         context,
@@ -71,7 +72,7 @@ final compileModuleTests = Query<ModuleId, Unit>(
         ..body = dart.Block((b) => b.statements.addAll(testFunctions)));
       final library = dart.Library((b) => b..body.add(mainFunction));
       final source = _dartFmt.format(
-        library.accept(dart.DartEmitter(_PrefixedAllocator())).toString(),
+        library.accept(FancyDartEmitter(_PrefixedAllocator())).toString(),
       );
       context.config.buildArtifactManager.setContent(
         context,

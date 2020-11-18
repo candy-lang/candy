@@ -67,7 +67,7 @@ class AnalysisServer {
       ),
     );
     _queryConfig = QueryConfig(
-      packageName: 'core',
+      packageName: p.basename(projectDirectory.absolute.path),
       resourceProvider: resourceProvider,
       buildArtifactManager: BuildArtifactManager(projectDirectory),
     );
