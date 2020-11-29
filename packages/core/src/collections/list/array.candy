@@ -5,7 +5,7 @@ use ...list
 
 public builtin class Array<Item> {
   /// A builtin structure that holds a fixed number of `Item`s.
-  
+
   public static fun filled<Item>(length: Int /* UInt */, item: Item): Array<Item>
   /// Creates a new `Array` of the given `length`, where every slot is filled with the same `item`.
 
@@ -112,7 +112,7 @@ impl<Item> ArrayList<Item>: List<Item> {
 
   fun get(index: Int /* UInt */): Maybe<Item> {
     if index >= length_ {
-      None<Maybe<Item>>()
+      None<Item>()
     } else {
       items.get(index)
     }

@@ -38,6 +38,7 @@ abstract class CandyType with _$CandyType {
       IntersectionCandyType;
   const factory CandyType.parameter(String name, DeclarationId declarationId) =
       ParameterCandyType;
+  const factory CandyType.meta(CandyType baseType) = MetaCandyType;
   const factory CandyType.reflection(DeclarationId declarationId) =
       ReflectionCandyType;
 
@@ -89,7 +90,7 @@ abstract class CandyType with _$CandyType {
       );
   factory CandyType.arrayList(CandyType itemType) => CandyType.user(
         ModuleId.coreCollections.nested(['list', 'array']),
-        'Array',
+        'ArrayList',
         arguments: [itemType],
       );
   static const arrayListModuleId =
@@ -125,6 +126,10 @@ abstract class CandyType with _$CandyType {
   static const implies =
       UserCandyType(ModuleId.coreOperatorsLogical, 'Implies');
 
+  // random
+  static const randomSource =
+      UserCandyType(ModuleId.coreRandomSource, 'RandomSource');
+
   // reflection
   static const type = UserCandyType(ModuleId.coreReflection, 'Type');
   static const module = UserCandyType(ModuleId.coreReflection, 'Module');
@@ -159,6 +164,7 @@ abstract class CandyType with _$CandyType {
       intersection: (type) => type.copyWith(
           types: type.types.map((t) => t.bakeThisType(thisType)).toList()),
       parameter: (type) => type,
+      meta: (type) => type,
       reflection: (type) => type,
     );
   }
@@ -183,6 +189,7 @@ abstract class CandyType with _$CandyType {
       intersection: (type) => type.copyWith(
           types: type.types.map((t) => t.bakeGenerics(types)).toList()),
       parameter: (type) => types[type] ?? type,
+      meta: (type) => type,
       reflection: (type) => type,
     );
   }
@@ -205,10 +212,17 @@ abstract class CandyType with _$CandyType {
       union: (type) => type.types.join(' | '),
       intersection: (type) => type.types.join(' & '),
       parameter: (type) => '${type.name}@${type.declarationId}',
+      meta: (type) {
+        final base = type.baseType;
+        if (base is UserCandyType) return 'Type<${base.virtualModuleId}>';
+        if (base is ParameterCandyType) return 'Type<$base>';
+        throw CompilerError.internalError(
+          'Invalid meta target in `CandyType.toString()`: `$base`.',
+        );
+      },
       reflection: (type) {
         final id = type.declarationId;
         if (id.isModule) return 'Module<$id>';
-        if (id.isTrait || id.isClass) return 'Type<$id>';
         if (id.isFunction) return 'Function<$id>';
         if (id.isProperty) return 'Property<$id>';
         throw CompilerError.internalError(
@@ -279,7 +293,6 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
     CandyType getResultingType(ReflectionCandyType type) {
       final id = type.declarationId;
       if (id.isModule) return CandyType.module;
-      if (id.isTrait || id.isClass) return CandyType.type;
 
       if (id.isFunction) {
         final functionHir = getFunctionDeclarationHir(context, id);
@@ -346,6 +359,7 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
           intersection: (parentType) => parentType.types.every(
               (type) => isAssignableTo(context, Tuple2(childType, type))),
           parameter: (type) => false,
+          meta: (_) => isAssignableTo(context, Tuple2(child, CandyType.type)),
           reflection: (type) => isAssignableTo(
             context,
             Tuple2(getResultingType(type), parent),
@@ -384,6 +398,7 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
         final bound = getTypeParameterBound(context, type);
         return isAssignableTo(context, Tuple2(bound, parent));
       },
+      meta: (_) => isAssignableTo(context, Tuple2(CandyType.type, parent)),
       reflection: (type) =>
           isAssignableTo(context, Tuple2(getResultingType(type), parent)),
     );

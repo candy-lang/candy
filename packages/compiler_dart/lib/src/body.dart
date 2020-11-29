@@ -77,59 +77,52 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           '`super` is not yet supported in Dart compiler.',
         );
       },
+      meta: (type, __) => _saveSingle(node, compileType(context, type)),
       reflection: (id, __) {
         if (id.isModule) {
           throw CompilerError.internalError(
             'Reflection identifiers pointing to modules are not yet supported in Dart compiler.; `$id`',
           );
-        } else if (id.isTrait || id.isClass || id.isProperty || id.isFunction) {
-          dart.Expression expression;
-          if (id.isProperty || id.isFunction) {
-            assert(id.parent.isNotModule);
+        } else if (id.isProperty || id.isFunction) {
+          assert(id.parent.isNotModule);
 
-            final propertyType = compileType(
-              context,
-              id.isProperty
-                  ? getPropertyDeclarationHir(context, id).type
-                  : getFunctionDeclarationHir(context, id).returnType,
-            );
+          final propertyType = compileType(
+            context,
+            id.isProperty
+                ? getPropertyDeclarationHir(context, id).type
+                : getFunctionDeclarationHir(context, id).returnType,
+          );
 
-            final propertyName = id.simplePath.last.nameOrNull;
+          final propertyName = id.simplePath.last.nameOrNull;
 
-            final valueParameters = id.isFunction
-                ? getFunctionDeclarationHir(context, id).valueParameters
-                : <ValueParameter>[];
-            var body = dart.refer('instance').property(propertyName);
-            if (id.isFunction) {
-              body = body.call(
-                [
-                  for (final parameter in valueParameters)
-                    dart.refer(parameter.name),
-                ],
-                {},
-                [],
-              );
-            }
-
-            expression = dart.Method((b) => b
-              ..returns = propertyType
-              ..requiredParameters.add(dart.Parameter((b) => b
-                ..type = compileType(
-                  context,
-                  getPropertyDeclarationParentAsType(context, id).value,
-                )
-                ..name = 'instance'))
-              ..requiredParameters
-                  .addAll(valueParameters.map((p) => dart.Parameter((b) => b
-                    ..type = compileType(context, p.type)
-                    ..name = p.name)))
-              ..body = body.code).closure;
-          } else {
-            expression = dart.refer(
-              id.simplePath.last.nameOrNull,
-              declarationIdToImportUrl(context, id.parent),
+          final valueParameters = id.isFunction
+              ? getFunctionDeclarationHir(context, id).valueParameters
+              : <ValueParameter>[];
+          var body = dart.refer('instance').property(propertyName);
+          if (id.isFunction) {
+            body = body.call(
+              [
+                for (final parameter in valueParameters)
+                  dart.refer(parameter.name),
+              ],
+              {},
+              [],
             );
           }
+
+          final expression = dart.Method((b) => b
+            ..returns = propertyType
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..type = compileType(
+                context,
+                getPropertyDeclarationParentAsType(context, id).value,
+              )
+              ..name = 'instance'))
+            ..requiredParameters
+                .addAll(valueParameters.map((p) => dart.Parameter((b) => b
+                  ..type = compileType(context, p.type)
+                  ..name = p.name)))
+            ..body = body.code).closure;
           return _saveSingle(node, expression);
         }
         throw CompilerError.internalError(
@@ -203,7 +196,24 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
         dart.Expression lowered;
         if ((id.isProperty || id.isFunction) && id.parent.isNotModule) {
-          lowered = compileTypeName(context, id.parent).property(name);
+          final parentId = () {
+            if (id.parent.isTrait || id.parent.isClass) return id.parent;
+            if (id.parent.isImpl) {
+              final implHir = getImplDeclarationHir(context, id.parent);
+              final moduleId = implHir.type.virtualModuleId;
+              return moduleIdToDeclarationId(context, moduleId);
+            }
+            throw CompilerError.internalError(
+              "Property or function's parent is not a module, trait, impl or class: `$id`.",
+            );
+          }();
+
+          var typeName = compileTypeName(context, parentId);
+          if (name == 'randomSample') {
+            typeName =
+                dart.refer('${typeName.symbol}RandomExtension', typeName.url);
+          }
+          lowered = typeName.property(name);
         } else {
           var name = id.simplePath.last.nameOrNull;
           if (name == 'assert') name = 'assert_';
@@ -683,6 +693,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       union: (type) => dart.refer('dynamic', dartCoreUrl),
       intersection: (type) => dart.refer('dynamic', dartCoreUrl),
       parameter: (_) => compileSimple(),
+      meta: (_) => compileSimple(),
       reflection: (_) => compileSimple(),
     );
   }
@@ -716,6 +727,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           .reduce((value, element) => value.and(element))
           .parenthesized,
       parameter: (_) => compileSimple(),
+      meta: (_) => compileSimple(),
       reflection: (_) => compileSimple(),
     );
   }

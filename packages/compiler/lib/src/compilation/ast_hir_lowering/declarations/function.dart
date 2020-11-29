@@ -100,6 +100,22 @@ Tuple2<hir.FunctionDeclaration, List<hir.Expression>> getSyntheticMethod(
 ) {
   final implId = declarationId.parent;
   assert(implId.isImpl);
+
+  if (declarationId.simplePath.last.nameOrNull == 'randomSample') {
+    return Tuple2(
+      hir.FunctionDeclaration(
+        isStatic: true,
+        isTest: false,
+        name: 'randomSample',
+        valueParameters: [
+          hir.ValueParameter(name: 'source', type: hir.CandyType.randomSource),
+        ],
+        returnType: getImplDeclarationHir(context, implId).type,
+      ),
+      [],
+    );
+  }
+
   final classId = implId.parent;
   assert(classId.isClass);
   final classHir = getClassDeclarationHir(context, classId);

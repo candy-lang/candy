@@ -1,0 +1,5 @@
+fun main() {
+  let source = RandomSource.default_()
+  let value = Int.randomSample(source)
+  print(value)
+}

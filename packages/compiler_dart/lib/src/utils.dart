@@ -37,6 +37,23 @@ class FancyDartEmitter extends DartEmitter {
     output.writeln(' }');
     return output;
   }
+
+  StringSink visitExtension(Extension spec, [StringSink output]) {
+    output ??= StringBuffer();
+    output.write('extension');
+    if (spec.name != null) output.write(' ${spec.name}');
+    visitTypeParameters(spec.types.map((r) => r.type), output);
+    output..write(' on ')..write(spec.on.type.accept(this))..write(' {');
+    for (final m in spec.methods) {
+      visitMethod(m, output);
+      if (_isLambdaMethod(m)) {
+        output.write(';');
+      }
+      output.writeln();
+    }
+    output.writeln(' }');
+    return output;
+  }
 }
 
 class Mixin extends Spec {
@@ -68,5 +85,34 @@ class Mixin extends Spec {
     }
     return (visitor as FancyDartEmitter).visitMixin(this, context as StringSink)
         as R;
+  }
+}
+
+class Extension extends Spec {
+  Extension({
+    this.name,
+    this.types = const [],
+    @required this.on,
+    this.methods = const [],
+  });
+
+  final String name;
+  final List<Reference> types;
+  final Reference on;
+
+  final List<Method> methods;
+
+  @override
+  R accept<R>(SpecVisitor<R> visitor, [R context]) {
+    if (visitor is! FancyDartEmitter) {
+      throw UnimplementedError(
+          'Extension only accepts FancyDartEmitter, not ${visitor.runtimeType}.');
+    }
+    if (R != StringSink) {
+      throw UnimplementedError(
+          'Extension visitor should have StringSink as result type, not $R.');
+    }
+    return (visitor as FancyDartEmitter)
+        .visitExtension(this, context as StringSink) as R;
   }
 }

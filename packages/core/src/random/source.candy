@@ -1,0 +1,28 @@
+use ...collections
+use ...primitives
+
+public trait RandomSource {
+  fun generateBool(): Bool { generateByte() > 127 }
+
+  fun generateByte(): Int /* Byte */
+
+  fun generateBytes(length: Int): List<Int /* Byte */> {
+    let result = ArrayList.empty<Int /* Byte */>()
+    mut let i = 0
+    while i < length {
+      result.append(generateByte())
+      i = i + 1
+    }
+    result
+  }
+
+
+  // TODO(JonasWanke): rename this to `default` when we support mangling names
+  static fun default_(): RandomSource { DefaultRandomSource() }
+  static fun defaultWithSeed(seed: Int): RandomSource { DefaultRandomSource.withSeed(seed) }
+}
+
+builtin class DefaultRandomSource {
+  static fun withSeed(seed: Int): DefaultRandomSource
+}
+builtin impl DefaultRandomSource: RandomSource

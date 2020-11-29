@@ -14,7 +14,7 @@ public trait Iterable<Item> {
 
   fun get(index: Int /* UInt */): Maybe<Item> {
     /// Returns the [index]th element.
-    
+
     let iter = iterator()
     mut let i = 0
     mut let element: Maybe<Item> = None<Item>()
