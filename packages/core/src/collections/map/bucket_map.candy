@@ -1,6 +1,7 @@
 use ....primitives
 use ....operators
 use ....hash
+use ....todo
 use ...array
 use ...iterable
 use ...list
@@ -45,21 +46,23 @@ impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: Map<Key, Value> {
 }
 impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: MutableMap<Key, Value> {
   fun set(key: Key, value: Value) {
-    todo("Implement MutableMap.set")
+    todo("Implement BucketMap.set")
   }
 
   // TODO(marcelgarus): Implement `putIfAbsent` more efficiently than the default one. We can do
   // this by only hashing the `key` once and caching the bucket.
   // fun putIfAbsent(key: Key, ifAbsent: () => Value): Value
 
-  fun remove(key: Key): Bool
+  fun remove(key: Key): Bool {
+    todo("Implement BucketMap.remove")
+  }
 
   fun clear() {
     // TODO(marcelgarus): Implement
     // for key in keys() {
     //   remove(key)
     // }
-    todo("Implement MutableMap.clear")
+    todo("Implement BucketMap.clear")
   }
 
   // TODO(marcelgarus): Implement `cast` more efficiently than the default one. We canc do this by
