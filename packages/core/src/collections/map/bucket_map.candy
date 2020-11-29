@@ -41,7 +41,7 @@ impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: Map<Key, Value> {
   }
 
   fun entries(): Iterable<(Key, Value)> {
-    List.empty<(Key, Value)>()
+    todo("Implement BucketMap.entries")
   }
 }
 impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: MutableMap<Key, Value> {
@@ -65,7 +65,7 @@ impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: MutableMap<Key, Value> {
     todo("Implement BucketMap.clear")
   }
 
-  // TODO(marcelgarus): Implement `cast` more efficiently than the default one. We canc do this by
+  // TODO(marcelgarus): Implement `cast` more efficiently than the default one. We can do this by
   // using the precomputed `hash`es – regardless of the type, those won't change. That also means
   // the buckets basically stay the same.
   // fun cast<NewKey, NewValue>(): Map<NewKey, NewValue>
