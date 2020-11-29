@@ -34,7 +34,7 @@ impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: Map<Key, Value> {
   fun length(): Int { numEntries }
 
   fun get(key: Key): Maybe<Value> {
-    let hash = key.hash<Int>(Hasher.default())
+    let hash = key.hash<Int>(Hasher.default_())
     let bucket = bucketByHash(hash)
     bucket.get(key)
   }

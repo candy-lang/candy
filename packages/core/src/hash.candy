@@ -10,7 +10,7 @@ trait Hash {
 trait Hasher<Result> {
   /// A trait for hashing an arbitrary stream of bytes.
 
-  static fun default(): Hasher<Int> {
+  static fun default_(): Hasher<Int> {
     DefaultHasher(0)
   }
 
