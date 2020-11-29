@@ -105,6 +105,7 @@ Tuple2<hir.FunctionDeclaration, List<hir.Expression>> getSyntheticMethod(
   if (declarationId.simplePath.last.nameOrNull == 'randomSample') {
     return Tuple2(
       hir.FunctionDeclaration(
+        declarationId,
         isStatic: true,
         isTest: false,
         name: 'randomSample',
