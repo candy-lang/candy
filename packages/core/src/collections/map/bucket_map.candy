@@ -41,7 +41,7 @@ impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: Map<Key, Value> {
   }
 
   fun entries(): Iterable<(Key, Value)> {
-    List.empty<Value>()
+    List.empty<(Key, Value)>()
   }
 }
 impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: MutableMap<Key, Value> {
