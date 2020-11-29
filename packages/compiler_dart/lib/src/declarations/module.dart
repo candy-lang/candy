@@ -22,7 +22,7 @@ final compileModule = Query<ModuleId, Unit>(
       }
 
       if (moduleId == ModuleId.corePrimitives) {
-        b.body.addAll(DartBuiltinCompiler().compilePrimitiveGhosts());
+        b.body.addAll(DartBuiltinCompiler(context).compilePrimitiveGhosts());
       }
     });
 

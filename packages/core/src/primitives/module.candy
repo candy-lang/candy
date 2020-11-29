@@ -1,4 +1,5 @@
 use ..operators
+use ..random
 public use .maybe
 public use .result
 
@@ -53,6 +54,7 @@ public builtin class Int
 builtin impl Int: Number
 builtin impl Int: Equals & Comparable
 builtin impl Int: Add & Subtract & Negate & Multiply & Divide & DivideTruncating & Modulo
+builtin impl Int: Random /* & RandomInRange */
 // builtin impl Int: Number
 
 public builtin class Float

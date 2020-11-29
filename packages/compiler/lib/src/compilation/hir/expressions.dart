@@ -178,6 +178,10 @@ abstract class Identifier implements _$Identifier {
   const factory Identifier.this_(CandyType type) = ThisIdentifier;
   // ignore: non_constant_identifier_names
   const factory Identifier.super_(UserCandyType type) = SuperIdentifier;
+  const factory Identifier.meta(
+    CandyType referencedType, [
+    IdentifierExpression base,
+  ]) = MetaIdentifier;
   const factory Identifier.reflection(
     DeclarationId id, [
     IdentifierExpression base,
@@ -217,6 +221,7 @@ abstract class Identifier implements _$Identifier {
   CandyType get type => when(
         this_: (type) => type,
         super_: (type) => type,
+        meta: (type, _) => CandyType.meta(type),
         reflection: (declarationId, _) => CandyType.reflection(declarationId),
         tuple: () {
           final resourceId =

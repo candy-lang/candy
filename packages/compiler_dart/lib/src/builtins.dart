@@ -3,16 +3,20 @@ import 'package:compiler/compiler.dart';
 import 'package:dartx/dartx.dart';
 
 import 'constants.dart' hide srcDirectoryName;
+import 'type.dart';
+import 'utils.dart';
 
-final compileBuiltin = Query<DeclarationId, Option<dart.Spec>>(
+final compileBuiltin = Query<DeclarationId, List<dart.Spec>>(
   'dart.compileBuiltin',
   provider: (context, declarationId) =>
-      DartBuiltinCompiler().compile(context, declarationId),
+      DartBuiltinCompiler(context).compile(context, declarationId),
 );
 
 abstract class BuiltinCompiler<Output> {
-  Option<Output> compile(QueryContext context, DeclarationId declarationId) {
-    if (declarationId.isImpl) return None();
+  const BuiltinCompiler();
+
+  List<Output> compile(QueryContext context, DeclarationId declarationId) {
+    if (declarationId.isImpl) return [];
 
     final moduleId = declarationIdToModuleId(context, declarationId);
     final name = declarationId.simplePath.last.nameOrNull;
@@ -42,6 +46,9 @@ abstract class BuiltinCompiler<Output> {
       return compileString();
     } else if (moduleId == ModuleId.coreIoPrint && name == 'print') {
       return compilePrint();
+    } else if (moduleId ==
+        ModuleId.coreRandomSource.nested(['DefaultRandomSource'])) {
+      return compileDefaultRandomSource();
     }
 
     final declaration = getDeclarationAst(context, declarationId);
@@ -52,124 +59,150 @@ abstract class BuiltinCompiler<Output> {
   }
 
   List<Output> compilePrimitiveGhosts() {
-    return 2
-        .rangeTo(10)
-        .map(compileTuple)
-        .mapNotNull((output) => output.valueOrNull)
-        .toList();
+    return 2.rangeTo(10).map(compileTuple).flatten().toList();
   }
 
   // assert
-  Option<Output> compileAssert();
+  List<Output> compileAssert();
 
   // collections
   // collections.list
   // collections.list.array
-  Option<Output> compileArray();
+  List<Output> compileArray();
 
   // primitives
-  Option<Output> compileAny();
-  Option<Output> compileToString();
+  List<Output> compileAny();
+  List<Output> compileToString();
 
-  Option<Output> compileUnit();
-  Option<Output> compileNever();
+  List<Output> compileUnit();
+  List<Output> compileNever();
 
-  Option<Output> compileBool();
+  List<Output> compileBool();
 
-  Option<Output> compileNumber();
-  Option<Output> compileInt();
-  Option<Output> compileFloat();
+  List<Output> compileNumber();
+  List<Output> compileInt();
+  List<Output> compileFloat();
 
-  Option<Output> compileString();
+  List<Output> compileString();
 
-  Option<Output> compileTuple(int size);
+  List<Output> compileTuple(int size);
 
   // stdio
-  Option<Output> compilePrint();
+  List<Output> compilePrint();
+
+  // random.source
+  List<Output> compileDefaultRandomSource();
 }
 
 class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
+  const DartBuiltinCompiler(this.context) : assert(context != null);
+
+  final QueryContext context;
+
   @override
-  Option<dart.Spec> compileAssert() {
-    return Option.some(dart.Method.returnsVoid((b) => b
-      ..name = 'assert_'
-      ..requiredParameters.add(dart.Parameter((b) => b
-        ..name = 'condition'
-        ..type = dart.refer('bool', dartCoreUrl)))
-      ..requiredParameters.add(dart.Parameter((b) => b
-        ..name = 'message'
-        ..type = dart.refer('String', dartCoreUrl)))
-      ..body = dart.Block(
-        (b) => b.addExpression(dart.InvokeExpression.newOf(
-          dart.refer('assert'),
-          [dart.refer('condition'), dart.refer('message')],
-          {},
-          [],
+  List<dart.Spec> compileAssert() {
+    return [
+      dart.Method.returnsVoid((b) => b
+        ..name = 'assert_'
+        ..requiredParameters.add(dart.Parameter((b) => b
+          ..name = 'condition'
+          ..type = dart.refer('bool', dartCoreUrl)))
+        ..requiredParameters.add(dart.Parameter((b) => b
+          ..name = 'message'
+          ..type = dart.refer('String', dartCoreUrl)))
+        ..body = dart.Block(
+          (b) => b.addExpression(dart.InvokeExpression.newOf(
+            dart.refer('assert'),
+            [dart.refer('condition'), dart.refer('message')],
+            {},
+            [],
+          )),
         )),
-      )));
+    ];
   }
 
   @override
-  Option<dart.Spec> compileArray() {
+  List<dart.Spec> compileArray() {
     // `Array<Value>` corresponds to `List<Value>`, hence nothing to do.
-    return Option.none();
+    return [];
   }
 
   @override
-  Option<dart.Spec> compileAny() {
+  List<dart.Spec> compileAny() {
     // `Any` corresponds to `Object`, hence nothing to do.
-    return Option.none();
+    return [];
   }
 
   @override
-  Option<dart.Spec> compileToString() {
+  List<dart.Spec> compileToString() {
     // `ToString` is given by Dart's `Object`, hence nothing to do.
-    return Option.none();
+    return [];
   }
 
   @override
-  Option<dart.Spec> compileUnit() {
+  List<dart.Spec> compileUnit() {
     // `Unit` corresponds to `void`, hence nothing to do.
-    return Option.none();
+    return [];
   }
 
   @override
-  Option<dart.Spec> compileNever() {
-    return Option.some(dart.Class((b) => b..name = 'Never'));
+  List<dart.Spec> compileNever() {
+    return [dart.Class((b) => b..name = 'Never')];
   }
 
   @override
-  Option<dart.Spec> compileBool() {
+  List<dart.Spec> compileBool() {
     // `Bool` corresponds to `bool`, hence nothing to do.
-    return Option.none();
+    return [];
   }
 
   @override
-  Option<dart.Spec> compileNumber() {
+  List<dart.Spec> compileNumber() {
     // `Number` corresponds to `num`, hence nothing to do.
-    return Option.none();
+    return [];
   }
 
   @override
-  Option<dart.Spec> compileInt() {
-    // `Int` corresponds to `int`, hence nothing to do.
-    return Option.none();
+  List<dart.Spec> compileInt() {
+    // `Int` corresponds to `int`, hence nothing to do for the type itself.
+    return [
+      Extension(
+        name: 'IntRandomExtension',
+        on: dart.refer('int', dartCoreUrl),
+        methods: [
+          dart.Method((b) => b
+            ..static = true
+            ..returns = dart.refer('int', dartCoreUrl)
+            ..name = 'randomSample'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..type = compileType(context, CandyType.randomSource)
+              ..name = 'source'))
+            ..body = dart.Block((b) => b
+              ..statements.add(dart
+                  .refer('source')
+                  .property('generateByte')
+                  .call([], {}, [])
+                  .returned
+                  .statement))),
+        ],
+      ),
+    ];
   }
 
   @override
-  Option<dart.Spec> compileFloat() {
+  List<dart.Spec> compileFloat() {
     // `Float` corresponds to `double`, hence nothing to do.
-    return Option.none();
+    return [];
   }
 
   @override
-  Option<dart.Spec> compileString() {
+  List<dart.Spec> compileString() {
     // `String` corresponds to `String`, hence nothing to do.
-    return Option.none();
+    return [];
   }
 
   @override
-  Option<dart.Spec> compileTuple(int size) {
+  List<dart.Spec> compileTuple(int size) {
     const fieldNames = [
       'first',
       'second',
@@ -185,43 +218,96 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
 
     final fields = 1.rangeTo(size).map((i) => fieldNames[i - 1]);
 
-    return Option.some(dart.Class((b) => b
-      ..annotations.add(dart.refer('sealed', packageMetaUrl))
-      ..name = 'Tuple$size'
-      ..types.addAll(1.rangeTo(size).map((number) => dart.refer('T$number')))
-      ..fields.addAll(fields.mapIndexed((index, name) => dart.Field((b) => b
-        ..modifier = dart.FieldModifier.final$
-        ..type = dart.refer('T${index + 1}')
-        ..name = name)))
-      ..constructors.add(dart.Constructor((b) => b
-        ..constant = true
-        ..requiredParameters.addAll(fields.map((name) => dart.Parameter((b) => b
-          ..toThis = true
+    return [
+      dart.Class((b) => b
+        ..annotations.add(dart.refer('sealed', packageMetaUrl))
+        ..name = 'Tuple$size'
+        ..types.addAll(1.rangeTo(size).map((number) => dart.refer('T$number')))
+        ..fields.addAll(fields.mapIndexed((index, name) => dart.Field((b) => b
+          ..modifier = dart.FieldModifier.final$
+          ..type = dart.refer('T${index + 1}')
           ..name = name)))
-        ..initializers.addAll(fields.map((name) => dart.refer('assert').call(
-            [dart.refer(name).notEqualTo(dart.literalNull)], {}, []).code))))
-      ..methods.add(dart.Method((b) => b
-        ..annotations.add(dart.refer('override', dartCoreUrl))
-        ..returns = dart.refer('String', dartCoreUrl)
-        ..name = 'toString'
-        ..lambda = true
-        ..body = dart.Code("'(${fields.map((f) => '\$$f').join(', ')})'")))));
+        ..constructors.add(dart.Constructor((b) => b
+          ..constant = true
+          ..requiredParameters
+              .addAll(fields.map((name) => dart.Parameter((b) => b
+                ..toThis = true
+                ..name = name)))
+          ..initializers.addAll(fields.map((name) => dart.refer('assert').call(
+              [dart.refer(name).notEqualTo(dart.literalNull)], {}, []).code))))
+        ..methods.add(dart.Method((b) => b
+          ..annotations.add(dart.refer('override', dartCoreUrl))
+          ..returns = dart.refer('String', dartCoreUrl)
+          ..name = 'toString'
+          ..lambda = true
+          ..body = dart.Code("'(${fields.map((f) => '\$$f').join(', ')})'")))),
+    ];
   }
 
   @override
-  Option<dart.Spec> compilePrint() {
-    return Option.some(dart.Method.returnsVoid((b) => b
-      ..name = 'print'
-      ..requiredParameters.add(dart.Parameter((b) => b
-        ..name = 'object'
-        ..type = dart.refer('Object', dartCoreUrl)))
-      ..body = dart.Block(
-        (b) => b.addExpression(dart.InvokeExpression.newOf(
-          dart.refer('print', dartCoreUrl),
-          [dart.refer('object')],
-          {},
-          [],
+  List<dart.Spec> compilePrint() {
+    return [
+      dart.Method.returnsVoid((b) => b
+        ..name = 'print'
+        ..requiredParameters.add(dart.Parameter((b) => b
+          ..name = 'object'
+          ..type = dart.refer('Object', dartCoreUrl)))
+        ..body = dart.Block(
+          (b) => b.addExpression(dart.InvokeExpression.newOf(
+            dart.refer('print', dartCoreUrl),
+            [dart.refer('object')],
+            {},
+            [],
+          )),
         )),
-      )));
+    ];
+  }
+
+  @override
+  List<dart.Spec> compileDefaultRandomSource() {
+    final int = compileType(context, CandyType.int);
+    final random = dart.refer('Random', dartMathUrl);
+    return [
+      dart.Class((b) => b
+        ..name = 'DefaultRandomSource'
+        ..implements.add(compileType(context, CandyType.randomSource))
+        ..mixins.add(dart.refer('RandomSource\$Default'))
+        ..constructors.add(dart.Constructor((b) => b
+          ..optionalParameters.add(dart.Parameter((b) => b
+            ..named = false
+            ..type = int
+            ..name = 'seed'))
+          ..initializers.add(dart
+              .refer('_random')
+              .assign(random.call([dart.refer('seed')], {}, []))
+              .code)))
+        ..methods.add(dart.Method((b) => b
+          ..static = true
+          ..name = 'withSeed'
+          ..requiredParameters.add(dart.Parameter((b) => b
+            ..type = int
+            ..name = 'seed'))
+          ..body = dart.Block((b) => b
+            ..statements.add(dart
+                .refer('DefaultRandomSource')
+                .call([dart.refer('seed')], {}, [])
+                .returned
+                .statement))))
+        ..fields.add(dart.Field((b) => b
+          ..modifier = dart.FieldModifier.final$
+          ..type = random
+          ..name = '_random'))
+        ..methods.add(dart.Method((b) => b
+          ..annotations.add(dart.refer('override', dartCoreUrl))
+          ..returns = compileType(context, CandyType.int)
+          ..name = 'generateByte'
+          ..body = dart.Block((b) => b
+            ..statements.add(dart
+                .refer('_random')
+                .property('nextInt')
+                .call([dart.literalNum(1 << 8)], {}, [])
+                .returned
+                .statement)))))
+    ];
   }
 }
