@@ -180,11 +180,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             ..body = dart.Block((b) => b
               ..statements.add(dart
                   .refer('source')
-                  .property('generateIntegers')
-                  .call([dart.literalNum(1)], {}, [])
-                  .property('single')
-                  .call([], {}, [])
-                  .property('unwrap')
+                  .property('generateByte')
                   .call([], {}, [])
                   .returned
                   .statement))),
