@@ -107,8 +107,9 @@ Iterable<DeclarationId> _getImplDeclarationIds(
   }
 }
 
-final getAllImplsForTraitOrClass = Query<DeclarationId, List<DeclarationId>>(
-  'getAllImplsForTraitOrClass',
+final getAllImplsForTraitOrClassOrImpl =
+    Query<DeclarationId, List<DeclarationId>>(
+  'getAllImplsForTraitOrClassOrImpl',
   provider: (context, declarationId) {
     final impls = getAllImpl(context, Unit()).where((id) {
       final moduleId = getImplDeclarationHir(context, id).type.virtualModuleId;

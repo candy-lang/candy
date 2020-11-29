@@ -691,10 +691,12 @@ class ContextContext extends Context {
       yield parent;
 
       Iterable<hir.Declaration> walkHierarchy(hir.Declaration type) sync* {
-        assert(type is hir.TraitDeclaration || type is hir.ClassDeclaration);
+        assert(type is hir.TraitDeclaration ||
+            type is hir.ClassDeclaration ||
+            type is hir.ImplDeclaration);
         yield type;
 
-        final implIds = getAllImplsForTraitOrClass(queryContext, type.id);
+        final implIds = getAllImplsForTraitOrClassOrImpl(queryContext, type.id);
         for (final implId in implIds) {
           final impl = implId.getHir(queryContext) as hir.ImplDeclaration;
           yield impl;
@@ -737,8 +739,8 @@ class ContextContext extends Context {
         assert(parentId.isImpl);
         final implHir = getImplDeclarationHir(queryContext, parentId);
         yield* walkHierarchy(
-          implHir,
-          // moduleIdToDeclarationId(queryContext, implHir.type.virtualModuleId),
+          moduleIdToDeclarationId(queryContext, implHir.type.virtualModuleId)
+              .getHir(queryContext),
         );
       }
     }
@@ -1662,7 +1664,7 @@ extension on Context {
           .zip<hir.CandyType, MapEntry<hir.CandyType, hir.CandyType>>(
               typeArguments, (a, b) => MapEntry(a, b)));
 
-      final impls = getAllImplsForTraitOrClass(queryContext, receiverId)
+      final impls = getAllImplsForTraitOrClassOrImpl(queryContext, receiverId)
           .map((implId) => getImplDeclarationHir(queryContext, implId))
           .toList();
       for (final impl in impls) {
