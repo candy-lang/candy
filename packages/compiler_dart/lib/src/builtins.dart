@@ -273,8 +273,6 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
     final int = compileType(context, CandyType.int);
     final random = dart.refer('Random', dartMathUrl);
     return [
-      // fun generateIntegers(length: Int): List<Int>
-      // static fun withSeed(seed: Int): This
       dart.Class((b) => b
         ..name = 'DefaultRandomSource'
         ..implements.add(compileType(context, CandyType.randomSource))

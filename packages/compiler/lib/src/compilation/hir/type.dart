@@ -126,7 +126,7 @@ abstract class CandyType with _$CandyType {
   static const implies =
       UserCandyType(ModuleId.coreOperatorsLogical, 'Implies');
 
-  // reflection
+  // random
   static const randomSource =
       UserCandyType(ModuleId.coreRandomSource, 'RandomSource');
 

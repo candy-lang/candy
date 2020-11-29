@@ -105,6 +105,7 @@ Tuple2<hir.FunctionDeclaration, List<hir.Expression>> getSyntheticMethod(
     return Tuple2(
       hir.FunctionDeclaration(
         isStatic: true,
+        isTest: false,
         name: 'randomSample',
         valueParameters: [
           hir.ValueParameter(name: 'source', type: hir.CandyType.randomSource),
