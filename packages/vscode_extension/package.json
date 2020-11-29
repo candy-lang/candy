@@ -39,9 +39,9 @@
     "configuration": {
       "title": "🍭 Candy",
       "properties": {
-        "candy.candyPath": {
+        "candy.corePath": {
           "type": "string",
-          "description": "Path to the 🍭 Candy standard library.",
+          "description": "Path to the 🍭 Candy core library.",
           "scope": "machine-overridable"
         },
         "candy.languageServerCommand": {

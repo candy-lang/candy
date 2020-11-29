@@ -20,7 +20,7 @@ final Query<DeclarationId, List<dart.Spec>> compileClass =
     // ignore: non_constant_identifier_names
     final classHir = getClassDeclarationHir(context, declarationId);
 
-    final impls = getAllImplsForTraitOrClass(context, declarationId)
+    final impls = getAllImplsForTraitOrClassOrImpl(context, declarationId)
         .map((id) => getImplDeclarationHir(context, id));
     final traits = impls.expand((impl) => impl.traits);
     final implements = traits.map((it) => compileType(context, it));

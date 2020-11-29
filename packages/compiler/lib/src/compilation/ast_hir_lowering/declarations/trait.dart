@@ -56,6 +56,7 @@ final getTraitDeclarationHir = Query<DeclarationId, hir.TraitDeclaration>(
     }
 
     return hir.TraitDeclaration(
+      declarationId,
       name,
       thisType: hir.UserCandyType(
         declarationIdToModuleId(context, declarationId).parent,

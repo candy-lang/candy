@@ -22,6 +22,7 @@ final getConstructorDeclarationHir =
         classHir.innerDeclarationIds.where((id) => id.isProperty);
 
     return hir.ConstructorDeclaration(
+      classId,
       typeParameters: classHir.typeParameters,
       valueParameters: propertyIds
           .map((id) => getPropertyDeclarationHir(context, id))

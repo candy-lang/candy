@@ -56,6 +56,7 @@ final getImplDeclarationHir = Query<DeclarationId, hir.ImplDeclaration>(
     // TODO(JonasWanke): check impl validity (required methods available, correct package)
 
     return hir.ImplDeclaration(
+      declarationId,
       typeParameters: typeParameters,
       type: astTypeToHirType(context, Tuple2(declarationId, implAst.type))
           as hir.UserCandyType,
@@ -106,8 +107,9 @@ Iterable<DeclarationId> _getImplDeclarationIds(
   }
 }
 
-final getAllImplsForTraitOrClass = Query<DeclarationId, List<DeclarationId>>(
-  'getAllImplsForTraitOrClass',
+final getAllImplsForTraitOrClassOrImpl =
+    Query<DeclarationId, List<DeclarationId>>(
+  'getAllImplsForTraitOrClassOrImpl',
   provider: (context, declarationId) {
     final impls = getAllImpl(context, Unit()).where((id) {
       final moduleId = getImplDeclarationHir(context, id).type.virtualModuleId;
@@ -126,10 +128,7 @@ final getAllImpl = Query<Unit, List<DeclarationId>>(
   'getAllImpl',
   provider: (context, declarationId) {
     return getAllDependencies(context, Unit())
-        .followedBy([
-          if (context.config.packageId != PackageId.core)
-            context.config.packageId,
-        ])
+        .followedBy([context.config.packageId])
         .expand((packageId) => context.config.resourceProvider
             .getAllFileResourceIds(context, packageId))
         .where((resourceId) => resourceId.isCandySourceFile)

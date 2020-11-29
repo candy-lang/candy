@@ -1,0 +1,33 @@
+use ...primitives
+use ..iterable
+
+public builtin class Array<Item> {
+  /// A structure that holds a fixed number of `Item`s.
+  
+  public static fun filled<Item>(length: Int /* UInt */, item: Item): Array<Item>
+  /// Creates a new `Array` of the given `length`, where every slot is filled with the same `item`.
+
+  public let length: Int
+
+  public fun get(index: Int /* UInt */): Item
+  public fun set(index: Int /* UInt */, item: Item)
+}
+
+// TODO(marcelgarus): Make Array Iterable.
+// impl<Item> Array<Item>: Iterable<Item> {
+//   fun iterator(): Iterator<Item> {
+//     ArrayIterator<Item>(this, 0)
+//   }
+// }
+
+// class ArrayIterator<Item> {
+//   let array: Array<Item>
+//   mut let cursor: Int
+// }
+// impl<Item> ArrayIterator<Item>: Iterator<Item> {
+//   fun next(): Maybe<Item> {
+//     let item = array.get(0)
+//     cursor = cursor + 1
+//     item
+//   }
+// }

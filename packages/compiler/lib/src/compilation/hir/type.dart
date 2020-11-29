@@ -89,14 +89,14 @@ abstract class CandyType with _$CandyType {
         arguments: [itemType],
       );
   factory CandyType.arrayList(CandyType itemType) => CandyType.user(
-        ModuleId.coreCollections.nested(['list', 'array']),
+        ModuleId.coreCollections.nested(['list', 'array_list']),
         'ArrayList',
         arguments: [itemType],
       );
-  static const arrayListModuleId =
-      ModuleId(PackageId.core, ['collections', 'list', 'array', 'ArrayList']);
+  static const arrayListModuleId = ModuleId(
+      PackageId.core, ['collections', 'list', 'array_list', 'ArrayList']);
   static const arrayModuleId =
-      ModuleId(PackageId.core, ['collections', 'list', 'array', 'Array']);
+      ModuleId(PackageId.core, ['collections', 'array', 'Array']);
 
   // operators
   // operators.arithmetic

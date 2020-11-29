@@ -1,6 +1,7 @@
 use ...primitives
 use ..iterable
-public use .array
+use ..array
+public use .array_list
 
 public trait List<Item>: Iterable<Item> {
   static fun empty<Item>(): List<Item> { ArrayList.empty<Item>() }
@@ -21,15 +22,8 @@ public trait List<Item>: Iterable<Item> {
   }
 
   // TODO(marcelgarus): Getterize!
-  fun length(): Int /* UInt */
-  // TODO(marcelgarus): Getterize!
   fun isEmpty(): Bool { length() == 0 }
-
-  fun get(index: Int /* UInt */): Maybe<Item>
 }
-
-// impl<Item> List<Item>: GetOperator<Int, Item> /* GetOperator<UInt, Item> */
-// TODO(JonasWanke): impl List<Item>: GetOperator<Range<UInt>, List<Item>>
 
 public trait MutableList<Item>: List<Item> {
   static fun empty<Item>(): MutableList<Item> { ArrayList.empty<Item>() }
@@ -60,12 +54,12 @@ public trait MutableList<Item>: List<Item> {
   fun removeThird(): Item { removeAt(2) }
   fun removeFourth(): Item { removeAt(3) }
   fun removeFifth(): Item { removeAt(4) }
-  fun removeSixth(): Item { removeAt(5) }
-  fun removeSeventh(): Item { removeAt(6) }
 
   fun removeLast(): Item { removeAt(length() - 1) }
   fun removeSecondLast(): Item { removeAt(length() - 2) }
-  fun removeThirdLast(): Item { removeAt(length() - 2) }
+  fun removeThirdLast(): Item { removeAt(length() - 3) }
+  fun removeFourthLast(): Item { removeAt(length() - 4) }
+  fun removeFifthLast(): Item { removeAt(length() - 5) }
 
   fun clear() {
     while isNotEmpty() {

@@ -30,8 +30,6 @@ public trait Iterable<Item> {
   fun third(): Maybe<Item> { get(2) }
   fun fourth(): Maybe<Item> { get(3) }
   fun fifth(): Maybe<Item> { get(4) }
-  fun sixth(): Maybe<Item> { get(5) }
-  fun seventh(): Maybe<Item> { get(6) }
 
   fun nthLast(index: Int): Maybe<Item> {
     // TODO(marcelgarus): Implement this.
@@ -53,6 +51,8 @@ public trait Iterable<Item> {
   fun last(): Maybe<Item> { nthLast(0) }
   fun secondLast(): Maybe<Item> { nthLast(1) }
   fun thirdLast(): Maybe<Item> { nthLast(2) }
+  fun fourthLast(): Maybe<Item> { nthLast(3) }
+  fun fifthLast(): Maybe<Item> { nthLast(4) }
 
   fun single(): Maybe<Item> {
     let iter = iterator()
@@ -68,14 +68,14 @@ public trait Iterable<Item> {
 
   // Properties.
 
-  // fun length(): Int {
-  //   let iter = iterator()
-  //   mut let length = 0
-  //   while iter.next() is More<Item> {
-  //     length = length + 1
-  //   }
-  //   length
-  // }
+  fun length(): Int {
+    let iter = iterator()
+    mut let length = 0
+    while iter.next() is Some<Item> {
+      length = length + 1
+    }
+    length
+  }
 
   // Boolean checks.
 

@@ -35,13 +35,12 @@ final getModuleDeclarationHir = Query<ModuleId, hir.ModuleDeclaration>(
   'getModuleDeclarationHir',
   provider: (context, moduleId) {
     final ast = getModuleDeclarationAst(context, moduleId);
+    final declarationId = moduleIdToDeclarationId(context, moduleId);
     return hir.ModuleDeclaration(
+      declarationId,
       parent: moduleId.parentOrNull,
       name: ast.name.name,
-      innerDeclarationIds: getInnerDeclarationIds(
-        context,
-        moduleIdToDeclarationId(context, moduleId),
-      ),
+      innerDeclarationIds: getInnerDeclarationIds(context, declarationId),
     );
   },
 );

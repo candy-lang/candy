@@ -1,39 +1,55 @@
 use ...operators
 use ...primitives
+use ...hash
 use ...todo
 use ..iterable
 
-/*public trait Map<Key: Equals, Value>: Iterable<(Key, Value)> {
+// TODO(marcelgarus): Create type alias `MapKey` for `Equals & Hash`.
+
+public trait Map<Key: Equals & Hash, Value> {
   fun length(): Int
   fun isEmpty(): Bool { length() == 0 }
+  fun isNotEmpty(): Bool { !isEmpty() }
 
-  fun get(index: Key): Maybe<Value>
-  fun keys(): Iterable<Key>
-  fun values(): Iterable<Value>
+  fun get(key: Key): Maybe<Value>
+  fun containsKey(key: Key): Bool { get(key) is Some<Value> }
 
-  fun containsKey(key: Key): Bool {
-    // keys().contains(key)
-    todo("Implement Map.containsKey")
-  }
+  fun entries(): Iterable<(Key, Value)>
+  fun keys(): Iterable<Key> { entries().map<Key>({ it.first }) }
+  fun values(): Iterable<Value> { entries().map<Value>({ it.second }) }
 }
 
 // TODO(marcelgarus): impl Map<Key, Value>: GetOperator<Key, Maybe<Value>>
 
-public trait MutableMap<Key: Equals, Value>: Map<Key, Value> {
+public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
   fun set(key: Key, value: Value)
-  fun putIfAbsent(key: Key, ifAbsent: () => Value): Value
+
+  fun putIfAbsent(key: Key, ifAbsent: () => Value): Value {
+    // let value = get(key)
+    // if value is Some<Value> {
+    //   // value.unwrap()
+    // } else {
+    //   let value = ifAbsent()
+    //   // set(key, value)
+    //   // value
+    // }
+    todo("Implement putIfAbsent")
+  }
+
   fun remove(key: Key): Bool
 
   fun clear() {
-    // TODO(marcelgarus): Implement
     // for key in keys() {
     //   remove(key)
     // }
     todo("Implement MutableMap.clear")
   }
 
-  fun setAll(map: Map<Key, Value>)
+  fun setAll(map: Map<Key, Value>) {
+    todo("Implement MutableMap.setAll")
+  }
+
   fun cast<NewKey, NewValue>(): Map<NewKey, NewValue> {
     todo("Implement MutableMap.cast")
   }
-}*/
+}

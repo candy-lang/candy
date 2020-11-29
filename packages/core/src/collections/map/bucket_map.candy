@@ -1,0 +1,72 @@
+use ....primitives
+use ....operators
+use ....hash
+use ....todo
+use ...array
+use ...iterable
+use ...list
+use ...map
+
+class MapEntry<Key, Value> {
+  let key: Key
+  let hash: Int
+  let value: Value
+}
+
+class Bucket<Key: Equals & Hash, Value> {
+  let entries: List<MapEntry<Key, Value>>
+
+  fun get(key: Key): Maybe<Value> {
+    let entries: Iterable<MapEntry<Key, Value>> = entries
+    entries.where({ it.key == key }).map<Value>({ it.value }).single()
+  }
+}
+
+class BucketMap<Key, Value> {
+  let buckets: Array<Bucket<Key, Value>>
+  let numEntries: Int
+
+  fun bucketByHash(hash: Int): Bucket<Key, Value> {
+    let index = hash % buckets.length
+    buckets.get(index)
+  }
+}
+impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: Map<Key, Value> {
+  fun length(): Int { numEntries }
+
+  fun get(key: Key): Maybe<Value> {
+    let hash = key.hash<Int>(Hasher.default_())
+    let bucket = bucketByHash(hash)
+    bucket.get(key)
+  }
+
+  fun entries(): Iterable<(Key, Value)> {
+    todo("Implement BucketMap.entries")
+  }
+}
+impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: MutableMap<Key, Value> {
+  fun set(key: Key, value: Value) {
+    todo("Implement BucketMap.set")
+  }
+
+  // TODO(marcelgarus): Implement `putIfAbsent` more efficiently than the default one. We can do
+  // this by only hashing the `key` once and caching the bucket.
+  // fun putIfAbsent(key: Key, ifAbsent: () => Value): Value
+
+  fun remove(key: Key): Bool {
+    todo("Implement BucketMap.remove")
+  }
+
+  fun clear() {
+    // TODO(marcelgarus): Implement
+    // for key in keys() {
+    //   remove(key)
+    // }
+    todo("Implement BucketMap.clear")
+  }
+
+  // TODO(marcelgarus): Implement `cast` more efficiently than the default one. We can do this by
+  // using the precomputed `hash`es – regardless of the type, those won't change. That also means
+  // the buckets basically stay the same.
+  // fun cast<NewKey, NewValue>(): Map<NewKey, NewValue>
+}

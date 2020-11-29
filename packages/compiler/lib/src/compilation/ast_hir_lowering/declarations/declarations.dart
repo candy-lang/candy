@@ -44,6 +44,31 @@ final getDeclarationAst = Query<DeclarationId, ast.Declaration>(
   },
 );
 
+extension GetHir on DeclarationId {
+  /// TODO(marcelgarus): We could rename this to just `hir`, but then the import should be different.
+  hir.Declaration getHir(QueryContext context) {
+    if (isModule) {
+      return getModuleDeclarationHir(
+          context, declarationIdToModuleId(context, this));
+    } else if (isConstructor) {
+      return getConstructorDeclarationHir(context, this);
+    } else if (isFunction) {
+      return getFunctionDeclarationHir(context, this);
+    } else if (isProperty) {
+      return getPropertyDeclarationHir(context, this);
+    } else if (isTrait) {
+      return getTraitDeclarationHir(context, this);
+    } else if (isImpl) {
+      return getImplDeclarationHir(context, this);
+    } else if (isClass) {
+      return getClassDeclarationHir(context, this);
+    } else {
+      throw CompilerError.internalError(
+          'Tried to get hir of DeclarationId with unknown type: $this');
+    }
+  }
+}
+
 Option<ast.Declaration> _findDeclarationAst(
   ast.Declaration declaration,
   List<DisambiguatedDeclarationPathData> path,
