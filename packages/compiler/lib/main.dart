@@ -21,7 +21,7 @@ class BuildCommand extends Command<void> {
     argParser.addFlag(_optionCandyDirectory);
   }
 
-  static const _optionCandyDirectory = 'candy-path';
+  static const _optionCandyDirectory = 'core-path';
 
   @override
   String get name => 'build';

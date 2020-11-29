@@ -6,7 +6,7 @@ import 'package:args/command_runner.dart';
 import 'package:compiler/compiler.dart';
 import 'package:compiler_dart/compiler_dart.dart';
 
-const _optionCandyDirectory = 'candy-path';
+const _optionCandyDirectory = 'core-path';
 
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()..addOption(_optionCandyDirectory);
@@ -17,7 +17,7 @@ Future<void> main(List<String> arguments) async {
     if (rest.length != 1) {
       throw UsageException(
         'Please enter the project directory to compile.',
-        'candy2dart --candy-path=/path/to/candy .',
+        'candy2dart --core-path=/path/to/candy .',
       );
     }
 
@@ -25,14 +25,14 @@ Future<void> main(List<String> arguments) async {
     if (candyDirectoryRaw == null) {
       throw UsageException(
         'Please enter the directory of the Candy standard library.',
-        'candy2dart --candy-path=/path/to/candy .',
+        'candy2dart --core-path=/path/to/candy .',
       );
     }
     final candyDirectory = Directory(candyDirectoryRaw);
     if (!candyDirectory.existsSync()) {
       throw UsageException(
         "Candy directory `${candyDirectory.absolute.path}` doesn't exist.",
-        'candy2dart --candy-path=/path/to/candy .',
+        'candy2dart --core-path=/path/to/candy .',
       );
     }
 
@@ -42,7 +42,7 @@ Future<void> main(List<String> arguments) async {
     if (validationResult != null) {
       throw UsageException(
         '${projectDirectory.absolute.path} is not a valid project directory:\n$validationResult',
-        'candy2dart --candy-path=/path/to/candy .',
+        'candy2dart --core-path=/path/to/candy .',
       );
     }
 

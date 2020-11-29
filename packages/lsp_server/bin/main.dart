@@ -5,15 +5,15 @@ import 'package:args/args.dart';
 import 'package:lsp_server/src/analysis_server.dart';
 import 'package:lsp_server/src/channel.dart';
 
-const _optionCandyDirectory = 'candy-path';
+const _optionCoreDirectory = 'core-path';
 
 Future<void> main(List<String> arguments) async {
   stderr.write('Starting LSP…');
 
-  final parser = ArgParser()..addOption(_optionCandyDirectory);
+  final parser = ArgParser()..addOption(_optionCoreDirectory);
   final results = parser.parse(arguments);
 
-  final corePath = results[_optionCandyDirectory];
+  final corePath = results[_optionCoreDirectory];
   final coreDirectory = Directory(corePath);
   if (!coreDirectory.existsSync()) {
     stderr.write('Core library not found at $corePath.');

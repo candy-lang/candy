@@ -69,8 +69,8 @@ function safeSpawn(): SpawnedProcess {
     command = [parts[0], parts.slice(1)];
   }
 
-  const candyPath = configuration.get<string | null>("candyPath");
-  command[1].push(`--candy-path="${candyPath}"`);
+  const corePath = configuration.get<string | null>("corePath");
+  command[1].push(`--core-path="${corePath}"`);
 
   return child_process.spawn(command[0], command[1], {
     env: process.env,
