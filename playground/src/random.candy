@@ -1,5 +1,5 @@
 fun main() {
-  let source = DefaultRandomSource()
+  let source = RandomSource.default_()
   let value = Int.randomSample(source)
   print(value)
 }

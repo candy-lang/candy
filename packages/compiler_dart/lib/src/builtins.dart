@@ -3,7 +3,6 @@ import 'package:compiler/compiler.dart';
 import 'package:dartx/dartx.dart';
 
 import 'constants.dart' hide srcDirectoryName;
-import 'declarations/declaration.dart';
 import 'type.dart';
 import 'utils.dart';
 
@@ -276,57 +275,43 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
       dart.Class((b) => b
         ..name = 'DefaultRandomSource'
         ..implements.add(compileType(context, CandyType.randomSource))
+        ..mixins.add(dart.refer('RandomSource\$Default'))
         ..constructors.add(dart.Constructor((b) => b
-          ..initializers
-              .add(dart.refer('_random').assign(random.call([], {}, [])).code)))
-        ..constructors.add(dart.Constructor((b) => b
-          ..name = 'withSeed'
-          ..requiredParameters.add(dart.Parameter((b) => b
+          ..optionalParameters.add(dart.Parameter((b) => b
+            ..named = false
             ..type = int
             ..name = 'seed'))
           ..initializers.add(dart
               .refer('_random')
               .assign(random.call([dart.refer('seed')], {}, []))
               .code)))
+        ..methods.add(dart.Method((b) => b
+          ..static = true
+          ..name = 'withSeed'
+          ..requiredParameters.add(dart.Parameter((b) => b
+            ..type = int
+            ..name = 'seed'))
+          ..body = dart.Block((b) => b
+            ..statements.add(dart
+                .refer('DefaultRandomSource')
+                .call([dart.refer('seed')], {}, [])
+                .returned
+                .statement))))
         ..fields.add(dart.Field((b) => b
           ..modifier = dart.FieldModifier.final$
           ..type = random
           ..name = '_random'))
         ..methods.add(dart.Method((b) => b
           ..annotations.add(dart.refer('override', dartCoreUrl))
-          ..returns = compileType(context, CandyType.list(CandyType.int))
-          ..name = 'generateIntegers'
-          ..requiredParameters.add(dart.Parameter((b) => b
-            ..type = int
-            ..name = 'length'))
+          ..returns = compileType(context, CandyType.int)
+          ..name = 'generateByte'
           ..body = dart.Block((b) => b
-            ..statements.add(compileTypeName(
-                    context,
-                    moduleIdToDeclarationId(
-                        context, CandyType.arrayListModuleId))
-                .property('create')
-                .call(
-                  [dart.refer('length')],
-                  {},
-                  [int],
-                )
-                .assignFinal('list')
-                .statement)
-            ..statements.add(dart.Block.of([
-              const dart.Code('for (var i = 0; i < length; i++) {'),
-              dart.refer('list').property('append').call(
-                [
-                  dart
-                      .refer('_random')
-                      .property('nextInt')
-                      .call([dart.literalNum(1 << 32)], {}, [])
-                ],
-                {},
-                [],
-              ).statement,
-              const dart.Code('}'),
-            ]))
-            ..statements.add(dart.refer('list').returned.statement)))))
+            ..statements.add(dart
+                .refer('_random')
+                .property('nextInt')
+                .call([dart.literalNum(1 << 8)], {}, [])
+                .returned
+                .statement)))))
     ];
   }
 }

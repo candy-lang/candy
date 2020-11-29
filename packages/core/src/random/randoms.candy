@@ -1,6 +1,6 @@
 use ..source
 
-trait Random {
+public trait Random {
   fun randomSample(source: RandomSource): This
 }
 
