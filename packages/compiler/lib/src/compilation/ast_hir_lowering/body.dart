@@ -1306,7 +1306,7 @@ extension on Context {
             if (!hir.isAssignableTo(
                 queryContext, Tuple2(typeParameter, hirType))) {
               errors.add(CompilerError.invalidExpressionType(
-                'Declared type `$hirType` is not assignable to expected type `${declaredParameter.type}`.',
+                'Declared type `$typeParameter` is not assignable to expected type `$hirType`.',
                 location:
                     ErrorLocation(resourceId, declaredParameter.type.span),
               ));
@@ -2834,7 +2834,7 @@ extension on Context {
       ]);
     }
 
-    final isMutable = left.identifier.isMutableOrNull;
+    final isMutable = left.identifier.isMutableOrNull ?? false;
     if (!isMutable) {
       return Error([
         CompilerError.assignmentToImmutable(
