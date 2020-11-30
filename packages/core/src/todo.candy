@@ -1,4 +1,5 @@
 use ..primitives
+use ..string
 
 public fun todo(message: String = "Not implemented"): Never {
   /// Always throws a `TodoError`.

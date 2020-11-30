@@ -147,7 +147,14 @@ abstract class ModuleId implements _$ModuleId {
 
   static const core = ModuleId(PackageId.core);
   static const coreAssert = ModuleId(PackageId.core, ['assert']);
+  static const coreBool = ModuleId(PackageId.core, ['bool']);
   static const coreCollections = ModuleId(PackageId.core, ['collections']);
+  static const coreIo = ModuleId(PackageId.core, ['io']);
+  static const coreMaybe = ModuleId(PackageId.core, ['maybe']);
+  static const coreNumbers = ModuleId(PackageId.core, ['numbers']);
+  static const coreNumbersFloat =
+      ModuleId(PackageId.core, ['numbers', 'float']);
+  static const coreNumbersInt = ModuleId(PackageId.core, ['numbers', 'int']);
   static const coreOperators = ModuleId(PackageId.core, ['operators']);
   static const coreOperatorsArithmetic =
       ModuleId(PackageId.core, ['operators', 'arithmetic']);
@@ -158,13 +165,12 @@ abstract class ModuleId implements _$ModuleId {
   static const coreOperatorsLogical =
       ModuleId(PackageId.core, ['operators', 'logical']);
   static const corePrimitives = ModuleId(PackageId.core, ['primitives']);
-  static const corePrimitivesTuples =
-      ModuleId(PackageId.core, ['primitives', 'tuples']);
+  static const coreString = ModuleId(PackageId.core, ['string']);
+  static const coreTuples = ModuleId(PackageId.core, ['tuples']);
   static const coreRandom = ModuleId(PackageId.core, ['random']);
   static const coreRandomSource =
       ModuleId(PackageId.core, ['random', 'source']);
   static const coreReflection = ModuleId(PackageId.core, ['reflection']);
-  static const coreIo = ModuleId(PackageId.core, ['io']);
   static const coreIoPrint = ModuleId(PackageId.core, ['io', 'print']);
 
   bool get hasParent => path.isNotEmpty;

@@ -1,5 +1,6 @@
 use ...collections
-use ...primitives
+use ...bool
+use ...numbers
 
 public trait RandomSource {
   fun generateBool(): Bool { generateByte() > 127 }
@@ -15,7 +16,6 @@ public trait RandomSource {
     }
     result
   }
-
 
   // TODO(JonasWanke): rename this to `default` when we support mangling names
   static fun default_(): RandomSource { DefaultRandomSource() }

@@ -46,24 +46,25 @@ abstract class CandyType with _$CandyType {
       _$CandyTypeFromJson(json);
   const CandyType._();
 
-  // primitives
+  // primitives types
   static const any = CandyType.user(ModuleId.corePrimitives, 'Any');
   static const unit = CandyType.user(ModuleId.corePrimitives, 'Unit');
   static const never = CandyType.user(ModuleId.corePrimitives, 'Never');
 
-  static const bool = CandyType.user(ModuleId.corePrimitives, 'Bool');
-  static const number = CandyType.user(ModuleId.corePrimitives, 'Number');
-  static const int = CandyType.user(ModuleId.corePrimitives, 'Int');
-  static const float = CandyType.user(ModuleId.corePrimitives, 'Float');
-  static const string = CandyType.user(ModuleId.corePrimitives, 'String');
+  // other important types
+  static const bool = CandyType.user(ModuleId.coreBool, 'Bool');
+  static const number = CandyType.user(ModuleId.coreNumbers, 'Number');
+  static const int = CandyType.user(ModuleId.coreNumbersInt, 'Int');
+  static const float = CandyType.user(ModuleId.coreNumbersFloat, 'Float');
+  static const string = CandyType.user(ModuleId.coreString, 'String');
 
   factory CandyType.maybe(CandyType itemType) => CandyType.user(
-        ModuleId.corePrimitives.nested(['maybe']),
+        ModuleId.coreMaybe,
         'Maybe',
         arguments: [itemType],
       );
   factory CandyType.some(CandyType itemType) => CandyType.user(
-        ModuleId.corePrimitives.nested(['maybe']),
+        ModuleId.coreMaybe,
         'Some',
         arguments: [itemType],
       );

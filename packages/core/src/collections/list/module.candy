@@ -1,4 +1,6 @@
-use ...primitives
+use ...bool
+use ...maybe
+use ...numbers
 use ..iterable
 use ..array
 public use .array_list

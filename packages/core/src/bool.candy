@@ -1,0 +1,6 @@
+use ..operators
+
+public builtin class Bool
+/// A type that can be either `true` or `false`.
+
+builtin impl Bool: Equals & And & Or & Opposite & Implies

@@ -1,13 +1,18 @@
+use ...bool
 use ...operators
-use ...primitives
-use ..list
+use ...maybe
+use ...numbers
 use ...todo
+use ..list
 
 public trait Iterator<Item> {
   fun next(): Maybe<Item>
+  /// Returns `Some` if there's another item ot iterate over and `None` if it finished iterating.
 }
 
 public trait Iterable<Item> {
+  /// A thing that can create an `Iterator<Item>`.
+
   fun /* let */ iterator(): Iterator<Item>
 
   // Getters

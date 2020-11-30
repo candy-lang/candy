@@ -1,4 +1,4 @@
-use ...primitives
+use ...bool
 
 // trait BinaryEquals<Other, Result> {
 //   fun equalsOperator(other: Other): Result

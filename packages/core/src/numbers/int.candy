@@ -1,0 +1,10 @@
+use ...numbers
+use ...operators
+use ...random
+
+public builtin class Int
+builtin impl Int: Number
+builtin impl Int: Equals & Comparable
+builtin impl Int: Add & Subtract & Negate & Multiply & Divide & DivideTruncating & Modulo
+builtin impl Int: Random /* & RandomInRange */
+// builtin impl Int: Number
