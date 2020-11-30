@@ -198,7 +198,7 @@ abstract class Identifier implements _$Identifier {
   const factory Identifier.property(
     DeclarationId id,
     CandyType type, {
-    bool isMutable,
+    @required bool isMutable,
     Expression base,
     Expression receiver,
   }) = PropertyIdentifier;

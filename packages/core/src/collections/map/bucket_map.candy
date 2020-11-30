@@ -43,8 +43,7 @@ impl<Key: Equals & Hash, Value> Bucket<Key, Value>: MutableMap<Key, Value> {
     if entry is None<MapEntry<Key, Value>> {
       entries_.append(MapEntry<Key, Value>(key, hashByKey(key), value))
     } else {
-      // entry.unwrap().value = value
-      todo("Implement Bucket.set if the entry is already there.")
+      entry.unwrap().value = value
     }
   }
   fun remove(key: Key): Maybe<Value> {
