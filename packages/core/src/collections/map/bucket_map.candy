@@ -7,38 +7,64 @@ use ...iterable
 use ...list
 use ...map
 
+// TODO(marcelgarus): Make the `BucketMap` implementation way more efficient.
+
+fun hashByKey(key: Hash): Int { key.hash<Int>(Hasher.default_()) }
+
 class MapEntry<Key, Value> {
   let key: Key
   let hash: Int
-  let value: Value
+  mut let value: Value
 }
 
 class Bucket<Key: Equals & Hash, Value> {
-  let entries: List<MapEntry<Key, Value>>
+  /// An inefficient "mini-map" (it's typically pretty small).
 
-  fun get(key: Key): Maybe<Value> {
-    let entries: Iterable<MapEntry<Key, Value>> = entries
-    entries.where({ it.key == key }).map<Value>({ it.value }).single()
+  let entries_: MutableList<MapEntry<Key, Value>>
+
+  fun entryForKey(key: Key): Maybe<MapEntry<Key, Value>> {
+    let entries: Iterable<MapEntry<Key, Value>> = entries_
+    entries.where({ it.key == key }).single()
+  }
+}
+impl<Key: Equals & Hash, Value> Bucket<Key, Value>: Map<Key, Value> {
+  fun length(): Int { (entries_ as Iterable<Bucket<Key, Value>>).length() }
+
+  fun get(key: Key): Maybe<Value> { entryForKey(key).map<Value>({ it.value }) }
+  fun entries(): Iterable<(Key, Value)> {
+    (entries_ as Iterable<MapEntry<Key, Value>>)
+      .map<(Key, Value)>({ Tuple(it.key, it.value) })
+    todo("Implement Bucket.entries")
+  }
+}
+impl<Key: Equals & Hash, Value> Bucket<Key, Value>: MutableMap<Key, Value> {
+  fun set(key: Key, value: Value) {
+    let entry = entryForKey(key)
+    if entry is None<MapEntry<Key, Value>> {
+      entries_.append(MapEntry<Key, Value>(key, hashByKey(key), value))
+    } else {
+      // entry.unwrap().value = value
+      todo("Implement Bucket.set if the entry is already there.")
+    }
+  }
+  fun remove(key: Key): Maybe<Value> {
+    entries_
+      .removeFirstWhere({ it.key == key })
+      .map<Value>({ bucket => bucket.value })
   }
 }
 
-class BucketMap<Key, Value> {
+class BucketMap<Key: Equals & Hash, Value> {
   let buckets: Array<Bucket<Key, Value>>
-  let numEntries: Int
+  mut let numEntries: Int
 
-  fun bucketByHash(hash: Int): Bucket<Key, Value> {
-    let index = hash % buckets.length
-    buckets.get(index)
-  }
+  fun bucketByHash(hash: Int): Bucket<Key, Value> { buckets.get(hash % buckets.length) }
+  fun bucketByKey(key: Key): Bucket<Key, Value> { bucketByHash(hashByKey(key)) }
 }
 impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: Map<Key, Value> {
   fun length(): Int { numEntries }
 
-  fun get(key: Key): Maybe<Value> {
-    let hash = key.hash<Int>(Hasher.default_())
-    let bucket = bucketByHash(hash)
-    bucket.get(key)
-  }
+  fun get(key: Key): Maybe<Value> { bucketByKey(key).get(key) }
 
   fun entries(): Iterable<(Key, Value)> {
     todo("Implement BucketMap.entries")
@@ -46,27 +72,31 @@ impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: Map<Key, Value> {
 }
 impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: MutableMap<Key, Value> {
   fun set(key: Key, value: Value) {
-    todo("Implement BucketMap.set")
+    let bucket = bucketByKey(key)
+    if !bucket.containsKey(key) {
+      numEntries = numEntries + 1
+    }
+    bucket.set(key, value)
   }
 
-  // TODO(marcelgarus): Implement `putIfAbsent` more efficiently than the default one. We can do
-  // this by only hashing the `key` once and caching the bucket.
-  // fun putIfAbsent(key: Key, ifAbsent: () => Value): Value
+  fun putIfAbsent(key: Key, ifAbsent: () => Value): Value {
+    let bucket = bucketByKey(key)
+    if !bucket.containsKey(key) {
+      bucket.set(key, ifAbsent())
+      numEntries = numEntries + 1
+    }
+  }
 
   fun remove(key: Key): Bool {
-    todo("Implement BucketMap.remove")
-  }
-
-  fun clear() {
-    // TODO(marcelgarus): Implement
-    // for key in keys() {
-    //   remove(key)
-    // }
-    todo("Implement BucketMap.clear")
+    let bucket = bucketByKey(key)
+    if bucket.containsKey(key) {
+      bucket.remove(key)
+      numEntries = numEntries - 1
+    }
   }
 
   // TODO(marcelgarus): Implement `cast` more efficiently than the default one. We can do this by
   // using the precomputed `hash`es – regardless of the type, those won't change. That also means
-  // the buckets basically stay the same.
+  // the buckets stay the same.
   // fun cast<NewKey, NewValue>(): Map<NewKey, NewValue>
 }

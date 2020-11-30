@@ -61,6 +61,18 @@ public trait MutableList<Item>: List<Item> {
   fun removeFourthLast(): Item { removeAt(length() - 4) }
   fun removeFifthLast(): Item { removeAt(length() - 5) }
 
+  fun removeFirstWhere(check: (Item) => Bool): Maybe<Item> {
+    mut let cursor = 0
+    for item in this as Iterable<Item> {
+      if check(item) {
+        removeAt(cursor)
+        return Some<Item>(item)
+      }
+      cursor = cursor + 1
+    }
+    return None<Item>()
+  }
+
   fun clear() {
     while isNotEmpty() {
       removeLast()
