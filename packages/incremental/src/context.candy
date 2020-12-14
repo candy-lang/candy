@@ -1,0 +1,62 @@
+use ..query
+
+trait QueryContext {
+  /// A context that orchestrates queries.
+
+  let cache: MutableMap<String, MutableMap<Any, Any>>
+  let stack: MutableList<(String, Any)>
+
+  fun run<T>(query: Query<T>): T {
+    let signature = (query.name, query.input)
+    if stack.contains(signature) {
+      throw "Cyclic query {signature}. This is the stack:\n{stack}"
+    }
+    cache
+      .putIfAbsent(query.name, { MutableMap.default_<Any, Any>() })
+      .putIfAbsent(query.input, {
+        stack.append(signature)
+        parent.run(query)
+        stack.removeLast()
+      }) as T
+  }
+}
+
+
+class SimpleQueryContext {
+  /// A very simple `QueryContext` that always executes all queries.
+
+  fun run<T>(query: Query<T>): T { query.runner() }
+}
+
+class CachedQueryContext {
+  /// A `QueryContext` that caches all runs.
+  // TODO(marcelgarus): Make this way more efficient.
+  
+  let parent: QueryContext
+  let cache: MutableMap<String, MutableMap<Any, Any>>
+  /// Maps each query name to a map from input to output.
+
+  fun run<T>(query: Query<T>): T {
+    cache
+      .putIfAbsent(query.name, { MutableMap.default_<Any, Any>() })
+      .putIfAbsent(query.input, { parent.run<T>(query) }) as T
+  }
+}
+
+class CycleDetectingQueryContext {
+  /// A `QueryContext` that aborts if it finds a cyclic query.
+  
+  let parent: QueryContext
+  let stack: MutableList<(String, Any)>
+  /// A stack containing signatures of all ongoing calls (name and input).
+
+  fun run<T>(query: Query<T>): T {
+    let signature = (query.name, query.input)
+    if stack.contains(signature) {
+      throw "Cyclic query {signature}. This is the stack:\n{stack}"
+    }
+    stack.append(signature)
+    parent.run(query)
+    stack.removeLast()
+  }
+}

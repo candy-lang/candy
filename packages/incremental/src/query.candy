@@ -1,0 +1,14 @@
+class Query<T> {
+  let name: String
+  /// A unique query name. For example, you might have a `"getSign"` query that computes the sign of
+  /// an integer. The query name usually equals the name of the method or function that runs the
+  /// query.
+
+  let input: Equals & Hash
+  /// The input to the query. Multiple inputs can be represented as `Tuple`s or `List`s.
+
+  let runner: () => T
+  /// A runner that actually runs the query.
+
+  let evaluateAlways: Bool
+}
