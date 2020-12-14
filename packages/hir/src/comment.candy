@@ -1,0 +1,6 @@
+use ..declaration
+
+public class CandyDoc {
+  public let target: Module | Trait | Class | Constructor | Function | Property
+  public let content: String /* Markup */
+}
