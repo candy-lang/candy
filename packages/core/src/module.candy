@@ -1,7 +1,16 @@
 public use .assert
+public use .bool
 public use .collections
+public use .hash
+public use .io
+public use .maybe
+public use .numbers
 public use .operators
 public use .primitives
-public use .io
 public use .random
+public use .reflection
+public use .result
+public use .run
+public use .string
 public use .todo
+public use .tuples

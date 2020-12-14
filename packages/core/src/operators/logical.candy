@@ -1,4 +1,4 @@
-use ...primitives
+use ...bool
 
 trait And {
   fun and(other: This): Bool

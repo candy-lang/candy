@@ -121,7 +121,7 @@ final lowerUseLineAstToHir =
               location: ErrorLocation(resourceId, useLine.span),
             );
           }
-          resolved = resolved.parent;
+          resolved = resolved.parentOrNull;
         }
         return resolved
             .nested(useLine.pathSegments.map((s) => s.name).toList());

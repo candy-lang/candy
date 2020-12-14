@@ -1,6 +1,8 @@
-use ...operators
-use ...primitives
+use ...bool
 use ...hash
+use ...maybe
+use ...numbers
+use ...operators
 use ...todo
 use ..iterable
 

@@ -34,15 +34,15 @@ abstract class BuiltinCompiler<Output> {
       return compileUnit();
     } else if (moduleId == ModuleId.corePrimitives.nested(['Never'])) {
       return compileNever();
-    } else if (moduleId == ModuleId.corePrimitives.nested(['Bool'])) {
+    } else if (moduleId == ModuleId.coreBool.nested(['Bool'])) {
       return compileBool();
-    } else if (moduleId == ModuleId.corePrimitives.nested(['Number'])) {
+    } else if (moduleId == ModuleId.coreNumbers.nested(['Number'])) {
       return compileNumber();
-    } else if (moduleId == ModuleId.corePrimitives.nested(['Int'])) {
+    } else if (moduleId == ModuleId.coreNumbersInt.nested(['Int'])) {
       return compileInt();
-    } else if (moduleId == ModuleId.corePrimitives.nested(['Float'])) {
+    } else if (moduleId == ModuleId.coreNumbersFloat.nested(['Float'])) {
       return compileFloat();
-    } else if (moduleId == ModuleId.corePrimitives.nested(['String'])) {
+    } else if (moduleId == ModuleId.coreString.nested(['String'])) {
       return compileString();
     } else if (moduleId == ModuleId.coreIoPrint && name == 'print') {
       return compilePrint();

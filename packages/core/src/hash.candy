@@ -1,5 +1,5 @@
 use ..collections
-use ..primitives
+use ..numbers
 
 trait Hash {
   /// Implemented by types that can be hashed.
