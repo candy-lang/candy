@@ -35,6 +35,9 @@
       "path": "playground"
     },
     {
+      "path": "packages\\glados"
+    },
+    {
       "path": "packages\\hir"
     }
   ],
