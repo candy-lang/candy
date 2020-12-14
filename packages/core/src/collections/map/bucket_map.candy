@@ -4,61 +4,18 @@ use ....hash
 use ....todo
 use ...array
 use ...iterable
-use ...list
 use ...map
+use ..linked_hash_map
 
 // TODO(marcelgarus): Make the `BucketMap` implementation way more efficient.
-
-fun hashByKey(key: Hash): Int { key.hash<Int>(Hasher.default_()) }
-
-class MapEntry<Key, Value> {
-  let key: Key
-  let hash: Int
-  mut let value: Value
-}
-
-class Bucket<Key: Equals & Hash, Value> {
-  /// An inefficient "mini-map" (it's typically pretty small).
-
-  let entries_: MutableList<MapEntry<Key, Value>>
-
-  fun entryForKey(key: Key): Maybe<MapEntry<Key, Value>> {
-    let entries: Iterable<MapEntry<Key, Value>> = entries_
-    entries.where({ it.key == key }).single()
-  }
-}
-impl<Key: Equals & Hash, Value> Bucket<Key, Value>: Map<Key, Value> {
-  fun length(): Int { (entries_ as Iterable<Bucket<Key, Value>>).length() }
-
-  fun get(key: Key): Maybe<Value> { entryForKey(key).map<Value>({ it.value }) }
-  fun entries(): Iterable<(Key, Value)> {
-    (entries_ as Iterable<MapEntry<Key, Value>>)
-      .map<(Key, Value)>({ Tuple(it.key, it.value) })
-    todo("Implement Bucket.entries")
-  }
-}
-impl<Key: Equals & Hash, Value> Bucket<Key, Value>: MutableMap<Key, Value> {
-  fun set(key: Key, value: Value) {
-    let entry = entryForKey(key)
-    if entry is None<MapEntry<Key, Value>> {
-      entries_.append(MapEntry<Key, Value>(key, hashByKey(key), value))
-    } else {
-      entry.unwrap().value = value
-    }
-  }
-  fun remove(key: Key): Maybe<Value> {
-    entries_
-      .removeFirstWhere({ it.key == key })
-      .map<Value>({ bucket => bucket.value })
-  }
-}
+// TODO(marcelgarus): Typedef Bucket as LinkedHashMap.
 
 class BucketMap<Key: Equals & Hash, Value> {
-  let buckets: Array<Bucket<Key, Value>>
+  let buckets: Array<LinkedHashMap<Key, Value>>
   mut let numEntries: Int
 
-  fun bucketByHash(hash: Int): Bucket<Key, Value> { buckets.get(hash % buckets.length) }
-  fun bucketByKey(key: Key): Bucket<Key, Value> { bucketByHash(hashByKey(key)) }
+  fun bucketByHash(hash: Int): LinkedHashMap<Key, Value> { buckets.get(hash % buckets.length) }
+  fun bucketByKey(key: Key): LinkedHashMap<Key, Value> { bucketByHash(hashByKey(key)) }
 }
 impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: Map<Key, Value> {
   fun length(): Int { numEntries }
