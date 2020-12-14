@@ -41,6 +41,7 @@ impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: MutableMap<Key, Value> {
       bucket.set(key, ifAbsent())
       numEntries = numEntries + 1
     }
+    bucket.get(key).unwrap()
   }
 
   fun remove(key: Key): Bool {
