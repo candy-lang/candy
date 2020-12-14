@@ -117,10 +117,10 @@ class _BodyPropertyVisitor extends ast.TraversingAstVisitor {
   ) {
     if (node.type == null) {
       final id = hirInfos.second.map[node.id];
-      final hir = getExpression(context, id).value;
+      final hir = getExpression(context, id);
       _labels.add(TypeLabel(
         node.name.span.toRange(server, resourceId),
-        hir.type.toString(),
+        hir is Some ? hir.value.type.toString() : "(couldn't determine type)",
       ));
     }
     super.visitPropertyDeclarationExpression(node);

@@ -667,7 +667,7 @@ class ParserGrammar {
           LexerGrammar.GREATER_GREATER_GREATER_EQUALS)
       // conditional
       ..complexGrouping<List<dynamic>, Expression, List<dynamic>>(
-        LexerGrammar.IF & LexerGrammar.NLs,
+        LexerGrammar.IF & LexerGrammar.WS,
         LexerGrammar.NLs &
             expression &
             (LexerGrammar.NLs &

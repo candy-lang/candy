@@ -67,7 +67,7 @@ final compileTypeName = Query<DeclarationId, dart.Reference>(
 
 final Query<TypeParameter, dart.TypeReference> compileTypeParameter =
     Query<TypeParameter, dart.TypeReference>(
-  'dart.compileType',
+  'dart.compileTypeParameter',
   evaluateAlways: true,
   provider: (context, parameter) {
     return dart.TypeReference((b) => b

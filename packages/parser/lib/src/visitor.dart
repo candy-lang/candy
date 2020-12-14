@@ -252,7 +252,7 @@ abstract class TraversingAstVisitor extends GeneralizingAstVisitor<void> {
 
   @override
   void visitAstNode(AstNode node) {
-    for (final innerNode in node.children) innerNode.accept(this);
+    for (final innerNode in node.children) innerNode?.accept(this);
   }
 }
 

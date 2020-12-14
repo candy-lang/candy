@@ -1306,7 +1306,7 @@ extension on Context {
             if (!hir.isAssignableTo(
                 queryContext, Tuple2(typeParameter, hirType))) {
               errors.add(CompilerError.invalidExpressionType(
-                'Declared type `$hirType` is not assignable to expected type `${declaredParameter.type}`.',
+                'Declared type `$typeParameter` is not assignable to expected type `$hirType`.',
                 location:
                     ErrorLocation(resourceId, declaredParameter.type.span),
               ));
@@ -1734,6 +1734,7 @@ extension on Context {
                     .bakeGenerics(genericsMap)
                     .bakeGenerics(genericsMap)
                     .bakeGenerics(genericsMap),
+                isMutable: propertyHir.isMutable,
                 base: target,
                 receiver: target,
               );
@@ -1747,6 +1748,7 @@ extension on Context {
                     .bakeGenerics(genericsMap)
                     .bakeGenerics(genericsMap)
                     .bakeGenerics(genericsMap),
+                isMutable: false,
                 base: target,
                 receiver: target,
               );
@@ -1803,6 +1805,7 @@ extension on Context {
                 ? hir.Identifier.property(
                     id,
                     propertyHir.type,
+                    isMutable: propertyHir.isMutable,
                     base: base,
                   )
                 : hir.Identifier.reflection(id, base);
@@ -1812,6 +1815,7 @@ extension on Context {
                 ? hir.Identifier.property(
                     id,
                     functionHir.functionType,
+                    isMutable: false,
                     base: base,
                   )
                 : hir.Identifier.reflection(id, base);
@@ -1897,6 +1901,7 @@ extension on Context {
                       .inner(DeclarationPathData.class_('Tuple$tupleSize'))
                       .inner(DeclarationPathData.property(name)),
                   type.items[fieldIndex],
+                  isMutable: false,
                   base: target,
                   receiver: target,
                 ),
@@ -2834,7 +2839,9 @@ extension on Context {
       ]);
     }
 
-    final isMutable = left.identifier.isMutableOrNull;
+    final isMutable = left.identifier.isMutableOrNull ??
+        (throw CompilerError.internalError(
+            'Assignment to ${left.identifier}, which is neither a property nor a local property.'));
     if (!isMutable) {
       return Error([
         CompilerError.assignmentToImmutable(
