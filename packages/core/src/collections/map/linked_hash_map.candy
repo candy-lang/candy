@@ -1,0 +1,50 @@
+use ....primitives
+use ....operators
+use ....hash
+use ....todo
+use ...iterable
+use ...list
+use ...map
+
+fun hashByKey(key: Hash): Int { key.hash<Int>(Hasher.default_()) }
+
+class MapEntry<Key, Value> {
+  let key: Key
+  let hash: Int
+  mut let value: Value
+}
+
+class LinkedHashMap<Key: Equals & Hash, Value> {
+  /// An inefficient "mini-map" (it's typically pretty small).
+
+  let entries_: MutableList<MapEntry<Key, Value>>
+
+  fun entryForKey(key: Key): Maybe<MapEntry<Key, Value>> {
+    let entries: Iterable<MapEntry<Key, Value>> = entries_
+    entries.where({ it.key == key }).single()
+  }
+}
+impl<Key: Equals & Hash, Value> LinkedHashMap<Key, Value>: Map<Key, Value> {
+  fun length(): Int { (entries_ as Iterable<LinkedHashMap<Key, Value>>).length() }
+
+  fun get(key: Key): Maybe<Value> { entryForKey(key).map<Value>({ it.value }) }
+  fun entries(): Iterable<(Key, Value)> {
+    (entries_ as Iterable<MapEntry<Key, Value>>)
+      .map<(Key, Value)>({ Tuple(it.key, it.value) })
+  }
+}
+impl<Key: Equals & Hash, Value> LinkedHashMap<Key, Value>: MutableMap<Key, Value> {
+  fun set(key: Key, value: Value) {
+    let entry = entryForKey(key)
+    if entry is None<MapEntry<Key, Value>> {
+      entries_.append(MapEntry<Key, Value>(key, hashByKey(key), value))
+    } else {
+      entry.unwrap().value = value
+    }
+  }
+  fun remove(key: Key): Maybe<Value> {
+    entries_
+      .removeFirstWhere({ it.key == key })
+      .map<Value>({ entry => entry.value })
+  }
+}
