@@ -44,12 +44,14 @@ impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: MutableMap<Key, Value> {
     bucket.get(key).unwrap()
   }
 
-  fun remove(key: Key): Bool {
+  fun remove(key: Key): Maybe<Value> {
     let bucket = bucketByKey(key)
     if bucket.containsKey(key) {
-      bucket.remove(key)
+      let result = bucket.remove(key)
       numEntries = numEntries - 1
+      return result
     }
+    None<Value>()
   }
 
   // TODO(marcelgarus): Implement `cast` more efficiently than the default one. We can do this by
