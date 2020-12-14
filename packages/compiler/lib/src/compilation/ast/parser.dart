@@ -3,6 +3,7 @@ import 'package:parser/parser.dart';
 import 'package:path/path.dart' as p;
 
 import '../../constants.dart';
+import '../../errors.dart';
 import '../../query.dart';
 import '../ids.dart';
 
@@ -67,9 +68,12 @@ final getSourceCode = Query<ResourceId, String>(
 final getAst = Query<ResourceId, CandyFile>(
   'getAst',
   provider: (context, resourceId) {
-    return parseCandySource(
-      resourceId.fileNameWithoutExtension,
-      getSourceCode(context, resourceId),
-    );
+    final source = getSourceCode(context, resourceId);
+    try {
+      return parseCandySource(resourceId.fileNameWithoutExtension, source);
+    } catch (e) {
+      throw CompilerError.internalError(
+          "Couldn't parse $resourceId. Source code:\n$source\nError: $e");
+    }
   },
 );
