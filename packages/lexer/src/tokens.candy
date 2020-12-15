@@ -1,0 +1,75 @@
+public trait Token {
+  public let span: Span
+}
+
+public data class Span {
+  public let start: Int
+  /// Start offset, inclusive.
+
+  public let end: Int
+  /// End offset, exclusive.
+}
+
+
+public class Keyword {
+  public let span: Span
+
+  public let keyword: String
+  /// May be one of the following:
+  ///
+  /// * directives: use, crate
+  /// * declarations: module, trait, impl, class, fun, let, var, get, set
+  /// * control flow: if, else, loop, while, for, return, break, continue
+  ///
+  /// TODO(JonasWanke): convert this to an enum when we support these
+}
+impl Keyword: Token
+
+
+public class Identifier {
+  public let span: Span
+  public let identifier: String
+}
+impl Identifier: Token
+
+
+public class Literal<T> {
+  public let span: Span
+  public let value: T
+}
+impl<T> Literal<T>: Token
+
+
+public class Punctuation {
+  public let span: Span
+
+  public let punctuation: String
+  /// May be one of the following:
+  ///
+  /// `-`, `->`, `,`, `:`, `!=`, `"`, `(`, `)`, `{`, `}`, `*`, `/`, `&`, `%`,
+  /// `+`, `<`, `<=`, `=`, `==`, `=>`, `>`, `>=`, `|`, `~/`, `.`
+  ///
+  /// TODO(JonasWanke): convert this to an enum when we support these
+}
+impl Punctuation: Token
+
+
+public class Comment {
+  public let span: Span
+  public let content: String
+
+  public let type: String
+  /// May be one of the following:
+  ///
+  /// * "line": `// foo`
+  /// * "doc": `/// foo`
+  /// * "block": `/* foo\nbar */`
+}
+impl Comment: Token
+
+
+public class Whitespace {
+  public let span: Span
+  public let content: String
+}
+impl Whitespace: Token
