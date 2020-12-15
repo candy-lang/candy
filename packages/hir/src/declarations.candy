@@ -1,0 +1,64 @@
+use ..uris
+
+public trait Declaration {
+  public let parent: Package | Module | Trait | Class
+  public fun name(): String
+}
+
+public class Module {
+  public let parent: Package | Module
+  public let name_: String
+}
+impl Module: Declaration {
+  fun name(): String { name_ }
+}
+
+public class Trait {
+  public let parent: Module | Trait | Class
+  public let name_: String
+}
+impl Trait: Declaration {
+  fun name(): String { name_ }
+}
+
+public class Impl {
+  public let parent: Module
+  public let disambiguator: Int
+}
+impl Impl: Declaration {
+  fun name(): String { "impl" }
+}
+
+public class Class {
+  public let parent: Module | Trait | Class
+  public let name_: String
+  public let disambiguator: Maybe<Int>
+}
+impl Class: Declaration {
+  fun name(): String { name_ }
+}
+
+public class Constructor {
+  public let parent: Class
+  public let disambiguator: Int
+}
+impl Constructor: Declaration {
+  fun name(): String { "constructor" }
+}
+
+public class Function {
+  public let parent: Module | Trait | Impl | Class
+  public let name_: String
+  public let disambiguator: Int
+}
+impl Function: Declaration {
+  fun name(): String { name_ }
+}
+
+public class Property {
+  public let parent: Module | Trait | Impl | Class
+  public let name_: String
+}
+impl Property: Declaration {
+  fun name(): String { name_ }
+}

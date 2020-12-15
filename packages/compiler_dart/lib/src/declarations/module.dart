@@ -24,6 +24,15 @@ final compileModule = Query<ModuleId, Unit>(
       if (moduleId == ModuleId.corePrimitives) {
         b.body.addAll(DartBuiltinCompiler(context).compilePrimitiveGhosts());
       }
+      if (moduleId == ModuleId.coreString) {
+        b.directives.add(dart.Directive((b) => b
+          ..type = dart.DirectiveType.import
+          ..url = 'package:characters/characters.dart'));
+      } else {
+        b.directives.add(dart.Directive((b) => b
+          ..type = dart.DirectiveType.import
+          ..url = moduleIdToImportUrl(context, ModuleId.coreString)));
+      }
     });
 
     if (library.body.isNotEmpty) {

@@ -1,0 +1,22 @@
+public trait Package {
+  // TODO(JonasWanke): provide a query to get the name of a package
+}
+
+public data class FilePackage {
+  public let path: String /* Path */
+}
+impl FilePackage: Package
+
+public data class GitPackage {
+  public let repoUrl: String /* Url */
+  public let path: String /* Path */ = ""
+  public let ref: String /* Sha1 */
+}
+impl GitPackage: Package
+
+public data class HostedPackage {
+  public let hostUrl: String /* Url */
+  public let path: List<String>
+  public let version: String /* Version */
+}
+impl HostedPackage: Package

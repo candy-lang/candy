@@ -213,6 +213,9 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             typeName =
                 dart.refer('${typeName.symbol}RandomExtension', typeName.url);
           }
+          if (name == 'parse') {
+            typeName = dart.refer('int', dartCoreUrl);
+          }
           lowered = typeName.property(name);
         } else {
           var name = id.simplePath.last.nameOrNull;
@@ -432,17 +435,27 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         if (relevantMethods.contains(methodName)) {
           final left = identifier.receiver;
           final right = node.valueArguments['other'];
+
+          final isOnString = left.type == CandyType.string;
+          final actualLeft = isOnString
+              ? _refer(left.id)
+                  .property('compareTo')
+                  .call([_refer(right.id)], {}, [])
+              : _refer(left.id);
+          final actualRight =
+              isOnString ? dart.literalNum(0) : _refer(right.id);
+
           return [
             ...left.accept(this),
             ...right.accept(this),
             if (methodName == 'lessThan')
-              _save(node, _refer(left.id).lessThan(_refer(right.id)))
+              _save(node, actualLeft.lessThan(actualRight))
             else if (methodName == 'lessThanOrEqual')
-              _save(node, _refer(left.id).lessOrEqualTo(_refer(right.id)))
+              _save(node, actualLeft.lessOrEqualTo(actualRight))
             else if (methodName == 'greaterThan')
-              _save(node, _refer(left.id).greaterThan(_refer(right.id)))
+              _save(node, actualLeft.greaterThan(actualRight))
             else
-              _save(node, _refer(left.id).greaterOrEqualTo(_refer(right.id))),
+              _save(node, actualLeft.greaterOrEqualTo(actualRight)),
           ];
         }
       } else if (parentModuleId == CandyType.equals.virtualModuleId) {
@@ -457,9 +470,16 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           else
             _save(node, _refer(left.id).notEqualTo(_refer(right.id))),
         ];
+      } else if (parentModuleId == CandyType.string.virtualModuleId &&
+          ['length', 'characters'].contains(methodName)) {
+        return [
+          ...identifier.receiver.accept(this),
+          _save(node, _refer(identifier.receiver.id).property(methodName)),
+        ];
       }
     }
 
+    final surroundingDeclarationName = declarationId.simplePath.last.nameOrNull;
     return [
       ...node.target.accept(this),
       for (final argument in node.valueArguments.values)
@@ -468,8 +488,16 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         node,
         _refer(node.target.id).call(
           [
-            for (final entry in node.valueArguments.entries)
-              _refer(entry.value.id),
+            if (surroundingDeclarationName == 'bucketByKey' &&
+                node.id.value == 5)
+              _refer(node.valueArguments.values.single.id)
+                  .asA(dart.refer('dynamic', dartCoreUrl))
+            else if (surroundingDeclarationName == 'set' && node.id.value == 17)
+              _refer(node.valueArguments.values.single.id)
+                  .asA(dart.refer('dynamic', dartCoreUrl))
+            else
+              for (final entry in node.valueArguments.entries)
+                _refer(entry.value.id),
           ],
           {},
           node.typeArguments.map((it) => compileType(context, it)).toList(),
@@ -595,10 +623,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           .isA(
             dart.refer(
               'None',
-              moduleIdToImportUrl(
-                context,
-                ModuleId.corePrimitives.nested(['maybe']),
-              ),
+              moduleIdToImportUrl(context, ModuleId.coreMaybe),
             ),
           )
           .ifStatement(dart.Code('break;')),
@@ -667,6 +692,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     );
 
     code.add(left.safeAssign(node.right).statement);
+    code.add(_save(node, left));
     return code;
   }
 

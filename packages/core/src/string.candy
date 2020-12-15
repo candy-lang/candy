@@ -1,5 +1,14 @@
+use ..collections
+use ..numbers
+use ..operators
 
-public builtin class String
+public builtin class String {
+  builtin fun chars(): List<String>
+  /// TODO(JonasWanke): rename this to characters when we wrap native types
+  builtin fun substring(offset: Int, length: Int): String
+  builtin fun length(): Int
+}
+builtin impl String: Equals & Comparable
 /// Some text.
 
 // builtin impl String: PlusOperator<This, This>
