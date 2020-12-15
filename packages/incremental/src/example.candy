@@ -1,0 +1,15 @@
+use ...query
+
+fun main() {
+  let context = QueryContext()
+  for i in List.of4(1, -2, 1, -2) {
+    print("Is {i} positive? {isPositive(context, i)}")
+  }
+}
+
+fun isPositive(context: QueryContext, input: Int): Bool {
+  query(context, "isPositive", input, {
+    print("Doing expensive computation.")
+    input > 0
+  })
+}
