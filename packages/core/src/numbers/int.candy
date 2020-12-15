@@ -1,8 +1,11 @@
 use ...numbers
 use ...operators
 use ...random
+use ...string
 
-public builtin class Int
+public builtin class Int {
+  static fun parse(value: String): Int
+}
 builtin impl Int: Number
 builtin impl Int: Equals & Comparable
 builtin impl Int: Add & Subtract & Negate & Multiply & Divide & DivideTruncating & Modulo

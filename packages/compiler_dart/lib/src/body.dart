@@ -213,6 +213,9 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             typeName =
                 dart.refer('${typeName.symbol}RandomExtension', typeName.url);
           }
+          if (name == 'parse') {
+            typeName = dart.refer('int', dartCoreUrl);
+          }
           lowered = typeName.property(name);
         } else {
           var name = id.simplePath.last.nameOrNull;
@@ -456,6 +459,12 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             _save(node, _refer(left.id).equalTo(_refer(right.id)))
           else
             _save(node, _refer(left.id).notEqualTo(_refer(right.id))),
+        ];
+      } else if (parentModuleId == CandyType.string.virtualModuleId &&
+          ['length', 'characters'].contains(methodName)) {
+        return [
+          ...identifier.receiver.accept(this),
+          _save(node, _refer(identifier.receiver.id).property(methodName)),
         ];
       }
     }

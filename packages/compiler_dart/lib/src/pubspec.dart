@@ -16,6 +16,8 @@ final generatePubspec = Query<PackageId, PubSpec>(
     return PubSpec(
       name: candyspec.name,
       dependencies: {
+        'characters':
+            HostedReference(VersionConstraint.compatibleWith(Version(1, 0, 0))),
         'meta':
             HostedReference(VersionConstraint.compatibleWith(Version(1, 1, 7))),
         for (final dependency in dependencyNames)
