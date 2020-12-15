@@ -1,0 +1,202 @@
+use ..declarations
+use ..types
+
+public data class ExpressionUri<E: Expression> {
+  public let declaration: Constructor | Function | Property
+  public let index: Int
+}
+
+
+public trait Expression {
+  public let uri: ExpressionUri<Expression>
+}
+
+
+
+public class BoolExpression {
+  public let uri: ExpressionUri<BoolExpression>
+  public let value: Bool
+}
+impl BoolExpression: Expression
+
+public class IntExpression {
+  public let uri: ExpressionUri<IntExpression>
+  public let value: Int
+}
+impl IntExpression: Expression
+
+
+public class StringExpression {
+  public let uri: ExpressionUri<StringExpression>
+  public let parts: List<StringPart>
+}
+impl StringExpression: Expression
+
+trait StringPart
+impl StringPart: Expression
+
+public class LiteralStringPart {
+  public let uri: ExpressionUri<LiteralStringPart>
+  public let value: String
+}
+impl LiteralStringPart: StringPart
+
+public class InterpolatedStringPart {
+  public let uri: ExpressionUri<InterpolatedStringPart>
+  public let value: String
+}
+impl InterpolatedStringPart: StringPart
+
+
+public class LambdaExpression {
+  public let uri: ExpressionUri<LambdaExpression>
+  public let parameters: List<LambdaParameter>
+  public let expressions: List<ExpressionUri<Expression>>
+  public let returnType: CandyType
+  public let receiverType: Maybe<CandyType>
+}
+impl LambdaExpression: Expression
+
+public class LambdaParameter {
+  public let name: String
+  public let type: CandyType
+}
+
+
+public class ThisExpression {
+  public let uri: ExpressionUri<ThisExpression>
+  public let type: CandyType
+}
+impl ThisExpression: Expression
+
+public class SuperExpression {
+  public let uri: ExpressionUri<SuperExpression>
+  public let type: NamedType
+}
+impl SuperExpression: Expression
+
+
+public class ReflectionExpression<Target: Module | Trait | Class | Function | Property | ParameterType> {
+  public let uri: ExpressionUri<ReflectionExpression<Target>>
+  public let target: Target
+}
+impl ReflectionExpression: Expression
+
+public class ParameterExpression {
+  public let uri: ExpressionUri<ParameterExpression>
+  public let scope: Function | ExpressionUri<LambdaExpression>
+}
+impl ParameterExpression: Expression
+
+
+public class PropertyReferenceExpression {
+  public let uri: ExpressionUri<PropertyReferenceExpression>
+  public let target: Property
+}
+impl PropertyReferenceExpression: Expression
+
+public class FunctionReferenceExpression {
+  public let uri: ExpressionUri<FunctionReferenceExpression>
+  public let target: Function
+}
+impl FunctionReferenceExpression: Expression
+
+
+public class LocalPropertyExpression {
+  public let uri: ExpressionUri<LocalPropertyExpression>
+  public let name: String
+  public let type: CandyType
+  public let initializer: ExpressionUri<Expression>
+  public let isMutable: Bool
+}
+impl LocalPropertyExpression: Expression
+
+public class LocalPropertyReferenceExpression {
+  public let uri: ExpressionUri<LocalPropertyReferenceExpression>
+  public let target: ExpressionUri<LocalPropertyExpression>
+}
+impl LocalPropertyReferenceExpression: Expression
+
+
+public class NavigationExpression {
+  public let uri: ExpressionUri<NavigationExpression>
+  public let receiver: ExpressionUri<Expression>
+  public let target: Function | Property
+}
+impl NavigationExpression: Expression
+
+
+public class FunctionCallExpression {
+  public let uri: ExpressionUri<FunctionCallExpression>
+  public let receiver: ExpressionUri<FunctionReferenceExpression | ReflectionExpression<Function>>
+  public let typeArguments: Map<String, CandyType>
+  public let valueArguments: Map<String, ExpressionUri<Expression>>
+}
+impl FunctionCallExpression: Expression
+
+public class ExpressionCallExpression {
+  public let uri: ExpressionUri<ExpressionCallExpression>
+  public let receiver: ExpressionUri<Expression>
+  public let valueArguments: List<ExpressionUri<Expression>>
+}
+impl ExpressionCallExpression: Expression
+
+public class ConstructorCallExpression {
+  public let uri: ExpressionUri<ConstructorCallExpression>
+  public let receiver: ExpressionUri<ReflectionExpression<Class>>
+  public let constructor: Constructor
+  public let typeArguments: Map<String, CandyType>
+  public let valueArguments: Map<String, ExpressionUri<Expression>>
+}
+impl ConstructorCallExpression: Expression
+
+public class TupleExpression {
+  public let uri: ExpressionUri<TupleExpression>
+  public let valueArguments: List<ExpressionUri<Expression>>
+}
+impl TupleExpression: Expression
+
+
+public class IfExpression {
+  public let uri: ExpressionUri<IfExpression>
+  public let condition: ExpressionUri<Expression>
+  public let thenBody: List<ExpressionUri<Expression>>
+  public let elseBody: List<ExpressionUri<Expression>>
+}
+impl IfExpression: Expression
+
+
+public class LoopExpression {
+  public let uri: ExpressionUri<LoopExpression>
+  public let body: List<ExpressionUri<Expression>>
+}
+impl LoopExpression: Expression
+
+
+public class ReturnExpression {
+  public let uri: ExpressionUri<ReturnExpression>
+  public let scope: Function | Property | ExpressionUri<LambdaExpression>
+  public let expression: ExpressionUri<Expression>
+}
+impl ReturnExpression: Expression
+
+public class BreakExpression {
+  public let uri: ExpressionUri<BreakExpression>
+  public let scope: ExpressionUri<LoopExpression>
+  public let expression: ExpressionUri<Expression>
+}
+impl BreakExpression: Expression
+
+public class ContinueExpression {
+  public let uri: ExpressionUri<ContinueExpression>
+  public let scope: ExpressionUri<LoopExpression>
+}
+impl ContinueExpression: Expression
+
+
+public class AssignmentExpression {
+  public let uri: ExpressionUri<AssignmentExpression>
+  public let target: ExpressionUri<PropertyReferenceExpression | LocalPropertyReferenceExpression>
+  public let value: ExpressionUri<Expression>
+}
+impl AssignmentExpression: Expression

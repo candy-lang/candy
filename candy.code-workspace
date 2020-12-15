@@ -1,27 +1,31 @@
 {
   "folders": [
     {
+      "name": "candy",
+      "path": "."
+    },
+    {
       "name": "language",
       "path": "language"
     },
     {
-      "name": "parser",
+      "name": "parser (dart)",
       "path": "packages\\parser"
     },
     {
-      "name": "compiler",
+      "name": "compiler (dart)",
       "path": "packages\\compiler"
     },
     {
-      "name": "compiler_dart",
+      "name": "compiler_dart (dart)",
       "path": "packages\\compiler_dart"
     },
     {
-      "name": "lsp_server",
+      "name": "lsp_server (dart)",
       "path": "packages\\lsp_server"
     },
     {
-      "name": "vscode_extension",
+      "name": "vscode_extension (dart)",
       "path": "packages\\vscode_extension"
     },
     {
@@ -31,7 +35,10 @@
       "path": "playground"
     },
     {
-      "path": "."
+      "path": "packages\\glados"
+    },
+    {
+      "path": "packages\\hir"
     }
   ],
   "launch": {
@@ -41,7 +48,8 @@
         "name": "compiler: build",
         "program": "${workspaceFolder:compiler}/lib/main.dart",
         "request": "launch",
-        "type": "dart"
+        "type": "dart",
+        "args": ["build", "${workspaceFolder:vscode_extension_test}"]
       },
       {
         "name": "vsc extension: run",
@@ -52,7 +60,7 @@
           "--extensionDevelopmentPath=${workspaceFolder:vscode_extension}"
         ],
         "outFiles": ["${workspaceFolder:vscode_extension}/out/**/*.js"],
-        "preLaunchTask": "${defaultBuildTask:vscode_extension}"
+        "preLaunchTask": "${defaultBuildTask}"
       },
       {
         "name": "vsc extension: tests",
@@ -64,7 +72,7 @@
           "--extensionTestsPath=${workspaceFolder:vscode_extension}/out/test/suite/index"
         ],
         "outFiles": ["${workspaceFolder:vscode_extension}/out/test/**/*.js"],
-        "preLaunchTask": "${defaultBuildTask:vscode_extension}"
+        "preLaunchTask": "${defaultBuildTask}"
       }
     ]
   }

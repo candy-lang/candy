@@ -197,8 +197,50 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
 
   @override
   List<dart.Spec> compileString() {
-    // `String` corresponds to `String`, hence nothing to do.
-    return [];
+    // `String` corresponds to `String`, hence nothing to do for the type itself.
+    return [
+      Extension(
+        name: 'StringCharsExtension',
+        on: dart.refer('String', dartCoreUrl),
+        methods: [
+          dart.Method((b) => b
+            ..returns = compileType(context, CandyType.list(CandyType.string))
+            ..name = 'chars'
+            ..body = dart.Block((b) => b
+              ..statements.add(dart
+                  .refer('characters')
+                  .property('map')
+                  .call(
+                    [
+                      dart.Method((b) => b
+                        ..requiredParameters.add(dart.Parameter((b) => b
+                          ..type = dart.refer('String', dartCoreUrl)
+                          ..name = 'it'))
+                        ..body = dart.Block((b) => b
+                          ..statements.add(compileType(
+                                  context, CandyType.some(CandyType.string))
+                              .call([dart.refer('it')], {}, [])
+                              .returned
+                              .statement))).closure,
+                    ],
+                    {},
+                    [],
+                  )
+                  .property('toList')
+                  .call([], {}, [])
+                  .assignFinal('list')
+                  .statement)
+              ..statements.add(
+                  compileType(context, CandyType.arrayList(CandyType.string))
+                      .call([
+                        dart.refer('list'),
+                        dart.refer('list').property('length')
+                      ], {}, [])
+                      .returned
+                      .statement))),
+        ],
+      ),
+    ];
   }
 
   @override

@@ -74,6 +74,7 @@ public class ArrayList<Item> {
       newItems.set(index, items.get(index))
       index = index + 1
     }
+    items = newItems
   }
 }
 

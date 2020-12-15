@@ -151,6 +151,19 @@ class GlobalQueryContext {
       _reportedErrors.remove(mapKey);
     }
   }
+
+  final List<Tuple2<String, dynamic>> _queryStack = [];
+  void recordQueryEnter(String name, dynamic key) {
+    final tuple = Tuple2(name, key);
+    if (_queryStack.contains(tuple)) {
+      final stack =
+          _queryStack.map((it) => '${it.first}(${it.second})').join('\n');
+      throw CompilerError.internalError('Cycle detected. Stack is:\n$stack');
+    }
+    _queryStack.add(tuple);
+  }
+
+  void recordQueryExit() => _queryStack.removeLast();
 }
 
 class QueryContext {
@@ -160,14 +173,21 @@ class QueryContext {
   QueryConfig get config => globalContext.config;
 
   R callQuery<K, R>(Query<K, R> query, K key) {
+    globalContext.recordQueryEnter(query.name, key);
     final cachedResult = globalContext.getResult<R>(query.name, key);
-    if (cachedResult is Some) return cachedResult.value;
+    if (cachedResult is Some) {
+      globalContext.recordQueryExit();
+      return cachedResult.value;
+    }
 
     final result = QueryContext(globalContext)._execute(query, key);
     _innerCalls.add(result);
     if (result.result == null) {
+      globalContext.recordQueryExit();
       throw _QueryFailedException(result);
     }
+
+    globalContext.recordQueryExit();
     return result.result as R;
   }
 
