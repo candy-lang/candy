@@ -13,6 +13,13 @@ use ..linked_hash_map
 // TODO(marcelgarus): Typedef Bucket as LinkedHashMap.
 
 class BucketMap<Key: Equals & Hash, Value> {
+  static fun empty<Key: Equals & Hash, Value>(): BucketMap<Key, Value> {
+    BucketMap<Key, Value>(
+      Array.generate<LinkedHashMap<Key, Value>>(8, { LinkedHashMap.empty<Key, Value>() }),
+      0,
+    )
+  }
+  
   let buckets: Array<LinkedHashMap<Key, Value>>
   mut let numEntries: Int
 
