@@ -10,5 +10,5 @@ class Query<T> {
   let runner: () => T
   /// A runner that actually runs the query.
 
-  let evaluateAlways: Bool
+  let shouldAlwaysRun: Bool
 }
