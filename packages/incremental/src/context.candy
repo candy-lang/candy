@@ -1,62 +1,30 @@
 use ..query
 
-trait QueryContext {
-  /// A context that orchestrates queries.
+class QueryContext {
+  /// A context that orchestrates running queries.
 
-  let cache: MutableMap<String, MutableMap<Any, Any>>
-  let stack: MutableList<(String, Any)>
+  let cache: MutableMap<String, MutableMap<Equals & Hash, Equals & Hash>>
+  /// A cache from query names to a query-specific cache that maps from input to output.
 
-  fun run<T>(query: Query<T>): T {
-    let signature = (query.name, query.input)
-    if stack.contains(signature) {
+  let stack: MutableList<(String, Equals & Hash)>
+  /// A stack of currently running queries. The tuples contain the name and input of the queries.
+
+  fun run<T: Equals & Hash>(query: Query<T>): T {
+    let signature = Tuple(query.name, query.input)
+
+    // TODO(marcelgarus): Use stack.contains(signature) once it exists.
+    if (stack as Iterable<(String, Equals & Hash)>).where({
+      it.first as Equals == signature.first as Equals && it.second == signature.second
+    }).isNotEmpty() {
       throw "Cyclic query {signature}. This is the stack:\n{stack}"
     }
     cache
-      .putIfAbsent(query.name, { MutableMap.default_<Any, Any>() })
-      .putIfAbsent(query.input, {
+    .putIfAbsent(query.name, { MutableMap.default_<Equals & Hash, Equals & Hash>() })
+    .putIfAbsent(query.input, {
         stack.append(signature)
-        parent.run(query)
+        let output = query.runner()
         stack.removeLast()
+        output
       }) as T
-  }
-}
-
-
-class SimpleQueryContext {
-  /// A very simple `QueryContext` that always executes all queries.
-
-  fun run<T>(query: Query<T>): T { query.runner() }
-}
-
-class CachedQueryContext {
-  /// A `QueryContext` that caches all runs.
-  // TODO(marcelgarus): Make this way more efficient.
-  
-  let parent: QueryContext
-  let cache: MutableMap<String, MutableMap<Any, Any>>
-  /// Maps each query name to a map from input to output.
-
-  fun run<T>(query: Query<T>): T {
-    cache
-      .putIfAbsent(query.name, { MutableMap.default_<Any, Any>() })
-      .putIfAbsent(query.input, { parent.run<T>(query) }) as T
-  }
-}
-
-class CycleDetectingQueryContext {
-  /// A `QueryContext` that aborts if it finds a cyclic query.
-  
-  let parent: QueryContext
-  let stack: MutableList<(String, Any)>
-  /// A stack containing signatures of all ongoing calls (name and input).
-
-  fun run<T>(query: Query<T>): T {
-    let signature = (query.name, query.input)
-    if stack.contains(signature) {
-      throw "Cyclic query {signature}. This is the stack:\n{stack}"
-    }
-    stack.append(signature)
-    parent.run(query)
-    stack.removeLast()
   }
 }
