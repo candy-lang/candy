@@ -1,14 +1,24 @@
 class Query<T> {
+  /// A query that can be run and produces a `T`.
+
   let name: String
-  /// A unique query name. For example, you might have a `"getSign"` query that computes the sign of
-  /// an integer. The query name usually equals the name of the method or function that runs the
-  /// query.
+  /// A unique query name.
+  /// 
+  /// The query name usually equals the name of the method or function that runs the query, possibly
+  /// with a package prefix. For example, you might have a `"math.computeSign"` query that computes
+  /// the sign of an `Int`.
 
   let input: Equals & Hash
-  /// The input to the query. Multiple inputs can be represented as `Tuple`s or `List`s.
+  /// The input to the query.
+  ///
+  /// Multiple inputs can be represented as `Tuple`s or `List`s.
 
   let runner: () => T
   /// A runner that actually runs the query.
+  ///
+  /// The runner should be deterministic with regard to the inputs.
 
   let shouldAlwaysRun: Bool
+  /// Indicates that this query should always be run, even if the inputs didn't change since the
+  /// last time.
 }
