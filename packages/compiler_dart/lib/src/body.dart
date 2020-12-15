@@ -435,17 +435,27 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         if (relevantMethods.contains(methodName)) {
           final left = identifier.receiver;
           final right = node.valueArguments['other'];
+
+          final isOnString = left.type == CandyType.string;
+          final actualLeft = isOnString
+              ? _refer(left.id)
+                  .property('compareTo')
+                  .call([_refer(right.id)], {}, [])
+              : _refer(left.id);
+          final actualRight =
+              isOnString ? dart.literalNum(0) : _refer(right.id);
+
           return [
             ...left.accept(this),
             ...right.accept(this),
             if (methodName == 'lessThan')
-              _save(node, _refer(left.id).lessThan(_refer(right.id)))
+              _save(node, actualLeft.lessThan(actualRight))
             else if (methodName == 'lessThanOrEqual')
-              _save(node, _refer(left.id).lessOrEqualTo(_refer(right.id)))
+              _save(node, actualLeft.lessOrEqualTo(actualRight))
             else if (methodName == 'greaterThan')
-              _save(node, _refer(left.id).greaterThan(_refer(right.id)))
+              _save(node, actualLeft.greaterThan(actualRight))
             else
-              _save(node, _refer(left.id).greaterOrEqualTo(_refer(right.id))),
+              _save(node, actualLeft.greaterOrEqualTo(actualRight)),
           ];
         }
       } else if (parentModuleId == CandyType.equals.virtualModuleId) {
@@ -604,10 +614,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           .isA(
             dart.refer(
               'None',
-              moduleIdToImportUrl(
-                context,
-                ModuleId.corePrimitives.nested(['maybe']),
-              ),
+              moduleIdToImportUrl(context, ModuleId.coreMaybe),
             ),
           )
           .ifStatement(dart.Code('break;')),
@@ -676,6 +683,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     );
 
     code.add(left.safeAssign(node.right).statement);
+    code.add(_save(node, left));
     return code;
   }
 

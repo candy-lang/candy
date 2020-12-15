@@ -63,8 +63,8 @@ final runPubGet = Query<PackageId, Unit>(
   evaluateAlways: true,
   provider: (context, packageId) {
     final result = Process.runSync(
-      'pub.bat',
-      ['get'],
+      'dart',
+      ['pub', 'get'],
       workingDirectory: context.config.buildArtifactManager
           .toPath(context, packageId.dartBuildArtifactId),
     );

@@ -59,7 +59,7 @@ final generateSyntheticDataClassImpls =
   provider: (context, classId) {
     final properties = getInnerDeclarationIds(context, classId)
         .where((it) => it.isProperty)
-        .map((it) => getPropertyDeclarationHir(context, it))
+        .map((it) => Tuple2(it, getPropertyDeclarationAst(context, it)))
         .toList();
     return [
       _generateEqualsImpl(
@@ -92,7 +92,7 @@ hir.SyntheticImpl _generateEqualsImpl(
   QueryContext context,
   hir.UserCandyType thisType,
   DeclarationId implId,
-  List<hir.PropertyDeclaration> properties,
+  List<Tuple2<DeclarationId, ast.PropertyDeclaration>> properties,
 ) {
   final methodId = implId.inner(DeclarationPathData.function('equals'));
 
@@ -134,12 +134,15 @@ hir.SyntheticImpl _generateEqualsImpl(
                     hir.Expression create(
                       hir.Identifier receiver,
                     ) {
+                      final type = astTypeToHirType(
+                              context, Tuple2(it.first, it.second.type))
+                          .bakeThisType(thisType);
                       return hir.Expression.identifier(
                         id(),
                         hir.PropertyIdentifier(
-                          it.id,
-                          it.type.bakeThisType(thisType),
-                          isMutable: it.isMutable,
+                          it.first,
+                          type,
+                          isMutable: it.second.isMutable,
                           receiver: hir.Expression.identifier(id(), receiver),
                         ),
                       );
