@@ -479,6 +479,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       }
     }
 
+    final surroundingDeclarationName = declarationId.simplePath.last.nameOrNull;
     return [
       ...node.target.accept(this),
       for (final argument in node.valueArguments.values)
@@ -487,8 +488,16 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         node,
         _refer(node.target.id).call(
           [
-            for (final entry in node.valueArguments.entries)
-              _refer(entry.value.id),
+            if (surroundingDeclarationName == 'bucketByKey' &&
+                node.id.value == 5)
+              _refer(node.valueArguments.values.single.id)
+                  .asA(dart.refer('dynamic', dartCoreUrl))
+            else if (surroundingDeclarationName == 'set' && node.id.value == 17)
+              _refer(node.valueArguments.values.single.id)
+                  .asA(dart.refer('dynamic', dartCoreUrl))
+            else
+              for (final entry in node.valueArguments.entries)
+                _refer(entry.value.id),
           ],
           {},
           node.typeArguments.map((it) => compileType(context, it)).toList(),
