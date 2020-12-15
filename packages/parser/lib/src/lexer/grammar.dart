@@ -267,6 +267,7 @@ class LexerGrammar {
       (lexeme, span) => BoolLiteralToken(lexeme == 'true', span: span));
 
   static final LiteralStringToken_ =
+      // ignore: unnecessary_cast
       (QUOTE | LCURL).neg().plus().tokenize<LiteralStringToken>((lexeme, span) {
     final content = StringBuffer();
     var isEscaped = false;
@@ -281,6 +282,7 @@ class LexerGrammar {
       }
 
       final code = {
+        '🦄': '"',
         'n': '\n',
         'r': '\r',
         't': '\t',
