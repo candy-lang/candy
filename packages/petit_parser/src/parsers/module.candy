@@ -36,6 +36,9 @@ public trait Parser<Item, Output> {
     ChoiceParser<Item, Output>(List.of2<Parser<Item, Output>>(this, other))
   }
 
+  // TODO(JonasWanke): move the following function to `combinator/optional.candy`
+  fun optional(): Parser<Item, Maybe<Output>> { OptionalParser<Item, Output>(this) }
+
   // TODO(JonasWanke): move the following function to `combinator/sequence.candy`
   fun sequence<OutputB>(other: Parser<Item, OutputB>): Parser<Item, (Output, OutputB)> {
     let parsers = List.of2<Parser<Item, Output | OutputB>>(
