@@ -177,10 +177,11 @@ final Query<DeclarationId, List<dart.Spec>> compileClass =
     final methods = classHir.innerDeclarationIds
         .where((id) => id.isFunction)
         .map((id) => compileFunction(context, id));
+    final name = compileTypeName(context, declarationId).symbol;
     return [
       dart.Class((b) => b
         ..annotations.add(dart.refer('sealed', packageMetaUrl))
-        ..name = compileTypeName(context, declarationId).symbol
+        ..name = name
         ..types.addAll(classHir.typeParameters
             .map((p) => compileTypeParameter(context, p)))
         ..mixins.addAll(traits.map((it) {
@@ -197,7 +198,28 @@ final Query<DeclarationId, List<dart.Spec>> compileClass =
         ))
         ..fields.addAll(properties)
         ..methods.addAll(methods)
-        ..methods.addAll(methodOverrides)),
+        ..methods.addAll(methodOverrides)
+        ..methods.add(dart.Method((b) => b
+          ..annotations.add(dart.refer('override', dartCoreUrl))
+          ..returns = dart.refer('String', dartCoreUrl)
+          ..name = 'toString'
+          ..body = dart.Block((b) {
+            var typeParametersString = classHir.typeParameters
+                .map((it) => it.name)
+                .map((it) => '$it = \${$it}')
+                .join(', ');
+            if (typeParametersString.isNotEmpty) {
+              typeParametersString = '<$typeParametersString>';
+            }
+            final propertiesString = properties
+                .map((it) => it.name)
+                .map((it) => '$it = \${this.$it}')
+                .join(', ');
+            b.statements.add(dart
+                .literalString('$name$typeParametersString($propertiesString)')
+                .returned
+                .statement);
+          })))),
       for (final classId
           in classHir.innerDeclarationIds.where((it) => it.isClass))
         ...compileClass(context, classId),
