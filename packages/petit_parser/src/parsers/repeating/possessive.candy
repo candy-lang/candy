@@ -1,14 +1,5 @@
 use ....parsers
 
-impl<Item, Output> Parser<Item, Output> {
-  fun star(): Parser<Item, List<Output>> { repeat(0, None<Int>()) }
-  fun plus(): Parser<Item, List<Output>> { repeat(1, None<Int>()) }
-  fun times(count: Int): Parser<Item, List<Output>> { repeat(count, Some<Int>(count)) }
-  fun repeat(minimum: Int, maximum: Maybe<Int>): Parser<Item, List<Output>> {
-    PossessiveRepeatingParser<Item, Output>(this, minimum, maximum)
-  }
-}
-
 class PossessiveRepeatingParser<Item, Output> {
   let parser: Parser<Item, Output>
   let minimum: Int
@@ -21,7 +12,10 @@ impl<Item, Output> PossessiveRepeatingParser<Item, Output>: Parser<Item, List<Ou
     mut let currentContext = context
     while (elements as Iterable<Output>).length() < minimum {
       let result = parser.parse(currentContext)
-      if result is Error<Item, Output> { return result }
+      if result is Error<Success<Output>, Failure> {
+        let failure = (result as Error<Success<Output>, Failure>).error
+        return Error<Success<List<Output>>, Failure>(Failure(failure.message, failure.offset))
+      }
       let result = result.unwrap()
 
       elements.append(result.output)
@@ -31,7 +25,9 @@ impl<Item, Output> PossessiveRepeatingParser<Item, Output>: Parser<Item, List<Ou
     let isUnbounded = maximum is None<Int>
     while isUnbounded || (elements as Iterable<Output>).length() < maximum.unwrap() {
       let result = parser.parse(currentContext)
-      if result is Error<Item, Output> { return currentContext.success<List<Output>>(elements) }
+      if result is Error<Success<Output>, Failure> {
+        return Ok<Success<List<Output>>, Failure>(currentContext.success<List<Output>>(elements))
+      }
       let result = result.unwrap()
 
       elements.append(result.output)

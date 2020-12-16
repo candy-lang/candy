@@ -1,11 +1,5 @@
 use ....parsers
 
-impl<Item, OldOutput> Parser<Item, OldOutput> {
-  fun map<NewOutput>(mapper: (OldOutput) => NewOutput): Parser<Item, NewOutput> {
-    MapParser<Item, OldOutput, NewOutput>(this, mapper)
-  }
-}
-
 class MapParser<Item, OldOutput, NewOutput> {
   let parser: Parser<Item, OldOutput>
   let mapper: (OldOutput) => NewOutput
@@ -13,7 +7,10 @@ class MapParser<Item, OldOutput, NewOutput> {
 impl<Item, OldOutput, NewOutput> MapParser<Item, OldOutput, NewOutput>: Parser<Item, NewOutput> {
   fun parse(context: Context<Item>): Result<Success<NewOutput>, Failure> {
     let result = parser.parse(context)
-    if result is Error<Success<OldOutput>, Failure> { return result }
+    if result is Error<Success<OldOutput>, Failure> {
+      let failure = (result as Error<Success<OldOutput>, Failure>).error
+      return Error<Success<NewOutput>, Failure>(Failure(failure.message, failure.offset))
+    }
     let result = result.unwrap()
 
     let newOutput = mapper(result.output)

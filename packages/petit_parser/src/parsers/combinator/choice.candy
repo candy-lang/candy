@@ -1,11 +1,5 @@
 use ....parsers
 
-impl<Item, Output> Parser<Item, Output> {
-  fun or(other: Parser<Item, Output>): Parser<Item, Output> {
-    ChoiceParser<Item, Output>(List.of2<Parser<Item, Output>>(this, other))
-  }
-}
-
 class ChoiceParser<Item, Output> {
   let parsers: List<Parser<Item, Output>>
 }

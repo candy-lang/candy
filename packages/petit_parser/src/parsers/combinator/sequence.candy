@@ -1,21 +1,5 @@
 use ....parsers
 
-impl<Item, OutputA> Parser<Item, OutputA> {
-  fun sequence<OutputB>(other: Parser<Item, OutputB>): Parser<Item, (OutputA, OutputB)> {
-    let parsers = List.of2<Parser<Item, OutputA | OutputB>>(
-        this as Parser<Item, OutputA | OutputB>,
-        other as Parser<Item, OutputA | OutputB>,
-    )
-    let sequenceParser = SequenceParser<Item, OutputA | OutputB>(parsers)
-    let mappedParser = (sequenceParser as Parser<Item, List<OutputA | OutputB>>)
-        .map<(OutputA, OutputB)>({
-            let iterable = it as Iterable<OutputA | OutputB>
-            Tuple(iterable.first().unwrap() as OutputA, iterable.second().unwrap() as OutputB)
-        })
-    mappedParser as Parser<Item, (OutputA, OutputB)>
-  }
-}
-
 class SequenceParser<Item, Output> {
   let parsers: List<Parser<Item, Output>>
 }
@@ -26,7 +10,10 @@ impl<Item, Output> SequenceParser<Item, Output>: Parser<Item, List<Output>> {
     mut let currentContext = context
     for parser in (parsers as Iterable<Parser<Item, Output>>) {
       let result = parser.parse(context)
-      if result is Error<Success<Output>, Failure> { return result }
+      if result is Error<Success<Output>, Failure> {
+        let failure = (result as Error<Success<Output>, Failure>).error
+        return Error<Success<List<Output>>, Failure>(Failure(failure.message, failure.offset))
+      }
       let result = result.unwrap()
 
       elements.append(result.output)

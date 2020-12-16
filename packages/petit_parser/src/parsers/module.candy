@@ -25,4 +25,37 @@ public trait Parser<Item, Output> {
   fun parseInput(input: List<Item>): Result<Success<Output>, Failure> {
     parse(Context<Item>(input, 0))
   }
+
+  // TODO(JonasWanke): move the following function to `action/map.candy`
+  fun map<NewOutput>(mapper: (Output) => NewOutput): Parser<Item, NewOutput> {
+    MapParser<Item, Output, NewOutput>(this, mapper)
+  }
+
+  // TODO(JonasWanke): move the following function to `combinator/choice.candy`
+  fun or(other: Parser<Item, Output>): Parser<Item, Output> {
+    ChoiceParser<Item, Output>(List.of2<Parser<Item, Output>>(this, other))
+  }
+
+  // TODO(JonasWanke): move the following function to `combinator/sequence.candy`
+  fun sequence<OutputB>(other: Parser<Item, OutputB>): Parser<Item, (Output, OutputB)> {
+    let parsers = List.of2<Parser<Item, Output | OutputB>>(
+        this as Parser<Item, Output | OutputB>,
+        other as Parser<Item, Output | OutputB>,
+    )
+    let sequenceParser = SequenceParser<Item, Output | OutputB>(parsers)
+    let mappedParser = (sequenceParser as Parser<Item, List<Output | OutputB>>)
+        .map<(Output, OutputB)>({
+            let iterable = it as Iterable<Output | OutputB>
+            Tuple(iterable.first().unwrap() as Output, iterable.second().unwrap() as OutputB)
+        })
+    mappedParser as Parser<Item, (Output, OutputB)>
+  }
+
+  // TODO(JonasWanke): move the following functions to `repeating/possessive.candy`
+  fun star(): Parser<Item, List<Output>> { repeat(0, None<Int>()) }
+  fun plus(): Parser<Item, List<Output>> { repeat(1, None<Int>()) }
+  fun times(count: Int): Parser<Item, List<Output>> { repeat(count, Some<Int>(count)) }
+  fun repeat(minimum: Int, maximum: Maybe<Int>): Parser<Item, List<Output>> {
+    PossessiveRepeatingParser<Item, Output>(this, minimum, maximum)
+  }
 }
