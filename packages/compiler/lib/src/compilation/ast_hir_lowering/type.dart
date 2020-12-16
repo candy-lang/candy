@@ -226,8 +226,9 @@ final resolveAstUserTypeInParameters =
         }
       } else if (id.isProperty) {
         final propertyAst = getPropertyDeclarationAst(context, id);
-        if (!propertyAst.isStatic && id.hasParent)
+        if (!propertyAst.isStatic && id.hasParent) {
           addTypeParametersOf(id.parent);
+        }
       } else if (id.isFunction) {
         final functionAst = getFunctionDeclarationAst(context, id);
         if (functionAst.typeParameters != null) {
