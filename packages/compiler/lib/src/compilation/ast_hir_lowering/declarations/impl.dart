@@ -7,7 +7,6 @@ import '../../../query.dart';
 import '../../../utils.dart';
 import '../../hir.dart' as hir;
 import '../../hir/ids.dart';
-import '../../ids.dart';
 import '../type.dart';
 import 'class.dart';
 import 'declarations.dart';
@@ -60,11 +59,13 @@ final getImplDeclarationHir = Query<DeclarationId, hir.ImplDeclaration>(
       typeParameters: typeParameters,
       type: astTypeToHirType(context, Tuple2(declarationId, implAst.type))
           as hir.UserCandyType,
-      traits: hirTypeToUserTypes(
-        context,
-        astTypeToHirType(context, Tuple2(declarationId, implAst.trait)),
-        ErrorLocation(declarationId.resourceId, implAst.trait.span),
-      ),
+      traits: implAst.trait == null
+          ? []
+          : hirTypeToUserTypes(
+              context,
+              astTypeToHirType(context, Tuple2(declarationId, implAst.trait)),
+              ErrorLocation(declarationId.resourceId, implAst.trait.span),
+            ),
       innerDeclarationIds: getInnerDeclarationIds(context, declarationId),
     );
   },
