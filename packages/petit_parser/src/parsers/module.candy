@@ -1,0 +1,25 @@
+public use .custom
+
+public class Context<Item> {
+  public let buffer: List<Item>
+  public let offset: Int
+
+  public fun success<Output>(output: Output): Success<Output> { Success<Output>(output, offset) }
+  public fun failure(message: String): Failure { Failure(message, offset) }
+}
+
+public class Success<Output> {
+  public let output: Output
+  public let offset: Int
+}
+public class Failure {
+  public let message: String
+  public let offset: Int
+}
+
+public trait Parser<Item, Output> {
+  fun parse(context: Context<Item>): Result<Success<Output>, Failure>
+  fun parseInput(input: List<Item>): Result<Success<Output>, Failure> {
+    parse(Context<Item>(input, 0))
+  }
+}

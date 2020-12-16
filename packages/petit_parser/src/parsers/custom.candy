@@ -1,0 +1,30 @@
+use ...parsers
+
+fun custom<Item, Output>(
+    length: Int,
+    converter: (List<Item>) => Maybe<Output>,
+    message: String
+  ): Parser<Item, Output> {
+  CustomParser<Item, Output>(length, converter, message)
+}
+
+class CustomParser<Item, Output> {
+  let length: Int
+  let converter: (List<Item>) => Maybe<Output>
+  let message: String
+}
+impl<Item, Output> CustomParser<Item, Output>: Parser<Item, Output> {
+  fun parse(context: Context<Item>): Result<Success<Output>, Failure> {
+    let start = context.offset
+    let stop = start + length
+    if stop > (context.buffer as Iterable<Item>).length() {
+      return Error<Success<Output>, Failure>(context.failure(message))
+    }
+    
+    let result = converter(context.buffer.subList(start, stop))
+    if result is None<Output> {
+      return Error<Success<Output>, Failure>(context.failure(message))
+    }
+    return Ok<Success<Output>, Failure>(Success<Output>(result.unwrap(), stop))
+  }
+}
