@@ -1,4 +1,5 @@
 public use .custom
+public use .repeating
 
 public class Context<Item> {
   public let buffer: List<Item>
