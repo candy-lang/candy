@@ -1,3 +1,5 @@
+use ..context
+
 class Query<T> {
   /// A query that can be run and produces a `T`.
 
@@ -22,3 +24,9 @@ class Query<T> {
   /// Indicates that this query should always be run, even if the inputs didn't change since the
   /// last time.
 }
+
+fun query<T>(context: QueryContext, name: String, input: Equals & Hash, runner: () => T): T {
+  let query = Query<T>(name, input, runner, false)
+  context.run<T>(query)
+}
+

@@ -1,7 +1,2 @@
 public use .context
 public use .query
-
-fun query<T>(context: QueryContext, name: String, input: Equals & Hash, runner: () => T): T {
-  let query = Query<T>(name, input, runner)
-  context.run<T>(query)
-}
