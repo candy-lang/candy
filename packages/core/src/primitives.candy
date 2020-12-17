@@ -21,6 +21,9 @@ public builtin class Unit
 /// * function calls of functions without an explicit return value like `print("Hello, world!")`
 /// * the explicit unit instance: `unit`
 
+public let unit: Unit = unitReturningFunction()
+fun unitReturningFunction(): Unit {}
+
 public builtin class Never
 /// Can never be created. It's still useful to specify that an expression will never return
 /// directly. More specifically, this is the case in the following cases:
