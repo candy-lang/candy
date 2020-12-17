@@ -1,0 +1,19 @@
+use ....parsers
+
+class MapParser<Item, OldOutput, NewOutput> {
+  let parser: Parser<Item, OldOutput>
+  let mapper: (OldOutput) => NewOutput
+}
+impl<Item, OldOutput, NewOutput> MapParser<Item, OldOutput, NewOutput>: Parser<Item, NewOutput> {
+  fun parse(context: Context<Item>): Result<Success<NewOutput>, Failure> {
+    let result = parser.parse(context)
+    if result is Error<Success<OldOutput>, Failure> {
+      let failure = (result as Error<Success<OldOutput>, Failure>).error
+      return Error<Success<NewOutput>, Failure>(Failure(failure.message, failure.offset))
+    }
+    let result = result.unwrap()
+
+    let newOutput = mapper(result.output)
+    Ok<Success<NewOutput>, Failure>(Success<NewOutput>(newOutput, result.offset))
+  }
+}

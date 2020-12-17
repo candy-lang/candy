@@ -1,0 +1,17 @@
+use ....parsers
+
+class ChoiceParser<Item, Output> {
+  let parsers: List<Parser<Item, Output>>
+}
+impl<Item, Output> ChoiceParser<Item, Output>: Parser<Item, Output> {
+  fun parse(context: Context<Item>): Result<Success<Output>, Failure> {
+    mut let result: Result<Success<Output>, Failure> = Error<Success<Output>, Failure>(
+      Failure("ChoiceParser has no children.", context.offset),
+    )
+    for parser in (parsers as Iterable<Parser<Item, Output>>) {
+      result = parser.parse(context)
+      if result is Ok<Success<Output>, Failure> { return result }
+    }
+    result
+  }
+}
