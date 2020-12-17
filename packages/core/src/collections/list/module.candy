@@ -2,6 +2,7 @@ use ...assert
 use ...bool
 use ...maybe
 use ...numbers
+use ...operators
 use ..iterable
 use ..array
 public use .array_list
@@ -42,6 +43,24 @@ public trait List<Item>: Iterable<Item> {
     mut let index = 0
     while index < length {
       (result as MutableList<Item>).append(get(start + index).unwrap() as Item)
+      index = index + 1
+    }
+    result
+  }
+
+  fun followedBy(other: List<Item>): List<Item> {
+    let length = length() + other.length()
+    let result = ArrayList.create<Item>(length)
+
+    mut let index = 0
+    while index < length() {
+      (result as MutableList<Item>).append(get(index).unwrap() as Item)
+      index = index + 1
+    }
+
+    mut let index = 0
+    while index < other.length() {
+      (result as MutableList<Item>).append(other.get(index).unwrap() as Item)
       index = index + 1
     }
     result

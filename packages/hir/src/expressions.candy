@@ -166,32 +166,12 @@ public class IfExpression {
 impl IfExpression: Expression
 
 
-public class LoopExpression {
-  public let uri: ExpressionUri<LoopExpression>
-  public let body: List<ExpressionUri<Expression>>
-}
-impl LoopExpression: Expression
-
-
 public class ReturnExpression {
   public let uri: ExpressionUri<ReturnExpression>
   public let scope: Function | Property | ExpressionUri<LambdaExpression>
   public let expression: ExpressionUri<Expression>
 }
 impl ReturnExpression: Expression
-
-public class BreakExpression {
-  public let uri: ExpressionUri<BreakExpression>
-  public let scope: ExpressionUri<LoopExpression>
-  public let expression: ExpressionUri<Expression>
-}
-impl BreakExpression: Expression
-
-public class ContinueExpression {
-  public let uri: ExpressionUri<ContinueExpression>
-  public let scope: ExpressionUri<LoopExpression>
-}
-impl ContinueExpression: Expression
 
 
 public class AssignmentExpression {

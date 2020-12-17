@@ -1,0 +1,7 @@
+use ..node
+
+public data class CandyDoc {
+  public let id: NodeId
+  public let content: String
+}
+impl CandyDoc: Node

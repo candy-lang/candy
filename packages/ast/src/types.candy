@@ -1,0 +1,63 @@
+use ..node
+
+public trait /* enum */ CandyType {
+  let modifiers: List<String>
+}
+impl CandyType: Node
+
+
+public data class NamedType {
+  public let id: NodeId
+  public let modifiers: List<String>
+  public let nameParts: List<String>
+  public let typeArguments: List<TypeArgument>
+}
+impl NamedType: CandyType
+
+
+public data class FunctionType {
+  public let id: NodeId
+  public let modifiers: List<String>
+  public let receiverType: Maybe<CandyType>
+  public let parameterTypes: List<CandyType>
+  public let returnType: Maybe<CandyType>
+}
+impl FunctionType: CandyType
+
+
+public data class TupleType {
+  public let id: NodeId
+  public let modifiers: List<String>
+  public let types: List<CandyType>
+}
+impl TupleType: CandyType
+
+
+public data class UnionType {
+  public let id: NodeId
+  public let modifiers: List<String>
+  public let types: List<CandyType>
+}
+impl UnionType: CandyType
+
+public data class IntersectionType {
+  public let id: NodeId
+  public let modifiers: List<String>
+  public let types: List<CandyType>
+}
+impl IntersectionType: CandyType
+
+
+public data class TypeParameter {
+  public let id: NodeId
+  public let modifiers: List<String>
+  public let modifiers: List<String>
+  public let name: Maybe<String>
+  public let upperBound: Maybe<CandyType>
+}
+
+public data class TypeArgument {
+  public let id: NodeId
+  public let modifiers: List<String>
+  public let type: Maybe<CandyType>
+}
