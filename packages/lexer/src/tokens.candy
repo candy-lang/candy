@@ -11,7 +11,7 @@ public data class Span {
 }
 
 
-public class Keyword {
+public class KeywordToken {
   public let span: Span
 
   public let keyword: String
@@ -23,24 +23,24 @@ public class Keyword {
   ///
   /// TODO(JonasWanke): convert this to an enum when we support these
 }
-impl Keyword: Token
+impl KeywordToken: Token
 
 
-public class Identifier {
+public class IdentifierToken {
   public let span: Span
   public let identifier: String
 }
-impl Identifier: Token
+impl IdentifierToken: Token
 
 
-public class Literal<T> {
+public class LiteralToken<T> {
   public let span: Span
   public let value: T
 }
-impl<T> Literal<T>: Token
+impl<T> LiteralToken<T>: Token
 
 
-public class Punctuation {
+public class PunctuationToken {
   public let span: Span
 
   public let punctuation: String
@@ -51,10 +51,10 @@ public class Punctuation {
   ///
   /// TODO(JonasWanke): convert this to an enum when we support these
 }
-impl Punctuation: Token
+impl PunctuationToken: Token
 
 
-public class Comment {
+public class CommentToken {
   public let span: Span
   public let content: String
 
@@ -65,11 +65,11 @@ public class Comment {
   /// * "doc": `/// foo`
   /// * "block": `/* foo\nbar */`
 }
-impl Comment: Token
+impl CommentToken: Token
 
 
-public class Whitespace {
+public class WhitespaceToken {
   public let span: Span
   public let content: String
 }
-impl Whitespace: Token
+impl WhitespaceToken: Token

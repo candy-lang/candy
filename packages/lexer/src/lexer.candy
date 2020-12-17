@@ -18,31 +18,31 @@ class Lexer {
       let char = char.unwrap()
 
       let token = comment()
-      if token is Some<Comment> {
+      if token is Some<CommentToken> {
         tokens.append(token.unwrap())
         continue
       }
 
       let token = punctuation()
-      if token is Some<Punctuation> {
+      if token is Some<PunctuationToken> {
         tokens.append(token.unwrap())
         continue
       }
 
       let token = number()
-      if token is Some<Literal<Int>> {
+      if token is Some<LiteralToken<Int>> {
         tokens.append(token.unwrap())
         continue
       }
 
       let token = keywordOrIdentifier()
-      if token is Some<Keyword | Identifier> {
+      if token is Some<KeywordToken | IdentifierToken> {
         tokens.append(token.unwrap())
         continue
       }
 
       let token = whitespace()
-      if token is Some<Whitespace> {
+      if token is Some<WhitespaceToken> {
         tokens.append(token.unwrap())
         continue
       }
@@ -57,15 +57,15 @@ class Lexer {
     }
   }
 
-  fun keywordOrIdentifier(): Maybe<Keyword | Identifier> {
+  fun keywordOrIdentifier(): Maybe<KeywordToken | IdentifierToken> {
     let peeked = peek()
-    if peeked is None<String> { return None<Keyword | Identifier>() }
+    if peeked is None<String> { return None<KeywordToken | IdentifierToken>() }
     let peeked = peeked.unwrap()
 
     let isFirstValid = "a" <= peeked && peeked <= "z"
         || "A" <= peeked && peeked <= "Z"
         || peeked == "_"
-    if (!isFirstValid) { return None<Keyword | Identifier>() }
+    if (!isFirstValid) { return None<KeywordToken | IdentifierToken>() }
 
     let lexeme = advanceWhile({
       "a" <= it && it <= "z"
@@ -93,27 +93,27 @@ class Lexer {
         || lexeme.second == "return"
         || lexeme.second == "break"
         || lexeme.second == "continue" {
-      Some<Keyword | Identifier>(Keyword(lexeme.first, lexeme.second))
+      Some<KeywordToken | IdentifierToken>(KeywordToken(lexeme.first, lexeme.second))
     } else {
-      Some<Keyword | Identifier>(Identifier(lexeme.first, lexeme.second))
+      Some<KeywordToken | IdentifierToken>(IdentifierToken(lexeme.first, lexeme.second))
     }
   }
 
-  fun number(): Maybe<Literal<Int>> {
+  fun number(): Maybe<LiteralToken<Int>> {
     let peeked = peek()
-    if peeked is None<String> { return None<Literal<Int>>() }
+    if peeked is None<String> { return None<LiteralToken<Int>>() }
     let peeked = peeked.unwrap()
 
     let isFirstValid = "0" <= peeked && peeked <= "9"
-    if (!isFirstValid) { return None<Literal<Int>>() }
+    if (!isFirstValid) { return None<LiteralToken<Int>>() }
 
     let lexeme = advanceWhile({
       "0" <= it && it <= "9"
     })
-    Some<Literal<Int>>(Literal<Int>(lexeme.first, Int.parse(lexeme.second)))
+    Some<LiteralToken<Int>>(LiteralToken<Int>(lexeme.first, Int.parse(lexeme.second)))
   }
 
-  fun punctuation(): Maybe<Punctuation> {
+  fun punctuation(): Maybe<PunctuationToken> {
     let operator = peekMulti(2)
     if operator is Some<String> {
       // TODO(JonasWanke): rename this to operator once that doesn't cause a compiler bug
@@ -126,7 +126,7 @@ class Lexer {
           || unwrapped == "->"
           || unwrapped == "!=" {
             let lexeme = advanceMulti(2)
-            return Some<Punctuation>(Punctuation(lexeme.first, lexeme.second))
+            return Some<PunctuationToken>(PunctuationToken(lexeme.first, lexeme.second))
           }
     }
     
@@ -153,26 +153,26 @@ class Lexer {
           || unwrapped == "="
           || unwrapped == "." {
         let lexeme = advanceMulti(1)
-        return Some<Punctuation>(Punctuation(lexeme.first, lexeme.second))
+        return Some<PunctuationToken>(PunctuationToken(lexeme.first, lexeme.second))
       }
     }
-    None<Punctuation>()
+    None<PunctuationToken>()
   }
 
-  fun comment(): Maybe<Comment> {
+  fun comment(): Maybe<CommentToken> {
     let peeked = peek()
-    if peeked is None<String> { return None<Comment>() }
+    if peeked is None<String> { return None<CommentToken>() }
     let peeked = peeked.unwrap()
 
     if peekMulti(3) is Some<String> && peekMulti(3).unwrap() == "///" {
       advanceMulti(3)
       let lexeme = advanceWhile({ !isLineBreak(it) })
-      Some<Comment>(Comment(lexeme.first, lexeme.second, "doc"))
+      Some<CommentToken>(CommentToken(lexeme.first, lexeme.second, "doc"))
     } else {
       if peekMulti(2) is Some<String> && peekMulti(2).unwrap() == "//" {
         advanceMulti(2)
         let lexeme = advanceWhile({ !isLineBreak(it) })
-        Some<Comment>(Comment(lexeme.first, lexeme.second, "line"))
+        Some<CommentToken>(CommentToken(lexeme.first, lexeme.second, "line"))
       } else {
         if peekMulti(2) is Some<String> && peekMulti(2).unwrap() == "/*" {
           advanceMulti(2)
@@ -191,22 +191,22 @@ class Lexer {
               lexeme.second.substring(0, lexeme.second.length() - 1)
             )
           }
-          Some<Comment>(Comment(lexeme.first, lexeme.second, "block"))
+          Some<CommentToken>(CommentToken(lexeme.first, lexeme.second, "block"))
         } else {
-          None<Comment>()
+          None<CommentToken>()
         }
       }
     }
   }
-  fun whitespace(): Maybe<Whitespace> {
+  fun whitespace(): Maybe<WhitespaceToken> {
     let peeked = peek()
-    if peeked is None<String> { return None<Whitespace>() }
+    if peeked is None<String> { return None<WhitespaceToken>() }
     let peeked = peeked.unwrap()
 
-    if (!isWhitespace(peeked)) { return None<Whitespace>() }
+    if (!isWhitespace(peeked)) { return None<WhitespaceToken>() }
 
     let lexeme = advanceWhile(isWhitespace)
-    return Some<Whitespace>(Whitespace(lexeme.first, lexeme.second))
+    return Some<WhitespaceToken>(WhitespaceToken(lexeme.first, lexeme.second))
   }
 
   fun isLineBreak(char: String): Bool { char == "\r" || char == "\n" }
