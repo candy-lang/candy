@@ -102,41 +102,9 @@ public data class IfExpression {
 }
 impl IfExpression: Expression
 
-public data class LoopExpression {
-  public let id: NodeId
-  public let body: List<Expression>
-}
-impl LoopExpression: Expression
-
-public data class WhileExpression {
-  public let id: NodeId
-  public let condition: Maybe<Expression>
-  public let body: List<Expression>
-}
-impl WhileExpression: Expression
-
-public data class ForExpression {
-  public let id: NodeId
-  public let name: Maybe<String>
-  public let iterable: Maybe<Expression>
-  public let body: List<Expression>
-}
-impl ForExpression: Expression
-
 
 public data class ReturnExpression {
   public let id: NodeId
   public let value: Maybe<Expression>
 }
 impl ReturnExpression: Expression
-
-public data class BreakExpression {
-  public let id: NodeId
-  public let value: Maybe<Expression>
-}
-impl BreakExpression: Expression
-
-public data class ContinueExpression {
-  public let id: NodeId
-}
-impl ContinueExpression: Expression
