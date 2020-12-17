@@ -1,0 +1,5 @@
+name: ast
+
+dependencies:
+  lexer:
+    path: ../lexer

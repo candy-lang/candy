@@ -1,0 +1,9 @@
+use lexer
+
+public trait Node {
+  public let id: NodeId
+}
+
+public data class NodeId {
+  let id: Int
+}
