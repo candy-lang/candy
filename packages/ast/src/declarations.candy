@@ -1,4 +1,5 @@
 use ..comment
+use ..expressions
 use ..node
 use ..types
 
@@ -59,7 +60,7 @@ public data class Function {
   public let typeParameters: List<TypeParameter>
   public let valueParameters: List<ValueParameter>
   public let returnType: Maybe<CandyType>
-  // public let body: 
+  public let body: Maybe<BlockBody | ExpressionBody | DelegationBody>
 }
 impl Function: Declaration
 
@@ -67,7 +68,7 @@ public data class ValueParameter {
   public let id: NodeId
   public let name: Maybe<String>
   public let type: Maybe<CandyType>
-  // public let defaultValue: Expression
+  public let defaultValue: Maybe<DelegationBody>
 }
 
 
@@ -78,6 +79,22 @@ public data class Property {
   public let isMutable: Bool
   public let name: Maybe<String>
   public let type: Maybe<CandyType>
-  // public let initializer: Expression
+  public let initializer: Maybe<DelegationBody>
 }
 impl Property: Declaration
+
+public data class BlockBody {
+  public let id: NodeId
+  public let expressions: List<Expression>
+}
+impl BlockBody: Node
+public data class ExpressionBody {
+  public let id: NodeId
+  public let expression: Maybe<Expression>
+}
+impl ExpressionBody: Node
+public data class DelegationBody {
+  public let id: NodeId
+  public let expression: Maybe<Expression>
+}
+impl DelegationBody: Node

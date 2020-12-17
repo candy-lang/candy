@@ -55,11 +55,9 @@ public data class TypeParameter {
   public let name: Maybe<String>
   public let upperBound: Maybe<CandyType>
 }
-impl TypeParameter: CandyType
 
 public data class TypeArgument {
   public let id: NodeId
   public let modifiers: List<String>
   public let type: Maybe<CandyType>
 }
-impl TypeArgument: CandyType
