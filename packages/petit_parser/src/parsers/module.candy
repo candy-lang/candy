@@ -33,8 +33,10 @@ public trait Parser<Item, Output> {
   }
 
   // TODO(JonasWanke): move the following function to `combinator/choice.candy`
-  fun or(other: Parser<Item, Output>): Parser<Item, Output> {
-    ChoiceParser<Item, Output>(List.of2<Parser<Item, Output>>(this, other))
+  fun or<OutputB>(other: Parser<Item, OutputB>): Parser<Item, Output | OutputB> {
+    let castedThis = this as Parser<Item, Output | OutputB>
+    let castedOther = other as Parser<Item, Output | OutputB>
+    ChoiceParser<Item, Output | OutputB>(List.of2<Parser<Item, Output | OutputB>>(castedThis, castedOther))
   }
 
   // TODO(JonasWanke): move the following function to `combinator/optional.candy`
