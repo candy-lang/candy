@@ -2,8 +2,8 @@ use ..context
 use ..query
 
 fun main() {
-  let context = QueryContext()
-  for i in List.of4(1, -2, 1, -2) {
+  let context = QueryContext.create()
+  for i in List.of4<Int>(1, -2, 1, -2) {
     print("Is {i} positive? {isPositive(context, i)}")
   }
 }
