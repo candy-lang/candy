@@ -36,7 +36,7 @@ public data class Impl {
   public let typeParameters: List<TypeParameter>
   public let type: Maybe<CandyType>
   public let traits: List<CandyType>
-  public let innerDeclarations: List<Module | Trait | Function | Property>
+  public let innerDeclarations: List<Function | Property>
 }
 impl Impl: Declaration
 
