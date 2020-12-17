@@ -3,6 +3,13 @@ use ..query
 class QueryContext {
   /// A context that orchestrates running queries.
 
+  static fun create(): QueryContext {
+    QueryContext(
+      MutableMap.empty<String, MutableMap<Equals & Hash, Equals & Hash>>(),
+      MutableList.empty<(String, Equals & Hash)>()
+    )
+  }
+
   let cache: MutableMap<String, MutableMap<Equals & Hash, Equals & Hash>>
   /// A cache from query names to a query-specific cache that maps from input to output.
 
