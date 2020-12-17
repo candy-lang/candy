@@ -45,7 +45,7 @@ public data class Class {
   public let id: NodeId
   public let candyDoc: Maybe<CandyDoc>
   public let modifiers: List<String>
-  public let name: Maybe<String>
+  public let name: String
   public let typeParameters: List<TypeParameter>
   public let innerDeclarations: List<Trait | Class | Function | Property>
 }
