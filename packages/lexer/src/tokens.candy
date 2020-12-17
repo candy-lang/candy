@@ -19,7 +19,7 @@ public class KeywordToken {
   ///
   /// * directives: use, crate
   /// * declarations: module, trait, impl, class, fun, let, var, get, set
-  /// * control flow: if, else, loop, while, for, return, break, continue
+  /// * control flow: if, else, return
   ///
   /// TODO(JonasWanke): convert this to an enum when we support these
 }

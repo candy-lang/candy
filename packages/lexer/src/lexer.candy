@@ -87,12 +87,7 @@ class Lexer {
         || lexeme.second == "set"
         || lexeme.second == "if"
         || lexeme.second == "else"
-        || lexeme.second == "loop"
-        || lexeme.second == "while"
-        || lexeme.second == "for"
-        || lexeme.second == "return"
-        || lexeme.second == "break"
-        || lexeme.second == "continue" {
+        || lexeme.second == "return" {
       Some<KeywordToken | IdentifierToken>(KeywordToken(lexeme.first, lexeme.second))
     } else {
       Some<KeywordToken | IdentifierToken>(IdentifierToken(lexeme.first, lexeme.second))
