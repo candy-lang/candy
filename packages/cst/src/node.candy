@@ -1,9 +1,9 @@
 use lexer
 
-public trait CstNode<T> {
+public data class CstNode<T> {
   public let id: CstNodeId
   public let child: T
-  public let trailingTrivia: List<CommentToken | WhitespaceToken>
+  public let trailingTrivia: List<WhitespaceToken | CommentToken>
 }
 
 public data class CstNodeId {
