@@ -155,12 +155,18 @@ class GlobalQueryContext {
   final List<Tuple2<String, dynamic>> _queryStack = [];
   void recordQueryEnter(String name, dynamic key) {
     final tuple = Tuple2(name, key);
-    if (_queryStack.contains(tuple)) {
-      final stack =
-          _queryStack.map((it) => '${it.first}(${it.second})').join('\n');
-      throw CompilerError.internalError('Cycle detected. Stack is:\n$stack');
-    }
+    final hasCycle = _queryStack.contains(tuple);
     _queryStack.add(tuple);
+    if (hasCycle) {
+      final stack = _queryStack.reversed
+          .map((it) => '${it.first}(${it.second})')
+          .join('\n');
+      throw CompilerError.internalError(
+        '🔁 Cycle detected.\n'
+        'Query stack:\n$stack\n\n'
+        'Stack trace:\n${StackTrace.current}',
+      );
+    }
   }
 
   void recordQueryExit() => _queryStack.removeLast();
