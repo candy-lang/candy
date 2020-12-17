@@ -21,7 +21,7 @@ impl IntExpression: Expression
 
 public data class StringExpression {
   public let id: NodeId
-  public let value: List<StringPart>
+  public let parts: List<StringPart>
 }
 impl StringExpression: Expression
 
