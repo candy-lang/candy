@@ -797,8 +797,13 @@ class ContextContext extends Context {
         .expand((it) => getInnerDeclarationIds(queryContext, it.id))
         .where((id) {
       if (id.isProperty) {
-        final propertyHir = getPropertyDeclarationHir(queryContext, id);
-        return propertyHir.name == name && !propertyHir.isStatic;
+        // YAW: `getPropertyDeclarationHir` already tries to lower the
+        // initializer, which results in a cycle when we try to find out whether
+        // the property we're trying to lower is static or not.
+        final propertyAst = getPropertyDeclarationAst(queryContext, id);
+        return propertyAst.name.name == name &&
+            !propertyAst.isStatic &&
+            id.parent.isNotModule;
       } else if (id.isFunction) {
         final functionHir = getFunctionDeclarationHir(queryContext, id);
         return functionHir.name == name && !functionHir.isStatic;
