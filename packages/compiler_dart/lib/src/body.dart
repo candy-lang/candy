@@ -155,36 +155,68 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       property: (id, type, _, __, receiver) {
         final name = id.simplePath.last.nameOrNull;
 
-        if (name == 'filled' &&
-            declarationIdToModuleId(context, id.parent) ==
-                CandyType.arrayModuleId) {
-          final t = dart.refer('T');
-          final function = dart.Method((b) => b
-            ..name = _name(node.id)
-            ..returns = dart.TypeReference((b) => b
-              ..symbol = 'List'
-              ..url = dartCoreUrl
-              ..types.add(t))
-            ..types.add(t)
-            ..requiredParameters.add(dart.Parameter((b) => b
-              ..type = compileType(context, CandyType.int)
-              ..name = 'length'))
-            ..requiredParameters.add(dart.Parameter((b) => b
-              ..type = t
-              ..name = 'item'))
-            ..body = dart.TypeReference((b) => b
-                  ..symbol = 'List'
-                  ..url = dartCoreUrl
-                  ..types.add(t))
-                .property('filled')
-                .call(
-                  [dart.refer('length'), dart.refer('item')],
-                  {},
-                  [],
-                )
-                .returned
-                .code);
-          return [function.code];
+        if (declarationIdToModuleId(context, id.parent) ==
+            CandyType.arrayModuleId) {
+          if (name == 'filled') {
+            final t = dart.refer('T');
+            final function = dart.Method((b) => b
+              ..name = _name(node.id)
+              ..returns = dart.TypeReference((b) => b
+                ..symbol = 'List'
+                ..url = dartCoreUrl
+                ..types.add(t))
+              ..types.add(t)
+              ..requiredParameters.add(dart.Parameter((b) => b
+                ..type = compileType(context, CandyType.int)
+                ..name = 'length'))
+              ..requiredParameters.add(dart.Parameter((b) => b
+                ..type = t
+                ..name = 'item'))
+              ..body = dart.TypeReference((b) => b
+                    ..symbol = 'List'
+                    ..url = dartCoreUrl
+                    ..types.add(t))
+                  .property('filled')
+                  .call(
+                    [dart.refer('length'), dart.refer('item')],
+                    {},
+                    [],
+                  )
+                  .returned
+                  .code);
+            return [function.code];
+          }
+          if (name == 'generate') {
+            final t = dart.refer('T');
+            final function = dart.Method((b) => b
+              ..name = _name(node.id)
+              ..returns = dart.TypeReference((b) => b
+                ..symbol = 'List'
+                ..url = dartCoreUrl
+                ..types.add(t))
+              ..types.add(t)
+              ..requiredParameters.add(dart.Parameter((b) => b
+                ..type = compileType(context, CandyType.int)
+                ..name = 'length'))
+              ..requiredParameters.add(dart.Parameter((b) => b
+                ..type = dart.FunctionType((b) => b
+                  ..requiredParameters.add(compileType(context, CandyType.int))
+                  ..returnType = t)
+                ..name = 'generator'))
+              ..body = dart.TypeReference((b) => b
+                    ..symbol = 'List'
+                    ..url = dartCoreUrl
+                    ..types.add(t))
+                  .property('generate')
+                  .call(
+                    [dart.refer('length'), dart.refer('generator')],
+                    {},
+                    [],
+                  )
+                  .returned
+                  .code);
+            return [function.code];
+          }
         }
 
         if (receiver != null) {
