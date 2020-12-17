@@ -1,10 +1,14 @@
-# Language X
+# Candy
 
 
 
 - [1. About](#1-about)
   - [1.1. Goals](#11-goals)
   - [1.2. Vision](#12-vision)
+    - [Rust](#rust)
+    - [Dart](#dart)
+    - [Kotlin](#kotlin)
+    - [Summary](#summary)
   - [1.3. Paradigms](#13-paradigms)
 - [2. Visibility Modifier](#2-visibility-modifier)
 - [3. Properties](#3-properties)
@@ -172,26 +176,26 @@ Properties are named storage slots, whether global, in classes or in functions.
 
 ```rust
 let readonly: Int = 0
-mut let mutable: Int = 0
+var mutable: Int = 0
 
 // Custom Getters:
-let foo1: Int => 1
+let foo1: Int -> 1
 let foo2: Int {
   return 1
 }
 let foo3: Int
-  get => 1
-mut let blub: Int
-  get => field * 5
-  set => field = it + 1
+  get -> 1
+var blub: Int
+  get -> field * 5
+  set -> field = it + 1
 
 // Delegation:
-let bar: Int by vetoable { old, new => TODO() }
+let bar: Int by vetoable { old, new -> todo() }
 
 // Default value:
-mut let whoosh: Int = bazfoo
+var whoosh: Int = bazfoo
 let yumminess: Int = impl { // Trait is inferred
-  fun foo() => 1
+  fun foo() -> 1
 }
 
 lateinit let baz: Int
@@ -222,23 +226,13 @@ fun abc(a: Int, b: String = "abc"): Foo {
 Expression bodies:
 
 ```kotlin
-fun doBar() => computeFoo()
+fun doBar() -> computeFoo()
 fun doBar() = methodReference
 ```
 
-The default return type (if not specified) is `Unit`. When using an expression body or delegating to a different function, the return type is inferred.
+The default return type (if not specified) is `Unit`.
 
 Overloading is supported based on parameters and return type.
-
-Infix methods are supported:
-
-```kotlin
-class Matrix {
-  infix fun dot(other: Matrix): Matrix
-}
-
-// Use as `matrix dot matrix`.
-```
 
 
 ## 5. Classes
@@ -246,7 +240,7 @@ class Matrix {
 ```kotlin
 class VerySimpleClass
 
-// Implicitly generates constructor with parameters foo and bar, where bar is optional.
+// Implicitly generates constructor with parameters [foo] and [bar], where [bar] is optional.
 class SimpleClass1 {
   let foo: String
   let bar: Int = 0
@@ -262,7 +256,6 @@ class SimpleClass2 {
 
   let foo: Int = 0
   let bar: Int = 0
-    get => field as Double
 }
 
 class SimpleClass3 {
@@ -290,11 +283,12 @@ class FieldClass {
 
   // properties:
   let foo: Int
-  mut let bar: This // Inside classes, you can use `This` to refer to the class itself.
-  mut let withDefault: Int = foo
+  var bar: This // Inside classes, you can use `This` to refer to the class itself.
+  var withDefault: Int = foo
 
   // methods:
   fun doFoo(param1: Param1Type): ReturnType {
+    // ...
   }
 }
 ```
@@ -306,7 +300,7 @@ let field: FieldClass = FieldClass(foo = 1, bar = 2)
 
 ### 5.1. Traits
 
-Traits can define an API (available properties and functions), but they cannot be instantiated.
+Traits can define behavior (available properties and functions), but they cannot be instantiated.
 
 ```kotlin
 trait Foo {
@@ -322,18 +316,16 @@ trait Foo {
 impl Foo: Bar {
   // Implement trait [Bar] for type [Foo].
 
-  fun baz() => 5
+  fun baz() -> 5
 }
 
-// Implementations for all cases must be provided. The same goes for abstract
-// classes.
+// Implementations for all cases must be provided. The same goes for traits.
 //
-// Note that you can't require an impl to be provided for a type defined by
-// some other package without providing a default implementation for it.
+// Note that you can't require an impl to be provided for a type defined by some other package
+// without providing a default implementation for it.
 impl MyEnum: Foo
 
-// Existing methods matching the trait will be reused → the implementation can
-// potentially be empty.
+// Existing methods matching the trait will be reused → the implementation can potentially be empty.
 impl MyClass: Foo
 ```
 
@@ -350,7 +342,7 @@ dooWithFoo(impl : Foo {
 })
 ```
 
-For implementing multiple (usually related) `trait`s, you can shorten your code like the following:
+For implementing multiple (usually related) `trait`s, you can shorten your code like the following (using intersection types):
 
 ```rust
 // Implement algebra stuff.
@@ -374,9 +366,9 @@ impl Int: Subtract<Int, Int> {
 For defining an `impl` without a trait (visible on the base type, but limited to the current package), write this:
 
 ```rust
-impl String {
+impl Int {
   let doubled: This
-    get => this + this
+    get -> this + this
 }
 ```
 
@@ -384,7 +376,7 @@ impl String {
 ## 6. Enums
 
 ```kotlin
-enum Foo1 { // implicitly extends `Enum<Unit>`
+enum Foo1 { // implicitly implements `Enum<Unit>`
   Bar,
   Baz,
   FooBar,
@@ -427,7 +419,9 @@ example usage: `Foo1.Bar`, `Foo2.FooBar.value`, `Barcode.Upc((1, 2, 3, 4))`
 trait Abc<T1, T2, …, Tn: Foo = Bar>
   where <ValueConstraints> {}
 
-impl Abc<Foo, Tn: Bar, T2: Baz> for MyStruct
+impl MyClass: Abc<Foo, Tn: Bar, T2: Baz> {}
+
+impl MyClass: Abc<Foo, Tn: Bar, T2: Baz>
   where <ValueConstraints> {}
 ```
 
@@ -468,7 +462,6 @@ class MyDataClass
 
 - Implicit member access (see Swift)
 
-
 ### 9.1. Operators
 
 | Precedence   | Description         | Operators                                                                              | Associativity |
@@ -507,8 +500,8 @@ Point(...tuple)
 Safe unwrap in arguments:
 
 ```kotlin
-let value: Option<Int> = Option.None
-let point /* Option<Point> */ = Point(value?, 0)
+let value: Maybe<Int> = Maybe.None
+let point /* Maybe<Point> */ = Point(value?, 0)
 ```
 
 
@@ -517,9 +510,9 @@ let point /* Option<Point> */ = Point(value?, 0)
 #### 9.2.1. Strings
 
 ```rust
-"foo" // foo
-"foo {bar}" // foo <bar's value>
-#"foo {bar}"# // foo {bar}
+"foo \\" // foo \
+"foo \{bar}" // foo \<bar's value>
+#"foo {bar} \ \\n \\\"# // foo {bar} \ <lf> \
 #"foo {{bar}}"# // foo <bar's value> (unnecessarily nested)
 "foo {bar.baz}" // foo <bar.baz's value>
 ##"foo " "# bar {{{bar}}}"## // foo " "# bar <bar's value>
@@ -541,8 +534,8 @@ If the values are compile-time inferred to be `Map.Entry`s, the literal creates 
 You can also use `if` expressions without an `else` branch, as well as safe/unsafe unwrapping (`?`/`!`).
 
 ```dart
-let a: Optional<Iterable<Int>>
-let b: Iterable<Optional<Int>>
+let a: Maybe<Iterable<Int>>
+let b: Iterable<Maybe<Int>>
 let c: Iterable<Int> = [
   if (true) 1 else 2,
   if (false) 2,
@@ -675,20 +668,20 @@ let regex: RegEx = `regex:abc[\w\d]+`
 
 ```rust
 match x {
-  1 => "exactly 1"
-  2 | 3 => "2 or 3: {it}"
-  a: Int if a.isEven => "is even"
-  (1, a) => "tuple of 1 and {a}"
-  ("abc", a = 1 | 2) => #"("abc", 1) or ("abc", 2) (and a captures the value)"#
-  ("abc", a: Int) => #"Tuple of "abc" and an integer ({{a}})"#
-  a = 4 | 5 => "is 4 or 5 and captured in a"
-  a in 6..8 => "is within 6 and 8 and captured in a"
-  a: Int => "is of type Int and captured in a"
-  Option.Some(a) => "Some of {a}"
-  _: Option<T = Int | UInt> => "Option<{T}>"
-  _: Option<T> => "Option<{T}>"
-  _: ((Int) => String) => "Function from Int to String"
-  _ => "default"
+  1 -> "exactly 1"
+  2 | 3 -> "2 or 3: {it}"
+  a: Int if a.isEven -> "is even"
+  (1, a) -> "tuple of 1 and {a}"
+  ("abc", a = 1 | 2) -> #"("abc", 1) or ("abc", 2) (and a captures the value)"#
+  ("abc", a: Int) -> #"Tuple of "abc" and an integer ({{a}})"#
+  a = 4 | 5 -> "is 4 or 5 and captured in a"
+  a in 6..8 -> "is within 6 and 8 and captured in a"
+  a: Int -> "is of type Int and captured in a"
+  Option.Some(a) -> "Some of {a}"
+  _: Option<T = Int | UInt> -> "Option<{T}>"
+  _: Option<T> -> "Option<{T}>"
+  _: ((Int) -> String) -> "Function from Int to String"
+  _ -> "default"
 }
 
 let (a, b) = (1, 2)
@@ -816,7 +809,7 @@ use serializable
 @Serializable()
 class Foo {
   @json.JsonName("foo_bar")
-  mut let fooBar
+  var fooBar
 }
 ```
 
@@ -827,7 +820,7 @@ use serializable.json
 @Serializable()
 class Foo {
   @JsonName("foo_bar")
-  mut let fooBar
+  var fooBar
 }
 ```
 
@@ -874,12 +867,12 @@ Primitive types:
 - `Nothing`, `Never` or `None`
 - `(T1, …, Tn) ≡ Tuple<T1, …, Tn>` (with `n in 2..*`)
 - `(P1, …, Pn) -> R ≡ Function<P1, …, Pn, R>` ()
-- `Type<T>` (potentially)
+- `Type` (potentially)
 
 ### 13.1. Function Types
 
 ```kotlin
-R.(T1 t1, T2 t2, …, Tn tn = dn) => T
+R.(T1 t1, T2 t2, …, Tn tn = dn) -> T
 ```
 
 ### 13.2. Value Constraints
