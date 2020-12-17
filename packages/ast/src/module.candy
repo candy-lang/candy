@@ -1,4 +1,6 @@
+public use .comment
 public use .declarations
 public use .expressions
+public use .file
 public use .node
 public use .types
