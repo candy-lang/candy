@@ -55,6 +55,25 @@ public data class IdentifierExpression {
 impl IdentifierExpression: Expression
 
 
+public data class BinaryExpression {
+  public let id: NodeId
+
+  public let leftOperand: Maybe<Expression>
+
+  public let operator: String
+  /// May be one of the following:
+  ///
+  /// * arithmetic: `+`, `-`, `*`, `/`, `~/`, `%`
+  /// * assignment & comparison: `=`, `==`, `!=`, `<`, `<=`, `>`, `>=`
+  /// * logical: `&`, `|`, `=>`
+  ///
+  /// TODO(JonasWanke): convert this to an enum when we support these
+
+  public let rightOperand: Maybe<Expression>
+}
+impl BinaryExpression: Expression
+
+
 public data class LocalPropertyExpression {
   public let id: NodeId
   public let modifiers: List<String>
