@@ -1,0 +1,65 @@
+use lexer
+use petit_parser
+use ..declarations
+use ..expressions
+use ..file
+use ..node
+use ..types
+
+public fun parse(tokens: List<Token>): CstFile {
+  CstParser(tokens, 0).parse()
+}
+
+class CstParser {
+  let tokens: List<Token>
+  mut let nextId = 0
+
+  fun parse(): CstFile {
+    loop {}
+  }
+
+  fun node<T>(parser: Parser<Token, T>): Parser<Token, CstNode<T>> {
+    let parser = parser.sequence<List<WhitespaceToken | CommentToken>>(trailingTrivia())
+    parser.map<CstNode<T>>({ output =>
+      let id = CstNodeId(nextId)
+      nextId = nextId + 1
+      CstNode<T>(id, output.first, output.second)
+    })
+  }
+
+  fun trailingTrivia(): Parser<Token, List<WhitespaceToken | CommentToken>> {
+    whitespace().or<CommentToken>(comment()).star()
+  }
+  fun whitespace(): Parser<Token, WhitespaceToken> {
+    custom<Token, WhitespaceToken>(
+      1,
+      { tokens =>
+        assert((tokens as Iterable<Token>).length() == 1, "List should only contain one token.")
+
+        let token = (tokens as Iterable<Token>).first().unwrap()
+        if token is WhitespaceToken {
+          Some<WhitespaceToken>(token as WhitespaceToken)
+        } else {
+          None<WhitespaceToken>()
+        }
+      },
+      "Expected whitespace.",
+    )
+  }
+  fun comment(): Parser<Token, CommentToken> {
+    custom<Token, CommentToken>(
+      1,
+      { tokens =>
+        assert((tokens as Iterable<Token>).length() == 1, "List should only contain one token.")
+
+        let token = (tokens as Iterable<Token>).first().unwrap()
+        if token is CommentToken {
+          Some<CommentToken>(token as CommentToken)
+        } else {
+          None<CommentToken>()
+        }
+      },
+      "Expected a comment.",
+    )
+  }
+}
