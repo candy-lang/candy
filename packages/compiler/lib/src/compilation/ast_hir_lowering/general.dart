@@ -59,6 +59,12 @@ final Query<Tuple4<ResourceId, String, bool, bool>, List<DeclarationId>>
               moduleIdToDeclarationId(context, useLine.moduleId);
           assert(declarationId.path.isEmpty);
 
+          if (useLine.alias != null) {
+            return [
+              if (useLine.alias == identifier) declarationId,
+            ];
+          }
+
           // TODO(JonasWanke): Ignore non-public declarations.
           final directMatches = getInnerDeclarationIds(context, declarationId)
               .where((id) =>
@@ -106,11 +112,16 @@ final lowerUseLineAstToHir =
     final useLine = inputs.second;
     // TODO(JonasWanke): packages with slashes
 
-    final moduleId = useLine.map(
-      localAbsolute: (useLine) => ModuleId(
-        resourceId.packageId,
-        useLine.pathSegments.map((s) => s.name).toList(),
-      ),
+    final moduleIdAndAlias = useLine.map<Tuple2<ModuleId, Option<String>>>(
+      localAbsolute: (useLine) {
+        return Tuple2(
+          ModuleId(
+            resourceId.packageId,
+            useLine.pathSegments.map((s) => s.name).toList(),
+          ),
+          None(),
+        );
+      },
       localRelative: (useLine) {
         var resolved = resourceIdToModuleId(context, resourceId);
         assert(useLine.leadingDots.isNotEmpty);
@@ -123,8 +134,10 @@ final lowerUseLineAstToHir =
           }
           resolved = resolved.parentOrNull;
         }
-        return resolved
-            .nested(useLine.pathSegments.map((s) => s.name).toList());
+        return Tuple2(
+          resolved.nested(useLine.pathSegments.map((s) => s.name).toList()),
+          None(),
+        );
       },
       global: (useLine) {
         if (useLine.moduleName != null) {
@@ -137,10 +150,22 @@ final lowerUseLineAstToHir =
             'Scoped packages are not yet supported.',
           );
         }
+        if (useLine.alias != null) {
+          throw CompilerError.unsupportedFeature(
+            'Import aliases are not yet supported.',
+          );
+        }
 
-        return ModuleId(PackageId(useLine.packagePathSegments.single.name), []);
+        return Tuple2(
+          ModuleId(PackageId(useLine.packagePathSegments.single.name), []),
+          Option.of(useLine.alias?.name),
+        );
       },
     );
-    return hir.UseLine(moduleId, isPublic: useLine.isPublic);
+    return hir.UseLine(
+      moduleIdAndAlias.first,
+      isPublic: useLine.isPublic,
+      alias: moduleIdAndAlias.second.valueOrNull,
+    );
   },
 );
