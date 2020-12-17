@@ -26,8 +26,8 @@ class QueryContext {
       throw "Cyclic query {signature}. This is the stack:\n{stack}"
     }
     cache
-    .putIfAbsent(query.name, { MutableMap.default_<Equals & Hash, Equals & Hash>() })
-    .putIfAbsent(query.input, {
+      .putIfAbsent(query.name, { MutableMap.empty<Equals & Hash, Equals & Hash>() })
+      .putIfAbsent(query.input, {
         stack.append(signature)
         let output = query.runner()
         stack.removeLast()
