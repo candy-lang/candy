@@ -1,0 +1,5 @@
+name: cst
+
+dependencies:
+  lexer:
+    path: ../lexer

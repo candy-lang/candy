@@ -1,0 +1,84 @@
+use lexer
+use ..node
+
+public trait /* enum */ CstType
+
+
+public data class CstNamedType {
+  public let modifiers: List<CstNode<IdentifierToken>>
+  public let nameParts: List<CstNode<IdentifierToken>>
+  public let typeArguments: Maybe<CstNode<CstTypeArguments>>
+}
+impl CstNamedType: CstType
+
+
+public data class CstGroupType {
+  public let modifiers: List<CstNode<IdentifierToken>>
+  public let openingParenthesis: CstNode<PunctuationToken>
+  public let type: Maybe<CstNode<CstType>>
+  public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
+}
+impl CstGroupType: CstType
+
+
+public data class CstFunctionType {
+  public let modifiers: List<CstNode<IdentifierToken>>
+  public let receiverType: Maybe<(CstNode<CstType>, Maybe<CstNode<PunctuationToken>>)>
+  public let parameterTypes: Maybe<CstNode<CstFunctionTypeParameterTypes>>
+  public let arrow: CstNode<PunctuationToken>
+  public let returnType: Maybe<CstNode<CstType>>
+}
+impl CstFunctionType: CstType
+
+public data class CstFunctionTypeParameterTypes {
+  public let openingParenthesis: CstNode<PunctuationToken>
+  public let parameterTypes: List<CstNode<CstType>>
+  public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
+}
+
+
+public data class CstTupleType {
+  public let modifiers: List<CstNode<IdentifierToken>>
+  public let openingParenthesis: CstNode<PunctuationToken>
+  public let types: List<CstNode<CstType | PunctuationToken>>
+  public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
+}
+impl CstTupleType: CstType
+
+
+public data class CstUnionType {
+  public let leftType: CstNode<CstType>
+  public let bar: CstNode<PunctuationToken>
+  public let rightType: Maybe<CstNode<CstType>>
+}
+impl CstUnionType: CstType
+
+public data class CstIntersectionType {
+  public let leftType: CstNode<CstType>
+  public let ampersand: CstNode<PunctuationToken>
+  public let rightType: Maybe<CstNode<CstType>>
+}
+impl CstIntersectionType: CstType
+
+
+public data class CstTypeParameters {
+  public let openingAngleBracket: CstNode<PunctuationToken>
+  public let typeParameters: List<CstNode<CstTypeParameter>>
+  public let closingAngleBracket: Maybe<CstNode<PunctuationToken>>
+}
+public data class CstTypeParameter {
+  public let modifiers: List<CstNode<IdentifierToken>>
+  public let modifiers: List<CstNode<IdentifierToken>>
+  public let name: Maybe<CstNode<IdentifierToken>>
+  public let upperBound: Maybe<CstNode<CstType>>
+}
+
+public data class CstTypeArguments {
+  public let openingAngleBracket: CstNode<PunctuationToken>
+  public let typeArguments: List<CstNode<CstTypeArgument>>
+  public let closingAngleBracket: Maybe<CstNode<PunctuationToken>>
+}
+public data class CstTypeArgument {
+  public let modifiers: List<CstNode<IdentifierToken>>
+  public let type: Maybe<CstNode<CstType>>
+}
