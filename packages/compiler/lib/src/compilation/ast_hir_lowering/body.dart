@@ -1307,7 +1307,9 @@ extension on Context {
     final errors = <ReportedCompilerError>[];
     if (functionType.isSome) {
       final typeParameters = functionType.value.parameterTypes;
-      if (typeParameters.length == 1 && declaredParameters.isEmpty) {
+      if (typeParameters.isEmpty && declaredParameters.isEmpty) {
+        // The lambda doesn't have any parameters. Nothing to do for us.
+      } else if (typeParameters.length == 1 && declaredParameters.isEmpty) {
         parameters['it'] = typeParameters.single;
       } else if (declaredParameters.isNotEmpty) {
         if (declaredParameters.length != typeParameters.length) {
