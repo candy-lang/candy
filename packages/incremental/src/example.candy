@@ -1,4 +1,5 @@
-use ...query
+use ..context
+use ..query
 
 fun main() {
   let context = QueryContext()
@@ -8,7 +9,7 @@ fun main() {
 }
 
 fun isPositive(context: QueryContext, input: Int): Bool {
-  query(context, "isPositive", input, {
+  query<Bool>(context, "isPositive", input as Equals & Hash, {
     print("Doing expensive computation.")
     input > 0
   })
