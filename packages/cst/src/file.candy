@@ -11,6 +11,7 @@ public trait /* enum */ CstUseLine
 
 public data class CstLocalRelativeUseLine {
   public let modifiers: List<CstNode<IdentifierToken>>
+  public let useKeyword: CstNode<KeywordToken>
   public let parentNavigations: List<CstNode<PunctuationToken>>
   public let path: List<CstNode<IdentifierToken | PunctuationToken>>
 }
@@ -18,6 +19,7 @@ impl CstLocalRelativeUseLine: CstUseLine
 
 public data class CstGlobalUseLine {
   public let modifiers: List<CstNode<IdentifierToken>>
+  public let useKeyword: CstNode<KeywordToken>
   public let packagePath: List<CstNode<IdentifierToken | PunctuationToken>>
 }
 impl CstGlobalUseLine: CstUseLine

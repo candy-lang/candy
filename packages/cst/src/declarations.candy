@@ -4,7 +4,7 @@ use ..node
 use ..types
 
 public trait /* enum */ CstDeclaration {
-  public let modifiers: List<CstNode<String>>
+  public let modifiers: List<CstNode<IdentifierToken>>
 }
 
 

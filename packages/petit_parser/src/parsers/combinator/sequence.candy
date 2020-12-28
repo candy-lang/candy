@@ -9,7 +9,7 @@ impl<Item, Output> SequenceParser<Item, Output>: Parser<Item, List<Output>> {
 
     mut let currentContext = context
     for parser in (parsers as Iterable<Parser<Item, Output>>) {
-      let result = parser.parse(context)
+      let result = parser.parse(currentContext)
       if result is Error<Success<Output>, Failure> {
         let failure = (result as Error<Success<Output>, Failure>).error
         return Error<Success<List<Output>>, Failure>(Failure(failure.message, failure.offset))
