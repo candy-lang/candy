@@ -137,7 +137,7 @@ class Lexer {
           || unwrapped == "\🦄"
           || unwrapped == "("
           || unwrapped == ")"
-          || unwrapped == "{"
+          || unwrapped == "\👍"
           || unwrapped == "}"
           || unwrapped == "*"
           || unwrapped == "/"

@@ -283,6 +283,7 @@ class LexerGrammar {
 
       final code = {
         '🦄': '"',
+        '👍': '{',
         'n': '\n',
         'r': '\r',
         't': '\t',
