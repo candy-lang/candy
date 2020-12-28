@@ -6,6 +6,7 @@ use ..file
 use ..node
 use ..types
 
+public fun parseString(source: String): CstFile { parse(lex(source)) }
 public fun parse(tokens: List<Token>): CstFile {
   CstParser(tokens, 0).parse()
 }
@@ -15,7 +16,74 @@ class CstParser {
   mut let nextId = 0
 
   fun parse(): CstFile {
-    loop {}
+    let result = file().parseInput(tokens)
+    if result is Error<Success<CstFile>, Failure> {
+      throw "Couldn't parse file: {result}."
+    }
+    result.unwrap().output
+  }
+
+  fun file(): Parser<Token, CstFile> {
+    useLine()
+        .map<CstNode<CstUseLine | CstDeclaration>>({ it as CstNode<CstUseLine | CstDeclaration> })
+        .star()
+        .map<CstFile>({
+          CstFile(it)
+        })
+  }
+
+  fun useLine(): Parser<Token, CstNode<CstUseLine>> {
+    localRelativeUseLine()
+        .or<CstNode<CstGlobalUseLine>>(globalUseLine())
+        .map<CstNode<CstUseLine>>({ it as CstNode<CstUseLine> })
+  }
+  fun localRelativeUseLine(): Parser<Token, CstNode<CstLocalRelativeUseLine>> {
+    let path = identifier()
+        .or<CstNode<PunctuationToken>>(punctuation("."))
+        .map<CstNode<IdentifierToken | PunctuationToken>>({ it as CstNode<IdentifierToken | PunctuationToken> })
+        .star()
+    let useLine = modifiers()
+        .sequence<CstNode<KeywordToken>>(keyword("use"))
+        .sequence<List<CstNode<PunctuationToken>>>(punctuation(".").plus())
+        .sequence<List<CstNode<IdentifierToken | PunctuationToken>>>(path)
+        .map<CstLocalRelativeUseLine>({
+          let modifiers = it.first.first.first
+          let useKeyword = it.first.first.second
+          let parentNavigations = it.first.second
+          let path = it.second
+          CstLocalRelativeUseLine(modifiers, useKeyword, parentNavigations, path)
+        })
+    node<CstLocalRelativeUseLine>(useLine)
+  }
+  fun globalUseLine(): Parser<Token, CstNode<CstGlobalUseLine>> {
+    let packagePath = identifier()
+        .or<CstNode<PunctuationToken>>(punctuation("."))
+        .map<CstNode<IdentifierToken | PunctuationToken>>({ it as CstNode<IdentifierToken | PunctuationToken> })
+        .star()
+    let useLine = modifiers()
+        .sequence<CstNode<KeywordToken>>(keyword("use"))
+        .sequence<List<CstNode<IdentifierToken | PunctuationToken>>>(packagePath)
+        .map<CstGlobalUseLine>({
+          let modifiers = it.first.first
+          let useKeyword = it.first.second
+          let packagePath = it.second
+          CstGlobalUseLine(modifiers, useKeyword, packagePath)
+        })
+    node<CstGlobalUseLine>(useLine)
+  }
+
+  fun modifiers(): Parser<Token, List<CstNode<IdentifierToken>>> { identifier().star() }
+
+  fun keyword(keyword: String): Parser<Token, CstNode<KeywordToken>> {
+    let token = token<KeywordToken>("keyword", { it.keyword == keyword })
+    node<KeywordToken>(token)
+  }
+  fun identifier(): Parser<Token, CstNode<IdentifierToken>> {
+    node<IdentifierToken>(token<IdentifierToken>("identifier", { true }))
+  }
+  fun punctuation(punctuation: String): Parser<Token, CstNode<PunctuationToken>> {
+    let token = token<PunctuationToken>("punctuation", { it.punctuation == punctuation })
+    node<PunctuationToken>(token)
   }
 
   fun node<T>(parser: Parser<Token, T>): Parser<Token, CstNode<T>> {
@@ -26,40 +94,27 @@ class CstParser {
       CstNode<T>(id, output.first, output.second)
     })
   }
-
   fun trailingTrivia(): Parser<Token, List<WhitespaceToken | CommentToken>> {
     whitespace().or<CommentToken>(comment()).star()
   }
-  fun whitespace(): Parser<Token, WhitespaceToken> {
-    custom<Token, WhitespaceToken>(
+  fun whitespace(): Parser<Token, WhitespaceToken> { token<WhitespaceToken>("whitespace", { true }) }
+  fun comment(): Parser<Token, CommentToken> { token<CommentToken>("comment", { true }) }
+
+  fun token<T: Token>(name: String, tester: (T) => Bool): Parser<Token, T> {
+    custom<Token, T>(
       1,
       { tokens =>
         assert((tokens as Iterable<Token>).length() == 1, "List should only contain one token.")
 
         let token = (tokens as Iterable<Token>).first().unwrap()
-        if token is WhitespaceToken {
-          Some<WhitespaceToken>(token as WhitespaceToken)
+        let result = if token is T && tester(token as T) {
+          Some<T>(token as T)
         } else {
-          None<WhitespaceToken>()
+          None<T>()
         }
+        result as Maybe<T>
       },
-      "Expected whitespace.",
-    )
-  }
-  fun comment(): Parser<Token, CommentToken> {
-    custom<Token, CommentToken>(
-      1,
-      { tokens =>
-        assert((tokens as Iterable<Token>).length() == 1, "List should only contain one token.")
-
-        let token = (tokens as Iterable<Token>).first().unwrap()
-        if token is CommentToken {
-          Some<CommentToken>(token as CommentToken)
-        } else {
-          None<CommentToken>()
-        }
-      },
-      "Expected a comment.",
+      "Expected a {name}.",
     )
   }
 }
