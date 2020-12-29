@@ -57,6 +57,9 @@ public trait Parser<Item, Output> {
     mappedParser as Parser<Item, (Output, OutputB)>
   }
 
+  // TODO(JonasWanke): move the following function to `combinator/settable.candy`
+  fun settable(): SettableParser<Item, Output> { SettableParser<Item, Output>(this) }
+
   // TODO(JonasWanke): move the following functions to `miscellaneous/end_of_input.candy`
   fun end(message: String): Parser<Item, Output> {
     let sequenceParser = sequence<Unit>(EndOfInputParser<Item>(message))

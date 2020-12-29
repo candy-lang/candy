@@ -1,0 +1,14 @@
+use ....parsers
+
+public fun failure<Item, Output>(message: String = "Unable to parse."): Parser<Item, Output> {
+  FailureParser<Item, Output>(message)
+}
+
+class FailureParser<Item, Output> {
+  let message: String
+}
+impl<Item, Output> FailureParser<Item, Output>: Parser<Item, Output> {
+  fun parse(context: Context<Item>): Result<Success<Output>, Failure> {
+    Error<Success<Output>, Failure>(context.failure(message))
+  }
+}
