@@ -1,3 +1,4 @@
+public use .and
 public use .choice
 public use .optional
 public use .sequence

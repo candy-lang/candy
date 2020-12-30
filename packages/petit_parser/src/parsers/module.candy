@@ -33,6 +33,9 @@ public trait Parser<Item, Output> {
     MapParser<Item, Output, NewOutput>(this, mapper)
   }
 
+  // TODO(JonasWanke): move the following function to `combinator/and.candy`
+  fun and(): Parser<Item, Output> { AndParser<Item, Output>(this) }
+
   // TODO(JonasWanke): move the following function to `combinator/choice.candy`
   fun or<OutputB>(other: Parser<Item, OutputB>): Parser<Item, Output | OutputB> {
     let castedThis = this as Parser<Item, Output | OutputB>
