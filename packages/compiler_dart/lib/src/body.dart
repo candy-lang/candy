@@ -266,8 +266,10 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   @override
   List<dart.Code> visitLiteralExpression(LiteralExpression node) {
     return node.literal.when(
-      boolean: (value) => _saveSingle(node, dart.literalBool(value)),
-      integer: (value) => _saveSingle(node, dart.literalNum(value)),
+      boolean: (value) =>
+          _saveSingle(node, dart.literalBool(value).wrapInCandyBool(context)),
+      integer: (value) =>
+          _saveSingle(node, dart.literalNum(value).wrapInCandyInt(context)),
       string: (parts) {
         if (parts.isEmpty) return _saveSingle(node, dart.literalString(''));
 
@@ -599,7 +601,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       dart.literalNull
           .assignVar(_name(node.id), compileType(context, node.type))
           .statement,
-      dart.Code('if (${_name(node.condition.id)}) {'),
+      dart.Code('if (${_name(node.condition.id)}.value) {'),
       ...visitBody(node.thenBody),
       dart.Code('} else {'),
       ...visitBody(node.elseBody),
@@ -624,7 +626,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             .statement,
         dart.Code('${_label(node.id)}:\nwhile (true) {'),
         ...node.condition.accept(this),
-        dart.Code('if (!${_name(node.condition.id)}) break;'),
+        dart.Code('if (!${_name(node.condition.id)}.value) break;'),
         for (final expression in node.body) ...expression.accept(this),
         dart.Code('}'),
       ];
@@ -762,7 +764,11 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     final check = _compileIs(instance, node.typeToCheck);
     return [
       ...node.instance.accept(this),
-      _save(node, node.isNegated ? check.parenthesized.negate() : check),
+      _save(
+        node,
+        (node.isNegated ? check.parenthesized.negate() : check)
+            .wrapInCandyBool(context),
+      ),
     ];
   }
 

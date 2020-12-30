@@ -35,9 +35,9 @@ abstract class BuiltinCompiler<Output> {
     } else if (moduleId == ModuleId.corePrimitives.nested(['Never'])) {
       return compileNever();
     } else if (moduleId == ModuleId.coreBool.nested(['Bool'])) {
-      return compileBool();
+      return compileBool(declarationId);
     } else if (moduleId == ModuleId.coreNumbersInt.nested(['Int'])) {
-      return compileInt();
+      return compileInt(declarationId);
     } else if (moduleId == ModuleId.coreString.nested(['String'])) {
       return compileString();
     } else if (moduleId == ModuleId.coreIoPrint && name == 'print') {
@@ -73,9 +73,9 @@ abstract class BuiltinCompiler<Output> {
   List<Output> compileUnit();
   List<Output> compileNever();
 
-  List<Output> compileBool();
+  List<Output> compileBool(DeclarationId id);
 
-  List<Output> compileInt();
+  List<Output> compileInt(DeclarationId id);
 
   List<Output> compileString();
 
@@ -145,40 +145,245 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
   }
 
   @override
-  List<dart.Spec> compileBool() {
-    // `Bool` corresponds to `bool`, hence nothing to do.
-    return [];
-  }
+  List<dart.Spec> compileBool(DeclarationId id) {
+    final impls = getAllImplsForTraitOrClassOrImpl(context, id)
+        .map((it) => getImplDeclarationHir(context, it));
+    final traits = impls.expand((impl) => impl.traits);
+    final implements = traits.map((it) => compileType(context, it));
+    final implMethodIds = impls
+        .expand((impl) => impl.innerDeclarationIds)
+        .where((id) => id.isFunction)
+        .toList();
+    final methodOverrides = implMethodIds
+        .map((it) => Tuple2(it, getFunctionDeclarationHir(context, it)))
+        .expand((values) sync* {
+      final id = values.first;
+      final function = values.second;
 
-  @override
-  List<dart.Spec> compileInt() {
-    // `Int` corresponds to `int`, hence nothing to do for the type itself.
+      if (function.isStatic) {
+        throw CompilerError.unsupportedFeature(
+          'Static functions in impls are not yet supported.',
+          location: ErrorLocation(
+            id.resourceId,
+            getPropertyDeclarationAst(context, id)
+                .modifiers
+                .firstWhere((w) => w is StaticModifierToken)
+                .span,
+          ),
+        );
+      }
+
+      yield dart.Method((b) => b
+        ..annotations.add(dart.refer('override', dartCoreUrl))
+        ..returns = compileType(context, function.returnType)
+        ..name = function.name
+        ..types.addAll(function.typeParameters
+            .map((it) => compileTypeParameter(context, it)))
+        ..requiredParameters
+            .addAll(compileParameters(context, function.valueParameters))
+        ..body = compileBody(context, id).value);
+    });
+
+    final otherBool = dart.Parameter((b) => b
+      ..name = 'other'
+      ..type = dart.refer('dynamic', dartCoreUrl));
     return [
-      Extension(
-        name: 'IntRandomExtension',
-        on: dart.refer('int', dartCoreUrl),
-        methods: [
+      dart.Class((b) => b
+        ..annotations.add(dart.refer('sealed', packageMetaUrl))
+        ..name = 'Bool'
+        ..fields.add(dart.Field((b) => b
+          ..name = 'value'
+          ..type = dart.refer('bool', dartCoreUrl)))
+        ..mixins.addAll(traits.map((it) {
+          final type = compileType(context, it);
+          return dart.TypeReference((b) => b
+            ..symbol = '${type.symbol}\$Default'
+            ..types.addAll(it.arguments.map((it) => compileType(context, it)))
+            ..url = type.url);
+        }))
+        ..implements.addAll(implements)
+        ..constructors.add(dart.Constructor((b) => b
+          ..requiredParameters
+              .add(dart.Parameter((b) => b..name = 'this.value'))))
+        ..methods.addAll([
           dart.Method((b) => b
-            ..static = true
-            ..returns = dart.refer('int', dartCoreUrl)
-            ..name = 'randomSample'
-            ..requiredParameters.add(dart.Parameter((b) => b
-              ..type = compileType(context, CandyType.randomSource)
-              ..name = 'source'))
-            ..body = dart.Block((b) => b
-              ..statements.add(dart
-                  .refer('source')
-                  .property('generateByte')
-                  .call([], {}, [])
-                  .returned
-                  .statement))),
-        ],
-      ),
+            ..name = 'equals'
+            ..returns = compileType(context, CandyType.bool)
+            ..requiredParameters.add(otherBool)
+            ..body = dart
+                .refer('value')
+                .equalTo(dart.refer('other.value'))
+                .wrapInCandyBool(context)
+                .code),
+          dart.Method((b) => b
+            ..name = 'and'
+            ..returns = compileType(context, CandyType.bool)
+            ..requiredParameters.add(otherBool)
+            ..body = dart
+                .refer('value')
+                .and(dart.refer('other.value'))
+                .wrapInCandyBool(context)
+                .code),
+          dart.Method((b) => b
+            ..name = 'or'
+            ..returns = compileType(context, CandyType.bool)
+            ..requiredParameters.add(otherBool)
+            ..body = dart
+                .refer('value')
+                .or(dart.refer('other.value'))
+                .wrapInCandyBool(context)
+                .code),
+          dart.Method((b) => b
+            ..name = 'opposite'
+            ..returns = compileType(context, CandyType.bool)
+            ..body =
+                dart.refer('value').negate().wrapInCandyBool(context).code),
+          dart.Method((b) => b
+            ..name = 'implies'
+            ..returns = compileType(context, CandyType.bool)
+            ..requiredParameters.add(otherBool)
+            ..body = dart
+                .refer('value')
+                .negate()
+                .or(dart.refer('other.value'))
+                .wrapInCandyBool(context)
+                .code),
+        ])
+        ..methods.addAll(methodOverrides)),
     ];
   }
 
   @override
-  List<dart.Spec> compileFloat() {
+  List<dart.Spec> compileInt(DeclarationId id) {
+    final impls = getAllImplsForTraitOrClassOrImpl(context, id)
+        .map((it) => getImplDeclarationHir(context, it));
+    final traits = impls.expand((impl) => impl.traits);
+    final implements = traits.map((it) => compileType(context, it));
+    final implMethodIds = impls
+        .expand((impl) => impl.innerDeclarationIds)
+        .where((id) => id.isFunction)
+        .toList();
+    final methodOverrides = implMethodIds
+        .map((it) => Tuple2(it, getFunctionDeclarationHir(context, it)))
+        .expand((values) sync* {
+      final id = values.first;
+      final function = values.second;
+
+      if (function.isStatic) {
+        throw CompilerError.unsupportedFeature(
+          'Static functions in impls are not yet supported.',
+          location: ErrorLocation(
+            id.resourceId,
+            getPropertyDeclarationAst(context, id)
+                .modifiers
+                .firstWhere((w) => w is StaticModifierToken)
+                .span,
+          ),
+        );
+      }
+
+      yield dart.Method((b) => b
+        ..annotations.add(dart.refer('override', dartCoreUrl))
+        ..returns = compileType(context, function.returnType)
+        ..name = function.name
+        ..types.addAll(function.typeParameters
+            .map((it) => compileTypeParameter(context, it)))
+        ..requiredParameters
+            .addAll(compileParameters(context, function.valueParameters))
+        ..body = compileBody(context, id).value);
+    });
+
+    final otherInt = dart.Parameter((b) => b
+      ..name = 'other'
+      ..type = dart.refer('dynamic', dartCoreUrl));
+    return [
+      dart.Class((b) => b
+        ..annotations.add(dart.refer('sealed', packageMetaUrl))
+        ..name = 'Int'
+        ..fields.add(dart.Field((b) => b
+          ..name = 'value'
+          ..type = dart.refer('int', dartCoreUrl)))
+        ..mixins.addAll(traits.map((it) {
+          final type = compileType(context, it);
+          return dart.TypeReference((b) => b
+            ..symbol = '${type.symbol}\$Default'
+            ..types.addAll(it.arguments.map((it) => compileType(context, it)))
+            ..url = type.url);
+        }))
+        ..implements.addAll(implements)
+        ..constructors.add(dart.Constructor((b) => b
+          ..requiredParameters
+              .add(dart.Parameter((b) => b..name = 'this.value'))))
+        ..methods.addAll([
+          dart.Method((b) => b
+            ..name = 'equals'
+            ..returns = compileType(context, CandyType.bool)
+            ..requiredParameters.add(otherInt)
+            ..body = dart
+                .refer('value')
+                .equalTo(dart.refer('other.value'))
+                .wrapInCandyBool(context)
+                .code),
+          dart.Method((b) => b
+            ..name = 'compareTo'
+            ..returns = compileType(context, CandyType.int)
+            ..requiredParameters.add(otherInt)
+            ..body = dart
+                .refer('value.compareTo')
+                .call([dart.refer('other.value')])
+                .wrapInCandyInt(context)
+                .code),
+          dart.Method((b) => b
+            ..name = 'add'
+            ..returns = compileType(context, CandyType.int)
+            ..requiredParameters.add(otherInt)
+            ..body = dart
+                .refer('value')
+                .operatorAdd(dart.refer('other.value'))
+                .wrapInCandyInt(context)
+                .code),
+          dart.Method((b) => b
+            ..name = 'subtract'
+            ..returns = compileType(context, CandyType.int)
+            ..requiredParameters.add(otherInt)
+            ..body = dart
+                .refer('value')
+                .operatorSubstract(dart.refer('other.value'))
+                .wrapInCandyInt(context)
+                .code),
+          dart.Method((b) => b
+            ..name = 'negate'
+            ..returns = compileType(context, CandyType.int)
+            ..body = dart.refer('-value').wrapInCandyInt(context).code),
+          dart.Method((b) => b
+            ..name = 'multiply'
+            ..returns = compileType(context, CandyType.int)
+            ..requiredParameters.add(otherInt)
+            ..body = dart
+                .refer('value')
+                .operatorMultiply(dart.refer('other.value'))
+                .wrapInCandyInt(context)
+                .code),
+          dart.Method((b) => b
+            ..name = 'divideTruncating'
+            ..returns = compileType(context, CandyType.int)
+            ..requiredParameters.add(otherInt)
+            ..body = dart
+                .refer('value ~/ other.value')
+                .wrapInCandyInt(context)
+                .code),
+          dart.Method((b) => b
+            ..name = 'modulo'
+            ..returns = compileType(context, CandyType.int)
+            ..requiredParameters.add(otherInt)
+            ..body = dart
+                .refer('value')
+                .operatorEuclideanModulo(dart.refer('other.value'))
+                .wrapInCandyInt(context)
+                .code),
+        ])
+        ..methods.addAll(methodOverrides)),
+    ];
   }
 
   @override
@@ -307,7 +512,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             ..name = 'seed'))
           ..initializers.add(dart
               .refer('_random')
-              .assign(random.call([dart.refer('seed')], {}, []))
+              .assign(random.call([dart.refer('seed.value')], {}, []))
               .code)))
         ..methods.add(dart.Method((b) => b
           ..static = true
@@ -334,8 +539,19 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                 .refer('_random')
                 .property('nextInt')
                 .call([dart.literalNum(1 << 8)], {}, [])
+                .wrapInCandyInt(context)
                 .returned
                 .statement)))))
     ];
   }
 }
+
+extension WrappingInCandyTypes on dart.Expression {
+  dart.Expression wrapInCandyBool(QueryContext context) {
+    return compileType(context, CandyType.bool).call([this]);
+  }
+
+  dart.Expression wrapInCandyInt(QueryContext context) {
+    return compileType(context, CandyType.int).call([this]);
+  }
+  }
