@@ -21,7 +21,6 @@ final Query<CandyType, dart.Reference> compileType =
         if (type == CandyType.bool) return _createType('bool');
         if (type == CandyType.number) return _createType('num');
         if (type == CandyType.int) return _createType('int');
-        if (type == CandyType.float) return _createType('double');
         if (type == CandyType.string) return _createType('String');
         if (type.virtualModuleId == CandyType.arrayModuleId) {
           assert(type.arguments.length == 1);

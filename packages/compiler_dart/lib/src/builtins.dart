@@ -40,8 +40,6 @@ abstract class BuiltinCompiler<Output> {
       return compileNumber();
     } else if (moduleId == ModuleId.coreNumbersInt.nested(['Int'])) {
       return compileInt();
-    } else if (moduleId == ModuleId.coreNumbersFloat.nested(['Float'])) {
-      return compileFloat();
     } else if (moduleId == ModuleId.coreString.nested(['String'])) {
       return compileString();
     } else if (moduleId == ModuleId.coreIoPrint && name == 'print') {
@@ -81,7 +79,6 @@ abstract class BuiltinCompiler<Output> {
 
   List<Output> compileNumber();
   List<Output> compileInt();
-  List<Output> compileFloat();
 
   List<Output> compileString();
 
@@ -191,8 +188,6 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
 
   @override
   List<dart.Spec> compileFloat() {
-    // `Float` corresponds to `double`, hence nothing to do.
-    return [];
   }
 
   @override

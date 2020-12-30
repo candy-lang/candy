@@ -55,7 +55,6 @@ abstract class CandyType with _$CandyType {
   static const bool = CandyType.user(ModuleId.coreBool, 'Bool');
   static const number = CandyType.user(ModuleId.coreNumbers, 'Number');
   static const int = CandyType.user(ModuleId.coreNumbersInt, 'Int');
-  static const float = CandyType.user(ModuleId.coreNumbersFloat, 'Float');
   static const string = CandyType.user(ModuleId.coreString, 'String');
 
   factory CandyType.maybe(CandyType itemType) => CandyType.user(
