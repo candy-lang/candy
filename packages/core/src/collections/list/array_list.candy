@@ -53,6 +53,7 @@ public class ArrayList<Item> {
     mut let i = 0
     while i < array.length() {
       list.append(array.get(i))
+      i = i + 1
     }
     list
   }
