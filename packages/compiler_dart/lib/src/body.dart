@@ -331,25 +331,6 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           ];
         }
       }
-
-      if (parentModuleId == CandyType.arrayModuleId) {
-        if (methodName == 'get' || methodName == 'set') {
-          final array = identifier.receiver;
-          final index = node.valueArguments['index'];
-          final item = node.valueArguments['item'];
-          final indexed = _refer(array.id).index(_refer(index.id));
-
-          return [
-            ...array.accept(this),
-            ...index.accept(this),
-            if (methodName == 'get')
-              _save(node, indexed)
-            else ...[
-              ...item.accept(this),
-              _save(node, indexed.assign(_refer(item.id))),
-            ],
-          ];
-        }
     }
 
     final surroundingDeclarationName = declarationId.simplePath.last.nameOrNull;
