@@ -18,14 +18,6 @@ final Query<CandyType, dart.Reference> compileType =
         if (type == CandyType.any) return _createType('Object');
         if (type == CandyType.unit) return _createType('void', url: null);
         if (type == CandyType.never) return _createType('dynamic');
-        if (type == CandyType.string) return _createType('String');
-        if (type.virtualModuleId == CandyType.arrayModuleId) {
-          assert(type.arguments.length == 1);
-          return _createType(
-            'List',
-            typeArguments: [compileType(context, type.arguments.single)],
-          );
-        }
 
         final declarationId =
             moduleIdToDeclarationId(context, type.virtualModuleId);

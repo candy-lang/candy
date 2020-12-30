@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 import 'package:strings/strings.dart' as strings;
 
+import 'builtins.dart';
 import 'constants.dart';
 import 'declarations/declaration.dart';
 import 'declarations/module.dart';
@@ -154,71 +155,6 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       },
       property: (id, type, _, __, receiver) {
         final name = id.simplePath.last.nameOrNull;
-
-        if (declarationIdToModuleId(context, id.parent) ==
-            CandyType.arrayModuleId) {
-          if (name == 'filled') {
-            final t = dart.refer('T');
-            final function = dart.Method((b) => b
-              ..name = _name(node.id)
-              ..returns = dart.TypeReference((b) => b
-                ..symbol = 'List'
-                ..url = dartCoreUrl
-                ..types.add(t))
-              ..types.add(t)
-              ..requiredParameters.add(dart.Parameter((b) => b
-                ..type = compileType(context, CandyType.int)
-                ..name = 'length'))
-              ..requiredParameters.add(dart.Parameter((b) => b
-                ..type = t
-                ..name = 'item'))
-              ..body = dart.TypeReference((b) => b
-                    ..symbol = 'List'
-                    ..url = dartCoreUrl
-                    ..types.add(t))
-                  .property('filled')
-                  .call(
-                    [dart.refer('length'), dart.refer('item')],
-                    {},
-                    [],
-                  )
-                  .returned
-                  .code);
-            return [function.code];
-          }
-          if (name == 'generate') {
-            final t = dart.refer('T');
-            final function = dart.Method((b) => b
-              ..name = _name(node.id)
-              ..returns = dart.TypeReference((b) => b
-                ..symbol = 'List'
-                ..url = dartCoreUrl
-                ..types.add(t))
-              ..types.add(t)
-              ..requiredParameters.add(dart.Parameter((b) => b
-                ..type = compileType(context, CandyType.int)
-                ..name = 'length'))
-              ..requiredParameters.add(dart.Parameter((b) => b
-                ..type = dart.FunctionType((b) => b
-                  ..requiredParameters.add(compileType(context, CandyType.int))
-                  ..returnType = t)
-                ..name = 'generator'))
-              ..body = dart.TypeReference((b) => b
-                    ..symbol = 'List'
-                    ..url = dartCoreUrl
-                    ..types.add(t))
-                  .property('generate')
-                  .call(
-                    [dart.refer('length'), dart.refer('generator')],
-                    {},
-                    [],
-                  )
-                  .returned
-                  .code);
-            return [function.code];
-          }
-        }
-
         if (receiver != null) {
           return [
             ...receiver.accept(this),
@@ -267,13 +203,20 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       integer: (value) =>
           _saveSingle(node, dart.literalNum(value).wrapInCandyInt(context)),
       string: (parts) {
-        if (parts.isEmpty) return _saveSingle(node, dart.literalString(''));
+        if (parts.isEmpty) {
+          return _saveSingle(
+            node,
+            dart.literalString('').wrapInCandyString(context),
+          );
+        }
 
         if (parts.length == 1 && parts.single is LiteralStringLiteralPart) {
           final part = parts.single as LiteralStringLiteralPart;
           return _saveSingle(
             node,
-            dart.literalString(strings.escape(part.value)),
+            dart
+                .literalString(strings.escape(part.value))
+                .wrapInCandyString(context),
           );
         }
 
@@ -288,7 +231,9 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
                   interpolated: (expression) => '\$${_name(expression.id)}',
                 ))
             .join();
-        lowered.add(_save(node, dart.literalString(content)));
+        lowered.add(
+          _save(node, dart.literalString(content).wrapInCandyString(context)),
+        );
 
         return lowered;
       },
@@ -332,8 +277,6 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     if (target is IdentifierExpression &&
         target.identifier is PropertyIdentifier) {
       final identifier = target.identifier as PropertyIdentifier;
-      final parentModuleId =
-          declarationIdToModuleId(context, identifier.id.parent);
       final methodName = identifier.id.simplePath.last.nameOrNull;
 
       List<dart.Code> simpleBinaryExpression(

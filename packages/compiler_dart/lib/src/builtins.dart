@@ -1,8 +1,12 @@
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 import 'package:dartx/dartx.dart';
+import 'package:parser/parser.dart' hide FunctionDeclaration;
 
+import 'body.dart';
 import 'constants.dart' hide srcDirectoryName;
+import 'declarations/declaration.dart';
+import 'declarations/function.dart';
 import 'type.dart';
 import 'utils.dart';
 
@@ -25,7 +29,7 @@ abstract class BuiltinCompiler<Output> {
       if (name == 'assert') return compileAssert();
     } else if (moduleId ==
         ModuleId.coreCollections.nested(['array', 'Array'])) {
-      return compileArray();
+      return compileArray(declarationId);
     } else if (moduleId == ModuleId.corePrimitives.nested(['Any'])) {
       return compileAny();
     } else if (moduleId == ModuleId.corePrimitives.nested(['ToString'])) {
@@ -39,7 +43,7 @@ abstract class BuiltinCompiler<Output> {
     } else if (moduleId == ModuleId.coreNumbersInt.nested(['Int'])) {
       return compileInt(declarationId);
     } else if (moduleId == ModuleId.coreString.nested(['String'])) {
-      return compileString();
+      return compileString(declarationId);
     } else if (moduleId == ModuleId.coreIoPrint && name == 'print') {
       return compilePrint();
     } else if (moduleId ==
@@ -64,7 +68,7 @@ abstract class BuiltinCompiler<Output> {
   // collections
   // collections.list
   // collections.list.array
-  List<Output> compileArray();
+  List<Output> compileArray(DeclarationId id);
 
   // primitives
   List<Output> compileAny();
@@ -77,7 +81,7 @@ abstract class BuiltinCompiler<Output> {
 
   List<Output> compileInt(DeclarationId id);
 
-  List<Output> compileString();
+  List<Output> compileString(DeclarationId id);
 
   List<Output> compileTuple(int size);
 
@@ -116,9 +120,141 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
   }
 
   @override
-  List<dart.Spec> compileArray() {
-    // `Array<Value>` corresponds to `List<Value>`, hence nothing to do.
-    return [];
+  List<dart.Spec> compileArray(DeclarationId id) {
+    final impls = getAllImplsForTraitOrClassOrImpl(context, id)
+        .map((it) => getImplDeclarationHir(context, it));
+    final traits = impls.expand((impl) => impl.traits);
+    final implements = traits.map((it) => compileType(context, it));
+    final implMethodIds = impls
+        .expand((impl) => impl.innerDeclarationIds)
+        .where((id) => id.isFunction)
+        .toList();
+    final methodOverrides = implMethodIds
+        .map((it) => Tuple2(it, getFunctionDeclarationHir(context, it)))
+        .expand((values) sync* {
+      final id = values.first;
+      final function = values.second;
+
+      if (function.isStatic) {
+        throw CompilerError.unsupportedFeature(
+          'Static functions in impls are not yet supported.',
+          location: ErrorLocation(
+            id.resourceId,
+            getPropertyDeclarationAst(context, id)
+                .modifiers
+                .firstWhere((w) => w is StaticModifierToken)
+                .span,
+          ),
+        );
+      }
+
+      yield dart.Method((b) => b
+        ..annotations.add(dart.refer('override', dartCoreUrl))
+        ..returns = compileType(context, function.returnType)
+        ..name = function.name
+        ..types.addAll(function.typeParameters
+            .map((it) => compileTypeParameter(context, it)))
+        ..requiredParameters
+            .addAll(compileParameters(context, function.valueParameters))
+        ..body = compileBody(context, id).value);
+    });
+
+    final t = dart.refer('T');
+    final arrayT = dart.refer('Array<T>');
+    final listT = dart.TypeReference((b) => b
+      ..symbol = 'List'
+      ..url = dartCoreUrl
+      ..types.add(t));
+    return [
+      dart.Class((b) => b
+        ..annotations.add(dart.refer('sealed', packageMetaUrl))
+        ..name = 'Array'
+        ..types.add(t)
+        ..fields.add(dart.Field((b) => b
+          ..name = 'value'
+          ..type = listT))
+        ..mixins.addAll(traits.map((it) {
+          final type = compileType(context, it);
+          return dart.TypeReference((b) => b
+            ..symbol = '${type.symbol}\$Default'
+            ..types.addAll(it.arguments.map((it) => compileType(context, it)))
+            ..url = type.url);
+        }))
+        ..implements.addAll(implements)
+        ..constructors.add(dart.Constructor((b) => b
+          ..requiredParameters
+              .add(dart.Parameter((b) => b..name = 'this.value'))))
+        ..methods.addAll([
+          dart.Method((b) => b
+            ..name = 'generate'
+            ..static = true
+            ..types.add(t)
+            ..returns = arrayT
+            ..requiredParameters.addAll([
+              dart.Parameter((b) => b
+                ..name = 'length'
+                ..type = compileType(context, CandyType.int)),
+              dart.Parameter((b) => b
+                ..name = 'generator'
+                ..type = dart.refer('T Function(int index)')),
+            ])
+            ..body = arrayT.call([
+              listT.property('generate').call([
+                dart.refer('length.value'),
+                // The Dart code generator doesn't support lambdas, so we do an ugly workaround.
+                dart.refer('(index) => generator').call([
+                  compileType(context, CandyType.int)
+                      .call([dart.refer('index')])
+                ]),
+              ]),
+            ]).code),
+          dart.Method((b) => b
+            ..name = 'length'
+            ..returns = compileType(context, CandyType.int)
+            ..body = dart.refer('value.length').wrapInCandyInt(context).code),
+          dart.Method((b) => b
+            ..name = 'get'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..name = 'index'
+              ..type = compileType(context, CandyType.int)))
+            ..returns = t
+            ..body = dart.refer('value').index(dart.refer('index.value')).code),
+          dart.Method(
+            (b) => b
+              ..name = 'set'
+              ..requiredParameters.addAll([
+                dart.Parameter((b) => b
+                  ..name = 'index'
+                  ..type = compileType(context, CandyType.int)),
+                dart.Parameter((b) => b
+                  ..name = 'item'
+                  ..type = t),
+              ])
+              ..returns = t
+              ..body = dart
+                  .refer('item')
+                  .assign(dart.refer('value').index(dart.refer('index.value')))
+                  .code,
+          ),
+        ])
+        ..methods.addAll(getClassDeclarationHir(context, id)
+            .innerDeclarationIds
+            .where((it) => it.getHir(context) is FunctionDeclaration)
+            .where((it) => getBody(context, it).isSome)
+            .map((it) {
+          final function = getFunctionDeclarationHir(context, it);
+          return dart.Method((b) => b
+            ..returns = compileType(context, function.returnType)
+            ..static = function.isStatic
+            ..name = function.name
+            ..types.addAll(function.typeParameters
+                .map((it) => compileTypeParameter(context, it)))
+            ..requiredParameters
+                .addAll(compileParameters(context, function.valueParameters))
+            ..body = compileBody(context, it).value);
+        }))
+        ..methods.addAll(methodOverrides)),
+    ];
   }
 
   @override
@@ -387,50 +523,119 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
   }
 
   @override
-  List<dart.Spec> compileString() {
+  List<dart.Spec> compileString(DeclarationId id) {
     // `String` corresponds to `String`, hence nothing to do for the type itself.
+    final impls = getAllImplsForTraitOrClassOrImpl(context, id)
+        .map((it) => getImplDeclarationHir(context, it));
+    final traits = impls.expand((impl) => impl.traits);
+    final implements = traits.map((it) => compileType(context, it));
+    final implMethodIds = impls
+        .expand((impl) => impl.innerDeclarationIds)
+        .where((id) => id.isFunction)
+        .toList();
+    final methodOverrides = implMethodIds
+        .map((it) => Tuple2(it, getFunctionDeclarationHir(context, it)))
+        .expand((values) sync* {
+      final id = values.first;
+      final function = values.second;
+
+      if (function.isStatic) {
+        throw CompilerError.unsupportedFeature(
+          'Static functions in impls are not yet supported.',
+          location: ErrorLocation(
+            id.resourceId,
+            getPropertyDeclarationAst(context, id)
+                .modifiers
+                .firstWhere((w) => w is StaticModifierToken)
+                .span,
+          ),
+        );
+      }
+
+      yield dart.Method((b) => b
+        ..annotations.add(dart.refer('override', dartCoreUrl))
+        ..returns = compileType(context, function.returnType)
+        ..name = function.name
+        ..types.addAll(function.typeParameters
+            .map((it) => compileTypeParameter(context, it)))
+        ..requiredParameters
+            .addAll(compileParameters(context, function.valueParameters))
+        ..body = compileBody(context, id).value);
+    });
+
+    final otherString = dart.Parameter((b) => b
+      ..name = 'other'
+      ..type = dart.refer('dynamic', dartCoreUrl));
     return [
-      Extension(
-        name: 'StringCharsExtension',
-        on: dart.refer('String', dartCoreUrl),
-        methods: [
+      dart.Class((b) => b
+        ..annotations.add(dart.refer('sealed', packageMetaUrl))
+        ..name = 'String'
+        ..fields.add(dart.Field((b) => b
+          ..name = 'value'
+          ..type = dart.refer('String', dartCoreUrl)))
+        ..mixins.addAll(traits.map((it) {
+          final type = compileType(context, it);
+          return dart.TypeReference((b) => b
+            ..symbol = '${type.symbol}\$Default'
+            ..types.addAll(it.arguments.map((it) => compileType(context, it)))
+            ..url = type.url);
+        }))
+        ..implements.addAll(implements)
+        ..constructors.add(dart.Constructor((b) => b
+          ..requiredParameters
+              .add(dart.Parameter((b) => b..name = 'this.value'))))
+        ..methods.addAll([
           dart.Method((b) => b
-            ..returns = compileType(context, CandyType.list(CandyType.string))
-            ..name = 'chars'
-            ..body = dart.Block((b) => b
-              ..statements.add(dart
-                  .refer('characters')
-                  .property('map')
-                  .call(
-                    [
-                      dart.Method((b) => b
-                        ..requiredParameters.add(dart.Parameter((b) => b
-                          ..type = dart.refer('String', dartCoreUrl)
-                          ..name = 'it'))
-                        ..body = dart.Block((b) => b
-                          ..statements.add(compileType(
-                                  context, CandyType.some(CandyType.string))
-                              .call([dart.refer('it')], {}, [])
-                              .returned
-                              .statement))).closure,
-                    ],
-                    {},
-                    [],
-                  )
-                  .property('toList')
-                  .call([], {}, [])
-                  .assignFinal('list')
-                  .statement)
-              ..statements.add(
-                  compileType(context, CandyType.arrayList(CandyType.string))
-                      .call([
-                        dart.refer('list'),
-                        dart.refer('list').property('length')
-                      ], {}, [])
-                      .returned
-                      .statement))),
-        ],
-      ),
+            ..name = 'equals'
+            ..returns = compileType(context, CandyType.bool)
+            ..requiredParameters.add(otherString)
+            ..body = dart
+                .refer('value')
+                .equalTo(dart.refer('other.value'))
+                .wrapInCandyBool(context)
+                .code),
+          dart.Method((b) => b
+            ..name = 'compareTo'
+            ..returns = compileType(context, CandyType.int)
+            ..requiredParameters.add(otherString)
+            ..body = dart
+                .refer('value.compareTo')
+                .call([dart.refer('other.value')])
+                .wrapInCandyInt(context)
+                .code),
+          dart.Method((b) => b
+            ..name = 'characters'
+            ..returns =
+                compileType(context, CandyType.arrayList(CandyType.string))
+            ..body = dart
+                .refer('value')
+                .property('characters')
+                .property('toList')
+                .call([])
+                .wrapInCandyArray(context, CandyType.string)
+                .code),
+          dart.Method((b) => b
+            ..name = 'substring'
+            ..returns = compileType(context, CandyType.string)
+            ..requiredParameters.addAll([
+              dart.Parameter((b) => b
+                ..name = 'offset'
+                ..type = compileType(context, CandyType.int)),
+              dart.Parameter((b) => b
+                ..name = 'length'
+                ..type = compileType(context, CandyType.int)),
+            ])
+            ..body = dart
+                .refer('value.substring')
+                .call([dart.refer('offset.value'), dart.refer('length.value')])
+                .wrapInCandyString(context)
+                .code),
+          dart.Method((b) => b
+            ..name = 'length'
+            ..returns = compileType(context, CandyType.int)
+            ..body = dart.refer('value.length').wrapInCandyInt(context).code),
+        ])
+        ..methods.addAll(methodOverrides)),
     ];
   }
 
@@ -554,4 +759,12 @@ extension WrappingInCandyTypes on dart.Expression {
   dart.Expression wrapInCandyInt(QueryContext context) {
     return compileType(context, CandyType.int).call([this]);
   }
+
+  dart.Expression wrapInCandyString(QueryContext context) {
+    return compileType(context, CandyType.string).call([this]);
   }
+
+  dart.Expression wrapInCandyArray(QueryContext context, CandyType itemType) {
+    return compileType(context, CandyType.array(itemType)).call([this]);
+  }
+}

@@ -94,6 +94,11 @@ abstract class CandyType with _$CandyType {
       );
   static const arrayListModuleId = ModuleId(
       PackageId.core, ['collections', 'list', 'array_list', 'ArrayList']);
+  factory CandyType.array(CandyType itemType) => CandyType.user(
+        ModuleId.coreCollections.nested(['array']),
+        'Array',
+        arguments: [itemType],
+      );
   static const arrayModuleId =
       ModuleId(PackageId.core, ['collections', 'array', 'Array']);
 

@@ -15,7 +15,7 @@ public builtin class Array<Item> {
   /// Creates a new `Array` of the given `length` where the `generator` is invoked with indizes to
   /// generate items to fill the slots.
 
-  public let length: Int
+  public fun length(): Int
 
   public fun get(index: Int /* UInt */): Item
   public fun set(index: Int /* UInt */, item: Item)

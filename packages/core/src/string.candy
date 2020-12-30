@@ -3,8 +3,7 @@ use ..numbers
 use ..operators
 
 public builtin class String {
-  builtin fun chars(): List<String>
-  /// TODO(JonasWanke): rename this to characters when we wrap native types
+  builtin fun characters(): Iterable<String>
   builtin fun substring(offset: Int, length: Int): String
   builtin fun length(): Int
 }

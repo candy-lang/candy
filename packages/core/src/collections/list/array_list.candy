@@ -62,7 +62,7 @@ public class ArrayList<Item> {
   mut let length_: Int /* UInt */
 
   // TODO(marcelgarus): Getterize!
-  fun capacity(): Int /* UInt */ { items.length }
+  fun capacity(): Int /* UInt */ { items.length() }
 
   fun grow() {
     /// Increases the capacity.
