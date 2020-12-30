@@ -564,15 +564,15 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   @override
   List<dart.Code> visitAsExpression(AsExpression node) {
     final instance = _refer(node.instance.id);
-    final check = _compileAs(instance, node.typeToCheck);
+    final type = _compileAsType(node.typeToCheck);
     return [
       ...node.instance.accept(this),
-      _save(node, check),
+      _save(node, instance.asA(type)),
     ];
   }
 
-  dart.Expression _compileAs(dart.Expression instance, CandyType type) {
-    dart.Expression compileSimple() => instance.asA(compileType(context, type));
+  dart.Expression _compileAsType(CandyType type) {
+    dart.Expression compileSimple() => compileType(context, type);
 
     return type.map(
       user: (_) => compileSimple(),
