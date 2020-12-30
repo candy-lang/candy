@@ -84,7 +84,7 @@ public trait MutableList<Item>: List<Item> {
   static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): MutableList<Item> {
     ArrayList.of5<Item>(first, second, third, fourth, fifth)
   }
-  
+
   fun set(index: Int /* UInt */, item: Item)
   // TODO(marcelgarus): Rename to add as soon as the naming conflict with + is resolved.
   fun append(item: Item)
