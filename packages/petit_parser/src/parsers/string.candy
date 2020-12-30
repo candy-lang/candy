@@ -1,0 +1,26 @@
+use ...parsers
+
+public fun digit(message: String = "Digit expected."): Parser<String, String> {
+  character({ "0" <= it && it <= "9" }, message)
+}
+public fun singleCharacter(char: String, message: String): Parser<String, String> {
+  character({ it == char }, message)
+}
+public fun character(tester: (String) => Bool, message: String): Parser<String, String> {
+  CharacterParser(tester, message)
+}
+
+class CharacterParser {
+  let tester: (String) => Bool
+  let message: String
+}
+impl CharacterParser: Parser<String, String> {
+  fun parse(context: Context<String>): Result<Success<String>, Failure> {
+    let character = (context.buffer as Iterable<String>).get(context.offset)
+    if character is None<String> || !tester(character.unwrap()) {
+      return Error<Success<String>, Failure>(Failure(message, context.offset))
+    }
+
+    return Ok<Success<String>, Failure>(Success<String>(character.unwrap(), context.offset + 1))
+  }
+}

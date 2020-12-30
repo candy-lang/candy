@@ -3,6 +3,7 @@ public use .combinator
 public use .custom
 public use .miscellaneous
 public use .repeating
+public use .string
 
 public class Context<Item> {
   public let buffer: List<Item>
