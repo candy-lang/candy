@@ -1,7 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../../lexer/token.dart';
-import '../../../source_span.dart';
 import '../../../syntactic_entity.dart';
 import '../../../utils.dart';
 import '../../../visitor.dart';

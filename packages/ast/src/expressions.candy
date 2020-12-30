@@ -1,0 +1,129 @@
+use ..declarations
+use ..node
+use ..types
+
+public trait /* enum */ Expression
+impl Expression: Node
+
+
+public data class BoolExpression {
+  public let id: NodeId
+  public let value: Bool
+}
+impl BoolExpression: Expression
+
+public data class IntExpression {
+  public let id: NodeId
+  public let value: Int
+}
+impl IntExpression: Expression
+
+
+public data class StringExpression {
+  public let id: NodeId
+  public let parts: List<StringPart>
+}
+impl StringExpression: Expression
+
+public trait /* enum */ StringPart
+
+public data class LiteralStringPart {
+  public let id: NodeId
+  public let value: String
+}
+impl LiteralStringPart: Expression
+
+public data class InterpolatedStringPart {
+  public let id: NodeId
+  public let expression: Maybe<Expression>
+}
+impl InterpolatedStringPart: Expression
+
+
+public data class LambdaExpression {
+  public let id: NodeId
+  public let valueParameters: List<ValueParameter>
+  public let expressions: List<Expression>
+}
+impl LambdaExpression: Expression
+
+
+public data class IdentifierExpression {
+  public let id: NodeId
+  public let value: String
+}
+impl IdentifierExpression: Expression
+
+
+public data class BinaryExpression {
+  public let id: NodeId
+
+  public let leftOperand: Maybe<Expression>
+
+  public let operator: String
+  /// May be one of the following:
+  ///
+  /// * arithmetic: `+`, `-`, `*`, `/`, `~/`, `%`
+  /// * assignment & comparison: `=`, `==`, `!=`, `<`, `<=`, `>`, `>=`
+  /// * logical: `&`, `|`, `=>`
+  ///
+  /// TODO(JonasWanke): convert this to an enum when we support these
+
+  public let rightOperand: Maybe<Expression>
+}
+impl BinaryExpression: Expression
+
+
+public data class LocalPropertyExpression {
+  public let id: NodeId
+  public let modifiers: List<String>
+  public let isMutable: Bool
+  public let name: Maybe<String>
+  public let type: Maybe<CandyType>
+  public let initializer: Maybe<Expression>
+}
+impl LocalPropertyExpression: Expression
+
+
+public data class NavigationExpression {
+  public let id: NodeId
+  public let receiver: Expression
+  public let target: String
+}
+impl NavigationExpression: Expression
+
+public data class CallExpression {
+  public let id: NodeId
+  public let receiver: Expression
+  public let typeArguments: List<TypeArgument>
+  public let valueArguments: List<ValueArgument>
+}
+impl CallExpression: Expression
+
+public data class ValueArgument {
+  public let id: NodeId
+  public let name: Maybe<String>
+  public let value: Maybe<Expression>
+}
+
+public data class TupleExpression {
+  public let id: NodeId
+  public let valueArguments: List<Expression>
+}
+impl TupleExpression: Expression
+
+
+public data class IfExpression {
+  public let id: NodeId
+  public let condition: Maybe<Expression>
+  public let thenBody: List<Expression>
+  public let elseBody: List<Expression>
+}
+impl IfExpression: Expression
+
+
+public data class ReturnExpression {
+  public let id: NodeId
+  public let value: Maybe<Expression>
+}
+impl ReturnExpression: Expression

@@ -1,0 +1,11 @@
+use lexer
+
+public data class CstNode<T> {
+  public let id: CstNodeId
+  public let child: T
+  public let trailingTrivia: List<WhitespaceToken | CommentToken>
+}
+
+public data class CstNodeId {
+  let id: Int
+}

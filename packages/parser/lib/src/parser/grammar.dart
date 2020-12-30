@@ -104,10 +104,16 @@ class ParserGrammar {
                   LexerGrammar.DOT &
                   LexerGrammar.NLs &
                   LexerGrammar.Identifier)
+              .optional() &
+          (LexerGrammar.WS &
+                  LexerGrammar.AS &
+                  LexerGrammar.WS &
+                  LexerGrammar.Identifier)
               .optional())
       .map<UseLine>((value) {
     final packagePart = value[3] as List<dynamic>;
     final modulePart = value[4] as List<dynamic>;
+    final aliasPart = value[5] as List<dynamic>;
     return UseLine.global(
       modifiers: value[0] as List<ModifierToken> ?? [],
       useKeyword: value[1] as UseKeywordToken,
@@ -115,6 +121,8 @@ class ParserGrammar {
       slashes: packagePart[1] as List<OperatorToken>,
       dot: modulePart?.elementAt(1) as OperatorToken,
       moduleName: modulePart?.elementAt(3) as IdentifierToken,
+      as: aliasPart?.elementAt(1) as OperatorToken,
+      alias: aliasPart?.elementAt(3) as IdentifierToken,
     );
   });
 
@@ -688,7 +696,7 @@ class ParserGrammar {
         },
       )
       ..prefix<LoopKeywordToken, Expression>(
-          (LexerGrammar.LOOP & LexerGrammar.NLs).map((value) => value.first as LoopKeywordToken),
+          (LexerGrammar.LOOP & LexerGrammar.WS).map((value) => value.first as LoopKeywordToken),
           mapper: (keyword, body) {
         return LoopExpression(
           _id++,
@@ -697,7 +705,7 @@ class ParserGrammar {
         );
       })
       ..complexGrouping<List<dynamic>, Expression, List<dynamic>>(
-        LexerGrammar.WHILE & LexerGrammar.NLs,
+        LexerGrammar.WHILE & LexerGrammar.WS,
         LexerGrammar.NLs & expression,
         mapper: (left, value, right) {
           return WhileExpression(
@@ -709,16 +717,21 @@ class ParserGrammar {
         },
       )
       ..complexGrouping<List<dynamic>, Expression, LambdaLiteral>(
-        LexerGrammar.FOR & LexerGrammar.NLs & LexerGrammar.Identifier & LexerGrammar.NLs & LexerGrammar.IN & LexerGrammar.NLs,
+        LexerGrammar.FOR &
+            LexerGrammar.WS &
+            LexerGrammar.Identifier &
+            LexerGrammar.NLs &
+            LexerGrammar.IN &
+            LexerGrammar.NLs,
         (LexerGrammar.NLs & lambdaLiteral).map((it) => it[1] as LambdaLiteral),
         mapper: (left, value, right) => ForExpression(
-            _id++,
-            forKeyword: left[0] as ForKeywordToken,
-            variable: left[2] as IdentifierToken,
-            inKeyword: left[4] as OperatorToken,
-            iterable: value,
-            body: right,
-          ),
+          _id++,
+          forKeyword: left[0] as ForKeywordToken,
+          variable: left[2] as IdentifierToken,
+          inKeyword: left[4] as OperatorToken,
+          iterable: value,
+          body: right,
+        ),
       )
       ..prefix<ReturnKeywordToken, Expression>(
           (LexerGrammar.RETURN & LexerGrammar.NLs).map((value) => value.first as ReturnKeywordToken),

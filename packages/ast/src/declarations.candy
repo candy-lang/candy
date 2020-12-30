@@ -1,0 +1,100 @@
+use ..comment
+use ..expressions
+use ..node
+use ..types
+
+public trait /* enum */ Declaration {
+  public let modifiers: List<String>
+}
+impl Declaration: Node
+
+
+public data class Module {
+  public let id: NodeId
+  public let candyDoc: Maybe<CandyDoc>
+  public let modifiers: List<String>
+  public let name: Maybe<String>
+  public let innerDeclarations: List<Module | Trait | Impl | Class | Function | Property>
+}
+impl Module: Declaration
+
+
+public data class Trait {
+  public let id: NodeId
+  public let candyDoc: Maybe<CandyDoc>
+  public let modifiers: List<String>
+  public let name: Maybe<String>
+  public let typeParameters: List<TypeParameter>
+  public let upperBound: Maybe<CandyType>
+  public let innerDeclarations: List<Trait | Class | Function | Property>
+}
+impl Trait: Declaration
+
+public data class Impl {
+  public let id: NodeId
+  public let modifiers: List<String>
+  public let typeParameters: List<TypeParameter>
+  public let type: CandyType
+  public let traits: List<CandyType>
+  public let innerDeclarations: List<Function | Property>
+}
+impl Impl: Declaration
+
+
+public data class Class {
+  public let id: NodeId
+  public let candyDoc: Maybe<CandyDoc>
+  public let modifiers: List<String>
+  public let name: String
+  public let typeParameters: List<TypeParameter>
+  public let innerDeclarations: List<Trait | Class | Function | Property>
+}
+impl Class: Declaration
+
+
+public data class Function {
+  public let id: NodeId
+  public let candyDoc: Maybe<CandyDoc>
+  public let modifiers: List<String>
+  public let name: String
+  public let typeParameters: List<TypeParameter>
+  public let valueParameters: List<ValueParameter>
+  public let returnType: Maybe<CandyType>
+  public let body: Maybe<BlockBody | ExpressionBody | DelegationBody>
+}
+impl Function: Declaration
+
+public data class ValueParameter {
+  public let id: NodeId
+  public let name: Maybe<String>
+  public let type: Maybe<CandyType>
+  public let defaultValue: Maybe<DelegationBody>
+}
+
+
+public data class Property {
+  public let id: NodeId
+  public let candyDoc: Maybe<CandyDoc>
+  public let modifiers: List<String>
+  public let isMutable: Bool
+  public let name: Maybe<String>
+  public let type: Maybe<CandyType>
+  public let initializer: Maybe<DelegationBody>
+}
+impl Property: Declaration
+
+public data class BlockBody {
+  public let id: NodeId
+  public let expressions: List<Expression>
+}
+impl BlockBody: Node
+public data class ExpressionBody {
+  public let id: NodeId
+  public let expression: Maybe<Expression>
+}
+impl ExpressionBody: Node
+public data class DelegationBody {
+  public let id: NodeId
+  public let expression: Maybe<Expression>
+}
+impl DelegationBody: Node

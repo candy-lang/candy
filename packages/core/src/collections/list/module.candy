@@ -1,6 +1,8 @@
+use ...assert
 use ...bool
 use ...maybe
 use ...numbers
+use ...operators
 use ..iterable
 use ..array
 public use .array_list
@@ -25,6 +27,44 @@ public trait List<Item>: Iterable<Item> {
 
   // TODO(marcelgarus): Getterize!
   fun isEmpty(): Bool { length() == 0 }
+
+  fun subList(start: Int, end: Int): List<Item> {
+    /// TODO(JonasWanke): make this more efficient by creating a view of the original list
+
+    assert(start >= 0, "start must be non-negative")
+    assert(start < length(), "start must be inside this list")
+    assert(end >= 0, "end must be non-negative")
+    assert(start <= length(), "end must be inside this list")
+    assert(start <= end, "end must be larger or equal to start")
+
+    let length = end - start
+    let result = ArrayList.create<Item>(length)
+
+    mut let index = 0
+    while index < length {
+      (result as MutableList<Item>).append(get(start + index).unwrap() as Item)
+      index = index + 1
+    }
+    result
+  }
+
+  fun followedBy(other: List<Item>): List<Item> {
+    let resultLength = length() + (other as Iterable<Item>).length()
+    let result = ArrayList.create<Item>(resultLength)
+
+    mut let index = 0
+    while index < length() {
+      (result as MutableList<Item>).append(get(index).unwrap() as Item)
+      index = index + 1
+    }
+
+    mut let index = 0
+    while index < (other as Iterable<Item>).length() {
+      (result as MutableList<Item>).append((other as Iterable<Item>).get(index).unwrap() as Item)
+      index = index + 1
+    }
+    result
+  }
 }
 
 public trait MutableList<Item>: List<Item> {
@@ -44,7 +84,7 @@ public trait MutableList<Item>: List<Item> {
   static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): MutableList<Item> {
     ArrayList.of5<Item>(first, second, third, fourth, fifth)
   }
-  
+
   fun set(index: Int /* UInt */, item: Item)
   // TODO(marcelgarus): Rename to add as soon as the naming conflict with + is resolved.
   fun append(item: Item)

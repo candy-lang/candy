@@ -29,15 +29,35 @@
       "path": "packages\\vscode_extension"
     },
     {
+      "name": "core",
       "path": "packages\\core"
     },
     {
+      "name": "playground",
       "path": "playground"
     },
     {
+      "name": "petit_parser",
+      "path": "packages\\petit_parser"
+    },
+    {
+      "name": "glados",
       "path": "packages\\glados"
     },
     {
+      "name": "lexer",
+      "path": "packages\\lexer"
+    },
+    {
+      "name": "cst",
+      "path": "packages\\cst"
+    },
+    {
+      "name": "ast",
+      "path": "packages\\ast"
+    },
+    {
+      "name": "hir",
       "path": "packages\\hir"
     }
   ],

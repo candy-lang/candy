@@ -99,7 +99,7 @@
     "constants-and-special-vars": {
       "patterns": [
         {
-          "match": "(?<!\\$)\\b(true|false)\\b(?!\\$)",
+          "match": "(?<!\\$)\\b(true|false|unit)\\b(?!\\$)",
           "name": "constant.language.candy"
         },
         {

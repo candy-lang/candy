@@ -275,10 +275,11 @@ final Query<DeclarationId,
       final body = getSyntheticMethod(context, declarationId).second;
       return Some(Tuple2(body, BodyAstToHirIds()));
     }
+    if (!hasBody(context, declarationId)) return None();
 
     if (declarationId.isFunction) {
       final functionAst = getFunctionDeclarationAst(context, declarationId);
-      if (functionAst.body == null) return None();
+      assert(functionAst.body != null);
 
       final result = FunctionContext.lowerFunction(context, declarationId);
       // ignore: only_throw_errors, Iterables of errors are also handled.
@@ -286,12 +287,37 @@ final Query<DeclarationId,
       return Some(result.value);
     } else if (declarationId.isProperty) {
       final propertyAst = getPropertyDeclarationAst(context, declarationId);
-      if (propertyAst.initializer == null) return None();
+      assert(propertyAst.initializer != null);
 
       final result = PropertyContext.lowerProperty(context, declarationId);
       // ignore: only_throw_errors, Iterables of errors are also handled.
       if (result is Error) throw result.error;
       return Some(Tuple2([result.value.first], result.value.second));
+    } else {
+      throw CompilerError.unsupportedFeature(
+        'Unsupported body.',
+        location: ErrorLocation(
+          declarationId.resourceId,
+          getDeclarationAst(context, declarationId).span,
+        ),
+      );
+    }
+  },
+);
+final hasBody = Query<DeclarationId, bool>(
+  'hasBody',
+  provider: (context, declarationId) {
+    if (!doesDeclarationExist(context, declarationId)) {
+      // Synthetic function
+      return declarationId.isFunction;
+    }
+
+    if (declarationId.isFunction) {
+      final functionAst = getFunctionDeclarationAst(context, declarationId);
+      return functionAst.body != null;
+    } else if (declarationId.isProperty) {
+      final propertyAst = getPropertyDeclarationAst(context, declarationId);
+      return propertyAst.initializer != null;
     } else {
       throw CompilerError.unsupportedFeature(
         'Unsupported body.',
@@ -691,9 +717,12 @@ class ContextContext extends Context {
             getFunctionDeclarationHir(queryContext, declarationId);
         if (functionHir.isStatic) return;
       } else if (declarationId.isProperty) {
-        final propertyHir =
-            getPropertyDeclarationHir(queryContext, declarationId);
-        if (propertyHir.isStatic) return;
+        // YAW: `getPropertyDeclarationHir` already tries to lower the
+        // initializer, which results in a cycle when we try to find out whether
+        // the property we're trying to lower is static or not.
+        final propertyAst =
+            getPropertyDeclarationAst(queryContext, declarationId);
+        if (propertyAst.isStatic || declarationId.parent.isModule) return;
       } else {
         throw CompilerError.unsupportedFeature(
           "Tried lowering an identifier in a body that's neither in a function nor in a property.",
@@ -768,8 +797,13 @@ class ContextContext extends Context {
         .expand((it) => getInnerDeclarationIds(queryContext, it.id))
         .where((id) {
       if (id.isProperty) {
-        final propertyHir = getPropertyDeclarationHir(queryContext, id);
-        return propertyHir.name == name && !propertyHir.isStatic;
+        // YAW: `getPropertyDeclarationHir` already tries to lower the
+        // initializer, which results in a cycle when we try to find out whether
+        // the property we're trying to lower is static or not.
+        final propertyAst = getPropertyDeclarationAst(queryContext, id);
+        return propertyAst.name.name == name &&
+            !propertyAst.isStatic &&
+            id.parent.isNotModule;
       } else if (id.isFunction) {
         final functionHir = getFunctionDeclarationHir(queryContext, id);
         return functionHir.name == name && !functionHir.isStatic;
@@ -1274,7 +1308,7 @@ extension on Context {
     if (functionType.isSome) {
       final typeParameters = functionType.value.parameterTypes;
       if (typeParameters.isEmpty && declaredParameters.isEmpty) {
-        // Do nothing.
+        // The lambda doesn't have any parameters. Nothing to do for us.
       } else if (typeParameters.length == 1 && declaredParameters.isEmpty) {
         parameters['it'] = typeParameters.single;
       } else if (declaredParameters.isNotEmpty) {
@@ -1533,7 +1567,9 @@ extension on Context {
     if (loweredIterable is Error) return loweredIterable.mapValue((e) => [e]);
     final iterable = loweredIterable.value;
 
-    final iterableType = iterable.type;
+    final iterableType = thisType is Some
+        ? iterable.type.bakeThisType(thisType.value)
+        : iterable.type;
     const supportedCollectionTypesModuleIds = [
       hir.CandyType.iterableModuleId,
       hir.CandyType.listModuleId,
@@ -1543,7 +1579,7 @@ extension on Context {
             .contains((iterableType as hir.UserCandyType).virtualModuleId)) {
       return Error([
         CompilerError.unsupportedFeature(
-          'For-loops only support collections with a static type of `Iterable<T>` or `List<T>`, was: ${(iterableType as hir.UserCandyType).virtualModuleId}.',
+          'For-loops only support collections with a static type of `Iterable<T>` or `List<T>`, was: $iterableType.',
           location: ErrorLocation(resourceId, forLoop.iterable.span),
         ),
       ]);
@@ -1678,6 +1714,8 @@ extension on Context {
       /// 1. to get from trait to impl
       /// 2. to get from impl to class
       /// 3. to get from class to instance
+      ///
+      /// Update(2020-12-16): Sometimes, this doesn't work.
 
       // from class to instance
       final genericsMap = Map.fromEntries(typeParameters
@@ -1718,7 +1756,7 @@ extension on Context {
                     moduleIdToDeclarationId(queryContext, it.virtualModuleId)))
                 .expand((trait) => trait.innerDeclarationIds)
                 .where((it) => it.isFunction)
-                .where((it) => getBody(queryContext, it) is Some));
+                .where((it) => hasBody(queryContext, it)));
           }))
           .where((id) => id.simplePath.last.nameOrNull == name)
           .mapNotNull((id) {
@@ -1743,13 +1781,26 @@ extension on Context {
             } else if (id.isFunction) {
               final functionHir = getFunctionDeclarationHir(queryContext, id);
               if (functionHir.isStatic) return null;
+
+              // TODO(JonasWanke): fix this 💩
+              final petitParserExceptionResourceId = ResourceId(
+                PackageId('petit_parser'),
+                'src/parsers/module.candy',
+              );
+              final baked =
+                  declarationId.resourceId == petitParserExceptionResourceId &&
+                          declarationId.simplePath.last.nameOrNull == 'end'
+                      ? functionHir.functionType
+                          .bakeThisType(type)
+                          .bakeGenerics(genericsMap)
+                      : functionHir.functionType
+                          .bakeThisType(type)
+                          .bakeGenerics(genericsMap)
+                          .bakeGenerics(genericsMap)
+                          .bakeGenerics(genericsMap);
               return hir.PropertyIdentifier(
                 id,
-                functionHir.functionType
-                    .bakeThisType(type)
-                    .bakeGenerics(genericsMap)
-                    .bakeGenerics(genericsMap)
-                    .bakeGenerics(genericsMap),
+                baked,
                 isMutable: false,
                 base: target,
                 receiver: target,

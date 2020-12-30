@@ -36,10 +36,7 @@ final getTraitDeclarationHir = Query<DeclarationId, hir.TraitDeclaration>(
         .map((p) => hir.TypeParameter(
               name: p.name.name,
               upperBound: p.bound != null
-                  ? astTypeToHirType(
-                      context,
-                      Tuple2(declarationId.parent, p.bound),
-                    )
+                  ? astTypeToHirType(context, Tuple2(declarationId, p.bound))
                   : hir.CandyType.any,
             ))
         .toList();

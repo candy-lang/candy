@@ -1,0 +1,36 @@
+use ..node
+use ..declarations
+
+public data class File {
+  public let id: NodeId
+  public let useLines: List<UseLine>
+  public let declarations: List<Module | Trait | Impl | Class | Function | Property>
+}
+impl File: Node
+
+
+public trait /* enum */ UseLine
+impl UseLine: Node
+
+public data class LocalAbsoluteUseLine {
+  public let id: NodeId
+  public let modifiers: List<String>
+  public let path: List<String>
+}
+impl LocalAbsoluteUseLine: UseLine & Node
+
+public data class LocalRelativeUseLine {
+  public let id: NodeId
+  public let modifiers: List<String>
+  public let parentNavigations: Int
+  public let path: List<String>
+}
+impl LocalRelativeUseLine: UseLine & Node
+
+public data class GlobalUseLine {
+  public let id: NodeId
+  public let modifiers: List<String>
+  public let packagePath: List<String>
+  public let moduleName: Maybe<String>
+}
+impl GlobalUseLine: UseLine & Node

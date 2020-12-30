@@ -49,6 +49,8 @@ abstract class UseLine extends AstNode implements _$UseLine {
     @Default(<OperatorToken>[]) List<OperatorToken> slashes,
     OperatorToken dot,
     IdentifierToken moduleName,
+    OperatorToken as,
+    IdentifierToken alias,
   }) = GlobalUseLine;
   const UseLine._();
 
@@ -72,13 +74,15 @@ abstract class UseLine extends AstNode implements _$UseLine {
           ...interleave(dots, pathSegments),
         ],
         global: (modifiers, useKeyword, packagePathSegments, slashes, dot,
-                moduleName) =>
+                moduleName, as, alias) =>
             [
           ...modifiers,
           useKeyword,
           ...interleave(packagePathSegments, slashes),
           if (dot != null) dot,
           if (moduleName != null) moduleName,
+          if (as != null) as,
+          if (alias != null) alias,
         ],
       );
 

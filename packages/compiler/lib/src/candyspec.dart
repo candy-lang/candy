@@ -38,8 +38,7 @@ final getCandyspec = Query<PackageId, Candyspec>(
   'getCandyspec',
   provider: (context, packageId) {
     final content = getCandyspecFileContent(context, packageId);
-    final json =
-        (loadYaml(content) as Map<dynamic, dynamic>).cast<String, dynamic>();
+    final json = _yamlToJson(loadYaml(content)) as Map<String, dynamic>;
     return Candyspec.fromJson(json);
   },
 );
@@ -68,3 +67,16 @@ final getAllDependencies = Query<Unit, List<PackageId>>(
     ]).toList();
   },
 );
+
+dynamic _yamlToJson(dynamic yaml) {
+  if (yaml is YamlMap) {
+    return yaml.map<String, dynamic>((dynamic k, dynamic v) =>
+        MapEntry<String, dynamic>(_yamlToJson(k) as String, _yamlToJson(v)));
+  } else if (yaml is YamlList) {
+    return yaml.map<dynamic>(_yamlToJson).toList();
+  } else if (yaml is YamlScalar) {
+    return _yamlToJson(yaml.value);
+  } else {
+    return yaml;
+  }
+}

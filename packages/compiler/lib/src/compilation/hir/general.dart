@@ -10,6 +10,7 @@ abstract class UseLine implements _$UseLine {
   const factory UseLine(
     ModuleId moduleId, {
     @required bool isPublic,
+    String alias,
   }) = _UseLine;
   factory UseLine.fromJson(Map<String, dynamic> json) =>
       _$UseLineFromJson(json);
