@@ -196,7 +196,9 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                 ..type = compileType(context, CandyType.int)),
               dart.Parameter((b) => b
                 ..name = 'generator'
-                ..type = dart.refer('T Function(int index)')),
+                ..type = dart.FunctionType((b) => b
+                  ..requiredParameters.add(compileType(context, CandyType.int))
+                  ..returnType = t)),
             ])
             ..body = arrayT.call([
               listT.property('generate').call([
@@ -606,14 +608,33 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
           dart.Method((b) => b
             ..name = 'characters'
             ..returns =
-                compileType(context, CandyType.arrayList(CandyType.string))
-            ..body = dart
-                .refer('value')
-                .property('characters')
-                .property('toList')
-                .call([])
-                .wrapInCandyArray(context, CandyType.string)
-                .code),
+                compileType(context, CandyType.iterable(CandyType.string))
+            ..body = compileTypeName(
+              context,
+              moduleIdToDeclarationId(context, CandyType.arrayListModuleId),
+            ).property('fromArray').call(
+              [
+                dart
+                    .refer('value')
+                    .property('characters')
+                    .property('map')
+                    .call([
+                      dart.Method((b) => b
+                        ..requiredParameters.add(dart.Parameter((b) => b
+                          ..name = 'char'
+                          ..type = dart.refer('String', dartCoreUrl)))
+                        ..body = dart
+                            .refer('char')
+                            .wrapInCandyString(context)
+                            .code).closure
+                    ])
+                    .property('toList')
+                    .call([])
+                    .wrapInCandyArray(context, CandyType.string),
+              ],
+              {},
+              [compileType(context, CandyType.string)],
+            ).code),
           dart.Method((b) => b
             ..name = 'substring'
             ..returns = compileType(context, CandyType.string)
