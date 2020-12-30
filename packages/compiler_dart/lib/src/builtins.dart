@@ -104,14 +104,17 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
         ..name = 'assert_'
         ..requiredParameters.add(dart.Parameter((b) => b
           ..name = 'condition'
-          ..type = dart.refer('bool', dartCoreUrl)))
+          ..type = compileType(context, CandyType.bool)))
         ..requiredParameters.add(dart.Parameter((b) => b
           ..name = 'message'
-          ..type = dart.refer('String', dartCoreUrl)))
+          ..type = compileType(context, CandyType.string)))
         ..body = dart.Block(
           (b) => b.addExpression(dart.InvokeExpression.newOf(
             dart.refer('assert'),
-            [dart.refer('condition'), dart.refer('message')],
+            [
+              dart.refer('condition').property('value'),
+              dart.refer('message').property('value'),
+            ],
             {},
             [],
           )),
