@@ -1,4 +1,5 @@
 use ..collections
+use ..hash
 use ..numbers
 use ..operators
 
@@ -8,6 +9,16 @@ public builtin class String {
   builtin fun length(): Int
 }
 builtin impl String: Equals & Comparable
+impl String: Hash {
+  fun hash<Result>(hasher: Hasher<Result>) {
+    hasher.write(length())
+    hasher.writeList(
+      characters()
+        .map<Int>({ 0 })
+        .toList()
+    )
+  }
+}
 /// Some text.
 
 // builtin impl String: PlusOperator<This, This>
