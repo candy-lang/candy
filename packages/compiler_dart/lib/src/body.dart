@@ -241,10 +241,6 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           }();
 
           var typeName = compileTypeName(context, parentId);
-          if (name == 'randomSample') {
-            typeName =
-                dart.refer('${typeName.symbol}RandomExtension', typeName.url);
-          }
           if (name == 'parse') {
             typeName = dart.refer('int', dartCoreUrl);
           }
@@ -411,106 +407,6 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             ],
           ];
         }
-      } else if (parentModuleId == CandyType.add.virtualModuleId) {
-        return simpleBinaryExpression('add', (l, r) => l.operatorAdd(r));
-      } else if (parentModuleId == CandyType.subtract.virtualModuleId) {
-        return simpleBinaryExpression(
-          'subtract',
-          (l, r) => l.operatorSubstract(r),
-        );
-      } else if (parentModuleId == CandyType.negate.virtualModuleId) {
-        assert(methodName == 'negate');
-        final receiver = identifier.receiver;
-        if (isAssignableTo(context, Tuple2(receiver.type, CandyType.number))) {
-          return [
-            ...receiver.accept(this),
-            _save(node, _refer(receiver.id).operatorNegate()),
-          ];
-        }
-      } else if (parentModuleId == CandyType.multiply.virtualModuleId) {
-        return simpleBinaryExpression(
-          'multiply',
-          (l, r) => l.operatorMultiply(r),
-        );
-      } else if (parentModuleId == CandyType.divide.virtualModuleId) {
-        return simpleBinaryExpression('divide', (l, r) => l.operatorDivide(r));
-      } else if (parentModuleId == CandyType.divideTruncating.virtualModuleId) {
-        return simpleBinaryExpression(
-          'divideTruncating',
-          (l, r) => l.operatorDivideTruncating(r),
-        );
-      } else if (parentModuleId == CandyType.modulo.virtualModuleId) {
-        return simpleBinaryExpression(
-          'modulo',
-          (l, r) => l.operatorEuclideanModulo(r),
-        );
-      } else if (parentModuleId == CandyType.and.virtualModuleId) {
-        return lazyBoolExpression('and', (l, r) => l.and(r));
-      } else if (parentModuleId == CandyType.or.virtualModuleId) {
-        return lazyBoolExpression('or', (l, r) => l.or(r));
-      } else if (parentModuleId == CandyType.implies.virtualModuleId) {
-        return lazyBoolExpression('implies', (l, r) => l.negate().or(r));
-      } else if (parentModuleId == CandyType.opposite.virtualModuleId) {
-        assert(methodName == 'opposite');
-        final receiver = identifier.receiver;
-        if (isAssignableTo(context, Tuple2(receiver.type, CandyType.bool))) {
-          return [
-            ...receiver.accept(this),
-            _save(node, _refer(receiver.id).negate()),
-          ];
-        }
-      } else if (parentModuleId == CandyType.comparable.virtualModuleId) {
-        final relevantMethods = [
-          'lessThan',
-          'lessThanOrEqual',
-          'greaterThan',
-          'greaterThanOrEqual',
-        ];
-        if (relevantMethods.contains(methodName)) {
-          final left = identifier.receiver;
-          final right = node.valueArguments['other'];
-
-          final isOnString = left.type == CandyType.string;
-          final actualLeft = isOnString
-              ? _refer(left.id)
-                  .property('compareTo')
-                  .call([_refer(right.id)], {}, [])
-              : _refer(left.id);
-          final actualRight =
-              isOnString ? dart.literalNum(0) : _refer(right.id);
-
-          return [
-            ...left.accept(this),
-            ...right.accept(this),
-            if (methodName == 'lessThan')
-              _save(node, actualLeft.lessThan(actualRight))
-            else if (methodName == 'lessThanOrEqual')
-              _save(node, actualLeft.lessOrEqualTo(actualRight))
-            else if (methodName == 'greaterThan')
-              _save(node, actualLeft.greaterThan(actualRight))
-            else
-              _save(node, actualLeft.greaterOrEqualTo(actualRight)),
-          ];
-        }
-      } else if (parentModuleId == CandyType.equals.virtualModuleId) {
-        assert(methodName == 'equals' || methodName == 'notEquals');
-        final left = identifier.receiver;
-        final right = node.valueArguments['other'];
-        return [
-          ...left.accept(this),
-          ...right.accept(this),
-          if (methodName == 'equals')
-            _save(node, _refer(left.id).equalTo(_refer(right.id)))
-          else
-            _save(node, _refer(left.id).notEqualTo(_refer(right.id))),
-        ];
-      } else if (parentModuleId == CandyType.string.virtualModuleId &&
-          ['length', 'characters'].contains(methodName)) {
-        return [
-          ...identifier.receiver.accept(this),
-          _save(node, _refer(identifier.receiver.id).property(methodName)),
-        ];
-      }
     }
 
     final surroundingDeclarationName = declarationId.simplePath.last.nameOrNull;

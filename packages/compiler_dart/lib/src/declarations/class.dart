@@ -48,126 +48,16 @@ final Query<DeclarationId, List<dart.Spec>> compileClass =
         );
       }
 
-      final implHir = getImplDeclarationHir(context, id.parent);
-      final trait = implHir.traits.single;
-      var name = function.name;
-      if (trait == CandyType.add) {
-        name = 'operator +';
-      } else if (trait == CandyType.subtract) {
-        name = 'operator -';
-      } else if (trait == CandyType.multiply) {
-        name = 'operator *';
-      } else if (trait == CandyType.divideTruncating) {
-        name = 'operator ~/';
-      } else if (trait == CandyType.modulo) {
-        name = 'operator %';
-      } else if (trait == CandyType.comparable) {
-        name = 'compareToTyped';
-
-        final parameter = function.valueParameters.single;
-        final comparableId =
-            ModuleId.coreOperatorsComparison.nested(['Comparable']);
-        final variants = {
-          'Less': -1,
-          'Equal': 0,
-          'Greater': 1,
-        };
-        final statements = [
-          dart
-              .refer('this')
-              .property('compareToTyped')
-              .call([dart.refer(parameter.name)], {}, [])
-              .assignFinal(
-                'result',
-                compileType(context, function.returnType),
-              )
-              .statement,
-          for (final entry in variants.entries)
-            dart.Block.of([
-              dart.Code('if ('),
-              dart
-                  .refer('result')
-                  .isA(compileType(
-                    context,
-                    CandyType.user(comparableId, entry.key),
-                  ))
-                  .code,
-              dart.Code(') {'),
-              dart.literalNum(entry.value).returned.statement,
-              dart.Code('}'),
-            ]),
-          dart
-              .refer('StateError', dartCoreUrl)
-              .call(
-                [
-                  dart.literalString(
-                    '`compareToTyped` returned an invalid object: `\$result`.',
-                  )
-                ],
-                {},
-                [],
-              )
-              .thrown
-              .statement,
-        ];
-        yield dart.Method((b) => b
-          ..annotations.add(dart.refer('override', dartCoreUrl))
-          ..returns = compileType(context, CandyType.int)
-          ..name = 'compareTo'
-          ..requiredParameters
-              .addAll(compileParameters(context, function.valueParameters))
-          ..body = dart.Block((b) => b.statements.addAll(statements)));
-      } else if (trait == CandyType.equals) {
-        name = 'operator ==';
-      }
-
       yield dart.Method((b) => b
         ..annotations.add(dart.refer('override', dartCoreUrl))
         ..returns = compileType(context, function.returnType)
-        ..name = name
+        ..name = function.name
         ..types.addAll(function.typeParameters
             .map((it) => compileTypeParameter(context, it)))
         ..requiredParameters
             .addAll(compileParameters(context, function.valueParameters))
         ..body = compileBody(context, id).value);
     });
-    // Super calls for all methods that aren't overriden in the impl.
-    final methodDelegations = impls
-        .expand((impl) => impl.traits)
-        .map((trait) => trait.virtualModuleId)
-        .map((moduleId) => moduleIdToDeclarationId(context, moduleId))
-        .map((id) => getTraitDeclarationHir(context, id))
-        .expand((trait) => trait.innerDeclarationIds)
-        .where((id) => id.isFunction)
-        .distinctBy((id) => id.simplePath.last.nameOrNull)
-        .whereNot((id) {
-          return implMethodIds.any((implId) =>
-              implId.simplePath.last.nameOrNull ==
-              id.simplePath.last.nameOrNull);
-        })
-        .map((id) => Tuple2(id, getFunctionDeclarationHir(context, id)))
-        .map((inputs) {
-          final id = inputs.first;
-          final functionHir = inputs.second;
-
-          const operatorMethods = {
-            'lessThan': 'operator <',
-            'lessThanOrEqual': 'operator <=',
-            'greaterThan': 'operator >',
-            'greaterThanOrEqual': 'operator >=',
-          };
-          final name = operatorMethods[functionHir.name] ?? functionHir.name;
-
-          return dart.Method((b) => b
-            ..annotations.add(dart.refer('override', dartCoreUrl))
-            ..returns = compileType(context, functionHir.returnType)
-            ..name = name
-            ..types.addAll(functionHir.typeParameters
-                .map((p) => compileTypeParameter(context, p)))
-            ..requiredParameters
-                .addAll(compileParameters(context, functionHir.valueParameters))
-            ..body = compileBody(context, id).value);
-        });
 
     final properties = classHir.innerDeclarationIds
         .where((id) => id.isProperty)
