@@ -73,4 +73,38 @@ public trait Parser<Item, Output> {
   fun repeat(minimum: Int, maximum: Maybe<Int>): Parser<Item, List<Output>> {
     PossessiveRepeatingParser<Item, Output>(this, minimum, maximum)
   }
+
+  // TODO(JonasWanke): move the following functions to `repeating/separated_by.candy`
+  fun separatedBy<SeparatorOutput>(
+      separator: Parser<Item, SeparatorOutput>,
+      allowTrailingSeparator: Bool = false,
+  ): Parser<Item, List<Output | SeparatorOutput>> {
+    let initial = map<List<Output | SeparatorOutput>>({
+      List.of1<Output | SeparatorOutput>(it as Output | SeparatorOutput)
+    })
+    let seq = separator.or<Output>(this)
+        .star()
+        .map<List<Output | SeparatorOutput>>({ it as List<Output | SeparatorOutput> })
+    mut let parser = initial.sequence<List<Output | SeparatorOutput>>(seq)
+        .map<(List<Output | SeparatorOutput>, List<Output | SeparatorOutput>)>({
+          it as (List<Output | SeparatorOutput>, List<Output | SeparatorOutput>)
+        })
+        .map<List<Output | SeparatorOutput>>({
+          it.first.followedBy(it.second) as List<Output | SeparatorOutput>
+        })
+
+    if allowTrailingSeparator {
+      parser = parser.sequence<SeparatorOutput>(separator)
+          .map<(List<Output | SeparatorOutput>, SeparatorOutput)>({
+            it as (List<Output | SeparatorOutput>, SeparatorOutput)
+          })
+          .map<List<Output | SeparatorOutput>>({
+            let first = it.first as List<Output | SeparatorOutput>
+            let trailing = List.of1<Output | SeparatorOutput>(it.second as Output | SeparatorOutput)
+            first.followedBy(trailing)
+          })
+    }
+
+    parser
+  }
 }
