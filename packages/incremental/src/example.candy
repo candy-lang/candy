@@ -3,14 +3,15 @@ use ..query
 
 fun main() {
   let context = QueryContext.create()
-  for i in List.of4<Int>(1, -2, 1, -2) {
-    print("Is {i} positive? {isPositive(context, i)}")
+  for i in List.of5<Int>(1, -2, 1, -2, 3) {
+    print("Is {i} positive?")
+    print("Result: {isPositive(context, i)}")
   }
 }
 
 fun isPositive(context: QueryContext, input: Int): Bool {
-  query<Bool>(context, "isPositive", input as Equals & Hash, {
-    print("Doing expensive computation.")
+  query<Bool>(context, "isPositive", input as (Equals & Hash), {
+    print("Doing expensive computation: isPositive({input})")
     input > 0
   })
 }
