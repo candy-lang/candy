@@ -221,23 +221,26 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
               ..type = compileType(context, CandyType.int)))
             ..returns = t
             ..body = dart.refer('value').index(dart.refer('index.value')).code),
-          dart.Method(
-            (b) => b
-              ..name = 'set'
-              ..requiredParameters.addAll([
-                dart.Parameter((b) => b
-                  ..name = 'index'
-                  ..type = compileType(context, CandyType.int)),
-                dart.Parameter((b) => b
-                  ..name = 'item'
-                  ..type = t),
-              ])
-              ..returns = t
-              ..body = dart
-                  .refer('item')
-                  .assign(dart.refer('value').index(dart.refer('index.value')))
-                  .code,
-          ),
+          dart.Method((b) => b
+            ..name = 'set'
+            ..requiredParameters.addAll([
+              dart.Parameter((b) => b
+                ..name = 'index'
+                ..type = compileType(context, CandyType.int)),
+              dart.Parameter((b) => b
+                ..name = 'item'
+                ..type = t),
+            ])
+            ..returns = t
+            ..body = dart
+                .refer('value')
+                .index(dart.refer('index.value'))
+                .assign(dart.refer('item'))
+                .code),
+          dart.Method((b) => b
+            ..name = 'toString'
+            ..returns = dart.refer('String', dartCoreUrl)
+            ..body = dart.refer('value').property('toString').call([]).code)
         ])
         ..methods.addAll(getClassDeclarationHir(context, id)
             .innerDeclarationIds
@@ -386,6 +389,10 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                 .or(dart.refer('other.value'))
                 .wrapInCandyBool(context)
                 .code),
+          dart.Method((b) => b
+            ..name = 'toString'
+            ..returns = dart.refer('String', dartCoreUrl)
+            ..body = dart.refer('value').property('toString').call([]).code)
         ])
         ..methods.addAll(methodOverrides)),
     ];
@@ -519,6 +526,10 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                 .operatorEuclideanModulo(dart.refer('other.value'))
                 .wrapInCandyInt(context)
                 .code),
+          dart.Method((b) => b
+            ..name = 'toString'
+            ..returns = dart.refer('String', dartCoreUrl)
+            ..body = dart.refer('value').property('toString').call([]).code)
         ])
         ..methods.addAll(methodOverrides)),
     ];
@@ -655,6 +666,10 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             ..name = 'length'
             ..returns = compileType(context, CandyType.int)
             ..body = dart.refer('value.length').wrapInCandyInt(context).code),
+          dart.Method((b) => b
+            ..name = 'toString'
+            ..returns = dart.refer('String', dartCoreUrl)
+            ..body = dart.refer('value').property('toString').call([]).code)
         ])
         ..methods.addAll(methodOverrides)),
     ];
