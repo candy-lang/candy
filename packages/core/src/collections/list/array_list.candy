@@ -48,6 +48,16 @@ public class ArrayList<Item> {
     list.append(fifth)
     list
   }
+  public static fun of6<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item): ArrayList<Item> {
+    let list = create<Item>(6)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list.append(sixth)
+    list
+  }
 
   static fun create<Item>(capacity: Int /* UInt */): ArrayList<Item> {
     /// Creates a new, empty `ArrayList` with the given capacity.

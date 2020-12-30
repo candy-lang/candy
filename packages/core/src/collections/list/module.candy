@@ -24,6 +24,9 @@ public trait List<Item>: Iterable<Item> {
   static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): List<Item> {
     ArrayList.of5<Item>(first, second, third, fourth, fifth)
   }
+  static fun of6<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item): List<Item> {
+    ArrayList.of6<Item>(first, second, third, fourth, fifth, sixth)
+  }
 
   // TODO(marcelgarus): Getterize!
   fun isEmpty(): Bool { length() == 0 }
@@ -83,6 +86,9 @@ public trait MutableList<Item>: List<Item> {
   }
   static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): MutableList<Item> {
     ArrayList.of5<Item>(first, second, third, fourth, fifth)
+  }
+  static fun of6<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item): MutableList<Item> {
+    ArrayList.of6<Item>(first, second, third, fourth, fifth, sixth)
   }
 
   fun set(index: Int /* UInt */, item: Item)
