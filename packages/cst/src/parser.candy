@@ -8,7 +8,13 @@ use ..types
 
 public fun parseString(source: String): CstFile { parse(lex(source)) }
 public fun parse(tokens: List<Token>): CstFile {
-  CstParser(tokens, 0).parse()
+  let parser = CstParser(
+    tokens,
+    0,
+    notYetDefined<Token, CstNode<CstType>>("Parser not yet defined."),
+  )
+  parser.initType()
+  parser.parse()
 }
 
 class CstParser {
@@ -23,13 +29,13 @@ class CstParser {
     result.unwrap().output
   }
 
+  // file
+
   fun file(): Parser<Token, CstFile> {
     useLine()
         .map<CstNode<CstUseLine | CstDeclaration>>({ it as CstNode<CstUseLine | CstDeclaration> })
         .star()
-        .map<CstFile>({
-          CstFile(it)
-        })
+        .map<CstFile>({ CstFile(it) })
   }
 
   fun useLine(): Parser<Token, CstNode<CstUseLine>> {
@@ -72,6 +78,195 @@ class CstParser {
     node<CstGlobalUseLine>(useLine)
   }
 
+  // types
+
+  let type = notYetDefined<Token, CstNode<CstType>>("Parser not yet defined.")
+  fun initType() {
+    let closingParenthesisOrOtherEndDetection = punctuationOrEnd(")")
+        .or<Maybe<CstNode<PunctuationToken>>>(
+          punctuation(">")
+              .or<CstNode<PunctuationToken>>(punctuation("}"))
+              .and()
+              .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
+        )
+        .map<Maybe<CstNode<PunctuationToken>>>({ it as Maybe<CstNode<PunctuationToken>> })
+
+    // TODO(JonasWanke): allow modifiers
+    let namedType = punctuation(".")
+        .map<CstNode<IdentifierToken | PunctuationToken>>({
+          it as CstNode<IdentifierToken | PunctuationToken>
+        })
+        .star()
+        .sequence<List<CstNode<IdentifierToken | PunctuationToken>>>(
+          identifier()
+              .map<List<CstNode<IdentifierToken | PunctuationToken>>>({
+                List.of1<CstNode<IdentifierToken | PunctuationToken>>(
+                  it as CstNode<IdentifierToken | PunctuationToken>,
+                )
+              })
+        )
+        .sequence<List<CstNode<IdentifierToken | PunctuationToken>>>(
+          identifier()
+              .or<CstNode<PunctuationToken>>(punctuation("."))
+              .map<CstNode<IdentifierToken | PunctuationToken>>({
+                it as CstNode<IdentifierToken | PunctuationToken>
+              })
+              .star()
+        )
+        .map<List<CstNode<IdentifierToken | PunctuationToken>>>({
+          it.first.first.followedBy(it.first.second).followedBy(it.second)
+        })
+        .sequence<Maybe<CstNode<CstTypeArguments>>>(typeArguments().optional())
+        .map<CstType>({ CstNamedType(List.empty<CstNode<IdentifierToken>>(), it.first, it.second) })
+
+    let groupType = modifiers()
+        .sequence<CstNode<PunctuationToken>>(punctuation("("))
+        .sequence<Maybe<CstNode<CstType>>>(type.optional())
+        .sequence<Maybe<CstNode<PunctuationToken>>>(
+          punctuationOrEnd(")")
+              .or<Maybe<CstNode<PunctuationToken>>>(
+                punctuation(">")
+                  .and()
+                  .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
+              )
+              .or<Maybe<CstNode<PunctuationToken>>>(
+                punctuation("}")
+                  .and()
+                  .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
+              )
+              .map<Maybe<CstNode<PunctuationToken>>>({ it as Maybe<CstNode<PunctuationToken>> })
+        )
+        .map<CstType>({
+          let modifiers = it.first.first.first
+          let openingParenthesis = it.first.first.second
+          let type = it.first.second
+          let closingParenthesis = it.second
+          CstGroupType(modifiers, openingParenthesis, type, closingParenthesis)
+        })
+
+    let tupleType = modifiers()
+        .sequence<CstNode<PunctuationToken>>(punctuation("("))
+        .sequence<List<CstNode<CstType | PunctuationToken>>>(commaSeparated<CstType>(type))
+        .sequence<Maybe<CstNode<PunctuationToken>>>(closingParenthesisOrOtherEndDetection)
+        .map<CstType>({
+          let modifiers = it.first.first.first
+          let openingParenthesis = it.first.first.second
+          let types = it.first.second
+          let closingParenthesis = it.second
+          CstTupleType(modifiers, openingParenthesis, types, closingParenthesis)
+        })
+
+    let intersectionType = notYetDefined<Token, CstType>("Parser not yet defined.")
+    intersectionType.delegate = node<CstType>(
+          choiceOf<Token, CstType>(List.of2<Parser<Token, CstType>>(namedType, groupType)),
+        )
+        .sequence<CstNode<PunctuationToken>>(punctuation("&"))
+        .sequence<Maybe<CstNode<CstType>>>(
+          node<CstType>(
+            choiceOf<Token, CstType>(
+              List.of3<Parser<Token, CstType>>(intersectionType, groupType, namedType),
+            ),
+          )
+          .optional()
+        )
+        .map<CstType>({
+          let leftType = it.first.first
+          let ampersand = it.first.second
+          let rightType = it.second
+          CstIntersectionType(leftType, ampersand, rightType)
+        })
+
+    let unionType = notYetDefined<Token, CstType>("Parser not yet defined.")
+    unionType.delegate = node<CstType>(
+          choiceOf<Token, CstType>(
+            List.of3<Parser<Token, CstType>>(intersectionType, groupType, namedType),
+          ),
+        )
+        .sequence<CstNode<PunctuationToken>>(punctuation("|"))
+        .sequence<Maybe<CstNode<CstType>>>(
+          node<CstType>(
+            choiceOf<Token, CstType>(
+              List.of4<Parser<Token, CstType>>(unionType, intersectionType, groupType, namedType),
+            ),
+          )
+          .optional()
+        )
+        .map<CstType>({
+          let leftType = it.first.first
+          let bar = it.first.second
+          let rightType = it.second
+          CstUnionType(leftType, bar, rightType)
+        })
+
+    let functionTypeParameterTypes = punctuation("(")
+        .sequence<List<CstNode<CstType | PunctuationToken>>>(commaSeparated<CstType>(type))
+        .sequence<Maybe<CstNode<PunctuationToken>>>(closingParenthesisOrOtherEndDetection)
+        .map<CstFunctionTypeParameterTypes>({
+          CstFunctionTypeParameterTypes(it.first.first, it.first.second, it.second)
+        })
+    let functionTypeParameterTypes = node<CstFunctionTypeParameterTypes>(functionTypeParameterTypes)
+    // TODO(JonasWanke): allow modifiers
+    let functionType = node<CstType>(
+          choiceOf<Token, CstType>(
+            List.of4<Parser<Token, CstType>>(unionType, intersectionType, groupType, namedType),
+          ),
+        )
+        .optional()
+        .sequence<Maybe<CstNode<CstFunctionTypeParameterTypes>>>(
+          functionTypeParameterTypes.optional()
+        )
+        .sequence<CstNode<PunctuationToken>>(punctuation("->"))
+        .sequence<Maybe<CstNode<CstType>>>(
+          node<CstType>(
+            choiceOf<Token, CstType>(
+              List.of4<Parser<Token, CstType>>(unionType, intersectionType, groupType, namedType),
+            ),
+          )
+          .optional()
+        )
+        .map<CstType>({
+          let modifiers = List.empty<CstNode<IdentifierToken>>()
+          let receiverType = it.first.first.first
+          let parameterTypes = it.first.first.second
+          let arrow = it.first.second
+          let returnType = it.second
+          CstFunctionType(modifiers, receiverType, parameterTypes, arrow, returnType)
+        })
+
+    type.delegate = node<CstType>(
+      choiceOf<Token, CstType>(
+        List.of6<Parser<Token, CstType>>(
+          unionType,
+          intersectionType,
+          functionType,
+          groupType,
+          tupleType,
+          namedType,
+        ),
+      ),
+    )
+  }
+
+  fun typeArguments(): Parser<Token, CstNode<CstTypeArguments>> {
+    let typeArguments = punctuation("<")
+        .sequence<List<CstNode<CstTypeArgument | PunctuationToken>>>(
+          commaSeparated<CstTypeArgument>(typeArgument())
+        )
+        .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd(">"))
+        .map<CstTypeArguments>({
+          CstTypeArguments(it.first.first, it.first.second, it.second)
+        })
+    node<CstTypeArguments>(typeArguments)
+  }
+  fun typeArgument(): Parser<Token, CstNode<CstTypeArgument>> {
+    let typeArgument = modifiers()
+        .sequence<Maybe<CstNode<CstType>>>(type.optional())
+        .map<CstTypeArgument>({ CstTypeArgument(it.first, it.second) })
+    node<CstTypeArgument>(typeArgument)
+  }
+
+  // utilities
+
   fun modifiers(): Parser<Token, List<CstNode<IdentifierToken>>> { identifier().star() }
 
   fun keyword(keyword: String): Parser<Token, CstNode<KeywordToken>> {
@@ -84,6 +279,25 @@ class CstParser {
   fun punctuation(punctuation: String): Parser<Token, CstNode<PunctuationToken>> {
     let token = token<PunctuationToken>("punctuation", { it.punctuation == punctuation })
     node<PunctuationToken>(token)
+  }
+  fun punctuationOrEnd(
+    punctuationString: String,
+  ): Parser<Token, Maybe<CstNode<PunctuationToken>>> {
+    punctuation(punctuationString)
+        .map<Maybe<CstNode<PunctuationToken>>>({ Some<CstNode<PunctuationToken>>(it) })
+        .or<Maybe<CstNode<PunctuationToken>>>(
+          endOfInput<Token>("End of input expected.")
+              .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
+        )
+        .map<Maybe<CstNode<PunctuationToken>>>({ it as Maybe<CstNode<PunctuationToken>> })
+  }
+  fun commaSeparated<Output>(
+    parser: Parser<Token, CstNode<Output>>,
+  ): Parser<Token, List<CstNode<Output | PunctuationToken>>> {
+    parser
+        .or<CstNode<PunctuationToken>>(punctuation(","))
+        .map<CstNode<Output | PunctuationToken>>({ it as CstNode<Output | PunctuationToken> })
+        .star()
   }
 
   fun node<T>(parser: Parser<Token, T>): Parser<Token, CstNode<T>> {
