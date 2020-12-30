@@ -1,5 +1,12 @@
 use ....parsers
 
+public fun sequenceOf<Item, Output>(parsers: List<Parser<Item, Output>>): Parser<Item, List<Output>> {
+  let parsersIterable = parsers as Iterable<Parser<Item, Output>>
+  assert(parsersIterable.isNotEmpty(), "parsers must not be empty")
+
+  SequenceParser<Item, Output>(parsers)
+}
+
 class SequenceParser<Item, Output> {
   let parsers: List<Parser<Item, Output>>
 }

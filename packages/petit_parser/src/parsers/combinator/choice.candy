@@ -1,5 +1,12 @@
 use ....parsers
 
+public fun choiceOf<Item, Output>(parsers: List<Parser<Item, Output>>): Parser<Item, Output> {
+  let parsersIterable = parsers as Iterable<Parser<Item, Output>>
+  assert(parsersIterable.isNotEmpty(), "parsers must not be empty")
+
+  parsersIterable.single().orElse({ ChoiceParser<Item, Output>(parsers) })
+}
+
 class ChoiceParser<Item, Output> {
   let parsers: List<Parser<Item, Output>>
 }
