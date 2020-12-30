@@ -7,6 +7,6 @@ public builtin class Int {
   static fun parse(value: String): Int
 }
 builtin impl Int: Equals & Comparable
-builtin impl Int: Add & Subtract & Negate & Multiply & Divide & DivideTruncating & Modulo
 builtin impl Int: Random /* & RandomInRange */
 // builtin impl Int: Number
+builtin impl Int: Add & Subtract & Negate & Multiply & DivideTruncating & Modulo

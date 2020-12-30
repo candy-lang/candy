@@ -57,8 +57,6 @@ final Query<DeclarationId, List<dart.Spec>> compileClass =
         name = 'operator -';
       } else if (trait == CandyType.multiply) {
         name = 'operator *';
-      } else if (trait == CandyType.divide) {
-        name = 'operator /';
       } else if (trait == CandyType.divideTruncating) {
         name = 'operator ~/';
       } else if (trait == CandyType.modulo) {

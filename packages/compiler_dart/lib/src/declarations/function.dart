@@ -19,7 +19,6 @@ final compileFunction = Query<DeclarationId, dart.Method>(
       'add': 'operator +',
       'subtract': 'operator -',
       'multiply': 'operator *',
-      'divide': 'operator /',
       'divideTruncating': 'operator ~/',
       'modulo': 'operator %',
       'compareTo': 'compareToTyped',
