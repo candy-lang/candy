@@ -53,7 +53,6 @@ abstract class CandyType with _$CandyType {
 
   // other important types
   static const bool = CandyType.user(ModuleId.coreBool, 'Bool');
-  static const number = CandyType.user(ModuleId.coreNumbers, 'Number');
   static const int = CandyType.user(ModuleId.coreNumbersInt, 'Int');
   static const string = CandyType.user(ModuleId.coreString, 'String');
 

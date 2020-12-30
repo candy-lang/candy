@@ -36,8 +36,6 @@ abstract class BuiltinCompiler<Output> {
       return compileNever();
     } else if (moduleId == ModuleId.coreBool.nested(['Bool'])) {
       return compileBool();
-    } else if (moduleId == ModuleId.coreNumbers.nested(['Number'])) {
-      return compileNumber();
     } else if (moduleId == ModuleId.coreNumbersInt.nested(['Int'])) {
       return compileInt();
     } else if (moduleId == ModuleId.coreString.nested(['String'])) {
@@ -77,7 +75,6 @@ abstract class BuiltinCompiler<Output> {
 
   List<Output> compileBool();
 
-  List<Output> compileNumber();
   List<Output> compileInt();
 
   List<Output> compileString();
@@ -150,12 +147,6 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
   @override
   List<dart.Spec> compileBool() {
     // `Bool` corresponds to `bool`, hence nothing to do.
-    return [];
-  }
-
-  @override
-  List<dart.Spec> compileNumber() {
-    // `Number` corresponds to `num`, hence nothing to do.
     return [];
   }
 
