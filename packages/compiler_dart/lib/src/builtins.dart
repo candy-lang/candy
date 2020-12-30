@@ -471,12 +471,19 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                 .code),
           dart.Method((b) => b
             ..name = 'compareTo'
-            ..returns = compileType(context, CandyType.int)
+            ..returns = compileType(
+              context,
+              CandyType.union([
+                CandyType.comparableLess,
+                CandyType.comparableEqual,
+                CandyType.comparableGreater,
+              ]),
+            )
             ..requiredParameters.add(otherInt)
             ..body = dart
                 .refer('value.compareTo')
                 .call([dart.refer('other.value')])
-                .wrapInCandyInt(context)
+                .toComparisonResult(context)
                 .code),
           dart.Method((b) => b
             ..name = 'add'
@@ -609,12 +616,19 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                 .code),
           dart.Method((b) => b
             ..name = 'compareTo'
-            ..returns = compileType(context, CandyType.int)
+            ..returns = compileType(
+              context,
+              CandyType.union([
+                CandyType.comparableLess,
+                CandyType.comparableEqual,
+                CandyType.comparableGreater,
+              ]),
+            )
             ..requiredParameters.add(otherString)
             ..body = dart
                 .refer('value.compareTo')
                 .call([dart.refer('other.value')])
-                .wrapInCandyInt(context)
+                .toComparisonResult(context)
                 .code),
           dart.Method((b) => b
             ..name = 'characters'
@@ -802,5 +816,30 @@ extension WrappingInCandyTypes on dart.Expression {
 
   dart.Expression wrapInCandyArray(QueryContext context, CandyType itemType) {
     return compileType(context, CandyType.array(itemType)).call([this]);
+  }
+
+  dart.Expression toComparisonResult(QueryContext context) {
+    return dart.Method((b) => b
+      ..body = dart.Block((b) => b
+        ..statements.addAll([
+          // ignore: unnecessary_this
+          this.assignFinal('result').statement,
+          dart.Code('if (result < 0) {'),
+          compileType(context, CandyType.comparableLess)
+              .call([])
+              .returned
+              .statement,
+          dart.Code('} else if (result > 0) {'),
+          compileType(context, CandyType.comparableGreater)
+              .call([])
+              .returned
+              .statement,
+          dart.Code('} else {'),
+          compileType(context, CandyType.comparableEqual)
+              .call([])
+              .returned
+              .statement,
+          dart.Code('}'),
+        ]))).closure.call([]);
   }
 }

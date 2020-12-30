@@ -120,6 +120,12 @@ abstract class CandyType with _$CandyType {
   // operators.comparison
   static final comparable =
       UserCandyType(ModuleId.coreOperatorsComparison, 'Comparable');
+  static final comparableLess =
+      UserCandyType(comparable.virtualModuleId, 'Less');
+  static final comparableEqual =
+      UserCandyType(comparable.virtualModuleId, 'Equal');
+  static final comparableGreater =
+      UserCandyType(comparable.virtualModuleId, 'Greater');
   // operators.equality
   static final equals = UserCandyType(ModuleId.coreOperatorsEquality, 'Equals');
   // operators.logical
