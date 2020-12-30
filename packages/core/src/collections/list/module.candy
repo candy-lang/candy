@@ -49,8 +49,8 @@ public trait List<Item>: Iterable<Item> {
   }
 
   fun followedBy(other: List<Item>): List<Item> {
-    let length = length() + other.length()
-    let result = ArrayList.create<Item>(length)
+    let resultLength = length() + (other as Iterable<Item>).length()
+    let result = ArrayList.create<Item>(resultLength)
 
     mut let index = 0
     while index < length() {
@@ -59,8 +59,8 @@ public trait List<Item>: Iterable<Item> {
     }
 
     mut let index = 0
-    while index < other.length() {
-      (result as MutableList<Item>).append(other.get(index).unwrap() as Item)
+    while index < (other as Iterable<Item>).length() {
+      (result as MutableList<Item>).append((other as Iterable<Item>).get(index).unwrap() as Item)
       index = index + 1
     }
     result
@@ -84,7 +84,7 @@ public trait MutableList<Item>: List<Item> {
   static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): MutableList<Item> {
     ArrayList.of5<Item>(first, second, third, fourth, fifth)
   }
-  
+
   fun set(index: Int /* UInt */, item: Item)
   // TODO(marcelgarus): Rename to add as soon as the naming conflict with + is resolved.
   fun append(item: Item)

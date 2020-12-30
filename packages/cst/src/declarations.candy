@@ -1,9 +1,10 @@
 use lexer
+use ..expressions
 use ..node
 use ..types
 
-public trait /* enum */ Declaration {
-  public let modifiers: List<CstNode<String>>
+public trait /* enum */ CstDeclaration {
+  public let modifiers: List<CstNode<IdentifierToken>>
 }
 
 
@@ -13,7 +14,7 @@ public data class CstModule {
   public let name: Maybe<CstNode<IdentifierToken>>
   public let content: Maybe<CstDeclarationContent>
 }
-impl CstModule: Declaration
+impl CstModule: CstDeclaration
 
 
 public data class CstTrait {
@@ -23,7 +24,7 @@ public data class CstTrait {
   public let upperBound: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>
   public let content: Maybe<CstDeclarationContent>
 }
-impl CstTrait: Declaration
+impl CstTrait: CstDeclaration
 
 public data class CstImpl {
   public let modifiers: List<CstNode<IdentifierToken>>
@@ -32,7 +33,7 @@ public data class CstImpl {
   public let traits: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>
   public let content: Maybe<CstDeclarationContent>
 }
-impl CstImpl: Declaration
+impl CstImpl: CstDeclaration
 
 
 public data class CstClass {
@@ -41,7 +42,7 @@ public data class CstClass {
   public let typeParameters: Maybe<CstNode<CstTypeParameters>>
   public let content: Maybe<CstDeclarationContent>
 }
-impl CstClass: Declaration
+impl CstClass: CstDeclaration
 
 
 public data class CstFunction {
@@ -52,7 +53,7 @@ public data class CstFunction {
   public let returnType: Maybe<CstNode<CstType>>
   public let body: Maybe<CstNode<CstBlockBody | CstExpressionBody>>
 }
-impl CstFunction: Declaration
+impl CstFunction: CstDeclaration
 
 public data class CstValueParameters {
   public let openingParenthesis: CstNode<PunctuationToken>
@@ -73,11 +74,11 @@ public data class CstProperty {
   public let type: Maybe<CstNode<CstType>>
   public let initializer: Maybe<CstNode<CstDelegationBody>>
 }
-impl CstProperty: Declaration
+impl CstProperty: CstDeclaration
 
 
 public data class CstDeclarationContent {
-  public let innerDeclarations: List<CstNode<Declaration>>
+  public let innerDeclarations: List<CstNode<CstDeclaration>>
   public let closingCurlyBrace: Maybe<CstNode<PunctuationToken>>
 }
 

@@ -696,7 +696,7 @@ class ParserGrammar {
         },
       )
       ..prefix<LoopKeywordToken, Expression>(
-          (LexerGrammar.LOOP & LexerGrammar.NLs).map((value) => value.first as LoopKeywordToken),
+          (LexerGrammar.LOOP & LexerGrammar.WS).map((value) => value.first as LoopKeywordToken),
           mapper: (keyword, body) {
         return LoopExpression(
           _id++,
@@ -705,7 +705,7 @@ class ParserGrammar {
         );
       })
       ..complexGrouping<List<dynamic>, Expression, List<dynamic>>(
-        LexerGrammar.WHILE & LexerGrammar.NLs,
+        LexerGrammar.WHILE & LexerGrammar.WS,
         LexerGrammar.NLs & expression,
         mapper: (left, value, right) {
           return WhileExpression(
@@ -718,7 +718,7 @@ class ParserGrammar {
       )
       ..complexGrouping<List<dynamic>, Expression, LambdaLiteral>(
         LexerGrammar.FOR &
-            LexerGrammar.NLs &
+            LexerGrammar.WS &
             LexerGrammar.Identifier &
             LexerGrammar.NLs &
             LexerGrammar.IN &

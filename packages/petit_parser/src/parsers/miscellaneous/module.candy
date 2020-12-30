@@ -1,1 +1,2 @@
 public use .end_of_input
+public use .failure

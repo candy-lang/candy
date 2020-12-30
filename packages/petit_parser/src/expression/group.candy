@@ -1,0 +1,111 @@
+use ...parsers
+
+class ExpressionGroup<Item, Output> {
+  let loopback: Parser<Item, Output>
+
+  let primitives: MutableList<Parser<Item, Output>>
+  public fun primitive(parser: Parser<Item, Output>) { primitives.append(parser) }
+  fun buildPrimitive(inner: Parser<Item, Output>): Parser<Item, Output> { buildChoiceOf(primitives, inner) }
+
+  let wrappers: MutableList<Parser<Item, Output>>
+  public fun wrapper<LeftOutput, RightOutput>(
+      left: Parser<Item, LeftOutput>,
+      right: Parser<Item, RightOutput>,
+      mapper: (LeftOutput, Output, RightOutput) => Output,
+  ) {
+    let parser = left
+        .sequence<Output>(loopback)
+        .sequence<RightOutput>(right)
+        .map<Output>({
+          let left = it.first.first
+          let value = it.first.second
+          let right = it.second
+          mapper(left, value, right)
+        })
+    wrappers.append(parser)
+  }
+  fun buildWrapper(inner: Parser<Item, Output>): Parser<Item, Output> { buildChoiceOf(wrappers, inner) }
+
+  // TODO(JonasWanke): prefix, postfix
+
+  let infixRights: MutableList<Parser<Item, (Output, Output) => Output>>
+  public fun infixRight<OperatorOutput>(
+      operator: Parser<Item, OperatorOutput>,
+      mapper: (Output, OperatorOutput, Output) => Output,
+  ) {
+    let parser = operator
+        .map<(Output, Output) => Output>({
+          { left: Output, right: Output => mapper(left, it, right) }
+        })
+    infixRights.append(parser)
+  }
+  fun buildInfixRight(inner: Parser<Item, Output>): Parser<Item, Output> {
+    if (infixRights as Iterable<Parser<Item, (Output, Output) => Output>>).isEmpty() {
+      inner
+    } else {
+      let anyInfixRight = choiceOf<Item, (Output, Output) => Output>(infixRights)
+      inner.separatedBy<(Output, Output) => Output>(anyInfixRight, false)
+          .map<Output>({
+            let iterable = it as Iterable<Output | ((Output, Output) => Output)>
+            mut let result = (iterable.last().unwrap() as Output)
+
+            mut let index = iterable.length() - 2
+            while index > 0 {
+              let curriedMapper = (iterable.get(index).unwrap() as (Output, Output) => Output)
+              let leftOperand = (iterable.get(index - 1).unwrap() as Output)
+              result = curriedMapper(leftOperand, result)
+              index = index - 2
+            }
+            result
+          })
+    }
+  }
+
+  let infixLefts: MutableList<Parser<Item, (Output, Output) => Output>>
+  public fun infixLeft<OperatorOutput>(
+      operator: Parser<Item, OperatorOutput>,
+      mapper: (Output, OperatorOutput, Output) => Output,
+  ) {
+    let parser = operator
+        .map<(Output, Output) => Output>({
+          { left: Output, right: Output => mapper(left, it, right) }
+        })
+    infixLefts.append(parser)
+  }
+  fun buildInfixLeft(inner: Parser<Item, Output>): Parser<Item, Output> {
+    if (infixLefts as Iterable<Parser<Item, (Output, Output) => Output>>).isEmpty() {
+      inner
+    } else {
+      let anyInfixLeft = choiceOf<Item, (Output, Output) => Output>(infixLefts)
+      inner.separatedBy<(Output, Output) => Output>(anyInfixLeft, false)
+          .map<Output>({
+            let iterable = it as Iterable<Output | ((Output, Output) => Output)>
+            mut let result = (iterable.first().unwrap() as Output)
+
+            mut let index = 1
+            while index < iterable.length() {
+              let curriedMapper = (iterable.get(index).unwrap() as (Output, Output) => Output)
+              let rightOperand = (iterable.get(index + 1).unwrap() as Output)
+              result = curriedMapper(result, rightOperand)
+              index = index + 2
+            }
+            result
+          })
+    }
+  }
+
+  fun build(inner: Parser<Item, Output>): Parser<Item, Output> {
+    let parser = buildPrimitive(inner)
+    let parser = buildWrapper(parser)
+    let parser = buildInfixRight(parser)
+    let parser = buildInfixLeft(parser)
+    parser
+  }
+  fun buildChoiceOf(parsers: List<Parser<Item, Output>>, inner: Parser<Item, Output>): Parser<Item, Output> {
+    if (parsers as Iterable<Parser<Item, Output>>).isEmpty() {
+      inner
+    } else {
+      choiceOf<Item, Output>(parsers)
+    }
+  }
+}

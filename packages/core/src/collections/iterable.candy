@@ -94,7 +94,11 @@ public trait Iterable<Item> {
 
   // Reductions.
 
-  // TODO(marcelgarus): foldLeft
+  fun foldLeft<Out>(initial: Out, combine: (Out, Item) => Out): Out {
+    mut let result = initial
+    for item in this { result = combine(result, item) }
+    result
+  }
   // TODO(marcelgarus): foldRight
   // TODO(marcelgarus): reduceLeft
   // TODO(marcelgarus): reduceRight

@@ -672,15 +672,17 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         final name = property.id.simplePath.last.nameOrNull ??
             (throw CompilerError.internalError(
                 'Path must be path to property.'));
+        if (property.receiver != null) {
+          code.addAll(property.receiver.accept(this));
+          return _refer(property.receiver.id).property(name);
+        }
+
         final parent = property.id.parent;
         if (parent.isModule) {
           return dart.refer(name, declarationIdToImportUrl(context, parent));
-        } else if (getPropertyDeclarationHir(context, property.id).isStatic) {
-          return compileTypeName(context, parent).property(name);
         } else {
-          assert(property.receiver != null);
-          code.addAll(property.receiver.accept(this));
-          return dart.refer(name);
+          assert(getPropertyDeclarationHir(context, property.id).isStatic);
+          return compileTypeName(context, parent).property(name);
         }
       },
       localProperty: (property) =>
@@ -716,8 +718,8 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       ),
       tuple: (_) => compileSimple(),
       function: (_) => compileSimple(),
-      union: (type) => dart.refer('dynamic', dartCoreUrl),
-      intersection: (type) => dart.refer('dynamic', dartCoreUrl),
+      union: (type) => instance.asA(dart.refer('dynamic', dartCoreUrl)),
+      intersection: (type) => instance.asA(dart.refer('dynamic', dartCoreUrl)),
       parameter: (_) => compileSimple(),
       meta: (_) => compileSimple(),
       reflection: (_) => compileSimple(),

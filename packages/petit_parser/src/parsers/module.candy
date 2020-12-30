@@ -3,6 +3,7 @@ public use .combinator
 public use .custom
 public use .miscellaneous
 public use .repeating
+public use .string
 
 public class Context<Item> {
   public let buffer: List<Item>
@@ -33,8 +34,10 @@ public trait Parser<Item, Output> {
   }
 
   // TODO(JonasWanke): move the following function to `combinator/choice.candy`
-  fun or(other: Parser<Item, Output>): Parser<Item, Output> {
-    ChoiceParser<Item, Output>(List.of2<Parser<Item, Output>>(this, other))
+  fun or<OutputB>(other: Parser<Item, OutputB>): Parser<Item, Output | OutputB> {
+    let castedThis = this as Parser<Item, Output | OutputB>
+    let castedOther = other as Parser<Item, Output | OutputB>
+    ChoiceParser<Item, Output | OutputB>(List.of2<Parser<Item, Output | OutputB>>(castedThis, castedOther))
   }
 
   // TODO(JonasWanke): move the following function to `combinator/optional.candy`
@@ -55,6 +58,9 @@ public trait Parser<Item, Output> {
     mappedParser as Parser<Item, (Output, OutputB)>
   }
 
+  // TODO(JonasWanke): move the following function to `combinator/settable.candy`
+  fun settable(): SettableParser<Item, Output> { SettableParser<Item, Output>(this) }
+
   // TODO(JonasWanke): move the following functions to `miscellaneous/end_of_input.candy`
   fun end(message: String): Parser<Item, Output> {
     let sequenceParser = sequence<Unit>(EndOfInputParser<Item>(message))
@@ -67,5 +73,39 @@ public trait Parser<Item, Output> {
   fun times(count: Int): Parser<Item, List<Output>> { repeat(count, Some<Int>(count)) }
   fun repeat(minimum: Int, maximum: Maybe<Int>): Parser<Item, List<Output>> {
     PossessiveRepeatingParser<Item, Output>(this, minimum, maximum)
+  }
+
+  // TODO(JonasWanke): move the following functions to `repeating/separated_by.candy`
+  fun separatedBy<SeparatorOutput>(
+      separator: Parser<Item, SeparatorOutput>,
+      allowTrailingSeparator: Bool = false,
+  ): Parser<Item, List<Output | SeparatorOutput>> {
+    let initial = map<List<Output | SeparatorOutput>>({
+      List.of1<Output | SeparatorOutput>(it as Output | SeparatorOutput)
+    })
+    let seq = separator.or<Output>(this)
+        .star()
+        .map<List<Output | SeparatorOutput>>({ it as List<Output | SeparatorOutput> })
+    mut let parser = initial.sequence<List<Output | SeparatorOutput>>(seq)
+        .map<(List<Output | SeparatorOutput>, List<Output | SeparatorOutput>)>({
+          it as (List<Output | SeparatorOutput>, List<Output | SeparatorOutput>)
+        })
+        .map<List<Output | SeparatorOutput>>({
+          it.first.followedBy(it.second) as List<Output | SeparatorOutput>
+        })
+
+    if allowTrailingSeparator {
+      parser = parser.sequence<SeparatorOutput>(separator)
+          .map<(List<Output | SeparatorOutput>, SeparatorOutput)>({
+            it as (List<Output | SeparatorOutput>, SeparatorOutput)
+          })
+          .map<List<Output | SeparatorOutput>>({
+            let first = it.first as List<Output | SeparatorOutput>
+            let trailing = List.of1<Output | SeparatorOutput>(it.second as Output | SeparatorOutput)
+            first.followedBy(trailing)
+          })
+    }
+
+    parser
   }
 }

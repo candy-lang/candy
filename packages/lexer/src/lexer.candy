@@ -5,7 +5,7 @@ public fun lex(source: String): List<Token> {
 }
 
 class Lexer {
-  mut let source: String
+  let source: String
   mut let offset: Int
   mut let length: Int
 
@@ -137,7 +137,7 @@ class Lexer {
           || unwrapped == "\🦄"
           || unwrapped == "("
           || unwrapped == ")"
-          || unwrapped == "{"
+          || unwrapped == "\👍"
           || unwrapped == "}"
           || unwrapped == "*"
           || unwrapped == "/"

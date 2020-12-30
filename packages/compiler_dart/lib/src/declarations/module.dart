@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart' hide srcDirectoryName;
 import 'package:dart_style/dart_style.dart';
@@ -36,9 +38,17 @@ final compileModule = Query<ModuleId, Unit>(
     });
 
     if (library.body.isNotEmpty) {
-      final source = _dartFmt.format(
-        library.accept(FancyDartEmitter(_PrefixedAllocator())).toString(),
-      );
+      final rawSource =
+          library.accept(FancyDartEmitter(_PrefixedAllocator())).toString();
+      String source;
+      try {
+        source = _dartFmt.format(rawSource);
+      } on FormatterException {
+        stderr.write(
+          'Syntax error in generated source of module $moduleId:\n$rawSource',
+        );
+        rethrow;
+      }
       context.config.buildArtifactManager.setContent(
         context,
         moduleIdToBuildArtifactId(context, moduleId),
