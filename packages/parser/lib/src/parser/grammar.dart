@@ -517,8 +517,12 @@ class ParserGrammar {
       ..primitive<Expression>(
           // ignore: unnecessary_cast, Without the cast the compiler complains…
           (literalConstant as Parser<Expression>) |
-              LexerGrammar.RETURN.map(
-                  (value) => ReturnExpression(_id++, returnKeyword: value)) |
+              (LexerGrammar.RETURN & LexerGrammar.WS.and()).map((value) {
+                return ReturnExpression(
+                  _id++,
+                  returnKeyword: value.first as ReturnKeywordToken,
+                );
+              }) |
               LexerGrammar.BREAK
                   .map((value) => BreakExpression(_id++, breakKeyword: value)) |
               LexerGrammar.CONTINUE.map((value) =>
@@ -734,7 +738,7 @@ class ParserGrammar {
         ),
       )
       ..prefix<ReturnKeywordToken, Expression>(
-          (LexerGrammar.RETURN & LexerGrammar.NLs).map((value) => value.first as ReturnKeywordToken),
+          (LexerGrammar.RETURN & LexerGrammar.WS).map((value) => value.first as ReturnKeywordToken),
           mapper: (keyword, expression) {
         return ReturnExpression(
           _id++,
