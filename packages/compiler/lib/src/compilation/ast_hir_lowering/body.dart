@@ -1567,7 +1567,9 @@ extension on Context {
     if (loweredIterable is Error) return loweredIterable.mapValue((e) => [e]);
     final iterable = loweredIterable.value;
 
-    final iterableType = iterable.type;
+    final iterableType = thisType is Some
+        ? iterable.type.bakeThisType(thisType.value)
+        : iterable.type;
     const supportedCollectionTypesModuleIds = [
       hir.CandyType.iterableModuleId,
       hir.CandyType.listModuleId,
@@ -1577,7 +1579,7 @@ extension on Context {
             .contains((iterableType as hir.UserCandyType).virtualModuleId)) {
       return Error([
         CompilerError.unsupportedFeature(
-          'For-loops only support collections with a static type of `Iterable<T>` or `List<T>`, was: ${(iterableType as hir.UserCandyType).virtualModuleId}.',
+          'For-loops only support collections with a static type of `Iterable<T>` or `List<T>`, was: $iterableType.',
           location: ErrorLocation(resourceId, forLoop.iterable.span),
         ),
       ]);
