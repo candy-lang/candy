@@ -24,7 +24,7 @@ class BucketMap<Key: Equals & Hash, Value> {
   mut let numEntries: Int
 
   fun bucketByHash(hash: Int): LinkedHashMap<Key, Value> { buckets.get(hash % buckets.length()) }
-  fun bucketByKey(key: Key): LinkedHashMap<Key, Value> { bucketByHash(hashByKey(key)) }
+  fun bucketByKey(key: Key): LinkedHashMap<Key, Value> { bucketByHash(key.hashCode_()) }
 }
 impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: Map<Key, Value> {
   fun length(): Int { numEntries }
