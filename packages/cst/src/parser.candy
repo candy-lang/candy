@@ -12,6 +12,7 @@ public fun parse(tokens: List<Token>): CstFile {
     tokens,
     0,
     notYetDefined<Token, CstNode<CstType>>("Parser not yet defined."),
+    notYetDefined<Token, CstNode<CstExpression>>("Parser not yet defined."),
   )
   parser.initType()
   parser.parse()
@@ -501,6 +502,122 @@ class CstParser {
     node<CstTypeArgument>(typeArgument)
   }
 
+  // expressions
+
+  let expression_ = notYetDefined<Token, CstNode<CstExpression>>("Parser not yet defined.")
+  fun initExpression() {
+    let intExpression = node<LiteralToken<Int>>(token<LiteralToken<Int>>("int literal", { true }))
+        .map<CstExpression>({ CstIntExpression(it) })
+
+    let lambdaExpressionValueParameters = commaSeparated<CstValueParameter>(
+      valueParameter()
+    )
+        .sequence<CstNode<PunctuationToken>>(punctuation("->"))
+        .map<CstLambdaExpressionValueParameters>({
+          CstLambdaExpressionValueParameters(it.first, it.second)
+        })
+    let lambdaExpressionValueParameters = node<CstLambdaExpressionValueParameters>(
+      lambdaExpressionValueParameters
+    )
+    let lambdaExpression = punctuation("👍")
+        .sequence<Maybe<CstNode<CstLambdaExpressionValueParameters>>>(
+          lambdaExpressionValueParameters.optional()
+        )
+        .sequence<List<CstNode<CstExpression>>>(expression_.star())
+        .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd("}"))
+        .map<CstExpression>({
+          let openingCurlyBrace = it.first.first.first
+          let valueParameters = it.first.first.second
+          let expressions = it.first.second
+          let closingCurlyBrace = it.second
+          CstLambdaExpression(openingCurlyBrace, valueParameters, expressions, closingCurlyBrace)
+        })
+
+    let identifierExpression = identifier()
+        .map<CstExpression>({ CstIdentifierExpression(it) })
+
+    // TODO(JonasWanke): binary expressions
+    // TODO(JonasWanke): property expressions
+
+    let navigationExpression = node<CstExpression>(
+      choiceOf<Token, CstExpression>(
+        List.of3<Parser<Token, CstExpression>>(
+          intExpression,
+          lambdaExpression,
+          identifierExpression,
+        ),
+      ),
+    )
+        .sequence<List<CstNode<IdentifierToken>>>(identifier().plus())
+        .map<CstExpression>({
+          let receiver = it.first
+          let targets = (it.second as Iterable<CstNode<IdentifierToken>>)
+          targets.foldLeft<CstNode<CstExpression>>(
+            receiver,
+            { receiver, target =>
+              CstNode<CstExpression>(
+                getNextNodeId(),
+                CstNavigationExpression(receiver, target),
+                List.empty<WhitespaceToken | CommentToken>(),
+              )
+            },
+          ).child as CstExpression
+        })
+
+    let callExpression = node<CstExpression>(
+      choiceOf<Token, CstExpression>(
+        List.of4<Parser<Token, CstExpression>>(
+          intExpression,
+          lambdaExpression,
+          identifierExpression,
+          navigationExpression,
+        ),
+      ),
+    )
+        .sequence<List<(Maybe<CstNode<CstTypeArguments>>, CstNode<CstValueArguments>)>(
+          typeArguments()
+              .optional()
+              .sequence<CstNode<CstValueArguments>>(valueArguments())
+              .plus()
+        )
+        .map<CstExpression>({
+          let receiver = it.first
+          let targets = (it.second as Iterable<(Maybe<CstNode<CstTypeArguments>>, CstNode<CstValueArguments>)>)
+          arguments.foldLeft<CstNode<CstExpression>>(
+            receiver,
+            { receiver, arguments =>
+              CstNode<CstExpression>(
+                getNextNodeId(),
+                CstCallExpression(receiver, arguments.first, arguments.second),
+                List.empty<WhitespaceToken | CommentToken>(),
+              )
+            },
+          ).child as CstExpression
+        })
+
+    // TODO(JonasWanke): tuple expression
+    // TODO(JonasWanke): if/else expression
+    // TODO(JonasWanke): return expression
+
+    expression_.delegate = node<CstExpression>(
+      choiceOf<Token, CstExpression>(
+        List.of5<Parser<Token, CstExpression>>(
+          intExpression,
+          // TODO(JonasWanke): string expressions
+          lambdaExpression,
+          identifierExpression,
+          // TODO(JonasWanke): binary expressions
+          // TODO(JonasWanke): property expressions
+          navigationExpression,
+          callExpression,
+          // TODO(JonasWanke): tuple expression
+          // TODO(JonasWanke): if/else expression
+          // TODO(JonasWanke): return expression
+        ),
+      ),
+    )
+  }
+
   // utilities
 
   fun modifiers(): Parser<Token, List<CstNode<IdentifierToken>>> { identifier().star() }
@@ -539,10 +656,13 @@ class CstParser {
   fun node<T>(parser: Parser<Token, T>): Parser<Token, CstNode<T>> {
     let parser = parser.sequence<List<WhitespaceToken | CommentToken>>(trailingTrivia())
     parser.map<CstNode<T>>({ output =>
-      let id = CstNodeId(nextId)
-      nextId = nextId + 1
-      CstNode<T>(id, output.first, output.second)
+      CstNode<T>(getNextNodeId(), output.first, output.second)
     })
+  }
+  fun getNextNodeId(): CstNodeId {
+    let id = CstNodeId(nextId)
+    nextId = nextId + 1
+    id
   }
   fun trailingTrivia(): Parser<Token, List<WhitespaceToken | CommentToken>> {
     whitespace().or<CommentToken>(comment()).star()

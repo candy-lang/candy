@@ -6,11 +6,6 @@ use ..types
 public trait /* enum */ CstExpression
 
 
-public data class CstBoolExpression {
-  public let value: CstNode<LiteralToken<Bool>>
-}
-impl CstBoolExpression: CstExpression
-
 public data class CstIntExpression {
   public let value: CstNode<LiteralToken<Int>>
 }
@@ -86,12 +81,12 @@ public data class CstNavigationExpression {
 }
 impl CstNavigationExpression: CstExpression
 
-public data class CallExpression {
+public data class CstCallExpression {
   public let receiver: CstNode<CstExpression>
   public let typeArguments: Maybe<CstNode<CstTypeArguments>>
-  public let valueArguments: List<CstValueArgument>
+  public let valueArguments: CstNode<CstValueArguments>
 }
-impl CallExpression: CstExpression
+impl CstCallExpression: CstExpression
 
 public data class CstValueArguments {
   public let openingParenthesis: CstNode<PunctuationToken>
