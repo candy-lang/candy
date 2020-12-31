@@ -222,12 +222,13 @@ class CstParser {
             delegationBody().optional()
         )
         .map<CstDeclaration>({
-          let modifiers = it.first.first.first.first.first.first
-          let keyword = it.first.first.first.first.first.second
-          let name = it.first.first.first.first.second
+          let modifiers = it.first.first.first.first
+          let keyword = it.first.first.first.second
+          let name = it.first.first.second
           let type = it.first.second
           let initializer = it.second
-          CstFunction(modifiers, keyword, name, type, initializer)
+          let initializer = it.second
+          CstProperty(modifiers, keyword, name, type, initializer)
         })
 
     declaration.delegate = node<CstDeclaration>(
