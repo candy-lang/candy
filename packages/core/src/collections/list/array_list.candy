@@ -132,6 +132,9 @@ impl<Item> ArrayList<Item>: MutableList<Item> {
     set(length_, item)
     length_ = length_ + 1
   }
+  fun appendAll(items: Iterable<Item>) {
+    for item in items { append(item) }
+  }
 
   fun removeAt(index: Int /* UInt */): Item {
     mut let index = index
