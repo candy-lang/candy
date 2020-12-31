@@ -63,7 +63,7 @@ impl CstUnionType: CstType
 
 public data class CstTypeParameters {
   public let openingAngleBracket: CstNode<PunctuationToken>
-  public let typeParameters: List<CstNode<CstTypeParameter>>
+  public let typeParameters: List<CstNode<CstTypeParameter | PunctuationToken>>
   public let closingAngleBracket: Maybe<CstNode<PunctuationToken>>
 }
 public data class CstTypeParameter {
