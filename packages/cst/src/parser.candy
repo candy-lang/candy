@@ -93,28 +93,33 @@ class CstParser {
 
     // TODO(JonasWanke): allow modifiers
     let namedType = punctuation(".")
-        .map<CstNode<IdentifierToken | PunctuationToken>>({
-          it as CstNode<IdentifierToken | PunctuationToken>
-        })
         .star()
-        .sequence<List<CstNode<IdentifierToken | PunctuationToken>>>(
-          identifier()
-              .map<List<CstNode<IdentifierToken | PunctuationToken>>>({
-                List.of1<CstNode<IdentifierToken | PunctuationToken>>(
-                  it as CstNode<IdentifierToken | PunctuationToken>,
-                )
-              })
+        .sequence<CstNode<IdentifierToken>>(identifier())
+        .sequence<List<(List<CstNode<PunctuationToken>>, CstNode<IdentifierToken>)>>(
+          punctuation(".")
+              .plus()
+              .sequence<CstNode<IdentifierToken>>(identifier())
+              .plus()
         )
-        .sequence<List<CstNode<IdentifierToken | PunctuationToken>>>(
-          identifier()
-              .or<CstNode<PunctuationToken>>(punctuation("."))
+        .map<List<CstNode<IdentifierToken | PunctuationToken>>>({
+          let initialDots = (it.first.first as Iterable<CstNode<PunctuationToken>>)
               .map<CstNode<IdentifierToken | PunctuationToken>>({
                 it as CstNode<IdentifierToken | PunctuationToken>
               })
-              .star()
-        )
-        .map<List<CstNode<IdentifierToken | PunctuationToken>>>({
-          it.first.first.followedBy(it.first.second).followedBy(it.second)
+          let initialIdentifier = it.first.second
+          let remaining = it.second
+          let result = MutableList.empty<CstNode<IdentifierToken | PunctuationToken>>()
+          result.appendAll(initialDots)
+          result.append(initialIdentifier as CstNode<IdentifierToken | PunctuationToken>)
+          for tuple in remaining {
+            let dots = (tuple.first as Iterable<CstNode<PunctuationToken>>)
+                .map<CstNode<IdentifierToken | PunctuationToken>>({
+                  it as CstNode<IdentifierToken | PunctuationToken>
+                })
+            result.appendAll(dots)
+            result.append(tuple.second as CstNode<IdentifierToken | PunctuationToken>)
+          }
+          result
         })
         .sequence<Maybe<CstNode<CstTypeArguments>>>(typeArguments().optional())
         .map<CstType>({ CstNamedType(List.empty<CstNode<IdentifierToken>>(), it.first, it.second) })
