@@ -83,18 +83,31 @@ public trait Parser<Item, Output> {
       separator: Parser<Item, SeparatorOutput>,
       allowTrailingSeparator: Bool = false,
   ): Parser<Item, List<Output | SeparatorOutput>> {
-    let initial = map<List<Output | SeparatorOutput>>({
-      List.of1<Output | SeparatorOutput>(it as Output | SeparatorOutput)
-    })
-    let seq = separator.or<Output>(this)
-        .star()
-        .map<List<Output | SeparatorOutput>>({ it as List<Output | SeparatorOutput> })
-    mut let parser = initial.sequence<List<Output | SeparatorOutput>>(seq)
-        .map<(List<Output | SeparatorOutput>, List<Output | SeparatorOutput>)>({
-          it as (List<Output | SeparatorOutput>, List<Output | SeparatorOutput>)
-        })
+    // let initial = map<List<Output | SeparatorOutput>>({
+    //   List.of1<Output | SeparatorOutput>(it as Output | SeparatorOutput)
+    // })
+    mut let parser = sequence<List<(SeparatorOutput, Output)>>(
+          separator
+              .sequence<Output>(this)
+              .star()
+              .map<List<(SeparatorOutput, Output)>>({ it as List<(SeparatorOutput, Output)> })
+        )
+        // .map<(Output, List<Output | SeparatorOutput>)>({
+        //   let a = it
+        //   let initial = a.first
+        //   let sequence = a.second
+        //   it as (Output, List<Output | SeparatorOutput>)
+        // })
         .map<List<Output | SeparatorOutput>>({
-          it.first.followedBy(it.second) as List<Output | SeparatorOutput>
+          let initial = (it.first as Output)
+          let sequence = (it.second as List<(Output, SeparatorOutput)>)
+          let result = MutableList.empty<Output | SeparatorOutput>()
+          result.append(initial as Output | SeparatorOutput)
+          for tuple in sequence {
+            result.append(tuple.first as Output | SeparatorOutput)
+            result.append(tuple.second as Output | SeparatorOutput)
+          }
+          result
         })
 
     if allowTrailingSeparator {
