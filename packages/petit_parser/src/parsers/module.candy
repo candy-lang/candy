@@ -89,8 +89,8 @@ public trait Parser<Item, Output> {
     mut let parser = sequence<List<(SeparatorOutput, Output)>>(
           separator
               .sequence<Output>(this)
-              .star()
               .map<List<(SeparatorOutput, Output)>>({ it as List<(SeparatorOutput, Output)> })
+              .repeat(minimumItems - 1, None<Int>())
         )
         // .map<(Output, List<Output | SeparatorOutput>)>({
         //   let a = it
@@ -100,7 +100,7 @@ public trait Parser<Item, Output> {
         // })
         .map<List<Output | SeparatorOutput>>({
           let initial = (it.first as Output)
-          let sequence = (it.second as List<(Output, SeparatorOutput)>)
+          let sequence = (it.second as List<(SeparatorOutput, Output)>)
           let result = MutableList.empty<Output | SeparatorOutput>()
           result.append(initial as Output | SeparatorOutput)
           for tuple in sequence {

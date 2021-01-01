@@ -44,7 +44,7 @@ class ExpressionGroup<Item, Output> {
       inner
     } else {
       let anyInfixRight = choiceOf<Item, (Output, Output) => Output>(infixRights)
-      inner.separatedBy<(Output, Output) => Output>(anyInfixRight, false)
+      inner.separatedBy<(Output, Output) => Output>(anyInfixRight, 1, false)
           .map<Output>({
             let iterable = it as Iterable<Output | ((Output, Output) => Output)>
             mut let result = (iterable.last().unwrap() as Output)
@@ -77,7 +77,7 @@ class ExpressionGroup<Item, Output> {
       inner
     } else {
       let anyInfixLeft = choiceOf<Item, (Output, Output) => Output>(infixLefts)
-      inner.separatedBy<(Output, Output) => Output>(anyInfixLeft, false)
+      inner.separatedBy<(Output, Output) => Output>(anyInfixLeft, 1, false)
           .map<Output>({
             let iterable = it as Iterable<Output | ((Output, Output) => Output)>
             mut let result = (iterable.first().unwrap() as Output)

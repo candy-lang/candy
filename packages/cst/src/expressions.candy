@@ -55,6 +55,22 @@ public data class CstIdentifierExpression {
 impl CstIdentifierExpression: CstExpression
 
 
+public data class CstGroupExpression {
+  public let openingParenthesis: CstNode<PunctuationToken>
+  public let expression: Maybe<CstNode<CstExpression>>
+  public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
+}
+impl CstGroupExpression: CstExpression
+
+
+public data class CstTupleExpression {
+  public let openingParenthesis: CstNode<PunctuationToken>
+  public let valueArguments: List<CstNode<CstExpression | PunctuationToken>>
+  public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
+}
+impl CstTupleExpression: CstExpression
+
+
 public data class CstBinaryExpression {
   public let leftOperand: Maybe<CstNode<CstExpression>>
 
@@ -97,13 +113,6 @@ public data class CstValueArgument {
   public let name: Maybe<(Maybe<CstNode<IdentifierToken>>, CstNode<PunctuationToken>)>
   public let value: Maybe<CstNode<CstExpression>>
 }
-
-public data class CstTupleExpression {
-  public let openingParenthesis: CstNode<PunctuationToken>
-  public let valueArguments: List<Maybe<CstNode<CstExpression>> | CstNode<PunctuationToken>>
-  public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
-}
-impl CstTupleExpression: CstExpression
 
 
 public data class CstIfExpression {
