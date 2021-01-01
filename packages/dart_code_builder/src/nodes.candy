@@ -1,0 +1,231 @@
+class File {
+  let parts: List<Directive | Declaration>
+}
+
+class Annotation {
+  let expression: Expression
+}
+
+// Directives.
+
+trait Directive {}
+
+class Import {
+  let path: String
+  let alias: Maybe<String> = None
+  let show: List<String> = []
+  let hide: List<String> = []
+}
+impl Import: Directive
+
+class Part {
+  let path: String
+}
+impl Part: Directive
+
+class PartOf {
+  let path: String
+}
+impl PartOf: Directive
+
+// Declarations.
+
+trait Declaration {}
+
+class Class {
+  let name: String
+  let annotations: List<Annotation> = []
+  let extends: Maybe<Type> = None
+  let implements: List<Type> = []
+  let with: List<Type> = []
+  let body: List<Field | Getter | Setter | Function> = []
+}
+impl Class: Declaration {}
+
+class Function {
+  let name: String
+  let annotations: List<Annotation> = []
+  let returns: Maybe<Type> = None
+  let requiredParameters: List<Parameter> = []
+  let positionalParameters: List<Parameter> = []
+  let namedParameters: List<Parameter> = []
+  let body: Maybe<Body> = None
+}
+impl Function: Declaration {}
+
+class Parameter {
+  let name: String
+  let type: Maybe<Type> = None
+  let defaultValue: Maybe<Expression> = None
+}
+
+class Field {
+  let name: String
+  let isStatic: Bool = false
+  let mutability: Mutability = var
+  let initialValue: Maybe<Expression> = None
+}
+
+trait Mutability {}
+class Var {}
+impl Var: Mutability
+class Final {}
+impl Final: Mutability
+class Const {}
+impl Const: Mutability
+
+class Getter {
+  let name: String
+  let type: Type
+  let body: Maybe<Body> = None
+}
+
+class Setter {
+  let name: String
+  let parameter: Parameter
+  let body: Maybe<Body> = None
+}
+
+trait Body {}
+
+class InlineBody {
+  let expression: Expression
+}
+impl InlineBody: Body {}
+
+class BlockBody {
+  let statements: List<Statement>
+}
+impl BlockBody: Body
+
+// Types.
+
+trait Type {}
+
+class UserType {
+  let name: String
+  let parameters: List<Type> = []
+  let prefix: Maybe<String> = None
+}
+impl UserType: Type
+
+class FunctionType {
+  let parameters: List<Parameter> = []
+  let positionalParameters: List<Parameter> = []
+  let namedParameters: List<Parameter> = []
+  let returns: Maybe<Type> = None
+}
+impl FunctionType: Type
+
+// Expressions.
+
+trait Expression {}
+
+impl Type: Expression
+
+class Identifier {
+  let name: String
+  let prefix: Maybe<String> = None
+}
+impl Identifier: Expression
+
+let this_ = Identifier("this")
+
+class Literal {
+  // TODO: Support Map, List, and Set literals.
+  let value: String | Int | Bool
+}
+impl Literal: Expression
+
+class Call {
+  let target: Expression
+  let positionalArguments: List<Expression> = []
+  let namedArguments: Map<String, Expression> = {}
+  let typeArguments: List<Type> = []
+}
+impl Call: Expression
+
+class Navigation {
+  let target: Expression
+  let property: String
+}
+impl Navigation: Expression
+
+class BinaryOperator {
+  let left: Expression
+  let operator: String
+  let right: Expression
+}
+impl BinaryOperator: Expression
+
+class PrefixOperator {
+  let operator: String
+  let target: Expression
+}
+impl PrefixOperator: Expression {}
+
+class Closure {
+  let returns: Maybe<Type> = None
+  let requiredParameters: List<Parameter> = []
+  let positionalParameters: List<Parameter> = []
+  let namedParameters: List<Parameter> = []
+  let body: Body
+}
+impl Closure: Expression {}
+
+impl Expression {
+  /*public fun call(
+    positionalArguments: List<Expression>,
+    namedArguments: List<Expression>,
+    typeArguments: List<Type>,
+  ): Call {
+    Call(this, positionalArguments, namedArguments, typeArguments)
+  }*/
+  fun dot(property: String): Navigation {
+    
+  }
+  /*fun equals(other: Expression): BinaryOperator { BinaryOperator(this, "==", other) }
+  fun notEquals(other: Expression): BinaryOperator { BinaryOperator(this, "!=", other) }
+  fun opposite(): PrefixOperator { PrefixOperator(this, "!") }
+  fun and(other: Expression): BinaryOperator { BinaryOperator(this, "&&", other) }
+  fun or(other: Expression): BinaryOperator { BinaryOperator(this, "||", other) }
+  fun lessThan(other: Expression): BinaryOperator { BinaryOperator(this, "<", other) }
+  fun greaterThan(other: Expression): BinaryOperator { BinaryOperator(this, ">", other) }
+  fun lessThanOrEqualTo(other: Expression): BinaryOperator { BinaryOperator(this, "<=", other) }
+  fun greaterThanOrEqualTo(other: Expression): BinaryOperator { BinaryOperator(this, ">=", other) }
+  fun bitwiseAnd(other: Expression): BinaryOperator { BinaryOperator(this, "&", other) }
+  fun bitwiseOr(other: Expression): BinaryOperator { BinaryOperator(this, "|", other) }
+  fun plus(other: Expression): BinaryOperator { BinaryOperator(this, "+", other) }
+  fun minus(other: Expression): BinaryOperator { BinaryOperator(this, "-", other) }
+  fun times(other: Expression): BinaryOperator { BinaryOperator(this, "*", other) }
+  fun divide(other: Expression): BinaryOperator { BinaryOperator(this, "/", other) }
+  fun divideTruncate(other: Expression): BinaryOperator { BinaryOperator(this, "~/", other) }*/
+  /*fun modulo(other: Expression): BinaryOperator {
+    // return BinaryOperator(other, "%", other)
+  }*/
+}
+
+// Statements.
+
+trait Statement {}
+
+impl Expression: Statement
+
+class If {
+  let condition: Expression
+  let then: List<Statement>
+  let else: List<Statement> = []
+}
+impl If: Statement
+
+class While {
+  let condition: Expression
+  let body: List<Statement> = []
+}
+impl While: Statement
+
+class Assignment {
+  let left: Expression
+  let right: Expression
+}
+impl Assignment: Statement
