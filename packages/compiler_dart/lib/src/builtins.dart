@@ -207,10 +207,13 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
               listT.property('generate').call([
                 dart.refer('length.value'),
                 // The Dart code generator doesn't support lambdas, so we do an ugly workaround.
-                dart.refer('(index) => generator').call([
-                  compileType(context, CandyType.int)
-                      .call([dart.refer('index')])
-                ]),
+                dart.Method((b) => b
+                  ..requiredParameters
+                      .add(dart.Parameter((b) => b..name = 'index'))
+                  ..body = dart.refer('generator').call([
+                    compileType(context, CandyType.int)
+                        .call([dart.refer('index')])
+                  ]).code).closure,
               ]),
             ]).code),
           dart.Method((b) => b

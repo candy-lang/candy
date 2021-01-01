@@ -5,8 +5,8 @@ class Query<T> {
 
   let name: String
   /// A unique query name.
-  /// 
-  /// The query name usually equals the name of the method or function that runs the query, possibly
+  ///
+  /// The `name` usually equals the name of the method or function that runs the query, possibly
   /// with a package prefix. For example, you might have a `"math.computeSign"` query that computes
   /// the sign of an `Int`.
 
@@ -17,16 +17,14 @@ class Query<T> {
 
   let runner: () => T
   /// A runner that actually runs the query.
-  ///
-  /// The runner should be deterministic with regard to the inputs.
 
-  let shouldAlwaysRun: Bool
-  /// Indicates that this query should always be run, even if the inputs didn't change since the
-  /// last time.
+  let isPure: Bool
+  /// Indicates whether the runner is deterministic with regard to the `input`.
 }
 
-fun query<T>(context: QueryContext, name: String, input: Equals & Hash, runner: () => T): T {
-  let query = Query<T>(name, input, runner, false)
+public fun query<T>(context: QueryContext, name: String, input: Equals & Hash, runner: () => T): T {
+  /// Creates and runs a pure query.
+
+  let query = Query<T>(name, input, runner, true)
   context.run<T>(query)
 }
-

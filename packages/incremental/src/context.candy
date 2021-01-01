@@ -17,6 +17,10 @@ class QueryContext {
   /// A stack of currently running queries. The tuples contain the name and input of the queries.
 
   fun run<T: Equals & Hash>(query: Query<T>): T {
+    if !query.isPure {
+      return query.runner()
+    }
+
     let signature = Tuple(query.name, query.input)
 
     // TODO(marcelgarus): Use stack.contains(signature) once it exists.
