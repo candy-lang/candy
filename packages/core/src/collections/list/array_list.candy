@@ -58,6 +58,56 @@ public class ArrayList<Item> {
     list.append(sixth)
     list
   }
+  public static fun of7<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item): ArrayList<Item> {
+    let list = create<Item>(7)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list.append(sixth)
+    list.append(seventh)
+    list
+  }
+  public static fun of8<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item): ArrayList<Item> {
+    let list = create<Item>(8)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list.append(sixth)
+    list.append(seventh)
+    list.append(eigth)
+    list
+  }
+  public static fun of9<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item): ArrayList<Item> {
+    let list = create<Item>(9)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list.append(sixth)
+    list.append(seventh)
+    list.append(eigth)
+    list.append(ninth)
+    list
+  }
+  public static fun of10<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item): ArrayList<Item> {
+    let list = create<Item>(10)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list.append(sixth)
+    list.append(seventh)
+    list.append(eigth)
+    list.append(ninth)
+    list.append(tenth)
+    list
+  }
 
   static fun create<Item>(capacity: Int /* UInt */): ArrayList<Item> {
     /// Creates a new, empty `ArrayList` with the given capacity.
