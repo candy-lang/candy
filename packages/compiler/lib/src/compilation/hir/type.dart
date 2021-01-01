@@ -378,11 +378,7 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
         }
         return false;
       },
-      function: (type) {
-        throw CompilerError.unsupportedFeature(
-          'Trait implementations for functions are not yet supported.',
-        );
-      },
+      function: (type) => false,
       union: (type) {
         final items = type.types;
         assert(items.length >= 2);
