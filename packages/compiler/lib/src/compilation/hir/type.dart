@@ -53,9 +53,7 @@ abstract class CandyType with _$CandyType {
 
   // other important types
   static const bool = CandyType.user(ModuleId.coreBool, 'Bool');
-  static const number = CandyType.user(ModuleId.coreNumbers, 'Number');
   static const int = CandyType.user(ModuleId.coreNumbersInt, 'Int');
-  static const float = CandyType.user(ModuleId.coreNumbersFloat, 'Float');
   static const string = CandyType.user(ModuleId.coreString, 'String');
 
   factory CandyType.maybe(CandyType itemType) => CandyType.user(
@@ -96,6 +94,11 @@ abstract class CandyType with _$CandyType {
       );
   static const arrayListModuleId = ModuleId(
       PackageId.core, ['collections', 'list', 'array_list', 'ArrayList']);
+  factory CandyType.array(CandyType itemType) => CandyType.user(
+        ModuleId.coreCollections.nested(['array']),
+        'Array',
+        arguments: [itemType],
+      );
   static const arrayModuleId =
       ModuleId(PackageId.core, ['collections', 'array', 'Array']);
 
@@ -117,6 +120,12 @@ abstract class CandyType with _$CandyType {
   // operators.comparison
   static final comparable =
       UserCandyType(ModuleId.coreOperatorsComparison, 'Comparable');
+  static final comparableLess =
+      UserCandyType(comparable.virtualModuleId, 'Less');
+  static final comparableEqual =
+      UserCandyType(comparable.virtualModuleId, 'Equal');
+  static final comparableGreater =
+      UserCandyType(comparable.virtualModuleId, 'Greater');
   // operators.equality
   static final equals = UserCandyType(ModuleId.coreOperatorsEquality, 'Equals');
   // operators.logical

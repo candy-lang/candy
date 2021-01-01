@@ -1,4 +1,1 @@
-public use .float
 public use .int
-
-public builtin trait Number

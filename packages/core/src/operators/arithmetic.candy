@@ -33,9 +33,6 @@ trait Negate {
 trait Multiply {
   fun multiply(other: This): This
 }
-trait Divide {
-  fun divide(other: This): Float
-}
 trait DivideTruncating {
   fun divideTruncating(other: This): Int
 }

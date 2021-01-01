@@ -2,7 +2,6 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 import 'package:parser/parser.dart';
 
-import '../constants.dart';
 import '../type.dart';
 import '../utils.dart';
 import 'class.dart';
@@ -30,21 +29,6 @@ final Query<DeclarationId, List<dart.Spec>> compileTrait =
         .where((id) => id.isFunction)
         .map((id) => compileFunction(context, id))
         .toList();
-
-    final moduleId = declarationIdToModuleId(context, declarationId);
-    if (moduleId == CandyType.comparable.virtualModuleId) {
-      implements.add(dart.TypeReference((b) => b
-        ..symbol = 'Comparable'
-        ..url = dartCoreUrl
-        ..types.add(dart.refer('dynamic', dartCoreUrl))));
-      methods.add(dart.Method((b) => b
-        ..annotations.add(dart.refer('override', dartCoreUrl))
-        ..returns = dart.refer('int', dartCoreUrl)
-        ..name = 'compareTo'
-        ..requiredParameters.add(dart.Parameter((b) => b
-          ..type = dart.refer('dynamic', dartCoreUrl)
-          ..name = 'other'))));
-    }
 
     final name = compileTypeName(context, declarationId).symbol;
     final typeParameters = traitHir.typeParameters

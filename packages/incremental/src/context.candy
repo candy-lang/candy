@@ -1,0 +1,42 @@
+use ..query
+
+class QueryContext {
+  /// A context that orchestrates running queries.
+
+  static fun create(): QueryContext {
+    QueryContext(
+      MutableMap.empty<String, MutableMap<Equals & Hash, Equals & Hash>>(),
+      MutableList.empty<(String, Equals & Hash)>()
+    )
+  }
+
+  let cache: MutableMap<String, MutableMap<Equals & Hash, Equals & Hash>>
+  /// A cache from query names to a query-specific cache that maps from input to output.
+
+  let stack: MutableList<(String, Equals & Hash)>
+  /// A stack of currently running queries. The tuples contain the name and input of the queries.
+
+  fun run<T: Equals & Hash>(query: Query<T>): T {
+    let signature = Tuple(query.name, query.input)
+
+    // TODO(marcelgarus): Use stack.contains(signature) once it exists.
+    if (stack as Iterable<(String, Equals & Hash)>).where({
+      it.first as Equals == signature.first as Equals && it.second == signature.second
+    }).isNotEmpty() {
+      throw "Cyclic query {signature}. This is the stack:\n{stack}"
+    }
+
+    if !query.isPure {
+      return query.runner()
+    }
+
+    cache
+      .putIfAbsent(query.name, { MutableMap.empty<Equals & Hash, Equals & Hash>() })
+      .putIfAbsent(query.input, {
+        stack.append(signature)
+        let output = query.runner()
+        stack.removeLast()
+        output
+      }) as T
+  }
+}

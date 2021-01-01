@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
 import 'package:strings/strings.dart' as strings;
 
+import 'builtins.dart';
 import 'constants.dart';
 import 'declarations/declaration.dart';
 import 'declarations/module.dart';
@@ -154,39 +155,6 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       },
       property: (id, type, _, __, receiver) {
         final name = id.simplePath.last.nameOrNull;
-
-        if (name == 'filled' &&
-            declarationIdToModuleId(context, id.parent) ==
-                CandyType.arrayModuleId) {
-          final t = dart.refer('T');
-          final function = dart.Method((b) => b
-            ..name = _name(node.id)
-            ..returns = dart.TypeReference((b) => b
-              ..symbol = 'List'
-              ..url = dartCoreUrl
-              ..types.add(t))
-            ..types.add(t)
-            ..requiredParameters.add(dart.Parameter((b) => b
-              ..type = compileType(context, CandyType.int)
-              ..name = 'length'))
-            ..requiredParameters.add(dart.Parameter((b) => b
-              ..type = t
-              ..name = 'item'))
-            ..body = dart.TypeReference((b) => b
-                  ..symbol = 'List'
-                  ..url = dartCoreUrl
-                  ..types.add(t))
-                .property('filled')
-                .call(
-                  [dart.refer('length'), dart.refer('item')],
-                  {},
-                  [],
-                )
-                .returned
-                .code);
-          return [function.code];
-        }
-
         if (receiver != null) {
           return [
             ...receiver.accept(this),
@@ -209,10 +177,6 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           }();
 
           var typeName = compileTypeName(context, parentId);
-          if (name == 'randomSample') {
-            typeName =
-                dart.refer('${typeName.symbol}RandomExtension', typeName.url);
-          }
           if (name == 'parse') {
             typeName = dart.refer('int', dartCoreUrl);
           }
@@ -234,16 +198,25 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   @override
   List<dart.Code> visitLiteralExpression(LiteralExpression node) {
     return node.literal.when(
-      boolean: (value) => _saveSingle(node, dart.literalBool(value)),
-      integer: (value) => _saveSingle(node, dart.literalNum(value)),
+      boolean: (value) =>
+          _saveSingle(node, dart.literalBool(value).wrapInCandyBool(context)),
+      integer: (value) =>
+          _saveSingle(node, dart.literalNum(value).wrapInCandyInt(context)),
       string: (parts) {
-        if (parts.isEmpty) return _saveSingle(node, dart.literalString(''));
+        if (parts.isEmpty) {
+          return _saveSingle(
+            node,
+            dart.literalString('').wrapInCandyString(context),
+          );
+        }
 
         if (parts.length == 1 && parts.single is LiteralStringLiteralPart) {
           final part = parts.single as LiteralStringLiteralPart;
           return _saveSingle(
             node,
-            dart.literalString(strings.escape(part.value)),
+            dart
+                .literalString(strings.escape(part.value))
+                .wrapInCandyString(context),
           );
         }
 
@@ -258,7 +231,9 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
                   interpolated: (expression) => '\$${_name(expression.id)}',
                 ))
             .join();
-        lowered.add(_save(node, dart.literalString(content)));
+        lowered.add(
+          _save(node, dart.literalString(content).wrapInCandyString(context)),
+        );
 
         return lowered;
       },
@@ -302,8 +277,6 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     if (target is IdentifierExpression &&
         target.identifier is PropertyIdentifier) {
       final identifier = target.identifier as PropertyIdentifier;
-      final parentModuleId =
-          declarationIdToModuleId(context, identifier.id.parent);
       final methodName = identifier.id.simplePath.last.nameOrNull;
 
       List<dart.Code> simpleBinaryExpression(
@@ -358,125 +331,6 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           ];
         }
       }
-
-      if (parentModuleId == CandyType.arrayModuleId) {
-        if (methodName == 'get' || methodName == 'set') {
-          final array = identifier.receiver;
-          final index = node.valueArguments['index'];
-          final item = node.valueArguments['item'];
-          final indexed = _refer(array.id).index(_refer(index.id));
-
-          return [
-            ...array.accept(this),
-            ...index.accept(this),
-            if (methodName == 'get')
-              _save(node, indexed)
-            else ...[
-              ...item.accept(this),
-              _save(node, indexed.assign(_refer(item.id))),
-            ],
-          ];
-        }
-      } else if (parentModuleId == CandyType.add.virtualModuleId) {
-        return simpleBinaryExpression('add', (l, r) => l.operatorAdd(r));
-      } else if (parentModuleId == CandyType.subtract.virtualModuleId) {
-        return simpleBinaryExpression(
-          'subtract',
-          (l, r) => l.operatorSubstract(r),
-        );
-      } else if (parentModuleId == CandyType.negate.virtualModuleId) {
-        assert(methodName == 'negate');
-        final receiver = identifier.receiver;
-        if (isAssignableTo(context, Tuple2(receiver.type, CandyType.number))) {
-          return [
-            ...receiver.accept(this),
-            _save(node, _refer(receiver.id).operatorNegate()),
-          ];
-        }
-      } else if (parentModuleId == CandyType.multiply.virtualModuleId) {
-        return simpleBinaryExpression(
-          'multiply',
-          (l, r) => l.operatorMultiply(r),
-        );
-      } else if (parentModuleId == CandyType.divide.virtualModuleId) {
-        return simpleBinaryExpression('divide', (l, r) => l.operatorDivide(r));
-      } else if (parentModuleId == CandyType.divideTruncating.virtualModuleId) {
-        return simpleBinaryExpression(
-          'divideTruncating',
-          (l, r) => l.operatorDivideTruncating(r),
-        );
-      } else if (parentModuleId == CandyType.modulo.virtualModuleId) {
-        return simpleBinaryExpression(
-          'modulo',
-          (l, r) => l.operatorEuclideanModulo(r),
-        );
-      } else if (parentModuleId == CandyType.and.virtualModuleId) {
-        return lazyBoolExpression('and', (l, r) => l.and(r));
-      } else if (parentModuleId == CandyType.or.virtualModuleId) {
-        return lazyBoolExpression('or', (l, r) => l.or(r));
-      } else if (parentModuleId == CandyType.implies.virtualModuleId) {
-        return lazyBoolExpression('implies', (l, r) => l.negate().or(r));
-      } else if (parentModuleId == CandyType.opposite.virtualModuleId) {
-        assert(methodName == 'opposite');
-        final receiver = identifier.receiver;
-        if (isAssignableTo(context, Tuple2(receiver.type, CandyType.bool))) {
-          return [
-            ...receiver.accept(this),
-            _save(node, _refer(receiver.id).negate()),
-          ];
-        }
-      } else if (parentModuleId == CandyType.comparable.virtualModuleId) {
-        final relevantMethods = [
-          'lessThan',
-          'lessThanOrEqual',
-          'greaterThan',
-          'greaterThanOrEqual',
-        ];
-        if (relevantMethods.contains(methodName)) {
-          final left = identifier.receiver;
-          final right = node.valueArguments['other'];
-
-          final isOnString = left.type == CandyType.string;
-          final actualLeft = isOnString
-              ? _refer(left.id)
-                  .property('compareTo')
-                  .call([_refer(right.id)], {}, [])
-              : _refer(left.id);
-          final actualRight =
-              isOnString ? dart.literalNum(0) : _refer(right.id);
-
-          return [
-            ...left.accept(this),
-            ...right.accept(this),
-            if (methodName == 'lessThan')
-              _save(node, actualLeft.lessThan(actualRight))
-            else if (methodName == 'lessThanOrEqual')
-              _save(node, actualLeft.lessOrEqualTo(actualRight))
-            else if (methodName == 'greaterThan')
-              _save(node, actualLeft.greaterThan(actualRight))
-            else
-              _save(node, actualLeft.greaterOrEqualTo(actualRight)),
-          ];
-        }
-      } else if (parentModuleId == CandyType.equals.virtualModuleId) {
-        assert(methodName == 'equals' || methodName == 'notEquals');
-        final left = identifier.receiver;
-        final right = node.valueArguments['other'];
-        return [
-          ...left.accept(this),
-          ...right.accept(this),
-          if (methodName == 'equals')
-            _save(node, _refer(left.id).equalTo(_refer(right.id)))
-          else
-            _save(node, _refer(left.id).notEqualTo(_refer(right.id))),
-        ];
-      } else if (parentModuleId == CandyType.string.virtualModuleId &&
-          ['length', 'characters'].contains(methodName)) {
-        return [
-          ...identifier.receiver.accept(this),
-          _save(node, _refer(identifier.receiver.id).property(methodName)),
-        ];
-      }
     }
 
     final surroundingDeclarationName = declarationId.simplePath.last.nameOrNull;
@@ -484,25 +338,36 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       ...node.target.accept(this),
       for (final argument in node.valueArguments.values)
         ...argument.accept(this),
-      _save(
-        node,
-        _refer(node.target.id).call(
-          [
-            if (surroundingDeclarationName == 'bucketByKey' &&
-                node.id.value == 5)
-              _refer(node.valueArguments.values.single.id)
-                  .asA(dart.refer('dynamic', dartCoreUrl))
-            else if (surroundingDeclarationName == 'set' && node.id.value == 17)
-              _refer(node.valueArguments.values.single.id)
-                  .asA(dart.refer('dynamic', dartCoreUrl))
-            else
-              for (final entry in node.valueArguments.entries)
-                _refer(entry.value.id),
-          ],
-          {},
-          node.typeArguments.map((it) => compileType(context, it)).toList(),
+      if (surroundingDeclarationName == 'entryForKey' && node.id.value == 10)
+        _save(
+          node,
+          _refer(node.target.id)
+              .call(
+                node.valueArguments.entries.map((it) => _refer(it.value.id)),
+              )
+              .asA(compileType(context, CandyType.bool)),
+        )
+      else
+        _save(
+          node,
+          _refer(node.target.id).call(
+            [
+              if (surroundingDeclarationName == 'entryForKey' &&
+                  node.id.value == 10)
+                _refer(node.valueArguments.values.single.id)
+                    .asA(dart.refer('dynamic', dartCoreUrl))
+              else
+                // if (surroundingDeclarationName == 'set' && node.id.value == 17)
+                //   _refer(node.valueArguments.values.single.id)
+                //       .asA(dart.refer('dynamic', dartCoreUrl))
+                // else
+                for (final entry in node.valueArguments.entries)
+                  _refer(entry.value.id),
+            ],
+            {},
+            node.typeArguments.map((it) => compileType(context, it)).toList(),
+          ),
         ),
-      ),
     ];
   }
 
@@ -567,7 +432,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       dart.literalNull
           .assignVar(_name(node.id), compileType(context, node.type))
           .statement,
-      dart.Code('if (${_name(node.condition.id)}) {'),
+      dart.Code('if (${_name(node.condition.id)}.value) {'),
       ...visitBody(node.thenBody),
       dart.Code('} else {'),
       ...visitBody(node.elseBody),
@@ -592,7 +457,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             .statement,
         dart.Code('${_label(node.id)}:\nwhile (true) {'),
         ...node.condition.accept(this),
-        dart.Code('if (!${_name(node.condition.id)}) break;'),
+        dart.Code('if (!${_name(node.condition.id)}.value) break;'),
         for (final expression in node.body) ...expression.accept(this),
         dart.Code('}'),
       ];
@@ -701,15 +566,15 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   @override
   List<dart.Code> visitAsExpression(AsExpression node) {
     final instance = _refer(node.instance.id);
-    final check = _compileAs(instance, node.typeToCheck);
+    final type = _compileAsType(node.typeToCheck);
     return [
       ...node.instance.accept(this),
-      _save(node, check),
+      _save(node, instance.asA(type)),
     ];
   }
 
-  dart.Expression _compileAs(dart.Expression instance, CandyType type) {
-    dart.Expression compileSimple() => instance.asA(compileType(context, type));
+  dart.Expression _compileAsType(CandyType type) {
+    dart.Expression compileSimple() => compileType(context, type);
 
     return type.map(
       user: (_) => compileSimple(),
@@ -718,8 +583,8 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
       ),
       tuple: (_) => compileSimple(),
       function: (_) => compileSimple(),
-      union: (type) => instance.asA(dart.refer('dynamic', dartCoreUrl)),
-      intersection: (type) => instance.asA(dart.refer('dynamic', dartCoreUrl)),
+      union: (type) => dart.refer('dynamic', dartCoreUrl),
+      intersection: (type) => dart.refer('dynamic', dartCoreUrl),
       parameter: (_) => compileSimple(),
       meta: (_) => compileSimple(),
       reflection: (_) => compileSimple(),
@@ -732,7 +597,11 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     final check = _compileIs(instance, node.typeToCheck);
     return [
       ...node.instance.accept(this),
-      _save(node, node.isNegated ? check.parenthesized.negate() : check),
+      _save(
+        node,
+        (node.isNegated ? check.parenthesized.negate() : check)
+            .wrapInCandyBool(context),
+      ),
     ];
   }
 

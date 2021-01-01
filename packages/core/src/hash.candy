@@ -4,7 +4,13 @@ use ..numbers
 trait Hash {
   /// Implemented by types that can be hashed.
 
-  fun hash<Result>(hasher: Hasher<Result>): Result
+  fun hash<Result>(hasher: Hasher<Result>)
+
+  fun hashCode_(): Int {
+    let hasher = Hasher.default_()
+    hash<Int>(hasher)
+    hasher.finish()
+  }
 }
 
 trait Hasher<Result> {

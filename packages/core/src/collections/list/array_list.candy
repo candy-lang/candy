@@ -48,6 +48,15 @@ public class ArrayList<Item> {
     list.append(fifth)
     list
   }
+  public static fun fromArray<Item>(array: Array<Item>): ArrayList<Item> {
+    let list = empty<Item>()
+    mut let i = 0
+    while i < array.length() {
+      list.append(array.get(i))
+      i = i + 1
+    }
+    list
+  }
 
   static fun create<Item>(capacity: Int /* UInt */): ArrayList<Item> {
     /// Creates a new, empty `ArrayList` with the given capacity.
@@ -62,7 +71,7 @@ public class ArrayList<Item> {
   mut let length_: Int /* UInt */
 
   // TODO(marcelgarus): Getterize!
-  fun capacity(): Int /* UInt */ { items.length }
+  fun capacity(): Int /* UInt */ { items.length() }
 
   fun grow() {
     /// Increases the capacity.
