@@ -1,0 +1,30 @@
+use ..context
+
+class Query<T> {
+  /// A query that can be run and produces a `T`.
+
+  let name: String
+  /// A unique query name.
+  ///
+  /// The `name` usually equals the name of the method or function that runs the query, possibly
+  /// with a package prefix. For example, you might have a `"math.computeSign"` query that computes
+  /// the sign of an `Int`.
+
+  let input: Equals & Hash
+  /// The input to the query.
+  ///
+  /// Multiple inputs can be represented as `Tuple`s or `List`s.
+
+  let runner: () => T
+  /// A runner that actually runs the query.
+
+  let isPure: Bool
+  /// Indicates whether the runner is deterministic with regard to the `input`.
+}
+
+public fun query<T>(context: QueryContext, name: String, input: Equals & Hash, runner: () => T): T {
+  /// Creates and runs a pure query.
+
+  let query = Query<T>(name, input, runner, true)
+  context.run<T>(query)
+}

@@ -21,7 +21,7 @@ trait Comparable: Equals {
   //   & BinaryLessThanOrEqual<Other, Bool>
   //   & BinaryGreaterThan<Other, Bool>
   //   & BinaryGreaterThanOrEqual<Other, Bool> {
-  fun compareTo(other: This): Less | Equal | Greater | Int
+  fun compareTo(other: This): Less | Equal | Greater
 
   fun lessThan(other: This): Bool { compareTo(other) is Less }
   fun lessThanOrEqual(other: This): Bool { compareTo(other) is Less | Equal }

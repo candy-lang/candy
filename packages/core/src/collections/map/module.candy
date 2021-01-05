@@ -5,10 +5,16 @@ use ...numbers
 use ...operators
 use ...todo
 use ..iterable
+use .bucket_map
+use .linked_hash_map
 
 // TODO(marcelgarus): Create type alias `MapKey` for `Equals & Hash`.
 
 public trait Map<Key: Equals & Hash, Value> {
+  static fun empty<Key: Equals & Hash, Value>(): Map<Key, Value> {
+    MutableMap.empty<Key, Value>()
+  }
+
   fun length(): Int
   fun isEmpty(): Bool { length() == 0 }
   fun isNotEmpty(): Bool { !isEmpty() }
@@ -24,6 +30,10 @@ public trait Map<Key: Equals & Hash, Value> {
 // TODO(marcelgarus): impl Map<Key, Value>: GetOperator<Key, Maybe<Value>>
 
 public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
+  static fun empty<Key: Equals & Hash, Value>(): MutableMap<Key, Value> {
+    BucketMap.empty<Key, Value>()
+  }
+
   fun set(key: Key, value: Value)
 
   fun putIfAbsent(key: Key, ifAbsent: () => Value): Value {

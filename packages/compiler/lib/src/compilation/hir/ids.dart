@@ -152,8 +152,6 @@ abstract class ModuleId implements _$ModuleId {
   static const coreIo = ModuleId(PackageId.core, ['io']);
   static const coreMaybe = ModuleId(PackageId.core, ['maybe']);
   static const coreNumbers = ModuleId(PackageId.core, ['numbers']);
-  static const coreNumbersFloat =
-      ModuleId(PackageId.core, ['numbers', 'float']);
   static const coreNumbersInt = ModuleId(PackageId.core, ['numbers', 'int']);
   static const coreOperators = ModuleId(PackageId.core, ['operators']);
   static const coreOperatorsArithmetic =
