@@ -1,29 +1,25 @@
 use ..nodes
 
 trait ToCode {
-  fun toCode(indention: Int): String
+  fun toCode(): String
 }
 
 impl File: ToCode {
-  fun toCode(indention: Int): String {
-    mut let s = ""
-    for part in parts {
-      s = "{s}{(part as ToCode).toCode(indention)}"
-    }
-    s
+  fun toCode(): String {
+    (parts as Iterable<Directive | Declaration>)
+      .map<String>({ (it as ToCode).toCode() })
+      .join("\n")
   }
 }
 
 impl Annotation: ToCode {
-  fun toCode(indention: Int): String {
-    "@{(expression as ToCode).toCode(indention)}"
-  }
+  fun toCode(): String { "@{(expression as ToCode).toCode()}" }
 }
 
 impl Directive: ToCode
 
 impl Import: ToCode {
-  fun toCode(indention: Int): String {
+  fun toCode(): String {
     mut let s = "import '{path}'"
     if alias is Some {
       s = "{s} as {alias.unwrap()}"
@@ -37,15 +33,11 @@ impl Import: ToCode {
 }
 
 impl Part: ToCode {
-  fun toCode(indention: Int): String {
-    "part '{path}';"
-  }
+  fun toCode(): String { "part '{path}';" }
 }
 
 impl PartOf: ToCode {
-  fun toCode(indention: Int): String {
-    "part of '{path}';"
-  }
+  fun toCode(): String { "part of '{path}';" }
 }
 
 let a = 3
@@ -59,13 +51,13 @@ impl Declaration: ToCode
 
 impl Mutability: ToCode
 impl Var: ToCode {
-  fun toCode(indention: Int): String { "var" }
+  fun toCode(): String { "var" }
 }
 impl Final: ToCode {
-  fun toCode(indention: Int): String { "final" }
+  fun toCode(): String { "final" }
 }
 impl Const: ToCode {
-  fun toCode(indention: Int): String { "const" }
+  fun toCode(): String { "const" }
 }
 
 // TOOD: Getter
@@ -73,19 +65,19 @@ impl Const: ToCode {
 
 impl Body: ToCode
 impl InlineBody: ToCode {
-  fun toCode(indention: Int): String {
+  fun toCode(): String {
     "=> {expression}"
   }
 }
 impl BlockBody: ToCode {
-  fun toCode(indention: Int): String {
+  fun toCode(): String {
     "🦄{(statements as Iterable).join("\n")}🦄"
   }
 }
 
 impl DartType: ToCode
 impl UserType: ToCode {
-  fun toCode(indention: Int): String {
+  fun toCode(): String {
     mut let s = name
     if prefix is Some {
       s = "{prefix.unwrap()}.{s}"
@@ -97,7 +89,7 @@ impl UserType: ToCode {
   }
 }
 impl FunctionType: ToCode {
-  fun toCode(indention: Int): String {
+  fun toCode(): String {
     mut let s = "Function"
     // if returns is Some {
     //   s = "{returns} {s}"
@@ -118,7 +110,7 @@ impl FunctionType: ToCode {
 
 impl Expression: ToCode
 impl Identifier: ToCode {
-  fun toCode(indention: Int): String {
+  fun toCode(): String {
     mut let s = name
     if prefix is Some {
       print("f")
@@ -128,13 +120,13 @@ impl Identifier: ToCode {
   }
 }
 impl Literal: ToCode {
-  fun toCode(indention: Int): String {
+  fun toCode(): String {
     "{this}"
   }
 }
 impl Call: ToCode {
-  fun toCode(indention: Int): String {
-    mut let s = (target as ToCode).toCode(indention)
+  fun toCode(): String {
+    mut let s = (target as ToCode).toCode()
     if (typeArguments as Iterable).isNotEmpty() {
       s = "{s}<{(typeArguments as Iterable).join(", ")}>"
     }
@@ -150,16 +142,16 @@ impl Call: ToCode {
   }
 }
 impl Navigation: ToCode {
-  fun toCode(indention: Int): String { "{target}.{property}" }
+  fun toCode(): String { "{target}.{property}" }
 }
 impl BinaryOperator: ToCode {
-  fun toCode(indention: Int): String { "{left} {operator} {right}" }
+  fun toCode(): String { "{left} {operator} {right}" }
 }
 impl PrefixOperator: ToCode {
-  fun toCode(indention: Int): String { "{operator}{target}" }
+  fun toCode(): String { "{operator}{target}" }
 }
 impl Assignment: ToCode {
-  fun toCode(indention: Int): String {
+  fun toCode(): String {
     "{left} = {right}"
   }
 }
@@ -167,12 +159,16 @@ impl Assignment: ToCode {
 
 impl Statement: ToCode
 impl ExpressionStatement: ToCode {
-  fun toCode(indention: Int): String { "{expression};" }
+  fun toCode(): String { "{expression};" }
 }
 impl If: ToCode {
-  fun toCode(indention: Int): String {
-    let thenCode = (then as Iterable).map<String>({ "{it}🦄" }).join("")
-    let elseCode = (else as Iterable).map<String>({ "{it}🦄" }).join("")
+  fun toCode(): String {
+    let thenCode = (then as Iterable<Statement>)
+      .map<String>({ it: Statement => "{it}🦄" })
+      .join("")
+    let elseCode = (else_ as Iterable<Statement>)
+      .map<String>({ it: Statement => "{it}🦄" })
+      .join("")
     "if ({condition}) 🦄{thenCode}🦄 else 🦄{elseCode}🦄"
   }
 }
