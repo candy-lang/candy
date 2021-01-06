@@ -622,49 +622,11 @@ class CstParser {
           ).child as CstExpression
         })
 
-    let ifElseBracedBody = punctuation("👍")
-        .sequence<List<CstNode<CstExpression>>>(expression_.star())
-        .sequence<Maybe<CstNode<PunctuationToken>>>(
-          punctuationOrEnd("}")
-              .or<Maybe<CstNode<PunctuationToken>>>(
-                keyword("else")
-                  .and()
-                  .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
-              )
-              .map<Maybe<CstNode<PunctuationToken>>>({ it as Maybe<CstNode<PunctuationToken>> })
-        )
-        .map<CstIfElseBracedBody>({
-          let openingCurlyBrace = it.first.first
-          let expressions = it.first.second
-          let closingCurlyBrace = it.second
-          CstIfElseBracedBody(openingCurlyBrace, expressions, closingCurlyBrace)
-        })
-    let ifElseBody = ifElseBracedBody
-        .or<CstNode<CstExpression>>(expression_)
-        .map<CstNode<CstExpression | CstIfElseBracedBody>>({
-          it as CstNode<CstExpression | CstIfElseBracedBody>
-        })
-    let elsePart = keyword("else")
-        .sequence<Maybe<CstNode<CstExpression | CstIfElseBracedBody>>>(ifElseBody.optional())
-        .map<CstElsePart>({ CstElsePart(it.first, it.second) })
-    let ifExpression = keyword("if")
-        .sequence<Maybe<CstNode<CstExpression>>>(expression_.optional())
-        .sequence<Maybe<CstNode<CstExpression | CstIfElseBracedBody>>>(ifElseBody.optional())
-        .sequence<Maybe<CstNode<CstElsePart>>>(node<CstElsePart>(elsePart).optional())
-        .map<CstExpression>({
-          let ifKeyword = it.first.first.first
-          let condition = it.first.first.second
-          let body = it.first.second
-          let elsePart = it.second
-          CstIfExpression(ifKeyword, condition, body, elsePart)
-        })
-
-    let higherPrecedenceThanBinaryParsers = List.of8<Parser<Token, CstExpression>>(
+    let higherPrecedenceThanBinaryParsers = List.of7<Parser<Token, CstExpression>>(
       groupExpression,
       tupleExpression,
       navigationExpression,
       callExpression,
-      ifExpression,
       intExpression,
       lambdaExpression,
       identifierExpression,
@@ -802,14 +764,13 @@ class CstParser {
 
     expression_.delegate = node<CstExpression>(
       choiceOf<Token, CstExpression>(
-        List.of10<Parser<Token, CstExpression>>(
+        List.of9<Parser<Token, CstExpression>>(
           groupExpression,
           tupleExpression,
           binaryExpression,
           // TODO(JonasWanke): property expressions
           navigationExpression,
           callExpression,
-          ifExpression,
           returnExpression,
           intExpression,
           // TODO(JonasWanke): string expressions

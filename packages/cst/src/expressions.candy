@@ -115,24 +115,6 @@ public data class CstValueArgument {
 }
 
 
-public data class CstIfExpression {
-  public let ifKeyword: CstNode<KeywordToken>
-  public let condition: Maybe<CstNode<CstExpression>>
-  public let body: Maybe<CstNode<CstExpression | CstIfElseBracedBody>>
-  public let elsePart: Maybe<CstNode<CstElsePart>>
-}
-impl CstIfExpression: CstExpression
-
-public data class CstElsePart {
-  public let elseKeyword: CstNode<KeywordToken>
-  public let body: Maybe<CstNode<CstExpression | CstIfElseBracedBody>>
-}
-public data class CstIfElseBracedBody {
-  public let openingCurlyBrace: CstNode<PunctuationToken>
-  public let expressions: List<CstNode<CstExpression>>
-  public let closingCurlyBrace: Maybe<CstNode<PunctuationToken>>
-}
-
 public data class CstReturnExpression {
   public let returnKeyword: CstNode<KeywordToken>
   public let value: Maybe<CstNode<CstExpression>>

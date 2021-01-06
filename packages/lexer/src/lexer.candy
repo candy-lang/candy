@@ -85,8 +85,6 @@ class Lexer {
         || lexeme.second == "var"
         || lexeme.second == "get"
         || lexeme.second == "set"
-        || lexeme.second == "if"
-        || lexeme.second == "else"
         || lexeme.second == "return" {
       Some<KeywordToken | IdentifierToken>(KeywordToken(lexeme.first, lexeme.second))
     } else {

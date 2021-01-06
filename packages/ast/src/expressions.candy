@@ -113,15 +113,6 @@ public data class TupleExpression {
 impl TupleExpression: Expression
 
 
-public data class IfExpression {
-  public let id: NodeId
-  public let condition: Maybe<Expression>
-  public let thenBody: List<Expression>
-  public let elseBody: List<Expression>
-}
-impl IfExpression: Expression
-
-
 public data class ReturnExpression {
   public let id: NodeId
   public let value: Maybe<Expression>
