@@ -34,9 +34,9 @@ public data class Impl {
   public let id: NodeId
   public let modifiers: List<String>
   public let typeParameters: List<TypeParameter>
-  public let type: Maybe<CandyType>
+  public let type: CandyType
   public let traits: List<CandyType>
-  public let innerDeclarations: List<Module | Trait | Function | Property>
+  public let innerDeclarations: List<Function | Property>
 }
 impl Impl: Declaration
 
@@ -45,7 +45,7 @@ public data class Class {
   public let id: NodeId
   public let candyDoc: Maybe<CandyDoc>
   public let modifiers: List<String>
-  public let name: Maybe<String>
+  public let name: String
   public let typeParameters: List<TypeParameter>
   public let innerDeclarations: List<Trait | Class | Function | Property>
 }
@@ -56,7 +56,7 @@ public data class Function {
   public let id: NodeId
   public let candyDoc: Maybe<CandyDoc>
   public let modifiers: List<String>
-  public let name: Maybe<String>
+  public let name: String
   public let typeParameters: List<TypeParameter>
   public let valueParameters: List<ValueParameter>
   public let returnType: Maybe<CandyType>

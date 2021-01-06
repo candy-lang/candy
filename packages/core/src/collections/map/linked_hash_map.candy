@@ -7,8 +7,6 @@ use ...iterable
 use ...list
 use ...map
 
-fun hashByKey(key: Hash): Int { key.hash<Int>(Hasher.default_()) }
-
 class MapEntry<Key, Value> {
   let key: Key
   let hash: Int
@@ -18,10 +16,14 @@ class MapEntry<Key, Value> {
 class LinkedHashMap<Key: Equals & Hash, Value> {
   /// An inefficient "mini-map" (it's typically pretty small).
 
+  static fun empty<Key: Equals & Hash, Value>(): LinkedHashMap<Key, Value> {
+    LinkedHashMap<Key, Value>(MutableList.empty<MapEntry<Key, Value>>())
+  }
+  
   let entries_: MutableList<MapEntry<Key, Value>>
 
   fun entryForKey(key: Key): Maybe<MapEntry<Key, Value>> {
-    let entries: Iterable<MapEntry<Key, Value>> = entries_
+    let entries: Iterable<MapEntry<Key, Value>> = entries_ 
     entries.where({ it.key == key }).single()
   }
 }
@@ -38,7 +40,7 @@ impl<Key: Equals & Hash, Value> LinkedHashMap<Key, Value>: MutableMap<Key, Value
   fun set(key: Key, value: Value) {
     let entry = entryForKey(key)
     if entry is None<MapEntry<Key, Value>> {
-      entries_.append(MapEntry<Key, Value>(key, hashByKey(key), value))
+      entries_.append(MapEntry<Key, Value>(key, key.hashCode_(), value))
     } else {
       entry.unwrap().value = value
     }

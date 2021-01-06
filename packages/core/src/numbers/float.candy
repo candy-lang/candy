@@ -1,8 +1,0 @@
-use ...operators
-use ...numbers
-
-public builtin class Float
-builtin impl Float: Number
-builtin impl Float: Equals & Comparable
-builtin impl Float: Add & Subtract & Negate & Multiply & Divide & DivideTruncating & Modulo
-// builtin impl Float: Number

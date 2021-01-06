@@ -2762,12 +2762,6 @@ extension on Context {
         'multiply',
         returnType: hir.CandyType.this_(),
       );
-    } else if (operatorType == ast.OperatorTokenType.slash) {
-      return handle(
-        hir.CandyType.divide,
-        'divide',
-        returnType: hir.CandyType.float,
-      );
     } else if (operatorType == ast.OperatorTokenType.tildeSlash) {
       return handle(
         hir.CandyType.divideTruncating,
