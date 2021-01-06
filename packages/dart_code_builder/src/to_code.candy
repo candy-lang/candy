@@ -27,8 +27,10 @@ impl Import: ToCode {
     if (show as Iterable).isNotEmpty() {
       s = "{s} show {(show as Iterable).join(", ")}"
     }
-    // TODO(marcelgarus): Use hide
-    s
+    if (hide as Iterable).isNotEmpty() {
+      s = "{s} hide {(hide as Iterable).join(", ")}"
+    }
+    "{s};"
   }
 }
 
