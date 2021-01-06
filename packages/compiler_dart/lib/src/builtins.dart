@@ -99,7 +99,8 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
   @override
   List<dart.Spec> compileAssert() {
     return [
-      dart.Method.returnsVoid((b) => b
+      dart.Method((b) => b
+        ..returns = compileType(context, CandyType.unit)
         ..name = 'assert_'
         ..requiredParameters.add(dart.Parameter((b) => b
           ..name = 'condition'
@@ -108,15 +109,20 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
           ..name = 'message'
           ..type = compileType(context, CandyType.string)))
         ..body = dart.Block(
-          (b) => b.addExpression(dart.InvokeExpression.newOf(
-            dart.refer('assert'),
-            [
-              dart.refer('condition').property('value'),
-              dart.refer('message').property('value'),
-            ],
-            {},
-            [],
-          )),
+          (b) => b
+            ..addExpression(dart.InvokeExpression.newOf(
+              dart.refer('assert'),
+              [
+                dart.refer('condition').property('value'),
+                dart.refer('message').property('value'),
+              ],
+              {},
+              [],
+            ))
+            ..addExpression(compileTypeName(
+              context,
+              moduleIdToDeclarationId(context, CandyType.unit.virtualModuleId),
+            ).call([], {}, []).returned),
         )),
     ];
   }
@@ -280,8 +286,30 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
 
   @override
   List<dart.Spec> compileUnit() {
-    // `Unit` corresponds to `void`, hence nothing to do.
-    return [];
+    final otherUnit = dart.Parameter((b) => b
+      ..name = 'other'
+      ..type = dart.refer('dynamic', dartCoreUrl));
+    return [
+      dart.Class((b) => b
+        ..annotations.add(dart.refer('sealed', packageMetaUrl))
+        ..name = 'Unit'
+        ..constructors.add(dart.Constructor((b) => b..constant = true))
+        ..methods.addAll([
+          dart.Method((b) => b
+            ..name = 'equals'
+            ..returns = compileType(context, CandyType.bool)
+            ..requiredParameters.add(otherUnit)
+            ..body = dart
+                .refer('other')
+                .isA(compileType(context, CandyType.unit))
+                .wrapInCandyBool(context)
+                .code),
+          dart.Method((b) => b
+            ..name = 'toString'
+            ..returns = dart.refer('String', dartCoreUrl)
+            ..body = dart.literalString('"unit"').code)
+        ])),
+    ];
   }
 
   @override
@@ -540,7 +568,25 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
           dart.Method((b) => b
             ..name = 'toString'
             ..returns = dart.refer('String', dartCoreUrl)
-            ..body = dart.refer('value').property('toString').call([]).code)
+            ..body = dart.refer('value').property('toString').call([]).code),
+          dart.Method((b) => b
+            ..static = true
+            ..returns = compileType(context, CandyType.int)
+            ..name = 'parse'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..type = compileType(context, CandyType.string)
+              ..name = 'value'))
+            ..body = compileType(context, CandyType.int).call(
+              [
+                dart.refer('int', dartCoreUrl).property('parse').call(
+                  [dart.refer('value').property('value')],
+                  {},
+                  [],
+                ),
+              ],
+              {},
+              [],
+            ).code),
         ])
         ..methods.addAll(methodOverrides)),
     ];
@@ -687,7 +733,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
           dart.Method((b) => b
             ..name = 'toString'
             ..returns = dart.refer('String', dartCoreUrl)
-            ..body = dart.refer('value').property('toString').call([]).code)
+            ..body = dart.literalString('"\${value.toString()}').code)
         ])
         ..methods.addAll(methodOverrides)),
     ];
@@ -739,18 +785,24 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
   @override
   List<dart.Spec> compilePrint() {
     return [
-      dart.Method.returnsVoid((b) => b
+      dart.Method((b) => b
+        ..returns = compileType(context, CandyType.unit)
         ..name = 'print'
         ..requiredParameters.add(dart.Parameter((b) => b
           ..name = 'object'
           ..type = dart.refer('Object', dartCoreUrl)))
         ..body = dart.Block(
-          (b) => b.addExpression(dart.InvokeExpression.newOf(
-            dart.refer('print', dartCoreUrl),
-            [dart.refer('object')],
-            {},
-            [],
-          )),
+          (b) => b
+            ..addExpression(dart.InvokeExpression.newOf(
+              dart.refer('print', dartCoreUrl),
+              [dart.refer('object')],
+              {},
+              [],
+            ))
+            ..addExpression(compileTypeName(
+              context,
+              moduleIdToDeclarationId(context, CandyType.unit.virtualModuleId),
+            ).call([], {}, []).returned),
         )),
     ];
   }

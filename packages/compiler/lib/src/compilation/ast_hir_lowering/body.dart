@@ -1498,8 +1498,8 @@ extension on Context {
 
     final type = expressionType.valueOrNull ??
         _unionOrUnit({
-          if (thenBody.isNotEmpty) thenBody.last.type,
-          if (elseBody.isNotEmpty) elseBody.last.type,
+          thenBody.lastOrNull?.type ?? hir.CandyType.unit,
+          elseBody.lastOrNull?.type ?? hir.CandyType.unit,
         }.toList());
 
     return Ok([
