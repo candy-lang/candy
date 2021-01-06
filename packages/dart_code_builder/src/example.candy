@@ -1,0 +1,147 @@
+use ..nodes
+
+fun main() {
+  let list = MutableList.empty<Directive | Declaration>()
+  list.append(Import(
+    "package:foo/foo.dart",
+    alias = Some<String>("foo"),
+    show = List.empty<String>(),
+    hide = List.of1<String>("bar")
+  ))
+  list.append(Import(
+    "dart:blub",
+    alias = None<String>(),
+    show = List.of1<String>("blubber"),
+    hide = List.empty<String>(),
+  ))
+  list.append(Part("test.dart"))
+  list.append(PartOf("meow.dart"))
+  list.append(Function(
+    "main",
+    annotations = List.of1<Annotation>(
+      Annotation(
+        (UserType(
+          "Cached",
+          parameters = List.empty<DartType>(),
+          prefix = None<String>(),
+        ) as Expression).call(
+          positionalArguments = List.empty<Expression>(),
+          namedArguments = Map.empty<String, Expression>(),
+          typeArguments = List.empty<DartType>(),
+        )
+      )
+    ),
+    returns = Some<DartType>(UserType(
+      "Foo",
+      parameters = List.empty<DartType>(),
+      prefix = Some<String>("foo"),
+    )),
+    requiredParameters = List.of1<Parameter>(
+      Parameter(
+        "args",
+        type = Some<DartType>(UserType(
+          "List",
+          parameters = List.of1<DartType>(UserType(
+            "String",
+            parameters = List.empty<DartType>(),
+            prefix = None<String>(),
+          )),
+          prefix = None<String>(),
+        )),
+        defaultValue = None<Expression>(),
+      ),
+    ),
+    positionalParameters = List.of1<Parameter>(
+      Parameter(
+        "number",
+        type = Some<DartType>(UserType("int", List.empty<DartType>(), None<String>())),
+        default = Some<Expression>(Literal(123)),
+      ),
+    ),
+    namedParameters = List.empty<Parameter>(),
+    body = None<Body>(),
+  ))
+  list.append(Class(
+    "Foo",
+    annotations = List.of1<Annotation>(Annotation(Identifier("data", prefix = None<String>()))),
+    extends = Some<DartType>(UserType("Bar", List.empty<DartType>(), None<String>())),
+    implements = List.of3<DartType>(
+      UserType("Baz", List.empty<DartType>(), None<String>()),
+      UserType("Wheez", List.empty<DartType>(), None<String>()),
+      UserType("Fnop", List.empty<DartType>(), None<String>()),
+    ),
+    with = List.of2<DartType>(
+      UserType("Whup", List.empty<DartType>(), None<String>()),
+      UserType("Flang", List.empty<DartType>(), None<String>()),
+    ),
+    body = List.of4<Field | Getter | Setter | Function>(
+      // static const numBlubs = 123;
+      Field(
+        "numBlubs",
+        isStatic = true,
+        mutability = Const(),
+        value = Some<Expression>(Literal(123)),
+      ),
+      // bool get isEmpty => this.length == 0;
+      Getter(
+        "isEmpty",
+        type = UserType("bool", List.empty<DartType>(), None<String>()),
+        body = Some<Body>(InlineBody(
+          this_.dot("length").equals(Literal(0))
+        )),
+      ),
+      // set isEmpty(bool value) {
+      //   if (value) {
+      //     length = 0;
+      //   } else {
+      //     add(1);
+      //   }
+      // }
+      Setter(
+        "isEmpty",
+        parameter = Parameter(
+          "value",
+          type = Some<DartType>(UserType("bool", List.empty<DartType>(), None<String>())),
+          defaultValue = None<Expression>(),
+        ),
+        body = Some<Body>(BlockBody(List.of1<Statement>(
+          If(
+            Identifier("value", None<String>()),
+            then = List.of1<Statement>(
+              Assignment(
+                Identifier("left", None<String>()),
+                Literal(0),
+              ),
+            ),
+            else = List.of1<Statement>(
+              Identifier("left", None<String>()).call(
+                List.of1<Expression>(Literal(1)),
+                Map.empty<String, Expression>(),
+                List.empty<DartType>(),
+              ) as Statement,
+            ),
+          ),
+        ))),
+      ),
+      Function(
+        "blub",
+        annotations = List.empty<Annotation>(),
+        returns = Some<DartType>(UserType(
+          "Foo",
+          List.empty<DartType>(),
+          Some<String>("foo"),
+        )),
+        requiredParameters = List.empty<Parameter>(),
+        positionalParameters = List.empty<Parameter>(),
+        namedParameters = List.of1<Parameter>(Parameter(
+          "blub",
+          Some<DartType>(UserType("int", List.empty<DartType>(), prefix = None<String>())),
+          defaultValue = None<Expression>(),
+        )),
+        body = None<Body>(),
+      ),
+    ),
+  ))
+  let code = File(list)
+  print(code)
+}
