@@ -2,6 +2,7 @@ use ...bool
 use ...operators
 use ...maybe
 use ...numbers
+use ...string
 use ...todo
 use ..list
 
@@ -209,6 +210,10 @@ public trait Iterable<Item> {
   // TODO(marcelgarus): reversed
   // TODO(marcelgarus): zip
 
+  fun followedBy(other: Iterable<Item>): Iterable<Item> {
+    FollowedByIterable<Item>(this, other)
+  }
+
   // Conversions.
 
   fun toList(): List<Item> {
@@ -240,6 +245,17 @@ public trait Iterable<Item> {
   // TODO(marcelgarus): for Iterable<Iterable<T>>: flatten
   // TODO(marcelgarus): for Iterable<Number>: average, sum, min, max, minBy, maxBy
   // TODO(marcelgarus): for Iterable<Maybe<T>>: whereSome, unwrapAll
+
+  fun join(separator: String): String {
+    mut let s = ""
+    for item in this {
+      if !(s == "") {
+        s = "{s}{separator}"
+      }
+      s = "{s}{item}"
+    }
+    s
+  }
 }
 
 class MappedIterable<In, Out> {
@@ -288,6 +304,29 @@ impl<Item> WhereIterator<Item>: Iterator<Item> {
         }
       }
     }
+  }
+}
+
+class FollowedByIterable<Item> {
+  let parent: Iterable<Item>
+  let following: Iterable<Item>
+}
+impl<Item> FollowedByIterable<Item>: Iterable<Item> {
+  fun iterator(): Iterator<Item> {
+    FollowedByIterator<Item>(parent.iterator(), following.iterator())
+  }
+}
+class FollowedByIterator<Item> {
+  let parent: Iterator<Item>
+  let following: Iterator<Item>
+}
+impl<Item> FollowedByIterator<Item>: Iterator<Item> {
+  fun next(): Maybe<Item> {
+    let a = parent.next()
+    if a is Some {
+      return a
+    }
+    following.next()
   }
 }
 
