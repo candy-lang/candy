@@ -4,7 +4,7 @@ use ..node
 public trait /* enum */ CstType
 
 
-public data class CstNamedType {
+public class CstNamedType {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let nameParts: List<CstNode<IdentifierToken | PunctuationToken>>
   public let typeArguments: Maybe<CstNode<CstTypeArguments>>
@@ -12,7 +12,7 @@ public data class CstNamedType {
 impl CstNamedType: CstType
 
 
-public data class CstGroupType {
+public class CstGroupType {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let openingParenthesis: CstNode<PunctuationToken>
   public let type: Maybe<CstNode<CstType>>
@@ -21,7 +21,7 @@ public data class CstGroupType {
 impl CstGroupType: CstType
 
 
-public data class CstFunctionType {
+public class CstFunctionType {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let receiverType: Maybe<CstNode<CstType>>
   public let parameterTypes: Maybe<CstNode<CstFunctionTypeParameterTypes>>
@@ -30,14 +30,14 @@ public data class CstFunctionType {
 }
 impl CstFunctionType: CstType
 
-public data class CstFunctionTypeParameterTypes {
+public class CstFunctionTypeParameterTypes {
   public let openingParenthesis: CstNode<PunctuationToken>
   public let parameterTypes: List<CstNode<CstType | PunctuationToken>>
   public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
 }
 
 
-public data class CstTupleType {
+public class CstTupleType {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let openingParenthesis: CstNode<PunctuationToken>
   public let types: List<CstNode<CstType | PunctuationToken>>
@@ -46,14 +46,14 @@ public data class CstTupleType {
 impl CstTupleType: CstType
 
 
-public data class CstIntersectionType {
+public class CstIntersectionType {
   public let leftType: CstNode<CstType>
   public let ampersand: CstNode<PunctuationToken>
   public let rightType: Maybe<CstNode<CstType>>
 }
 impl CstIntersectionType: CstType
 
-public data class CstUnionType {
+public class CstUnionType {
   public let leftType: CstNode<CstType>
   public let bar: CstNode<PunctuationToken>
   public let rightType: Maybe<CstNode<CstType>>
@@ -61,23 +61,23 @@ public data class CstUnionType {
 impl CstUnionType: CstType
 
 
-public data class CstTypeParameters {
+public class CstTypeParameters {
   public let openingAngleBracket: CstNode<PunctuationToken>
   public let typeParameters: List<CstNode<CstTypeParameter | PunctuationToken>>
   public let closingAngleBracket: Maybe<CstNode<PunctuationToken>>
 }
-public data class CstTypeParameter {
+public class CstTypeParameter {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let name: Maybe<CstNode<IdentifierToken>>
   public let upperBound: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>
 }
 
-public data class CstTypeArguments {
+public class CstTypeArguments {
   public let openingAngleBracket: CstNode<PunctuationToken>
   public let typeArguments: List<CstNode<CstTypeArgument | PunctuationToken>>
   public let closingAngleBracket: Maybe<CstNode<PunctuationToken>>
 }
-public data class CstTypeArgument {
+public class CstTypeArgument {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let type: Maybe<CstNode<CstType>>
 }
