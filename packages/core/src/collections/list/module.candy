@@ -47,24 +47,6 @@ public trait List<Item>: Iterable<Item> {
     }
     result
   }
-
-  fun followedBy(other: List<Item>): List<Item> {
-    let resultLength = length() + (other as Iterable<Item>).length()
-    let result = ArrayList.create<Item>(resultLength)
-
-    mut let index = 0
-    while index < length() {
-      (result as MutableList<Item>).append(get(index).unwrap() as Item)
-      index = index + 1
-    }
-
-    mut let index = 0
-    while index < (other as Iterable<Item>).length() {
-      (result as MutableList<Item>).append((other as Iterable<Item>).get(index).unwrap() as Item)
-      index = index + 1
-    }
-    result
-  }
 }
 
 public trait MutableList<Item>: List<Item> {
