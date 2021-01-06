@@ -204,7 +204,7 @@ impl Call: ToCode {
     if (typeArguments as Iterable).isNotEmpty() {
       s = "{s}<{(typeArguments as Iterable).join(", ")}>"
     }
-    let arguments = (positionalArguments as Iterable)
+    let arguments = (positionalArguments as Iterable<Expression>)
       .map<String>({ "{it}, " })
       .followedBy(
         namedArguments
