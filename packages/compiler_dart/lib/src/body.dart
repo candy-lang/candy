@@ -184,11 +184,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             );
           }();
 
-          var typeName = compileTypeName(context, parentId);
-          if (name == 'parse') {
-            typeName = dart.refer('int', dartCoreUrl);
-          }
-          lowered = typeName.property(name);
+          lowered = compileTypeName(context, parentId).property(name);
         } else {
           var name = id.simplePath.last.nameOrNull;
           if (name == 'assert') name = 'assert_';
@@ -252,9 +248,24 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
                 .add(dart.Parameter((b) => b..name = _lambdaThisName(node)));
           }
 
-          final params = parameters.map((p) => dart.Parameter((b) => b
-            ..type = compileType(context, p.type)
-            ..name = p.name));
+          final params = parameters.map((p) => dart.Parameter((b) {
+                final parserSeparatedById = DeclarationId(
+                  ResourceId(
+                    PackageId('petit_parser'),
+                    'src/parsers/module.candy',
+                  ),
+                )
+                    .inner(DeclarationPathData.trait('Parser'))
+                    .inner(DeclarationPathData.function('separatedBy'));
+                final exceptionIds = [
+                  DeclarationLocalId(parserSeparatedById, 20),
+                  DeclarationLocalId(parserSeparatedById, 32),
+                ];
+                if (!exceptionIds.contains(node.id)) {
+                  b.type = compileType(context, p.type);
+                }
+                b.name = p.name;
+              }));
           b.requiredParameters.addAll(params);
 
           final loweredExpressions = expressions.expand((e) => e.accept(this));

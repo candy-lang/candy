@@ -81,6 +81,7 @@ public trait Parser<Item, Output> {
   // TODO(JonasWanke): move the following functions to `repeating/separated_by.candy`
   fun separatedBy<SeparatorOutput>(
       separator: Parser<Item, SeparatorOutput>,
+      minimumItems: Int /* UInt */ = 1,
       allowTrailingSeparator: Bool = false,
   ): Parser<Item, List<Output | SeparatorOutput>> {
     // let initial = map<List<Output | SeparatorOutput>>({
@@ -89,8 +90,8 @@ public trait Parser<Item, Output> {
     mut let parser = sequence<List<(SeparatorOutput, Output)>>(
           separator
               .sequence<Output>(this)
-              .map<List<(SeparatorOutput, Output)>>({ it as List<(SeparatorOutput, Output)> })
               .repeat(minimumItems - 1, None<Int>())
+              .map<List<(SeparatorOutput, Output)>>({ it as List<(SeparatorOutput, Output)> })
         )
         // .map<(Output, List<Output | SeparatorOutput>)>({
         //   let a = it

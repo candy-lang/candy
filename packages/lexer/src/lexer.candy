@@ -223,7 +223,7 @@ class Lexer {
     currentLexeme()
   }
 
-  fun isAtEnd(): Bool { remaining().chars().isEmpty() }
+  fun isAtEnd(): Bool { remaining().characters().isEmpty() }
   fun peek(): Maybe<String> {
     if isAtEnd() { return None<String>() }
     Some<String>(remaining().substring(0, 1))
