@@ -31,7 +31,7 @@ fun main() {
         )
       )
     ),
-    returns = Some<DartType>(UserType(
+    _returns = Some<DartType>(UserType(
       "Foo",
       parameters = List.empty<DartType>(),
       prefix = Some<String>("foo"),
@@ -64,31 +64,24 @@ fun main() {
   list.append(Class(
     "Foo",
     annotations = List.of1<Annotation>(Annotation(Identifier("data", prefix = None<String>()))),
-    extends = Some<DartType>(UserType("Bar", List.empty<DartType>(), None<String>())),
-    implements = List.of3<DartType>(
+    extends_ = Some<DartType>(UserType("Bar", List.empty<DartType>(), None<String>())),
+    implements_ = List.of3<DartType>(
       UserType("Baz", List.empty<DartType>(), None<String>()),
       UserType("Wheez", List.empty<DartType>(), None<String>()),
       UserType("Fnop", List.empty<DartType>(), None<String>()),
     ),
-    with = List.of2<DartType>(
+    with_ = List.of2<DartType>(
       UserType("Whup", List.empty<DartType>(), None<String>()),
       UserType("Flang", List.empty<DartType>(), None<String>()),
     ),
     body = List.of4<Field | Getter | Setter | Function>(
       // static const numBlubs = 123;
-      Field(
-        "numBlubs",
-        isStatic = true,
-        mutability = Const(),
-        value = Some<Expression>(Literal(123)),
-      ),
+      Field("numBlubs", isStatic = true, mutability = Const(), Some<Expression>(Literal(123))),
       // bool get isEmpty => this.length == 0;
       Getter(
         "isEmpty",
         type = UserType("bool", List.empty<DartType>(), None<String>()),
-        body = Some<Body>(InlineBody(
-          this_.dot("length").equals(Literal(0))
-        )),
+        body = Some<Body>(InlineBody(this_.dot("length").equals(Literal(0)))),
       ),
       // set isEmpty(bool value) {
       //   if (value) {
@@ -108,17 +101,17 @@ fun main() {
           If(
             Identifier("value", None<String>()),
             then = List.of1<Statement>(
-              Assignment(
+              ExpressionStatement(Assignment(
                 Identifier("left", None<String>()),
                 Literal(0),
-              ),
+              )),
             ),
-            else = List.of1<Statement>(
-              Identifier("left", None<String>()).call(
+            else_ = List.of1<Statement>(
+              ExpressionStatement(Identifier("left", None<String>()).call(
                 List.of1<Expression>(Literal(1)),
                 Map.empty<String, Expression>(),
                 List.empty<DartType>(),
-              ) as Statement,
+              )),
             ),
           ),
         ))),
@@ -126,10 +119,10 @@ fun main() {
       Function(
         "blub",
         annotations = List.empty<Annotation>(),
-        returns = Some<DartType>(UserType(
-          "Foo",
+        _returns = Some<DartType>(UserType(
+          "Blub",
           List.empty<DartType>(),
-          Some<String>("foo"),
+          None<String>(),
         )),
         requiredParameters = List.empty<Parameter>(),
         positionalParameters = List.empty<Parameter>(),
@@ -142,6 +135,6 @@ fun main() {
       ),
     ),
   ))
-  let code = File(list)
-  print(code)
+  let file = File(list)
+  print(file.toCode())
 }

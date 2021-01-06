@@ -54,9 +54,9 @@ class Class {
   
   let name: String
   let annotations: List<Annotation> = List.empty<Annotation>()
-  let extends: Maybe<DartType> = None<DartType>()
-  let implements: List<DartType> = List.empty<DartType>()
-  let with: List<DartType> = List.empty<DartType>()
+  let extends_: Maybe<DartType> = None<DartType>()
+  let implements_: List<DartType> = List.empty<DartType>()
+  let with_: List<DartType> = List.empty<DartType>()
   let body: List<Field | Getter | Setter | Function> = List.empty<Field | Getter | Setter | Function>()
 }
 impl Class: Declaration {}
@@ -75,7 +75,7 @@ class Function {
 
   let name: String
   let annotations: List<Annotation> = List.empty<Annotation>()
-  let returns: Maybe<DartType> = None<DartType>()
+  let _returns: Maybe<DartType> = None<DartType>()
   let requiredParameters: List<Parameter> = List.empty<Parameter>()
   let positionalParameters: List<Parameter> = List.empty<Parameter>()
   let namedParameters: List<Parameter> = List.empty<Parameter>()
@@ -103,7 +103,6 @@ class Final {}
 impl Final: Mutability
 class Const {}
 impl Const: Mutability
-
 
 class Getter {
   let name: String
@@ -139,6 +138,8 @@ class UserType {
   let prefix: Maybe<String> = None<String>()
 }
 impl UserType: DartType
+impl UserType: Expression
+/// TODO(marcelgarus): Remove once the compiler realizes DartType implements Expression.
 
 class FunctionType {
   let parameters: List<Parameter> = List.empty<Parameter>()
@@ -147,7 +148,8 @@ class FunctionType {
   let returns: Maybe<DartType> = None<DartType>()
 }
 impl FunctionType: DartType
-
+impl FunctionType: Expression
+/// TODO(marcelgarus): Remove once the compiler realizes DartType implements Expression.
 
 // Expressions.
 
@@ -249,7 +251,7 @@ impl ExpressionStatement: Statement
 class If {
   let condition: Expression
   let then: List<Statement>
-  let else: List<Statement> = List.empty<Statement>()
+  let else_: List<Statement> = List.empty<Statement>()
 }
 impl If: Statement
 
