@@ -8,7 +8,6 @@ import 'constants.dart' hide srcDirectoryName;
 import 'declarations/declaration.dart';
 import 'declarations/function.dart';
 import 'type.dart';
-import 'utils.dart';
 
 final compileBuiltin = Query<DeclarationId, List<dart.Spec>>(
   'dart.compileBuiltin',

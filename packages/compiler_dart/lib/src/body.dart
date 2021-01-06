@@ -273,66 +273,6 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
   @override
   List<dart.Code> visitFunctionCallExpression(FunctionCallExpression node) {
-    final target = node.target;
-    if (target is IdentifierExpression &&
-        target.identifier is PropertyIdentifier) {
-      final identifier = target.identifier as PropertyIdentifier;
-      final methodName = identifier.id.simplePath.last.nameOrNull;
-
-      List<dart.Code> simpleBinaryExpression(
-        String name,
-        dart.Expression Function(dart.Expression left, dart.Expression right)
-            binaryBuilder,
-      ) {
-        assert(name == methodName);
-
-        final left = identifier.receiver;
-        final right = node.valueArguments['other'];
-        return [
-          ...left.accept(this),
-          ...right.accept(this),
-          _save(
-            node,
-            binaryBuilder(_refer(left.id), _refer(right.id)),
-          ),
-        ];
-      }
-
-      List<dart.Code> lazyBoolExpression(
-        String name,
-        dart.Expression Function(dart.Expression left, dart.Expression right)
-            binaryBuilder,
-      ) {
-        assert(name == methodName);
-
-        final left = identifier.receiver;
-        final right = node.valueArguments['other'];
-
-        if (isAssignableTo(context, Tuple2(left.type, CandyType.bool))) {
-          final rightCompiled = lambdaOf([
-            ...right.accept(this),
-            _refer(right.id).returned.statement,
-          ]);
-          return [
-            ...left.accept(this),
-            _save(
-              node,
-              binaryBuilder(_refer(left.id), rightCompiled.call([], {}, [])),
-            ),
-          ];
-        } else {
-          return [
-            ...left.accept(this),
-            ...right.accept(this),
-            _save(
-              node,
-              _refer(left.id).property(name).call([_refer(right.id)], {}, []),
-            ),
-          ];
-        }
-      }
-    }
-
     final surroundingDeclarationName = declarationId.simplePath.last.nameOrNull;
     return [
       ...node.target.accept(this),
@@ -688,16 +628,6 @@ extension on dart.Expression {
         code,
         const dart.Code(')'),
       ]));
-  dart.Expression operatorNegate() => dart.CodeExpression(dart.Block.of([
-        const dart.Code('-'),
-        code,
-      ]));
-  dart.Expression operatorDivideTruncating(dart.Expression other) =>
-      dart.CodeExpression(dart.Block.of([
-        code,
-        const dart.Code('~/'),
-        other.code,
-      ]));
 
   /// Assigns the `other` expression. If the type of the `other` expression is
   /// `Unit`, assigns `null`.
@@ -716,39 +646,6 @@ extension on dart.Expression {
         body,
         const dart.Code('}'),
       ]);
-}
-
-extension on dart.Method {
-  dart.Expression get expression => dart.CodeExpression(dart.Block.of([
-        returns.code,
-        dart.Code(name),
-        if (types.isNotEmpty) ...[
-          const dart.Code('<'),
-          for (final type in types) type.code,
-          const dart.Code('>'),
-        ],
-        const dart.Code('('),
-        for (final parameter in requiredParameters) ...[
-          parameter.type.code,
-          dart.Code(parameter.name),
-          const dart.Code(','),
-        ],
-        if (optionalParameters.isNotEmpty) ...[
-          dart.Code(optionalParameters.first.named ? '{' : '['),
-          for (final parameter in optionalParameters) ...[
-            parameter.type.code,
-            dart.Code(parameter.name),
-            const dart.Code(','),
-          ],
-          dart.Code(optionalParameters.first.named ? '}' : ']'),
-        ],
-        const dart.Code(')'),
-        const dart.Code('{'),
-        body,
-        const dart.Code(';'),
-        const dart.Code('}'),
-      ])).expression;
-  dart.Code get code => expression.code;
 }
 
 dart.Expression lambdaOf(List<dart.Code> code) {
