@@ -4,13 +4,13 @@ fun main() {
   let list = MutableList.empty<Directive | Declaration>()
   list.append(Import(
     "package:foo/foo.dart",
-    alias = Some<String>("foo"),
+    prefix = Some<String>("foo"),
     show = List.empty<String>(),
     hide = List.of1<String>("bar"),
   ))
   list.append(Import(
     "dart:blub",
-    alias = None<String>(),
+    prefix = None<String>(),
     show = List.of1<String>("blubber"),
     hide = List.empty<String>(),
   ))

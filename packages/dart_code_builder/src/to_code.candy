@@ -40,8 +40,8 @@ impl Directive: ToCode
 impl Import: ToCode {
   fun toCode(): String {
     mut let s = "import '{path}'"
-    if alias is Some {
-      s = "{s} as {alias.unwrap()}"
+    if prefix is Some {
+      s = "{s} as {prefix.unwrap()}"
     }
     if (show as Iterable).isNotEmpty() {
       s = "{s} show {(show as Iterable).join(", ")}"

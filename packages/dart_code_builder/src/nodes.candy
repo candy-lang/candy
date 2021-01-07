@@ -20,7 +20,7 @@ class Import {
   /// import 'foo.dart' hide secretFoo;
 
   let path: String
-  let alias: Maybe<String> = None<String>()
+  let prefix: Maybe<String> = None<String>()
   let show: List<String> = List.empty<String>()
   let hide: List<String> = List.empty<String>()
 }
