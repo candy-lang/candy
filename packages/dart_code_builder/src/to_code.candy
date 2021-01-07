@@ -93,6 +93,12 @@ impl Function: ToCode {
     if _returns is Some {
       s = "{(_returns.unwrap() as ToCode).toCode()} {s}"
     }
+    if (annotations as Iterable).isNotEmpty() {
+      let annotationsCode = (annotations as Iterable<Annotation>)
+        .map<String>({ (it as ToCode).toCode() })
+        .join("\n")
+      s = "{annotationsCode}\n{s}"
+    }
     let required = (requiredParameters as Iterable<Parameter>)
       .map<String>({ (it as ToCode).toCode() })
       .join(", ")
