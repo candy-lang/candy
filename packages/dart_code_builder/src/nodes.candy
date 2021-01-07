@@ -1,5 +1,6 @@
-class File {
-  let parts: List<Directive | Declaration>
+class CompilationUnit {
+  let directives: List<Directive>
+  let declarations: List<Declaration>
 }
 
 class Annotation {
