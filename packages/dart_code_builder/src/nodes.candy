@@ -249,9 +249,14 @@ class ExpressionStatement {
 impl ExpressionStatement: Statement
 
 class Return {
-  let expression: Expression
+  let expression: Maybe<Expression>
 }
 impl Return: Statement
+
+class Break {
+  let label: Maybe<String>
+}
+impl Break: Statement
 
 class If {
   let condition: Expression
@@ -262,6 +267,7 @@ impl If: Statement
 
 class While {
   let condition: Expression
+  let label: Maybe<String>
   let body: List<Statement> = List.empty<Statement>()
 }
 impl While: Statement
