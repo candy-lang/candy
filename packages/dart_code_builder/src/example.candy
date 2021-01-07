@@ -20,7 +20,7 @@ fun main() {
     "main",
     annotations = List.of1<Annotation>(
       Annotation(
-        (UserType(
+        (NamedType(
           "Cached",
           parameters = List.empty<DartType>(),
           prefix = None<String>(),
@@ -31,7 +31,7 @@ fun main() {
         )
       )
     ),
-    _returns = Some<DartType>(UserType(
+    _returns = Some<DartType>(NamedType(
       "Foo",
       parameters = List.empty<DartType>(),
       prefix = Some<String>("foo"),
@@ -39,10 +39,10 @@ fun main() {
     requiredParameters = List.of1<Parameter>(
       Parameter(
         "args",
-        type = Some<DartType>(UserType(
+        type = Some<DartType>(NamedType(
           "List",
           parameters = List.of1<DartType>(
-            UserType("String", parameters = List.empty<DartType>(), prefix = None<String>())
+            NamedType("String", parameters = List.empty<DartType>(), prefix = None<String>())
           ),
           prefix = None<String>(),
         )),
@@ -52,7 +52,7 @@ fun main() {
     positionalParameters = List.of1<Parameter>(
       Parameter(
         "number",
-        type = Some<DartType>(UserType("int", List.empty<DartType>(), None<String>())),
+        type = Some<DartType>(NamedType("int", List.empty<DartType>(), None<String>())),
         default = Some<Expression>(Literal(123)),
       ),
     ),
@@ -68,15 +68,15 @@ fun main() {
   list.append(Class(
     "Foo",
     annotations = List.of1<Annotation>(Annotation(Identifier("data", prefix = None<String>()))),
-    extends_ = Some<DartType>(UserType("Bar", List.empty<DartType>(), None<String>())),
+    extends_ = Some<DartType>(NamedType("Bar", List.empty<DartType>(), None<String>())),
     implements_ = List.of3<DartType>(
-      UserType("Baz", List.empty<DartType>(), None<String>()),
-      UserType("Wheez", List.empty<DartType>(), None<String>()),
-      UserType("Fnop", List.empty<DartType>(), None<String>()),
+      NamedType("Baz", List.empty<DartType>(), None<String>()),
+      NamedType("Wheez", List.empty<DartType>(), None<String>()),
+      NamedType("Fnop", List.empty<DartType>(), None<String>()),
     ),
     with_ = List.of2<DartType>(
-      UserType("Whup", List.empty<DartType>(), None<String>()),
-      UserType("Flang", List.empty<DartType>(), None<String>()),
+      NamedType("Whup", List.empty<DartType>(), None<String>()),
+      NamedType("Flang", List.empty<DartType>(), None<String>()),
     ),
     body = List.of4<Field | Getter | Setter | Function>(
       // static const numBlubs = 123;
@@ -84,7 +84,7 @@ fun main() {
       // bool get isEmpty => this.length == 0;
       Getter(
         "isEmpty",
-        type = UserType("bool", List.empty<DartType>(), None<String>()),
+        type = NamedType("bool", List.empty<DartType>(), None<String>()),
         body = Some<Body>(InlineBody(this_.dot("length").equals(Literal(0)))),
       ),
       // set isEmpty(bool value) {
@@ -98,7 +98,7 @@ fun main() {
         "isEmpty",
         parameter = Parameter(
           "value",
-          type = Some<DartType>(UserType("bool", List.empty<DartType>(), None<String>())),
+          type = Some<DartType>(NamedType("bool", List.empty<DartType>(), None<String>())),
           defaultValue = None<Expression>(),
         ),
         body = Some<Body>(BlockBody(List.of1<Statement>(
@@ -111,7 +111,7 @@ fun main() {
               ExpressionStatement(Identifier("length", None<String>()).dot("someCall").call(
                 List.of2<Expression>(Literal(1), Literal(2)),
                 Map.empty<String, Expression>(),
-                List.of1<DartType>(UserType("bool", List.empty<DartType>(), None<String>())),
+                List.of1<DartType>(NamedType("bool", List.empty<DartType>(), None<String>())),
               )),
             ),
           ),
@@ -120,12 +120,12 @@ fun main() {
       Function(
         "blub",
         annotations = List.empty<Annotation>(),
-        _returns = Some<DartType>(UserType("Blub", List.empty<DartType>(), None<String>())),
+        _returns = Some<DartType>(NamedType("Blub", List.empty<DartType>(), None<String>())),
         requiredParameters = List.empty<Parameter>(),
         positionalParameters = List.empty<Parameter>(),
         namedParameters = List.of1<Parameter>(Parameter(
           "blub",
-          Some<DartType>(UserType("int", List.empty<DartType>(), prefix = None<String>())),
+          Some<DartType>(NamedType("int", List.empty<DartType>(), prefix = None<String>())),
           defaultValue = None<Expression>(),
         )),
         body = None<Body>(),

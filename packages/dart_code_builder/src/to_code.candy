@@ -213,7 +213,7 @@ impl BlockBody: ToCode {
 }
 
 impl DartType: ToCode
-impl UserType: ToCode {
+impl NamedType: ToCode {
   fun toCode(): String {
     mut let s = name
     if prefix is Some {
