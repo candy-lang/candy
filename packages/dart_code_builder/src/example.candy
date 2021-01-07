@@ -102,15 +102,15 @@ fun main() {
             Identifier("value", None<String>()),
             then = List.of1<Statement>(
               ExpressionStatement(Assignment(
-                Identifier("left", None<String>()),
+                Identifier("length", None<String>()),
                 Literal(0),
               )),
             ),
             else_ = List.of1<Statement>(
-              ExpressionStatement(Identifier("left", None<String>()).call(
-                List.of1<Expression>(Literal(1)),
+              ExpressionStatement(Identifier("length", None<String>()).dot("someCall").call(
+                List.of2<Expression>(Literal(1), Literal(2)),
                 Map.empty<String, Expression>(),
-                List.empty<DartType>(),
+                List.of1<DartType>(UserType("bool", List.empty<DartType>(), None<String>())),
               )),
             ),
           ),
