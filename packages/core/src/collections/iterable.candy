@@ -248,8 +248,12 @@ public trait Iterable<Item> {
 
   fun join(separator: String): String {
     mut let s = ""
+    mut let isFirst = true
+
     for item in this {
-      if !(s == "") {
+      if isFirst {
+        isFirst = false
+      } else {
         s = "{s}{separator}"
       }
       s = "{s}{item}"
