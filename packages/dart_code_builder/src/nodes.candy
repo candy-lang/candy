@@ -248,6 +248,11 @@ class ExpressionStatement {
 }
 impl ExpressionStatement: Statement
 
+class Return {
+  let expression: Expression
+}
+impl Return: Statement
+
 class If {
   let condition: Expression
   let then: List<Statement>

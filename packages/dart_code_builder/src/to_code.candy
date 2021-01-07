@@ -303,6 +303,9 @@ impl Statement: ToCode
 impl ExpressionStatement: ToCode {
   fun toCode(): String { "{(expression as ToCode).toCode()};" }
 }
+impl Return: ToCode {
+  fun toCode(): String { "return {(expression as ToCode).toCode()};" }
+}
 impl If: ToCode {
   fun toCode(): String {
     let thenCode = (then as Iterable<Statement>)
