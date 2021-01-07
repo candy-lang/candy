@@ -120,7 +120,7 @@ impl Function: ToCode {
     }
     s = "{s}({parameters})"
     if body is Some {
-      s = "{s} {body}"
+      s = "{s} {(body.unwrap() as ToCode).toCode()}"
     }
     if body.map<Bool>({ it is InlineBody }).orElse({ true }) {
       s = "{s};"
@@ -304,7 +304,22 @@ impl ExpressionStatement: ToCode {
   fun toCode(): String { "{(expression as ToCode).toCode()};" }
 }
 impl Return: ToCode {
-  fun toCode(): String { "return {(expression as ToCode).toCode()};" }
+  fun toCode(): String {
+    if expression is Some {
+      "return {(expression as ToCode).toCode()};"
+    } else {
+      "return;"
+    }
+  }
+}
+impl Break: ToCode {
+  fun toCode(): String {
+    if label is Some {
+      "break {label.unwrap()};"
+    } else {
+      "break;"
+    }
+  }
 }
 impl If: ToCode {
   fun toCode(): String {
@@ -319,6 +334,13 @@ impl If: ToCode {
 }
 impl While: ToCode {
   fun toCode(): String {
-    "While" // TODO(marcelgarus): Implement.
+    mut let s = "while ({(condition as ToCode).toCode()})"
+    if label is Some {
+      s = "{label.unwrap()}:\n{s}"
+    }
+    let bodyCode = (body as Iterable<Statement>)
+      .map<String>({ (it as ToCode).toCode() })
+      .join("\n")
+    "{s} \👍\n{indent(bodyCode, true)}\n}"
   }
 }
