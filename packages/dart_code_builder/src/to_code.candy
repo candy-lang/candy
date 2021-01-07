@@ -219,8 +219,8 @@ impl NamedType: ToCode {
     if prefix is Some {
       s = "{prefix.unwrap()}.{s}"
     }
-    if (parameters as Iterable).isNotEmpty() {
-      let generics = (parameters as Iterable<DartType>)
+    if (typeArguments as Iterable).isNotEmpty() {
+      let generics = (typeArguments as Iterable<DartType>)
         .map<String>({ (it as ToCode).toCode() })
         .join(", ")
       s = "{s}<{generics}>"

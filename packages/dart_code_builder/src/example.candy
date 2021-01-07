@@ -22,7 +22,7 @@ fun main() {
       Annotation(
         (NamedType(
           "Cached",
-          parameters = List.empty<DartType>(),
+          typeArguments = List.empty<DartType>(),
           prefix = None<String>(),
         ) as Expression).call(
           positionalArguments = List.empty<Expression>(),
@@ -33,7 +33,7 @@ fun main() {
     ),
     _returns = Some<DartType>(NamedType(
       "Foo",
-      parameters = List.empty<DartType>(),
+      typeArguments = List.empty<DartType>(),
       prefix = Some<String>("foo"),
     )),
     requiredParameters = List.of1<Parameter>(
@@ -41,8 +41,8 @@ fun main() {
         "args",
         type = Some<DartType>(NamedType(
           "List",
-          parameters = List.of1<DartType>(
-            NamedType("String", parameters = List.empty<DartType>(), prefix = None<String>())
+          typeArguments = List.of1<DartType>(
+            NamedType("String", typeArguments = List.empty<DartType>(), prefix = None<String>())
           ),
           prefix = None<String>(),
         )),

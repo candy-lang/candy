@@ -135,7 +135,7 @@ trait DartType {}
 
 class NamedType {
   let name: String
-  let parameters: List<DartType> = List.empty<DartType>()
+  let typeArguments: List<DartType> = List.empty<DartType>()
   let prefix: Maybe<String> = None<String>()
 }
 impl NamedType: DartType
