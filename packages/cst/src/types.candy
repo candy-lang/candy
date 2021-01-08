@@ -1,5 +1,5 @@
-use lexer
 use ..node
+use ..tokens
 
 public trait /* enum */ CstType
 

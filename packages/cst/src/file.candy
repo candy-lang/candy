@@ -1,6 +1,6 @@
-use lexer
 use ..declarations
 use ..node
+use ..tokens
 
 public class CstFile {
   public let content: List<CstNode<CstUseLine | CstDeclaration>>

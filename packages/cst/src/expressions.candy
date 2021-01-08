@@ -1,13 +1,13 @@
-use lexer
 use ..declarations
 use ..node
+use ..tokens
 use ..types
 
 public trait /* enum */ CstExpression
 
 
 public class CstIntExpression {
-  public let value: CstNode<LiteralToken<Int>>
+  public let value: CstNode<IntLiteralToken>
 }
 impl CstIntExpression: CstExpression
 
@@ -93,7 +93,8 @@ impl CstProperty: CstExpression
 
 public class CstNavigationExpression {
   public let receiver: CstNode<CstExpression>
-  public let target: CstNode<IdentifierToken>
+  public let dot: CstNode<PunctuationToken>
+  public let target: Maybe<CstNode<IdentifierToken>>
 }
 impl CstNavigationExpression: CstExpression
 

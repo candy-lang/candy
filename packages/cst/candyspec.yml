@@ -1,7 +1,5 @@
 name: cst
 
 dependencies:
-  lexer:
-    path: ../lexer
   petit_parser:
     path: ../petit_parser

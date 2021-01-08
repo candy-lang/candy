@@ -1,18 +1,17 @@
-use lexer
 use petit_parser
 use ..declarations
 use ..expressions
 use ..file
 use ..node
+use ..tokens
 use ..types
 
-public fun parseString(source: String): CstFile { parse(lex(source)) }
-public fun parse(tokens: List<Token>): CstFile {
+public fun parse(source: String): CstFile {
   let parser = CstParser(
-    tokens,
+    source.characters().toList(),
     0,
-    notYetDefined<Token, CstNode<CstType>>("Parser not yet defined."),
-    notYetDefined<Token, CstNode<CstExpression>>("Parser not yet defined."),
+    notYetDefined<String, CstNode<CstType>>("Parser not yet defined."),
+    notYetDefined<String, CstNode<CstExpression>>("Parser not yet defined."),
   )
   parser.initType()
   parser.initExpression()
@@ -20,11 +19,11 @@ public fun parse(tokens: List<Token>): CstFile {
 }
 
 class CstParser {
-  let tokens: List<Token>
+  let source: List<String>
   mut let nextId = 0
 
   fun parse(): CstFile {
-    let result = file().parseInput(tokens)
+    let result = file().parseInput(source)
     if result is Error<Success<CstFile>, Failure> {
       throw "Couldn't parse file: {result}."
     }
@@ -33,19 +32,19 @@ class CstParser {
 
   // file
 
-  fun file(): Parser<Token, CstFile> {
+  fun file(): Parser<String, CstFile> {
     useLine()
         .map<CstNode<CstUseLine | CstDeclaration>>({ it as CstNode<CstUseLine | CstDeclaration> })
         .star()
         .map<CstFile>({ CstFile(it) })
   }
 
-  fun useLine(): Parser<Token, CstNode<CstUseLine>> {
+  fun useLine(): Parser<String, CstNode<CstUseLine>> {
     localRelativeUseLine()
         .or<CstNode<CstGlobalUseLine>>(globalUseLine())
         .map<CstNode<CstUseLine>>({ it as CstNode<CstUseLine> })
   }
-  fun localRelativeUseLine(): Parser<Token, CstNode<CstLocalRelativeUseLine>> {
+  fun localRelativeUseLine(): Parser<String, CstNode<CstLocalRelativeUseLine>> {
     let path = identifier()
         .or<CstNode<PunctuationToken>>(punctuation("."))
         .map<CstNode<IdentifierToken | PunctuationToken>>({ it as CstNode<IdentifierToken | PunctuationToken> })
@@ -63,7 +62,7 @@ class CstParser {
         })
     node<CstLocalRelativeUseLine>(useLine)
   }
-  fun globalUseLine(): Parser<Token, CstNode<CstGlobalUseLine>> {
+  fun globalUseLine(): Parser<String, CstNode<CstGlobalUseLine>> {
     let packagePath = identifier()
         .or<CstNode<PunctuationToken>>(punctuation("."))
         .map<CstNode<IdentifierToken | PunctuationToken>>({ it as CstNode<IdentifierToken | PunctuationToken> })
@@ -82,8 +81,8 @@ class CstParser {
 
   // declarations
 
-  fun declaration(): Parser<Token, CstNode<CstDeclaration>> {
-    let declaration = notYetDefined<Token, CstNode<CstDeclaration>>("Parser not yet defined.")
+  fun declaration(): Parser<String, CstNode<CstDeclaration>> {
+    let declaration = notYetDefined<String, CstNode<CstDeclaration>>("Parser not yet defined.")
     let declarationBeginning = { keywordString: String =>
         modifiers().sequence<CstNode<KeywordToken>>(keyword(keywordString))
     }
@@ -234,14 +233,14 @@ class CstParser {
         })
 
     declaration.delegate = node<CstDeclaration>(
-      choiceOf<Token, CstDeclaration>(
-        List.of6<Parser<Token, CstDeclaration>>(module_, trait_, impl_, class_, function, property),
+      choiceOf<String, CstDeclaration>(
+        List.of6<Parser<String, CstDeclaration>>(module_, trait_, impl_, class_, function, property),
       ),
     )
     declaration
   }
 
-  fun valueParameters(): Parser<Token, CstNode<CstValueParameters>> {
+  fun valueParameters(): Parser<String, CstNode<CstValueParameters>> {
     let valueParameters = punctuation("(")
         .sequence<List<CstNode<CstValueParameter | PunctuationToken>>>(
           commaSeparated<CstValueParameter>(valueParameter())
@@ -250,7 +249,7 @@ class CstParser {
         .map<CstValueParameters>({ CstValueParameters(it.first.first, it.first.second, it.second) })
     node<CstValueParameters>(valueParameters)
   }
-  fun valueParameter(): Parser<Token, CstNode<CstValueParameter>> {
+  fun valueParameter(): Parser<String, CstNode<CstValueParameter>> {
     // TODO(JonasWanke): allow modifiers
     let valueParameter = identifier()
         .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>>(
@@ -270,7 +269,7 @@ class CstParser {
     node<CstValueParameter>(valueParameter)
   }
 
-  fun blockBody(): Parser<Token, CstNode<CstBlockBody>> {
+  fun blockBody(): Parser<String, CstNode<CstBlockBody>> {
     let blockBody = punctuation("👍")
         // TODO(JonasWanke): expressions
         .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd("}"))
@@ -279,13 +278,13 @@ class CstParser {
         })
     node<CstBlockBody>(blockBody)
   }
-  fun expressionBody(): Parser<Token, CstNode<CstExpressionBody>> {
+  fun expressionBody(): Parser<String, CstNode<CstExpressionBody>> {
     let expressionBody = punctuation("->")
         // TODO(JonasWanke): expression
         .map<CstExpressionBody>({ CstExpressionBody(it, None<CstNode<CstExpression>>()) })
     node<CstExpressionBody>(expressionBody)
   }
-  fun delegationBody(): Parser<Token, CstNode<CstDelegationBody>> {
+  fun delegationBody(): Parser<String, CstNode<CstDelegationBody>> {
     let delegationBody = punctuation("=")
         // TODO(JonasWanke): expression
         .map<CstDelegationBody>({ CstDelegationBody(it, None<CstNode<CstExpression>>()) })
@@ -294,7 +293,7 @@ class CstParser {
 
   // types
 
-  let type = notYetDefined<Token, CstNode<CstType>>("Parser not yet defined.")
+  let type = notYetDefined<String, CstNode<CstType>>("Parser not yet defined.")
   fun initType() {
     let closingParenthesisOrOtherEndDetection = punctuationOrEnd(")")
         .or<Maybe<CstNode<PunctuationToken>>>(
@@ -375,15 +374,15 @@ class CstParser {
           CstTupleType(modifiers, openingParenthesis, types, closingParenthesis)
         })
 
-    let intersectionType = notYetDefined<Token, CstType>("Parser not yet defined.")
+    let intersectionType = notYetDefined<String, CstType>("Parser not yet defined.")
     intersectionType.delegate = node<CstType>(
-          choiceOf<Token, CstType>(List.of2<Parser<Token, CstType>>(namedType, groupType)),
+          choiceOf<String, CstType>(List.of2<Parser<String, CstType>>(namedType, groupType)),
         )
         .sequence<CstNode<PunctuationToken>>(punctuation("&"))
         .sequence<Maybe<CstNode<CstType>>>(
           node<CstType>(
-            choiceOf<Token, CstType>(
-              List.of3<Parser<Token, CstType>>(intersectionType, groupType, namedType),
+            choiceOf<String, CstType>(
+              List.of3<Parser<String, CstType>>(intersectionType, groupType, namedType),
             ),
           )
           .optional()
@@ -395,17 +394,17 @@ class CstParser {
           CstIntersectionType(leftType, ampersand, rightType)
         })
 
-    let unionType = notYetDefined<Token, CstType>("Parser not yet defined.")
+    let unionType = notYetDefined<String, CstType>("Parser not yet defined.")
     unionType.delegate = node<CstType>(
-          choiceOf<Token, CstType>(
-            List.of3<Parser<Token, CstType>>(intersectionType, groupType, namedType),
+          choiceOf<String, CstType>(
+            List.of3<Parser<String, CstType>>(intersectionType, groupType, namedType),
           ),
         )
         .sequence<CstNode<PunctuationToken>>(punctuation("|"))
         .sequence<Maybe<CstNode<CstType>>>(
           node<CstType>(
-            choiceOf<Token, CstType>(
-              List.of4<Parser<Token, CstType>>(unionType, intersectionType, groupType, namedType),
+            choiceOf<String, CstType>(
+              List.of4<Parser<String, CstType>>(unionType, intersectionType, groupType, namedType),
             ),
           )
           .optional()
@@ -426,8 +425,8 @@ class CstParser {
     let functionTypeParameterTypes = node<CstFunctionTypeParameterTypes>(functionTypeParameterTypes)
     // TODO(JonasWanke): allow modifiers
     let functionType = node<CstType>(
-          choiceOf<Token, CstType>(
-            List.of4<Parser<Token, CstType>>(unionType, intersectionType, groupType, namedType),
+          choiceOf<String, CstType>(
+            List.of4<Parser<String, CstType>>(unionType, intersectionType, groupType, namedType),
           ),
         )
         .optional()
@@ -437,8 +436,8 @@ class CstParser {
         .sequence<CstNode<PunctuationToken>>(punctuation("->"))
         .sequence<Maybe<CstNode<CstType>>>(
           node<CstType>(
-            choiceOf<Token, CstType>(
-              List.of4<Parser<Token, CstType>>(unionType, intersectionType, groupType, namedType),
+            choiceOf<String, CstType>(
+              List.of4<Parser<String, CstType>>(unionType, intersectionType, groupType, namedType),
             ),
           )
           .optional()
@@ -453,8 +452,8 @@ class CstParser {
         })
 
     type.delegate = node<CstType>(
-      choiceOf<Token, CstType>(
-        List.of6<Parser<Token, CstType>>(
+      choiceOf<String, CstType>(
+        List.of6<Parser<String, CstType>>(
           unionType,
           intersectionType,
           functionType,
@@ -466,7 +465,7 @@ class CstParser {
     )
   }
 
-  fun typeParameters(): Parser<Token, CstNode<CstTypeParameters>> {
+  fun typeParameters(): Parser<String, CstNode<CstTypeParameters>> {
     let typeParameters = punctuation("<")
         .sequence<List<CstNode<CstTypeParameter | PunctuationToken>>>(
           commaSeparated<CstTypeParameter>(typeParameter())
@@ -475,7 +474,7 @@ class CstParser {
         .map<CstTypeParameters>({ CstTypeParameters(it.first.first, it.first.second, it.second) })
     node<CstTypeParameters>(typeParameters)
   }
-  fun typeParameter(): Parser<Token, CstNode<CstTypeParameter>> {
+  fun typeParameter(): Parser<String, CstNode<CstTypeParameter>> {
     let typeParameter = modifiers()
         .sequence<Maybe<CstNode<IdentifierToken>>>(identifier().optional())
         .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>>(
@@ -487,7 +486,7 @@ class CstParser {
     node<CstTypeParameter>(typeParameter)
   }
 
-  fun typeArguments(): Parser<Token, CstNode<CstTypeArguments>> {
+  fun typeArguments(): Parser<String, CstNode<CstTypeArguments>> {
     let typeArguments = punctuation("<")
         .sequence<List<CstNode<CstTypeArgument | PunctuationToken>>>(
           commaSeparated<CstTypeArgument>(typeArgument())
@@ -496,7 +495,7 @@ class CstParser {
         .map<CstTypeArguments>({ CstTypeArguments(it.first.first, it.first.second, it.second) })
     node<CstTypeArguments>(typeArguments)
   }
-  fun typeArgument(): Parser<Token, CstNode<CstTypeArgument>> {
+  fun typeArgument(): Parser<String, CstNode<CstTypeArgument>> {
     let typeArgument = modifiers()
         .sequence<Maybe<CstNode<CstType>>>(type.optional())
         .map<CstTypeArgument>({ CstTypeArgument(it.first, it.second) })
@@ -505,9 +504,9 @@ class CstParser {
 
   // expressions
 
-  let expression_ = notYetDefined<Token, CstNode<CstExpression>>("Parser not yet defined.")
+  let expression_ = notYetDefined<String, CstNode<CstExpression>>("Parser not yet defined.")
   fun initExpression() {
-    let intExpression = node<LiteralToken<Int>>(token<LiteralToken<Int>>("int literal", { true }))
+    let intExpression = intLiteral()
         .map<CstExpression>({ CstIntExpression(it) })
 
     let lambdaExpressionValueParameters = commaSeparated<CstValueParameter>(
@@ -562,8 +561,8 @@ class CstParser {
     // TODO(JonasWanke): property expressions
 
     let navigationExpression = node<CstExpression>(
-      choiceOf<Token, CstExpression>(
-        List.of5<Parser<Token, CstExpression>>(
+      choiceOf<String, CstExpression>(
+        List.of5<Parser<String, CstExpression>>(
           groupExpression,
           tupleExpression,
           // TODO(JonasWanke): callExpression
@@ -573,16 +572,20 @@ class CstParser {
         ),
       ),
     )
-        .sequence<List<CstNode<IdentifierToken>>>(identifier().plus())
+        .sequence<List<(CstNode<PunctuationToken>, Maybe<CstNode<IdentifierToken>>)>>(
+          punctuation(".")
+              .sequence<Maybe<CstNode<IdentifierToken>>>(identifier().optional())
+              .plus()
+        )
         .map<CstExpression>({
           let receiver = it.first
-          let arguments = (it.second as Iterable<CstNode<IdentifierToken>>)
-          arguments.foldLeft<CstNode<CstExpression>>(
+          let navigationParts = (it.second as Iterable<(CstNode<PunctuationToken>, Maybe<CstNode<IdentifierToken>>)>)
+          navigationParts.foldLeft<CstNode<CstExpression>>(
             receiver,
-            { receiver, target =>
+            { receiver, navigationPart =>
               CstNode<CstExpression>(
                 getNextNodeId(),
-                CstNavigationExpression(receiver, target),
+                CstNavigationExpression(receiver, navigationPart.first, navigationPart.second),
                 List.empty<WhitespaceToken | CommentToken>(),
               )
             },
@@ -590,8 +593,8 @@ class CstParser {
         })
 
     let callExpression = node<CstExpression>(
-      choiceOf<Token, CstExpression>(
-        List.of6<Parser<Token, CstExpression>>(
+      choiceOf<String, CstExpression>(
+        List.of6<Parser<String, CstExpression>>(
           groupExpression,
           tupleExpression,
           navigationExpression,
@@ -622,7 +625,7 @@ class CstParser {
           ).child as CstExpression
         })
 
-    let higherPrecedenceThanBinaryParsers = List.of7<Parser<Token, CstExpression>>(
+    let higherPrecedenceThanBinaryParsers = List.of7<Parser<String, CstExpression>>(
       groupExpression,
       tupleExpression,
       navigationExpression,
@@ -633,16 +636,16 @@ class CstParser {
     )
     let buildBinaryLeftAssociative = {
         operators: List<String>,
-        higherPrecedenceBinaryParsers: List<Parser<Token, CstExpression>> =>
+        higherPrecedenceBinaryParsers: List<Parser<String, CstExpression>> =>
       let higherPrecedenceParsers = node<CstExpression>(
-        choiceOf<Token, CstExpression>(
-          higherPrecedenceThanBinaryParsers.followedBy(higherPrecedenceBinaryParsers),
+        choiceOf<String, CstExpression>(
+          higherPrecedenceThanBinaryParsers.followedByList(higherPrecedenceBinaryParsers),
         ),
       )
 
-      let operatorsParser = choiceOf<Token, CstNode<PunctuationToken>>(
+      let operatorsParser = choiceOf<String, CstNode<PunctuationToken>>(
         (operators as Iterable<String>)
-            .map<Parser<Token, CstNode<PunctuationToken>>>({ punctuation(it) })
+            .map<Parser<String, CstNode<PunctuationToken>>>({ punctuation(it) })
             .toList()
       )
 
@@ -671,22 +674,22 @@ class CstParser {
     }
     let binaryExpressionMultiplicative = buildBinaryLeftAssociative(
       List.of4<String>("*", "/", "~/", "%"),
-      List.empty<Parser<Token, CstExpression>>(),
+      List.empty<Parser<String, CstExpression>>(),
     )
     let binaryExpressionAdditive = buildBinaryLeftAssociative(
       List.of2<String>("+", "-"),
-      List.of1<Parser<Token, CstExpression>>(binaryExpressionMultiplicative),
+      List.of1<Parser<String, CstExpression>>(binaryExpressionMultiplicative),
     )
     let binaryExpressionComparison = buildBinaryLeftAssociative(
       List.of4<String>("<", "<=", ">", ">="),
-      List.of2<Parser<Token, CstExpression>>(
+      List.of2<Parser<String, CstExpression>>(
         binaryExpressionAdditive,
         binaryExpressionMultiplicative,
       ),
     )
     let binaryExpressionEquality = buildBinaryLeftAssociative(
       List.of2<String>("==", "!="),
-      List.of3<Parser<Token, CstExpression>>(
+      List.of3<Parser<String, CstExpression>>(
         binaryExpressionComparison,
         binaryExpressionAdditive,
         binaryExpressionMultiplicative,
@@ -694,7 +697,7 @@ class CstParser {
     )
     let binaryExpressionLogicalAnd = buildBinaryLeftAssociative(
       List.of1<String>("&"),
-      List.of4<Parser<Token, CstExpression>>(
+      List.of4<Parser<String, CstExpression>>(
         binaryExpressionEquality,
         binaryExpressionComparison,
         binaryExpressionAdditive,
@@ -703,7 +706,7 @@ class CstParser {
     )
     let binaryExpressionLogicalOr = buildBinaryLeftAssociative(
       List.of1<String>("|"),
-      List.of5<Parser<Token, CstExpression>>(
+      List.of5<Parser<String, CstExpression>>(
         binaryExpressionLogicalAnd,
         binaryExpressionEquality,
         binaryExpressionComparison,
@@ -713,7 +716,7 @@ class CstParser {
     )
     let binaryExpressionLogicalImplication = buildBinaryLeftAssociative(
       List.of1<String>("=>"),
-      List.of6<Parser<Token, CstExpression>>(
+      List.of6<Parser<String, CstExpression>>(
         binaryExpressionLogicalOr,
         binaryExpressionLogicalAnd,
         binaryExpressionEquality,
@@ -723,10 +726,10 @@ class CstParser {
       ),
     )
     let higherPrecedenceThanAssignmentParser = node<CstExpression>(
-      choiceOf<Token, CstExpression>(
+      choiceOf<String, CstExpression>(
         higherPrecedenceThanBinaryParsers
-            .followedBy(
-              List.of7<Parser<Token, CstExpression>>(
+            .followedByList(
+              List.of7<Parser<String, CstExpression>>(
                 binaryExpressionLogicalImplication,
                 binaryExpressionLogicalOr,
                 binaryExpressionLogicalAnd,
@@ -745,8 +748,8 @@ class CstParser {
         .map<CstExpression>({
           CstBinaryExpression(it.first.first, it.first.second, it.second)
         })
-    let binaryExpression = choiceOf<Token, CstExpression>(
-      List.of8<Parser<Token, CstExpression>>(
+    let binaryExpression = choiceOf<String, CstExpression>(
+      List.of8<Parser<String, CstExpression>>(
         binaryExpressionAssignment,
         binaryExpressionLogicalImplication,
         binaryExpressionLogicalOr,
@@ -763,8 +766,8 @@ class CstParser {
         .map<CstExpression>({ CstReturnExpression(it.first, it.second) })
 
     expression_.delegate = node<CstExpression>(
-      choiceOf<Token, CstExpression>(
-        List.of9<Parser<Token, CstExpression>>(
+      choiceOf<String, CstExpression>(
+        List.of9<Parser<String, CstExpression>>(
           groupExpression,
           tupleExpression,
           binaryExpression,
@@ -781,7 +784,7 @@ class CstParser {
     )
   }
 
-  fun valueArguments(): Parser<Token, CstNode<CstValueArguments>> {
+  fun valueArguments(): Parser<String, CstNode<CstValueArguments>> {
     let valueArguments = punctuation("(")
         .sequence<List<CstNode<CstValueArgument | PunctuationToken>>>(
           commaSeparated<CstValueArgument>(valueArgument())
@@ -790,7 +793,7 @@ class CstParser {
         .map<CstValueArguments>({ CstValueArguments(it.first.first, it.first.second, it.second) })
     node<CstValueArguments>(valueArguments)
   }
-  fun valueArgument(): Parser<Token, CstNode<CstValueArgument>> {
+  fun valueArgument(): Parser<String, CstNode<CstValueArgument>> {
     let valueArgument = identifier()
         .optional()
         .sequence<CstNode<PunctuationToken>>(punctuation("="))
@@ -802,40 +805,9 @@ class CstParser {
 
   // utilities
 
-  fun modifiers(): Parser<Token, List<CstNode<IdentifierToken>>> { identifier().star() }
+  fun modifiers(): Parser<String, List<CstNode<IdentifierToken>>> { identifier().star() }
 
-  fun keyword(keyword: String): Parser<Token, CstNode<KeywordToken>> {
-    let token = token<KeywordToken>("keyword", { it.keyword == keyword })
-    node<KeywordToken>(token)
-  }
-  fun identifier(): Parser<Token, CstNode<IdentifierToken>> {
-    node<IdentifierToken>(token<IdentifierToken>("identifier", { true }))
-  }
-  fun punctuation(punctuation: String): Parser<Token, CstNode<PunctuationToken>> {
-    let token = token<PunctuationToken>("punctuation", { it.punctuation == punctuation })
-    node<PunctuationToken>(token)
-  }
-  fun punctuationOrEnd(
-    punctuationString: String,
-  ): Parser<Token, Maybe<CstNode<PunctuationToken>>> {
-    punctuation(punctuationString)
-        .map<Maybe<CstNode<PunctuationToken>>>({ Some<CstNode<PunctuationToken>>(it) })
-        .or<Maybe<CstNode<PunctuationToken>>>(
-          endOfInput<Token>("End of input expected.")
-              .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
-        )
-        .map<Maybe<CstNode<PunctuationToken>>>({ it as Maybe<CstNode<PunctuationToken>> })
-  }
-  fun commaSeparated<Output>(
-    parser: Parser<Token, CstNode<Output>>,
-  ): Parser<Token, List<CstNode<Output | PunctuationToken>>> {
-    parser
-        .or<CstNode<PunctuationToken>>(punctuation(","))
-        .map<CstNode<Output | PunctuationToken>>({ it as CstNode<Output | PunctuationToken> })
-        .star()
-  }
-
-  fun node<T>(parser: Parser<Token, T>): Parser<Token, CstNode<T>> {
+  fun node<T>(parser: Parser<String, T>): Parser<String, CstNode<T>> {
     let parser = parser.sequence<List<WhitespaceToken | CommentToken>>(trailingTrivia())
     parser.map<CstNode<T>>({ output =>
       CstNode<T>(getNextNodeId(), output.first, output.second)
@@ -846,27 +818,167 @@ class CstParser {
     nextId = nextId + 1
     id
   }
-  fun trailingTrivia(): Parser<Token, List<WhitespaceToken | CommentToken>> {
+
+  // lexer
+
+  fun keyword(keyword: String): Parser<String, CstNode<KeywordToken>> {
+    assert((keywords as Iterable<String>).any({ it == keyword }), "Invalid keyword: {keyword}.")
+
+    let parser = string(keyword, "'{keyword}' expected.")
+        .token()
+        .map<KeywordToken>({ KeywordToken(it.span, keyword) })
+    node<KeywordToken>(parser)
+  }
+  fun identifier(): Parser<String, CstNode<IdentifierToken>> {
+    let firstCharacter = character(
+          {
+            "a" <= it && it <= "z"
+            || "A" <= it && it <= "Z"
+            || it == "_"
+          },
+          "Letter or underscore expected.",
+        )
+    let followingCharacter = character(
+          {
+            "a" <= it && it <= "z"
+            || "A" <= it && it <= "Z"
+            || "0" <= it && it <= "9"
+            || it == "_"
+          },
+          "Letter, digit or underscore expected.",
+        )
+    let parser = firstCharacter
+        .sequence<List<String>>(followingCharacter.star())
+        .token()
+        .map<Token<String, String>>({
+          let a = it
+          Token<String, String>((it.input as Iterable<String>).join(""), it.span, it.input as List<String>)
+        })
+        .when({ token =>
+          if (keywords as Iterable<String>).any({ it == token.value }) {
+            return Error<Unit, String>("Expected an identifier, but got keyword '{token.value}'.")
+          }
+          Ok<Unit, String>(unit)
+        })
+        .map<IdentifierToken>({ IdentifierToken(it.span, it.value) })
+    node<IdentifierToken>(parser)
+  }
+
+  fun intLiteral(): Parser<String, CstNode<IntLiteralToken>> {
+    let parser = digit("Digit expected.")
+        .plus()
+        .map<Int>({ Int.parse((it as Iterable<String>).join("")) })
+        .token()
+        .map<IntLiteralToken>({ IntLiteralToken(it.span, it.value as Int) })
+    node<IntLiteralToken>(parser)
+  }
+  
+  fun punctuation(punctuation: String): Parser<String, CstNode<PunctuationToken>> {
+    // TODO(JonasWanke): detect punctuation separated by whitespace, e.g., "> =" as ">="
+
+    let parser = string(punctuation, "'{punctuation}' expected.")
+        .token()
+        .map<PunctuationToken>({ PunctuationToken(it.span, punctuation) })
+    node<PunctuationToken>(parser)
+  }
+  fun punctuationOrEnd(
+    punctuationString: String,
+  ): Parser<String, Maybe<CstNode<PunctuationToken>>> {
+    punctuation(punctuationString)
+        .map<Maybe<CstNode<PunctuationToken>>>({ Some<CstNode<PunctuationToken>>(it) })
+        .or<Maybe<CstNode<PunctuationToken>>>(
+          endOfInput<String>("End of input expected.")
+              .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
+        )
+        .map<Maybe<CstNode<PunctuationToken>>>({ it as Maybe<CstNode<PunctuationToken>> })
+  }
+  fun commaSeparated<Output>(
+    parser: Parser<String, CstNode<Output>>,
+  ): Parser<String, List<CstNode<Output | PunctuationToken>>> {
+    parser
+        .or<CstNode<PunctuationToken>>(punctuation(","))
+        .map<CstNode<Output | PunctuationToken>>({ it as CstNode<Output | PunctuationToken> })
+        .star()
+  }
+
+  fun trailingTrivia(): Parser<String, List<WhitespaceToken | CommentToken>> {
     whitespace().or<CommentToken>(comment()).star()
   }
-  fun whitespace(): Parser<Token, WhitespaceToken> { token<WhitespaceToken>("whitespace", { true }) }
-  fun comment(): Parser<Token, CommentToken> { token<CommentToken>("comment", { true }) }
+  fun whitespace(): Parser<String, WhitespaceToken> {
+    character(
+      { it == " " || it == "\t" || it == "\r" || it == "\n" },
+      "Whitespace expected.",
+    )
+        .plus()
+        .token()
+        .map<Token<String, String>>({
+          Token<String, String>((it.input as Iterable<String>).join(""), it.span, it.input as List<String>)
+        })
+        .map<WhitespaceToken>({ WhitespaceToken(it.span, it.value) })
+  }
+  fun comment(): Parser<String, CommentToken> {
+    let lineCommentFromStart = { start: Parser<String, String> =>
+      start
+          .sequence<String>(
+            lineBreak()
+                .negated("Expected something different from the receiver.")
+                .star()
+                .token()
+                .map<String>({ (it.input as Iterable<String>).join("") })
+          )
+          .map<String>({ it.second })
+          .token()
+          .sequence<Unit>(
+            lineBreak()
+                .or<Unit>(endOfInput<String>("End of input expected."))
+                .map<Unit>({ unit })
+                .and()
+          )
+          .map<(Span, String)>({ Tuple(it.first.span, it.first.value as String) })
+    }
+    let docComment = lineCommentFromStart(string("///", "'///' expected."))
+        .map<CommentToken>({ CommentToken(it.first, it.second, "doc") })
+    let lineComment = lineCommentFromStart(string("//", "'//' expected."))
+        .map<CommentToken>({ CommentToken(it.first, it.second, "line") })
 
-  fun token<T: Token>(name: String, tester: (T) => Bool): Parser<Token, T> {
-    custom<Token, T>(
-      1,
-      { tokens =>
-        assert((tokens as Iterable<Token>).length() == 1, "List should only contain one token.")
+    let blockComment = notYetDefined<String, CommentToken>("Parser not yet defined.")
+    blockComment.delegate = string("/*", "'/*' expected.")
+        .sequence<Token<String, String>>(
+          blockComment
+              .or<Failure>(string("*/", "'*/' expected.").negated("Expected something different from the receiver."))
+              .star()
+              .token()
+              .map<Token<String, String>>({
+                Token<String, String>((it.input as Iterable<String>).join(""), it.span, it.input as List<String>)
+              })
+        )
+        .sequence<Unit>(
+          string("*/", "'*/' expected.")
+              .or<Unit>(endOfInput<String>("End of input expected."))
+              .map<Unit>({ unit })
+        )
+        .map<CommentToken>({
+          let token = it.first.second
+          CommentToken(token.span, token.value, "block")
+        })
 
-        let token = (tokens as Iterable<Token>).first().unwrap()
-        let result = if token is T && tester(token as T) {
-          Some<T>(token as T)
-        } else {
-          None<T>()
-        }
-        result as Maybe<T>
-      },
-      "Expected a {name}.",
+    choiceOf<String, CommentToken>(
+      List.of3<Parser<String, CommentToken>>(docComment, lineComment, blockComment),
     )
   }
+  fun lineBreak(): Parser<String, Token<String, String>> {
+    singleCharacter("\r", "'\\r' expected.")
+        .optional()
+        .sequence<String>(singleCharacter("\n", "'\\n' expected."))
+        .token()
+        .map<Token<String, String>>({
+          Token<String, String>((it.input as Iterable<String>).join(""), it.span, it.input as List<String>)
+        })
+  }
 }
+let keywords = List.of12<String>(
+  "use", "crate",
+  "module", "trait", "impl", "class",
+  "fun", "let", "var", "get", "set",
+  "return",
+)

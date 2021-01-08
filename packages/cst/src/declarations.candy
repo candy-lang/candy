@@ -1,6 +1,6 @@
-use lexer
 use ..expressions
 use ..node
+use ..tokens
 use ..types
 
 public trait /* enum */ CstDeclaration {
