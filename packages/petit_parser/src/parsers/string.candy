@@ -1,9 +1,20 @@
 use ...parsers
 
+public fun string(string: String, message: String = "'{string}' expected."): Parser<String, String> {
+  custom<String, String>(
+    string.length(),
+    {
+      if (it as Iterable<String>).join("") == string { return Some<String>(string) }
+      None<String>()
+    },
+    message,
+  )
+}
+
 public fun digit(message: String = "Digit expected."): Parser<String, String> {
   character({ "0" <= it && it <= "9" }, message)
 }
-public fun singleCharacter(char: String, message: String): Parser<String, String> {
+public fun singleCharacter(char: String, message: String = "'{char}' expected."): Parser<String, String> {
   character({ it == char }, message)
 }
 public fun character(tester: (String) => Bool, message: String): Parser<String, String> {
