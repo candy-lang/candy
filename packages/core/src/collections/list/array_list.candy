@@ -108,6 +108,37 @@ public class ArrayList<Item> {
     list.append(tenth)
     list
   }
+  public static fun of11<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item, eleventh: Item): ArrayList<Item> {
+    let list = create<Item>(11)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list.append(sixth)
+    list.append(seventh)
+    list.append(eigth)
+    list.append(ninth)
+    list.append(tenth)
+    list.append(eleventh)
+    list
+  }
+  public static fun of12<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item, eleventh: Item, twelfth: Item): ArrayList<Item> {
+    let list = create<Item>(12)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list.append(sixth)
+    list.append(seventh)
+    list.append(eigth)
+    list.append(ninth)
+    list.append(tenth)
+    list.append(eleventh)
+    list.append(twelfth)
+    list
+  }
 
   public static fun fromArray<Item>(array: Array<Item>): ArrayList<Item> {
     let list = empty<Item>()

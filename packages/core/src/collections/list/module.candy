@@ -39,6 +39,12 @@ public trait List<Item>: Iterable<Item> {
   static fun of10<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item): List<Item> {
     ArrayList.of10<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth, tenth)
   }
+  static fun of11<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item, eleventh: Item): List<Item> {
+    ArrayList.of11<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth, tenth, eleventh)
+  }
+  static fun of12<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item, eleventh: Item, twelfth: Item): List<Item> {
+    ArrayList.of12<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth, tenth, eleventh, twelfth)
+  }
 
   // TODO(marcelgarus): Getterize!
   fun isEmpty(): Bool { length() == 0 }
@@ -113,6 +119,12 @@ public trait MutableList<Item>: List<Item> {
   }
   static fun of10<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item): MutableList<Item> {
     ArrayList.of10<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth, tenth)
+  }
+  static fun of11<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item, eleventh: Item): MutableList<Item> {
+    ArrayList.of11<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth, tenth, eleventh)
+  }
+  static fun of12<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item, eleventh: Item, twelfth: Item): MutableList<Item> {
+    ArrayList.of12<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth, tenth, eleventh, twelfth)
   }
 
   fun set(index: Int /* UInt */, item: Item)
