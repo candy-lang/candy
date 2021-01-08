@@ -6,6 +6,7 @@ use ....operators
 use ....todo
 use ...array
 use ...iterable
+use ...list
 use ...map
 use ..linked_hash_map
 
@@ -32,7 +33,13 @@ impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: Map<Key, Value> {
   fun get(key: Key): Maybe<Value> { bucketByKey(key).get(key) }
 
   fun entries(): Iterable<(Key, Value)> {
-    todo("Implement BucketMap.entries")
+    let list = MutableList.empty<(Key, Value)>()
+    for bucket in buckets.toList() {
+      for entry in bucket.entries() {
+        list.append(entry)
+      }
+    }
+    list as Iterable<(Key, Value)>
   }
 }
 impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: MutableMap<Key, Value> {

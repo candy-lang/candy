@@ -167,20 +167,20 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
         ..body = compileBody(context, id).value);
     });
 
-    final t = dart.refer('T');
-    final arrayT = dart.refer('Array<T>');
-    final listT = dart.TypeReference((b) => b
+    final item = dart.refer('Item');
+    final arrayItem = dart.refer('Array<Item>');
+    final listItem = dart.TypeReference((b) => b
       ..symbol = 'List'
       ..url = dartCoreUrl
-      ..types.add(t));
+      ..types.add(item));
     return [
       dart.Class((b) => b
         ..annotations.add(dart.refer('sealed', packageMetaUrl))
         ..name = 'Array'
-        ..types.add(t)
+        ..types.add(item)
         ..fields.add(dart.Field((b) => b
           ..name = 'value'
-          ..type = listT))
+          ..type = listItem))
         ..mixins.addAll(traits.map((it) {
           final type = compileType(context, it);
           return dart.TypeReference((b) => b
@@ -196,8 +196,8 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
           dart.Method((b) => b
             ..name = 'generate'
             ..static = true
-            ..types.add(t)
-            ..returns = arrayT
+            ..types.add(item)
+            ..returns = arrayItem
             ..requiredParameters.addAll([
               dart.Parameter((b) => b
                 ..name = 'length'
@@ -206,10 +206,10 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                 ..name = 'generator'
                 ..type = dart.FunctionType((b) => b
                   ..requiredParameters.add(compileType(context, CandyType.int))
-                  ..returnType = t)),
+                  ..returnType = item)),
             ])
-            ..body = arrayT.call([
-              listT.property('generate').call([
+            ..body = arrayItem.call([
+              listItem.property('generate').call([
                 dart.refer('length.value'),
                 // The Dart code generator doesn't support lambdas, so we do an ugly workaround.
                 dart.Method((b) => b
@@ -229,7 +229,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             ..requiredParameters.add(dart.Parameter((b) => b
               ..name = 'index'
               ..type = compileType(context, CandyType.int)))
-            ..returns = t
+            ..returns = item
             ..body = dart.refer('value').index(dart.refer('index.value')).code),
           dart.Method((b) => b
             ..name = 'set'
@@ -239,9 +239,9 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                 ..type = compileType(context, CandyType.int)),
               dart.Parameter((b) => b
                 ..name = 'item'
-                ..type = t),
+                ..type = item),
             ])
-            ..returns = t
+            ..returns = item
             ..body = dart
                 .refer('value')
                 .index(dart.refer('index.value'))

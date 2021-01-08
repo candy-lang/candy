@@ -17,9 +17,11 @@ class LinkedHashMap<Key: Equals & Hash, Value> {
   /// An inefficient "mini-map" (it's typically pretty small).
 
   static fun empty<Key: Equals & Hash, Value>(): LinkedHashMap<Key, Value> {
-    LinkedHashMap<Key, Value>(MutableList.empty<MapEntry<Key, Value>>())
+    LinkedHashMap<Key, Value>(
+      MutableList.empty<MapEntry<Key, Value>>()
+    )
   }
-  
+
   let entries_: MutableList<MapEntry<Key, Value>>
 
   fun entryForKey(key: Key): Maybe<MapEntry<Key, Value>> {

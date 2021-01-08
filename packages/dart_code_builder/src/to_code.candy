@@ -1,0 +1,350 @@
+use ..nodes
+
+fun indent(code: String, indentFirstLine: Bool): String {
+  mut let s = ""
+  if indentFirstLine {
+    s = "  "
+  }
+  for char in code.characters() {
+    if char == "\n" {
+      s = "{s}\n  "
+    } else {
+      s = "{s}{char}"
+    }
+  }
+  s
+}
+
+trait ToCode {
+  fun toCode(): String
+}
+
+impl CompilationUnit: ToCode {
+  fun toCode(): String {
+    let directivesCode = (directives as Iterable<Directive>)
+      .map({ (it as ToCode).toCode() })
+      .join("\n")
+    let declarationsCode = (declarations as Iterable<Declaration>)
+      .map({ (it as ToCode).toCode() })
+      .join("\n")
+    "{directivesCode}\n\n{declarationsCode}"
+  }
+}
+
+impl Annotation: ToCode {
+  fun toCode(): String { "@{(expression as ToCode).toCode()}" }
+}
+
+impl Directive: ToCode
+
+impl Import: ToCode {
+  fun toCode(): String {
+    mut let s = "import '{path}'"
+    if prefix is Some {
+      s = "{s} as {prefix.unwrap()}"
+    }
+    if (show as Iterable).isNotEmpty() {
+      s = "{s} show {(show as Iterable).join(", ")}"
+    }
+    if (hide as Iterable).isNotEmpty() {
+      s = "{s} hide {(hide as Iterable).join(", ")}"
+    }
+    "{s};"
+  }
+}
+
+impl Part: ToCode {
+  fun toCode(): String { "part '{path}';" }
+}
+
+impl PartOf: ToCode {
+  fun toCode(): String { "part of '{path}';" }
+}
+
+let a = 3
+
+impl Declaration: ToCode
+impl Class: ToCode {
+  fun toCode(): String {
+    let annotationsCode = (annotations as Iterable<Annotation>)
+      .map<String>({ (it as ToCode).toCode() })
+      .join("\n")
+    mut let s = "{annotationsCode}\nclass {name}"
+    if extends_ is Some {
+      s = "{s} extends {(extends_.unwrap() as ToCode).toCode()}"
+    }
+    if (implements_ as Iterable).isNotEmpty() {
+      let implementsCode = (implements_ as Iterable<DartType>)
+        .map<String>({ (it as ToCode).toCode() })
+        .join(", ")
+      s = "{s} implements {implementsCode}"
+    }
+    if (with_ as Iterable).isNotEmpty() {
+      let withCode = (with_ as Iterable<DartType>)
+        .map<String>({ (it as ToCode).toCode() })
+        .join(", ")
+      s = "{s} with {withCode}"
+    }
+    let bodyCode = (body as Iterable<Field | Getter | Setter | Function>)
+      .map<String>({ (it as ToCode).toCode() })
+      .join("\n")
+    "{s} \👍\n{indent(bodyCode, true)}\n}"
+  }
+}
+impl Function: ToCode {
+  fun toCode(): String {
+    mut let s = name
+    if _returns is Some {
+      s = "{(_returns.unwrap() as ToCode).toCode()} {s}"
+    }
+    if (annotations as Iterable).isNotEmpty() {
+      let annotationsCode = (annotations as Iterable<Annotation>)
+        .map<String>({ (it as ToCode).toCode() })
+        .join("\n")
+      s = "{annotationsCode}\n{s}"
+    }
+    let required = (requiredParameters as Iterable<Parameter>)
+      .map<String>({ (it as ToCode).toCode() })
+      .join(", ")
+    let positional = (positionalParameters as Iterable<Parameter>)
+      .map<String>({ (it as ToCode).toCode() })
+      .join(", ")
+    let named = (namedParameters as Iterable<Parameter>)
+      .map<String>({ (it as ToCode).toCode() })
+      .join(", ")
+    mut let parameters = ""
+    if !(required == "") && (!(positional == "") || !(named == "")) {
+      parameters = "{required}, "
+    }
+    if !(positional == "") {
+      parameters = "{parameters}[{positional}]"
+    }
+    if !(named == "") {
+      parameters = "{parameters}\👍{named}}"
+    }
+    s = "{s}({parameters})"
+    if body is Some {
+      s = "{s} {(body.unwrap() as ToCode).toCode()}"
+    }
+    if body.map<Bool>({ it is InlineBody }).orElse({ true }) {
+      s = "{s};"
+    }
+    s
+  }
+}
+impl Parameter: ToCode {
+  fun toCode(): String {
+    mut let s = name
+    if type is Some {
+      s = "{(type.unwrap() as ToCode).toCode()} {s}"
+    }
+    if defaultValue is Some {
+      s = "{s} = {(defaultValue.unwrap() as ToCode).toCode()}"
+    }
+    s
+  }
+}
+impl Field: ToCode {
+  fun toCode(): String {
+    mut let s = name
+    if !(mutability is Var) {
+      s = "{(mutability as ToCode).toCode()} {s}"
+    }
+    if isStatic {
+      s = "static {s}"
+    }
+    if initialValue is Some {
+      s = "{s} = {(initialValue.unwrap() as ToCode).toCode()}"
+    }
+    s = "{s};"
+    s
+  }
+}
+
+impl Mutability: ToCode
+impl Var: ToCode {
+  fun toCode(): String { "var" }
+}
+impl Final: ToCode {
+  fun toCode(): String { "final" }
+}
+impl Const: ToCode {
+  fun toCode(): String { "const" }
+}
+
+impl Getter: ToCode {
+  fun toCode(): String {
+    mut let s = "{(type as ToCode).toCode()} get {name}"
+    if body is Some {
+      s = "{s} {(body.unwrap() as ToCode).toCode()}"
+    }
+    if body.map<Bool>({ it is InlineBody }).orElse({ true }) {
+      s = "{s};"
+    }
+    s
+  }
+}
+impl Setter: ToCode {
+  fun toCode(): String {
+    mut let s = "set {name}({(parameter as ToCode).toCode()})"
+    if body is Some {
+      s = "{s} {(body.unwrap() as ToCode).toCode()}"
+    }
+    if body.map<Bool>({ it is InlineBody }).orElse({ true }) {
+      s = "{s};"
+    }
+    s
+  }
+}
+
+impl Body: ToCode
+impl InlineBody: ToCode {
+  fun toCode(): String {
+    "=> {(expression as ToCode).toCode()}"
+  }
+}
+impl BlockBody: ToCode {
+  fun toCode(): String {
+    let statementsCode = (statements as Iterable<Statement>)
+      .map<String>({ (it as ToCode).toCode() })
+      .join("\n")
+    "\👍\n{indent(statementsCode, true)}\n}"
+  }
+}
+
+impl DartType: ToCode
+impl NamedType: ToCode {
+  fun toCode(): String {
+    mut let s = name
+    if prefix is Some {
+      s = "{prefix.unwrap()}.{s}"
+    }
+    if (typeArguments as Iterable).isNotEmpty() {
+      let generics = (typeArguments as Iterable<DartType>)
+        .map<String>({ (it as ToCode).toCode() })
+        .join(", ")
+      s = "{s}<{generics}>"
+    }
+    s
+  }
+}
+impl FunctionType: ToCode {
+  fun toCode(): String {
+    mut let s = "Function"
+    // if returns is Some {
+    //   s = "{returns} {s}"
+    // }
+    s = "{s}("
+    // s = "{s}{(parameters as Iterable).map<String>({ "{it}," }).join("")}"
+    // for parameter in parameters {
+    //   s = "{s}{parameter},"
+    // }
+    // if positionalParameters.isNotEmpty() {
+    //   s = "{"
+    // }
+    s = "{s})"
+    s
+  }
+}
+
+impl Expression: ToCode
+impl Identifier: ToCode {
+  fun toCode(): String {
+    mut let s = name
+    if prefix is Some {
+      print("f")
+      s = "{prefix}.{s}"
+    }
+    s
+  }
+}
+impl Literal: ToCode {
+  fun toCode(): String {
+    "{value}"
+  }
+}
+impl Call: ToCode {
+  fun toCode(): String {
+    mut let s = (target as ToCode).toCode()
+    let typeArgumentsCode = (typeArguments as Iterable<DartType>)
+      .map<String>({ (it as ToCode).toCode() })
+      .join(", ")
+    if !(typeArgumentsCode == "") {
+      s = "{s}<{typeArgumentsCode}>"
+    }
+    let arguments = (positionalArguments as Iterable<Expression>)
+      .map<String>({ (it as ToCode).toCode() })
+      .followedBy(
+        namedArguments
+          .entries()
+          .map<String>({ "{it.first}: {(it.second as ToCode).toCode()}" })
+      )
+      .join(", ")
+    s = "{s}({arguments})"
+  }
+}
+impl Navigation: ToCode {
+  fun toCode(): String { "{(target as ToCode).toCode()}.{property}" }
+}
+impl BinaryOperator: ToCode {
+  fun toCode(): String { "{(left as ToCode).toCode()} {operator} {(right as ToCode).toCode()}" }
+}
+impl PrefixOperator: ToCode {
+  fun toCode(): String { "{operator}{(target as ToCode).toCode()}" }
+}
+impl Assignment: ToCode {
+  fun toCode(): String {
+    "{(left as ToCode).toCode()} = {(right as ToCode).toCode()}"
+  }
+}
+impl Closure: ToCode {
+  fun toCode(): String {
+    "Closure" // TODO(marcelgarus): Implement.
+  }
+}
+
+impl Statement: ToCode
+impl ExpressionStatement: ToCode {
+  fun toCode(): String { "{(expression as ToCode).toCode()};" }
+}
+impl Return: ToCode {
+  fun toCode(): String {
+    if expression is Some {
+      "return {(expression as ToCode).toCode()};"
+    } else {
+      "return;"
+    }
+  }
+}
+impl Break: ToCode {
+  fun toCode(): String {
+    if label is Some {
+      "break {label.unwrap()};"
+    } else {
+      "break;"
+    }
+  }
+}
+impl If: ToCode {
+  fun toCode(): String {
+    let thenCode = (then as Iterable<Statement>)
+      .map<String>({ it: Statement => "  {(it as ToCode).toCode()}" })
+      .join("\n")
+    let elseCode = (else_ as Iterable<Statement>)
+      .map<String>({ it: Statement => "  {(it as ToCode).toCode()}" })
+      .join("\n")
+    "if ({(condition as ToCode).toCode()}) \👍\n{thenCode}\n} else \👍\n{elseCode}\n}"
+  }
+}
+impl While: ToCode {
+  fun toCode(): String {
+    mut let s = "while ({(condition as ToCode).toCode()})"
+    if label is Some {
+      s = "{label.unwrap()}:\n{s}"
+    }
+    let bodyCode = (body as Iterable<Statement>)
+      .map<String>({ (it as ToCode).toCode() })
+      .join("\n")
+    "{s} \👍\n{indent(bodyCode, true)}\n}"
+  }
+}
