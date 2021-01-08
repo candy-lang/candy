@@ -33,6 +33,14 @@ public trait Parser<Item, Output> {
     MapParser<Item, Output, NewOutput>(this, mapper)
   }
 
+  // TODO(JonasWanke): move the following function to `action/token.candy`
+  fun token(): Parser<Item, Token<Item, Output>> { TokenParser<Item, Output>(this) }
+
+  // TODO(JonasWanke): move the following function to `action/token.candy`
+  fun when(tester: (Output) => Result<Unit, String>): Parser<Item, Output> {
+    WhenParser<Item, Output>(this, tester)
+  }
+
   // TODO(JonasWanke): move the following function to `combinator/and.candy`
   fun and(): Parser<Item, Output> { AndParser<Item, Output>(this) }
 
@@ -41,6 +49,18 @@ public trait Parser<Item, Output> {
     let castedThis = this as Parser<Item, Output | OutputB>
     let castedOther = other as Parser<Item, Output | OutputB>
     ChoiceParser<Item, Output | OutputB>(List.of2<Parser<Item, Output | OutputB>>(castedThis, castedOther))
+  }
+
+  // TODO(JonasWanke): move the following function to `combinator/not.candy`
+  fun not(message: String = "Expected the receiver to fail."): Parser<Item, Failure> {
+    NotParser<Item, Output>(this, message)
+  }
+  fun negated(
+    message: String = "Expected something different from the receiver.",
+  ): Parser<Item, Failure> {
+    not(message)
+        .sequence<Item>(any<Item>("Expected any input."))
+        .map<Failure>({ it.first })
   }
 
   // TODO(JonasWanke): move the following function to `combinator/optional.candy`
@@ -119,7 +139,7 @@ public trait Parser<Item, Output> {
           .map<List<Output | SeparatorOutput>>({
             let first = it.first as List<Output | SeparatorOutput>
             let trailing = List.of1<Output | SeparatorOutput>(it.second as Output | SeparatorOutput)
-            first.followedBy(trailing)
+            first.followedByList(trailing)
           })
     }
 
