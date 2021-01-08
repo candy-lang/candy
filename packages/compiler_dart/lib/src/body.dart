@@ -1,6 +1,5 @@
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
-import 'package:strings/strings.dart' as strings;
 
 import 'builtins.dart';
 import 'constants.dart';
@@ -214,12 +213,22 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           );
         }
 
+        String escapeForStringLiteral(String value) {
+          // `code_builder` escapes single quotes and newlines, but misses the
+          // following:
+          return value
+              .replaceAll('\t', '\\t')
+              .replaceAll('\r', '\\r')
+              .replaceAll('\$', '\\\$')
+              .replaceAll('\\', '\\\\');
+        }
+
         if (parts.length == 1 && parts.single is LiteralStringLiteralPart) {
           final part = parts.single as LiteralStringLiteralPart;
           return _saveSingle(
             node,
             dart
-                .literalString(strings.escape(part.value))
+                .literalString(escapeForStringLiteral(part.value))
                 .wrapInCandyString(context),
           );
         }
@@ -231,7 +240,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
         final content = parts
             .map((p) => p.when(
-                  literal: (value) => value,
+                  literal: escapeForStringLiteral,
                   interpolated: (expression) => '\$${_name(expression.id)}',
                 ))
             .join();

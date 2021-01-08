@@ -1,0 +1,69 @@
+use petit_parser
+
+public trait CstToken {
+  public let span: Span
+}
+
+
+public class KeywordToken {
+  public let span: Span
+
+  public let keyword: String
+  /// May be one of the following:
+  ///
+  /// * directives: use, crate
+  /// * declarations: module, trait, impl, class, fun, let, var, get, set
+  /// * control flow: return
+  ///
+  /// TODO(JonasWanke): convert this to an enum when we support these
+}
+impl KeywordToken: CstToken
+
+
+public class IdentifierToken {
+  public let span: Span
+  public let identifier: String
+}
+impl IdentifierToken: CstToken
+
+
+public class IntLiteralToken {
+  public let span: Span
+  public let value: Int
+}
+impl IntLiteralToken: CstToken
+
+
+public class PunctuationToken {
+  public let span: Span
+
+  public let punctuation: String
+  /// May be one of the following:
+  ///
+  /// `-`, `->`, `,`, `:`, `!=`, `"`, `(`, `)`, `{`, `}`, `*`, `/`, `&`, `%`,
+  /// `+`, `<`, `<=`, `=`, `==`, `=>`, `>`, `>=`, `|`, `~/`, `.`
+  ///
+  /// TODO(JonasWanke): convert this to an enum when we support these
+}
+impl PunctuationToken: CstToken
+
+
+public class WhitespaceToken {
+  public let span: Span
+  public let content: String
+}
+impl WhitespaceToken: CstToken
+
+
+public class CommentToken {
+  public let span: Span
+  public let content: String
+
+  public let type: String
+  /// May be one of the following:
+  ///
+  /// * "line": `// foo`
+  /// * "doc": `/// foo`
+  /// * "block": `/* foo\nbar */`
+}
+impl CommentToken: CstToken
