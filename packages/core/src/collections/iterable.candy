@@ -88,10 +88,18 @@ public trait Iterable<Item> {
   fun isEmpty(): Bool { first() is None }
   fun isNotEmpty(): Bool { !isEmpty() }
 
-  // TODO(marcelgarus): Implement these as soon as for-loops work:
-  // TODO(marcelgarus): all
-  // TODO(marcelgarus): any
-  // TODO(marcelgarus): contains
+  fun all(tester: (Item) => Bool): Bool {
+    for item in this {
+      if !tester(item) { return false }
+    }
+    true
+  }
+  fun any(tester: (Item) => Bool): Bool {
+    for item in this {
+      if tester(item) { return true }
+    }
+    false
+  }
 
   // Reductions.
 
@@ -240,6 +248,7 @@ public trait Iterable<Item> {
   // Extras:
 
   // TODO(marcelgarus): + operator for joining Iterables
+  // TODO(marcelgarus): for Iterable<Equals>: contains
 
   // TODO(marcelgarus): for Iterable<(A, B)>: map with 2 args, unzip
   // TODO(marcelgarus): for Iterable<Iterable<T>>: flatten
