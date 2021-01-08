@@ -22,8 +22,12 @@ impl<Item, Output> PossessiveRepeatingParser<Item, Output>: Parser<Item, List<Ou
       currentContext = Context<Item>(currentContext.buffer, result.offset)
     }
 
-    let isUnbounded = maximum is None<Int>
-    while isUnbounded || (elements as Iterable<Output>).length() < maximum.unwrap() {
+    loop {
+      // TODO(JonasWanke): use a while-loop when we re-add lazy evaluation of disjunctions
+      if maximum is Some<Int> {
+        if ((elements as Iterable<Output>).length() >= maximum.unwrap()) { break unit }
+      }
+
       let result = parser.parse(currentContext)
       if result is Error<Success<Output>, Failure> {
         return Ok<Success<List<Output>>, Failure>(currentContext.success<List<Output>>(elements))
