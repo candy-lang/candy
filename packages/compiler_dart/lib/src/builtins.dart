@@ -733,7 +733,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
           dart.Method((b) => b
             ..name = 'toString'
             ..returns = dart.refer('String', dartCoreUrl)
-            ..body = dart.literalString('"\${value.toString()}').code)
+            ..body = dart.literalString('\${value.toString()}').code)
         ])
         ..methods.addAll(methodOverrides)),
     ];
@@ -754,31 +754,47 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
       'tenth',
     ];
 
-    final fields = 1.rangeTo(size).map((i) => fieldNames[i - 1]);
+    final name = 'Tuple$size';
+    final indices = 1.rangeTo(size);
+    final typeParameterNames = indices.map((it) => 'T$it');
+    final propertyNames = indices.map((i) => fieldNames[i - 1]);
 
     return [
       dart.Class((b) => b
         ..annotations.add(dart.refer('sealed', packageMetaUrl))
-        ..name = 'Tuple$size'
-        ..types.addAll(1.rangeTo(size).map((number) => dart.refer('T$number')))
-        ..fields.addAll(fields.mapIndexed((index, name) => dart.Field((b) => b
-          ..modifier = dart.FieldModifier.final$
-          ..type = dart.refer('T${index + 1}')
-          ..name = name)))
+        ..name = name
+        ..types.addAll(typeParameterNames.map(dart.refer))
+        ..fields.addAll(
+            propertyNames.mapIndexed((index, name) => dart.Field((b) => b
+              ..modifier = dart.FieldModifier.final$
+              ..type = dart.refer('T${index + 1}')
+              ..name = name)))
         ..constructors.add(dart.Constructor((b) => b
           ..constant = true
           ..requiredParameters
-              .addAll(fields.map((name) => dart.Parameter((b) => b
+              .addAll(propertyNames.map((name) => dart.Parameter((b) => b
                 ..toThis = true
                 ..name = name)))
-          ..initializers.addAll(fields.map((name) => dart.refer('assert').call(
-              [dart.refer(name).notEqualTo(dart.literalNull)], {}, []).code))))
+          ..initializers.addAll(propertyNames.map((name) => dart
+              .refer('assert')
+              .call([dart.refer(name).notEqualTo(dart.literalNull)], {},
+                  []).code))))
         ..methods.add(dart.Method((b) => b
           ..annotations.add(dart.refer('override', dartCoreUrl))
           ..returns = dart.refer('String', dartCoreUrl)
           ..name = 'toString'
-          ..lambda = true
-          ..body = dart.Code("'(${fields.map((f) => '\$$f').join(', ')})'")))),
+          ..body = dart.Block((b) {
+            final typeParametersString =
+                typeParameterNames.map((it) => '"$it": "\${$it}"').join(', ');
+            final propertiesString =
+                propertyNames.map((it) => '"$it": \${this.$it}').join(', ');
+            b.statements.add(dart
+                .literalString('{"name": "$name", '
+                    '"typeParameters": {$typeParametersString}, '
+                    '"properties": {$propertiesString}}')
+                .returned
+                .statement);
+          })))),
     ];
   }
 
