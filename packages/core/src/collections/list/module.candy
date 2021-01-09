@@ -86,6 +86,20 @@ public trait List<Item>: Iterable<Item> {
     }
     result
   }
+
+  fun reversed(): List<Item> {
+    /// TODO(JonasWanke): make this more efficient by creating a view of the original list
+
+    let length = (this as Iterable<Item>).length()
+    let result = ArrayList.create<Item>(length)
+
+    mut let index = length - 1
+    while index >= 0 {
+      (result as MutableList<Item>).append(get(index).unwrap() as Item)
+      index = index - 1
+    }
+    result
+  }
 }
 
 public trait MutableList<Item>: List<Item> {
