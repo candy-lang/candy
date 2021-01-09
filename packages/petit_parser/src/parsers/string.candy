@@ -28,7 +28,11 @@ class CharacterParser {
 impl CharacterParser: Parser<String, String> {
   fun parse(context: Context<String>): Result<Success<String>, Failure> {
     let character = (context.buffer as Iterable<String>).get(context.offset)
-    if character is None<String> || !tester(character.unwrap()) {
+    // TODO(JonasWanke): combine the following into one if-expression when we re-add lazy disjunctions
+    if character is None<String> {
+      return Error<Success<String>, Failure>(Failure(message, context.offset))
+    }
+    if !tester(character.unwrap()) {
       return Error<Success<String>, Failure>(Failure(message, context.offset))
     }
 
