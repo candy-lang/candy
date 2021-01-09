@@ -1,6 +1,0 @@
-use ..parser
-
-fun main() {
-  let source = "a.b + c * d"
-  print(testParseString(source))
-}
