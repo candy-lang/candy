@@ -48,7 +48,7 @@ public trait List<Item>: Iterable<Item> {
     result
   }
 
-  fun followedBy(other: List<Item>): List<Item> {
+  fun followedByList(other: List<Item>): List<Item> {
     let resultLength = length() + (other as Iterable<Item>).length()
     let result = ArrayList.create<Item>(resultLength)
 

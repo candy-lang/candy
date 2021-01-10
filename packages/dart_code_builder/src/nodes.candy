@@ -1,0 +1,316 @@
+class CompilationUnit {
+  let directives: List<Directive>
+  let declarations: List<Declaration>
+}
+
+class Annotation {
+  /// @override
+  /// @sealed
+  
+  let expression: Expression
+}
+
+// Directives.
+
+trait Directive {}
+
+class Import {
+  /// import 'package:blub/blub.dart' as blub;
+  /// import 'blub.dart' show Foo, Bar;
+  /// import 'foo.dart' hide secretFoo;
+
+  let path: String
+  let prefix: Maybe<String> = None<String>()
+  let show: List<String> = List.empty<String>()
+  let hide: List<String> = List.empty<String>()
+}
+impl Import: Directive
+
+class Part {
+  /// part 'foo.dart';
+  
+  let path: String
+}
+impl Part: Directive
+
+class PartOf {
+  /// part of 'bar.dart';
+  
+  let path: String
+}
+impl PartOf: Directive
+
+// Declarations.
+
+trait Declaration {}
+
+class Class {
+  /// @immutable
+  /// class Foo extends Bar implements Baz with Whop {
+  ///   final String flub;
+  ///   final int flop;
+  ///
+  ///   void foo(bool value);
+  /// }
+  
+  let name: String
+  let annotations: List<Annotation> = List.empty<Annotation>()
+  let extends_: Maybe<DartType> = None<DartType>()
+  let implements_: List<DartType> = List.empty<DartType>()
+  let with_: List<DartType> = List.empty<DartType>()
+  let body: List<Constructor | Field | Getter | Setter | Function> = List.empty<Constructor | Field | Getter | Setter | Function>()
+}
+impl Class: Declaration
+
+class Constructor {
+  let className: String
+  let name: Maybe<String>
+  let annotations: List<Annotation> = List.empty<Annotation>()
+  let requiredParameters: List<Parameter | InitializingFormal> = List.empty<Parameter | InitializingFormal>()
+  let positionalParameters: List<Parameter | InitializingFormal> = List.empty<Parameter | InitializingFormal>()
+  let namedParameters: List<Parameter | InitializingFormal> = List.empty<Parameter | InitializingFormal>()
+  let body: Maybe<Body> = None<Body>()
+}
+class InitializingFormal {
+  /// this.foo
+  /// this.bar
+
+  let name: String
+  let defaultValue: Maybe<Expression> = None<Expression>()
+}
+
+class Mixin {
+  let name: String
+  let annotations: List<Annotation> = List.empty<Annotation>()
+  let on_: Maybe<DartType> = None<DartType>()
+  let body: List<Getter | Setter | Function> = List.empty<Getter | Setter | Function>()
+}
+impl Mixin: Declaration
+
+class Function {
+  /// void foo();
+  ///
+  /// @override
+  /// String toString() => 'Foo';
+  ///
+  /// int blub(int a, [int b, int c]) => ...;
+  ///
+  /// String bar(int a, {int b = 0, int c}) {
+  ///   print('a=$a, b=$b, c=$c');
+  /// }
+
+  let name: String
+  let annotations: List<Annotation> = List.empty<Annotation>()
+  let _returns: Maybe<DartType> = None<DartType>()
+  let requiredParameters: List<Parameter> = List.empty<Parameter>()
+  let positionalParameters: List<Parameter> = List.empty<Parameter>()
+  let namedParameters: List<Parameter> = List.empty<Parameter>()
+  let body: Maybe<Body> = None<Body>()
+}
+impl Function: Declaration
+
+class Parameter {
+  let name: String
+  let type: Maybe<DartType> = None<DartType>()
+  let defaultValue: Maybe<Expression> = None<Expression>()
+}
+
+class Field {
+  let name: String
+  let isStatic: Bool = false
+  let mutability: Mutability = Var()
+  let initialValue: Maybe<Expression> = None<Expression>()
+}
+
+trait Mutability {}
+class Var {}
+impl Var: Mutability
+class Final {}
+impl Final: Mutability
+class Const {}
+impl Const: Mutability
+
+class Getter {
+  let name: String
+  let type: DartType
+  let body: Maybe<Body> = None<Body>()
+}
+
+class Setter {
+  let name: String
+  let parameter: Parameter
+  let body: Maybe<Body> = None<Body>()
+}
+
+trait Body {}
+
+class InlineBody {
+  let expression: Expression
+}
+impl InlineBody: Body
+
+class Block {
+  let statements: List<Statement>
+}
+impl Block: Body
+
+// Types.
+
+trait DartType {}
+
+class NamedType {
+  let name: Identifier
+  let typeArguments: List<DartType> = List.empty<DartType>()
+}
+impl NamedType: DartType
+impl NamedType: Expression
+/// TODO(marcelgarus): Remove once the compiler realizes DartType implements Expression.
+
+class FunctionType {
+  let parameters: List<Parameter> = List.empty<Parameter>()
+  let positionalParameters: List<Parameter> = List.empty<Parameter>()
+  let namedParameters: List<Parameter> = List.empty<Parameter>()
+  let _returns: Maybe<DartType> = None<DartType>()
+}
+impl FunctionType: DartType
+impl FunctionType: Expression
+/// TODO(marcelgarus): Remove once the compiler realizes DartType implements Expression.
+
+// Expressions.
+
+trait Expression {
+  fun dot(property: String): Navigation { Navigation(this, property) }
+  public fun call(
+    positionalArguments: List<Expression>,
+    namedArguments: Map<String, Expression>,
+    typeArguments: List<DartType>,
+  ): Call {
+    Call(this, positionalArguments, namedArguments, typeArguments)
+  }
+  fun equals(other: Expression): BinaryOperator { BinaryOperator(this, "==", other) }
+  fun notEquals(other: Expression): BinaryOperator { BinaryOperator(this, "!=", other) }
+  fun opposite(): PrefixOperator { PrefixOperator("!", this) }
+  fun and(other: Expression): BinaryOperator { BinaryOperator(this, "&&", other) }
+  fun or(other: Expression): BinaryOperator { BinaryOperator(this, "||", other) }
+  fun lessThan(other: Expression): BinaryOperator { BinaryOperator(this, "<", other) }
+  fun greaterThan(other: Expression): BinaryOperator { BinaryOperator(this, ">", other) }
+  fun lessThanOrEqualTo(other: Expression): BinaryOperator { BinaryOperator(this, "<=", other) }
+  fun greaterThanOrEqualTo(other: Expression): BinaryOperator { BinaryOperator(this, ">=", other) }
+  fun bitwiseAnd(other: Expression): BinaryOperator { BinaryOperator(this, "&", other) }
+  fun bitwiseOr(other: Expression): BinaryOperator { BinaryOperator(this, "|", other) }
+  fun plus(other: Expression): BinaryOperator { BinaryOperator(this, "+", other) }
+  fun minus(other: Expression): BinaryOperator { BinaryOperator(this, "-", other) }
+  fun times(other: Expression): BinaryOperator { BinaryOperator(this, "*", other) }
+  fun divide(other: Expression): BinaryOperator { BinaryOperator(this, "/", other) }
+  fun divideTruncate(other: Expression): BinaryOperator { BinaryOperator(this, "~/", other) }
+  fun modulo(other: Expression): BinaryOperator { BinaryOperator(other, "%", other) }
+  fun as_(other: DartType): BinaryOperator { BinaryOperator(this, "as", other as Expression) }
+  fun is_(other: DartType): BinaryOperator { BinaryOperator(this, "is", other as Expression) }
+}
+
+impl DartType: Expression
+
+class Identifier {
+  let name: String
+  let prefix: Maybe<String> = None<String>()
+}
+impl Identifier: Expression
+
+let this_ = Identifier("this", None<String>())
+
+class NullLiteral {}
+impl NullLiteral: Expression
+class StringLiteral {
+  let value: String
+}
+impl StringLiteral: Expression
+class IntLiteral {
+  let value: Int
+}
+impl IntLiteral: Expression
+class BoolLiteral {
+  let value: Bool
+}
+impl BoolLiteral: Expression
+
+class Call {
+  let target: Expression
+  let positionalArguments: List<Expression> = List.empty<Expression>()
+  let namedArguments: Map<String, Expression> = Map.empty<String, Expression>()
+  let typeArguments: List<DartType> = List.empty<DartType>()
+}
+impl Call: Expression
+
+class Navigation {
+  let target: Expression
+  let property: String
+}
+impl Navigation: Expression
+
+class BinaryOperator {
+  let left: Expression
+  let operator: String
+  let right: Expression
+}
+impl BinaryOperator: Expression
+
+class PrefixOperator {
+  let operator: String
+  let target: Expression
+}
+impl PrefixOperator: Expression
+
+class Assignment {
+  let left: Expression
+  let right: Expression
+}
+impl Assignment: Expression
+
+class Closure {
+  let returns: Maybe<DartType> = None<DartType>()
+  let requiredParameters: List<Parameter> = List.empty<Parameter>()
+  let positionalParameters: List<Parameter> = List.empty<Parameter>()
+  let namedParameters: List<Parameter> = List.empty<Parameter>()
+  let body: Body
+}
+impl Closure: Expression
+
+// Statements.
+
+trait Statement {}
+
+impl Block: Statement
+
+class ExpressionStatement {
+  let expression: Expression
+}
+impl ExpressionStatement: Statement
+
+class Return {
+  let expression: Maybe<Expression>
+}
+impl Return: Statement
+
+class Break {
+  let label: Maybe<String>
+}
+impl Break: Statement
+
+class Continue {
+  let label: Maybe<String>
+}
+impl Continue: Statement
+
+class If {
+  let condition: Expression
+  let then: Statement
+  let else_: Maybe<Statement> = None<Statement>()
+}
+impl If: Statement
+
+class While {
+  let condition: Expression
+  let label: Maybe<String>
+  let body: Statement
+}
+impl While: Statement
