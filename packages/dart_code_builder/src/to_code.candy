@@ -276,19 +276,15 @@ impl NamedType: ToCode {
 impl FunctionType: ToCode {
   fun toCode(): String {
     mut let s = "Function"
-    // if returns is Some {
-    //   s = "{returns} {s}"
-    // }
-    s = "{s}("
-    // s = "{s}{(parameters as Iterable).map<String>({ "{it}," }).join("")}"
-    // for parameter in parameters {
-    //   s = "{s}{parameter},"
-    // }
-    // if positionalParameters.isNotEmpty() {
-    //   s = "{"
-    // }
-    s = "{s})"
-    s
+    if _returns is Some {
+      s = "{(_returns.unwrap() as ToCode).toCode()} {s}"
+    }
+    let parameters = parametersToCode(
+      (parameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
+      (positionalParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
+      (namedParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
+    )
+    "{s}(parameters)"
   }
 }
 
