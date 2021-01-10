@@ -406,6 +406,6 @@ impl While: ToCode {
     if label is Some {
       s = "{label.unwrap()}:\n{s}"
     }
-    "{s} \👍\n{indent((body as ToCode).toCode(), true)}\n}"
+    "{s} {indent((body as ToCode).toCode(), true)}"
   }
 }
