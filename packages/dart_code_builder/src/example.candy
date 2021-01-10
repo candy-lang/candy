@@ -19,7 +19,7 @@ fun main() {
       Part("test.dart"),
       PartOf("meow.dart"),
     ),
-    declarations = List.of2<Declaration>(
+    declarations = List.of3<Declaration>(
       Function(
         "main",
         annotations = List.of1<Annotation>(
@@ -94,13 +94,25 @@ fun main() {
           NamedType(Identifier("Whup", None<String>()), List.empty<DartType>()),
           NamedType(Identifier("Flang", None<String>()), List.empty<DartType>()),
         ),
-        body = List.of4<Field | Getter | Setter | Function>(
+        body = List.of5<Constructor | Field | Getter | Setter | Function>(
           // static const numBlubs = 123;
           Field(
             "numBlubs",
             isStatic = true,
             mutability = Const(),
             initialValue = Some<Expression>(IntLiteral(123)),
+          ),
+          // Foo()
+          Constructor(
+            className = "Foo",
+            name = None<String>(),
+            annotations = List.empty<Annotation>(),
+            requiredParameters = List.of1<Parameter | InitializingFormal>(
+              InitializingFormal("blub", defaultValue = None<Expression>()),
+            ),
+            positionalParameters = List.empty<Parameter | InitializingFormal>(),
+            namedParameters = List.empty<Parameter | InitializingFormal>(),
+            body = None<Body>(),
           ),
           // bool get isEmpty => this.length == 0;
           Getter(
@@ -179,6 +191,14 @@ fun main() {
             body = None<Body>(),
           ),
         ),
+      ),
+      Mixin(
+        "MyMixin",
+        annotations = List.of1<Annotation>(Annotation(Identifier("data", prefix = None<String>()))),
+        on_ = Some<DartType>(
+          NamedType(Identifier("Foo", prefix = None<String>()), List.empty<DartType>()),
+        ),
+        body = List.empty<Getter | Setter | Function>(),
       ),
     ),
   )

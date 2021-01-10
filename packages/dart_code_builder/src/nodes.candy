@@ -58,9 +58,34 @@ class Class {
   let extends_: Maybe<DartType> = None<DartType>()
   let implements_: List<DartType> = List.empty<DartType>()
   let with_: List<DartType> = List.empty<DartType>()
-  let body: List<Field | Getter | Setter | Function> = List.empty<Field | Getter | Setter | Function>()
+  let body: List<Constructor | Field | Getter | Setter | Function> = List.empty<Constructor | Field | Getter | Setter | Function>()
 }
-impl Class: Declaration {}
+impl Class: Declaration
+
+class Constructor {
+  let className: String
+  let name: Maybe<String>
+  let annotations: List<Annotation> = List.empty<Annotation>()
+  let requiredParameters: List<Parameter | InitializingFormal> = List.empty<Parameter | InitializingFormal>()
+  let positionalParameters: List<Parameter | InitializingFormal> = List.empty<Parameter | InitializingFormal>()
+  let namedParameters: List<Parameter | InitializingFormal> = List.empty<Parameter | InitializingFormal>()
+  let body: Maybe<Body> = None<Body>()
+}
+class InitializingFormal {
+  /// this.foo
+  /// this.bar
+
+  let name: String
+  let defaultValue: Maybe<Expression> = None<Expression>()
+}
+
+class Mixin {
+  let name: String
+  let annotations: List<Annotation> = List.empty<Annotation>()
+  let on_: Maybe<DartType> = None<DartType>()
+  let body: List<Getter | Setter | Function> = List.empty<Getter | Setter | Function>()
+}
+impl Mixin: Declaration
 
 class Function {
   /// void foo();
@@ -82,7 +107,7 @@ class Function {
   let namedParameters: List<Parameter> = List.empty<Parameter>()
   let body: Maybe<Body> = None<Body>()
 }
-impl Function: Declaration {}
+impl Function: Declaration
 
 class Parameter {
   let name: String

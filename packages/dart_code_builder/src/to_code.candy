@@ -15,6 +15,32 @@ fun indent(code: String, indentFirstLine: Bool): String {
   s
 }
 
+fun parametersToCode(
+  required: Iterable<String>,
+  positional: Iterable<String>,
+  named: Iterable<String>,
+): String {
+  let required = required.join(", ")
+  let positional = positional.join(", ")
+  let named = named.join(", ")
+
+  mut let parameters = required
+  if !(required == "") && (!(positional == "") || !(named == "")) {
+    parameters = "{parameters}, "
+  }
+  if !(positional == "") {
+    parameters = "{parameters}[{positional}]"
+  }
+  if !(named == "") {
+    parameters = "{parameters}\👍{named}}"
+  }
+  parameters
+}
+
+fun annotationsToCode(annotations: Iterable<Annotation>): String {
+  (annotations as Iterable<Annotation>).map<String>({ "{(it as ToCode).toCode()}\n" }).join("")
+}
+
 trait ToCode {
   fun toCode(): String
 }
@@ -66,10 +92,7 @@ let a = 3
 impl Declaration: ToCode
 impl Class: ToCode {
   fun toCode(): String {
-    let annotationsCode = (annotations as Iterable<Annotation>)
-      .map<String>({ (it as ToCode).toCode() })
-      .join("\n")
-    mut let s = "{annotationsCode}\nclass {name}"
+    mut let s = "{annotationsToCode(annotations)}class {name}"
     if extends_ is Some {
       s = "{s} extends {(extends_.unwrap() as ToCode).toCode()}"
     }
@@ -91,37 +114,62 @@ impl Class: ToCode {
     "{s} \👍\n{indent(bodyCode, true)}\n}"
   }
 }
+impl Constructor: ToCode {
+  fun toCode(): String {
+    mut let s = className
+    if name is Some {
+      s = "{s}.{name}"
+    }
+    s = "{annotationsToCode(annotations)}{s}"
+    let parameters = parametersToCode(
+      (requiredParameters as Iterable<Parameter | InitializingFormal>)
+        .map<String>({ (it as ToCode).toCode() }),
+      (positionalParameters as Iterable<Parameter | InitializingFormal>)
+        .map<String>({ (it as ToCode).toCode() }),
+      (namedParameters as Iterable<Parameter | InitializingFormal>)
+        .map<String>({ (it as ToCode).toCode() }),
+    )
+    if body is Some {
+      s = "{s} {(body.unwrap() as ToCode).toCode()}"
+    }
+    if body.map<Bool>({ it is InlineBody }).orElse({ true }) {
+      s = "{s};"
+    }
+  }
+}
+impl InitializingFormal: ToCode {
+  fun toCode(): String {
+    mut let s = "this.{name}"
+    if defaultValue is Some {
+      s = "{s} = {(defaultValue.unwrap() as ToCode).toCode()}"
+    }
+    s
+  }
+}
+impl Mixin: ToCode {
+  fun toCode(): String {
+    mut let s = "{annotationsToCode(annotations)}mixin {name}"
+    if on_ is Some {
+      s = "{s} on {(on_.unwrap() as ToCode).toCode()}"
+    }
+    let bodyCode = (body as Iterable<Field | Getter | Setter | Function>)
+      .map<String>({ (it as ToCode).toCode() })
+      .join("\n")
+    "{s} \👍\n{indent(bodyCode, true)}\n}"
+  }
+}
 impl Function: ToCode {
   fun toCode(): String {
     mut let s = name
     if _returns is Some {
       s = "{(_returns.unwrap() as ToCode).toCode()} {s}"
     }
-    if (annotations as Iterable).isNotEmpty() {
-      let annotationsCode = (annotations as Iterable<Annotation>)
-        .map<String>({ (it as ToCode).toCode() })
-        .join("\n")
-      s = "{annotationsCode}\n{s}"
-    }
-    let required = (requiredParameters as Iterable<Parameter>)
-      .map<String>({ (it as ToCode).toCode() })
-      .join(", ")
-    let positional = (positionalParameters as Iterable<Parameter>)
-      .map<String>({ (it as ToCode).toCode() })
-      .join(", ")
-    let named = (namedParameters as Iterable<Parameter>)
-      .map<String>({ (it as ToCode).toCode() })
-      .join(", ")
-    mut let parameters = ""
-    if !(required == "") && (!(positional == "") || !(named == "")) {
-      parameters = "{required}, "
-    }
-    if !(positional == "") {
-      parameters = "{parameters}[{positional}]"
-    }
-    if !(named == "") {
-      parameters = "{parameters}\👍{named}}"
-    }
+    s = "{annotationsToCode(annotations)}{s}"
+    let parameters = parametersToCode(
+      (requiredParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
+      (positionalParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
+      (namedParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
+    )
     s = "{s}({parameters})"
     if body is Some {
       s = "{s} {(body.unwrap() as ToCode).toCode()}"
@@ -314,7 +362,7 @@ impl ExpressionStatement: ToCode {
 impl Return: ToCode {
   fun toCode(): String {
     if expression is Some {
-      "return {(expression as ToCode).toCode()};"
+      "return {(expression.unwrap() as ToCode).toCode()};"
     } else {
       "return;"
     }
