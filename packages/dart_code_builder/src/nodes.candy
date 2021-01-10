@@ -170,7 +170,7 @@ class FunctionType {
   let parameters: List<Parameter> = List.empty<Parameter>()
   let positionalParameters: List<Parameter> = List.empty<Parameter>()
   let namedParameters: List<Parameter> = List.empty<Parameter>()
-  let returns: Maybe<DartType> = None<DartType>()
+  let _returns: Maybe<DartType> = None<DartType>()
 }
 impl FunctionType: DartType
 impl FunctionType: Expression
@@ -204,9 +204,8 @@ trait Expression {
   fun divide(other: Expression): BinaryOperator { BinaryOperator(this, "/", other) }
   fun divideTruncate(other: Expression): BinaryOperator { BinaryOperator(this, "~/", other) }
   fun modulo(other: Expression): BinaryOperator { BinaryOperator(other, "%", other) }
-  fun as(other: DartType): BinaryOperator { BinaryOperator(this, "as", other as Expression) }
-  fun is(other: DartType): BinaryOperator { BinaryOperator(this, "is", other as Expression) }
-
+  fun as_(other: DartType): BinaryOperator { BinaryOperator(this, "as", other as Expression) }
+  fun is_(other: DartType): BinaryOperator { BinaryOperator(this, "is", other as Expression) }
 }
 
 impl DartType: Expression
