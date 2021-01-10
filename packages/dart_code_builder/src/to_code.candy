@@ -1,10 +1,7 @@
 use ..nodes
 
-fun indent(code: String, indentFirstLine: Bool): String {
-  mut let s = ""
-  if indentFirstLine {
-    s = "  "
-  }
+fun indent(code: String): String {
+  mut let s = " "
   for char in code.characters() {
     if char == "\n" {
       s = "{s}\n  "
@@ -87,8 +84,6 @@ impl PartOf: ToCode {
   fun toCode(): String { "part of '{path}';" }
 }
 
-let a = 3
-
 impl Declaration: ToCode
 impl Class: ToCode {
   fun toCode(): String {
@@ -108,10 +103,10 @@ impl Class: ToCode {
         .join(", ")
       s = "{s} with {withCode}"
     }
-    let bodyCode = (body as Iterable<Field | Getter | Setter | Function>)
+    let bodyCode = (body as Iterable<Constructor | Field | Getter | Setter | Function>)
       .map<String>({ (it as ToCode).toCode() })
       .join("\n")
-    "{s} \👍\n{indent(bodyCode, true)}\n}"
+    "{s} \👍\n{indent(bodyCode)}\n}"
   }
 }
 impl Constructor: ToCode {
@@ -155,7 +150,7 @@ impl Mixin: ToCode {
     let bodyCode = (body as Iterable<Field | Getter | Setter | Function>)
       .map<String>({ (it as ToCode).toCode() })
       .join("\n")
-    "{s} \👍\n{indent(bodyCode, true)}\n}"
+    "{s} \👍\n{indent(bodyCode)}\n}"
   }
 }
 impl Function: ToCode {
@@ -256,7 +251,7 @@ impl Block: ToCode {
     let statementsCode = (statements as Iterable<Statement>)
       .map<String>({ (it as ToCode).toCode() })
       .join("\n")
-    "\👍\n{indent(statementsCode, true)}\n}"
+    "\👍\n{indent(statementsCode)}\n}"
   }
 }
 
@@ -293,7 +288,6 @@ impl Identifier: ToCode {
   fun toCode(): String {
     mut let s = name
     if prefix is Some {
-      print("f")
       s = "{prefix}.{s}"
     }
     s
@@ -406,6 +400,6 @@ impl While: ToCode {
     if label is Some {
       s = "{label.unwrap()}:\n{s}"
     }
-    "{s} {indent((body as ToCode).toCode(), true)}"
+    "{s} {indent((body as ToCode).toCode())}"
   }
 }
