@@ -203,7 +203,7 @@ impl InlineBody: ToCode {
     "=> {(expression as ToCode).toCode()}"
   }
 }
-impl BlockBody: ToCode {
+impl Block: ToCode {
   fun toCode(): String {
     let statementsCode = (statements as Iterable<Statement>)
       .map<String>({ (it as ToCode).toCode() })
@@ -215,10 +215,7 @@ impl BlockBody: ToCode {
 impl DartType: ToCode
 impl NamedType: ToCode {
   fun toCode(): String {
-    mut let s = name
-    if prefix is Some {
-      s = "{prefix.unwrap()}.{s}"
-    }
+    mut let s = (name as ToCode).toCode()
     if (typeArguments as Iterable).isNotEmpty() {
       let generics = (typeArguments as Iterable<DartType>)
         .map<String>({ (it as ToCode).toCode() })
@@ -258,10 +255,17 @@ impl Identifier: ToCode {
     s
   }
 }
-impl Literal: ToCode {
-  fun toCode(): String {
-    "{value}"
-  }
+impl NullLiteral: ToCode {
+  fun toCode(): String { "null" }
+}
+impl StringLiteral: ToCode {
+  fun toCode(): String { "\🦄{value}\🦄" }
+}
+impl IntLiteral: ToCode {
+  fun toCode(): String { "{value}" }
+}
+impl BoolLiteral: ToCode {
+  fun toCode(): String { "{value}" }
 }
 impl Call: ToCode {
   fun toCode(): String {
@@ -327,13 +331,11 @@ impl Break: ToCode {
 }
 impl If: ToCode {
   fun toCode(): String {
-    let thenCode = (then as Iterable<Statement>)
-      .map<String>({ it: Statement => "  {(it as ToCode).toCode()}" })
-      .join("\n")
-    let elseCode = (else_ as Iterable<Statement>)
-      .map<String>({ it: Statement => "  {(it as ToCode).toCode()}" })
-      .join("\n")
-    "if ({(condition as ToCode).toCode()}) \👍\n{thenCode}\n} else \👍\n{elseCode}\n}"
+    mut let s = "if ({(condition as ToCode).toCode()}) {(then as ToCode).toCode()}"
+    if else_ is Some {
+      s = "{s} else {(else_.unwrap() as ToCode).toCode()}"
+    }
+    s
   }
 }
 impl While: ToCode {
@@ -342,9 +344,6 @@ impl While: ToCode {
     if label is Some {
       s = "{label.unwrap()}:\n{s}"
     }
-    let bodyCode = (body as Iterable<Statement>)
-      .map<String>({ (it as ToCode).toCode() })
-      .join("\n")
-    "{s} \👍\n{indent(bodyCode, true)}\n}"
+    "{s} \👍\n{indent((body as ToCode).toCode(), true)}\n}"
   }
 }

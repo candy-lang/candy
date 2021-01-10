@@ -124,19 +124,18 @@ class InlineBody {
 }
 impl InlineBody: Body
 
-class BlockBody {
+class Block {
   let statements: List<Statement>
 }
-impl BlockBody: Body
+impl Block: Body
 
 // Types.
 
 trait DartType {}
 
 class NamedType {
-  let name: String
+  let name: Identifier
   let typeArguments: List<DartType> = List.empty<DartType>()
-  let prefix: Maybe<String> = None<String>()
 }
 impl NamedType: DartType
 impl NamedType: Expression
@@ -192,11 +191,20 @@ impl Identifier: Expression
 
 let this_ = Identifier("this", None<String>())
 
-class Literal {
-  // TODO: Support Map, List, and Set literals.
-  let value: String | Int | Bool
+class NullLiteral {}
+impl NullLiteral: Expression
+class StringLiteral {
+  let value: String
 }
-impl Literal: Expression
+impl StringLiteral: Expression
+class IntLiteral {
+  let value: Int
+}
+impl IntLiteral: Expression
+class BoolLiteral {
+  let value: Bool
+}
+impl BoolLiteral: Expression
 
 class Call {
   let target: Expression
@@ -244,6 +252,8 @@ impl Closure: Expression
 
 trait Statement {}
 
+impl Block: Statement
+
 class ExpressionStatement {
   let expression: Expression
 }
@@ -261,14 +271,14 @@ impl Break: Statement
 
 class If {
   let condition: Expression
-  let then: List<Statement>
-  let else_: List<Statement> = List.empty<Statement>()
+  let then: Statement
+  let else_: Maybe<Statement> = None<Statement>()
 }
 impl If: Statement
 
 class While {
   let condition: Expression
   let label: Maybe<String>
-  let body: List<Statement> = List.empty<Statement>()
+  let body: Statement
 }
 impl While: Statement
