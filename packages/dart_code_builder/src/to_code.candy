@@ -92,7 +92,7 @@ let a = 3
 impl Declaration: ToCode
 impl Class: ToCode {
   fun toCode(): String {
-    mut let s = "{annotationsToCode(annotations)}class {name}"
+    mut let s = "{annotationsToCode(annotations)} class {name}"
     if extends_ is Some {
       s = "{s} extends {(extends_.unwrap() as ToCode).toCode()}"
     }
@@ -120,7 +120,7 @@ impl Constructor: ToCode {
     if name is Some {
       s = "{s}.{name}"
     }
-    s = "{annotationsToCode(annotations)}{s}"
+    s = "{annotationsToCode(annotations)} {s}"
     let parameters = parametersToCode(
       (requiredParameters as Iterable<Parameter | InitializingFormal>)
         .map<String>({ (it as ToCode).toCode() }),
@@ -148,7 +148,7 @@ impl InitializingFormal: ToCode {
 }
 impl Mixin: ToCode {
   fun toCode(): String {
-    mut let s = "{annotationsToCode(annotations)}mixin {name}"
+    mut let s = "{annotationsToCode(annotations)} mixin {name}"
     if on_ is Some {
       s = "{s} on {(on_.unwrap() as ToCode).toCode()}"
     }
@@ -164,7 +164,7 @@ impl Function: ToCode {
     if _returns is Some {
       s = "{(_returns.unwrap() as ToCode).toCode()} {s}"
     }
-    s = "{annotationsToCode(annotations)}{s}"
+    s = "{annotationsToCode(annotations)} {s}"
     let parameters = parametersToCode(
       (requiredParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
       (positionalParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
