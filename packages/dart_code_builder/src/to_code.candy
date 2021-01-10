@@ -377,6 +377,15 @@ impl Break: ToCode {
     }
   }
 }
+impl Continue: ToCode {
+  fun toCode(): String {
+    if label is Some {
+      "continue {label.unwrap()};"
+    } else {
+      "continue;"
+    }
+  }
+}
 impl If: ToCode {
   fun toCode(): String {
     mut let s = "if ({(condition as ToCode).toCode()}) {(then as ToCode).toCode()}"

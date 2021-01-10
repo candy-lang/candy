@@ -297,6 +297,11 @@ class Break {
 }
 impl Break: Statement
 
+class Continue {
+  let label: Maybe<String>
+}
+impl Continue: Statement
+
 class If {
   let condition: Expression
   let then: Statement
