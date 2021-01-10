@@ -347,7 +347,16 @@ impl Assignment: ToCode {
 }
 impl Closure: ToCode {
   fun toCode(): String {
-    "Closure" // TODO(marcelgarus): Implement.
+    let parameters = parametersToCode(
+      (requiredParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
+      (positionalParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
+      (namedParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
+    )
+    mut let s = "({parameters}) {(body as ToCode).toCode()}"
+    if body is InlineBody {
+      s = "{s};"
+    }
+    s
   }
 }
 
