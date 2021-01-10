@@ -22,10 +22,10 @@ trait ToCode {
 impl CompilationUnit: ToCode {
   fun toCode(): String {
     let directivesCode = (directives as Iterable<Directive>)
-      .map({ (it as ToCode).toCode() })
+      .map<String>({ (it as ToCode).toCode() })
       .join("\n")
     let declarationsCode = (declarations as Iterable<Declaration>)
-      .map({ (it as ToCode).toCode() })
+      .map<String>({ (it as ToCode).toCode() })
       .join("\n")
     "{directivesCode}\n\n{declarationsCode}"
   }
