@@ -913,7 +913,7 @@ class CstParser {
     blockComment.delegate = string("/*", "'/*' expected.")
         .sequence<Token<String, String>>(
           blockComment
-              .or<Failure>(string("*/", "'*/' expected.").negated("Expected something different from the receiver."))
+              .or<String>(string("*/", "'*/' expected.").negated("Expected something different from the receiver."))
               .star()
               .token()
               .map<Token<String, String>>({

@@ -54,16 +54,16 @@ public trait Parser<Item, Output> {
     ChoiceParser<Item, Output | OutputB>(List.of2<Parser<Item, Output | OutputB>>(castedThis, castedOther))
   }
 
-  // TODO(JonasWanke): move the following function to `combinator/not.candy`
+  // TODO(JonasWanke): move the following functions to `combinator/not.candy`
   fun not(message: String = "Expected the receiver to fail."): Parser<Item, Failure> {
     NotParser<Item, Output>(this, message)
   }
   fun negated(
     message: String = "Expected something different from the receiver.",
-  ): Parser<Item, Failure> {
+  ): Parser<Item, Item> {
     not(message)
         .sequence<Item>(any<Item>("Expected any input."))
-        .map<Failure>({ it.first })
+        .map<Item>({ it.second })
   }
 
   // TODO(JonasWanke): move the following function to `combinator/optional.candy`
