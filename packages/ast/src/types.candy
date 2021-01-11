@@ -1,63 +1,63 @@
 use ..node
 
-public trait /* enum */ CandyType {
+public trait /* enum */ AstCandyType {
   let modifiers: List<String>
 }
-impl CandyType: Node
+impl AstCandyType: AstNode
 
 
-public data class NamedType {
-  public let id: NodeId
+public class AstNamedType {
+  public let id: AstNodeId
   public let modifiers: List<String>
   public let nameParts: List<String>
-  public let typeArguments: List<TypeArgument>
+  public let typeArguments: List<AstTypeArgument>
 }
-impl NamedType: CandyType
+impl AstNamedType: AstCandyType
 
 
-public data class FunctionType {
-  public let id: NodeId
+public class AstFunctionType {
+  public let id: AstNodeId
   public let modifiers: List<String>
-  public let receiverType: Maybe<CandyType>
-  public let parameterTypes: List<CandyType>
-  public let returnType: Maybe<CandyType>
+  public let receiverType: Maybe<AstCandyType>
+  public let parameterTypes: List<AstCandyType>
+  public let returnType: Maybe<AstCandyType>
 }
-impl FunctionType: CandyType
+impl AstFunctionType: AstCandyType
 
 
-public data class TupleType {
-  public let id: NodeId
+public class AstTupleType {
+  public let id: AstNodeId
   public let modifiers: List<String>
-  public let types: List<CandyType>
+  public let types: List<AstCandyType>
 }
-impl TupleType: CandyType
+impl AstTupleType: AstCandyType
 
 
-public data class UnionType {
-  public let id: NodeId
+public class AstUnionType {
+  public let id: AstNodeId
   public let modifiers: List<String>
-  public let types: List<CandyType>
+  public let types: List<AstCandyType>
 }
-impl UnionType: CandyType
+impl AstUnionType: AstCandyType
 
-public data class IntersectionType {
-  public let id: NodeId
+public class AstIntersectionType {
+  public let id: AstNodeId
   public let modifiers: List<String>
-  public let types: List<CandyType>
+  public let types: List<AstCandyType>
 }
-impl IntersectionType: CandyType
+impl AstIntersectionType: AstCandyType
 
 
-public data class TypeParameter {
-  public let id: NodeId
+public class AstTypeParameter {
+  public let id: AstNodeId
   public let modifiers: List<String>
   public let modifiers: List<String>
   public let name: Maybe<String>
-  public let upperBound: Maybe<CandyType>
+  public let upperBound: Maybe<AstCandyType>
 }
 
-public data class TypeArgument {
-  public let id: NodeId
+public class AstTypeArgument {
+  public let id: AstNodeId
   public let modifiers: List<String>
-  public let type: Maybe<CandyType>
+  public let type: Maybe<AstCandyType>
 }

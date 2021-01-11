@@ -1,36 +1,43 @@
 use ..node
 use ..declarations
 
-public data class File {
-  public let id: NodeId
-  public let useLines: List<UseLine>
-  public let declarations: List<Module | Trait | Impl | Class | Function | Property>
+public class AstFile {
+  public let id: AstNodeId
+  public let useLines: List<AstUseLine>
+  public let declarations: List<
+    AstModule
+    | AstTrait
+    | AstImpl
+    | AstClass
+    | AstFunction
+    | AstProperty
+  >
 }
-impl File: Node
+impl AstFile: AstNode
 
 
-public trait /* enum */ UseLine
-impl UseLine: Node
+public trait /* enum */ AstUseLine
+impl AstUseLine: AstNode
 
-public data class LocalAbsoluteUseLine {
-  public let id: NodeId
+public class AstLocalAbsoluteUseLine {
+  public let id: AstNodeId
   public let modifiers: List<String>
   public let path: List<String>
 }
-impl LocalAbsoluteUseLine: UseLine & Node
+impl AstLocalAbsoluteUseLine: AstUseLine
 
-public data class LocalRelativeUseLine {
-  public let id: NodeId
+public class AstLocalRelativeUseLine {
+  public let id: AstNodeId
   public let modifiers: List<String>
   public let parentNavigations: Int
   public let path: List<String>
 }
-impl LocalRelativeUseLine: UseLine & Node
+impl AstLocalRelativeUseLine: AstUseLine
 
-public data class GlobalUseLine {
-  public let id: NodeId
+public class AstGlobalUseLine {
+  public let id: AstNodeId
   public let modifiers: List<String>
   public let packagePath: List<String>
   public let moduleName: Maybe<String>
 }
-impl GlobalUseLine: UseLine & Node
+impl AstGlobalUseLine: AstUseLine

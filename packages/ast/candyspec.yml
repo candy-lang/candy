@@ -1,5 +1,6 @@
 name: ast
 
 dependencies:
-  lexer:
-    path: ../lexer
+  petit_parser:
+    # remove this when we support transitive dependencies
+    path: ../petit_parser

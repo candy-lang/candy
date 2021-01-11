@@ -1,7 +1,7 @@
 use ..node
 
-public data class CandyDoc {
-  public let id: NodeId
+public data class AstCandyDoc {
+  public let id: AstNodeId
   public let content: String
 }
-impl CandyDoc: Node
+impl AstCandyDoc: AstNode

@@ -3,98 +3,105 @@ use ..expressions
 use ..node
 use ..types
 
-public trait /* enum */ Declaration {
+public trait /* enum */ AstDeclaration {
   public let modifiers: List<String>
 }
-impl Declaration: Node
+impl AstDeclaration: AstNode
 
 
-public data class Module {
-  public let id: NodeId
-  public let candyDoc: Maybe<CandyDoc>
-  public let modifiers: List<String>
-  public let name: Maybe<String>
-  public let innerDeclarations: List<Module | Trait | Impl | Class | Function | Property>
-}
-impl Module: Declaration
-
-
-public data class Trait {
-  public let id: NodeId
-  public let candyDoc: Maybe<CandyDoc>
+public class AstModule {
+  public let id: AstNodeId
+  public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<String>
   public let name: Maybe<String>
-  public let typeParameters: List<TypeParameter>
-  public let upperBound: Maybe<CandyType>
-  public let innerDeclarations: List<Trait | Class | Function | Property>
+  public let innerDeclarations: List<
+    AstModule
+    | AstTrait
+    | AstImpl
+    | AstClass
+    | AstFunction
+    | AstProperty
+  >
 }
-impl Trait: Declaration
+impl AstModule: AstDeclaration
 
-public data class Impl {
-  public let id: NodeId
+
+public class AstTrait {
+  public let id: AstNodeId
+  public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<String>
-  public let typeParameters: List<TypeParameter>
-  public let type: CandyType
-  public let traits: List<CandyType>
-  public let innerDeclarations: List<Function | Property>
+  public let name: Maybe<String>
+  public let typeParameters: List<AstTypeParameter>
+  public let upperBound: Maybe<AstCandyType>
+  public let innerDeclarations: List<AstTrait | AstClass | AstFunction | AstProperty>
 }
-impl Impl: Declaration
+impl AstTrait: AstDeclaration
+
+public class AstImpl {
+  public let id: AstNodeId
+  public let modifiers: List<String>
+  public let typeParameters: List<AstTypeParameter>
+  public let type: AstCandyType
+  public let traits: List<AstCandyType>
+  public let innerDeclarations: List<AstFunction | AstProperty>
+}
+impl AstImpl: AstDeclaration
 
 
-public data class Class {
-  public let id: NodeId
-  public let candyDoc: Maybe<CandyDoc>
+public class AstClass {
+  public let id: AstNodeId
+  public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<String>
   public let name: String
-  public let typeParameters: List<TypeParameter>
-  public let innerDeclarations: List<Trait | Class | Function | Property>
+  public let typeParameters: List<AstTypeParameter>
+  public let innerDeclarations: List<AstTrait | AstClass | AstFunction | AstProperty>
 }
-impl Class: Declaration
+impl AstClass: AstDeclaration
 
 
-public data class Function {
-  public let id: NodeId
-  public let candyDoc: Maybe<CandyDoc>
+public class AstFunction {
+  public let id: AstNodeId
+  public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<String>
   public let name: String
-  public let typeParameters: List<TypeParameter>
-  public let valueParameters: List<ValueParameter>
-  public let returnType: Maybe<CandyType>
-  public let body: Maybe<BlockBody | ExpressionBody | DelegationBody>
+  public let typeParameters: List<AstTypeParameter>
+  public let valueParameters: List<AstValueParameter>
+  public let returnType: Maybe<AstCandyType>
+  public let body: Maybe<AstBlockBody | AstExpressionBody | AstDelegationBody>
 }
-impl Function: Declaration
+impl AstFunction: AstDeclaration
 
-public data class ValueParameter {
-  public let id: NodeId
+public class AstValueParameter {
+  public let id: AstNodeId
   public let name: Maybe<String>
-  public let type: Maybe<CandyType>
-  public let defaultValue: Maybe<DelegationBody>
+  public let type: Maybe<AstCandyType>
+  public let defaultValue: Maybe<AstDelegationBody>
 }
 
 
-public data class Property {
-  public let id: NodeId
-  public let candyDoc: Maybe<CandyDoc>
+public class AstProperty {
+  public let id: AstNodeId
+  public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<String>
   public let isMutable: Bool
   public let name: Maybe<String>
-  public let type: Maybe<CandyType>
-  public let initializer: Maybe<DelegationBody>
+  public let type: Maybe<AstCandyType>
+  public let initializer: Maybe<AstDelegationBody>
 }
-impl Property: Declaration
+impl AstProperty: AstDeclaration
 
-public data class BlockBody {
-  public let id: NodeId
-  public let expressions: List<Expression>
+public class AstBlockBody {
+  public let id: AstNodeId
+  public let expressions: List<AstExpression>
 }
-impl BlockBody: Node
-public data class ExpressionBody {
-  public let id: NodeId
-  public let expression: Maybe<Expression>
+impl AstBlockBody: AstNode
+public class AstExpressionBody {
+  public let id: AstNodeId
+  public let expression: Maybe<AstExpression>
 }
-impl ExpressionBody: Node
-public data class DelegationBody {
-  public let id: NodeId
-  public let expression: Maybe<Expression>
+impl AstExpressionBody: AstNode
+public class AstDelegationBody {
+  public let id: AstNodeId
+  public let expression: Maybe<AstExpression>
 }
-impl DelegationBody: Node
+impl AstDelegationBody: AstNode
