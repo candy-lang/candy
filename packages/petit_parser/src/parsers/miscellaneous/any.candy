@@ -10,7 +10,7 @@ class AnyParser<Item> {
 impl<Item> AnyParser<Item>: Parser<Item, Item> {
   fun parse(context: Context<Item>): Result<Success<Item>, Failure> {
     let buffer = (context.buffer as Iterable<Item>)
-    if (context.offset >= buffer.length()) {
+    if context.offset >= buffer.length() {
       Error<Success<Item>, Failure>(context.failure(message))
     } else {
       let item = buffer.get(context.offset).unwrap()
