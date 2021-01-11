@@ -33,6 +33,12 @@ public class IntLiteralToken {
 }
 impl IntLiteralToken: CstToken
 
+public class StringLiteralToken {
+  public let span: Span
+  public let value: String
+}
+impl StringLiteralToken: CstToken
+
 
 public class PunctuationToken {
   public let span: Span
@@ -41,7 +47,7 @@ public class PunctuationToken {
   /// May be one of the following:
   ///
   /// `-`, `->`, `,`, `:`, `!=`, `"`, `(`, `)`, `{`, `}`, `*`, `/`, `&`, `%`,
-  /// `+`, `<`, `<=`, `=`, `==`, `=>`, `>`, `>=`, `|`, `~/`, `.`
+  /// `+`, `<`, `<=`, `=`, `==`, `=>`, `>`, `>=`, `|`, `~/`, `.`, `\`
   ///
   /// TODO(JonasWanke): convert this to an enum when we support these
 }
