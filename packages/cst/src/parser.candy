@@ -743,7 +743,7 @@ class CstParser {
                     ),
                   )
                 },
-              ).unwrap().child
+              ).unwrap().child as CstExpression
             }),
         logicalImplicationExpressions,
       ),
