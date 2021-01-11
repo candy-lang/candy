@@ -3,7 +3,6 @@ use ..tokens
 public class CstNode<T> {
   public let id: CstNodeId
   public let child: T
-  public let trailingTrivia: List<WhitespaceToken | CommentToken>
 }
 
 public class CstNodeId {
