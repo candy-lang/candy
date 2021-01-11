@@ -502,7 +502,79 @@ class CstParser {
     let intExpression = intLiteral()
         .map<CstExpression>({ CstIntExpression(it) })
 
-    // TODO(JonasWanke): string expressions
+    let stringLiteralToken = { parser: Parser<String, Any> =>
+      parser.token()
+          .map<CstNode<StringLiteralToken>>({
+            CstNode<StringLiteralToken>(
+              getNextNodeId(),
+              StringLiteralToken(it.span, (it.input as Iterable<String>).join("")),
+              List.empty<WhitespaceToken | CommentToken>(),
+            )
+          })
+    }
+    let literalStringPart = choiceOf<String, String>(
+      (List.of3<String>("\🦄", "\\", "\👍") as Iterable<String>)
+          .map<Parser<String, String>>({ singleCharacter(it, "'{it}' expected.") })
+          .toList()
+    )
+        .negated("Expected a valid char inside a string literal.")
+        .plus()
+    let literalStringPart = stringLiteralToken(literalStringPart as Parser<String, Any>)
+        .map<StringPart>({ CstLiteralStringPart(it) })
+    let escapedStringPart = rawPunctuation("\\")
+        .sequence<Maybe<CstNode<StringLiteralToken>>>(
+          choiceOf<String, Maybe<CstNode<StringLiteralToken>>>(
+            List.of2<Parser<String, Maybe<CstNode<StringLiteralToken>>>>(
+              stringLiteralToken(any<String>("Any character expected.") as Parser<String, Any>)
+                  .map<Maybe<CstNode<StringLiteralToken>>>({
+                    Some<CstNode<StringLiteralToken>>(it)
+                  }),
+              endOfInput<String>("End of input expected.")
+                  .map<Maybe<CstNode<StringLiteralToken>>>({ None<CstNode<StringLiteralToken>>() }),
+            ),
+          ),
+        )
+        .map<StringPart>({
+          CstEscapedStringPart(
+            CstNode<PunctuationToken>(
+              getNextNodeId(),
+              it.first,
+              List.empty<WhitespaceToken | CommentToken>(),
+            ),
+            it.second,
+          )
+        })
+    let interpolatedStringPart = punctuation("\👍")
+        .sequence<Maybe<CstNode<CstExpression>>>(expression_.optional())
+        .sequence<Maybe<CstNode<PunctuationToken>>>(rawPunctuationOrEnd("}"))
+        .map<StringPart>({
+          CstInterpolatedStringPart(it.first.first, it.first.second, it.second)
+        })
+    let stringExpression = punctuation("\🦄")
+        .sequence<List<CstNode<StringPart>>>(
+          choiceOf<String, StringPart>(
+            List.of3<Parser<String, StringPart>>(
+              literalStringPart,
+              escapedStringPart,
+              interpolatedStringPart,
+            ),
+          )
+              .map<CstNode<StringPart>>({
+                CstNode<StringPart>(
+                  getNextNodeId(),
+                  it,
+                  List.empty<WhitespaceToken | CommentToken>(),
+                )
+              })
+              .star(),
+        )
+        .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd("\🦄"))
+        .map<CstExpression>({
+          let openingQuote = it.first.first
+          let parts = it.first.second
+          let closingQuote = it.second
+          CstStringExpression(openingQuote, parts, closingQuote)
+        })
 
     let lambdaExpressionValueParameters = commaSeparated<CstValueParameter>(
       valueParameter()
@@ -555,8 +627,9 @@ class CstParser {
     // TODO(JonasWanke): property expressions
 
     let primitiveExpressions = choiceOf<String, CstExpression>(
-        List.of5<Parser<String, CstExpression>>(
+        List.of6<Parser<String, CstExpression>>(
           intExpression,
+          stringExpression,
           lambdaExpression,
           identifierExpression,
           groupExpression,
@@ -840,20 +913,41 @@ class CstParser {
         .map<IntLiteralToken>({ IntLiteralToken(it.span, it.value as Int) })
     node<IntLiteralToken>(parser)
   }
-  
-  fun punctuation(punctuation: String): Parser<String, CstNode<PunctuationToken>> {
-    // TODO(JonasWanke): detect punctuation separated by whitespace, e.g., "> =" as ">="
 
-    let parser = string(punctuation, "'{punctuation}' expected.")
+  fun punctuation(punctuation: String): Parser<String, CstNode<PunctuationToken>> {
+    node<PunctuationToken>(rawPunctuation(punctuation))
+  }
+  fun rawPunctuation(punctuation: String): Parser<String, PunctuationToken> {
+    /// TODO(JonasWanke): detect punctuation separated by whitespace, e.g., "> =" as ">="
+
+    string(punctuation, "'{punctuation}' expected.")
         .token()
         .map<PunctuationToken>({ PunctuationToken(it.span, punctuation) })
-    node<PunctuationToken>(parser)
   }
   fun punctuationOrEnd(
     punctuationString: String,
   ): Parser<String, Maybe<CstNode<PunctuationToken>>> {
     punctuation(punctuationString)
         .map<Maybe<CstNode<PunctuationToken>>>({ Some<CstNode<PunctuationToken>>(it) })
+        .or<Maybe<CstNode<PunctuationToken>>>(
+          endOfInput<String>("End of input expected.")
+              .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
+        )
+        .cast<Maybe<CstNode<PunctuationToken>>>()
+  }
+  fun rawPunctuationOrEnd(
+    punctuationString: String,
+  ): Parser<String, Maybe<CstNode<PunctuationToken>>> {
+    rawPunctuation(punctuationString)
+        .map<Maybe<CstNode<PunctuationToken>>>({
+          Some<CstNode<PunctuationToken>>(
+            CstNode<PunctuationToken>(
+              getNextNodeId(),
+              it,
+              List.empty<WhitespaceToken | CommentToken>(),
+            ),
+          )
+        })
         .or<Maybe<CstNode<PunctuationToken>>>(
           endOfInput<String>("End of input expected.")
               .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
@@ -913,7 +1007,7 @@ class CstParser {
     blockComment.delegate = string("/*", "'/*' expected.")
         .sequence<Token<String, String>>(
           blockComment
-              .or<Failure>(string("*/", "'*/' expected.").negated("Expected something different from the receiver."))
+              .or<String>(string("*/", "'*/' expected.").negated("Expected something different from the receiver."))
               .star()
               .token()
               .map<Token<String, String>>({

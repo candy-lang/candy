@@ -22,17 +22,23 @@ impl CstStringExpression: CstExpression
 public trait /* enum */ StringPart
 
 public class CstLiteralStringPart {
-  public let value: CstNode<IdentifierToken>
+  public let value: CstNode<StringLiteralToken>
   // TODO(JonasWanke): Check this when our lexer supports strings.
 }
-impl CstLiteralStringPart: CstExpression
+impl CstLiteralStringPart: StringPart
+
+public class CstEscapedStringPart {
+  public let backslash: CstNode<PunctuationToken>
+  public let value: Maybe<CstNode<StringLiteralToken>>
+}
+impl CstEscapedStringPart: StringPart
 
 public class CstInterpolatedStringPart {
   public let openingCurlyBrace: CstNode<PunctuationToken>
   public let expression: Maybe<CstNode<CstExpression>>
   public let closingCurlyBrace: Maybe<CstNode<PunctuationToken>>
 }
-impl CstInterpolatedStringPart: CstExpression
+impl CstInterpolatedStringPart: StringPart
 
 
 public class CstLambdaExpression {
