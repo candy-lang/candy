@@ -29,6 +29,9 @@ public trait Parser<Item, Output> {
   }
 
   // TODO(JonasWanke): move the following function to `action/map.candy`
+  fun cast<NewOutput>(): Parser<Item, NewOutput> { CastParser<Item, Output, NewOutput>(this) }
+
+  // TODO(JonasWanke): move the following function to `action/map.candy`
   fun map<NewOutput>(mapper: (Output) => NewOutput): Parser<Item, NewOutput> {
     MapParser<Item, Output, NewOutput>(this, mapper)
   }

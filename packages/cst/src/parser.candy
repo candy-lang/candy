@@ -46,12 +46,12 @@ class CstParser {
   fun useLine(): Parser<String, CstNode<CstUseLine>> {
     localRelativeUseLine()
         .or<CstNode<CstGlobalUseLine>>(globalUseLine())
-        .map<CstNode<CstUseLine>>({ it as CstNode<CstUseLine> })
+        .cast<CstNode<CstUseLine>>()
   }
   fun localRelativeUseLine(): Parser<String, CstNode<CstLocalRelativeUseLine>> {
     let path = identifier()
         .or<CstNode<PunctuationToken>>(punctuation("."))
-        .map<CstNode<IdentifierToken | PunctuationToken>>({ it as CstNode<IdentifierToken | PunctuationToken> })
+        .cast<CstNode<IdentifierToken | PunctuationToken>>()
         .star()
     let useLine = modifiers()
         .sequence<CstNode<KeywordToken>>(keyword("use"))
@@ -69,7 +69,7 @@ class CstParser {
   fun globalUseLine(): Parser<String, CstNode<CstGlobalUseLine>> {
     let packagePath = identifier()
         .or<CstNode<PunctuationToken>>(punctuation("."))
-        .map<CstNode<IdentifierToken | PunctuationToken>>({ it as CstNode<IdentifierToken | PunctuationToken> })
+        .cast<CstNode<IdentifierToken | PunctuationToken>>()
         .star()
     let useLine = modifiers()
         .sequence<CstNode<KeywordToken>>(keyword("use"))
@@ -178,9 +178,7 @@ class CstParser {
         .sequence<Maybe<CstNode<CstBlockBody | CstExpressionBody>>>(
           blockBody()
               .or<CstNode<CstExpressionBody>>(expressionBody())
-              .map<CstNode<CstBlockBody | CstExpressionBody>>({
-                it as CstNode<CstBlockBody | CstExpressionBody>
-              })
+              .cast<CstNode<CstBlockBody | CstExpressionBody>>()
               .optional()
         )
         .map<CstDeclaration>({
@@ -209,15 +207,10 @@ class CstParser {
         )>(
           declarationBeginningWithName("var")
         )
-        .map<(
+        .cast<(
           (List<CstNode<IdentifierToken>>, CstNode<KeywordToken>),
           Maybe<CstNode<IdentifierToken>>,
-        )>({
-          it as (
-              (List<CstNode<IdentifierToken>>, CstNode<KeywordToken>),
-              Maybe<CstNode<IdentifierToken>>,
-            )
-        })
+        )>()
         .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>>(
           punctuation(":")
               .sequence<Maybe<CstNode<CstType>>>(type.optional())
@@ -306,7 +299,7 @@ class CstParser {
               .and()
               .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
         )
-        .map<Maybe<CstNode<PunctuationToken>>>({ it as Maybe<CstNode<PunctuationToken>> })
+        .cast<Maybe<CstNode<PunctuationToken>>>()
 
     // TODO(JonasWanke): allow modifiers
     let namedType = punctuation(".")
@@ -320,9 +313,7 @@ class CstParser {
         )
         .map<List<CstNode<IdentifierToken | PunctuationToken>>>({
           let initialDots = (it.first.first as Iterable<CstNode<PunctuationToken>>)
-              .map<CstNode<IdentifierToken | PunctuationToken>>({
-                it as CstNode<IdentifierToken | PunctuationToken>
-              })
+              .cast<CstNode<IdentifierToken | PunctuationToken>>()
           let initialIdentifier = it.first.second
           let remaining = it.second
           let result = MutableList.empty<CstNode<IdentifierToken | PunctuationToken>>()
@@ -330,9 +321,7 @@ class CstParser {
           result.append(initialIdentifier as CstNode<IdentifierToken | PunctuationToken>)
           for tuple in remaining {
             let dots = (tuple.first as Iterable<CstNode<PunctuationToken>>)
-                .map<CstNode<IdentifierToken | PunctuationToken>>({
-                  it as CstNode<IdentifierToken | PunctuationToken>
-                })
+                .cast<CstNode<IdentifierToken | PunctuationToken>>()
             result.appendAll(dots)
             result.append(tuple.second as CstNode<IdentifierToken | PunctuationToken>)
           }
@@ -356,7 +345,7 @@ class CstParser {
                   .and()
                   .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
               )
-              .map<Maybe<CstNode<PunctuationToken>>>({ it as Maybe<CstNode<PunctuationToken>> })
+              .cast<Maybe<CstNode<PunctuationToken>>>()
         )
         .map<CstType>({
           let modifiers = it.first.first.first
@@ -869,14 +858,14 @@ class CstParser {
           endOfInput<String>("End of input expected.")
               .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
         )
-        .map<Maybe<CstNode<PunctuationToken>>>({ it as Maybe<CstNode<PunctuationToken>> })
+        .cast<Maybe<CstNode<PunctuationToken>>>()
   }
   fun commaSeparated<Output>(
     parser: Parser<String, CstNode<Output>>,
   ): Parser<String, List<CstNode<Output | PunctuationToken>>> {
     parser
         .or<CstNode<PunctuationToken>>(punctuation(","))
-        .map<CstNode<Output | PunctuationToken>>({ it as CstNode<Output | PunctuationToken> })
+        .cast<CstNode<Output | PunctuationToken>>()
         .star()
   }
 
