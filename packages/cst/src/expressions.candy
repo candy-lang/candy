@@ -1,23 +1,18 @@
-use lexer
 use ..declarations
 use ..node
+use ..tokens
 use ..types
 
 public trait /* enum */ CstExpression
 
 
-public data class CstBoolExpression {
-  public let value: CstNode<LiteralToken<Bool>>
-}
-impl CstBoolExpression: CstExpression
-
-public data class CstIntExpression {
-  public let value: CstNode<LiteralToken<Int>>
+public class CstIntExpression {
+  public let value: CstNode<IntLiteralToken>
 }
 impl CstIntExpression: CstExpression
 
 
-public data class CstStringExpression {
+public class CstStringExpression {
   public let openingQuote: CstNode<PunctuationToken>
   public let parts: List<CstNode<StringPart>>
   public let closingQuote: Maybe<CstNode<PunctuationToken>>
@@ -26,13 +21,13 @@ impl CstStringExpression: CstExpression
 
 public trait /* enum */ StringPart
 
-public data class CstLiteralStringPart {
+public class CstLiteralStringPart {
   public let value: CstNode<IdentifierToken>
   // TODO(JonasWanke): Check this when our lexer supports strings.
 }
 impl CstLiteralStringPart: CstExpression
 
-public data class CstInterpolatedStringPart {
+public class CstInterpolatedStringPart {
   public let openingCurlyBrace: CstNode<PunctuationToken>
   public let expression: Maybe<CstNode<CstExpression>>
   public let closingCurlyBrace: Maybe<CstNode<PunctuationToken>>
@@ -40,7 +35,7 @@ public data class CstInterpolatedStringPart {
 impl CstInterpolatedStringPart: CstExpression
 
 
-public data class CstLambdaExpression {
+public class CstLambdaExpression {
   public let openingCurlyBrace: CstNode<PunctuationToken>
   public let valueParameters: Maybe<CstNode<CstLambdaExpressionValueParameters>>
   public let expressions: List<CstNode<CstExpression>>
@@ -48,19 +43,35 @@ public data class CstLambdaExpression {
 }
 impl CstLambdaExpression: CstExpression
 
-public data class CstLambdaExpressionValueParameters {
+public class CstLambdaExpressionValueParameters {
   public let valueParameters: List<CstNode<CstValueParameter | PunctuationToken>>
   public let arrow: CstNode<PunctuationToken>
 }
 
 
-public data class CstIdentifierExpression {
+public class CstIdentifierExpression {
   public let value: CstNode<IdentifierToken>
 }
 impl CstIdentifierExpression: CstExpression
 
 
-public data class CstBinaryExpression {
+public class CstGroupExpression {
+  public let openingParenthesis: CstNode<PunctuationToken>
+  public let expression: Maybe<CstNode<CstExpression>>
+  public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
+}
+impl CstGroupExpression: CstExpression
+
+
+public class CstTupleExpression {
+  public let openingParenthesis: CstNode<PunctuationToken>
+  public let valueArguments: List<CstNode<CstExpression | PunctuationToken>>
+  public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
+}
+impl CstTupleExpression: CstExpression
+
+
+public class CstBinaryExpression {
   public let leftOperand: Maybe<CstNode<CstExpression>>
 
   public let operator: CstNode<PunctuationToken>
@@ -80,56 +91,32 @@ impl CstBinaryExpression: CstExpression
 impl CstProperty: CstExpression
 
 
-public data class CstNavigationExpression {
+public class CstNavigationExpression {
   public let receiver: CstNode<CstExpression>
-  public let target: CstNode<IdentifierToken>
+  public let dot: CstNode<PunctuationToken>
+  public let target: Maybe<CstNode<IdentifierToken>>
 }
 impl CstNavigationExpression: CstExpression
 
-public data class CallExpression {
+public class CstCallExpression {
   public let receiver: CstNode<CstExpression>
   public let typeArguments: Maybe<CstNode<CstTypeArguments>>
-  public let valueArguments: List<CstValueArgument>
+  public let valueArguments: CstNode<CstValueArguments>
 }
-impl CallExpression: CstExpression
+impl CstCallExpression: CstExpression
 
-public data class CstValueArguments {
+public class CstValueArguments {
   public let openingParenthesis: CstNode<PunctuationToken>
   public let valueArguments: List<CstNode<CstValueArgument | PunctuationToken>>
   public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
 }
-public data class CstValueArgument {
+public class CstValueArgument {
   public let name: Maybe<(Maybe<CstNode<IdentifierToken>>, CstNode<PunctuationToken>)>
   public let value: Maybe<CstNode<CstExpression>>
 }
 
-public data class CstTupleExpression {
-  public let openingParenthesis: CstNode<PunctuationToken>
-  public let valueArguments: List<Maybe<CstNode<CstExpression>> | CstNode<PunctuationToken>>
-  public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
-}
-impl CstTupleExpression: CstExpression
 
-
-public data class CstIfExpression {
-  public let ifKeyword: CstNode<KeywordToken>
-  public let condition: Maybe<CstNode<CstExpression>>
-  public let body: Maybe<CstNode<CstExpression | CstIfElseBracedBody>>
-  public let elsePart: Maybe<CstNode<CstElsePart>>
-}
-impl CstIfExpression: CstExpression
-
-public data class CstElsePart {
-  public let elseKeyword: CstNode<KeywordToken>
-  public let body: Maybe<CstNode<CstExpression | CstIfElseBracedBody>>
-}
-public data class CstIfElseBracedBody {
-  public let openingCurlyBrace: CstNode<PunctuationToken>
-  public let expressions: List<CstNode<CstExpression>>
-  public let closingCurlyBrace: Maybe<CstNode<PunctuationToken>>
-}
-
-public data class CstReturnExpression {
+public class CstReturnExpression {
   public let returnKeyword: CstNode<KeywordToken>
   public let value: Maybe<CstNode<CstExpression>>
 }

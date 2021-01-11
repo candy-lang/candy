@@ -71,9 +71,9 @@ final getAst = Query<ResourceId, CandyFile>(
     final source = getSourceCode(context, resourceId);
     try {
       return parseCandySource(resourceId.fileNameWithoutExtension, source);
-    } catch (e) {
+    } catch (e, st) {
       throw CompilerError.internalError(
-          "Couldn't parse $resourceId. Source code:\n$source\nError: $e");
+          "Couldn't parse $resourceId.\nError: $e\n\n$st");
     }
   },
 );

@@ -157,15 +157,6 @@ public class TupleExpression {
 impl TupleExpression: Expression
 
 
-public class IfExpression {
-  public let uri: ExpressionUri<IfExpression>
-  public let condition: ExpressionUri<Expression>
-  public let thenBody: List<ExpressionUri<Expression>>
-  public let elseBody: List<ExpressionUri<Expression>>
-}
-impl IfExpression: Expression
-
-
 public class ReturnExpression {
   public let uri: ExpressionUri<ReturnExpression>
   public let scope: Function | Property | ExpressionUri<LambdaExpression>

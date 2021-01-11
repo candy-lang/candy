@@ -1,13 +1,7 @@
-public trait Token {
+use petit_parser
+
+public trait CstToken {
   public let span: Span
-}
-
-public data class Span {
-  public let start: Int
-  /// Start offset, inclusive.
-
-  public let end: Int
-  /// End offset, exclusive.
 }
 
 
@@ -19,25 +13,25 @@ public class KeywordToken {
   ///
   /// * directives: use, crate
   /// * declarations: module, trait, impl, class, fun, let, var, get, set
-  /// * control flow: if, else, return
+  /// * control flow: return
   ///
   /// TODO(JonasWanke): convert this to an enum when we support these
 }
-impl KeywordToken: Token
+impl KeywordToken: CstToken
 
 
 public class IdentifierToken {
   public let span: Span
   public let identifier: String
 }
-impl IdentifierToken: Token
+impl IdentifierToken: CstToken
 
 
-public class LiteralToken<T> {
+public class IntLiteralToken {
   public let span: Span
-  public let value: T
+  public let value: Int
 }
-impl<T> LiteralToken<T>: Token
+impl IntLiteralToken: CstToken
 
 
 public class PunctuationToken {
@@ -51,7 +45,14 @@ public class PunctuationToken {
   ///
   /// TODO(JonasWanke): convert this to an enum when we support these
 }
-impl PunctuationToken: Token
+impl PunctuationToken: CstToken
+
+
+public class WhitespaceToken {
+  public let span: Span
+  public let content: String
+}
+impl WhitespaceToken: CstToken
 
 
 public class CommentToken {
@@ -65,11 +66,4 @@ public class CommentToken {
   /// * "doc": `/// foo`
   /// * "block": `/* foo\nbar */`
 }
-impl CommentToken: Token
-
-
-public class WhitespaceToken {
-  public let span: Span
-  public let content: String
-}
-impl WhitespaceToken: Token
+impl CommentToken: CstToken

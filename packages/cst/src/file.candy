@@ -1,15 +1,15 @@
-use lexer
 use ..declarations
 use ..node
+use ..tokens
 
-public data class CstFile {
+public class CstFile {
   public let content: List<CstNode<CstUseLine | CstDeclaration>>
 }
 
 
 public trait /* enum */ CstUseLine
 
-public data class CstLocalRelativeUseLine {
+public class CstLocalRelativeUseLine {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let useKeyword: CstNode<KeywordToken>
   public let parentNavigations: List<CstNode<PunctuationToken>>
@@ -17,7 +17,7 @@ public data class CstLocalRelativeUseLine {
 }
 impl CstLocalRelativeUseLine: CstUseLine
 
-public data class CstGlobalUseLine {
+public class CstGlobalUseLine {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let useKeyword: CstNode<KeywordToken>
   public let packagePath: List<CstNode<IdentifierToken | PunctuationToken>>

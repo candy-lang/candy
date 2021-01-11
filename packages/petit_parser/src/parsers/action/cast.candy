@@ -1,0 +1,18 @@
+use ....parsers
+
+class CastParser<Item, OldOutput, NewOutput> {
+  let parser: Parser<Item, OldOutput>
+}
+impl<Item, OldOutput, NewOutput> CastParser<Item, OldOutput, NewOutput>: Parser<Item, NewOutput> {
+  fun parse(context: Context<Item>): Result<Success<NewOutput>, Failure> {
+    let result = parser.parse(context)
+    if result is Error<Success<OldOutput>, Failure> {
+      let failure = (result as Error<Success<OldOutput>, Failure>).error
+      return Error<Success<NewOutput>, Failure>(Failure(failure.message, failure.offset))
+    }
+    let result = result.unwrap()
+
+    let newOutput = (result.output as NewOutput)
+    Ok<Success<NewOutput>, Failure>(Success<NewOutput>(newOutput, result.offset))
+  }
+}

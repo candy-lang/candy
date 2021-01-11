@@ -2,6 +2,7 @@ name: compiler_dart
 description: "🍭 Dart-Compiler for the Candy language"
 version: 0.1.0
 homepage: https://github.com/JonasWanke/candy
+publish_to: none
 
 environment:
   sdk: ">=2.7.0 <3.0.0"
@@ -20,7 +21,6 @@ dependencies:
   json_serializable: ^3.4.1
   meta: ^1.1.8
   pubspec: ^0.1.5
-  strings: ^0.1.2
   yaml_edit:
     git:
       url: https://github.com/google/dart-neats.git
