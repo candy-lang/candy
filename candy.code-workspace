@@ -59,6 +59,9 @@
     {
       "name": "hir",
       "path": "packages\\hir"
+    },
+    {
+      "path": "packages\\incremental"
     }
   ],
   "launch": {

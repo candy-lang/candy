@@ -1,7 +1,8 @@
 use ..context
 
-class Query<T> {
-  /// A query that can be run and produces a `T`.
+class Query<T, S> {
+  /// A query that can be run and produces a primary, direct result `T` and a secondary result `S`
+  /// only accessible via the `QueryContext`.
 
   let name: String
   /// A unique query name.
@@ -15,16 +16,21 @@ class Query<T> {
   ///
   /// Multiple inputs can be represented as `Tuple`s or `List`s.
 
-  let runner: () => T
+  let runner: () => (T, S)
   /// A runner that actually runs the query.
 
   let isPure: Bool
   /// Indicates whether the runner is deterministic with regard to the `input`.
 }
 
-public fun query<T>(context: QueryContext, name: String, input: Equals & Hash, runner: () => T): T {
+public fun query<T, S>(
+  context: QueryContext<S>,
+  name: String,
+  input: Equals & Hash,
+  runner: () => (T, S),
+): T {
   /// Creates and runs a pure query.
 
-  let query = Query<T>(name, input, runner, true)
+  let query = Query<T, S>(name, input, runner, true)
   context.run<T>(query)
 }

@@ -1,22 +1,35 @@
 use ..query
 
-class QueryContext {
+class QueryContext<S> {
   /// A context that orchestrates running queries.
 
-  static fun create(): QueryContext {
-    QueryContext(
-      MutableMap.empty<String, MutableMap<Equals & Hash, Equals & Hash>>(),
-      MutableList.empty<(String, Equals & Hash)>()
+  static fun create<S>(): QueryContext<S> {
+    QueryContext<S>(
+      MutableMap.empty<String, MutableMap<Equals & Hash, (Equals & Hash, S)>>(),
+      MutableList.empty<(String, Equals & Hash)>(),
     )
   }
 
-  let cache: MutableMap<String, MutableMap<Equals & Hash, Equals & Hash>>
-  /// A cache from query names to a query-specific cache that maps from input to output.
+  let cache: MutableMap<String, MutableMap<Equals & Hash, (Equals & Hash, S)>>
+  /// A cache from query names to a query-specific cache that maps from input to outputs.
+
+  fun outputs(): Map<String, Map<Equals & Hash, S>> {
+    /// Returns all secondary outputs of all queries by query names and input.
+
+    let result = MutableMap.empty<String, MutableMap<Equals & Hash, S>>()
+    for outerEntry in (cache as Map<String, MutableMap<Equals & Hash, (Equals & Hash, S)>>).entries() {
+      let queryMap = result.putIfAbsent(outerEntry.first, { MutableMap.empty<Equals & Hash, S>() })
+      for innerEntry in (outerEntry.second as Map<Equals & Hash, (Equals & Hash, S)>).entries() {
+        queryMap.set(innerEntry.first, innerEntry.second.second)
+      }
+    }
+    result as Map<String, Map<Equals & Hash, S>>
+  }
 
   let stack: MutableList<(String, Equals & Hash)>
   /// A stack of currently running queries. The tuples contain the name and input of the queries.
 
-  fun run<T: Equals & Hash>(query: Query<T>): T {
+  fun run<T: Equals & Hash>(query: Query<T, S>): T {
     let signature = Tuple(query.name, query.input)
 
     // TODO(marcelgarus): Use stack.contains(signature) once it exists.
@@ -26,17 +39,19 @@ class QueryContext {
       throw "Cyclic query {signature}. This is the stack:\n{stack}"
     }
 
+    let outerMap = cache.putIfAbsent(query.name, { MutableMap.empty<Equals & Hash, (Equals & Hash, S)>() })
     if !query.isPure {
-      return query.runner()
+      let outputs = query.runner()
+      outerMap.set(query.input, outputs)
+      return outputs.first
     }
 
-    cache
-      .putIfAbsent(query.name, { MutableMap.empty<Equals & Hash, Equals & Hash>() })
-      .putIfAbsent(query.input, {
+    let outputs = outerMap.putIfAbsent(query.input, {
         stack.append(signature)
-        let output = query.runner()
+        let outputs = query.runner()
         stack.removeLast()
-        output
-      }) as T
+        outputs
+      }) as (T, S)
+    outputs.first
   }
 }
