@@ -126,14 +126,15 @@ final lowerUseLineAstToHir =
         var resolved = resourceIdToModuleId(context, resourceId);
         assert(useLine.leadingDots.isNotEmpty);
         for (var i = 0; i < useLine.leadingDots.length - 1; i++) {
-          if (resolved == null) {
-            throw CompilerError.invalidUseLine(
-              'This use line uses too many dots.',
-              location: ErrorLocation(resourceId, useLine.span),
-            );
-          }
-          resolved = resolved.parentOrNull;
+          resolved = resolved?.parentOrNull;
         }
+        if (resolved == null) {
+          throw CompilerError.invalidUseLine(
+            'This use line uses too many dots.',
+            location: ErrorLocation(resourceId, useLine.span),
+          );
+        }
+
         return Tuple2(
           resolved.nested(useLine.pathSegments.map((s) => s.name).toList()),
           None(),

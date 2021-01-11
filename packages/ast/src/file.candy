@@ -1,8 +1,14 @@
+use compiler_utils
 use ..node
 use ..declarations
 
+public class AstFileId {
+  let file: File
+}
+impl AstFileId: AstNodeId
+
 public class AstFile {
-  public let id: AstNodeId
+  public let id: AstFileId
   public let useLines: List<AstUseLine>
   public let declarations: List<
     AstModule
@@ -16,18 +22,24 @@ public class AstFile {
 impl AstFile: AstNode
 
 
+public class AstUseLineId {
+  let file: AstFileId
+  let index: Int
+}
+impl AstUseLineId: AstNodeId
+
 public trait /* enum */ AstUseLine
 impl AstUseLine: AstNode
 
 public class AstLocalAbsoluteUseLine {
-  public let id: AstNodeId
+  public let id: AstUseLineId
   public let modifiers: List<String>
   public let path: List<String>
 }
 impl AstLocalAbsoluteUseLine: AstUseLine
 
 public class AstLocalRelativeUseLine {
-  public let id: AstNodeId
+  public let id: AstUseLineId
   public let modifiers: List<String>
   public let parentNavigations: Int
   public let path: List<String>
@@ -35,7 +47,7 @@ public class AstLocalRelativeUseLine {
 impl AstLocalRelativeUseLine: AstUseLine
 
 public class AstGlobalUseLine {
-  public let id: AstNodeId
+  public let id: AstUseLineId
   public let modifiers: List<String>
   public let packagePath: List<String>
   public let moduleName: Maybe<String>

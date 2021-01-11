@@ -2,6 +2,4 @@ public trait AstNode {
   public let id: AstNodeId
 }
 
-public data class AstNodeId {
-  let id: Int
-}
+public trait /* enum */ AstNodeId

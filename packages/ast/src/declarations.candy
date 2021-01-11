@@ -1,7 +1,14 @@
 use ..comment
 use ..expressions
+use ..file
 use ..node
 use ..types
+
+public class AstDeclarationId {
+  let parent: AstFileId | AstDeclarationId | AstExpressionId
+  let name: String
+}
+impl AstDeclarationId: AstNodeId
 
 public trait /* enum */ AstDeclaration {
   public let modifiers: List<String>
@@ -10,7 +17,7 @@ impl AstDeclaration: AstNode
 
 
 public class AstModule {
-  public let id: AstNodeId
+  public let id: AstDeclarationId
   public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<String>
   public let name: Maybe<String>
@@ -27,7 +34,7 @@ impl AstModule: AstDeclaration
 
 
 public class AstTrait {
-  public let id: AstNodeId
+  public let id: AstDeclarationId
   public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<String>
   public let name: Maybe<String>
@@ -38,7 +45,7 @@ public class AstTrait {
 impl AstTrait: AstDeclaration
 
 public class AstImpl {
-  public let id: AstNodeId
+  public let id: AstDeclarationId
   public let modifiers: List<String>
   public let typeParameters: List<AstTypeParameter>
   public let type: AstCandyType
@@ -49,7 +56,7 @@ impl AstImpl: AstDeclaration
 
 
 public class AstClass {
-  public let id: AstNodeId
+  public let id: AstDeclarationId
   public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<String>
   public let name: String
@@ -60,7 +67,7 @@ impl AstClass: AstDeclaration
 
 
 public class AstFunction {
-  public let id: AstNodeId
+  public let id: AstDeclarationId
   public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<String>
   public let name: String
@@ -71,8 +78,15 @@ public class AstFunction {
 }
 impl AstFunction: AstDeclaration
 
+
+public class AstValueParameterId {
+  let parent: AstDeclarationId | AstExpressionId
+  let name: String
+}
+impl AstValueParameterId: AstNodeId
+
 public class AstValueParameter {
-  public let id: AstNodeId
+  public let id: AstValueParameterId
   public let name: Maybe<String>
   public let type: Maybe<AstCandyType>
   public let defaultValue: Maybe<AstDelegationBody>
@@ -80,7 +94,7 @@ public class AstValueParameter {
 
 
 public class AstProperty {
-  public let id: AstNodeId
+  public let id: AstDeclarationId
   public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<String>
   public let isMutable: Bool
@@ -90,18 +104,25 @@ public class AstProperty {
 }
 impl AstProperty: AstDeclaration
 
+
+public class AstBodyId {
+  let parent: AstDeclarationId
+  let name: String
+}
+impl AstBodyId: AstNodeId
+
 public class AstBlockBody {
-  public let id: AstNodeId
+  public let id: AstBodyId
   public let expressions: List<AstExpression>
 }
 impl AstBlockBody: AstNode
 public class AstExpressionBody {
-  public let id: AstNodeId
+  public let id: AstBodyId
   public let expression: Maybe<AstExpression>
 }
 impl AstExpressionBody: AstNode
 public class AstDelegationBody {
-  public let id: AstNodeId
+  public let id: AstBodyId
   public let expression: Maybe<AstExpression>
 }
 impl AstDelegationBody: AstNode

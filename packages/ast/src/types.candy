@@ -1,4 +1,12 @@
+use ..declarations
+use ..expressions
 use ..node
+
+public class AstTypeId {
+  let declaration: AstDeclarationId | AstExpressionId
+  let value: Int
+}
+impl AstTypeId: AstNodeId
 
 public trait /* enum */ AstCandyType {
   let modifiers: List<String>
@@ -7,7 +15,7 @@ impl AstCandyType: AstNode
 
 
 public class AstNamedType {
-  public let id: AstNodeId
+  public let id: AstTypeId
   public let modifiers: List<String>
   public let nameParts: List<String>
   public let typeArguments: List<AstTypeArgument>
@@ -16,7 +24,7 @@ impl AstNamedType: AstCandyType
 
 
 public class AstFunctionType {
-  public let id: AstNodeId
+  public let id: AstTypeId
   public let modifiers: List<String>
   public let receiverType: Maybe<AstCandyType>
   public let parameterTypes: List<AstCandyType>
@@ -26,7 +34,7 @@ impl AstFunctionType: AstCandyType
 
 
 public class AstTupleType {
-  public let id: AstNodeId
+  public let id: AstTypeId
   public let modifiers: List<String>
   public let types: List<AstCandyType>
 }
@@ -34,30 +42,42 @@ impl AstTupleType: AstCandyType
 
 
 public class AstUnionType {
-  public let id: AstNodeId
+  public let id: AstTypeId
   public let modifiers: List<String>
   public let types: List<AstCandyType>
 }
 impl AstUnionType: AstCandyType
 
 public class AstIntersectionType {
-  public let id: AstNodeId
+  public let id: AstTypeId
   public let modifiers: List<String>
   public let types: List<AstCandyType>
 }
 impl AstIntersectionType: AstCandyType
 
 
+public class AstTypeParameterId {
+  let declaration: AstDeclarationId
+  let name: String
+}
+impl AstTypeParameterId: AstNodeId
+
 public class AstTypeParameter {
-  public let id: AstNodeId
-  public let modifiers: List<String>
+  public let id: AstTypeParameterId
   public let modifiers: List<String>
   public let name: Maybe<String>
   public let upperBound: Maybe<AstCandyType>
 }
 
+
+public class AstTypeArgumentId {
+  let declaration: AstDeclarationId
+  let name: String
+}
+impl AstTypeArgumentId: AstNodeId
+
 public class AstTypeArgument {
-  public let id: AstNodeId
+  public let id: AstTypeArgumentId
   public let modifiers: List<String>
   public let type: Maybe<AstCandyType>
 }
