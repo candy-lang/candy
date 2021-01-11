@@ -1,5 +1,5 @@
 public trait Package {
-  // TODO(JonasWanke): provide a query to get the name of a package
+  /// TODO(JonasWanke): provide a query to get the name of a package
 }
 
 public data class FilePackage {

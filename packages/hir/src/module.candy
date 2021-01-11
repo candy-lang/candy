@@ -1,5 +1,4 @@
 public use .comment
 public use .declarations
 public use .expressions
-public use .package
 public use .types
