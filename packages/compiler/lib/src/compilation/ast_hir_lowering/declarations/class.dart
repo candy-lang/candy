@@ -68,6 +68,12 @@ final generateSyntheticDataClassImpls =
         classId.inner(DeclarationPathData.impl('synthetic')),
         properties,
       ),
+      _generateHashImpl(
+        context,
+        createClassThisType(context, classId),
+        classId.inner(DeclarationPathData.impl('synthetic'), 1),
+        properties,
+      ),
     ];
   },
 );
@@ -203,6 +209,97 @@ hir.SyntheticImpl _generateEqualsImpl(
                   ),
                 ),
           ),
+        ],
+      ),
+    ],
+  );
+}
+
+hir.SyntheticImpl _generateHashImpl(
+  QueryContext context,
+  hir.UserCandyType thisType,
+  DeclarationId implId,
+  List<Tuple2<DeclarationId, ast.PropertyDeclaration>> properties,
+) {
+  final methodId = implId.inner(DeclarationPathData.function('hash'));
+
+  var nextId = 0;
+  DeclarationLocalId id() => DeclarationLocalId(methodId, nextId++);
+  final resultParameterType = hir.CandyType.parameter('Result', methodId);
+  final hasherType = hir.CandyType.hasher(resultParameterType);
+
+  return hir.SyntheticImpl(
+    implHir: hir.ImplDeclaration(
+      implId,
+      type: thisType,
+      traits: [hir.CandyType.hash],
+      innerDeclarationIds: [methodId],
+    ),
+    methods: [
+      Tuple2(
+        hir.FunctionDeclaration(
+          methodId,
+          isStatic: false,
+          isTest: false,
+          name: 'hash',
+          typeParameters: [
+            hir.TypeParameter(name: 'Result', upperBound: hir.CandyType.any),
+          ],
+          valueParameters: [
+            hir.ValueParameter(name: 'hasher', type: hasherType),
+          ],
+          returnType: hir.CandyType.unit,
+        ),
+        [
+          for (final property in properties)
+            hir.Expression.functionCall(
+              id(),
+              hir.Expression.identifier(
+                id(),
+                hir.Identifier.property(
+                  moduleIdToDeclarationId(
+                    context,
+                    hir.CandyType.hash.virtualModuleId,
+                  ).inner(DeclarationPathData.function('hash')),
+                  hir.CandyType.function(
+                    returnType: hir.CandyType.unit,
+                    parameterTypes: [
+                      hir.CandyType.parameter(
+                        'Result',
+                        moduleIdToDeclarationId(
+                          context,
+                          hir.CandyType.hash.virtualModuleId,
+                        ).inner(DeclarationPathData.function('hash')),
+                      ),
+                    ],
+                  ),
+                  isMutable: false,
+                  receiver: hir.Expression.identifier(
+                    id(),
+                    hir.Identifier.property(
+                      property.first,
+                      astTypeToHirType(
+                        context,
+                        Tuple2(property.first, property.second.type),
+                      ),
+                      isMutable: false,
+                      receiver: hir.Expression.identifier(
+                        id(),
+                        hir.Identifier.this_(thisType),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              [resultParameterType],
+              {
+                'hasher': hir.Expression.identifier(
+                  id(),
+                  hir.Identifier.parameter(id(), 'hasher', hasherType),
+                ),
+              },
+              hir.CandyType.unit,
+            ),
         ],
       ),
     ],

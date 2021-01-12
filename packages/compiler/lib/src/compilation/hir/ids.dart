@@ -149,6 +149,7 @@ abstract class ModuleId implements _$ModuleId {
   static const coreAssert = ModuleId(PackageId.core, ['assert']);
   static const coreBool = ModuleId(PackageId.core, ['bool']);
   static const coreCollections = ModuleId(PackageId.core, ['collections']);
+  static const coreHash = ModuleId(PackageId.core, ['hash']);
   static const coreIo = ModuleId(PackageId.core, ['io']);
   static const coreMaybe = ModuleId(PackageId.core, ['maybe']);
   static const coreNumbers = ModuleId(PackageId.core, ['numbers']);

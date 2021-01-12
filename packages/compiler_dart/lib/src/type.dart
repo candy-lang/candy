@@ -20,7 +20,10 @@ final Query<CandyType, dart.Reference> compileType =
 
         final declarationId =
             moduleIdToDeclarationId(context, type.virtualModuleId);
-        assert(declarationId.isTrait || declarationId.isClass);
+        assert(
+          declarationId.isTrait || declarationId.isClass,
+          'Expected a trait or class, got: $declarationId.',
+        );
 
         final reference = compileTypeName(context, declarationId);
         return _createType(
