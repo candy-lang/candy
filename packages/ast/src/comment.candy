@@ -2,7 +2,7 @@ use ..declarations
 use ..node
 
 public class AstCandyDocId {
-  let declaration: AstDeclarationId
+  let parentId: AstDeclarationId
 }
 impl AstCandyDocId: AstNodeId
 

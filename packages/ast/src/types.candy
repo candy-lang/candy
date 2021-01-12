@@ -3,7 +3,7 @@ use ..expressions
 use ..node
 
 public class AstTypeId {
-  let declaration: AstDeclarationId | AstExpressionId
+  let parentId: AstDeclarationId | AstExpressionId
   let value: Int
 }
 impl AstTypeId: AstNodeId

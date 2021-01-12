@@ -5,7 +5,7 @@ use ..node
 use ..types
 
 public class AstDeclarationId {
-  let parent: AstFileId | AstDeclarationId | AstExpressionId
+  let parentId: AstFileId | AstDeclarationId | AstExpressionId
   let name: String
 }
 impl AstDeclarationId: AstNodeId
@@ -80,7 +80,7 @@ impl AstFunction: AstDeclaration
 
 
 public class AstValueParameterId {
-  let parent: AstDeclarationId | AstExpressionId
+  let parentId: AstDeclarationId | AstExpressionId
   let name: String
 }
 impl AstValueParameterId: AstNodeId
@@ -106,7 +106,7 @@ impl AstProperty: AstDeclaration
 
 
 public class AstBodyId {
-  let parent: AstDeclarationId
+  let parentId: AstDeclarationId
   let name: String
 }
 impl AstBodyId: AstNodeId

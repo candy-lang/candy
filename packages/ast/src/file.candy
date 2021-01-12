@@ -24,7 +24,7 @@ impl AstFile: AstNode
 
 
 public class AstUseLineId {
-  public let file: AstFileId
+  public let parentId: AstFileId
   public let index: Int
 }
 impl AstUseLineId: AstNodeId
@@ -38,7 +38,7 @@ impl AstUseLine: AstNode
 
 
 public class AstUseLineTargetId {
-  public let useLine: AstUseLineId
+  public let parentId: AstUseLineId
 }
 impl AstUseLineTargetId: AstNodeId
 
@@ -66,7 +66,7 @@ impl AstGlobalUseLineTarget: AstUseLineTarget
 
 
 public class AstIdentifierId {
-  public let parent: AstUseLineId | AstUseLineTargetId | AstDeclarationId | AstExpressionId
+  public let parentId: AstUseLineId | AstUseLineTargetId | AstDeclarationId | AstExpressionId
   public let index: Int
 }
 impl AstIdentifierId: AstNodeId
