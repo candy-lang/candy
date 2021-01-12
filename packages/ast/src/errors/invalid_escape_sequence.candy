@@ -1,0 +1,23 @@
+use compiler_utils
+use cst
+
+public class InvalidEscapeSequenceCompilerError {
+  public let file: File
+  public let stringPart: CstNode<CstEscapedStringPart>
+}
+impl InvalidEscapeSequenceCompilerError: CompilerError {
+  public fun id(): String { "invalidEscapeSequence" }
+
+  public fun location(): Location {
+    let span = if stringPart.child.value is Some<CstNode<StringLiteralToken>> {
+      stringPart.child.value.unwrap().child.span
+    } else {
+      stringPart.child.backslash.child.span
+    }
+    Location(file, span)
+  }
+  public fun title(): String { "Invalid escape sequence." }
+  public fun description(): String {
+    "Valid escape sequences are:\n\n* `\\\🦄`: `\🦄`\n* `\\\👍`: `\👍`\n* `\\\n`: line feed (LF), used for newlines\n* `\\\r`: carriage return (CR)\n* `\\\t`: horizontal tab\n* `\\\\`: `\\`"
+  }
+}

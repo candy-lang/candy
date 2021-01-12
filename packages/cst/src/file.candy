@@ -7,19 +7,21 @@ public class CstFile {
 }
 
 
-public trait /* enum */ CstUseLine
-
-public class CstLocalRelativeUseLine {
+public class CstUseLine {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let useKeyword: CstNode<KeywordToken>
+  public let target: Maybe<CstNode<CstUseLineTarget>>
+}
+
+public trait /* enum */ CstUseLineTarget
+
+public class CstLocalRelativeUseLineTarget {
   public let parentNavigations: List<CstNode<PunctuationToken>>
   public let path: List<CstNode<IdentifierToken | PunctuationToken>>
 }
-impl CstLocalRelativeUseLine: CstUseLine
+impl CstLocalRelativeUseLineTarget: CstUseLineTarget
 
-public class CstGlobalUseLine {
-  public let modifiers: List<CstNode<IdentifierToken>>
-  public let useKeyword: CstNode<KeywordToken>
+public class CstGlobalUseLineTarget {
   public let packagePath: List<CstNode<IdentifierToken | PunctuationToken>>
 }
-impl CstGlobalUseLine: CstUseLine
+impl CstGlobalUseLineTarget: CstUseLineTarget

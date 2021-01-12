@@ -1,7 +1,7 @@
 use ..location
 
 public trait CompilerError {
-  public let id: String
+  public fun id(): String
 
   public fun location(): Location
   public fun title(): String
@@ -14,7 +14,7 @@ public class InternalCompilerError {
   public let description_: String
 }
 impl InternalCompilerError: CompilerError {
-  public let id: String = "internalError"
+  public fun id(): String { "internalError" }
 
   public fun location(): Location { location_ }
   public fun title(): String { "Internal Error" }

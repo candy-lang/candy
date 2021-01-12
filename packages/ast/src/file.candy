@@ -1,6 +1,7 @@
 use compiler_utils
 use ..node
 use ..declarations
+use ..expressions
 
 public class AstFileId {
   let file: File
@@ -23,33 +24,54 @@ impl AstFile: AstNode
 
 
 public class AstUseLineId {
-  let file: AstFileId
-  let index: Int
+  public let file: AstFileId
+  public let index: Int
 }
 impl AstUseLineId: AstNodeId
 
-public trait /* enum */ AstUseLine
+public class AstUseLine {
+  public let id: AstUseLineId
+  public let modifiers: List<AstIdentifier>
+  public let target: AstUseLineTarget
+}
 impl AstUseLine: AstNode
 
-public class AstLocalAbsoluteUseLine {
-  public let id: AstUseLineId
-  public let modifiers: List<String>
-  public let path: List<String>
-}
-impl AstLocalAbsoluteUseLine: AstUseLine
 
-public class AstLocalRelativeUseLine {
-  public let id: AstUseLineId
-  public let modifiers: List<String>
+public class AstUseLineTargetId {
+  public let useLine: AstUseLineId
+}
+impl AstUseLineTargetId: AstNodeId
+
+public trait /* enum */ AstUseLineTarget
+
+public class AstLocalAbsoluteUseLineTarget {
+  public let id: AstUseLineTargetId
+  public let path: List<AstIdentifier>
+}
+impl AstLocalAbsoluteUseLineTarget: AstUseLineTarget
+
+public class AstLocalRelativeUseLineTarget {
+  public let id: AstUseLineTargetId
   public let parentNavigations: Int
-  public let path: List<String>
+  public let path: List<AstIdentifier>
 }
-impl AstLocalRelativeUseLine: AstUseLine
+impl AstLocalRelativeUseLineTarget: AstUseLineTarget
 
-public class AstGlobalUseLine {
-  public let id: AstUseLineId
-  public let modifiers: List<String>
-  public let packagePath: List<String>
-  public let moduleName: Maybe<String>
+public class AstGlobalUseLineTarget {
+  public let id: AstUseLineTargetId
+  public let packagePath: List<AstIdentifier>
+  public let moduleName: Maybe<AstIdentifier>
 }
-impl AstGlobalUseLine: AstUseLine
+impl AstGlobalUseLineTarget: AstUseLineTarget
+
+
+public class AstIdentifierId {
+  public let parent: AstUseLineId | AstUseLineTargetId | AstDeclarationId | AstExpressionId
+  public let index: Int
+}
+impl AstIdentifierId: AstNodeId
+
+public class AstIdentifier {
+  public let id: AstIdentifierId
+  public let value: String
+}

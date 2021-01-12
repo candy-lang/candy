@@ -3,8 +3,10 @@ use ..tokens
 public class CstNode<T> {
   public let id: CstNodeId
   public let child: T
+
+  fun cast<R>(): CstNode<R> { CstNode<R>(id, child as R) }
 }
 
-public class CstNodeId {
+public data class CstNodeId {
   let id: Int
 }

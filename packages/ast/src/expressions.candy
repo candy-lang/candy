@@ -1,4 +1,5 @@
 use ..declarations
+use ..file
 use ..node
 use ..types
 
@@ -22,23 +23,23 @@ impl AstIntExpression: AstExpression
 
 public class AstStringExpression {
   public let id: AstExpressionId
-  public let parts: List<StringPart>
+  public let parts: List<AstStringPart>
 }
 impl AstStringExpression: AstExpression
 
-public trait /* enum */ StringPart
+public trait /* enum */ AstStringPart
 
 public class AstLiteralStringPart {
   public let id: AstExpressionId
-  public let value: String
+  public let value: AstIdentifier
 }
-impl AstLiteralStringPart: AstExpression
+impl AstLiteralStringPart: AstStringPart
 
 public class AstInterpolatedStringPart {
   public let id: AstExpressionId
-  public let expression: Maybe<AstExpression>
+  public let expression: AstExpression
 }
-impl AstInterpolatedStringPart: AstExpression
+impl AstInterpolatedStringPart: AstStringPart
 
 
 public class AstLambdaExpression {
