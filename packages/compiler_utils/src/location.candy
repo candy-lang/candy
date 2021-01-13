@@ -1,0 +1,7 @@
+use petit_parser
+use ..file
+
+public class Location {
+  public let file: File
+  public let span: Span
+}

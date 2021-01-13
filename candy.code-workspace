@@ -9,59 +9,59 @@
       "path": "language"
     },
     {
-      "name": "parser (dart)",
-      "path": "packages\\parser"
-    },
-    {
-      "name": "compiler (dart)",
-      "path": "packages\\compiler"
-    },
-    {
-      "name": "compiler_dart (dart)",
-      "path": "packages\\compiler_dart"
-    },
-    {
-      "name": "lsp_server (dart)",
-      "path": "packages\\lsp_server"
-    },
-    {
-      "name": "vscode_extension (dart)",
-      "path": "packages\\vscode_extension"
-    },
-    {
-      "name": "core",
-      "path": "packages\\core"
-    },
-    {
       "name": "playground",
       "path": "playground"
     },
     {
-      "name": "petit_parser",
-      "path": "packages\\petit_parser"
+      "path": "packages\\core"
     },
     {
-      "name": "glados",
+      "path": "packages\\dart_code_builder"
+    },
+    {
       "path": "packages\\glados"
     },
     {
-      "name": "lexer",
-      "path": "packages\\lexer"
+      "path": "packages\\incremental"
     },
     {
-      "name": "cst",
+      "path": "packages\\petit_parser"
+    },
+    {
+      "name": "compiler: cst",
       "path": "packages\\cst"
     },
     {
-      "name": "ast",
+      "name": "compiler: ast",
       "path": "packages\\ast"
     },
     {
-      "name": "hir",
+      "name": "compiler: hir",
       "path": "packages\\hir"
     },
     {
-      "path": "packages\\incremental"
+      "name": "compiler: utils",
+      "path": "packages\\compiler_utils"
+    },
+    {
+      "name": "dart-compiler: parser",
+      "path": "packages\\parser"
+    },
+    {
+      "name": "dart-compiler: compiler",
+      "path": "packages\\compiler"
+    },
+    {
+      "name": "dart-compiler: compiler_dart",
+      "path": "packages\\compiler_dart"
+    },
+    {
+      "name": "dart-compiler: lsp_server",
+      "path": "packages\\lsp_server"
+    },
+    {
+      "name": "dart-compiler: vscode_extension",
+      "path": "packages\\vscode_extension"
     }
   ],
   "launch": {

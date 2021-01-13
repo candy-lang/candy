@@ -1,0 +1,5 @@
+name: compiler_utils
+
+dependencies:
+  petit_parser:
+    path: ../petit_parser
