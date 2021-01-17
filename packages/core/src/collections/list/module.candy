@@ -96,6 +96,14 @@ public trait MutableList<Item>: List<Item> {
     set(index, newValue)
   }
 
+  fun updateAll(updater: (Item) => Item) {
+    mut let index = 0
+    while index < length() {
+      update(index, updater)
+      index = index + 1
+    }
+  }
+
   fun removeAt(index: Int /* UInt */): Item
 
   fun removeFirst(): Item { removeAt(0) }
