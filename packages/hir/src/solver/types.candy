@@ -1,0 +1,170 @@
+
+trait Type {
+  /// Either a `Variable` or a `ConcreteType`.
+
+  fun containsVariable(variable: Variable): Bool {
+    if this is Variable {
+      (this as Variable).name == variable.name
+    } else {
+      ((this as ConcreteType).parameters as Iterable<Type>).any({ it.containsVariable(variable) })
+    }
+  }
+
+  fun substitute(variable: Variable, substitution: Type): Type {
+    if this is Variable {
+      if (this as Variable).name == variable.name {
+        substitution
+      } else {
+        this
+      }
+    } else {
+      ConcreteType(
+        (this as ConcreteType).name,
+        ((this as ConcreteType).parameters as Iterable<Type>)
+          .map<Type>({ it.substitute(variable, substitution) })
+          .toList()
+      )
+    }
+  }
+
+  public fun unify(other: Type): Maybe<Map<Variable, Type>> {
+    /// Unifies `this` type with the `other`. If unification succeeds, returns a map from variables
+    /// to substitutions. Unification may fail if no variable substitutions exist that makes both
+    /// types the same.
+    ///
+    /// Examples:
+    ///
+    /// * Unifying `String` with `String` succeeds. No substitutions necessary.
+    /// * Unifying `Int` with `String` fails.
+    /// * Unifying `Int` with `?A` succeeds with the substitution `?A = Int`.
+    /// * Unifying `List<?A>` with `List<Set<?B>>` succeeds with the substitution `?A = Set<?B>`.
+    /// * Unifying `Map<?A, ?A>` with `Map<Int, String>` fails.
+    /// * Unifying `Map<?A, ?A>` with `Map<Int, Int>` succeeds with the subsitution `?A = Int`.
+    /// * Unifying `Map<?A, ?A>` with `Map<?B, Int>` succeeds with the substitutions `?A = Int` and
+    ///   `?B = Int`.
+    /// * Unifying `Set<?A>` with `Set<?B>` succeeds with the substitution `?A = ?B`.
+    /// * Unifying `?Batman` with `Na<?Batman>` fails because repeated substitution would lead to
+    ///   types of infinite size:
+    ///   `?Batman = Na<?Batman> = Na<Na<?Batman>> = ... = Na<Na<Na<Na<Na<Na<?Batman>>>>>> = ...`
+    /// * Unifying `Map<?A, ?B>` with `Map<Ping<?B>, Pong<?A>>` fails because repeated substitution
+    ///   would lead to types of infinite size:
+    ///   `?A = Ping<?B> = Ping<Pong<?A>> = Ping<Pong<Ping<?B>>> = Ping<Pong<Ping<Pong<?A>>>> = ...`
+    //
+    // TODO(marcelgarus): Write property-based tests for this. For example, generate random types
+    // and then check that the order of unifying doesn't matter and that applying the substitutions
+    // actually results in the same type.
+
+    if this is Variable && other is Variable {
+      // If both are variables, we return a substitution with the lexicographically first one being
+      // the one subsituted. For example, unifying `?B` with `?A` would yield the substitution
+      // `?A = ?B`.
+      let this_ = (this as Variable)
+      let other_ = (other as Variable)
+
+      if this_.name == other_.name {
+        // Being equal to itself is no bound, so no substitution `?A = ?A` is necessary.
+        Some<Map<Variable, Type>>(Map.empty<Variable, Type>())
+      } else {
+        if this_.name < other_.name {
+          Some<Map<Variable, Type>>(Map.of1<Variable, Type>(Tuple(this_, other_)))
+        } else {
+          Some<Map<Variable, Type>>(Map.of1<Variable, Type>(Tuple(other_, this_)))
+        }
+      }
+    }
+
+    if this is Variable && other is ConcreteType {
+      let this_ = (this as Variable)
+      
+      if other.containsVariable(this_) {
+        // This is an infinitely growing type. That's not allowed.
+        return None<Map<Variable, Type>>()
+      }
+      return Some<Map<Variable, Type>>(Map.of1<Variable, Type>(Tuple(this_, other)))
+    }
+
+    if this is ConcreteType && other is Variable {
+      return other.unify(this)
+    }
+
+    let this_ = (this as ConcreteType)
+    let other_ = (other as ConcreteType)
+
+    if !(this_.name == other_.name)
+      || !((this_.parameters as Iterable).length() == (other_.parameters as Iterable).length()) {
+      return None<Map<Variable, Type>>()
+    }
+
+    // To unify all types, we have a queue of substitutions that we try to bring into a common
+    // solution space one by one.
+    let a = 2
+    let solutionSpace = MutableMap.empty<Variable, Type>()
+    let queue: Maybe<MutableList<(Variable, Type)>> = (this_.parameters as Iterable<Type>).zip<Type>(other_.parameters)
+      .map<Maybe<Map<Variable, Type>>>({ it.first.unify(it.second) })
+      .foldLeft<Maybe<Iterable<Map<Variable, Type>>>>(
+        Some<Iterable<Map<Variable, Type>>>(List.empty<Map<Variable, Type>>()),
+        { a, b =>
+          if a is None { return None<Iterable<Map<Variable, Type>>>() }
+          if b is None { return None<Iterable<Map<Variable, Type>>>() }
+          return Some<Iterable<Map<Variable, Type>>>(
+            a.unwrap().followedBy(List.of1<Map<Variable, Type>>(b.unwrap())),
+          )
+        },
+      )
+      .map<MutableList<(Variable, Type)>>({
+        it.expand<(Variable, Type)>({ it.entries() }).toMutableList()
+      })
+    if queue is None {
+      return None<Map<Variable, Type>>()
+    }
+    let queue = queue.unwrap()
+
+    while (queue as Iterable).isNotEmpty() {
+      let substitution = queue.removeFirst()
+      if !(solutionSpace as Map<Variable, Type>).containsKey(substitution.first) {
+        let existingSubstitution = (solutionSpace as Map<Variable, Type>).get(substitution.first).unwrap()
+        let unified = existingSubstitution.unify(substitution.second)
+        if unified is None {
+          return None<Map<Variable, Type>>()
+        }
+        queue.appendAll(unified.unwrap().entries())
+      } else {
+        solutionSpace.set(substitution.first, substitution.second)
+        solutionSpace.updateAll({ it.substitute(substitution.first, substitution.second) })
+        queue.updateAll({
+          Tuple(it.first, it.second.substitute(substitution.first, substitution.second))
+        })
+      }
+    }
+
+    Some<Map<Variable, Type>>(solutionSpace)
+  }
+}
+
+class Variable {
+  /// A type variable that needs to be substituted.
+  ///
+  /// These map to the type parameters in Candy. In the context of the solver,
+  /// they are displayed with a leading question mark: `?name`
+  ///
+  /// Examples:
+  /// * `?T`
+  /// * `?0`
+
+  let name: String
+}
+impl Variable: Type
+
+class ConcreteType {
+  /// A concrete type. May contain `Variable`s inside its `parameters`.
+  ///
+  /// Examples:
+  /// * `List<?T>`
+  /// * `String`
+  /// * `Set<Int>`
+  /// * `Tuple<Int, String>`
+
+  let name: String
+  let parameters: List<Type>
+}
+impl ConcreteType: Type
