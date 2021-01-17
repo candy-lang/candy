@@ -144,6 +144,15 @@ public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
     }
   }
 
+  fun update(key: Key, updater: (Value) => Value) {
+    let safeGet = get as ((Key) => Maybe<Value>)
+    let value = safeGet(key)
+    if value is Some {
+      let newValue = updater(value.unwrap())
+      set(key, newValue)
+    }
+  }
+
   fun remove(key: Key): Maybe<Value>
 
   fun clear() {
