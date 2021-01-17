@@ -1,6 +1,6 @@
-use ..declaration
+use ..declarations
 
-public class CandyDoc {
+public class HirDoc {
   public let target: Module | Trait | Class | Constructor | Function | Property
   public let content: String /* Markup */
 }

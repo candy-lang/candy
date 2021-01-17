@@ -1,182 +1,178 @@
 use ..declarations
 use ..types
 
-public data class ExpressionUri<E: Expression> {
-  public let declaration: Constructor | Function | Property
+public data class HirExpressionUri<E: HirExpression> {
+  public let declaration: HirConstructor | HirFunction | HirProperty
   public let index: Int
 }
 
 
-public trait Expression {
-  public let uri: ExpressionUri<Expression>
+public trait HirExpression {
+  public let uri: HirExpressionUri<HirExpression>
 }
 
 
 
-public class BoolExpression {
-  public let uri: ExpressionUri<BoolExpression>
+public class HirBoolExpression {
+  public let uri: HirExpressionUri<HirBoolExpression>
   public let value: Bool
 }
-impl BoolExpression: Expression
+impl HirBoolExpression: HirExpression
 
-public class IntExpression {
-  public let uri: ExpressionUri<IntExpression>
+public class HirIntExpression {
+  public let uri: HirExpressionUri<HirIntExpression>
   public let value: Int
 }
-impl IntExpression: Expression
+impl HirIntExpression: HirExpression
 
 
-public class StringExpression {
-  public let uri: ExpressionUri<StringExpression>
-  public let parts: List<StringPart>
+public class HirStringExpression {
+  public let uri: HirExpressionUri<HirStringExpression>
+  public let parts: List<HirStringPart>
 }
-impl StringExpression: Expression
+impl HirStringExpression: HirExpression
 
-trait StringPart
-impl StringPart: Expression
+trait HirStringPart
+impl HirStringPart: HirExpression
 
-public class LiteralStringPart {
-  public let uri: ExpressionUri<LiteralStringPart>
+public class HirLiteralStringPart {
+  public let uri: HirExpressionUri<HirLiteralStringPart>
   public let value: String
 }
-impl LiteralStringPart: StringPart
+impl HirLiteralStringPart: HirStringPart
 
-public class InterpolatedStringPart {
-  public let uri: ExpressionUri<InterpolatedStringPart>
+public class HirInterpolatedStringPart {
+  public let uri: HirExpressionUri<HirInterpolatedStringPart>
   public let value: String
 }
-impl InterpolatedStringPart: StringPart
+impl HirInterpolatedStringPart: HirStringPart
 
 
-public class LambdaExpression {
-  public let uri: ExpressionUri<LambdaExpression>
-  public let parameters: List<LambdaParameter>
-  public let expressions: List<ExpressionUri<Expression>>
-  public let returnType: CandyType
-  public let receiverType: Maybe<CandyType>
+public class HirLambdaExpression {
+  public let uri: HirExpressionUri<HirLambdaExpression>
+  public let parameters: List<HirLambdaParameter>
+  public let expressions: List<HirExpressionUri<HirExpression>>
+  public let returnType: HirType
+  public let receiverType: Maybe<HirType>
 }
-impl LambdaExpression: Expression
+impl HirLambdaExpression: HirExpression
 
-public class LambdaParameter {
+public class HirLambdaParameter {
   public let name: String
-  public let type: CandyType
+  public let type: HirType
 }
 
 
-public class ThisExpression {
-  public let uri: ExpressionUri<ThisExpression>
-  public let type: CandyType
+public class HirThisExpression {
+  public let uri: HirExpressionUri<HirThisExpression>
+  public let type: HirType
 }
-impl ThisExpression: Expression
+impl HirThisExpression: HirExpression
 
-public class SuperExpression {
-  public let uri: ExpressionUri<SuperExpression>
-  public let type: NamedType
+public class HirSuperExpression {
+  public let uri: HirExpressionUri<HirSuperExpression>
+  public let type: HirNamedType
 }
-impl SuperExpression: Expression
+impl HirSuperExpression: HirExpression
 
 
-public class ReflectionExpression<Target: Module | Trait | Class | Function | Property | ParameterType> {
-  public let uri: ExpressionUri<ReflectionExpression<Target>>
+public class HirReflectionExpression<
+  Target: HirModule | HirTrait | HirClass | HirFunction | HirProperty | HirParameterType
+> {
+  public let uri: HirExpressionUri<HirReflectionExpression<Target>>
   public let target: Target
 }
-impl ReflectionExpression: Expression
+impl HirReflectionExpression: HirExpression
 
-public class ParameterExpression {
-  public let uri: ExpressionUri<ParameterExpression>
-  public let scope: Function | ExpressionUri<LambdaExpression>
+public class HirParameterExpression {
+  public let uri: HirExpressionUri<HirParameterExpression>
+  public let scope: HirFunction | HirExpressionUri<HirLambdaExpression>
 }
-impl ParameterExpression: Expression
+impl HirParameterExpression: HirExpression
 
 
-public class PropertyReferenceExpression {
-  public let uri: ExpressionUri<PropertyReferenceExpression>
-  public let target: Property
+public class HirPropertyReferenceExpression {
+  public let uri: HirExpressionUri<HirPropertyReferenceExpression>
+  public let target: HirProperty
 }
-impl PropertyReferenceExpression: Expression
+impl HirPropertyReferenceExpression: HirExpression
 
-public class FunctionReferenceExpression {
-  public let uri: ExpressionUri<FunctionReferenceExpression>
-  public let target: Function
+public class HirFunctionReferenceExpression {
+  public let uri: HirExpressionUri<HirFunctionReferenceExpression>
+  public let target: HirFunction
 }
-impl FunctionReferenceExpression: Expression
+impl HirFunctionReferenceExpression: HirExpression
 
 
-public class LocalPropertyExpression {
-  public let uri: ExpressionUri<LocalPropertyExpression>
+public class HirLocalPropertyExpression {
+  public let uri: HirExpressionUri<HirLocalPropertyExpression>
   public let name: String
-  public let type: CandyType
-  public let initializer: ExpressionUri<Expression>
+  public let type: HirType
+  public let initializer: HirExpressionUri<HirExpression>
   public let isMutable: Bool
 }
-impl LocalPropertyExpression: Expression
+impl HirLocalPropertyExpression: HirExpression
 
-public class LocalPropertyReferenceExpression {
-  public let uri: ExpressionUri<LocalPropertyReferenceExpression>
-  public let target: ExpressionUri<LocalPropertyExpression>
+public class HirLocalPropertyReferenceExpression {
+  public let uri: HirExpressionUri<HirLocalPropertyReferenceExpression>
+  public let target: HirExpressionUri<HirLocalPropertyExpression>
 }
-impl LocalPropertyReferenceExpression: Expression
+impl HirLocalPropertyReferenceExpression: HirExpression
 
 
-public class NavigationExpression {
-  public let uri: ExpressionUri<NavigationExpression>
-  public let receiver: ExpressionUri<Expression>
-  public let target: Function | Property
+public class HirNavigationExpression {
+  public let uri: HirExpressionUri<HirNavigationExpression>
+  public let receiver: HirExpressionUri<HirExpression>
+  public let target: HirFunction | HirProperty
 }
-impl NavigationExpression: Expression
+impl HirNavigationExpression: HirExpression
 
 
-public class FunctionCallExpression {
-  public let uri: ExpressionUri<FunctionCallExpression>
-  public let receiver: ExpressionUri<FunctionReferenceExpression | ReflectionExpression<Function>>
-  public let typeArguments: Map<String, CandyType>
-  public let valueArguments: Map<String, ExpressionUri<Expression>>
+public class HirFunctionCallExpression {
+  public let uri: HirExpressionUri<HirFunctionCallExpression>
+  public let receiver: HirExpressionUri<
+    HirFunctionReferenceExpression | HirReflectionExpression<HirFunction>
+  >
+  public let typeArguments: Map<String, HirType>
+  public let valueArguments: Map<String, HirExpressionUri<HirExpression>>
 }
-impl FunctionCallExpression: Expression
+impl HirFunctionCallExpression: HirExpression
 
-public class ExpressionCallExpression {
-  public let uri: ExpressionUri<ExpressionCallExpression>
-  public let receiver: ExpressionUri<Expression>
-  public let valueArguments: List<ExpressionUri<Expression>>
+public class HirExpressionCallExpression {
+  public let uri: HirExpressionUri<HirExpressionCallExpression>
+  public let receiver: HirExpressionUri<HirExpression>
+  public let valueArguments: List<HirExpressionUri<HirExpression>>
 }
-impl ExpressionCallExpression: Expression
+impl HirExpressionCallExpression: HirExpression
 
-public class ConstructorCallExpression {
-  public let uri: ExpressionUri<ConstructorCallExpression>
-  public let receiver: ExpressionUri<ReflectionExpression<Class>>
-  public let constructor: Constructor
-  public let typeArguments: Map<String, CandyType>
-  public let valueArguments: Map<String, ExpressionUri<Expression>>
+public class HirConstructorCallExpression {
+  public let uri: HirExpressionUri<HirConstructorCallExpression>
+  public let receiver: HirExpressionUri<HirReflectionExpression<HirClass>>
+  public let constructor: HirConstructor
+  public let typeArguments: Map<String, HirType>
+  public let valueArguments: Map<String, HirExpressionUri<HirExpression>>
 }
-impl ConstructorCallExpression: Expression
+impl HirConstructorCallExpression: HirExpression
 
-public class TupleExpression {
-  public let uri: ExpressionUri<TupleExpression>
-  public let valueArguments: List<ExpressionUri<Expression>>
+public class HirTupleExpression {
+  public let uri: HirExpressionUri<HirTupleExpression>
+  public let valueArguments: List<HirExpressionUri<HirExpression>>
 }
-impl TupleExpression: Expression
+impl HirTupleExpression: HirExpression
 
-
-public class IfExpression {
-  public let uri: ExpressionUri<IfExpression>
-  public let condition: ExpressionUri<Expression>
-  public let thenBody: List<ExpressionUri<Expression>>
-  public let elseBody: List<ExpressionUri<Expression>>
+public class HirReturnExpression {
+  public let uri: HirExpressionUri<HirReturnExpression>
+  public let scope: HirFunction | HirProperty | HirExpressionUri<HirLambdaExpression>
+  public let expression: HirExpressionUri<HirExpression>
 }
-impl IfExpression: Expression
+impl HirReturnExpression: HirExpression
 
 
-public class ReturnExpression {
-  public let uri: ExpressionUri<ReturnExpression>
-  public let scope: Function | Property | ExpressionUri<LambdaExpression>
-  public let expression: ExpressionUri<Expression>
+public class HirAssignmentExpression {
+  public let uri: HirExpressionUri<HirAssignmentExpression>
+  public let target: HirExpressionUri<
+    HirPropertyReferenceExpression | HirLocalPropertyReferenceExpression
+  >
+  public let value: HirExpressionUri<HirExpression>
 }
-impl ReturnExpression: Expression
-
-
-public class AssignmentExpression {
-  public let uri: ExpressionUri<AssignmentExpression>
-  public let target: ExpressionUri<PropertyReferenceExpression | LocalPropertyReferenceExpression>
-  public let value: ExpressionUri<Expression>
-}
-impl AssignmentExpression: Expression
+impl HirAssignmentExpression: HirExpression

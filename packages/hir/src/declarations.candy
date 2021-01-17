@@ -1,64 +1,64 @@
-use ..uris
+use ..package
 
-public trait Declaration {
-  public let parent: Package | Module | Trait | Class
+public trait HirDeclaration {
+  public let parent: HirPackage | HirModule | HirTrait | HirClass
   public fun name(): String
 }
 
-public class Module {
-  public let parent: Package | Module
+public class HirModule {
+  public let parent: HirPackage | HirModule
   public let name_: String
 }
-impl Module: Declaration {
+impl HirModule: HirDeclaration {
   fun name(): String { name_ }
 }
 
-public class Trait {
-  public let parent: Module | Trait | Class
+public class HirTrait {
+  public let parent: HirModule | HirTrait | HirClass
   public let name_: String
 }
-impl Trait: Declaration {
+impl HirTrait: HirDeclaration {
   fun name(): String { name_ }
 }
 
-public class Impl {
-  public let parent: Module
+public class HirImpl {
+  public let parent: HirModule
   public let disambiguator: Int
 }
-impl Impl: Declaration {
+impl HirImpl: HirDeclaration {
   fun name(): String { "impl" }
 }
 
-public class Class {
-  public let parent: Module | Trait | Class
+public class HirClass {
+  public let parent: HirModule | HirTrait | HirClass
   public let name_: String
   public let disambiguator: Maybe<Int>
 }
-impl Class: Declaration {
+impl HirClass: HirDeclaration {
   fun name(): String { name_ }
 }
 
-public class Constructor {
-  public let parent: Class
+public class HirConstructor {
+  public let parent: HirClass
   public let disambiguator: Int
 }
-impl Constructor: Declaration {
+impl HirConstructor: HirDeclaration {
   fun name(): String { "constructor" }
 }
 
-public class Function {
-  public let parent: Module | Trait | Impl | Class
+public class HirFunction {
+  public let parent: HirModule | HirTrait | HirImpl | HirClass
   public let name_: String
   public let disambiguator: Int
 }
-impl Function: Declaration {
+impl HirFunction: HirDeclaration {
   fun name(): String { name_ }
 }
 
-public class Property {
-  public let parent: Module | Trait | Impl | Class
+public class HirProperty {
+  public let parent: HirModule | HirTrait | HirImpl | HirClass
   public let name_: String
 }
-impl Property: Declaration {
+impl HirProperty: HirDeclaration {
   fun name(): String { name_ }
 }
