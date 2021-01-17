@@ -1,44 +1,44 @@
 use ..uris
 
-public trait CandyType
+public trait HirType
 
 public class NamedType {
   public let declarationUri: Trait | Class
 }
-impl NamedType: CandyType
+impl NamedType: HirType
 
 public class TupleType {
-  public let types: List<Type>
+  public let types: List<HirType>
 }
-impl TupleType: CandyType
+impl TupleType: HirType
 
 public class FunctionType {
-  public let receiverType: CandyType
-  public let parameterTypes: List<Type>
-  public let returnType: CandyType
+  public let receiverType: HirType
+  public let parameterTypes: List<HirType>
+  public let returnType: HirType
 }
-impl FunctionType: CandyType
+impl FunctionType: HirType
 
 public class UnionType {
-  public let types: List<Type>
+  public let types: List<HirType>
 }
-impl UnionType: CandyType
+impl UnionType: HirType
 
 public class IntersectionType {
-  public let types: List<Type>
+  public let types: List<HirType>
 }
-impl IntersectionType: CandyType
+impl IntersectionType: HirType
 
 public class ThisType
-impl ThisType: CandyType
+impl ThisType: HirType
 
 public class ParameterType {
   public let declarationUri: Trait | Class | Function
   public let name: String
 }
-impl ParameterType: CandyType
+impl ParameterType: HirType
 
 public class ReflectionType {
   public let target: Module | Trait | Class | Function | Property | ParameterType
 }
-impl ReflectionType: CandyType
+impl ReflectionType: HirType
