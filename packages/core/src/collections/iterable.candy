@@ -88,10 +88,23 @@ public trait Iterable<Item> {
   fun isEmpty(): Bool { first() is None }
   fun isNotEmpty(): Bool { !isEmpty() }
 
-  // TODO(marcelgarus): Implement these as soon as for-loops work:
-  // TODO(marcelgarus): all
-  // TODO(marcelgarus): any
-  // TODO(marcelgarus): contains
+  fun all(check: (Item) => Bool): Bool {
+    for item in this {
+      if !check(item) {
+        return false
+      }
+    }
+    return true
+  }
+
+  fun any(check: (Item) => Bool): Bool {
+    for item in this {
+      if check(item) {
+        return true
+      }
+    }
+    return false
+  }
 
   // Reductions.
 
