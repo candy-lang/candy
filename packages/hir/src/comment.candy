@@ -1,6 +1,7 @@
-use ..declarations
+/*use ..declarations
 
 public class HirDoc {
   public let target: HirModule | HirTrait | HirClass | HirConstructor | HirFunction | HirProperty
   public let content: String /* Markup */
 }
+*/

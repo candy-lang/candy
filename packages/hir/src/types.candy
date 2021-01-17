@@ -1,4 +1,4 @@
-use ..declarations
+/*use ..declarations
 
 public trait HirType
 
@@ -42,3 +42,4 @@ public class HirReflectionType {
   public let target: HirModule | HirTrait | HirClass | HirFunction | HirProperty | HirParameterType
 }
 impl HirReflectionType: HirType
+*/

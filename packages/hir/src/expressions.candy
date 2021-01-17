@@ -1,4 +1,4 @@
-use ..declarations
+/*use ..declarations
 use ..types
 
 public data class HirExpressionUri<E: HirExpression> {
@@ -33,7 +33,6 @@ public class HirStringExpression {
 impl HirStringExpression: HirExpression
 
 trait HirStringPart
-impl HirStringPart: HirExpression
 
 public class HirLiteralStringPart {
   public let uri: HirExpressionUri<HirLiteralStringPart>
@@ -176,3 +175,4 @@ public class HirAssignmentExpression {
   public let value: HirExpressionUri<HirExpression>
 }
 impl HirAssignmentExpression: HirExpression
+*/

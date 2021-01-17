@@ -1,4 +1,4 @@
-public trait HirPackage {
+/*public trait HirPackage {
   // TODO(JonasWanke): provide a query to get the name of a package
 }
 
@@ -20,3 +20,4 @@ public data class HirHostedPackage {
   public let version: String /* Version */
 }
 impl HirHostedPackage: HirPackage
+*/

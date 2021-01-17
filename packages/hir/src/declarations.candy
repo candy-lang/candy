@@ -1,4 +1,4 @@
-use ..package
+/*use ..package
 
 public trait HirDeclaration {
   public let parent: HirPackage | HirModule | HirTrait | HirClass
@@ -62,3 +62,4 @@ public class HirProperty {
 impl HirProperty: HirDeclaration {
   fun name(): String { name_ }
 }
+*/
