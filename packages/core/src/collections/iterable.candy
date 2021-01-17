@@ -217,7 +217,11 @@ public trait Iterable<Item> {
   // }
 
   // TODO(marcelgarus): distinctBy
-  // TODO(marcelgarus): expand
+
+  fun expand<T>(expander: (Item) => Iterable<T>): Iterable<T> {
+    ExpandIterable<Item, T>(this, expander)
+  }
+
   // TODO(marcelgarus): flatMap
   // TODO(marcelgarus): groupBy
   // TODO(marcelgarus): reversed
@@ -323,6 +327,38 @@ impl<Item> WhereIterator<Item>: Iterator<Item> {
           return element
         }
       }
+    }
+  }
+}
+
+class ExpandIterable<Item, T> {
+  let parent: Iterable<Item>
+  let expander: (Item) => Iterable<T>
+}
+impl<Item, T> ExpandIterable<Item, T>: Iterable<T> {
+  fun iterator(): Iterator<T> {
+    ExpandIterator<Item, T>(parent.iterator(), expander, None<Iterator<T>>())
+  }
+}
+class ExpandIterator<Item, T> {
+  let parent: Iterator<Item>
+  let expander: (Item) => Iterable<T>
+  mut let expanded: Maybe<Iterator<T>>
+}
+impl<Item, T> ExpandIterator<Item, T>: Iterator<T> {
+  fun next(): Maybe<T> {
+    loop {
+      if expanded is Some {
+        let item = expanded.unwrap().next()
+        if item is Some {
+          return item
+        }
+      }
+      let item = parent.next()
+      if item is None {
+        return None<T>()
+      }
+      expanded = Some<Iterator<T>>(expander(item.unwrap()).iterator())
     }
   }
 }
