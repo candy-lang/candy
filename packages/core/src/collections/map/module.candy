@@ -153,6 +153,12 @@ public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
     }
   }
 
+  fun updateAll(updater: (Value) => Value) {
+    for key in keys() {
+      update(key as Key, updater)
+    }
+  }
+
   fun remove(key: Key): Maybe<Value>
 
   fun clear() {
