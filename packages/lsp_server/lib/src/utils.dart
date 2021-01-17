@@ -52,10 +52,12 @@ extension ErrorLocationConversion on ErrorLocation {
   Location toLocation(AnalysisServer server) =>
       Location(server.resourceIdToFileUri(resourceId), toRange(server));
   Range toRange(AnalysisServer server) {
-    return Range(
-      span.start.toPosition(server, resourceId),
-      span.end.toPosition(server, resourceId),
-    );
+    return span == null
+        ? Range(Position(0, 0), Position(0, 0))
+        : Range(
+            span.start.toPosition(server, resourceId),
+            span.end.toPosition(server, resourceId),
+          );
   }
 }
 
