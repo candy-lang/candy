@@ -221,7 +221,10 @@ public trait Iterable<Item> {
   // TODO(marcelgarus): flatMap
   // TODO(marcelgarus): groupBy
   // TODO(marcelgarus): reversed
-  // TODO(marcelgarus): zip
+
+  fun zip<T>(other: Iterable<T>): Iterable<(Item, T)> {
+    ZipIterable<Item, T>(this, other)
+  }
 
   fun followedBy(other: Iterable<Item>): Iterable<Item> {
     FollowedByIterable<Item>(this, other)
@@ -320,6 +323,32 @@ impl<Item> WhereIterator<Item>: Iterator<Item> {
           return element
         }
       }
+    }
+  }
+}
+
+
+class ZipIterable<Item, T> {
+  let parent: Iterable<Item>
+  let other: Iterable<T>
+}
+impl<Item, T> ZipIterable<Item, T>: Iterable<(Item, T)> {
+  fun iterator(): Iterator<(Item, T)> {
+    ZipIterator<Item, T>(parent.iterator(), other.iterator())
+  }
+}
+class ZipIterator<Item, T> {
+  let parent: Iterator<Item>
+  let other: Iterator<T>
+}
+impl<Item, T> ZipIterator<Item, T>: Iterator<(Item, T)> {
+  fun next(): Maybe<(Item, T)> {
+    let a = parent.next()
+    let b = other.next()
+    if a is None || b is None {
+      None<(Item, T)>()
+    } else {
+      Some<(Item, T)>(Tuple(a.unwrap(), b.unwrap()))
     }
   }
 }
