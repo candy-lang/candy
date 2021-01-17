@@ -89,6 +89,13 @@ public trait MutableList<Item>: List<Item> {
   // TODO(marcelgarus): Rename to add as soon as the naming conflict with + is resolved.
   fun append(item: Item)
 
+  fun update(index: Int, updater: (Item) => Item) {
+    let safeGet = get as ((Int) => Item)
+    let value = safeGet(index)
+    let newValue = updater(value)
+    set(index, newValue)
+  }
+
   fun removeAt(index: Int /* UInt */): Item
 
   fun removeFirst(): Item { removeAt(0) }
