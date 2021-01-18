@@ -6,7 +6,7 @@ public class MissingExpressionInInterpolationCompilerError {
   public let stringPart: CstNode<CstInterpolatedStringPart>
 }
 impl MissingExpressionInInterpolationCompilerError: CompilerError {
-  public fun id(): String { "missingExpressionInInterpolation" }
+  public fun id(): String { "missing-expression-in-interpolation" }
 
   public fun location(): Location { Location(file, stringPart.child.openingCurlyBrace.child.span) }
   public fun title(): String { "Missing expression in string interpolation." }

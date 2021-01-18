@@ -6,7 +6,7 @@ public class UseLineAfterDeclarationCompilerError {
   public let useLine: CstNode<CstUseLine>
 }
 impl UseLineAfterDeclarationCompilerError: CompilerError {
-  public fun id(): String { "useLineAfterDeclaration" }
+  public fun id(): String { "use-line-after-declaration" }
 
   public fun location(): Location {
     Location(file, useLine.child.useKeyword.child.span)

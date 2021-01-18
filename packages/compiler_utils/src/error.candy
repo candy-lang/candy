@@ -14,7 +14,7 @@ public class InternalCompilerError {
   public let description_: String
 }
 impl InternalCompilerError: CompilerError {
-  public fun id(): String { "internalError" }
+  public fun id(): String { "internal-error" }
 
   public fun location(): Location { location_ }
   public fun title(): String { "Internal Error" }

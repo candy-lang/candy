@@ -6,7 +6,7 @@ public class InvalidEscapeSequenceCompilerError {
   public let stringPart: CstNode<CstEscapedStringPart>
 }
 impl InvalidEscapeSequenceCompilerError: CompilerError {
-  public fun id(): String { "invalidEscapeSequence" }
+  public fun id(): String { "invalid-escape-sequence" }
 
   public fun location(): Location {
     let span = if stringPart.child.value is Some<CstNode<StringLiteralToken>> {

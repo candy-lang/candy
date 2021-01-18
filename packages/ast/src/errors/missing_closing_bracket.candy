@@ -10,7 +10,7 @@ public class MissingClosingBracketCompilerError {
   >
 }
 impl MissingClosingBracketCompilerError: CompilerError {
-  public fun id(): String { "missingClosingBracket" }
+  public fun id(): String { "missing-closing-bracket" }
 
   public fun location(): Location {
     let span = if expressionOrStringPart is CstNode<CstGroupExpression> {
