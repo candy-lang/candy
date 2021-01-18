@@ -1,0 +1,17 @@
+use compiler_utils
+use cst
+
+public class ExpectedReturnTypeInFunctionTypeCompilerError {
+  public let file: File
+  public let functionType: CstNode<CstFunctionType>
+}
+impl ExpectedReturnTypeInFunctionTypeCompilerError: CompilerError {
+  public fun id(): String { "expected-return-type-in-function-type" }
+
+  public fun location(): Location { Location(file, functionType.child.arrow.child.span) }
+  public fun title(): String { "Missing return type in function type." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description
+    ""
+  }
+}

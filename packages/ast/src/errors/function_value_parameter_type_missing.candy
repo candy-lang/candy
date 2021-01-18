@@ -1,0 +1,18 @@
+use compiler_utils
+use cst
+
+public class FunctionValueParameterTypeMissingCompilerError {
+  public let file: File
+  public let valueParameter: CstNode<CstValueParameter>
+}
+impl FunctionValueParameterTypeMissingCompilerError: CompilerError {
+  public fun id(): String { "function-value-parameter-type-missing" }
+
+  public fun valueParameterName() { valueParameter.child.name.child.identifier}
+
+  public fun location(): Location { Location(file, valueParameter.child.name.child.span) }
+  public fun title(): String { "Missing type for value parameter {valueParameterName()}." }
+  public fun description(): String {
+    "Try adding an explicit type: `{valueParameterName()}: MyType`."
+  }
+}

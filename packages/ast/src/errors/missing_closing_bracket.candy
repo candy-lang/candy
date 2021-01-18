@@ -3,8 +3,12 @@ use cst
 
 public class MissingClosingBracketCompilerError {
   public let file: File
-  public let expressionOrStringPart: CstNode<
-    CstGroupExpression
+  public let node: CstNode<
+    CstGroupType
+    | CstFunctionTypeParameterTypes
+    | CstTupleType
+    | CstTypeArguments
+    | CstGroupExpression
     | CstTupleExpression
     | CstInterpolatedStringPart
   >
@@ -12,16 +16,32 @@ public class MissingClosingBracketCompilerError {
 impl MissingClosingBracketCompilerError: CompilerError {
   public fun id(): String { "missing-closing-bracket" }
 
-  public fun location(): Location {
-    let span = if expressionOrStringPart is CstNode<CstGroupExpression> {
-      (expressionOrStringPart as CstNode<CstGroupExpression>).child.openingParenthesis.child.span
-    } else {
-      if expressionOrStringPart is CstNode<CstTupleExpression> {
-        (expressionOrStringPart as CstNode<CstTupleExpression>).child.openingParenthesis.child.span
-      } else {
-        (expressionOrStringPart as CstNode<CstInterpolatedStringPart>).child.openingCurlyBrace.child.span
-      }
+  fun span(): Span {
+    if node.child is CstGroupType {
+      return node.cast<CstGroupType>().child.openingParenthesis.child.span
     }
+    if node.child is CstFunctionTypeParameterTypes {
+      return node.cast<CstFunctionTypeParameterTypes>().child.openingParenthesis.child.span
+    }
+    if node.child is CstTupleType {
+      return node.cast<CstTupleType>().child.openingParenthesis.child.span
+    }
+    if node.child is CstTypeArguments {
+      return node.cast<CstTypeArguments>().child.openingAngleBracket.child.span
+    }
+    if node.child is CstGroupExpression {
+      return node.cast<CstGroupExpression>().child.openingParenthesis.child.span
+    }
+    if node.child is CstTupleExpression {
+      node.cast<CstTupleExpression>().child.openingParenthesis.child.span
+    }
+    if node.child is CstInterpolatedStringPart {
+      node.cast<CstInterpolatedStringPart>().child.openingCurlyBrace.child.span
+    }
+    throw "Unknown node: {node}."
+  }
+  public fun location(): Location {
+    let span = 
     Location(file, span)
   }
   public fun title(): String { "Missing closing bracket." }
