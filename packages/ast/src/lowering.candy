@@ -131,7 +131,7 @@ fun lowerGlobalUseLineTarget(
       } else {
         let identifierId = AstIdentifierId(id, (packagePath as Iterable<AstIdentifier>).length())
         packagePath.append(
-          AstIdentifier(identifierId, (node.cast<IdentifierToken>()).child.identifier),
+          AstIdentifier(identifierId, node.cast<IdentifierToken>().child.identifier),
         )
         punctuationExpectedNext = true
       }
