@@ -485,9 +485,8 @@ class CstParser {
     node<CstTypeArguments>(typeArguments)
   }
   fun typeArgument(): Parser<String, CstNode<CstTypeArgument>> {
-    let typeArgument = modifiers()
-        .sequence<Maybe<CstNode<CstType>>>(type.optional())
-        .map<CstTypeArgument>({ CstTypeArgument(it.first, it.second) })
+    let typeArgument = type
+        .map<CstTypeArgument>({ CstTypeArgument(it) })
     node<CstTypeArgument>(typeArgument)
   }
 
