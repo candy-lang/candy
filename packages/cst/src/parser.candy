@@ -6,7 +6,7 @@ use ..node
 use ..tokens
 use ..types
 
-public fun parse(source: String): CstFile {
+public fun parse(source: String): CstNode<CstFile> {
   let parser = CstParser(
     source.characters().toList(),
     0,
@@ -22,9 +22,9 @@ class CstParser {
   let source: List<String>
   mut let nextId = 0
 
-  fun parse(): CstFile {
+  fun parse(): CstNode<CstFile> {
     let result = file().parseInput(source)
-    if result is Error<Success<CstFile>, Failure> {
+    if result is Error<Success<CstNode<CstFile>>, Failure> {
       throw "Couldn't parse file: {result}."
     }
     result.unwrap().output
@@ -32,8 +32,8 @@ class CstParser {
 
   // file
 
-  fun file(): Parser<String, CstFile> {
-    choiceOf<String, CstNode<CstUseLine | CstDeclaration>>(
+  fun file(): Parser<String, CstNode<CstFile>> {
+    let parser = choiceOf<String, CstNode<CstUseLine | CstDeclaration>>(
       List.of2<Parser<String, CstNode<CstUseLine | CstDeclaration>>>(
         useLine() as Parser<String, CstNode<CstUseLine | CstDeclaration>>,
         declaration() as Parser<String, CstNode<CstUseLine | CstDeclaration>>,
@@ -41,46 +41,42 @@ class CstParser {
     )
         .star()
         .map<CstFile>({ CstFile(it) })
+    node<CstFile>(parser)
   }
 
   fun useLine(): Parser<String, CstNode<CstUseLine>> {
-    localRelativeUseLine()
-        .or<CstNode<CstGlobalUseLine>>(globalUseLine())
-        .cast<CstNode<CstUseLine>>()
+    let parser = modifiers()
+        .sequence<CstNode<KeywordToken>>(keyword("use"))
+        .sequence<Maybe<CstNode<CstUseLineTarget>>>(
+          choiceOf<String, CstNode<CstUseLineTarget>>(
+            List.of2<Parser<String, CstNode<CstUseLineTarget>>>(
+              localRelativeUseLineTarget(),
+              globalUseLineTarget(),
+            ),
+          ).optional()
+        )
+        .map<CstUseLine>({ CstUseLine(it.first.first, it.first.second, it.second) })
+    node<CstUseLine>(parser)
   }
-  fun localRelativeUseLine(): Parser<String, CstNode<CstLocalRelativeUseLine>> {
-    let path = identifier()
+  fun localRelativeUseLineTarget(): Parser<String, CstNode<CstUseLineTarget>> {
+    let parser = punctuation(".")
+        .plus()
+        .sequence<List<CstNode<IdentifierToken | PunctuationToken>>>(
+          identifier()
+              .or<CstNode<PunctuationToken>>(punctuation("."))
+              .cast<CstNode<IdentifierToken | PunctuationToken>>()
+              .star()
+        )
+        .map<CstUseLineTarget>({ CstLocalRelativeUseLineTarget(it.first, it.second) })
+    node<CstUseLineTarget>(parser)
+  }
+  fun globalUseLineTarget(): Parser<String, CstNode<CstUseLineTarget>> {
+    let parser = identifier()
         .or<CstNode<PunctuationToken>>(punctuation("."))
         .cast<CstNode<IdentifierToken | PunctuationToken>>()
-        .star()
-    let useLine = modifiers()
-        .sequence<CstNode<KeywordToken>>(keyword("use"))
-        .sequence<List<CstNode<PunctuationToken>>>(punctuation(".").plus())
-        .sequence<List<CstNode<IdentifierToken | PunctuationToken>>>(path)
-        .map<CstLocalRelativeUseLine>({
-          let modifiers = it.first.first.first
-          let useKeyword = it.first.first.second
-          let parentNavigations = it.first.second
-          let path = it.second
-          CstLocalRelativeUseLine(modifiers, useKeyword, parentNavigations, path)
-        })
-    node<CstLocalRelativeUseLine>(useLine)
-  }
-  fun globalUseLine(): Parser<String, CstNode<CstGlobalUseLine>> {
-    let packagePath = identifier()
-        .or<CstNode<PunctuationToken>>(punctuation("."))
-        .cast<CstNode<IdentifierToken | PunctuationToken>>()
-        .star()
-    let useLine = modifiers()
-        .sequence<CstNode<KeywordToken>>(keyword("use"))
-        .sequence<List<CstNode<IdentifierToken | PunctuationToken>>>(packagePath)
-        .map<CstGlobalUseLine>({
-          let modifiers = it.first.first
-          let useKeyword = it.first.second
-          let packagePath = it.second
-          CstGlobalUseLine(modifiers, useKeyword, packagePath)
-        })
-    node<CstGlobalUseLine>(useLine)
+        .plus()
+        .map<CstUseLineTarget>({ CstGlobalUseLineTarget(it) })
+    node<CstUseLineTarget>(parser)
   }
 
   // declarations
@@ -825,9 +821,7 @@ class CstParser {
   fun modifiers(): Parser<String, List<CstNode<IdentifierToken>>> { identifier().star() }
 
   fun node<T>(parser: Parser<String, T>): Parser<String, CstNode<T>> {
-    parser.map<CstNode<T>>({ output =>
-      CstNode<T>(getNextNodeId(), output)
-    })
+    parser.map<CstNode<T>>({ CstNode<T>(getNextNodeId(), it) })
   }
   fun getNextNodeId(): CstNodeId {
     let id = CstNodeId(nextId)

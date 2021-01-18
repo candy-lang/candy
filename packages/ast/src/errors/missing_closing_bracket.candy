@@ -1,0 +1,32 @@
+use compiler_utils
+use cst
+
+public class MissingClosingBracketCompilerError {
+  public let file: File
+  public let expressionOrStringPart: CstNode<
+    CstGroupExpression
+    | CstTupleExpression
+    | CstInterpolatedStringPart
+  >
+}
+impl MissingClosingBracketCompilerError: CompilerError {
+  public fun id(): String { "missing-closing-bracket" }
+
+  public fun location(): Location {
+    let span = if expressionOrStringPart is CstNode<CstGroupExpression> {
+      (expressionOrStringPart as CstNode<CstGroupExpression>).child.openingParenthesis.child.span
+    } else {
+      if expressionOrStringPart is CstNode<CstTupleExpression> {
+        (expressionOrStringPart as CstNode<CstTupleExpression>).child.openingParenthesis.child.span
+      } else {
+        (expressionOrStringPart as CstNode<CstInterpolatedStringPart>).child.openingCurlyBrace.child.span
+      }
+    }
+    Location(file, span)
+  }
+  public fun title(): String { "Missing closing bracket." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description for this error
+    ""
+  }
+}

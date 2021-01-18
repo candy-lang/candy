@@ -1,63 +1,83 @@
+use ..declarations
+use ..expressions
 use ..node
 
-public trait /* enum */ CandyType {
+public class AstTypeId {
+  let parentId: AstDeclarationId | AstExpressionId
+  let value: Int
+}
+impl AstTypeId: AstNodeId
+
+public trait /* enum */ AstType {
   let modifiers: List<String>
 }
-impl CandyType: Node
+impl AstType: AstNode
 
 
-public data class NamedType {
-  public let id: NodeId
+public class AstNamedType {
+  public let id: AstTypeId
   public let modifiers: List<String>
   public let nameParts: List<String>
-  public let typeArguments: List<TypeArgument>
+  public let typeArguments: List<AstTypeArgument>
 }
-impl NamedType: CandyType
+impl AstNamedType: AstType
 
 
-public data class FunctionType {
-  public let id: NodeId
+public class AstFunctionType {
+  public let id: AstTypeId
   public let modifiers: List<String>
-  public let receiverType: Maybe<CandyType>
-  public let parameterTypes: List<CandyType>
-  public let returnType: Maybe<CandyType>
+  public let receiverType: Maybe<AstType>
+  public let parameterTypes: List<AstType>
+  public let returnType: Maybe<AstType>
 }
-impl FunctionType: CandyType
+impl AstFunctionType: AstType
 
 
-public data class TupleType {
-  public let id: NodeId
+public class AstTupleType {
+  public let id: AstTypeId
   public let modifiers: List<String>
-  public let types: List<CandyType>
+  public let types: List<AstType>
 }
-impl TupleType: CandyType
+impl AstTupleType: AstType
 
 
-public data class UnionType {
-  public let id: NodeId
+public class AstUnionType {
+  public let id: AstTypeId
   public let modifiers: List<String>
-  public let types: List<CandyType>
+  public let types: List<AstType>
 }
-impl UnionType: CandyType
+impl AstUnionType: AstType
 
-public data class IntersectionType {
-  public let id: NodeId
+public class AstIntersectionType {
+  public let id: AstTypeId
   public let modifiers: List<String>
-  public let types: List<CandyType>
+  public let types: List<AstType>
 }
-impl IntersectionType: CandyType
+impl AstIntersectionType: AstType
 
 
-public data class TypeParameter {
-  public let id: NodeId
-  public let modifiers: List<String>
+public class AstTypeParameterId {
+  let declaration: AstDeclarationId
+  let name: String
+}
+impl AstTypeParameterId: AstNodeId
+
+public class AstTypeParameter {
+  public let id: AstTypeParameterId
   public let modifiers: List<String>
   public let name: Maybe<String>
-  public let upperBound: Maybe<CandyType>
+  public let upperBound: Maybe<AstType>
 }
 
-public data class TypeArgument {
-  public let id: NodeId
+
+public class AstTypeArgumentId {
+  let declaration: AstDeclarationId
+  let name: String
+}
+impl AstTypeArgumentId: AstNodeId
+
+public class AstTypeArgument {
+  public let id: AstTypeArgumentId
   public let modifiers: List<String>
-  public let type: Maybe<CandyType>
+  public let type: Maybe<AstType>
 }

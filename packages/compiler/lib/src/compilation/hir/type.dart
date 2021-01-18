@@ -102,6 +102,11 @@ abstract class CandyType with _$CandyType {
   static const arrayModuleId =
       ModuleId(PackageId.core, ['collections', 'array', 'Array']);
 
+  // hash
+  static final hash = UserCandyType(ModuleId.coreHash, 'Hash');
+  factory CandyType.hasher(CandyType result) =>
+      CandyType.user(ModuleId.coreHash, 'Hasher', arguments: [result]);
+
   // operators
   // operators.arithmetic
   static final add = UserCandyType(ModuleId.coreOperatorsArithmetic, 'Add');

@@ -23,7 +23,6 @@ public trait /* enum */ StringPart
 
 public class CstLiteralStringPart {
   public let value: CstNode<StringLiteralToken>
-  // TODO(JonasWanke): Check this when our lexer supports strings.
 }
 impl CstLiteralStringPart: StringPart
 

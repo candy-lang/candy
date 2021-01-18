@@ -1,36 +1,77 @@
+use compiler_utils
 use ..node
 use ..declarations
+use ..expressions
 
-public data class File {
-  public let id: NodeId
-  public let useLines: List<UseLine>
-  public let declarations: List<Module | Trait | Impl | Class | Function | Property>
+public class AstFileId {
+  let file: File
 }
-impl File: Node
+impl AstFileId: AstNodeId
 
-
-public trait /* enum */ UseLine
-impl UseLine: Node
-
-public data class LocalAbsoluteUseLine {
-  public let id: NodeId
-  public let modifiers: List<String>
-  public let path: List<String>
+public class AstFile {
+  public let id: AstFileId
+  public let useLines: List<AstUseLine>
+  public let declarations: List<
+    AstModule
+    | AstTrait
+    | AstImpl
+    | AstClass
+    | AstFunction
+    | AstProperty
+  >
 }
-impl LocalAbsoluteUseLine: UseLine & Node
+impl AstFile: AstNode
 
-public data class LocalRelativeUseLine {
-  public let id: NodeId
-  public let modifiers: List<String>
+
+public class AstUseLineId {
+  public let parentId: AstFileId
+  public let index: Int
+}
+impl AstUseLineId: AstNodeId
+
+public class AstUseLine {
+  public let id: AstUseLineId
+  public let modifiers: List<AstIdentifier>
+  public let target: AstUseLineTarget
+}
+impl AstUseLine: AstNode
+
+
+public class AstUseLineTargetId {
+  public let parentId: AstUseLineId
+}
+impl AstUseLineTargetId: AstNodeId
+
+public trait /* enum */ AstUseLineTarget
+
+public class AstLocalAbsoluteUseLineTarget {
+  public let id: AstUseLineTargetId
+  public let path: List<AstIdentifier>
+}
+impl AstLocalAbsoluteUseLineTarget: AstUseLineTarget
+
+public class AstLocalRelativeUseLineTarget {
+  public let id: AstUseLineTargetId
   public let parentNavigations: Int
-  public let path: List<String>
+  public let path: List<AstIdentifier>
 }
-impl LocalRelativeUseLine: UseLine & Node
+impl AstLocalRelativeUseLineTarget: AstUseLineTarget
 
-public data class GlobalUseLine {
-  public let id: NodeId
-  public let modifiers: List<String>
-  public let packagePath: List<String>
-  public let moduleName: Maybe<String>
+public class AstGlobalUseLineTarget {
+  public let id: AstUseLineTargetId
+  public let packagePath: List<AstIdentifier>
+  public let moduleName: Maybe<AstIdentifier>
 }
-impl GlobalUseLine: UseLine & Node
+impl AstGlobalUseLineTarget: AstUseLineTarget
+
+
+public class AstIdentifierId {
+  public let parentId: AstUseLineId | AstUseLineTargetId | AstDeclarationId | AstExpressionId
+  public let index: Int
+}
+impl AstIdentifierId: AstNodeId
+
+public class AstIdentifier {
+  public let id: AstIdentifierId
+  public let value: String
+}

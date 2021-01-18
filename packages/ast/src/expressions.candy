@@ -1,64 +1,66 @@
 use ..declarations
+use ..file
 use ..node
 use ..types
 
-public trait /* enum */ Expression
-impl Expression: Node
-
-
-public data class BoolExpression {
-  public let id: NodeId
-  public let value: Bool
+public class AstExpressionId {
+  let parentId: AstDeclarationId
+  let value: Int
 }
-impl BoolExpression: Expression
+impl AstExpressionId: AstNodeId
 
-public data class IntExpression {
-  public let id: NodeId
+
+public trait /* enum */ AstExpression
+impl AstExpression: AstNode
+
+
+public class AstIntExpression {
+  public let id: AstExpressionId
   public let value: Int
 }
-impl IntExpression: Expression
+impl AstIntExpression: AstExpression
 
 
-public data class StringExpression {
-  public let id: NodeId
-  public let parts: List<StringPart>
+public class AstStringExpression {
+  public let id: AstExpressionId
+  public let parts: List<AstStringPart>
 }
-impl StringExpression: Expression
+impl AstStringExpression: AstExpression
 
-public trait /* enum */ StringPart
+public trait /* enum */ AstStringPart
 
-public data class LiteralStringPart {
-  public let id: NodeId
+public class AstLiteralStringPart {
+  public let id: AstExpressionId
+  public let value: AstIdentifier
+}
+impl AstLiteralStringPart: AstStringPart
+
+public class AstInterpolatedStringPart {
+  public let id: AstExpressionId
+  public let expression: AstExpression
+}
+impl AstInterpolatedStringPart: AstStringPart
+
+
+public class AstLambdaExpression {
+  public let id: AstExpressionId
+  public let valueParameters: List<AstValueParameter>
+  public let expressions: List<AstExpression>
+}
+impl AstLambdaExpression: AstExpression
+
+
+public class AstIdentifierExpression {
+  public let id: AstExpressionId
   public let value: String
 }
-impl LiteralStringPart: Expression
-
-public data class InterpolatedStringPart {
-  public let id: NodeId
-  public let expression: Maybe<Expression>
-}
-impl InterpolatedStringPart: Expression
+impl AstIdentifierExpression: AstExpression
 
 
-public data class LambdaExpression {
-  public let id: NodeId
-  public let valueParameters: List<ValueParameter>
-  public let expressions: List<Expression>
-}
-impl LambdaExpression: Expression
+public class AstBinaryExpression {
+  public let id: AstExpressionId
 
-
-public data class IdentifierExpression {
-  public let id: NodeId
-  public let value: String
-}
-impl IdentifierExpression: Expression
-
-
-public data class BinaryExpression {
-  public let id: NodeId
-
-  public let leftOperand: Maybe<Expression>
+  public let leftOperand: Maybe<AstExpression>
 
   public let operator: String
   /// May be one of the following:
@@ -69,52 +71,52 @@ public data class BinaryExpression {
   ///
   /// TODO(JonasWanke): convert this to an enum when we support these
 
-  public let rightOperand: Maybe<Expression>
+  public let rightOperand: Maybe<AstExpression>
 }
-impl BinaryExpression: Expression
+impl AstBinaryExpression: AstExpression
 
 
-public data class LocalPropertyExpression {
-  public let id: NodeId
+public class AstLocalPropertyExpression {
+  public let id: AstDeclarationId
   public let modifiers: List<String>
   public let isMutable: Bool
   public let name: Maybe<String>
-  public let type: Maybe<CandyType>
-  public let initializer: Maybe<Expression>
+  public let type: Maybe<AstType>
+  public let initializer: Maybe<AstExpression>
 }
-impl LocalPropertyExpression: Expression
+impl AstLocalPropertyExpression: AstExpression
 
 
-public data class NavigationExpression {
-  public let id: NodeId
-  public let receiver: Expression
+public class AstNavigationExpression {
+  public let id: AstExpressionId
+  public let receiver: AstExpression
   public let target: String
 }
-impl NavigationExpression: Expression
+impl AstNavigationExpression: AstExpression
 
-public data class CallExpression {
-  public let id: NodeId
-  public let receiver: Expression
-  public let typeArguments: List<TypeArgument>
-  public let valueArguments: List<ValueArgument>
+public class AstCallExpression {
+  public let id: AstExpressionId
+  public let receiver: AstExpression
+  public let typeArguments: List<AstTypeArgument>
+  public let valueArguments: List<AstValueArgument>
 }
-impl CallExpression: Expression
+impl AstCallExpression: AstExpression
 
-public data class ValueArgument {
-  public let id: NodeId
+public class AstValueArgument {
+  public let id: AstExpressionId
   public let name: Maybe<String>
-  public let value: Maybe<Expression>
+  public let value: Maybe<AstExpression>
 }
 
-public data class TupleExpression {
-  public let id: NodeId
-  public let valueArguments: List<Expression>
+public class AstTupleExpression {
+  public let id: AstExpressionId
+  public let valueArguments: List<AstExpression>
 }
-impl TupleExpression: Expression
+impl AstTupleExpression: AstExpression
 
 
-public data class ReturnExpression {
-  public let id: NodeId
-  public let value: Maybe<Expression>
+public class AstReturnExpression {
+  public let id: AstExpressionId
+  public let value: Maybe<AstExpression>
 }
-impl ReturnExpression: Expression
+impl AstReturnExpression: AstExpression

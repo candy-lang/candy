@@ -1,7 +1,14 @@
+use ..declarations
 use ..node
 
-public data class CandyDoc {
-  public let id: NodeId
+public class AstCandyDocId {
+  let parentId: AstDeclarationId
+}
+impl AstCandyDocId: AstNodeId
+
+
+public class AstCandyDoc {
+  public let id: AstCandyDocId
   public let content: String
 }
-impl CandyDoc: Node
+impl AstCandyDoc: AstNode
