@@ -8,10 +8,10 @@ public class AstTypeId {
 }
 impl AstTypeId: AstNodeId
 
-public trait /* enum */ AstCandyType {
+public trait /* enum */ AstType {
   let modifiers: List<String>
 }
-impl AstCandyType: AstNode
+impl AstType: AstNode
 
 
 public class AstNamedType {
@@ -20,40 +20,40 @@ public class AstNamedType {
   public let nameParts: List<String>
   public let typeArguments: List<AstTypeArgument>
 }
-impl AstNamedType: AstCandyType
+impl AstNamedType: AstType
 
 
 public class AstFunctionType {
   public let id: AstTypeId
   public let modifiers: List<String>
-  public let receiverType: Maybe<AstCandyType>
-  public let parameterTypes: List<AstCandyType>
-  public let returnType: Maybe<AstCandyType>
+  public let receiverType: Maybe<AstType>
+  public let parameterTypes: List<AstType>
+  public let returnType: Maybe<AstType>
 }
-impl AstFunctionType: AstCandyType
+impl AstFunctionType: AstType
 
 
 public class AstTupleType {
   public let id: AstTypeId
   public let modifiers: List<String>
-  public let types: List<AstCandyType>
+  public let types: List<AstType>
 }
-impl AstTupleType: AstCandyType
+impl AstTupleType: AstType
 
 
 public class AstUnionType {
   public let id: AstTypeId
   public let modifiers: List<String>
-  public let types: List<AstCandyType>
+  public let types: List<AstType>
 }
-impl AstUnionType: AstCandyType
+impl AstUnionType: AstType
 
 public class AstIntersectionType {
   public let id: AstTypeId
   public let modifiers: List<String>
-  public let types: List<AstCandyType>
+  public let types: List<AstType>
 }
-impl AstIntersectionType: AstCandyType
+impl AstIntersectionType: AstType
 
 
 public class AstTypeParameterId {
@@ -66,7 +66,7 @@ public class AstTypeParameter {
   public let id: AstTypeParameterId
   public let modifiers: List<String>
   public let name: Maybe<String>
-  public let upperBound: Maybe<AstCandyType>
+  public let upperBound: Maybe<AstType>
 }
 
 
@@ -79,5 +79,5 @@ impl AstTypeArgumentId: AstNodeId
 public class AstTypeArgument {
   public let id: AstTypeArgumentId
   public let modifiers: List<String>
-  public let type: Maybe<AstCandyType>
+  public let type: Maybe<AstType>
 }

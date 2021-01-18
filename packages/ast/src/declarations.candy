@@ -39,7 +39,7 @@ public class AstTrait {
   public let modifiers: List<String>
   public let name: Maybe<String>
   public let typeParameters: List<AstTypeParameter>
-  public let upperBound: Maybe<AstCandyType>
+  public let upperBound: Maybe<AstType>
   public let innerDeclarations: List<AstTrait | AstClass | AstFunction | AstProperty>
 }
 impl AstTrait: AstDeclaration
@@ -48,8 +48,8 @@ public class AstImpl {
   public let id: AstDeclarationId
   public let modifiers: List<String>
   public let typeParameters: List<AstTypeParameter>
-  public let type: AstCandyType
-  public let traits: List<AstCandyType>
+  public let type: AstType
+  public let traits: List<AstType>
   public let innerDeclarations: List<AstFunction | AstProperty>
 }
 impl AstImpl: AstDeclaration
@@ -73,7 +73,7 @@ public class AstFunction {
   public let name: String
   public let typeParameters: List<AstTypeParameter>
   public let valueParameters: List<AstValueParameter>
-  public let returnType: Maybe<AstCandyType>
+  public let returnType: Maybe<AstType>
   public let body: Maybe<AstBlockBody | AstExpressionBody | AstDelegationBody>
 }
 impl AstFunction: AstDeclaration
@@ -88,7 +88,7 @@ impl AstValueParameterId: AstNodeId
 public class AstValueParameter {
   public let id: AstValueParameterId
   public let name: Maybe<String>
-  public let type: Maybe<AstCandyType>
+  public let type: Maybe<AstType>
   public let defaultValue: Maybe<AstDelegationBody>
 }
 
@@ -99,7 +99,7 @@ public class AstProperty {
   public let modifiers: List<String>
   public let isMutable: Bool
   public let name: Maybe<String>
-  public let type: Maybe<AstCandyType>
+  public let type: Maybe<AstType>
   public let initializer: Maybe<AstDelegationBody>
 }
 impl AstProperty: AstDeclaration

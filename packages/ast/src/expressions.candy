@@ -81,7 +81,7 @@ public class AstLocalPropertyExpression {
   public let modifiers: List<String>
   public let isMutable: Bool
   public let name: Maybe<String>
-  public let type: Maybe<AstCandyType>
+  public let type: Maybe<AstType>
   public let initializer: Maybe<AstExpression>
 }
 impl AstLocalPropertyExpression: AstExpression
