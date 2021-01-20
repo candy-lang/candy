@@ -96,10 +96,12 @@ public trait MutableList<Item>: List<Item> {
   }
 
   fun update(index: Int, updater: (Item) => Item) {
-    let safeGet = get as ((Int) => Item)
+    let safeGet = get as ((Int) => Maybe<Item>)
     let value = safeGet(index)
-    let newValue = updater(value)
-    set(index, newValue)
+    if value is Some {
+      let newValue = updater(value.unwrap())
+      set(index, newValue)
+    }
   }
 
   fun updateAll(updater: (Item) => Item) {
