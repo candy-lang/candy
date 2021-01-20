@@ -144,8 +144,6 @@ public trait MutableList<Item>: List<Item> {
   fun set(index: Int /* UInt */, item: Item)
   // TODO(marcelgarus): Rename to add as soon as the naming conflict with + is resolved.
   fun append(item: Item)
-  fun appendAll(items: Iterable<Item>)
-
   fun appendAll(items: Iterable<Item>) {
     for item in items {
       append(item)
