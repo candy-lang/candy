@@ -136,7 +136,8 @@ impl<Item> ArrayList<Item>: MutableList<Item> {
     mut let index = index
     mut let removed = items.get(index).unwrap()
     while index < length_ - 1 {
-      items.set(index, items.get(index))
+      items.set(index, items.get(index + 1))
+      index = index + 1
     }
     items.set(index, None<Item>())
     length_ = length_ - 1
