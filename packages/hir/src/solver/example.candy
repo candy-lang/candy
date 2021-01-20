@@ -1,0 +1,40 @@
+use ..types
+
+fun main() {
+  debug(string, string)
+  debug(int, string)
+  debug(int, a)
+  debug(list(a), list(set(b)))
+  debug(map(a, a), map(int, string))
+  debug(map(a, a), map(int, int))
+  debug(map(a, a), map(b, int))
+  debug(set(a), set(b))
+  debug(a, list(a))
+  debug(map(a, b), map(list(b), list(a)))
+}
+
+fun debug(first: SolverType, second: SolverType) {
+  mut let s = "Unifying {first.toString_()} and {second.toString_()}"
+  let result = first.unify(second)
+  if result is None {
+    print("{s}: not possible")
+  } else {
+    let substitutions = result.unwrap()
+    if substitutions.isEmpty() {
+      print("{s}: possible, no substitutions necessary")
+    } else {
+      print("{s}: possible, with these substitutions: {substitutions.entries().map<String>({ "{it.first.toString_()} = {it.second.toString_()}" }).join(", ")}")
+    }
+  }
+}
+
+let noParams = List.empty<SolverType>()
+let string = SolverValue("String", noParams)
+let int = SolverValue("Int", noParams)
+fun list(t: SolverType): SolverType { SolverValue("List", List.of1<SolverType>(t)) }
+fun set(t: SolverType): SolverType { SolverValue("Set", List.of1<SolverType>(t)) }
+fun map(key: SolverType, value: SolverType): SolverType {
+  SolverValue("Map", List.of2<SolverType>(key, value))
+}
+let a = SolverVariable("A")
+let b = SolverVariable("B")
