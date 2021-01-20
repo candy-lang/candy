@@ -4,13 +4,7 @@ trait SolverType {
 
   fun toString_(): String
 
-  fun containsVariable(variable: SolverVariable): Bool {
-    if this is SolverVariable {
-      (this as SolverVariable).name == variable.name
-    } else {
-      ((this as SolverValue).parameters as Iterable<SolverType>).any({ it.containsVariable(variable) })
-    }
-  }
+  fun containsVariable(variable: SolverVariable): Bool
 
   fun substitute(variable: SolverVariable, substitution: SolverType): SolverType {
     if this is SolverVariable {
@@ -167,6 +161,7 @@ class SolverVariable {
 }
 impl SolverVariable: SolverType {
   fun toString_(): String { "?{name}" }
+  fun containsVariable(variable: SolverVariable): Bool { name == variable.name }
 }
 impl SolverVariable: Hash {
   fun hash<T>(hasher: Hasher<T>) {
@@ -198,6 +193,10 @@ impl SolverValue: SolverType {
       s = "{s}<{(parameters as Iterable<SolverType>).map<String>({ it.toString_() }).join(", ")}>"
     }
     s
+  }
+
+  fun containsVariable(variable: SolverVariable): Bool {
+    (parameters as Iterable<SolverType>).any({ it.containsVariable(variable) })
   }
 }
 impl SolverValue: Hash {
