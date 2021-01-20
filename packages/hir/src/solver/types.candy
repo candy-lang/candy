@@ -65,12 +65,16 @@ trait SolverType {
 
       if this_.name == other_.name {
         // Being equal to itself is no bound, so no substitution `?A = ?A` is necessary.
-        Some<Map<SolverVariable, SolverType>>(Map.empty<SolverVariable, SolverType>())
+        return Some<Map<SolverVariable, SolverType>>(Map.empty<SolverVariable, SolverType>())
       } else {
         if this_.name < other_.name {
-          Some<Map<SolverVariable, SolverType>>(Map.of1<SolverVariable, SolverType>(Tuple(this_, other_)))
+          return Some<Map<SolverVariable, SolverType>>(
+            Map.of1<SolverVariable, SolverType>(Tuple(this_, other_)),
+          )
         } else {
-          Some<Map<SolverVariable, SolverType>>(Map.of1<SolverVariable, SolverType>(Tuple(other_, this_)))
+          return Some<Map<SolverVariable, SolverType>>(
+            Map.of1<SolverVariable, SolverType>(Tuple(other_, this_)),
+          )
         }
       }
     }
@@ -99,7 +103,6 @@ trait SolverType {
 
     // To unify all types, we have a queue of substitutions that we try to bring into a common
     // solution space one by one.
-    let a = 2
     let solutionSpace = MutableMap.empty<SolverVariable, SolverType>()
     let queue: Maybe<MutableList<(SolverVariable, SolverType)>> = (this_.parameters as Iterable<SolverType>).zip<SolverType>(other_.parameters)
       .map<Maybe<Map<SolverVariable, SolverType>>>({ it.first.unify(it.second) })
@@ -123,7 +126,7 @@ trait SolverType {
 
     while (queue as Iterable).isNotEmpty() {
       let substitution = queue.removeFirst()
-      if !(solutionSpace as Map<SolverVariable, SolverType>).containsKey(substitution.first) {
+      if (solutionSpace as Map<SolverVariable, SolverType>).containsKey(substitution.first) {
         let existingSubstitution = (solutionSpace as Map<SolverVariable, SolverType>).get(substitution.first).unwrap()
         let unified = existingSubstitution.unify(substitution.second)
         if unified is None {
@@ -136,6 +139,9 @@ trait SolverType {
         queue.updateAll({
           Tuple(it.first, it.second.substitute(substitution.first, substitution.second))
         })
+        if (queue as Iterable<(SolverVariable, SolverType)>).any({ it.second.containsVariable(it.first) }) {
+          return None<Map<SolverVariable, SolverType>>()
+        }
       }
     }
 
