@@ -1,44 +1,45 @@
-use ..uris
+/*use ..declarations
 
-public trait CandyType
+public trait HirType
 
-public class NamedType {
-  public let declarationUri: Trait | Class
+public class HirNamedType {
+  public let declarationUri: HirTrait | HirClass
 }
-impl NamedType: CandyType
+impl HirNamedType: HirType
 
-public class TupleType {
-  public let types: List<Type>
+public class HirTupleType {
+  public let types: List<HirType>
 }
-impl TupleType: CandyType
+impl HirTupleType: HirType
 
-public class FunctionType {
-  public let receiverType: CandyType
-  public let parameterTypes: List<Type>
-  public let returnType: CandyType
+public class HirFunctionType {
+  public let receiverType: HirType
+  public let parameterTypes: List<HirType>
+  public let returnType: HirType
 }
-impl FunctionType: CandyType
+impl HirFunctionType: HirType
 
-public class UnionType {
-  public let types: List<Type>
+public class HirUnionType {
+  public let types: List<HirType>
 }
-impl UnionType: CandyType
+impl HirUnionType: HirType
 
-public class IntersectionType {
-  public let types: List<Type>
+public class HirIntersectionType {
+  public let types: List<HirType>
 }
-impl IntersectionType: CandyType
+impl HirIntersectionType: HirType
 
-public class ThisType
-impl ThisType: CandyType
+public class HirThisType
+impl HirThisType: HirType
 
-public class ParameterType {
-  public let declarationUri: Trait | Class | Function
+public class HirParameterType {
+  public let declarationUri: HirTrait | HirClass | HirFunction
   public let name: String
 }
-impl ParameterType: CandyType
+impl HirParameterType: HirType
 
-public class ReflectionType {
-  public let target: Module | Trait | Class | Function | Property | ParameterType
+public class HirReflectionType {
+  public let target: HirModule | HirTrait | HirClass | HirFunction | HirProperty | HirParameterType
 }
-impl ReflectionType: CandyType
+impl HirReflectionType: HirType
+*/

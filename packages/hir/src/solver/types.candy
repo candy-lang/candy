@@ -1,0 +1,212 @@
+trait SolverType {
+  /// Either a `SolverVariable` or a `SolverValue`.
+
+  fun toString_(): String
+  fun containsVariable(variable: SolverVariable): Bool
+  fun substitute(variable: SolverVariable, substitution: SolverType): SolverType
+
+  public fun unify(other: SolverType): Maybe<Map<SolverVariable, SolverType>> {
+    /// Unifies `this` type with the `other`. If unification succeeds, returns a map from variables
+    /// to substitutions. Unification may fail if no variable substitutions exist that makes both
+    /// types the same.
+    ///
+    /// Examples:
+    ///
+    /// * Unifying `String` with `String` succeeds. No substitutions necessary.
+    /// * Unifying `Int` with `String` fails.
+    /// * Unifying `Int` with `?A` succeeds with the substitution `?A = Int`.
+    /// * Unifying `List<?A>` with `List<Set<?B>>` succeeds with the substitution `?A = Set<?B>`.
+    /// * Unifying `Map<?A, ?A>` with `Map<Int, String>` fails.
+    /// * Unifying `Map<?A, ?A>` with `Map<Int, Int>` succeeds with the subsitution `?A = Int`.
+    /// * Unifying `Map<?A, ?A>` with `Map<?B, Int>` succeeds with the substitutions `?A = Int` and
+    ///   `?B = Int`.
+    /// * Unifying `Set<?A>` with `Set<?B>` succeeds with the substitution `?A = ?B`.
+    /// * Unifying `?Batman` with `Na<?Batman>` fails because repeated substitution would lead to
+    ///   types of infinite size:
+    ///   `?Batman = Na<?Batman> = Na<Na<?Batman>> = ... = Na<Na<Na<Na<Na<Na<?Batman>>>>>> = ...`
+    /// * Unifying `Map<?A, ?B>` with `Map<Ping<?B>, Pong<?A>>` fails because repeated substitution
+    ///   would lead to types of infinite size:
+    ///   `?A = Ping<?B> = Ping<Pong<?A>> = Ping<Pong<Ping<?B>>> = Ping<Pong<Ping<Pong<?A>>>> = ...`
+    //
+    // TODO(marcelgarus): Write property-based tests for this. For example, generate random types
+    // and then check that the order of unifying doesn't matter and that applying the substitutions
+    // actually results in the same type.
+
+    if this is SolverVariable && other is SolverVariable {
+      // If both are variables, we return a substitution with the lexicographically first one being
+      // the one subsituted. For example, unifying `?B` with `?A` would yield the substitution
+      // `?A = ?B`.
+      let this_ = (this as SolverVariable)
+      let other_ = (other as SolverVariable)
+
+      if this_.name == other_.name {
+        // Being equal to itself is no bound, so no substitution `?A = ?A` is necessary.
+        return Some<Map<SolverVariable, SolverType>>(Map.empty<SolverVariable, SolverType>())
+      } else {
+        if this_.name < other_.name {
+          return Some<Map<SolverVariable, SolverType>>(
+            Map.of1<SolverVariable, SolverType>(Tuple(this_, other_)),
+          )
+        } else {
+          return Some<Map<SolverVariable, SolverType>>(
+            Map.of1<SolverVariable, SolverType>(Tuple(other_, this_)),
+          )
+        }
+      }
+    }
+
+    if this is SolverVariable && other is SolverValue {
+      let this_ = (this as SolverVariable)
+      
+      if other.containsVariable(this_) {
+        // This is an infinitely growing type. That's not allowed.
+        return None<Map<SolverVariable, SolverType>>()
+      }
+      return Some<Map<SolverVariable, SolverType>>(Map.of1<SolverVariable, SolverType>(Tuple(this_, other)))
+    }
+
+    if this is SolverValue && other is SolverVariable {
+      return other.unify(this)
+    }
+
+    let this_ = (this as SolverValue)
+    let other_ = (other as SolverValue)
+
+    if !(this_.name == other_.name)
+      || !((this_.parameters as Iterable).length() == (other_.parameters as Iterable).length()) {
+      return None<Map<SolverVariable, SolverType>>()
+    }
+
+    // To unify all types, we have a queue of substitutions that we try to bring into a common
+    // solution space one by one.
+    let solutionSpace = MutableMap.empty<SolverVariable, SolverType>()
+    let queue: Maybe<MutableList<(SolverVariable, SolverType)>> = (this_.parameters as Iterable<SolverType>).zip<SolverType>(other_.parameters)
+      .map<Maybe<Map<SolverVariable, SolverType>>>({ it.first.unify(it.second) })
+      .foldLeft<Maybe<Iterable<Map<SolverVariable, SolverType>>>>(
+        Some<Iterable<Map<SolverVariable, SolverType>>>(List.empty<Map<SolverVariable, SolverType>>()),
+        { a, b =>
+          if a is None { return None<Iterable<Map<SolverVariable, SolverType>>>() }
+          if b is None { return None<Iterable<Map<SolverVariable, SolverType>>>() }
+          return Some<Iterable<Map<SolverVariable, SolverType>>>(
+            a.unwrap().followedBy(List.of1<Map<SolverVariable, SolverType>>(b.unwrap())),
+          )
+        },
+      )
+      .map<MutableList<(SolverVariable, SolverType)>>({
+        it.expand<(SolverVariable, SolverType)>({ it.entries() }).toMutableList()
+      })
+    if queue is None {
+      return None<Map<SolverVariable, SolverType>>()
+    }
+    let queue = queue.unwrap()
+
+    while (queue as Iterable).isNotEmpty() {
+      let substitution = queue.removeFirst()
+      if (solutionSpace as Map<SolverVariable, SolverType>).containsKey(substitution.first) {
+        let existingSubstitution = (solutionSpace as Map<SolverVariable, SolverType>).get(substitution.first).unwrap()
+        let unified = existingSubstitution.unify(substitution.second)
+        if unified is None {
+          return None<Map<SolverVariable, SolverType>>()
+        }
+        queue.appendAll(unified.unwrap().entries())
+      } else {
+        solutionSpace.set(substitution.first, substitution.second)
+        solutionSpace.updateAll({ it.substitute(substitution.first, substitution.second) })
+        queue.updateAll({
+          Tuple(it.first, it.second.substitute(substitution.first, substitution.second))
+        })
+        if (queue as Iterable<(SolverVariable, SolverType)>).any({ it.second.containsVariable(it.first) }) {
+          return None<Map<SolverVariable, SolverType>>()
+        }
+      }
+    }
+
+    Some<Map<SolverVariable, SolverType>>(solutionSpace)
+  }
+}
+impl SolverType: Hash & Equals
+
+class SolverVariable {
+  /// A type variable that needs to be substituted.
+  ///
+  /// These map to the type parameters in Candy. In the context of the solver,
+  /// they are displayed with a leading question mark: `?name`
+  ///
+  /// Examples:
+  ///
+  /// * `?T`
+  /// * `?0`
+
+  let name: String
+}
+impl SolverVariable: SolverType {
+  fun toString_(): String { "?{name}" }
+  fun containsVariable(variable: SolverVariable): Bool { name == variable.name }
+  fun substitute(variable: SolverVariable, substitution: SolverType): SolverType {
+    if name == variable.name { substitution } else { this }
+  }
+}
+impl SolverVariable: Hash {
+  fun hash<T>(hasher: Hasher<T>) {
+    name.hash<T>(hasher)
+  }
+}
+impl SolverVariable: Equals {
+  fun equals(other: This): Bool {
+    name == other.name
+  }
+}
+
+class SolverValue {
+  /// A concrete type. May contain `SolverVariable`s inside its `parameters`.
+  ///
+  /// Examples:
+  ///
+  /// * `List<?T>`
+  /// * `String`
+  /// * `Set<Int>`
+  /// * `Tuple<Int, String>`
+
+  let name: String
+  let parameters: List<SolverType>
+}
+impl SolverValue: SolverType {
+  fun toString_(): String {
+    mut let s = "{name}"
+    if (parameters as Iterable).isNotEmpty() {
+      s = "{s}<{(parameters as Iterable<SolverType>).map<String>({ it.toString_() }).join(", ")}>"
+    }
+    s
+  }
+
+  fun containsVariable(variable: SolverVariable): Bool {
+    (parameters as Iterable<SolverType>).any({ it.containsVariable(variable) })
+  }
+
+  fun substitute(variable: SolverVariable, substitution: SolverType): SolverType {
+    SolverValue(
+      name,
+      (parameters as Iterable<SolverType>)
+        .map<SolverType>({ it.substitute(variable, substitution) })
+        .toList()
+    )
+  }
+}
+impl SolverValue: Hash {
+  fun hash<T>(hasher: Hasher<T>) {
+    name.hash<T>(hasher)
+    (parameters as Iterable).length().hash<T>(hasher)
+    for parameter in parameters {
+      (parameter as Hash).hash<T>(hasher)
+    }
+  }
+}
+impl SolverValue: Equals {
+  fun equals(other: This): Bool {
+    name == other.name
+      && (parameters as Iterable).length() == (other.parameters as Iterable).length()
+      && (parameters as Iterable<SolverType>)
+        .zip<SolverType>(other.parameters)
+        .all({ (it.first as Equals) == (it.second as Equals) })
+  }
+}

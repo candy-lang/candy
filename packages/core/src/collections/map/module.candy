@@ -15,6 +15,44 @@ public trait Map<Key: Equals & Hash, Value> {
     MutableMap.empty<Key, Value>()
   }
 
+  static fun of1<Key: Equals & Hash, Value>(single: (Key, Value)): Map<Key, Value> {
+    MutableMap.of1<Key, Value>(single)
+  }
+
+  static fun of2<Key: Equals & Hash, Value>(
+    first: (Key, Value),
+    second: (Key, Value),
+  ): Map<Key, Value> {
+    MutableMap.of2<Key, Value>(first, second)
+  }
+
+  static fun of3<Key: Equals & Hash, Value>(
+    first: (Key, Value),
+    second: (Key, Value),
+    third: (Key, Value),
+  ): Map<Key, Value> {
+    MutableMap.of3<Key, Value>(first, second, third)
+  }
+
+  static fun of4<Key: Equals & Hash, Value>(
+    first: (Key, Value),
+    second: (Key, Value),
+    third: (Key, Value),
+    fourth: (Key, Value),
+  ): Map<Key, Value> {
+    MutableMap.of4<Key, Value>(first, second, third, fourth)
+  }
+
+  static fun of5<Key: Equals & Hash, Value>(
+    first: (Key, Value),
+    second: (Key, Value),
+    third: (Key, Value),
+    fourth: (Key, Value),
+    fifth: (Key, Value),
+  ): Map<Key, Value> {
+    MutableMap.of5<Key, Value>(first, second, third, fourth, fifth)
+  }
+
   fun length(): Int
   fun isEmpty(): Bool { length() == 0 }
   fun isNotEmpty(): Bool { !isEmpty() }
@@ -34,6 +72,64 @@ public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
     BucketMap.empty<Key, Value>()
   }
 
+  static fun of1<Key: Equals & Hash, Value>(single: (Key, Value)): MutableMap<Key, Value> {
+    let map = BucketMap.empty<Key, Value>()
+    map.set(single.first, single.second)
+    map
+  }
+
+  static fun of2<Key: Equals & Hash, Value>(
+    first: (Key, Value),
+    second: (Key, Value),
+  ): MutableMap<Key, Value> {
+    let map = BucketMap.empty<Key, Value>()
+    map.set(first.first, first.second)
+    map.set(second.first, second.second)
+    map
+  }
+
+  static fun of3<Key: Equals & Hash, Value>(
+    first: (Key, Value),
+    second: (Key, Value),
+    third: (Key, Value),
+  ): MutableMap<Key, Value> {
+    let map = BucketMap.empty<Key, Value>()
+    map.set(first.first, first.second)
+    map.set(second.first, second.second)
+    map.set(third.first, third.second)
+    map
+  }
+
+  static fun of4<Key: Equals & Hash, Value>(
+    first: (Key, Value),
+    second: (Key, Value),
+    third: (Key, Value),
+    fourth: (Key, Value),
+  ): MutableMap<Key, Value> {
+    let map = BucketMap.empty<Key, Value>()
+    map.set(first.first, first.second)
+    map.set(second.first, second.second)
+    map.set(third.first, third.second)
+    map.set(fourth.first, fourth.second)
+    map
+  }
+
+  static fun of5<Key: Equals & Hash, Value>(
+    first: (Key, Value),
+    second: (Key, Value),
+    third: (Key, Value),
+    fourth: (Key, Value),
+    fifth: (Key, Value),
+  ): MutableMap<Key, Value> {
+    let map = BucketMap.empty<Key, Value>()
+    map.set(first.first, first.second)
+    map.set(second.first, second.second)
+    map.set(third.first, third.second)
+    map.set(fourth.first, fourth.second)
+    map.set(fifth.first, fifth.second)
+    map
+  }
+
   fun set(key: Key, value: Value)
 
   fun putIfAbsent(key: Key, ifAbsent: () => Value): Value {
@@ -45,6 +141,21 @@ public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
       let value = ifAbsent()
       set(key, value)
       value
+    }
+  }
+
+  fun update(key: Key, updater: (Value) => Value) {
+    let safeGet = get as ((Key) => Maybe<Value>)
+    let value = safeGet(key)
+    if value is Some {
+      let newValue = updater(value.unwrap())
+      set(key, newValue)
+    }
+  }
+
+  fun updateAll(updater: (Value) => Value) {
+    for key in keys() {
+      update(key as Key, updater)
     }
   }
 

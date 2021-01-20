@@ -144,7 +144,28 @@ public trait MutableList<Item>: List<Item> {
   fun set(index: Int /* UInt */, item: Item)
   // TODO(marcelgarus): Rename to add as soon as the naming conflict with + is resolved.
   fun append(item: Item)
-  fun appendAll(items: Iterable<Item>)
+  fun appendAll(items: Iterable<Item>) {
+    for item in items {
+      append(item)
+    }
+  }
+
+  fun update(index: Int, updater: (Item) => Item) {
+    let safeGet = get as ((Int) => Maybe<Item>)
+    let value = safeGet(index)
+    if value is Some {
+      let newValue = updater(value.unwrap())
+      set(index, newValue)
+    }
+  }
+
+  fun updateAll(updater: (Item) => Item) {
+    mut let index = 0
+    while index < length() {
+      update(index, updater)
+      index = index + 1
+    }
+  }
 
   fun removeAt(index: Int /* UInt */): Item
 
