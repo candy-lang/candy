@@ -35,14 +35,12 @@ impl HirStringExpression: HirExpression
 trait HirStringPart
 
 public class HirLiteralStringPart {
-  public let uri: HirExpressionUri<HirLiteralStringPart>
   public let value: String
 }
 impl HirLiteralStringPart: HirStringPart
 
 public class HirInterpolatedStringPart {
-  public let uri: HirExpressionUri<HirInterpolatedStringPart>
-  public let value: String
+  public let value: HirExpressionUri<HirExpression>
 }
 impl HirInterpolatedStringPart: HirStringPart
 

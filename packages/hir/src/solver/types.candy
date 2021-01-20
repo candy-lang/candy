@@ -142,10 +142,7 @@ trait SolverType {
     Some<Map<SolverVariable, SolverType>>(solutionSpace)
   }
 }
-impl SolverType: Hash {
-  fun hash<T>(hasher: Hasher<T>) { assert(false, "subclasses should override this") }
-}
-impl SolverType: Equals
+impl SolverType: Hash & Equals
 
 class SolverVariable {
   /// A type variable that needs to be substituted.
@@ -154,6 +151,7 @@ class SolverVariable {
   /// they are displayed with a leading question mark: `?name`
   ///
   /// Examples:
+  ///
   /// * `?T`
   /// * `?0`
 
@@ -178,6 +176,7 @@ class SolverValue {
   /// A concrete type. May contain `SolverVariable`s inside its `parameters`.
   ///
   /// Examples:
+  ///
   /// * `List<?T>`
   /// * `String`
   /// * `Set<Int>`
