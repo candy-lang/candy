@@ -1,4 +1,3 @@
-
 trait SolverType {
   /// Either a `SolverVariable` or a `SolverValue`.
 
