@@ -48,6 +48,98 @@ public class ArrayList<Item> {
     list.append(fifth)
     list
   }
+  public static fun of6<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item): ArrayList<Item> {
+    let list = create<Item>(6)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list.append(sixth)
+    list
+  }
+  public static fun of7<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item): ArrayList<Item> {
+    let list = create<Item>(7)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list.append(sixth)
+    list.append(seventh)
+    list
+  }
+  public static fun of8<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item): ArrayList<Item> {
+    let list = create<Item>(8)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list.append(sixth)
+    list.append(seventh)
+    list.append(eigth)
+    list
+  }
+  public static fun of9<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item): ArrayList<Item> {
+    let list = create<Item>(9)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list.append(sixth)
+    list.append(seventh)
+    list.append(eigth)
+    list.append(ninth)
+    list
+  }
+  public static fun of10<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item): ArrayList<Item> {
+    let list = create<Item>(10)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list.append(sixth)
+    list.append(seventh)
+    list.append(eigth)
+    list.append(ninth)
+    list.append(tenth)
+    list
+  }
+  public static fun of11<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item, eleventh: Item): ArrayList<Item> {
+    let list = create<Item>(11)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list.append(sixth)
+    list.append(seventh)
+    list.append(eigth)
+    list.append(ninth)
+    list.append(tenth)
+    list.append(eleventh)
+    list
+  }
+  public static fun of12<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item, eleventh: Item, twelfth: Item): ArrayList<Item> {
+    let list = create<Item>(12)
+    list.append(first)
+    list.append(second)
+    list.append(third)
+    list.append(fourth)
+    list.append(fifth)
+    list.append(sixth)
+    list.append(seventh)
+    list.append(eigth)
+    list.append(ninth)
+    list.append(tenth)
+    list.append(eleventh)
+    list.append(twelfth)
+    list
+  }
+
   public static fun fromArray<Item>(array: Array<Item>): ArrayList<Item> {
     let list = empty<Item>()
     mut let i = 0
@@ -130,6 +222,9 @@ impl<Item> ArrayList<Item>: MutableList<Item> {
     }
     set(length_, item)
     length_ = length_ + 1
+  }
+  fun appendAll(items: Iterable<Item>) {
+    for item in items { append(item) }
   }
 
   fun removeAt(index: Int /* UInt */): Item {

@@ -31,9 +31,9 @@ abstract class CandyType with _$CandyType {
     @Default(<CandyType>[]) List<CandyType> parameterTypes,
     @required CandyType returnType,
   }) = FunctionCandyType;
-  @Assert('types.length > 0')
+  @Assert('types.length > 1')
   const factory CandyType.union(List<CandyType> types) = UnionCandyType;
-  @Assert('types.length > 0')
+  @Assert('types.length > 1')
   const factory CandyType.intersection(List<CandyType> types) =
       IntersectionCandyType;
   const factory CandyType.parameter(String name, DeclarationId declarationId) =
@@ -101,6 +101,11 @@ abstract class CandyType with _$CandyType {
       );
   static const arrayModuleId =
       ModuleId(PackageId.core, ['collections', 'array', 'Array']);
+
+  // hash
+  static final hash = UserCandyType(ModuleId.coreHash, 'Hash');
+  factory CandyType.hasher(CandyType result) =>
+      CandyType.user(ModuleId.coreHash, 'Hasher', arguments: [result]);
 
   // operators
   // operators.arithmetic
@@ -387,11 +392,7 @@ final Query<Tuple2<CandyType, CandyType>, bool> isAssignableTo =
         }
         return false;
       },
-      function: (type) {
-        throw CompilerError.unsupportedFeature(
-          'Trait implementations for functions are not yet supported.',
-        );
-      },
+      function: (type) => false,
       union: (type) {
         final items = type.types;
         assert(items.length >= 2);

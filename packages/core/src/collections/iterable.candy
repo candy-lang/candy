@@ -88,22 +88,17 @@ public trait Iterable<Item> {
   fun isEmpty(): Bool { first() is None }
   fun isNotEmpty(): Bool { !isEmpty() }
 
-  fun all(check: (Item) => Bool): Bool {
+  fun all(tester: (Item) => Bool): Bool {
     for item in this {
-      if !check(item) {
-        return false
-      }
+      if !tester(item) { return false }
     }
-    return true
+    true
   }
-
-  fun any(check: (Item) => Bool): Bool {
+  fun any(tester: (Item) => Bool): Bool {
     for item in this {
-      if check(item) {
-        return true
-      }
+      if tester(item) { return true }
     }
-    return false
+    false
   }
 
   // Reductions.
@@ -113,7 +108,11 @@ public trait Iterable<Item> {
     for item in this { result = combine(result, item) }
     result
   }
-  // TODO(marcelgarus): foldRight
+  fun foldRight<Out>(initial: Out, combine: (Item, Out) => Out): Out {
+    mut let result = initial
+    for item in toList().reversed() { result = combine(item, result) }
+    result
+  }
   // TODO(marcelgarus): reduceLeft
   // TODO(marcelgarus): reduceRight
 
@@ -236,10 +235,7 @@ public trait Iterable<Item> {
 
   // Conversions.
 
-  fun toList(): List<Item> {
-    toMutableList()
-  }
-
+  fun toList(): List<Item> { toMutableList() }
   fun toMutableList(): MutableList<Item> {
     let iter = iterator()
     let list = MutableList.empty<Item>()
@@ -260,6 +256,7 @@ public trait Iterable<Item> {
   // Extras:
 
   // TODO(marcelgarus): + operator for joining Iterables
+  // TODO(marcelgarus): for Iterable<Equals>: contains
 
   // TODO(marcelgarus): for Iterable<(A, B)>: map with 2 args, unzip
   // TODO(marcelgarus): for Iterable<Iterable<T>>: flatten

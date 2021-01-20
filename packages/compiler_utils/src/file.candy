@@ -1,0 +1,6 @@
+use ..package
+
+public class File {
+  public let package: Package
+  public let path: List<String> /* Path */
+}

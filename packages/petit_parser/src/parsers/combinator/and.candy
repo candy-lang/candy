@@ -1,0 +1,14 @@
+use ....parsers
+
+class AndParser<Item, Output> {
+  let parser: Parser<Item, Output>
+}
+impl<Item, Output> AndParser<Item, Output>: Parser<Item, Output> {
+  fun parse(context: Context<Item>): Result<Success<Output>, Failure> {
+    let result = parser.parse(context)
+    if result is Ok<Success<Output>, Failure> {
+      return Ok<Success<Output>, Failure>(Success<Output>(result.unwrap().output, context.offset))
+    }
+    result
+  }
+}

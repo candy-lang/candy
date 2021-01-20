@@ -29,15 +29,41 @@ public trait Parser<Item, Output> {
   }
 
   // TODO(JonasWanke): move the following function to `action/map.candy`
+  fun cast<NewOutput>(): Parser<Item, NewOutput> { CastParser<Item, Output, NewOutput>(this) }
+
+  // TODO(JonasWanke): move the following function to `action/map.candy`
   fun map<NewOutput>(mapper: (Output) => NewOutput): Parser<Item, NewOutput> {
     MapParser<Item, Output, NewOutput>(this, mapper)
   }
+
+  // TODO(JonasWanke): move the following function to `action/token.candy`
+  fun token(): Parser<Item, Token<Item, Output>> { TokenParser<Item, Output>(this) }
+
+  // TODO(JonasWanke): move the following function to `action/token.candy`
+  fun when(tester: (Output) => Result<Unit, String>): Parser<Item, Output> {
+    WhenParser<Item, Output>(this, tester)
+  }
+
+  // TODO(JonasWanke): move the following function to `combinator/and.candy`
+  fun and(): Parser<Item, Output> { AndParser<Item, Output>(this) }
 
   // TODO(JonasWanke): move the following function to `combinator/choice.candy`
   fun or<OutputB>(other: Parser<Item, OutputB>): Parser<Item, Output | OutputB> {
     let castedThis = this as Parser<Item, Output | OutputB>
     let castedOther = other as Parser<Item, Output | OutputB>
     ChoiceParser<Item, Output | OutputB>(List.of2<Parser<Item, Output | OutputB>>(castedThis, castedOther))
+  }
+
+  // TODO(JonasWanke): move the following functions to `combinator/not.candy`
+  fun not(message: String = "Expected the receiver to fail."): Parser<Item, Failure> {
+    NotParser<Item, Output>(this, message)
+  }
+  fun negated(
+    message: String = "Expected something different from the receiver.",
+  ): Parser<Item, Item> {
+    not(message)
+        .sequence<Item>(any<Item>("Expected any input."))
+        .map<Item>({ it.second })
   }
 
   // TODO(JonasWanke): move the following function to `combinator/optional.candy`
@@ -78,20 +104,25 @@ public trait Parser<Item, Output> {
   // TODO(JonasWanke): move the following functions to `repeating/separated_by.candy`
   fun separatedBy<SeparatorOutput>(
       separator: Parser<Item, SeparatorOutput>,
+      minimumItems: Int /* UInt */ = 1,
       allowTrailingSeparator: Bool = false,
   ): Parser<Item, List<Output | SeparatorOutput>> {
-    let initial = map<List<Output | SeparatorOutput>>({
-      List.of1<Output | SeparatorOutput>(it as Output | SeparatorOutput)
-    })
-    let seq = separator.or<Output>(this)
-        .star()
-        .map<List<Output | SeparatorOutput>>({ it as List<Output | SeparatorOutput> })
-    mut let parser = initial.sequence<List<Output | SeparatorOutput>>(seq)
-        .map<(List<Output | SeparatorOutput>, List<Output | SeparatorOutput>)>({
-          it as (List<Output | SeparatorOutput>, List<Output | SeparatorOutput>)
-        })
+    mut let parser = sequence<List<(SeparatorOutput, Output)>>(
+          separator
+              .sequence<Output>(this)
+              .repeat(minimumItems - 1, None<Int>())
+              .map<List<(SeparatorOutput, Output)>>({ it as List<(SeparatorOutput, Output)> })
+        )
         .map<List<Output | SeparatorOutput>>({
-          it.first.followedBy(it.second) as List<Output | SeparatorOutput>
+          let initial = (it.first as Output)
+          let sequence = (it.second as List<(SeparatorOutput, Output)>)
+          let result = MutableList.empty<Output | SeparatorOutput>()
+          result.append(initial as Output | SeparatorOutput)
+          for tuple in sequence {
+            result.append(tuple.first as Output | SeparatorOutput)
+            result.append(tuple.second as Output | SeparatorOutput)
+          }
+          result
         })
 
     if allowTrailingSeparator {
@@ -102,7 +133,7 @@ public trait Parser<Item, Output> {
           .map<List<Output | SeparatorOutput>>({
             let first = it.first as List<Output | SeparatorOutput>
             let trailing = List.of1<Output | SeparatorOutput>(it.second as Output | SeparatorOutput)
-            first.followedBy(trailing)
+            first.followedByList(trailing)
           })
     }
 

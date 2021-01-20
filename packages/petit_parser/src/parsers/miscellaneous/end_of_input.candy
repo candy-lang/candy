@@ -1,6 +1,6 @@
 use ....parsers
 
-fun endOfInput<Item>(message: String = "End of input expected."): Parser<Item, Unit> {
+public fun endOfInput<Item>(message: String = "End of input expected."): Parser<Item, Unit> {
   EndOfInputParser<Item>(message)
 }
 

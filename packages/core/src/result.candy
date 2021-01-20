@@ -23,5 +23,5 @@ public class Error<Success, ErrorType> {
   public let error: ErrorType
 }
 impl<Success, ErrorType> Error<Success, ErrorType>: Result<Success, ErrorType> {
-  fun unwrap(): Success { throw "Unwrapped `Error`." }
+  fun unwrap(): Success { throw "Unwrapped `Error`: {error}." }
 }

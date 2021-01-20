@@ -1,0 +1,339 @@
+use compiler_utils
+use cst
+use ..declarations
+use ..errors
+use ..expressions
+use ..file
+use ..node
+
+public fun lowerCstToAst(
+  file: File,
+  cst: CstNode<CstFile>,
+): (AstFile, Map<CstNodeId, AstNodeId>, List<CompilerError>) {
+  let context = LoweringContext.create(file)
+  let ast = lowerFile(context, cst)
+  let trackingResult = context.getResult()
+  Tuple(ast, trackingResult.first, trackingResult.second)
+}
+
+// file
+
+fun lowerFile(context: LoweringContext, cst: CstNode<CstFile>): AstFile {
+  let id = AstFileId(context.file)
+
+  mut let sawDeclaration = false
+  let useLines = MutableList.empty<AstUseLine>()
+  let declarations = MutableList.empty<AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty>()
+  for node in cst.child.content {
+    if node.child is CstUseLine {
+      if sawDeclaration {
+        context.addError(
+          UseLineAfterDeclarationCompilerError(context.file, node.cast<CstUseLine>()),
+        )
+      }
+
+      let result = lowerUseLine(
+        context,
+        id,
+        node.cast<CstUseLine>(),
+        (useLines as Iterable<AstUseLine>).length(),
+      )
+      if result is Some<AstUseLine> {
+        useLines.append(result.unwrap())
+      }
+    } else {
+      sawDeclaration = true
+    }
+  }
+
+  context.addIdMapping(cst.id, id)
+  AstFile(id, useLines, declarations)
+}
+
+fun lowerUseLine(
+  context: LoweringContext,
+  fileId: AstFileId,
+  cst: CstNode<CstUseLine>,
+  useLineIndex: Int,
+): Maybe<AstUseLine> {
+  let id = AstUseLineId(fileId, useLineIndex)
+
+  let modifiers = lowerModifiers(context, id, cst.child.modifiers)
+  let target = cst.child.target
+      .map<AstUseLineTarget>({
+        if it.child is CstLocalRelativeUseLineTarget {
+          lowerLocalRelativeUseLineTarget(context, id, it.cast<CstLocalRelativeUseLineTarget>())
+        } else {
+          lowerGlobalUseLineTarget(context, id, it.cast<CstGlobalUseLineTarget>())
+        }
+      })
+
+  if target is None<AstUseLineTarget> { return None<AstUseLine>() }
+
+  context.addIdMapping(cst.id, id)
+  Some<AstUseLine>(AstUseLine(id, modifiers, target.unwrap()))
+}
+fun lowerLocalRelativeUseLineTarget(
+  context: LoweringContext,
+  useLineId: AstUseLineId,
+  cst: CstNode<CstLocalRelativeUseLineTarget>,
+): AstLocalRelativeUseLineTarget {
+  let id = AstUseLineTargetId(useLineId)
+
+  let parentNavigationsIterable = cst.child.parentNavigations as Iterable<CstNode<PunctuationToken>>
+  assert(parentNavigationsIterable.isNotEmpty(), "Parent navigations may not be empty.")
+  let parentNavigations = parentNavigationsIterable.length() - 1
+
+  let path = MutableList.empty<AstIdentifier>()
+  mut let punctuationExpectedNext = false
+  for node in cst.child.path {
+    if node.child is PunctuationToken {
+      if !punctuationExpectedNext {
+        /// TODO(JonasWanke)
+      } else {
+        punctuationExpectedNext = false
+      }
+    } else {
+      if punctuationExpectedNext {
+        /// TODO(JonasWanke)
+      } else {
+        let identifierId = AstIdentifierId(id, (path as Iterable<AstIdentifier>).length())
+        path.append(
+          AstIdentifier(identifierId, (node.cast<IdentifierToken>()).child.identifier),
+        )
+        punctuationExpectedNext = true
+      }
+    }
+  }
+
+  context.addIdMapping(cst.id, id)
+  AstLocalRelativeUseLineTarget(id, parentNavigations, path)
+}
+fun lowerGlobalUseLineTarget(
+  context: LoweringContext,
+  useLineId: AstUseLineId,
+  cst: CstNode<CstGlobalUseLineTarget>,
+): AstGlobalUseLineTarget {
+  let id = AstUseLineTargetId(useLineId)
+
+  let packagePath = MutableList.empty<AstIdentifier>()
+  mut let punctuationExpectedNext = false
+  for node in cst.child.packagePath {
+    if node.child is PunctuationToken {
+      if !punctuationExpectedNext {
+        /// TODO(JonasWanke)
+      } else {
+        punctuationExpectedNext = false
+      }
+    } else {
+      if punctuationExpectedNext {
+        /// TODO(JonasWanke)
+      } else {
+        let identifierId = AstIdentifierId(id, (packagePath as Iterable<AstIdentifier>).length())
+        packagePath.append(
+          AstIdentifier(identifierId, node.cast<IdentifierToken>().child.identifier),
+        )
+        punctuationExpectedNext = true
+      }
+    }
+  }
+
+  let moduleName = None<AstIdentifier>()
+
+  context.addIdMapping(cst.id, id)
+  AstGlobalUseLineTarget(id, packagePath, moduleName)
+}
+
+fun lowerModifiers(
+  context: LoweringContext,
+  parentId: AstUseLineId | AstDeclarationId,
+  modifiers: List<CstNode<IdentifierToken>>,
+): List<AstIdentifier> {
+  mut let index = 0
+  mut let result = MutableList.empty<AstIdentifier>()
+  for modifier in modifiers {
+    result.append(lowerModifier(context, parentId, modifier, index))
+    index = index + 1
+  }
+  result
+}
+fun lowerModifier(
+  context: LoweringContext,
+  parentId: AstUseLineId | AstDeclarationId,
+  cst: CstNode<IdentifierToken>,
+  index: Int,
+): AstIdentifier {
+  let id = AstIdentifierId(parentId, index)
+  context.addIdMapping(cst.id, id)
+  AstIdentifier(id, cst.child.identifier)
+}
+
+// expressions
+
+fun lowerExpression(
+  context: LoweringContext,
+  parentId: AstDeclarationId,
+  cst: CstNode<CstExpression>,
+): AstExpression {
+  if cst.child is CstIntExpression {
+    return lowerIntExpression(context, parentId, cst.cast<CstIntExpression>())
+  }
+  if cst.child is CstStringExpression {
+    return lowerStringExpression(context, parentId, cst.cast<CstStringExpression>())
+  }
+  throw "Unknown expression: {cst}."
+}
+
+fun lowerIntExpression(
+  context: LoweringContext,
+  parentId: AstDeclarationId,
+  cst: CstNode<CstIntExpression>,
+): AstIntExpression {
+  let id = context.getExpressionId(parentId)
+  context.addIdMapping(cst.id, id)
+  AstIntExpression(id, cst.child.value.child.value)
+}
+
+fun lowerStringExpression(
+  context: LoweringContext,
+  parentId: AstDeclarationId,
+  cst: CstNode<CstStringExpression>,
+): AstStringExpression {
+  let id = context.getExpressionId(parentId)
+
+  let parts = (cst.child.parts as Iterable<CstNode<StringPart>>)
+      .map<AstStringPart>({
+        if it.child is CstLiteralStringPart {
+          return lowerLiteralStringPart(context, parentId, it.cast<CstLiteralStringPart>())
+        }
+        if it.child is CstEscapedStringPart {
+          return lowerEscapedStringPart(context, parentId, it.cast<CstEscapedStringPart>())
+        }
+        if it.child is CstInterpolatedStringPart {
+          return lowerInterpolatedStringPart(
+            context,
+            parentId,
+            it.cast<CstInterpolatedStringPart>(),
+          )
+        }
+        throw "Unknown string part: {it}."
+      })
+      .toList()
+
+  context.addIdMapping(cst.id, id)
+  AstStringExpression(id, parts)
+}
+fun lowerLiteralStringPart(
+  context: LoweringContext,
+  parentId: AstDeclarationId,
+  cst: CstNode<CstLiteralStringPart>,
+): AstStringPart {
+  let id = context.getExpressionId(parentId)
+
+  let identifierId = AstIdentifierId(id, 0)
+  context.addIdMapping(cst.child.value.id, identifierId)
+  let identifier = AstIdentifier(identifierId, cst.child.value.child.value)
+
+  context.addIdMapping(cst.id, id)
+  AstLiteralStringPart(id, identifier)
+}
+fun lowerEscapedStringPart(
+  context: LoweringContext,
+  parentId: AstDeclarationId,
+  cst: CstNode<CstEscapedStringPart>,
+): AstStringPart {
+  let id = context.getExpressionId(parentId)
+
+  let identifierId = AstIdentifierId(id, 0)
+  let value = if cst.child.value is None<CstNode<StringLiteralToken>> {
+    context.addError(InvalidEscapeSequenceCompilerError(context.file, cst))
+    AstIdentifier(identifierId, "")
+  } else {
+    let escapeSequence = cst.child.value.unwrap()
+
+    let validEscapeSequences = MutableMap.empty<String, String>()
+    validEscapeSequences.set("🦄", "\🦄")
+    validEscapeSequences.set("👍", "\👍")
+    validEscapeSequences.set("n", "\n")
+    validEscapeSequences.set("r", "\r")
+    validEscapeSequences.set("t", "\t")
+    validEscapeSequences.set("\\", "\\")
+
+    let rawValue = escapeSequence.child.value
+    let value = (validEscapeSequences as Map<String, String>)
+      .get(rawValue)
+      .orElse({
+        context.addError(InvalidEscapeSequenceCompilerError(context.file, cst))
+        rawValue
+      })
+    context.addIdMapping(escapeSequence.id, identifierId)
+    AstIdentifier(identifierId, value)
+  }
+
+  context.addIdMapping(cst.id, id)
+  AstLiteralStringPart(id, value)
+}
+fun lowerInterpolatedStringPart(
+  context: LoweringContext,
+  parentId: AstDeclarationId,
+  cst: CstNode<CstInterpolatedStringPart>,
+): AstStringPart {
+  let id = context.getExpressionId(parentId)
+
+  if cst.child.closingCurlyBrace is None<CstNode<PunctuationToken>> {
+    context.addError(
+      MissingClosingBracketCompilerError(
+        context.file,
+        cst.cast<CstGroupExpression | CstTupleExpression | CstInterpolatedStringPart>(),
+      ),
+    )
+  }
+
+  context.addIdMapping(cst.id, id)
+  if cst.child.expression is Some<CstNode<CstExpression>> {
+    let expression = lowerExpression(context, parentId, cst.child.expression.unwrap())
+    AstInterpolatedStringPart(id, expression)
+  } else {
+    context.addError(MissingExpressionInInterpolationCompilerError(context.file, cst))
+    AstLiteralStringPart(id, AstIdentifier(AstIdentifierId(id, 0), ""))
+  }
+}
+
+// utility
+
+class LoweringContext {
+  static fun create(file: File): LoweringContext {
+    LoweringContext(
+      file,
+      MutableMap.empty<CstNodeId, AstNodeId>(),
+      0,
+      MutableList.empty<CompilerError>(),
+    )
+  }
+
+  let file: File
+
+  let idMapping: MutableMap<CstNodeId, AstNodeId>
+  fun addIdMapping(cstId: CstNodeId, astId: AstNodeId) {
+    assert(
+      !(idMapping as Map<CstNodeId, AstNodeId>).containsKey(cstId),
+      "ID {cstId} already lowered to {astId}.",
+    )
+    idMapping.set(cstId, astId)
+  }
+  mut let nextExpressionId: Int
+  fun getExpressionId(declarationId: AstDeclarationId): AstExpressionId {
+    /// TODO(JonasWanke): number these per declaration when IDs implement `Equals & Hash`
+
+    let id = AstExpressionId(declarationId, nextExpressionId)
+    nextExpressionId = nextExpressionId + 1
+    id
+  }
+
+  let errors: MutableList<CompilerError>
+  fun addError(error: CompilerError) { errors.append(error) }
+
+  fun getResult(): (Map<CstNodeId, AstNodeId>, List<CompilerError>) {
+    Tuple(idMapping, errors)
+  }
+}

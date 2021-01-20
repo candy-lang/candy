@@ -1,4 +1,4 @@
-name: cst
+name: compiler_utils
 
 dependencies:
   petit_parser:

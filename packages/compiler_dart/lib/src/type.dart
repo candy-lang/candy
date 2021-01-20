@@ -16,12 +16,14 @@ final Query<CandyType, dart.Reference> compileType =
       this_: (_) => _createType('dynamic'),
       user: (type) {
         if (type == CandyType.any) return _createType('Object');
-        if (type == CandyType.unit) return _createType('void', url: null);
         if (type == CandyType.never) return _createType('dynamic');
 
         final declarationId =
             moduleIdToDeclarationId(context, type.virtualModuleId);
-        assert(declarationId.isTrait || declarationId.isClass);
+        assert(
+          declarationId.isTrait || declarationId.isClass,
+          'Expected a trait or class, got: $declarationId.',
+        );
 
         final reference = compileTypeName(context, declarationId);
         return _createType(

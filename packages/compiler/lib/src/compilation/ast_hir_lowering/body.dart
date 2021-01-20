@@ -1424,9 +1424,7 @@ extension on Context {
       for (final expression in expressions) {
         expression.accept(visitor);
       }
-      actualReturnType = visitor.returnTypes.isEmpty
-          ? hir.CandyType.unit
-          : hir.CandyType.union(visitor.returnTypes.toList());
+      actualReturnType = _unionOrUnit(visitor.returnTypes);
     }
 
     return Ok([
@@ -1500,8 +1498,8 @@ extension on Context {
 
     final type = expressionType.valueOrNull ??
         _unionOrUnit({
-          if (thenBody.isNotEmpty) thenBody.last.type,
-          if (elseBody.isNotEmpty) elseBody.last.type,
+          thenBody.lastOrNull?.type ?? hir.CandyType.unit,
+          elseBody.lastOrNull?.type ?? hir.CandyType.unit,
         }.toList());
 
     return Ok([
@@ -2908,8 +2906,12 @@ extension on Context {
   }
 }
 
-hir.CandyType _unionOrUnit(List<hir.CandyType> types) {
-  return types.isEmpty ? hir.CandyType.unit : hir.CandyType.union(types);
+hir.CandyType _unionOrUnit(Iterable<hir.CandyType> types) {
+  return types.isEmpty
+      ? hir.CandyType.unit
+      : types.length == 1
+          ? types.single
+          : hir.CandyType.union(types.toSet().toList());
 }
 
 extension on hir.Declaration {

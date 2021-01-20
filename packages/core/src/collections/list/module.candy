@@ -24,6 +24,27 @@ public trait List<Item>: Iterable<Item> {
   static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): List<Item> {
     ArrayList.of5<Item>(first, second, third, fourth, fifth)
   }
+  static fun of6<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item): List<Item> {
+    ArrayList.of6<Item>(first, second, third, fourth, fifth, sixth)
+  }
+  static fun of7<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item): List<Item> {
+    ArrayList.of7<Item>(first, second, third, fourth, fifth, sixth, seventh)
+  }
+  static fun of8<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item): List<Item> {
+    ArrayList.of8<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth)
+  }
+  static fun of9<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item): List<Item> {
+    ArrayList.of9<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth)
+  }
+  static fun of10<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item): List<Item> {
+    ArrayList.of10<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth, tenth)
+  }
+  static fun of11<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item, eleventh: Item): List<Item> {
+    ArrayList.of11<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth, tenth, eleventh)
+  }
+  static fun of12<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item, eleventh: Item, twelfth: Item): List<Item> {
+    ArrayList.of12<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth, tenth, eleventh, twelfth)
+  }
 
   // TODO(marcelgarus): Getterize!
   fun isEmpty(): Bool { length() == 0 }
@@ -65,6 +86,20 @@ public trait List<Item>: Iterable<Item> {
     }
     result
   }
+
+  fun reversed(): List<Item> {
+    /// TODO(JonasWanke): make this more efficient by creating a view of the original list
+
+    let length = (this as Iterable<Item>).length()
+    let result = ArrayList.create<Item>(length)
+
+    mut let index = length - 1
+    while index >= 0 {
+      (result as MutableList<Item>).append(get(index).unwrap() as Item)
+      index = index - 1
+    }
+    result
+  }
 }
 
 public trait MutableList<Item>: List<Item> {
@@ -84,10 +119,32 @@ public trait MutableList<Item>: List<Item> {
   static fun of5<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item): MutableList<Item> {
     ArrayList.of5<Item>(first, second, third, fourth, fifth)
   }
+  static fun of6<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item): MutableList<Item> {
+    ArrayList.of6<Item>(first, second, third, fourth, fifth, sixth)
+  }
+  static fun of7<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item): MutableList<Item> {
+    ArrayList.of7<Item>(first, second, third, fourth, fifth, sixth, seventh)
+  }
+  static fun of8<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item): MutableList<Item> {
+    ArrayList.of8<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth)
+  }
+  static fun of9<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item): MutableList<Item> {
+    ArrayList.of9<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth)
+  }
+  static fun of10<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item): MutableList<Item> {
+    ArrayList.of10<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth, tenth)
+  }
+  static fun of11<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item, eleventh: Item): MutableList<Item> {
+    ArrayList.of11<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth, tenth, eleventh)
+  }
+  static fun of12<Item>(first: Item, second: Item, third: Item, fourth: Item, fifth: Item, sixth: Item, seventh: Item, eigth: Item, ninth: Item, tenth: Item, eleventh: Item, twelfth: Item): MutableList<Item> {
+    ArrayList.of12<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth, tenth, eleventh, twelfth)
+  }
 
   fun set(index: Int /* UInt */, item: Item)
   // TODO(marcelgarus): Rename to add as soon as the naming conflict with + is resolved.
   fun append(item: Item)
+  fun appendAll(items: Iterable<Item>)
 
   fun appendAll(items: Iterable<Item>) {
     for item in items {

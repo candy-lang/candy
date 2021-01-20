@@ -1,0 +1,17 @@
+use compiler_utils
+use cst
+
+public class MissingExpressionInInterpolationCompilerError {
+  public let file: File
+  public let stringPart: CstNode<CstInterpolatedStringPart>
+}
+impl MissingExpressionInInterpolationCompilerError: CompilerError {
+  public fun id(): String { "missing-expression-in-interpolation" }
+
+  public fun location(): Location { Location(file, stringPart.child.openingCurlyBrace.child.span) }
+  public fun title(): String { "Missing expression in string interpolation." }
+  public fun description(): String {
+    /// TODO(JonasWanke): explain what a string interpolation is and how to escape a `{`
+    "Your string interpolation doesn't contain any expression."
+  }
+}

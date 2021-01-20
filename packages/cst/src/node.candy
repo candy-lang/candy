@@ -1,9 +1,10 @@
-use lexer
+use ..tokens
 
-public data class CstNode<T> {
+public class CstNode<T> {
   public let id: CstNodeId
   public let child: T
-  public let trailingTrivia: List<WhitespaceToken | CommentToken>
+
+  fun cast<R>(): CstNode<R> { CstNode<R>(id, child as R) }
 }
 
 public data class CstNodeId {

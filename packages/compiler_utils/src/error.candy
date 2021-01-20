@@ -1,0 +1,22 @@
+use ..location
+
+public trait CompilerError {
+  public fun id(): String
+
+  public fun location(): Location
+  public fun title(): String
+  public fun description(): String
+  public fun relatedInformation(): List<(Location, String)> { List.empty<(Location, String)>() }
+}
+
+public class InternalCompilerError {
+  public let location_: Location
+  public let description_: String
+}
+impl InternalCompilerError: CompilerError {
+  public fun id(): String { "internal-error" }
+
+  public fun location(): Location { location_ }
+  public fun title(): String { "Internal Error" }
+  public fun description(): String { description_ }
+}

@@ -1,6 +1,5 @@
 import 'package:code_builder/code_builder.dart' as dart;
 import 'package:compiler/compiler.dart';
-import 'package:strings/strings.dart' as strings;
 
 import 'builtins.dart';
 import 'constants.dart';
@@ -30,7 +29,15 @@ final compileBody = Query<DeclarationId, Option<dart.Code>>(
 
     final visitor = DartExpressionVisitor(context, declarationId);
     final compiled = expressions.expand((e) => e.accept(visitor));
-    return Some(dart.Block((b) => b.statements.addAll(compiled)));
+    return Some(dart.Block((b) {
+      b.statements.addAll(compiled);
+      if (declarationId.isFunction) {
+        final hir = getFunctionDeclarationHir(context, declarationId);
+        if (hir.returnType == CandyType.unit) {
+          b.statements.add(visitor.unitInstance.returned.statement);
+        }
+      }
+    }));
   },
 );
 final compileExpression =
@@ -176,11 +183,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             );
           }();
 
-          var typeName = compileTypeName(context, parentId);
-          if (name == 'parse') {
-            typeName = dart.refer('int', dartCoreUrl);
-          }
-          lowered = typeName.property(name);
+          lowered = compileTypeName(context, parentId).property(name);
         } else {
           var name = id.simplePath.last.nameOrNull;
           if (name == 'assert') name = 'assert_';
@@ -210,12 +213,22 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           );
         }
 
+        String escapeForStringLiteral(String value) {
+          // `code_builder` escapes single quotes and newlines, but misses the
+          // following:
+          return value
+              .replaceAll('\t', '\\t')
+              .replaceAll('\r', '\\r')
+              .replaceAll('\$', '\\\$')
+              .replaceAll('\\', '\\\\');
+        }
+
         if (parts.length == 1 && parts.single is LiteralStringLiteralPart) {
           final part = parts.single as LiteralStringLiteralPart;
           return _saveSingle(
             node,
             dart
-                .literalString(strings.escape(part.value))
+                .literalString(escapeForStringLiteral(part.value))
                 .wrapInCandyString(context),
           );
         }
@@ -227,7 +240,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
         final content = parts
             .map((p) => p.when(
-                  literal: (value) => value,
+                  literal: escapeForStringLiteral,
                   interpolated: (expression) => '\$${_name(expression.id)}',
                 ))
             .join();
@@ -244,13 +257,33 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
                 .add(dart.Parameter((b) => b..name = _lambdaThisName(node)));
           }
 
-          final params = parameters.map((p) => dart.Parameter((b) => b
-            ..type = compileType(context, p.type)
-            ..name = p.name));
+          final params = parameters.map((p) => dart.Parameter((b) {
+                final parserSeparatedById = DeclarationId(
+                  ResourceId(
+                    PackageId('petit_parser'),
+                    'src/parsers/module.candy',
+                  ),
+                )
+                    .inner(DeclarationPathData.trait('Parser'))
+                    .inner(DeclarationPathData.function('separatedBy'));
+                final exceptionIds = [
+                  DeclarationLocalId(parserSeparatedById, 20),
+                  DeclarationLocalId(parserSeparatedById, 32),
+                ];
+                if (!exceptionIds.contains(node.id)) {
+                  b.type = compileType(context, p.type);
+                }
+                b.name = p.name;
+              }));
           b.requiredParameters.addAll(params);
 
           final loweredExpressions = expressions.expand((e) => e.accept(this));
-          b.body = dart.Block((b) => b.statements.addAll(loweredExpressions));
+          b.body = dart.Block((b) {
+            b.statements.addAll(loweredExpressions);
+            if (returnType == CandyType.unit) {
+              b.statements.add(unitInstance.returned.statement);
+            }
+          });
         }).closure;
         return [_save(node, closure)];
       },
@@ -273,66 +306,6 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
   @override
   List<dart.Code> visitFunctionCallExpression(FunctionCallExpression node) {
-    final target = node.target;
-    if (target is IdentifierExpression &&
-        target.identifier is PropertyIdentifier) {
-      final identifier = target.identifier as PropertyIdentifier;
-      final methodName = identifier.id.simplePath.last.nameOrNull;
-
-      List<dart.Code> simpleBinaryExpression(
-        String name,
-        dart.Expression Function(dart.Expression left, dart.Expression right)
-            binaryBuilder,
-      ) {
-        assert(name == methodName);
-
-        final left = identifier.receiver;
-        final right = node.valueArguments['other'];
-        return [
-          ...left.accept(this),
-          ...right.accept(this),
-          _save(
-            node,
-            binaryBuilder(_refer(left.id), _refer(right.id)),
-          ),
-        ];
-      }
-
-      List<dart.Code> lazyBoolExpression(
-        String name,
-        dart.Expression Function(dart.Expression left, dart.Expression right)
-            binaryBuilder,
-      ) {
-        assert(name == methodName);
-
-        final left = identifier.receiver;
-        final right = node.valueArguments['other'];
-
-        if (isAssignableTo(context, Tuple2(left.type, CandyType.bool))) {
-          final rightCompiled = lambdaOf([
-            ...right.accept(this),
-            _refer(right.id).returned.statement,
-          ]);
-          return [
-            ...left.accept(this),
-            _save(
-              node,
-              binaryBuilder(_refer(left.id), rightCompiled.call([], {}, [])),
-            ),
-          ];
-        } else {
-          return [
-            ...left.accept(this),
-            ...right.accept(this),
-            _save(
-              node,
-              _refer(left.id).property(name).call([_refer(right.id)], {}, []),
-            ),
-          ];
-        }
-      }
-    }
-
     final surroundingDeclarationName = declarationId.simplePath.last.nameOrNull;
     return [
       ...node.target.accept(this),
@@ -416,15 +389,16 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           _refer(node.expression.id).returned.statement,
         ] else
           dart.Code('return;'),
-        _save(node, dart.literalNull),
+        _save(node, unitInstance),
       ];
 
   @override
   List<dart.Code> visitIfExpression(IfExpression node) {
     List<dart.Code> visitBody(List<Expression> body) => [
           for (final expression in body) ...expression.accept(this),
-          if (body.isNotEmpty && node.type != CandyType.unit)
-            _refer(node.id).safeAssign(body.last).statement,
+          _refer(node.id)
+              .assign(body.isNotEmpty ? _refer(body.last.id) : unitInstance)
+              .statement,
         ];
 
     return [
@@ -452,12 +426,15 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
   @override
   List<dart.Code> visitWhileExpression(WhileExpression node) => [
-        dart.literalNull
+        unitInstance
             .assignVar(_name(node.id), compileType(context, node.type))
             .statement,
         dart.Code('${_label(node.id)}:\nwhile (true) {'),
         ...node.condition.accept(this),
-        dart.Code('if (!${_name(node.condition.id)}.value) break;'),
+        dart.Code('if (!${_name(node.condition.id)}.value) {'),
+        _refer(node.id).assign(unitInstance).statement,
+        dart.Code('break;'),
+        dart.Code('}'),
         for (final expression in node.body) ...expression.accept(this),
         dart.Code('}'),
       ];
@@ -467,7 +444,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     final iteratorName = '${_name(node.id)}_iterator';
     final rawItemName = '${_name(node.id)}_rawItem';
     return [
-      dart.literalNull
+      unitInstance
           .assignVar(_name(node.id), compileType(context, node.type))
           .statement,
       ...node.iterable.accept(this),
@@ -483,6 +460,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           .call([], {}, [])
           .assignFinal(rawItemName)
           .statement,
+      dart.Code('if ('),
       dart
           .refer(rawItemName)
           .isA(
@@ -491,7 +469,11 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
               moduleIdToImportUrl(context, ModuleId.coreMaybe),
             ),
           )
-          .ifStatement(dart.Code('break;')),
+          .code,
+      dart.Code(') {'),
+      _refer(node.id).assign(unitInstance).statement,
+      dart.Code('break;'),
+      dart.Code('}'),
       dart
           .refer(rawItemName)
           .asA(compileType(context, CandyType.some(node.itemType)))
@@ -507,16 +489,16 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   List<dart.Code> visitBreakExpression(BreakExpression node) => [
         if (node.expression != null) ...[
           ...node.expression.accept(this),
-          _refer(node.scopeId).safeAssign(node.expression).statement,
+          _refer(node.scopeId).assign(_refer(node.expression.id)).statement,
         ],
         dart.Code('break ${_label(node.scopeId)};'),
-        _save(node, dart.literalNull),
+        _save(node, unitInstance),
       ];
 
   @override
   List<dart.Code> visitContinueExpression(ContinueExpression node) => [
         dart.Code('continue ${_label(node.scopeId)};'),
-        _save(node, dart.literalNull),
+        _save(node, unitInstance),
       ];
 
   @override
@@ -558,7 +540,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           '(${node.left})'),
     );
 
-    code.add(left.safeAssign(node.right).statement);
+    code.add(left.assign(_refer(node.right.id)).statement);
     code.add(_save(node, left));
     return code;
   }
@@ -644,6 +626,12 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     ];
   }
 
+  dart.Expression get unitInstance {
+    final moduleId = CandyType.unit.virtualModuleId;
+    final declarationId = moduleIdToDeclarationId(context, moduleId);
+    return compileTypeName(context, declarationId).call([], {}, []);
+  }
+
   static String _name(DeclarationLocalId id) => '_${id.value}';
   static dart.Expression _refer(DeclarationLocalId id) => dart.refer(_name(id));
   dart.Code _save(
@@ -688,67 +676,6 @@ extension on dart.Expression {
         code,
         const dart.Code(')'),
       ]));
-  dart.Expression operatorNegate() => dart.CodeExpression(dart.Block.of([
-        const dart.Code('-'),
-        code,
-      ]));
-  dart.Expression operatorDivideTruncating(dart.Expression other) =>
-      dart.CodeExpression(dart.Block.of([
-        code,
-        const dart.Code('~/'),
-        other.code,
-      ]));
-
-  /// Assigns the `other` expression. If the type of the `other` expression is
-  /// `Unit`, assigns `null`.
-  /// Why? Candy's `Unit` is represented by Dart's `void` (type) and `null`
-  /// (value). In Dart, the result of a statement producing `void` can't be
-  /// assigned to anything, so we manually substitute `null` as the value.
-  dart.Expression safeAssign(Expression other) =>
-      assign(other.type == CandyType.unit
-          ? dart.literalNull
-          : DartExpressionVisitor._refer(other.id));
-
-  dart.Code ifStatement(dart.Code body) => dart.Block.of([
-        const dart.Code('if ('),
-        code,
-        const dart.Code(') {'),
-        body,
-        const dart.Code('}'),
-      ]);
-}
-
-extension on dart.Method {
-  dart.Expression get expression => dart.CodeExpression(dart.Block.of([
-        returns.code,
-        dart.Code(name),
-        if (types.isNotEmpty) ...[
-          const dart.Code('<'),
-          for (final type in types) type.code,
-          const dart.Code('>'),
-        ],
-        const dart.Code('('),
-        for (final parameter in requiredParameters) ...[
-          parameter.type.code,
-          dart.Code(parameter.name),
-          const dart.Code(','),
-        ],
-        if (optionalParameters.isNotEmpty) ...[
-          dart.Code(optionalParameters.first.named ? '{' : '['),
-          for (final parameter in optionalParameters) ...[
-            parameter.type.code,
-            dart.Code(parameter.name),
-            const dart.Code(','),
-          ],
-          dart.Code(optionalParameters.first.named ? '}' : ']'),
-        ],
-        const dart.Code(')'),
-        const dart.Code('{'),
-        body,
-        const dart.Code(';'),
-        const dart.Code('}'),
-      ])).expression;
-  dart.Code get code => expression.code;
 }
 
 dart.Expression lambdaOf(List<dart.Code> code) {

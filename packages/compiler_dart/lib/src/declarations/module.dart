@@ -30,10 +30,6 @@ final compileModule = Query<ModuleId, Unit>(
         b.directives.add(dart.Directive((b) => b
           ..type = dart.DirectiveType.import
           ..url = 'package:characters/characters.dart'));
-      } else {
-        b.directives.add(dart.Directive((b) => b
-          ..type = dart.DirectiveType.import
-          ..url = moduleIdToImportUrl(context, ModuleId.coreString)));
       }
     });
 
