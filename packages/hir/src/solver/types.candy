@@ -2,25 +2,8 @@ trait SolverType {
   /// Either a `SolverVariable` or a `SolverValue`.
 
   fun toString_(): String
-
   fun containsVariable(variable: SolverVariable): Bool
-
-  fun substitute(variable: SolverVariable, substitution: SolverType): SolverType {
-    if this is SolverVariable {
-      if (this as SolverVariable).name == variable.name {
-        substitution
-      } else {
-        this
-      }
-    } else {
-      SolverValue(
-        (this as SolverValue).name,
-        ((this as SolverValue).parameters as Iterable<SolverType>)
-          .map<SolverType>({ it.substitute(variable, substitution) })
-          .toList()
-      )
-    }
-  }
+  fun substitute(variable: SolverVariable, substitution: SolverType): SolverType
 
   public fun unify(other: SolverType): Maybe<Map<SolverVariable, SolverType>> {
     /// Unifies `this` type with the `other`. If unification succeeds, returns a map from variables
@@ -159,6 +142,9 @@ class SolverVariable {
 impl SolverVariable: SolverType {
   fun toString_(): String { "?{name}" }
   fun containsVariable(variable: SolverVariable): Bool { name == variable.name }
+  fun substitute(variable: SolverVariable, substitution: SolverType): SolverType {
+    if name == variable.name { substitution } else { this }
+  }
 }
 impl SolverVariable: Hash {
   fun hash<T>(hasher: Hasher<T>) {
@@ -195,6 +181,15 @@ impl SolverValue: SolverType {
 
   fun containsVariable(variable: SolverVariable): Bool {
     (parameters as Iterable<SolverType>).any({ it.containsVariable(variable) })
+  }
+
+  fun substitute(variable: SolverVariable, substitution: SolverType): SolverType {
+    SolverValue(
+      name,
+      (parameters as Iterable<SolverType>)
+        .map<SolverType>({ it.substitute(variable, substitution) })
+        .toList()
+    )
   }
 }
 impl SolverValue: Hash {
