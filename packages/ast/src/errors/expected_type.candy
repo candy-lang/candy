@@ -3,7 +3,7 @@ use cst
 
 public class ExpectedTypeCompilerError {
   public let file: File
-  public let node: CstNode<CstTrait | CstIntersectionType | CstUnionType>
+  public let node: CstNode<CstTrait | CstImpl | CstIntersectionType | CstUnionType>
 }
 impl ExpectedTypeCompilerError: CompilerError {
   public fun id(): String { "expected-type" }
@@ -11,6 +11,9 @@ impl ExpectedTypeCompilerError: CompilerError {
   fun span(): Span {
     if node.child is CstTrait {
       return node.cast<CstTrait>().child.traitKeyword.child.span
+    }
+    if node.child is CstImpl {
+      return node.cast<CstImpl>().child.implKeyword.child.span
     }
     if node.child is CstIntersectionType {
       return node.cast<CstIntersectionType>().child.ampersand.child.span

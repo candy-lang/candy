@@ -190,6 +190,9 @@ fun lowerDeclaration(
   if cst.child is CstTrait {
     return lowerTrait(context, parentId, cst.cast<CstTrait>(), previousNames)
   }
+  if cst.child is CstImpl {
+    return lowerImpl(context, parentId, cst.cast<CstImpl>())
+  }
   throw "Unknown declaration: {cst}."
 }
 fun lowerModule(
@@ -269,7 +272,7 @@ fun lowerTrait(
           context.addError(
             ExpectedTypeCompilerError(
               context.file,
-              cst.cast<CstTrait | CstIntersectionType | CstUnionType>(),
+              cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
             ),
           )
           None<AstType>()
@@ -282,6 +285,65 @@ fun lowerTrait(
 
   context.addIdMapping(cst.id, id)
   AstTrait(id, None<AstCandyDoc>(), modifiers, name, typeParameters, upperBound, innerDeclarations)
+}
+fun lowerImpl(
+  context: LoweringContext,
+  parentId: AstFileId | AstDeclarationId | AstExpressionId,
+  cst: CstNode<CstImpl>,
+): AstImpl {
+  let id = AstDeclarationId(parentId, "impl-{context.getUnnamedDeclarationIndex()}")
+
+  let modifiers = lowerModifiers(context, id, cst.child.modifiers)
+
+  let typeParameters = cst.child.typeParameters
+      .map<List<AstTypeParameter>>({ lowerTypeParameters(context, id, it) })
+      .orElse({ List.empty<AstTypeParameter>() })
+
+  let type = if cst.child.type is Some<CstNode<CstType>> {
+    lowerType(context, id, cst.child.type.unwrap())
+  } else {
+    context.addError(
+      ExpectedTypeCompilerError(
+        context.file,
+        cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
+      ),
+    )
+    None<AstType>()
+  }
+
+  let traits = cst.child.traits
+      .flatMap<AstType>({
+        if it.second is None<CstNode<CstType>> {
+          context.addError(
+            ExpectedTypeCompilerError(
+              context.file,
+              cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
+            ),
+          )
+          None<AstType>()
+        } else {
+          lowerType(context, id, it.second.unwrap())
+        }
+      })
+      .map<List<AstNamedType>>({
+        if it is AstNamedType { return List.of1<AstNamedType>(it as AstNamedType) }
+        if it is AstIntersectionType {
+          let types = (it as AstIntersectionType).types
+          if (types as Iterable<AstType>).any({ !(it is AstNamedType) }) {
+            context.addError(InvalidImplementedTraitsCompilerError(context.file, cst))
+            return List.empty<AstNamedType>()
+          }
+          return (types as Iterable<AstType>).cast<AstNamedType>().toList()
+        }
+        context.addError(InvalidImplementedTraitsCompilerError(context.file, cst))
+        return List.empty<AstNamedType>()
+      })
+      .orElse({ List.empty<AstNamedType>() })
+
+  let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, false) as List<AstFunction | AstProperty>
+
+  context.addIdMapping(cst.id, id)
+  AstImpl(id, modifiers, typeParameters, type, traits, innerDeclarations)
 }
 fun lowerDeclarationContent(
   context: LoweringContext,
@@ -689,7 +751,7 @@ fun lowerIntersectionType(
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstIntersectionType | CstUnionType>(),
+        cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
       ),
     )
   } else {
@@ -724,7 +786,7 @@ fun lowerUnionType(
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstIntersectionType | CstUnionType>(),
+        cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
       ),
     )
   } else {
