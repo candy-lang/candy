@@ -26,6 +26,7 @@ fun lowerFile(context: LoweringContext, cst: CstNode<CstFile>): AstFile {
   mut let sawDeclaration = false
   let useLines = MutableList.empty<AstUseLine>()
   let declarations = MutableList.empty<AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty>()
+  let previousDeclarationNames = MutableMap.empty<String, Bool>()
   for node in cst.child.content {
     if node.child is CstUseLine {
       if sawDeclaration {
@@ -45,6 +46,15 @@ fun lowerFile(context: LoweringContext, cst: CstNode<CstFile>): AstFile {
       }
     } else {
       sawDeclaration = true
+      let result = lowerDeclaration(
+        context,
+        id,
+        node.cast<CstDeclaration>(),
+        previousDeclarationNames as Map<String, Bool>,
+      )
+      declarations.append(
+        result as AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty,
+      )
     }
   }
 
