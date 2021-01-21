@@ -70,7 +70,7 @@ public class AstFunction {
   public let id: AstDeclarationId
   public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<AstIdentifier>
-  public let name: AstIdentifier
+  public let name: Maybe<AstIdentifier>
   public let typeParameters: List<AstTypeParameter>
   public let valueParameters: List<AstValueParameter>
   public let returnType: Maybe<AstType>
@@ -108,7 +108,6 @@ impl AstProperty: AstDeclaration
 
 public class AstBodyId {
   let parentId: AstDeclarationId
-  let name: String
 }
 impl AstBodyId: AstNodeId
 

@@ -1,0 +1,16 @@
+use compiler_utils
+use cst
+
+public class ExpectedFunctionReturnTypeCompilerError {
+  public let file: File
+  public let node: CstNode<CstFunction>
+}
+impl ExpectedFunctionReturnTypeCompilerError: CompilerError {
+  public fun id(): String { "expected-function-return-type" }
+
+  public fun location(): Location { Location(file, node.child.functionKeyword.child.span) }
+  public fun title(): String { "Expected a return type." }
+  public fun description(): String {
+    "Functions must be declared with an explicit return type."
+  }
+}

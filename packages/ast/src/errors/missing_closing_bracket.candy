@@ -5,6 +5,7 @@ public class MissingClosingBracketCompilerError {
   public let file: File
   public let node: CstNode<
     CstDeclarationContent
+    | CstBlockBody
     | CstValueParameters
     | CstGroupType
     | CstFunctionTypeParameterTypes
@@ -22,6 +23,9 @@ impl MissingClosingBracketCompilerError: CompilerError {
   fun span(): Span {
     if node.child is CstDeclarationContent {
       return node.cast<CstDeclarationContent>().child.openingCurlyBrace.child.span
+    }
+    if node.child is CstBlockBody {
+      return node.cast<CstBlockBody>().child.openingCurlyBrace.child.span
     }
     if node.child is CstValueParameters {
       return node.cast<CstValueParameters>().child.openingParenthesis.child.span
