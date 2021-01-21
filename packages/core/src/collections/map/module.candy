@@ -50,7 +50,7 @@ public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
 
   fun remove(key: Key): Maybe<Value>
   fun removeWhere(selector: (Key, Value) => Bool) {
-    for entry in (this as Map<Key, Value>) {
+    for entry in (this as Map<Key, Value>).entries() {
       if selector(entry.first, entry.second) { remove(entry.first) }
     }
   }
