@@ -1,5 +1,6 @@
 use compiler_utils
 use cst
+use petit_parser
 
 public class DuplicateDeclarationNameCompilerError {
   public let file: File
@@ -10,10 +11,10 @@ impl DuplicateDeclarationNameCompilerError: CompilerError {
   public fun id(): String { "duplicate-declaration-name" }
 
   fun span(): Span {
-    if node.child is CstModule { return node.cast<CstModule>().child.name.child.value }
-    if node.child is CstTrait { return node.cast<CstTrait>().child.name.child.value }
-    if node.child is CstClass { return node.cast<CstClass>().child.name.child.value }
-    if node.child is CstProperty { return node.cast<CstProperty>().child.name.child.value }
+    if node.child is CstModule { return node.cast<CstModule>().child.name.unwrap().child.span }
+    if node.child is CstTrait { return node.cast<CstTrait>().child.name.unwrap().child.span }
+    if node.child is CstClass { return node.cast<CstClass>().child.name.unwrap().child.span }
+    if node.child is CstProperty { return node.cast<CstProperty>().child.name.unwrap().child.span }
     throw "Unknown declaration: {node}."
   }
   public fun location(): Location { Location(file, span()) }

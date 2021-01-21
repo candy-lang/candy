@@ -1,5 +1,6 @@
 use compiler_utils
 use cst
+use petit_parser
 
 public class InvalidDeclarationTypeCompilerError {
   public let file: File
@@ -25,7 +26,7 @@ impl InvalidDeclarationTypeCompilerError: CompilerError {
       return node.cast<CstFunction>().child.functionKeyword.child.span
     }
     if node.child is CstProperty {
-      return node.cast<CstProperty>().child.propertyKeyword.child.span
+      return node.cast<CstProperty>().child.keyword.child.span
     }
     throw "Unknown declaration: {node}."
   }

@@ -8,7 +8,9 @@ public class ExpectedTypeInTypeParameterCompilerError {
 impl ExpectedTypeInTypeParameterCompilerError: CompilerError {
   public fun id(): String { "expected-type-in-type-parameter" }
 
-  public fun location(): Location { Location(file, node.child.upperBound.unwrap().first.span) }
+  public fun location(): Location {
+    Location(file, node.child.upperBound.unwrap().first.child.span)
+  }
   public fun title(): String { "Missing type in type parameter." }
   public fun description(): String {
     /// TODO(JonasWanke): add a description

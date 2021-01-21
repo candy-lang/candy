@@ -3,12 +3,12 @@ use cst
 
 public class MissingExpressionInInterpolationCompilerError {
   public let file: File
-  public let stringPart: CstNode<CstInterpolatedStringPart>
+  public let node: CstNode<CstInterpolatedStringPart>
 }
 impl MissingExpressionInInterpolationCompilerError: CompilerError {
   public fun id(): String { "missing-expression-in-interpolation" }
 
-  public fun location(): Location { Location(file, stringPart.child.openingCurlyBrace.child.span) }
+  public fun location(): Location { Location(file, node.child.openingCurlyBrace.child.span) }
   public fun title(): String { "Missing expression in string interpolation." }
   public fun description(): String {
     /// TODO(JonasWanke): explain what a string interpolation is and how to escape a `{`

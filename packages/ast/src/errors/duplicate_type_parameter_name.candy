@@ -9,7 +9,7 @@ public class DuplicateTypeParameterNameCompilerError {
 impl DuplicateTypeParameterNameCompilerError: CompilerError {
   public fun id(): String { "duplicate-type-parameter-name" }
 
-  public fun location(): Location { Location(file, node.child.name.unwrap().span) }
+  public fun location(): Location { Location(file, node.child.name.unwrap().child.span) }
   public fun title(): String { "Duplicate type parameter name." }
   public fun description(): String {
     /// TODO(JonasWanke): add a description for this error

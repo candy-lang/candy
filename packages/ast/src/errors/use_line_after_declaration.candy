@@ -3,14 +3,12 @@ use cst
 
 public class UseLineAfterDeclarationCompilerError {
   public let file: File
-  public let useLine: CstNode<CstUseLine>
+  public let node: CstNode<CstUseLine>
 }
 impl UseLineAfterDeclarationCompilerError: CompilerError {
   public fun id(): String { "use-line-after-declaration" }
 
-  public fun location(): Location {
-    Location(file, useLine.child.useKeyword.child.span)
-  }
+  public fun location(): Location { Location(file, node.child.useKeyword.child.span) }
   public fun title(): String { "Use lines must appear before any declarations." }
   public fun description(): String {
     "Try moving the use line before any declarations."

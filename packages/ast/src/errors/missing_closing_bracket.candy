@@ -1,5 +1,6 @@
 use compiler_utils
 use cst
+use petit_parser
 
 public class MissingClosingBracketCompilerError {
   public let file: File
