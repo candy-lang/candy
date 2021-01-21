@@ -3,19 +3,22 @@ use cst
 
 public class ExpectedTypeCompilerError {
   public let file: File
-  public let type: CstNode<CstIntersectionType | CstUnionType>
+  public let node: CstNode<CstTrait | CstIntersectionType | CstUnionType>
 }
 impl ExpectedTypeCompilerError: CompilerError {
   public fun id(): String { "expected-type" }
 
   fun span(): Span {
-    if type.child is CstIntersectionType {
-      return type.cast<CstIntersectionType>().child.ampersand.child.span
+    if node.child is CstTrait {
+      return node.cast<CstTrait>().child.traitKeyword.child.span
     }
-    if type.child is CstUnionType {
-      return type.cast<CstUnionType>().child.bar.child.span
+    if node.child is CstIntersectionType {
+      return node.cast<CstIntersectionType>().child.ampersand.child.span
     }
-    throw "Unknown type: {type}."
+    if node.child is CstUnionType {
+      return node.cast<CstUnionType>().child.bar.child.span
+    }
+    throw "Unknown node: {node}."
   }
   public fun location(): Location { Location(file, span()) }
   public fun title(): String { "Expected type." }

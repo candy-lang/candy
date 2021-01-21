@@ -6,6 +6,7 @@ use ..node
 public class AstTypeId {
   let parentId: AstDeclarationId
       | AstTypeId
+      | AstTypeParameterId
       | AstTypeArgumentId
       | AstValueParameterId
       | AstExpressionId

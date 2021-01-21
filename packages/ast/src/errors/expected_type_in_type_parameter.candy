@@ -1,0 +1,17 @@
+use compiler_utils
+use cst
+
+public class ExpectedTypeInTypeParameterCompilerError {
+  public let file: File
+  public let node: CstNode<CstTypeParameter>
+}
+impl ExpectedTypeInTypeParameterCompilerError: CompilerError {
+  public fun id(): String { "expected-type-in-type-parameter" }
+
+  public fun location(): Location { Location(file, node.child.upperBound.unwrap().first.span) }
+  public fun title(): String { "Missing type in type parameter." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description
+    ""
+  }
+}

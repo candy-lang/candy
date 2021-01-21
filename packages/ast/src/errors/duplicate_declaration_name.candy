@@ -1,0 +1,25 @@
+use compiler_utils
+use cst
+
+public class DuplicateDeclarationNameCompilerError {
+  public let file: File
+  public let node: CstNode<CstModule | CstTrait | CstClass | CstProperty>
+  // TODO(JonasWanke): highlight previous occurrences of that name
+}
+impl DuplicateDeclarationNameCompilerError: CompilerError {
+  public fun id(): String { "duplicate-declaration-name" }
+
+  fun span(): Span {
+    if node.child is CstModule { return node.cast<CstModule>().child.name.child.value }
+    if node.child is CstTrait { return node.cast<CstTrait>().child.name.child.value }
+    if node.child is CstClass { return node.cast<CstClass>().child.name.child.value }
+    if node.child is CstProperty { return node.cast<CstProperty>().child.name.child.value }
+    throw "Unknown declaration: {node}."
+  }
+  public fun location(): Location { Location(file, span()) }
+  public fun title(): String { "Duplicate declaration name." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description for this error
+    ""
+  }
+}

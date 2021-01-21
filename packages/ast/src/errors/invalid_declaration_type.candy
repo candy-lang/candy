@@ -1,0 +1,38 @@
+use compiler_utils
+use cst
+
+public class InvalidDeclarationTypeCompilerError {
+  public let file: File
+  public let node: CstNode<CstDeclaration>
+}
+impl InvalidDeclarationTypeCompilerError: CompilerError {
+  public fun id(): String { "invalid-declaration-type" }
+
+  fun span(): Span {
+    if node.child is CstModule {
+      return node.cast<CstModule>().child.moduleKeyword.child.span
+    }
+    if node.child is CstTrait {
+      return node.cast<CstTrait>().child.traitKeyword.child.span
+    }
+    if node.child is CstImpl {
+      return node.cast<CstImpl>().child.implKeyword.child.span
+    }
+    if node.child is CstClass {
+      return node.cast<CstClass>().child.classKeyword.child.span
+    }
+    if node.child is CstFunction {
+      return node.cast<CstFunction>().child.functionKeyword.child.span
+    }
+    if node.child is CstProperty {
+      return node.cast<CstProperty>().child.propertyKeyword.child.span
+    }
+    throw "Unknown declaration: {node}."
+  }
+  public fun location(): Location { Location(file, span()) }
+  public fun title(): String { "Invalid declaration type." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description for this error
+    ""
+  }
+}
