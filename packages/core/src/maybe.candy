@@ -1,7 +1,8 @@
 public trait Maybe<Value> {
   fun unwrap(): Value
   fun orElse(alternative: () => Value): Value
-  fun map<Out>(mapper: (Value) => Out): Maybe<Out>
+  fun map<Out>(mapper: (Value) => Out): Maybe<Out> { flatMap<Out>({ Some<Out>(mapper(it)) })}
+  fun flatMap<Out>(mapper: (Value) => Maybe<Out>): Maybe<Out>
 }
 
 public class Some<Value> {
@@ -10,7 +11,7 @@ public class Some<Value> {
 impl<Value> Some<Value>: Maybe<Value> {
   fun unwrap(): Value { value }
   fun orElse(alternative: () => Value): Value { value }
-  fun map<Out>(mapper: (Value) => Out): Maybe<Out> { Some<Out>(mapper(value)) }
+  fun flatMap<Out>(mapper: (Value) => Maybe<Out>): Maybe<Out> { mapper(value) }
 }
 
 // TODO(JonasWanke): remove type parameter when multi-impls are supported
@@ -18,5 +19,5 @@ public class None<Value>
 impl<Value> None<Value>: Maybe<Value> {
   fun unwrap(): Value { throw "Unwrapped `None`." }
   fun orElse(alternative: () => Value): Value { alternative() }
-  fun map<Out>(mapper: (Value) => Out): Maybe<Out> { None<Out>() }
+  fun flatMap<Out>(mapper: (Value) => Maybe<Out>): Maybe<Out> { None<Out>() }
 }
