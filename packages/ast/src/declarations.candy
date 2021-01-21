@@ -59,7 +59,7 @@ public class AstClass {
   public let id: AstDeclarationId
   public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<AstIdentifier>
-  public let name: AstIdentifier
+  public let name: Maybe<AstIdentifier>
   public let typeParameters: List<AstTypeParameter>
   public let innerDeclarations: List<AstTrait | AstClass | AstFunction | AstProperty>
 }

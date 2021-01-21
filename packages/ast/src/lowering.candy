@@ -193,6 +193,9 @@ fun lowerDeclaration(
   if cst.child is CstImpl {
     return lowerImpl(context, parentId, cst.cast<CstImpl>())
   }
+  if cst.child is CstClass {
+    return lowerClass(context, parentId, cst.cast<CstClass>(), previousNames)
+  }
   throw "Unknown declaration: {cst}."
 }
 fun lowerModule(
@@ -344,6 +347,46 @@ fun lowerImpl(
 
   context.addIdMapping(cst.id, id)
   AstImpl(id, modifiers, typeParameters, type, traits, innerDeclarations)
+}
+fun lowerClass(
+  context: LoweringContext,
+  parentId: AstFileId | AstDeclarationId | AstExpressionId,
+  cst: CstNode<CstClass>,
+  previousNames: Map<String, Bool>,
+): AstClass {
+  let name = cst.child.name
+      .map<String>({ it.child.identifier })
+      .orElse({ "unnamed-class-{context.getUnnamedDeclarationIndex()}" })
+  let id = AstDeclarationId(parentId, name)
+
+  let modifiers = lowerModifiers(context, id, cst.child.modifiers)
+
+  let name = cst.child.name.map<AstIdentifier>({
+    let identifierId = AstIdentifierId(id, 0)
+    context.addIdMapping(it.id, identifierId)
+    AstIdentifier(identifierId, it.child.identifier)
+  })
+  if name is None<AstIdentifier> {
+    context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
+  } else {
+    if previousNames.containsKey(name.unwrap().value) {
+      context.addError(
+        DuplicateDeclarationNameCompilerError(
+          context.file,
+          cst.cast<CstModule | CstTrait | CstClass | CstProperty>(),
+        ),
+      )
+    }
+  }
+
+  let typeParameters = cst.child.typeParameters
+      .map<List<AstTypeParameter>>({ lowerTypeParameters(context, id, it) })
+      .orElse({ List.empty<AstTypeParameter>() })
+
+  let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, true) as List<AstTrait | AstClass | AstFunction | AstProperty>
+
+  context.addIdMapping(cst.id, id)
+  AstClass(id, None<AstCandyDoc>(), modifiers, name, typeParameters, innerDeclarations)
 }
 fun lowerDeclarationContent(
   context: LoweringContext,
