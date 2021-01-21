@@ -4,7 +4,8 @@ use cst
 public class MissingClosingBracketCompilerError {
   public let file: File
   public let node: CstNode<
-    CstGroupType
+    CstValueParameters
+    | CstGroupType
     | CstFunctionTypeParameterTypes
     | CstTupleType
     | CstTypeArguments
@@ -17,6 +18,9 @@ impl MissingClosingBracketCompilerError: CompilerError {
   public fun id(): String { "missing-closing-bracket" }
 
   fun span(): Span {
+    if node.child is CstValueParameters {
+      return node.cast<CstValueParameters>().child.openingParenthesis.child.span
+    }
     if node.child is CstGroupType {
       return node.cast<CstGroupType>().child.openingParenthesis.child.span
     }

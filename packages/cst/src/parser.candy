@@ -244,6 +244,7 @@ class CstParser {
   }
   fun valueParameter(): Parser<String, CstNode<CstValueParameter>> {
     // TODO(JonasWanke): allow modifiers
+    // TODO(JonasWanke): allow parameters without a name
     let valueParameter = identifier()
         .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>>(
           punctuation(":")

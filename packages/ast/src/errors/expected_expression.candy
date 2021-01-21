@@ -1,0 +1,26 @@
+use compiler_utils
+use cst
+
+public class ExpectedExpressionCompilerError {
+  public let file: File
+  public let body: CstNode<CstExpressionBody | CstDelegationBody>
+}
+impl ExpectedExpressionCompilerError: CompilerError {
+  public fun id(): String { "expected-expression" }
+
+  fun span(): Span {
+    if body.child is CstExpressionBody {
+      return body.cast<CstExpressionBody>().child.arrow.child.span
+    }
+    if body.child is CstDelegationBody {
+      return body.cast<CstDelegationBody>().child.equalsSign.child.span
+    }
+    throw "Unknown body: {body}."
+  }
+  public fun location(): Location { Location(file, span()) }
+  public fun title(): String { "Expected expression." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description
+    ""
+  }
+}

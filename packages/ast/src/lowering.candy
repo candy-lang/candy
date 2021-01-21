@@ -175,6 +175,122 @@ fun lowerModifier(
   AstIdentifier(id, cst.child.identifier)
 }
 
+// declarations
+
+fun lowerValueParameters(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstExpressionId,
+  cst: CstNode<CstValueParameters>,
+): List<AstValueParameter> {
+  let result = MutableList.empty<AstValueParameter>()
+  let previousNames = MutableMap.empty<String, Bool>()
+  mut let punctuationExpectedNext = false
+  for node in cst.child.valueParameters {
+    if node.child is PunctuationToken {
+      if !punctuationExpectedNext {
+        // TODO(JonasWanke)
+      } else {
+        punctuationExpectedNext = false
+      }
+    } else {
+      if punctuationExpectedNext {
+        // TODO(JonasWanke)
+      } else {
+        let node = node.cast<CstValueParameter>()
+        let lowered = lowerValueParameter(context, parentId, node, previousNames as Map<String, Bool>)
+        if lowered is Some<AstValueParameter> {
+          let lowered = lowered.unwrap()
+          result.append(lowered)
+          previousNames.set(lowered.name.unwrap().value, true)
+        }
+        punctuationExpectedNext = true
+      }
+    }
+  }
+
+  if cst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
+    let upcastedCst = cst.cast<CstValueParameters
+        | CstGroupType
+        | CstFunctionTypeParameterTypes
+        | CstTupleType
+        | CstTypeArguments
+        | CstGroupExpression
+        | CstTupleExpression
+        | CstInterpolatedStringPart>()
+    context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
+  }
+
+  result
+}
+fun lowerValueParameter(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstExpressionId,
+  cst: CstNode<CstValueParameter>,
+  previousNames: Map<String, Bool>,
+): Maybe<AstValueParameter> {
+  let name = cst.child.name.child.identifier
+  if previousNames.containsKey(name) {
+    context.addError(DuplicateValueParameterNameCompilerError(context.file, cst))
+    return None<AstValueParameter>()
+  }
+
+  let id = AstValueParameterId(parentId, name)
+
+  let modifiers = lowerModifiers(context, id, cst.child.modifiers)
+
+  let nameId = AstIdentifierId(id, 0)
+  context.addIdMapping(cst.child.name.id, nameId)
+  let name = AstIdentifier(nameId, name)
+
+  // Value parameters only occur in functions and lambdas, which we can differentiate using
+  // `parentId`.
+  let isFunctionParameter = (parentId is AstDeclarationId)
+  let type = if isFunctionParameter {
+    if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)> {
+      context.addError(FunctionValueParameterTypeMissingCompilerError(context.file, cst))
+      None<AstType>()
+    } else {
+      if cst.child.type.unwrap().second is None<CstNode<CstType>> {
+        context.addError(FunctionValueParameterTypeMissingCompilerError(context.file, cst))
+        None<AstType>()
+      } else {
+        lowerType(context, id, cst.child.type.unwrap().second.unwrap())
+      }
+    }
+  } else {
+    if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)> {
+      None<AstType>()
+    } else {
+      if cst.child.type.unwrap().second is None<CstNode<CstType>> {
+        context.addError(LambdaValueParameterTypeExpectedCompilerError(context.file, cst))
+        None<AstType>()
+      } else {
+        lowerType(context, id, cst.child.type.unwrap().second.unwrap())
+      }
+    }
+  }
+
+  let defaultValue = cst.child.defaultValue
+      .flatMap<AstExpression>({
+        if it.child.expression is None<CstNode<CstExpression>> {
+          context.addError(
+            ExpectedExpressionCompilerError(
+              context.file,
+              it as CstNode<CstExpressionBody | CstDelegationBody>,
+            ),
+          )
+          None<AstExpression>()
+        } else {
+          lowerExpression(context, id, it.child.expression.unwrap())
+        }
+      })
+
+  context.addIdMapping(cst.id, id)
+  Some<AstValueParameter>(
+    AstValueParameter(id, modifiers, Some<AstIdentifier>(name), type, defaultValue),
+  )
+}
+
 // types
 
 fun lowerType(
@@ -251,7 +367,8 @@ fun lowerGroupType(
   // TODO(JonasWanke): support modifiers on group types
   let groupTypeCst = cst.cast<CstGroupType>()
   if groupTypeCst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
-    let upcastedCst = groupTypeCst.cast<CstGroupType
+    let upcastedCst = groupTypeCst.cast<CstValueParameters
+        | CstGroupType
         | CstFunctionTypeParameterTypes
         | CstTupleType
         | CstTypeArguments
@@ -324,7 +441,8 @@ fun lowerFunctionTypeParameterTypes(
   }
 
   if cst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
-    let upcastedCst = cst.cast<CstGroupType
+    let upcastedCst = cst.cast<CstValueParameters
+        | CstGroupType
         | CstFunctionTypeParameterTypes
         | CstTupleType
         | CstTypeArguments
@@ -369,7 +487,8 @@ fun lowerTupleType(
   }
 
   if cst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
-    let upcastedCst = cst.cast<CstGroupType
+    let upcastedCst = cst.cast<CstValueParameters
+        | CstGroupType
         | CstFunctionTypeParameterTypes
         | CstTupleType
         | CstTypeArguments
@@ -453,7 +572,7 @@ fun lowerTypeArguments(
   cst: CstNode<CstTypeArguments>,
 ): List<AstTypeArgument> {
   mut let index = 0
-  mut let result = MutableList.empty<AstTypeArgument>()
+  let result = MutableList.empty<AstTypeArgument>()
   mut let punctuationExpectedNext = false
   for node in cst.child.typeArguments {
     if node.child is PunctuationToken {
@@ -475,7 +594,8 @@ fun lowerTypeArguments(
   }
 
   if cst.child.closingAngleBracket is None<CstNode<PunctuationToken>> {
-    let upcastedCst = cst.cast<CstGroupType
+    let upcastedCst = cst.cast<CstValueParameters
+        | CstGroupType
         | CstFunctionTypeParameterTypes
         | CstTupleType
         | CstTypeArguments
@@ -505,7 +625,7 @@ fun lowerTypeArgument(
 
 fun lowerExpression(
   context: LoweringContext,
-  parentId: AstDeclarationId,
+  parentId: AstDeclarationId | AstValueParameterId,
   cst: CstNode<CstExpression>,
 ): AstExpression {
   if cst.child is CstIntExpression {
@@ -519,7 +639,7 @@ fun lowerExpression(
 
 fun lowerIntExpression(
   context: LoweringContext,
-  parentId: AstDeclarationId,
+  parentId: AstDeclarationId | AstValueParameterId,
   cst: CstNode<CstIntExpression>,
 ): AstIntExpression {
   let id = context.getExpressionId(parentId)
@@ -529,7 +649,7 @@ fun lowerIntExpression(
 
 fun lowerStringExpression(
   context: LoweringContext,
-  parentId: AstDeclarationId,
+  parentId: AstDeclarationId | AstValueParameterId,
   cst: CstNode<CstStringExpression>,
 ): AstStringExpression {
   let id = context.getExpressionId(parentId)
@@ -558,7 +678,7 @@ fun lowerStringExpression(
 }
 fun lowerLiteralStringPart(
   context: LoweringContext,
-  parentId: AstDeclarationId,
+  parentId: AstDeclarationId | AstValueParameterId,
   cst: CstNode<CstLiteralStringPart>,
 ): AstStringPart {
   let id = context.getExpressionId(parentId)
@@ -572,7 +692,7 @@ fun lowerLiteralStringPart(
 }
 fun lowerEscapedStringPart(
   context: LoweringContext,
-  parentId: AstDeclarationId,
+  parentId: AstDeclarationId | AstValueParameterId,
   cst: CstNode<CstEscapedStringPart>,
 ): AstStringPart {
   let id = context.getExpressionId(parentId)
@@ -608,13 +728,14 @@ fun lowerEscapedStringPart(
 }
 fun lowerInterpolatedStringPart(
   context: LoweringContext,
-  parentId: AstDeclarationId,
+  parentId: AstDeclarationId | AstValueParameterId,
   cst: CstNode<CstInterpolatedStringPart>,
 ): AstStringPart {
   let id = context.getExpressionId(parentId)
 
   if cst.child.closingCurlyBrace is None<CstNode<PunctuationToken>> {
-    let upcastedCst = cst.cast<CstGroupType
+    let upcastedCst = cst.cast<CstValueParameters
+        | CstGroupType
         | CstFunctionTypeParameterTypes
         | CstTupleType
         | CstTypeArguments
@@ -679,8 +800,8 @@ class LoweringContext {
     nextTypeId = nextTypeId + 1
     id
   }
-  fun getExpressionId(parentId: AstDeclarationId): AstExpressionId {
-    // TODO(JonasWanke): number these per declaration when IDs implement `Equals & Hash`
+  fun getExpressionId(parentId: AstDeclarationId | AstValueParameterId): AstExpressionId {
+    // TODO(JonasWanke): number these per parent when IDs implement `Equals & Hash`
 
     let id = AstExpressionId(parentId, nextExpressionId)
     nextExpressionId = nextExpressionId + 1

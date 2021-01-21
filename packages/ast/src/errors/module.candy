@@ -1,3 +1,5 @@
+public use .duplicate_value_parameter_name
+public use .expected_expression
 public use .expected_parameter_types_in_function_type
 public use .expected_return_type_in_function_type
 public use .expected_type
