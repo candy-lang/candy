@@ -1,0 +1,26 @@
+use compiler_utils
+use cst
+
+public class ExpectedTypeCompilerError {
+  public let file: File
+  public let tupleType: CstNode<CstIntersectionType | CstUnionType>
+}
+impl ExpectedTypeCompilerError: CompilerError {
+  public fun id(): String { "expected-type" }
+
+  fun span(): Span {
+    if node.child is CstIntersectionType {
+      return node.cast<CstIntersectionType>().child.ampersand.child.span
+    }
+    if node.child is CstUnionType {
+      return node.cast<CstUnionType>().child.bar.child.span
+    }
+    throw "Unknown node: {node}."
+  }
+  public fun location(): Location { Location(file, span()) }
+  public fun title(): String { "Expected type." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description
+    ""
+  }
+}

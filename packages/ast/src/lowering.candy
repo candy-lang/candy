@@ -194,6 +194,12 @@ fun lowerType(
   if cst.child is CstTupleType {
     return Some<AstType>(lowerTupleType(context, parentId, cst.cast<CstTupleType>()))
   }
+  if cst.child is CstIntersectionType {
+    return Some<AstType>(lowerIntersectionType(context, parentId, cst.cast<CstIntersectionType>()))
+  }
+  if cst.child is CstUnionType {
+    return Some<AstType>(lowerUnionType(context, parentId, cst.cast<CstUnionType>()))
+  }
   throw "Unknown expression: {cst}."
 }
 fun lowerNamedType(
@@ -375,6 +381,70 @@ fun lowerTupleType(
 
   context.addIdMapping(cst.id, id)
   AstTupleType(id, modifiers, types)
+}
+fun lowerIntersectionType(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstTypeId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
+  cst: CstNode<CstIntersectionType>,
+): AstIntersectionType {
+  let id = context.getTypeId(parentId)
+
+  let types = MutableList.empty<AstType>()
+  let appendType = { type: AstType =>
+    if type is AstIntersectionType {
+      types.appendAll((type as AstIntersectionType).types as Iterable<AstType>)
+      context.removeTypeIdMapping((type as AstIntersectionType).id)
+    } else {
+      types.append(type)
+    }
+  }
+
+  let leftType = lowerType(context, id, cst.child.leftType)
+  if leftType is Some<AstType> { appendType(leftType.unwrap()) }
+
+  if cst.child.rightType is None<CstNode<CstType>> {
+    context.addError(
+      ExpectedTypeCompilerError(context.file, cst as CstNode<CstIntersectionType | CstUnionType>),
+    )
+  } else {
+    let rightType = lowerType(context, id, cst.child.rightType.unwrap())
+    if rightType is Some<AstType> { appendType(rightType.unwrap()) }
+  }
+
+  context.addIdMapping(cst.id, id)
+  AstIntersectionType(id, List.empty<AstIdentifier>(), types)
+}
+fun lowerUnionType(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstTypeId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
+  cst: CstNode<CstUnionType>,
+): AstUnionType {
+  let id = context.getTypeId(parentId)
+
+  let types = MutableList.empty<AstType>()
+  let appendType = { type: AstType =>
+    if type is AstUnionType {
+      types.appendAll((type as AstUnionType).types as Iterable<AstType>)
+      context.removeTypeIdMapping((type as AstUnionType).id)
+    } else {
+      types.append(type)
+    }
+  }
+
+  let leftType = lowerType(context, id, cst.child.leftType)
+  if leftType is Some<AstType> { appendType(leftType.unwrap()) }
+
+  if cst.child.rightType is None<CstNode<CstType>> {
+    context.addError(
+      ExpectedTypeCompilerError(context.file, cst as CstNode<CstIntersectionType | CstUnionType>),
+    )
+  } else {
+    let rightType = lowerType(context, id, cst.child.rightType.unwrap())
+    if rightType is Some<AstType> { appendType(rightType.unwrap()) }
+  }
+
+  context.addIdMapping(cst.id, id)
+  AstUnionType(id, List.empty<AstIdentifier>(), types)
 }
 
 fun lowerTypeArguments(
@@ -587,6 +657,13 @@ class LoweringContext {
     )
     idMapping.set(cstId, astId)
   }
+  fun removeTypeIdMapping(astId: AstTypeId) {
+    idMapping.removeWhere({ _, value =>
+      if !(value is AstTypeId) { return false }
+      // TODO(JonasWanke): this only works because type IDs are currently numbered per file
+      (value as AstTypeId).value == astId.value
+    })
+  }
   mut let nextTypeId: Int
   mut let nextExpressionId: Int
   fun getTypeId(
@@ -596,14 +673,14 @@ class LoweringContext {
       | AstValueParameterId
       | AstExpressionId,
     ): AstTypeId {
-    /// TODO(JonasWanke): number these per parent when IDs implement `Equals & Hash`
+    // TODO(JonasWanke): number these per parent when IDs implement `Equals & Hash`
 
     let id = AstTypeId(parentId, nextTypeId)
     nextTypeId = nextTypeId + 1
     id
   }
   fun getExpressionId(parentId: AstDeclarationId): AstExpressionId {
-    /// TODO(JonasWanke): number these per declaration when IDs implement `Equals & Hash`
+    // TODO(JonasWanke): number these per declaration when IDs implement `Equals & Hash`
 
     let id = AstExpressionId(parentId, nextExpressionId)
     nextExpressionId = nextExpressionId + 1

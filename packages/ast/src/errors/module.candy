@@ -1,5 +1,6 @@
 public use .expected_parameter_types_in_function_type
 public use .expected_return_type_in_function_type
+public use .expected_type
 public use .expected_type_in_group_type
 public use .expected_type_in_type_argument
 public use .expected_two_or_more_types_in_tuple_type

@@ -40,10 +40,7 @@ impl MissingClosingBracketCompilerError: CompilerError {
     }
     throw "Unknown node: {node}."
   }
-  public fun location(): Location {
-    let span = 
-    Location(file, span)
-  }
+  public fun location(): Location { Location(file, span()) }
   public fun title(): String { "Missing closing bracket." }
   public fun description(): String {
     /// TODO(JonasWanke): add a description for this error
