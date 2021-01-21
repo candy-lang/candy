@@ -196,6 +196,12 @@ fun lowerDeclaration(
   if cst.child is CstClass {
     return lowerClass(context, parentId, cst.cast<CstClass>(), previousNames)
   }
+  if cst.child is CstFunction {
+    return lowerFunction(context, parentId, cst.cast<CstFunction>())
+  }
+  if cst.child is CstProperty {
+    return lowerProperty(context, parentId, cst.cast<CstProperty>(), previousNames)
+  }
   throw "Unknown declaration: {cst}."
 }
 fun lowerModule(
@@ -275,7 +281,7 @@ fun lowerTrait(
           context.addError(
             ExpectedTypeCompilerError(
               context.file,
-              cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
+              cst.cast<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>(),
             ),
           )
           None<AstType>()
@@ -308,7 +314,7 @@ fun lowerImpl(
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
+        cst.cast<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>(),
       ),
     )
     None<AstType>()
@@ -320,7 +326,7 @@ fun lowerImpl(
           context.addError(
             ExpectedTypeCompilerError(
               context.file,
-              cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
+              cst.cast<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>(),
             ),
           )
           None<AstType>()
@@ -460,6 +466,76 @@ fun lowerFunction(
     returnType,
     body,
   )
+}
+fun lowerProperty(
+  context: LoweringContext,
+  parentId: AstFileId | AstDeclarationId | AstExpressionId,
+  cst: CstNode<CstProperty>,
+  previousNames: Map<String, Bool>,
+): AstProperty {
+  let name = cst.child.name
+      .map<String>({ it.child.identifier })
+      .orElse({ "unnamed-property-{context.getUnnamedDeclarationIndex()}" })
+  let id = AstDeclarationId(parentId, name)
+
+  let modifiers = lowerModifiers(context, id, cst.child.modifiers)
+
+  let isMutable = cst.child.isMutable()
+
+  let name = cst.child.name.map<AstIdentifier>({
+    let identifierId = AstIdentifierId(id, 0)
+    context.addIdMapping(it.id, identifierId)
+    AstIdentifier(identifierId, it.child.identifier)
+  })
+  if name is None<AstIdentifier> {
+    context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
+  } else {
+    if previousNames.containsKey(name.unwrap().value) {
+      context.addError(
+        DuplicateDeclarationNameCompilerError(
+          context.file,
+          cst.cast<CstModule | CstTrait | CstClass | CstProperty>(),
+        ),
+      )
+    }
+  }
+
+  let type = if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)> {
+    None<AstType>()
+  } else {
+    let type = cst.child.type.unwrap()
+    if type.second is None<CstNode<CstType>> {
+      context.addError(
+        ExpectedTypeCompilerError(
+          context.file,
+          cst.cast<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>(),
+        ),
+      )
+      None<AstType>()
+    } else {
+      lowerType(context, id, type.second.unwrap())
+    }
+  }
+
+  let initializer = if cst.child.initializer is None<CstNode<CstDelegationBody>> {
+    None<AstExpression>()
+  } else {
+    let initializer = cst.child.initializer.unwrap()
+    if initializer.child.expression is None<CstNode<CstExpression>> {
+      context.addError(
+        ExpectedExpressionCompilerError(
+          context.file,
+          initializer.cast<CstExpressionBody | CstDelegationBody>(),
+        ),
+      )
+      None<AstExpression>()
+    } else {
+      Some<AstExpression>(lowerExpression(context, id, initializer.child.expression.unwrap()))
+    }
+  }
+
+  context.addIdMapping(cst.id, id)
+  AstProperty(id, None<AstCandyDoc>(), modifiers, isMutable, name, type, initializer)
 }
 fun lowerDeclarationContent(
   context: LoweringContext,
@@ -929,7 +1005,7 @@ fun lowerIntersectionType(
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
+        cst.cast<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>(),
       ),
     )
   } else {
@@ -964,7 +1040,7 @@ fun lowerUnionType(
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
+        cst.cast<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>(),
       ),
     )
   } else {
