@@ -52,9 +52,11 @@ fun lowerFile(context: LoweringContext, cst: CstNode<CstFile>): AstFile {
         node.cast<CstDeclaration>(),
         previousDeclarationNames as Map<String, Bool>,
       )
-      declarations.append(
-        result as AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty,
-      )
+      if result is Some<AstDeclaration> {
+        declarations.append(
+          result.unwrap() as AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty,
+        )
+      }
     }
   }
 
@@ -191,7 +193,7 @@ fun lowerDeclaration(
   parentId: AstFileId | AstDeclarationId | AstExpressionId,
   cst: CstNode<CstDeclaration>,
   previousNames: Map<String, Bool>,
-): AstDeclaration {
+): Maybe<AstDeclaration> {
   if cst.child is CstModule {
     return lowerModule(context, parentId, cst.cast<CstModule>(), previousNames)
   }
@@ -217,10 +219,13 @@ fun lowerModule(
   parentId: AstFileId | AstDeclarationId | AstExpressionId,
   cst: CstNode<CstModule>,
   previousNames: Map<String, Bool>,
-): AstModule {
-  let name = cst.child.name
-      .map<String>({ it.child.identifier })
-      .orElse({ "unnamed-module-{context.getUnnamedDeclarationIndex()}" })
+): Maybe<AstModule> {
+  let hasName = cst.child.name is Some<CstNode<IdentifierToken>>
+  let name = if hasName {
+    cst.child.name.unwrap().child.identifier
+  } else {
+    "unnamed-module-{context.getUnnamedDeclarationIndex()}"
+  }
   let id = AstDeclarationId(parentId, name)
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
@@ -230,7 +235,7 @@ fun lowerModule(
     context.addIdMapping(it.id, identifierId)
     AstIdentifier(identifierId, it.child.identifier)
   })
-  if name is None<AstIdentifier> {
+  if !hasName {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
   } else {
     if previousNames.containsKey(name.unwrap().value) {
@@ -245,18 +250,22 @@ fun lowerModule(
 
   let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, true, true) as List<AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty>
 
+  if !hasName { return None<AstModule>() }
   context.addIdMapping(cst.id, id)
-  AstModule(id, None<AstCandyDoc>(), modifiers, name, innerDeclarations)
+  Some<AstModule>(AstModule(id, None<AstCandyDoc>(), modifiers, name, innerDeclarations))
 }
 fun lowerTrait(
   context: LoweringContext,
   parentId: AstFileId | AstDeclarationId | AstExpressionId,
   cst: CstNode<CstTrait>,
   previousNames: Map<String, Bool>,
-): AstTrait {
-  let name = cst.child.name
-      .map<String>({ it.child.identifier })
-      .orElse({ "unnamed-trait-{context.getUnnamedDeclarationIndex()}" })
+): Maybe<AstTrait> {
+  let hasName = cst.child.name is Some<CstNode<IdentifierToken>>
+  let name = if hasName {
+    cst.child.name.unwrap().child.identifier
+  } else {
+    "unnamed-trait-{context.getUnnamedDeclarationIndex()}"
+  }
   let id = AstDeclarationId(parentId, name)
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
@@ -266,7 +275,7 @@ fun lowerTrait(
     context.addIdMapping(it.id, identifierId)
     AstIdentifier(identifierId, it.child.identifier)
   })
-  if name is None<AstIdentifier> {
+  if !hasName {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
   } else {
     if previousNames.containsKey(name.unwrap().value) {
@@ -300,14 +309,25 @@ fun lowerTrait(
 
   let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, true) as List<AstTrait | AstClass | AstFunction | AstProperty>
 
+  if !hasName { return None<AstTrait>() }
   context.addIdMapping(cst.id, id)
-  AstTrait(id, None<AstCandyDoc>(), modifiers, name, typeParameters, upperBound, innerDeclarations)
+  Some<AstTrait>(
+    AstTrait(
+      id,
+      None<AstCandyDoc>(),
+      modifiers,
+      name,
+      typeParameters,
+      upperBound,
+      innerDeclarations,
+    ),
+  )
 }
 fun lowerImpl(
   context: LoweringContext,
   parentId: AstFileId | AstDeclarationId | AstExpressionId,
   cst: CstNode<CstImpl>,
-): AstImpl {
+): Maybe<AstImpl> {
   let id = AstDeclarationId(parentId, "impl-{context.getUnnamedDeclarationIndex()}")
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
@@ -360,17 +380,21 @@ fun lowerImpl(
   let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, false) as List<AstFunction | AstProperty>
 
   context.addIdMapping(cst.id, id)
-  AstImpl(id, modifiers, typeParameters, type, traits, innerDeclarations)
+  Some<AstImpl>(AstImpl(id, modifiers, typeParameters, type, traits, innerDeclarations))
 }
 fun lowerClass(
   context: LoweringContext,
   parentId: AstFileId | AstDeclarationId | AstExpressionId,
   cst: CstNode<CstClass>,
   previousNames: Map<String, Bool>,
-): AstClass {
+): Maybe<AstClass> {
   let name = cst.child.name
-      .map<String>({ it.child.identifier })
-      .orElse({ "unnamed-class-{context.getUnnamedDeclarationIndex()}" })
+  let hasName = cst.child.name is Some<CstNode<IdentifierToken>>
+  let name = if hasName {
+    cst.child.name.unwrap().child.identifier
+  } else {
+    "unnamed-class-{context.getUnnamedDeclarationIndex()}"
+  }
   let id = AstDeclarationId(parentId, name)
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
@@ -380,7 +404,7 @@ fun lowerClass(
     context.addIdMapping(it.id, identifierId)
     AstIdentifier(identifierId, it.child.identifier)
   })
-  if name is None<AstIdentifier> {
+  if !hasName {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
   } else {
     if previousNames.containsKey(name.unwrap().value) {
@@ -399,17 +423,23 @@ fun lowerClass(
 
   let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, true) as List<AstTrait | AstClass | AstFunction | AstProperty>
 
+  if !hasName { return None<AstClass>() }
   context.addIdMapping(cst.id, id)
-  AstClass(id, None<AstCandyDoc>(), modifiers, name, typeParameters, innerDeclarations)
+  Some<AstClass>(
+    AstClass(id, None<AstCandyDoc>(), modifiers, name, typeParameters, innerDeclarations),
+  )
 }
 fun lowerFunction(
   context: LoweringContext,
   parentId: AstFileId | AstDeclarationId | AstExpressionId,
   cst: CstNode<CstFunction>,
-): AstFunction {
-  let name = cst.child.name
-      .map<String>({ it.child.identifier })
-      .orElse({ "unnamed-function" })
+): Maybe<AstFunction> {
+  let hasName = cst.child.name is Some<CstNode<IdentifierToken>>
+  let name = if hasName {
+    cst.child.name.unwrap().child.identifier
+  } else {
+    "unnamed-function-{context.getUnnamedDeclarationIndex()}"
+  }
   let name = "{name}-{context.getUnnamedDeclarationIndex()}"
   let id = AstDeclarationId(parentId, name)
 
@@ -420,7 +450,7 @@ fun lowerFunction(
     context.addIdMapping(it.id, identifierId)
     AstIdentifier(identifierId, it.child.identifier)
   })
-  if name is None<AstIdentifier> {
+  if !hasName {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
   }
 
@@ -463,16 +493,19 @@ fun lowerFunction(
     }
   }
 
+  if !hasName { return None<AstFunction>() }
   context.addIdMapping(cst.id, id)
-  AstFunction(
-    id,
-    None<AstCandyDoc>(),
-    modifiers,
-    name,
-    typeParameters,
-    valueParameters,
-    returnType,
-    body,
+  Some<AstFunction>(
+    AstFunction(
+      id,
+      None<AstCandyDoc>(),
+      modifiers,
+      name,
+      typeParameters,
+      valueParameters,
+      returnType,
+      body,
+    ),
   )
 }
 fun lowerProperty(
@@ -480,10 +513,13 @@ fun lowerProperty(
   parentId: AstFileId | AstDeclarationId | AstExpressionId,
   cst: CstNode<CstProperty>,
   previousNames: Map<String, Bool>,
-): AstProperty {
-  let name = cst.child.name
-      .map<String>({ it.child.identifier })
-      .orElse({ "unnamed-property-{context.getUnnamedDeclarationIndex()}" })
+): Maybe<AstProperty> {
+  let hasName = cst.child.name is Some<CstNode<IdentifierToken>>
+  let name = if hasName {
+    cst.child.name.unwrap().child.identifier
+  } else {
+    "unnamed-property-{context.getUnnamedDeclarationIndex()}"
+  }
   let id = AstDeclarationId(parentId, name)
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
@@ -495,7 +531,7 @@ fun lowerProperty(
     context.addIdMapping(it.id, identifierId)
     AstIdentifier(identifierId, it.child.identifier)
   })
-  if name is None<AstIdentifier> {
+  if !hasName {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
   } else {
     if previousNames.containsKey(name.unwrap().value) {
@@ -542,8 +578,11 @@ fun lowerProperty(
     }
   }
 
+  if !hasName { return None<AstProperty>() }
   context.addIdMapping(cst.id, id)
-  AstProperty(id, None<AstCandyDoc>(), modifiers, isMutable, name, type, initializer)
+  Some<AstProperty>(
+    AstProperty(id, None<AstCandyDoc>(), modifiers, isMutable, name, type, initializer),
+  )
 }
 fun lowerDeclarationContent(
   context: LoweringContext,
@@ -558,7 +597,9 @@ fun lowerDeclarationContent(
   let result = MutableList.empty<AstDeclaration>()
   let previousNames = MutableMap.empty<String, Bool>()
   for node in cst.child.innerDeclarations {
-    let lowered = lowerDeclaration(context, parentId, node, previousNames as Map<String, Bool>)
+    let loweredRaw = lowerDeclaration(context, parentId, node, previousNames as Map<String, Bool>)
+    if loweredRaw is None<AstDeclaration> { continue }
+    let lowered = loweredRaw.unwrap()
 
     mut let isValid = true
     if lowered is AstModule {
