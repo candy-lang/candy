@@ -111,9 +111,13 @@ fun lowerLocalRelativeUseLineTarget(
       if punctuationExpectedNext {
         /// TODO(JonasWanke)
       }
-      let identifierId = AstIdentifierId(id, (path as Iterable<AstIdentifier>).length())
       path.append(
-        AstIdentifier(identifierId, (node.cast<IdentifierToken>()).child.identifier),
+        lowerIdentifier(
+          context,
+          id,
+          node.cast<IdentifierToken>(),
+          (path as Iterable<AstIdentifier>).length(),
+        )
       )
       punctuationExpectedNext = true
     }
@@ -145,9 +149,13 @@ fun lowerGlobalUseLineTarget(
       if punctuationExpectedNext {
         /// TODO(JonasWanke)
       }
-      let identifierId = AstIdentifierId(id, (packagePath as Iterable<AstIdentifier>).length())
       packagePath.append(
-        AstIdentifier(identifierId, node.cast<IdentifierToken>().child.identifier),
+        lowerIdentifier(
+          context,
+          id,
+          node.cast<IdentifierToken>(),
+          (packagePath as Iterable<AstIdentifier>).length(),
+        )
       )
       punctuationExpectedNext = true
     }
@@ -178,6 +186,19 @@ fun lowerModifiers(
 fun lowerModifier(
   context: LoweringContext,
   parentId: AstUseLineId | AstDeclarationId | AstTypeParameterId | AstValueParameterId | AstTypeId | AstExpressionId,
+  cst: CstNode<IdentifierToken>,
+  index: Int,
+): AstIdentifier { lowerIdentifier(context, parentId, cst, index) }
+
+fun lowerIdentifier(
+  context: LoweringContext,
+  parentId: AstUseLineId
+    | AstUseLineTargetId
+    | AstDeclarationId
+    | AstTypeParameterId
+    | AstValueParameterId
+    | AstTypeId
+    | AstExpressionId,
   cst: CstNode<IdentifierToken>,
   index: Int,
 ): AstIdentifier {
@@ -230,11 +251,7 @@ fun lowerModule(
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
-  let name = cst.child.name.map<AstIdentifier>({
-    let identifierId = AstIdentifierId(id, 0)
-    context.addIdMapping(it.id, identifierId)
-    AstIdentifier(identifierId, it.child.identifier)
-  })
+  let name = cst.child.name.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
   if !hasName {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
   } else {
@@ -270,11 +287,7 @@ fun lowerTrait(
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
-  let name = cst.child.name.map<AstIdentifier>({
-    let identifierId = AstIdentifierId(id, 0)
-    context.addIdMapping(it.id, identifierId)
-    AstIdentifier(identifierId, it.child.identifier)
-  })
+  let name = cst.child.name.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
   if !hasName {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
   } else {
@@ -399,11 +412,7 @@ fun lowerClass(
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
-  let name = cst.child.name.map<AstIdentifier>({
-    let identifierId = AstIdentifierId(id, 0)
-    context.addIdMapping(it.id, identifierId)
-    AstIdentifier(identifierId, it.child.identifier)
-  })
+  let name = cst.child.name.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
   if !hasName {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
   } else {
@@ -445,11 +454,7 @@ fun lowerFunction(
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
-  let name = cst.child.name.map<AstIdentifier>({
-    let identifierId = AstIdentifierId(id, 0)
-    context.addIdMapping(it.id, identifierId)
-    AstIdentifier(identifierId, it.child.identifier)
-  })
+  let name = cst.child.name.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
   if !hasName {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
   }
@@ -526,11 +531,7 @@ fun lowerProperty(
 
   let isMutable = cst.child.isMutable()
 
-  let name = cst.child.name.map<AstIdentifier>({
-    let identifierId = AstIdentifierId(id, 0)
-    context.addIdMapping(it.id, identifierId)
-    AstIdentifier(identifierId, it.child.identifier)
-  })
+  let name = cst.child.name.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
   if !hasName {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
   } else {
@@ -770,9 +771,7 @@ fun lowerValueParameter(
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
-  let nameId = AstIdentifierId(id, 0)
-  context.addIdMapping(cst.child.name.id, nameId)
-  let name = AstIdentifier(nameId, name)
+  let name =  lowerIdentifier(context, id, cst.child.name, 0)
 
   // Value parameters only occur in functions and lambdas, which we can differentiate using
   // `parentId`.
@@ -872,9 +871,13 @@ fun lowerNamedType(
       if punctuationExpectedNext {
         // TODO(JonasWanke)
       }
-      let identifierId = AstIdentifierId(id, (nameParts as Iterable<AstIdentifier>).length())
       nameParts.append(
-        AstIdentifier(identifierId, node.cast<IdentifierToken>().child.identifier),
+        lowerIdentifier(
+          context,
+          id,
+          node.cast<IdentifierToken>(),
+          (nameParts as Iterable<AstIdentifier>).length(),
+        )
       )
       punctuationExpectedNext = true
     }
@@ -1180,11 +1183,7 @@ fun lowerTypeParameter(
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
-  let name = cst.child.name.map<AstIdentifier>({
-    let identifierId = AstIdentifierId(id, 0)
-    context.addIdMapping(it.id, identifierId)
-    AstIdentifier(identifierId, it.child.identifier)
-  })
+  let name = cst.child.name.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
 
   let upperBound = cst.child.upperBound
       .flatMap<AstType>({
