@@ -1315,6 +1315,9 @@ fun lowerExpression(
   if cst.child is CstCallExpression {
     return lowerCallExpression(context, parentId, cst.cast<CstCallExpression>())
   }
+  if cst.child is CstReturnExpression {
+    return lowerReturnExpression(context, parentId, cst.cast<CstReturnExpression>())
+  }
   throw "Unknown expression: {cst}."
 }
 
@@ -1737,6 +1740,19 @@ fun lowerValueArgument(
 
   context.addIdMapping(cst.id, id)
   AstValueArgument(id, name, value)
+}
+
+fun lowerReturnExpression(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
+  cst: CstNode<CstReturnExpression>,
+): Maybe<AstExpression> {
+  let id = context.getExpressionId(parentId)
+
+  let value = cst.child.value.flatMap<AstExpression>({ lowerExpression(context, id, it) })
+
+  context.addIdMapping(cst.id, id)
+  Some<AstExpression>(AstReturnExpression(id, value))
 }
 
 // utility
