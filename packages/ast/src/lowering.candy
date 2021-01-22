@@ -841,7 +841,7 @@ fun lowerType(
     return Some<AstType>(lowerFunctionType(context, parentId, cst.cast<CstFunctionType>()))
   }
   if cst.child is CstTupleType {
-    return Some<AstType>(lowerTupleType(context, parentId, cst.cast<CstTupleType>()))
+    return lowerTupleType(context, parentId, cst.cast<CstTupleType>())
   }
   if cst.child is CstIntersectionType {
     return Some<AstType>(lowerIntersectionType(context, parentId, cst.cast<CstIntersectionType>()))
@@ -999,8 +999,9 @@ fun lowerTupleType(
   context: LoweringContext,
   parentId: AstDeclarationId | AstTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstTupleType>,
-): AstTupleType {
+): Maybe<AstType> {
   let id = context.getTypeId(parentId)
+  mut let isValid = true
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
@@ -1023,6 +1024,7 @@ fun lowerTupleType(
     }
   }
   if (types as Iterable<AstType>).length() < 2 {
+    isValid = false
     context.addError(
       ExpectedTwoOrMoreItemsInTupleCompilerError(
         context.file,
@@ -1046,8 +1048,9 @@ fun lowerTupleType(
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
+  if !isValid { return None<AstType>() }
   context.addIdMapping(cst.id, id)
-  AstTupleType(id, modifiers, types)
+  Some<AstType>(AstTupleType(id, modifiers, types))
 }
 fun lowerIntersectionType(
   context: LoweringContext,
