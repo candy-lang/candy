@@ -5,7 +5,11 @@ use petit_parser
 public class ExpectedExpressionCompilerError {
   public let file: File
   public let node: CstNode<
-    CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression
+    CstExpressionBody
+      | CstDelegationBody
+      | CstGroupExpression
+      | CstBinaryExpression
+      | CstValueArgument
   >
 }
 impl ExpectedExpressionCompilerError: CompilerError {
@@ -23,6 +27,9 @@ impl ExpectedExpressionCompilerError: CompilerError {
     }
     if node.child is CstBinaryExpression {
       return node.cast<CstBinaryExpression>().child.operator.child.span
+    }
+    if node.child is CstValueArgument {
+      return node.cast<CstValueArgument>().child.name.unwrap().second.child.span
     }
     throw "Unknown body: {node}."
   }

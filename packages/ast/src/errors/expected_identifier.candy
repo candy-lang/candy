@@ -1,14 +1,24 @@
 use compiler_utils
 use cst
+use petit_parser
 
 public class ExpectedIdentifierCompilerError {
   public let file: File
-  public let node: CstNode<CstNavigationExpression>
+  public let node: CstNode<CstNavigationExpression | CstValueArgument>
 }
 impl ExpectedIdentifierCompilerError: CompilerError {
   public fun id(): String { "expected-identifier" }
 
-  public fun location(): Location { Location(file, node.child.dot.child.span) }
+  fun span(): Span {
+    if node.child is CstNavigationExpression {
+      return node.cast<CstNavigationExpression>().child.dot.child.span
+    }
+    if node.child is CstValueArgument {
+      return node.cast<CstValueArgument>().child.equalsSign.child.span
+    }
+    throw "Unknown body: {node}."
+  }
+  public fun location(): Location { Location(file, span()) }
   public fun title(): String { "Expected identifier." }
   public fun description(): String {
     /// TODO(JonasWanke): add a description

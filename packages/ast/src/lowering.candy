@@ -570,7 +570,7 @@ fun lowerProperty(
       context.addError(
         ExpectedExpressionCompilerError(
           context.file,
-          initializer.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression>(),
+          cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
         ),
       )
       None<AstExpression>()
@@ -637,7 +637,8 @@ fun lowerDeclarationContent(
         | CstTypeArguments
         | CstGroupExpression
         | CstTupleExpression
-        | CstInterpolatedStringPart>()
+        | CstInterpolatedStringPart
+        | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
@@ -667,7 +668,8 @@ fun lowerBlockBody(
         | CstTypeArguments
         | CstGroupExpression
         | CstTupleExpression
-        | CstInterpolatedStringPart>()
+        | CstInterpolatedStringPart
+        | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
@@ -685,7 +687,7 @@ fun lowerExpressionBody(
     context.addError(
       ExpectedExpressionCompilerError(
         context.file,
-        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression>(),
+        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
       ),
     )
     None<AstExpression>()
@@ -715,7 +717,8 @@ fun lowerValueParameters(
         | CstTypeArguments
         | CstGroupExpression
         | CstTupleExpression
-        | CstInterpolatedStringPart>()
+        | CstInterpolatedStringPart
+        | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
@@ -809,7 +812,7 @@ fun lowerValueParameter(
           context.addError(
             ExpectedExpressionCompilerError(
               context.file,
-              it.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression>(),
+              it.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
             ),
           )
           None<AstExpression>()
@@ -919,7 +922,8 @@ fun lowerGroupType(
         | CstTypeArguments
         | CstGroupExpression
         | CstTupleExpression
-        | CstInterpolatedStringPart>()
+        | CstInterpolatedStringPart
+        | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
@@ -989,7 +993,8 @@ fun lowerFunctionTypeParameterTypes(
         | CstTypeArguments
         | CstGroupExpression
         | CstTupleExpression
-        | CstInterpolatedStringPart>()
+        | CstInterpolatedStringPart
+        | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
@@ -1044,7 +1049,8 @@ fun lowerTupleType(
         | CstTypeArguments
         | CstGroupExpression
         | CstTupleExpression
-        | CstInterpolatedStringPart>()
+        | CstInterpolatedStringPart
+        | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
@@ -1170,7 +1176,8 @@ fun lowerTypeParameters(
         | CstTypeArguments
         | CstGroupExpression
         | CstTupleExpression
-        | CstInterpolatedStringPart>()
+        | CstInterpolatedStringPart
+        | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
@@ -1245,7 +1252,8 @@ fun lowerTypeArguments(
         | CstTypeArguments
         | CstGroupExpression
         | CstTupleExpression
-        | CstInterpolatedStringPart>()
+        | CstInterpolatedStringPart
+        | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
@@ -1414,7 +1422,8 @@ fun lowerInterpolatedStringPart(
         | CstTypeArguments
         | CstGroupExpression
         | CstTupleExpression
-        | CstInterpolatedStringPart>()
+        | CstInterpolatedStringPart
+        | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
@@ -1484,7 +1493,7 @@ fun lowerGroupExpression(
     context.addError(
       ExpectedExpressionCompilerError(
         context.file,
-        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression>(),
+        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
       ),
     )
     None<AstExpression>()
@@ -1503,7 +1512,8 @@ fun lowerGroupExpression(
         | CstTypeArguments
         | CstGroupExpression
         | CstTupleExpression
-        | CstInterpolatedStringPart>()
+        | CstInterpolatedStringPart
+        | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
@@ -1557,7 +1567,8 @@ fun lowerTupleExpression(
         | CstTypeArguments
         | CstGroupExpression
         | CstTupleExpression
-        | CstInterpolatedStringPart>()
+        | CstInterpolatedStringPart
+        | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
@@ -1578,7 +1589,7 @@ fun lowerBinaryExpression(
     context.addError(
       ExpectedExpressionCompilerError(
         context.file,
-        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression>(),
+        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
       )
     )
   }
@@ -1603,7 +1614,12 @@ fun lowerNavigationExpression(
   cst: CstNode<CstNavigationExpression>,
 ): Maybe<AstExpression> {
   if cst.child.target is None<CstNode<IdentifierToken>> {
-    context.addError(ExpectedIdentifierCompilerError(context.file, cst))
+    context.addError(
+      ExpectedIdentifierCompilerError(
+        context.file,
+        cst.cast<CstNavigationExpression | CstValueArgument>(),
+      ),
+    )
     return lowerExpression(context, parentId, cst.child.receiver)
   }
 
@@ -1615,6 +1631,90 @@ fun lowerNavigationExpression(
 
   context.addIdMapping(cst.id, id)
   Some<AstExpression>(AstNavigationExpression(id, receiver, target))
+}
+
+fun lowerValueArguments(
+  context: LoweringContext,
+  parentId: AstExpressionId,
+  cst: CstNode<CstValueArguments>,
+): List<AstValueArgument> {
+  mut let index = 0
+  let result = MutableList.empty<AstValueArgument>()
+  mut let punctuationExpectedNext = false
+  for node in cst.child.valueArguments {
+    if node.child is PunctuationToken {
+      if !punctuationExpectedNext {
+        // TODO(JonasWanke)
+      } else {
+        punctuationExpectedNext = false
+      }
+    } else {
+      if punctuationExpectedNext {
+        // TODO(JonasWanke)
+      }
+      result.append(lowerValueArgument(context, parentId, node.cast<CstValueArgument>(), index))
+      index = index + 1
+      punctuationExpectedNext = true
+    }
+  }
+
+  if cst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
+    let upcastedCst = cst.cast<CstDeclarationContent
+        | CstBlockBody
+        | CstValueParameters
+        | CstGroupType
+        | CstFunctionTypeParameterTypes
+        | CstTupleType
+        | CstTypeParameters
+        | CstTypeArguments
+        | CstGroupExpression
+        | CstTupleExpression
+        | CstInterpolatedStringPart
+        | CstValueArguments>()
+    context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
+  }
+
+  result
+}
+fun lowerValueArgument(
+  context: LoweringContext,
+  parentId: AstExpressionId,
+  cst: CstNode<CstValueArgument>,
+  index: Int,
+): AstValueArgument {
+  let id = AstExpressionId(parentId, index)
+
+  let name = if cst.child.name is None<(Maybe<CstNode<IdentifierToken>>, CstNode<PunctuationToken>)> {
+    None<AstIdentifier>()
+  } else {
+    let name = cst.child.name.unwrap()
+    if name.first is None<CstNode<IdentifierToken>> {
+      context.addError(
+        ExpectedIdentifierCompilerError(
+          context.file,
+          cst.cast<CstNavigationExpression | CstValueArgument>(),
+        ),
+      )
+      None<AstIdentifier>()
+    } else {
+      Some<AstIdentifier>(lowerIdentifier(context, id, name.first.unwrap(), 0))
+    }
+  }
+
+  let value = if cst.child.value is None<CstNode<CstExpression>> {
+    context.addError(
+      ExpectedExpressionCompilerError(
+        context.file,
+        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
+      ),
+    )
+    None<AstExpression>()
+  } else {
+    lowerExpression(context, id, cst.child.value.unwrap())
+  }
+
+  context.addIdMapping(cst.id, id)
+  AstValueArgument(id, name, value)
 }
 
 // utility
