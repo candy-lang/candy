@@ -83,15 +83,7 @@ public class AstBinaryExpression {
 impl AstBinaryExpression: AstExpression
 
 
-public class AstLocalPropertyExpression {
-  public let id: AstDeclarationId
-  public let modifiers: List<String>
-  public let isMutable: Bool
-  public let name: Maybe<String>
-  public let type: Maybe<AstType>
-  public let initializer: Maybe<AstExpression>
-}
-impl AstLocalPropertyExpression: AstExpression
+impl AstProperty: AstExpression
 
 
 public class AstNavigationExpression {

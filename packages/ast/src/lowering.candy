@@ -515,7 +515,7 @@ fun lowerFunction(
 }
 fun lowerProperty(
   context: LoweringContext,
-  parentId: AstFileId | AstDeclarationId | AstExpressionId,
+  parentId: AstFileId | AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstProperty>,
   previousNames: Map<String, Bool>,
 ): Maybe<AstProperty> {
@@ -1292,6 +1292,14 @@ fun lowerExpression(
   }
   if cst.child is CstBinaryExpression {
     return lowerBinaryExpression(context, parentId, cst.cast<CstBinaryExpression>())
+  }
+  if cst.child is CstProperty {
+    return lowerProperty(
+      context,
+      parentId,
+      cst.cast<CstProperty>(),
+      Map.empty<String, Bool>(),
+    ).cast<AstExpression>()
   }
   throw "Unknown expression: {cst}."
 }
