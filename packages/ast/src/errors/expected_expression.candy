@@ -4,7 +4,7 @@ use petit_parser
 
 public class ExpectedExpressionCompilerError {
   public let file: File
-  public let node: CstNode<CstExpressionBody | CstDelegationBody>
+  public let node: CstNode<CstExpressionBody | CstDelegationBody | CstGroupExpression>
 }
 impl ExpectedExpressionCompilerError: CompilerError {
   public fun id(): String { "expected-expression" }
@@ -15,6 +15,9 @@ impl ExpectedExpressionCompilerError: CompilerError {
     }
     if node.child is CstDelegationBody {
       return node.cast<CstDelegationBody>().child.equalsSign.child.span
+    }
+    if node.child is CstGroupExpression {
+      return node.cast<CstGroupExpression>().child.openingParenthesis.child.span
     }
     throw "Unknown body: {node}."
   }

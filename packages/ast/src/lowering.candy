@@ -570,7 +570,7 @@ fun lowerProperty(
       context.addError(
         ExpectedExpressionCompilerError(
           context.file,
-          initializer.cast<CstExpressionBody | CstDelegationBody>(),
+          initializer.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression>(),
         ),
       )
       None<AstExpression>()
@@ -685,7 +685,7 @@ fun lowerExpressionBody(
     context.addError(
       ExpectedExpressionCompilerError(
         context.file,
-        cst.cast<CstExpressionBody | CstDelegationBody>(),
+        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression>(),
       ),
     )
     None<AstExpression>()
@@ -809,7 +809,7 @@ fun lowerValueParameter(
           context.addError(
             ExpectedExpressionCompilerError(
               context.file,
-              it.cast<CstExpressionBody | CstDelegationBody>(),
+              it.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression>(),
             ),
           )
           None<AstExpression>()
@@ -900,10 +900,16 @@ fun lowerGroupType(
   parentId: AstDeclarationId | AstTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstGroupType>,
 ): Maybe<AstType> {
+  let type = if cst.child.type is None<CstNode<CstType>> {
+    context.addError(ExpectedTypeInGroupTypeCompilerError(context.file, cst))
+    None<AstType>()
+  } else {
+    lowerType(context, parentId, cst.child.type.unwrap())
+  }
+
   // TODO(JonasWanke): support modifiers on group types
-  let groupTypeCst = cst.cast<CstGroupType>()
-  if groupTypeCst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
-    let upcastedCst = groupTypeCst.cast<CstDeclarationContent
+  if cst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
+    let upcastedCst = cst.cast<CstDeclarationContent
         | CstBlockBody
         | CstValueParameters
         | CstGroupType
@@ -917,13 +923,7 @@ fun lowerGroupType(
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
-  if groupTypeCst.child.type is None<CstNode<CstType>> {
-    context.addError(ExpectedTypeInGroupTypeCompilerError(context.file, cst))
-  }
-  return groupTypeCst
-      .child
-      .type
-      .flatMap<AstType>({ lowerType(context, parentId, it) })
+  type
 }
 fun lowerFunctionType(
   context: LoweringContext,
@@ -1276,6 +1276,9 @@ fun lowerExpression(
   if cst.child is CstIdentifierExpression {
     return lowerIdentifierExpression(context, parentId, cst.cast<CstIdentifierExpression>())
   }
+  if cst.child is CstGroupExpression {
+    return lowerGroupExpression(context, parentId, cst.cast<CstGroupExpression>())
+  }
   throw "Unknown expression: {cst}."
 }
 
@@ -1445,6 +1448,41 @@ fun lowerIdentifierExpression(
 
   context.addIdMapping(cst.id, id)
   Some<AstIdentifierExpression>(AstIdentifierExpression(id, value))
+}
+
+fun lowerGroupExpression(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
+  cst: CstNode<CstGroupExpression>,
+): Maybe<AstExpression> {
+  let expression = if cst.child.expression is None<CstNode<CstExpression>> {
+    context.addError(
+      ExpectedExpressionCompilerError(
+        context.file,
+        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression>(),
+      ),
+    )
+    None<AstExpression>()
+  } else {
+    lowerExpression(context, parentId, cst.child.expression.unwrap())
+  }
+
+  if cst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
+    let upcastedCst = cst.cast<CstDeclarationContent
+        | CstBlockBody
+        | CstValueParameters
+        | CstGroupType
+        | CstFunctionTypeParameterTypes
+        | CstTupleType
+        | CstTypeParameters
+        | CstTypeArguments
+        | CstGroupExpression
+        | CstTupleExpression
+        | CstInterpolatedStringPart>()
+    context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
+  }
+
+  return expression
 }
 
 // utility

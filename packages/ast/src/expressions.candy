@@ -52,9 +52,16 @@ impl AstLambdaExpression: AstExpression
 
 public class AstIdentifierExpression {
   public let id: AstExpressionId
-  public let value: String
+  public let value: AstIdentifier
 }
 impl AstIdentifierExpression: AstExpression
+
+
+public class AstTupleExpression {
+  public let id: AstExpressionId
+  public let valueArguments: List<AstExpression>
+}
+impl AstTupleExpression: AstExpression
 
 
 public class AstBinaryExpression {
@@ -107,12 +114,6 @@ public class AstValueArgument {
   public let name: Maybe<String>
   public let value: Maybe<AstExpression>
 }
-
-public class AstTupleExpression {
-  public let id: AstExpressionId
-  public let valueArguments: List<AstExpression>
-}
-impl AstTupleExpression: AstExpression
 
 
 public class AstReturnExpression {
