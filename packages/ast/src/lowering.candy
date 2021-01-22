@@ -575,7 +575,7 @@ fun lowerProperty(
       )
       None<AstExpression>()
     } else {
-      Some<AstExpression>(lowerExpression(context, id, initializer.child.expression.unwrap()))
+      lowerExpression(context, id, initializer.child.expression.unwrap())
     }
   }
 
@@ -651,7 +651,9 @@ fun lowerBlockBody(
   let id = AstBodyId(parentId)
 
   let expressions = (cst.child.expressions as Iterable<CstNode<CstExpression>>)
-      .map<AstExpression>({ lowerExpression(context, parentId, it) })
+      .map<Maybe<AstExpression>>({ lowerExpression(context, parentId, it) })
+      .where({ it is Some<AstExpression> })
+      .map<AstExpression>({ it.unwrap() })
       .toList()
 
   if cst.child.closingCurlyBrace is None<CstNode<PunctuationToken>> {
@@ -688,7 +690,7 @@ fun lowerExpressionBody(
     )
     None<AstExpression>()
   } else {
-    Some<AstExpression>(lowerExpression(context, parentId, cst.child.expression.unwrap()))
+    lowerExpression(context, parentId, cst.child.expression.unwrap())
   }
 
   context.addIdMapping(cst.id, id)
@@ -812,7 +814,7 @@ fun lowerValueParameter(
           )
           None<AstExpression>()
         } else {
-          Some<AstExpression>(lowerExpression(context, id, it.child.expression.unwrap()))
+          lowerExpression(context, id, it.child.expression.unwrap())
         }
       })
 
@@ -1261,7 +1263,7 @@ fun lowerExpression(
   context: LoweringContext,
   parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstExpression>,
-): AstExpression {
+): Maybe<AstExpression> {
   if cst.child is CstIntExpression {
     return lowerIntExpression(context, parentId, cst.cast<CstIntExpression>())
   }
@@ -1281,17 +1283,17 @@ fun lowerIntExpression(
   context: LoweringContext,
   parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstIntExpression>,
-): AstIntExpression {
+): Maybe<AstIntExpression> {
   let id = context.getExpressionId(parentId)
   context.addIdMapping(cst.id, id)
-  AstIntExpression(id, cst.child.value.child.value)
+  Some<AstIntExpression>(AstIntExpression(id, cst.child.value.child.value))
 }
 
 fun lowerStringExpression(
   context: LoweringContext,
   parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstStringExpression>,
-): AstStringExpression {
+): Maybe<AstStringExpression> {
   let id = context.getExpressionId(parentId)
 
   let parts = (cst.child.parts as Iterable<CstNode<StringPart>>)
@@ -1314,7 +1316,7 @@ fun lowerStringExpression(
       .toList()
 
   context.addIdMapping(cst.id, id)
-  AstStringExpression(id, parts)
+  Some<AstStringExpression>(AstStringExpression(id, parts))
 }
 fun lowerLiteralStringPart(
   context: LoweringContext,
@@ -1390,8 +1392,9 @@ fun lowerInterpolatedStringPart(
 
   context.addIdMapping(cst.id, id)
   if cst.child.expression is Some<CstNode<CstExpression>> {
-    let expression = lowerExpression(context, parentId, cst.child.expression.unwrap())
-    AstInterpolatedStringPart(id, expression)
+    lowerExpression(context, parentId, cst.child.expression.unwrap())
+        .map<AstStringPart>({ AstInterpolatedStringPart(id, it) })
+        .orElse({ AstLiteralStringPart(id, AstIdentifier(AstIdentifierId(id, 0), "")) })
   } else {
     context.addError(MissingExpressionInInterpolationCompilerError(context.file, cst))
     AstLiteralStringPart(id, AstIdentifier(AstIdentifierId(id, 0), ""))
@@ -1402,7 +1405,7 @@ fun lowerLambdaExpression(
   context: LoweringContext,
   parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstLambdaExpression>,
-): AstLambdaExpression {
+): Maybe<AstLambdaExpression> {
   let id = context.getExpressionId(parentId)
 
   let valueParameters = cst.child.valueParameters
@@ -1410,11 +1413,13 @@ fun lowerLambdaExpression(
       .orElse({ List.empty<AstValueParameter>() })
 
   let expressions = (cst.child.expressions as Iterable<CstNode<CstExpression>>)
-      .map<AstExpression>({ lowerExpression(context, id, it)})
+      .map<Maybe<AstExpression>>({ lowerExpression(context, id, it)})
+      .where({ it is Some<AstExpression> })
+      .map<AstExpression>({ it.unwrap() })
       .toList()
 
   context.addIdMapping(cst.id, id)
-  AstLambdaExpression(id, valueParameters, expressions)
+  Some<AstLambdaExpression>(AstLambdaExpression(id, valueParameters, expressions))
 }
 fun lowerLambdaExpressionValueParameters(
   context: LoweringContext,
@@ -1433,13 +1438,13 @@ fun lowerIdentifierExpression(
   context: LoweringContext,
   parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstIdentifierExpression>,
-): AstIdentifierExpression {
+): Maybe<AstIdentifierExpression> {
   let id = context.getExpressionId(parentId)
 
   let value = lowerIdentifier(context, id, cst.child.value, 0)
 
   context.addIdMapping(cst.id, id)
-  AstIdentifierExpression(id, value)
+  Some<AstIdentifierExpression>(AstIdentifierExpression(id, value))
 }
 
 // utility
