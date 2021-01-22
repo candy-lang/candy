@@ -699,10 +699,34 @@ fun lowerValueParameters(
   parentId: AstDeclarationId | AstExpressionId,
   cst: CstNode<CstValueParameters>,
 ): List<AstValueParameter> {
+  let result = lowerValueParameterList(context, parentId, cst.child.valueParameters)
+
+  if cst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
+    let upcastedCst = cst.cast<CstDeclarationContent
+        | CstBlockBody
+        | CstValueParameters
+        | CstGroupType
+        | CstFunctionTypeParameterTypes
+        | CstTupleType
+        | CstTypeParameters
+        | CstTypeArguments
+        | CstGroupExpression
+        | CstTupleExpression
+        | CstInterpolatedStringPart>()
+    context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
+  }
+
+  result
+}
+fun lowerValueParameterList(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstExpressionId,
+  csts: List<CstNode<CstValueParameter | PunctuationToken>>,
+): List<AstValueParameter> {
   let result = MutableList.empty<AstValueParameter>()
   let previousNames = MutableMap.empty<String, Bool>()
   mut let punctuationExpectedNext = false
-  for node in cst.child.valueParameters {
+  for node in csts {
     if node.child is PunctuationToken {
       if !punctuationExpectedNext {
         // TODO(JonasWanke)
@@ -726,21 +750,6 @@ fun lowerValueParameters(
       }
       punctuationExpectedNext = true
     }
-  }
-
-  if cst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
-    let upcastedCst = cst.cast<CstDeclarationContent
-        | CstBlockBody
-        | CstValueParameters
-        | CstGroupType
-        | CstFunctionTypeParameterTypes
-        | CstTupleType
-        | CstTypeParameters
-        | CstTypeArguments
-        | CstGroupExpression
-        | CstTupleExpression
-        | CstInterpolatedStringPart>()
-    context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
   result
@@ -1251,7 +1260,7 @@ fun lowerTypeArgument(
 
 fun lowerExpression(
   context: LoweringContext,
-  parentId: AstDeclarationId | AstBodyId | AstValueParameterId,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstExpression>,
 ): AstExpression {
   if cst.child is CstIntExpression {
@@ -1260,12 +1269,15 @@ fun lowerExpression(
   if cst.child is CstStringExpression {
     return lowerStringExpression(context, parentId, cst.cast<CstStringExpression>())
   }
+  if cst.child is CstLambdaExpression {
+    return lowerLambdaExpression(context, parentId, cst.cast<CstLambdaExpression>())
+  }
   throw "Unknown expression: {cst}."
 }
 
 fun lowerIntExpression(
   context: LoweringContext,
-  parentId: AstDeclarationId | AstBodyId | AstValueParameterId,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstIntExpression>,
 ): AstIntExpression {
   let id = context.getExpressionId(parentId)
@@ -1275,7 +1287,7 @@ fun lowerIntExpression(
 
 fun lowerStringExpression(
   context: LoweringContext,
-  parentId: AstDeclarationId | AstBodyId | AstValueParameterId,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstStringExpression>,
 ): AstStringExpression {
   let id = context.getExpressionId(parentId)
@@ -1304,7 +1316,7 @@ fun lowerStringExpression(
 }
 fun lowerLiteralStringPart(
   context: LoweringContext,
-  parentId: AstDeclarationId | AstBodyId | AstValueParameterId,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstLiteralStringPart>,
 ): AstStringPart {
   let id = context.getExpressionId(parentId)
@@ -1318,7 +1330,7 @@ fun lowerLiteralStringPart(
 }
 fun lowerEscapedStringPart(
   context: LoweringContext,
-  parentId: AstDeclarationId | AstBodyId | AstValueParameterId,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstEscapedStringPart>,
 ): AstStringPart {
   let id = context.getExpressionId(parentId)
@@ -1354,7 +1366,7 @@ fun lowerEscapedStringPart(
 }
 fun lowerInterpolatedStringPart(
   context: LoweringContext,
-  parentId: AstDeclarationId | AstBodyId | AstValueParameterId,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstInterpolatedStringPart>,
 ): AstStringPart {
   let id = context.getExpressionId(parentId)
@@ -1382,6 +1394,37 @@ fun lowerInterpolatedStringPart(
     context.addError(MissingExpressionInInterpolationCompilerError(context.file, cst))
     AstLiteralStringPart(id, AstIdentifier(AstIdentifierId(id, 0), ""))
   }
+}
+
+fun lowerLambdaExpression(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
+  cst: CstNode<CstLambdaExpression>,
+): AstLambdaExpression {
+  let id = context.getExpressionId(parentId)
+
+  let valueParameters = cst.child.valueParameters
+      .map<List<AstValueParameter>>({ lowerLambdaExpressionValueParameters(context, id, it) })
+      .orElse({ List.empty<AstValueParameter>() })
+
+  let expressions = (cst.child.expressions as Iterable<CstNode<CstExpression>>)
+      .map<AstExpression>({ lowerExpression(context, id, it)})
+      .toList()
+
+  context.addIdMapping(cst.id, id)
+  AstLambdaExpression(id, valueParameters, expressions)
+}
+fun lowerLambdaExpressionValueParameters(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
+  cst: CstNode<CstLambdaExpressionValueParameters>,
+): List<AstValueParameter> {
+  let id = context.getExpressionId(parentId)
+
+  let valueParameters = lowerValueParameterList(context, id, cst.child.valueParameters)
+
+  context.addIdMapping(cst.id, id)
+  valueParameters
 }
 
 // utility
@@ -1440,7 +1483,7 @@ class LoweringContext {
 
   mut let nextExpressionId: Int
   fun getExpressionId(
-    parentId: AstDeclarationId | AstBodyId | AstValueParameterId,
+    parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   ): AstExpressionId {
     // TODO(JonasWanke): number these per parent when IDs implement `Equals & Hash`
 
