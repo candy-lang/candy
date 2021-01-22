@@ -1312,6 +1312,9 @@ fun lowerExpression(
   if cst.child is CstNavigationExpression {
     return lowerNavigationExpression(context, parentId, cst.cast<CstNavigationExpression>())
   }
+  if cst.child is CstCallExpression {
+    return lowerCallExpression(context, parentId, cst.cast<CstCallExpression>())
+  }
   throw "Unknown expression: {cst}."
 }
 
@@ -1631,6 +1634,25 @@ fun lowerNavigationExpression(
 
   context.addIdMapping(cst.id, id)
   Some<AstExpression>(AstNavigationExpression(id, receiver, target))
+}
+
+fun lowerCallExpression(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
+  cst: CstNode<CstCallExpression>,
+): Maybe<AstExpression> {
+  let id = context.getExpressionId(parentId)
+
+  let receiver = lowerExpression(context, id, cst.child.receiver)
+
+  let typeArguments = cst.child.typeArguments
+      .map<List<AstTypeArgument>>({ lowerTypeArguments(context, id, it) })
+      .orElse({ List.empty<AstTypeArgument>() })
+
+  let valueArguments = lowerValueArguments(context, id, cst.child.valueArguments)
+
+  context.addIdMapping(cst.id, id)
+  Some<AstExpression>(AstCallExpression(id, receiver, typeArguments, valueArguments))
 }
 
 fun lowerValueArguments(

@@ -95,7 +95,7 @@ impl AstNavigationExpression: AstExpression
 
 public class AstCallExpression {
   public let id: AstExpressionId
-  public let receiver: AstExpression
+  public let receiver: Maybe<AstExpression>
   public let typeArguments: List<AstTypeArgument>
   public let valueArguments: List<AstValueArgument>
 }
