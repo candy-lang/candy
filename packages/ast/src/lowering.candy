@@ -570,7 +570,7 @@ fun lowerProperty(
       context.addError(
         ExpectedExpressionCompilerError(
           context.file,
-          initializer.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression>(),
+          initializer.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression>(),
         ),
       )
       None<AstExpression>()
@@ -685,7 +685,7 @@ fun lowerExpressionBody(
     context.addError(
       ExpectedExpressionCompilerError(
         context.file,
-        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression>(),
+        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression>(),
       ),
     )
     None<AstExpression>()
@@ -809,7 +809,7 @@ fun lowerValueParameter(
           context.addError(
             ExpectedExpressionCompilerError(
               context.file,
-              it.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression>(),
+              it.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression>(),
             ),
           )
           None<AstExpression>()
@@ -1287,6 +1287,12 @@ fun lowerExpression(
   if cst.child is CstGroupExpression {
     return lowerGroupExpression(context, parentId, cst.cast<CstGroupExpression>())
   }
+  if cst.child is CstTupleExpression {
+    return lowerTupleExpression(context, parentId, cst.cast<CstTupleExpression>())
+  }
+  if cst.child is CstBinaryExpression {
+    return lowerBinaryExpression(context, parentId, cst.cast<CstBinaryExpression>())
+  }
   throw "Unknown expression: {cst}."
 }
 
@@ -1297,7 +1303,7 @@ fun lowerIntExpression(
 ): Maybe<AstExpression> {
   let id = context.getExpressionId(parentId)
   context.addIdMapping(cst.id, id)
-  Some<AstIntExpression>(AstIntExpression(id, cst.child.value.child.value))
+  Some<AstExpression>(AstIntExpression(id, cst.child.value.child.value))
 }
 
 fun lowerStringExpression(
@@ -1327,7 +1333,7 @@ fun lowerStringExpression(
       .toList()
 
   context.addIdMapping(cst.id, id)
-  Some<AstStringExpression>(AstStringExpression(id, parts))
+  Some<AstExpression>(AstStringExpression(id, parts))
 }
 fun lowerLiteralStringPart(
   context: LoweringContext,
@@ -1430,7 +1436,7 @@ fun lowerLambdaExpression(
       .toList()
 
   context.addIdMapping(cst.id, id)
-  Some<AstLambdaExpression>(AstLambdaExpression(id, valueParameters, expressions))
+  Some<AstExpression>(AstLambdaExpression(id, valueParameters, expressions))
 }
 fun lowerLambdaExpressionValueParameters(
   context: LoweringContext,
@@ -1455,7 +1461,7 @@ fun lowerIdentifierExpression(
   let value = lowerIdentifier(context, id, cst.child.value, 0)
 
   context.addIdMapping(cst.id, id)
-  Some<AstIdentifierExpression>(AstIdentifierExpression(id, value))
+  Some<AstExpression>(AstIdentifierExpression(id, value))
 }
 
 fun lowerGroupExpression(
@@ -1467,7 +1473,7 @@ fun lowerGroupExpression(
     context.addError(
       ExpectedExpressionCompilerError(
         context.file,
-        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression>(),
+        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression>(),
       ),
     )
     None<AstExpression>()
@@ -1547,6 +1553,37 @@ fun lowerTupleExpression(
   if !isValid { return None<AstExpression>() }
   context.addIdMapping(cst.id, id)
   Some<AstExpression>(AstTupleExpression(id, expressions))
+}
+
+fun lowerBinaryExpression(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
+  cst: CstNode<CstBinaryExpression>,
+): Maybe<AstExpression> {
+  let id = context.getExpressionId(parentId)
+
+  if cst.child.leftOperand is None<CstNode<CstExpression>>
+    || cst.child.rightOperand is None<CstNode<CstExpression>> {
+    context.addError(
+      ExpectedExpressionCompilerError(
+        context.file,
+        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression>(),
+      )
+    )
+  }
+
+  let leftOperand = cst.child.leftOperand
+      .flatMap<AstExpression>({ lowerExpression(context, id, it) })
+
+  let operatorId = AstIdentifierId(id, 0)
+  context.addIdMapping(cst.child.operator.id, operatorId)
+  let operator = AstIdentifier(operatorId, cst.child.operator.child.punctuation)
+
+  let rightOperand = cst.child.rightOperand
+      .flatMap<AstExpression>({ lowerExpression(context, id, it) })
+
+  context.addIdMapping(cst.id, id)
+  Some<AstExpression>(AstBinaryExpression(id, leftOperand, operator, rightOperand))
 }
 
 // utility

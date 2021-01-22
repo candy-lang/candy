@@ -69,7 +69,7 @@ public class AstBinaryExpression {
 
   public let leftOperand: Maybe<AstExpression>
 
-  public let operator: String
+  public let operator: AstIdentifier
   /// May be one of the following:
   ///
   /// * arithmetic: `+`, `-`, `*`, `/`, `~/`, `%`
