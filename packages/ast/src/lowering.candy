@@ -1301,6 +1301,9 @@ fun lowerExpression(
       Map.empty<String, Bool>(),
     ).cast<AstExpression>()
   }
+  if cst.child is CstNavigationExpression {
+    return lowerNavigationExpression(context, parentId, cst.cast<CstNavigationExpression>())
+  }
   throw "Unknown expression: {cst}."
 }
 
@@ -1592,6 +1595,26 @@ fun lowerBinaryExpression(
 
   context.addIdMapping(cst.id, id)
   Some<AstExpression>(AstBinaryExpression(id, leftOperand, operator, rightOperand))
+}
+
+fun lowerNavigationExpression(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
+  cst: CstNode<CstNavigationExpression>,
+): Maybe<AstExpression> {
+  if cst.child.target is None<CstNode<IdentifierToken>> {
+    context.addError(ExpectedIdentifierCompilerError(context.file, cst))
+    return lowerExpression(context, parentId, cst.child.receiver)
+  }
+
+  let id = context.getExpressionId(parentId)
+
+  let receiver = lowerExpression(context, id, cst.child.receiver)
+
+  let target = lowerIdentifier(context, id, cst.child.target.unwrap(), 0)
+
+  context.addIdMapping(cst.id, id)
+  Some<AstExpression>(AstNavigationExpression(id, receiver, target))
 }
 
 // utility

@@ -1,0 +1,17 @@
+use compiler_utils
+use cst
+
+public class ExpectedIdentifierCompilerError {
+  public let file: File
+  public let node: CstNode<CstNavigationExpression>
+}
+impl ExpectedIdentifierCompilerError: CompilerError {
+  public fun id(): String { "expected-identifier" }
+
+  public fun location(): Location { Location(file, node.child.dot.child.span) }
+  public fun title(): String { "Expected identifier." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description
+    ""
+  }
+}

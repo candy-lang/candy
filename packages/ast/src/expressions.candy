@@ -88,8 +88,8 @@ impl AstProperty: AstExpression
 
 public class AstNavigationExpression {
   public let id: AstExpressionId
-  public let receiver: AstExpression
-  public let target: String
+  public let receiver: Maybe<AstExpression>
+  public let target: AstIdentifier
 }
 impl AstNavigationExpression: AstExpression
 
@@ -103,7 +103,7 @@ impl AstCallExpression: AstExpression
 
 public class AstValueArgument {
   public let id: AstExpressionId
-  public let name: Maybe<String>
+  public let name: Maybe<AstIdentifier>
   public let value: Maybe<AstExpression>
 }
 
