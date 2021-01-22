@@ -1271,6 +1271,9 @@ fun lowerExpression(
   if cst.child is CstLambdaExpression {
     return lowerLambdaExpression(context, parentId, cst.cast<CstLambdaExpression>())
   }
+  if cst.child is CstIdentifierExpression {
+    return lowerIdentifierExpression(context, parentId, cst.cast<CstIdentifierExpression>())
+  }
   throw "Unknown expression: {cst}."
 }
 
@@ -1424,6 +1427,19 @@ fun lowerLambdaExpressionValueParameters(
 
   context.addIdMapping(cst.id, id)
   valueParameters
+}
+
+fun lowerIdentifierExpression(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
+  cst: CstNode<CstIdentifierExpression>,
+): AstIdentifierExpression {
+  let id = context.getExpressionId(parentId)
+
+  let value = lowerIdentifier(context, id, cst.child.value, 0)
+
+  context.addIdMapping(cst.id, id)
+  AstIdentifierExpression(id, value)
 }
 
 // utility
