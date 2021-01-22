@@ -59,7 +59,7 @@ impl AstIdentifierExpression: AstExpression
 
 public class AstTupleExpression {
   public let id: AstExpressionId
-  public let valueArguments: List<AstExpression>
+  public let expressions: List<AstExpression>
 }
 impl AstTupleExpression: AstExpression
 
