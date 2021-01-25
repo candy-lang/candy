@@ -48,7 +48,7 @@ public class AstImpl {
   public let id: AstDeclarationId
   public let modifiers: List<AstIdentifier>
   public let typeParameters: List<AstTypeParameter>
-  public let type: Maybe<AstType>
+  public let type: AstType
   public let traits: List<AstNamedType>
   public let innerDeclarations: List<AstFunction | AstProperty>
 }

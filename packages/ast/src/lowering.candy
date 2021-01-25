@@ -346,17 +346,15 @@ fun lowerImpl(
       .map<List<AstTypeParameter>>({ lowerTypeParameters(context, id, it) })
       .orElse({ List.empty<AstTypeParameter>() })
 
-  let type = if cst.child.type is Some<CstNode<CstType>> {
-    lowerType(context, id, cst.child.type.unwrap())
-  } else {
+  if cst.child.type is None<AstType> {
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
         cst.cast<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>(),
       ),
     )
-    None<AstType>()
   }
+  let type = cst.child.type.flatMap<AstType>({ lowerType(context, id, it) })
 
   let traits = cst.child.traits
       .flatMap<AstType>({
@@ -389,8 +387,9 @@ fun lowerImpl(
 
   let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, false) as List<AstFunction | AstProperty>
 
+  if type is None<AstType> { return None<AstImpl>() }
   context.addIdMapping(cst.id, id)
-  Some<AstImpl>(AstImpl(id, modifiers, typeParameters, type, traits, innerDeclarations))
+  Some<AstImpl>(AstImpl(id, modifiers, typeParameters, type.unwrap(), traits, innerDeclarations))
 }
 fun lowerClass(
   context: LoweringContext,
