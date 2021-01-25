@@ -1374,11 +1374,11 @@ class LoweringContext {
   static fun create(file: File): LoweringContext {
     LoweringContext(
       file,
-      MutableMap.empty<CstNodeId, AstNodeId>(),
-      0,
-      0,
-      0,
-      MutableList.empty<CompilerError>(),
+      idMapping = MutableMap.empty<CstNodeId, AstNodeId>(),
+      nextUnnamedDeclarationIndex = 0,
+      nextTypeId = 0,
+      nextExpressionId = 0,
+      errors = MutableList.empty<CompilerError>(),
     )
   }
 
