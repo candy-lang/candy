@@ -8,7 +8,7 @@ public class InvalidImplementedTraitsCompilerError {
 impl InvalidImplementedTraitsCompilerError: CompilerError {
   public fun id(): String { "invalid-implemented-traits" }
 
-  public fun location(): Location { Location(file, node.child.implKeyword.child.span) }
+  public fun location(): Location { Location(file, node.child.keyword.child.span) }
   public fun title(): String { "Invalid implemented traits." }
   public fun description(): String {
     "Impls may only have named types or intersections of those as implemented traits."

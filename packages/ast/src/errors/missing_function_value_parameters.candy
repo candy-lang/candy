@@ -8,7 +8,7 @@ public class MissingValueParametersCompilerError {
 impl MissingValueParametersCompilerError: CompilerError {
   public fun id(): String { "missing-function-value-parameters" }
 
-  public fun location(): Location { Location(file, node.child.functionKeyword.child.span) }
+  public fun location(): Location { Location(file, node.child.keyword.child.span) }
   public fun title(): String { "Missing function value parameters." }
   public fun description(): String {
     "Functions must always have parentheses for value parameters, even if these are empty."
