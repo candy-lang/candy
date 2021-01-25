@@ -1,3 +1,5 @@
+use ..primitives
+
 public trait Maybe<Value> {
   fun unwrap(): Value
   fun orElse(alternative: () => Value): Value

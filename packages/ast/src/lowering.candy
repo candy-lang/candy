@@ -52,11 +52,11 @@ fun lowerFile(context: LoweringContext, cst: CstNode<CstFile>): AstFile {
         node.cast<CstDeclaration>(),
         previousDeclarationNames as Map<String, Bool>,
       )
-      if result is Some<AstDeclaration> {
+      result.do({
         declarations.append(
-          result.unwrap() as AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty,
+          it as AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty,
         )
-      }
+      })
     }
   }
 
@@ -178,6 +178,22 @@ fun lowerModifiers(
 fun lowerModifier(
   context: LoweringContext,
   parentId: AstUseLineId | AstDeclarationId | AstTypeParameterId | AstValueParameterId | AstTypeId | AstExpressionId,
+  cst: CstNode<IdentifierToken>,
+  index: Int,
+): AstIdentifier {
+  let id = AstIdentifierId(parentId, index)
+  context.addIdMapping(cst.id, id)
+  AstIdentifier(id, cst.child.identifier)
+}
+fun lowerIdentifier(
+  context: LoweringContext,
+  parentId: AstUseLineId
+      | AstUseLineTargetId
+      | AstDeclarationId
+      | AstTypeParameterId
+      | AstValueParameterId
+      | AstTypeId
+      | AstExpressionId,
   cst: CstNode<IdentifierToken>,
   index: Int,
 ): AstIdentifier {
@@ -504,7 +520,7 @@ fun lowerProperty(
     parentId,
     cst.child.name
       .map<String>({ it.child.identifier })
-      .orElse({ "unnamed-property-{context.getUnnamedDeclarationIndex()}" })
+      .orElse({ "unnamed-property-{context.getUnnamedDeclarationIndex()}" }),
   )
   mut let isValid = true
 
@@ -556,7 +572,7 @@ fun lowerProperty(
     } else {
       Some<AstExpression>(lowerExpression(context, id, it.child.expression.unwrap()))
     }
-  }
+  })
 
   if !isValid { return None<AstProperty>() }
   context.addIdMapping(cst.id, id)
