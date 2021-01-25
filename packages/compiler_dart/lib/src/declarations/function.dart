@@ -3,6 +3,7 @@ import 'package:compiler/compiler.dart';
 
 import '../body.dart';
 import '../type.dart';
+import '../utils.dart';
 import 'declaration.dart';
 
 final compileFunction = Query<DeclarationId, dart.Method>(
@@ -16,7 +17,7 @@ final compileFunction = Query<DeclarationId, dart.Method>(
     return dart.Method((b) => b
       ..static = functionHir.isStatic && declarationId.parent.isNotModule
       ..returns = compileType(context, functionHir.returnType)
-      ..name = functionHir.name
+      ..name = mangleName(functionHir.name)
       ..types.addAll(functionHir.typeParameters
           .map((p) => compileTypeParameter(context, p)))
       ..requiredParameters
