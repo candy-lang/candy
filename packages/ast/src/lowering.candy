@@ -544,20 +544,17 @@ fun lowerProperty(
     }
   }
 
-  let initializer = if cst.child.initializer is None<CstNode<CstDelegationBody>> {
-    None<AstExpression>()
-  } else {
-    let initializer = cst.child.initializer.unwrap()
-    if initializer.child.expression is None<CstNode<CstExpression>> {
+  let initializer = cst.child.initializer.flatMap<AstExpression>({
+    if it.child.expression is None<CstNode<CstExpression>> {
       context.addError(
         ExpectedExpressionCompilerError(
           context.file,
-          initializer.cast<CstExpressionBody | CstDelegationBody>(),
+          it.cast<CstExpressionBody | CstDelegationBody>(),
         ),
       )
       None<AstExpression>()
     } else {
-      Some<AstExpression>(lowerExpression(context, id, initializer.child.expression.unwrap()))
+      Some<AstExpression>(lowerExpression(context, id, it.child.expression.unwrap()))
     }
   }
 
@@ -666,16 +663,15 @@ fun lowerExpressionBody(
 ): AstExpressionBody {
   let id = AstBodyId(parentId)
 
-  let expression = if cst.child.expression is None<CstNode<CstExpression>> {
+  let expression = cst.child.expression
+    .map<AstExpression>({ lowerExpression(context, parentId, it) })
+  if expression is None<AstExpression> {
     context.addError(
       ExpectedExpressionCompilerError(
         context.file,
         cst.cast<CstExpressionBody | CstDelegationBody>(),
       ),
     )
-    None<AstExpression>()
-  } else {
-    Some<AstExpression>(lowerExpression(context, parentId, cst.child.expression.unwrap()))
   }
 
   context.addIdMapping(cst.id, id)
@@ -1110,13 +1106,12 @@ fun lowerTypeParameters(
         node.cast<CstTypeParameter>(),
         previousNames as Map<String, Bool>,
       )
-      if lowered is Some<AstTypeParameter> {
-        let unwrapped = lowered.unwrap()
-        result.append(unwrapped)
-        if unwrapped.name is Some<AstIdentifier> {
-          previousNames.set(unwrapped.name.unwrap().value, true)
+      lowered.do({
+        result.append(it)
+        if it.name is Some<AstIdentifier> {
+          previousNames.set(it.name.unwrap().value, true)
         }
-      }
+      })
       punctuationExpectedNext = true
     }
   }
