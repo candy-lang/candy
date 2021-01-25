@@ -220,23 +220,20 @@ fun lowerModule(
   cst: CstNode<CstModule>,
   previousNames: Map<String, Bool>,
 ): Maybe<AstModule> {
-  let hasName = cst.child.name is Some<CstNode<IdentifierToken>>
-  let name = if hasName {
-    cst.child.name.unwrap().child.identifier
-  } else {
-    "unnamed-module-{context.getUnnamedDeclarationIndex()}"
-  }
-  let id = AstDeclarationId(parentId, name)
+ let id = AstDeclarationId(
+    parentId,
+    cst.child.name
+      .map<String>({ it.child.identifier })
+      .orElse({ "unnamed-module-{context.getUnnamedDeclarationIndex()}" })
+  )
+  mut let isValid = true
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
-  let name = cst.child.name.map<AstIdentifier>({
-    let identifierId = AstIdentifierId(id, 0)
-    context.addIdMapping(it.id, identifierId)
-    AstIdentifier(identifierId, it.child.identifier)
-  })
-  if !hasName {
+  let name = cst.child.name.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
+  if name is None<AstIdentifier> {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
+    isValid = false
   } else {
     if previousNames.containsKey(name.unwrap().value) {
       context.addError(
@@ -250,9 +247,9 @@ fun lowerModule(
 
   let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, true, true) as List<AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty>
 
-  if !hasName { return None<AstModule>() }
+  if !isValid { return None<AstModule>() }
   context.addIdMapping(cst.id, id)
-  Some<AstModule>(AstModule(id, None<AstCandyDoc>(), modifiers, name, innerDeclarations))
+  Some<AstModule>(AstModule(id, None<AstCandyDoc>(), modifiers, name.unwrap(), innerDeclarations))
 }
 fun lowerTrait(
   context: LoweringContext,
@@ -260,23 +257,20 @@ fun lowerTrait(
   cst: CstNode<CstTrait>,
   previousNames: Map<String, Bool>,
 ): Maybe<AstTrait> {
-  let hasName = cst.child.name is Some<CstNode<IdentifierToken>>
-  let name = if hasName {
-    cst.child.name.unwrap().child.identifier
-  } else {
-    "unnamed-trait-{context.getUnnamedDeclarationIndex()}"
-  }
-  let id = AstDeclarationId(parentId, name)
+  let id = AstDeclarationId(
+    parentId,
+    cst.child.name
+      .map<String>({ it.child.identifier })
+      .orElse({ "unnamed-trait-{context.getUnnamedDeclarationIndex()}" })
+  )
+  mut let isValid = true
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
-  let name = cst.child.name.map<AstIdentifier>({
-    let identifierId = AstIdentifierId(id, 0)
-    context.addIdMapping(it.id, identifierId)
-    AstIdentifier(identifierId, it.child.identifier)
-  })
-  if !hasName {
+  let name = cst.child.name.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
+  if name is None<AstIdentifier> {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
+    isValid = false
   } else {
     if previousNames.containsKey(name.unwrap().value) {
       context.addError(
@@ -309,14 +303,14 @@ fun lowerTrait(
 
   let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, true) as List<AstTrait | AstClass | AstFunction | AstProperty>
 
-  if !hasName { return None<AstTrait>() }
+  if !isValid { return None<AstTrait>() }
   context.addIdMapping(cst.id, id)
   Some<AstTrait>(
     AstTrait(
       id,
       None<AstCandyDoc>(),
       modifiers,
-      name,
+      name.unwrap(),
       typeParameters,
       upperBound,
       innerDeclarations,
@@ -388,24 +382,20 @@ fun lowerClass(
   cst: CstNode<CstClass>,
   previousNames: Map<String, Bool>,
 ): Maybe<AstClass> {
-  let name = cst.child.name
-  let hasName = cst.child.name is Some<CstNode<IdentifierToken>>
-  let name = if hasName {
-    cst.child.name.unwrap().child.identifier
-  } else {
-    "unnamed-class-{context.getUnnamedDeclarationIndex()}"
-  }
-  let id = AstDeclarationId(parentId, name)
+  let id = AstDeclarationId(
+    parentId,
+    cst.child.name
+      .map<String>({ it.child.identifier })
+      .orElse({ "unnamed-class-{context.getUnnamedDeclarationIndex()}" })
+  )
+  mut let isValid = true
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
-  let name = cst.child.name.map<AstIdentifier>({
-    let identifierId = AstIdentifierId(id, 0)
-    context.addIdMapping(it.id, identifierId)
-    AstIdentifier(identifierId, it.child.identifier)
-  })
-  if !hasName {
+  let name = cst.child.name.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
+  if name is None<AstIdentifier> {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
+    isValid = false
   } else {
     if previousNames.containsKey(name.unwrap().value) {
       context.addError(
@@ -423,10 +413,10 @@ fun lowerClass(
 
   let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, true) as List<AstTrait | AstClass | AstFunction | AstProperty>
 
-  if !hasName { return None<AstClass>() }
+  if !isValid { return None<AstClass>() }
   context.addIdMapping(cst.id, id)
   Some<AstClass>(
-    AstClass(id, None<AstCandyDoc>(), modifiers, name, typeParameters, innerDeclarations),
+    AstClass(id, None<AstCandyDoc>(), modifiers, name.unwrap(), typeParameters, innerDeclarations),
   )
 }
 fun lowerFunction(
@@ -434,24 +424,20 @@ fun lowerFunction(
   parentId: AstFileId | AstDeclarationId | AstExpressionId,
   cst: CstNode<CstFunction>,
 ): Maybe<AstFunction> {
-  let hasName = cst.child.name is Some<CstNode<IdentifierToken>>
-  let name = if hasName {
-    cst.child.name.unwrap().child.identifier
-  } else {
-    "unnamed-function-{context.getUnnamedDeclarationIndex()}"
-  }
-  let name = "{name}-{context.getUnnamedDeclarationIndex()}"
-  let id = AstDeclarationId(parentId, name)
+  let id = AstDeclarationId(
+    parentId,
+    cst.child.name
+      .map<String>({ "{it.child.identifier}-{context.getUnnamedDeclarationIndex()}" })
+      .orElse({ "unnamed-function-{context.getUnnamedDeclarationIndex()}" })
+  )
+  mut let isValid = true
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
-  let name = cst.child.name.map<AstIdentifier>({
-    let identifierId = AstIdentifierId(id, 0)
-    context.addIdMapping(it.id, identifierId)
-    AstIdentifier(identifierId, it.child.identifier)
-  })
-  if !hasName {
+  let name = cst.child.name.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
+  if name is None<AstIdentifier> {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
+    isValid = false
   }
 
   let typeParameters = cst.child.typeParameters
@@ -493,14 +479,14 @@ fun lowerFunction(
     }
   }
 
-  if !hasName { return None<AstFunction>() }
+  if !isValid { return None<AstFunction>() }
   context.addIdMapping(cst.id, id)
   Some<AstFunction>(
     AstFunction(
       id,
       None<AstCandyDoc>(),
       modifiers,
-      name,
+      name.unwrap(),
       typeParameters,
       valueParameters,
       returnType,
@@ -514,25 +500,22 @@ fun lowerProperty(
   cst: CstNode<CstProperty>,
   previousNames: Map<String, Bool>,
 ): Maybe<AstProperty> {
-  let hasName = cst.child.name is Some<CstNode<IdentifierToken>>
-  let name = if hasName {
-    cst.child.name.unwrap().child.identifier
-  } else {
-    "unnamed-property-{context.getUnnamedDeclarationIndex()}"
-  }
-  let id = AstDeclarationId(parentId, name)
+  let id = AstDeclarationId(
+    parentId,
+    cst.child.name
+      .map<String>({ it.child.identifier })
+      .orElse({ "unnamed-property-{context.getUnnamedDeclarationIndex()}" })
+  )
+  mut let isValid = true
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
   let isMutable = cst.child.isMutable()
 
-  let name = cst.child.name.map<AstIdentifier>({
-    let identifierId = AstIdentifierId(id, 0)
-    context.addIdMapping(it.id, identifierId)
-    AstIdentifier(identifierId, it.child.identifier)
-  })
-  if !hasName {
+  let name = cst.child.name.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
+  if name is None<AstIdentifier> {
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
+    isValid = false
   } else {
     if previousNames.containsKey(name.unwrap().value) {
       context.addError(
@@ -578,10 +561,10 @@ fun lowerProperty(
     }
   }
 
-  if !hasName { return None<AstProperty>() }
+  if !isValid { return None<AstProperty>() }
   context.addIdMapping(cst.id, id)
   Some<AstProperty>(
-    AstProperty(id, None<AstCandyDoc>(), modifiers, isMutable, name, type, initializer),
+    AstProperty(id, None<AstCandyDoc>(), modifiers, isMutable, name.unwrap(), type, initializer),
   )
 }
 fun lowerDeclarationContent(
@@ -603,19 +586,24 @@ fun lowerDeclarationContent(
 
     mut let isValid = true
     if lowered is AstModule {
-      previousNames.set((lowered as AstModule).name.unwrap().value, true)
+      previousNames.set((lowered as AstModule).name.value, true)
       if !allowModulesAndImpls { isValid = false }
     }
     if lowered is AstTrait {
-      previousNames.set((lowered as AstTrait).name.unwrap().value, true)
+      previousNames.set((lowered as AstTrait).name.value, true)
       if !allowTraitsAndClasses { isValid = false }
     }
     if lowered is AstImpl && !allowModulesAndImpls { isValid = false }
     if lowered is AstClass {
-      previousNames.set((lowered as AstClass).name.unwrap().value, true)
+      previousNames.set((lowered as AstClass).name.value, true)
       if !allowTraitsAndClasses { isValid = false }
     }
-    // Functions and properties are always allowed.
+    if lowered is AstFunction {
+      previousNames.set((lowered as AstFunction).name.value, true)
+    }
+    if lowered is AstProperty {
+      previousNames.set((lowered as AstProperty).name.value, true)
+    }
     if isValid {
       result.append(lowered)
     } else {
@@ -720,9 +708,9 @@ fun lowerValueParameters(
         previousNames as Map<String, Bool>,
       )
       if lowered is Some<AstValueParameter> {
-        let lowered = lowered.unwrap()
-        result.append(lowered)
-        previousNames.set(lowered.name.unwrap().value, true)
+        let valueParameter = lowered.unwrap()
+        result.append(valueParameter)
+        previousNames.set(valueParameter.name.value, true)
       }
       punctuationExpectedNext = true
     }
@@ -761,9 +749,7 @@ fun lowerValueParameter(
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
-  let nameId = AstIdentifierId(id, 0)
-  context.addIdMapping(cst.child.name.id, nameId)
-  let name = AstIdentifier(nameId, name)
+  let name = lowerIdentifier(context, id, cst.child.name, 0)
 
   // Value parameters only occur in functions and lambdas, which we can differentiate using
   // `parentId`.
@@ -809,9 +795,7 @@ fun lowerValueParameter(
       })
 
   context.addIdMapping(cst.id, id)
-  Some<AstValueParameter>(
-    AstValueParameter(id, modifiers, Some<AstIdentifier>(name), type, defaultValue),
-  )
+  Some<AstValueParameter>(AstValueParameter(id, modifiers, name, type, defaultValue))
 }
 
 // types
