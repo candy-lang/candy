@@ -1163,6 +1163,7 @@ fun lowerTypeParameter(
     return None<AstTypeParameter>()
   }
   let id = AstTypeParameterId(parentId, name)
+  mut let isValid = true
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
@@ -1171,6 +1172,10 @@ fun lowerTypeParameter(
     context.addIdMapping(it.id, identifierId)
     AstIdentifier(identifierId, it.child.identifier)
   })
+  if name is None<AstIdentifier> {
+    context.addError(MissingTypeParameterNameCompilerError(context.file, cst))
+    isValid = false
+  }
 
   let upperBound = cst.child.upperBound
       .flatMap<AstType>({
@@ -1182,6 +1187,7 @@ fun lowerTypeParameter(
         }
       })
 
+  if !isValid { return None<AstTypeParameter>() }
   context.addIdMapping(cst.id, id)
   Some<AstTypeParameter>(AstTypeParameter(id, modifiers, name, upperBound))
 }
