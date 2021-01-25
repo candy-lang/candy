@@ -3,6 +3,7 @@ public trait Maybe<Value> {
   fun orElse(alternative: () => Value): Value
   fun map<Out>(mapper: (Value) => Out): Maybe<Out> { flatMap<Out>({ Some<Out>(mapper(it)) })}
   fun flatMap<Out>(mapper: (Value) => Maybe<Out>): Maybe<Out>
+  fun do(lambda: (Value) => Unit) { map<Unit>({ lambda(it) }) }
 }
 
 public class Some<Value> {
