@@ -4,32 +4,37 @@ use ..tokens
 use ..types
 
 public trait /* enum */ CstDeclaration {
-  public let modifiers: List<CstNode<IdentifierToken>>
+  let modifiers: List<CstNode<IdentifierToken>>
+  let keyword: CstNode<KeywordToken>
+}
+
+public trait CstDeclarationWithName {
+  let name: Maybe<CstNode<IdentifierToken>>
 }
 
 
 public class CstModule {
   public let modifiers: List<CstNode<IdentifierToken>>
-  public let moduleKeyword: CstNode<KeywordToken>
+  public let keyword: CstNode<KeywordToken>
   public let name: Maybe<CstNode<IdentifierToken>>
   public let content: Maybe<CstNode<CstDeclarationContent>>
 }
-impl CstModule: CstDeclaration
+impl CstModule: CstDeclaration & CstDeclarationWithName
 
 
 public class CstTrait {
   public let modifiers: List<CstNode<IdentifierToken>>
-  public let traitKeyword: CstNode<KeywordToken>
+  public let keyword: CstNode<KeywordToken>
   public let name: Maybe<CstNode<IdentifierToken>>
   public let typeParameters: Maybe<CstNode<CstTypeParameters>>
   public let upperBound: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>
   public let content: Maybe<CstNode<CstDeclarationContent>>
 }
-impl CstTrait: CstDeclaration
+impl CstTrait: CstDeclaration & CstDeclarationWithName
 
 public class CstImpl {
   public let modifiers: List<CstNode<IdentifierToken>>
-  public let implKeyword: CstNode<KeywordToken>
+  public let keyword: CstNode<KeywordToken>
   public let typeParameters: Maybe<CstNode<CstTypeParameters>>
   public let type: Maybe<CstNode<CstType>>
   public let traits: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>
@@ -40,24 +45,24 @@ impl CstImpl: CstDeclaration
 
 public class CstClass {
   public let modifiers: List<CstNode<IdentifierToken>>
-  public let classKeyword: CstNode<KeywordToken>
+  public let keyword: CstNode<KeywordToken>
   public let name: Maybe<CstNode<IdentifierToken>>
   public let typeParameters: Maybe<CstNode<CstTypeParameters>>
   public let content: Maybe<CstNode<CstDeclarationContent>>
 }
-impl CstClass: CstDeclaration
+impl CstClass: CstDeclaration & CstDeclarationWithName
 
 
 public class CstFunction {
   public let modifiers: List<CstNode<IdentifierToken>>
-  public let functionKeyword: CstNode<KeywordToken>
+  public let keyword: CstNode<KeywordToken>
   public let name: Maybe<CstNode<IdentifierToken>>
   public let typeParameters: Maybe<CstNode<CstTypeParameters>>
   public let valueParameters: Maybe<CstNode<CstValueParameters>>
   public let returnType: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>
   public let body: Maybe<CstNode<CstBlockBody | CstExpressionBody>>
 }
-impl CstFunction: CstDeclaration
+impl CstFunction: CstDeclaration & CstDeclarationWithName
 
 public class CstValueParameters {
   public let openingParenthesis: CstNode<PunctuationToken>
@@ -83,7 +88,7 @@ public class CstProperty {
     (keyword.child as KeywordToken).keyword == "var"
   }
 }
-impl CstProperty: CstDeclaration
+impl CstProperty: CstDeclaration & CstDeclarationWithName
 
 
 public class CstDeclarationContent {
