@@ -11,7 +11,7 @@ public class AstDeclarationId {
 impl AstDeclarationId: AstNodeId
 
 public trait /* enum */ AstDeclaration {
-  public let modifiers: List<String>
+  public let modifiers: List<AstIdentifier>
 }
 impl AstDeclaration: AstNode
 
@@ -19,8 +19,8 @@ impl AstDeclaration: AstNode
 public class AstModule {
   public let id: AstDeclarationId
   public let candyDoc: Maybe<AstCandyDoc>
-  public let modifiers: List<String>
-  public let name: Maybe<String>
+  public let modifiers: List<AstIdentifier>
+  public let name: AstIdentifier
   public let innerDeclarations: List<
     AstModule
     | AstTrait
@@ -36,8 +36,8 @@ impl AstModule: AstDeclaration
 public class AstTrait {
   public let id: AstDeclarationId
   public let candyDoc: Maybe<AstCandyDoc>
-  public let modifiers: List<String>
-  public let name: Maybe<String>
+  public let modifiers: List<AstIdentifier>
+  public let name: AstIdentifier
   public let typeParameters: List<AstTypeParameter>
   public let upperBound: Maybe<AstType>
   public let innerDeclarations: List<AstTrait | AstClass | AstFunction | AstProperty>
@@ -46,10 +46,10 @@ impl AstTrait: AstDeclaration
 
 public class AstImpl {
   public let id: AstDeclarationId
-  public let modifiers: List<String>
+  public let modifiers: List<AstIdentifier>
   public let typeParameters: List<AstTypeParameter>
   public let type: AstType
-  public let traits: List<AstType>
+  public let traits: List<AstNamedType>
   public let innerDeclarations: List<AstFunction | AstProperty>
 }
 impl AstImpl: AstDeclaration
@@ -58,8 +58,8 @@ impl AstImpl: AstDeclaration
 public class AstClass {
   public let id: AstDeclarationId
   public let candyDoc: Maybe<AstCandyDoc>
-  public let modifiers: List<String>
-  public let name: String
+  public let modifiers: List<AstIdentifier>
+  public let name: AstIdentifier
   public let typeParameters: List<AstTypeParameter>
   public let innerDeclarations: List<AstTrait | AstClass | AstFunction | AstProperty>
 }
@@ -69,8 +69,8 @@ impl AstClass: AstDeclaration
 public class AstFunction {
   public let id: AstDeclarationId
   public let candyDoc: Maybe<AstCandyDoc>
-  public let modifiers: List<String>
-  public let name: String
+  public let modifiers: List<AstIdentifier>
+  public let name: AstIdentifier
   public let typeParameters: List<AstTypeParameter>
   public let valueParameters: List<AstValueParameter>
   public let returnType: Maybe<AstType>
@@ -87,27 +87,27 @@ impl AstValueParameterId: AstNodeId
 
 public class AstValueParameter {
   public let id: AstValueParameterId
-  public let name: Maybe<String>
+  public let modifiers: List<AstIdentifier>
+  public let name: AstIdentifier
   public let type: Maybe<AstType>
-  public let defaultValue: Maybe<AstDelegationBody>
+  public let defaultValue: Maybe<AstExpression>
 }
 
 
 public class AstProperty {
   public let id: AstDeclarationId
   public let candyDoc: Maybe<AstCandyDoc>
-  public let modifiers: List<String>
+  public let modifiers: List<AstIdentifier>
   public let isMutable: Bool
-  public let name: Maybe<String>
+  public let name: AstIdentifier
   public let type: Maybe<AstType>
-  public let initializer: Maybe<AstDelegationBody>
+  public let initializer: Maybe<AstExpression>
 }
 impl AstProperty: AstDeclaration
 
 
 public class AstBodyId {
   let parentId: AstDeclarationId
-  let name: String
 }
 impl AstBodyId: AstNodeId
 

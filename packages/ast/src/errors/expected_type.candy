@@ -1,0 +1,36 @@
+use compiler_utils
+use cst
+use petit_parser
+
+public class ExpectedTypeCompilerError {
+  public let file: File
+  public let node: CstNode<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>
+}
+impl ExpectedTypeCompilerError: CompilerError {
+  public fun id(): String { "expected-type" }
+
+  fun span(): Span {
+    if node.child is CstTrait {
+      return node.cast<CstTrait>().child.keyword.child.span
+    }
+    if node.child is CstImpl {
+      return node.cast<CstImpl>().child.keyword.child.span
+    }
+    if node.child is CstProperty {
+      return node.cast<CstProperty>().child.keyword.child.span
+    }
+    if node.child is CstIntersectionType {
+      return node.cast<CstIntersectionType>().child.ampersand.child.span
+    }
+    if node.child is CstUnionType {
+      return node.cast<CstUnionType>().child.bar.child.span
+    }
+    throw "Unknown node: {node}."
+  }
+  public fun location(): Location { Location(file, span()) }
+  public fun title(): String { "Expected type." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description
+    ""
+  }
+}

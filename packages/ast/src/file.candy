@@ -2,6 +2,7 @@ use compiler_utils
 use ..node
 use ..declarations
 use ..expressions
+use ..types
 
 public class AstFileId {
   let file: File
@@ -66,7 +67,13 @@ impl AstGlobalUseLineTarget: AstUseLineTarget
 
 
 public class AstIdentifierId {
-  public let parentId: AstUseLineId | AstUseLineTargetId | AstDeclarationId | AstExpressionId
+  public let parentId: AstUseLineId
+      | AstUseLineTargetId
+      | AstDeclarationId
+      | AstTypeParameterId
+      | AstValueParameterId
+      | AstTypeId
+      | AstExpressionId
   public let index: Int
 }
 impl AstIdentifierId: AstNodeId

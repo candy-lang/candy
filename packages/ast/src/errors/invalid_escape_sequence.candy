@@ -3,16 +3,16 @@ use cst
 
 public class InvalidEscapeSequenceCompilerError {
   public let file: File
-  public let stringPart: CstNode<CstEscapedStringPart>
+  public let node: CstNode<CstEscapedStringPart>
 }
 impl InvalidEscapeSequenceCompilerError: CompilerError {
   public fun id(): String { "invalid-escape-sequence" }
 
   public fun location(): Location {
-    let span = if stringPart.child.value is Some<CstNode<StringLiteralToken>> {
-      stringPart.child.value.unwrap().child.span
+    let span = if node.child.value is Some<CstNode<StringLiteralToken>> {
+      node.child.value.unwrap().child.span
     } else {
-      stringPart.child.backslash.child.span
+      node.child.backslash.child.span
     }
     Location(file, span)
   }

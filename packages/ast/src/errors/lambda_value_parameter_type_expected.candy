@@ -1,0 +1,18 @@
+use compiler_utils
+use cst
+
+public class LambdaValueParameterTypeExpectedCompilerError {
+  public let file: File
+  public let node: CstNode<CstValueParameter>
+}
+impl LambdaValueParameterTypeExpectedCompilerError: CompilerError {
+  public fun id(): String { "lambda-value-parameter-type-expected" }
+
+  public fun valueParameterName() { node.child.name.child.identifier}
+
+  public fun location(): Location { Location(file, node.child.name.child.span) }
+  public fun title(): String { "Expected type for value parameter {valueParameterName()} after the colon." }
+  public fun description(): String {
+    "Try adding a type: `{valueParameterName()}: MyType`."
+  }
+}

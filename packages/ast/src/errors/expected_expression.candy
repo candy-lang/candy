@@ -1,0 +1,27 @@
+use compiler_utils
+use cst
+use petit_parser
+
+public class ExpectedExpressionCompilerError {
+  public let file: File
+  public let node: CstNode<CstExpressionBody | CstDelegationBody>
+}
+impl ExpectedExpressionCompilerError: CompilerError {
+  public fun id(): String { "expected-expression" }
+
+  fun span(): Span {
+    if node.child is CstExpressionBody {
+      return node.cast<CstExpressionBody>().child.arrow.child.span
+    }
+    if node.child is CstDelegationBody {
+      return node.cast<CstDelegationBody>().child.equalsSign.child.span
+    }
+    throw "Unknown body: {node}."
+  }
+  public fun location(): Location { Location(file, span()) }
+  public fun title(): String { "Expected expression." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description
+    ""
+  }
+}

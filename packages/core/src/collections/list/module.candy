@@ -49,6 +49,17 @@ public trait List<Item>: Iterable<Item> {
   // TODO(marcelgarus): Getterize!
   fun isEmpty(): Bool { length() == 0 }
 
+  fun copy(): List<Item> {
+    let length = (this as Iterable<Item>).length()
+    let result = ArrayList.create<Item>(length)
+
+    mut let index = 0
+    while index < length {
+      (result as MutableList<Item>).append(get(index).unwrap() as Item)
+      index = index + 1
+    }
+    result
+  }
   fun subList(start: Int, end: Int): List<Item> {
     /// TODO(JonasWanke): make this more efficient by creating a view of the original list
 

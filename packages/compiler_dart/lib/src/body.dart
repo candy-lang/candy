@@ -6,6 +6,7 @@ import 'constants.dart';
 import 'declarations/declaration.dart';
 import 'declarations/module.dart';
 import 'type.dart';
+import 'utils.dart';
 
 final compilePropertyInitializer = Query<DeclarationId, Option<dart.Code>>(
   'dart.compilePropertyInitializer',
@@ -161,7 +162,8 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         return _saveSingle(node, dart.refer(name));
       },
       property: (id, type, _, __, receiver) {
-        final name = id.simplePath.last.nameOrNull;
+        final name = mangleName(id.simplePath.last.nameOrNull);
+
         if (receiver != null) {
           return [
             ...receiver.accept(this),

@@ -78,6 +78,5 @@ public class CstTypeArguments {
   public let closingAngleBracket: Maybe<CstNode<PunctuationToken>>
 }
 public class CstTypeArgument {
-  public let modifiers: List<CstNode<IdentifierToken>>
-  public let type: Maybe<CstNode<CstType>>
+  public let type: CstNode<CstType>
 }

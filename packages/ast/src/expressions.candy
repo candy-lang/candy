@@ -4,7 +4,7 @@ use ..node
 use ..types
 
 public class AstExpressionId {
-  let parentId: AstDeclarationId
+  let parentId: AstDeclarationId | AstBodyId | AstValueParameterId
   let value: Int
 }
 impl AstExpressionId: AstNodeId

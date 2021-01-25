@@ -160,6 +160,12 @@ public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
   }
 
   fun remove(key: Key): Maybe<Value>
+  fun removeWhere(selector: (Key, Value) => Bool) {
+    let entries = (this as Map<Key, Value>).entries().toList().copy()
+    for entry in entries {
+      if selector(entry.first, entry.second) { remove(entry.first) }
+    }
+  }
 
   fun clear() {
     for key in keys() {

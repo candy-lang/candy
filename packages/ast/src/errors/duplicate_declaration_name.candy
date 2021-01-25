@@ -1,0 +1,21 @@
+use compiler_utils
+use cst
+use petit_parser
+
+public class DuplicateDeclarationNameCompilerError {
+  public let file: File
+  public let node: CstNode<CstModule | CstTrait | CstClass | CstProperty>
+  // TODO(JonasWanke): highlight previous occurrences of that name
+}
+impl DuplicateDeclarationNameCompilerError: CompilerError {
+  public fun id(): String { "duplicate-declaration-name" }
+
+  public fun location(): Location {
+    Location(file, node.cast<CstDeclarationWithName>().child.name.unwrap().child.span)
+  }
+  public fun title(): String { "Duplicate declaration name." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description for this error
+    ""
+  }
+}

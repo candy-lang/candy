@@ -214,7 +214,8 @@ class IdFinderVisitor extends hir.ExpressionVisitor<Option<hir.Expression>> {
 
   @override
   Option<hir.Expression> visitContinueExpression(hir.ContinueExpression node) {
-    return node.accept(this);
+    if (node.id == id) return Some(node);
+    return None();
   }
 
   @override

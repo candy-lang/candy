@@ -1,23 +1,29 @@
 use ..declarations
 use ..expressions
+use ..file
 use ..node
 
 public class AstTypeId {
-  let parentId: AstDeclarationId | AstExpressionId
+  let parentId: AstDeclarationId
+      | AstTypeId
+      | AstTypeParameterId
+      | AstTypeArgumentId
+      | AstValueParameterId
+      | AstExpressionId
   let value: Int
 }
 impl AstTypeId: AstNodeId
 
 public trait /* enum */ AstType {
-  let modifiers: List<String>
+  let modifiers: List<AstIdentifier>
 }
 impl AstType: AstNode
 
 
 public class AstNamedType {
   public let id: AstTypeId
-  public let modifiers: List<String>
-  public let nameParts: List<String>
+  public let modifiers: List<AstIdentifier>
+  public let nameParts: List<AstIdentifier>
   public let typeArguments: List<AstTypeArgument>
 }
 impl AstNamedType: AstType
@@ -25,7 +31,7 @@ impl AstNamedType: AstType
 
 public class AstFunctionType {
   public let id: AstTypeId
-  public let modifiers: List<String>
+  public let modifiers: List<AstIdentifier>
   public let receiverType: Maybe<AstType>
   public let parameterTypes: List<AstType>
   public let returnType: Maybe<AstType>
@@ -35,7 +41,7 @@ impl AstFunctionType: AstType
 
 public class AstTupleType {
   public let id: AstTypeId
-  public let modifiers: List<String>
+  public let modifiers: List<AstIdentifier>
   public let types: List<AstType>
 }
 impl AstTupleType: AstType
@@ -43,41 +49,40 @@ impl AstTupleType: AstType
 
 public class AstUnionType {
   public let id: AstTypeId
-  public let modifiers: List<String>
+  public let modifiers: List<AstIdentifier>
   public let types: List<AstType>
 }
 impl AstUnionType: AstType
 
 public class AstIntersectionType {
   public let id: AstTypeId
-  public let modifiers: List<String>
+  public let modifiers: List<AstIdentifier>
   public let types: List<AstType>
 }
 impl AstIntersectionType: AstType
 
 
 public class AstTypeParameterId {
-  let declaration: AstDeclarationId
+  let parentId: AstDeclarationId
   let name: String
 }
 impl AstTypeParameterId: AstNodeId
 
 public class AstTypeParameter {
   public let id: AstTypeParameterId
-  public let modifiers: List<String>
-  public let name: Maybe<String>
+  public let modifiers: List<AstIdentifier>
+  public let name: Maybe<AstIdentifier>
   public let upperBound: Maybe<AstType>
 }
 
 
 public class AstTypeArgumentId {
-  let declaration: AstDeclarationId
-  let name: String
+  let parentId: AstTypeId | AstExpressionId
+  let index: Int
 }
 impl AstTypeArgumentId: AstNodeId
 
 public class AstTypeArgument {
   public let id: AstTypeArgumentId
-  public let modifiers: List<String>
   public let type: Maybe<AstType>
 }

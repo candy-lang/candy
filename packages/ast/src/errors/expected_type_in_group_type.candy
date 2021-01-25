@@ -1,0 +1,17 @@
+use compiler_utils
+use cst
+
+public class ExpectedTypeInGroupTypeCompilerError {
+  public let file: File
+  public let node: CstNode<CstGroupType>
+}
+impl ExpectedTypeInGroupTypeCompilerError: CompilerError {
+  public fun id(): String { "expected-type-in-group-type" }
+
+  public fun location(): Location { Location(file, node.child.openingParenthesis.child.span) }
+  public fun title(): String { "Missing type in group type." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description
+    ""
+  }
+}

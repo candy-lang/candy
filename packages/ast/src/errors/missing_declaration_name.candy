@@ -1,0 +1,18 @@
+use compiler_utils
+use cst
+use petit_parser
+
+public class MissingDeclarationNameCompilerError {
+  public let file: File
+  public let node: CstNode<CstDeclaration>
+}
+impl MissingDeclarationNameCompilerError: CompilerError {
+  public fun id(): String { "missing-declaration-name" }
+
+  public fun location(): Location { Location(file, node.child.keyword.child.span) }
+  public fun title(): String { "Missing declaration name." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description for this error
+    ""
+  }
+}
