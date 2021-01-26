@@ -464,7 +464,7 @@ abstract class Context {
     } else if (lowered.length > 1) {
       return Error([
         CompilerError.ambiguousExpression(
-          'Expression is ambiguous.',
+          'Expression is ambiguous: Found ${lowered.length} matching definitions.',
           location: ErrorLocation(resourceId, expression.span),
           relatedInformation: [
             for (final it in lowered)

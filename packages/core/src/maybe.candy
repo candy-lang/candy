@@ -1,9 +1,12 @@
+use ..primitives
+
 public trait Maybe<Value> {
   fun unwrap(): Value
   fun orElse(alternative: () => Value): Value
   fun map<Out>(mapper: (Value) => Out): Maybe<Out> { flatMap<Out>({ Some<Out>(mapper(it)) }) }
   fun flatMap<Out>(mapper: (Value) => Maybe<Out>): Maybe<Out>
   fun cast<Out>(): Maybe<Out> { map<Out>({ it as Out }) }
+  fun do(lambda: (Value) => Unit) { map<Unit>({ lambda(it) }) }
 }
 
 public class Some<Value> {

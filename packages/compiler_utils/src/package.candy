@@ -1,22 +1,23 @@
-public trait Package {
-  /// TODO(JonasWanke): provide a query to get the name of a package
+/*public trait HirPackage {
+  // TODO(JonasWanke): provide a query to get the name of a package
 }
 
-public class FilePackage {
+public class HirFilePackage {
   public let path: String /* Path */
 }
-impl FilePackage: Package
+impl HirFilePackage: HirPackage
 
-public class GitPackage {
+public class HirGitPackage {
   public let repoUrl: String /* Url */
   public let path: String /* Path */ = ""
   public let ref: String /* Sha1 */
 }
-impl GitPackage: Package
+impl HirGitPackage: HirPackage
 
-public class HostedPackage {
+public class HirHostedPackage {
   public let hostUrl: String /* Url */
   public let path: List<String>
   public let version: String /* Version */
 }
-impl HostedPackage: Package
+impl HirHostedPackage: HirPackage
+*/

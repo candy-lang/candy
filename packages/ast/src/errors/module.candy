@@ -20,4 +20,5 @@ public use .missing_closing_bracket
 public use .missing_declaration_name
 public use .missing_expression_in_interpolation
 public use .missing_function_value_parameters
+public use .missing_type_parameter_name
 public use .use_line_after_declaration

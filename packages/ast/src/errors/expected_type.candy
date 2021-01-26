@@ -11,10 +11,10 @@ impl ExpectedTypeCompilerError: CompilerError {
 
   fun span(): Span {
     if node.child is CstTrait {
-      return node.cast<CstTrait>().child.traitKeyword.child.span
+      return node.cast<CstTrait>().child.keyword.child.span
     }
     if node.child is CstImpl {
-      return node.cast<CstImpl>().child.implKeyword.child.span
+      return node.cast<CstImpl>().child.keyword.child.span
     }
     if node.child is CstProperty {
       return node.cast<CstProperty>().child.keyword.child.span

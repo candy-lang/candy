@@ -3,6 +3,11 @@ import 'package:code_builder/code_builder.dart';
 import 'package:code_builder/src/visitors.dart';
 import 'package:meta/meta.dart';
 
+String mangleName(String name) {
+  if (name == 'do') return 'do_';
+  return name;
+}
+
 class FancyDartEmitter extends DartEmitter {
   FancyDartEmitter(Allocator allocator) : super(allocator);
 

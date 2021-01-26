@@ -10,14 +10,9 @@ public class DuplicateDeclarationNameCompilerError {
 impl DuplicateDeclarationNameCompilerError: CompilerError {
   public fun id(): String { "duplicate-declaration-name" }
 
-  fun span(): Span {
-    if node.child is CstModule { return node.cast<CstModule>().child.name.unwrap().child.span }
-    if node.child is CstTrait { return node.cast<CstTrait>().child.name.unwrap().child.span }
-    if node.child is CstClass { return node.cast<CstClass>().child.name.unwrap().child.span }
-    if node.child is CstProperty { return node.cast<CstProperty>().child.name.unwrap().child.span }
-    throw "Unknown declaration: {node}."
+  public fun location(): Location {
+    Location(file, node.cast<CstDeclarationWithName>().child.name.unwrap().child.span)
   }
-  public fun location(): Location { Location(file, span()) }
   public fun title(): String { "Duplicate declaration name." }
   public fun description(): String {
     /// TODO(JonasWanke): add a description for this error

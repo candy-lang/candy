@@ -90,11 +90,11 @@ final compilePropertyInsideTrait = Query<DeclarationId, List<dart.Method>>(
       dart.Method((b) => b
         ..returns = compileType(context, property.type)
         ..type = dart.MethodType.getter
-        ..name = property.name),
+        ..name = mangleName(property.name)),
       if (property.isMutable)
         dart.Method.returnsVoid((b) => b
           ..type = dart.MethodType.setter
-          ..name = property.name
+          ..name = mangleName(property.name)
           ..requiredParameters.add(dart.Parameter((b) => b
             ..type = compileType(context, property.type)
             ..name = 'it'))),
