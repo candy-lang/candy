@@ -1460,7 +1460,7 @@ fun lowerLambdaExpression(
       .orElse({ List.empty<AstValueParameter>() })
 
   let expressions = (cst.child.expressions as Iterable<CstNode<CstExpression>>)
-      .map<Maybe<AstExpression>>({ lowerExpression(context, id, it)})
+      .map<Maybe<AstExpression>>({ lowerExpression(context, id, it) })
       .where({ it is Some<AstExpression> })
       .map<AstExpression>({ it.unwrap() })
       .toList()
@@ -1713,11 +1713,8 @@ fun lowerValueArgument(
 ): AstValueArgument {
   let id = AstExpressionId(parentId, index)
 
-  let name = if cst.child.name is None<(Maybe<CstNode<IdentifierToken>>, CstNode<PunctuationToken>)> {
-    None<AstIdentifier>()
-  } else {
-    let name = cst.child.name.unwrap()
-    if name.first is None<CstNode<IdentifierToken>> {
+  let name = cst.child.name.flatMap<AstIdentifier>({
+    if it.first is None<CstNode<IdentifierToken>> {
       context.addError(
         ExpectedIdentifierCompilerError(
           context.file,
@@ -1725,10 +1722,9 @@ fun lowerValueArgument(
         ),
       )
       None<AstIdentifier>()
-    } else {
-      Some<AstIdentifier>(lowerIdentifier(context, id, name.first.unwrap(), 0))
     }
-  }
+    it.first.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
+  })
 
   let value = if cst.child.value is None<CstNode<CstExpression>> {
     context.addError(
