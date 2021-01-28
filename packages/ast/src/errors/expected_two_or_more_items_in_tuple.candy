@@ -1,0 +1,17 @@
+use compiler_utils
+use cst
+
+public class ExpectedTwoOrMoreItemsInTupleCompilerError {
+  public let file: File
+  public let node: CstNode<CstTupleType | CstTupleExpression>
+}
+impl ExpectedTwoOrMoreItemsInTupleCompilerError: CompilerError {
+  public fun id(): String { "expected-two-or-more-items-in-tuple" }
+
+  public fun location(): Location { Location(file, node.child.openingParenthesis.child.span) }
+  public fun title(): String { "Expected two or more items in tuple." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description
+    ""
+  }
+}

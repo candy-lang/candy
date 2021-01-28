@@ -70,7 +70,7 @@ impl CstGroupExpression: CstExpression
 
 public class CstTupleExpression {
   public let openingParenthesis: CstNode<PunctuationToken>
-  public let valueArguments: List<CstNode<CstExpression | PunctuationToken>>
+  public let expressions: List<CstNode<CstExpression | PunctuationToken>>
   public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
 }
 impl CstTupleExpression: CstExpression
