@@ -111,6 +111,14 @@ public trait List<Item>: Iterable<Item> {
     }
     result
   }
+
+  fun toMutable(): MutableList<Item> {
+    let list = MutableList.empty<Item>()
+    for item in this {
+      list.append(item)
+    }
+    list
+  }
 }
 
 public trait MutableList<Item>: List<Item> {
