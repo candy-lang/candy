@@ -208,9 +208,7 @@ class CstParser {
         .or<(
           (List<CstNode<IdentifierToken>>, CstNode<KeywordToken>),
           Maybe<CstNode<IdentifierToken>>,
-        )>(
-          declarationBeginningWithName("var", false)
-        )
+        )>(declarationBeginningWithName("var", false))
         .cast<(
           (List<CstNode<IdentifierToken>>, CstNode<KeywordToken>),
           Maybe<CstNode<IdentifierToken>>,
@@ -220,9 +218,7 @@ class CstParser {
               .sequence<Maybe<CstNode<CstType>>>(type.optional())
               .optional()
         )
-        .sequence<Maybe<CstNode<CstDelegationBody>>>(
-            delegationBody().optional()
-        )
+        .sequence<Maybe<CstNode<CstDelegationBody>>>(delegationBody().optional())
         .map<CstProperty>({
           let modifiers = it.first.first.first.first
           let keyword = it.first.first.first.second
@@ -484,13 +480,19 @@ class CstParser {
   }
   fun typeParameter(): Parser<String, CstNode<CstTypeParameter>> {
     let typeParameter = modifiers()
-        .sequence<Maybe<CstNode<IdentifierToken>>>(identifier(true).optional())
-        .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>>(
-          punctuation(":")
-              .sequence<Maybe<CstNode<CstType>>>(type.optional())
-              .optional()
+        .sequence<(
+          Maybe<CstNode<IdentifierToken>>,
+          Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>,
+        )>(
+          atLeastOne<
+            CstNode<IdentifierToken>,
+            (CstNode<PunctuationToken>, Maybe<CstNode<CstType>>),
+          >(
+            identifier(true),
+            punctuation(":").sequence<Maybe<CstNode<CstType>>>(type.optional()),
+          )
         )
-        .map<CstTypeParameter>({ CstTypeParameter(it.first.first, it.first.second, it.second) })
+        .map<CstTypeParameter>({ CstTypeParameter(it.first, it.second.first, it.second.second) })
     node<CstTypeParameter>(typeParameter)
   }
 
