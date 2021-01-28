@@ -3,7 +3,16 @@ trait SolverType {
 
   fun toString_(): String
   fun containsVariable(variable: SolverVariable): Bool
-  fun substitute(variable: SolverVariable, substitution: SolverType): SolverType
+
+  fun substitute(variable: SolverVariable, substitution: SolverType): SolverType {
+    substituteAll(Map.of1<SolverVariable, SolverType>(Tuple(variable, substitution)))
+  }
+  fun substituteAll(substitutions: Map<SolverVariable, SolverType>): SolverType
+
+  fun canonicalize(): SolverType {
+    canonicalizeInternal(MutableMap.empty<SolverVariable, SolverVariable>())
+  }
+  fun canonicalizeInternal(mapping: MutableMap<SolverVariable, SolverVariable>): SolverType
 
   public fun unify(other: SolverType): Maybe<Map<SolverVariable, SolverType>> {
     /// Unifies `this` type with the `other`. If unification succeeds, returns a map from variables
@@ -142,8 +151,16 @@ class SolverVariable {
 impl SolverVariable: SolverType {
   fun toString_(): String { "?{name}" }
   fun containsVariable(variable: SolverVariable): Bool { name == variable.name }
-  fun substitute(variable: SolverVariable, substitution: SolverType): SolverType {
-    if name == variable.name { substitution } else { this }
+
+  fun substituteAll(substitutions: Map<SolverVariable, SolverType>): SolverType {
+    let substitution = substitutions.get(SolverVariable(name))
+    if substitution is Some { substitution.unwrap() } else { this }
+  }
+
+  fun canonicalizeInternal(mapping: MutableMap<SolverVariable, SolverVariable>): SolverVariable {
+    mapping.putIfAbsent(this, {
+      SolverVariable("{(mapping as Map).entries().length()}")
+    })
   }
 }
 impl SolverVariable: Hash {
@@ -183,12 +200,21 @@ impl SolverValue: SolverType {
     (parameters as Iterable<SolverType>).any({ it.containsVariable(variable) })
   }
 
-  fun substitute(variable: SolverVariable, substitution: SolverType): SolverType {
+  fun substituteAll(substitutions: Map<SolverVariable, SolverType>): SolverValue {
     SolverValue(
       name,
       (parameters as Iterable<SolverType>)
-        .map<SolverType>({ it.substitute(variable, substitution) })
+        .map<SolverType>({ it.substituteAll(substitutions) })
         .toList()
+    )
+  }
+
+  fun canonicalizeInternal(mapping: MutableMap<SolverVariable, SolverVariable>): SolverValue {
+    SolverValue(
+      name,
+      (parameters as Iterable<SolverType>)
+        .map<SolverType>({ it.canonicalizeInternal(mapping) })
+        .toList(),
     )
   }
 }
