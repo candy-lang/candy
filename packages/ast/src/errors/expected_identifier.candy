@@ -14,7 +14,7 @@ impl ExpectedIdentifierCompilerError: CompilerError {
       return node.cast<CstNavigationExpression>().child.dot.child.span
     }
     if node.child is CstValueArgument {
-      return node.cast<CstValueArgument>().child.equalsSign.child.span
+      return node.cast<CstValueArgument>().child.name.unwrap().second.child.span
     }
     throw "Unknown body: {node}."
   }
