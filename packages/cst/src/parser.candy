@@ -62,7 +62,7 @@ class CstParser {
     let parser = punctuation(".")
         .plus()
         .sequence<List<CstNode<IdentifierToken | PunctuationToken>>>(
-          identifier()
+          identifier(true)
               .or<CstNode<PunctuationToken>>(punctuation("."))
               .cast<CstNode<IdentifierToken | PunctuationToken>>()
               .star()
@@ -71,7 +71,7 @@ class CstParser {
     node<CstUseLineTarget>(parser)
   }
   fun globalUseLineTarget(): Parser<String, CstNode<CstUseLineTarget>> {
-    let parser = identifier()
+    let parser = identifier(true)
         .or<CstNode<PunctuationToken>>(punctuation("."))
         .cast<CstNode<IdentifierToken | PunctuationToken>>()
         .plus()
@@ -86,9 +86,9 @@ class CstParser {
     let declarationBeginning = { keywordString: String =>
         modifiers().sequence<CstNode<KeywordToken>>(keyword(keywordString))
     }
-    let declarationBeginningWithName = { keywordString: String =>
+    let declarationBeginningWithName = { keywordString: String, startWithUppercase: Bool =>
         declarationBeginning(keywordString)
-            .sequence<Maybe<CstNode<IdentifierToken>>>(identifier().optional())
+            .sequence<Maybe<CstNode<IdentifierToken>>>(identifier(startWithUppercase).optional())
     }
 
     let optionalDeclarationContent = node<CstDeclarationContent>(
@@ -104,7 +104,7 @@ class CstParser {
       )
       .optional()
 
-    let module_ = declarationBeginningWithName("module")
+    let module_ = declarationBeginningWithName("module", true)
         .sequence<Maybe<CstNode<CstDeclarationContent>>>(optionalDeclarationContent)
         .map<CstDeclaration>({
           let modifiers = it.first.first.first
@@ -114,7 +114,7 @@ class CstParser {
           CstModule(modifiers, moduleKeyword, name, content)
         })
 
-    let trait_ = declarationBeginningWithName("trait")
+    let trait_ = declarationBeginningWithName("trait", true)
         .sequence<Maybe<CstNode<CstTypeParameters>>>(typeParameters().optional())
         .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>>(
           punctuation(":")
@@ -151,7 +151,7 @@ class CstParser {
           CstImpl(modifiers, implKeyword, typeParameters, type, traits, content)
         })
 
-    let class_ = declarationBeginningWithName("class")
+    let class_ = declarationBeginningWithName("class", true)
         .sequence<Maybe<CstNode<CstTypeParameters>>>(typeParameters().optional())
         .sequence<Maybe<CstNode<CstDeclarationContent>>>(optionalDeclarationContent)
         .map<CstDeclaration>({
@@ -163,7 +163,7 @@ class CstParser {
           CstClass(modifiers, classKeyword, name, typeParameters, content)
         })
 
-    let function = declarationBeginningWithName("fun")
+    let function = declarationBeginningWithName("fun", false)
         .sequence<Maybe<CstNode<CstTypeParameters>>>(typeParameters().optional())
         .sequence<Maybe<CstNode<CstValueParameters>>>(valueParameters().optional())
         .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>>(
@@ -196,12 +196,12 @@ class CstParser {
           )
         })
 
-    let property = declarationBeginningWithName("let")
+    let property = declarationBeginningWithName("let", false)
         .or<(
           (List<CstNode<IdentifierToken>>, CstNode<KeywordToken>),
           Maybe<CstNode<IdentifierToken>>,
         )>(
-          declarationBeginningWithName("var")
+          declarationBeginningWithName("var", false)
         )
         .cast<(
           (List<CstNode<IdentifierToken>>, CstNode<KeywordToken>),
@@ -245,7 +245,7 @@ class CstParser {
   fun valueParameter(): Parser<String, CstNode<CstValueParameter>> {
     // TODO(JonasWanke): allow modifiers
     // TODO(JonasWanke): allow parameters without a name
-    let valueParameter = identifier()
+    let valueParameter = identifier(false)
         .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>>(
           punctuation(":")
               .sequence<Maybe<CstNode<CstType>>>(type.optional())
@@ -298,34 +298,36 @@ class CstParser {
         )
         .cast<Maybe<CstNode<PunctuationToken>>>()
 
-    // TODO(JonasWanke): allow modifiers
-    let namedType = punctuation(".")
-        .star()
-        .sequence<CstNode<IdentifierToken>>(identifier())
-        .sequence<List<(List<CstNode<PunctuationToken>>, CstNode<IdentifierToken>)>>(
+    let namedType = modifiers()
+        .sequence<List<CstNode<IdentifierToken | PunctuationToken>>>(
           punctuation(".")
-              .plus()
-              .sequence<CstNode<IdentifierToken>>(identifier())
-              .plus()
-        )
-        .map<List<CstNode<IdentifierToken | PunctuationToken>>>({
-          let initialDots = (it.first.first as Iterable<CstNode<PunctuationToken>>)
-              .cast<CstNode<IdentifierToken | PunctuationToken>>()
-          let initialIdentifier = it.first.second
-          let remaining = it.second
-          let result = MutableList.empty<CstNode<IdentifierToken | PunctuationToken>>()
-          result.appendAll(initialDots)
-          result.append(initialIdentifier as CstNode<IdentifierToken | PunctuationToken>)
-          for tuple in remaining {
-            let dots = (tuple.first as Iterable<CstNode<PunctuationToken>>)
-                .cast<CstNode<IdentifierToken | PunctuationToken>>()
-            result.appendAll(dots)
-            result.append(tuple.second as CstNode<IdentifierToken | PunctuationToken>)
-          }
-          result
-        })
+              .star()
+              .sequence<CstNode<IdentifierToken>>(identifier(true))
+              .sequence<List<(List<CstNode<PunctuationToken>>, CstNode<IdentifierToken>)>>(
+                punctuation(".")
+                    .plus()
+                    .sequence<CstNode<IdentifierToken>>(identifier(true))
+                    .star()
+              )
+              .map<List<CstNode<IdentifierToken | PunctuationToken>>>({
+                let initialDots = (it.first.first as Iterable<CstNode<PunctuationToken>>)
+                    .cast<CstNode<IdentifierToken | PunctuationToken>>()
+                let initialIdentifier = it.first.second
+                let remaining = it.second
+                let result = MutableList.empty<CstNode<IdentifierToken | PunctuationToken>>()
+                result.appendAll(initialDots)
+                result.append(initialIdentifier as CstNode<IdentifierToken | PunctuationToken>)
+                for tuple in remaining {
+                  let dots = (tuple.first as Iterable<CstNode<PunctuationToken>>)
+                      .cast<CstNode<IdentifierToken | PunctuationToken>>()
+                  result.appendAll(dots)
+                  result.append(tuple.second as CstNode<IdentifierToken | PunctuationToken>)
+                }
+                result
+              }),
+          )
         .sequence<Maybe<CstNode<CstTypeArguments>>>(typeArguments().optional())
-        .map<CstType>({ CstNamedType(List.empty<CstNode<IdentifierToken>>(), it.first, it.second) })
+        .map<CstType>({ CstNamedType(it.first.first, it.first.second, it.second) })
 
     let groupType = modifiers()
         .sequence<CstNode<PunctuationToken>>(punctuation("("))
@@ -466,7 +468,7 @@ class CstParser {
   }
   fun typeParameter(): Parser<String, CstNode<CstTypeParameter>> {
     let typeParameter = modifiers()
-        .sequence<Maybe<CstNode<IdentifierToken>>>(identifier().optional())
+        .sequence<Maybe<CstNode<IdentifierToken>>>(identifier(true).optional())
         .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>>(
           punctuation(":")
               .sequence<Maybe<CstNode<CstType>>>(type.optional())
@@ -586,8 +588,9 @@ class CstParser {
           CstLambdaExpression(openingCurlyBrace, valueParameters, expressions, closingCurlyBrace)
         })
 
-    let identifierExpression = identifier()
-        .map<CstExpression>({ CstIdentifierExpression(it) })
+    let identifierExpression = choiceOf<String, CstNode<IdentifierToken>>(
+      List.of2<Parser<String, CstNode<IdentifierToken>>>(identifier(false), identifier(true)),
+    ).map<CstExpression>({ CstIdentifierExpression(it) })
 
     let groupExpression = punctuation("(")
         .sequence<Maybe<CstNode<CstExpression>>>(expression_.optional())
@@ -597,7 +600,6 @@ class CstParser {
           let expression = it.first.second
           let closingParenthesis = it.second
           CstGroupExpression(openingParenthesis, expression, closingParenthesis)
-          loop {}
         })
 
     let tupleExpression = punctuation("(")
@@ -625,7 +627,7 @@ class CstParser {
 
 
     let navigationPostfix = punctuation(".")
-        .sequence<Maybe<CstNode<IdentifierToken>>>(identifier().optional())
+        .sequence<Maybe<CstNode<IdentifierToken>>>(identifier(false).optional())
         .map<(CstNode<CstExpression>) => CstExpression>({
           { receiver: CstNode<CstExpression> =>
             CstNavigationExpression(receiver, it.first, it.second)
@@ -811,7 +813,7 @@ class CstParser {
       (Maybe<CstNode<IdentifierToken>>, CstNode<PunctuationToken>),
       CstNode<CstExpression>,
     >(
-      identifier()
+      identifier(false)
           .optional()
           .sequence<CstNode<PunctuationToken>>(punctuation("=")),
       expression_,
@@ -821,7 +823,7 @@ class CstParser {
 
   // utilities
 
-  fun modifiers(): Parser<String, List<CstNode<IdentifierToken>>> { identifier().star() }
+  fun modifiers(): Parser<String, List<CstNode<IdentifierToken>>> { identifier(false).star() }
 
   fun node<T>(parser: Parser<String, T>): Parser<String, CstNode<T>> {
     parser.map<CstNode<T>>({ CstNode<T>(getNextNodeId(), it) })
@@ -857,12 +859,11 @@ class CstParser {
         .map<KeywordToken>({ KeywordToken(it.first.span, it.second, keyword) })
     node<KeywordToken>(parser)
   }
-  fun identifier(): Parser<String, CstNode<IdentifierToken>> {
+  fun identifier(startWithUppercase: Bool = false): Parser<String, CstNode<IdentifierToken>> {
     let firstCharacter = character(
           {
-            "a" <= it && it <= "z"
-            || "A" <= it && it <= "Z"
-            || it == "_"
+            (!startWithUppercase && "a" <= it && it <= "z")
+            || (startWithUppercase && "A" <= it && it <= "Z")
           },
           "Letter or underscore expected.",
         )
@@ -873,7 +874,7 @@ class CstParser {
             || "0" <= it && it <= "9"
             || it == "_"
           },
-          "Letter, digit or underscore expected.",
+          "Letter, digit, or underscore expected.",
         )
     let parser = firstCharacter
         .sequence<List<String>>(followingCharacter.star())
