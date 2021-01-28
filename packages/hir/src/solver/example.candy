@@ -1,3 +1,5 @@
+use ..impls
+use ..solver
 use ..types
 
 fun main() {
@@ -11,6 +13,20 @@ fun main() {
   debug(set(a), set(b))
   debug(a, list(a))
   debug(map(a, b), map(list(b), list(a)))
+
+  let solution = Environment(
+    List.of4<SolverRule>(
+      // impl Int: Equals
+      SolverRule(equalsImpl(int), List.empty<SolverGoal>()),
+      // impl<T: Equals> Maybe<T>: Equals
+      SolverRule(equalsImpl(maybe(a)), List.of1<SolverGoal>(equalsImpl(a))),
+      // impl<T: Equals> Iterable<T>: Equals
+      SolverRule(equalsImpl(a), List.of2<SolverGoal>(iterableImpl(b, a), equalsImpl(b))),
+      // impl<T> List<T>: Iterable<T>
+      SolverRule(iterableImpl(a, list(a)), List.empty<SolverGoal>()),
+    ),
+  ).solve(equalsImpl(int))
+  print(solution.toString_())
 }
 
 fun debug(first: SolverType, second: SolverType) {
@@ -31,6 +47,7 @@ fun debug(first: SolverType, second: SolverType) {
 let noParams = List.empty<SolverType>()
 let string = SolverValue("String", noParams)
 let int = SolverValue("Int", noParams)
+fun maybe(t: SolverType): SolverType { SolverValue("Maybe", List.of1<SolverType>(t)) }
 fun list(t: SolverType): SolverType { SolverValue("List", List.of1<SolverType>(t)) }
 fun set(t: SolverType): SolverType { SolverValue("Set", List.of1<SolverType>(t)) }
 fun map(key: SolverType, value: SolverType): SolverType {
@@ -38,3 +55,7 @@ fun map(key: SolverType, value: SolverType): SolverType {
 }
 let a = SolverVariable("A")
 let b = SolverVariable("B")
+fun equalsImpl(t: SolverType): SolverGoal { SolverGoal("Equals", List.of1<SolverType>(t)) }
+fun iterableImpl(t: SolverType, iterable: SolverType): SolverGoal {
+  SolverGoal("Iterable", List.of2<SolverType>(t, iterable))
+}
