@@ -1551,7 +1551,9 @@ fun lowerTupleExpression(
       if punctuationExpectedNext {
         // TODO(JonasWanke)
       }
-      lowerExpression(context, parentId, node.cast<CstExpression>()).do({ expressions.append(it) })
+      let expression = lowerExpression(context, parentId, node.cast<CstExpression>())
+      expression.do({ expressions.append(it) })
+      if expression is None<AstExpression> { isValid = false }
       punctuationExpectedNext = true
     }
   }
