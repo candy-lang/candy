@@ -204,16 +204,16 @@ public trait Iterable<Item> {
     })
   }
 
-  // // Conversion transformations.
-  // // These do more complicated stuff.
+  // Conversion transformations.
+  // These do more complicated stuff.
 
-  // fun maybeMap<Out>(maybeMapper: (Item) => Maybe<Out>): Iterable<Out> {
-  //   // TODO(marcelgarus): As soon as implicit casts are available, maybe make the checker return a
-  //   // `MaybeMapResult`, which can be either `Map(value)` or `Drop`?
+  fun maybeMap<Out>(maybeMapper: (Item) => Maybe<Out>): Iterable<Out> {
+    // TODO(marcelgarus): As soon as implicit casts are available, maybe make the checker return a
+    // `MaybeMapResult`, which can be either `Map(value)` or `Drop`?
 
-  //   // TODO: Use `whereSome` as soon as that's available.
-  //   map<Maybe<Out>>(maybeMapper).whereType<Some>().map<Out>({ it.value })
-  // }
+    // TODO(JonasWanke): Use `whereSome` as soon as that's available.
+    map<Maybe<Out>>(maybeMapper).whereType<Some<Out>>().map<Out>({ it.value })
+  }
 
   // TODO(marcelgarus): distinctBy
 
