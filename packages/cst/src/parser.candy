@@ -83,13 +83,6 @@ class CstParser {
 
   fun declaration(): Parser<String, CstNode<CstDeclaration>> {
     let declaration = notYetDefined<String, CstNode<CstDeclaration>>("Parser not yet defined.")
-    let declarationBeginning = { keywordString: String =>
-        modifiers().sequence<CstNode<KeywordToken>>(keyword(keywordString))
-    }
-    let declarationBeginningWithName = { keywordString: String, startWithUppercase: Bool =>
-        declarationBeginning(keywordString)
-            .sequence<Maybe<CstNode<IdentifierToken>>>(identifier(startWithUppercase).optional())
-    }
 
     let optionalDeclarationContent = node<CstDeclarationContent>(
         punctuation("\👍")
@@ -196,7 +189,22 @@ class CstParser {
           )
         })
 
-    let property = declarationBeginningWithName("let", false)
+    declaration.delegate = node<CstDeclaration>(
+      choiceOf<String, CstDeclaration>(
+        List.of6<Parser<String, CstDeclaration>>(
+          module_,
+          trait_,
+          impl_,
+          class_,
+          function,
+          property().cast<CstDeclaration>(),
+        ),
+      ),
+    )
+    declaration
+  }
+  fun property(): Parser<String, CstProperty> {
+    declarationBeginningWithName("let", false)
         .or<(
           (List<CstNode<IdentifierToken>>, CstNode<KeywordToken>),
           Maybe<CstNode<IdentifierToken>>,
@@ -215,7 +223,7 @@ class CstParser {
         .sequence<Maybe<CstNode<CstDelegationBody>>>(
             delegationBody().optional()
         )
-        .map<CstDeclaration>({
+        .map<CstProperty>({
           let modifiers = it.first.first.first.first
           let keyword = it.first.first.first.second
           let name = it.first.first.second
@@ -224,13 +232,21 @@ class CstParser {
           let initializer = it.second
           CstProperty(modifiers, keyword, name, type, initializer)
         })
-
-    declaration.delegate = node<CstDeclaration>(
-      choiceOf<String, CstDeclaration>(
-        List.of6<Parser<String, CstDeclaration>>(module_, trait_, impl_, class_, function, property),
-      ),
-    )
-    declaration
+  }
+  fun declarationBeginning(
+    keywordString: String,
+  ): Parser<String, (List<CstNode<IdentifierToken>>, CstNode<KeywordToken>)> {
+      modifiers().sequence<CstNode<KeywordToken>>(keyword(keywordString))
+  }
+  fun declarationBeginningWithName(
+    keywordString: String,
+    startWithUppercase: Bool,
+  ): Parser<
+    String,
+    ((List<CstNode<IdentifierToken>>, CstNode<KeywordToken>), Maybe<CstNode<IdentifierToken>>),
+  > {
+      declarationBeginning(keywordString)
+          .sequence<Maybe<CstNode<IdentifierToken>>>(identifier(startWithUppercase).optional())
   }
 
   fun valueParameters(): Parser<String, CstNode<CstValueParameters>> {
@@ -612,10 +628,9 @@ class CstParser {
           CstTupleExpression(openingParenthesis, valueArguments, closingParenthesis)
         })
 
-    // TODO(JonasWanke): property expressions
-
     let primitiveExpressions = choiceOf<String, CstExpression>(
-        List.of6<Parser<String, CstExpression>>(
+        List.of7<Parser<String, CstExpression>>(
+          property().cast<CstExpression>(),
           intExpression,
           stringExpression,
           lambdaExpression,
