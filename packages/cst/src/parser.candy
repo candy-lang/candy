@@ -807,12 +807,15 @@ class CstParser {
     node<CstValueArguments>(valueArguments)
   }
   fun valueArgument(): Parser<String, CstNode<CstValueArgument>> {
-    let valueArgument = identifier()
-        .optional()
-        .sequence<CstNode<PunctuationToken>>(punctuation("="))
-        .optional()
-        .sequence<Maybe<CstNode<CstExpression>>>(expression_.optional())
-        .map<CstValueArgument>({ CstValueArgument(it.first, it.second) })
+    let valueArgument = atLeastOne<
+      (Maybe<CstNode<IdentifierToken>>, CstNode<PunctuationToken>),
+      CstNode<CstExpression>,
+    >(
+      identifier()
+          .optional()
+          .sequence<CstNode<PunctuationToken>>(punctuation("=")),
+      expression_,
+    ).map<CstValueArgument>({ CstValueArgument(it.first, it.second) })
     node<CstValueArgument>(valueArgument)
   }
 
@@ -827,6 +830,20 @@ class CstParser {
     let id = CstNodeId(nextId)
     nextId = nextId + 1
     id
+  }
+
+  fun atLeastOne<T1, T2>(
+    parser1: Parser<String, T1>,
+    parser2: Parser<String, T2>,
+  ): Parser<String, (Maybe<T1>, Maybe<T2>)> {
+    choiceOf<String, (Maybe<T1>, Maybe<T2>)>(
+      List.of2<Parser<String, (Maybe<T1>, Maybe<T2>)>>(
+        parser1
+            .map<Maybe<T1>>({ Some<T1>(it) })
+            .sequence<Maybe<T2>>(parser2.optional()),
+        parser2.map<(Maybe<T1>, Maybe<T2>)>({ Tuple(None<T1>(), Some<T2>(it)) }),
+      ),
+    )
   }
 
   // lexer
