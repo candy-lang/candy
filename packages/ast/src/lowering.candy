@@ -657,8 +657,7 @@ fun lowerBlockBody(
 
   let expressions = (cst.child.expressions as Iterable<CstNode<CstExpression>>)
       .map<Maybe<AstExpression>>({ lowerExpression(context, parentId, it) })
-      .where({ it is Some<AstExpression> })
-      .map<AstExpression>({ it.unwrap() })
+      .maybeMap<AstExpression>({ it })
       .toList()
 
   if cst.child.closingCurlyBrace is None<CstNode<PunctuationToken>> {
@@ -1461,8 +1460,7 @@ fun lowerLambdaExpression(
 
   let expressions = (cst.child.expressions as Iterable<CstNode<CstExpression>>)
       .map<Maybe<AstExpression>>({ lowerExpression(context, id, it) })
-      .where({ it is Some<AstExpression> })
-      .map<AstExpression>({ it.unwrap() })
+      .maybeMap<AstExpression>({ it.unwrap() })
       .toList()
 
   context.addIdMapping(cst.id, id)
