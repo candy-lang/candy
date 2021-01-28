@@ -1343,9 +1343,11 @@ fun lowerStringExpression(
   let id = context.getExpressionId(parentId)
 
   let parts = (cst.child.parts as Iterable<CstNode<StringPart>>)
-      .map<AstStringPart>({
+      .map<Maybe<AstStringPart>>({
         if it.child is CstLiteralStringPart {
-          return lowerLiteralStringPart(context, parentId, it.cast<CstLiteralStringPart>())
+          return Some<AstStringPart>(
+            lowerLiteralStringPart(context, parentId, it.cast<CstLiteralStringPart>()),
+          )
         }
         if it.child is CstEscapedStringPart {
           return lowerEscapedStringPart(context, parentId, it.cast<CstEscapedStringPart>())
@@ -1359,6 +1361,7 @@ fun lowerStringExpression(
         }
         throw "Unknown string part: {it}."
       })
+      .maybeMap<AstStringPart>({ it })
       .toList()
 
   context.addIdMapping(cst.id, id)
@@ -1382,16 +1385,11 @@ fun lowerEscapedStringPart(
   context: LoweringContext,
   parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstEscapedStringPart>,
-): AstStringPart {
+): Maybe<AstStringPart> {
   let id = context.getExpressionId(parentId)
 
   let identifierId = AstIdentifierId(id, 0)
-  let value = if cst.child.value is None<CstNode<StringLiteralToken>> {
-    context.addError(InvalidEscapeSequenceCompilerError(context.file, cst))
-    AstIdentifier(identifierId, "")
-  } else {
-    let escapeSequence = cst.child.value.unwrap()
-
+  let value = cst.child.value.map<AstIdentifier>({
     let validEscapeSequences = MutableMap.empty<String, String>()
     validEscapeSequences.set("🦄", "\🦄")
     validEscapeSequences.set("👍", "\👍")
@@ -1400,25 +1398,28 @@ fun lowerEscapedStringPart(
     validEscapeSequences.set("t", "\t")
     validEscapeSequences.set("\\", "\\")
 
-    let rawValue = escapeSequence.child.value
+    let rawValue = it.child.value
     let value = (validEscapeSequences as Map<String, String>)
       .get(rawValue)
       .orElse({
         context.addError(InvalidEscapeSequenceCompilerError(context.file, cst))
         rawValue
       })
-    context.addIdMapping(escapeSequence.id, identifierId)
+    context.addIdMapping(it.id, identifierId)
     AstIdentifier(identifierId, value)
+  })
+  if cst.child.value is None<CstNode<StringLiteralToken>> {
+    context.addError(InvalidEscapeSequenceCompilerError(context.file, cst))
   }
 
   context.addIdMapping(cst.id, id)
-  AstLiteralStringPart(id, value)
+  value.map<AstStringPart>({ value => AstLiteralStringPart(id, value) })
 }
 fun lowerInterpolatedStringPart(
   context: LoweringContext,
   parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstInterpolatedStringPart>,
-): AstStringPart {
+): Maybe<AstStringPart> {
   let id = context.getExpressionId(parentId)
 
   if cst.child.closingCurlyBrace is None<CstNode<PunctuationToken>> {
@@ -1441,10 +1442,9 @@ fun lowerInterpolatedStringPart(
   if cst.child.expression is Some<CstNode<CstExpression>> {
     lowerExpression(context, parentId, cst.child.expression.unwrap())
         .map<AstStringPart>({ AstInterpolatedStringPart(id, it) })
-        .orElse({ AstLiteralStringPart(id, AstIdentifier(AstIdentifierId(id, 0), "")) })
   } else {
     context.addError(MissingExpressionInInterpolationCompilerError(context.file, cst))
-    AstLiteralStringPart(id, AstIdentifier(AstIdentifierId(id, 0), ""))
+    None<AstStringPart>()
   }
 }
 
@@ -1499,16 +1499,16 @@ fun lowerGroupExpression(
   parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstGroupExpression>,
 ): Maybe<AstExpression> {
-  let expression = if cst.child.expression is None<CstNode<CstExpression>> {
+  let expression = cst.child.expression.flatMap<AstExpression>({
+    lowerExpression(context, parentId, it)
+  })
+  if cst.child.expression is None<CstNode<CstExpression>> {
     context.addError(
       ExpectedExpressionCompilerError(
         context.file,
         cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
       ),
     )
-    None<AstExpression>()
-  } else {
-    lowerExpression(context, parentId, cst.child.expression.unwrap())
   }
 
   if cst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
@@ -1593,6 +1593,7 @@ fun lowerBinaryExpression(
   cst: CstNode<CstBinaryExpression>,
 ): Maybe<AstExpression> {
   let id = context.getExpressionId(parentId)
+  mut let isValid = true
 
   if cst.child.leftOperand is None<CstNode<CstExpression>>
     || cst.child.rightOperand is None<CstNode<CstExpression>> {
@@ -1615,7 +1616,13 @@ fun lowerBinaryExpression(
       .flatMap<AstExpression>({ lowerExpression(context, id, it) })
 
   context.addIdMapping(cst.id, id)
-  Some<AstExpression>(AstBinaryExpression(id, leftOperand, operator, rightOperand))
+  if leftOperand is Some<AstExpression> && rightOperand is Some<AstExpression> {
+    Some<AstExpression>(
+      AstBinaryExpression(id, leftOperand.unwrap(), operator, rightOperand.unwrap()),
+    )
+  } else {
+    None<AstExpression>()
+  }
 }
 
 fun lowerNavigationExpression(
@@ -1640,7 +1647,7 @@ fun lowerNavigationExpression(
   let target = lowerIdentifier(context, id, cst.child.target.unwrap(), 0)
 
   context.addIdMapping(cst.id, id)
-  Some<AstExpression>(AstNavigationExpression(id, receiver, target))
+  receiver.map<AstExpression>({ receiver => AstNavigationExpression(id, receiver, target) })
 }
 
 fun lowerCallExpression(
@@ -1659,7 +1666,9 @@ fun lowerCallExpression(
   let valueArguments = lowerValueArguments(context, id, cst.child.valueArguments)
 
   context.addIdMapping(cst.id, id)
-  Some<AstExpression>(AstCallExpression(id, receiver, typeArguments, valueArguments))
+  receiver.map<AstExpression>({ receiver =>
+    AstCallExpression(id, receiver, typeArguments, valueArguments)
+  })
 }
 
 fun lowerValueArguments(
@@ -1681,7 +1690,8 @@ fun lowerValueArguments(
       if punctuationExpectedNext {
         // TODO(JonasWanke)
       }
-      result.append(lowerValueArgument(context, parentId, node.cast<CstValueArgument>(), index))
+      lowerValueArgument(context, parentId, node.cast<CstValueArgument>(), index)
+          .do({ result.append(it) })
       index = index + 1
       punctuationExpectedNext = true
     }
@@ -1710,7 +1720,7 @@ fun lowerValueArgument(
   parentId: AstExpressionId,
   cst: CstNode<CstValueArgument>,
   index: Int,
-): AstValueArgument {
+): Maybe<AstValueArgument> {
   let id = AstExpressionId(parentId, index)
 
   let name = cst.child.name.flatMap<AstIdentifier>({
@@ -1726,20 +1736,18 @@ fun lowerValueArgument(
     it.first.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
   })
 
-  let value = if cst.child.value is None<CstNode<CstExpression>> {
+  let value = cst.child.value.flatMap<AstExpression>({ lowerExpression(context, id, it) })
+  if cst.child.value is None<CstNode<CstExpression>> {
     context.addError(
       ExpectedExpressionCompilerError(
         context.file,
         cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
       ),
     )
-    None<AstExpression>()
-  } else {
-    lowerExpression(context, id, cst.child.value.unwrap())
   }
 
   context.addIdMapping(cst.id, id)
-  AstValueArgument(id, name, value)
+  value.map<AstValueArgument>({ value => AstValueArgument(id, name, value) })
 }
 
 fun lowerReturnExpression(

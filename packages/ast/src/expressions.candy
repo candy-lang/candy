@@ -67,7 +67,7 @@ impl AstTupleExpression: AstExpression
 public class AstBinaryExpression {
   public let id: AstExpressionId
 
-  public let leftOperand: Maybe<AstExpression>
+  public let leftOperand: AstExpression
 
   public let operator: AstIdentifier
   /// May be one of the following:
@@ -78,7 +78,7 @@ public class AstBinaryExpression {
   ///
   /// TODO(JonasWanke): convert this to an enum when we support these
 
-  public let rightOperand: Maybe<AstExpression>
+  public let rightOperand: AstExpression
 }
 impl AstBinaryExpression: AstExpression
 
@@ -88,14 +88,14 @@ impl AstProperty: AstExpression
 
 public class AstNavigationExpression {
   public let id: AstExpressionId
-  public let receiver: Maybe<AstExpression>
+  public let receiver: AstExpression
   public let target: AstIdentifier
 }
 impl AstNavigationExpression: AstExpression
 
 public class AstCallExpression {
   public let id: AstExpressionId
-  public let receiver: Maybe<AstExpression>
+  public let receiver: AstExpression
   public let typeArguments: List<AstTypeArgument>
   public let valueArguments: List<AstValueArgument>
 }
@@ -104,7 +104,7 @@ impl AstCallExpression: AstExpression
 public class AstValueArgument {
   public let id: AstExpressionId
   public let name: Maybe<AstIdentifier>
-  public let value: Maybe<AstExpression>
+  public let value: AstExpression
 }
 
 
