@@ -785,13 +785,13 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
           ..name = 'toString'
           ..body = dart.Block((b) {
             final typeParametersString =
-                typeParameterNames.map((it) => '"$it": "\${$it}"').join(', ');
+                typeParameterNames.map((it) => '$it = \${$it}').join(', ');
             final propertiesString =
-                propertyNames.map((it) => '"$it": \${this.$it}').join(', ');
+                propertyNames.map((it) => ', "$it": \${this.$it}').join('');
             b.statements.add(dart
-                .literalString('{"name": "$name", '
-                    '"typeParameters": {$typeParametersString}, '
-                    '"properties": {$propertiesString}}')
+                .literalString(
+                  '{"_type": "$name<$typeParametersString>"$propertiesString}',
+                )
                 .returned
                 .statement);
           })))),

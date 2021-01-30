@@ -1460,7 +1460,7 @@ fun lowerLambdaExpression(
 
   let expressions = (cst.child.expressions as Iterable<CstNode<CstExpression>>)
       .map<Maybe<AstExpression>>({ lowerExpression(context, id, it) })
-      .maybeMap<AstExpression>({ it.unwrap() })
+      .maybeMap<AstExpression>({ it })
       .toList()
 
   context.addIdMapping(cst.id, id)

@@ -91,18 +91,21 @@ final Query<DeclarationId, List<dart.Spec>> compileClass =
           ..returns = dart.refer('String', dartCoreUrl)
           ..name = 'toString'
           ..body = dart.Block((b) {
-            final typeParametersString = classHir.typeParameters
+            var typeParametersString = classHir.typeParameters
                 .map((it) => it.name)
-                .map((it) => '"$it": "\${$it}"')
+                .map((it) => '$it = \${$it}')
                 .join(', ');
+            if (typeParametersString.isNotEmpty) {
+              typeParametersString = '<$typeParametersString>';
+            }
             final propertiesString = properties
                 .map((it) => it.name)
-                .map((it) => '"$it": \${this.$it}')
-                .join(', ');
+                .map((it) => ', "$it": \${$it}')
+                .join();
             b.statements.add(dart
-                .literalString('{"name": "$name", '
-                    '"typeParameters": {$typeParametersString}, '
-                    '"properties": {$propertiesString}}')
+                .literalString(
+                  '{"_type": "$name$typeParametersString"$propertiesString}',
+                )
                 .returned
                 .statement);
           })))),

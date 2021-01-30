@@ -406,8 +406,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     return [
       ...node.condition.accept(this),
       dart.literalNull
-          .assignVar(_name(node.id), compileType(context, node.type))
-          .statement,
+          .assignVarTypesafe(_name(node.id), compileType(context, node.type)),
       dart.Code('if (${_name(node.condition.id)}.value) {'),
       ...visitBody(node.thenBody),
       dart.Code('} else {'),
@@ -419,8 +418,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
   @override
   List<dart.Code> visitLoopExpression(LoopExpression node) => [
         dart.literalNull
-            .assignVar(_name(node.id), compileType(context, node.type))
-            .statement,
+            .assignVarTypesafe(_name(node.id), compileType(context, node.type)),
         dart.Code('${_label(node.id)}:\nwhile (true) {'),
         for (final expression in node.body) ...expression.accept(this),
         dart.Code('}'),
@@ -428,9 +426,8 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
 
   @override
   List<dart.Code> visitWhileExpression(WhileExpression node) => [
-        unitInstance
-            .assignVar(_name(node.id), compileType(context, node.type))
-            .statement,
+        unitInstance.assignVarTypesafe(
+            _name(node.id), compileType(context, node.type)),
         dart.Code('${_label(node.id)}:\nwhile (true) {'),
         ...node.condition.accept(this),
         dart.Code('if (!${_name(node.condition.id)}.value) {'),
@@ -446,9 +443,8 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     final iteratorName = '${_name(node.id)}_iterator';
     final rawItemName = '${_name(node.id)}_rawItem';
     return [
-      unitInstance
-          .assignVar(_name(node.id), compileType(context, node.type))
-          .statement,
+      unitInstance.assignVarTypesafe(
+          _name(node.id), compileType(context, node.type)),
       ...node.iterable.accept(this),
       _refer(node.iterable.id)
           .property('iterator')
@@ -678,6 +674,16 @@ extension on dart.Expression {
         code,
         const dart.Code(')'),
       ]));
+
+  dart.Code assignVarTypesafe(String name, dart.Reference type) {
+    return dart.CodeExpression(dart.Block.of([
+      type.code,
+      const dart.Code(' '),
+      dart.refer(name).code,
+      const dart.Code('='),
+      code,
+    ])).statement;
+  }
 }
 
 dart.Expression lambdaOf(List<dart.Code> code) {

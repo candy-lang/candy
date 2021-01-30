@@ -156,8 +156,9 @@ public trait Iterable<Item> {
     where({ !checker(it) })
   }
 
-  fun whereType<Result>(): Iterable<Item & Result> {
-    where({ it is Result }).cast<Item & Result>()
+  fun whereType<Result>(): Iterable<Result> {
+    // TODO(JonasWanke): return `Iterable<Item & Result>` when our type system gets smarter
+    where({ it is Result }).cast<Result>()
   }
 
   fun skip(n: Int): Iterable<Item> {

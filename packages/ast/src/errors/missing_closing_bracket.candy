@@ -57,7 +57,7 @@ impl MissingClosingBracketCompilerError: CompilerError {
       node.cast<CstInterpolatedStringPart>().child.openingCurlyBrace.child.span
     }
     if node.child is CstValueArguments {
-      node.cast<CstValueArguments>().child.closingParenthesis.child.span
+      node.cast<CstValueArguments>().child.openingParenthesis.child.span
     }
     throw "Unknown node: {node}."
   }
