@@ -29,27 +29,27 @@ dynamic simplify(dynamic json) {
   if (json is List<dynamic>) {
     return json
         .where(
-            (dynamic it) => it is! Map<String, dynamic> || it['name'] != 'None')
+          (dynamic it) =>
+              it is! Map<String, dynamic> ||
+              (it['_type'] as String)?.startsWith('None') != true,
+        )
         .map<dynamic>(simplify)
         .toList();
   } else if (json is Map<String, dynamic>) {
-    if (json['name'] is String) {
-      final name = json['name'] as String;
+    if (json['_type'] is String) {
+      final type = json['_type'] as String;
+      final className =
+          type.contains('<') ? type.substring(0, type.indexOf('<')) : type;
 
-      final typeParameters = json['typeParameters'] as Map<String, dynamic>;
-      final properties = json['properties'] as Map<String, dynamic>;
-      switch (name) {
+      switch (className) {
         case 'None':
-          return 'None<${typeParameters['Value']}>';
+          return type;
         case 'Some':
-          return <String, dynamic>{
-            'name': 'Some<${typeParameters['Value']}>',
-            'properties': simplify(properties),
-          };
+          return simplify(json['value']);
         case 'ArrayList':
-          return simplify(properties['items']);
+          return simplify(json['items']);
         default:
-          if (name != null && name.endsWith('Id')) return '<some-id>';
+          if (type != null && type.endsWith('Id')) return '<some-id>';
       }
     }
 
