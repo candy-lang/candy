@@ -3,7 +3,7 @@ use cst
 use petit_parser
 
 public class ExpectedExpressionCompilerError {
-  public let file: File
+  public let file: FancyFile
   public let node: CstNode<
     CstExpressionBody
       | CstDelegationBody

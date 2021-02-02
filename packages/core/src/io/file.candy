@@ -1,3 +1,45 @@
+use ...bool
+use ...collections
+use ...operators
+use ...string
+
+trait FileSystemNode {
+  public let path: Path
+
+  builtin fun doesExist(): Bool
+  builtin fun create(recursive: Bool = true)
+}
+
+builtin class Directory {
+  public let path: Path
+
+  builtin fun doesExist(): Bool
+  builtin fun create(recursive: Bool = true)
+
+  builtin fun listContents(recursive: Bool = false): List<FileSystemNode>
+}
+builtin impl Directory: FileSystemNode & Equals
+
+builtin class File {
+  public let path: Path
+
+  builtin fun doesExist(): Bool
+  builtin fun create(recursive: Bool = true)
+
+  builtin fun read(): String
+  builtin fun write(content: String)
+}
+builtin impl File: FileSystemNode & Equals
+
+
+builtin class Path {
+  static fun parse(path: String): Path
+
+  builtin fun child(name: String): Path
+}
+builtin impl Path: Equals
+
+
 /*
 trait FileSystem {
   // TODO(marcelgarus): Getterize!
