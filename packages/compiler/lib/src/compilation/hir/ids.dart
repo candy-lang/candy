@@ -149,8 +149,14 @@ abstract class ModuleId implements _$ModuleId {
   static const coreAssert = ModuleId(PackageId.core, ['assert']);
   static const coreBool = ModuleId(PackageId.core, ['bool']);
   static const coreCollections = ModuleId(PackageId.core, ['collections']);
+  static const coreCollectionsList =
+      ModuleId(PackageId.core, ['collections', 'list']);
+  static const coreCollectionsListArrayList =
+      ModuleId(PackageId.core, ['collections', 'list', 'array_list']);
   static const coreHash = ModuleId(PackageId.core, ['hash']);
   static const coreIo = ModuleId(PackageId.core, ['io']);
+  static const coreIoFile = ModuleId(PackageId.core, ['io', 'file']);
+  static const coreIoPrint = ModuleId(PackageId.core, ['io', 'print']);
   static const coreMaybe = ModuleId(PackageId.core, ['maybe']);
   static const coreNumbers = ModuleId(PackageId.core, ['numbers']);
   static const coreNumbersInt = ModuleId(PackageId.core, ['numbers', 'int']);
@@ -170,7 +176,6 @@ abstract class ModuleId implements _$ModuleId {
   static const coreRandomSource =
       ModuleId(PackageId.core, ['random', 'source']);
   static const coreReflection = ModuleId(PackageId.core, ['reflection']);
-  static const coreIoPrint = ModuleId(PackageId.core, ['io', 'print']);
 
   bool get hasParent => path.isNotEmpty;
   bool get hasNoParent => !hasParent;
