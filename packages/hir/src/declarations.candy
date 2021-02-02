@@ -1,15 +1,23 @@
-/*use ..package
+use compiler_utils
 
 public trait HirDeclaration {
-  public let parent: HirPackage | HirModule | HirTrait | HirClass
+  public let parent: Package | HirModule | HirTrait | HirClass
   public fun name(): String
 }
 
-public class HirModule {
-  public let parent: HirPackage | HirModule
+public trait HirModule
+impl HirModule: HirDeclaration 
+public class HirTopLevelModule {
+  public let parent: Package
+}
+impl HirTopLevelModule: HirDeclaration {
+  fun name(): String { name_ }
+}
+public class HirInnerModule {
+  public let parent: HirModule
   public let name_: String
 }
-impl HirModule: HirDeclaration {
+impl HirInnerModule: HirDeclaration {
   fun name(): String { name_ }
 }
 
@@ -32,7 +40,6 @@ impl HirImpl: HirDeclaration {
 public class HirClass {
   public let parent: HirModule | HirTrait | HirClass
   public let name_: String
-  public let disambiguator: Maybe<Int>
 }
 impl HirClass: HirDeclaration {
   fun name(): String { name_ }
@@ -62,4 +69,3 @@ public class HirProperty {
 impl HirProperty: HirDeclaration {
   fun name(): String { name_ }
 }
-*/
