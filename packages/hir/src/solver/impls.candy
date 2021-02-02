@@ -152,7 +152,6 @@ class SolverTree {
   let strands: MutableList<SolverStrand>
 
   fun solve(context: Solver): SolverSolution {
-    print("Solving {goal.toString_()}.")
     if solution is Some {
       return solution.unwrap()
     }
@@ -167,7 +166,6 @@ class SolverTree {
         .where({ it.goal.unify(goal) is Some })
         .map<SolverStrand>({
           let result = it.goal.unify(goal).unwrap()
-          print("- Rule {it.toString_()} is matching with substitutions: {result.entries().map<String>({ "{it.first.toString_()} = {it.second.toString_()}" }).join(", ")}")
           SolverStrand(
             it.goal.substituteAll(result),
             result.toMutable(),
@@ -177,21 +175,19 @@ class SolverTree {
           )
         })
     )
-    for strand in (strands as Iterable<SolverStrand>) {
-      let solution = strand.solve(context)
-      print("- Strand {strand.goal.toString_()} has solution {solution.toString_()}")
-    }
-    print("- Merging strands' solutions: {(strands as Iterable<SolverStrand>).map<String>({ it.solve(context).toString_() }).join(", ")}")
-    let remainingStrands = (strands as Iterable<SolverStrand>).where({ !(it.solve(context) is SolverSolutionImpossible) })
-    print("- Remaining solutions: {(remainingStrands as Iterable<SolverStrand>).map<String>({ it.solve(context).toString_() }).join(", ")}")
-    if (remainingStrands as Iterable).length() > 1 {
+    let strandsAndSolutions = (strands as Iterable<SolverStrand>)
+      .map<(SolverStrand, SolverSolution)>({ Tuple(it, it.solve(context)) })
+      .where({ !(it.second is SolverSolutionImpossible) })
+      .toList()
+    if (strandsAndSolutions as Iterable).length() > 1 {
       return SolverSolutionAmbiguous()
     }
-    if (remainingStrands as Iterable).length() == 0 {
+    if (strandsAndSolutions as Iterable).isEmpty() {
       return SolverSolutionImpossible()
     }
-    let strand = (remainingStrands as Iterable<SolverStrand>).single().unwrap()
-    let solution = strand.solve(context)
+    let strandAndSolution = (strandsAndSolutions as Iterable<(SolverStrand, SolverSolution)>).single().unwrap()
+    let strand = strandAndSolution.first
+    let solution = strandAndSolution.second
     if solution is SolverSolutionAmbiguous {
       return SolverSolutionAmbiguous()
     }
@@ -213,7 +209,6 @@ class SolverStrand {
     while (subgoals as Iterable<SolverGoal>).isNotEmpty() {
       let subgoal = subgoals.removeFirst().canonicalize()
       let solution = context.solve(subgoal)
-      print("{subgoal.toString_()} solved: {solution.toString_()}")
       if solution is SolverSolutionImpossible {
         return SolverSolutionImpossible()
       }
