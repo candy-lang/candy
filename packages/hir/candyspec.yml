@@ -1,1 +1,15 @@
 name: hir
+
+dependencies:
+  ast:
+    path: ../ast
+  compiler_utils:
+    path: ../compiler_utils
+  cst:
+    # remove this when we support transitive dependencies
+    path: ../cst
+  incremental:
+    path: ../incremental
+  petit_parser:
+    # remove this when we support transitive dependencies
+    path: ../petit_parser
