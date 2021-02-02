@@ -4,3 +4,13 @@ public class File {
   public let package: Package
   public let path: List<String> /* Path */
 }
+impl File: Equals & Hash {
+  fun equals(other: This): Bool {
+    (package as Equals) == (other.package as Equals)
+      && (path as Iterable<String>).unsafeEquals(other.path as Iterable<String>)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (package as Hash).hash<T>(hasher)
+    (path as Iterable<String>).unsafeHash<T>(hasher)
+  }
+}

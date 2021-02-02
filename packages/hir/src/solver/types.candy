@@ -164,14 +164,8 @@ impl SolverVariable: SolverType {
   }
 }
 impl SolverVariable: Hash {
-  fun hash<T>(hasher: Hasher<T>) {
-    name.hash<T>(hasher)
-  }
-}
-impl SolverVariable: Equals {
-  fun equals(other: This): Bool {
-    name == other.name
-  }
+  fun equals(other: This): Bool { name == other.name }
+  fun hash<T>(hasher: Hasher<T>) { name.hash<T>(hasher) }
 }
 
 class SolverValue {
@@ -218,21 +212,16 @@ impl SolverValue: SolverType {
     )
   }
 }
-impl SolverValue: Hash {
+impl SolverValue: Equals & Hash {
+  fun equals(other: This): Bool {
+    name == other.name
+      && (parameters as Iterable<SolverType>).unsafeEquals(other.parameters as Iterable<SolverType>)
+  }
   fun hash<T>(hasher: Hasher<T>) {
     name.hash<T>(hasher)
     (parameters as Iterable).length().hash<T>(hasher)
     for parameter in parameters {
       (parameter as Hash).hash<T>(hasher)
     }
-  }
-}
-impl SolverValue: Equals {
-  fun equals(other: This): Bool {
-    name == other.name
-      && (parameters as Iterable).length() == (other.parameters as Iterable).length()
-      && (parameters as Iterable<SolverType>)
-        .zip<SolverType>(other.parameters)
-        .all({ (it.first as Equals) == (it.second as Equals) })
   }
 }
