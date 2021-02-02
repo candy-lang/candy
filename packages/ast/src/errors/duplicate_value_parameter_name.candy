@@ -2,7 +2,7 @@ use compiler_utils
 use cst
 
 public class DuplicateValueParameterNameCompilerError {
-  public let file: File
+  public let file: FancyFile
   public let node: CstNode<CstValueParameter>
   // TODO(JonasWanke): highlight previous occurrences of that name
 }

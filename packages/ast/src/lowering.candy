@@ -9,7 +9,7 @@ use ..node
 use ..types
 
 public fun lowerCstToAst(
-  file: File,
+  file: FancyFile,
   cst: CstNode<CstFile>,
 ): (AstFile, Map<CstNodeId, AstNodeId>, List<CompilerError>) {
   let context = LoweringContext.create(file)
@@ -1765,7 +1765,7 @@ fun lowerReturnExpression(
 // utility
 
 class LoweringContext {
-  static fun create(file: File): LoweringContext {
+  static fun create(file: FancyFile): LoweringContext {
     LoweringContext(
       file,
       idMapping = MutableMap.empty<CstNodeId, AstNodeId>(),
@@ -1776,7 +1776,7 @@ class LoweringContext {
     )
   }
 
-  let file: File
+  let file: FancyFile
 
   let idMapping: MutableMap<CstNodeId, AstNodeId>
   fun addIdMapping(cstId: CstNodeId, astId: AstNodeId) {

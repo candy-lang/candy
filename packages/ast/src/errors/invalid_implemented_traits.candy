@@ -2,7 +2,7 @@ use compiler_utils
 use cst
 
 public class InvalidImplementedTraitsCompilerError {
-  public let file: File
+  public let file: FancyFile
   public let node: CstNode<CstImpl>
 }
 impl InvalidImplementedTraitsCompilerError: CompilerError {
