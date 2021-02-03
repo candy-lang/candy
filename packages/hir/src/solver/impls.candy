@@ -94,7 +94,7 @@ class Environment {
 }
 
 
-trait SolverSolution {
+trait /* enum */ SolverSolution {
   fun toString_(): String
 }
 
@@ -152,9 +152,7 @@ class SolverTree {
   let strands: MutableList<SolverStrand>
 
   fun solve(context: Solver): SolverSolution {
-    if solution is Some {
-      return solution.unwrap()
-    }
+    if solution is Some { return solution.unwrap() }
     if isCurrentlyBeingSolved {
       solution = Some<SolverSolution>(SolverSolutionAmbiguous())
       isCurrentlyBeingSolved = false

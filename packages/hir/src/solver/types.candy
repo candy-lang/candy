@@ -153,8 +153,7 @@ impl SolverVariable: SolverType {
   fun containsVariable(variable: SolverVariable): Bool { name == variable.name }
 
   fun substituteAll(substitutions: Map<SolverVariable, SolverType>): SolverType {
-    let substitution = substitutions.get(SolverVariable(name))
-    if substitution is Some { substitution.unwrap() } else { this }
+    substitutions.get(SolverVariable(name)).orElse({ this })
   }
 
   fun canonicalizeInternal(mapping: MutableMap<SolverVariable, SolverVariable>): SolverVariable {
