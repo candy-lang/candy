@@ -1,19 +1,29 @@
+use ..impls
+use ..solver
 use ..types
 
 fun main() {
-  debug(string, string)
-  debug(int, string)
-  debug(int, a)
-  debug(list(a), list(set(b)))
-  debug(map(a, a), map(int, string))
-  debug(map(a, a), map(int, int))
-  debug(map(a, a), map(b, int))
-  debug(set(a), set(b))
-  debug(a, list(a))
-  debug(map(a, b), map(list(b), list(a)))
+  debugUnify(string, string)
+  debugUnify(int, string)
+  debugUnify(int, a)
+  debugUnify(list(a), list(set(b)))
+  debugUnify(map(a, a), map(int, string))
+  debugUnify(map(a, a), map(int, int))
+  debugUnify(map(a, a), map(b, int))
+  debugUnify(set(a), set(b))
+  debugUnify(a, list(a))
+  debugUnify(map(a, b), map(list(b), list(a)))
+
+  debugSolveEqualsImpl(foo)
+  debugSolveEqualsImpl(int)
+  debugSolveEqualsImpl(a)
+  debugSolveEqualsImpl(maybe(foo))
+  debugSolveEqualsImpl(maybe(int))
+  debugSolveEqualsImpl(list(maybe(int)))
+  debugSolveEqualsImpl(list(a))
 }
 
-fun debug(first: SolverType, second: SolverType) {
+fun debugUnify(first: SolverType, second: SolverType) {
   mut let s = "Unifying {first.toString_()} and {second.toString_()}"
   let result = first.unify(second)
   if result is None {
@@ -28,9 +38,27 @@ fun debug(first: SolverType, second: SolverType) {
   }
 }
 
+fun debugSolveEqualsImpl(type: SolverType) {
+  let environment = Environment(
+    List.of4<SolverRule>(
+      // impl Int: Equals
+      SolverRule(equalsImpl(int), List.empty<SolverGoal>()),
+      // impl<T: Equals> Maybe<T>: Equals
+      SolverRule(equalsImpl(maybe(a)), List.of1<SolverGoal>(equalsImpl(a))),
+      // impl<T: Equals> Iterable<T>: Equals
+      SolverRule(equalsImpl(a), List.of2<SolverGoal>(iterableImpl(b, a), equalsImpl(b))),
+      // impl<T> List<T>: Iterable<T>
+      SolverRule(iterableImpl(a, list(a)), List.empty<SolverGoal>()),
+    ),
+  )
+  print("Does {type.toString_()} implement Equals? {environment.solve(equalsImpl(type)).toString_()}")
+}
+
 let noParams = List.empty<SolverType>()
 let string = SolverValue("String", noParams)
 let int = SolverValue("Int", noParams)
+let foo = SolverValue("Foo", noParams)
+fun maybe(t: SolverType): SolverType { SolverValue("Maybe", List.of1<SolverType>(t)) }
 fun list(t: SolverType): SolverType { SolverValue("List", List.of1<SolverType>(t)) }
 fun set(t: SolverType): SolverType { SolverValue("Set", List.of1<SolverType>(t)) }
 fun map(key: SolverType, value: SolverType): SolverType {
@@ -38,3 +66,7 @@ fun map(key: SolverType, value: SolverType): SolverType {
 }
 let a = SolverVariable("A")
 let b = SolverVariable("B")
+fun equalsImpl(t: SolverType): SolverGoal { SolverGoal("Equals", List.of1<SolverType>(t)) }
+fun iterableImpl(t: SolverType, iterable: SolverType): SolverGoal {
+  SolverGoal("Iterable", List.of2<SolverType>(t, iterable))
+}

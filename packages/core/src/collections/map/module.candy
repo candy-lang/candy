@@ -63,6 +63,14 @@ public trait Map<Key: Equals & Hash, Value> {
   fun entries(): Iterable<(Key, Value)>
   fun keys(): Iterable<Key> { entries().map<Key>({ it.first }) }
   fun values(): Iterable<Value> { entries().map<Value>({ it.second }) }
+
+  fun toMutable(): MutableMap<Key, Value> {
+    let map = MutableMap.empty<Key, Value>()
+    for entry in entries() {
+      map.set(entry.first, entry.second)
+    }
+    map
+  }
 }
 
 // TODO(marcelgarus): impl Map<Key, Value>: GetOperator<Key, Maybe<Value>>
