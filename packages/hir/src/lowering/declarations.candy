@@ -13,11 +13,11 @@ trait HasDeclarations {
   /// immediately followed by `whereType()`.
 }
 
-fun fileToHirModule(context: QueryContext<List<CompilerError>>, file: File): HirModule {
+fun fileToHirModule(context: QueryContext<List<CompilerError>>, file: FancyFile): HirModule {
   // TODO(marcelgarus): Implement this as a static function on `HirModule` (`HirModule fromFile`) as
   // soon as adding static functions through impls works.
 
-  query<HirModule, List<CompilerError>>(context, "HirModule.fromFile", file, {
+  query<HirModule, List<CompilerError>>(context, "HirModule.fromFile", (file as Equals & Hash), {
       mut let module: HirModule = (HirTopLevelModule(file.package) as HirModule)
       for segment in file.path {
           module = (HirInnerModule(module, segment) as HirModule)

@@ -4,7 +4,7 @@ public class FancyFile {
   public let package: Package
   public let path: List<String> /* Path */
 }
-impl File: Equals & Hash {
+impl FancyFile: Equals & Hash {
   fun equals(other: This): Bool {
     (package as Equals) == (other.package as Equals)
       && (path as Iterable<String>).unsafeEquals(other.path as Iterable<String>)

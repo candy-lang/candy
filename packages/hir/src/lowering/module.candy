@@ -2,7 +2,7 @@ use incremental
 use compiler_utils
 public use .declarations
 
-fun compile(file: File) {
+fun compile(file: FancyFile) {
   let context = QueryContext.create<List<CompilerError>>()
   let module = fileToHirModule(context, file)
   print("Module is {module}")
