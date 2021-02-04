@@ -162,7 +162,7 @@ impl SolverVariable: SolverType {
     })
   }
 }
-impl SolverVariable: Hash {
+impl SolverVariable: Equals & Hash {
   fun equals(other: This): Bool { name == other.name }
   fun hash<T>(hasher: Hasher<T>) { name.hash<T>(hasher) }
 }
