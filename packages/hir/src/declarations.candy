@@ -6,12 +6,14 @@ public trait HirDeclaration {
 }
 
 public trait HirModule
-impl HirModule: HirDeclaration 
+impl HirModule: HirDeclaration & Equals & Hash
 public class HirTopLevelModule {
   public let parent: Package
 }
-impl HirTopLevelModule: HirDeclaration {
-  fun name(): String { name_ }
+impl HirTopLevelModule: HirDeclaration & Equals & Hash {
+  fun name(): String { "<{parent}>" }
+  fun equals(other: This): Bool { (parent as Equals) == (other.parent as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { (parent as Hash).hash<T>(hasher) }
 }
 public class HirInnerModule {
   public let parent: HirModule
@@ -19,38 +21,73 @@ public class HirInnerModule {
 }
 impl HirInnerModule: HirDeclaration {
   fun name(): String { name_ }
+  fun equals(other: This): Bool {
+    (parent as Equals) == (other.parent as Equals) && name_ == other.name_
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (parent as Hash).hash<T>(hasher)
+    (name_ as Hash).hash<T>(hasher)
+  }
 }
 
 public class HirTrait {
   public let parent: HirModule | HirTrait | HirClass
   public let name_: String
 }
-impl HirTrait: HirDeclaration {
+impl HirTrait: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
+  fun equals(other: This): Bool {
+    (parent as Equals) == (other.parent as Equals) && name_ == other.name_
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (parent as Hash).hash<T>(hasher)
+    (name_ as Hash).hash<T>(hasher)
+  }
 }
 
 public class HirImpl {
   public let parent: HirModule
   public let disambiguator: Int
 }
-impl HirImpl: HirDeclaration {
+impl HirImpl: HirDeclaration & Equals & Hash {
   fun name(): String { "impl" }
+  fun equals(other: This): Bool {
+    (parent as Equals) == (other.parent as Equals) && disambiguator == other.disambiguator
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (parent as Hash).hash<T>(hasher)
+    (disambiguator as Hash).hash<T>(hasher)
+  }
 }
 
 public class HirClass {
   public let parent: HirModule | HirTrait | HirClass
   public let name_: String
 }
-impl HirClass: HirDeclaration {
+impl HirClass: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
+  fun equals(other: This): Bool {
+    (parent as Equals) == (other.parent as Equals) && name_ == other.name_
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (parent as Hash).hash<T>(hasher)
+    (name_ as Hash).hash<T>(hasher)
+  }
 }
 
 public class HirConstructor {
   public let parent: HirClass
   public let disambiguator: Int
 }
-impl HirConstructor: HirDeclaration {
+impl HirConstructor: HirDeclaration & Equals & Hash {
   fun name(): String { "constructor" }
+  fun equals(other: This): Bool {
+    (parent as Equals) == (other.parent as Equals) && disambiguator == other.disambiguator
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (parent as Hash).hash<T>(hasher)
+    (disambiguator as Hash).hash<T>(hasher)
+  }
 }
 
 public class HirFunction {
@@ -58,14 +95,31 @@ public class HirFunction {
   public let name_: String
   public let disambiguator: Int
 }
-impl HirFunction: HirDeclaration {
+impl HirFunction: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
+  fun equals(other: This): Bool {
+    (parent as Equals) == (other.parent as Equals)
+      && name_ == other.name_
+      && disambiguator == other.disambiguator
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (parent as Hash).hash<T>(hasher)
+    (name_ as Hash).hash<T>(hasher)
+    (disambiguator as Hash).hash<T>(hasher)
+  }
 }
 
 public class HirProperty {
   public let parent: HirModule | HirTrait | HirImpl | HirClass
   public let name_: String
 }
-impl HirProperty: HirDeclaration {
+impl HirProperty: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
+  fun equals(other: This): Bool {
+    (parent as Equals) == (other.parent as Equals) && name_ == other.name_
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (parent as Hash).hash<T>(hasher)
+    (name_ as Hash).hash<T>(hasher)
+  }
 }
