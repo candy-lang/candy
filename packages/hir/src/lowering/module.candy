@@ -1,8 +1,11 @@
-public use ..declarations
+use incremental
+use compiler_utils
+public use .declarations
 
 fun compile(file: File) {
-    let module = HirModule.from(file)
-    print("Module is {module}")
-    let declarations = module.declarations()
-    print("Declarations are {declarations}")
+  let context = QueryContext.create<List<CompilerError>>()
+  let module = fileToHirModule(context, file)
+  print("Module is {module}")
+  let declarations = module.declarations(context)
+  print("Declarations are {declarations}")
 }
