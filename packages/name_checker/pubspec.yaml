@@ -1,0 +1,16 @@
+name: name_checker
+version: 0.1.0
+
+environment:
+  sdk: ">=2.7.0 <3.0.0"
+
+dependencies:
+  basics: ^0.4.0
+  characters: ^1.0.0
+  collection: ^1.14.12
+  dartx: ^0.5.0
+  http: ^0.12.2
+  meta: ^1.1.8
+
+dev_dependencies:
+  extra_pedantic: ^1.2.0
