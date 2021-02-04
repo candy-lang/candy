@@ -1,0 +1,8 @@
+public use ..declarations
+
+fun compile(file: File) {
+    let module = HirModule.from(file)
+    print("Module is {module}")
+    let declarations = module.declarations()
+    print("Declarations are {declarations}")
+}
