@@ -2,7 +2,7 @@ use compiler_utils
 use cst
 
 public class ExpectedTypeInTypeArgumentCompilerError {
-  public let file: File
+  public let file: FancyFile
   public let node: CstNode<CstValueParameter>
 }
 impl ExpectedTypeInTypeArgumentCompilerError: CompilerError {

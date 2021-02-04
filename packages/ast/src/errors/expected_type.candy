@@ -3,7 +3,7 @@ use cst
 use petit_parser
 
 public class ExpectedTypeCompilerError {
-  public let file: File
+  public let file: FancyFile
   public let node: CstNode<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>
 }
 impl ExpectedTypeCompilerError: CompilerError {

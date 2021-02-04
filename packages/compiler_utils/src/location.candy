@@ -2,6 +2,6 @@ use petit_parser
 use ..file
 
 public class Location {
-  public let file: File
+  public let file: FancyFile
   public let span: Span
 }

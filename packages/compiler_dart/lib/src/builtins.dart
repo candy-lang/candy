@@ -7,6 +7,7 @@ import 'body.dart';
 import 'constants.dart' hide srcDirectoryName;
 import 'declarations/declaration.dart';
 import 'declarations/function.dart';
+import 'declarations/module.dart';
 import 'type.dart';
 
 final compileBuiltin = Query<DeclarationId, List<dart.Spec>>(
@@ -43,6 +44,12 @@ abstract class BuiltinCompiler<Output> {
       return compileInt(declarationId);
     } else if (moduleId == ModuleId.coreString.nested(['String'])) {
       return compileString(declarationId);
+    } else if (moduleId == CandyType.directory.virtualModuleId) {
+      return compileDirectory(declarationId);
+    } else if (moduleId == CandyType.file.virtualModuleId) {
+      return compileFile(declarationId);
+    } else if (moduleId == CandyType.path.virtualModuleId) {
+      return compilePath(declarationId);
     } else if (moduleId == ModuleId.coreIoPrint && name == 'print') {
       return compilePrint();
     } else if (moduleId ==
@@ -69,6 +76,14 @@ abstract class BuiltinCompiler<Output> {
   // collections.list.array
   List<Output> compileArray(DeclarationId id);
 
+  // io
+  // io.file
+  List<Output> compileDirectory(DeclarationId id);
+  List<Output> compileFile(DeclarationId id);
+  List<Output> compilePath(DeclarationId id);
+  // io.print
+  List<Output> compilePrint();
+
   // primitives
   List<Output> compileAny();
   List<Output> compileToString();
@@ -83,9 +98,6 @@ abstract class BuiltinCompiler<Output> {
   List<Output> compileString(DeclarationId id);
 
   List<Output> compileTuple(int size);
-
-  // stdio
-  List<Output> compilePrint();
 
   // random.source
   List<Output> compileDefaultRandomSource();
@@ -273,6 +285,360 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
   }
 
   @override
+  List<dart.Spec> compileDirectory(DeclarationId id) {
+    final mixinsAndImplementsAndMethodOverrides =
+        _prepareMixinsAndImplementsAndMethodOverrides(context, id);
+
+    final bool = compileType(context, CandyType.bool);
+    final fileSystemNode = compileType(context, CandyType.fileSystemNode);
+    final directory = compileType(context, CandyType.directory);
+    final file = compileType(context, CandyType.file);
+    final path = compileType(context, CandyType.path);
+
+    final _directory = dart.refer('_directory');
+    return [
+      dart.Class((b) => b
+        ..annotations.add(dart.refer('sealed', packageMetaUrl))
+        ..name = 'Directory'
+        ..fields.addAll([
+          dart.Field((b) => b
+            ..annotations.add(dart.refer('override', dartCoreUrl))
+            ..name = 'path'
+            ..type = dart.refer(
+                'Path', moduleIdToImportUrl(context, ModuleId.coreIoFile))),
+          dart.Field((b) => b
+            ..name = '_directory'
+            ..type = dart.refer('Directory', dartIoUrl)),
+        ])
+        ..mixins.addAll(mixinsAndImplementsAndMethodOverrides.first)
+        ..implements.addAll(mixinsAndImplementsAndMethodOverrides.second)
+        ..constructors.add(dart.Constructor((b) => b
+          ..requiredParameters.add(dart.Parameter((b) => b..name = 'this.path'))
+          ..initializers.addAll([
+            dart.refer('assert').call(
+                [dart.refer('path').notEqualTo(dart.literalNull)], {}, []).code,
+            _directory
+                .assign(dart.refer('Directory', dartIoUrl).call(
+                    [dart.refer('path').property('_path').property('value')],
+                    {},
+                    []))
+                .code,
+          ])))
+        ..methods.addAll([
+          dart.Method((b) => b
+            ..annotations.add(dart.refer('override', dartCoreUrl))
+            ..returns = bool
+            ..name = 'doesExist'
+            ..body = _directory
+                .property('existsSync')
+                .call([], {}, [])
+                .wrapInCandyBool(context)
+                .code),
+          dart.Method((b) => b
+            ..returns = compileType(context, CandyType.unit)
+            ..name = 'create'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..name = 'recursive'
+              ..type = bool))
+            ..body = dart.Block((b) => b
+              ..statements.addAll([
+                _directory.property('createSync').call(
+                    [],
+                    {'recursive': dart.refer('recursive').property('value')},
+                    []).statement,
+                compileTypeName(
+                  context,
+                  moduleIdToDeclarationId(
+                    context,
+                    CandyType.unit.virtualModuleId,
+                  ),
+                ).call([], {}, []).returned.statement,
+              ]))),
+          dart.Method((b) => b
+            ..returns =
+                compileType(context, CandyType.list(CandyType.fileSystemNode))
+            ..name = 'listContents'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..name = 'recursive'
+              ..type = bool))
+            ..body = dart.Block((b) => b
+              ..statements.addAll([
+                _directory
+                    .property('listSync')
+                    .call(
+                      [],
+                      {'recursive': dart.refer('recursive').property('value')},
+                      [],
+                    )
+                    .property('map')
+                    .call(
+                      [
+                        dart.Method((b) => b
+                          ..requiredParameters.add(dart.Parameter((b) => b
+                            ..type = dart.refer('FileSystemEntity', dartIoUrl)
+                            ..name = 'it'))
+                          ..body = dart.Block((b) {
+                            dart.Code checkAndConvertTo(
+                              dart.Reference type,
+                              String name,
+                            ) {
+                              final pathArgument = dart
+                                  .refer('it')
+                                  .property('absolute')
+                                  .property('path')
+                                  .wrapInCandyString(context);
+                              return dart.CodeExpression(dart.Block.of([
+                                dart.Code('if ('),
+                                dart
+                                    .refer('it')
+                                    .isA(dart.refer(name, dartIoUrl))
+                                    .code,
+                                dart.Code(') {'),
+                                type
+                                    .call(
+                                      [
+                                        path.call([pathArgument], {}, []),
+                                      ],
+                                      {},
+                                      [],
+                                    )
+                                    .returned
+                                    .statement,
+                                dart.Code('}'),
+                              ])).code;
+                            }
+
+                            b.statements.addAll([
+                              dart.CodeExpression(dart.Block.of([
+                                checkAndConvertTo(directory, 'Directory'),
+                                checkAndConvertTo(file, 'File'),
+                              ])).code,
+                              dart.literalNull.returned.statement,
+                            ]);
+                          })).closure,
+                      ],
+                      {},
+                      [fileSystemNode],
+                    )
+                    .property('where')
+                    .call([
+                      dart.Method((b) => b
+                        ..requiredParameters.add(dart.Parameter((b) => b
+                          ..type = fileSystemNode
+                          ..name = 'it'))
+                        ..body = dart
+                            .refer('it')
+                            .notEqualTo(dart.literalNull)
+                            .code).closure,
+                    ], {}, [])
+                    .property('toList')
+                    .call([], {}, [])
+                    .wrapInCandyArray(context, CandyType.fileSystemNode)
+                    .assignFinal('contents')
+                    .statement,
+                dart
+                    .refer(
+                        'ArrayList',
+                        moduleIdToImportUrl(
+                            context, ModuleId.coreCollectionsListArrayList))
+                    .property('fromArray')
+                    .call([dart.refer('contents')], {}, [fileSystemNode])
+                    .returned
+                    .statement,
+              ]))),
+          dart.Method((b) => b
+            ..returns = bool
+            ..name = 'equals'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..name = 'other'
+              ..type = dart.refer('dynamic', dartCoreUrl)))
+            ..body = dart
+                .refer('path')
+                .equalTo(dart.refer('other.path'))
+                .wrapInCandyBool(context)
+                .code),
+          dart.Method((b) => b
+            ..returns = dart.refer('String', dartCoreUrl)
+            ..name = 'toString'
+            ..body = dart.literalString('Directory(\${path.toString()})').code)
+        ])
+        ..methods.addAll(mixinsAndImplementsAndMethodOverrides.third)),
+    ];
+  }
+
+  @override
+  List<dart.Spec> compileFile(DeclarationId id) {
+    final mixinsAndImplementsAndMethodOverrides =
+        _prepareMixinsAndImplementsAndMethodOverrides(context, id);
+
+    final bool = compileType(context, CandyType.bool);
+    final string = compileType(context, CandyType.string);
+
+    final _file = dart.refer('_file');
+    return [
+      dart.Class((b) => b
+        ..annotations.add(dart.refer('sealed', packageMetaUrl))
+        ..name = 'File'
+        ..fields.addAll([
+          dart.Field((b) => b
+            ..annotations.add(dart.refer('override', dartCoreUrl))
+            ..name = 'path'
+            ..type = dart.refer(
+                'Path', moduleIdToImportUrl(context, ModuleId.coreIoFile))),
+          dart.Field((b) => b
+            ..name = '_file'
+            ..type = dart.refer('File', dartIoUrl)),
+        ])
+        ..mixins.addAll(mixinsAndImplementsAndMethodOverrides.first)
+        ..implements.addAll(mixinsAndImplementsAndMethodOverrides.second)
+        ..constructors.add(dart.Constructor((b) => b
+          ..requiredParameters.add(dart.Parameter((b) => b..name = 'this.path'))
+          ..initializers.addAll([
+            dart.refer('assert').call(
+                [dart.refer('path').notEqualTo(dart.literalNull)], {}, []).code,
+            _file
+                .assign(dart.refer('File', dartIoUrl).call(
+                    [dart.refer('path').property('_path').property('value')],
+                    {},
+                    []))
+                .code,
+          ])))
+        ..methods.addAll([
+          dart.Method((b) => b
+            ..annotations.add(dart.refer('override', dartCoreUrl))
+            ..returns = bool
+            ..name = 'doesExist'
+            ..body = _file
+                .property('existsSync')
+                .call([], {}, [])
+                .wrapInCandyBool(context)
+                .code),
+          dart.Method((b) => b
+            ..annotations.add(dart.refer('override', dartCoreUrl))
+            ..returns = compileType(context, CandyType.unit)
+            ..name = 'create'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..name = 'recursive'
+              ..type = bool))
+            ..body = dart.Block((b) => b
+              ..statements.addAll([
+                _file.property('createSync').call(
+                  [],
+                  {'recursive': dart.refer('recursive').property('value')},
+                  [],
+                ).statement,
+                compileTypeName(
+                  context,
+                  moduleIdToDeclarationId(
+                    context,
+                    CandyType.unit.virtualModuleId,
+                  ),
+                ).call([], {}, []).returned.statement,
+              ]))),
+          dart.Method((b) => b
+            ..returns = string
+            ..name = 'read'
+            ..body = _file
+                .property('readAsStringSync')
+                .call([], {}, [])
+                .wrapInCandyString(context)
+                .code),
+          dart.Method((b) => b
+            ..returns = compileType(context, CandyType.unit)
+            ..name = 'write'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..name = 'content'
+              ..type = string))
+            ..body = dart.Block((b) => b
+              ..statements.addAll([
+                _file.property('writeAsStringSync').call(
+                  [dart.refer('content').property('value')],
+                  {},
+                  [],
+                ).statement,
+                compileTypeName(
+                  context,
+                  moduleIdToDeclarationId(
+                    context,
+                    CandyType.unit.virtualModuleId,
+                  ),
+                ).call([], {}, []).returned.statement,
+              ]))),
+          dart.Method((b) => b
+            ..returns = bool
+            ..name = 'equals'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..name = 'other'
+              ..type = dart.refer('dynamic', dartCoreUrl)))
+            ..body = dart
+                .refer('path')
+                .equalTo(dart.refer('other.path'))
+                .wrapInCandyBool(context)
+                .code),
+          dart.Method((b) => b
+            ..returns = dart.refer('String', dartCoreUrl)
+            ..name = 'toString'
+            ..body = dart.literalString('File(\${path.toString()})').code)
+        ])
+        ..methods.addAll(mixinsAndImplementsAndMethodOverrides.third)),
+    ];
+  }
+
+  @override
+  List<dart.Spec> compilePath(DeclarationId id) {
+    final mixinsAndImplementsAndMethodOverrides =
+        _prepareMixinsAndImplementsAndMethodOverrides(context, id);
+
+    final bool = compileType(context, CandyType.bool);
+    final string = compileType(context, CandyType.string);
+    final path = compileType(context, CandyType.path);
+
+    return [
+      dart.Class((b) => b
+        ..annotations.add(dart.refer('sealed', packageMetaUrl))
+        ..name = 'Path'
+        ..fields.add(dart.Field((b) => b
+          ..name = '_path'
+          ..type = string))
+        ..mixins.addAll(mixinsAndImplementsAndMethodOverrides.first)
+        ..implements.addAll(mixinsAndImplementsAndMethodOverrides.second)
+        ..constructors.add(dart.Constructor((b) => b
+          ..requiredParameters
+              .add(dart.Parameter((b) => b..name = 'this._path'))
+          ..initializers.add(dart.refer('assert').call(
+              [dart.refer('_path').notEqualTo(dart.literalNull)],
+              {},
+              []).code)))
+        ..methods.addAll([
+          dart.Method((b) => b
+            ..static = true
+            ..returns = path
+            ..name = 'parse'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..name = 'path'
+              ..type = string))
+            ..body = path.call([dart.refer('path')], {}, []).code),
+          dart.Method((b) => b
+            ..returns = bool
+            ..name = 'equals'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..name = 'other'
+              ..type = dart.refer('dynamic', dartCoreUrl)))
+            ..body = dart
+                .refer('_path')
+                .equalTo(dart.refer('other._path'))
+                .wrapInCandyBool(context)
+                .code),
+          dart.Method((b) => b
+            ..returns = dart.refer('String', dartCoreUrl)
+            ..name = 'toString'
+            ..body = dart.literalString('\${_path.toString()}').code)
+        ])
+        ..methods.addAll(mixinsAndImplementsAndMethodOverrides.third)),
+    ];
+  }
+
+  @override
   List<dart.Spec> compileAny() {
     // `Any` corresponds to `Object`, hence nothing to do.
     return [];
@@ -319,43 +685,8 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
 
   @override
   List<dart.Spec> compileBool(DeclarationId id) {
-    final impls = getAllImplsForTraitOrClassOrImpl(context, id)
-        .map((it) => getImplDeclarationHir(context, it));
-    final traits = impls.expand((impl) => impl.traits);
-    final implements = traits.map((it) => compileType(context, it));
-    final implMethodIds = impls
-        .expand((impl) => impl.innerDeclarationIds)
-        .where((id) => id.isFunction)
-        .toList();
-    final methodOverrides = implMethodIds
-        .map((it) => Tuple2(it, getFunctionDeclarationHir(context, it)))
-        .expand((values) sync* {
-      final id = values.first;
-      final function = values.second;
-
-      if (function.isStatic) {
-        throw CompilerError.unsupportedFeature(
-          'Static functions in impls are not yet supported.',
-          location: ErrorLocation(
-            id.resourceId,
-            getPropertyDeclarationAst(context, id)
-                .modifiers
-                .firstWhere((w) => w is StaticModifierToken)
-                .span,
-          ),
-        );
-      }
-
-      yield dart.Method((b) => b
-        ..annotations.add(dart.refer('override', dartCoreUrl))
-        ..returns = compileType(context, function.returnType)
-        ..name = function.name
-        ..types.addAll(function.typeParameters
-            .map((it) => compileTypeParameter(context, it)))
-        ..requiredParameters
-            .addAll(compileParameters(context, function.valueParameters))
-        ..body = compileBody(context, id).value);
-    });
+    final mixinsAndImplementsAndMethodOverrides =
+        _prepareMixinsAndImplementsAndMethodOverrides(context, id);
 
     final otherBool = dart.Parameter((b) => b
       ..name = 'other'
@@ -367,14 +698,8 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
         ..fields.add(dart.Field((b) => b
           ..name = 'value'
           ..type = dart.refer('bool', dartCoreUrl)))
-        ..mixins.addAll(traits.map((it) {
-          final type = compileType(context, it);
-          return dart.TypeReference((b) => b
-            ..symbol = '${type.symbol}\$Default'
-            ..types.addAll(it.arguments.map((it) => compileType(context, it)))
-            ..url = type.url);
-        }))
-        ..implements.addAll(implements)
+        ..mixins.addAll(mixinsAndImplementsAndMethodOverrides.first)
+        ..implements.addAll(mixinsAndImplementsAndMethodOverrides.second)
         ..constructors.add(dart.Constructor((b) => b
           ..requiredParameters
               .add(dart.Parameter((b) => b..name = 'this.value'))))
@@ -426,49 +751,14 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             ..returns = dart.refer('String', dartCoreUrl)
             ..body = dart.refer('value').property('toString').call([]).code)
         ])
-        ..methods.addAll(methodOverrides)),
+        ..methods.addAll(mixinsAndImplementsAndMethodOverrides.third)),
     ];
   }
 
   @override
   List<dart.Spec> compileInt(DeclarationId id) {
-    final impls = getAllImplsForTraitOrClassOrImpl(context, id)
-        .map((it) => getImplDeclarationHir(context, it));
-    final traits = impls.expand((impl) => impl.traits);
-    final implements = traits.map((it) => compileType(context, it));
-    final implMethodIds = impls
-        .expand((impl) => impl.innerDeclarationIds)
-        .where((id) => id.isFunction)
-        .toList();
-    final methodOverrides = implMethodIds
-        .map((it) => Tuple2(it, getFunctionDeclarationHir(context, it)))
-        .expand((values) sync* {
-      final id = values.first;
-      final function = values.second;
-
-      if (function.isStatic) {
-        throw CompilerError.unsupportedFeature(
-          'Static functions in impls are not yet supported.',
-          location: ErrorLocation(
-            id.resourceId,
-            getPropertyDeclarationAst(context, id)
-                .modifiers
-                .firstWhere((w) => w is StaticModifierToken)
-                .span,
-          ),
-        );
-      }
-
-      yield dart.Method((b) => b
-        ..annotations.add(dart.refer('override', dartCoreUrl))
-        ..returns = compileType(context, function.returnType)
-        ..name = function.name
-        ..types.addAll(function.typeParameters
-            .map((it) => compileTypeParameter(context, it)))
-        ..requiredParameters
-            .addAll(compileParameters(context, function.valueParameters))
-        ..body = compileBody(context, id).value);
-    });
+    final mixinsAndImplementsAndMethodOverrides =
+        _prepareMixinsAndImplementsAndMethodOverrides(context, id);
 
     final otherInt = dart.Parameter((b) => b
       ..name = 'other'
@@ -480,14 +770,8 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
         ..fields.add(dart.Field((b) => b
           ..name = 'value'
           ..type = dart.refer('int', dartCoreUrl)))
-        ..mixins.addAll(traits.map((it) {
-          final type = compileType(context, it);
-          return dart.TypeReference((b) => b
-            ..symbol = '${type.symbol}\$Default'
-            ..types.addAll(it.arguments.map((it) => compileType(context, it)))
-            ..url = type.url);
-        }))
-        ..implements.addAll(implements)
+        ..mixins.addAll(mixinsAndImplementsAndMethodOverrides.first)
+        ..implements.addAll(mixinsAndImplementsAndMethodOverrides.second)
         ..constructors.add(dart.Constructor((b) => b
           ..requiredParameters
               .add(dart.Parameter((b) => b..name = 'this.value'))))
@@ -588,50 +872,14 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
               [],
             ).code),
         ])
-        ..methods.addAll(methodOverrides)),
+        ..methods.addAll(mixinsAndImplementsAndMethodOverrides.third)),
     ];
   }
 
   @override
   List<dart.Spec> compileString(DeclarationId id) {
-    // `String` corresponds to `String`, hence nothing to do for the type itself.
-    final impls = getAllImplsForTraitOrClassOrImpl(context, id)
-        .map((it) => getImplDeclarationHir(context, it));
-    final traits = impls.expand((impl) => impl.traits);
-    final implements = traits.map((it) => compileType(context, it));
-    final implMethodIds = impls
-        .expand((impl) => impl.innerDeclarationIds)
-        .where((id) => id.isFunction)
-        .toList();
-    final methodOverrides = implMethodIds
-        .map((it) => Tuple2(it, getFunctionDeclarationHir(context, it)))
-        .expand((values) sync* {
-      final id = values.first;
-      final function = values.second;
-
-      if (function.isStatic) {
-        throw CompilerError.unsupportedFeature(
-          'Static functions in impls are not yet supported.',
-          location: ErrorLocation(
-            id.resourceId,
-            getPropertyDeclarationAst(context, id)
-                .modifiers
-                .firstWhere((w) => w is StaticModifierToken)
-                .span,
-          ),
-        );
-      }
-
-      yield dart.Method((b) => b
-        ..annotations.add(dart.refer('override', dartCoreUrl))
-        ..returns = compileType(context, function.returnType)
-        ..name = function.name
-        ..types.addAll(function.typeParameters
-            .map((it) => compileTypeParameter(context, it)))
-        ..requiredParameters
-            .addAll(compileParameters(context, function.valueParameters))
-        ..body = compileBody(context, id).value);
-    });
+    final mixinsAndImplementsAndMethodOverrides =
+        _prepareMixinsAndImplementsAndMethodOverrides(context, id);
 
     final otherString = dart.Parameter((b) => b
       ..name = 'other'
@@ -643,14 +891,8 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
         ..fields.add(dart.Field((b) => b
           ..name = 'value'
           ..type = dart.refer('String', dartCoreUrl)))
-        ..mixins.addAll(traits.map((it) {
-          final type = compileType(context, it);
-          return dart.TypeReference((b) => b
-            ..symbol = '${type.symbol}\$Default'
-            ..types.addAll(it.arguments.map((it) => compileType(context, it)))
-            ..url = type.url);
-        }))
-        ..implements.addAll(implements)
+        ..mixins.addAll(mixinsAndImplementsAndMethodOverrides.first)
+        ..implements.addAll(mixinsAndImplementsAndMethodOverrides.second)
         ..constructors.add(dart.Constructor((b) => b
           ..requiredParameters
               .add(dart.Parameter((b) => b..name = 'this.value'))))
@@ -735,7 +977,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             ..returns = dart.refer('String', dartCoreUrl)
             ..body = dart.literalString('\${value.toString()}').code)
         ])
-        ..methods.addAll(methodOverrides)),
+        ..methods.addAll(mixinsAndImplementsAndMethodOverrides.third)),
     ];
   }
 
@@ -785,13 +1027,13 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
           ..name = 'toString'
           ..body = dart.Block((b) {
             final typeParametersString =
-                typeParameterNames.map((it) => '"$it": "\${$it}"').join(', ');
+                typeParameterNames.map((it) => '$it = \${$it}').join(', ');
             final propertiesString =
-                propertyNames.map((it) => '"$it": \${this.$it}').join(', ');
+                propertyNames.map((it) => ', "$it": \${this.$it}').join('');
             b.statements.add(dart
-                .literalString('{"name": "$name", '
-                    '"typeParameters": {$typeParametersString}, '
-                    '"properties": {$propertiesString}}')
+                .literalString(
+                  '{"_type": "$name<$typeParametersString>"$propertiesString}',
+                )
                 .returned
                 .statement);
           })))),
@@ -870,6 +1112,61 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                 .returned
                 .statement)))))
     ];
+  }
+
+  Tuple3<Iterable<dart.Reference>, Iterable<dart.Reference>,
+      Iterable<dart.Method>> _prepareMixinsAndImplementsAndMethodOverrides(
+    QueryContext context,
+    DeclarationId id,
+  ) {
+    final impls = getAllImplsForTraitOrClassOrImpl(context, id)
+        .map((it) => getImplDeclarationHir(context, it));
+    final traits = impls.expand((impl) => impl.traits);
+    final mixins = traits.map((it) {
+      final type = compileType(context, it);
+      return dart.TypeReference((b) => b
+        ..symbol = '${type.symbol}\$Default'
+        ..types.addAll(it.arguments.map((it) => compileType(context, it)))
+        ..url = type.url);
+    });
+
+    final implements = traits.map((it) => compileType(context, it));
+
+    final implMethodIds = impls
+        .expand((impl) => impl.innerDeclarationIds)
+        .where((id) => id.isFunction)
+        .toList();
+    final methodOverrides = implMethodIds
+        .map((it) => Tuple2(it, getFunctionDeclarationHir(context, it)))
+        .expand((values) sync* {
+      final id = values.first;
+      final function = values.second;
+
+      if (function.isStatic) {
+        throw CompilerError.unsupportedFeature(
+          'Static functions in impls are not yet supported.',
+          location: ErrorLocation(
+            id.resourceId,
+            getPropertyDeclarationAst(context, id)
+                .modifiers
+                .firstWhere((w) => w is StaticModifierToken)
+                .span,
+          ),
+        );
+      }
+
+      yield dart.Method((b) => b
+        ..annotations.add(dart.refer('override', dartCoreUrl))
+        ..returns = compileType(context, function.returnType)
+        ..name = function.name
+        ..types.addAll(function.typeParameters
+            .map((it) => compileTypeParameter(context, it)))
+        ..requiredParameters
+            .addAll(compileParameters(context, function.valueParameters))
+        ..body = compileBody(context, id).value);
+    });
+
+    return Tuple3(mixins, implements, methodOverrides);
   }
 }
 

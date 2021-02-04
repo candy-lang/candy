@@ -5,7 +5,7 @@ use ..expressions
 use ..types
 
 public class AstFileId {
-  let file: File
+  let file: FancyFile
 }
 impl AstFileId: AstNodeId
 

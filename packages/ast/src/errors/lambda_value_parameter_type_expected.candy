@@ -2,7 +2,7 @@ use compiler_utils
 use cst
 
 public class LambdaValueParameterTypeExpectedCompilerError {
-  public let file: File
+  public let file: FancyFile
   public let node: CstNode<CstValueParameter>
 }
 impl LambdaValueParameterTypeExpectedCompilerError: CompilerError {

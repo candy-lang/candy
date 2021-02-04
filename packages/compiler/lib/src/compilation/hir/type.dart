@@ -107,6 +107,14 @@ abstract class CandyType with _$CandyType {
   factory CandyType.hasher(CandyType result) =>
       CandyType.user(ModuleId.coreHash, 'Hasher', arguments: [result]);
 
+  // io
+  // io.file
+  static final fileSystemNode =
+      UserCandyType(ModuleId.coreIoFile, 'FileSystemNode');
+  static final directory = UserCandyType(ModuleId.coreIoFile, 'Directory');
+  static final file = UserCandyType(ModuleId.coreIoFile, 'File');
+  static final path = UserCandyType(ModuleId.coreIoFile, 'Path');
+
   // operators
   // operators.arithmetic
   static final add = UserCandyType(ModuleId.coreOperatorsArithmetic, 'Add');

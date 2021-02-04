@@ -3,7 +3,7 @@ use cst
 use petit_parser
 
 public class MissingDeclarationNameCompilerError {
-  public let file: File
+  public let file: FancyFile
   public let node: CstNode<CstDeclaration>
 }
 impl MissingDeclarationNameCompilerError: CompilerError {

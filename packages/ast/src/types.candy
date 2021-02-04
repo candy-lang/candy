@@ -71,7 +71,7 @@ impl AstTypeParameterId: AstNodeId
 public class AstTypeParameter {
   public let id: AstTypeParameterId
   public let modifiers: List<AstIdentifier>
-  public let name: Maybe<AstIdentifier>
+  public let name: AstIdentifier
   public let upperBound: Maybe<AstType>
 }
 
