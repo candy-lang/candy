@@ -1,22 +1,71 @@
-public trait Package {
+use incremental
+
+use ..error
+
+public trait Package: Equals & Hash {
   // TODO(JonasWanke): provide a query to get the name of a package
+
+  fun getResolvedPath(context: QueryContext<List<CompilerError>>): Path
 }
 
 public class FilePackage {
-  public let path: String /* Path */
+  public let path: Path
 }
-impl FilePackage: Package
+impl FilePackage: Package & Equals & Hash {
+  fun getResolvedPath(context: QueryContext<List<CompilerError>>): Path {
+    query<Path, List<CompilerError>>(context, "FilePackage.getResolvedPath", (this as Equals & Hash), {
+      Tuple(path, List.empty<CompilerError>())
+    })
+  }
+
+  fun equals(other: This): Bool { (path as Equals) == (other.path as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { (path as Hash).hash<T>(hasher) }
+}
 
 public class GitPackage {
   public let repoUrl: String /* Url */
-  public let path: String /* Path */ = ""
+  public let path: Path
   public let ref: String /* Sha1 */
 }
-impl GitPackage: Package
+impl GitPackage: Package & Equals & Hash {
+  fun getResolvedPath(context: QueryContext<List<CompilerError>>): Path {
+    query<Path, List<CompilerError>>(context, "GitPackage.getResolvedPath", (this as Equals & Hash), {
+      todo("Support Git packages.")
+    })
+  }
+
+  fun equals(other: This): Bool {
+    (repoUrl as Equals) == (other.repoUrl as Equals)
+      && (path as Equals) == (other.path as Equals)
+      && (ref as Equals) == (other.ref as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    repoUrl.hash<T>(hasher)
+    (path as Hash).hash<T>(hasher)
+    ref.hash<T>(hasher)
+  }
+}
 
 public class HostedPackage {
   public let hostUrl: String /* Url */
-  public let path: List<String>
+  public let path: Path
   public let version: String /* Version */
 }
-impl HostedPackage: Package
+impl HostedPackage: Package & Equals & Hash {
+  fun getResolvedPath(context: QueryContext<List<CompilerError>>): Path {
+    query<Path, List<CompilerError>>(context, "HostedPackage.getResolvedPath", (this as Equals & Hash), {
+      todo("Support hosted packages.")
+    })
+  }
+
+  fun equals(other: This): Bool {
+    (hostUrl as Equals) == (other.hostUrl as Equals)
+      && (path as Equals) == (other.path as Equals)
+      && (version as Equals) == (other.version as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    hostUrl.hash<T>(hasher)
+    (path as Hash).hash<T>(hasher)
+    version.hash<T>(hasher)
+  }
+}

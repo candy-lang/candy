@@ -1,6 +1,38 @@
+use incremental
+
+use ..error
 use ..package
 
 public class FancyFile {
   public let package: Package
-  public let path: List<String> /* Path */
+  public let path: Path
+
+  fun getResolvedPath(context: QueryContext<List<CompilerError>>): Path {
+    query<Path, List<CompilerError>>(context, "FancyFile.getResolvedPath", (this as Equals & Hash), {
+      Tuple(package.getResolvedPath(context).append(path), List.empty<CompilerError>())
+    })
+  }
+
+  fun doesExist(context: QueryContext<List<CompilerError>>): Bool {
+    impureQuery<Bool, List<CompilerError>>(context, "FancyFile.doesExist", (this as Equals & Hash), {
+      Tuple(File(getResolvedPath(context)).doesExist(), List.empty<CompilerError>())
+    })
+  }
+
+  fun read(context: QueryContext<List<CompilerError>>): String {
+    impureQuery<String, List<CompilerError>>(context, "FancyFile.read", (this as Equals & Hash), {
+      if !doesExist(context) { throw "FancyFile doesn't exist: `{this}`" }
+      Tuple(File(getResolvedPath(context)).read(), List.empty<CompilerError>())
+    })
+  }
+}
+impl FancyFile: Equals & Hash {
+  fun equals(other: This): Bool {
+    (package as Equals) == (other.package as Equals)
+      && (path as Equals) == (other.path as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (package as Hash).hash<T>(hasher)
+    (path as Hash).hash<T>(hasher)
+  }
 }

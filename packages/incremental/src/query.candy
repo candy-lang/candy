@@ -34,3 +34,15 @@ public fun query<T, S>(
   let query = Query<T, S>(name, input, runner, true)
   context.run<T>(query)
 }
+
+public fun impureQuery<T, S>(
+  context: QueryContext<S>,
+  name: String,
+  input: Equals & Hash,
+  runner: () => (T, S),
+): T {
+  /// TODO(JonasWanke): merge this with `query` when we support optional arguments
+
+  let query = Query<T, S>(name, input, runner, false)
+  context.run<T>(query)
+}
