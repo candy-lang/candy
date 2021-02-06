@@ -1,10 +1,11 @@
 name: ast
 
 dependencies:
+  incremental: # remove this when we support transitive dependencies
+    path: ../incremental
+  petit_parser: # remove this when we support transitive dependencies
+    path: ../petit_parser
   compiler_utils:
     path: ../compiler_utils
   cst:
     path: ../cst
-  petit_parser:
-    # remove this when we support transitive dependencies
-    path: ../petit_parser

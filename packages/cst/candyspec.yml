@@ -1,5 +1,9 @@
 name: cst
 
 dependencies:
+  incremental: # remove this when we support transitive dependencies
+    path: ../incremental
   petit_parser:
     path: ../petit_parser
+  compiler_utils:
+    path: ../compiler_utils

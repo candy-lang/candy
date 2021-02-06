@@ -1,5 +1,7 @@
 use compiler_utils
 use cst
+use incremental
+use petit_parser
 use ..comment
 use ..declarations
 use ..errors
@@ -7,6 +9,13 @@ use ..expressions
 use ..file
 use ..node
 use ..types
+
+public fun parseAstOfFile(context: QueryContext<List<CompilerError>>, file: FancyFile): (AstFile, Map<CstNodeId, AstNodeId>) {
+  query<(AstFile, Map<CstNodeId, AstNodeId>), List<CompilerError>>(context, "parseAstOfFile", (file as Equals & Hash), {
+    let result = lowerCstToAst(file, parseCstOfFile(context, file))
+    Tuple(Tuple(result.first, result.second), result.third)
+  })
+}
 
 public fun lowerCstToAst(
   file: FancyFile,
