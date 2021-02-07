@@ -18,11 +18,16 @@ fun fileToHirModule(context: QueryContext<List<CompilerError>>, file: FancyFile)
   // soon as adding static functions through impls works.
 
   query<HirModule, List<CompilerError>>(context, "HirModule.fromFile", (file as Equals & Hash), {
-      mut let module: HirModule = (HirTopLevelModule(file.package) as HirModule)
-      for segment in file.path {
-          module = (HirInnerModule(module, segment) as HirModule)
-      }
-      Tuple(module, List.empty<CompilerError>())
+    todo("Implement HirModule.fromFile")
+    // TODO(marcelgarus): Once `Path`s support getting the parent, we should create a
+    // `HirTopLevelModule` for the `file`'s package and for each path segment, wrap it with a
+    // `HirInnerModule`.
+    
+    // mut let module: HirModule = (HirTopLevelModule(file.package) as HirModule)
+    // for segment in file.path {
+    //     module = (HirInnerModule(module, segment) as HirModule)
+    // }
+    // Tuple(module, List.empty<CompilerError>())
   })
 }
 

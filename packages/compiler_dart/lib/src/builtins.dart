@@ -592,6 +592,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
     final bool = compileType(context, CandyType.bool);
     final string = compileType(context, CandyType.string);
     final path = compileType(context, CandyType.path);
+    final t = dart.refer('T');
 
     return [
       dart.Class((b) => b
@@ -619,6 +620,28 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
               ..type = string))
             ..body = path.call([dart.refer('path')], {}, []).code),
           dart.Method((b) => b
+            ..returns = path
+            ..name = 'child'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..name = 'name'
+              ..type = string))
+            ..body = path.call(
+              [dart.literalString(r'${_path.value}/${name.value}')],
+              {},
+              [],
+            ).code),
+          dart.Method((b) => b
+            ..returns = path
+            ..name = 'append'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..name = 'other'
+              ..type = path))
+            ..body = path.call(
+              [dart.literalString(r'${_path.value}/${other._path.value}')],
+              {},
+              [],
+            ).code),
+          dart.Method((b) => b
             ..returns = bool
             ..name = 'equals'
             ..requiredParameters.add(dart.Parameter((b) => b
@@ -628,6 +651,22 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                 .refer('_path')
                 .equalTo(dart.refer('other._path'))
                 .wrapInCandyBool(context)
+                .code),
+          dart.Method((b) => b
+            ..returns = bool
+            ..name = 'hash'
+            ..types.add(t)
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..name = 'hasher'
+              ..type = compileType(
+                context,
+                CandyType.hasher(CandyType.parameter('T', id)),
+              )))
+            ..body = dart
+                .refer('_path')
+                .property('value')
+                .property('hashCode')
+                .wrapInCandyInt(context)
                 .code),
           dart.Method((b) => b
             ..returns = dart.refer('String', dartCoreUrl)

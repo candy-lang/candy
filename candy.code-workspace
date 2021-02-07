@@ -62,6 +62,9 @@
     {
       "name": "dart-compiler: vscode_extension",
       "path": "packages\\vscode_extension"
+    },
+    {
+      "path": "packages\\name_checker"
     }
   ],
   "launch": {

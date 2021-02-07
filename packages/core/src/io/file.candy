@@ -1,5 +1,6 @@
 use ...bool
 use ...collections
+use ...hash
 use ...operators
 use ...string
 
@@ -36,8 +37,9 @@ builtin class Path {
   static fun parse(path: String): Path
 
   builtin fun child(name: String): Path
+  builtin fun append(other: Path): Path
 }
-builtin impl Path: Equals
+builtin impl Path: Equals & Hash
 
 
 /*
