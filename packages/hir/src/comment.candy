@@ -1,7 +1,16 @@
-/*use ..declarations
+use ..declarations
 
 public class HirDoc {
   public let target: HirModule | HirTrait | HirClass | HirConstructor | HirFunction | HirProperty
   public let content: String /* Markup */
 }
-*/
+impl HirDoc: Equals & Hash {
+  fun equals(other: This): Bool {
+    (target as Equals) == (other.target as Equals)
+      && (content as Equals) == (other.content as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (target as Hash).hash<T>(hasher)
+    content.hash<T>(hasher)
+  }
+}

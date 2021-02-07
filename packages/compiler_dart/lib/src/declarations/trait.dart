@@ -18,8 +18,13 @@ final Query<DeclarationId, List<dart.Spec>> compileTrait =
     // ignore: non_constant_identifier_names
     final traitHir = getTraitDeclarationHir(context, declarationId);
 
+    final impls = getAllImplsForTraitOrClassOrImpl(context, declarationId)
+        .map((id) => getImplDeclarationHir(context, id));
+    final traits = impls.expand((impl) => impl.traits);
+
     final implements = <dart.Reference>[
-      for (final bound in traitHir.upperBounds) compileType(context, bound)
+      for (final bound in traitHir.upperBounds) compileType(context, bound),
+      for (final trait in traits) compileType(context, trait)
     ];
 
     final properties = traitHir.innerDeclarationIds
@@ -39,6 +44,13 @@ final Query<DeclarationId, List<dart.Spec>> compileTrait =
         ..abstract = true
         ..name = name
         ..types.addAll(typeParameters)
+        ..mixins.addAll(traits.map((it) {
+          final type = compileType(context, it);
+          return dart.TypeReference((b) => b
+            ..symbol = '${type.symbol}\$Default'
+            ..types.addAll(it.arguments.map((it) => compileType(context, it)))
+            ..url = type.url);
+        }))
         ..implements.addAll(implements)
         ..constructors.add(dart.Constructor((b) => b..constant = true))
         ..methods.addAll(properties)

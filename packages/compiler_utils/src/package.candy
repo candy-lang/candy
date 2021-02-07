@@ -7,6 +7,7 @@ public trait Package: Equals & Hash {
 
   fun getResolvedPath(context: QueryContext<List<CompilerError>>): Path
 }
+impl Package: Equals & Hash
 
 public class FilePackage {
   public let path: Path

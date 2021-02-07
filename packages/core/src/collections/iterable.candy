@@ -1,4 +1,5 @@
 use ...bool
+use ...hash
 use ...operators
 use ...maybe
 use ...numbers
@@ -277,6 +278,22 @@ public trait Iterable<Item> {
       s = "{s}{item}"
     }
     s
+  }
+
+  fun unsafeEquals(other: Iterable<Item>): Bool {
+    /// Checks if this `Iterable` is equal to the `other` one. Crashes if `Item` does not implement
+    /// `Equals`.
+
+    length() == other.length()
+      && zip<Item>(other).all({ (it.first as Equals) == (it.second as Equals) })
+  }
+
+  fun unsafeHash<T>(hasher: Hasher<T>) {
+    /// Hashes this `Iterable`. Crashes if `Item` does not implement `Hash`.
+
+    for item in this {
+      (item as Hash).hash<T>(hasher)
+    }
   }
 }
 

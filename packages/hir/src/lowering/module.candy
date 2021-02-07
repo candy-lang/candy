@@ -1,0 +1,11 @@
+use compiler_utils
+use incremental
+public use .declarations
+
+fun compile(file: FancyFile) {
+  let context = QueryContext.create<List<CompilerError>>()
+  let module = fileToHirModule(context, file)
+  print("Module is {module}")
+  let declarations = module.declarations(context)
+  print("Declarations are {declarations}")
+}
