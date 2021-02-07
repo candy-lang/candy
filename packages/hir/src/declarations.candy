@@ -5,12 +5,11 @@ public trait HirDeclaration {
   public fun name(): String
 }
 
-public trait HirModule
-impl HirModule: HirDeclaration & Equals & Hash
+public trait HirModule: HirDeclaration & Equals & Hash
 public class HirTopLevelModule {
   public let parent: Package
 }
-impl HirTopLevelModule: HirDeclaration & Equals & Hash {
+impl HirTopLevelModule: HirDeclaration & Equals & Hash & HirModule {
   fun name(): String { "<{parent}>" }
   fun equals(other: This): Bool { (parent as Equals) == (other.parent as Equals) }
   fun hash<T>(hasher: Hasher<T>) { (parent as Hash).hash<T>(hasher) }
@@ -19,7 +18,7 @@ public class HirInnerModule {
   public let parent: HirModule
   public let name_: String
 }
-impl HirInnerModule: HirDeclaration {
+impl HirInnerModule: HirDeclaration & Equals & Hash & HirModule {
   fun name(): String { name_ }
   fun equals(other: This): Bool {
     (parent as Equals) == (other.parent as Equals) && name_ == other.name_
