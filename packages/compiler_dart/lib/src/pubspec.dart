@@ -20,6 +20,10 @@ final generatePubspec = Query<PackageId, PubSpec>(
             HostedReference(VersionConstraint.compatibleWith(Version(1, 0, 0))),
         'meta':
             HostedReference(VersionConstraint.compatibleWith(Version(1, 1, 7))),
+        if (packageId.isCore)
+          'path': HostedReference(
+            VersionConstraint.compatibleWith(Version(1, 7, 0)),
+          ),
         for (final dependency in dependencyNames)
           dependency: PathReference(
             context.config.buildArtifactManager

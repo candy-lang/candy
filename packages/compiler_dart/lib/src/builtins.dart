@@ -611,13 +611,86 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
               ..type = string))
             ..body = path.call([dart.refer('path')], {}, []).code),
           dart.Method((b) => b
+            ..returns = bool
+            ..name = 'isAbsolute'
+            ..body = dart
+                .refer('isAbsolute', packagePathUrl)
+                .call(
+                  [dart.refer('_path').property('value')],
+                  {},
+                  [],
+                )
+                .wrapInCandyBool(context)
+                .code),
+          dart.Method((b) => b
+            ..returns = compileType(context, CandyType.maybe(CandyType.path))
+            ..name = 'parent'
+            ..body = dart.Block((b) => b
+              ..statements.addAll([
+                dart.CodeExpression(dart.Block.of([
+                  dart.Code('if ('),
+                  dart
+                      .refer('split', packagePathUrl)
+                      .call(
+                        [
+                          dart.refer('normalize', packagePathUrl).call(
+                            [dart.refer('_path').property('value')],
+                            {},
+                            [],
+                          ),
+                        ],
+                        {},
+                        [],
+                      )
+                      .property('length')
+                      .equalTo(dart.literalNum(1))
+                      .code,
+                  dart.Code(') {'),
+                  compileType(context, CandyType.none(CandyType.path))
+                      .call([], {}, [])
+                      .returned
+                      .statement,
+                  dart.Code('} else {'),
+                  compileType(context, CandyType.some(CandyType.path))
+                      .call(
+                        [
+                          path.call(
+                            [
+                              dart.refer('dirname', packagePathUrl).call(
+                                [dart.refer('_path').property('value')],
+                                {},
+                                [],
+                              ).wrapInCandyString(context),
+                            ],
+                            {},
+                            [],
+                          ),
+                        ],
+                        {},
+                        [],
+                      )
+                      .returned
+                      .statement,
+                  dart.Code('}'),
+                ])).code,
+              ]))),
+          dart.Method((b) => b
             ..returns = path
             ..name = 'child'
             ..requiredParameters.add(dart.Parameter((b) => b
               ..name = 'name'
               ..type = string))
             ..body = path.call(
-              [dart.literalString(r'${_path.value}/${name.value}')],
+              [
+                dart.refer('join', packagePathUrl).call(
+                  [
+                    dart.refer('_path').property('value'),
+                    dart.refer('name').property('value'),
+                  ],
+                  {},
+                  [],
+                ).wrapInCandyString(context),
+              ],
               {},
               [],
             ).code),
@@ -628,7 +701,16 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
               ..name = 'other'
               ..type = path))
             ..body = path.call(
-              [dart.literalString(r'${_path.value}/${other._path.value}')],
+              [
+                dart.refer('join', packagePathUrl).call(
+                  [
+                    dart.refer('_path').property('value'),
+                    dart.refer('other').property('_path').property('value'),
+                  ],
+                  {},
+                  [],
+                ).wrapInCandyString(context),
+              ],
               {},
               [],
             ).code),

@@ -1,6 +1,7 @@
 use ...bool
 use ...collections
 use ...hash
+use ...maybe
 use ...operators
 use ...string
 
@@ -36,7 +37,10 @@ builtin impl File: FileSystemNode & Equals
 builtin class Path {
   static fun parse(path: String): Path
 
+  builtin fun isAbsolute(): Bool
+  builtin fun parent(): Maybe<Path>
   builtin fun child(name: String): Path
+
   builtin fun append(other: Path): Path
 }
 builtin impl Path: Equals & Hash
