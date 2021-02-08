@@ -1,3 +1,4 @@
+use ..bool
 use ..collections
 use ..hash
 use ..numbers
@@ -6,7 +7,11 @@ use ..operators
 public builtin class String {
   builtin fun characters(): Iterable<String>
   builtin fun substring(offset: Int, length: Int): String
+
+  builtin fun isEmpty(): Bool
+  builtin fun isNotEmpty(): Bool
   builtin fun length(): Int
+
   builtin fun split(pattern: String): List<String>
   builtin fun trimmed(): String
 }

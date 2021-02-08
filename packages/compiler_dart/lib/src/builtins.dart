@@ -1005,6 +1005,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
     final mixinsAndImplementsAndMethodOverrides =
         _prepareMixinsAndImplementsAndMethodOverrides(context, id);
 
+    final bool = compileType(context, CandyType.bool);
     final int = compileType(context, CandyType.int);
     final string = compileType(context, CandyType.string);
     final otherString = dart.Parameter((b) => b
@@ -1086,6 +1087,15 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                 .wrapInCandyString(context)
                 .code),
           dart.Method((b) => b
+            ..returns = bool
+            ..name = 'isEmpty'
+            ..body = dart.refer('value.isEmpty').wrapInCandyBool(context).code),
+          dart.Method((b) => b
+            ..returns = bool
+            ..name = 'isNotEmpty'
+            ..body =
+                dart.refer('value.isNotEmpty').wrapInCandyBool(context).code),
+          dart.Method((b) => b
             ..returns = int
             ..name = 'length'
             ..body = dart.refer('value.length').wrapInCandyInt(context).code),
@@ -1114,7 +1124,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                 .code),
           dart.Method((b) => b
             ..returns = string
-            ..name = 'trim'
+            ..name = 'trimmed'
             ..body = dart
                 .refer('value')
                 .property('trim')
