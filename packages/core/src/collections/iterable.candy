@@ -297,7 +297,7 @@ public trait Iterable<Item> {
     }
   }
 
-  fun unsafeToMap<K: Equals & Hash, V: Equals & Hash>(): Map<K, V> {
+  fun unsafeToMap<K: Equals & Hash, V>(): Map<K, V> {
     /// Collects all items into a map. Crashes if `this` is not an `Iterable<(K, V)>`.
 
     let result = MutableMap.empty<K, V>()
