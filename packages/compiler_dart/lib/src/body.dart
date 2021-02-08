@@ -268,9 +268,15 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
                 )
                     .inner(DeclarationPathData.trait('Parser'))
                     .inner(DeclarationPathData.function('separatedBy'));
+                final iterableUnsafeEquals = DeclarationId(
+                  ResourceId(PackageId.core, 'src/collections/iterable.candy'),
+                )
+                    .inner(DeclarationPathData.trait('Iterable'))
+                    .inner(DeclarationPathData.function('unsafeEquals'));
                 final exceptionIds = [
                   DeclarationLocalId(parserSeparatedById, 20),
                   DeclarationLocalId(parserSeparatedById, 32),
+                  DeclarationLocalId(iterableUnsafeEquals, 14),
                 ];
                 if (!exceptionIds.contains(node.id)) {
                   b.type = compileType(context, p.type);
