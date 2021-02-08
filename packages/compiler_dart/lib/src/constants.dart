@@ -17,4 +17,5 @@ const dartCoreUrl = 'dart:core';
 const dartIoUrl = 'dart:io';
 const dartMathUrl = 'dart:math';
 const packageMetaUrl = 'package:meta/meta.dart';
+const packagePathUrl = 'package:path/path.dart';
 const packageTestUrl = 'package:test/test.dart';
