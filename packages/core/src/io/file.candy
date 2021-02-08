@@ -35,7 +35,8 @@ builtin impl File: FileSystemNode & Equals
 
 
 builtin class Path {
-  static fun parse(path: String): Path
+  builtin static fun current(): Path
+  builtin static fun parse(path: String): Path
 
   builtin fun isAbsolute(): Bool
   builtin fun parent(): Maybe<Path>

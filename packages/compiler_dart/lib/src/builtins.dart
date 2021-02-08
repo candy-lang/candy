@@ -393,9 +393,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                                 dart.Code(') {'),
                                 type
                                     .call(
-                                      [
-                                        path.call([pathArgument], {}, []),
-                                      ],
+                                      [pathArgument.wrapInCandyPath(context)],
                                       {},
                                       [],
                                     )
@@ -605,11 +603,20 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
           dart.Method((b) => b
             ..static = true
             ..returns = path
+            ..name = 'current'
+            ..body = dart
+                .refer('current', packagePathUrl)
+                .wrapInCandyString(context)
+                .wrapInCandyPath(context)
+                .code),
+          dart.Method((b) => b
+            ..static = true
+            ..returns = path
             ..name = 'parse'
             ..requiredParameters.add(dart.Parameter((b) => b
               ..name = 'path'
               ..type = string))
-            ..body = path.call([dart.refer('path')], {}, []).code),
+            ..body = dart.refer('path').wrapInCandyPath(context).code),
           dart.Method((b) => b
             ..returns = bool
             ..name = 'isAbsolute'
@@ -1341,6 +1348,10 @@ extension WrappingInCandyTypes on dart.Expression {
       {},
       [compileType(context, itemType)],
     );
+  }
+
+  dart.Expression wrapInCandyPath(QueryContext context) {
+    return compileType(context, CandyType.path).call([this]);
   }
 
   dart.Expression toComparisonResult(QueryContext context) {
