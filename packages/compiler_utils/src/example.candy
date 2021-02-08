@@ -1,0 +1,12 @@
+use incremental
+use ..candyspec
+use ..error
+use ..file
+use ..package
+
+fun main() {
+  let package = Package(Path.parse("D:/p/candy/packages/compiler_utils"))
+  let context = QueryContext.create<List<CompilerError>>()
+
+  print("{package.getCandyspec(context)}")
+}
