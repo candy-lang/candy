@@ -1,3 +1,5 @@
+use compiler_utils
+use incremental
 use petit_parser
 use ..declarations
 use ..expressions
@@ -5,6 +7,18 @@ use ..file
 use ..node
 use ..tokens
 use ..types
+
+public fun parseCstOfFile(context: QueryContext<List<CompilerError>>, file: FancyFile): CstNode<CstFile> {
+  query<CstNode<CstFile>, List<CompilerError>>(context, "parseCstOfFile", (file as Equals & Hash), {
+    Tuple(parseCst(context, file.read(context)), List.empty<CompilerError>())
+  })
+}
+public fun parseCst(context: QueryContext<List<CompilerError>>, source: String): CstNode<CstFile> {
+  query<CstNode<CstFile>, List<CompilerError>>(context, "parseCst", (source as Equals & Hash), {
+    Tuple(parse(source), List.empty<CompilerError>())
+  })
+}
+
 
 public fun parse(source: String): CstNode<CstFile> {
   let parser = CstParser(
