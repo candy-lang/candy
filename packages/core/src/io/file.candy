@@ -38,6 +38,8 @@ builtin class Path {
   builtin static fun current(): Path
   builtin static fun parse(path: String): Path
 
+  builtin fun normalized(): Path
+
   builtin fun isAbsolute(): Bool
   builtin fun parent(): Maybe<Path>
   builtin fun child(name: String): Path

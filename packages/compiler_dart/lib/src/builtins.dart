@@ -618,6 +618,15 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
               ..type = string))
             ..body = dart.refer('path').wrapInCandyPath(context).code),
           dart.Method((b) => b
+            ..returns = path
+            ..name = 'normalized'
+            ..body = dart
+                .refer('normalize', packagePathUrl)
+                .call([dart.refer('_path.value')], {}, [])
+                .wrapInCandyString(context)
+                .wrapInCandyPath(context)
+                .code),
+          dart.Method((b) => b
             ..returns = bool
             ..name = 'isAbsolute'
             ..body = dart
