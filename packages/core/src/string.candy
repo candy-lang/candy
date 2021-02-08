@@ -7,6 +7,8 @@ public builtin class String {
   builtin fun characters(): Iterable<String>
   builtin fun substring(offset: Int, length: Int): String
   builtin fun length(): Int
+  builtin fun split(pattern: String): List<String>
+  builtin fun trimmed(): String
 }
 builtin impl String: Equals & Comparable
 impl String: Hash {

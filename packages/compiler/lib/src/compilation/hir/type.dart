@@ -66,6 +66,11 @@ abstract class CandyType with _$CandyType {
         'Some',
         arguments: [itemType],
       );
+  factory CandyType.none(CandyType itemType) => CandyType.user(
+        ModuleId.coreMaybe,
+        'None',
+        arguments: [itemType],
+      );
 
   // collections
   factory CandyType.iterator(CandyType itemType) => CandyType.user(
