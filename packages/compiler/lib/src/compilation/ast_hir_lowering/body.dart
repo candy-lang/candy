@@ -2785,13 +2785,13 @@ extension on Context {
     } else if (operatorType == ast.OperatorTokenType.equalsEquals) {
       return handle(
         hir.CandyType.equals,
-        'equals',
+        'equalsAny',
         returnType: hir.CandyType.bool,
       );
     } else if (operatorType == ast.OperatorTokenType.exclamationEquals) {
       return handle(
         hir.CandyType.equals,
-        'notEquals',
+        'notEqualsAny',
         returnType: hir.CandyType.bool,
       );
     } else if (operatorType == ast.OperatorTokenType.ampersandAmpersand) {
