@@ -6,13 +6,18 @@ use ..package
 class Candyspec {
   public let package: Package
   public let name: String
-  public let dependencies: Map<String, Path>
+  public let dependencies: Map<String, Package>
 }
 
 impl Package {
+  fun getCandyspecFile(context: QueryContext<List<CompilerError>>): FancyFile {
+    query<FancyFile, List<CompilerError>>(context, "Package.getCandyspecFile", (this as Equals & Hash), {
+      Tuple(FancyFile(this, Path.parse("candyspec.yaml")), List.empty<CompilerError>())
+    })
+  }
   fun getCandyspec(context: QueryContext<List<CompilerError>>): Candyspec {
     query<Candyspec, List<CompilerError>>(context, "Package.getCandyspec", (this as Equals & Hash), {
-      let file = FancyFile(this, Path.parse("candyspec.yaml"))
+      let file = getCandyspecFile(context)
       assert(file.doesExist(context), "Package {this} doesn't contain a `candyspec.yaml`.")
       let lines = (file.read(context).split("\n") as Iterable<String>)
           .map<String>({ it.trimmed() })
@@ -29,9 +34,9 @@ impl Package {
             let path = Path.current()
                 .append(Path.parse(parts.second().unwrap().trimmed()))
                 .normalized()
-            Tuple(name, path)
+            Tuple(name, Package(path))
           })
-          .unsafeToMap<String, Path>()
+          .unsafeToMap<String, Package>()
 
       Tuple(Candyspec(this, name, dependencies), List.empty<CompilerError>())
     })

@@ -1,4 +1,5 @@
 use ..location
+use ..package
 
 public trait CompilerError {
   public fun id(): String
@@ -19,4 +20,16 @@ impl InternalCompilerError: CompilerError {
   public fun location(): Location { location_ }
   public fun title(): String { "Internal Error" }
   public fun description(): String { description_ }
+}
+
+public class CyclicDependenciesCompilerError {
+  public let location_: Location
+  public let cycle: List<Package>
+}
+impl CyclicDependenciesCompilerError: CompilerError {
+  public fun id(): String { "cyclic-dependencies-error" }
+
+  public fun location(): Location { location_ }
+  public fun title(): String { "Cycle detected in the dependencies." }
+  public fun description(): String { (cycle as Iterable<Package>).join(" → ") }
 }
