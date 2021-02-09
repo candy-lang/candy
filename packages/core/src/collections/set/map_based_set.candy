@@ -1,0 +1,43 @@
+use ....bool
+use ....hash
+use ....numbers
+use ....operators
+use ....primitives
+use ...iterable
+use ...map
+use ...set
+
+class MapBasedSet<Item: Equals & Hash> {
+  static fun empty<Item: Equals & Hash>(): MapBasedSet<Item> {
+    MapBasedSet<Item>(MutableMap.empty<Item, Unit>())
+  }
+
+  let map: MutableMap<Item, Unit>
+}
+impl<Item: Equals & Hash> MapBasedSet<Item>: Set<Item> {
+  fun length(): Int { (map as Map<Item, Unit>).length() }
+
+  fun contains(item: Item): Bool { (map as Map<Item, Unit>).containsKey(item) }
+
+  fun union(other: Set<Item>): Set<Item> {
+    let result = (toMutable() as MutableSet<Item>)
+    for item in other.items() { result.insert(item) }
+    result
+  }
+
+  fun items(): Iterable<Item> { (map as Map<Item, Unit>).keys() }
+}
+impl<Item: Equals & Hash> MapBasedSet<Item>: MutableSet<Item> {
+  fun insert(item: Item) {
+    if (this as Set<Item>).contains(item) { return false }
+
+    map.set(item, unit)
+    true
+  }
+  fun remove(item: Item): Bool {
+    if !(this as Set<Item>).contains(item) { return false }
+
+    map.remove(item)
+    false
+  }
+}
