@@ -1,0 +1,4 @@
+name: compiler_utils
+
+incremental: ../incremental
+petit_parser: ../petit_parser

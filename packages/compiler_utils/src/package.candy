@@ -2,19 +2,21 @@ use incremental
 
 use ..error
 
+/*
 public trait Package: Equals & Hash {
   // TODO(JonasWanke): provide a query to get the name of a package
 
   fun getResolvedPath(context: QueryContext<List<CompilerError>>): Path
 }
 impl Package: Equals & Hash
+*/
 
-public class FilePackage {
+public class Package /* FilePackage */ {
   public let path: Path
 }
-impl FilePackage: Package & Equals & Hash {
+impl Package: /* Package & */ Equals & Hash {
   fun getResolvedPath(context: QueryContext<List<CompilerError>>): Path {
-    query<Path, List<CompilerError>>(context, "FilePackage.getResolvedPath", (this as Equals & Hash), {
+    query<Path, List<CompilerError>>(context, "Package.getResolvedPath", (this as Equals & Hash), {
       Tuple(path, List.empty<CompilerError>())
     })
   }
@@ -23,6 +25,7 @@ impl FilePackage: Package & Equals & Hash {
   fun hash<T>(hasher: Hasher<T>) { (path as Hash).hash<T>(hasher) }
 }
 
+/*
 public class GitPackage {
   public let repoUrl: String /* Url */
   public let path: Path
@@ -70,3 +73,4 @@ impl HostedPackage: Package & Equals & Hash {
     version.hash<T>(hasher)
   }
 }
+*/

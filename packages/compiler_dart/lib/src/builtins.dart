@@ -393,9 +393,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                                 dart.Code(') {'),
                                 type
                                     .call(
-                                      [
-                                        path.call([pathArgument], {}, []),
-                                      ],
+                                      [pathArgument.wrapInCandyPath(context)],
                                       {},
                                       [],
                                     )
@@ -605,11 +603,29 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
           dart.Method((b) => b
             ..static = true
             ..returns = path
+            ..name = 'current'
+            ..body = dart
+                .refer('current', packagePathUrl)
+                .wrapInCandyString(context)
+                .wrapInCandyPath(context)
+                .code),
+          dart.Method((b) => b
+            ..static = true
+            ..returns = path
             ..name = 'parse'
             ..requiredParameters.add(dart.Parameter((b) => b
               ..name = 'path'
               ..type = string))
-            ..body = path.call([dart.refer('path')], {}, []).code),
+            ..body = dart.refer('path').wrapInCandyPath(context).code),
+          dart.Method((b) => b
+            ..returns = path
+            ..name = 'normalized'
+            ..body = dart
+                .refer('normalize', packagePathUrl)
+                .call([dart.refer('_path.value')], {}, [])
+                .wrapInCandyString(context)
+                .wrapInCandyPath(context)
+                .code),
           dart.Method((b) => b
             ..returns = bool
             ..name = 'isAbsolute'
@@ -998,6 +1014,9 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
     final mixinsAndImplementsAndMethodOverrides =
         _prepareMixinsAndImplementsAndMethodOverrides(context, id);
 
+    final bool = compileType(context, CandyType.bool);
+    final int = compileType(context, CandyType.int);
+    final string = compileType(context, CandyType.string);
     final otherString = dart.Parameter((b) => b
       ..name = 'other'
       ..type = dart.refer('dynamic', dartCoreUrl));
@@ -1043,42 +1062,33 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             ..name = 'characters'
             ..returns =
                 compileType(context, CandyType.iterable(CandyType.string))
-            ..body = compileTypeName(
-              context,
-              moduleIdToDeclarationId(context, CandyType.arrayListModuleId),
-            ).property('fromArray').call(
-              [
-                dart
-                    .refer('value')
-                    .property('characters')
-                    .property('map')
-                    .call([
-                      dart.Method((b) => b
+            ..body = dart
+                .refer('value')
+                .property('characters')
+                .property('map')
+                .call([
+                  dart.Method((b) => b
                         ..requiredParameters.add(dart.Parameter((b) => b
                           ..name = 'char'
                           ..type = dart.refer('String', dartCoreUrl)))
-                        ..body = dart
-                            .refer('char')
-                            .wrapInCandyString(context)
-                            .code).closure
-                    ])
-                    .property('toList')
-                    .call([])
-                    .wrapInCandyArray(context, CandyType.string),
-              ],
-              {},
-              [compileType(context, CandyType.string)],
-            ).code),
+                        ..body =
+                            dart.refer('char').wrapInCandyString(context).code)
+                      .closure
+                ])
+                .property('toList')
+                .call([])
+                .wrapInCandyArrayList(context, CandyType.string)
+                .code),
           dart.Method((b) => b
             ..name = 'substring'
-            ..returns = compileType(context, CandyType.string)
+            ..returns = string
             ..requiredParameters.addAll([
               dart.Parameter((b) => b
-                ..name = 'offset'
-                ..type = compileType(context, CandyType.int)),
+                ..type = int
+                ..name = 'offset'),
               dart.Parameter((b) => b
-                ..name = 'length'
-                ..type = compileType(context, CandyType.int)),
+                ..type = int
+                ..name = 'length'),
             ])
             ..body = dart
                 .refer('value.substring')
@@ -1086,9 +1096,50 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                 .wrapInCandyString(context)
                 .code),
           dart.Method((b) => b
+            ..returns = bool
+            ..name = 'isEmpty'
+            ..body = dart.refer('value.isEmpty').wrapInCandyBool(context).code),
+          dart.Method((b) => b
+            ..returns = bool
+            ..name = 'isNotEmpty'
+            ..body =
+                dart.refer('value.isNotEmpty').wrapInCandyBool(context).code),
+          dart.Method((b) => b
+            ..returns = int
             ..name = 'length'
-            ..returns = compileType(context, CandyType.int)
             ..body = dart.refer('value.length').wrapInCandyInt(context).code),
+          dart.Method((b) => b
+            ..returns = compileType(context, CandyType.list(CandyType.string))
+            ..name = 'split'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..type = string
+              ..name = 'pattern'))
+            ..body = dart
+                .refer('value')
+                .property('split')
+                .call([dart.refer('pattern.value')], {}, [])
+                .property('map')
+                .call([
+                  dart.Method((b) => b
+                        ..requiredParameters
+                            .add(dart.Parameter((b) => b..name = 'it'))
+                        ..body =
+                            dart.refer('it').wrapInCandyString(context).code)
+                      .closure,
+                ], {}, [])
+                .property('toList')
+                .call([], {}, [])
+                .wrapInCandyArrayList(context, CandyType.string)
+                .code),
+          dart.Method((b) => b
+            ..returns = string
+            ..name = 'trimmed'
+            ..body = dart
+                .refer('value')
+                .property('trim')
+                .call([], {}, [])
+                .wrapInCandyString(context)
+                .code),
           dart.Method((b) => b
             ..name = 'toString'
             ..returns = dart.refer('String', dartCoreUrl)
@@ -1302,6 +1353,24 @@ extension WrappingInCandyTypes on dart.Expression {
 
   dart.Expression wrapInCandyArray(QueryContext context, CandyType itemType) {
     return compileType(context, CandyType.array(itemType)).call([this]);
+  }
+
+  dart.Expression wrapInCandyArrayList(
+    QueryContext context,
+    CandyType itemType,
+  ) {
+    return compileTypeName(
+      context,
+      moduleIdToDeclarationId(context, CandyType.arrayListModuleId),
+    ).property('fromArray').call(
+      [wrapInCandyArray(context, itemType)],
+      {},
+      [compileType(context, itemType)],
+    );
+  }
+
+  dart.Expression wrapInCandyPath(QueryContext context) {
+    return compileType(context, CandyType.path).call([this]);
   }
 
   dart.Expression toComparisonResult(QueryContext context) {

@@ -30,10 +30,31 @@ final Query<DeclarationId, List<dart.Spec>> compileTrait =
     final properties = traitHir.innerDeclarationIds
         .where((id) => id.isProperty)
         .expand((id) => compilePropertyInsideTrait(context, id));
-    final methods = traitHir.innerDeclarationIds
-        .where((id) => id.isFunction)
-        .map((id) => compileFunction(context, id))
-        .toList();
+    final methods =
+        traitHir.innerDeclarationIds.where((id) => id.isFunction).map((id) {
+      if (declarationIdToModuleId(context, declarationId) ==
+          CandyType.equals.virtualModuleId) {
+        if (id.simplePath.last.nameOrNull == 'equalsAny') {
+          return dart.Method((b) => b
+            ..returns = compileType(context, CandyType.bool)
+            ..name = 'equalsAny'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..type = compileType(context, CandyType.any)
+              ..name = 'other'))
+            ..body = dart.Block((b) => b
+              ..statements.addAll([
+                dart.Code('if (this.runtimeType != other.runtimeType) {'),
+                compileType(context, CandyType.bool)
+                    .call([dart.literalBool(false)])
+                    .returned
+                    .statement,
+                dart.Code('}'),
+                dart.refer('equals(other)').returned.statement,
+              ])));
+        }
+      }
+      return compileFunction(context, id);
+    }).toList();
 
     final name = compileTypeName(context, declarationId).symbol;
     final typeParameters = traitHir.typeParameters

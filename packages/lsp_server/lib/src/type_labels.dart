@@ -58,7 +58,7 @@ final _generateTypeLabels =
         final propertyHir = getPropertyDeclarationHir(context, id);
         if (propertyAst.type == null) {
           final range = propertyAst.name.span.toRange(server, resourceId);
-          labels.add(TypeLabel(range, propertyHir.type.toString()));
+          labels.add(TypeLabel(range, _typeToString(propertyHir.type)));
         }
 
         if (propertyAst.initializer != null) {
@@ -70,7 +70,7 @@ final _generateTypeLabels =
         if (functionAst.returnType == null) {
           final range =
               functionAst.rightParenthesis.span.toRange(server, resourceId);
-          labels.add(TypeLabel(range, functionHir.returnType.toString()));
+          labels.add(TypeLabel(range, _typeToString(functionHir.returnType)));
         }
 
         if (functionAst.body != null) handleBody(functionAst.body);
@@ -80,6 +80,28 @@ final _generateTypeLabels =
     return labels;
   },
 );
+
+String _typeToString(CandyType type) {
+  String mapAndJoin(List<CandyType> types) =>
+      types.map(_typeToString).join(', ');
+
+  return type.maybeMap(
+    user: (it) {
+      if (it.arguments.isEmpty) return it.name;
+      return '${it.name}<${mapAndJoin(it.arguments)}>';
+    },
+    this_: (_) => 'This',
+    tuple: (it) => '(${mapAndJoin(it.items)})',
+    function: (it) {
+      final receiver =
+          it.receiverType == null ? '' : '${_typeToString(it.receiverType)}.';
+      return '$receiver(${mapAndJoin(it.parameterTypes)}) => ${it.returnType}';
+    },
+    union: (it) => it.types.map(_typeToString).join(' | '),
+    intersection: (it) => it.types.map(_typeToString).join(' & '),
+    orElse: () => type.toString(),
+  );
+}
 
 class _BodyPropertyVisitor extends ast.TraversingAstVisitor {
   _BodyPropertyVisitor._(
@@ -120,7 +142,9 @@ class _BodyPropertyVisitor extends ast.TraversingAstVisitor {
       final hir = getExpression(context, id);
       _labels.add(TypeLabel(
         node.name.span.toRange(server, resourceId),
-        hir is Some ? hir.value.type.toString() : "(couldn't determine type)",
+        hir is Some
+            ? _typeToString(hir.value.type)
+            : "(couldn't determine type)",
       ));
     }
     super.visitPropertyDeclarationExpression(node);

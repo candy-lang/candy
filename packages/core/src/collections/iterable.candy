@@ -6,6 +6,7 @@ use ...numbers
 use ...string
 use ...todo
 use ..list
+use ..map
 
 public trait Iterator<Item> {
   fun next(): Maybe<Item>
@@ -294,6 +295,16 @@ public trait Iterable<Item> {
     for item in this {
       (item as Hash).hash<T>(hasher)
     }
+  }
+
+  fun unsafeToMap<K: Equals & Hash, V>(): Map<K, V> {
+    /// Collects all items into a map. Crashes if `this` is not an `Iterable<(K, V)>`.
+
+    let result = MutableMap.empty<K, V>()
+    for item in cast<(K, V)>() {
+      result.set(item.first, item.second)
+    }
+    result
   }
 }
 
