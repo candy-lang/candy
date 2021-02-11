@@ -20,7 +20,7 @@ class BucketMap<Key: Equals & Hash, Value> {
       0,
     )
   }
-  
+
   let buckets: Array<LinkedHashMap<Key, Value>>
   mut let numEntries: Int
 

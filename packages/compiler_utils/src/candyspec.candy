@@ -6,32 +6,33 @@ use ..package
 class Candyspec {
   public let package: Package
   public let name: String
-  public let dependencies: Map<String, Path>
+  public let dependencies: Set<Package>
 }
 
 impl Package {
+  fun getCandyspecFile(context: QueryContext<List<CompilerError>>): FancyFile {
+    query<FancyFile, List<CompilerError>>(context, "Package.getCandyspecFile", (this as Equals & Hash), {
+      Tuple(FancyFile(this, Path.parse("candyspec.yaml")), List.empty<CompilerError>())
+    })
+  }
   fun getCandyspec(context: QueryContext<List<CompilerError>>): Candyspec {
     query<Candyspec, List<CompilerError>>(context, "Package.getCandyspec", (this as Equals & Hash), {
-      let file = FancyFile(this, Path.parse("candyspec.yaml"))
+      let file = getCandyspecFile(context)
       assert(file.doesExist(context), "Package {this} doesn't contain a `candyspec.yaml`.")
       let lines = (file.read(context).split("\n") as Iterable<String>)
           .map<String>({ it.trimmed() })
           .where({ it.isNotEmpty() })
 
-      let nameLine = lines.first().unwrap()
-      let name = (nameLine.split(":") as Iterable<String>).second().unwrap().trimmed()
+      let name = lines.first().unwrap().trimmed()
 
       let dependencies = lines
           .skip(1)
-          .map<(String, Path)>({
-            let parts = (it.split(":") as Iterable<String>)
-            let name = parts.first().unwrap().trimmed()
-            let path = Path.current()
-                .append(Path.parse(parts.second().unwrap().trimmed()))
-                .normalized()
-            Tuple(name, path)
-          })
-          .unsafeToMap<String, Path>()
+          .map<Package>({ Package(Path.current().append(Path.parse(it.trimmed())).normalized()) })
+          .unsafeToSet<Package>()
+          .toMutable()
+      if !(name == "core") {
+        dependencies.insert(Package(Path.current().append(Path.parse("../core")).normalized()))
+      }
 
       Tuple(Candyspec(this, name, dependencies), List.empty<CompilerError>())
     })

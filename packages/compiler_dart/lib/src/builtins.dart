@@ -293,7 +293,6 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
     final fileSystemNode = compileType(context, CandyType.fileSystemNode);
     final directory = compileType(context, CandyType.directory);
     final file = compileType(context, CandyType.file);
-    final path = compileType(context, CandyType.path);
 
     final _directory = dart.refer('_directory');
     return [
@@ -449,8 +448,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
               ..type = dart.refer('dynamic', dartCoreUrl)))
             ..body = dart
                 .refer('path')
-                .equalTo(dart.refer('other.path'))
-                .wrapInCandyBool(context)
+                .equalToCandyValue(dart.refer('other.path'))
                 .code),
           dart.Method((b) => b
             ..returns = dart.refer('String', dartCoreUrl)
@@ -561,8 +559,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
               ..type = dart.refer('dynamic', dartCoreUrl)))
             ..body = dart
                 .refer('path')
-                .equalTo(dart.refer('other.path'))
-                .wrapInCandyBool(context)
+                .equalToCandyValue(dart.refer('other.path'))
                 .code),
           dart.Method((b) => b
             ..returns = dart.refer('String', dartCoreUrl)
@@ -738,8 +735,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
               ..type = dart.refer('dynamic', dartCoreUrl)))
             ..body = dart
                 .refer('_path')
-                .equalTo(dart.refer('other._path'))
-                .wrapInCandyBool(context)
+                .equalToCandyValue(dart.refer('other._path'))
                 .code),
           dart.Method((b) => b
             ..returns = compileType(context, CandyType.unit)
@@ -1371,6 +1367,10 @@ extension WrappingInCandyTypes on dart.Expression {
 
   dart.Expression wrapInCandyPath(QueryContext context) {
     return compileType(context, CandyType.path).call([this]);
+  }
+
+  dart.Expression equalToCandyValue(dart.Expression other) {
+    return property('equalsAny').call([other]);
   }
 
   dart.Expression toComparisonResult(QueryContext context) {
