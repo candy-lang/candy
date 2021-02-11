@@ -28,7 +28,7 @@ impl<Item: Equals & Hash> MapBasedSet<Item>: Set<Item> {
   fun items(): Iterable<Item> { (map as Map<Item, Unit>).keys() }
 }
 impl<Item: Equals & Hash> MapBasedSet<Item>: MutableSet<Item> {
-  fun insert(item: Item) {
+  fun insert(item: Item): Bool {
     if (this as Set<Item>).contains(item) { return false }
 
     map.set(item, unit)
