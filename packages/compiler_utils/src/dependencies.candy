@@ -47,4 +47,35 @@ impl Package {
     newStack.removeLast()
     Tuple(result, errors)
   }
+
+  public fun getAllPackagesInCompilationOrder(context: QueryContext<List<CompilerError>>): List<Package> {
+    /// Returns all packages (dependencies and this package itself) sorted topologically.
+    ///
+    /// By compiling packages in the order of the returned list, packages are only compiled after
+    /// all of their dependencies.
+
+    query<List<Package>, List<CompilerError>>(context, "Package.getAllPackagesInCompilationOrder", (this as Equals & Hash), {
+      Tuple(getAllPackagesInCompilationOrderHelper(context, Set.empty<Package>()), List.empty<CompilerError>())
+    })
+  }
+  public fun getAllPackagesInCompilationOrderHelper(
+    context: QueryContext<List<CompilerError>>,
+    visited: Set<Package>,
+  ): List<Package> {
+    /// Helper for `getAllPackagesInCompilationOrder` that performs the actual topological sort.
+
+    assert(!visited.contains(this), "Already visited package {this}.")
+
+    let newVisited = visited.union(Set.of1<Package>(this)).toMutable()
+    let result = MutableList.empty<Package>()
+    for dependency in getCandyspec(context).dependencies.items() {
+      if visited.contains(dependency) { continue }
+
+      let dependencyResult = dependency.getAllPackagesInCompilationOrderHelper(context, newVisited)
+      result.appendAll(dependencyResult)
+      newVisited.addAll(dependencyResult)
+    }
+    result.append(this)
+    result
+  }
 }

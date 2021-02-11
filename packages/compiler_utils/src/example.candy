@@ -5,9 +5,13 @@ use ..file
 use ..package
 
 fun main() {
+  // This should be executed using the launch script (`.vscode/launch.json`). Otherwise, the working
+  // directory points to `compiler_utils/build/dart/` instead of `compiler_utils`.
+
   let package = Package(Path.current().append(Path.parse("../hir")).normalized())
   let context = QueryContext.create<List<CompilerError>>()
 
   print("{package.getCandyspec(context)}")
   print("{package.getAllDependencies(context)}")
+  print("{package.getAllPackagesInCompilationOrder(context)}")
 }
