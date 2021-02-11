@@ -6,7 +6,7 @@ use ..package
 class Candyspec {
   public let package: Package
   public let name: String
-  public let dependencies: Map<String, Package>
+  public let dependencies: Set<Package>
 }
 
 impl Package {
@@ -23,20 +23,16 @@ impl Package {
           .map<String>({ it.trimmed() })
           .where({ it.isNotEmpty() })
 
-      let nameLine = lines.first().unwrap()
-      let name = (nameLine.split(":") as Iterable<String>).second().unwrap().trimmed()
+      let name = lines.first().unwrap().trimmed()
 
       let dependencies = lines
           .skip(1)
-          .map<(String, Path)>({
-            let parts = (it.split(":") as Iterable<String>)
-            let name = parts.first().unwrap().trimmed()
-            let path = Path.current()
-                .append(Path.parse(parts.second().unwrap().trimmed()))
-                .normalized()
-            Tuple(name, Package(path))
-          })
-          .unsafeToMap<String, Package>()
+          .map<Package>({ Package(Path.current().append(Path.parse(it.trimmed())).normalized()) })
+          .unsafeToSet<Package>()
+          .toMutable()
+      if !(name == "core") {
+        dependencies.insert(Package(Path.current().append(Path.parse("../core")).normalized()))
+      }
 
       Tuple(Candyspec(this, name, dependencies), List.empty<CompilerError>())
     })
