@@ -104,6 +104,16 @@ public trait MutableSet<Item: Equals & Hash>: Set<Item> {
   fun insert(item: Item): Bool
   /// Returns `true` if `item` (or an equal value) was not yet in the set. Otherwise, returns
   /// `false` and the set is not modified.
+  fun addAll(items: Iterable<Item>): Bool {
+    /// Returns `true` if any of `items` (or an equal value) was not yet in the set. Otherwise,
+    /// returns `false` and the set is not modified.
+    mut let wasModified = false
+    for item in items {
+      wasModified = insert(item) || wasModified
+    }
+    wasModified
+  }
+
   fun remove(item: Item): Bool
   /// Returns `true` if `item` was in the set. Otherwise, returns `false` and the set is not
   /// modified.
