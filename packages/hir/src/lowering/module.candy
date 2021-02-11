@@ -1,3 +1,3 @@
-public use compiler_utils
-public use incremental
+use compiler_utils
+use incremental
 public use .declarations
