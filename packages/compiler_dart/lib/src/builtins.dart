@@ -730,7 +730,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
           dart.Method(
             (b) => b
               ..returns = string
-              ..name = 'basename'
+              ..name = 'baseName'
               ..body = dart
                   .refer('basename', packagePathUrl)
                   .call([dart.refer('_path').property('value')])
@@ -740,7 +740,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
           dart.Method(
             (b) => b
               ..returns = string
-              ..name = 'basenameWithoutExtension'
+              ..name = 'baseNameWithoutExtension'
               ..body = dart
                   .refer('basenameWithoutExtension', packagePathUrl)
                   .call([dart.refer('_path').property('value')])
