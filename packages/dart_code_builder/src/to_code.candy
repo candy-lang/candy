@@ -34,33 +34,33 @@ fun parametersToCode(
   parameters
 }
 
-fun annotationsToCode(annotations: Iterable<Annotation>): String {
-  (annotations as Iterable<Annotation>).map<String>({ "{(it as ToCode).toCode()}\n" }).join("")
+fun annotationsToCode(annotations: Iterable<DartAnnotation>): String {
+  (annotations as Iterable<DartAnnotation>).map<String>({ "{(it as DartToCode).toCode()}\n" }).join("")
 }
 
-trait ToCode {
+trait DartToCode {
   fun toCode(): String
 }
 
-impl CompilationUnit: ToCode {
+impl DartCompilationUnit: DartToCode {
   fun toCode(): String {
-    let directivesCode = (directives as Iterable<Directive>)
-      .map<String>({ (it as ToCode).toCode() })
+    let directivesCode = (directives as Iterable<DartDirective>)
+      .map<String>({ (it as DartToCode).toCode() })
       .join("\n")
-    let declarationsCode = (declarations as Iterable<Declaration>)
-      .map<String>({ (it as ToCode).toCode() })
+    let declarationsCode = (declarations as Iterable<DartDeclaration>)
+      .map<String>({ (it as DartToCode).toCode() })
       .join("\n")
     "{directivesCode}\n\n{declarationsCode}"
   }
 }
 
-impl Annotation: ToCode {
-  fun toCode(): String { "@{(expression as ToCode).toCode()}" }
+impl DartAnnotation: DartToCode {
+  fun toCode(): String { "@{(expression as DartToCode).toCode()}" }
 }
 
-impl Directive: ToCode
+impl DartDirective: DartToCode
 
-impl Import: ToCode {
+impl DartImport: DartToCode {
   fun toCode(): String {
     mut let s = "import '{path}'"
     if prefix is Some {
@@ -76,40 +76,40 @@ impl Import: ToCode {
   }
 }
 
-impl Part: ToCode {
+impl DartPart: DartToCode {
   fun toCode(): String { "part '{path}';" }
 }
 
-impl PartOf: ToCode {
+impl DartPartOf: DartToCode {
   fun toCode(): String { "part of '{path}';" }
 }
 
-impl Declaration: ToCode
-impl Class: ToCode {
+impl DartDeclaration: DartToCode
+impl DartClass: DartToCode {
   fun toCode(): String {
     mut let s = "{annotationsToCode(annotations)} class {name}"
     if extends_ is Some {
-      s = "{s} extends {(extends_.unwrap() as ToCode).toCode()}"
+      s = "{s} extends {(extends_.unwrap() as DartToCode).toCode()}"
     }
     if (implements_ as Iterable).isNotEmpty() {
       let implementsCode = (implements_ as Iterable<DartType>)
-        .map<String>({ (it as ToCode).toCode() })
+        .map<String>({ (it as DartToCode).toCode() })
         .join(", ")
       s = "{s} implements {implementsCode}"
     }
     if (with_ as Iterable).isNotEmpty() {
       let withCode = (with_ as Iterable<DartType>)
-        .map<String>({ (it as ToCode).toCode() })
+        .map<String>({ (it as DartToCode).toCode() })
         .join(", ")
       s = "{s} with {withCode}"
     }
-    let bodyCode = (body as Iterable<Constructor | Field | Getter | Setter | Function>)
-      .map<String>({ (it as ToCode).toCode() })
+    let bodyCode = (body as Iterable<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>)
+      .map<String>({ (it as DartToCode).toCode() })
       .join("\n")
     "{s} \👍\n{indent(bodyCode)}\n}"
   }
 }
-impl Constructor: ToCode {
+impl DartConstructor: DartToCode {
   fun toCode(): String {
     mut let s = className
     if name is Some {
@@ -117,174 +117,174 @@ impl Constructor: ToCode {
     }
     s = "{annotationsToCode(annotations)} {s}"
     let parameters = parametersToCode(
-      (requiredParameters as Iterable<Parameter | InitializingFormal>)
-        .map<String>({ (it as ToCode).toCode() }),
-      (positionalParameters as Iterable<Parameter | InitializingFormal>)
-        .map<String>({ (it as ToCode).toCode() }),
-      (namedParameters as Iterable<Parameter | InitializingFormal>)
-        .map<String>({ (it as ToCode).toCode() }),
+      (requiredParameters as Iterable<DartParameter | DartInitializingFormal>)
+        .map<String>({ (it as DartToCode).toCode() }),
+      (positionalParameters as Iterable<DartParameter | DartInitializingFormal>)
+        .map<String>({ (it as DartToCode).toCode() }),
+      (namedParameters as Iterable<DartParameter | DartInitializingFormal>)
+        .map<String>({ (it as DartToCode).toCode() }),
     )
     if body is Some {
-      s = "{s} {(body.unwrap() as ToCode).toCode()}"
+      s = "{s} {(body.unwrap() as DartToCode).toCode()}"
     }
-    if body.map<Bool>({ it is InlineBody }).orElse({ true }) {
+    if body.map<Bool>({ it is DartInlineBody }).orElse({ true }) {
       s = "{s};"
     }
   }
 }
-impl InitializingFormal: ToCode {
+impl DartInitializingFormal: DartToCode {
   fun toCode(): String {
     mut let s = "this.{name}"
     if defaultValue is Some {
-      s = "{s} = {(defaultValue.unwrap() as ToCode).toCode()}"
+      s = "{s} = {(defaultValue.unwrap() as DartToCode).toCode()}"
     }
     s
   }
 }
-impl Mixin: ToCode {
+impl DartMixin: DartToCode {
   fun toCode(): String {
     mut let s = "{annotationsToCode(annotations)} mixin {name}"
     if on_ is Some {
-      s = "{s} on {(on_.unwrap() as ToCode).toCode()}"
+      s = "{s} on {(on_.unwrap() as DartToCode).toCode()}"
     }
-    let bodyCode = (body as Iterable<Field | Getter | Setter | Function>)
-      .map<String>({ (it as ToCode).toCode() })
+    let bodyCode = (body as Iterable<DartField | DartGetter | DartSetter | DartFunction>)
+      .map<String>({ (it as DartToCode).toCode() })
       .join("\n")
     "{s} \👍\n{indent(bodyCode)}\n}"
   }
 }
-impl Function: ToCode {
+impl DartFunction: DartToCode {
   fun toCode(): String {
     mut let s = name
     if _returns is Some {
-      s = "{(_returns.unwrap() as ToCode).toCode()} {s}"
+      s = "{(_returns.unwrap() as DartToCode).toCode()} {s}"
     }
     s = "{annotationsToCode(annotations)} {s}"
     let parameters = parametersToCode(
-      (requiredParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
-      (positionalParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
-      (namedParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
+      (requiredParameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode() }),
+      (positionalParameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode() }),
+      (namedParameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode() }),
     )
     s = "{s}({parameters})"
     if body is Some {
-      s = "{s} {(body.unwrap() as ToCode).toCode()}"
+      s = "{s} {(body.unwrap() as DartToCode).toCode()}"
     }
-    if body.map<Bool>({ it is InlineBody }).orElse({ true }) {
+    if body.map<Bool>({ it is DartInlineBody }).orElse({ true }) {
       s = "{s};"
     }
     s
   }
 }
-impl Parameter: ToCode {
+impl DartParameter: DartToCode {
   fun toCode(): String {
     mut let s = name
     if type is Some {
-      s = "{(type.unwrap() as ToCode).toCode()} {s}"
+      s = "{(type.unwrap() as DartToCode).toCode()} {s}"
     }
     if defaultValue is Some {
-      s = "{s} = {(defaultValue.unwrap() as ToCode).toCode()}"
+      s = "{s} = {(defaultValue.unwrap() as DartToCode).toCode()}"
     }
     s
   }
 }
-impl Field: ToCode {
+impl DartField: DartToCode {
   fun toCode(): String {
     mut let s = name
-    if !(mutability is Var) {
-      s = "{(mutability as ToCode).toCode()} {s}"
+    if !(mutability is DartVar) {
+      s = "{(mutability as DartToCode).toCode()} {s}"
     }
     if isStatic {
       s = "static {s}"
     }
     if initialValue is Some {
-      s = "{s} = {(initialValue.unwrap() as ToCode).toCode()}"
+      s = "{s} = {(initialValue.unwrap() as DartToCode).toCode()}"
     }
     s = "{s};"
     s
   }
 }
 
-impl Mutability: ToCode
-impl Var: ToCode {
+impl DartMutability: DartToCode
+impl DartVar: DartToCode {
   fun toCode(): String { "var" }
 }
-impl Final: ToCode {
+impl DartFinal: DartToCode {
   fun toCode(): String { "final" }
 }
-impl Const: ToCode {
+impl DartConst: DartToCode {
   fun toCode(): String { "const" }
 }
 
-impl Getter: ToCode {
+impl DartGetter: DartToCode {
   fun toCode(): String {
-    mut let s = "{(type as ToCode).toCode()} get {name}"
+    mut let s = "{(type as DartToCode).toCode()} get {name}"
     if body is Some {
-      s = "{s} {(body.unwrap() as ToCode).toCode()}"
+      s = "{s} {(body.unwrap() as DartToCode).toCode()}"
     }
-    if body.map<Bool>({ it is InlineBody }).orElse({ true }) {
+    if body.map<Bool>({ it is DartInlineBody }).orElse({ true }) {
       s = "{s};"
     }
     s
   }
 }
-impl Setter: ToCode {
+impl DartSetter: DartToCode {
   fun toCode(): String {
-    mut let s = "set {name}({(parameter as ToCode).toCode()})"
+    mut let s = "set {name}({(parameter as DartToCode).toCode()})"
     if body is Some {
-      s = "{s} {(body.unwrap() as ToCode).toCode()}"
+      s = "{s} {(body.unwrap() as DartToCode).toCode()}"
     }
-    if body.map<Bool>({ it is InlineBody }).orElse({ true }) {
+    if body.map<Bool>({ it is DartInlineBody }).orElse({ true }) {
       s = "{s};"
     }
     s
   }
 }
 
-impl Body: ToCode
-impl InlineBody: ToCode {
+impl DartBody: DartToCode
+impl DartInlineBody: DartToCode {
   fun toCode(): String {
-    "=> {(expression as ToCode).toCode()}"
+    "=> {(expression as DartToCode).toCode()}"
   }
 }
-impl Block: ToCode {
+impl DartBlock: DartToCode {
   fun toCode(): String {
-    let statementsCode = (statements as Iterable<Statement>)
-      .map<String>({ (it as ToCode).toCode() })
+    let statementsCode = (statements as Iterable<DartStatement>)
+      .map<String>({ (it as DartToCode).toCode() })
       .join("\n")
     "\👍\n{indent(statementsCode)}\n}"
   }
 }
 
-impl DartType: ToCode
-impl NamedType: ToCode {
+impl DartType: DartToCode
+impl DartNamedType: DartToCode {
   fun toCode(): String {
-    mut let s = (name as ToCode).toCode()
+    mut let s = (name as DartToCode).toCode()
     if (typeArguments as Iterable).isNotEmpty() {
       let generics = (typeArguments as Iterable<DartType>)
-        .map<String>({ (it as ToCode).toCode() })
+        .map<String>({ (it as DartToCode).toCode() })
         .join(", ")
       s = "{s}<{generics}>"
     }
     s
   }
 }
-impl FunctionType: ToCode {
+impl DartFunctionType: DartToCode {
   fun toCode(): String {
     mut let s = "Function"
     if _returns is Some {
-      s = "{(_returns.unwrap() as ToCode).toCode()} {s}"
+      s = "{(_returns.unwrap() as DartToCode).toCode()} {s}"
     }
     let parameters = parametersToCode(
-      (parameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
-      (positionalParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
-      (namedParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
+      (parameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode() }),
+      (positionalParameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode() }),
+      (namedParameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode() }),
     )
     "{s}(parameters)"
   }
 }
 
-impl Expression: ToCode
-impl Identifier: ToCode {
+impl DartExpression: DartToCode
+impl DartIdentifier: DartToCode {
   fun toCode(): String {
     mut let s = name
     if prefix is Some {
@@ -293,81 +293,81 @@ impl Identifier: ToCode {
     s
   }
 }
-impl NullLiteral: ToCode {
+impl DartNullLiteral: DartToCode {
   fun toCode(): String { "null" }
 }
-impl StringLiteral: ToCode {
+impl DartStringLiteral: DartToCode {
   fun toCode(): String { "\🦄{value}\🦄" }
 }
-impl IntLiteral: ToCode {
+impl DartIntLiteral: DartToCode {
   fun toCode(): String { "{value}" }
 }
-impl BoolLiteral: ToCode {
+impl DartBoolLiteral: DartToCode {
   fun toCode(): String { "{value}" }
 }
-impl Call: ToCode {
+impl DartCall: DartToCode {
   fun toCode(): String {
-    mut let s = (target as ToCode).toCode()
+    mut let s = (target as DartToCode).toCode()
     let typeArgumentsCode = (typeArguments as Iterable<DartType>)
-      .map<String>({ (it as ToCode).toCode() })
+      .map<String>({ (it as DartToCode).toCode() })
       .join(", ")
     if !(typeArgumentsCode == "") {
       s = "{s}<{typeArgumentsCode}>"
     }
-    let arguments = (positionalArguments as Iterable<Expression>)
-      .map<String>({ (it as ToCode).toCode() })
+    let arguments = (positionalArguments as Iterable<DartExpression>)
+      .map<String>({ (it as DartToCode).toCode() })
       .followedBy(
         namedArguments
           .entries()
-          .map<String>({ "{it.first}: {(it.second as ToCode).toCode()}" })
+          .map<String>({ "{it.first}: {(it.second as DartToCode).toCode()}" })
       )
       .join(", ")
     s = "{s}({arguments})"
   }
 }
-impl Navigation: ToCode {
-  fun toCode(): String { "{(target as ToCode).toCode()}.{property}" }
+impl DartNavigation: DartToCode {
+  fun toCode(): String { "{(target as DartToCode).toCode()}.{property}" }
 }
-impl BinaryOperator: ToCode {
-  fun toCode(): String { "{(left as ToCode).toCode()} {operator} {(right as ToCode).toCode()}" }
+impl DartBinaryOperator: DartToCode {
+  fun toCode(): String { "{(left as DartToCode).toCode()} {operator} {(right as DartToCode).toCode()}" }
 }
-impl PrefixOperator: ToCode {
-  fun toCode(): String { "{operator}{(target as ToCode).toCode()}" }
+impl DartPrefixOperator: DartToCode {
+  fun toCode(): String { "{operator}{(target as DartToCode).toCode()}" }
 }
-impl Assignment: ToCode {
+impl DartAssignment: DartToCode {
   fun toCode(): String {
-    "{(left as ToCode).toCode()} = {(right as ToCode).toCode()}"
+    "{(left as DartToCode).toCode()} = {(right as DartToCode).toCode()}"
   }
 }
-impl Closure: ToCode {
+impl DartClosure: DartToCode {
   fun toCode(): String {
     let parameters = parametersToCode(
-      (requiredParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
-      (positionalParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
-      (namedParameters as Iterable<Parameter>).map<String>({ (it as ToCode).toCode() }),
+      (requiredParameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode() }),
+      (positionalParameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode() }),
+      (namedParameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode() }),
     )
-    mut let s = "({parameters}) {(body as ToCode).toCode()}"
-    if body is InlineBody {
+    mut let s = "({parameters}) {(body as DartToCode).toCode()}"
+    if body is DartInlineBody {
       s = "{s};"
     }
     s
   }
 }
 
-impl Statement: ToCode
-impl ExpressionStatement: ToCode {
-  fun toCode(): String { "{(expression as ToCode).toCode()};" }
+impl DartStatement: DartToCode
+impl DartExpressionStatement: DartToCode {
+  fun toCode(): String { "{(expression as DartToCode).toCode()};" }
 }
-impl Return: ToCode {
+impl DartReturn: DartToCode {
   fun toCode(): String {
     if expression is Some {
-      "return {(expression.unwrap() as ToCode).toCode()};"
+      "return {(expression.unwrap() as DartToCode).toCode()};"
     } else {
       "return;"
     }
   }
 }
-impl Break: ToCode {
+impl DartBreak: DartToCode {
   fun toCode(): String {
     if label is Some {
       "break {label.unwrap()};"
@@ -376,7 +376,7 @@ impl Break: ToCode {
     }
   }
 }
-impl Continue: ToCode {
+impl DartContinue: DartToCode {
   fun toCode(): String {
     if label is Some {
       "continue {label.unwrap()};"
@@ -385,21 +385,21 @@ impl Continue: ToCode {
     }
   }
 }
-impl If: ToCode {
+impl DartIf: DartToCode {
   fun toCode(): String {
-    mut let s = "if ({(condition as ToCode).toCode()}) {(then as ToCode).toCode()}"
+    mut let s = "if ({(condition as DartToCode).toCode()}) {(then as DartToCode).toCode()}"
     if else_ is Some {
-      s = "{s} else {(else_.unwrap() as ToCode).toCode()}"
+      s = "{s} else {(else_.unwrap() as DartToCode).toCode()}"
     }
     s
   }
 }
-impl While: ToCode {
+impl DartWhile: DartToCode {
   fun toCode(): String {
-    mut let s = "while ({(condition as ToCode).toCode()})"
+    mut let s = "while ({(condition as DartToCode).toCode()})"
     if label is Some {
       s = "{label.unwrap()}:\n{s}"
     }
-    "{s} {indent((body as ToCode).toCode())}"
+    "{s} {indent((body as DartToCode).toCode())}"
   }
 }
