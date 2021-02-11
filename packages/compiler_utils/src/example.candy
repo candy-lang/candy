@@ -5,8 +5,9 @@ use ..file
 use ..package
 
 fun main() {
-  let package = Package(Path.parse("D:/p/candy/packages/compiler_utils"))
+  let package = Package(Path.current().append(Path.parse("../hir")).normalized())
   let context = QueryContext.create<List<CompilerError>>()
 
   print("{package.getCandyspec(context)}")
+  print("{package.getAllDependencies(context)}")
 }

@@ -5,52 +5,46 @@ use ..file
 use ..location
 use ..package
 
-class Candyspec {
-  public let package: Package
-  public let name: String
-  public let dependencies: Map<String, Path>
-}
-
 impl Package {
   public fun getAllDependencies(context: QueryContext<List<CompilerError>>): Set<Package> {
     /// Returns all dependencies (without this package itself).
 
     query<Set<Package>, List<CompilerError>>(context, "Package.getAllDependencies", (this as Equals & Hash), {
-      Tuple(getAllDependenciesHelper(context, List.empty<Package>()), List.empty<CompilerError>())
+      getAllDependenciesHelper(context, List.empty<Package>())
     })
   }
   fun getAllDependenciesHelper(
     context: QueryContext<List<CompilerError>>,
     stack: List<Package>,
-  ): Set<Package> {
+  ): (Set<Package>, List<CompilerError>) {
     /// Helper for `getAllDependencies` that checks for cycles.
-    query<Set<Package>, List<CompilerError>>(context, "Package.getAllDependenciesHelper", (this as Equals & Hash), {
-      if (stack as Iterable<Package>).any({ it == this }) {
-        let cycle = (stack as Iterable<Package>).skipWhile({ !(it == this) }).toMutableList()
-        cycle.append(this)
-        return Tuple(
-          List.empty<Package>(),
-          List.of1<CompilerError>(
-            CyclicDependenciesCompilerError(
-              Location(getCandyspecFile(context), Span(0, 1)),
-              cycle,
-            ),
+
+    if (stack as Iterable<Package>).any({ it == this }) {
+      let cycle = (stack as Iterable<Package>).skipWhile({ !(it == this) }).toMutableList()
+      cycle.append(this)
+      return Tuple(
+        Set.empty<Package>(),
+        List.of1<CompilerError>(
+          CyclicDependenciesCompilerError(
+            Location(getCandyspecFile(context), Span(0, 1)),
+            cycle,
           ),
-        )
-      }
+        ),
+      )
+    }
 
-      let newStack = (stack as Iterable<Package>).toMutableList()
-      newStack.append(this)
-      let result = MutableSet.empty<Package>()
-      for directDependency in getCandyspec(context).dependencies.values() {
-        if (result as Set<Package>).contains(this) { continue }
+    let newStack = (stack as Iterable<Package>).toMutableList()
+    newStack.append(this)
+    let result = MutableSet.empty<Package>()
+    let errors = MutableList.empty<CompilerError>()
+    for directDependency in getCandyspec(context).dependencies.items() {
+      if !result.insert(directDependency) { continue }
 
-        for transitiveDependency in directDependency.getAllDependenciesHelper(context, newStack).items() {
-          result.insert(transitiveDependency)
-        }
-      }
-      newStack.removeLast()
-      Tuple(result, List.empty<CompilerError>())
-    })
+      let transitiveResult = directDependency.getAllDependenciesHelper(context, newStack)
+      result.addAll(transitiveResult.first.items())
+      errors.appendAll(transitiveResult.second)
+    }
+    newStack.removeLast()
+    Tuple(result, errors)
   }
 }
