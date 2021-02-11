@@ -293,7 +293,27 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
             }
           });
         }).closure;
-        return [_save(node, closure)];
+
+        dart.Reference type;
+        final linkedHashMapRemoveId = DeclarationLocalId(
+          DeclarationId(
+            ResourceId(
+              PackageId.core,
+              'src/collections/map/linked_hash_map.candy',
+            ),
+          )
+              .inner(DeclarationPathData.impl('LinkedHashMap'), 1)
+              .inner(DeclarationPathData.function('remove')),
+          4,
+        );
+        if (node.id == linkedHashMapRemoveId) {
+          type = dart.FunctionType((b) => b
+            ..requiredParameters.add(dart.refer('MapEntry<Key, Value>'))
+            ..returnType = compileType(context, CandyType.bool));
+        }
+        return [
+          _save(node, closure, type: type),
+        ];
       },
     );
   }
@@ -642,11 +662,12 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     Expression source,
     dart.Expression lowered, {
     bool isMutable = false,
+    dart.Reference type,
   }) {
     if (isMutable) {
-      return lowered.assignVar(_name(source.id)).statement;
+      return lowered.assignVar(_name(source.id), type).statement;
     } else {
-      return lowered.assignFinal(_name(source.id)).statement;
+      return lowered.assignFinal(_name(source.id), type).statement;
     }
   }
 

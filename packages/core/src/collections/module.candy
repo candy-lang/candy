@@ -2,3 +2,4 @@ public use .array
 public use .iterable
 public use .list
 public use .map
+public use .set
