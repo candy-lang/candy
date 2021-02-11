@@ -10,20 +10,39 @@ impl Package {
     /// Returns all dependencies (without this package itself).
 
     query<Set<Package>, List<CompilerError>>(context, "Package.getAllDependencies", (this as Equals & Hash), {
-      getAllDependenciesHelper(context, List.empty<Package>())
+      let packages = (getAllPackagesInCompilationOrder(context) as Iterable<Package>)
+          .unsafeToSet<Package>()
+          .toMutable()
+      packages.remove(this)
+      Tuple(packages, List.empty<CompilerError>())
     })
   }
-  fun getAllDependenciesHelper(
+
+  public fun getAllPackagesInCompilationOrder(context: QueryContext<List<CompilerError>>): List<Package> {
+    /// Returns all packages (dependencies and this package itself) sorted topologically.
+    ///
+    /// By compiling packages in the order of the returned list, packages are only compiled after
+    /// all of their dependencies.
+
+    query<List<Package>, List<CompilerError>>(context, "Package.getAllPackagesInCompilationOrder", (this as Equals & Hash), {
+      getAllPackagesInCompilationOrderHelper(context, List.empty<Package>(), Set.empty<Package>())
+    })
+  }
+  public fun getAllPackagesInCompilationOrderHelper(
     context: QueryContext<List<CompilerError>>,
     stack: List<Package>,
-  ): (Set<Package>, List<CompilerError>) {
-    /// Helper for `getAllDependencies` that checks for cycles.
+    visited: Set<Package>,
+  ): (List<Package>, List<CompilerError>) {
+    /// Helper for `getAllPackagesInCompilationOrder` that performs the actual topological sort and
+    /// checks for cycles.
+
+    assert(!visited.contains(this), "Already visited package {this}.")
 
     if (stack as Iterable<Package>).any({ it == this }) {
       let cycle = (stack as Iterable<Package>).skipWhile({ !(it == this) }).toMutableList()
       cycle.append(this)
       return Tuple(
-        Set.empty<Package>(),
+        List.empty<Package>(),
         List.of1<CompilerError>(
           CyclicDependenciesCompilerError(
             Location(getCandyspecFile(context), Span(0, 1)),
@@ -35,47 +54,18 @@ impl Package {
 
     let newStack = (stack as Iterable<Package>).toMutableList()
     newStack.append(this)
-    let result = MutableSet.empty<Package>()
-    let errors = MutableList.empty<CompilerError>()
-    for directDependency in getCandyspec(context).dependencies.items() {
-      if !result.insert(directDependency) { continue }
-
-      let transitiveResult = directDependency.getAllDependenciesHelper(context, newStack)
-      result.addAll(transitiveResult.first.items())
-      errors.appendAll(transitiveResult.second)
-    }
-    newStack.removeLast()
-    Tuple(result, errors)
-  }
-
-  public fun getAllPackagesInCompilationOrder(context: QueryContext<List<CompilerError>>): List<Package> {
-    /// Returns all packages (dependencies and this package itself) sorted topologically.
-    ///
-    /// By compiling packages in the order of the returned list, packages are only compiled after
-    /// all of their dependencies.
-
-    query<List<Package>, List<CompilerError>>(context, "Package.getAllPackagesInCompilationOrder", (this as Equals & Hash), {
-      Tuple(getAllPackagesInCompilationOrderHelper(context, Set.empty<Package>()), List.empty<CompilerError>())
-    })
-  }
-  public fun getAllPackagesInCompilationOrderHelper(
-    context: QueryContext<List<CompilerError>>,
-    visited: Set<Package>,
-  ): List<Package> {
-    /// Helper for `getAllPackagesInCompilationOrder` that performs the actual topological sort.
-
-    assert(!visited.contains(this), "Already visited package {this}.")
-
     let newVisited = visited.union(Set.of1<Package>(this)).toMutable()
-    let result = MutableList.empty<Package>()
+    let packages = MutableList.empty<Package>()
+    let errors = MutableList.empty<CompilerError>()
     for dependency in getCandyspec(context).dependencies.items() {
       if visited.contains(dependency) { continue }
 
-      let dependencyResult = dependency.getAllPackagesInCompilationOrderHelper(context, newVisited)
-      result.appendAll(dependencyResult)
-      newVisited.addAll(dependencyResult)
+      let result = dependency.getAllPackagesInCompilationOrderHelper(context, newStack, newVisited)
+      newVisited.addAll(result.first)
+      packages.appendAll(result.first)
+      errors.appendAll(result.second)
     }
-    result.append(this)
-    result
+    packages.append(this)
+    Tuple(packages, List.empty<CompilerError>())
   }
 }
