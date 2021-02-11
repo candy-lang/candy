@@ -13,9 +13,10 @@ Future<void> main(List<String> args) async {
       .trim()
       .replaceAll('\r', '')
       .replaceAll('\n', '\\n')
+      .replaceAll('\\', '\\\\') // Separators from paths on Windows.
       .replaceAllMapped(
         RegExp(
-          '("(?:path|value|name|identifier|keyword|punctuation|content)":) ([^"{\\d][^}"]*|["{](?=[,}]))',
+          '("(?:path|value|name|identifier|keyword|punctuation|content)":) ([^"{\\d][^,}"]*|["{](?=[,}]))',
         ),
         (it) => '${it[1]} "${it[2]}"',
       )
