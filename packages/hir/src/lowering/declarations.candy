@@ -87,7 +87,7 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, module: HirModule): 
     // TODO(marcelgarus): Inline the condition into the `if` once the && is lazy.
     mut let condition = segments.isNotEmpty()
     if condition {
-      File(path.append(Path.parse("{segments.first().unwrap()}.candy"))).doesExist()
+      condition = File(path.append(Path.parse("{segments.first().unwrap()}.candy"))).doesExist()
     }
     if condition {
       path = path.append(Path.parse("{segments.first().unwrap()}"))
@@ -99,8 +99,8 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, module: HirModule): 
 
     let ast = parseAstOfFile(context, FancyFile(module.package(), path)).first
     if segments.isNotEmpty() {
-      // TODO(marcelgarus): Navigate through the ast to find the correct `AstModule`.
-      todo("Support getting the ast of inline modules.")
+      // TODO(marcelgarus): Navigate through the AST to find the correct `AstModule`.
+      todo("Support getting the AST of inline modules.")
     }
 
     return Tuple(ast, List.empty<CompilerError>()) as (AstFile | AstModule, List<CompilerError>)
