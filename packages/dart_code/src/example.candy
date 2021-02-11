@@ -1,0 +1,213 @@
+use ..nodes
+use ..to_code
+
+fun main() {
+  let compilationUnit = DartCompilationUnit(
+    directives = List.of4<DartDirective>(
+      DartImport(
+        "package:foo/foo.dart",
+        prefix = Some<String>("foo"),
+        show = List.empty<String>(),
+        hide = List.of1<String>("bar"),
+      ),
+      DartImport(
+        "dart:blub",
+        prefix = None<String>(),
+        show = List.of1<String>("blubber"),
+        hide = List.empty<String>(),
+      ),
+      DartPart("test.dart"),
+      DartPartOf("meow.dart"),
+    ),
+    declarations = List.of3<DartDeclaration>(
+      DartFunction(
+        "main",
+        annotations = List.of1<DartAnnotation>(
+          DartAnnotation(
+            (DartNamedType(
+              DartIdentifier("Cached", prefix = None<String>()),
+              typeArguments = List.empty<DartType>(),
+            ) as DartExpression).call(
+              positionalArguments = List.empty<DartExpression>(),
+              namedArguments = Map.empty<String, DartExpression>(),
+              typeArguments = List.empty<DartType>(),
+            ),
+          ),
+        ),
+        _returns = Some<DartType>(
+          DartNamedType(
+            DartIdentifier("Foo", prefix = Some<String>("foo")),
+            typeArguments = List.empty<DartType>(),
+          ),
+        ),
+        requiredParameters = List.of1<DartParameter>(
+          DartParameter(
+            "args",
+            type = Some<DartType>(
+              DartNamedType(
+                DartIdentifier("List", prefix = None<String>()),
+                typeArguments = List.of1<DartType>(
+                  DartNamedType(
+                    DartIdentifier("String", prefix = None<String>()),
+                    typeArguments = List.empty<DartType>(),
+                  )
+                ),
+              ),
+            ),
+            defaultValue = None<DartExpression>(),
+          ),
+        ),
+        positionalParameters = List.of1<DartParameter>(
+          DartParameter(
+            "number",
+            type = Some<DartType>(
+              DartNamedType(DartIdentifier("int", None<String>()), List.empty<DartType>()),
+            ),
+            default = Some<DartExpression>(DartIntLiteral(123)),
+          ),
+        ),
+        namedParameters = List.empty<DartParameter>(),
+        body = Some<DartBody>(
+          DartBlock(
+            List.of1<DartStatement>(
+              DartWhile(
+                condition = DartBoolLiteral(true),
+                label = Some<String>("foo"),
+                body = DartBlock(List.of1<DartStatement>(DartBreak(label = Some<String>("foo")))),
+              ),
+            ),
+          ),
+        ),
+      ),
+      DartClass(
+        "Foo",
+        annotations = List.of1<DartAnnotation>(
+          DartAnnotation(DartIdentifier("data", prefix = None<String>())),
+        ),
+        extends_ = Some<DartType>(
+          DartNamedType(DartIdentifier("Bar", None<String>()), List.empty<DartType>()),
+        ),
+        implements_ = List.of3<DartType>(
+          DartNamedType(DartIdentifier("Baz", None<String>()), List.empty<DartType>()),
+          DartNamedType(DartIdentifier("Wheez", None<String>()), List.empty<DartType>()),
+          DartNamedType(DartIdentifier("Fnop", None<String>()), List.empty<DartType>()),
+        ),
+        with_ = List.of2<DartType>(
+          DartNamedType(DartIdentifier("Whup", None<String>()), List.empty<DartType>()),
+          DartNamedType(DartIdentifier("Flang", None<String>()), List.empty<DartType>()),
+        ),
+        body = List.of5<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>(
+          // static const numBlubs = 123;
+          DartField(
+            "numBlubs",
+            isStatic = true,
+            mutability = DartConst(),
+            initialValue = Some<DartExpression>(DartIntLiteral(123)),
+          ),
+          // Foo()
+          DartConstructor(
+            className = "Foo",
+            name = None<String>(),
+            annotations = List.empty<DartAnnotation>(),
+            requiredParameters = List.of1<DartParameter | DartInitializingFormal>(
+              DartInitializingFormal("blub", defaultValue = None<DartExpression>()),
+            ),
+            positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
+            namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
+            body = None<DartBody>(),
+          ),
+          // bool get isEmpty => this.length == 0;
+          DartGetter(
+            "isEmpty",
+            type = DartNamedType(DartIdentifier("bool", None<String>()), List.empty<DartType>()),
+            body = Some<DartBody>(DartInlineBody(this_.dot("length").equals(DartIntLiteral(0)))),
+          ),
+          // set isEmpty(bool value) {
+          //   if (value) {
+          //     length = 0;
+          //   } else {
+          //     add(1);
+          //   }
+          // }
+          DartSetter(
+            "isEmpty",
+            parameter = DartParameter(
+              "value",
+              type = Some<DartType>(
+                DartNamedType(DartIdentifier("bool", None<String>()), List.empty<DartType>()),
+              ),
+              defaultValue = None<DartExpression>(),
+            ),
+            body = Some<DartBody>(
+              DartBlock(
+                List.of1<DartStatement>(
+                  DartIf(
+                    DartIdentifier("value", None<String>()),
+                    then = DartBlock(
+                      List.of1<DartStatement>(
+                        DartExpressionStatement(
+                          DartAssignment(
+                            DartIdentifier("length", None<String>()),
+                            DartIntLiteral(0),
+                          ),
+                        ),
+                      ),
+                    ),
+                    else_ = Some<DartStatement>(
+                      DartBlock(
+                        List.of1<DartStatement>(
+                          DartExpressionStatement(
+                            DartIdentifier("length", None<String>()).dot("someCall").call(
+                              List.of2<DartExpression>(DartIntLiteral(1), DartIntLiteral(2)),
+                              Map.empty<String, DartExpression>(),
+                              List.of1<DartType>(
+                                DartNamedType(
+                                  DartIdentifier("bool", None<String>()),
+                                  List.empty<DartType>(),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          DartFunction(
+            "blub",
+            annotations = List.empty<DartAnnotation>(),
+            _returns = Some<DartType>(
+              DartNamedType(DartIdentifier("Blub", None<String>()), List.empty<DartType>()),
+            ),
+            requiredParameters = List.empty<DartParameter>(),
+            positionalParameters = List.empty<DartParameter>(),
+            namedParameters = List.of1<DartParameter>(
+              DartParameter(
+                "blub",
+                Some<DartType>(
+                  DartNamedType(DartIdentifier("int", None<String>()), List.empty<DartType>()),
+                ),
+                defaultValue = None<DartExpression>(),
+              ),
+            ),
+            body = None<DartBody>(),
+          ),
+        ),
+      ),
+      DartMixin(
+        "MyMixin",
+        annotations = List.of1<DartAnnotation>(
+          DartAnnotation(DartIdentifier("data", prefix = None<String>())),
+        ),
+        on_ = Some<DartType>(
+          DartNamedType(DartIdentifier("Foo", prefix = None<String>()), List.empty<DartType>()),
+        ),
+        body = List.empty<DartGetter | DartSetter | DartFunction>(),
+      ),
+    ),
+  )
+  print((compilationUnit as DartToCode).toCode())
+}
