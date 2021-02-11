@@ -19,7 +19,7 @@ fun fileToHirModule(context: QueryContext<List<CompilerError>>, file: FancyFile)
 
   query<HirModule, List<CompilerError>>(context, "HirModule.fromFile", (file as Equals & Hash), {
     mut let path = file.path
-    if path.basenameWithoutExtension() == "module" {
+    if path.baseNameWithoutExtension() == "module" {
       path = path.parent().unwrap()
     }
     let module = ((if path.parent() is None {
@@ -27,7 +27,7 @@ fun fileToHirModule(context: QueryContext<List<CompilerError>>, file: FancyFile)
     } else {
       HirInnerModule(
         fileToHirModule(context, FancyFile(file.package, path.parent().unwrap())),
-        file.path.basenameWithoutExtension(),
+        file.path.baseNameWithoutExtension(),
       )
     }) as HirModule)
     Tuple(module, List.empty<CompilerError>())
