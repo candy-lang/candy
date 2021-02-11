@@ -1,66 +1,71 @@
 {
   "folders": [
     {
-      "name": "candy",
+      "name": "🍭 Candy",
       "path": "."
     },
     {
-      "name": "language",
+      "name": "📖 Language",
       "path": "language"
     },
     {
-      "name": "playground",
+      "name": "🧸 Playground",
       "path": "playground"
     },
     {
+      "name": "Code",
       "path": "packages\\core"
     },
     {
+      "name": "Dart Code",
       "path": "packages\\dart_code"
     },
     {
+      "name": "Glados",
       "path": "packages\\glados"
     },
     {
+      "name": "Incremental",
       "path": "packages\\incremental"
     },
     {
+      "name": "PetitParser",
       "path": "packages\\petit_parser"
     },
     {
-      "name": "compiler: cst",
+      "name": "Compiler: CST",
       "path": "packages\\cst"
     },
     {
-      "name": "compiler: ast",
+      "name": "Compiler: AST",
       "path": "packages\\ast"
     },
     {
-      "name": "compiler: hir",
+      "name": "Compiler: HIR",
       "path": "packages\\hir"
     },
     {
-      "name": "compiler: utils",
+      "name": "Compiler: Utils",
       "path": "packages\\compiler_utils"
     },
     {
-      "name": "dart-compiler: parser",
+      "name": "Dart-Compiler: parser",
       "path": "packages\\parser"
     },
     {
-      "name": "dart-compiler: compiler",
+      "name": "Dart-Compiler: compiler",
       "path": "packages\\compiler"
     },
     {
-      "name": "dart-compiler: compiler_dart",
+      "name": "Dart-Compiler: compiler_dart",
       "path": "packages\\compiler_dart"
     },
     {
-      "name": "dart-compiler: lsp_server",
+      "name": "Dart-Compiler: lsp_server",
       "path": "packages\\lsp_server"
     },
     {
-      "name": "dart-compiler: vscode_extension",
+      "name": "Dart-Compiler: vscode_extension",
       "path": "packages\\vscode_extension"
     },
     {
