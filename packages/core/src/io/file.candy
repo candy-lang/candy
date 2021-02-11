@@ -43,6 +43,8 @@ builtin class Path {
   builtin fun isAbsolute(): Bool
   builtin fun parent(): Maybe<Path>
   builtin fun child(name: String): Path
+  builtin fun baseName(): String
+  builtin fun baseNameWithoutExtension(): String
 
   builtin fun append(other: Path): Path
 }

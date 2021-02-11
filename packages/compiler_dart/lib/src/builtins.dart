@@ -727,6 +727,26 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
               {},
               [],
             ).code),
+          dart.Method(
+            (b) => b
+              ..returns = string
+              ..name = 'baseName'
+              ..body = dart
+                  .refer('basename', packagePathUrl)
+                  .call([dart.refer('_path').property('value')])
+                  .wrapInCandyString(context)
+                  .code,
+          ),
+          dart.Method(
+            (b) => b
+              ..returns = string
+              ..name = 'baseNameWithoutExtension'
+              ..body = dart
+                  .refer('basenameWithoutExtension', packagePathUrl)
+                  .call([dart.refer('_path').property('value')])
+                  .wrapInCandyString(context)
+                  .code,
+          ),
           dart.Method((b) => b
             ..returns = bool
             ..name = 'equals'

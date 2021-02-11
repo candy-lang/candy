@@ -18,17 +18,39 @@ fun fileToHirModule(context: QueryContext<List<CompilerError>>, file: FancyFile)
   // soon as adding static functions through impls works.
 
   query<HirModule, List<CompilerError>>(context, "HirModule.fromFile", (file as Equals & Hash), {
-    todo("Implement HirModule.fromFile")
-    // TODO(marcelgarus): Once `Path`s support getting the parent, we should create a
-    // `HirTopLevelModule` for the `file`'s package and for each path segment, wrap it with a
-    // `HirInnerModule`.
-    
-    // mut let module: HirModule = (HirTopLevelModule(file.package) as HirModule)
-    // for segment in file.path {
-    //     module = (HirInnerModule(module, segment) as HirModule)
-    // }
-    // Tuple(module, List.empty<CompilerError>())
+    mut let path = file.path
+    if path.baseNameWithoutExtension() == "module" {
+      path = path.parent().unwrap()
+    }
+    let module = ((if path.parent() is None {
+      HirTopLevelModule(file.package)
+    } else {
+      HirInnerModule(
+        fileToHirModule(context, FancyFile(file.package, path.parent().unwrap())),
+        file.path.baseNameWithoutExtension(),
+      )
+    }) as HirModule)
+    Tuple(module, List.empty<CompilerError>())
   })
+}
+
+trait HasPackageAndPath {
+  fun package(): Package
+  fun path(): List<String>
+}
+impl HirModule: HasPackageAndPath {
+  fun package(): Package
+  fun path(): List<String>
+}
+impl HirTopLevelModule: HasPackageAndPath {
+  fun package(): Package { parent }
+  fun path(): List<String> { List.empty<String>() }
+}
+impl HirInnerModule: HasPackageAndPath {
+  fun package(): Package { parent.package() }
+  fun path(): List<String> {
+    (parent.path() as Iterable<String>).followedBy(List.of1<String>(name())).toList()
+  }
 }
 
 // TODO(marcelgarus): We'd like `HirModule` to implement `HasDeclarations`. Normally, we could just
@@ -40,7 +62,48 @@ fun fileToHirModule(context: QueryContext<List<CompilerError>>, file: FancyFile)
 
 fun astOfModule(context: QueryContext<List<CompilerError>>, module: HirModule): AstFile | AstModule {
   query<AstFile | AstModule, List<CompilerError>>(context, "HirModule.ast", (module as Equals & Hash), {
-    todo("Check the filesystem and astify the correct file.")
+    // These are all the ways that modules can be declared with decreasing priority:
+    //
+    // * By creating directories.
+    // * By creating files.
+    // * By creating inline modules.
+    //
+    // First, go into directories with correct names as long as possible. Then, look for a file with
+    // the name of the next submodule, defaulting to module.candy if it doesn't exist. Finally, read
+    // that file and find a inline module nested.
+
+    mut let segments = module.path() as Iterable<String>
+    mut let path = module.package().getResolvedPath(context).append(Path.parse("src"))
+
+    while segments.isNotEmpty() {
+      // TODO(marcelgarus): Move this into the while condition once the && is lazy.
+      if !Directory(path.append(Path.parse(segments.first().unwrap()))).doesExist() {
+        break unit
+      }
+      path = path.append(Path.parse(segments.first().unwrap()))
+      segments = segments.skip(1)
+    }
+
+    // TODO(marcelgarus): Inline the condition into the `if` once the && is lazy.
+    mut let condition = segments.isNotEmpty()
+    if condition {
+      condition = File(path.append(Path.parse("{segments.first().unwrap()}.candy"))).doesExist()
+    }
+    if condition {
+      path = path.append(Path.parse("{segments.first().unwrap()}"))
+      segments = segments.skip(1)
+    } else {
+      path = path.append(Path.parse("module.candy"))
+      assert(File(path).doesExist(), "Module {module} couldn't be found at path {path}.")
+    }
+
+    let ast = parseAstOfFile(context, FancyFile(module.package(), path)).first
+    if segments.isNotEmpty() {
+      // TODO(marcelgarus): Navigate through the AST to find the correct `AstModule`.
+      todo("Support getting the AST of inline modules.")
+    }
+
+    return Tuple(ast, List.empty<CompilerError>()) as (AstFile | AstModule, List<CompilerError>)
   })
 }
 fun astDeclarationsOfModule(
@@ -74,20 +137,20 @@ fun declarationsOfModule(
       mut let functionDisambiguator = 0
       let declarations = (astDeclarationsOfModule(context, module) as Iterable<AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty>)
         .map<HirDeclaration>({
-          if (it is AstModule) { return HirInnerModule(module, (it as AstModule).name.value) }
-          if (it is AstTrait) { return HirTrait(module, (it as AstTrait).name.value) }
+          if (it is AstModule) { return HirInnerModule(module, (it as AstModule).name.value) as HirDeclaration }
+          if (it is AstTrait) { return HirTrait(module, (it as AstTrait).name.value) as HirDeclaration }
           if (it is AstImpl) {
             let impl_ = HirImpl(module, implDisambiguator)
             implDisambiguator = implDisambiguator + 1
-            return impl_
+            return impl_ as HirDeclaration
           }
-          if (it is AstClass) { return HirClass(module, (it as AstClass).name.value) }
+          if (it is AstClass) { return HirClass(module, (it as AstClass).name.value) as HirDeclaration }
           if (it is AstFunction) {
             let function = HirFunction(module, (it as AstFunction).name.value, functionDisambiguator)
             functionDisambiguator = functionDisambiguator + 1
-            return function
+            return function as HirDeclaration
           }
-          if (it is AstProperty) { return HirProperty(module, (it as AstProperty).name.value) }
+          if (it is AstProperty) { return HirProperty(module, (it as AstProperty).name.value) as HirDeclaration }
           throw "Shouldn't reach this."
         })
         .toList()
