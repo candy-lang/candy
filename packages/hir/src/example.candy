@@ -1,3 +1,4 @@
+use ..declarations
 use ..lowering
 
 fun main() {
@@ -6,8 +7,13 @@ fun main() {
   print("Package path is {packagePath}.")
   let file = FancyFile(Package(packagePath), Path.parse("src/module.candy"))
   let context = QueryContext.create<List<CompilerError>>()
+
   let module = fileToHirModule(context, file)
   print("Module is {module}")
+
   let declarations = module.declarations(context)
   print("Declarations are {declarations}")
+
+  let primitives = HirInnerModule(module, "Primitives").declarations(context)
+  print("Primitives are {primitives}")
 }
