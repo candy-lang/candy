@@ -58,7 +58,8 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
   let baz = if (true) { 3 } else { 4 } // baz = 3
   ```
   `if` is just a `builtin` function that takes a `Bool` and another function, which is provided as a trailing lambda. It returns a `Maybe<T>`.
-  And because `Maybe<T>` has an `else` function that returns just a `T` by executing the passed function if it's `None`, we can have a pretty if-else construct without baking it into the language.  
+  And `Maybe<T>` has an `else` function that returns just a `T` by defaulting to the result of the given function if it's `None`.
+  Tadaa! We just built a fancy if-else construct without baking it into the language.  
   Similarly, `loop` is a `builtin` function and instead of `for`-loops, we just add a `do` function on `Iterable`:
   ```rust
   0..3 do {
