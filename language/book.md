@@ -1,5 +1,7 @@
 # The Candy Book
 
+> Note: This document is not up-to-date.
+
 ## Foreword
 
 Welcome to the Candy Book, an introductory book to Candy!
