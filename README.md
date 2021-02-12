@@ -25,7 +25,7 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
   }
   someLambda()
   ```
-  Just like in Kotlin, if lambdas are the last parameter passed to a function, you can write it behind the parenthesis of the parameter list.
+  Just like in Kotlin, if a lambda is the last parameter passed to a function, you can write it behind the parenthesis of the parameter list.
   You can even omit the parenthesis completely if the lambda is the only parameter:
   ```rust
   someFunction { a, b -> a + b }
