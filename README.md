@@ -2,6 +2,8 @@
 
 A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
 
+[Join our Discord server.](https://discord.gg/5Vr4eAJ7gU)
+
 ## Quick introduction
 
 * **Rust-like type system with classes, enums, and traits.**
