@@ -27,15 +27,15 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
   }
   someLambda()
   ```
-  Just like in Kotlin, if a lambda is the last parameter passed to a function, you can write it behind the parenthesis of the parameter list.
-  You can even omit the parenthesis completely if the lambda is the only parameter:
+  Just like in Kotlin, if a lambda is the last parameter passed to a function, you can write it behind the parentheses of the parameter list.
+  You can even omit the parentheses completely if the lambda is the only parameter:
   ```rust
   someFunction { a, b -> a + b }
   ```
   If it's inferred from the context that the lambda accepts a single parameter and you don't specify one, it's bound to the `it` variable.
 * **Indentation-aware.**
   Candy uses indentation to find out what's an expression.
-  We still keep brackets and parenthesis for clarity – it's a very important information that you leave the scope of a long class.
+  We still keep brackets and parentheses for clarity – it's a very important information that you leave the scope of a long class.
   Rather, we use indentation so that dots for navigation and semicolons between expressions are no longer necessary:
   ```swift
   let candy = programmingLanguages
