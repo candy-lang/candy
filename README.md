@@ -19,7 +19,7 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
   That works both in local scope and in classes.
 * **Trailing lambdas.**
   Using brackets (`{}`), you can define inline lambdas:
-  ```kotlin
+  ```rust
   let someLambda = {
     print("Hello, world!")
   }
@@ -27,7 +27,7 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
   ```
   Just like in Kotlin, if lambdas are the last parameter passed to a function, you can write it behind the parenthesis of the parameter list.
   You can even omit the parenthesis completely if the lambda is the only parameter:
-  ```dart
+  ```rust
   someFunction { a, b -> a + b }
   ```
   If it's inferred from the context that the lambda accepts a single parameter and you don't specify one, it's bound to the `it` variable.
@@ -44,13 +44,13 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
 * **Keep magic to a minimum.**
   All types and functions are defined in Candy (although some are marked `builtin`, which means the compiler takes care of implementing them).
   For example, here's the definition of `Bool`:
-  ```kotlin
+  ```rust
   enum Bool { True, False }
   let true = Bool True
   let false = Bool False
   ```
   Most "control-flow structures" are just functions – take the following code:
-  ```kotlin
+  ```rust
   let foo = if (true) { 1 }  // foo = Some(1)
   let bar = if (false) { 2 } // bar = None
   let baz = if (true) { 3 } else { 4 } // baz = 3
@@ -58,7 +58,7 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
   `if` is just a `builtin` function that takes a `Bool` and another function, which is provided as a trailing lambda. It returns a `Maybe<T>`.
   And because `Maybe<T>` has an `else` function that returns just a `T` by executing the passed function if it's `None`, we can have a pretty if-else construct without baking it into the language.  
   Similarly, `loop` is a `builtin` function and instead of `for`-loops, we just add a `do` function on `Iterable`:
-  ```kotlin
+  ```rust
   0..3 do {
     print("Hello, {it}!")
   }
