@@ -97,7 +97,7 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
 We implemented a first version of the Candy compiler in Dart.
 Currently, we're working on making Candy selfhosting, so we're working on creating the Candy compiler in Candy.
 
-Some features are not implemented yet and will be added later (most notably indentation-based expressions and trailing lambdas). The first version also still contains a lot of magic like `if`, `while` and the type system is very weak.
+Some features are not implemented yet and will be added later (most notably indentation-based expressions and trailing lambdas). The first version also still contains a lot of magic like `if` and `while` and the type system is very weak.
 
 ## How to use Candy
 
