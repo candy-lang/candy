@@ -20,7 +20,7 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
   Use `var` for reassignable variables, otherwise `let`.
   That works both in local scope and in classes.
 * **Trailing lambdas.**
-  Using brackets (`{}`), you can define inline lambdas:
+  Use brackets to define inline lambdas:
   ```rust
   let someLambda = {
     print("Hello, world!")
@@ -34,7 +34,7 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
   ```
   If it's inferred from the context that the lambda accepts a single parameter and you don't specify one, it's bound to the `it` variable.
 * **Indentation-aware.**
-  Candy uses indentation for finding out what's an expression.
+  Candy uses indentation to find out what's an expression.
   We still keep brackets and parenthesis for clarity – it's a very important information that you leave the scope of a long class.
   Rather, we use indentation so that dots for navigation and semicolons between expressions are no longer necessary:
   ```swift
@@ -44,7 +44,7 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
     single()
   ```
 * **Keep magic to a minimum.**
-  All types and functions are defined in Candy (although some are marked `builtin`, which means the compiler takes care of implementing them).
+  All types and functions are defined in Candy (although some are marked `builtin`, which means the compiler implements them).
   For example, here's the definition of `Bool`:
   ```rust
   enum Bool { True, False }
@@ -78,16 +78,16 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
   use ....WayUpTop APublicSubmodule
   ```
   No dots indicate other packages that were declared in the candyspec file.  
-  Using dots imports local modules from the same package. The number of dots indicates how much to go up in the hierarchy before going down.
+  Dots indicate local modules from the same package. The number of dots indicates how much to go up in the hierarchy before traversing down.
   A nice side-effect of the dot syntax is that paths are automatically canonical, `../foo/../bar` is not possible.
 * **Enforce conventions.**
   All modules (including packages and types) are uppercased.
   Builtin types like `Bool` or `UInt8` are no exception.
-  Packages being uppercased is also nice because projects have proper names: Want to depend on `Google Maps` or `Rust FFI`? The capitalization matches the project name.
+  Uppercasing packages is also nice because projects have proper names: Want to depend on `Google Maps` or `Rust FFI`? The capitalization matches the actual project name.
   For ease-of-use, package names are case-insensitive and autoformatted to the canonical capitalization.
 * **Keywords.**
   You can define your own keywords (well, keyword modifiers), which are similar to macros in other languages.
-  There's a `keyword` keyword for doing that:
+  There's a `keyword` keyword to do that:
   ```rust
   keyword let foobar = ... // A code transformer
   foobar class Baz { ... }
