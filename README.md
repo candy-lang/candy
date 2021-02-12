@@ -82,12 +82,12 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
   Dots indicate local modules from the same package. The number of dots indicates how much to go up in the hierarchy before traversing down.
   A nice side-effect of the dot syntax is that paths are automatically canonical, `../foo/../bar` is not possible.
 * **Enforce conventions.**
-  All modules (including packages and types) are uppercased.
+  Packages and modules (including types) are uppercased.
   Builtin types like `Bool` or `UInt8` are no exception.
-  Uppercasing packages is also nice because projects have proper names: Want to depend on `Google Maps` or `Rust FFI`? The capitalization matches the actual project name.
+  Uppercasing packages and organizations is also nice because they have proper names: Want to depend on `Google Maps` or `Rust FFI`? The capitalization matches the actual project name.
   For ease-of-use, package names are case-insensitive and autoformatted to the canonical capitalization.
 * **Keywords.**
-  You can define your own keywords (well, keyword modifiers), which are similar to macros in other languages.
+  You can define your own keywords, which are similar to macros in other languages.
   There's a `keyword` keyword to do that:
   ```rust
   keyword let foobar = ... // A code transformer
