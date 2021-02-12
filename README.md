@@ -52,12 +52,12 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
   Most "control-flow structures" are just functions – take the following code:
   ```kotlin
   let foo = if (true) { 1 }  // foo = Some(1)
-  let bar = if (false) { 2 } // foo = None
-  let baz = if (true) { 3 } else { 4 } // foo = 3
+  let bar = if (false) { 2 } // bar = None
+  let baz = if (true) { 3 } else { 4 } // baz = 3
   ```
   `if` is just a `builtin` function that takes a `Bool` and another function, which is provided as a trailing lambda. It returns a `Maybe<T>`.
   And because `Maybe<T>` has an `else` function that returns just a `T` by executing the passed function if it's `None`, we can have a pretty if-else construct without baking it into the language.  
-  Similarly, `loop` is a `builtin` function and instead of `for`-loops, we'll just add a `do` function on `Iterable`:
+  Similarly, `loop` is a `builtin` function and instead of `for`-loops, we just add a `do` function on `Iterable`:
   ```kotlin
   0..3 do {
     print("Hello, {it}!")
@@ -77,11 +77,12 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
   ```
   No dots indicate other packages that were declared in the candyspec file.  
   Using dots imports local modules from the same package. The number of dots indicates how much to go up in the hierarchy before going down.
-  A nice side-effect of the dot syntax is that paths are automatically canonical, no `../foo/../bar` is possible.
+  A nice side-effect of the dot syntax is that paths are automatically canonical, `../foo/../bar` is not possible.
 * **Enforce conventions.**
   All modules (including packages and types) are uppercased.
   Builtin types like `Bool` or `UInt8` are no exception.
-  Packages being uppercase is also nice because projects have proper names: Want to depend on `Google Maps` or `Rust FFI`? The capitlization matches the project name.
+  Packages being uppercased is also nice because projects have proper names: Want to depend on `Google Maps` or `Rust FFI`? The capitalization matches the project name.
+  For ease-of-use, package names are case-insensitive and autoformatted to the canonical capitalization.
 * **Keywords.**
   You can define your own keywords (well, keyword modifiers), which are similar to macros in other languages.
   There's a `keyword` keyword for doing that:
