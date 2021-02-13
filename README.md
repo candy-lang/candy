@@ -94,6 +94,9 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
   foobar class Baz { ... }
   async fun doStuff() { ... }
   ```
+* **Tooling.**
+  Of course, we want to offer great tooling including syntax highlighting, autocomplete based on the popularity of code and its documentation, a package ecosystem etc.  
+  We aim to not have one global namespace for packages, but publish them hierarchically under people/organizations. Popular packages can opt-in to also being available globally. Very popular packages may be auto-imported, i.e. if you try to use the `jsonDecode` function, you'll get the autocomplete option to depend on the `JSON` package.
 
 ## The current state
 
@@ -101,6 +104,8 @@ We implemented a first version of the Candy compiler in Dart.
 Currently, we're working on making Candy selfhosting, so we're working on creating the Candy compiler in Candy.
 
 Some features are not implemented yet and will be added later (most notably indentation-based expressions and trailing lambdas). The first version also still contains a lot of magic like `if` and `while` and the type system is very weak.
+
+Regarding tooling, we already have a language server that provides syntax highlighting and go-to-definition.
 
 ## How to use Candy
 
