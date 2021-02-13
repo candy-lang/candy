@@ -94,6 +94,9 @@ A sweet programming language, mainly inspired by Kotlin, Rust and Dart.
   foobar class Baz { ... }
   async fun doStuff() { ... }
   ```
+* **Tooling.**
+  Of course, we want to offer great tooling including syntax highlighting, autocomplete based on the popularity of code and its documentation, a package ecosystem etc.  
+  We aim to not have one global namespace for packages, but publish them hierarchically under people/organizations. Popular packages can opt-in to also being available globally. Very popular packages may be auto-imported, i.e. if you try to use the `jsonDecode` function, you'll get the autocomplete option to depend on the `JSON` package.
 
 ## The current state
 
