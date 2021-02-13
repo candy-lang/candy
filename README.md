@@ -105,6 +105,8 @@ Currently, we're working on making Candy selfhosting, so we're working on creati
 
 Some features are not implemented yet and will be added later (most notably indentation-based expressions and trailing lambdas). The first version also still contains a lot of magic like `if` and `while` and the type system is very weak.
 
+Regarding tooling, we already have a language server that provides syntax highlighting and go-to-definition.
+
 ## How to use Candy
 
 1. Download the [latest release bundle](https://github.com/JonasWanke/candy/releases/latest).
