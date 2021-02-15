@@ -11,9 +11,9 @@ class Candyspec {
 }
 
 impl Package {
-  fun getCandyspecFile(context: QueryContext<List<CompilerError>>): FancyFile {
-    query<FancyFile, List<CompilerError>>(context, "Package.getCandyspecFile", (this as Equals & Hash), {
-      Tuple(FancyFile(this, Path.parse("candyspec.yaml")), List.empty<CompilerError>())
+  fun getName(context: QueryContext<List<CompilerError>>): String {
+    query<String, List<CompilerError>>(context, "Package.getName", (this as Equals & Hash), {
+      Tuple(getCandyspec(context).name, List.empty<CompilerError>())
     })
   }
   fun getCandyspec(context: QueryContext<List<CompilerError>>): Candyspec {
@@ -36,6 +36,11 @@ impl Package {
       }
 
       Tuple(Candyspec(this, name, dependencies), List.empty<CompilerError>())
+    })
+  }
+  fun getCandyspecFile(context: QueryContext<List<CompilerError>>): FancyFile {
+    query<FancyFile, List<CompilerError>>(context, "Package.getCandyspecFile", (this as Equals & Hash), {
+      Tuple(FancyFile(this, Path.parse("candyspec.yaml")), List.empty<CompilerError>())
     })
   }
 }
