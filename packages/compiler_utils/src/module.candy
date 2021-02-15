@@ -1,3 +1,4 @@
+public use .config
 public use .error
 public use .file
 public use .location

@@ -1,0 +1,31 @@
+use incremental
+use ..error
+use ..package
+
+// Assuming the `build/dart` folder is our current working directory.
+// TODO(JonasWanke): read these paths from a dynamic config
+let newPackagesPath_ = Path.current().append(Path.parse("../../../../new-packages")).normalized()
+
+fun getCorePackage(context: QueryContext<List<CompilerError>>): Package {
+  impureQuery<Package, List<CompilerError>>(context, "getCorePackage", unit, {
+    Tuple(Package(getCorePath(context)), List.empty<CompilerError>())
+  })
+}
+fun getCorePath(context: QueryContext<List<CompilerError>>): Path {
+  impureQuery<Path, List<CompilerError>>(context, "getCorePath", unit, {
+    Tuple(corePath_, List.empty<CompilerError>())
+  })
+}
+let corePath_ = newPackagesPath_.child("Core").normalized()
+
+fun getPlaygroundPackage(context: QueryContext<List<CompilerError>>): Package {
+  impureQuery<Package, List<CompilerError>>(context, "getPlaygroundPackage", unit, {
+    Tuple(Package(getPlaygroundPath(context)), List.empty<CompilerError>())
+  })
+}
+fun getPlaygroundPath(context: QueryContext<List<CompilerError>>): Path {
+  impureQuery<Path, List<CompilerError>>(context, "getPlaygroundPath", unit, {
+    Tuple(playgroundPath_, List.empty<CompilerError>())
+  })
+}
+let playgroundPath_ = newPackagesPath_.child("Playground").normalized()

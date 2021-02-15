@@ -1,4 +1,5 @@
 use incremental
+use ..config
 use ..error
 use ..file
 use ..package
@@ -30,8 +31,8 @@ impl Package {
           .map<Package>({ Package(Path.current().append(Path.parse(it.trimmed())).normalized()) })
           .unsafeToSet<Package>()
           .toMutable()
-      if !(name == "core") {
-        dependencies.insert(Package(Path.current().append(Path.parse("../core")).normalized()))
+      if !(name == "Core") {
+        dependencies.insert(getCorePackage(context))
       }
 
       Tuple(Candyspec(this, name, dependencies), List.empty<CompilerError>())

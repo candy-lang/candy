@@ -1,13 +1,20 @@
+use ast
+use compiler_utils
+use incremental
+use ..file
 use ..lowering
 
 fun main() {
-  // Assuming the build/dart folder is our current working directory.
-  let packagePath = Path.current().append(Path.parse("../../../../new-packages/Core")).normalized()
-  print("Package path is {packagePath}.")
-  let file = FancyFile(Package(packagePath), Path.parse("src/module.candy"))
   let context = QueryContext.create<List<CompilerError>>()
-  let module = fileToHirModule(context, file)
-  print("Module is {module}")
-  let declarations = module.declarations(context)
+  print("Core package path is {getCorePath(context)}.")
+
+  declarationsExample(context)
+}
+
+fun declarationsExample(context: QueryContext<List<CompilerError>>) {
+  let file = FancyFile(getCorePackage(context), Path.parse("src/module.candy"))
+  let moduleHir = fileToHirModule(context, file)
+  print("Module is {moduleHir}")
+  let declarations = moduleHir.declarations(context)
   print("Declarations are {declarations}")
 }
