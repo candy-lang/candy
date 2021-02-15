@@ -1,3 +1,6 @@
+use ..hash
+use ..operators
+
 public builtin trait Any
 /// Could be anything, from an `Int8` to a `String` to a raspberry cookie. 🍪
 ///
@@ -23,6 +26,11 @@ public builtin class Unit
 
 public let unit: Unit = unitReturningFunction()
 fun unitReturningFunction(): Unit {}
+
+impl Unit: Equals & Hash {
+  fun equals(other: This): Bool { true }
+  fun hash<T>(hasher: Hasher<T>) {}
+}
 
 public builtin class Never
 /// Can never be created. It's still useful to specify that an expression will never return
