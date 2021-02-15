@@ -17,7 +17,7 @@ public trait Any {
 //   fun toString(): String
 // }
 
-public builtin class Unit
+public class Unit
 /// The default type for expressions that don't have an explicit result.
 ///
 /// Has only one instance, `unit`. Because there's only one instance, instances of this type carry
@@ -28,6 +28,8 @@ public builtin class Unit
 /// * assignments like `let a = 5`
 /// * function calls of functions without an explicit return value like `print("Hello, world!")`
 /// * the explicit unit instance: `unit`
+//
+// TODO(marcelgarus): Make `Unit`'s constructor private.
 
 public let unit: Unit = unitReturningFunction()
 fun unitReturningFunction(): Unit {}
