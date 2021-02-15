@@ -1,3 +1,5 @@
+use compiler_utils
+use incremental
 use ..declarations
 use ..lowering
 
