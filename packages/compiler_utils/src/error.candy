@@ -21,3 +21,15 @@ impl InternalCompilerError: CompilerError {
   public fun title(): String { "Internal Error" }
   public fun description(): String { description_ }
 }
+
+public class UnsupportedFeatureCompilerError {
+  public let location_: Location
+  public let description_: String
+}
+impl UnsupportedFeatureCompilerError: CompilerError {
+  public fun id(): String { "unsupported-feature" }
+
+  public fun location(): Location { location_ }
+  public fun title(): String { "Unsupported feature" }
+  public fun description(): String { description_ }
+}
