@@ -121,11 +121,12 @@ public trait Iterable<Item> {
 
   // Searching.
 
-  // TODO(marcelgarus): firstWhere
-  // TODO(marcelgarus): lastWhere
-  // TODO(marcelgarus): singleWhere
+  fun firstWhere(checker: (Item) => Bool): Maybe<Item> { where(checker).first() }
   // TODO(marcelgarus): firstIndexWhere
+  fun lastWhere(checker: (Item) => Bool): Maybe<Item> { where(checker).last() }
   // TODO(marcelgarus): lastIndexWhere
+  fun singleWhere(checker: (Item) => Bool): Maybe<Item> { where(checker).single() }
+  // TODO(JonasWanke): singleIndexWhere
 
   // Mapping transformations.
   // These return an `Iterable` with the same length, but a different type.
