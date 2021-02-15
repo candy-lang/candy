@@ -1,6 +1,7 @@
 use ...hash
 use ...numbers
 use ...operators
+use ...primitives
 use ...random
 use ...string
 
@@ -13,5 +14,14 @@ builtin impl Int: Add & Subtract & Negate & Multiply & DivideTruncating & Modulo
 impl Int: Hash {
   fun hash<Result>(hasher: Hasher<Result>) {
     hasher.write(this)
+  }
+}
+impl Int {
+  fun times(action: (Int) => Unit) {
+    mut let index = 0
+    while index <= this {
+      action(index)
+      index = index + 1
+    }
   }
 }
