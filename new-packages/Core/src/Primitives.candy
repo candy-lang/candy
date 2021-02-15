@@ -50,5 +50,6 @@ public class Never {
   /// converted to all other types loslessly – you can assign `Never` to anything:
   /// `let a: Int = return 5` works, because the result of `return 5` is never created.
 
+  // TODO(marcelgarus): Remove this when we have private constructors.
   let impossibleToInstantiate: Never
 }
