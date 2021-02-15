@@ -1,3 +1,4 @@
+use ..bool
 use ..hash
 use ..operators
 
