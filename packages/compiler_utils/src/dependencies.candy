@@ -4,8 +4,16 @@ use ..error
 use ..file
 use ..location
 use ..package
+use ..utils
 
 impl Package {
+  public fun getDependencyByName(context: QueryContext<List<CompilerError>>, name: String): Maybe<Package> {
+    query<Maybe<Package>, List<CompilerError>>(context, "Package.getDependencyByName", DataTuple2<Package, String>(this, name), {
+      let dependencies = getAllDependencies(context).items()
+      Tuple(dependencies.singleWhere({ it.getName(context) == name }), List.empty<CompilerError>())
+    })
+  }
+
   public fun getAllDependencies(context: QueryContext<List<CompilerError>>): Set<Package> {
     /// Returns all dependencies (without this package itself).
 
@@ -68,4 +76,16 @@ impl Package {
     packages.append(this)
     Tuple(packages, List.empty<CompilerError>())
   }
+}
+
+public class CyclicDependenciesCompilerError {
+  public let location_: Location
+  public let cycle: List<Package>
+}
+impl CyclicDependenciesCompilerError: CompilerError {
+  public fun id(): String { "cyclic-dependencies-error" }
+
+  public fun location(): Location { location_ }
+  public fun title(): String { "Cycle detected in the dependencies." }
+  public fun description(): String { (cycle as Iterable<Package>).join(" → ") }
 }
