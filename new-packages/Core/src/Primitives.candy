@@ -1,4 +1,4 @@
-public builtin trait Any {
+public trait Any {
   /// Could be anything, from an `Int8` to a `String` to a raspberry cookie. 🍪
   ///
   /// All types are assignable to `Any`.
@@ -32,20 +32,23 @@ public builtin class Unit
 public let unit: Unit = unitReturningFunction()
 fun unitReturningFunction(): Unit {}
 
-public builtin class Never
-/// Can never be created. It's still useful to specify that an expression will never return
-/// directly. More specifically, this is the case in the following cases:
-///
-/// * An expression runs endlessly.
-/// * An expression aborts the current control flow.
-///
-/// Here are a few examples for expressions that evaluate to `Never`:
-///
-/// * `return 5`
-/// * `break`
-/// * `throw "blub"`
-/// * `loop {}`
-///
-/// There are no instances of `Never`. That's why we can claim that all (zero) instances can be
-/// converted to all other types loslessly – you can assign `Never` to anything:
-/// `let a: Int = return 5` works, because the result of `return 5` is never created.
+public class Never {
+  /// Can never be created. It's still useful to specify that an expression will never return
+  /// directly. More specifically, this is the case in the following cases:
+  ///
+  /// * An expression runs endlessly.
+  /// * An expression aborts the current control flow.
+  ///
+  /// Here are a few examples for expressions that evaluate to `Never`:
+  ///
+  /// * `return 5`
+  /// * `break`
+  /// * `throw "blub"`
+  /// * `loop {}`
+  ///
+  /// There are no instances of `Never`. That's why we can claim that all (zero) instances can be
+  /// converted to all other types loslessly – you can assign `Never` to anything:
+  /// `let a: Int = return 5` works, because the result of `return 5` is never created.
+
+  let impossibleToInstantiate: Never
+}
