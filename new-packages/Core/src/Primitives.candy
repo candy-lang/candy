@@ -1,9 +1,17 @@
-public builtin trait Any
-/// Could be anything, from an `Int8` to a `String` to a raspberry cookie. 🍪
-///
-/// All types are assignable to `Any`.
+public builtin trait Any {
+  /// Could be anything, from an `Int8` to a `String` to a raspberry cookie. 🍪
+  ///
+  /// All types are assignable to `Any`.
 
-// builtin impl Any: ToString
+  builtin fun as<T>(): Option<T>
+  /// Returns a `Some(this)` if `this` is of type `T`, otherwise `None()`.
+
+  fun is<T>(): Bool {
+    /// Checks if `this` if of type `T`.
+
+    (as<T>() is Some)
+  }
+}
 
 // public builtin trait ToString {
 //   fun toString(): String
