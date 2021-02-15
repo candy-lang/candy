@@ -80,6 +80,15 @@
           },
           "name": "comment.line.candy",
           "patterns": [{ "include": "#candydoc" }]
+        },
+        {
+          "begin": "(#)",
+          "end": "$",
+          "beginCaptures": {
+            "1": { "name": "comment.line.double-slash.candy" }
+          },
+          "name": "comment.line.candy",
+          "patterns": [{ "include": "#candydoc" }]
         }
       ]
     },
@@ -169,7 +178,7 @@
           "name": "keyword.control.catch-exception.candy"
         },
         {
-          "match": "(?<!\\$)\\b(break|continue|else|for|if|\\!?in|loop|match|return|while)\\b(?!\\$)",
+          "match": "(?<!\\$)\\b(break|continue|do|else|for|if|\\!?in|loop|match|return|while)\\b(?!\\$)",
           "name": "keyword.control.candy"
         },
         {
