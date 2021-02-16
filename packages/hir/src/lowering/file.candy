@@ -6,6 +6,46 @@ use ...declarations
 use ...file
 use ..declarations
 
+trait HasUseLines {
+  fun useLines(context: QueryContext<List<CompilerError>>): List<HirUseLine>
+}
+impl HirModule: HasUseLines {
+  fun useLines(context: QueryContext<List<CompilerError>>): List<HirUseLine> {
+    useLines_(context, this)
+  }
+}
+impl HirTopLevelModule: HasUseLines {
+  fun useLines(context: QueryContext<List<CompilerError>>): List<HirUseLine> {
+    useLines_(context, this)
+  }
+}
+impl HirInnerModule: HasUseLines {
+  fun useLines(context: QueryContext<List<CompilerError>>): List<HirUseLine> {
+    useLines_(context, this)
+  }
+}
+fun useLines_(context: QueryContext<List<CompilerError>>, moduleHir: HirModule): List<HirUseLine> {
+  query<List<HirUseLine>, List<CompilerError>>(context, "HirModule.useLines", (moduleHir as Equals & Hash), {
+    let ast = moduleHir.ast(context)
+    if !(ast is AstFile) { return Tuple(List.empty<HirUseLine>(), List.empty<CompilerError>()) }
+
+    let useLines = MutableList.empty<HirUseLine>()
+    ((ast as AstFile).useLines as Iterable<AstUseLine>).length().times({ index =>
+      useLines.append(HirExplicitUseLine(moduleHir, index))
+    })
+
+    let isCoreImported = (useLines as Iterable<HirUseLine>)
+      .maybeMap<HirModule>({ it.targetModule(context) })
+      .any({ it == HirModule.core(context) })
+    if !(moduleHir.package() == Package.core(context)) && !isCoreImported {
+      useLines.append(HirImplicitCoreUseLine(moduleHir))
+    }
+
+    Tuple(useLines, List.empty<CompilerError>())
+  })
+}
+
+
 trait HasTargetModule {
   fun targetModule(context: QueryContext<List<CompilerError>>): Maybe<HirModule>
 }

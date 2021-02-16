@@ -25,9 +25,7 @@ fun useLinesExample(context: QueryContext<List<CompilerError>>) {
   print("Use-Lines Example")
   let file = FancyFile(Package.playground(context), Path.parse("src/UseLines/module.candy"))
   let moduleHir = fileToHirModule(context, file)
-  ((moduleHir.ast(context) as AstFile).useLines as Iterable<AstUseLine>).length().times({ index =>
-    let useLineHir = HirExplicitUseLine(moduleHir, index)
-    let targetModule = useLineHir.targetModule(context)
-    print("Use line {index}: targetModule = {targetModule}")
-  })
+  for useLine in moduleHir.useLines(context) {
+    print("Use line {useLine}: targetModule = {useLine.targetModule(context)}")
+  }
 }

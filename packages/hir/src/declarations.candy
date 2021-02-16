@@ -1,4 +1,5 @@
 use compiler_utils
+use incremental
 
 public trait HirDeclaration {
   let parent: Package | HirModule | HirTrait | HirClass
@@ -6,6 +7,12 @@ public trait HirDeclaration {
 }
 
 public trait HirModule: HirDeclaration & Equals & Hash {
+  static fun core(context: QueryContext<List<CompilerError>>): HirTopLevelModule {
+    query<HirTopLevelModule, List<CompilerError>>(context, "HirModule.core", unit, {
+      Tuple(HirTopLevelModule(Package.core(context)), List.empty<CompilerError>())
+    })
+  }
+
   let parent: Package | HirModule
   fun innerModule(name: String): HirInnerModule { HirInnerModule(this, name) }
 }
