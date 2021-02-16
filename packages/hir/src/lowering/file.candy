@@ -10,7 +10,15 @@ trait HasTargetModule {
   fun targetModule(context: QueryContext<List<CompilerError>>): Maybe<HirModule>
 }
 
-impl HirUseLine: HasAst<AstUseLine> & HasTargetModule
+impl HirUseLine: HasTargetModule
+
+impl HirImplicitCoreUseLine: HasTargetModule {
+  fun targetModule(context: QueryContext<List<CompilerError>>): Maybe<HirModule> {
+    query<Maybe<HirModule>, List<CompilerError>>(context, "HirImplicitCoreUseLine.targetModule", (this as Equals & Hash), {
+      Tuple(Some<HirModule>(HirModule.core(context)), List.empty<CompilerError>())
+    })
+  }
+}
 
 impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
   fun ast(context: QueryContext<List<CompilerError>>): AstUseLine {
@@ -29,6 +37,7 @@ impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
       Tuple(useLineAst, List.empty<CompilerError>())
     })
   }
+
   fun targetModule(context: QueryContext<List<CompilerError>>): Maybe<HirModule> {
     query<Maybe<HirModule>, List<CompilerError>>(context, "HirExplicitUseLine.targetModule", (this as Equals & Hash), {
       let ast = this.ast(context)

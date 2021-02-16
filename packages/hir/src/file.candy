@@ -9,6 +9,16 @@ public trait HirUseLine: Equals & Hash {
   fun targetModule(context: QueryContext<List<CompilerError>>): Maybe<HirModule>
 }
 
+public class HirImplicitCoreUseLine {
+  public let parent: HirModule
+}
+impl HirImplicitCoreUseLine: Equals & Hash & HirUseLine {
+  fun equals(other: This): Bool { (parent as Equals) == (other.parent as Equals) }
+  fun hash<T>(hasher: Hasher<T>) {
+    (parent as Hash).hash<T>(hasher)
+  }
+}
+
 public class HirExplicitUseLine {
   public let parent: HirModule
   public let index: Int
