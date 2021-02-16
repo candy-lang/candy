@@ -13,7 +13,7 @@ public class HirTupleType {
 impl HirTupleType: HirType
 
 public class HirFunctionType {
-  public let receiverType: HirType
+  public let receiverType: Maybe<HirType>
   public let parameterTypes: List<HirType>
   public let returnType: HirType
 }
