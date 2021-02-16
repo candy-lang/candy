@@ -1,8 +1,11 @@
 use ..bool
 use ..hash
 use ..operators
+use ..string
 
-public builtin trait Any
+public builtin trait Any {
+  builtin fun toString(): String
+}
 /// Could be anything, from an `Int8` to a `String` to a raspberry cookie. 🍪
 ///
 /// All types are assignable to `Any`.
