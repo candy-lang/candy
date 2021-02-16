@@ -1,1 +1,22 @@
-// These impls make type system information available.
+use ast
+use compiler_utils
+use incremental
+
+use ...types
+
+/// These impls make type system information available.
+
+impl AstType {
+  fun hir(context: QueryContext<List<CompilerError>>): HirType {
+    query<HirType, List<CompilerError>>(context, "AstType.hir", this as Equals & Hash, {
+      todo("Implement AstType.hir")
+      // if (this is AstNamedType) { return HirNamedType(declaration) }
+      // if (this is AstFunctionType) { return HirFunctionType(receiverType, parameterTypes, returnType) }
+      // if (this is AstTupleType) { return HirTupleType(types) }
+      // if (this is AstUnionType) { return HirUnionType(types) }
+      // if (this is AstIntersectionType) { return HirIntersectionType(types) }
+      // if (this is AstTypeParameter) { return HirParameterType(declaration, name) }
+      // throw "Shouldn't reach this."
+    })
+  }
+}
