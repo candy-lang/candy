@@ -19,7 +19,7 @@ impl Int: Hash {
 impl Int {
   fun times(action: (Int) => Unit) {
     mut let index = 0
-    while index <= this {
+    while index < this {
       action(index)
       index = index + 1
     }
