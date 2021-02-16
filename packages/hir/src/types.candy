@@ -1,9 +1,9 @@
-/*use ..declarations
+use ..declarations
 
 public trait HirType
 
 public class HirNamedType {
-  public let declarationUri: HirTrait | HirClass
+  public let declaration: HirTrait | HirClass
 }
 impl HirNamedType: HirType
 
@@ -33,7 +33,7 @@ public class HirThisType
 impl HirThisType: HirType
 
 public class HirParameterType {
-  public let declarationUri: HirTrait | HirClass | HirFunction
+  public let declaration: HirTrait | HirClass | HirFunction
   public let name: String
 }
 impl HirParameterType: HirType
@@ -42,4 +42,3 @@ public class HirReflectionType {
   public let target: HirModule | HirTrait | HirClass | HirFunction | HirProperty | HirParameterType
 }
 impl HirReflectionType: HirType
-*/
