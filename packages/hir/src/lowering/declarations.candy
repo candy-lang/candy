@@ -81,6 +81,7 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule
     mut let segments = moduleHir.path() as Iterable<String>
     mut let path = Path.parse("src")
 
+    // Follow the directory structure down as much as possible.
     while segments.isNotEmpty() {
       // TODO(marcelgarus): Move this into the while condition once the && is lazy.
       let newPath = path.child(segments.first().unwrap())
@@ -91,6 +92,8 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule
       segments = segments.skip(1)
     }
 
+    // Choose the correct file, default to "module.candy".
+    //
     // TODO(marcelgarus): Inline the condition into the `if` once the && is lazy.
     mut let condition = segments.isNotEmpty()
     if condition {
@@ -107,9 +110,9 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule
       return Tuple(None<AstFile | AstModule>(), List.empty<CompilerError>())
     }
 
+    // TODO(marcelgarus): Navigate through the AST to find the inline `AstModule`.
     let ast = parseAstOfFile(context, FancyFile(package, path)).first
     if segments.isNotEmpty() {
-      // TODO(marcelgarus): Navigate through the AST to find the correct `AstModule`.
       todo("Support getting the AST of inline modules.")
     }
 

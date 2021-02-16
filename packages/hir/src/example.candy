@@ -1,6 +1,7 @@
 use ast
 use compiler_utils
 use incremental
+use ..declarations
 use ..file
 use ..lowering
 
@@ -15,10 +16,15 @@ fun main() {
 fun declarationsExample(context: QueryContext<List<CompilerError>>) {
   print("Declarations Example")
   let file = FancyFile(Package.core(context), Path.parse("src/module.candy"))
+
   let moduleHir = fileToHirModule(context, file)
   print("Module is {moduleHir}")
+
   let declarations = moduleHir.declarations(context)
   print("Declarations are {declarations}")
+
+  let primitives = HirInnerModule(moduleHir, "Primitives").declarations(context)
+  print("Primitives are {primitives}")
 }
 
 fun useLinesExample(context: QueryContext<List<CompilerError>>) {
