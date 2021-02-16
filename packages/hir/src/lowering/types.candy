@@ -2,21 +2,105 @@ use ast
 use compiler_utils
 use incremental
 
+use ...declarations
 use ...types
+use ..declarations
 
 /// These impls make type system information available.
 
+impl HirReflectionType: HasDeclarations {
+  fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any> {
+    List.empty<Any>()
+  }
+  public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
+    List.empty<HirDeclaration>()
+  }
+}
+
 impl AstType {
-  fun hir(context: QueryContext<List<CompilerError>>): HirType {
+  fun hir(context: QueryContext<List<CompilerError>>, scope: HirDeclaration): HirType
+}
+impl AstNamedType {
+  fun hir(context: QueryContext<List<CompilerError>>, scope: HirDeclaration): HirType {
     query<HirType, List<CompilerError>>(context, "AstType.hir", this as Equals & Hash, {
-      todo("Implement AstType.hir")
-      // if (this is AstNamedType) { return HirNamedType(declaration) }
-      // if (this is AstFunctionType) { return HirFunctionType(receiverType, parameterTypes, returnType) }
-      // if (this is AstTupleType) { return HirTupleType(types) }
-      // if (this is AstUnionType) { return HirUnionType(types) }
-      // if (this is AstIntersectionType) { return HirIntersectionType(types) }
-      // if (this is AstTypeParameter) { return HirParameterType(declaration, name) }
-      // throw "Shouldn't reach this."
+      let nameParts = ((this as AstNamedType).nameParts as Iterable<AstIdentifier>)
+        .map<String>({ it.value })
+
+      // Try to find the first part of the `nameParts`. Then, find children inside its
+      // declarations.
+      mut let candidates = nameParts.first().unwrap().resolveIdentifier(context, scope)
+      for namePart in nameParts.skip(1) {
+        candidates = (candidates as Iterable<HirDeclaration>)
+          .expand<HirDeclaration>({
+            namePart.resolveIdentifier(context, it) as Iterable<HirDeclaration>
+          })
+          .toSet()
+      }
+
+      // There should only be one candidate left.
+      let declaration = (candidates as Iterable<HirDeclaration>).single().unwrap()
+      assert((declaration is HirClass) || (declaration is HirTrait), "Declaration should be HirClass or HirTrait.")
+      return Tuple(HirNamedType(declaration as HirTrait | HirClass), List.empty<CompilerError>())
+    })
+  }
+}
+impl AstFunctionType {
+  fun hir(context: QueryContext<List<CompilerError>>, scope: HirDeclaration): HirType {
+    query<HirType, List<CompilerError>>(context, "AstType.hir", this as Equals & Hash, {
+      return Tuple(
+        HirFunctionType(
+          ast.receiverType.map<HirType>({ it.hir(context, scope) }),
+          (ast.parameterTypes as Iterable<AstType>)
+            .map<HirType>({ it.hir(context, scope) })
+            .toList(),
+          ast.returnType.hir(context, scope),
+        ),
+        List.empty<CompilerError>()
+      )
+    })
+  }
+}
+impl AstTupleType {
+  fun hir(context: QueryContext<List<CompilerError>>, scope: HirDeclaration): HirType {
+    query<HirType, List<CompilerError>>(context, "AstType.hir", this as Equals & Hash, {
+      return Tuple(
+        HirTupleType(
+          (ast.types as Iterable<AstType>).map<HirType>({ it.hir(context, scope) }).toList(),
+        ),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
+}
+impl AstUnionType {
+  fun hir(context: QueryContext<List<CompilerError>>, scope: HirDeclaration): HirType {
+    query<HirType, List<CompilerError>>(context, "AstType.hir", this as Equals & Hash, {
+      return Tuple(
+        HirUnionType(
+          (ast.types as Iterable<AstType>).map<HirType>({ it.hir(context, scope) }).toList(),
+        ),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
+}
+impl AstIntersectionType {
+  fun hir(context: QueryContext<List<CompilerError>>, scope: HirDeclaration): HirType {
+    query<HirType, List<CompilerError>>(context, "AstType.hir", this as Equals & Hash, {
+      return Tuple(
+        HirIntersectionType(
+          (ast.types as Iterable<AstType>).map<HirType>({ it.hir(context, scope) }).toList(),
+        ),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
+}
+impl AstTypeParameter {
+  fun hir(context: QueryContext<List<CompilerError>>, scope: HirDeclaration): HirType {
+    query<HirType, List<CompilerError>>(context, "AstType.hir", this as Equals & Hash, {
+      todo("Implement AstTypeParameter.hir")
+      // return HirParameterType(declaration, name)
     })
   }
 }
