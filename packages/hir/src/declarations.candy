@@ -5,7 +5,10 @@ public trait HirDeclaration {
   public fun name(): String
 }
 
-public trait HirModule: HirDeclaration & Equals & Hash
+public trait HirModule: HirDeclaration & Equals & Hash {
+  public let parent: Package | HirModule
+  fun innerModule(name: String): HirInnerModule { HirInnerModule(this, name) }
+}
 public class HirTopLevelModule {
   public let parent: Package
 }
