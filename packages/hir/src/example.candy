@@ -14,7 +14,7 @@ fun main() {
 
 fun declarationsExample(context: QueryContext<List<CompilerError>>) {
   print("Declarations Example")
-  let file = FancyFile(getCorePackage(context), Path.parse("src/module.candy"))
+  let file = FancyFile(Package.core(context), Path.parse("src/module.candy"))
   let moduleHir = fileToHirModule(context, file)
   print("Module is {moduleHir}")
   let declarations = moduleHir.declarations(context)
@@ -23,7 +23,7 @@ fun declarationsExample(context: QueryContext<List<CompilerError>>) {
 
 fun useLinesExample(context: QueryContext<List<CompilerError>>) {
   print("Use-Lines Example")
-  let file = FancyFile(getPlaygroundPackage(context), Path.parse("src/UseLines/module.candy"))
+  let file = FancyFile(Package.playground(context), Path.parse("src/UseLines/module.candy"))
   let moduleHir = fileToHirModule(context, file)
   ((moduleHir.ast(context) as AstFile).useLines as Iterable<AstUseLine>).length().times({ index =>
     let useLineHir = HirExplicitUseLine(moduleHir, index)

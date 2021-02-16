@@ -31,9 +31,7 @@ impl Package {
           .map<Package>({ Package(Path.current().append(Path.parse(it.trimmed())).normalized()) })
           .unsafeToSet<Package>()
           .toMutable()
-      if !(name == "Core") {
-        dependencies.insert(getCorePackage(context))
-      }
+      if !(name == "Core") { dependencies.insert(Package.core(context)) }
 
       Tuple(Candyspec(this, name, dependencies), List.empty<CompilerError>())
     })
