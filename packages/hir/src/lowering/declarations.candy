@@ -72,34 +72,38 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, module: HirModule): 
     // the name of the next submodule, defaulting to module.candy if it doesn't exist. Finally, read
     // that file and find a inline module nested.
 
+    let packagePath = module.package().getResolvedPath(context)
     mut let segments = module.path() as Iterable<String>
-    mut let path = module.package().getResolvedPath(context).append(Path.parse("src"))
+    mut let path = Path.parse("src")
 
+    // Follow the directory structure down as much as possible.
     while segments.isNotEmpty() {
       // TODO(marcelgarus): Move this into the while condition once the && is lazy.
-      if !Directory(path.append(Path.parse(segments.first().unwrap()))).doesExist() {
+      if !Directory(packagePath.append(path).append(Path.parse(segments.first().unwrap()))).doesExist() {
         break unit
       }
       path = path.append(Path.parse(segments.first().unwrap()))
       segments = segments.skip(1)
     }
 
+    // Choose the correct file, default to "module.candy".
+    //
     // TODO(marcelgarus): Inline the condition into the `if` once the && is lazy.
     mut let condition = segments.isNotEmpty()
     if condition {
-      condition = File(path.append(Path.parse("{segments.first().unwrap()}.candy"))).doesExist()
+      condition = File(packagePath.append(path).append(Path.parse("{segments.first().unwrap()}.candy"))).doesExist()
     }
     if condition {
-      path = path.append(Path.parse("{segments.first().unwrap()}"))
+      path = path.append(Path.parse("{segments.first().unwrap()}.candy"))
       segments = segments.skip(1)
     } else {
       path = path.append(Path.parse("module.candy"))
-      assert(File(path).doesExist(), "Module {module} couldn't be found at path {path}.")
+      assert(File(packagePath.append(path)).doesExist(), "Module {module} couldn't be found at path {path}.")
     }
 
+    // TODO(marcelgarus): Navigate through the AST to find the inline `AstModule`.
     let ast = parseAstOfFile(context, FancyFile(module.package(), path)).first
     if segments.isNotEmpty() {
-      // TODO(marcelgarus): Navigate through the AST to find the correct `AstModule`.
       todo("Support getting the AST of inline modules.")
     }
 
