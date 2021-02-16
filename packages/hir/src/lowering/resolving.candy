@@ -1,1 +1,50 @@
+use ast
+use compiler_utils
+use incremental
+
+use ..declarations
+use ...declarations
+use ...types
+
 // These impls make it possible to resolve identifiers.
+
+impl String {
+  fun resolveIdentifier(
+    context: QueryContext<List<CompilerError>>,
+    declaration: HirDeclaration,
+  ): List<HirReflectionType | HirProperty | HirFunction | HirModule> {
+    query<List<HirReflectionType | HirProperty | HirFunction | HirModule>, List<CompilerError>>(
+      context,
+      "String.resolveIdentifier",
+      this as Equals & Hash,
+      {
+        let candidates = MutableList.empty<HirReflectionType | HirProperty | HirFunction | HirModule>()
+        if declaration is HasDeclarations {
+          for d in (declaration as HasDeclarations).declarations(context) {
+            if d.name() == this {
+              candidates.append(d as HirReflectionType | HirProperty | HirFunction | HirModule)
+            }
+          }
+        }
+        
+        // If the `declaration` is directly a file, search the use-lines.
+        if declaration is HirModule {
+          let ast = (declaration as HirModule).ast(context) 
+          if ast is AstFile {
+            // TODO(marcelgarus): Search use-lines.
+            return candidates
+          }
+        }
+
+        // Otherwise, visit the parent.
+        let parent: Package | HirModule | HirTrait | HirClass = declaration.parent
+        assert(!(parent is Package), "Parent is a package, although this is not a file-level module.")
+        candidates.appendAll(resolveIdentifier(context, declaration.parent as HirDeclaration))
+        Tuple(
+          candidates as List<HirReflectionType | HirProperty | HirFunction | HirModule>,
+          List.empty<CompilerError>()
+        )
+      }
+    )
+  }
+}
