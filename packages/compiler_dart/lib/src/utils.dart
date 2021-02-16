@@ -4,6 +4,7 @@ import 'package:code_builder/src/visitors.dart';
 import 'package:meta/meta.dart';
 
 String mangleName(String name) {
+  if (name == 'toString') return 'toString_';
   if (name == 'do') return 'do_';
   return name;
 }

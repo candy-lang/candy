@@ -4,7 +4,7 @@ use ..declarations
 use ..expressions
 use ..types
 
-public class AstFileId {
+public data class AstFileId {
   let file: FancyFile
 }
 impl AstFileId: AstNodeId
@@ -24,7 +24,7 @@ public class AstFile {
 impl AstFile: AstNode
 
 
-public class AstUseLineId {
+public data class AstUseLineId {
   public let parentId: AstFileId
   public let index: Int
 }

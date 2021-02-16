@@ -219,10 +219,10 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
           // `code_builder` escapes single quotes and newlines, but misses the
           // following:
           return value
+              .replaceAll('\\', '\\\\')
               .replaceAll('\t', '\\t')
               .replaceAll('\r', '\\r')
-              .replaceAll('\$', '\\\$')
-              .replaceAll('\\', '\\\\');
+              .replaceAll('\$', '\\\$');
         }
 
         if (parts.length == 1 && parts.single is LiteralStringLiteralPart) {
