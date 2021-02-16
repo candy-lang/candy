@@ -5,7 +5,7 @@ use ...declarations
 
 // These impls make declarative information from the AST available in the HIR.
 
-trait HasDeclarations {
+public trait HasDeclarations {
   fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration>
 
   fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any>
