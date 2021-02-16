@@ -1,12 +1,12 @@
 use compiler_utils
 
 public trait HirDeclaration {
-  public let parent: Package | HirModule | HirTrait | HirClass
-  public fun name(): String
+  let parent: Package | HirModule | HirTrait | HirClass
+  fun name(): String
 }
 
 public trait HirModule: HirDeclaration & Equals & Hash {
-  public let parent: Package | HirModule
+  let parent: Package | HirModule
   fun innerModule(name: String): HirInnerModule { HirInnerModule(this, name) }
 }
 public class HirTopLevelModule {
@@ -14,6 +14,7 @@ public class HirTopLevelModule {
 }
 impl HirTopLevelModule: HirDeclaration & Equals & Hash & HirModule {
   fun name(): String { "<{parent}>" }
+  fun toString(): String { "{parent.path}" }
   fun equals(other: This): Bool { (parent as Equals) == (other.parent as Equals) }
   fun hash<T>(hasher: Hasher<T>) { (parent as Hash).hash<T>(hasher) }
 }
@@ -23,6 +24,7 @@ public class HirInnerModule {
 }
 impl HirInnerModule: HirDeclaration & Equals & Hash & HirModule {
   fun name(): String { name_ }
+  fun toString(): String { "{parent}/{name()}" }
   fun equals(other: This): Bool {
     (parent as Equals) == (other.parent as Equals) && name_ == other.name_
   }
@@ -38,6 +40,7 @@ public class HirTrait {
 }
 impl HirTrait: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
+  fun toString(): String { "{parent}:{name()}" }
   fun equals(other: This): Bool {
     (parent as Equals) == (other.parent as Equals) && name_ == other.name_
   }
@@ -52,7 +55,8 @@ public class HirImpl {
   public let disambiguator: Int
 }
 impl HirImpl: HirDeclaration & Equals & Hash {
-  fun name(): String { "impl" }
+  fun name(): String { "impl#{disambiguator}" }
+  fun toString(): String { "{parent}:{name()}" }
   fun equals(other: This): Bool {
     (parent as Equals) == (other.parent as Equals) && disambiguator == other.disambiguator
   }
@@ -68,6 +72,7 @@ public class HirClass {
 }
 impl HirClass: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
+  fun toString(): String { "{parent}:{name()}" }
   fun equals(other: This): Bool {
     (parent as Equals) == (other.parent as Equals) && name_ == other.name_
   }
@@ -83,6 +88,7 @@ public class HirConstructor {
 }
 impl HirConstructor: HirDeclaration & Equals & Hash {
   fun name(): String { "constructor" }
+  fun toString(): String { "{parent}:{name()}" }
   fun equals(other: This): Bool {
     (parent as Equals) == (other.parent as Equals) && disambiguator == other.disambiguator
   }
@@ -99,6 +105,7 @@ public class HirFunction {
 }
 impl HirFunction: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
+  fun toString(): String { "{parent}:{name()}#{disambiguator}" }
   fun equals(other: This): Bool {
     (parent as Equals) == (other.parent as Equals)
       && name_ == other.name_
@@ -117,6 +124,7 @@ public class HirProperty {
 }
 impl HirProperty: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
+  fun toString(): String { "{parent}:{name()}" }
   fun equals(other: This): Bool {
     (parent as Equals) == (other.parent as Equals) && name_ == other.name_
   }
