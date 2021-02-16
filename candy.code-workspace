@@ -9,6 +9,14 @@
       "path": "language"
     },
     {
+      "name": "🧸 Playground (new)",
+      "path": "new-packages\\Playground"
+    },
+    {
+      "name": "Core (new)",
+      "path": "new-packages\\Core"
+    },
+    {
       "name": "🧸 Playground",
       "path": "playground"
     },

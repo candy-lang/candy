@@ -9,12 +9,25 @@ fun main() {
   print("Core package path is {getCorePath(context)}.")
 
   declarationsExample(context)
+  useLinesExample(context)
 }
 
 fun declarationsExample(context: QueryContext<List<CompilerError>>) {
+  print("Declarations Example")
   let file = FancyFile(getCorePackage(context), Path.parse("src/module.candy"))
   let moduleHir = fileToHirModule(context, file)
   print("Module is {moduleHir}")
   let declarations = moduleHir.declarations(context)
   print("Declarations are {declarations}")
+}
+
+fun useLinesExample(context: QueryContext<List<CompilerError>>) {
+  print("Use-Lines Example")
+  let file = FancyFile(getPlaygroundPackage(context), Path.parse("src/UseLines/module.candy"))
+  let moduleHir = fileToHirModule(context, file)
+  ((moduleHir.ast(context) as AstFile).useLines as Iterable<AstUseLine>).length().times({ index =>
+    let useLineHir = HirExplicitUseLine(moduleHir, index)
+    let targetModule = useLineHir.targetModule(context)
+    print("Use line {index}: targetModule = {targetModule}")
+  })
 }
