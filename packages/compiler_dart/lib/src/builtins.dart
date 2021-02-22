@@ -351,6 +351,23 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                     .statement,
               ]))),
           dart.Method((b) => b
+            ..returns = compileType(context, CandyType.unit)
+            ..name = 'delete'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..name = 'recursive'
+              ..type = bool))
+            ..body = dart.Block((b) => b
+              ..statements.addAll([
+                _directory.property('deleteSync').call(
+                    [],
+                    {'recursive': dart.refer('recursive').property('value')},
+                    []).statement,
+                compileType(context, CandyType.unit)
+                    .call([], {}, [])
+                    .returned
+                    .statement,
+              ]))),
+          dart.Method((b) => b
             ..returns =
                 compileType(context, CandyType.list(CandyType.fileSystemNode))
             ..name = 'listContents'

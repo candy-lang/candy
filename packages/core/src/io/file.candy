@@ -17,6 +17,7 @@ builtin class Directory {
 
   builtin fun doesExist(): Bool
   builtin fun create(recursive: Bool = true)
+  builtin fun delete(recursive: Bool = true)
 
   builtin fun listContents(recursive: Bool = false): List<FileSystemNode>
 }
