@@ -53,6 +53,10 @@
       "path": "packages\\hir"
     },
     {
+      "name": "Compiler: Code Generator Dart",
+      "path": "packages\\code_generator_dart"
+    },
+    {
       "name": "Compiler: Utils",
       "path": "packages\\compiler_utils"
     },
