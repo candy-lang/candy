@@ -25,6 +25,12 @@ public class Package /* FilePackage */ {
   }
 
   public let path: Path
+
+  public fun getOutputPath(context: QueryContext<List<CompilerError>>, outputName: String): Path {
+    query<Path, List<CompilerError>>(context, "Package.getOutputPath", this, {
+      Tuple(path.child("build").child(outputName), List.empty<CompilerError>())
+    })
+  }
 }
 impl Package: /* Package & */ Equals & Hash {
   fun getResolvedPath(context: QueryContext<List<CompilerError>>): Path {
