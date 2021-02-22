@@ -1,0 +1,19 @@
+use ...collections
+use ...numbers
+use ...string
+use ..file
+
+builtin public class Process {
+  builtin public static fun run(
+    executable: Path,
+    arguments: List<String>,
+    workingDirectory: Path,
+  ): ProcessResult
+}
+
+public class ProcessResult {
+  public let exitCode: Int
+  public let processId: Int
+  public let standardOutput: String
+  public let standardError: String
+}

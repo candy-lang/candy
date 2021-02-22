@@ -52,6 +52,8 @@ abstract class BuiltinCompiler<Output> {
       return compilePath(declarationId);
     } else if (moduleId == ModuleId.coreIoPrint && name == 'print') {
       return compilePrint();
+    } else if (moduleId == CandyType.process.virtualModuleId) {
+      return compileProcess(declarationId);
     } else if (moduleId ==
         ModuleId.coreRandomSource.nested(['DefaultRandomSource'])) {
       return compileDefaultRandomSource();
@@ -83,6 +85,8 @@ abstract class BuiltinCompiler<Output> {
   List<Output> compilePath(DeclarationId id);
   // io.print
   List<Output> compilePrint();
+  // io.process
+  List<Output> compileProcess(DeclarationId id);
 
   // primitives
   List<Output> compileAny();
@@ -317,10 +321,9 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             dart.refer('assert').call(
                 [dart.refer('path').notEqualTo(dart.literalNull)], {}, []).code,
             _directory
-                .assign(dart.refer('Directory', dartIoUrl).call(
-                    [dart.refer('path').property('_path').property('value')],
-                    {},
-                    []))
+                .assign(dart
+                    .refer('Directory', dartIoUrl)
+                    .call([dart.refer('path.value.value')], {}, []))
                 .code,
           ])))
         ..methods.addAll([
@@ -507,10 +510,9 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             dart.refer('assert').call(
                 [dart.refer('path').notEqualTo(dart.literalNull)], {}, []).code,
             _file
-                .assign(dart.refer('File', dartIoUrl).call(
-                    [dart.refer('path').property('_path').property('value')],
-                    {},
-                    []))
+                .assign(dart
+                    .refer('File', dartIoUrl)
+                    .call([dart.refer('path.value.value')]))
                 .code,
           ])))
         ..methods.addAll([
@@ -602,15 +604,15 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
         ..annotations.add(dart.refer('sealed', packageMetaUrl))
         ..name = 'Path'
         ..fields.add(dart.Field((b) => b
-          ..name = '_path'
+          ..name = 'value'
           ..type = string))
         ..mixins.addAll(mixinsAndImplementsAndMethodOverrides.first)
         ..implements.addAll(mixinsAndImplementsAndMethodOverrides.second)
         ..constructors.add(dart.Constructor((b) => b
           ..requiredParameters
-              .add(dart.Parameter((b) => b..name = 'this._path'))
+              .add(dart.Parameter((b) => b..name = 'this.value'))
           ..initializers.add(dart.refer('assert').call(
-              [dart.refer('_path').notEqualTo(dart.literalNull)],
+              [dart.refer('value').notEqualTo(dart.literalNull)],
               {},
               []).code)))
         ..methods.addAll([
@@ -636,7 +638,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             ..name = 'normalized'
             ..body = dart
                 .refer('normalize', packagePathUrl)
-                .call([dart.refer('_path.value')], {}, [])
+                .call([dart.refer('value.value')], {}, [])
                 .wrapInCandyString(context)
                 .wrapInCandyPath(context)
                 .code),
@@ -645,11 +647,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             ..name = 'isAbsolute'
             ..body = dart
                 .refer('isAbsolute', packagePathUrl)
-                .call(
-                  [dart.refer('_path').property('value')],
-                  {},
-                  [],
-                )
+                .call([dart.refer('value.value')])
                 .wrapInCandyBool(context)
                 .code),
           dart.Method((b) => b
@@ -661,44 +659,28 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                   dart.Code('if ('),
                   dart
                       .refer('split', packagePathUrl)
-                      .call(
-                        [
-                          dart.refer('normalize', packagePathUrl).call(
-                            [dart.refer('_path').property('value')],
-                            {},
-                            [],
-                          ),
-                        ],
-                        {},
-                        [],
-                      )
+                      .call([
+                        dart
+                            .refer('normalize', packagePathUrl)
+                            .call([dart.refer('value.value')]),
+                      ])
                       .property('length')
                       .equalTo(dart.literalNum(1))
                       .code,
                   dart.Code(') {'),
                   compileType(context, CandyType.none(CandyType.path))
-                      .call([], {}, [])
+                      .call([])
                       .returned
                       .statement,
                   dart.Code('} else {'),
                   compileType(context, CandyType.some(CandyType.path))
-                      .call(
-                        [
-                          path.call(
-                            [
-                              dart.refer('dirname', packagePathUrl).call(
-                                [dart.refer('_path').property('value')],
-                                {},
-                                [],
-                              ).wrapInCandyString(context),
-                            ],
-                            {},
-                            [],
-                          ),
-                        ],
-                        {},
-                        [],
-                      )
+                      .call([
+                        path.call([
+                          dart.refer('dirname', packagePathUrl).call([
+                            dart.refer('value.value')
+                          ]).wrapInCandyString(context),
+                        ]),
+                      ])
                       .returned
                       .statement,
                   dart.Code('}'),
@@ -710,47 +692,31 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             ..requiredParameters.add(dart.Parameter((b) => b
               ..name = 'name'
               ..type = string))
-            ..body = path.call(
-              [
-                dart.refer('join', packagePathUrl).call(
-                  [
-                    dart.refer('_path').property('value'),
-                    dart.refer('name').property('value'),
-                  ],
-                  {},
-                  [],
-                ).wrapInCandyString(context),
-              ],
-              {},
-              [],
-            ).code),
+            ..body = path.call([
+              dart.refer('join', packagePathUrl).call([
+                dart.refer('value.value'),
+                dart.refer('name.value'),
+              ]).wrapInCandyString(context),
+            ]).code),
           dart.Method((b) => b
             ..returns = path
             ..name = 'append'
             ..requiredParameters.add(dart.Parameter((b) => b
               ..name = 'other'
               ..type = path))
-            ..body = path.call(
-              [
-                dart.refer('join', packagePathUrl).call(
-                  [
-                    dart.refer('_path').property('value'),
-                    dart.refer('other').property('_path').property('value'),
-                  ],
-                  {},
-                  [],
-                ).wrapInCandyString(context),
-              ],
-              {},
-              [],
-            ).code),
+            ..body = path.call([
+              dart.refer('join', packagePathUrl).call([
+                dart.refer('value.value'),
+                dart.refer('other.value.value'),
+              ]).wrapInCandyString(context),
+            ]).code),
           dart.Method(
             (b) => b
               ..returns = string
               ..name = 'baseName'
               ..body = dart
                   .refer('basename', packagePathUrl)
-                  .call([dart.refer('_path').property('value')])
+                  .call([dart.refer('value.value')])
                   .wrapInCandyString(context)
                   .code,
           ),
@@ -760,7 +726,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
               ..name = 'baseNameWithoutExtension'
               ..body = dart
                   .refer('basenameWithoutExtension', packagePathUrl)
-                  .call([dart.refer('_path').property('value')])
+                  .call([dart.refer('value.value')])
                   .wrapInCandyString(context)
                   .code,
           ),
@@ -771,8 +737,8 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
               ..name = 'other'
               ..type = dart.refer('dynamic', dartCoreUrl)))
             ..body = dart
-                .refer('_path')
-                .equalToCandyValue(dart.refer('other._path'))
+                .refer('value')
+                .equalToCandyValue(dart.refer('other.value'))
                 .code),
           dart.Method((b) => b
             ..returns = compileType(context, CandyType.unit)
@@ -787,18 +753,96 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             ..body = dart.Block((b) => b
               ..statements.addAll([
                 dart
-                    .refer('_path')
+                    .refer('value')
                     .property('hash')
-                    .call([dart.refer('hasher')], {}, []).statement,
-                compileType(context, CandyType.unit)
-                    .call([], {}, [])
-                    .returned
-                    .statement
+                    .call([dart.refer('hasher')]).statement,
+                compileType(context, CandyType.unit).call([]).returned.statement
               ]))),
           dart.Method((b) => b
             ..returns = dart.refer('String', dartCoreUrl)
             ..name = 'toString'
-            ..body = dart.literalString('\${_path.toString()}').code)
+            ..body = dart.literalString('\${value.toString()}').code)
+        ])
+        ..methods.addAll(mixinsAndImplementsAndMethodOverrides.third)),
+    ];
+  }
+
+  @override
+  List<dart.Spec> compileProcess(DeclarationId id) {
+    final mixinsAndImplementsAndMethodOverrides =
+        _prepareMixinsAndImplementsAndMethodOverrides(context, id);
+
+    final processResult = compileType(context, CandyType.processResult);
+    final path = compileType(context, CandyType.path);
+
+    return [
+      dart.Class((b) => b
+        ..annotations.add(dart.refer('sealed', packageMetaUrl))
+        ..name = 'Process'
+        ..mixins.addAll(mixinsAndImplementsAndMethodOverrides.first)
+        ..implements.addAll(mixinsAndImplementsAndMethodOverrides.second)
+        ..constructors.add(dart.Constructor((b) => b..name = '_'))
+        ..methods.addAll([
+          dart.Method((b) => b
+            ..static = true
+            ..returns = processResult
+            ..name = 'run'
+            ..requiredParameters.addAll([
+              dart.Parameter((b) => b
+                ..type = path
+                ..name = 'executable'),
+              dart.Parameter((b) => b
+                ..type = compileType(context, CandyType.list(CandyType.string))
+                ..name = 'arguments'),
+              dart.Parameter((b) => b
+                ..type = path
+                ..name = 'workingDirectory'),
+            ])
+            ..body = dart.Block((b) => b
+              ..statements.addAll([
+                dart
+                    .refer('Process', dartIoUrl)
+                    .property('runSync')
+                    .call([
+                      dart.refer('executable.value.value'),
+                      dart
+                          .refer('List', dartCoreUrl)
+                          .property('generate')
+                          .call([
+                        dart.refer('arguments.length().value'),
+                        dart.Method((b) => b
+                          ..requiredParameters
+                              .add(dart.Parameter((b) => b..name = 'it'))
+                          ..body = dart
+                              .refer('arguments.get')
+                              .call([
+                                dart.refer('it').wrapInCandyInt(context),
+                              ])
+                              .property('unwrap().value')
+                              .code).closure,
+                      ]),
+                    ], {
+                      'workingDirectory':
+                          dart.refer('workingDirectory.value.value'),
+                    })
+                    .assignFinal('result')
+                    .statement,
+                processResult
+                    .call([
+                      dart.refer('result.exitCode').wrapInCandyInt(context),
+                      dart.refer('result.pid').wrapInCandyInt(context),
+                      dart
+                          .refer('result.stdout')
+                          .asA(dart.refer('String', dartCoreUrl))
+                          .wrapInCandyString(context),
+                      dart
+                          .refer('result.stderr')
+                          .asA(dart.refer('String', dartCoreUrl))
+                          .wrapInCandyString(context),
+                    ])
+                    .returned
+                    .statement,
+              ]))),
         ])
         ..methods.addAll(mixinsAndImplementsAndMethodOverrides.third)),
     ];
@@ -1144,7 +1188,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             ..body = dart
                 .refer('value')
                 .property('split')
-                .call([dart.refer('pattern.value')], {}, [])
+                .call([dart.refer('pattern.value')])
                 .property('map')
                 .call([
                   dart.Method((b) => b
@@ -1153,7 +1197,7 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
                         ..body =
                             dart.refer('it').wrapInCandyString(context).code)
                       .closure,
-                ], {}, [])
+                ])
                 .property('toList')
                 .call([], {}, [])
                 .wrapInCandyArrayList(context, CandyType.string)
