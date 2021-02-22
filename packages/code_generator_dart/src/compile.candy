@@ -20,6 +20,11 @@ public fun compile(context: QueryContext<List<CompilerError>>, package: Package)
       file.write(content)
     }
 
+    let pubGetResult = Process.run(Path.parse("dart"), List.of2<String>("pub", "get"), outputPath)
+    if !(pubGetResult.exitCode == 0) {
+      throw "Error running `pub get`: Exit Code {pubGetResult.exitCode}\n{pubGetResult.standardOutput}\n{pubGetResult.standardError}"
+    }
+
     Tuple(unit, List.empty<CompilerError>())
   })
 }
