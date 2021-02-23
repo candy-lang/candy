@@ -22,14 +22,14 @@ impl InternalCompilerError: CompilerError {
   public fun description(): String { description_ }
 }
 
-public class CyclicDependenciesCompilerError {
+public class UnsupportedFeatureCompilerError {
   public let location_: Location
-  public let cycle: List<Package>
+  public let description_: String
 }
-impl CyclicDependenciesCompilerError: CompilerError {
-  public fun id(): String { "cyclic-dependencies-error" }
+impl UnsupportedFeatureCompilerError: CompilerError {
+  public fun id(): String { "unsupported-feature" }
 
   public fun location(): Location { location_ }
-  public fun title(): String { "Cycle detected in the dependencies." }
-  public fun description(): String { (cycle as Iterable<Package>).join(" → ") }
+  public fun title(): String { "Unsupported feature" }
+  public fun description(): String { description_ }
 }

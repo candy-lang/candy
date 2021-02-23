@@ -1,4 +1,4 @@
-/*use ..declarations
+use ..declarations
 use ..types
 
 public data class HirExpressionUri<E: HirExpression> {
@@ -11,13 +11,6 @@ public trait HirExpression {
   public let uri: HirExpressionUri<HirExpression>
 }
 
-
-
-public class HirBoolExpression {
-  public let uri: HirExpressionUri<HirBoolExpression>
-  public let value: Bool
-}
-impl HirBoolExpression: HirExpression
 
 public class HirIntExpression {
   public let uri: HirExpressionUri<HirIntExpression>
@@ -32,7 +25,7 @@ public class HirStringExpression {
 }
 impl HirStringExpression: HirExpression
 
-trait HirStringPart
+trait /* enum */ HirStringPart
 
 public class HirLiteralStringPart {
   public let value: String
@@ -81,12 +74,12 @@ public class HirReflectionExpression<
 }
 impl HirReflectionExpression: HirExpression
 
-public class HirParameterExpression {
-  public let uri: HirExpressionUri<HirParameterExpression>
+public class HirParameterReferenceExpression {
+  public let uri: HirExpressionUri<HirParameterReferenceExpression>
   public let scope: HirFunction | HirExpressionUri<HirLambdaExpression>
+  public let name: String
 }
-impl HirParameterExpression: HirExpression
-
+impl HirParameterReferenceExpression: HirExpression
 
 public class HirPropertyReferenceExpression {
   public let uri: HirExpressionUri<HirPropertyReferenceExpression>
@@ -173,4 +166,3 @@ public class HirAssignmentExpression {
   public let value: HirExpressionUri<HirExpression>
 }
 impl HirAssignmentExpression: HirExpression
-*/

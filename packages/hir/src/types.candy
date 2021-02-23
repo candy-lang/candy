@@ -2,15 +2,18 @@ use ..declarations
 
 public trait HirType
 
+
 public class HirNamedType {
   public let declaration: HirTrait | HirClass
 }
 impl HirNamedType: HirType
 
+
 public class HirTupleType {
   public let types: List<HirType>
 }
 impl HirTupleType: HirType
+
 
 public class HirFunctionType {
   public let receiverType: Maybe<HirType>
@@ -19,24 +22,30 @@ public class HirFunctionType {
 }
 impl HirFunctionType: HirType
 
+
 public class HirUnionType {
   public let types: List<HirType>
+  // TODO(JonasWanke): Use a `Set<HirType>` when we have sets that keep insertion order.
 }
 impl HirUnionType: HirType
 
 public class HirIntersectionType {
   public let types: List<HirType>
+  // TODO(JonasWanke): Use a `Set<HirType>` when we have sets that keep insertion order.
 }
 impl HirIntersectionType: HirType
 
+
 public class HirThisType
 impl HirThisType: HirType
+
 
 public class HirParameterType {
   public let declaration: HirTrait | HirClass | HirFunction
   public let name: String
 }
 impl HirParameterType: HirType
+
 
 public class HirReflectionType {
   public let target: HirModule | HirTrait | HirClass | HirFunction | HirProperty | HirParameterType

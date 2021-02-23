@@ -1,5 +1,6 @@
 use incremental
 
+use ..config
 use ..error
 
 /*
@@ -12,6 +13,17 @@ impl Package: Equals & Hash
 */
 
 public class Package /* FilePackage */ {
+  public static fun core(context: QueryContext<List<CompilerError>>): Package {
+    query<Package, List<CompilerError>>(context, "Package.core", unit, {
+      Tuple(Package(getCorePath(context)), List.empty<CompilerError>())
+    })
+  }
+  public static fun playground(context: QueryContext<List<CompilerError>>): Package {
+    query<Package, List<CompilerError>>(context, "Package.playground", unit, {
+      Tuple(Package(getPlaygroundPath(context)), List.empty<CompilerError>())
+    })
+  }
+
   public let path: Path
 }
 impl Package: /* Package & */ Equals & Hash {

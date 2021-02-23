@@ -3,6 +3,7 @@ use ...hash
 use ...operators
 use ...maybe
 use ...numbers
+use ...primitives
 use ...string
 use ...todo
 use ..list
@@ -121,11 +122,12 @@ public trait Iterable<Item> {
 
   // Searching.
 
-  // TODO(marcelgarus): firstWhere
-  // TODO(marcelgarus): lastWhere
-  // TODO(marcelgarus): singleWhere
+  fun firstWhere(checker: (Item) => Bool): Maybe<Item> { where(checker).first() }
   // TODO(marcelgarus): firstIndexWhere
+  fun lastWhere(checker: (Item) => Bool): Maybe<Item> { where(checker).last() }
   // TODO(marcelgarus): lastIndexWhere
+  fun singleWhere(checker: (Item) => Bool): Maybe<Item> { where(checker).single() }
+  // TODO(JonasWanke): singleIndexWhere
 
   // Mapping transformations.
   // These return an `Iterable` with the same length, but a different type.
@@ -152,8 +154,12 @@ public trait Iterable<Item> {
   // These return an `Iterable` with a subset of the items.
 
   fun where(checker: (Item) => Bool): Iterable<Item> {
-    WhereIterable<Item>(this, checker)
+    whereWithState<Unit>(unit, { item, _ => Tuple(checker(item), unit) })
   }
+  fun whereWithState<State>(
+    initialState: State,
+    checker: (Item, State) => (Bool, State),
+  ): Iterable<Item> { WhereIterable<Item, State>(this, initialState, checker) }
 
   fun whereNot(checker: (Item) => Bool): Iterable<Item> {
     where({ !checker(it) })
@@ -165,22 +171,18 @@ public trait Iterable<Item> {
   }
 
   fun skip(n: Int): Iterable<Item> {
-    mut let counter = 0
-    where({
-      counter = counter + 1
-      counter > n
-    })
+    whereWithState<Int>(0, { item, index => Tuple(index >= n, index + 1) })
   }
-
   fun skipWhile(checker: (Item) => Bool): Iterable<Item> {
-    mut let skipping = true
-    where({
-      if !skipping {
-        return true
-      }
-      skipping = checker(it)
-      return skipping
-    })
+    whereWithState<Bool>(
+      true,
+      { item, isSkipping =>
+        if !isSkipping { return Tuple(true, false) }
+
+        let newIsSkipping = checker(item)
+        Tuple(!newIsSkipping, newIsSkipping)
+      },
+    )
   }
 
   fun slice(start: Int, end: Int): Iterable<Item> {
@@ -188,24 +190,20 @@ public trait Iterable<Item> {
   }
 
   fun take(n: Int): Iterable<Item> {
-    mut let counter = 0
-    where({
-      counter = counter + 1
-      counter <= n
-    })
+    whereWithState<Int>(0, { item, index => Tuple(index < n, index + 1) })
   }
-
   fun takeWhile(checker: (Item) => Bool): Iterable<Item> {
     // TODO(marcelgarus): Implement more efficiently.
 
-    mut let taking = true
-    where({
-      if !taking {
-        return false
-      }
-      taking = checker(it)
-      return taking
-    })
+    whereWithState<Bool>(
+      true,
+      { item, isTaking =>
+        if !isTaking { return Tuple(false, false) }
+
+        let newIsTaking = checker(item)
+        Tuple(newIsTaking, newIsTaking)
+      },
+    )
   }
 
   // Conversion transformations.
@@ -335,31 +333,33 @@ impl<In, Out> MappedIterator<In, Out>: Iterator<Out> {
   }
 }
 
-// TODO(marcelgarus): As soon as implicit casts are available, maybe make the checker return a
-// `WhereResult`, which can be either `Keep` or `Drop`?
-class WhereIterable<Item> {
+class WhereIterable<Item, State> {
+  // TODO(marcelgarus): As soon as implicit casts are available, maybe make the updater return a
+  //   `WhereResult`, which can be either `Keep` or `Drop`?
   let parent: Iterable<Item>
-  let checker: (Item) => Bool
+  let initialState: State
+  let checker: (Item, State) => (Bool, State)
 }
-impl<Item> WhereIterable<Item>: Iterable<Item> {
+impl<Item, State> WhereIterable<Item, State>: Iterable<Item> {
   fun iterator(): Iterator<Item> {
-    WhereIterator<Item>(parent.iterator(), checker)
+    WhereIterator<Item, State>(parent.iterator(), initialState, checker)
   }
 }
-class WhereIterator<Item> {
+class WhereIterator<Item, State> {
   let parent: Iterator<Item>
-  let checker: (Item) => Bool
+  mut let state: State
+  let checker: (Item, State) => (Bool, State)
 }
-impl<Item> WhereIterator<Item>: Iterator<Item> {
+impl<Item, State> WhereIterator<Item, State>: Iterator<Item> {
   fun next(): Maybe<Item> {
     loop {
       let element = parent.next()
       if element is None {
         return element
       } else {
-        if checker(element.unwrap()) {
-          return element
-        }
+        let result = checker(element.unwrap(), state)
+        state = result.second
+        if result.first { return element }
       }
     }
   }

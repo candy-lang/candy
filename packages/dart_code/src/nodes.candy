@@ -1,0 +1,314 @@
+class DartCompilationUnit {
+  let directives: List<DartDirective>
+  let declarations: List<DartDeclaration>
+}
+
+class DartAnnotation {
+  /// @override
+  /// @sealed
+
+  let expression: DartExpression
+}
+
+// Directives.
+
+trait DartDirective {}
+
+class DartImport {
+  /// import 'package:blub/blub.dart' as blub;
+  /// import 'blub.dart' show Foo, Bar;
+  /// import 'foo.dart' hide secretFoo;
+
+  let path: String
+  let prefix: Maybe<String> = None<String>()
+  let show: List<String> = List.empty<String>()
+  let hide: List<String> = List.empty<String>()
+}
+impl DartImport: DartDirective
+
+class DartPart {
+  /// part 'foo.dart';
+  
+  let path: String
+}
+impl DartPart: DartDirective
+
+class DartPartOf {
+  /// part of 'bar.dart';
+  
+  let path: String
+}
+impl DartPartOf: DartDirective
+
+// Declarations.
+
+trait DartDeclaration {}
+
+class DartClass {
+  /// @immutable
+  /// class Foo extends Bar implements Baz with Whop {
+  ///   final String flub;
+  ///   final int flop;
+  ///
+  ///   void foo(bool value);
+  /// }
+
+  let name: String
+  let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
+  let extends_: Maybe<DartType> = None<DartType>()
+  let implements_: List<DartType> = List.empty<DartType>()
+  let with_: List<DartType> = List.empty<DartType>()
+  let body: List<DartConstructor | DartField | DartGetter | DartSetter | DartFunction> = List.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
+}
+impl DartClass: DartDeclaration
+
+class DartConstructor {
+  let className: String
+  let name: Maybe<String>
+  let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
+  let requiredParameters: List<DartParameter | DartInitializingFormal> = List.empty<DartParameter | DartInitializingFormal>()
+  let positionalParameters: List<DartParameter | DartInitializingFormal> = List.empty<DartParameter | DartInitializingFormal>()
+  let namedParameters: List<DartParameter | DartInitializingFormal> = List.empty<DartParameter | DartInitializingFormal>()
+  let body: Maybe<DartBody> = None<DartBody>()
+}
+class DartInitializingFormal {
+  /// this.foo
+  /// this.bar
+
+  let name: String
+  let defaultValue: Maybe<DartExpression> = None<DartExpression>()
+}
+
+class DartMixin {
+  let name: String
+  let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
+  let on_: Maybe<DartType> = None<DartType>()
+  let body: List<DartGetter | DartSetter | DartFunction> = List.empty<DartGetter | DartSetter | DartFunction>()
+}
+impl DartMixin: DartDeclaration
+
+class DartFunction {
+  /// void foo();
+  ///
+  /// @override
+  /// String toString() => 'Foo';
+  ///
+  /// int blub(int a, [int b, int c]) => ...;
+  ///
+  /// String bar(int a, {int b = 0, int c}) {
+  ///   print('a=$a, b=$b, c=$c');
+  /// }
+
+  let name: String
+  let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
+  let _returns: Maybe<DartType> = None<DartType>()
+  let requiredParameters: List<DartParameter> = List.empty<DartParameter>()
+  let positionalParameters: List<DartParameter> = List.empty<DartParameter>()
+  let namedParameters: List<DartParameter> = List.empty<DartParameter>()
+  let body: Maybe<DartBody> = None<DartBody>()
+}
+impl DartFunction: DartDeclaration
+
+class DartParameter {
+  let name: String
+  let type: Maybe<DartType> = None<DartType>()
+  let defaultValue: Maybe<DartExpression> = None<DartExpression>()
+}
+
+class DartField {
+  let name: String
+  let isStatic: Bool = false
+  let mutability: DartMutability = DartVar()
+  let initialValue: Maybe<DartExpression> = None<DartExpression>()
+}
+
+trait DartMutability {}
+class DartVar {}
+impl DartVar: DartMutability
+class DartFinal {}
+impl DartFinal: DartMutability
+class DartConst {}
+impl DartConst: DartMutability
+
+class DartGetter {
+  let name: String
+  let type: DartType
+  let body: Maybe<DartBody> = None<DartBody>()
+}
+
+class DartSetter {
+  let name: String
+  let parameter: DartParameter
+  let body: Maybe<DartBody> = None<DartBody>()
+}
+
+trait DartBody {}
+
+class DartInlineBody {
+  let expression: DartExpression
+}
+impl DartInlineBody: DartBody
+
+class DartBlock {
+  let statements: List<DartStatement>
+}
+impl DartBlock: DartBody
+
+// Types.
+
+trait DartType: DartExpression {}
+
+class DartNamedType {
+  let name: DartIdentifier
+  let typeArguments: List<DartType> = List.empty<DartType>()
+}
+impl DartNamedType: DartType & DartExpression
+/// TODO(marcelgarus): Remove once the compiler realizes `DartType` implements `DartExpression`.
+
+class DartFunctionType {
+  let parameters: List<DartParameter> = List.empty<DartParameter>()
+  let positionalParameters: List<DartParameter> = List.empty<DartParameter>()
+  let namedParameters: List<DartParameter> = List.empty<DartParameter>()
+  let _returns: Maybe<DartType> = None<DartType>()
+}
+impl DartFunctionType: DartType & DartExpression
+/// TODO(marcelgarus): Remove once the compiler realizes `DartType` implements `DartExpression`.
+
+// Expressions.
+
+trait DartExpression {
+  fun dot(property: String): DartNavigation { DartNavigation(this, property) }
+  public fun call(
+    positionalArguments: List<DartExpression>,
+    namedArguments: Map<String, DartExpression>,
+    typeArguments: List<DartType>,
+  ): DartCall {
+    DartCall(this, positionalArguments, namedArguments, typeArguments)
+  }
+  fun equals(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, "==", other) }
+  fun notEquals(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, "!=", other) }
+  fun opposite(): DartPrefixOperator { DartPrefixOperator("!", this) }
+  fun and(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, "&&", other) }
+  fun or(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, "||", other) }
+  fun lessThan(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, "<", other) }
+  fun greaterThan(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, ">", other) }
+  fun lessThanOrEqualTo(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, "<=", other) }
+  fun greaterThanOrEqualTo(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, ">=", other) }
+  fun bitwiseAnd(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, "&", other) }
+  fun bitwiseOr(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, "|", other) }
+  fun plus(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, "+", other) }
+  fun minus(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, "-", other) }
+  fun times(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, "*", other) }
+  fun divide(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, "/", other) }
+  fun divideTruncate(other: DartExpression): DartBinaryOperator { DartBinaryOperator(this, "~/", other) }
+  fun modulo(other: DartExpression): DartBinaryOperator { DartBinaryOperator(other, "%", other) }
+  fun as_(other: DartType): DartBinaryOperator { DartBinaryOperator(this, "as", other as DartExpression) }
+  fun is_(other: DartType): DartBinaryOperator { DartBinaryOperator(this, "is", other as DartExpression) }
+}
+
+impl DartType: DartExpression
+
+class DartIdentifier {
+  let name: String
+  let prefix: Maybe<String> = None<String>()
+}
+impl DartIdentifier: DartExpression
+
+let this_ = DartIdentifier("this", None<String>())
+
+class DartNullLiteral {}
+impl DartNullLiteral: DartExpression
+class DartStringLiteral {
+  let value: String
+}
+impl DartStringLiteral: DartExpression
+class DartIntLiteral {
+  let value: Int
+}
+impl DartIntLiteral: DartExpression
+class DartBoolLiteral {
+  let value: Bool
+}
+impl DartBoolLiteral: DartExpression
+
+class DartCall {
+  let target: DartExpression
+  let positionalArguments: List<DartExpression> = List.empty<DartExpression>()
+  let namedArguments: Map<String, DartExpression> = Map.empty<String, DartExpression>()
+  let typeArguments: List<DartType> = List.empty<DartType>()
+}
+impl DartCall: DartExpression
+
+class DartNavigation {
+  let target: DartExpression
+  let property: String
+}
+impl DartNavigation: DartExpression
+
+class DartBinaryOperator {
+  let left: DartExpression
+  let operator: String
+  let right: DartExpression
+}
+impl DartBinaryOperator: DartExpression
+
+class DartPrefixOperator {
+  let operator: String
+  let target: DartExpression
+}
+impl DartPrefixOperator: DartExpression
+
+class DartAssignment {
+  let left: DartExpression
+  let right: DartExpression
+}
+impl DartAssignment: DartExpression
+
+class DartClosure {
+  let returns: Maybe<DartType> = None<DartType>()
+  let requiredParameters: List<DartParameter> = List.empty<DartParameter>()
+  let positionalParameters: List<DartParameter> = List.empty<DartParameter>()
+  let namedParameters: List<DartParameter> = List.empty<DartParameter>()
+  let body: DartBody
+}
+impl DartClosure: DartExpression
+
+// Statements.
+
+trait DartStatement {}
+
+impl DartBlock: DartStatement
+
+class DartExpressionStatement {
+  let expression: DartExpression
+}
+impl DartExpressionStatement: DartStatement
+
+class DartReturn {
+  let expression: Maybe<DartExpression>
+}
+impl DartReturn: DartStatement
+
+class DartBreak {
+  let label: Maybe<String>
+}
+impl DartBreak: DartStatement
+
+class DartContinue {
+  let label: Maybe<String>
+}
+impl DartContinue: DartStatement
+
+class DartIf {
+  let condition: DartExpression
+  let then: DartStatement
+  let else_: Maybe<DartStatement> = None<DartStatement>()
+}
+impl DartIf: DartStatement
+
+class DartWhile {
+  let condition: DartExpression
+  let label: Maybe<String>
+  let body: DartStatement
+}
+impl DartWhile: DartStatement

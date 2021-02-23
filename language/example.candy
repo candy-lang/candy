@@ -1,5 +1,8 @@
-use math
-use money
+use Firebase Basics
+use Mathematics
+use Money
+
+public use ..Utils
 
 public fun main() {
   print("Hello world!")
@@ -10,11 +13,11 @@ public fun main() {
 
 @Remember(cacheSize = 30)
 fun fibonacci(n: UInt): UInt {
-  /// Returns the [n]th fibonacci number.
-  return match n {
-    0 | 1 => it
-    n => fibonacci(n - 1) + fibonacci(n - 2)
-  }
+  # Returns the [n]th fibonacci number.
+
+  (n == 0 | n == 1)
+    then { it }
+    else { n -> fibonacci(n - 1) + fibonacci(n - 2) }
 }
 
 fun main1() {
@@ -22,57 +25,57 @@ fun main1() {
   print("The 100th fibonacci number is {fibonacci(100)}.")
 }
 
-data class Fruit {
-  let name: String
+public data class Fruit {
+  let name: String = "Mysterious"
   let cost: Money
-  let ripeness: Ripeness = .unripe
+  let ripeness: Ripeness = Ripeness unripe
 }
 
 enum Ripeness { ripe, unripe }
 
-let apple = Fruit("apple", 2.euro)
-let banana = Fruit("banana", 5.20.euro)
-let kiwi = Fruit("kiwi", apple.cost + banana.cost, ripeness = .ripe)
+let apple = Fruit("apple", 2 euro)
+let banana = Fruit("banana", 5 euro)
+let kiwi = Fruit("kiwi", apple cost + banana cost, ripeness = Ripeness ripe)
 let smoothieIngredients = [apple, banana, kiwi, apple, kiwi]
 
 fun main2() {
-  let expensiveIngredients = smoothieIngredients.where { it.cost > 3 }
+  let expensiveIngredients = smoothieIngredients where { it cost > 3 }
 }
 
 class Cart {
-  /// A shopping cart than can contain items.
+  # A shopping cart than can contain items.
 
   trait Item {
     let cost: Money
   }
 
-  mut let items = <Item>[]
-  /// The items currently in the cart.
+  var items = <Item>[]
+  # The items currently in the cart.
 
-  let cost: Money => items.cost
+  let cost: Money -> items.cost
 
-  fun buy() = todo
+  fun buy() -> todo()
 }
 
 impl Iterable<Item>: Item {
-  /// Simplifies getting the cost of a list of items.
+  # Simplifies getting the cost of a list of items.
 
-  let cost => sumBy { it.cost }
+  let cost -> sumBy { it cost }
 }
 
-impl Fruit: Cart.Item
+impl Fruit: Cart Item
 
-data class Box<Item: Cart.Item> {
-  /// A beautiful, handcrafted, wooden box.
+data class Box<Item: Cart Item> {
+  # A beautiful, handcrafted, wooden box.
 
-  static let cost: Money = 30.euro
-  /// A box is very expensive.
+  static let cost: Money = 30 euro
+  # A box is very expensive.
 
   let content: List<Item>
 }
 
-impl<Item> Box<Item>: Cart.Item {
-  let cost => content.cost + Box.cost
+impl<_> Box<Item>: Cart Item {
+  let cost -> content cost + Box cost
 }
 
 let cart = Cart([
@@ -82,49 +85,42 @@ let cart = Cart([
 ])
 
 fun main3() {
-  print("The cart costs {cart.cost}.")
+  print("The cart costs {cart cost}.")
 }
 
 impl Fruit {
   let yumminess: Int {
-    /// Computes a yumminess score for this [Fruit] using a secret formula.
-    return fibonacci(cost.value as UInt) + name.bytes.sum() + match ripeness {
-      .ripe => 0
-      .unripe => -20
-    }
+    # Computes a yumminess score for this [Fruit] using a secret formula.
+
+    fibonacci(cost value as<UInt>())
+      + name bytes sum()
+      + (ripeness == Ripeness ripe) then { 0 } else { -20 }
   }
 }
 
 fun main4() {
-  for ingredient in smoothieIngredients {
-    todo("Do something")
-  }
+  smoothieIngredients do { todo("Do something") }
 }
 
-class Human {
+public class Human {
   fun eat(fruits: List<Fruit>): Result<Burp, ThrowUp> {
-    mut let fullness = 0
-    for fruit in fruits {
-      if fullness < 10 {
+    var fullness = 0
+    fruits do { fruit ->
+      (fullness < 10) then {
         fullness++
-      } else if randomBool() {
-        return ThrowUp()
+      } else {
+        randomBool() then { return ThrowUp() }
       }
     }
-    return Burp()
+    Burp()
   }
 }
 
-/*
-- abstract classes
-- labels
-- try
-- while
-- break
-- continue
-- yield & yield each
-- modules
-- function types, tuple types
-- value constraints
-- implication operator
-*/
+## - labels
+## - break
+## - continue
+## - yield & yield each
+## - modules
+## - function types, tuple types
+## - value constraints
+## - implication operator

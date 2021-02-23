@@ -1,5 +1,6 @@
 # Candy
 
+> Note: This document is not up-to-date.
 
 
 - [1. About](#1-about)

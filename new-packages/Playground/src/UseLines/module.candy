@@ -1,0 +1,6 @@
+use Core
+use .Blub
+
+class Bar {
+  let bar: Foo
+}

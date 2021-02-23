@@ -1,0 +1,201 @@
+use ast
+use compiler_utils
+use incremental
+use petit_parser
+use ...declarations
+use ...file
+use ..declarations
+
+trait HasUseLines {
+  fun useLines(context: QueryContext<List<CompilerError>>): List<HirUseLine>
+}
+impl HirModule: HasUseLines {
+  fun useLines(context: QueryContext<List<CompilerError>>): List<HirUseLine> {
+    useLines_(context, this)
+  }
+}
+impl HirTopLevelModule: HasUseLines {
+  fun useLines(context: QueryContext<List<CompilerError>>): List<HirUseLine> {
+    useLines_(context, this)
+  }
+}
+impl HirInnerModule: HasUseLines {
+  fun useLines(context: QueryContext<List<CompilerError>>): List<HirUseLine> {
+    useLines_(context, this)
+  }
+}
+fun useLines_(context: QueryContext<List<CompilerError>>, moduleHir: HirModule): List<HirUseLine> {
+  query<List<HirUseLine>, List<CompilerError>>(context, "HirModule.useLines", (moduleHir as Equals & Hash), {
+    let ast = moduleHir.ast(context)
+    if !(ast is AstFile) { return Tuple(List.empty<HirUseLine>(), List.empty<CompilerError>()) }
+
+    let useLines = MutableList.empty<HirUseLine>()
+    ((ast as AstFile).useLines as Iterable<AstUseLine>).length().times({ index =>
+      useLines.append(HirExplicitUseLine(moduleHir, index))
+    })
+
+    let isCoreImported = (useLines as Iterable<HirUseLine>)
+      .maybeMap<HirModule>({ it.targetModule(context) })
+      .any({ it == HirModule.core(context) })
+    if !(moduleHir.package() == Package.core(context)) && !isCoreImported {
+      useLines.append(HirImplicitCoreUseLine(moduleHir))
+    }
+
+    Tuple(useLines, List.empty<CompilerError>())
+  })
+}
+
+
+trait HasTargetModule {
+  fun targetModule(context: QueryContext<List<CompilerError>>): Maybe<HirModule>
+}
+
+impl HirUseLine: HasTargetModule
+
+impl HirImplicitCoreUseLine: HasTargetModule {
+  fun targetModule(context: QueryContext<List<CompilerError>>): Maybe<HirModule> {
+    query<Maybe<HirModule>, List<CompilerError>>(context, "HirImplicitCoreUseLine.targetModule", (this as Equals & Hash), {
+      Tuple(Some<HirModule>(HirModule.core(context)), List.empty<CompilerError>())
+    })
+  }
+}
+
+impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
+  fun ast(context: QueryContext<List<CompilerError>>): AstUseLine {
+    query<AstUseLine, List<CompilerError>>(context, "HirExplicitUseLine.ast", (this as Equals & Hash), {
+      let moduleAst = parent.ast(context)
+      if moduleAst is AstModule {
+        assert(false, "Explicit module declarations can't have use-lines.")
+      }
+
+      let fileAst = (moduleAst as AstFile)
+      let useLineAst = (fileAst.useLines as Iterable<AstUseLine>).get(index).unwrap()
+      assert(
+        useLineAst.id == AstUseLineId(fileAst.id, index),
+        "Invalid ID for use-line at index {index}: {useLineAst.id}",
+      )
+      Tuple(useLineAst, List.empty<CompilerError>())
+    })
+  }
+
+  fun targetModule(context: QueryContext<List<CompilerError>>): Maybe<HirModule> {
+    query<Maybe<HirModule>, List<CompilerError>>(context, "HirExplicitUseLine.targetModule", (this as Equals & Hash), {
+      let ast = this.ast(context)
+      if ast.target is AstGlobalUseLineTarget {
+        let targetAst = (ast.target as AstGlobalUseLineTarget)
+        if (targetAst.packagePath as Iterable<AstIdentifier>).length() > 1 {
+          return Tuple(
+            None<HirModule>(),
+            List.of1<CompilerError>(
+              UnsupportedFeatureCompilerError(
+                // TODO(JonasWanke): add the actual location of this compiler error
+                Location(ast.id.parentId.file, Span(0, 1)),
+                "Grouped packages are not yet supported.",
+              ),
+            ),
+          )
+        }
+        if targetAst.moduleName is Some<AstIdentifier> {
+          return Tuple(
+            None<HirModule>(),
+            List.of1<CompilerError>(
+              UnsupportedFeatureCompilerError(
+                // TODO(JonasWanke): add the actual location of this compiler error
+                Location(ast.id.parentId.file, Span(0, 1)),
+                "Named exports of packages are not yet supported.",
+              ),
+            ),
+          )
+        }
+
+        let packageName = (targetAst.packagePath as Iterable<AstIdentifier>).single().unwrap().value
+        let package = parent.package().getDependencyByName(context, packageName)
+        if package is None<Package> {
+          return Tuple(
+            None<HirModule>(),
+            List.of1<CompilerError>(UseLineTargetNotFoundCompilerError(ast.id.parentId.file)),
+          )
+        }
+
+        let moduleHir = HirTopLevelModule(package.unwrap())
+        if !moduleHir.doesExist(context) {
+          return Tuple(
+            None<HirModule>(),
+            List.of1<CompilerError>(UseLineTargetNotFoundCompilerError(ast.id.parentId.file)),
+          )
+        }
+
+        return Tuple(Some<HirModule>(moduleHir), List.empty<CompilerError>())
+      }
+
+      let targetAndRemainingPath = if ast.target is AstLocalAbsoluteUseLineTarget {
+        let targetAst = (ast.target as AstLocalAbsoluteUseLineTarget)
+        Tuple(HirTopLevelModule(parent.package()) as HirModule, targetAst.path)
+      } else {
+        let targetAst = (ast.target as AstLocalRelativeUseLineTarget)
+        mut let target = parent
+
+        // TODO(JonasWanke): use `int.times` when we support non-local returns
+        mut let i = 0
+        while i < targetAst.parentNavigations {
+          let newTarget = target.parent
+          if newTarget is Package {
+            return Tuple(
+              None<HirModule>(),
+              List.of1<CompilerError>(
+                TooManyUpNavigationsInUseLineCompilerError(ast.id.parentId.file),
+              ),
+            )
+          }
+          target = (newTarget as HirModule)
+          i = i + 1
+        }
+
+        Tuple(target, targetAst.path)
+      }
+      mut let target = targetAndRemainingPath.first
+      let remainingPath = targetAndRemainingPath.second
+
+      for pathSegment in remainingPath { target = target.innerModule(pathSegment.value) }
+
+      if !target.doesExist(context) {
+        return Tuple(
+          None<HirModule>(),
+          List.of1<CompilerError>(UseLineTargetNotFoundCompilerError(ast.id.parentId.file)),
+        )
+      }
+
+      Tuple(Some<HirModule>(target), List.empty<CompilerError>())
+    })
+  }
+}
+
+public class TooManyUpNavigationsInUseLineCompilerError {
+  // TODO(JonasWanke): add the actual location of this compiler error
+  public let file: FancyFile
+}
+impl TooManyUpNavigationsInUseLineCompilerError: CompilerError {
+  public fun id(): String { "too-many-up-navigations-in-use-line" }
+
+  public fun location(): Location { Location(file, Span(0, 1)) }
+  public fun title(): String { "Too many up navigations in use-line." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description for this error
+    ""
+  }
+}
+
+public class UseLineTargetNotFoundCompilerError {
+  // TODO(JonasWanke): add the actual location of this compiler error
+  public let file: FancyFile
+}
+impl UseLineTargetNotFoundCompilerError: CompilerError {
+  public fun id(): String { "use-line-target-not-found" }
+
+  public fun location(): Location { Location(file, Span(0, 1)) }
+  public fun title(): String { "Use-line target not found." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description for this error
+    ""
+  }
+}

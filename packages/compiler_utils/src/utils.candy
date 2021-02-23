@@ -1,0 +1,6 @@
+public data class DataTuple2<T1: Equals & Hash, T2: Equals & Hash> {
+  // TODO(JonasWanke): delete this when `(Equals & Hash, Equals & Hash)`
+  //   implements `(Equals & Hash)`
+  public let first: T1
+  public let second: T2
+}

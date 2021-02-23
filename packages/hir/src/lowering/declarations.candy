@@ -5,6 +5,21 @@ use ...declarations
 
 // These impls make declarative information from the AST available in the HIR.
 
+trait HasDeclarations {
+  fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration>
+
+  fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any>
+  /// Getter for ast declarations, but type unsafe. Still useful if it's
+  /// immediately followed by `whereType()`.
+}
+
+trait MightNotExist {
+  fun doesExist(context: QueryContext<List<CompilerError>>): Bool
+}
+trait HasAst<Ast> {
+  fun ast(context: QueryContext<List<CompilerError>>): Ast
+}
+
 fun fileToHirModule(context: QueryContext<List<CompilerError>>, file: FancyFile): HirModule {
   // TODO(marcelgarus): Implement this as a static function on `HirModule` (`HirModule fromFile`) as
   // soon as adding static functions through impls works.
@@ -17,10 +32,8 @@ fun fileToHirModule(context: QueryContext<List<CompilerError>>, file: FancyFile)
     let module = ((if path.parent() is None {
       HirTopLevelModule(file.package)
     } else {
-      HirInnerModule(
-        fileToHirModule(context, FancyFile(file.package, path.parent().unwrap())),
-        file.path.baseNameWithoutExtension(),
-      )
+      fileToHirModule(context, FancyFile(file.package, path.parent().unwrap()))
+        .innerModule(path.baseNameWithoutExtension())
     }) as HirModule)
     Tuple(module, List.empty<CompilerError>())
   })
@@ -64,29 +77,30 @@ impl HirDeclaration: HasDeclarations
 // So, we put the code of the impl into the following few functions, which are used by the concrete
 // classes `HirTopLevelModule` and `HirInnerModule`, passing themselves as parameters.
 
-fun astOfModule(context: QueryContext<List<CompilerError>>, module: HirModule): AstFile | AstModule {
-  query<AstFile | AstModule, List<CompilerError>>(context, "HirModule.ast", (module as Equals & Hash), {
+fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule): Maybe<AstFile | AstModule> {
+  query<Maybe<AstFile | AstModule>, List<CompilerError>>(context, "HirModule.ast", (moduleHir as Equals & Hash), {
     // These are all the ways that modules can be declared with decreasing priority:
     //
-    // * By creating directories.
-    // * By creating files.
-    // * By creating inline modules.
+    // 1. By creating directories.
+    // 2. By creating files.
+    // 3. By creating inline modules.
     //
     // First, go into directories with correct names as long as possible. Then, look for a file with
     // the name of the next submodule, defaulting to module.candy if it doesn't exist. Finally, read
     // that file and find a inline module nested.
 
-    let packagePath = module.package().getResolvedPath(context)
-    mut let segments = module.path() as Iterable<String>
+    let package = moduleHir.package()
+    mut let segments = moduleHir.path() as Iterable<String>
     mut let path = Path.parse("src")
 
     // Follow the directory structure down as much as possible.
     while segments.isNotEmpty() {
       // TODO(marcelgarus): Move this into the while condition once the && is lazy.
-      if !Directory(packagePath.append(path).append(Path.parse(segments.first().unwrap()))).doesExist() {
-        break unit
-      }
-      path = path.append(Path.parse(segments.first().unwrap()))
+      let newPath = path.child(segments.first().unwrap())
+      let resolvedPath = FancyFile(package, newPath).getResolvedPath(context)
+      if !Directory(resolvedPath).doesExist() { break unit }
+
+      path = newPath
       segments = segments.skip(1)
     }
 
@@ -95,23 +109,26 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, module: HirModule): 
     // TODO(marcelgarus): Inline the condition into the `if` once the && is lazy.
     mut let condition = segments.isNotEmpty()
     if condition {
-      condition = File(packagePath.append(path).append(Path.parse("{segments.first().unwrap()}.candy"))).doesExist()
+      condition = FancyFile(package, path.child("{segments.first().unwrap()}.candy"))
+        .doesExist(context)
     }
     if condition {
-      path = path.append(Path.parse("{segments.first().unwrap()}.candy"))
+      path = path.child("{segments.first().unwrap()}.candy")
       segments = segments.skip(1)
     } else {
-      path = path.append(Path.parse("module.candy"))
-      assert(File(packagePath.append(path)).doesExist(), "Module {module} couldn't be found at path {path}.")
+      path = path.child("module.candy")
+    }
+    if !FancyFile(package, path).doesExist(context) {
+      return Tuple(None<AstFile | AstModule>(), List.empty<CompilerError>())
     }
 
     // TODO(marcelgarus): Navigate through the AST to find the inline `AstModule`.
-    let ast = parseAstOfFile(context, FancyFile(module.package(), path)).first
+    let ast = parseAstOfFile(context, FancyFile(package, path)).first
     if segments.isNotEmpty() {
       todo("Support getting the AST of inline modules.")
     }
 
-    return Tuple(ast, List.empty<CompilerError>()) as (AstFile | AstModule, List<CompilerError>)
+    return Tuple(Some<AstFile | AstModule>(ast), List.empty<CompilerError>())
   })
 }
 fun astDeclarationsOfModule(
@@ -123,6 +140,13 @@ fun astDeclarationsOfModule(
     List<CompilerError>,
   >(context, "HirModule.astDeclarations", (module as Equals & Hash), {
     let ast = astOfModule(context, module)
+    if ast is None<AstFile | AstModule> {
+      return Tuple(
+        List.empty<AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty>(),
+        List.empty<CompilerError>(),
+      )
+    }
+    let ast = ast.unwrap()
     if (ast is AstFile) {
       return Tuple((ast as AstFile).declarations, List.empty<CompilerError>())
     }
@@ -172,8 +196,13 @@ impl HirModule: HasDeclarations {
     context: QueryContext<List<CompilerError>>,
   ): List<AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty>
 }
-impl HirTopLevelModule: HasDeclarations {
-  fun ast(context: QueryContext<List<CompilerError>>): AstFile | AstModule { astOfModule(context, this) }
+impl HirTopLevelModule: HasDeclarations & MightNotExist & HasAst<AstFile | AstModule> {
+  fun doesExist(context: QueryContext<List<CompilerError>>): Bool {
+    astOfModule(context, this) is Some<AstFile | AstModule>
+  }
+  fun ast(context: QueryContext<List<CompilerError>>): AstFile | AstModule {
+    astOfModule(context, this).unwrap()
+  }
   fun astDeclarations(
     context: QueryContext<List<CompilerError>>,
   ): List<AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty> {
@@ -186,8 +215,13 @@ impl HirTopLevelModule: HasDeclarations {
     declarationsOfModule(context, this)
   }
 }
-impl HirInnerModule: HasDeclarations {
-  fun ast(context: QueryContext<List<CompilerError>>): AstFile | AstModule { astOfModule(context, this) }
+impl HirInnerModule: HasDeclarations & MightNotExist & HasAst<AstFile | AstModule> {
+  fun doesExist(context: QueryContext<List<CompilerError>>): Bool {
+    astOfModule(context, this) is Some<AstFile | AstModule>
+  }
+  fun ast(context: QueryContext<List<CompilerError>>): AstFile | AstModule {
+    astOfModule(context, this).unwrap()
+  }
   fun astDeclarations(
     context: QueryContext<List<CompilerError>>,
   ): List<AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty> {
@@ -201,7 +235,7 @@ impl HirInnerModule: HasDeclarations {
   }
 }
 
-impl HirTrait: HasDeclarations {
+impl HirTrait: HasDeclarations & HasAst<AstTrait> {
   fun ast(context: QueryContext<List<CompilerError>>): AstTrait {
     query<AstTrait, List<CompilerError>>(context, "HirTrait.ast", this, {
       let ast = ((parent as HasDeclarations).typeUnsafeAstDeclarations(context) as Iterable<Any>)
@@ -254,7 +288,7 @@ impl HirTrait: HasDeclarations {
   }
 }
 
-impl HirImpl: HasDeclarations {
+impl HirImpl: HasDeclarations & HasAst<AstImpl> {
   fun ast(context: QueryContext<List<CompilerError>>): AstImpl {
     query<AstImpl, List<CompilerError>>(context, "HirImpl.ast", this, {
       let ast = ((parent as HasDeclarations).typeUnsafeAstDeclarations(context) as Iterable<Any>)
@@ -292,7 +326,7 @@ impl HirImpl: HasDeclarations {
   }
 }
 
-impl HirClass: HasDeclarations {
+impl HirClass: HasDeclarations & HasAst<AstClass> {
   fun ast(context: QueryContext<List<CompilerError>>): AstClass {
     query<AstClass, List<CompilerError>>(context, "HirClass.ast", this, {
       let ast = ((parent as HasDeclarations).typeUnsafeAstDeclarations(context) as Iterable<Any>)
@@ -343,7 +377,7 @@ impl HirClass: HasDeclarations {
   }
 }
 
-impl HirFunction: HasDeclarations {
+impl HirFunction: HasDeclarations & HasAst<AstFunction> {
   fun ast(context: QueryContext<List<CompilerError>>): AstFunction {
     query<AstFunction, List<CompilerError>>(context, "HirFunction.ast", this, {
       let ast = ((parent as HasDeclarations).declarations(context) as Iterable<Any>)
@@ -362,7 +396,7 @@ impl HirFunction: HasDeclarations {
   }
 }
 
-impl HirProperty: HasDeclarations {
+impl HirProperty: HasDeclarations & HasAst<AstProperty> {
   fun ast(context: QueryContext<List<CompilerError>>): AstProperty {
     query<AstProperty, List<CompilerError>>(context, "HirProperty.ast", this, {
       let ast = ((parent as HasDeclarations).declarations(context) as Iterable<Any>)

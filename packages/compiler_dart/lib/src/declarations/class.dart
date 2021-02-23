@@ -5,6 +5,7 @@ import 'package:parser/parser.dart';
 import '../body.dart';
 import '../constants.dart';
 import '../type.dart';
+import '../utils.dart';
 import 'constructor.dart';
 import 'declaration.dart';
 import 'function.dart';
@@ -50,21 +51,53 @@ final Query<DeclarationId, List<dart.Spec>> compileClass =
       yield dart.Method((b) => b
         ..annotations.add(dart.refer('override', dartCoreUrl))
         ..returns = compileType(context, function.returnType)
-        ..name = function.name
+        ..name = mangleName(function.name)
         ..types.addAll(function.typeParameters
             .map((it) => compileTypeParameter(context, it)))
         ..requiredParameters
             .addAll(compileParameters(context, function.valueParameters))
         ..body = compileBody(context, id).value);
-    });
+    }).toList();
 
+    final name = compileTypeName(context, declarationId).symbol;
     final properties = classHir.innerDeclarationIds
         .where((id) => id.isProperty)
         .map((id) => compileProperty(context, id));
     final methods = classHir.innerDeclarationIds
         .where((id) => id.isFunction)
         .map((id) => compileFunction(context, id));
-    final name = compileTypeName(context, declarationId).symbol;
+
+    methodOverrides.add(dart.Method((b) => b
+      ..annotations.add(dart.refer('override', dartCoreUrl))
+      ..returns = dart.refer('String', dartCoreUrl)
+      ..name = 'toString'
+      ..body = dart.Block((b) {
+        if (implMethodIds
+            .any((it) => it.simplePath.last.nameOrNull == 'toString')) {
+          b.statements
+              .add(dart.refer('this.toString_().value').returned.statement);
+          return;
+        }
+
+        var typeParametersString = classHir.typeParameters
+            .map((it) => it.name)
+            .map((it) => '$it = \${$it}')
+            .join(', ');
+        if (typeParametersString.isNotEmpty) {
+          typeParametersString = '<$typeParametersString>';
+        }
+        final propertiesString = properties
+            .map((it) => it.name)
+            .map((it) => ', "$it": \${$it}')
+            .join();
+        b.statements.add(dart
+            .literalString(
+              '{"_type": "$name$typeParametersString"$propertiesString}',
+            )
+            .returned
+            .statement);
+      })));
+
     return [
       dart.Class((b) => b
         ..annotations.add(dart.refer('sealed', packageMetaUrl))
@@ -85,30 +118,7 @@ final Query<DeclarationId, List<dart.Spec>> compileClass =
         ))
         ..fields.addAll(properties)
         ..methods.addAll(methods)
-        ..methods.addAll(methodOverrides)
-        ..methods.add(dart.Method((b) => b
-          ..annotations.add(dart.refer('override', dartCoreUrl))
-          ..returns = dart.refer('String', dartCoreUrl)
-          ..name = 'toString'
-          ..body = dart.Block((b) {
-            var typeParametersString = classHir.typeParameters
-                .map((it) => it.name)
-                .map((it) => '$it = \${$it}')
-                .join(', ');
-            if (typeParametersString.isNotEmpty) {
-              typeParametersString = '<$typeParametersString>';
-            }
-            final propertiesString = properties
-                .map((it) => it.name)
-                .map((it) => ', "$it": \${$it}')
-                .join();
-            b.statements.add(dart
-                .literalString(
-                  '{"_type": "$name$typeParametersString"$propertiesString}',
-                )
-                .returned
-                .statement);
-          })))),
+        ..methods.addAll(methodOverrides)),
       for (final classId
           in classHir.innerDeclarationIds.where((it) => it.isClass))
         ...compileClass(context, classId),

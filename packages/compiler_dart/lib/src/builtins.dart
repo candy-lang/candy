@@ -35,7 +35,7 @@ abstract class BuiltinCompiler<Output> {
     } else if (moduleId == ModuleId.corePrimitives.nested(['ToString'])) {
       return compileToString();
     } else if (moduleId == ModuleId.corePrimitives.nested(['Unit'])) {
-      return compileUnit();
+      return compileUnit(declarationId);
     } else if (moduleId == ModuleId.corePrimitives.nested(['Never'])) {
       return compileNever();
     } else if (moduleId == ModuleId.coreBool.nested(['Bool'])) {
@@ -88,7 +88,7 @@ abstract class BuiltinCompiler<Output> {
   List<Output> compileAny();
   List<Output> compileToString();
 
-  List<Output> compileUnit();
+  List<Output> compileUnit(DeclarationId id);
   List<Output> compileNever();
 
   List<Output> compileBool(DeclarationId id);
@@ -800,30 +800,24 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
   }
 
   @override
-  List<dart.Spec> compileUnit() {
-    final otherUnit = dart.Parameter((b) => b
-      ..name = 'other'
-      ..type = dart.refer('dynamic', dartCoreUrl));
+  List<dart.Spec> compileUnit(DeclarationId id) {
+    final mixinsAndImplementsAndMethodOverrides =
+        _prepareMixinsAndImplementsAndMethodOverrides(context, id);
+
     return [
       dart.Class((b) => b
         ..annotations.add(dart.refer('sealed', packageMetaUrl))
         ..name = 'Unit'
         ..constructors.add(dart.Constructor((b) => b..constant = true))
+        ..mixins.addAll(mixinsAndImplementsAndMethodOverrides.first)
+        ..implements.addAll(mixinsAndImplementsAndMethodOverrides.second)
         ..methods.addAll([
-          dart.Method((b) => b
-            ..name = 'equals'
-            ..returns = compileType(context, CandyType.bool)
-            ..requiredParameters.add(otherUnit)
-            ..body = dart
-                .refer('other')
-                .isA(compileType(context, CandyType.unit))
-                .wrapInCandyBool(context)
-                .code),
           dart.Method((b) => b
             ..name = 'toString'
             ..returns = dart.refer('String', dartCoreUrl)
             ..body = dart.literalString('"unit"').code)
-        ])),
+        ])
+        ..methods.addAll(mixinsAndImplementsAndMethodOverrides.third)),
     ];
   }
 
