@@ -209,5 +209,7 @@ fun main() {
       ),
     ),
   )
-  print((compilationUnit as DartToCode).toCode())
+
+  let importAllocator = DartSimplePrefixingImportAllocator(MutableMap.empty<String, String>())
+  print((compilationUnit as DartToCode).toCode(importAllocator))
 }

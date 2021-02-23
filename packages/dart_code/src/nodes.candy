@@ -210,7 +210,7 @@ impl DartType: DartExpression
 
 class DartIdentifier {
   let name: String
-  let prefix: Maybe<String> = None<String>()
+  let importUrl: Maybe<String /* Url */> = None<String>()
 }
 impl DartIdentifier: DartExpression
 
