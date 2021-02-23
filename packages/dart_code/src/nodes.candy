@@ -62,14 +62,14 @@ public let dartPackageTestUrl = "package:test/test.dart";
 
 class DartPart {
   /// part 'foo.dart';
-  
+
   let path: String
 }
 impl DartPart: DartDirective
 
 class DartPartOf {
   /// part of 'bar.dart';
-  
+
   let path: String
 }
 impl DartPartOf: DartDirective
@@ -227,7 +227,7 @@ class DartNamedType {
   let name: DartIdentifier
   let typeArguments: List<DartType> = List.empty<DartType>()
 }
-impl DartNamedType: DartType & DartExpression
+impl DartNamedType: DartExpression & DartType
 /// TODO(marcelgarus): Remove once the compiler realizes `DartType` implements `DartExpression`.
 
 class DartFunctionType {
@@ -236,7 +236,7 @@ class DartFunctionType {
   let namedParameters: List<DartParameter> = List.empty<DartParameter>()
   let _returns: Maybe<DartType> = None<DartType>()
 }
-impl DartFunctionType: DartType & DartExpression
+impl DartFunctionType: DartExpression & DartType
 /// TODO(marcelgarus): Remove once the compiler realizes `DartType` implements `DartExpression`.
 
 // Expressions.
@@ -270,8 +270,6 @@ trait DartExpression {
   fun as_(other: DartType): DartBinaryOperator { DartBinaryOperator(this, "as", other as DartExpression) }
   fun is_(other: DartType): DartBinaryOperator { DartBinaryOperator(this, "is", other as DartExpression) }
 }
-
-impl DartType: DartExpression
 
 class DartIdentifier {
   let name: String
