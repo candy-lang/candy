@@ -139,17 +139,17 @@ impl DartClass: DartToCode {
     if extends_ is Some {
       s = "{s} extends {(extends_.unwrap() as DartToCode).toCode(importAllocator)}"
     }
-    if (implements_ as Iterable).isNotEmpty() {
-      let implementsCode = (implements_ as Iterable<DartType>)
-        .map<String>({ (it as DartToCode).toCode(importAllocator) })
-        .join(", ")
-      s = "{s} implements {implementsCode}"
-    }
     if (with_ as Iterable).isNotEmpty() {
       let withCode = (with_ as Iterable<DartType>)
         .map<String>({ (it as DartToCode).toCode(importAllocator) })
         .join(", ")
       s = "{s} with {withCode}"
+    }
+    if (implements_ as Iterable).isNotEmpty() {
+      let implementsCode = (implements_ as Iterable<DartType>)
+        .map<String>({ (it as DartToCode).toCode(importAllocator) })
+        .join(", ")
+      s = "{s} implements {implementsCode}"
     }
     let bodyCode = (body as Iterable<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>)
       .map<String>({ (it as DartToCode).toCode(importAllocator) })
@@ -172,12 +172,14 @@ impl DartConstructor: DartToCode {
       (namedParameters as Iterable<DartParameter | DartInitializingFormal>)
         .map<String>({ (it as DartToCode).toCode(importAllocator) }),
     )
+    s = "{s}({parameters})"
     if body is Some {
       s = "{s} {(body.unwrap() as DartToCode).toCode(importAllocator)}"
     }
     if body.map<Bool>({ it is DartInlineBody }).orElse({ true }) {
       s = "{s};"
     }
+    s
   }
 }
 impl DartInitializingFormal: DartToCode {
