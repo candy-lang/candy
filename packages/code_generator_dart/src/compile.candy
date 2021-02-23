@@ -1,0 +1,60 @@
+use compiler_utils
+use incremental
+
+public fun compile(context: QueryContext<List<CompilerError>>, package: Package): Unit {
+  impureQuery<Unit, List<CompilerError>>(context, "code_generator_dart.compile", package, {
+    let outputPath = package.getOutputPath(context, "Dart")
+    let outputDirectory = Directory(outputPath)
+    if outputDirectory.doesExist() {
+      outputDirectory.delete(recursive = true)
+      outputDirectory.create(recursive = true)
+    }
+
+    let files = compile_(context, package)
+    for entry in files.entries() {
+      let path = outputPath.append(entry.first)
+      let content = entry.second
+
+      let file = File(path)
+      file.create(recursive = true)
+      file.write(content)
+    }
+
+    let pubGetResult = Process.run(Path.parse("dart"), List.of2<String>("pub", "get"), outputPath)
+    if !(pubGetResult.exitCode == 0) {
+      throw "Error running `pub get`: Exit Code {pubGetResult.exitCode}\n{pubGetResult.standardOutput}\n{pubGetResult.standardError}"
+    }
+
+    Tuple(unit, List.empty<CompilerError>())
+  })
+}
+
+fun compile_(context: QueryContext<List<CompilerError>>, package: Package): Map<Path, String> {
+  query<Map<Path, String>, List<CompilerError>>(context, "code_generator_dart.compile_", package, {
+    let output = MutableMap.empty<Path, String>()
+
+    let pubspec = generatePubspec(context, package)
+    output.set(pubspec.first, pubspec.second)
+
+    // TODO(JonasWanke): generate code
+
+    Tuple(output, List.empty<CompilerError>())
+  })
+}
+
+fun generatePubspec(context: QueryContext<List<CompilerError>>, package: Package): (Path, String) {
+  query<(Path, String), List<CompilerError>>(context, "code_generator_dart.generatePubspec", package, {
+    let path = Path.parse("pubspec.yaml")
+
+    let content = "name: {package.getName(context)}
+environment:
+  sdk: '>=2.12.0-0 <3.0.0'
+dependencies:
+  characters: ^1.1.0
+  meta: ^1.3.0
+dev_dependencies:
+  test: ^1.16.3"
+
+    Tuple(Tuple(path, content), List.empty<CompilerError>())
+  })
+}
