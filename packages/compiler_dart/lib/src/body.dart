@@ -425,7 +425,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
     List<dart.Code> visitBody(List<Expression> body) => [
           for (final expression in body) ...expression.accept(this),
           _refer(node.id)
-              .assign(body.isNotEmpty ? _refer(body.last.id) : unitInstance)
+              .assign(body.isNotEmpty ? _refer(body.last.id) : dart.literalNull)
               .statement,
         ];
 
