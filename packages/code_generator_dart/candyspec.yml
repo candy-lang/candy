@@ -16,3 +16,5 @@ dependencies:
     path: ../hir
   incremental:
     path: ../incremental
+  dart_code:
+    path: ../dart_code

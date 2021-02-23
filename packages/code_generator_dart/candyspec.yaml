@@ -1,4 +1,5 @@
 code_generator_dart
 
-../hir
 ../compiler_utils
+../dart_code
+../hir

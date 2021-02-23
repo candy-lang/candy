@@ -44,8 +44,6 @@ fun compile_(context: QueryContext<List<CompilerError>>, package: Package): Map<
 
 fun generatePubspec(context: QueryContext<List<CompilerError>>, package: Package): (Path, String) {
   query<(Path, String), List<CompilerError>>(context, "code_generator_dart.generatePubspec", package, {
-    let path = Path.parse("pubspec.yaml")
-
     let content = "name: {package.getName(context)}
 environment:
   sdk: '>=2.12.0-0 <3.0.0'
@@ -55,6 +53,6 @@ dependencies:
 dev_dependencies:
   test: ^1.16.3"
 
-    Tuple(Tuple(path, content), List.empty<CompilerError>())
+    Tuple(Tuple(Path.parse(dartPubspecFileName), content), List.empty<CompilerError>())
   })
 }
