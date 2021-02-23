@@ -14,7 +14,7 @@ fun main() {
   let module = fileToHirModule(context, file)
   print("Module is {module}")
 
-  let declarations = module.declarations(context)
+  let declarations = (module as HasDeclarations).declarations(context)
   print("Declarations are {declarations}")
 
   let primitives = HirInnerModule(module, "Primitives").declarations(context)

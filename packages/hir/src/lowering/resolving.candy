@@ -19,7 +19,7 @@ impl String {
       this as Equals & Hash,
       {
         let candidates = MutableSet.empty<HirClass | HirTrait | HirProperty | HirFunction | HirModule>()
-        for declaration in scope.declarations(context) {
+        for declaration in (scope as HasDeclarations).declarations(context) {
           if declaration.name() == this {
             candidates.insert(
               declaration as HirClass | HirTrait | HirProperty | HirFunction | HirModule
