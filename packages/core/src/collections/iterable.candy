@@ -42,20 +42,9 @@ public trait Iterable<Item> {
   fun fifth(): Maybe<Item> { get(4) }
 
   fun nthLast(index: Int): Maybe<Item> {
-    // TODO(marcelgarus): Implement this.
     // TODO(marcelgarus): Make this way more efficient.
-    // let list = ArrayList.empty<Item>()
-    // let iter = iterator()
-    // loop {
-    //   let element = iter.next()
-    //   if element is None { break }
-    //   list.append(element.unwrap())
-    //   if list.length() > index {
-    //     list.removeFirst()
-    //   }
-    // }
-    // if list.length() == index { list.first() } else { None<Item>() }
-    todo("Implement nthLast.")
+    let list = (toList() as Iterable<Item>)
+    list.get(list.length() - index - 1)
   }
 
   fun last(): Maybe<Item> { nthLast(0) }
