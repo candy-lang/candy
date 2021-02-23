@@ -1,4 +1,11 @@
+public let dartPubspecFileName = "pubspec.yaml"
+public let dartLibPath = Path.parse("lib")
+public let dartSourcePath = dartLibPath.child("src")
+public let dartTestPath = Path.parse("test")
+public let dartFileExtension = "dart"
+
 class DartCompilationUnit {
+
   let directives: List<DartDirective>
   let declarations: List<DartDeclaration>
 }
@@ -25,6 +32,33 @@ class DartImport {
   let hide: List<String> = List.empty<String>()
 }
 impl DartImport: DartDirective
+
+public let dartAsyncUrl = "dart:async"
+public let dartCollectionUrl = "dart:collection"
+public let dartConvertUrl = "dart:convert"
+public let dartCoreUrl = "dart:core"
+public let dartDeveloperUrl = "dart:developer"
+public let dartMathUrl = "dart:math"
+public let dartTypedDataUrl = "dart:typed_data"
+// VM-only:
+public let dartFfiUrl = "dart:ffi"
+public let dartIoUrl = "dart:io"
+public let dartIsolateUrl = "dart:isolate"
+public let dartMirrorsUrl = "dart:mirrors"
+// Web-only:
+public let dartHtmlUrl = "dart:html"
+public let dartIndexedDbUrl = "dart:indexed_db"
+public let dartJsUrl = "dart:js"
+public let dartJsUtilUrl = "dart:js_util"
+public let dartSvgUrl = "dart:svg"
+public let dartWebAudioUrl = "dart:web_audio"
+public let dartWebGlUrl = "dart:web_gl"
+public let dartWebSqlUrl = "dart:web_sql"
+
+// Packages:
+public let dartPackageMetaUrl = "package:meta/meta.dart";
+public let dartPackagePathUrl = "package:path/path.dart";
+public let dartPackageTestUrl = "package:test/test.dart";
 
 class DartPart {
   /// part 'foo.dart';
@@ -156,7 +190,38 @@ impl DartBlock: DartBody
 
 // Types.
 
-trait DartType: DartExpression {}
+public trait DartType: DartExpression
+
+// TODO(JonasWanke): Move these to `DartType` when we support static properties in traits.
+static let dartBool = DartNamedType(DartIdentifier("bool", Some<String>(dartCoreUrl)), List.empty<DartType>())
+static fun dartComparable(t: DartType): DartType {
+  DartNamedType(DartIdentifier("Comparable", Some<String>(dartCoreUrl)), List.of1<DartType>(t))
+}
+static let dartDeprecated = DartNamedType(DartIdentifier("Deprecated", Some<String>(dartCoreUrl)), List.empty<DartType>())
+static let dartDouble = DartNamedType(DartIdentifier("double", Some<String>(dartCoreUrl)), List.empty<DartType>())
+static let dartDynamic = DartNamedType(DartIdentifier("dynamic", None<String>()), List.empty<DartType>())
+static let dartInt = DartNamedType(DartIdentifier("int", Some<String>(dartCoreUrl)), List.empty<DartType>())
+static fun dartIterable(entry: DartType): DartType {
+  DartNamedType(DartIdentifier("Iterable", Some<String>(dartCoreUrl)), List.of1<DartType>(entry))
+}
+static fun dartIterator(entry: DartType): DartType {
+  DartNamedType(DartIdentifier("Iterator", Some<String>(dartCoreUrl)), List.of1<DartType>(entry))
+}
+static fun dartList(entry: DartType): DartType {
+  DartNamedType(DartIdentifier("List", Some<String>(dartCoreUrl)), List.of1<DartType>(entry))
+}
+static fun dartMap(key: DartType, value: DartType): DartType {
+  DartNamedType(DartIdentifier("Map", Some<String>(dartCoreUrl)), List.of2<DartType>(key, value))
+}
+static let dartNull = DartNamedType(DartIdentifier("Null", Some<String>(dartCoreUrl)), List.empty<DartType>())
+static let dartNum = DartNamedType(DartIdentifier("num", Some<String>(dartCoreUrl)), List.empty<DartType>())
+static let dartObject = DartNamedType(DartIdentifier("Object", Some<String>(dartCoreUrl)), List.empty<DartType>())
+static let dartSet = DartNamedType(DartIdentifier("Set", Some<String>(dartCoreUrl)), List.empty<DartType>())
+static let dartStackTrace = DartNamedType(DartIdentifier("StackTrace", Some<String>(dartCoreUrl)), List.empty<DartType>())
+static let dartString = DartNamedType(DartIdentifier("String", Some<String>(dartCoreUrl)), List.empty<DartType>())
+static let dartType = DartNamedType(DartIdentifier("Type", Some<String>(dartCoreUrl)), List.empty<DartType>())
+static let dartVoid = DartNamedType(DartIdentifier("void", None<String>()), List.empty<DartType>())
+// Of course, "void" is not in "dart:core".
 
 class DartNamedType {
   let name: DartIdentifier
