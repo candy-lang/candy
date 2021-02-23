@@ -64,6 +64,8 @@ class BuildCommandHandler extends CommandHandler<ExecuteCommandParams, Object> {
         'Failed to build to Dart.',
         context.reportedErrors.join(', '),
       );
+    } else {
+      server.sendLogMessage('Build succeeded 🎉');
     }
     return success();
   }
