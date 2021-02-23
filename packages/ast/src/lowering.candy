@@ -850,7 +850,7 @@ fun lowerType(
     return lowerGroupType(context, parentId, cst.cast<CstGroupType>())
   }
   if cst.child is CstFunctionType {
-    return Some<AstType>(lowerFunctionType(context, parentId, cst.cast<CstFunctionType>()))
+    return lowerFunctionType(context, parentId, cst.cast<CstFunctionType>())
   }
   if cst.child is CstTupleType {
     return lowerTupleType(context, parentId, cst.cast<CstTupleType>())
@@ -942,7 +942,7 @@ fun lowerFunctionType(
   context: LoweringContext,
   parentId: AstDeclarationId | AstTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstFunctionType>,
-): AstFunctionType {
+): Maybe<AstFunctionType> {
   let id = context.getTypeId(parentId)
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
@@ -958,14 +958,16 @@ fun lowerFunctionType(
       })
 
   let returnType = cst.child.returnType
-      .map<Maybe<AstType>>({ lowerType(context, id, it) })
-      .orElse({
-        context.addError(ExpectedReturnTypeInFunctionTypeCompilerError(context.file, cst))
-        None<AstType>()
-      })
+      .flatMap<AstType>({ lowerType(context, id, cst.child.returnType.unwrap()) })
+  if returnType is None {
+    context.addError(ExpectedReturnTypeInFunctionTypeCompilerError(context.file, cst))
+    return None<AstFunctionType>()
+  }
 
   context.addIdMapping(cst.id, id)
-  AstFunctionType(id, modifiers, receiverType, parameterTypes, returnType)
+  Some<AstFunctionType>(
+    AstFunctionType(id, modifiers, receiverType, parameterTypes, returnType.unwrap())
+  )
 }
 fun lowerFunctionTypeParameterTypes(
   context: LoweringContext,
