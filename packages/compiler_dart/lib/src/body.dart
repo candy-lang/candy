@@ -243,7 +243,7 @@ class DartExpressionVisitor extends ExpressionVisitor<List<dart.Code>> {
         final content = parts
             .map((p) => p.when(
                   literal: escapeForStringLiteral,
-                  interpolated: (expression) => '\$${_name(expression.id)}',
+                  interpolated: (expression) => '\${${_name(expression.id)}}',
                 ))
             .join();
         lowered.add(

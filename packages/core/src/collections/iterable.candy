@@ -42,20 +42,9 @@ public trait Iterable<Item> {
   fun fifth(): Maybe<Item> { get(4) }
 
   fun nthLast(index: Int): Maybe<Item> {
-    // TODO(marcelgarus): Implement this.
     // TODO(marcelgarus): Make this way more efficient.
-    // let list = ArrayList.empty<Item>()
-    // let iter = iterator()
-    // loop {
-    //   let element = iter.next()
-    //   if element is None { break }
-    //   list.append(element.unwrap())
-    //   if list.length() > index {
-    //     list.removeFirst()
-    //   }
-    // }
-    // if list.length() == index { list.first() } else { None<Item>() }
-    todo("Implement nthLast.")
+    let list = (toList() as Iterable<Item>)
+    list.get(list.length() - index - 1)
   }
 
   fun last(): Maybe<Item> { nthLast(0) }
@@ -117,8 +106,22 @@ public trait Iterable<Item> {
     for item in toList().reversed() { result = combine(item, result) }
     result
   }
-  // TODO(marcelgarus): reduceLeft
+  fun reduceLeft(combine: (Item, Item) => Item): Maybe<Item> {
+    if isEmpty() { return None<Item>() }
+
+    mut let result = first().unwrap()
+    for item in skip(1) { result = combine(result, item) }
+    Some<Item>(result)
+  }
   // TODO(marcelgarus): reduceRight
+
+  fun minBy<C: Comparable>(selector: (Item) => C): Maybe<Item> {
+    reduceLeft({ result, item => if selector(result) <= selector(item) { result } else { item } })
+  }
+  fun maxBy<C: Comparable>(selector: (Item) => C): Maybe<Item> {
+    reduceLeft({ result, item => if selector(result) >= selector(item) { result } else { item } })
+  }
+  // TODO(JonasWanke): sumBy, averageBy
 
   // Searching.
 
@@ -262,7 +265,7 @@ public trait Iterable<Item> {
 
   // TODO(marcelgarus): for Iterable<(A, B)>: map with 2 args, unzip
   // TODO(marcelgarus): for Iterable<Iterable<T>>: flatten
-  // TODO(marcelgarus): for Iterable<Number>: average, sum, min, max, minBy, maxBy
+  // TODO(marcelgarus): for Iterable<Number>: average, sum, min, max
   // TODO(marcelgarus): for Iterable<Maybe<T>>: whereSome, unwrapAll
 
   fun join(separator: String): String {

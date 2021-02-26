@@ -1,0 +1,91 @@
+use compiler_utils
+use incremental
+
+fun mangleName(context: QueryContext<List<CompilerError>>, name: String): String {
+  query<String, List<CompilerError>>(context, "code_generator_dart.mangleName", name, {
+    let reservedIdentifiers = MutableSet.empty<String>()
+    // Some of these are only reserved in some contexts, e.g., "await" is a valid identifier except
+    // in `async`/`async*`/`sync*` functions. But it's easier to just avoid them everywhere.
+    reservedIdentifiers.insert("abstract")
+    reservedIdentifiers.insert("as")
+    reservedIdentifiers.insert("assert")
+    reservedIdentifiers.insert("async")
+    reservedIdentifiers.insert("await")
+    reservedIdentifiers.insert("break")
+    reservedIdentifiers.insert("case")
+    reservedIdentifiers.insert("catch")
+    reservedIdentifiers.insert("class")
+    reservedIdentifiers.insert("const")
+    reservedIdentifiers.insert("continue")
+    reservedIdentifiers.insert("covariant")
+    reservedIdentifiers.insert("default")
+    reservedIdentifiers.insert("deferred")
+    reservedIdentifiers.insert("do")
+    reservedIdentifiers.insert("dynamic")
+    reservedIdentifiers.insert("else")
+    reservedIdentifiers.insert("enum")
+    reservedIdentifiers.insert("export")
+    reservedIdentifiers.insert("extends")
+    reservedIdentifiers.insert("extension")
+    reservedIdentifiers.insert("external")
+    reservedIdentifiers.insert("factory")
+    reservedIdentifiers.insert("false")
+    reservedIdentifiers.insert("final")
+    reservedIdentifiers.insert("finally")
+    reservedIdentifiers.insert("for")
+    reservedIdentifiers.insert("Function")
+    reservedIdentifiers.insert("get")
+    reservedIdentifiers.insert("hide")
+    reservedIdentifiers.insert("if")
+    reservedIdentifiers.insert("implements")
+    reservedIdentifiers.insert("import")
+    reservedIdentifiers.insert("in")
+    reservedIdentifiers.insert("interface")
+    reservedIdentifiers.insert("is")
+    reservedIdentifiers.insert("library")
+    reservedIdentifiers.insert("mixin")
+    reservedIdentifiers.insert("new")
+    reservedIdentifiers.insert("null")
+    reservedIdentifiers.insert("on")
+    reservedIdentifiers.insert("operator")
+    reservedIdentifiers.insert("part")
+    reservedIdentifiers.insert("rethrow")
+    reservedIdentifiers.insert("return")
+    reservedIdentifiers.insert("set")
+    reservedIdentifiers.insert("show")
+    reservedIdentifiers.insert("static")
+    reservedIdentifiers.insert("super")
+    reservedIdentifiers.insert("switch")
+    reservedIdentifiers.insert("sync")
+    reservedIdentifiers.insert("this")
+    reservedIdentifiers.insert("throw")
+    reservedIdentifiers.insert("true")
+    reservedIdentifiers.insert("try")
+    reservedIdentifiers.insert("typedef")
+    reservedIdentifiers.insert("var")
+    reservedIdentifiers.insert("void")
+    reservedIdentifiers.insert("while")
+    reservedIdentifiers.insert("with")
+    reservedIdentifiers.insert("yield")
+
+    // Find the longest reserved identifier that is a prefix of `name`.
+    let longestMatchingIdentifier = (reservedIdentifiers as Set<String>)
+        .items()
+        .where({ name.substring(0, it.length()) == it })
+        .maxBy<Int>({ it.length() })
+    if longestMatchingIdentifier is None<String> {
+      return Tuple(name, List.empty<CompilerError>())
+    }
+    let longestMatchingIdentifier = longestMatchingIdentifier.unwrap()
+
+    // Check whether the remaining characters of `name` are just underscores.
+    let suffix = name.substring(
+      longestMatchingIdentifier.length(),
+      name.length() - longestMatchingIdentifier.length(),
+    )
+    if !suffix.characters().all({ it == "_" }) { return Tuple(name, List.empty<CompilerError>()) }
+
+    // Add another underscore.
+    Tuple("{name}_", List.empty<CompilerError>())
+  })
+}
