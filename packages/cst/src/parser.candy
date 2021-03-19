@@ -312,7 +312,7 @@ class CstParser {
   fun initType() {
     let closingParenthesisOrOtherEndDetection = punctuationOrEnd(")")
         .or<Maybe<CstNode<PunctuationToken>>>(
-          punctuation(">")
+          punctuation("]")
               .or<CstNode<PunctuationToken>>(punctuation("}"))
               .and()
               .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
@@ -356,14 +356,10 @@ class CstParser {
         .sequence<Maybe<CstNode<PunctuationToken>>>(
           punctuationOrEnd(")")
               .or<Maybe<CstNode<PunctuationToken>>>(
-                punctuation(">")
-                  .and()
-                  .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
-              )
-              .or<Maybe<CstNode<PunctuationToken>>>(
-                punctuation("}")
-                  .and()
-                  .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() })
+                punctuation("]")
+                    .or<CstNode<PunctuationToken>>(punctuation("}"))
+                    .and()
+                    .map<Maybe<CstNode<PunctuationToken>>>({ None<CstNode<PunctuationToken>>() }),
               )
               .cast<Maybe<CstNode<PunctuationToken>>>()
         )
@@ -510,11 +506,11 @@ class CstParser {
   }
 
   fun typeParameters(): Parser<String, CstNode<CstTypeParameters>> {
-    let typeParameters = punctuation("<")
+    let typeParameters = punctuation("[")
         .sequence<List<CstNode<CstTypeParameter | PunctuationToken>>>(
           commaSeparated<CstTypeParameter>(typeParameter())
         )
-        .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd(">"))
+        .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd("]"))
         .map<CstTypeParameters>({ CstTypeParameters(it.first.first, it.first.second, it.second) })
     node<CstTypeParameters>(typeParameters)
   }
@@ -537,11 +533,11 @@ class CstParser {
   }
 
   fun typeArguments(): Parser<String, CstNode<CstTypeArguments>> {
-    let typeArguments = punctuation("<")
+    let typeArguments = punctuation("[")
         .sequence<List<CstNode<CstTypeArgument | PunctuationToken>>>(
           commaSeparated<CstTypeArgument>(typeArgument())
         )
-        .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd(">"))
+        .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd("]"))
         .map<CstTypeArguments>({ CstTypeArguments(it.first.first, it.first.second, it.second) })
     node<CstTypeArguments>(typeArguments)
   }
