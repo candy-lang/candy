@@ -139,6 +139,11 @@ public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
   }
 
   fun set(key: Key, value: Value)
+  fun setAll(map: Map<Key, Value>) {
+    for entry in map.entries() {
+      set(entry.first, entry.second)
+    }
+  }
 
   fun putIfAbsent(key: Key, ifAbsent: () => Value): Value {
     let safeGet = get as ((Key) => Maybe<Value>)
@@ -178,12 +183,6 @@ public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
   fun clear() {
     for key in keys() {
       remove(key as Key)
-    }
-  }
-
-  fun setAll(map: Map<Key, Value>) {
-    for entry in map.entries() {
-      set(entry.first, entry.second)
     }
   }
 
