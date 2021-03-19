@@ -1048,9 +1048,9 @@ class CstParser {
           )
           .map<(Span, String)>({ Tuple(it.first.span, it.first.value as String) })
     }
-    let docComment = lineCommentFromStart(string("///", "'///' expected."))
+    let docComment = lineCommentFromStart(string("#", "'#' expected."))
         .map<CommentToken>({ CommentToken(it.first, it.second, "doc") })
-    let lineComment = lineCommentFromStart(string("//", "'//' expected."))
+    let lineComment = lineCommentFromStart(string("##", "'##' expected."))
         .map<CommentToken>({ CommentToken(it.first, it.second, "line") })
 
     let blockComment = notYetDefined<String, CommentToken>("Parser not yet defined.")
@@ -1075,7 +1075,7 @@ class CstParser {
         })
 
     choiceOf<String, CommentToken>(
-      List.of3<Parser<String, CommentToken>>(docComment, lineComment, blockComment),
+      List.of3<Parser<String, CommentToken>>(lineComment, docComment, blockComment),
     )
   }
   fun lineBreak(): Parser<String, Token<String, String>> {
