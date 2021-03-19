@@ -24,7 +24,7 @@ public fun parse(source: String): CstNode<CstFile> {
   let parser = CstParser(
     source.characters().toList(),
     0,
-    notYetDefined<String, CstNode<CstType>>("Parser not yet defined."),
+    notYetDefined<String, CstNode<CstInlineType>>("Parser not yet defined."),
     notYetDefined<String, CstNode<CstExpression>>("Parser not yet defined."),
   )
   parser.initType()
@@ -123,9 +123,9 @@ class CstParser {
 
     let trait_ = declarationBeginningWithName("trait", true)
         .sequence<Maybe<CstNode<CstTypeParameters>>>(typeParameters().optional())
-        .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>>(
+        .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>>(
           punctuation(":")
-              .sequence<Maybe<CstNode<CstType>>>(type.optional())
+              .sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional())
               .optional()
         )
         .sequence<Maybe<CstNode<CstDeclarationContent>>>(optionalDeclarationContent)
@@ -141,10 +141,10 @@ class CstParser {
 
     let impl_ = declarationBeginning("impl")
         .sequence<Maybe<CstNode<CstTypeParameters>>>(typeParameters().optional())
-        .sequence<Maybe<CstNode<CstType>>>(type.optional())
-        .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>>(
+        .sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional())
+        .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>>(
           punctuation(":")
-              .sequence<Maybe<CstNode<CstType>>>(type.optional())
+              .sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional())
               .optional()
         )
         .sequence<Maybe<CstNode<CstDeclarationContent>>>(optionalDeclarationContent)
@@ -173,9 +173,9 @@ class CstParser {
     let function = declarationBeginningWithName("fun", false)
         .sequence<Maybe<CstNode<CstTypeParameters>>>(typeParameters().optional())
         .sequence<Maybe<CstNode<CstValueParameters>>>(valueParameters().optional())
-        .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>>(
+        .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>>(
           punctuation(":")
-              .sequence<Maybe<CstNode<CstType>>>(type.optional())
+              .sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional())
               .optional()
         )
         .sequence<Maybe<CstNode<CstBlockBody | CstExpressionBody>>>(
@@ -227,9 +227,9 @@ class CstParser {
           (List<CstNode<IdentifierToken>>, CstNode<KeywordToken>),
           Maybe<CstNode<IdentifierToken>>,
         )>()
-        .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>>(
+        .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>>(
           punctuation(":")
-              .sequence<Maybe<CstNode<CstType>>>(type.optional())
+              .sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional())
               .optional()
         )
         .sequence<Maybe<CstNode<CstDelegationBody>>>(delegationBody().optional())
@@ -272,9 +272,9 @@ class CstParser {
     // TODO(JonasWanke): allow modifiers
     // TODO(JonasWanke): allow parameters without a name
     let valueParameter = identifier(false)
-        .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>>(
+        .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>>(
           punctuation(":")
-              .sequence<Maybe<CstNode<CstType>>>(type.optional())
+              .sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional())
               .optional()
         )
         .sequence<Maybe<CstNode<CstDelegationBody>>>(delegationBody().optional())
@@ -313,7 +313,7 @@ class CstParser {
 
   // types
 
-  let type = notYetDefined<String, CstNode<CstType>>("Parser not yet defined.")
+  let inlineType = notYetDefined<String, CstNode<CstInlineType>>("Parser not yet defined.")
   fun initType() {
     let closingParenthesisOrOtherEndDetection = punctuationOrEnd(")")
         .or<Maybe<CstNode<PunctuationToken>>>(
@@ -353,11 +353,11 @@ class CstParser {
               }),
           )
         .sequence<Maybe<CstNode<CstTypeArguments>>>(typeArguments().optional())
-        .map<CstType>({ CstNamedType(it.first.first, it.first.second, it.second) })
+        .map<CstInlineType>({ CstNamedType(it.first.first, it.first.second, it.second) })
 
     let groupType = modifiers()
         .sequence<CstNode<PunctuationToken>>(punctuation("("))
-        .sequence<Maybe<CstNode<CstType>>>(type.optional())
+        .sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional())
         .sequence<Maybe<CstNode<PunctuationToken>>>(
           punctuationOrEnd(")")
               .or<Maybe<CstNode<PunctuationToken>>>(
@@ -372,7 +372,7 @@ class CstParser {
               )
               .cast<Maybe<CstNode<PunctuationToken>>>()
         )
-        .map<CstType>({
+        .map<CstInlineType>({
           let modifiers = it.first.first.first
           let openingParenthesis = it.first.first.second
           let type = it.first.second
@@ -382,9 +382,9 @@ class CstParser {
 
     let tupleType = modifiers()
         .sequence<CstNode<PunctuationToken>>(punctuation("("))
-        .sequence<List<CstNode<CstType | PunctuationToken>>>(commaSeparated<CstType>(type))
+        .sequence<List<CstNode<CstInlineType | PunctuationToken>>>(commaSeparated<CstInlineType>(inlineType))
         .sequence<Maybe<CstNode<PunctuationToken>>>(closingParenthesisOrOtherEndDetection)
-        .map<CstType>({
+        .map<CstInlineType>({
           let modifiers = it.first.first.first
           let openingParenthesis = it.first.first.second
           let types = it.first.second
@@ -392,42 +392,42 @@ class CstParser {
           CstTupleType(modifiers, openingParenthesis, types, closingParenthesis)
         })
 
-    let intersectionType = notYetDefined<String, CstType>("Parser not yet defined.")
-    intersectionType.delegate = node<CstType>(
-          choiceOf<String, CstType>(List.of2<Parser<String, CstType>>(namedType, groupType)),
+    let intersectionType = notYetDefined<String, CstInlineType>("Parser not yet defined.")
+    intersectionType.delegate = node<CstInlineType>(
+          choiceOf<String, CstInlineType>(List.of2<Parser<String, CstInlineType>>(namedType, groupType)),
         )
         .sequence<CstNode<PunctuationToken>>(punctuation("&"))
-        .sequence<Maybe<CstNode<CstType>>>(
-          node<CstType>(
-            choiceOf<String, CstType>(
-              List.of3<Parser<String, CstType>>(intersectionType, groupType, namedType),
+        .sequence<Maybe<CstNode<CstInlineType>>>(
+          node<CstInlineType>(
+            choiceOf<String, CstInlineType>(
+              List.of3<Parser<String, CstInlineType>>(intersectionType, groupType, namedType),
             ),
           )
           .optional()
         )
-        .map<CstType>({
+        .map<CstInlineType>({
           let leftType = it.first.first
           let ampersand = it.first.second
           let rightType = it.second
           CstIntersectionType(leftType, ampersand, rightType)
         })
 
-    let unionType = notYetDefined<String, CstType>("Parser not yet defined.")
-    unionType.delegate = node<CstType>(
-          choiceOf<String, CstType>(
-            List.of3<Parser<String, CstType>>(intersectionType, groupType, namedType),
+    let unionType = notYetDefined<String, CstInlineType>("Parser not yet defined.")
+    unionType.delegate = node<CstInlineType>(
+          choiceOf<String, CstInlineType>(
+            List.of3<Parser<String, CstInlineType>>(intersectionType, groupType, namedType),
           ),
         )
         .sequence<CstNode<PunctuationToken>>(punctuation("|"))
-        .sequence<Maybe<CstNode<CstType>>>(
-          node<CstType>(
-            choiceOf<String, CstType>(
-              List.of4<Parser<String, CstType>>(unionType, intersectionType, groupType, namedType),
+        .sequence<Maybe<CstNode<CstInlineType>>>(
+          node<CstInlineType>(
+            choiceOf<String, CstInlineType>(
+              List.of4<Parser<String, CstInlineType>>(unionType, intersectionType, groupType, namedType),
             ),
           )
           .optional()
         )
-        .map<CstType>({
+        .map<CstInlineType>({
           let leftType = it.first.first
           let bar = it.first.second
           let rightType = it.second
@@ -435,16 +435,16 @@ class CstParser {
         })
 
     let functionTypeParameterTypes = punctuation("(")
-        .sequence<List<CstNode<CstType | PunctuationToken>>>(commaSeparated<CstType>(type))
+        .sequence<List<CstNode<CstInlineType | PunctuationToken>>>(commaSeparated<CstInlineType>(inlineType))
         .sequence<Maybe<CstNode<PunctuationToken>>>(closingParenthesisOrOtherEndDetection)
         .map<CstFunctionTypeParameterTypes>({
           CstFunctionTypeParameterTypes(it.first.first, it.first.second, it.second)
         })
     let functionTypeParameterTypes = node<CstFunctionTypeParameterTypes>(functionTypeParameterTypes)
     // TODO(JonasWanke): allow modifiers
-    let functionType = node<CstType>(
-          choiceOf<String, CstType>(
-            List.of4<Parser<String, CstType>>(unionType, intersectionType, groupType, namedType),
+    let functionType = node<CstInlineType>(
+          choiceOf<String, CstInlineType>(
+            List.of4<Parser<String, CstInlineType>>(unionType, intersectionType, groupType, namedType),
           ),
         )
         .optional()
@@ -452,15 +452,15 @@ class CstParser {
           functionTypeParameterTypes.optional()
         )
         .sequence<CstNode<PunctuationToken>>(punctuation("->"))
-        .sequence<Maybe<CstNode<CstType>>>(
-          node<CstType>(
-            choiceOf<String, CstType>(
-              List.of4<Parser<String, CstType>>(unionType, intersectionType, groupType, namedType),
+        .sequence<Maybe<CstNode<CstInlineType>>>(
+          node<CstInlineType>(
+            choiceOf<String, CstInlineType>(
+              List.of4<Parser<String, CstInlineType>>(unionType, intersectionType, groupType, namedType),
             ),
           )
           .optional()
         )
-        .map<CstType>({
+        .map<CstInlineType>({
           let modifiers = List.empty<CstNode<IdentifierToken>>()
           let receiverType = it.first.first.first
           let parameterTypes = it.first.first.second
@@ -469,9 +469,9 @@ class CstParser {
           CstFunctionType(modifiers, receiverType, parameterTypes, arrow, returnType)
         })
 
-    type.delegate = node<CstType>(
-      choiceOf<String, CstType>(
-        List.of6<Parser<String, CstType>>(
+    inlineType.delegate = node<CstInlineType>(
+      choiceOf<String, CstInlineType>(
+        List.of6<Parser<String, CstInlineType>>(
           unionType,
           intersectionType,
           functionType,
@@ -496,14 +496,14 @@ class CstParser {
     let typeParameter = modifiers()
         .sequence<(
           Maybe<CstNode<IdentifierToken>>,
-          Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>,
+          Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>,
         )>(
           atLeastOne<
             CstNode<IdentifierToken>,
-            (CstNode<PunctuationToken>, Maybe<CstNode<CstType>>),
+            (CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>),
           >(
             identifier(true),
-            punctuation(":").sequence<Maybe<CstNode<CstType>>>(type.optional()),
+            punctuation(":").sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional()),
           )
         )
         .map<CstTypeParameter>({ CstTypeParameter(it.first, it.second.first, it.second.second) })
@@ -520,8 +520,7 @@ class CstParser {
     node<CstTypeArguments>(typeArguments)
   }
   fun typeArgument(): Parser<String, CstNode<CstTypeArgument>> {
-    let typeArgument = type
-        .map<CstTypeArgument>({ CstTypeArgument(it) })
+    let typeArgument = inlineType.map<CstTypeArgument>({ CstTypeArgument(it) })
     node<CstTypeArgument>(typeArgument)
   }
 
