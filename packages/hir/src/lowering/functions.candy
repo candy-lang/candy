@@ -1,0 +1,11 @@
+use compiler_utils
+use incremental
+
+use ...declarations
+use ...types
+
+impl HirFunction {
+  fun returnType(context: QueryContext<List<CompilerError>>): HirType {
+    todo("Implement HirFunction.returnType")
+  }
+}

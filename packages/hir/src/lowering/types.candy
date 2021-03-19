@@ -1,1 +1,105 @@
-// These impls make type system information available.
+use ast
+use compiler_utils
+use incremental
+
+use ...declarations
+use ...types
+use ..declarations
+
+/// These impls make type system information available.
+
+impl HirReflectionType: HasDeclarations {
+  fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any> {
+    List.empty<Any>()
+  }
+  public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
+    List.empty<HirDeclaration>()
+  }
+}
+
+// TODO(marcelgarus): Convert this into extension methods on Ast as soon as impls for types from
+// other packages work.
+fun astTypeToHirType(
+  context: QueryContext<List<CompilerError>>,
+  astType: AstType,
+  scope: HirDeclaration,
+): HirType {
+  query<HirType, List<CompilerError>>(
+    context,
+    "AstType.hir",
+    DataTuple2<AstType, HirDeclaration>(astType, scope) as Equals & Hash,
+    {
+      if (astType is AstNamedType) {
+        let nameParts = ((astType as AstNamedType).nameParts as Iterable<AstIdentifier>)
+          .map<String>({ it.value })
+
+        // Try to find the first part of the `nameParts`. Then, find children inside its
+        // declarations.
+        // TODO(marcelgarus): When resolving `Foo Bar`, we currently accept a `Bar` next to `Foo` if
+        // `Foo` itself doesn't contain a `Bar`, as the resolver traverses parent scopes.
+        mut let candidates = nameParts.first().unwrap().resolveIdentifier(context, scope)
+        for namePart in nameParts.skip(1) {
+          candidates = ((candidates as Iterable<HirDeclaration>)
+            .expand<HirDeclaration>({
+              namePart.resolveIdentifier(context, it) as Iterable<HirDeclaration>
+            })
+            .toSet() as Set<HirClass | HirTrait | HirProperty | HirFunction | HirModule>)
+        }
+
+        // There should only be one candidate left.
+        let declaration = (candidates as Iterable<HirDeclaration>).single().unwrap()
+        assert((declaration is HirClass) || (declaration is HirTrait), "Declaration should be HirClass or HirTrait.")
+        return Tuple(HirNamedType(declaration as HirTrait | HirClass), List.empty<CompilerError>())
+      }
+
+      if (astType is AstFunctionType) {
+        return Tuple(
+          HirFunctionType(
+            (astType as AstFunctionType).receiverType
+              .map<HirType>({ astTypeToHirType(context, it, scope) }),
+            ((astType as AstFunctionType).parameterTypes as Iterable<AstType>)
+              .map<HirType>({ astTypeToHirType(context, it, scope) })
+              .toList(),
+            astTypeToHirType(context, (astType as AstFunctionType).returnType, scope),
+          ),
+          List.empty<CompilerError>()
+        )
+      }
+
+      if (astType is AstTupleType) {
+        return Tuple(
+          HirTupleType(
+            ((astType as AstTupleType).types as Iterable<AstType>)
+              .map<HirType>({ astTypeToHirType(context, it, scope) })
+              .toList(),
+          ),
+          List.empty<CompilerError>(),
+        )
+      }
+
+      if (astType is AstUnionType) {
+        return Tuple(
+          HirUnionType(
+            ((astType as AstUnionType).types as Iterable<AstType>)
+              .map<HirType>({ astTypeToHirType(context, it, scope) })
+              .toList(),
+          ),
+          List.empty<CompilerError>(),
+        )
+      }
+
+      if (astType is AstIntersectionType) {
+        return Tuple(
+          HirIntersectionType(
+            ((astType as AstIntersectionType).types as Iterable<AstType>)
+              .map<HirType>({ astTypeToHirType(context, it, scope) })
+              .toList(),
+          ),
+          List.empty<CompilerError>(),
+        )
+      }
+
+      todo("Implement astTypeToHirType for {astType}")
+    }
+  )
+}

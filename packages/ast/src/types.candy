@@ -34,7 +34,7 @@ public class AstFunctionType {
   public let modifiers: List<AstIdentifier>
   public let receiverType: Maybe<AstType>
   public let parameterTypes: List<AstType>
-  public let returnType: Maybe<AstType>
+  public let returnType: AstType
 }
 impl AstFunctionType: AstType
 

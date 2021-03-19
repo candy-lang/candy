@@ -4,7 +4,7 @@ public trait HirType
 
 
 public class HirNamedType {
-  public let declarationUri: HirTrait | HirClass
+  public let declaration: HirTrait | HirClass
 }
 impl HirNamedType: HirType
 
@@ -16,7 +16,7 @@ impl HirTupleType: HirType
 
 
 public class HirFunctionType {
-  public let receiverType: HirType
+  public let receiverType: Maybe<HirType>
   public let parameterTypes: List<HirType>
   public let returnType: HirType
 }
@@ -41,7 +41,7 @@ impl HirThisType: HirType
 
 
 public class HirParameterType {
-  public let declarationUri: HirTrait | HirClass | HirFunction
+  public let declaration: HirTrait | HirClass | HirFunction
   public let name: String
 }
 impl HirParameterType: HirType
