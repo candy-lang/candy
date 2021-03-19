@@ -401,6 +401,44 @@ class CstParser {
           CstNamedTupleType(modifiers, openingParenthesis, types, closingParenthesis)
         })
 
+    // We have to make sure that this doesn't match nothing.
+    let enumTypeVariant = atLeastOne<
+      List<CstNode<IdentifierToken>>,
+      (CstNode<IdentifierToken>, Maybe<CstNode<CstInlineType>>),
+    >(
+      identifier(false).plus(),
+      identifier(true).sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional()),
+    )
+      .map<CstEnumTypeVariant>({
+        let modifiers = it.first.orElse({ List.empty<CstNode<IdentifierToken>>() })
+        let nameAndValue = it.second
+        CstEnumTypeVariant(modifiers, nameAndValue)
+      })
+    let enumTypeVariant = node<CstEnumTypeVariant>(enumTypeVariant)
+    let enumType = enumTypeVariant.optional()
+        .sequence<CstNode<PunctuationToken>>(punctuation("|"))
+        .sequence<List<CstNode<CstEnumTypeVariant | PunctuationToken>>>(
+          enumTypeVariant
+            .or<CstNode<PunctuationToken>>(punctuation("|"))
+            .cast<CstNode<CstEnumTypeVariant | PunctuationToken>>()
+            .star(),
+        )
+        .map<CstInlineType>({
+          let firstVariant = it.first.first
+          let firstBar = it.first.second
+          let remaining = it.second
+
+          mut let variants = List.of1<CstNode<CstEnumTypeVariant | PunctuationToken>>(
+            (firstBar as CstNode<CstEnumTypeVariant | PunctuationToken>),
+          ).followedByList(remaining)
+          if (firstVariant is Some<CstNode<CstEnumTypeVariant>>) {
+            variants = List.of1<CstNode<CstEnumTypeVariant | PunctuationToken>>(
+              (firstVariant.unwrap() as CstNode<CstEnumTypeVariant | PunctuationToken>),
+            ).followedByList(variants)
+          }
+          CstEnumType(variants)
+        })
+
     let intersectionType = notYetDefined<String, CstInlineType>("Parser not yet defined.")
     intersectionType.delegate = node<CstInlineType>(
           choiceOf<String, CstInlineType>(List.of2<Parser<String, CstInlineType>>(namedType, groupType)),
@@ -421,28 +459,6 @@ class CstParser {
           CstIntersectionType(leftType, ampersand, rightType)
         })
 
-    let unionType = notYetDefined<String, CstInlineType>("Parser not yet defined.")
-    unionType.delegate = node<CstInlineType>(
-          choiceOf<String, CstInlineType>(
-            List.of3<Parser<String, CstInlineType>>(intersectionType, groupType, namedType),
-          ),
-        )
-        .sequence<CstNode<PunctuationToken>>(punctuation("|"))
-        .sequence<Maybe<CstNode<CstInlineType>>>(
-          node<CstInlineType>(
-            choiceOf<String, CstInlineType>(
-              List.of4<Parser<String, CstInlineType>>(unionType, intersectionType, groupType, namedType),
-            ),
-          )
-          .optional()
-        )
-        .map<CstInlineType>({
-          let leftType = it.first.first
-          let bar = it.first.second
-          let rightType = it.second
-          CstUnionType(leftType, bar, rightType)
-        })
-
     let functionTypeParameterTypes = punctuation("(")
         .sequence<List<CstNode<CstInlineType | PunctuationToken>>>(commaSeparated<CstInlineType>(inlineType))
         .sequence<Maybe<CstNode<PunctuationToken>>>(closingParenthesisOrOtherEndDetection)
@@ -453,7 +469,7 @@ class CstParser {
     // TODO(JonasWanke): allow modifiers
     let functionType = node<CstInlineType>(
           choiceOf<String, CstInlineType>(
-            List.of4<Parser<String, CstInlineType>>(unionType, intersectionType, groupType, namedType),
+            List.of4<Parser<String, CstInlineType>>(enumType, intersectionType, groupType, namedType),
           ),
         )
         .optional()
@@ -464,7 +480,7 @@ class CstParser {
         .sequence<Maybe<CstNode<CstInlineType>>>(
           node<CstInlineType>(
             choiceOf<String, CstInlineType>(
-              List.of4<Parser<String, CstInlineType>>(unionType, intersectionType, groupType, namedType),
+              List.of4<Parser<String, CstInlineType>>(enumType, intersectionType, groupType, namedType),
             ),
           )
           .optional()
@@ -481,7 +497,7 @@ class CstParser {
     inlineType.delegate = node<CstInlineType>(
       choiceOf<String, CstInlineType>(
         List.of7<Parser<String, CstInlineType>>(
-          unionType,
+          enumType,
           intersectionType,
           functionType,
           groupType,

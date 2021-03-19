@@ -55,19 +55,23 @@ public class CstNamedTupleType {
 impl CstNamedTupleType: CstInlineType
 
 
+public class CstEnumType {
+  public let variants: List<CstNode<CstEnumTypeVariant | PunctuationToken>>
+}
+impl CstEnumType: CstInlineType
+
+public class CstEnumTypeVariant {
+  public let modifiers: List<CstNode<IdentifierToken>>
+  public let nameAndValue: Maybe<(CstNode<IdentifierToken>, Maybe<CstNode<CstInlineType>>)>
+}
+
+
 public class CstIntersectionType {
   public let leftType: CstNode<CstInlineType>
   public let ampersand: CstNode<PunctuationToken>
   public let rightType: Maybe<CstNode<CstInlineType>>
 }
 impl CstIntersectionType: CstInlineType
-
-public class CstUnionType {
-  public let leftType: CstNode<CstInlineType>
-  public let bar: CstNode<PunctuationToken>
-  public let rightType: Maybe<CstNode<CstInlineType>>
-}
-impl CstUnionType: CstInlineType
 
 
 public class CstTypeParameters {
