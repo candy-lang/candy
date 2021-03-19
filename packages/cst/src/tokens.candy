@@ -16,7 +16,7 @@ public class KeywordToken {
   /// May be one of the following:
   ///
   /// * directives: use, crate
-  /// * declarations: module, trait, impl, class, fun, let, var, get, set
+  /// * declarations: module, trait, impl, type, fun, let
   /// * control flow: return
   ///
   /// TODO(JonasWanke): convert this to an enum when we support these
@@ -76,8 +76,8 @@ public class CommentToken {
   public let type: String
   /// May be one of the following:
   ///
-  /// * "line": `// foo`
-  /// * "doc": `/// foo`
+  /// * "doc": `# foo`
+  /// * "line": `## foo`
   /// * "block": `/* foo\nbar */`
 }
 impl CommentToken: CstToken
