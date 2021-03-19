@@ -1,0 +1,114 @@
+use compiler_utils
+use dart_code
+use hir
+use incremental
+use ..class
+use ..name_mangling
+
+fun compileModuleAndDescendants(
+  context: QueryContext<List<CompilerError>>,
+  package: Package,
+  moduleHir: HirModule,
+): Map<Path, String> {
+  query<Map<Path, String>, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileModuleAndDescendants",
+    DataTuple2<Package, HirModule>(package, moduleHir), {
+    let output = MutableMap.empty<Path, String>()
+
+    let moduleResult = compileModule(context, package, moduleHir)
+    output.set(moduleResult.first, moduleResult.second)
+
+    for moduleHir in (moduleHir as HasDeclarations).whereType<HirModule>() {
+      let result = compileModuleAndDescendants(context, package, moduleHir)
+      output.setAll(result)
+    }
+
+    Tuple(output, List.empty<CompilerError>())
+  })
+}
+
+fun compileModule(
+  context: QueryContext<List<CompilerError>>,
+  package: Package,
+  moduleHir: HirModule,
+): (Path, String) {
+  query<(Path, String), List<CompilerError>>(
+    context,
+    "code_generator_dart.compileModule",
+    DataTuple2<Package, HirModule>(package, moduleHir), {
+    let outputPath = moduleHirToOutputPath(context, moduleHir)
+
+    let declarations = MutableList.empty<DartDeclaration>()
+    for declaration in (moduleHir as HasDeclarations).declarations(context) {
+      if declaration is HirModule {
+        // Compiled by `compileModuleAndDescendants`.
+        continue
+      }
+      // if declaration is HirTrait {
+      //   declarations.appendAll(compileTrait(context, package, declaration as HirTrait))
+      //   continue
+      // }
+      // if declaration is HirImpl {
+      //   // Impl contents are directly compiled into their target traits or classes.
+      //   continue
+      // }
+      if declaration is HirClass {
+        let compiledClasses = compileClass(context, package, declaration as HirClass)
+        declarations.appendAll((compiledClasses as Iterable<DartClass>).cast<DartDeclaration>())
+        continue
+      }
+      // if declaration is HirFunction {
+      //   declarations.appendAll(compileGlobalFunction(context, package, declaration as HirFunction))
+      //   continue
+      // }
+      // if declaration is HirProperty {
+      //   declarations.appendAll(compileGlobalProperty(context, package, declaration as HirProperty))
+      //   continue
+      // }
+      assert(false, "Unknown declaration type: {declaration}.")
+    }
+
+    let compilationUnit = DartCompilationUnit(
+      directives = List.empty<DartDirective>(),
+      declarations = declarations,
+    )
+    let importAllocator = DartSimplePrefixingImportAllocator(MutableMap.empty<String, String>())
+    let code = (compilationUnit as DartToCode).toCode(importAllocator)
+
+    // TODO(JonasWanke): generate tests
+
+    Tuple(Tuple(outputPath, code), List.empty<CompilerError>())
+  })
+}
+
+fun moduleHirToOutputPath(context: QueryContext<List<CompilerError>>, moduleHir: HirModule): Path {
+  query<Path, List<CompilerError>>(context, "code_generator_dart.moduleHirToOutputPath", moduleHir, {
+    let projectName = mangleName(context, (moduleHir as HasPackageAndPath).package().getName(context))
+    let path = ((moduleHir as HasPackageAndPath).path() as Iterable<String>)
+        .map<String>({ mangleName(context, it) })
+        .join("/")
+    let path = Path.parse("{path}.{dartFileExtension}")
+    Tuple(dartSourcePath.child(projectName).append(path), List.empty<CompilerError>())
+  })
+}
+fun moduleHirToImportUrl(
+  context: QueryContext<List<CompilerError>>,
+  package: Package,
+  moduleHir: HirModule,
+): String {
+  query<String, List<CompilerError>>(
+    context,
+    "code_generator_dart.moduleHirToImportUrl",
+    DataTuple2<Package, HirModule>(package, moduleHir), {
+    let currentProjectName = mangleName(context, package.getName(context))
+    let projectName = mangleName(context, (moduleHir as HasPackageAndPath).package().getName(context))
+    let path = ((moduleHir as HasPackageAndPath).path() as Iterable<String>)
+        .map<String>({ mangleName(context, it) })
+        .join("/")
+    Tuple(
+      "package:{currentProjectName}/src/{projectName}/{path}.{dartFileExtension}",
+      List.empty<CompilerError>(),
+    )
+  })
+}

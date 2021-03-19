@@ -157,6 +157,7 @@ abstract class ModuleId implements _$ModuleId {
   static const coreIo = ModuleId(PackageId.core, ['io']);
   static const coreIoFile = ModuleId(PackageId.core, ['io', 'file']);
   static const coreIoPrint = ModuleId(PackageId.core, ['io', 'print']);
+  static const coreIoProcess = ModuleId(PackageId.core, ['io', 'process']);
   static const coreMaybe = ModuleId(PackageId.core, ['maybe']);
   static const coreNumbers = ModuleId(PackageId.core, ['numbers']);
   static const coreNumbersInt = ModuleId(PackageId.core, ['numbers', 'int']);

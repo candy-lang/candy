@@ -119,6 +119,10 @@ abstract class CandyType with _$CandyType {
   static final directory = UserCandyType(ModuleId.coreIoFile, 'Directory');
   static final file = UserCandyType(ModuleId.coreIoFile, 'File');
   static final path = UserCandyType(ModuleId.coreIoFile, 'Path');
+  // io.process
+  static final process = UserCandyType(ModuleId.coreIoProcess, 'Process');
+  static final processResult =
+      UserCandyType(ModuleId.coreIoProcess, 'ProcessResult');
 
   // operators
   // operators.arithmetic

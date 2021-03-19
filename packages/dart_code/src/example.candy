@@ -11,7 +11,7 @@ fun main() {
         hide = List.of1<String>("bar"),
       ),
       DartImport(
-        "dart:blub",
+        dartCoreUrl,
         prefix = None<String>(),
         show = List.of1<String>("blubber"),
         hide = List.empty<String>(),
@@ -36,33 +36,21 @@ fun main() {
         ),
         _returns = Some<DartType>(
           DartNamedType(
-            DartIdentifier("Foo", prefix = Some<String>("foo")),
+            DartIdentifier("Foo", prefix = Some<String>(dartPackageMetaUrl)),
             typeArguments = List.empty<DartType>(),
           ),
         ),
         requiredParameters = List.of1<DartParameter>(
           DartParameter(
             "args",
-            type = Some<DartType>(
-              DartNamedType(
-                DartIdentifier("List", prefix = None<String>()),
-                typeArguments = List.of1<DartType>(
-                  DartNamedType(
-                    DartIdentifier("String", prefix = None<String>()),
-                    typeArguments = List.empty<DartType>(),
-                  )
-                ),
-              ),
-            ),
+            type = Some<DartType>(dartList(dartString)),
             defaultValue = None<DartExpression>(),
           ),
         ),
         positionalParameters = List.of1<DartParameter>(
           DartParameter(
             "number",
-            type = Some<DartType>(
-              DartNamedType(DartIdentifier("int", None<String>()), List.empty<DartType>()),
-            ),
+            type = Some<DartType>(dartInt),
             default = Some<DartExpression>(DartIntLiteral(123)),
           ),
         ),
@@ -102,6 +90,7 @@ fun main() {
             "numBlubs",
             isStatic = true,
             mutability = DartConst(),
+            type = None<DartType>(),
             initialValue = Some<DartExpression>(DartIntLiteral(123)),
           ),
           // Foo()
@@ -119,7 +108,7 @@ fun main() {
           // bool get isEmpty => this.length == 0;
           DartGetter(
             "isEmpty",
-            type = DartNamedType(DartIdentifier("bool", None<String>()), List.empty<DartType>()),
+            type = dartBool,
             body = Some<DartBody>(DartInlineBody(this_.dot("length").equals(DartIntLiteral(0)))),
           ),
           // set isEmpty(bool value) {
@@ -133,9 +122,7 @@ fun main() {
             "isEmpty",
             parameter = DartParameter(
               "value",
-              type = Some<DartType>(
-                DartNamedType(DartIdentifier("bool", None<String>()), List.empty<DartType>()),
-              ),
+              type = Some<DartType>(dartBool),
               defaultValue = None<DartExpression>(),
             ),
             body = Some<DartBody>(
@@ -160,12 +147,7 @@ fun main() {
                             DartIdentifier("length", None<String>()).dot("someCall").call(
                               List.of2<DartExpression>(DartIntLiteral(1), DartIntLiteral(2)),
                               Map.empty<String, DartExpression>(),
-                              List.of1<DartType>(
-                                DartNamedType(
-                                  DartIdentifier("bool", None<String>()),
-                                  List.empty<DartType>(),
-                                ),
-                              ),
+                              List.of1<DartType>(dartBool),
                             ),
                           ),
                         ),
@@ -187,9 +169,7 @@ fun main() {
             namedParameters = List.of1<DartParameter>(
               DartParameter(
                 "blub",
-                Some<DartType>(
-                  DartNamedType(DartIdentifier("int", None<String>()), List.empty<DartType>()),
-                ),
+                Some<DartType>(dartInt),
                 defaultValue = None<DartExpression>(),
               ),
             ),
@@ -209,5 +189,7 @@ fun main() {
       ),
     ),
   )
-  print((compilationUnit as DartToCode).toCode())
+
+  let importAllocator = DartSimplePrefixingImportAllocator(MutableMap.empty<String, String>())
+  print((compilationUnit as DartToCode).toCode(importAllocator))
 }

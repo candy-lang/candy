@@ -11,6 +11,9 @@ trait MightNotExist {
 trait HasAst<Ast> {
   fun ast(context: QueryContext<List<CompilerError>>): Ast
 }
+trait CanBeStatic {
+  fun isStatic(context: QueryContext<List<CompilerError>>): Bool
+}
 
 fun fileToHirModule(context: QueryContext<List<CompilerError>>, file: FancyFile): HirModule {
   // TODO(marcelgarus): Implement this as a static function on `HirModule` (`HirModule fromFile`) as
@@ -377,7 +380,7 @@ impl HirClass: HasAst<AstClass> & HasDeclarations {
   }
 }
 
-impl HirFunction: HasAst<AstFunction> & HasDeclarations {
+impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic {
   fun ast(context: QueryContext<List<CompilerError>>): AstFunction {
     query<AstFunction, List<CompilerError>>(context, "HirFunction.ast", this, {
       let ast = ((parent as HasDeclarations).declarations(context) as Iterable<Any>)
@@ -394,9 +397,16 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations {
   public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
     List.empty<HirDeclaration>()
   }
+
+  fun isStatic(context: QueryContext<List<CompilerError>>): Bool {
+    query<Bool, List<CompilerError>>(context, "HirFunction.isStatic", this, {
+      let ast = ast(context)
+      Tuple(containsStaticModifier(ast.modifiers), List.empty<CompilerError>())
+    })
+  }
 }
 
-impl HirProperty: HasAst<AstProperty> & HasDeclarations {
+impl HirProperty: HasAst<AstProperty> & HasDeclarations & CanBeStatic {
   fun ast(context: QueryContext<List<CompilerError>>): AstProperty {
     query<AstProperty, List<CompilerError>>(context, "HirProperty.ast", this, {
       let ast = ((parent as HasDeclarations).declarations(context) as Iterable<Any>)
@@ -416,6 +426,13 @@ impl HirProperty: HasAst<AstProperty> & HasDeclarations {
   public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
     List.empty<HirDeclaration>()
   }
+
+  fun isStatic(context: QueryContext<List<CompilerError>>): Bool {
+    query<Bool, List<CompilerError>>(context, "HirProperty.isStatic", this, {
+      let ast = ast(context)
+      Tuple(containsStaticModifier(ast.modifiers), List.empty<CompilerError>())
+    })
+  }
 }
 
 impl HirConstructor: HasDeclarations {
@@ -425,4 +442,9 @@ impl HirConstructor: HasDeclarations {
   public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
     List.empty<HirDeclaration>()
   }
+}
+
+fun containsStaticModifier(modifiers: List<AstIdentifier>): Bool {
+  // TODO(JonasWanke): This should resolve modifier names when we support custom annotations.
+  (modifiers as Iterable<AstIdentifier>).any({ it.value == "static" })
 }

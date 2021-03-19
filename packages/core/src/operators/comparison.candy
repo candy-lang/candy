@@ -35,3 +35,10 @@ trait Comparable: Equals {
 // impl<Other, Result> Comparable<Other, Result>: BinaryLessThan<Other, Result> {
 //   fun lessThan(other: Other): Result { add(other) }
 // }
+
+public fun min<T: Comparable>(first: T, second: T): T {
+  if first <= second { first } else { second }
+}
+public fun max<T: Comparable>(first: T, second: T): T {
+  if first >= second { first } else { second }
+}

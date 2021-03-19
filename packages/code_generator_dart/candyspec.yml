@@ -1,0 +1,20 @@
+name: code_generator_dart
+
+dependencies:
+  petit_parser:
+    # remove this when we support transitive dependencies
+    path: ../petit_parser
+  compiler_utils:
+    path: ../compiler_utils
+  cst:
+    # remove this when we support transitive dependencies
+    path: ../cst
+  ast:
+    # remove this when we support transitive dependencies
+    path: ../ast
+  hir:
+    path: ../hir
+  incremental:
+    path: ../incremental
+  dart_code:
+    path: ../dart_code
