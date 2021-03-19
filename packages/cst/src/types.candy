@@ -46,6 +46,15 @@ public class CstTupleType {
 impl CstTupleType: CstInlineType
 
 
+public class CstNamedTupleType {
+  public let modifiers: List<CstNode<IdentifierToken>>
+  public let openingParenthesis: CstNode<PunctuationToken>
+  public let types: List<CstNode<CstTypeParameter | PunctuationToken>>
+  public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
+}
+impl CstNamedTupleType: CstInlineType
+
+
 public class CstIntersectionType {
   public let leftType: CstNode<CstInlineType>
   public let ampersand: CstNode<PunctuationToken>

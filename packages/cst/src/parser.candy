@@ -387,6 +387,20 @@ class CstParser {
           CstTupleType(modifiers, openingParenthesis, types, closingParenthesis)
         })
 
+    let namedTupleType = modifiers()
+        .sequence<CstNode<PunctuationToken>>(punctuation("("))
+        .sequence<List<CstNode<CstTypeParameter | PunctuationToken>>>(
+          commaSeparated<CstTypeParameter>(typeParameter()),
+        )
+        .sequence<Maybe<CstNode<PunctuationToken>>>(closingParenthesisOrOtherEndDetection)
+        .map<CstInlineType>({
+          let modifiers = it.first.first.first
+          let openingParenthesis = it.first.first.second
+          let types = it.first.second
+          let closingParenthesis = it.second
+          CstNamedTupleType(modifiers, openingParenthesis, types, closingParenthesis)
+        })
+
     let intersectionType = notYetDefined<String, CstInlineType>("Parser not yet defined.")
     intersectionType.delegate = node<CstInlineType>(
           choiceOf<String, CstInlineType>(List.of2<Parser<String, CstInlineType>>(namedType, groupType)),
@@ -466,11 +480,12 @@ class CstParser {
 
     inlineType.delegate = node<CstInlineType>(
       choiceOf<String, CstInlineType>(
-        List.of6<Parser<String, CstInlineType>>(
+        List.of7<Parser<String, CstInlineType>>(
           unionType,
           intersectionType,
           functionType,
           groupType,
+          namedTupleType,
           tupleType,
           namedType,
         ),
@@ -1057,7 +1072,7 @@ class CstParser {
         })
   }
 }
-let keywords = List.of10<String>(
+let keywords = List.of9<String>(
   "use", "crate",
   "module", "trait", "impl", "type",
   "fun", "let",
