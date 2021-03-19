@@ -83,10 +83,6 @@ public class CstProperty {
   public let name: Maybe<CstNode<IdentifierToken>>
   public let type: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>
   public let initializer: Maybe<CstNode<CstDelegationBody>>
-
-  public fun isMutable(): Bool {
-    (keyword.child as KeywordToken).keyword == "var"
-  }
 }
 impl CstProperty: CstDeclaration & CstDeclarationWithName
 
