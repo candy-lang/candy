@@ -36,7 +36,9 @@ fun compile_(context: QueryContext<List<CompilerError>>, package: Package): Map<
     let pubspec = generatePubspec(context, package)
     output.set(pubspec.first, pubspec.second)
 
-    // TODO(JonasWanke): generate code
+    for dependency in package.getAllPackagesInCompilationOrder(context) {
+      output.setAll(compileModuleAndDescendants(context, package, HirTopLevelModule(dependency)))
+    }
 
     Tuple(output, List.empty<CompilerError>())
   })
@@ -46,9 +48,10 @@ fun generatePubspec(context: QueryContext<List<CompilerError>>, package: Package
   query<(Path, String), List<CompilerError>>(context, "code_generator_dart.generatePubspec", package, {
     let content = "name: {package.getName(context)}
 environment:
-  sdk: '>=2.12.0-0 <3.0.0'
+  sdk: '>=2.12.0 <3.0.0'
 dependencies:
   characters: ^1.1.0
+  collection: ^1.15.0
   meta: ^1.3.0
 dev_dependencies:
   test: ^1.16.3"

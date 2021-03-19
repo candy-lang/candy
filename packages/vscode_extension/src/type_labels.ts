@@ -1,11 +1,11 @@
 // Lots of this code are taken from Dart-Code:
 // https://github.com/Dart-Code/Dart-Code/blob/1d86cf3a4fcb3653376092f6677447cd9870b98e/src/extension/lsp/closing_labels_decorations.ts
-import * as vs from "vscode";
-import { LanguageClient } from "vscode-languageclient/node";
+import * as vs from 'vscode';
+import { LanguageClient } from 'vscode-languageclient/node';
 import {
   TypeLabel,
   PublishTypeLabelsNotification,
-} from "./lsp_custom_protocol";
+} from './lsp_custom_protocol';
 
 export class TypeLabelsDecorations implements vs.Disposable {
   private subscriptions: vs.Disposable[] = [];
@@ -14,10 +14,7 @@ export class TypeLabelsDecorations implements vs.Disposable {
   private updateTimeout?: NodeJS.Timer;
 
   private readonly decorationType = vs.window.createTextEditorDecorationType({
-    after: {
-      color: new vs.ThemeColor("candy.typeLabels"),
-      margin: "2px",
-    },
+    after: { color: new vs.ThemeColor('candy.typeLabels') },
     rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
   });
 
@@ -82,7 +79,7 @@ export class TypeLabelsDecorations implements vs.Disposable {
     editor.setDecorations(this.decorationType, decorations);
   }
   private uriToString(uri: vs.Uri): string {
-    return uri.toString().replace("%3A", ":");
+    return uri.toString().replace('%3A', ':');
   }
 
   public dispose() {

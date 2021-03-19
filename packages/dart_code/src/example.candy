@@ -90,6 +90,7 @@ fun main() {
             "numBlubs",
             isStatic = true,
             mutability = DartConst(),
+            type = None<DartType>(),
             initialValue = Some<DartExpression>(DartIntLiteral(123)),
           ),
           // Foo()
