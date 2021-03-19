@@ -1,6 +1,4 @@
 public use .Io
 public use .Primitives
 
-class Foo {
-  let bar: Foo
-}
+type Foo = (bar: Foo)

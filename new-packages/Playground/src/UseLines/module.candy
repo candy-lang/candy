@@ -1,6 +1,4 @@
 use Core
 use .Blub
 
-class Bar {
-  let bar: Foo
-}
+type Bar = (bar: Foo)
