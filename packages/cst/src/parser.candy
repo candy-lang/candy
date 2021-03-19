@@ -158,16 +158,20 @@ class CstParser {
           CstImpl(modifiers, implKeyword, typeParameters, type, traits, content)
         })
 
-    let class_ = declarationBeginningWithName("class", true)
+    let type = declarationBeginningWithName("type", true)
         .sequence<Maybe<CstNode<CstTypeParameters>>>(typeParameters().optional())
-        .sequence<Maybe<CstNode<CstDeclarationContent>>>(optionalDeclarationContent)
+        .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>>(
+          punctuation("=")
+              .sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional())
+              .optional()
+        )
         .map<CstDeclaration>({
           let modifiers = it.first.first.first.first
-          let classKeyword = it.first.first.first.second
+          let typeKeyword = it.first.first.first.second
           let name = it.first.first.second
           let typeParameters = it.first.second
-          let content = it.second
-          CstClass(modifiers, classKeyword, name, typeParameters, content)
+          let type = it.second
+          CstType(modifiers, typeKeyword, name, typeParameters, type)
         })
 
     let function = declarationBeginningWithName("fun", false)
@@ -209,7 +213,7 @@ class CstParser {
           module_,
           trait_,
           impl_,
-          class_,
+          type,
           function,
           property().cast<CstDeclaration>(),
         ),
@@ -1064,7 +1068,7 @@ class CstParser {
 }
 let keywords = List.of12<String>(
   "use", "crate",
-  "module", "trait", "impl", "class",
+  "module", "trait", "impl", "type",
   "fun", "let", "var", "get", "set",
   "return",
 )

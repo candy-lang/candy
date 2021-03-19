@@ -43,14 +43,14 @@ public class CstImpl {
 impl CstImpl: CstDeclaration
 
 
-public class CstClass {
+public class CstType {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let keyword: CstNode<KeywordToken>
   public let name: Maybe<CstNode<IdentifierToken>>
   public let typeParameters: Maybe<CstNode<CstTypeParameters>>
-  public let content: Maybe<CstNode<CstDeclarationContent>>
+  public let type: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>
 }
-impl CstClass: CstDeclaration & CstDeclarationWithName
+impl CstType: CstDeclaration & CstDeclarationWithName
 
 
 public class CstFunction {
