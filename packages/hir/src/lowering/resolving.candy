@@ -16,7 +16,7 @@ impl String {
     query<Set<HirClass | HirTrait | HirProperty | HirFunction | HirModule>, List<CompilerError>>(
       context,
       "String.resolveIdentifier",
-      this as Equals & Hash,
+      DataTuple2<String, HirDeclaration>(this, scope) as Equals & Hash,
       {
         let candidates = MutableSet.empty<HirClass | HirTrait | HirProperty | HirFunction | HirModule>()
         for declaration in (scope as HasDeclarations).declarations(context) {
@@ -46,7 +46,7 @@ impl String {
           "Parent is a package, although this is not a file-level module."
         )
         candidates.addAll(
-          (resolveIdentifier(context, scope.parent as HirDeclaration) as Iterable<
+          (resolveIdentifier(context, scope.parent as HirDeclaration).items() as Iterable<
             HirClass | HirTrait | HirProperty | HirFunction | HirModule>)
         )
         Tuple(

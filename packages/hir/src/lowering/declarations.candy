@@ -369,6 +369,7 @@ impl HirClass: HasDeclarations & HasAst<AstClass> {
               return function
             }
             if it is AstProperty { return HirProperty(this, (it as AstProperty).name.value) }
+            throw "Shouldn't reach this."
           })
           .toList()
         Tuple(declarations, List.empty<CompilerError>())

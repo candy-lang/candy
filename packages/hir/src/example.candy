@@ -21,7 +21,7 @@ fun declarationsExample(context: QueryContext<List<CompilerError>>) {
   let moduleHir = fileToHirModule(context, file)
   print("Module is {moduleHir}")
 
-  let declarations = (module as HasDeclarations).declarations(context)
+  let declarations = (moduleHir as HasDeclarations).declarations(context)
   print("Declarations are {declarations}")
 
   let primitives = HirInnerModule(moduleHir, "Primitives").declarations(context)
