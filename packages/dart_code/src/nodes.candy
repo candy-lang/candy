@@ -5,7 +5,6 @@ public let dartTestPath = Path.parse("test")
 public let dartFileExtension = "dart"
 
 class DartCompilationUnit {
-
   let directives: List<DartDirective>
   let declarations: List<DartDeclaration>
 }
@@ -153,6 +152,7 @@ class DartField {
   let name: String
   let isStatic: Bool = false
   let mutability: DartMutability = DartVar()
+  let type: Maybe<DartType> = None<DartType>()
   let initialValue: Maybe<DartExpression> = None<DartExpression>()
 }
 

@@ -246,6 +246,9 @@ impl DartField: DartToCode {
     if isStatic {
       s = "static {s}"
     }
+    if type is Some {
+      s = "{s} {(type.unwrap() as DartToCode).toCode(importAllocator)}"
+    }
     if initialValue is Some {
       s = "{s} = {(initialValue.unwrap() as DartToCode).toCode(importAllocator)}"
     }
