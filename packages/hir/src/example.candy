@@ -12,6 +12,7 @@ fun main() {
 
   declarationsExample(context)
   useLinesExample(context)
+  resolvingExample(context)
 }
 
 fun declarationsExample(context: QueryContext<List<CompilerError>>) {
@@ -35,4 +36,13 @@ fun useLinesExample(context: QueryContext<List<CompilerError>>) {
   for useLine in moduleHir.useLines(context) {
     print("Use line {useLine}: targetModule = {useLine.targetModule(context)}")
   }
+}
+
+fun resolvingExample(context: QueryContext<List<CompilerError>>) {
+  print("Resolving Example")
+  let file = FancyFile(Package.core(context), Path.parse("src/module.candy"))
+  let primitives = fileToHirModule(context, file).innerModule("Primitives").declarations(context)
+  let any = (primitives as Iterable<HirDeclaration>).first().unwrap()
+  let never = "Never".resolveIdentifier(context, any)
+  print("Candidates for Never: {never}")
 }
