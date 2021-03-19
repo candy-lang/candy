@@ -252,8 +252,20 @@ public trait Iterable<Item> {
     }
   }
 
-  // TODO(marcelgarus): toSet
-  // TODO(marcelgarus): toMutableSet
+  fun toSet(): Set<Item> { toMutableSet() }
+  fun toMutableSet(): MutableSet<Item> {
+    let iter = iterator()
+    let set = MutableSet.empty<Item>()
+
+    loop {
+      let element = iter.next()
+      if element is None {
+        return set
+      } else {
+        set.insert(element.unwrap())
+      }
+    }
+  }
 
   // Extras:
 
