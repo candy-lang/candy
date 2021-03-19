@@ -957,8 +957,9 @@ fun lowerFunctionType(
         List.empty<AstType>()
       })
 
-  let returnType = cst.child.returnType
-      .flatMap<AstType>({ lowerType(context, id, cst.child.returnType.unwrap()) })
+  let returnType = cst.child.returnType.flatMap<AstType>({ lowerType(context, id, it) })
+  // TODO(marcelgarus): This error also gets emitted if the CST contains a return type, but this
+  // type couldn't be lowered.
   if returnType is None {
     context.addError(ExpectedReturnTypeInFunctionTypeCompilerError(context.file, cst))
     return None<AstFunctionType>()

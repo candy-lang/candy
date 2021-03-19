@@ -235,36 +235,32 @@ public trait Iterable<Item> {
     FollowedByIterable<Item>(this, other)
   }
 
+  // Action.
+
+  fun do(action: (Item) => Unit) {
+    for element in this {
+      action(element)
+    }
+  }
+
   // Conversions.
 
   fun toList(): List<Item> { toMutableList() }
   fun toMutableList(): MutableList<Item> {
-    let iter = iterator()
     let list = MutableList.empty<Item>()
-
-    loop {
-      let element = iter.next()
-      if element is None {
-        return list
-      } else {
-        list.append(element.unwrap())
-      }
-    }
+    do({ list.append(it) })
+    list
   }
 
   fun toSet(): Set<Item> { toMutableSet() }
   fun toMutableSet(): MutableSet<Item> {
     let iter = iterator()
     let set = MutableSet.empty<Item>()
-
-    loop {
-      let element = iter.next()
-      if element is None {
-        return set
-      } else {
-        set.insert(element.unwrap())
-      }
-    }
+    do({
+      set.insert(it)
+      unit
+    })
+    set
   }
 
   // Extras:

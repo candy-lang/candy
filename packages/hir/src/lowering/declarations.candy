@@ -52,10 +52,10 @@ impl HirInnerModule: HasPackageAndPath {
 
 public trait HasDeclarations {
   fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration>
-  /// Returns the child declarations of this declarations.
+  /// Returns the child declarations of this declaration.
   ///
   /// Note that some declarations can never have any child declarations (for example, functions or
-  /// properties). These always empty lists.
+  /// properties). These always return empty lists.
 
   fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any>
   /// Getter for ast declarations, but type unsafe. Still useful if it's immediately followed by

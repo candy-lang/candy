@@ -35,6 +35,8 @@ fun astTypeToHirType(
 
         // Try to find the first part of the `nameParts`. Then, find children inside its
         // declarations.
+        // TODO(marcelgarus): When resolving `Foo Bar`, we currently accept a `Bar` next to `Foo` if
+        // `Foo` itself doesn't contain a `Bar`, as the resolver traverses parent scopes.
         mut let candidates = nameParts.first().unwrap().resolveIdentifier(context, scope)
         for namePart in nameParts.skip(1) {
           candidates = ((candidates as Iterable<HirDeclaration>)
