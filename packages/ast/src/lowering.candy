@@ -34,7 +34,7 @@ fun lowerFile(context: LoweringContext, cst: CstNode<CstFile>): AstFile {
 
   mut let sawDeclaration = false
   let useLines = MutableList.empty<AstUseLine>()
-  let declarations = MutableList.empty<AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty>()
+  let declarations = MutableList.empty<AstModule | AstTrait | AstImpl | AstClass | AstFunction>()
   let previousDeclarationNames = MutableMap.empty<String, Bool>()
   for node in cst.child.content {
     if node.child is CstUseLine {
@@ -62,9 +62,7 @@ fun lowerFile(context: LoweringContext, cst: CstNode<CstFile>): AstFile {
         previousDeclarationNames as Map<String, Bool>,
       )
       result.do({
-        declarations.append(
-          it as AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty,
-        )
+        declarations.append(it as AstModule | AstTrait | AstImpl | AstClass | AstFunction)
       })
     }
   }
@@ -239,9 +237,6 @@ fun lowerDeclaration(
   if cst.child is CstFunction {
     return lowerFunction(context, parentId, cst.cast<CstFunction>())
   }
-  if cst.child is CstProperty {
-    return lowerProperty(context, parentId, cst.cast<CstProperty>(), previousNames)
-  }
   throw "Unknown declaration: {cst}."
 }
 fun lowerModule(
@@ -269,13 +264,13 @@ fun lowerModule(
       context.addError(
         DuplicateDeclarationNameCompilerError(
           context.file,
-          cst.cast<CstModule | CstTrait | CstClass | CstProperty>(),
+          cst.cast<CstModule | CstTrait | CstClass>(),
         ),
       )
     }
   }
 
-  let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, true, true) as List<AstModule | AstTrait | AstImpl | AstClass | AstFunction | AstProperty>
+  let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, true, true) as List<AstModule | AstTrait | AstImpl | AstClass | AstFunction>
 
   if !isValid { return None<AstModule>() }
   context.addIdMapping(cst.id, id)
@@ -306,7 +301,7 @@ fun lowerTrait(
       context.addError(
         DuplicateDeclarationNameCompilerError(
           context.file,
-          cst.cast<CstModule | CstTrait | CstClass | CstProperty>(),
+          cst.cast<CstModule | CstTrait | CstClass>(),
         ),
       )
     }
@@ -322,7 +317,7 @@ fun lowerTrait(
           context.addError(
             ExpectedTypeCompilerError(
               context.file,
-              cst.cast<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>(),
+              cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
             ),
           )
           None<AstType>()
@@ -331,7 +326,7 @@ fun lowerTrait(
         }
       })
 
-  let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, true) as List<AstTrait | AstClass | AstFunction | AstProperty>
+  let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, true) as List<AstTrait | AstClass | AstFunction>
 
   if !isValid { return None<AstTrait>() }
   context.addIdMapping(cst.id, id)
@@ -364,7 +359,7 @@ fun lowerImpl(
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>(),
+        cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
       ),
     )
   }
@@ -376,7 +371,7 @@ fun lowerImpl(
           context.addError(
             ExpectedTypeCompilerError(
               context.file,
-              cst.cast<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>(),
+              cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
             ),
           )
           None<AstType>()
@@ -399,7 +394,7 @@ fun lowerImpl(
       })
       .orElse({ List.empty<AstNamedType>() })
 
-  let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, false) as List<AstFunction | AstProperty>
+  let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, false) as List<AstFunction>
 
   if type is None<AstType> { return None<AstImpl>() }
   context.addIdMapping(cst.id, id)
@@ -430,7 +425,7 @@ fun lowerClass(
       context.addError(
         DuplicateDeclarationNameCompilerError(
           context.file,
-          cst.cast<CstModule | CstTrait | CstClass | CstProperty>(),
+          cst.cast<CstModule | CstTrait | CstClass>(),
         ),
       )
     }
@@ -440,7 +435,7 @@ fun lowerClass(
       .map<List<AstTypeParameter>>({ lowerTypeParameters(context, id, it) })
       .orElse({ List.empty<AstTypeParameter>() })
 
-  let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, true) as List<AstTrait | AstClass | AstFunction | AstProperty>
+  let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, true) as List<AstTrait | AstClass | AstFunction>
 
   if !isValid { return None<AstClass>() }
   context.addIdMapping(cst.id, id)
@@ -523,76 +518,7 @@ fun lowerFunction(
     ),
   )
 }
-fun lowerProperty(
-  context: LoweringContext,
-  parentId: AstFileId | AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
-  cst: CstNode<CstProperty>,
-  previousNames: Map<String, Bool>,
-): Maybe<AstProperty> {
-  let id = AstDeclarationId(
-    parentId,
-    cst.child.name
-      .map<String>({ it.child.identifier })
-      .orElse({ "unnamed-property-{context.getUnnamedDeclarationIndex()}" }),
-  )
-  mut let isValid = true
 
-  let modifiers = lowerModifiers(context, id, cst.child.modifiers)
-
-  let isMutable = cst.child.isMutable()
-
-  let name = cst.child.name.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
-  if name is None<AstIdentifier> {
-    context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
-    isValid = false
-  } else {
-    if previousNames.containsKey(name.unwrap().value) {
-      context.addError(
-        DuplicateDeclarationNameCompilerError(
-          context.file,
-          cst.cast<CstModule | CstTrait | CstClass | CstProperty>(),
-        ),
-      )
-    }
-  }
-
-  let type = if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)> {
-    None<AstType>()
-  } else {
-    let type = cst.child.type.unwrap()
-    if type.second is None<CstNode<CstInlineType>> {
-      context.addError(
-        ExpectedTypeCompilerError(
-          context.file,
-          cst.cast<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>(),
-        ),
-      )
-      None<AstType>()
-    } else {
-      lowerType(context, id, type.second.unwrap())
-    }
-  }
-
-  let initializer = cst.child.initializer.flatMap<AstExpression>({
-    if it.child.expression is None<CstNode<CstExpression>> {
-      context.addError(
-        ExpectedExpressionCompilerError(
-          context.file,
-          it.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
-        ),
-      )
-      None<AstExpression>()
-    } else {
-      lowerExpression(context, id, it.child.expression.unwrap())
-    }
-  })
-
-  if !isValid { return None<AstProperty>() }
-  context.addIdMapping(cst.id, id)
-  Some<AstProperty>(
-    AstProperty(id, None<AstCandyDoc>(), modifiers, isMutable, name.unwrap(), type, initializer),
-  )
-}
 fun lowerDeclarationContent(
   context: LoweringContext,
   parentId: AstDeclarationId,
@@ -626,9 +552,6 @@ fun lowerDeclarationContent(
     }
     if lowered is AstFunction {
       previousNames.set((lowered as AstFunction).name.value, true)
-    }
-    if lowered is AstProperty {
-      previousNames.set((lowered as AstProperty).name.value, true)
     }
     if isValid {
       result.append(lowered)
@@ -1094,7 +1017,7 @@ fun lowerIntersectionType(
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>(),
+        cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
       ),
     )
   } else {
@@ -1129,7 +1052,7 @@ fun lowerUnionType(
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>(),
+        cst.cast<CstTrait | CstImpl | CstIntersectionType | CstUnionType>(),
       ),
     )
   } else {
@@ -1316,13 +1239,8 @@ fun lowerExpression(
   if cst.child is CstBinaryExpression {
     return lowerBinaryExpression(context, parentId, cst.cast<CstBinaryExpression>())
   }
-  if cst.child is CstProperty {
-    return lowerProperty(
-      context,
-      parentId,
-      cst.cast<CstProperty>(),
-      Map.empty<String, Bool>(),
-    ).cast<AstExpression>()
+  if cst.child is CstPropertyExpression {
+    return lowerPropertyExpression(context, parentId, cst.cast<CstPropertyExpression>())
   }
   if cst.child is CstNavigationExpression {
     return lowerNavigationExpression(context, parentId, cst.cast<CstNavigationExpression>())
@@ -1597,6 +1515,95 @@ fun lowerTupleExpression(
   context.addIdMapping(cst.id, id)
   Some<AstExpression>(AstTupleExpression(id, expressions))
 }
+
+fun lowerPropertyExpression(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
+  cst: CstNode<CstPropertyExpression>,
+): Maybe<AstExpression> {
+  let id = context.getExpressionId(parentId)
+  mut let isValid = true
+
+  let modifiers = lowerModifiers(context, id, cst.child.modifiers)
+
+  let name = cst.child.name.map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
+  if name is None<AstIdentifier> {
+    context.addError(MissingPropertyNameCompilerError(context.file, cst))
+    isValid = false
+  }
+
+  let type = if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)> {
+    None<AstType>()
+  } else {
+    let type = cst.child.type.unwrap()
+    if type.second is None<CstNode<CstInlineType>> {
+      context.addError(
+        ExpectedTypeCompilerError(
+          context.file,
+          cst.cast<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>(),
+        ),
+      )
+      None<AstType>()
+    } else {
+      lowerType(context, id, type.second.unwrap())
+    }
+  }
+
+  let initializer = cst.child.initializer.flatMap<AstExpression>({
+    if it.child.expression is None<CstNode<CstExpression>> {
+      context.addError(
+        ExpectedExpressionCompilerError(
+          context.file,
+          it.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
+        ),
+      )
+      None<AstExpression>()
+    } else {
+      lowerExpression(context, id, it.child.expression.unwrap())
+    }
+  })
+  if (cst.child.initializer is None<CstDelegationBody>) {
+    context.addError(MissingPropertyNameCompilerError(context.file, cst))
+    isValid = false
+  }
+
+  if !isValid { return None<AstExpression>() }
+  context.addIdMapping(cst.id, id)
+  Some<AstExpression>(
+    AstPropertyExpression(id, None<AstCandyDoc>(), modifiers, name.unwrap(), type, initializer),
+  )
+}
+
+public class MissingPropertyNameCompilerError {
+  public let file: FancyFile
+  public let node: CstNode<CstPropertyExpression>
+}
+impl MissingPropertyNameCompilerError: CompilerError {
+  public fun id(): String { "missing-property-name" }
+
+  public fun location(): Location { Location(file, node.child.keyword.child.span) }
+  public fun title(): String { "Missing property name." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description for this error
+    ""
+  }
+}
+
+public class MissingPropertyInitializerCompilerError {
+  public let file: FancyFile
+  public let node: CstNode<CstPropertyExpression>
+}
+impl MissingPropertyInitializerCompilerError: CompilerError {
+  public fun id(): String { "missing-property-initializer" }
+
+  public fun location(): Location { Location(file, node.child.keyword.child.span) }
+  public fun title(): String { "Missing property initializer." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description for this error
+    ""
+  }
+}
+
 
 fun lowerBinaryExpression(
   context: LoweringContext,

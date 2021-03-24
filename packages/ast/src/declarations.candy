@@ -21,14 +21,7 @@ public class AstModule {
   public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<AstIdentifier>
   public let name: AstIdentifier
-  public let innerDeclarations: List<
-    AstModule
-    | AstTrait
-    | AstImpl
-    | AstClass
-    | AstFunction
-    | AstProperty
-  >
+  public let innerDeclarations: List<AstModule | AstTrait | AstImpl | AstClass | AstFunction>
 }
 impl AstModule: AstDeclaration
 
@@ -40,7 +33,7 @@ public class AstTrait {
   public let name: AstIdentifier
   public let typeParameters: List<AstTypeParameter>
   public let upperBound: Maybe<AstType>
-  public let innerDeclarations: List<AstTrait | AstClass | AstFunction | AstProperty>
+  public let innerDeclarations: List<AstTrait | AstClass | AstFunction>
 }
 impl AstTrait: AstDeclaration
 
@@ -50,7 +43,7 @@ public class AstImpl {
   public let typeParameters: List<AstTypeParameter>
   public let type: AstType
   public let traits: List<AstNamedType>
-  public let innerDeclarations: List<AstFunction | AstProperty>
+  public let innerDeclarations: List<AstFunction>
 }
 impl AstImpl: AstDeclaration
 
@@ -61,7 +54,7 @@ public class AstClass {
   public let modifiers: List<AstIdentifier>
   public let name: AstIdentifier
   public let typeParameters: List<AstTypeParameter>
-  public let innerDeclarations: List<AstTrait | AstClass | AstFunction | AstProperty>
+  public let innerDeclarations: List<AstTrait | AstClass | AstFunction>
 }
 impl AstClass: AstDeclaration
 
@@ -92,18 +85,6 @@ public class AstValueParameter {
   public let type: Maybe<AstType>
   public let defaultValue: Maybe<AstExpression>
 }
-
-
-public class AstProperty {
-  public let id: AstDeclarationId
-  public let candyDoc: Maybe<AstCandyDoc>
-  public let modifiers: List<AstIdentifier>
-  public let isMutable: Bool
-  public let name: AstIdentifier
-  public let type: Maybe<AstType>
-  public let initializer: Maybe<AstExpression>
-}
-impl AstProperty: AstDeclaration
 
 
 public class AstBodyId {

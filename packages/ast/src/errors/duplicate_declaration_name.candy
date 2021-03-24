@@ -4,7 +4,7 @@ use petit_parser
 
 public class DuplicateDeclarationNameCompilerError {
   public let file: FancyFile
-  public let node: CstNode<CstModule | CstTrait | CstClass | CstProperty>
+  public let node: CstNode<CstModule | CstTrait | CstClass>
   // TODO(JonasWanke): highlight previous occurrences of that name
 }
 impl DuplicateDeclarationNameCompilerError: CompilerError {
