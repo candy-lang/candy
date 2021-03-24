@@ -317,7 +317,7 @@ fun lowerTrait(
           context.addError(
             ExpectedTypeCompilerError(
               context.file,
-              cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstEnumType | CstIntersectionType>(),
+              cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
             ),
           )
           None<AstInlineType>()
@@ -359,7 +359,7 @@ fun lowerImpl(
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstEnumType | CstIntersectionType>(),
+        cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
       ),
     )
   }
@@ -371,7 +371,7 @@ fun lowerImpl(
           context.addError(
             ExpectedTypeCompilerError(
               context.file,
-              cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstEnumType | CstIntersectionType>(),
+              cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
             ),
           )
           None<AstInlineType>()
@@ -439,7 +439,7 @@ fun lowerType(
     if (it.second is None<CstNode<CstInlineType>>) {
       context.addError(ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstEnumType | CstIntersectionType>(),
+        cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
       ))
       isValid = false
       return None<AstInlineType>()
@@ -1106,7 +1106,7 @@ fun lowerNamedTupleTypeField(
     if (it.second is None<CstNode<CstInlineType>>) {
       context.addError(ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstEnumType | CstIntersectionType>(),
+        cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
       ))
       isValid = false
       return None<AstInlineType>()
@@ -1186,7 +1186,7 @@ fun lowerEnumType(
   let cstVariants = cst.child.variants as Iterable<CstNode<CstEnumTypeVariant | PunctuationToken>>
   assert(cstVariants.isNotEmpty(), "`CstEnumType` must contain at least one variant.")
 
-  if ((cstVariants.whereType<CstNode<CstEnumTypeVariant>>() as Iterable<AstInlineType>).length() < 2) {
+  if ((cstVariants.whereType<CstNode<CstEnumTypeVariant>>() as Iterable<CstNode<CstEnumTypeVariant>>).length() < 2) {
     context.addError(
       ExpectedTwoOrMoreItemsInTupleCompilerError(
         context.file,
@@ -1345,7 +1345,7 @@ fun lowerIntersectionType(
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstEnumType | CstIntersectionType>(),
+        cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
       ),
     )
   } else {
@@ -1839,7 +1839,7 @@ fun lowerPropertyExpression(
       context.addError(
         ExpectedTypeCompilerError(
           context.file,
-          cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstEnumType | CstIntersectionType>(),
+          cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
         ),
       )
       None<AstInlineType>()
