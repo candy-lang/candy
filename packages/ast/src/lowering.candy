@@ -318,7 +318,7 @@ fun lowerTrait(
 
   let upperBound = cst.child.upperBound
       .flatMap<AstType>({
-        if it.second is None<CstNode<CstType>> {
+        if it.second is None<CstNode<CstInlineType>> {
           context.addError(
             ExpectedTypeCompilerError(
               context.file,
@@ -372,7 +372,7 @@ fun lowerImpl(
 
   let traits = cst.child.traits
       .flatMap<AstType>({
-        if it.second is None<CstNode<CstType>> {
+        if it.second is None<CstNode<CstInlineType>> {
           context.addError(
             ExpectedTypeCompilerError(
               context.file,
@@ -480,12 +480,12 @@ fun lowerFunction(
         List.empty<AstValueParameter>()
       })
 
-  let returnType = if cst.child.returnType is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)> {
+  let returnType = if cst.child.returnType is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)> {
     context.addError(ExpectedFunctionReturnTypeCompilerError(context.file, cst))
     None<AstType>()
   } else {
     let returnType = cst.child.returnType.unwrap()
-    if returnType.second is None<CstNode<CstType>> {
+    if returnType.second is None<CstNode<CstInlineType>> {
       context.addError(ExpectedFunctionReturnTypeCompilerError(context.file, cst))
       None<AstType>()
     } else {
@@ -556,11 +556,11 @@ fun lowerProperty(
     }
   }
 
-  let type = if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)> {
+  let type = if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)> {
     None<AstType>()
   } else {
     let type = cst.child.type.unwrap()
-    if type.second is None<CstNode<CstType>> {
+    if type.second is None<CstNode<CstInlineType>> {
       context.addError(
         ExpectedTypeCompilerError(
           context.file,
@@ -793,11 +793,11 @@ fun lowerValueParameter(
   // `parentId`.
   let isFunctionParameter = (parentId is AstDeclarationId)
   let type = if isFunctionParameter {
-    if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)> {
+    if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)> {
       context.addError(FunctionValueParameterTypeMissingCompilerError(context.file, cst))
       None<AstType>()
     } else {
-      if cst.child.type.unwrap().second is None<CstNode<CstType>> {
+      if cst.child.type.unwrap().second is None<CstNode<CstInlineType>> {
         context.addError(FunctionValueParameterTypeMissingCompilerError(context.file, cst))
         None<AstType>()
       } else {
@@ -805,10 +805,10 @@ fun lowerValueParameter(
       }
     }
   } else {
-    if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)> {
+    if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)> {
       None<AstType>()
     } else {
-      if cst.child.type.unwrap().second is None<CstNode<CstType>> {
+      if cst.child.type.unwrap().second is None<CstNode<CstInlineType>> {
         context.addError(LambdaValueParameterTypeExpectedCompilerError(context.file, cst))
         None<AstType>()
       } else {
@@ -841,7 +841,7 @@ fun lowerValueParameter(
 fun lowerType(
   context: LoweringContext,
   parentId: AstDeclarationId | AstTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
-  cst: CstNode<CstType>,
+  cst: CstNode<CstInlineType>,
 ): Maybe<AstType> {
   if cst.child is CstNamedType {
     return Some<AstType>(lowerNamedType(context, parentId, cst.cast<CstNamedType>()))
@@ -912,7 +912,7 @@ fun lowerGroupType(
   parentId: AstDeclarationId | AstTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstGroupType>,
 ): Maybe<AstType> {
-  let type = if cst.child.type is None<CstNode<CstType>> {
+  let type = if cst.child.type is None<CstNode<CstInlineType>> {
     context.addError(ExpectedTypeInGroupTypeCompilerError(context.file, cst))
     None<AstType>()
   } else {
@@ -988,7 +988,7 @@ fun lowerFunctionTypeParameterTypes(
       if punctuationExpectedNext {
         // TODO(JonasWanke)
       }
-      let type = lowerType(context, parentId, node.cast<CstType>())
+      let type = lowerType(context, parentId, node.cast<CstInlineType>())
       if type is Some<AstType> { parameterTypes.append(type.unwrap()) }
       punctuationExpectedNext = true
     }
@@ -1035,7 +1035,7 @@ fun lowerTupleType(
       if punctuationExpectedNext {
         // TODO(JonasWanke)
       }
-      let type = lowerType(context, parentId, node.cast<CstType>())
+      let type = lowerType(context, parentId, node.cast<CstInlineType>())
       if type is Some<AstType> { types.append(type.unwrap()) }
       punctuationExpectedNext = true
     }
@@ -1090,7 +1090,7 @@ fun lowerIntersectionType(
   let leftType = lowerType(context, id, cst.child.leftType)
   if leftType is Some<AstType> { appendType(leftType.unwrap()) }
 
-  if cst.child.rightType is None<CstNode<CstType>> {
+  if cst.child.rightType is None<CstNode<CstInlineType>> {
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
@@ -1125,7 +1125,7 @@ fun lowerUnionType(
   let leftType = lowerType(context, id, cst.child.leftType)
   if leftType is Some<AstType> { appendType(leftType.unwrap()) }
 
-  if cst.child.rightType is None<CstNode<CstType>> {
+  if cst.child.rightType is None<CstNode<CstInlineType>> {
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
@@ -1218,7 +1218,7 @@ fun lowerTypeParameter(
 
   let upperBound = cst.child.upperBound
       .flatMap<AstType>({
-        if it.second is None<CstNode<CstType>> {
+        if it.second is None<CstNode<CstInlineType>> {
           context.addError(ExpectedTypeInTypeParameterCompilerError(context.file, cst))
           None<AstType>()
         } else {
