@@ -17,6 +17,10 @@
       "path": "new-packages\\Core"
     },
     {
+      "name": "🛒 Shopping List (example)",
+      "path": "new-packages\\ShoppingList"
+    },
+    {
       "name": "🧸 Playground",
       "path": "playground"
     },

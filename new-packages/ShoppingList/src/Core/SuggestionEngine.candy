@@ -1,0 +1,76 @@
+use Chest
+
+public trait SuggestionEngine: GenericServer[RememberState, SuggestionCall, SuggestionResult] {
+  static fun create(): This
+
+  fun add(item: String) -> call(SuggestionCall Add(item))
+  fun remove(item: String) -> call(SuggestionCall Remove(item))
+  fun scoreOf(item: String): Float {
+    call(SuggestionCall ScoreOf(item)) as<SuggestionResult ScoreOf>() unwrap() value
+  }
+
+  fun suggestionFor(prefix: String): Maybe[String] {
+    call(SuggestionCall SuggestionFor(item)) as<SuggestionResult SuggestionFor>() unwrap() value
+  }
+
+  fun handleCall(call: SuggestionCall, state: RememberState): (SuggestionResult, RememberState) {
+    let allSuggestions -> state scores entries sortedBy { it value negated } map { it key }
+    let suggestionsNotInList -> allSuggestions whereNotIn(shoppingList items toSet())
+
+    call >{
+      Add item {
+        let scores = state scores
+          putIfAbsent(item, 0)
+          update(item) { it + 1 }
+        (Unit, state copyWith(scores = scores))
+      }
+      Remove item -> (Unit, state copyWith(scores = state scores remove(item)))
+      ScoreOf item -> (state scores get(item) else(0), state)
+      SuggestionFor prefix {
+        let suggestion = if(prefix isEmpty) { None } else {
+          suggestionsNotInList where { it startsWith(prefix) & it != prefix } first
+        }
+        (suggestion, state)
+      }
+    }
+  }
+}
+
+type ActualSuggestionEngine = Unit
+impl ActualSuggestionEngine: SuggestionEngine {
+  static fun create(): This {
+    # Outdated
+    let chest = open("rememberState") { RememberState empty } await
+    let durationSinceDecay = Instant now - chest lastDecay value
+    if(durationSinceDecay > 1 hours) {
+      let daysSinceDecay = durationSinceDecay inPreciseDays
+      chest scores updateValues { score -> score * 0.95 ^ daysSinceDecay }
+    }
+    chest
+  }
+}
+
+type SuggestionCall =
+  | Add String
+  | Remove String
+  | ScoreOf String
+  | SuggestionFor String
+type SuggestionResult =
+  | None
+  | ScoreOf Float
+  | SuggestionFor Maybe[String]
+
+@tape
+type RememberState = (scores: Map[String, Float], lastDecay: Instant)
+impl RememberState {
+  static let empty -> This(scores = defaultScores, lastDecay = Instant now)
+  static let defaultScores = mapOf(
+    ("Milk", 0.9),
+    ("Bread", 0.9),
+    ("Cheese", 0.9),
+    ("Honey", 0.9),
+    ("Beer", 0.9),
+  )
+}
+
+global let suggestionEngine: SuggestionEngine

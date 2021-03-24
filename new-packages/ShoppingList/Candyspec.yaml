@@ -1,0 +1,8 @@
+name ShoppingList
+
+dependencies {
+  HTTP 1.1
+  Oxygen 1
+  Serialization 1
+  Serialization JSON 1
+}

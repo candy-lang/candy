@@ -1,0 +1,62 @@
+fun main() {
+  let server: Mutable[List[String]] = Mutable { [] }
+  // {:ok, #PID<0.57.0>}
+  server update { it + "eggs" }
+  // :ok
+  server value last
+  // ["eggs"]
+}
+
+trait Fiber[T = Any] {
+  builtin static fun spawn(function: (This) -> Unit): This
+
+  builtin fun send(input: T)
+  builtin fun receive(): Maybe[T]
+}
+
+public type Mutable[State] = Fiber[MutableIn[State]]
+impl Mutable[State] {
+  public constructor(initializer: () -> State): This {
+    let fiber = Fiber spawn {
+      ## TODO(JonasWanke): extract ListenableMutable
+      fun actualLoop(state: State, listeners: List[(State) -> Unit]): Never {
+        let fiber = Fiber current[MutableIn[State]]()
+        let state = fiber receive() >{
+          Update updater {
+            let newState = updater(state)
+            Fiber parent send(newState)
+            (newState, listeners)
+          }
+          Do action {
+            action(state)
+            (state, listeners)
+          }
+          AddListener listener -> (state, listeners + listener)
+        }
+        actualLoop(state first, state second)
+      }
+      actualLoop(initializer(), [])
+    }
+    Mutable(fiber)
+  }
+
+  fun update(updater: (State) -> State): State {
+    value send(MutableIn Update(updater))
+    Fiber current receive() unwrap() as[State]()
+  }
+
+  let value: State -> update { it }
+
+  fun do(action: (State) -> Unit) {
+    value send(MutableIn Do(worker))
+  }
+
+  fun addListener(listener: (State) -> Unit) {
+    value send(MutableIn AddListener(listener))
+  }
+}
+
+type MutableIn[State] =
+  | Update (State) -> State
+  | Do (State) -> Unit
+  | AddListener (State) -> Unit
