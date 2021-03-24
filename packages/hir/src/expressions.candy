@@ -67,7 +67,7 @@ impl HirSuperExpression: HirExpression
 
 
 public class HirReflectionExpression<
-  Target: HirModule | HirTrait | HirClass | HirFunction | HirProperty | HirParameterType
+  Target: HirModule | HirTrait | HirType | HirFunction | HirProperty | HirParameterType
 > {
   public let uri: HirExpressionUri<HirReflectionExpression<Target>>
   public let target: Target
@@ -137,7 +137,7 @@ impl HirExpressionCallExpression: HirExpression
 
 public class HirConstructorCallExpression {
   public let uri: HirExpressionUri<HirConstructorCallExpression>
-  public let receiver: HirExpressionUri<HirReflectionExpression<HirClass>>
+  public let receiver: HirExpressionUri<HirReflectionExpression<HirType>>
   public let constructor: HirConstructor
   public let typeArguments: Map<String, HirType>
   public let valueArguments: Map<String, HirExpressionUri<HirExpression>>

@@ -1,8 +1,9 @@
 use compiler_utils
 use incremental
+use ..types
 
 public trait HirDeclaration {
-  let parent: Package | HirModule | HirTrait | HirClass
+  let parent: Package | HirModule | HirTrait | HirType | HirImpl
   fun name(): String
 }
 
@@ -42,7 +43,7 @@ impl HirInnerModule: HirDeclaration & Equals & Hash & HirModule {
 }
 
 public class HirTrait {
-  public let parent: HirModule | HirTrait | HirClass
+  public let parent: HirModule | HirTrait | HirType
   public let name_: String
 }
 impl HirTrait: HirDeclaration & Equals & Hash {
@@ -73,24 +74,31 @@ impl HirImpl: HirDeclaration & Equals & Hash {
   }
 }
 
-public class HirClass {
-  public let parent: HirModule | HirTrait | HirClass
+public class HirType {
+  public let parent: HirModule | HirTrait | HirType
   public let name_: String
+  public let parameters: List<String>
+  public let type_: HirInlineType
 }
-impl HirClass: HirDeclaration & Equals & Hash {
+impl HirType: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
   fun toString(): String { "{parent}:{name()}" }
   fun equals(other: This): Bool {
-    (parent as Equals) == (other.parent as Equals) && name_ == other.name_
+    (parent as Equals) == (other.parent as Equals)
+      && name_ == other.name_
+      && (parameters as Equals) == (other.parameters as Equals)
+      && (type_ as Equals) == (other.type_ as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (parent as Hash).hash<T>(hasher)
     (name_ as Hash).hash<T>(hasher)
+    (parameters as Hash).hash<T>(hasher)
+    (type_ as Hash).hash<T>(hasher)
   }
 }
 
 public class HirConstructor {
-  public let parent: HirClass
+  public let parent: HirType
   public let disambiguator: Int
 }
 impl HirConstructor: HirDeclaration & Equals & Hash {
@@ -106,7 +114,7 @@ impl HirConstructor: HirDeclaration & Equals & Hash {
 }
 
 public class HirFunction {
-  public let parent: HirModule | HirTrait | HirImpl | HirClass
+  public let parent: HirModule | HirTrait | HirImpl | HirType
   public let name_: String
   public let disambiguator: Int
 }
@@ -126,7 +134,7 @@ impl HirFunction: HirDeclaration & Equals & Hash {
 }
 
 public class HirProperty {
-  public let parent: HirModule | HirTrait | HirImpl | HirClass
+  public let parent: HirModule | HirTrait | HirImpl | HirType
   public let name_: String
 }
 impl HirProperty: HirDeclaration & Equals & Hash {
