@@ -49,10 +49,16 @@ impl CstTupleType: CstInlineType
 public class CstNamedTupleType {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let openingParenthesis: CstNode<PunctuationToken>
-  public let types: List<CstNode<CstTypeParameter | PunctuationToken>>
+  public let entries: List<CstNode<CstNamedTupleTypeEntry | PunctuationToken>>
   public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
 }
 impl CstNamedTupleType: CstInlineType
+
+public class CstNamedTupleTypeEntry {
+  public let modifiers: List<CstNode<IdentifierToken>>
+  public let name: Maybe<CstNode<IdentifierToken>>
+  public let upperBound: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>
+}
 
 
 public class CstEnumType {
