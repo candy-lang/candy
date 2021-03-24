@@ -1,13 +1,4 @@
 fun main() {
-  // let agent = Agent startLinked { [] } unwrap()
-  // // {:ok, #PID<0.57.0>}
-  // agent update { list + "eggs" }
-  // // :ok
-  // agent get { list last }
-  // // ["eggs"]
-  // agent stop()
-  // // :ok
-
   let server: Mutable[List[String]] = Mutable { [] }
   // {:ok, #PID<0.57.0>}
   server update { it + "eggs" }
@@ -73,23 +64,3 @@ type MutableIn[State] =
   | Update (State) -> State
   | Do (State) -> Unit
   | AddListener (State) -> Unit
-
-
-
-// public type Agent[State] = FiberId
-// public trait Agent[State] {
-//   static fun spawn(initializer: () -> State): This {
-//   }
-
-//   fun loop(state: State): State {
-//     let fiber = Fiber current[AgentIn[State], AgentOut[State]]()
-//     let output = fiber receive() >{
-//       Get -> (AgentOut Value(state), state)
-//       Update updater -> (AgentOut None, updater(state))
-//     }
-
-//   }
-// }
-
-// public type AgentIn[State] = Get | Update (State) -> State
-// public type AgentOut[State] = Value State | None
