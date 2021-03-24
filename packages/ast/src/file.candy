@@ -12,7 +12,7 @@ impl AstFileId: AstNodeId
 public class AstFile {
   public let id: AstFileId
   public let useLines: List<AstUseLine>
-  public let declarations: List<AstModule | AstTrait | AstImpl | AstClass | AstFunction>
+  public let declarations: List<AstModule | AstTrait | AstImpl | AstType | AstFunction>
 }
 impl AstFile: AstNode
 
@@ -65,7 +65,7 @@ public class AstIdentifierId {
       | AstDeclarationId
       | AstTypeParameterId
       | AstValueParameterId
-      | AstTypeId
+      | AstInlineTypeId
       | AstExpressionId
   public let index: Int
 }

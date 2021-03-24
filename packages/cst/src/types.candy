@@ -57,7 +57,7 @@ impl CstNamedTupleType: CstInlineType
 public class CstNamedTupleTypeField {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let name: Maybe<CstNode<IdentifierToken>>
-  public let upperBound: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>
+  public let type: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>
 }
 
 

@@ -21,7 +21,7 @@ public class AstModule {
   public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<AstIdentifier>
   public let name: AstIdentifier
-  public let innerDeclarations: List<AstModule | AstTrait | AstImpl | AstClass | AstFunction>
+  public let innerDeclarations: List<AstModule | AstTrait | AstImpl | AstType | AstFunction>
 }
 impl AstModule: AstDeclaration
 
@@ -32,8 +32,8 @@ public class AstTrait {
   public let modifiers: List<AstIdentifier>
   public let name: AstIdentifier
   public let typeParameters: List<AstTypeParameter>
-  public let upperBound: Maybe<AstType>
-  public let innerDeclarations: List<AstTrait | AstClass | AstFunction>
+  public let upperBound: Maybe<AstInlineType>
+  public let innerDeclarations: List<AstTrait | AstType | AstFunction>
 }
 impl AstTrait: AstDeclaration
 
@@ -41,22 +41,22 @@ public class AstImpl {
   public let id: AstDeclarationId
   public let modifiers: List<AstIdentifier>
   public let typeParameters: List<AstTypeParameter>
-  public let type: AstType
+  public let type: AstInlineType
   public let traits: List<AstNamedType>
   public let innerDeclarations: List<AstFunction>
 }
 impl AstImpl: AstDeclaration
 
 
-public class AstClass {
+public class AstType {
   public let id: AstDeclarationId
   public let candyDoc: Maybe<AstCandyDoc>
   public let modifiers: List<AstIdentifier>
   public let name: AstIdentifier
   public let typeParameters: List<AstTypeParameter>
-  public let innerDeclarations: List<AstTrait | AstClass | AstFunction>
+  public let type: AstInlineType
 }
-impl AstClass: AstDeclaration
+impl AstType: AstDeclaration
 
 
 public class AstFunction {
@@ -66,7 +66,7 @@ public class AstFunction {
   public let name: AstIdentifier
   public let typeParameters: List<AstTypeParameter>
   public let valueParameters: List<AstValueParameter>
-  public let returnType: Maybe<AstType>
+  public let returnType: Maybe<AstInlineType>
   public let body: Maybe<AstBlockBody | AstExpressionBody | AstDelegationBody>
 }
 impl AstFunction: AstDeclaration
@@ -82,7 +82,7 @@ public class AstValueParameter {
   public let id: AstValueParameterId
   public let modifiers: List<AstIdentifier>
   public let name: AstIdentifier
-  public let type: Maybe<AstType>
+  public let type: Maybe<AstInlineType>
   public let defaultValue: Maybe<AstExpression>
 }
 
