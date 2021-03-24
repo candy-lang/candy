@@ -118,7 +118,7 @@
           "name": "constant.language.candy"
         },
         {
-          "match": "(?<!\\$)\\b(field|it|super|this|value)\\b(?!\\$)",
+          "match": "(?<!\\$)\\b(it|super|this|value)\\b(?!\\$)",
           "name": "variable.language.candy"
         },
         {
