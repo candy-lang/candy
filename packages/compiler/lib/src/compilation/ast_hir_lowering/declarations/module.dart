@@ -79,7 +79,10 @@ final moduleIdToOptionalDeclarationId = Query<ModuleId, Option<DeclarationId>>(
         path.isEmpty ? newSegment : '$path/$newSegment';
     final remainingPath = moduleId.path.toList();
 
-    assert(doesResourceDirectoryExist(context, ResourceId(packageId, path)));
+    assert(
+      doesResourceDirectoryExist(context, ResourceId(packageId, path)),
+      "Directory $packageId:$path doesn't exist.",
+    );
     while (remainingPath.isNotEmpty &&
         doesResourceDirectoryExist(
           context,
