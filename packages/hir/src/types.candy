@@ -1,53 +1,58 @@
 use ..declarations
 
-public trait HirType
+public trait HirInlineType
 
 
 public class HirNamedType {
-  public let declaration: HirTrait | HirClass
+  public let declaration: HirTrait | HirType
+  public let parameterTypes: List<HirInlineType>
 }
-impl HirNamedType: HirType
+impl HirNamedType: HirInlineType
 
 
 public class HirTupleType {
-  public let types: List<HirType>
+  public let types: List<HirInlineType>
 }
-impl HirTupleType: HirType
+impl HirTupleType: HirInlineType
+
+
+public class HirNamedTupleType {
+  public let types: Map<String, HirInlineType>
+}
+
+
+public class HirEnumType {
+  public let types: Map<String, HirInlineType>
+}
 
 
 public class HirFunctionType {
-  public let receiverType: Maybe<HirType>
-  public let parameterTypes: List<HirType>
-  public let returnType: HirType
+  public let receiverType: Maybe<HirInlineType>
+  public let parameterTypes: List<HirInlineType>
+  public let returnType: HirInlineType
 }
-impl HirFunctionType: HirType
+impl HirFunctionType: HirInlineType
 
-
-public class HirUnionType {
-  public let types: List<HirType>
-  // TODO(JonasWanke): Use a `Set<HirType>` when we have sets that keep insertion order.
-}
-impl HirUnionType: HirType
 
 public class HirIntersectionType {
-  public let types: List<HirType>
-  // TODO(JonasWanke): Use a `Set<HirType>` when we have sets that keep insertion order.
+  public let types: List<HirInlineType>
+  // TODO(JonasWanke): Use a `Set<HirInlineType>` when we have sets that keep insertion order.
 }
-impl HirIntersectionType: HirType
+impl HirIntersectionType: HirInlineType
 
 
 public class HirThisType
-impl HirThisType: HirType
+impl HirThisType: HirInlineType
 
 
 public class HirParameterType {
-  public let declaration: HirTrait | HirClass | HirFunction
+  public let declaration: HirTrait | HirType | HirFunction
   public let name: String
 }
-impl HirParameterType: HirType
+impl HirParameterType: HirInlineType
 
 
 public class HirReflectionType {
-  public let target: HirModule | HirTrait | HirClass | HirFunction | HirProperty | HirParameterType
+  public let target: HirModule | HirTrait | HirType | HirFunction | HirProperty | HirParameterType
 }
-impl HirReflectionType: HirType
+impl HirReflectionType: HirInlineType
