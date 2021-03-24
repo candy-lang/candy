@@ -152,6 +152,16 @@ fun makeSureImplsAreNotConflicting(context: QueryContext<List<CompilerError>>) {
   })
 }
 
+impl HirType {
+  fun implFor(context: QueryContext<List<CompilerError>>, trait_: HirTrait): Maybe<HirImpl> {
+    query<HirType, List<CompilerError>>( context, "HirType.implements", this as Equals & Hash, {
+      let impls = (getAllImpls(context) as Iterable<HirImpl>).where({ it.trait_ == trait_ }).where({
+        it.type_.unify(this) is Some
+      })
+    })
+  }
+}
+
 public class ConflictingImplsCompilerError {
   public let impl1: HirImpl
   public let impl2: HirImpl
