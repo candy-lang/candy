@@ -17,7 +17,7 @@ public trait SuggestionEngine: GenericServer[RememberState, SuggestionCall, Sugg
     let allSuggestions -> state scores entries sortedBy { it value negated } map { it key }
     let suggestionsNotInList -> allSuggestions whereNotIn(shoppingList items toSet())
 
-    call %{
+    call >{
       Add item {
         let scores = state scores
           putIfAbsent(item, 0)
