@@ -7,22 +7,41 @@ public class HirNamedType {
   public let declaration: HirTrait | HirType
   public let parameterTypes: List<HirInlineType>
 }
-impl HirNamedType: HirInlineType
+impl HirNamedType: HirInlineType, Equals, Hash {
+  fun equals(other: HirNamedType): Bool {
+    declaration == other.declaration && parameterTypes == other.parameterTypes
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    declaration.hash<T>(hasher)
+    parameterTypes.hash<T>(hasher)
+  }
+}
 
 
 public class HirTupleType {
   public let types: List<HirInlineType>
 }
-impl HirTupleType: HirInlineType
+impl HirTupleType: HirInlineType, Equals, Hash {
+  fun equals(other: HirNamedType): Bool { types == other.types }
+  fun hash<T>(hasher: Hasher<T>) { types.hash<T>(hasher) }
+}
 
 
 public class HirNamedTupleType {
   public let types: Map<String, HirInlineType>
 }
+impl HirNamedTupleType: HirInlineType, Equals, Hash {
+  fun equals(other: HirNamedType): Bool { types == other.types }
+  fun hash<T>(hasher: Hasher<T>) { types.hash<T>(hasher) }
+}
 
 
 public class HirEnumType {
   public let types: Map<String, HirInlineType>
+}
+impl HirEnumType: HirInlineType, Equals, Hash {
+  fun equals(other: HirNamedType): Bool { types == other.types }
+  fun hash<T>(hasher: Hasher<T>) { types.hash<T>(hasher) }
 }
 
 
@@ -31,28 +50,54 @@ public class HirFunctionType {
   public let parameterTypes: List<HirInlineType>
   public let returnType: HirInlineType
 }
-impl HirFunctionType: HirInlineType
+impl HirFunctionType: HirInlineType, Equals, Hash {
+  fun equals(other: HirNamedType): Bool {
+    receiverType == other.receiverType
+      && parameterTypes == other.parameterTypes
+      && returnType == other.returnType
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    receiverType.hash<T>(hasher)
+    parameterTypes.hash<T>(hasher)
+    returnType.hash<T>(hasher)
+  }
+}
 
 
 public class HirIntersectionType {
   public let types: List<HirInlineType>
   // TODO(JonasWanke): Use a `Set<HirInlineType>` when we have sets that keep insertion order.
 }
-impl HirIntersectionType: HirInlineType
+impl HirIntersectionType: HirInlineType, Equals, Hash {
+  fun equals(other: HirNamedType): Bool { types == other.types }
+  fun hash<T>(hasher: Hasher<T>) { types.hash<T>(hasher) }
+}
 
 
 public class HirThisType
-impl HirThisType: HirInlineType
+impl HirThisType: HirInlineType, Equals, Hash {
+  fun equals(other: HirNamedType): Bool { true }
+  fun hash<T>(hasher: Hasher<T>) {}
+}
 
 
 public class HirParameterType {
   public let declaration: HirTrait | HirType | HirFunction
   public let name: String
 }
-impl HirParameterType: HirInlineType
+impl HirParameterType: HirInlineType, Equals, Hash {
+  fun equals(other: HirNamedType): Bool { declaration == other.declaration && name == other.name }
+  fun hash<T>(hasher: Hasher<T>) {
+    declaration.hash<T>(hasher)
+    name.hash<T>(hasher)
+  }
+}
 
 
 public class HirReflectionType {
   public let target: HirModule | HirTrait | HirType | HirFunction | HirProperty | HirParameterType
 }
-impl HirReflectionType: HirInlineType
+impl HirReflectionType: HirInlineType, Equals, Hash {
+  fun equals(other: HirNamedType): Bool { target == other.target }
+  fun hash<T>(hasher: Hasher<T>) { target.hash<T>(hasher) }
+}
