@@ -49,12 +49,12 @@ impl CstTupleType: CstInlineType
 public class CstNamedTupleType {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let openingParenthesis: CstNode<PunctuationToken>
-  public let entries: List<CstNode<CstNamedTupleTypeEntry | PunctuationToken>>
+  public let fields: List<CstNode<CstNamedTupleTypeField | PunctuationToken>>
   public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
 }
 impl CstNamedTupleType: CstInlineType
 
-public class CstNamedTupleTypeEntry {
+public class CstNamedTupleTypeField {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let name: Maybe<CstNode<IdentifierToken>>
   public let upperBound: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>

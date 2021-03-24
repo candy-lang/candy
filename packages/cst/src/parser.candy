@@ -365,30 +365,30 @@ class CstParser {
           CstTupleType(modifiers, openingParenthesis, types, closingParenthesis)
         })
 
-    // TODO(JonasWanke): Allow modifiers before named tuple type entries.
-    let namedTupleTypeEntry = atLeastOne<
+    // TODO(JonasWanke): Allow modifiers before named tuple type fields.
+    let namedTupleTypeField = atLeastOne<
         CstNode<IdentifierToken>,
         (CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>),
       >(
         identifier(false),
         punctuation(":").sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional()),
       )
-      .map<CstNamedTupleTypeEntry>({
-        CstNamedTupleTypeEntry(List.empty<CstNode<IdentifierToken>>(), it.first, it.second)
+      .map<CstNamedTupleTypeField>({
+        CstNamedTupleTypeField(List.empty<CstNode<IdentifierToken>>(), it.first, it.second)
       })
-    let namedTupleTypeEntry = node<CstNamedTupleTypeEntry>(namedTupleTypeEntry)
+    let namedTupleTypeField = node<CstNamedTupleTypeField>(namedTupleTypeField)
     let namedTupleType = modifiers()
         .sequence<CstNode<PunctuationToken>>(punctuation("("))
-        .sequence<List<CstNode<CstNamedTupleTypeEntry | PunctuationToken>>>(
-          commaSeparated<CstNamedTupleTypeEntry>(namedTupleTypeEntry),
+        .sequence<List<CstNode<CstNamedTupleTypeField | PunctuationToken>>>(
+          commaSeparated<CstNamedTupleTypeField>(namedTupleTypeField),
         )
         .sequence<Maybe<CstNode<PunctuationToken>>>(closingParenthesisOrOtherEndDetection)
         .map<CstInlineType>({
           let modifiers = it.first.first.first
           let openingParenthesis = it.first.first.second
-          let entries = it.first.second
+          let fields = it.first.second
           let closingParenthesis = it.second
-          CstNamedTupleType(modifiers, openingParenthesis, entries, closingParenthesis)
+          CstNamedTupleType(modifiers, openingParenthesis, fields, closingParenthesis)
         })
 
     // We have to make sure that this doesn't match nothing.
