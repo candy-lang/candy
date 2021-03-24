@@ -1,0 +1,139 @@
+use Oxygen
+use Reorderables
+
+use ..Core
+
+fun main() {
+  runApp(shoppingListApp())
+}
+
+let sharedPreferences = SharedPreferences()
+
+ui fun shoppingListApp() {
+  let theme by sharedPreferences theme
+  appTheme(
+    data = AppThemeData fromThemeMode(theme),
+    child = materialApp(
+      title = "Shopping List",
+      theme = appThemeData toDefaultMaterialTheme(),
+      home = splashScreen(),
+    ),
+  )
+}
+
+ui fun splashScreen() -> container(color = Color teal)
+
+ui fun mainPage() {
+  scaffold(
+    body = todoList(),
+    floatingActionButton = floatingActionButton extended(
+      icon = Icons add,
+      label = Text(
+        "Add item",
+        style = appThemeData accentStyle copyWith(color = appThemeData color onPrimary),
+      ),
+      onPressed = showCreateItemSheet,
+    ),
+  )
+}
+
+let shoppingList = ShoppingList()
+
+ui fun todoList() {
+  let list by shoppingList
+  customScrollView(
+    slivers = [
+      listAppBar(),
+      sliverToBoxAdapter(
+        animatedCrossFade(
+          duration = 200 milliseconds,
+          crossFadeState = (list areAllItemsInMainList)
+            then { CrossFadeState showFirst }
+            else { CrossFadeState showSecond },
+          firstChild = sizedBox(height = appThemeData padding inner),
+          secondChild = padding(
+            padding = EdgeInsets(
+              left = appThemeData padding outer,
+              right = appThemeData padding outer,
+              top = appThemeData padding inner,
+              bottom = 2 * appThemeData padding inner,
+            ),
+            child = completedSection(),
+          ),
+        ),
+      ),
+      (list items isEmpty)
+        then { sliverToBoxAdapter(emptyState()) }
+        else { sliverMainList() },
+      sliverToBoxAdapter(
+        padding(
+          padding = EdgeInsets(horizontal = appThemeData padding outer)
+            + EdgeInsets(top = appThemeData padding inner),
+          child = suggestions(),
+        ),
+      ),
+      // This makes sure that nothing is hidden behin the FAB.
+      sliverToBoxAdapter(container(height = 100)),
+    ],
+  )
+}
+
+ui fun emptyState() {
+  center(
+    text(
+      "A fresh start",
+      textAlign = TextAlign Center,
+      style = appThemeData accentStyle,
+    ),
+  )
+}
+
+ui fun sliverMainList() {
+  fun putInCart(item: String) {
+    let index = shoppingList value items indexOf(item) unwrap()
+    shoppingList update { it copy(items = it items - item, inTheCart = it inTheCart + item) }
+    onboarding swipeToPutInCart used()
+    history checkedItem(item)
+    showSnackBarWithUndo("Put {item} in the cart.") {
+      shoppingList update {
+        it copy(items = it items + (index, item), inTheCart = it inTheCart removeLast)
+      }
+    }
+  }
+
+  fun markAsNotAvailable(item: String) {
+    let index = shoppingList value items indexOf(item) unwrap()
+    shoppingList update { it copy(items = it items - item, notAvailable = it notAvailable + item) }
+    showSnackBarWithUndo("Marked {item} as not available.") {
+      shoppingList update {
+        it copy(items = it items + (index, item), notAvailable = it notAvailable removeLast)
+      }
+    }
+  }
+
+  let list by shoppingList
+  reorderableSliverList(
+    onReorder = { oldIndex, newIndex ->
+      shoppingList update { it copyWith(items = it items move(oldIndex, newIndex)) }
+    },
+    buildDraggableFeedback = { constraints, child ->
+      material(
+        elevation = 2,
+        child = sizedBox(size = constraints biggest, child = child),
+      )
+    },
+    delegate = reorderableSliverChildBuilderDelegate(
+      childCount = list items length,
+    ) { index ->
+        let item = list items get(index)
+        todoItem(
+          item = item,
+          onTap = { showEditItemSheet(item) },
+          onPrimarySwipe = { putInCart(item) },
+          onSecondarySwipe = { markAsNotAvailable(item) },
+          showSwipeIndicator = onboarding swipeToPutInCart showExplanation & index == 0,
+        )
+      },
+    ),
+  )
+}

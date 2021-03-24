@@ -1,0 +1,190 @@
+use Chest
+
+// public type FormatterOptions =
+//   | NoFormatting
+//     # Don't format.
+//   | Format(
+//     # Format.
+
+//     indentation: UInt,
+//     # Number of spaces.
+//     naming: CamelCase | UpperCase | SnakeCase,
+//     range: Range[Int],
+//   )
+//   | Blub
+
+
+// type FormatterOptions =
+// # Foo
+//   | NoFormatting
+//     # 123
+//   | Format (CamelCase | UpperCase | SnakeCase)
+//     # Abc
+
+// type FormatterOptions =
+//   | NoFormatting
+//     # Don't format.
+//   | Format Format
+
+// type Format = (
+//   # Format.
+
+//   indentation: UInt,
+//   # Number of spaces.
+//   naming: CamelCase | UpperCase | SnakeCase,
+//   range: Range[Int],
+// )
+
+
+// type Casing = CamelCase | UpperCase | SnakeCase
+
+
+
+// impl Formatter {
+//   public fun format(source: String, options: FormatterOptions): String {
+//     match options {
+//       NoFormatting -> source
+//       Format -> actualFormat(source, it)
+//     }
+//   }
+//   fun actualFormat(source: String, options: (indentation: UInt, naming: CamelCase | UpperCase | SnakeCase, range: (Int, Int))): String -> todo()
+// }
+
+
+
+
+
+
+
+// public trait SuggestionEngine {
+//   static fun create(): This
+//   fun scoreOf(item: String): Float
+//   fun add(item: String)
+//   fun remove()
+//   fun suggestionFor(prefix: String): Maybe[String]
+// }
+
+// @tape
+// type RememberState = (scores: Map[String, Float], lastDecay: Instant)
+// impl RememberState {
+//   static let empty = This(scores = defaultScores, lastDecay = Instant now)
+//   static let defaultScores = mapOf(
+//     ("Milk", 0.9),
+//     ("Bread", 0.9),
+//     ("Cheese", 0.9),
+//     ("Honey", 0.9),
+//     ("Beer", 0.9),
+//   )
+// }
+
+// global let suggestionEngine: SuggestionEngine
+// impl Chest[RememberState]: SuggestionEngine {
+//   async static fun create(): This {
+//     let chest = open("rememberState") { RememberState empty } await
+//     let durationSinceDecay = Instant now - chest lastDecay value
+//     if(durationSinceDecay > 1 hours) {
+//       let daysSinceDecay = durationSinceDecay inPreciseDays
+//       chest scores updateValues { score -> score * 0.95 ^ daysSinceDecay }
+//     }
+//     chest
+//   }
+
+//   fun scoreOf(item: String): Float -> scores[item] value else { 0 }
+
+//   fun add(item: String) {
+//     if(score containsKey(item)) {
+//       scores[item] += 1
+//     } else {
+//       scores[item] = 1
+//       if(scores length > 100) {
+//         scores <- remove(scores entries minByValue unwrap() key)
+//       }
+//     }
+//   }
+
+//   fun remove(item: String) -> scores <- remove(item)
+
+//   let allSuggestions -> scores entries sortedBy { it value negated } map { it key }
+//   let suggestionsNotInList -> allSuggestions whereNotIn(shoppingList items toSet())
+
+//   fun suggestionFor(prefix: String): Maybe[String] {
+//     if(prefix isEmpty) { return None }
+//     suggestionsNotInList where { it startsWith(prefix) & it != prefix } first
+//   }
+// }
+
+
+type ActualSuggestionEngine = Unit
+
+public trait SuggestionEngine: GenericServer[RememberState, SuggestionCall, SuggestionResult] {
+  static fun create(): This
+
+  fun add(item: String) -> call(SuggestionCall Add(item))
+  fun remove(item: String) -> call(SuggestionCall Remove(item))
+  fun scoreOf(item: String): Float {
+    call(SuggestionCall ScoreOf(item)) as<SuggestionResult ScoreOf>() unwrap() value
+  }
+
+  fun suggestionFor(prefix: String): Maybe[String] {
+    call(SuggestionCall SuggestionFor(item)) as<SuggestionResult SuggestionFor>() unwrap() value
+  }
+
+  fun handleCall(call: SuggestionCall, state: RememberState): (SuggestionResult, RememberState) {
+    let allSuggestions -> state scores entries sortedBy { it value negated } map { it key }
+    let suggestionsNotInList -> allSuggestions whereNotIn(shoppingList items toSet())
+
+    call %{
+      Add item {
+        let scores = state scores
+          putIfAbsent(item, 0)
+          update(item) { it + 1 }
+        (Unit, state copyWith(scores = scores))
+      }
+      Remove item -> (Unit, state copyWith(scores = state scores remove(item)))
+      ScoreOf item -> (state scores get(item) else(0), state)
+      SuggestionFor prefix {
+        let suggestion = if(prefix isEmpty) { None } else {
+          suggestionsNotInList where { it startsWith(prefix) & it != prefix } first
+        }
+        (suggestion, state)
+      }
+    }
+  }
+}
+impl ActualSuggestionEngine: SuggestionEngine {
+  static fun create() {
+    This()
+    let chest = open("rememberState") { RememberState empty } await
+    let durationSinceDecay = Instant now - chest lastDecay value
+    if(durationSinceDecay > 1 hours) {
+      let daysSinceDecay = durationSinceDecay inPreciseDays
+      chest scores updateValues { score -> score * 0.95 ^ daysSinceDecay }
+    }
+    chest
+  }
+}
+
+type SuggestionCall =
+  | Add String
+  | Remove String
+  | ScoreOf String
+  | SuggestionFor String
+type SuggestionResult =
+  | None
+  | ScoreOf Float
+  | SuggestionFor Maybe[String]
+
+@tape
+type RememberState = (scores: Map[String, Float], lastDecay: Instant)
+impl RememberState {
+  static let empty -> This(scores = defaultScores, lastDecay = Instant now)
+  static let defaultScores = mapOf(
+    ("Milk", 0.9),
+    ("Bread", 0.9),
+    ("Cheese", 0.9),
+    ("Honey", 0.9),
+    ("Beer", 0.9),
+  )
+}
+
+global let suggestionEngine: SuggestionEngine
