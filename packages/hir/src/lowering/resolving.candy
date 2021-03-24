@@ -12,17 +12,17 @@ impl String {
   fun resolveIdentifier(
     context: QueryContext<List<CompilerError>>,
     scope: HirDeclaration,
-  ): Set<HirClass | HirTrait | HirProperty | HirFunction | HirModule> {
-    query<Set<HirClass | HirTrait | HirProperty | HirFunction | HirModule>, List<CompilerError>>(
+  ): Set<HirType | HirTrait | HirProperty | HirFunction | HirModule> {
+    query<Set<HirType | HirTrait | HirProperty | HirFunction | HirModule>, List<CompilerError>>(
       context,
       "String.resolveIdentifier",
       DataTuple2<String, HirDeclaration>(this, scope) as Equals & Hash,
       {
-        let candidates = MutableSet.empty<HirClass | HirTrait | HirProperty | HirFunction | HirModule>()
+        let candidates = MutableSet.empty<HirType | HirTrait | HirProperty | HirFunction | HirModule>()
         for declaration in (scope as HasDeclarations).declarations(context) {
           if declaration.name() == this {
             candidates.insert(
-              declaration as HirClass | HirTrait | HirProperty | HirFunction | HirModule
+              declaration as HirType | HirTrait | HirProperty | HirFunction | HirModule
             )
           }
         }
@@ -33,24 +33,24 @@ impl String {
           if ast is AstFile {
             // TODO(marcelgarus): Search use-lines and add their candidates here.
             return Tuple(
-              candidates as Set<HirClass | HirTrait | HirProperty | HirFunction | HirModule>,
+              candidates as Set<HirType | HirTrait | HirProperty | HirFunction | HirModule>,
               List.empty<CompilerError>(),
             )
           }
         }
 
         // Otherwise, visit the parent.
-        let parent: Package | HirModule | HirTrait | HirClass = scope.parent
+        let parent: Package | HirModule | HirTrait | HirType = scope.parent
         assert(
           !(parent is Package),
           "Parent is a package, although this is not a file-level module."
         )
         candidates.addAll(
           (resolveIdentifier(context, scope.parent as HirDeclaration).items() as Iterable<
-            HirClass | HirTrait | HirProperty | HirFunction | HirModule>)
+            HirType | HirTrait | HirProperty | HirFunction | HirModule>)
         )
         Tuple(
-          candidates as Set<HirClass | HirTrait | HirProperty | HirFunction | HirModule>,
+          candidates as Set<HirType | HirTrait | HirProperty | HirFunction | HirModule>,
           List.empty<CompilerError>()
         )
       }

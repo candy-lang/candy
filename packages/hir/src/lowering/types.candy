@@ -43,13 +43,13 @@ fun astTypeToHirType(
             .expand<HirDeclaration>({
               namePart.resolveIdentifier(context, it) as Iterable<HirDeclaration>
             })
-            .toSet() as Set<HirClass | HirTrait | HirProperty | HirFunction | HirModule>)
+            .toSet() as Set<HirType | HirTrait | HirProperty | HirFunction | HirModule>)
         }
 
         // There should only be one candidate left.
         let declaration = (candidates as Iterable<HirDeclaration>).single().unwrap()
-        assert((declaration is HirClass) || (declaration is HirTrait), "Declaration should be HirClass or HirTrait.")
-        return Tuple(HirNamedType(declaration as HirTrait | HirClass), List.empty<CompilerError>())
+        assert((declaration is HirType) || (declaration is HirTrait), "Declaration should be HirType or HirTrait.")
+        return Tuple(HirNamedType(declaration as HirTrait | HirType), List.empty<CompilerError>())
       }
 
       if (astType is AstFunctionType) {
