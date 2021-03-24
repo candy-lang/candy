@@ -19,6 +19,16 @@ impl HirReflectionType: HasDeclarations {
 
 // TODO(marcelgarus): Convert this into extension methods on Ast as soon as impls for types from
 // other packages work.
+fun astInlineTypeToHirInlineType(
+  context: QueryContext<List<CompilerError>>,
+  astType: AstInlineType,
+  scope: HirDeclaration,
+): HirInlineType {
+  todo("Implement")
+}
+
+// TODO(marcelgarus): Convert this into extension methods on Ast as soon as impls for types from
+// other packages work.
 fun astTypeToHirType(
   context: QueryContext<List<CompilerError>>,
   astType: AstType,
@@ -49,7 +59,16 @@ fun astTypeToHirType(
         // There should only be one candidate left.
         let declaration = (candidates as Iterable<HirDeclaration>).single().unwrap()
         assert((declaration is HirType) || (declaration is HirTrait), "Declaration should be HirType or HirTrait.")
-        return Tuple(HirNamedType(declaration as HirTrait | HirType), List.empty<CompilerError>())
+
+        return Tuple(
+          HirNamedType(
+            declaration as HirTrait | HirType,
+            ((astType as AstNamedType).typeArguments as Iterable<AstTypeArgument>)
+              .map<HirType>({ astInlineTypeToHirInlineType(context, it.type, scope) })
+              .toList(),
+          ),
+          List.empty<CompilerError>(),
+        )
       }
 
       if (astType is AstFunctionType) {

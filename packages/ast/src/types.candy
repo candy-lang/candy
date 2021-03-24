@@ -84,5 +84,5 @@ impl AstTypeArgumentId: AstNodeId
 
 public class AstTypeArgument {
   public let id: AstTypeArgumentId
-  public let type: Maybe<AstType>
+  public let type: AstType
 }
