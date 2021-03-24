@@ -122,3 +122,50 @@ fun astTypeToHirType(
     }
   )
 }
+
+fun getAllImpls(context: QueryContext<List<CompilerError>>): List<HirImpl> {
+  todo("Implement getAllImpls")
+}
+
+fun makeSureImplsAreNotConflicting(context: QueryContext<List<CompilerError>>) {
+  query<HirType, List<CompilerError>>( context, "HirType.implements", this as Equals & Hash, {
+    for implsForSameTrait in getAllImpls(context).groupBy({ it.trait_ }).values() {
+      for impl1 in implsForSameTrait {
+        for impl2 in implsForSameTrait {
+          let unified = impl1.type.unify(impl2.type)
+          if unified is Some {
+            // Unifying the impl types succeeded. This means there's a type to which both impls
+            // apply. That's bad.
+            impl1.type.substitute(unified.unwrap())
+            return Tuple(
+              unit,
+              ConflictingImplsCompilerError(
+                impl1,
+                impl2,
+                unified,
+              )
+            )
+          }
+        }
+      }
+    }
+  })
+}
+
+public class ConflictingImplsCompilerError {
+  public let impl1: HirImpl
+  public let impl2: HirImpl
+  public let conflictingType: HirType
+}
+impl ConflictingImplsCompilerError: CompilerError {
+  public fun id(): String { "conflicting-impls" }
+
+  public fun location(): Location {
+    Location(file, node.cast<CstDeclarationWithName>().child.name.unwrap().child.span)
+  }
+  public fun title(): String { "Conflicting impls." }
+  public fun description(): String {
+    /// TODO(marcelgarus): add a description for this error
+    ""
+  }
+}
