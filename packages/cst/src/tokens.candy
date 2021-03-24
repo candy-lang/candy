@@ -54,8 +54,8 @@ public class PunctuationToken {
   public let punctuation: String
   /// May be one of the following:
   ///
-  /// `-`, `->`, `,`, `:`, `!=`, `"`, `(`, `)`, `{`, `}`, `*`, `/`, `&`, `%`,
-  /// `+`, `<`, `<=`, `=`, `==`, `=>`, `>`, `>=`, `|`, `~/`, `.`, `\`
+  /// `-`, `->`, `,`, `:`, `!=`, `"`, `(`, `)`, `{`, `}`, `[`, `]`, `*`, `/`,
+  /// `&`, `%`,`+`, `<`, `<=`, `=`, `==`, `=>`, `>`, `>=`, `|`, `~/`, `.`, `\`
   ///
   /// TODO(JonasWanke): convert this to an enum when we support these
 }
