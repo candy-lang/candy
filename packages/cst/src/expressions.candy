@@ -93,14 +93,14 @@ public class CstBinaryExpression {
 impl CstBinaryExpression: CstExpression
 
 
-public class CstProperty {
+public class CstPropertyExpression {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let keyword: CstNode<KeywordToken>
   public let name: Maybe<CstNode<IdentifierToken>>
   public let type: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>
   public let initializer: Maybe<CstNode<CstDelegationBody>>
 }
-impl CstProperty: CstExpression
+impl CstPropertyExpression: CstExpression
 
 
 public class CstNavigationExpression {
