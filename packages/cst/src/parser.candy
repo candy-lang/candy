@@ -209,34 +209,16 @@ class CstParser {
 
     declaration.delegate = node<CstDeclaration>(
       choiceOf<String, CstDeclaration>(
-        List.of6<Parser<String, CstDeclaration>>(
+        List.of5<Parser<String, CstDeclaration>>(
           module_,
           trait_,
           impl_,
           type,
           function,
-          property().cast<CstDeclaration>(),
         ),
       ),
     )
     declaration
-  }
-  fun property(): Parser<String, CstProperty> {
-    declarationBeginningWithName("let", false)
-        .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>>(
-          punctuation(":")
-              .sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional())
-              .optional()
-        )
-        .sequence<Maybe<CstNode<CstDelegationBody>>>(delegationBody().optional())
-        .map<CstProperty>({
-          let modifiers = it.first.first.first.first
-          let keyword = it.first.first.first.second
-          let name = it.first.first.second
-          let type = it.first.second
-          let initializer = it.second
-          CstProperty(modifiers, keyword, name, type, initializer)
-        })
   }
   fun declarationBeginning(
     keywordString: String,
@@ -550,6 +532,22 @@ class CstParser {
 
   let expression_ = notYetDefined<String, CstNode<CstExpression>>("Parser not yet defined.")
   fun initExpression() {
+    let propertyExpression = declarationBeginningWithName("let", false)
+          .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>>(
+            punctuation(":")
+                .sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional())
+                .optional()
+          )
+          .sequence<Maybe<CstNode<CstDelegationBody>>>(delegationBody().optional())
+          .map<CstExpression>({
+            let modifiers = it.first.first.first.first
+            let keyword = it.first.first.first.second
+            let name = it.first.first.second
+            let type = it.first.second
+            let initializer = it.second
+            CstProperty(modifiers, keyword, name, type, initializer)
+          })
+
     let intExpression = intLiteral()
         .map<CstExpression>({ CstIntExpression(it) })
 
@@ -667,7 +665,7 @@ class CstParser {
 
     let primitiveExpressions = choiceOf<String, CstExpression>(
         List.of7<Parser<String, CstExpression>>(
-          property().cast<CstExpression>(),
+          propertyExpression,
           intExpression,
           stringExpression,
           lambdaExpression,

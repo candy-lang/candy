@@ -77,16 +77,6 @@ public class CstValueParameter {
 }
 
 
-public class CstProperty {
-  public let modifiers: List<CstNode<IdentifierToken>>
-  public let keyword: CstNode<KeywordToken>
-  public let name: Maybe<CstNode<IdentifierToken>>
-  public let type: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>
-  public let initializer: Maybe<CstNode<CstDelegationBody>>
-}
-impl CstProperty: CstDeclaration & CstDeclarationWithName
-
-
 public class CstDeclarationContent {
   public let openingCurlyBrace: CstNode<PunctuationToken>
   public let innerDeclarations: List<CstNode<CstDeclaration>>
