@@ -1188,7 +1188,7 @@ fun lowerEnumType(
 
   if ((cstVariants.whereType<CstNode<CstEnumTypeVariant>>() as Iterable<CstNode<CstEnumTypeVariant>>).length() < 2) {
     context.addError(
-      ExpectedTwoOrMoreItemsInTupleCompilerError(
+      ExpectedTwoOrMoreEnumVariantsCompilerError(
         context.file,
         cst.cast<CstTupleType | CstTupleExpression>(),
       ),
