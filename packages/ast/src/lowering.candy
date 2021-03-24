@@ -220,7 +220,7 @@ fun lowerDeclaration(
   context: LoweringContext,
   parentId: AstFileId | AstDeclarationId | AstExpressionId,
   cst: CstNode<CstDeclaration>,
-  previousNames: Map<String, Bool>,
+  previousNames: Set<String>,
 ): Maybe<AstDeclaration> {
   if cst.child is CstModule {
     return lowerModule(context, parentId, cst.cast<CstModule>(), previousNames)
@@ -243,7 +243,7 @@ fun lowerModule(
   context: LoweringContext,
   parentId: AstFileId | AstDeclarationId | AstExpressionId,
   cst: CstNode<CstModule>,
-  previousNames: Map<String, Bool>,
+  previousNames: Set<String>,
 ): Maybe<AstModule> {
  let id = AstDeclarationId(
     parentId,
@@ -260,7 +260,7 @@ fun lowerModule(
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
     isValid = false
   } else {
-    if previousNames.containsKey(name.unwrap().value) {
+    if previousNames.contains(name.unwrap().value) {
       context.addError(
         DuplicateDeclarationNameCompilerError(
           context.file,
@@ -280,7 +280,7 @@ fun lowerTrait(
   context: LoweringContext,
   parentId: AstFileId | AstDeclarationId | AstExpressionId,
   cst: CstNode<CstTrait>,
-  previousNames: Map<String, Bool>,
+  previousNames: Set<String>,
 ): Maybe<AstTrait> {
   let id = AstDeclarationId(
     parentId,
@@ -297,7 +297,7 @@ fun lowerTrait(
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
     isValid = false
   } else {
-    if previousNames.containsKey(name.unwrap().value) {
+    if previousNames.contains(name.unwrap().value) {
       context.addError(
         DuplicateDeclarationNameCompilerError(
           context.file,
@@ -404,7 +404,7 @@ fun lowerClass(
   context: LoweringContext,
   parentId: AstFileId | AstDeclarationId | AstExpressionId,
   cst: CstNode<CstClass>,
-  previousNames: Map<String, Bool>,
+  previousNames: Set<String>,
 ): Maybe<AstClass> {
   let id = AstDeclarationId(
     parentId,
@@ -421,7 +421,7 @@ fun lowerClass(
     context.addError(MissingDeclarationNameCompilerError(context.file, cst.cast<CstDeclaration>()))
     isValid = false
   } else {
-    if previousNames.containsKey(name.unwrap().value) {
+    if previousNames.contains(name.unwrap().value) {
       context.addError(
         DuplicateDeclarationNameCompilerError(
           context.file,
@@ -530,28 +530,28 @@ fun lowerDeclarationContent(
   let cst = cst.unwrap()
 
   let result = MutableList.empty<AstDeclaration>()
-  let previousNames = MutableMap.empty<String, Bool>()
+  let previousNames = MutableSet.empty<String>()
   for node in cst.child.innerDeclarations {
-    let loweredRaw = lowerDeclaration(context, parentId, node, previousNames as Map<String, Bool>)
+    let loweredRaw = lowerDeclaration(context, parentId, node, previousNames as Set<String>)
     if loweredRaw is None<AstDeclaration> { continue }
     let lowered = loweredRaw.unwrap()
 
     mut let isValid = true
     if lowered is AstModule {
-      previousNames.set((lowered as AstModule).name.value, true)
+      previousNames.insert((lowered as AstModule).name.value)
       if !allowModulesAndImpls { isValid = false }
     }
     if lowered is AstTrait {
-      previousNames.set((lowered as AstTrait).name.value, true)
+      previousNames.insert((lowered as AstTrait).name.value)
       if !allowTraitsAndClasses { isValid = false }
     }
     if lowered is AstImpl && !allowModulesAndImpls { isValid = false }
     if lowered is AstClass {
-      previousNames.set((lowered as AstClass).name.value, true)
+      previousNames.insert((lowered as AstClass).name.value)
       if !allowTraitsAndClasses { isValid = false }
     }
     if lowered is AstFunction {
-      previousNames.set((lowered as AstFunction).name.value, true)
+      previousNames.insert((lowered as AstFunction).name.value)
     }
     if isValid {
       result.append(lowered)
@@ -664,7 +664,7 @@ fun lowerValueParameterList(
   csts: List<CstNode<CstValueParameter | PunctuationToken>>,
 ): List<AstValueParameter> {
   let result = MutableList.empty<AstValueParameter>()
-  let previousNames = MutableMap.empty<String, Bool>()
+  let previousNames = MutableSet.empty<String>()
   mut let punctuationExpectedNext = false
   for node in csts {
     if node.child is PunctuationToken {
@@ -681,12 +681,12 @@ fun lowerValueParameterList(
         context,
         parentId,
         node.cast<CstValueParameter>(),
-        previousNames as Map<String, Bool>,
+        previousNames as Set<String>,
       )
       if lowered is Some<AstValueParameter> {
         let valueParameter = lowered.unwrap()
         result.append(valueParameter)
-        previousNames.set(valueParameter.name.value, true)
+        previousNames.insert(valueParameter.name.value)
       }
       punctuationExpectedNext = true
     }
@@ -698,10 +698,10 @@ fun lowerValueParameter(
   context: LoweringContext,
   parentId: AstDeclarationId | AstExpressionId,
   cst: CstNode<CstValueParameter>,
-  previousNames: Map<String, Bool>,
+  previousNames: Set<String>,
 ): Maybe<AstValueParameter> {
   let name = cst.child.name.child.identifier
-  if previousNames.containsKey(name) {
+  if previousNames.contains(name) {
     context.addError(DuplicateValueParameterNameCompilerError(context.file, cst))
     return None<AstValueParameter>()
   }
@@ -1070,7 +1070,7 @@ fun lowerTypeParameters(
   cst: CstNode<CstTypeParameters>,
 ): List<AstTypeParameter> {
   let result = MutableList.empty<AstTypeParameter>()
-  let previousNames = MutableMap.empty<String, Bool>()
+  let previousNames = MutableSet.empty<String>()
   mut let punctuationExpectedNext = false
   for node in cst.child.typeParameters {
     if node.child is PunctuationToken {
@@ -1087,11 +1087,11 @@ fun lowerTypeParameters(
         context,
         parentId,
         node.cast<CstTypeParameter>(),
-        previousNames as Map<String, Bool>,
+        previousNames as Set<String>,
       )
       lowered.do({
         result.append(it)
-        previousNames.set(it.name.value, true)
+        previousNames.insert(it.name.value)
       })
       punctuationExpectedNext = true
     }
@@ -1119,12 +1119,12 @@ fun lowerTypeParameter(
   context: LoweringContext,
   parentId: AstDeclarationId,
   cst: CstNode<CstTypeParameter>,
-  previousNames: Map<String, Bool>,
+  previousNames: Set<String>,
 ): Maybe<AstTypeParameter> {
   let name = cst.child.name
       .map<String>({ it.child.identifier })
       .orElse({ "unnamed-type-parameter-{context.getUnnamedDeclarationIndex()}" })
-  if previousNames.containsKey(name) {
+  if previousNames.contains(name) {
     context.addError(DuplicateTypeParameterNameCompilerError(context.file, cst))
     return None<AstTypeParameter>()
   }
