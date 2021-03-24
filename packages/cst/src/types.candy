@@ -68,7 +68,7 @@ impl CstEnumType: CstInlineType
 
 public class CstEnumTypeVariant {
   public let modifiers: List<CstNode<IdentifierToken>>
-  public let nameAndValue: Maybe<(CstNode<IdentifierToken>, Maybe<CstNode<CstInlineType>>)>
+  public let nameAndValueType: Maybe<(CstNode<IdentifierToken>, Maybe<CstNode<CstInlineType>>)>
 }
 
 

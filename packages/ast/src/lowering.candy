@@ -795,6 +795,9 @@ fun lowerInlineType(
   if cst.child is CstNamedTupleType {
     return lowerNamedTupleType(context, parentId, cst.cast<CstNamedTupleType>())
   }
+  if cst.child is CstEnumType {
+    return lowerEnumType(context, parentId, cst.cast<CstEnumType>())
+  }
   if cst.child is CstIntersectionType {
     return Some<AstInlineType>(lowerIntersectionType(context, parentId, cst.cast<CstIntersectionType>()))
   }
@@ -1024,7 +1027,6 @@ fun lowerNamedTupleType(
 
   let fields = MutableList.empty<AstNamedTupleTypeField>()
   let previousNames = MutableSet.empty<String>()
-  mut let identifierIndex = 0
   mut let punctuationExpectedNext = false
   for node in cst.child.fields {
     if node.child is PunctuationToken {
@@ -1172,6 +1174,151 @@ impl MissingNamedTupleTypeFieldTypeCompilerError: CompilerError {
   }
 }
 
+
+fun lowerEnumType(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstInlineTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
+  cst: CstNode<CstEnumType>,
+): Maybe<AstInlineType> {
+  let id = context.getInlineTypeId(parentId)
+  mut let isValid = true
+
+  let cstVariants = cst.child.variants as Iterable<CstNode<CstEnumTypeVariant | PunctuationToken>>
+  assert(cstVariants.isNotEmpty(), "`CstEnumType` must contain at least one variant.")
+
+  if ((cstVariants.whereType<CstNode<CstEnumTypeVariant>>() as Iterable<AstInlineType>).length() < 2) {
+    context.addError(
+      ExpectedTwoOrMoreItemsInTupleCompilerError(
+        context.file,
+        cst.cast<CstTupleType | CstTupleExpression>(),
+      ),
+    )
+    isValid = false
+  }
+
+  let variants = MutableList.empty<AstEnumTypeVariant>()
+  let previousNames = MutableSet.empty<String>()
+  // We allow a leading bar.
+  mut let punctuationExpectedNext = (cstVariants.first().unwrap().child is PunctuationToken)
+  for node in cstVariants {
+    if node.child is PunctuationToken {
+      if !punctuationExpectedNext {
+        // TODO(JonasWanke)
+      } else {
+        punctuationExpectedNext = false
+      }
+    } else {
+      if punctuationExpectedNext {
+        // TODO(JonasWanke)
+      }
+
+      let variant = lowerEnumTypeVariant(
+        context,
+        id,
+        node.cast<CstEnumTypeVariant>(),
+        previousNames,
+      )
+      if variant is Some<AstEnumTypeVariant> {
+        variants.append(variant.unwrap())
+        previousNames.insert(variant.unwrap().name.value)
+      }
+      punctuationExpectedNext = true
+    }
+  }
+
+  if !isValid { return None<AstInlineType>() }
+  context.addIdMapping(cst.id, id)
+  Some<AstInlineType>(AstEnumType(id, List.empty<AstIdentifier>(), variants))
+}
+
+public class ExpectedTwoOrMoreEnumVariantsCompilerError {
+  public let file: FancyFile
+  public let node: CstNode<CstEnumType>
+}
+impl ExpectedTwoOrMoreEnumVariantsCompilerError: CompilerError {
+  public fun id(): String { "expected-two-or-more-enum-variants" }
+
+  public fun location(): Location {
+    // TODO(JonasWanke): report the actual position
+    Location(file, Span(0, 1))
+  }
+  public fun title(): String { "Expected two or more variants in an enum." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description
+    ""
+  }
+}
+
+fun lowerEnumTypeVariant(
+  context: LoweringContext,
+  parentId: AstInlineTypeId,
+  cst: CstNode<CstEnumTypeVariant>,
+  previousNames: Set<String>,
+): Maybe<AstEnumTypeVariant> {
+  let id = context.getInlineTypeId(parentId)
+  mut let isValid = true
+
+  let modifiers = lowerModifiers(context, id, cst.child.modifiers)
+
+  if (cst.child.nameAndValueType is None<CstNode<IdentifierToken>>) {
+    context.addError(MissingEnumVariantNameCompilerError(context.file, cst))
+    return None<AstEnumTypeVariant>()
+  }
+  let nameAndValueType = cst.child.nameAndValueType.unwrap()
+
+  let name = nameAndValueType.first
+  if (previousNames.contains(name.child.identifier)) {
+    context.addError(DuplicateEnumVariantNameCompilerError(context.file, cst))
+    isValid = false
+  }
+  let name = lowerIdentifier(context, id, name, 0)
+
+  let valueType = nameAndValueType.second
+  let valueType = valueType.flatMap<AstInlineType>({ lowerInlineType(context, id, it) })
+
+  if !isValid { return None<AstEnumTypeVariant>() }
+  context.addIdMapping(cst.id, id)
+  Some<AstEnumTypeVariant>(AstEnumTypeVariant(id, modifiers, name, valueType))
+}
+
+public class MissingEnumVariantNameCompilerError {
+  public let file: FancyFile
+  public let node: CstNode<CstEnumTypeVariant>
+}
+impl MissingEnumVariantNameCompilerError: CompilerError {
+  public fun id(): String { "missing-enum-variant-name" }
+
+  public fun location(): Location {
+    // At least one modifier or the variant name must be present.
+    Location(
+      file,
+      (node.child.modifiers as Iterable<CstNode<IdentifierToken>>).first().unwrap().child.span,
+    )
+  }
+  public fun title(): String { "Missing enum variant name." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description for this error
+    ""
+  }
+}
+
+public class DuplicateEnumVariantNameCompilerError {
+  public let file: FancyFile
+  public let node: CstNode<CstEnumTypeVariant>
+  // TODO(JonasWanke): highlight previous occurrences of that name
+}
+impl DuplicateEnumVariantNameCompilerError: CompilerError {
+  public fun id(): String { "duplicate-enum-variant-name" }
+
+  public fun location(): Location {
+    Location(file, node.child.nameAndValueType.unwrap().first.child.span)
+  }
+  public fun title(): String { "Duplicate enum variant name." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description for this error
+    ""
+  }
+}
 
 
 fun lowerIntersectionType(

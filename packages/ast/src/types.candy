@@ -61,12 +61,20 @@ public class AstNamedTupleTypeField {
   public let type: AstInlineType
 }
 
+
 public class AstEnumType {
   public let id: AstInlineTypeId
   public let modifiers: List<AstIdentifier>
-  public let variants: List<(AstIdentifier, Maybe<AstInlineType>)>
+  public let variants: List<AstEnumTypeVariant>
 }
 impl AstEnumType: AstInlineType
+
+public class AstEnumTypeVariant {
+  public let id: AstInlineTypeId
+  public let modifiers: List<AstIdentifier>
+  public let name: AstIdentifier
+  public let valueType: Maybe<AstInlineType>
+}
 
 
 public class AstIntersectionType {
