@@ -4,7 +4,7 @@ use petit_parser
 
 public class ExpectedTypeCompilerError {
   public let file: FancyFile
-  public let node: CstNode<CstTrait | CstImpl | CstProperty | CstIntersectionType | CstUnionType>
+  public let node: CstNode<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>
 }
 impl ExpectedTypeCompilerError: CompilerError {
   public fun id(): String { "expected-type" }
@@ -16,14 +16,14 @@ impl ExpectedTypeCompilerError: CompilerError {
     if node.child is CstImpl {
       return node.cast<CstImpl>().child.keyword.child.span
     }
-    if node.child is CstProperty {
-      return node.cast<CstProperty>().child.keyword.child.span
+    if node.child is CstType {
+      return node.cast<CstType>().child.keyword.child.span
+    }
+    if node.child is CstNamedTupleTypeField {
+      return node.cast<CstNamedTupleTypeField>().child.type.unwrap().first.child.span
     }
     if node.child is CstIntersectionType {
       return node.cast<CstIntersectionType>().child.ampersand.child.span
-    }
-    if node.child is CstUnionType {
-      return node.cast<CstUnionType>().child.bar.child.span
     }
     throw "Unknown node: {node}."
   }

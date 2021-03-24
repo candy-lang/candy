@@ -27,7 +27,7 @@ public fun parse(source: String): CstNode<CstFile> {
     notYetDefined<String, CstNode<CstInlineType>>("Parser not yet defined."),
     notYetDefined<String, CstNode<CstExpression>>("Parser not yet defined."),
   )
-  parser.initType()
+  parser.initInlineType()
   parser.initExpression()
   parser.parse()
 }
@@ -209,13 +209,7 @@ class CstParser {
 
     declaration.delegate = node<CstDeclaration>(
       choiceOf<String, CstDeclaration>(
-        List.of5<Parser<String, CstDeclaration>>(
-          module_,
-          trait_,
-          impl_,
-          type,
-          function,
-        ),
+        List.of5<Parser<String, CstDeclaration>>(module_, trait_, impl_, type, function),
       ),
     )
     declaration
@@ -291,7 +285,7 @@ class CstParser {
   // types
 
   let inlineType = notYetDefined<String, CstNode<CstInlineType>>("Parser not yet defined.")
-  fun initType() {
+  fun initInlineType() {
     let closingParenthesisOrOtherEndDetection = punctuationOrEnd(")")
         .or<Maybe<CstNode<PunctuationToken>>>(
           punctuation("]")
@@ -365,27 +359,54 @@ class CstParser {
           CstTupleType(modifiers, openingParenthesis, types, closingParenthesis)
         })
 
+    // TODO(JonasWanke): Allow modifiers before named tuple type fields.
+    let namedTupleTypeField = atLeastOne<
+        CstNode<IdentifierToken>,
+        (CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>),
+      >(
+        identifier(false),
+        punctuation(":").sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional()),
+      )
+      .map<CstNamedTupleTypeField>({
+        CstNamedTupleTypeField(List.empty<CstNode<IdentifierToken>>(), it.first, it.second)
+      })
+    let namedTupleTypeField = node<CstNamedTupleTypeField>(namedTupleTypeField)
     let namedTupleType = modifiers()
         .sequence<CstNode<PunctuationToken>>(punctuation("("))
-        .sequence<List<CstNode<CstTypeParameter | PunctuationToken>>>(
-          commaSeparated<CstTypeParameter>(typeParameter()),
+        .sequence<List<CstNode<CstNamedTupleTypeField | PunctuationToken>>>(
+          commaSeparated<CstNamedTupleTypeField>(namedTupleTypeField),
         )
         .sequence<Maybe<CstNode<PunctuationToken>>>(closingParenthesisOrOtherEndDetection)
         .map<CstInlineType>({
           let modifiers = it.first.first.first
           let openingParenthesis = it.first.first.second
-          let types = it.first.second
+          let fields = it.first.second
           let closingParenthesis = it.second
-          CstNamedTupleType(modifiers, openingParenthesis, types, closingParenthesis)
+          CstNamedTupleType(modifiers, openingParenthesis, fields, closingParenthesis)
         })
 
+    let intersectionType = notYetDefined<String, CstInlineType>("Parser not yet defined.")
+    let functionType = notYetDefined<String, CstInlineType>("Parser not yet defined.")
+
+    let enumTypeVariantValueType = node<CstInlineType>(
+      choiceOf<String, CstInlineType>(
+        List.of6<Parser<String, CstInlineType>>(
+          intersectionType,
+          functionType,
+          groupType,
+          namedTupleType,
+          tupleType,
+          namedType,
+        ),
+      ),
+    )
     // We have to make sure that this doesn't match nothing.
     let enumTypeVariant = atLeastOne<
       List<CstNode<IdentifierToken>>,
       (CstNode<IdentifierToken>, Maybe<CstNode<CstInlineType>>),
     >(
       identifier(false).plus(),
-      identifier(true).sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional()),
+      identifier(true).sequence<Maybe<CstNode<CstInlineType>>>(enumTypeVariantValueType.optional()),
     )
       .map<CstEnumTypeVariant>({
         let modifiers = it.first.orElse({ List.empty<CstNode<IdentifierToken>>() })
@@ -417,7 +438,6 @@ class CstParser {
           CstEnumType(variants)
         })
 
-    let intersectionType = notYetDefined<String, CstInlineType>("Parser not yet defined.")
     intersectionType.delegate = node<CstInlineType>(
           choiceOf<String, CstInlineType>(List.of2<Parser<String, CstInlineType>>(namedType, groupType)),
         )
@@ -445,7 +465,7 @@ class CstParser {
         })
     let functionTypeParameterTypes = node<CstFunctionTypeParameterTypes>(functionTypeParameterTypes)
     // TODO(JonasWanke): allow modifiers
-    let functionType = node<CstInlineType>(
+    functionType.delegate = node<CstInlineType>(
           choiceOf<String, CstInlineType>(
             List.of4<Parser<String, CstInlineType>>(enumType, intersectionType, groupType, namedType),
           ),

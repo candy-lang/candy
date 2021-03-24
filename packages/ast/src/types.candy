@@ -3,63 +3,86 @@ use ..expressions
 use ..file
 use ..node
 
-public class AstTypeId {
+public class AstInlineTypeId {
   let parentId: AstDeclarationId
-      | AstTypeId
+      | AstInlineTypeId
       | AstTypeParameterId
       | AstTypeArgumentId
       | AstValueParameterId
       | AstExpressionId
   let value: Int
 }
-impl AstTypeId: AstNodeId
+impl AstInlineTypeId: AstNodeId
 
-public trait /* enum */ AstType {
+public trait /* enum */ AstInlineType {
   let modifiers: List<AstIdentifier>
 }
-impl AstType: AstNode
+impl AstInlineType: AstNode
 
 
 public class AstNamedType {
-  public let id: AstTypeId
+  public let id: AstInlineTypeId
   public let modifiers: List<AstIdentifier>
   public let nameParts: List<AstIdentifier>
   public let typeArguments: List<AstTypeArgument>
 }
-impl AstNamedType: AstType
+impl AstNamedType: AstInlineType
 
 
 public class AstFunctionType {
-  public let id: AstTypeId
+  public let id: AstInlineTypeId
   public let modifiers: List<AstIdentifier>
-  public let receiverType: Maybe<AstType>
-  public let parameterTypes: List<AstType>
-  public let returnType: AstType
+  public let receiverType: Maybe<AstInlineType>
+  public let parameterTypes: List<AstInlineType>
+  public let returnType: AstInlineType
 }
-impl AstFunctionType: AstType
+impl AstFunctionType: AstInlineType
 
 
 public class AstTupleType {
-  public let id: AstTypeId
+  public let id: AstInlineTypeId
   public let modifiers: List<AstIdentifier>
-  public let types: List<AstType>
+  public let types: List<AstInlineType>
 }
-impl AstTupleType: AstType
+impl AstTupleType: AstInlineType
 
 
-public class AstUnionType {
-  public let id: AstTypeId
+public class AstNamedTupleType {
+  public let id: AstInlineTypeId
   public let modifiers: List<AstIdentifier>
-  public let types: List<AstType>
+  public let types: List<AstNamedTupleTypeField>
 }
-impl AstUnionType: AstType
+impl AstNamedTupleType: AstInlineType
+
+public class AstNamedTupleTypeField {
+  public let id: AstInlineTypeId
+  public let modifiers: List<AstIdentifier>
+  public let name: AstIdentifier
+  public let type: AstInlineType
+}
+
+
+public class AstEnumType {
+  public let id: AstInlineTypeId
+  public let modifiers: List<AstIdentifier>
+  public let variants: List<AstEnumTypeVariant>
+}
+impl AstEnumType: AstInlineType
+
+public class AstEnumTypeVariant {
+  public let id: AstInlineTypeId
+  public let modifiers: List<AstIdentifier>
+  public let name: AstIdentifier
+  public let valueType: Maybe<AstInlineType>
+}
+
 
 public class AstIntersectionType {
-  public let id: AstTypeId
+  public let id: AstInlineTypeId
   public let modifiers: List<AstIdentifier>
-  public let types: List<AstType>
+  public let types: List<AstInlineType>
 }
-impl AstIntersectionType: AstType
+impl AstIntersectionType: AstInlineType
 
 
 public class AstTypeParameterId {
@@ -72,17 +95,17 @@ public class AstTypeParameter {
   public let id: AstTypeParameterId
   public let modifiers: List<AstIdentifier>
   public let name: AstIdentifier
-  public let upperBound: Maybe<AstType>
+  public let upperBound: Maybe<AstInlineType>
 }
 
 
 public class AstTypeArgumentId {
-  let parentId: AstTypeId | AstExpressionId
+  let parentId: AstInlineTypeId | AstExpressionId
   let index: Int
 }
 impl AstTypeArgumentId: AstNodeId
 
 public class AstTypeArgument {
   public let id: AstTypeArgumentId
-  public let type: Maybe<AstType>
+  public let type: Maybe<AstInlineType>
 }
