@@ -2,7 +2,7 @@ use ..declarations
 use ..types
 
 public data class HirExpressionUri<E: HirExpression> {
-  public let declaration: HirConstructor | HirFunction | HirProperty
+  public let declaration: HirConstructor | HirFunction
   public let index: Int
 }
 
@@ -67,7 +67,7 @@ impl HirSuperExpression: HirExpression
 
 
 public class HirReflectionExpression<
-  Target: HirModule | HirTrait | HirType | HirFunction | HirProperty | HirParameterType
+  Target: HirModule | HirTrait | HirType | HirFunction | HirParameterType
 > {
   public let uri: HirExpressionUri<HirReflectionExpression<Target>>
   public let target: Target
@@ -80,12 +80,6 @@ public class HirParameterReferenceExpression {
   public let name: String
 }
 impl HirParameterReferenceExpression: HirExpression
-
-public class HirPropertyReferenceExpression {
-  public let uri: HirExpressionUri<HirPropertyReferenceExpression>
-  public let target: HirProperty
-}
-impl HirPropertyReferenceExpression: HirExpression
 
 public class HirFunctionReferenceExpression {
   public let uri: HirExpressionUri<HirFunctionReferenceExpression>
@@ -113,7 +107,7 @@ impl HirLocalPropertyReferenceExpression: HirExpression
 public class HirNavigationExpression {
   public let uri: HirExpressionUri<HirNavigationExpression>
   public let receiver: HirExpressionUri<HirExpression>
-  public let target: HirFunction | HirProperty
+  public let target: HirFunction
 }
 impl HirNavigationExpression: HirExpression
 
@@ -152,7 +146,7 @@ impl HirTupleExpression: HirExpression
 
 public class HirReturnExpression {
   public let uri: HirExpressionUri<HirReturnExpression>
-  public let scope: HirFunction | HirProperty | HirExpressionUri<HirLambdaExpression>
+  public let scope: HirFunction | HirExpressionUri<HirLambdaExpression>
   public let expression: HirExpressionUri<HirExpression>
 }
 impl HirReturnExpression: HirExpression
@@ -160,9 +154,7 @@ impl HirReturnExpression: HirExpression
 
 public class HirAssignmentExpression {
   public let uri: HirExpressionUri<HirAssignmentExpression>
-  public let target: HirExpressionUri<
-    HirPropertyReferenceExpression | HirLocalPropertyReferenceExpression
-  >
+  public let target: HirExpressionUri<HirLocalPropertyReferenceExpression>
   public let value: HirExpressionUri<HirExpression>
 }
 impl HirAssignmentExpression: HirExpression

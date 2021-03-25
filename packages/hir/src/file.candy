@@ -2,6 +2,7 @@ use ast
 use compiler_utils
 use incremental
 use petit_parser
+
 use ..declarations
 
 public trait HirUseLine: Equals & Hash {
@@ -14,9 +15,7 @@ public class HirImplicitCoreUseLine {
 }
 impl HirImplicitCoreUseLine: Equals & Hash & HirUseLine {
   fun equals(other: This): Bool { (parent as Equals) == (other.parent as Equals) }
-  fun hash<T>(hasher: Hasher<T>) {
-    (parent as Hash).hash<T>(hasher)
-  }
+  fun hash<T>(hasher: Hasher<T>) { (parent as Hash).hash<T>(hasher) }
 }
 
 public class HirExplicitUseLine {

@@ -3,46 +3,27 @@ use ..declarations
 public trait HirInlineType
 
 
+public class HirErrorType {}
+impl HirErrorType: HirInlineType & Equals & Hash {
+  fun equals(other: This): Bool { true }
+  fun hash<T>(hasher: Hasher<T>) {}
+}
+
+
 public class HirNamedType {
   public let declaration: HirTrait | HirType
   public let parameterTypes: List<HirInlineType>
 }
 impl HirNamedType: HirInlineType & Equals & Hash {
-  fun equals(other: HirNamedType): Bool {
+  fun equals(other: This): Bool {
     declaration == other.declaration
-      && parameterTypes.unsafeEquals(other.parameterTypes)
+      && (parameterTypes as Iterable<HirInlineType>)
+        .unsafeEquals(other.parameterTypes as Iterable<HirInlineType>)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (declaration as Hash).hash<T>(hasher)
     parameterTypes.unsafeHash<T>(hasher)
   }
-}
-
-
-public class HirTupleType {
-  public let types: List<HirInlineType>
-}
-impl HirTupleType: HirInlineType & Equals & Hash {
-  fun equals(other: HirTupleType): Bool { types.unsafeEquals(other.types) }
-  fun hash<T>(hasher: Hasher<T>) { types.unsafeHash<T>(hasher) }
-}
-
-
-public class HirNamedTupleType {
-  public let types: Map<String, HirInlineType>
-}
-impl HirNamedTupleType: HirInlineType & Equals & Hash {
-  fun equals(other: HirNamedTupleType): Bool { types.unsafeEquals(other.types) }
-  fun hash<T>(hasher: Hasher<T>) { types.unsafeHash<T>(hasher) }
-}
-
-
-public class HirEnumType {
-  public let types: Map<String, HirInlineType>
-}
-impl HirEnumType: HirInlineType & Equals & Hash {
-  fun equals(other: HirEnumType): Bool { types.unsafeEquals(other.types) }
-  fun hash<T>(hasher: Hasher<T>) { types.unsafeHash<T>(hasher) }
 }
 
 
@@ -52,10 +33,11 @@ public class HirFunctionType {
   public let returnType: HirInlineType
 }
 impl HirFunctionType: HirInlineType & Equals & Hash {
-  fun equals(other: HirFunctionType): Bool {
-    receiverType == other.receiverType
-      && parameterTypes.unsafeEquals(other.parameterTypes)
-      && returnType == other.returnType
+  fun equals(other: This): Bool {
+    (receiverType as Equals) == (other.receiverType as Equals)
+      && (parameterTypes as Iterable<HirInlineType>)
+        .unsafeEquals(other.parameterTypes as Iterable<HirInlineType>)
+      && (returnType as Equals) == (other.returnType as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (receiverType as Hash).hash<T>(hasher)
@@ -65,19 +47,50 @@ impl HirFunctionType: HirInlineType & Equals & Hash {
 }
 
 
+public class HirTupleType {
+  public let types: List<HirInlineType>
+}
+impl HirTupleType: HirInlineType & Equals & Hash {
+  fun equals(other: This): Bool {
+    (types as Iterable<HirInlineType>).unsafeEquals(other.types as Iterable<HirInlineType>)
+  }
+  fun hash<T>(hasher: Hasher<T>) { types.unsafeHash<T>(hasher) }
+}
+
+
+public class HirNamedTupleType {
+  public let types: Map<String, HirInlineType>
+}
+impl HirNamedTupleType: HirInlineType & Equals & Hash {
+  fun equals(other: This): Bool { types.unsafeEquals(other.types) }
+  fun hash<T>(hasher: Hasher<T>) { types.unsafeHash<T>(hasher) }
+}
+
+
+public class HirEnumType {
+  public let variants: Map<String, HirInlineType>
+}
+impl HirEnumType: HirInlineType & Equals & Hash {
+  fun equals(other: This): Bool { variants.unsafeEquals(other.variants) }
+  fun hash<T>(hasher: Hasher<T>) { variants.unsafeHash<T>(hasher) }
+}
+
+
 public class HirIntersectionType {
   public let types: List<HirInlineType>
   // TODO(JonasWanke): Use a `Set<HirInlineType>` when we have sets that keep insertion order.
 }
 impl HirIntersectionType: HirInlineType & Equals & Hash {
-  fun equals(other: HirIntersectionType): Bool { types.unsafeEquals(other.types) }
+  fun equals(other: This): Bool {
+    (types as Iterable<HirInlineType>).unsafeEquals(other.types as Iterable<HirInlineType>)
+  }
   fun hash<T>(hasher: Hasher<T>) { types.unsafeHash<T>(hasher) }
 }
 
 
 public class HirThisType
 impl HirThisType: HirInlineType & Equals & Hash {
-  fun equals(other: HirThisType): Bool { true }
+  fun equals(other: This): Bool { true }
   fun hash<T>(hasher: Hasher<T>) {}
 }
 
@@ -87,18 +100,20 @@ public class HirParameterType {
   public let name: String
 }
 impl HirParameterType: HirInlineType & Equals & Hash {
-  fun equals(other: HirParameterType): Bool { declaration == other.declaration && name == other.name }
+  fun equals(other: This): Bool {
+    (declaration as Equals) == other.declaration && name == other.name
+  }
   fun hash<T>(hasher: Hasher<T>) {
-    declaration.hash<T>(hasher)
+    (declaration as Hash).hash<T>(hasher)
     name.hash<T>(hasher)
   }
 }
 
 
 public class HirReflectionType {
-  public let target: HirModule | HirTrait | HirType | HirFunction | HirProperty | HirParameterType
+  public let target: HirModule | HirTrait | HirType | HirFunction | HirParameterType
 }
 impl HirReflectionType: HirInlineType & Equals & Hash {
-  fun equals(other: HirReflectionType): Bool { target == other.target }
-  fun hash<T>(hasher: Hasher<T>) { target.hash<T>(hasher) }
+  fun equals(other: This): Bool { (target as Equals) == (other.target as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { (target as Hash).hash<T>(hasher) }
 }
