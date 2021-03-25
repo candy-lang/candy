@@ -71,6 +71,11 @@ public trait Map<Key: Equals & Hash, Value> {
     }
     map
   }
+
+  fun unsafeEquals(other: Map<Key, Value>) {
+    keys().toSet().unsafeEquals(other.keys().toSet())
+      && keys().map({ get(key) == other.get(key) }).all({ it })
+  }
 }
 
 // TODO(marcelgarus): impl Map<Key, Value>: GetOperator<Key, Maybe<Value>>

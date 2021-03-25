@@ -48,6 +48,11 @@ public trait Set<Item: Equals & Hash> {
     for item in items() { set.insert(item) }
     set
   }
+
+  fun unsafeEquals(other: Set<Item>): Bool {
+    let len = length()
+    len == other.length() && union(other).length() == len
+  }
 }
 
 public trait MutableSet<Item: Equals & Hash>: Set<Item> {
