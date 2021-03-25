@@ -119,6 +119,10 @@ public trait List<Item>: Iterable<Item> {
     }
     list
   }
+
+  fun unsafeEquals(other: List<Item>): Bool {
+    (this as Iterable<Item>).unsafeEquals(other as Iterable<Item>)
+  }
 }
 
 public trait MutableList<Item>: List<Item> {
