@@ -3,13 +3,13 @@ public trait Any {
   #
   # All types are assignable to `Any`.
 
-  builtin fun as<T>(): Maybe<T>
+  builtin fun as[T](): Maybe[T]
   # Returns a `Some(this)` if `this` is of type `T`, otherwise `None()`.
 
-  fun is<T>(): Bool {
+  fun is[T](): Bool {
     # Checks if `this` is of type `T`.
 
-    as<T>().map<Bool>({ true }).else({ false })
+    as[T]().map[Bool]({ true }).else({ false })
   }
 }
 
