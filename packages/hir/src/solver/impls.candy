@@ -1,6 +1,6 @@
 use ..types
 
-class SolverGoal {
+class SolverGoal<Trait: Equals & Hash, Data: SolverData> {
   /// The fact that a type implements a trait.
   ///
   /// In the context of the solver, this is displayed as `trait(type)`.
@@ -12,35 +12,40 @@ class SolverGoal {
   /// * `Clone(?T)`: the fact that `?T` implements `Clone`
   /// * `Iterable(?T, ?L)`: the fact that `?L` implements `Iterable<?T>`
 
-  let trait_: String
-  let parameters: List<SolverType>
+  let trait_: Trait
+  let parameters: List<SolverType<Data>>
 
   fun toString_(): String {
-    "{trait_}({(parameters as Iterable<SolverType>).map<String>({ it.toString_() }).join(", ")})"
+    "{trait_}({(parameters as Iterable<SolverType<Data>>).map<String>({ it.toString_() }).join(", ")})"
   }
-  fun unify(other: SolverGoal): Maybe<Map<SolverVariable, SolverType>> {
-    SolverValue(trait_, parameters).unify(SolverValue(other.trait_, other.parameters))
+  fun unify(other: SolverGoal<Trait, Data>, canonical: (Int) => Data): Maybe<Map<SolverVariable<Data>, SolverType<Data>>> {
+    if !(trait_ == other.trait_) { return None }
+    SolverValue<Data>(canonical(0), parameters)
+      .unify(SolverValue<Data>(canonical(0), other.parameters))
   }
-  fun substituteAll(substitutions: Map<SolverVariable, SolverType>): SolverGoal {
-    SolverGoal(
+  fun substituteAll(
+    substitutions: Map<SolverVariable<Data>, SolverType<Data>>,
+  ): SolverGoal<Trait, Data> {
+    SolverGoal<Trait, Data>(
       trait_,
-      (parameters as Iterable<SolverType>)
-        .map<SolverType>({ it.substituteAll(substitutions) })
+      (parameters as Iterable<SolverType<Data>>)
+        .map<SolverType<Data>>({ it.substituteAll(substitutions) })
         .toList(),
     )
   }
-  fun canonicalize(): SolverGoal {
-    SolverGoal(
+  fun canonicalize(canonical: (Int) => Data): SolverGoal<Trait, Data> {
+    SolverGoal<Trait, Data>(
       trait_,
-      (SolverValue("", parameters).canonicalize() as SolverValue).parameters,
+      (SolverValue<Data>(canonical(0), parameters).canonicalize(canonical) as SolverValue<Data>)
+        .parameters,
     )
   }
 }
-impl SolverGoal: Equals & Hash {
+impl<Trait: Equals & Hash, Data: SolverData> SolverGoal<Trait, Data>: Equals & Hash {
   fun equals(other: This): Bool {
     trait_ == other.trait_
-      && (parameters as Iterable<SolverType>)
-        .zip<SolverType>(other.parameters)
+      && (parameters as Iterable<SolverType<Data>>)
+        .zip<SolverType<Data>>(other.parameters)
         .map<Bool>({ (it.first as Equals) == (it.second as Equals) })
         .all({ it })
   }
@@ -52,7 +57,7 @@ impl SolverGoal: Equals & Hash {
   }
 }
 
-class SolverRule {
+class SolverRule<Trait: Equals & Hash, Data: SolverData> {
   /// An inference rule. Usually generated based on impls.
   ///
   /// In the context of the solver, these are displayed as `goal <- subgoals`.
@@ -62,18 +67,18 @@ class SolverRule {
   ///   `Clone` if both `?0` and `?1` implement `Clone`
   /// * `Any(?T) <- <nothing>`: the fact that every `?T` implements `Any`
 
-  let goal: SolverGoal
-  let subgoals: List<SolverGoal>
+  let goal: SolverGoal<Trait, Data>
+  let subgoals: List<SolverGoal<Trait, Data>>
 
   fun toString_(): String {
-    "{goal.toString_()} <- {(subgoals as Iterable<SolverGoal>).map<String>({ it.toString_() }).join(", ")}"
+    "{goal.toString_()} <- {(subgoals as Iterable<SolverGoal<Trait, Data>>).map<String>({ it.toString_() }).join(", ")}"
   }
 }
 impl SolverRule: Equals & Hash {
   fun equals(other: This): Bool {
     (goal as Equals) == (other.goal as Equals)
-      && (subgoals as Iterable<SolverType>)
-        .zip<SolverType>(other.subgoals as Iterable<SolverType>)
+      && (subgoals as Iterable<SolverType<Data>>)
+        .zip<SolverType<Data>>(other.subgoals as Iterable<SolverType<Data>>)
         .map<Bool>({ (it.first as Equals) == (it.second as Equals) })
         .all({ it })
   }
@@ -85,47 +90,48 @@ impl SolverRule: Equals & Hash {
   }
 }
 
-class Environment {
-  let rules: List<SolverRule>
+class Environment<Trait: Equals & Hash, Data: SolverData> {
+  let rules: List<SolverRule<Trait, Data>>
 
-  fun solve(goal: SolverGoal): SolverSolution {
-    Solver(rules, MutableMap.empty<SolverGoal, SolverTree>()).solve(goal)
+  fun solve(goal: SolverGoal<Trait, Data>): SolverSolution<Trait, Data> {
+    Solver<Trait, Data>(rules, MutableMap.empty<SolverGoal<Trait, Data>, SolverTree<Trait, Data>>())
+      .solve(goal)
   }
 }
 
 
-trait /* enum */ SolverSolution {
+trait /* enum */ SolverSolution<Trait: Equals & Hash, Data: SolverData> {
   fun toString_(): String
 }
 
-class SolverSolutionUnique {
+class SolverSolutionUnique<Trait: Equals & Hash, Data: SolverData> {
   /// Indicates that there is exactly one type that can fulfill the goal.
 
-  let refinedGoal: SolverGoal
+  let refinedGoal: SolverGoal<Trait, Data>
 
   fun toString_(): String { "Unique({refinedGoal.toString_()})" }
 }
-impl SolverSolutionUnique: SolverSolution
+impl<Trait: Equals & Hash, Data: SolverData> SolverSolutionUnique<Trait, Data>: SolverSolution<Trait, Data>
 
-class SolverSolutionAmbiguous {
+class SolverSolutionAmbiguous<Trait: Equals & Hash, Data: SolverData> {
   /// Indicates that there may be multiple types that can fulfill the goal.
 
   fun toString_(): String { "Ambiguous" }
 }
-impl SolverSolutionAmbiguous: SolverSolution
+impl<Trait: Equals & Hash, Data: SolverData> SolverSolutionAmbiguous<Trait, Data>: SolverSolution<Trait, Data>
 
-class SolverSolutionImpossible {
+class SolverSolutionImpossible<Trait: Equals & Hash, Data: SolverData> {
   /// Indicates that it's impossible to fulfill the goal.
 
   fun toString_(): String { "Impossible" }
 }
-impl SolverSolutionImpossible: SolverSolution 
+impl<Trait: Equals & Hash, Data: SolverData> SolverSolutionImpossible<Trait, Data>: SolverSolution<Trait, Data>
 
 
-class Solver {
-  let rules: List<SolverRule>
+class Solver<Trait: Equals & Hash, Data: SolverData> {
+  let rules: List<SolverRule<Trait, Data>>
 
-  let cache: MutableMap<SolverGoal, SolverTree>
+  let cache: MutableMap<SolverGoal<Trait, Data>, SolverTree<Trait, Data>>
   /// Sometimes, the same goal needs to be reached multiple times.
   ///
   /// For example, when checking whether `Clone(Tuple<Int, Int>)`, it doesn't make sense to prove
@@ -133,11 +139,16 @@ class Solver {
   ///
   /// This also allows us to detect cycles and resolve them.
 
-  fun solve(goal: SolverGoal): SolverSolution {
+  fun solve(goal: SolverGoal<Trait, Data>): SolverSolution<Trait, Data> {
     let goal = goal.canonicalize()
     cache
       .putIfAbsent(goal, {
-        SolverTree(goal, None<SolverSolution>(), false, MutableList.empty<SolverStrand>())
+        SolverTree(
+          goal,
+          None<SolverSolution<Trait, Data>>(),
+          false,
+          MutableList.empty<SolverStrand<Trait, Data>>(),
+        )
       })
       .solve(this)
   }
@@ -145,91 +156,95 @@ class Solver {
 
 // Solutions that solving a goal might produce.
 
-class SolverTree {
-  let goal: SolverGoal
-  mut let solution: Maybe<SolverSolution>
+class SolverTree<Trait: Equals & Hash, Data: SolverData> {
+  let goal: SolverGoal<Trait, Data>
+  mut let solution: Maybe<SolverSolution<Trait, Data>>
   mut let isCurrentlyBeingSolved: Bool
-  let strands: MutableList<SolverStrand>
+  let strands: MutableList<SolverStrand<Trait, Data>>
 
-  fun solve(context: Solver): SolverSolution {
+  fun solve(context: Solver<Trait, Data>): SolverSolution<Trait, Data> {
     if solution is Some { return solution.unwrap() }
     if isCurrentlyBeingSolved {
-      solution = Some<SolverSolution>(SolverSolutionAmbiguous())
+      solution = Some<SolverSolution<Trait, Data>>(SolverSolutionAmbiguous<Trait, Data>())
       isCurrentlyBeingSolved = false
       return solution.unwrap()
     }
     isCurrentlyBeingSolved = true
     strands.appendAll(
-      (context.rules as Iterable<SolverRule>)
+      (context.rules as Iterable<SolverRule<Trait, Data>>)
         .where({ it.goal.unify(goal) is Some })
-        .map<SolverStrand>({
+        .map<SolverStrand<Trait, Data>>({
           let result = it.goal.unify(goal).unwrap()
-          SolverStrand(
+          SolverStrand<Trait, Data>(
             it.goal.substituteAll(result),
             result.toMutable(),
-            (it.subgoals as Iterable<SolverGoal>)
-              .map<SolverGoal>({ it.substituteAll(result) })
+            (it.subgoals as Iterable<SolverGoal<Trait, Data>>)
+              .map<SolverGoal<Trait, Data>>({ it.substituteAll(result) })
               .toMutableList(),
           )
         })
     )
-    let strandsAndSolutions = (strands as Iterable<SolverStrand>)
-      .map<(SolverStrand, SolverSolution)>({ Tuple(it, it.solve(context)) })
+    let strandsAndSolutions = (strands as Iterable<SolverStrand<Trait, Data>>)
+      .map<(SolverStrand<Trait, Data>, SolverSolution<Trait, Data>)>({
+        Tuple(it, it.solve(context))
+      })
       .where({ !(it.second is SolverSolutionImpossible) })
       .toList()
     if (strandsAndSolutions as Iterable).length() > 1 {
-      return SolverSolutionAmbiguous()
+      return SolverSolutionAmbiguous<Trait, Data>()
     }
     if (strandsAndSolutions as Iterable).isEmpty() {
-      return SolverSolutionImpossible()
+      return SolverSolutionImpossible<Trait, Data>()
     }
-    let strandAndSolution = (strandsAndSolutions as Iterable<(SolverStrand, SolverSolution)>).single().unwrap()
+    let strandAndSolution = (strandsAndSolutions as Iterable<(SolverStrand<Trait, Data>, SolverSolution<Trait, Data>)>)
+      .single()
+      .unwrap()
     let strand = strandAndSolution.first
     let solution = strandAndSolution.second
     if solution is SolverSolutionAmbiguous {
-      return SolverSolutionAmbiguous()
+      return SolverSolutionAmbiguous<Trait, Data>()
     }
-    let solution = (solution as SolverSolutionUnique)
+    let solution = (solution as SolverSolutionUnique<Trait, Data>)
     let substitutions = strand.goal.unify(solution.refinedGoal).unwrap()
     let refinedGoal = goal.substituteAll(substitutions)
-    SolverSolutionUnique(refinedGoal)
+    SolverSolutionUnique<Trait, Data>(refinedGoal)
   }
 }
 
-class SolverStrand {
+class SolverStrand<Trait: Equals & Hash, Data: SolverData> {
   /// A thread exploring possible solutions.
 
-  let goal: SolverGoal
-  let solutionSpace: MutableMap<SolverVariable, SolverType>
-  let subgoals: MutableList<SolverGoal>
+  let goal: SolverGoal<Trait, Data>
+  let solutionSpace: MutableMap<SolverVariable<Trait, Data>, SolverType<Data>>
+  let subgoals: MutableList<SolverGoal<Trait, Data>>
 
-  fun solve(context: Solver): SolverSolution {
-    while (subgoals as Iterable<SolverGoal>).isNotEmpty() {
+  fun solve(context: Solver<Trait, Data>): SolverSolution<Trait, Data> {
+    while (subgoals as Iterable<SolverGoal<Trait, Data>>).isNotEmpty() {
       let subgoal = subgoals.removeFirst().canonicalize()
       let solution = context.solve(subgoal)
       if solution is SolverSolutionImpossible {
-        return SolverSolutionImpossible()
+        return SolverSolutionImpossible<Trait, Data>()
       }
       if solution is SolverSolutionUnique {
         // Integrate the solution into the solution space.
-        let refinedGoal = (solution as SolverSolutionUnique).refinedGoal
+        let refinedGoal = (solution as SolverSolutionUnique<Trait, Data>).refinedGoal
         let substitutions = subgoal.unify(refinedGoal).unwrap()
         for substitution in substitutions.entries() {
           let variable = substitution.first
           let type = substitution.second
-          let sub = (solutionSpace as Map<SolverVariable, SolverType>).get(variable)
+          let sub = (solutionSpace as Map<SolverVariable<Trait, Data>, SolverType<Data>>).get(variable)
           if sub is None {
             solutionSpace.set(variable, type)
           } else {
             let newSubstitutions = sub.unwrap().unify(type)
             if newSubstitutions is None {
-              return SolverSolutionImpossible()
+              return SolverSolutionImpossible<Trait, Data>()
             }
             solutionSpace.updateAll({ it.substituteAll(newSubstitutions.unwrap()) })
           }
         }
       }
     }
-    SolverSolutionUnique(goal.substituteAll(solutionSpace))
+    SolverSolutionUnique<Trait, Data>(goal.substituteAll(solutionSpace))
   }
 }
