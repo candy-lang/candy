@@ -75,6 +75,8 @@ impl HirDeclaration: HasDeclarations
 // types `HirTopLevelModule` and `HirInnerModule`, passing themselves as parameters.
 
 fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule): Maybe<AstFile | AstModule> {
+  /// Returns the ast of the given `moduleHir`, or `None` if it doesn't exist.
+  
   query<Maybe<AstFile | AstModule>, List<CompilerError>>(context, "HirModule.ast", (moduleHir as Equals & Hash), {
     // These are all the ways that modules can be declared with decreasing priority:
     //
@@ -116,6 +118,7 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule
       path = path.child(".candy")
     }
     if !FancyFile(package, path).doesExist(context) {
+      print("File at {path} doesn't exist.")
       return Tuple(None<AstFile | AstModule>(), List.empty<CompilerError>())
     }
 
@@ -175,7 +178,7 @@ fun declarationsOfModule(
             implDisambiguator = implDisambiguator + 1
             return impl_ as HirDeclaration
           }
-          if (it is AstType) { return astTypeToHirType(context, module, it as AstType) as HirDeclaration }
+          if (it is AstType) { return HirType(module, (it as AstType).name.value) as HirDeclaration }
           if (it is AstFunction) {
             let function = HirFunction(module, (it as AstFunction).name.value, functionDisambiguator)
             functionDisambiguator = functionDisambiguator + 1
@@ -271,8 +274,6 @@ impl HirTrait: HasAst<AstTrait> & HasDeclarations {
       mut let functionDisambiguator = 0
       let declarations = (astDeclarations(context) as Iterable<AstTrait | AstType | AstFunction>)
         .map<HirDeclaration>({
-          if (it is AstTrait) { return (HirTrait(this, (it as AstTrait).name.value) as HirDeclaration) }
-          if (it is AstType) { return astTypeToHirType(context, this, it as AstType) as HirDeclaration }
           if (it is AstFunction) {
             let function = HirFunction(this, (it as AstFunction).name.value, functionDisambiguator)
             functionDisambiguator = functionDisambiguator + 1
@@ -399,17 +400,4 @@ impl HirConstructor: HasDeclarations {
 fun containsStaticModifier(modifiers: List<AstIdentifier>): Bool {
   // TODO(JonasWanke): This should resolve modifier names when we support custom annotations.
   (modifiers as Iterable<AstIdentifier>).any({ it.value == "static" })
-}
-
-fun astTypeToHirType(
-  context: QueryContext<List<CompilerError>>,
-  parent: HirModule | HirTrait | HirType,
-  astType: AstType,
-): HirType {
-  return HirType(
-    parent,
-    astType.name.value,
-    (astType.typeParameters as Iterable<AstTypeParameter>).map<String>({ it.name.value }).toList(),
-    astInlineTypeToHirInlineType(context, astType.type, parent),
-  )
 }

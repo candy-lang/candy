@@ -27,7 +27,7 @@ fun astInlineTypeToHirInlineType(
   query<HirInlineType, List<CompilerError>>(
     context,
     "astInlineTypeToHirInlineType",
-    DataTuple2<AstType, HirDeclaration>(astType, scope) as Equals & Hash,
+    DataTuple2<AstInlineType, HirDeclaration>(astType, scope) as Equals & Hash,
     {
       if (astType is AstNamedType) {
         let nameParts = ((astType as AstNamedType).nameParts as Iterable<AstIdentifier>)
@@ -43,20 +43,26 @@ fun astInlineTypeToHirInlineType(
             .expand<HirDeclaration>({
               namePart.resolveIdentifier(context, it) as Iterable<HirDeclaration>
             })
-            .toSet() as Set<HirType | HirTrait | HirProperty | HirFunction | HirModule>)
+            .toSet() as Set<HirType | HirTrait | HirFunction | HirModule>)
         }
 
         // There should only be one candidate left.
         let declaration = (candidates as Iterable<HirDeclaration>).single().unwrap()
         assert((declaration is HirType) || (declaration is HirTrait), "Declaration should be HirType or HirTrait.")
 
+        let types = ((astType as AstNamedType).typeArguments as Iterable<AstTypeArgument>)
+          .map<Maybe<HirInlineType>>({
+            it.type.map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, scope) })
+          })
         return Tuple(
-          HirNamedType(
-            declaration as HirTrait | HirType,
-            ((astType as AstNamedType).typeArguments as Iterable<AstTypeArgument>)
-              .map<HirType>({ astInlineTypeToHirInlineType(context, it.type, scope) })
-              .toList(),
-          ),
+          if types.any({ it is None }) {
+            HirErrorType()
+          } else {
+            HirNamedType(
+              declaration as HirTrait | HirType,
+              types.map<HirInlineType>({ it.unwrap() }).toList(),
+            )
+          },
           List.empty<CompilerError>(),
         )
       }
@@ -65,11 +71,11 @@ fun astInlineTypeToHirInlineType(
         return Tuple(
           HirFunctionType(
             (astType as AstFunctionType).receiverType
-              .map<HirType>({ astTypeToHirType(context, it, scope) }),
-            ((astType as AstFunctionType).parameterTypes as Iterable<AstType>)
-              .map<HirType>({ astTypeToHirType(context, it, scope) })
+              .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, scope) }),
+            ((astType as AstFunctionType).parameterTypes as Iterable<AstInlineType>)
+              .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, scope) })
               .toList(),
-            astTypeToHirType(context, (astType as AstFunctionType).returnType, scope),
+            astInlineTypeToHirInlineType(context, (astType as AstFunctionType).returnType, scope),
           ),
           List.empty<CompilerError>()
         )
@@ -78,8 +84,8 @@ fun astInlineTypeToHirInlineType(
       if (astType is AstTupleType) {
         return Tuple(
           HirTupleType(
-            ((astType as AstTupleType).types as Iterable<AstType>)
-              .map<HirType>({ astTypeToHirType(context, it, scope) })
+            ((astType as AstTupleType).types as Iterable<AstInlineType>)
+              .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, scope) })
               .toList(),
           ),
           List.empty<CompilerError>(),
@@ -87,24 +93,36 @@ fun astInlineTypeToHirInlineType(
       }
 
       if (astType is AstNamedTupleType) {
-        todo("Implement")
         return Tuple(
-          HirTupleType(
-            ((astType as AstTupleType).types as Iterable<AstType>)
-              .map<HirType>({ astTypeToHirType(context, it, scope) })
-              .toList(),
+          HirNamedTupleType(
+            ((astType as AstNamedTupleType).types as Iterable<AstNamedTupleTypeField>)
+              .map<(String, HirInlineType)>({
+                Tuple(it.name.value, astInlineTypeToHirInlineType(context, it.type, scope))
+              })
+              .unsafeToMap<String, HirInlineType>(),
           ),
           List.empty<CompilerError>(),
         )
       }
 
       if (astType is AstEnumType) {
+        let loweredVariants = ((astType as AstEnumType).variants as Iterable<AstEnumTypeVariant>)
+          .map<Maybe<(String, HirInlineType)>>({
+            it.valueType.map<(String, HirInlineType)>({ valueType =>
+              Tuple(it.name.value, astInlineTypeToHirInlineType(context, valueType, scope))
+            })
+          })
+          .toList()
         return Tuple(
-          HirEnumType(
-            ((astType as AstEnumType).types as Iterable<AstType>)
-              .map<HirType>({ astTypeToHirType(context, it, scope) })
-              .toList(),
-          ),
+          if (loweredVariants as Iterable<Maybe<(String, HirInlineType)>>).any({ it is None }) {
+            HirErrorType()
+          } else {
+            HirEnumType(
+              (loweredVariants as Iterable<Maybe<(String, HirInlineType)>>)
+                .map<(String, HirInlineType)>({ it.unwrap() })
+                .unsafeToMap<String, HirInlineType>(),
+            )
+          },
           List.empty<CompilerError>(),
         )
       }
@@ -112,15 +130,15 @@ fun astInlineTypeToHirInlineType(
       if (astType is AstIntersectionType) {
         return Tuple(
           HirIntersectionType(
-            ((astType as AstIntersectionType).types as Iterable<AstType>)
-              .map<HirType>({ astTypeToHirType(context, it, scope) })
+            ((astType as AstIntersectionType).types as Iterable<AstInlineType>)
+              .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, scope) })
               .toList(),
           ),
           List.empty<CompilerError>(),
         )
       }
 
-      todo("Implement astTypeToHirType for {astType}")
+      todo("Implement astInlineTypeToHirInlineType for {astType}")
     }
   )
 }
@@ -130,36 +148,38 @@ fun getAllImpls(context: QueryContext<List<CompilerError>>): List<HirImpl> {
 }
 
 fun makeSureImplsAreNotConflicting(context: QueryContext<List<CompilerError>>) {
-  query<HirType, List<CompilerError>>( context, "HirType.implements", this as Equals & Hash, {
-    for implsForSameTrait in getAllImpls(context).groupBy({ it.trait_ }).values() {
-      for impl1 in implsForSameTrait {
-        for impl2 in implsForSameTrait {
-          let unified = impl1.type.unify(impl2.type)
-          if unified is Some {
-            // Unifying the impl types succeeded. This means there's a type to which both impls
-            // apply. That's bad.
-            impl1.type.substitute(unified.unwrap())
-            return Tuple(
-              unit,
-              ConflictingImplsCompilerError(
-                impl1,
-                impl2,
-                unified,
-              )
-            )
-          }
-        }
-      }
-    }
+  query<HirType, List<CompilerError>>( context, "HirType.implements", unit as Equals & Hash, {
+    todo("Implement makeSureImplsAreNotConflicting")
+    // for implsForSameTrait in (getAllImpls(context) as Iterable<HirImpl>).groupBy({ it.trait_ }).values() {
+    //   for impl1 in implsForSameTrait {
+    //     for impl2 in implsForSameTrait {
+    //       let unified = impl1.type.unify(impl2.type)
+    //       if unified is Some {
+    //         // Unifying the impl types succeeded. This means there's a type to which both impls
+    //         // apply. That's bad.
+    //         impl1.type.substitute(unified.unwrap())
+    //         return Tuple(
+    //           unit,
+    //           ConflictingImplsCompilerError(
+    //             impl1,
+    //             impl2,
+    //             unified,
+    //           )
+    //         )
+    //       }
+    //     }
+    //   }
+    // }
   })
 }
 
 impl HirType {
   fun implFor(context: QueryContext<List<CompilerError>>, trait_: HirTrait): Maybe<HirImpl> {
-    query<HirType, List<CompilerError>>( context, "HirType.implements", this as Equals & Hash, {
-      let impls = (getAllImpls(context) as Iterable<HirImpl>).where({ it.trait_ == trait_ }).where({
-        it.type_.unify(this) is Some
-      })
+    query<Maybe<HirImpl>, List<CompilerError>>( context, "HirType.implements", this as Equals & Hash, {
+      todo("Implement HirType.implFor")
+      // let impls = (getAllImpls(context) as Iterable<HirImpl>).where({ it.trait_ == trait_ }).where({
+      //   it.type_.unify(this) is Some
+      // })
     })
   }
 }
@@ -173,7 +193,7 @@ impl ConflictingImplsCompilerError: CompilerError {
   public fun id(): String { "conflicting-impls" }
 
   public fun location(): Location {
-    Location(file, node.cast<CstDeclarationWithName>().child.name.unwrap().child.span)
+    todo("Implement ConflictingImplsCompilerError.location") // TODO(marcelgarus)
   }
   public fun title(): String { "Conflicting impls." }
   public fun description(): String {

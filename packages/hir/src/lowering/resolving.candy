@@ -12,17 +12,17 @@ impl String {
   fun resolveIdentifier(
     context: QueryContext<List<CompilerError>>,
     scope: HirDeclaration,
-  ): Set<HirType | HirTrait | HirProperty | HirFunction | HirModule> {
-    query<Set<HirType | HirTrait | HirProperty | HirFunction | HirModule>, List<CompilerError>>(
+  ): Set<HirType | HirTrait | HirFunction | HirModule> {
+    query<Set<HirType | HirTrait | HirFunction | HirModule>, List<CompilerError>>(
       context,
       "String.resolveIdentifier",
       DataTuple2<String, HirDeclaration>(this, scope) as Equals & Hash,
       {
-        let candidates = MutableSet.empty<HirType | HirTrait | HirProperty | HirFunction | HirModule>()
+        let candidates = MutableSet.empty<HirType | HirTrait | HirFunction | HirModule>()
         for declaration in (scope as HasDeclarations).declarations(context) {
           if declaration.name() == this {
             candidates.insert(
-              declaration as HirType | HirTrait | HirProperty | HirFunction | HirModule
+              declaration as HirType | HirTrait | HirFunction | HirModule
             )
           }
         }
@@ -33,7 +33,7 @@ impl String {
           if ast is AstFile {
             // TODO(marcelgarus): Search use-lines and add their candidates here.
             return Tuple(
-              candidates as Set<HirType | HirTrait | HirProperty | HirFunction | HirModule>,
+              candidates as Set<HirType | HirTrait | HirFunction | HirModule>,
               List.empty<CompilerError>(),
             )
           }
@@ -47,10 +47,10 @@ impl String {
         )
         candidates.addAll(
           (resolveIdentifier(context, scope.parent as HirDeclaration).items() as Iterable<
-            HirType | HirTrait | HirProperty | HirFunction | HirModule>)
+            HirType | HirTrait | HirFunction | HirModule>)
         )
         Tuple(
-          candidates as Set<HirType | HirTrait | HirProperty | HirFunction | HirModule>,
+          candidates as Set<HirType | HirTrait | HirFunction | HirModule>,
           List.empty<CompilerError>()
         )
       }
