@@ -121,9 +121,10 @@ public trait List<Item>: Iterable<Item> {
     list
   }
 
-  fun unsafeEquals(other: List<Item>): Bool {
-    (this as Iterable<Item>).unsafeEquals(other as Iterable<Item>)
-  }
+  // Note: We don't override unsafeEquals here, because it would have to override the
+  // Iterable.unsafeEqual on the Dart side and writing `list.unsafeEquals(otherList as Iterable<...>)`
+  // looks weird (one side is a `List`, the other an `Iterable`). So for those cases where you want
+  // to compare two lists, just do `(list as Iterable<...>).unsafeEquals(otherList as Iterable<...>)`.
   fun unsafeHash<T>(hasher: Hasher<T>) {
     for item in (this as Iterable<Item>) {
       (item as Hash).hash<T>(hasher)
