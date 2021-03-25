@@ -1,7 +1,7 @@
 use ..node
 use ..tokens
 
-public trait /* enum */ CstType
+public trait /* enum */ CstInlineType
 
 
 public class CstNamedType {
@@ -9,30 +9,30 @@ public class CstNamedType {
   public let nameParts: List<CstNode<IdentifierToken | PunctuationToken>>
   public let typeArguments: Maybe<CstNode<CstTypeArguments>>
 }
-impl CstNamedType: CstType
+impl CstNamedType: CstInlineType
 
 
 public class CstGroupType {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let openingParenthesis: CstNode<PunctuationToken>
-  public let type: Maybe<CstNode<CstType>>
+  public let type: Maybe<CstNode<CstInlineType>>
   public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
 }
-impl CstGroupType: CstType
+impl CstGroupType: CstInlineType
 
 
 public class CstFunctionType {
   public let modifiers: List<CstNode<IdentifierToken>>
-  public let receiverType: Maybe<CstNode<CstType>>
+  public let receiverType: Maybe<CstNode<CstInlineType>>
   public let parameterTypes: Maybe<CstNode<CstFunctionTypeParameterTypes>>
   public let arrow: CstNode<PunctuationToken>
-  public let returnType: Maybe<CstNode<CstType>>
+  public let returnType: Maybe<CstNode<CstInlineType>>
 }
-impl CstFunctionType: CstType
+impl CstFunctionType: CstInlineType
 
 public class CstFunctionTypeParameterTypes {
   public let openingParenthesis: CstNode<PunctuationToken>
-  public let parameterTypes: List<CstNode<CstType | PunctuationToken>>
+  public let parameterTypes: List<CstNode<CstInlineType | PunctuationToken>>
   public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
 }
 
@@ -40,25 +40,44 @@ public class CstFunctionTypeParameterTypes {
 public class CstTupleType {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let openingParenthesis: CstNode<PunctuationToken>
-  public let types: List<CstNode<CstType | PunctuationToken>>
+  public let types: List<CstNode<CstInlineType | PunctuationToken>>
   public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
 }
-impl CstTupleType: CstType
+impl CstTupleType: CstInlineType
+
+
+public class CstNamedTupleType {
+  public let modifiers: List<CstNode<IdentifierToken>>
+  public let openingParenthesis: CstNode<PunctuationToken>
+  public let fields: List<CstNode<CstNamedTupleTypeField | PunctuationToken>>
+  public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
+}
+impl CstNamedTupleType: CstInlineType
+
+public class CstNamedTupleTypeField {
+  public let modifiers: List<CstNode<IdentifierToken>>
+  public let name: Maybe<CstNode<IdentifierToken>>
+  public let type: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>
+}
+
+
+public class CstEnumType {
+  public let variants: List<CstNode<CstEnumTypeVariant | PunctuationToken>>
+}
+impl CstEnumType: CstInlineType
+
+public class CstEnumTypeVariant {
+  public let modifiers: List<CstNode<IdentifierToken>>
+  public let nameAndValueType: Maybe<(CstNode<IdentifierToken>, Maybe<CstNode<CstInlineType>>)>
+}
 
 
 public class CstIntersectionType {
-  public let leftType: CstNode<CstType>
+  public let leftType: CstNode<CstInlineType>
   public let ampersand: CstNode<PunctuationToken>
-  public let rightType: Maybe<CstNode<CstType>>
+  public let rightType: Maybe<CstNode<CstInlineType>>
 }
-impl CstIntersectionType: CstType
-
-public class CstUnionType {
-  public let leftType: CstNode<CstType>
-  public let bar: CstNode<PunctuationToken>
-  public let rightType: Maybe<CstNode<CstType>>
-}
-impl CstUnionType: CstType
+impl CstIntersectionType: CstInlineType
 
 
 public class CstTypeParameters {
@@ -69,7 +88,7 @@ public class CstTypeParameters {
 public class CstTypeParameter {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let name: Maybe<CstNode<IdentifierToken>>
-  public let upperBound: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstType>>)>
+  public let upperBound: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>
 }
 
 public class CstTypeArguments {
@@ -78,5 +97,5 @@ public class CstTypeArguments {
   public let closingAngleBracket: Maybe<CstNode<PunctuationToken>>
 }
 public class CstTypeArgument {
-  public let type: CstNode<CstType>
+  public let type: CstNode<CstInlineType>
 }

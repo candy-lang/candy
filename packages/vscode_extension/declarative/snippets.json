@@ -1,15 +1,11 @@
 {
-  "Class": {
-    "prefix": "class",
-    "body": ["class ${1:name} {", "\t$0", "}"]
-  },
   "Function": {
     "prefix": "fun",
     "body": ["fun ${1:name}(${2:parameters}): ${3:returnType} {", "\t$0", "}"]
   },
   "Impl": {
     "prefix": "impl",
-    "body": ["impl ${1:classOrType} {", "\t$0", "}"]
+    "body": ["impl ${1:type} {", "\t$0", "}"]
   },
   "Main function without arguments": {
     "prefix": "main",
@@ -22,5 +18,9 @@
   "Trait": {
     "prefix": "trait",
     "body": ["trait ${1:name} {", "\t$0", "}"]
+  },
+  "Type": {
+    "prefix": "type",
+    "body": ["type ${1:name} = $0"]
   }
 }

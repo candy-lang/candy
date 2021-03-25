@@ -1,54 +1,54 @@
 public trait Any {
-  /// Could be anything, from an `Int8` to a `String` to a raspberry cookie. 🍪
-  ///
-  /// All types are assignable to `Any`.
+  # Could be anything, from an `Int8` to a `String` to a raspberry cookie. 🍪
+  #
+  # All types are assignable to `Any`.
 
   builtin fun as<T>(): Maybe<T>
-  /// Returns a `Some(this)` if `this` is of type `T`, otherwise `None()`.
+  # Returns a `Some(this)` if `this` is of type `T`, otherwise `None()`.
 
   fun is<T>(): Bool {
-    /// Checks if `this` is of type `T`.
+    # Checks if `this` is of type `T`.
 
     as<T>().map<Bool>({ true }).else({ false })
   }
 }
 
-// public builtin trait ToString {
-//   fun toString(): String
-// }
+## public builtin trait ToString {
+##   fun toString(): String
+## }
 
 public builtin type Unit
-/// The default type for expressions that don't have an explicit result.
-///
-/// Has only one instance, `unit`. Because there's only one instance, instances of this type carry
-/// no information.
-///
-/// Here are a few examples of expressions that evaluate to `Unit`:
-///
-/// * assignments like `let a = 5`
-/// * function calls of functions without an explicit return value like `print("Hello, world!")`
-/// * the explicit unit instance: `unit`
-//
-// TODO(marcelgarus): Make `Unit`'s constructor private.
+# The default type for expressions that don't have an explicit result.
+#
+# Has only one instance, `unit`. Because there's only one instance, instances of this type carry
+# no information.
+#
+# Here are a few examples of expressions that evaluate to `Unit`:
+#
+# * assignments like `let a = 5`
+# * function calls of functions without an explicit return value like `print("Hello, world!")`
+# * the explicit unit instance: `unit`
+##
+## TODO(marcelgarus): Make `Unit`'s constructor private.
 
 public let unit: Unit = unitReturningFunction()
 fun unitReturningFunction(): Unit {}
 
-// Because the `Never` type contains itself, it's impossible to instantiate.
+## Because the `Never` type contains itself, it's impossible to instantiate.
 public type Never = Never
-/// Can never be created. It's still useful to specify that an expression will never return
-/// directly. More specifically, this is the case in the following cases:
-///
-/// * An expression runs endlessly.
-/// * An expression aborts the current control flow.
-///
-/// Here are a few examples for expressions that evaluate to `Never`:
-///
-/// * `return 5`
-/// * `break`
-/// * `throw "blub"`
-/// * `loop {}`
-///
-/// There are no instances of `Never`. That's why we can claim that all (zero) instances can be
-/// converted to all other types loslessly – you can assign `Never` to anything:
-/// `let a: Int = return 5` works, because the result of `return 5` is never created.
+# Can never be created. It's still useful to specify that an expression will never return
+# directly. More specifically, this is the case in the following cases:
+#
+# * An expression runs endlessly.
+# * An expression aborts the current control flow.
+#
+# Here are a few examples for expressions that evaluate to `Never`:
+#
+# * `return 5`
+# * `break`
+# * `throw "blub"`
+# * `loop {}`
+#
+# There are no instances of `Never`. That's why we can claim that all (zero) instances can be
+# converted to all other types loslessly – you can assign `Never` to anything:
+# `let a: Int = return 5` works, because the result of `return 5` is never created.

@@ -40,7 +40,7 @@ impl String {
         }
 
         // Otherwise, visit the parent.
-        let parent: Package | HirModule | HirTrait | HirType = scope.parent
+        let parent: Package | HirModule | HirTrait | HirType | HirImpl = scope.parent
         assert(
           !(parent is Package),
           "Parent is a package, although this is not a file-level module."
