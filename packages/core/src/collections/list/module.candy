@@ -1,5 +1,6 @@
 use ...assert
 use ...bool
+use ...hash
 use ...maybe
 use ...numbers
 use ...operators

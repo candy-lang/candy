@@ -74,12 +74,12 @@ public trait Map<Key: Equals & Hash, Value> {
 
   fun unsafeEquals(other: Map<Key, Value>) {
     keys().toSet().unsafeEquals(other.keys().toSet())
-      && keys().map({ get(key) == other.get(key) }).all({ it })
+      && keys().map<Bool>({ (get(it) as Equals) == (other.get(it) as Equals) }).all({ it })
   }
   fun unsafeHash<T>(hasher: Hasher<T>) {
     for entry in entries() {
-      entry.first.hash<T>(hasher)
-      entry.second.hash<T>(hasher)
+      (entry.first as Hash).hash<T>(hasher)
+      (entry.second as Hash).hash<T>(hasher)
     }
   }
 }
