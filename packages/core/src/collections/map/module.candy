@@ -72,7 +72,7 @@ public trait Map<Key: Equals & Hash, Value> {
     map
   }
 
-  fun unsafeEquals(other: Map<Key, Value>) {
+  fun unsafeEquals(other: Map<Key, Value>): Bool {
     keys().toSet().unsafeEquals(other.keys().toSet())
       && keys().map<Bool>({ (get(it) as Equals) == (other.get(it) as Equals) }).all({ it })
   }
