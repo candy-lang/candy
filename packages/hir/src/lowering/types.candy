@@ -24,19 +24,9 @@ fun astInlineTypeToHirInlineType(
   astType: AstInlineType,
   scope: HirDeclaration,
 ): HirInlineType {
-  todo("Implement")
-}
-
-// TODO(marcelgarus): Convert this into extension methods on Ast as soon as impls for types from
-// other packages work.
-fun astTypeToHirType(
-  context: QueryContext<List<CompilerError>>,
-  astType: AstType,
-  scope: HirDeclaration,
-): HirType {
-  query<HirType, List<CompilerError>>(
+  query<HirInlineType, List<CompilerError>>(
     context,
-    "AstType.hir",
+    "astInlineTypeToHirInlineType",
     DataTuple2<AstType, HirDeclaration>(astType, scope) as Equals & Hash,
     {
       if (astType is AstNamedType) {
@@ -96,10 +86,22 @@ fun astTypeToHirType(
         )
       }
 
-      if (astType is AstUnionType) {
+      if (astType is AstNamedTupleType) {
+        todo("Implement")
         return Tuple(
-          HirUnionType(
-            ((astType as AstUnionType).types as Iterable<AstType>)
+          HirTupleType(
+            ((astType as AstTupleType).types as Iterable<AstType>)
+              .map<HirType>({ astTypeToHirType(context, it, scope) })
+              .toList(),
+          ),
+          List.empty<CompilerError>(),
+        )
+      }
+
+      if (astType is AstEnumType) {
+        return Tuple(
+          HirEnumType(
+            ((astType as AstEnumType).types as Iterable<AstType>)
               .map<HirType>({ astTypeToHirType(context, it, scope) })
               .toList(),
           ),
