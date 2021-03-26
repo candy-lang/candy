@@ -1,6 +1,6 @@
 # 🍭 Candy
 
-A sweet programming language, mainly inspired by Kotlin, Rust, and Dart.
+A sweet programming language, mainly inspired by Kotlin, Rust, Elixir, and Dart.
 
 [Join our Discord server.](https://discord.gg/5Vr4eAJ7gU)
 
@@ -84,7 +84,7 @@ A sweet programming language, mainly inspired by Kotlin, Rust, and Dart.
 * **Be modular.**
   All elements are private by default. The `public` modifier makes functions, properties and types available if the module gets imported.
   Rust very much inspires the module system itself – you can use folders, files, and explicit `module` declarations interchangeably.
-  Also, defining types creates implicit modules.  
+  Also, defining traits creates implicit modules.  
   We call our imports *use-lines* because they look like this:
   ```rust
   use MongoDB
