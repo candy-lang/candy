@@ -4,6 +4,7 @@ use ...hash
 use ...maybe
 use ...numbers
 use ...operators
+use ...primitives
 use ..iterable
 use ..array
 public use .array_list
@@ -129,6 +130,12 @@ public trait List<Item>: Iterable<Item> {
       (item as Hash).hash<T>(hasher)
     }
   }
+
+  fun unsafeSorted(): List<Item> {
+    let result = toMutable()
+    result.unsafeSort()
+    result
+  }
 }
 
 public trait MutableList<Item>: List<Item> {
@@ -226,5 +233,21 @@ public trait MutableList<Item>: List<Item> {
     while isNotEmpty() {
       removeLast()
     }
+  }
+
+  fun unsafeSort() {
+    // TODO(JonasWanke): use something faster for larger lists
+    // Currently using insertion sort.
+    1.until(length()).do({ i =>
+      let item = get(i).unwrap()
+      mut let j = i
+      while j > 0 {
+        let leftItem = get(j - 1).unwrap()
+        if (leftItem as Comparable) <= (item as Comparable) { break unit }
+        set(j, leftItem as Item)
+        j = j - 1
+      }
+      set(j, item as Item)
+    })
   }
 }
