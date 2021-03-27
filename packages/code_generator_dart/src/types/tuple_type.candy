@@ -1,0 +1,114 @@
+use compiler_utils
+use dart_code
+use hir
+use incremental
+
+public fun compileTupleType(
+  context: QueryContext<List<CompilerError>>,
+  tupleType: HirTupleType,
+): DartType {
+  query<DartType, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileTupleType",
+    tupleType, {
+    let types = tupleType.types as Iterable<HirInlineType>
+    let size = types.length()
+    assert(
+      size <= (HirTupleType.fieldNames as Iterable<String>).length(),
+      "Tuple is too long: {size}.",
+    )
+
+    let name = getCompiledTupleTypeName(context, size)
+    let name = DartIdentifier(name, None<String>())
+    // TODO(JonasWanke): correct package URL
+
+    let types = List.empty<DartType>()
+    // TODO(JonasWanke): Map the types
+
+    Tuple(DartNamedType(name, types), List.empty<CompilerError>())
+  })
+}
+
+public fun compileTupleTypeDeclaration(
+  context: QueryContext<List<CompilerError>>,
+  size: Int,
+): DartClass {
+  query<DartClass, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileTupleTypeDeclaration",
+    size, {
+    assert(
+      size <= (HirTupleType.fieldNames as Iterable<String>).length(),
+      "Tuple is too long: {size}.",
+    )
+
+    let name = getCompiledTupleTypeName(context, size)
+
+    let fieldNames = (HirTupleType.fieldNames as Iterable<String>).take(size)
+    let types = fieldNames.mapIndexed<DartType>({ name, index =>
+      DartNamedType(
+        DartIdentifier("T{index}", None<String>()),
+        List.empty<DartType>(),
+      )
+    })
+
+    let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
+
+    let constructor = DartConstructor(
+      className = name,
+      name = None<String>(),
+      annotations = List.empty<DartAnnotation>(),
+      isConst = true,
+      requiredParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      namedParameters = fieldNames
+        .map< DartParameter | DartInitializingFormal>({
+          DartInitializingFormal(it, defaultValue = None<DartExpression>())
+        })
+        .toList(),
+      body = None<DartBody>(),
+    )
+    body.append(constructor)
+
+    let fields = fieldNames.zip<DartType>(types)
+      .map<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>({
+        DartField(
+          it.first,
+          isStatic = false,
+          mutability = DartFinal(),
+          type = Some<DartType>(it.second),
+          initialValue = None<DartExpression>(),
+        )
+      })
+    body.appendAll(fields)
+
+    let dartDeclaration = DartClass(
+      name = name,
+      annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
+      typeParameters = List.empty<DartTypeParameter>(),
+      extends_ = None<DartType>(),
+      implements_ = List.empty<DartType>(),
+      with_ = List.empty<DartType>(),
+      body = body,
+    )
+
+    Tuple(output, List.empty<CompilerError>())
+  })
+}
+
+public fun getCompiledTupleTypeName(
+  context: QueryContext<List<CompilerError>>,
+  size: Int,
+): String {
+  query<String, List<CompilerError>>(
+    context,
+    "code_generator_dart.getCompiledTupleTypeName",
+    size, {
+    assert(
+      size <= (HirTupleType.fieldNames as Iterable<String>).length(),
+      "Tuple is too long: {size}.",
+    )
+
+    Tuple("Tuple{size}", List.empty<CompilerError>())
+  })
+}

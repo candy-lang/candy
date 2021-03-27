@@ -53,11 +53,11 @@ fun compileModule(
       //   // Impl contents are directly compiled into their target traits or classes.
       //   continue
       // }
-      if declaration is HirClass {
-        let compiledClasses = compileClass(context, package, declaration as HirClass)
-        declarations.appendAll((compiledClasses as Iterable<DartClass>).cast<DartDeclaration>())
-        continue
-      }
+      // if declaration is HirClass {
+      //   let compiledClasses = compileClass(context, package, declaration as HirClass)
+      //   declarations.appendAll((compiledClasses as Iterable<DartClass>).cast<DartDeclaration>())
+      //   continue
+      // }
       // if declaration is HirFunction {
       //   declarations.appendAll(compileGlobalFunction(context, package, declaration as HirFunction))
       //   continue
