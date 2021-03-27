@@ -10,11 +10,16 @@ class DartCompilationUnit {
 }
 
 class DartAnnotation {
-  /// @override
-  /// @sealed
+  /// E.g., `@override` or `@sealed`
 
   let expression: DartExpression
 }
+public let dartOverrideAnnotation = DartAnnotation(
+  DartExpression(DartIdentifier("override", Some<String>(dartCoreUrl))),
+)
+public let dartMetaSealedAnnotation = DartAnnotation(
+  DartExpression(DartIdentifier("sealed", Some<String>(dartPackageMetaUrl))),
+)
 
 // Directives.
 
