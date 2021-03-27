@@ -1,3 +1,4 @@
+use ...assert
 use ...bool
 use ...hash
 use ...operators
@@ -465,3 +466,37 @@ trait EqualsIterable<Item: Equals>: Iterable<Item> {
   // TODO(marcelgarus): Implement distinct, indexOf, lastIndexOf
 }
 // impl<Item: Equals> Iterable<Item>: EqualsIterable<Item>
+
+impl Int {
+  fun until(endExclusive: Int): Iterable<Int> {
+    assert(
+      endExclusive >= this,
+      "Exclusive end must be greater than or equal to that start, but {this} > {endExclusive}.",
+    )
+    UntilIterable(this, endExclusive)
+  }
+}
+class UntilIterable {
+  let start: Int
+  let endExclusive: Int
+}
+impl UntilIterable: Iterable<Int> {
+  fun iterator(): Iterator<Int> { UntilIterator(start, endExclusive) }
+}
+class UntilIterator {
+  mut let value: Int
+  let endExclusive: Int
+}
+impl UntilIterator: Iterator<Int> {
+  fun next(): Maybe<Int> {
+    assert(
+      value <= endExclusive,
+      "Value must be smaller than or equal to endExclusive, but {value} > {endExclusive}."
+    )
+    if (value == endExclusive) { return None<Int>() }
+    
+    let result = Some<Int>(value)
+    value = value + 1
+    result
+  }
+}
