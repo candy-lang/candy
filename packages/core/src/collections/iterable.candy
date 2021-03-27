@@ -137,6 +137,9 @@ public trait Iterable<Item> {
   // These return an `Iterable` with the same length, but a different type.
 
   fun map<Out>(mapper: (Item) => Out): Iterable<Out> {
+    mapIndexed<Out>({ item, index => mapper(item) })
+  }
+  fun mapIndexed<Out>(mapper: (Item, Int) => Out): Iterable<Out> {
     MappedIterable<Item, Out>(this, mapper)
   }
 
@@ -328,20 +331,23 @@ public trait Iterable<Item> {
 
 class MappedIterable<In, Out> {
   let parent: Iterable<In>
-  let mapper: (In) => Out
+  let mapper: (In, Int) => Out
 }
 impl<In, Out> MappedIterable<In, Out>: Iterable<Out> {
   fun iterator(): Iterator<Out> {
-    MappedIterator<In, Out>(parent.iterator(), mapper)
+    MappedIterator<In, Out>(parent.iterator(), mapper, 0)
   }
 }
 class MappedIterator<In, Out> {
   let parent: Iterator<In>
-  let mapper: (In) => Out
+  let mapper: (In, Int) => Out
+  mut let index = 0
 }
 impl<In, Out> MappedIterator<In, Out>: Iterator<Out> {
   fun next(): Maybe<Out> {
-    parent.next().map<Out>(mapper)
+    let item = parent.next().map<Out>({ mapper(it, index) })
+    index = index + 1
+    item
   }
 }
 
