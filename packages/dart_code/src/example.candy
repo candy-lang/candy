@@ -100,6 +100,7 @@ fun main() {
             className = "Foo",
             name = None<String>(),
             annotations = List.empty<DartAnnotation>(),
+            isConst = false,
             requiredParameters = List.of1<DartParameter | DartInitializingFormal>(
               DartInitializingFormal("blub", defaultValue = None<DartExpression>()),
             ),

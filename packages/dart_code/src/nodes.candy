@@ -100,6 +100,7 @@ class DartConstructor {
   let className: String
   let name: Maybe<String>
   let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
+  let isConst: Bool = false
   let requiredParameters: List<DartParameter | DartInitializingFormal> = List.empty<DartParameter | DartInitializingFormal>()
   let positionalParameters: List<DartParameter | DartInitializingFormal> = List.empty<DartParameter | DartInitializingFormal>()
   let namedParameters: List<DartParameter | DartInitializingFormal> = List.empty<DartParameter | DartInitializingFormal>()

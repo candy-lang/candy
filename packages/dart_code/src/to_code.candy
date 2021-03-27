@@ -169,9 +169,8 @@ impl DartClass: DartToCode {
 impl DartConstructor: DartToCode {
   fun toCode(importAllocator: DartImportAllocator): String {
     mut let s = className
-    if name is Some {
-      s = "{s}.{name}"
-    }
+    if (name is Some) { s = "{s}.{name}" }
+    if (isConst) { s = "const {s}" }
     s = "{annotationsToCode(importAllocator, annotations)} {s}"
     let parameters = parametersToCode(
       (requiredParameters as Iterable<DartParameter | DartInitializingFormal>)
