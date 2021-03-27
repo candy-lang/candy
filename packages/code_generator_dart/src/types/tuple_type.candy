@@ -44,13 +44,12 @@ public fun compileTupleTypeDeclaration(
 
     let name = getCompiledTupleTypeName(context, size)
 
-    let fieldNames = (HirTupleType.fieldNames as Iterable<String>).take(size)
-    let types = fieldNames.mapIndexed<DartType>({ name, index =>
-      DartNamedType(
-        DartIdentifier("T{index}", None<String>()),
-        List.empty<DartType>(),
-      )
-    })
+    let fields = (HirTupleType.fieldNames as Iterable<String>)
+      .take(size)
+      .mapIndexed<(String, DartType)>({ name, index =>
+        let type = DartNamedType(DartIdentifier("T{index}", None<String>()), List.empty<DartType>())
+        Tuple(name, type)
+      })
 
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
@@ -59,18 +58,18 @@ public fun compileTupleTypeDeclaration(
       name = None<String>(),
       annotations = List.empty<DartAnnotation>(),
       isConst = true,
-      requiredParameters = List.empty<DartParameter | DartInitializingFormal>(),
-      positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
-      namedParameters = fieldNames
-        .map< DartParameter | DartInitializingFormal>({
-          DartInitializingFormal(it, defaultValue = None<DartExpression>())
+      requiredParameters = fields
+        .map<DartParameter | DartInitializingFormal>({
+          DartInitializingFormal(it.first, defaultValue = None<DartExpression>())
         })
         .toList(),
+      positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
       body = None<DartBody>(),
     )
     body.append(constructor)
 
-    let fields = fieldNames.zip<DartType>(types)
+    let dartFields = fields
       .map<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>({
         DartField(
           it.first,
@@ -80,12 +79,14 @@ public fun compileTupleTypeDeclaration(
           initialValue = None<DartExpression>(),
         )
       })
-    body.appendAll(fields)
+    body.appendAll(dartFields)
 
     let dartDeclaration = DartClass(
       name = name,
       annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
-      typeParameters = List.empty<DartTypeParameter>(),
+      typeParameters = fields
+        .map<DartTypeParameter>({ DartTypeParameter(it.second, None<DartType>()) })
+        .toList(),
       extends_ = None<DartType>(),
       implements_ = List.empty<DartType>(),
       with_ = List.empty<DartType>(),
@@ -96,7 +97,7 @@ public fun compileTupleTypeDeclaration(
   })
 }
 
-public fun getCompiledTupleTypeName(
+fun getCompiledTupleTypeName(
   context: QueryContext<List<CompilerError>>,
   size: Int,
 ): String {
