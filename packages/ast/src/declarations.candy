@@ -42,7 +42,7 @@ public class AstImpl {
   public let modifiers: List<AstIdentifier>
   public let typeParameters: List<AstTypeParameter>
   public let type: AstInlineType
-  public let traits: List<AstNamedType>
+  public let traits: List<AstNamedType | AstErrorType>
   public let innerDeclarations: List<AstFunction>
 }
 impl AstImpl: AstDeclaration
@@ -66,7 +66,7 @@ public class AstFunction {
   public let name: AstIdentifier
   public let typeParameters: List<AstTypeParameter>
   public let valueParameters: List<AstValueParameter>
-  public let returnType: Maybe<AstInlineType>
+  public let returnType: AstInlineType
   public let body: Maybe<AstBlockBody | AstExpressionBody | AstDelegationBody>
 }
 impl AstFunction: AstDeclaration

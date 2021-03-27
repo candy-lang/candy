@@ -312,7 +312,7 @@ fun lowerTrait(
       .orElse({ List.empty<AstTypeParameter>() })
 
   let upperBound = cst.child.upperBound
-      .flatMap<AstInlineType>({
+      .map<AstInlineType>({
         if it.second is None<CstNode<CstInlineType>> {
           context.addError(
             ExpectedTypeCompilerError(
@@ -320,7 +320,7 @@ fun lowerTrait(
               cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
             ),
           )
-          None<AstInlineType>()
+          context.createErrorType(id)
         } else {
           lowerInlineType(context, id, it.second.unwrap())
         }
@@ -363,10 +363,10 @@ fun lowerImpl(
       ),
     )
   }
-  let type = cst.child.type.flatMap<AstInlineType>({ lowerInlineType(context, id, it) })
+  let type = cst.child.type.map<AstInlineType>({ lowerInlineType(context, id, it) })
 
   let traits = cst.child.traits
-      .flatMap<AstInlineType>({
+      .map<AstInlineType>({
         if it.second is None<CstNode<CstInlineType>> {
           context.addError(
             ExpectedTypeCompilerError(
@@ -374,25 +374,27 @@ fun lowerImpl(
               cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
             ),
           )
-          None<AstInlineType>()
+          context.createErrorType(id)
         } else {
           lowerInlineType(context, id, it.second.unwrap())
         }
       })
-      .map<List<AstNamedType>>({
-        if it is AstNamedType { return List.of1<AstNamedType>(it as AstNamedType) }
+      .map<List<AstNamedType | AstErrorType>>({
+        if it is AstNamedType { return List.of1<AstNamedType | AstErrorType>(it as AstNamedType) }
         if it is AstIntersectionType {
           let types = (it as AstIntersectionType).types
           if (types as Iterable<AstInlineType>).any({ !(it is AstNamedType) }) {
             context.addError(InvalidImplementedTraitsCompilerError(context.file, cst))
-            return List.empty<AstNamedType>()
+            return List.empty<AstNamedType | AstErrorType>()
           }
-          return (types as Iterable<AstInlineType>).cast<AstNamedType>().toList()
+          return (types as Iterable<AstInlineType>)
+            .cast<AstNamedType | AstErrorType>()
+            .toList()
         }
         context.addError(InvalidImplementedTraitsCompilerError(context.file, cst))
-        return List.empty<AstNamedType>()
+        return List.of1<AstNamedType | AstErrorType>(context.createErrorType(id))
       })
-      .orElse({ List.empty<AstNamedType>() })
+      .orElse({ List.empty<AstNamedType | AstErrorType>() })
 
   let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, false) as List<AstFunction>
 
@@ -435,14 +437,17 @@ fun lowerType(
       .map<List<AstTypeParameter>>({ lowerTypeParameters(context, id, it) })
       .orElse({ List.empty<AstTypeParameter>() })
 
-  let type = cst.child.type.flatMap<AstInlineType>({
+  if (cst.child.type is None<AstInlineType>) {
+    context.addError(MissingTypeContentCompilerError(context.file, cst))
+  }
+  let type = cst.child.type.map<AstInlineType>({
     if (it.second is None<CstNode<CstInlineType>>) {
       context.addError(ExpectedTypeCompilerError(
         context.file,
         cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
       ))
       isValid = false
-      return None<AstInlineType>()
+      return context.createErrorType(id)
     }
     lowerInlineType(context, id, it.second.unwrap())
   })
@@ -454,6 +459,21 @@ fun lowerType(
     AstType(id, None<AstCandyDoc>(), modifiers, name.unwrap(), typeParameters, type.unwrap()),
   )
 }
+public class MissingTypeContentCompilerError {
+  public let file: FancyFile
+  public let node: CstNode<CstType>
+}
+impl MissingTypeContentCompilerError: CompilerError {
+  public fun id(): String { "missing-type-content" }
+
+  public fun location(): Location { Location(file, node.child.keyword.child.span) }
+  public fun title(): String { "Missing type content." }
+  public fun description(): String {
+    /// TODO(JonasWanke): add a description
+    ""
+  }
+}
+
 fun lowerFunction(
   context: LoweringContext,
   parentId: AstFileId | AstDeclarationId | AstExpressionId,
@@ -488,12 +508,12 @@ fun lowerFunction(
 
   let returnType = if cst.child.returnType is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)> {
     context.addError(ExpectedFunctionReturnTypeCompilerError(context.file, cst))
-    None<AstType>()
+    context.createErrorType(id)
   } else {
     let returnType = cst.child.returnType.unwrap()
     if returnType.second is None<CstNode<CstInlineType>> {
       context.addError(ExpectedFunctionReturnTypeCompilerError(context.file, cst))
-      None<AstType>()
+      context.createErrorType(id)
     } else {
       lowerInlineType(context, id, returnType.second.unwrap())
     }
@@ -732,24 +752,24 @@ fun lowerValueParameter(
   let type = if isFunctionParameter {
     if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)> {
       context.addError(FunctionValueParameterTypeMissingCompilerError(context.file, cst))
-      None<AstType>()
+      Some<AstInlineType>(context.createErrorType(id))
     } else {
       if cst.child.type.unwrap().second is None<CstNode<CstInlineType>> {
         context.addError(FunctionValueParameterTypeMissingCompilerError(context.file, cst))
-        None<AstType>()
+        Some<AstInlineType>(context.createErrorType(id))
       } else {
-        lowerInlineType(context, id, cst.child.type.unwrap().second.unwrap())
+        Some<AstInlineType>(lowerInlineType(context, id, cst.child.type.unwrap().second.unwrap()))
       }
     }
   } else {
     if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)> {
-      None<AstType>()
+      None<AstInlineType>()
     } else {
       if cst.child.type.unwrap().second is None<CstNode<CstInlineType>> {
         context.addError(LambdaValueParameterTypeExpectedCompilerError(context.file, cst))
-        None<AstType>()
+        Some<AstInlineType>(context.createErrorType(id))
       } else {
-        lowerInlineType(context, id, cst.child.type.unwrap().second.unwrap())
+        Some<AstInlineType>(lowerInlineType(context, id, cst.child.type.unwrap().second.unwrap()))
       }
     }
   }
@@ -779,9 +799,9 @@ fun lowerInlineType(
   context: LoweringContext,
   parentId: AstDeclarationId | AstInlineTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstInlineType>,
-): Maybe<AstInlineType> {
+): AstInlineType {
   if cst.child is CstNamedType {
-    return Some<AstInlineType>(lowerNamedType(context, parentId, cst.cast<CstNamedType>()))
+    return lowerNamedType(context, parentId, cst.cast<CstNamedType>())
   }
   if cst.child is CstGroupType {
     return lowerGroupType(context, parentId, cst.cast<CstGroupType>())
@@ -799,7 +819,7 @@ fun lowerInlineType(
     return lowerEnumType(context, parentId, cst.cast<CstEnumType>())
   }
   if cst.child is CstIntersectionType {
-    return Some<AstInlineType>(lowerIntersectionType(context, parentId, cst.cast<CstIntersectionType>()))
+    return lowerIntersectionType(context, parentId, cst.cast<CstIntersectionType>())
   }
   throw "Unknown expression: {cst}."
 }
@@ -851,13 +871,13 @@ fun lowerGroupType(
   context: LoweringContext,
   parentId: AstDeclarationId | AstInlineTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstGroupType>,
-): Maybe<AstInlineType> {
-  let type = if cst.child.type is None<CstNode<CstInlineType>> {
-    context.addError(ExpectedTypeInGroupTypeCompilerError(context.file, cst))
-    None<AstInlineType>()
-  } else {
-    lowerInlineType(context, parentId, cst.child.type.unwrap())
-  }
+): AstInlineType {
+  let type = cst.child.type
+    .map<AstInlineType>({ lowerInlineType(context, parentId, it) })
+    .orElse({
+      context.addError(ExpectedTypeInGroupTypeCompilerError(context.file, cst))
+      context.createErrorType(parentId)
+    })
 
   // TODO(JonasWanke): support modifiers on group types
   if cst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
@@ -883,13 +903,13 @@ fun lowerFunctionType(
   context: LoweringContext,
   parentId: AstDeclarationId | AstInlineTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstFunctionType>,
-): Maybe<AstFunctionType> {
+): AstFunctionType {
   let id = context.getInlineTypeId(parentId)
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
   let receiverType = cst.child.receiverType
-      .flatMap<AstInlineType>({ lowerInlineType(context, id, it) })
+      .map<AstInlineType>({ lowerInlineType(context, id, it) })
 
   let parameterTypes = cst.child.parameterTypes
       .map<List<AstInlineType>>({ lowerFunctionTypeParameterTypes(context, id, it) })
@@ -898,18 +918,14 @@ fun lowerFunctionType(
         List.empty<AstInlineType>()
       })
 
-  let returnType = cst.child.returnType.flatMap<AstInlineType>({ lowerInlineType(context, id, it) })
-  // TODO(marcelgarus): This error also gets emitted if the CST contains a return type, but this
-  // type couldn't be lowered.
+  let returnType = cst.child.returnType.map<AstInlineType>({ lowerInlineType(context, id, it) })
   if returnType is None {
     context.addError(ExpectedReturnTypeInFunctionTypeCompilerError(context.file, cst))
-    return None<AstFunctionType>()
+    return context.createErrorType(id)
   }
 
   context.addIdMapping(cst.id, id)
-  Some<AstFunctionType>(
-    AstFunctionType(id, modifiers, receiverType, parameterTypes, returnType.unwrap())
-  )
+  AstFunctionType(id, modifiers, receiverType, parameterTypes, returnType.unwrap())
 }
 fun lowerFunctionTypeParameterTypes(
   context: LoweringContext,
@@ -929,8 +945,7 @@ fun lowerFunctionTypeParameterTypes(
       if punctuationExpectedNext {
         // TODO(JonasWanke)
       }
-      let type = lowerInlineType(context, parentId, node.cast<CstInlineType>())
-      if type is Some<AstInlineType> { parameterTypes.append(type.unwrap()) }
+      parameterTypes.append(lowerInlineType(context, parentId, node.cast<CstInlineType>()))
       punctuationExpectedNext = true
     }
   }
@@ -959,7 +974,7 @@ fun lowerTupleType(
   context: LoweringContext,
   parentId: AstDeclarationId | AstInlineTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstTupleType>,
-): Maybe<AstInlineType> {
+): AstInlineType {
   let id = context.getInlineTypeId(parentId)
   mut let isValid = true
 
@@ -978,8 +993,7 @@ fun lowerTupleType(
       if punctuationExpectedNext {
         // TODO(JonasWanke)
       }
-      let type = lowerInlineType(context, id, node.cast<CstInlineType>())
-      if type is Some<AstInlineType> { types.append(type.unwrap()) }
+      types.append(lowerInlineType(context, id, node.cast<CstInlineType>()))
       punctuationExpectedNext = true
     }
   }
@@ -1010,16 +1024,16 @@ fun lowerTupleType(
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
-  if !isValid { return None<AstInlineType>() }
+  if !isValid { return context.createErrorType(id) }
   context.addIdMapping(cst.id, id)
-  Some<AstInlineType>(AstTupleType(id, modifiers, types))
+  AstTupleType(id, modifiers, types)
 }
 
 fun lowerNamedTupleType(
   context: LoweringContext,
   parentId: AstDeclarationId | AstInlineTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstNamedTupleType>,
-): Maybe<AstInlineType> {
+): AstInlineType {
   let id = context.getInlineTypeId(parentId)
   mut let isValid = true
 
@@ -1071,9 +1085,9 @@ fun lowerNamedTupleType(
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
   }
 
-  if !isValid { return None<AstInlineType>() }
+  if !isValid { return context.createErrorType(id) }
   context.addIdMapping(cst.id, id)
-  Some<AstInlineType>(AstNamedTupleType(id, modifiers, fields))
+  AstNamedTupleType(id, modifiers, fields)
 }
 fun lowerNamedTupleTypeField(
   context: LoweringContext,
@@ -1098,26 +1112,25 @@ fun lowerNamedTupleTypeField(
     lowerIdentifier(context, id, it, 0)
   })
 
-  if (cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>) {
-    context.addError(MissingNamedTupleTypeFieldTypeCompilerError(context.file, cst))
-    isValid = false
-  }
-  let type = cst.child.type.flatMap<AstInlineType>({
-    if (it.second is None<CstNode<CstInlineType>>) {
-      context.addError(ExpectedTypeCompilerError(
-        context.file,
-        cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
-      ))
-      isValid = false
-      return None<AstInlineType>()
-    }
-    lowerInlineType(context, id, it.second.unwrap())
-  })
-  if (type is None<AstNamedType>) { isValid = false }
+  let type = cst.child.type
+    .map<AstInlineType>({
+      if (it.second is None<CstNode<CstInlineType>>) {
+        context.addError(ExpectedTypeCompilerError(
+          context.file,
+          cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
+        ))
+        return context.createErrorType(id)
+      }
+      lowerInlineType(context, id, it.second.unwrap())
+    })
+    .orElse({
+      context.addError(MissingNamedTupleTypeFieldTypeCompilerError(context.file, cst))
+      context.createErrorType(id)
+    })
 
   if !isValid { return None<AstNamedTupleTypeField>() }
   context.addIdMapping(cst.id, id)
-  Some<AstNamedTupleTypeField>(AstNamedTupleTypeField(id, modifiers, name.unwrap(), type.unwrap()))
+  Some<AstNamedTupleTypeField>(AstNamedTupleTypeField(id, modifiers, name.unwrap(), type))
 }
 
 public class MissingNamedTupleTypeFieldNameCompilerError {
@@ -1179,7 +1192,7 @@ fun lowerEnumType(
   context: LoweringContext,
   parentId: AstDeclarationId | AstInlineTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstEnumType>,
-): Maybe<AstInlineType> {
+): AstInlineType {
   let id = context.getInlineTypeId(parentId)
   mut let isValid = true
 
@@ -1188,10 +1201,7 @@ fun lowerEnumType(
 
   if ((cstVariants.whereType<CstNode<CstEnumTypeVariant>>() as Iterable<CstNode<CstEnumTypeVariant>>).length() < 2) {
     context.addError(
-      ExpectedTwoOrMoreEnumVariantsCompilerError(
-        context.file,
-        cst.cast<CstTupleType | CstTupleExpression>(),
-      ),
+      ExpectedTwoOrMoreEnumVariantsCompilerError(context.file, cst.cast<CstEnumType>()),
     )
     isValid = false
   }
@@ -1226,9 +1236,9 @@ fun lowerEnumType(
     }
   }
 
-  if !isValid { return None<AstInlineType>() }
+  if !isValid { return context.createErrorType(id) }
   context.addIdMapping(cst.id, id)
-  Some<AstInlineType>(AstEnumType(id, List.empty<AstIdentifier>(), variants))
+  AstEnumType(id, List.empty<AstIdentifier>(), variants)
 }
 
 public class ExpectedTwoOrMoreEnumVariantsCompilerError {
@@ -1274,7 +1284,7 @@ fun lowerEnumTypeVariant(
   let name = lowerIdentifier(context, id, name, 0)
 
   let valueType = nameAndValueType.second
-  let valueType = valueType.flatMap<AstInlineType>({ lowerInlineType(context, id, it) })
+  let valueType = valueType.map<AstInlineType>({ lowerInlineType(context, id, it) })
 
   if !isValid { return None<AstEnumTypeVariant>() }
   context.addIdMapping(cst.id, id)
@@ -1338,8 +1348,7 @@ fun lowerIntersectionType(
     }
   }
 
-  let leftType = lowerInlineType(context, id, cst.child.leftType)
-  if leftType is Some<AstInlineType> { appendType(leftType.unwrap()) }
+  appendType(lowerInlineType(context, id, cst.child.leftType))
 
   if cst.child.rightType is None<CstNode<CstInlineType>> {
     context.addError(
@@ -1349,8 +1358,7 @@ fun lowerIntersectionType(
       ),
     )
   } else {
-    let rightType = lowerInlineType(context, id, cst.child.rightType.unwrap())
-    if rightType is Some<AstType> { appendType(rightType.unwrap()) }
+    appendType(lowerInlineType(context, id, cst.child.rightType.unwrap()))
   }
 
   context.addIdMapping(cst.id, id)
@@ -1831,22 +1839,18 @@ fun lowerPropertyExpression(
     isValid = false
   }
 
-  let type = if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)> {
-    None<AstInlineType>()
-  } else {
-    let type = cst.child.type.unwrap()
-    if type.second is None<CstNode<CstInlineType>> {
+  let type = cst.child.type.map<AstInlineType>({
+    if it.second is None<CstNode<CstInlineType>> {
       context.addError(
         ExpectedTypeCompilerError(
           context.file,
           cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
         ),
       )
-      None<AstInlineType>()
-    } else {
-      lowerInlineType(context, id, type.second.unwrap())
+      return context.createErrorType(id)
     }
-  }
+    lowerInlineType(context, id, it.second.unwrap())
+  })
 
   let initializer = cst.child.initializer.flatMap<AstExpression>({
     if it.child.expression is None<CstNode<CstExpression>> {
@@ -2134,6 +2138,14 @@ class LoweringContext {
     nextTypeId = nextTypeId + 1
     id
   }
+  fun createErrorType(
+    parentId: AstDeclarationId
+      | AstInlineTypeId
+      | AstTypeParameterId
+      | AstTypeArgumentId
+      | AstValueParameterId
+      | AstExpressionId,
+    ): AstErrorType { AstErrorType(getInlineTypeId(parentId), List.empty<AstIdentifier>()) }
 
   mut let nextExpressionId: Int
   fun getExpressionId(
