@@ -29,7 +29,7 @@ impl String {
 
         // If the `scope` is directly a file, search the use-lines.
         if scope is HirModule {
-          let ast = (scope as HirModule).ast(context) 
+          let ast = (scope as HirModule).ast(context)
           if ast is AstFile {
             // TODO(marcelgarus): Search use-lines and add their candidates here.
             return Tuple(
