@@ -437,9 +437,6 @@ fun lowerType(
       .map<List<AstTypeParameter>>({ lowerTypeParameters(context, id, it) })
       .orElse({ List.empty<AstTypeParameter>() })
 
-  if (cst.child.type is None<AstInlineType>) {
-    context.addError(MissingTypeContentCompilerError(context.file, cst))
-  }
   let type = cst.child.type.map<AstInlineType>({
     if (it.second is None<CstNode<CstInlineType>>) {
       context.addError(ExpectedTypeCompilerError(
@@ -451,27 +448,12 @@ fun lowerType(
     }
     lowerInlineType(context, id, it.second.unwrap())
   })
-  if (type is None<AstInlineType>) { isValid = false }
 
   if !isValid { return None<AstType>() }
   context.addIdMapping(cst.id, id)
   Some<AstType>(
     AstType(id, None<AstCandyDoc>(), modifiers, name.unwrap(), typeParameters, type.unwrap()),
   )
-}
-public class MissingTypeContentCompilerError {
-  public let file: FancyFile
-  public let node: CstNode<CstType>
-}
-impl MissingTypeContentCompilerError: CompilerError {
-  public fun id(): String { "missing-type-content" }
-
-  public fun location(): Location { Location(file, node.child.keyword.child.span) }
-  public fun title(): String { "Missing type content." }
-  public fun description(): String {
-    /// TODO(JonasWanke): add a description
-    ""
-  }
 }
 
 fun lowerFunction(
