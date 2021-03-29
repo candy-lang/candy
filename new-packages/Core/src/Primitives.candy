@@ -1,18 +1,33 @@
+# This module contains the bread of the type-system-sandwich:
+#
+# * A top type: `Any`
+# * A unit type: `Nothing`
+# * A bottom type: `Never`
+
 public trait Any {
   # Could be anything, from an `Int8` to a `String` to a raspberry cookie. 🍪
   #
-  # All types are assignable to `Any`.
+  # All types are assignable to `Any`:
+  #
+  # * `let hey: Any = 4`
+  # * `print("Hello!")` (`print` expects `Any`)
 
   builtin fun as[T](): Maybe[T]
   # Returns a `Some(this)` if `this` is of type `T`, otherwise `None()`.
+  #
+  # Here are some examples:
+  #
+  # * `4.as[Int]() == Some(4)`
+  # * `"Hello".as[Int]() == None()`
 
   fun is[T](): Bool {
     # Checks if `this` is of type `T`.
 
-    as[T]().map[Bool]({ true }).else({ false })
+    as[T]().isSome()
   }
 }
 
+## TODO(marcelgarus): Move this somewhere else.
 ## public builtin trait ToString {
 ##   fun toString(): String
 ## }
@@ -34,8 +49,9 @@ fun functionThatReturnsNothing(): Nothing {}
 
 ## Because the `Never` type contains itself, it's impossible to instantiate.
 public type Never = Never
-# Can never be created. It's still useful to specify that an expression will never return
-# directly. More specifically, this happens in these cases:
+# Can never be created. It's still useful to specify that an expression will never return directly.
+#
+# More specifically, this happens in these cases:
 #
 # * An expression runs endlessly.
 # * An expression aborts the current control flow.
@@ -44,7 +60,7 @@ public type Never = Never
 #
 # * `return 5`
 # * `break`
-# * `throw "blub"`
+# * `panic("blub")`
 # * `loop {}`
 #
 # There are no instances of `Never`. That's why we can claim that all (zero) instances can be
