@@ -1,0 +1,12 @@
+builtin fun loop(body: () -> Nothing): Never
+# Executes the body infinitely often.
+## TODO(marcelgarus): Implement this in pure Candy once we have tail-call elimination.
+
+impl Int {
+  fun times(body: () -> Nothing) {
+    # Executes the `body` `this` many times.
+    
+    body()
+    (this - 1).times(body)
+  }
+}
