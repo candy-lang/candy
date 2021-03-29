@@ -1,43 +1,57 @@
+# This module contains the bread of the type-system-sandwich:
+#
+# * A top type: `Any`
+# * A unit type: `Nothing`
+# * A bottom type: `Never`
+
 public trait Any {
   # Could be anything, from an `Int8` to a `String` to a raspberry cookie. 🍪
   #
-  # All types are assignable to `Any`.
+  # All types are assignable to `Any`:
+  #
+  # * `let hey: Any = 4`
+  # * `print("Hello!")` (`print` expects `Any`)
 
-  builtin fun as<T>(): Maybe<T>
+  builtin fun as[T](): Maybe[T]
   # Returns a `Some(this)` if `this` is of type `T`, otherwise `None()`.
+  #
+  # Here are some examples:
+  #
+  # * `4.as[Int]() == Some(4)`
+  # * `"Hello".as[Int]() == None()`
 
-  fun is<T>(): Bool {
+  fun is[T](): Bool {
     # Checks if `this` is of type `T`.
 
-    as<T>().map<Bool>({ true }).else({ false })
+    as[T]().isSome()
   }
 }
 
+## TODO(marcelgarus): Move this somewhere else.
 ## public builtin trait ToString {
 ##   fun toString(): String
 ## }
 
-public builtin type Unit
+public builtin type Nothing
 # The default type for expressions that don't have an explicit result.
 #
-# Has only one instance, `unit`. Because there's only one instance, instances of this type carry
+# Has only one instance, `nothing`. Because there's only one instance, instances of this type carry
 # no information.
 #
-# Here are a few examples of expressions that evaluate to `Unit`:
+# Here are a few examples of expressions that evaluate to `Nothing`:
 #
 # * assignments like `let a = 5`
 # * function calls of functions without an explicit return value like `print("Hello, world!")`
-# * the explicit unit instance: `unit`
-##
-## TODO(marcelgarus): Make `Unit`'s constructor private.
+# * the explicit nothing instance: `nothing`
 
-public let unit: Unit = unitReturningFunction()
-fun unitReturningFunction(): Unit {}
+public fun nothing(): Nothing { functionThatReturnsNothing() }
+fun functionThatReturnsNothing(): Nothing {}
 
 ## Because the `Never` type contains itself, it's impossible to instantiate.
 public type Never = Never
-# Can never be created. It's still useful to specify that an expression will never return
-# directly. More specifically, this is the case in the following cases:
+# Can never be created. It's still useful to specify that an expression will never return directly.
+#
+# More specifically, this happens in these cases:
 #
 # * An expression runs endlessly.
 # * An expression aborts the current control flow.
@@ -46,7 +60,7 @@ public type Never = Never
 #
 # * `return 5`
 # * `break`
-# * `throw "blub"`
+# * `panic("blub")`
 # * `loop {}`
 #
 # There are no instances of `Never`. That's why we can claim that all (zero) instances can be

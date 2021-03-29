@@ -1,5 +1,17 @@
+use compiler_utils
+
+use ...declarations
+use ...types
+
+fun canonicalVariable(n: Int): HirInlineType {
+  let canonicalType = HirType(HirTopLevelModule(Package(Path.parse("$canonical"))), "$")
+  HirParameterType(canonicalType, "{n}")
+}
+
 trait SolverType {
   /// Either a `SolverVariable` or a `SolverValue`.
+
+  let type: HirInlineType
 
   fun toString_(): String
   fun containsVariable(variable: SolverVariable): Bool
@@ -48,11 +60,11 @@ trait SolverType {
       let this_ = (this as SolverVariable)
       let other_ = (other as SolverVariable)
 
-      if this_.name == other_.name {
+      if (this_.type as Equals) == (other_.type as Equals) {
         // Being equal to itself is no bound, so no substitution `?A = ?A` is necessary.
         return Some<Map<SolverVariable, SolverType>>(Map.empty<SolverVariable, SolverType>())
       } else {
-        if this_.name < other_.name {
+        if (this_.type as HirParameterType).name < (other_.type as HirParameterType).name {
           return Some<Map<SolverVariable, SolverType>>(
             Map.of1<SolverVariable, SolverType>(Tuple(this_, other_)),
           )
@@ -71,7 +83,9 @@ trait SolverType {
         // This is an infinitely growing type. That's not allowed.
         return None<Map<SolverVariable, SolverType>>()
       }
-      return Some<Map<SolverVariable, SolverType>>(Map.of1<SolverVariable, SolverType>(Tuple(this_, other)))
+      return Some<Map<SolverVariable, SolverType>>(
+        Map.of1<SolverVariable, SolverType>(Tuple(this_, other))
+      )
     }
 
     if this is SolverValue && other is SolverVariable {
@@ -81,7 +95,7 @@ trait SolverType {
     let this_ = (this as SolverValue)
     let other_ = (other as SolverValue)
 
-    if !(this_.name == other_.name)
+    if !((this_.type as Equals) == (other_.type as Equals))
       || !((this_.parameters as Iterable).length() == (other_.parameters as Iterable).length()) {
       return None<Map<SolverVariable, SolverType>>()
     }
@@ -89,10 +103,13 @@ trait SolverType {
     // To unify all types, we have a queue of substitutions that we try to bring into a common
     // solution space one by one.
     let solutionSpace = MutableMap.empty<SolverVariable, SolverType>()
-    let queue: Maybe<MutableList<(SolverVariable, SolverType)>> = (this_.parameters as Iterable<SolverType>).zip<SolverType>(other_.parameters)
+    let queue: Maybe<MutableList<(SolverVariable, SolverType)>> = (this_.parameters as Iterable<SolverType>)
+      .zip<SolverType>(other_.parameters as Iterable<SolverType>)
       .map<Maybe<Map<SolverVariable, SolverType>>>({ it.first.unify(it.second) })
       .foldLeft<Maybe<Iterable<Map<SolverVariable, SolverType>>>>(
-        Some<Iterable<Map<SolverVariable, SolverType>>>(List.empty<Map<SolverVariable, SolverType>>()),
+        Some<Iterable<Map<SolverVariable, SolverType>>>(
+          List.empty<Map<SolverVariable, SolverType>>(),
+        ),
         { a, b =>
           if a is None { return None<Iterable<Map<SolverVariable, SolverType>>>() }
           if b is None { return None<Iterable<Map<SolverVariable, SolverType>>>() }
@@ -112,7 +129,9 @@ trait SolverType {
     while (queue as Iterable).isNotEmpty() {
       let substitution = queue.removeFirst()
       if (solutionSpace as Map<SolverVariable, SolverType>).containsKey(substitution.first) {
-        let existingSubstitution = (solutionSpace as Map<SolverVariable, SolverType>).get(substitution.first).unwrap()
+        let existingSubstitution = (solutionSpace as Map<SolverVariable, SolverType>)
+          .get(substitution.first)
+          .unwrap()
         let unified = existingSubstitution.unify(substitution.second)
         if unified is None {
           return None<Map<SolverVariable, SolverType>>()
@@ -124,7 +143,9 @@ trait SolverType {
         queue.updateAll({
           Tuple(it.first, it.second.substitute(substitution.first, substitution.second))
         })
-        if (queue as Iterable<(SolverVariable, SolverType)>).any({ it.second.containsVariable(it.first) }) {
+        if (queue as Iterable<(SolverVariable, SolverType)>).any({
+          it.second.containsVariable(it.first)
+        }) {
           return None<Map<SolverVariable, SolverType>>()
         }
       }
@@ -133,7 +154,7 @@ trait SolverType {
     Some<Map<SolverVariable, SolverType>>(solutionSpace)
   }
 }
-impl SolverType: Hash & Equals
+impl SolverType: Equals & Hash
 
 class SolverVariable {
   /// A type variable that needs to be substituted.
@@ -146,25 +167,27 @@ class SolverVariable {
   /// * `?T`
   /// * `?0`
 
-  let name: String
+  let type: HirInlineType
 }
 impl SolverVariable: SolverType {
-  fun toString_(): String { "?{name}" }
-  fun containsVariable(variable: SolverVariable): Bool { name == variable.name }
+  fun toString_(): String { "?{type}" }
+  fun containsVariable(variable: SolverVariable): Bool {
+    (type as Equals) == (variable.type as Equals)
+  }
 
   fun substituteAll(substitutions: Map<SolverVariable, SolverType>): SolverType {
-    substitutions.get(SolverVariable(name)).orElse({ this })
+    substitutions.get(SolverVariable(type)).orElse({ this })
   }
 
   fun canonicalizeInternal(mapping: MutableMap<SolverVariable, SolverVariable>): SolverVariable {
     mapping.putIfAbsent(this, {
-      SolverVariable("{(mapping as Map).entries().length()}")
+      SolverVariable(canonicalVariable((mapping as Map).entries().length()))
     })
   }
 }
 impl SolverVariable: Equals & Hash {
-  fun equals(other: This): Bool { name == other.name }
-  fun hash<T>(hasher: Hasher<T>) { name.hash<T>(hasher) }
+  fun equals(other: This): Bool { (type as Equals) == (other.type as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { (type as Hash).hash<T>(hasher) }
 }
 
 class SolverValue {
@@ -177,12 +200,12 @@ class SolverValue {
   /// * `Set<Int>`
   /// * `Tuple<Int, String>`
 
-  let name: String
+  let type: HirInlineType
   let parameters: List<SolverType>
 }
 impl SolverValue: SolverType {
   fun toString_(): String {
-    mut let s = "{name}"
+    mut let s = "{type}"
     if (parameters as Iterable).isNotEmpty() {
       s = "{s}<{(parameters as Iterable<SolverType>).map<String>({ it.toString_() }).join(", ")}>"
     }
@@ -195,7 +218,7 @@ impl SolverValue: SolverType {
 
   fun substituteAll(substitutions: Map<SolverVariable, SolverType>): SolverValue {
     SolverValue(
-      name,
+      type,
       (parameters as Iterable<SolverType>)
         .map<SolverType>({ it.substituteAll(substitutions) })
         .toList()
@@ -204,7 +227,7 @@ impl SolverValue: SolverType {
 
   fun canonicalizeInternal(mapping: MutableMap<SolverVariable, SolverVariable>): SolverValue {
     SolverValue(
-      name,
+      type,
       (parameters as Iterable<SolverType>)
         .map<SolverType>({ it.canonicalizeInternal(mapping) })
         .toList(),
@@ -213,11 +236,12 @@ impl SolverValue: SolverType {
 }
 impl SolverValue: Equals & Hash {
   fun equals(other: This): Bool {
-    name == other.name
-      && (parameters as Iterable<SolverType>).unsafeEquals(other.parameters as Iterable<SolverType>)
+    (type as Equals) == (other.type as Equals)
+      && (parameters as Iterable<SolverType>)
+        .unsafeEquals(other.parameters as Iterable<SolverType>)
   }
   fun hash<T>(hasher: Hasher<T>) {
-    name.hash<T>(hasher)
+    (type as Hash).hash<T>(hasher)
     (parameters as Iterable).length().hash<T>(hasher)
     for parameter in parameters {
       (parameter as Hash).hash<T>(hasher)

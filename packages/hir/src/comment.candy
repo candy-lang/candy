@@ -1,7 +1,7 @@
 use ..declarations
 
 public class HirDoc {
-  public let target: HirModule | HirTrait | HirClass | HirConstructor | HirFunction | HirProperty
+  public let target: HirModule | HirTrait | HirType | HirConstructor | HirFunction
   public let content: String /* Markup */
 }
 impl HirDoc: Equals & Hash {

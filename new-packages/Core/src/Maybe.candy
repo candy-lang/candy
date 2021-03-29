@@ -1,0 +1,15 @@
+use ..Primitives
+use ..Bool
+
+public type Maybe[T] = Some T | None
+
+impl Maybe[T] {
+  fun unwrap(): T
+  fun else(alternative: () -> T): T { todo("Implement Maybe.else") }
+  fun map[Out](mapper: (T) -> Out): Maybe[Out] { flatMap[Out]({ Maybe.Some[Out](mapper(it)) }) }
+  fun flatMap[Out](mapper: (T) -> Maybe[Out]): Maybe[Out] { todo("Implement Maybe.flatMap") }
+  fun cast[Out](): Maybe[Out] { map[Out]({ it.as[Out]().unwrap() }) }
+  fun do(body: (T) -> Nothing) { map[Nothing]({ body(it) }) }
+  fun isSome(): Bool { todo("Implement Maybe.isSome") }
+  fun isNone(): Bool { todo("Implement Maybe.isNone") }
+}

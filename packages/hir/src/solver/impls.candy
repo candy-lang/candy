@@ -1,3 +1,5 @@
+use ...declarations
+use ...types
 use ..types
 
 class SolverGoal {
@@ -12,14 +14,16 @@ class SolverGoal {
   /// * `Clone(?T)`: the fact that `?T` implements `Clone`
   /// * `Iterable(?T, ?L)`: the fact that `?L` implements `Iterable<?T>`
 
-  let trait_: String
+  let trait_: HirTrait
   let parameters: List<SolverType>
 
   fun toString_(): String {
     "{trait_}({(parameters as Iterable<SolverType>).map<String>({ it.toString_() }).join(", ")})"
   }
   fun unify(other: SolverGoal): Maybe<Map<SolverVariable, SolverType>> {
-    SolverValue(trait_, parameters).unify(SolverValue(other.trait_, other.parameters))
+    if !(trait_ == other.trait_) { return None<Map<SolverVariable, SolverType>>() }
+    SolverValue(canonicalVariable(0), parameters)
+      .unify(SolverValue(canonicalVariable(0), other.parameters))
   }
   fun substituteAll(substitutions: Map<SolverVariable, SolverType>): SolverGoal {
     SolverGoal(
@@ -32,7 +36,7 @@ class SolverGoal {
   fun canonicalize(): SolverGoal {
     SolverGoal(
       trait_,
-      (SolverValue("", parameters).canonicalize() as SolverValue).parameters,
+      (SolverValue(canonicalVariable(0), parameters).canonicalize() as SolverValue).parameters,
     )
   }
 }
@@ -119,7 +123,7 @@ class SolverSolutionImpossible {
 
   fun toString_(): String { "Impossible" }
 }
-impl SolverSolutionImpossible: SolverSolution 
+impl SolverSolutionImpossible: SolverSolution
 
 
 class Solver {
@@ -174,7 +178,9 @@ class SolverTree {
         })
     )
     let strandsAndSolutions = (strands as Iterable<SolverStrand>)
-      .map<(SolverStrand, SolverSolution)>({ Tuple(it, it.solve(context)) })
+      .map<(SolverStrand, SolverSolution)>({
+        Tuple(it, it.solve(context))
+      })
       .where({ !(it.second is SolverSolutionImpossible) })
       .toList()
     if (strandsAndSolutions as Iterable).length() > 1 {
@@ -183,7 +189,9 @@ class SolverTree {
     if (strandsAndSolutions as Iterable).isEmpty() {
       return SolverSolutionImpossible()
     }
-    let strandAndSolution = (strandsAndSolutions as Iterable<(SolverStrand, SolverSolution)>).single().unwrap()
+    let strandAndSolution = (strandsAndSolutions as Iterable<(SolverStrand, SolverSolution)>)
+      .single()
+      .unwrap()
     let strand = strandAndSolution.first
     let solution = strandAndSolution.second
     if solution is SolverSolutionAmbiguous {
@@ -207,9 +215,7 @@ class SolverStrand {
     while (subgoals as Iterable<SolverGoal>).isNotEmpty() {
       let subgoal = subgoals.removeFirst().canonicalize()
       let solution = context.solve(subgoal)
-      if solution is SolverSolutionImpossible {
-        return SolverSolutionImpossible()
-      }
+      if solution is SolverSolutionImpossible { return SolverSolutionImpossible() }
       if solution is SolverSolutionUnique {
         // Integrate the solution into the solution space.
         let refinedGoal = (solution as SolverSolutionUnique).refinedGoal
