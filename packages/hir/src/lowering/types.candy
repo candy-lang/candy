@@ -50,16 +50,16 @@ fun astInlineTypeToHirInlineType(
         if (candidates as Iterable).isEmpty() {
           return Tuple(
             HirErrorType(),
-            List.of1<CompilerError>(CouldNotResolveTypeCompilerError(astType as AstNamedType)),
+            List.of1<CompilerError>(UnknownTypeCompilerError(astType as AstNamedType)),
           )
         }
         if (candidates as Iterable).length() > 1 {
           return Tuple(
             HirErrorType(),
             List.of1<CompilerError>(
-              //       // This cast from `Set<HirType | HirTrait | HirFunction | HirModule>` to
-              //       // `Set<HirType | HirTrait | HirModule>`succeeds because the name is uppercase, so no
-              //       // functions get resolved.
+              // This cast from `Set<HirType | HirTrait | HirFunction | HirModule>` to
+              // `Set<HirType | HirTrait | HirModule>`succeeds because the name is uppercase, so no
+              // functions get resolved.
               AmbiguousTypeCompilerError(candidates as Set<HirType | HirTrait | HirModule>),
             ),
           )
@@ -227,14 +227,14 @@ impl AmbiguousTypeCompilerError: CompilerError {
   }
 }
 
-public class CouldNotResolveTypeCompilerError {
+public class UnknownTypeCompilerError {
   public let astType: AstNamedType
 }
-impl CouldNotResolveTypeCompilerError: CompilerError {
+impl UnknownTypeCompilerError: CompilerError {
   public fun id(): String { "could-not-resolve-type" }
 
   public fun location(): Location {
-    todo("Implement CouldNotResolveTypeCompilerError.location") // TODO(marcelgarus)
+    todo("Implement UnknownTypeCompilerError.location") // TODO(marcelgarus)
   }
   public fun title(): String { "Couldn't resolve type {astType.nameParts}." }
   public fun description(): String {
