@@ -46,23 +46,36 @@ fun astInlineTypeToHirInlineType(
             .toSet() as Set<HirType | HirTrait | HirFunction | HirModule>)
         }
 
-        // There should only be one candidate left.
+        // There should be exactly one candidate left.
+        if (candidates as Iterable).isEmpty() {
+          return Tuple(
+            HirErrorType(),
+            List.of1<CompilerError>(CouldNotResolveTypeCompilerError(astType as AstNamedType)),
+          )
+        }
+        if (candidates as Iterable).length() > 1 {
+          return Tuple(
+            HirErrorType(),
+            List.of1<CompilerError>(
+              //       // This cast from `Set<HirType | HirTrait | HirFunction | HirModule>` to
+              //       // `Set<HirType | HirTrait | HirModule>`succeeds because the name is uppercase, so no
+              //       // functions get resolved.
+              AmbiguousTypeCompilerError(candidates as Set<HirType | HirTrait | HirModule>),
+            ),
+          )
+        }
         let declaration = (candidates as Iterable<HirDeclaration>).single().unwrap()
         assert((declaration is HirType) || (declaration is HirTrait), "Declaration should be HirType or HirTrait.")
 
         let types = ((astType as AstNamedType).typeArguments as Iterable<AstTypeArgument>)
-          .map<Maybe<HirInlineType>>({
-            it.type.map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, scope) })
+          .map<HirInlineType>({
+            it.type
+              .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, scope) })
+              .orElse({ HirErrorType() })
           })
+          .toList()
         return Tuple(
-          if types.any({ it is None }) {
-            HirErrorType()
-          } else {
-            HirNamedType(
-              declaration as HirTrait | HirType,
-              types.map<HirInlineType>({ it.unwrap() }).toList(),
-            )
-          },
+          HirNamedType((declaration as HirTrait | HirType), types),
           List.empty<CompilerError>(),
         )
       }
@@ -99,7 +112,7 @@ fun astInlineTypeToHirInlineType(
               .map<(String, HirInlineType)>({
                 Tuple(it.name.value, astInlineTypeToHirInlineType(context, it.type, scope))
               })
-              .unsafeToMap<String, HirInlineType>(),
+              .toList(),
           ),
           List.empty<CompilerError>(),
         )
@@ -107,22 +120,18 @@ fun astInlineTypeToHirInlineType(
 
       if (astType is AstEnumType) {
         let loweredVariants = ((astType as AstEnumType).variants as Iterable<AstEnumTypeVariant>)
-          .map<Maybe<(String, HirInlineType)>>({
-            it.valueType.map<(String, HirInlineType)>({ valueType =>
-              Tuple(it.name.value, astInlineTypeToHirInlineType(context, valueType, scope))
+          .map<(String, Maybe<HirInlineType>)>({
+            let valueType = it.valueType.map<HirInlineType>({ valueType =>
+              astInlineTypeToHirInlineType(context, valueType, scope)
             })
+            Tuple(it.name.value, valueType)
           })
           .toList()
         return Tuple(
-          if (loweredVariants as Iterable<Maybe<(String, HirInlineType)>>).any({ it is None }) {
-            HirErrorType()
-          } else {
-            HirEnumType(
-              (loweredVariants as Iterable<Maybe<(String, HirInlineType)>>)
-                .map<(String, HirInlineType)>({ it.unwrap() })
-                .unsafeToMap<String, HirInlineType>(),
-            )
-          },
+          HirEnumType(
+            (loweredVariants as Iterable<(String, Maybe<HirInlineType>)>)
+              .unsafeToMap<String, Maybe<HirInlineType>>(),
+          ),
           List.empty<CompilerError>(),
         )
       }
@@ -196,6 +205,38 @@ impl ConflictingImplsCompilerError: CompilerError {
     todo("Implement ConflictingImplsCompilerError.location") // TODO(marcelgarus)
   }
   public fun title(): String { "Conflicting impls." }
+  public fun description(): String {
+    /// TODO(marcelgarus): add a description for this error
+    ""
+  }
+}
+
+public class AmbiguousTypeCompilerError {
+  public let candidates: Set<HirType | HirTrait | HirModule>
+}
+impl AmbiguousTypeCompilerError: CompilerError {
+  public fun id(): String { "ambiguous-type" }
+
+  public fun location(): Location {
+    todo("Implement AmbiguousTypeCompilerError.location") // TODO(marcelgarus)
+  }
+  public fun title(): String { "Ambiguous type. Candidates are {candidates}." }
+  public fun description(): String {
+    /// TODO(marcelgarus): add a description for this error
+    ""
+  }
+}
+
+public class CouldNotResolveTypeCompilerError {
+  public let astType: AstNamedType
+}
+impl CouldNotResolveTypeCompilerError: CompilerError {
+  public fun id(): String { "could-not-resolve-type" }
+
+  public fun location(): Location {
+    todo("Implement CouldNotResolveTypeCompilerError.location") // TODO(marcelgarus)
+  }
+  public fun title(): String { "Couldn't resolve type {astType.nameParts}." }
   public fun description(): String {
     /// TODO(marcelgarus): add a description for this error
     ""

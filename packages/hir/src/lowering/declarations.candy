@@ -338,18 +338,8 @@ impl HirType: HasAst<AstType> & HasDeclarations {
     })
   }
 
-  fun astDeclarations(
-    context: QueryContext<List<CompilerError>>
-  ): List<Never> {
-    query<List<Never>, List<CompilerError>>(
-      context,
-      "HirType.astDeclarations",
-      this,
-      { Tuple(List.empty<Never>(), List.empty<CompilerError>()) },
-    )
-  }
   fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any> {
-    astDeclarations(context) as List<Any>
+    List.empty<Any>()
   }
 
   public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {

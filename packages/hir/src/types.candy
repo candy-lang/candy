@@ -59,16 +59,19 @@ impl HirTupleType: HirInlineType & Equals & Hash {
 
 
 public class HirNamedTupleType {
-  public let types: Map<String, HirInlineType>
+  public let types: List<(String, HirInlineType)>
 }
 impl HirNamedTupleType: HirInlineType & Equals & Hash {
-  fun equals(other: This): Bool { types.unsafeEquals(other.types) }
+  fun equals(other: This): Bool {
+    (types as Iterable<(String, HirInlineType)>)
+      .unsafeEquals(other.types as Iterable<(String, HirInlineType)>)
+  }
   fun hash<T>(hasher: Hasher<T>) { types.unsafeHash<T>(hasher) }
 }
 
 
 public class HirEnumType {
-  public let variants: Map<String, HirInlineType>
+  public let variants: Map<String, Maybe<HirInlineType>>
 }
 impl HirEnumType: HirInlineType & Equals & Hash {
   fun equals(other: This): Bool { variants.unsafeEquals(other.variants) }

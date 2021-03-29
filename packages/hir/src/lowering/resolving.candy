@@ -21,9 +21,7 @@ impl String {
         let candidates = MutableSet.empty<HirType | HirTrait | HirFunction | HirModule>()
         for declaration in (scope as HasDeclarations).declarations(context) {
           if declaration.name() == this {
-            candidates.insert(
-              declaration as HirType | HirTrait | HirFunction | HirModule
-            )
+            candidates.insert(declaration as HirType | HirTrait | HirFunction | HirModule)
           }
         }
 
