@@ -37,7 +37,7 @@ fun unitReturningFunction(): Unit {}
 ## Because the `Never` type contains itself, it's impossible to instantiate.
 public type Never = Never
 # Can never be created. It's still useful to specify that an expression will never return
-# directly. More specifically, this is the case in the following cases:
+# directly. More specifically, this happens in these cases:
 #
 # * An expression runs endlessly.
 # * An expression aborts the current control flow.

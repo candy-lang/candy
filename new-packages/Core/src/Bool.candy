@@ -1,0 +1,17 @@
+use ..Maybe
+## use ..operators
+
+public type Bool = True | False
+
+fun true(): Bool { Bool.True }
+fun false(): Bool { Bool.False }
+
+## builtin impl Bool: Equals & And & Or & Opposite & Implies
+
+impl Bool {
+  builtin fun then[T](body: () -> T): Maybe[T]
+}
+
+fun if[T](condition: Bool, thenBody: () -> T): Maybe[T] {
+  condition.then(thenBody)
+}
