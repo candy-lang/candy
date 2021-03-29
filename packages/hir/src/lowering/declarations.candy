@@ -23,7 +23,7 @@ fun fileToHirModule(context: QueryContext<List<CompilerError>>, file: FancyFile)
 
   query<HirModule, List<CompilerError>>(context, "HirModule.fromFile", (file as Equals & Hash), {
     mut let path = file.path
-    if path.baseNameWithoutExtension() == "module" {
+    if path.baseNameWithoutExtension() == ".candy" {
       path = path.parent().unwrap()
     }
     let module = ((if path.parent() is None {
