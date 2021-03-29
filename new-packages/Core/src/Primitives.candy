@@ -17,22 +17,20 @@ public trait Any {
 ##   fun toString(): String
 ## }
 
-public builtin type Unit
+public builtin type Nothing
 # The default type for expressions that don't have an explicit result.
 #
-# Has only one instance, `unit`. Because there's only one instance, instances of this type carry
+# Has only one instance, `nothing`. Because there's only one instance, instances of this type carry
 # no information.
 #
-# Here are a few examples of expressions that evaluate to `Unit`:
+# Here are a few examples of expressions that evaluate to `Nothing`:
 #
 # * assignments like `let a = 5`
 # * function calls of functions without an explicit return value like `print("Hello, world!")`
-# * the explicit unit instance: `unit`
-##
-## TODO(marcelgarus): Make `Unit`'s constructor private.
+# * the explicit nothing instance: `nothing`
 
-public let unit: Unit = unitReturningFunction()
-fun unitReturningFunction(): Unit {}
+public fun nothing(): Nothing { functionThatReturnsNothing() }
+fun functionThatReturnsNothing(): Nothing {}
 
 ## Because the `Never` type contains itself, it's impossible to instantiate.
 public type Never = Never
