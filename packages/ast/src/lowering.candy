@@ -885,7 +885,7 @@ fun lowerFunctionType(
   context: LoweringContext,
   parentId: AstDeclarationId | AstInlineTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstFunctionType>,
-): AstFunctionType {
+): AstInlineType {
   let id = context.getInlineTypeId(parentId)
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
@@ -1425,13 +1425,12 @@ fun lowerTypeParameter(
   }
 
   let upperBound = cst.child.upperBound
-      .flatMap<AstInlineType>({
+      .map<AstInlineType>({
         if it.second is None<CstNode<CstInlineType>> {
           context.addError(ExpectedTypeInTypeParameterCompilerError(context.file, cst))
-          None<AstInlineType>()
-        } else {
-          lowerInlineType(context, id, it.second.unwrap())
+          return context.createErrorType(id)
         }
+        lowerInlineType(context, id, it.second.unwrap())
       })
 
   if !isValid { return None<AstTypeParameter>() }
