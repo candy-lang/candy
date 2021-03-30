@@ -2,7 +2,6 @@ use compiler_utils
 use dart_code
 use hir
 use incremental
-use ..class
 use ..name_mangling
 
 fun compileModuleAndDescendants(
@@ -53,9 +52,9 @@ fun compileModule(
       //   // Impl contents are directly compiled into their target traits or classes.
       //   continue
       // }
-      // if declaration is HirClass {
-      //   let compiledClasses = compileClass(context, package, declaration as HirClass)
-      //   declarations.appendAll((compiledClasses as Iterable<DartClass>).cast<DartDeclaration>())
+      // if declaration is HirType {
+      //   let compiledTypes = compileType(context, package, declaration as HirType)
+      //   declarations.appendAll((compiledTypes as Iterable<DartClass>).cast<DartDeclaration>())
       //   continue
       // }
       // if declaration is HirFunction {
