@@ -1,6 +1,8 @@
 use ast
 use compiler_utils
 use incremental
+
+use ..types
 use ...declarations
 
 // These impls make declarative information from the AST available in the HIR.
@@ -21,7 +23,7 @@ fun fileToHirModule(context: QueryContext<List<CompilerError>>, file: FancyFile)
 
   query<HirModule, List<CompilerError>>(context, "HirModule.fromFile", (file as Equals & Hash), {
     mut let path = file.path
-    if path.baseNameWithoutExtension() == "module" {
+    if path.baseNameWithoutExtension() == ".candy" {
       path = path.parent().unwrap()
     }
     let module = ((if path.parent() is None {
@@ -73,6 +75,8 @@ impl HirDeclaration: HasDeclarations
 // types `HirTopLevelModule` and `HirInnerModule`, passing themselves as parameters.
 
 fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule): Maybe<AstFile | AstModule> {
+  /// Returns the ast of the given `moduleHir`, or `None` if it doesn't exist.
+  
   query<Maybe<AstFile | AstModule>, List<CompilerError>>(context, "HirModule.ast", (moduleHir as Equals & Hash), {
     // These are all the ways that modules can be declared with decreasing priority:
     //
@@ -114,6 +118,7 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule
       path = path.child(".candy")
     }
     if !FancyFile(package, path).doesExist(context) {
+      print("File at {path} doesn't exist.")
       return Tuple(None<AstFile | AstModule>(), List.empty<CompilerError>())
     }
 
@@ -129,15 +134,15 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule
 fun astDeclarationsOfModule(
   context: QueryContext<List<CompilerError>>,
   module: HirModule,
-): List<AstModule | AstTrait | AstImpl | AstType | AstFunction | AstProperty> {
+): List<AstModule | AstTrait | AstImpl | AstType | AstFunction> {
   query<
-    List<AstModule | AstTrait | AstImpl | AstType | AstFunction | AstProperty>,
+    List<AstModule | AstTrait | AstImpl | AstType | AstFunction>,
     List<CompilerError>,
   >(context, "HirModule.astDeclarations", (module as Equals & Hash), {
     let ast = astOfModule(context, module)
     if ast is None<AstFile | AstModule> {
       return Tuple(
-        List.empty<AstModule | AstTrait | AstImpl | AstType | AstFunction | AstProperty>(),
+        List.empty<AstModule | AstTrait | AstImpl | AstType | AstFunction>(),
         List.empty<CompilerError>(),
       )
     }
@@ -162,10 +167,12 @@ fun declarationsOfModule(
     {
       mut let implDisambiguator = 0
       mut let functionDisambiguator = 0
-      let declarations = (astDeclarationsOfModule(context, module) as Iterable<AstModule | AstTrait | AstImpl | AstType | AstFunction | AstProperty>)
+      let declarations = (astDeclarationsOfModule(context, module) as Iterable<AstModule | AstTrait | AstImpl | AstType | AstFunction>)
         .map<HirDeclaration>({
           if (it is AstModule) { return HirInnerModule(module, (it as AstModule).name.value) as HirDeclaration }
-          if (it is AstTrait) { return HirTrait(module, (it as AstTrait).name.value) as HirDeclaration }
+          if (it is AstTrait) {
+            return HirTrait(module, (it as AstTrait).name.value) as HirDeclaration
+          }
           if (it is AstImpl) {
             let impl_ = HirImpl(module, implDisambiguator)
             implDisambiguator = implDisambiguator + 1
@@ -177,7 +184,6 @@ fun declarationsOfModule(
             functionDisambiguator = functionDisambiguator + 1
             return function as HirDeclaration
           }
-          if (it is AstProperty) { return HirProperty(module, (it as AstProperty).name.value) as HirDeclaration }
           throw "Shouldn't reach this."
         })
         .toList()
@@ -190,7 +196,7 @@ impl HirModule: MightNotExist & HasAst<AstFile | AstModule> & HasDeclarations {
   fun ast(context: QueryContext<List<CompilerError>>): AstFile | AstModule
   fun astDeclarations(
     context: QueryContext<List<CompilerError>>,
-  ): List<AstModule | AstTrait | AstImpl | AstType | AstFunction | AstProperty>
+  ): List<AstModule | AstTrait | AstImpl | AstType | AstFunction>
 }
 impl HirTopLevelModule: MightNotExist & HasAst<AstFile | AstModule> & HasDeclarations {
   fun doesExist(context: QueryContext<List<CompilerError>>): Bool {
@@ -201,7 +207,7 @@ impl HirTopLevelModule: MightNotExist & HasAst<AstFile | AstModule> & HasDeclara
   }
   fun astDeclarations(
     context: QueryContext<List<CompilerError>>,
-  ): List<AstModule | AstTrait | AstImpl | AstType | AstFunction | AstProperty> {
+  ): List<AstModule | AstTrait | AstImpl | AstType | AstFunction> {
     astDeclarationsOfModule(context, this)
   }
   fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any> {
@@ -220,7 +226,7 @@ impl HirInnerModule: MightNotExist & HasAst<AstFile | AstModule> & HasDeclaratio
   }
   fun astDeclarations(
     context: QueryContext<List<CompilerError>>,
-  ): List<AstModule | AstTrait | AstImpl | AstType | AstFunction | AstProperty> {
+  ): List<AstModule | AstTrait | AstImpl | AstType | AstFunction> {
     astDeclarationsOfModule(context, this)
   }
   fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any> {
@@ -245,8 +251,8 @@ impl HirTrait: HasAst<AstTrait> & HasDeclarations {
 
   fun astDeclarations(
     context: QueryContext<List<CompilerError>>
-  ): List<AstTrait | AstType | AstFunction | AstProperty> {
-    query<List<AstTrait | AstType | AstFunction | AstProperty>, List<CompilerError>>(
+  ): List<AstTrait | AstType | AstFunction> {
+    query<List<AstTrait | AstType | AstFunction>, List<CompilerError>>(
       context,
       "HirTrait.astDeclarations",
       this,
@@ -266,17 +272,12 @@ impl HirTrait: HasAst<AstTrait> & HasDeclarations {
       this,
       {
       mut let functionDisambiguator = 0
-      let declarations = (astDeclarations(context) as Iterable<AstTrait | AstType | AstFunction | AstProperty>)
+      let declarations = (astDeclarations(context) as Iterable<AstTrait | AstType | AstFunction>)
         .map<HirDeclaration>({
-          if (it is AstTrait) { return (HirTrait(this, (it as AstTrait).name.value) as HirDeclaration) }
-          if (it is AstType) { return (HirType(this, (it as AstType).name.value) as HirDeclaration) }
           if (it is AstFunction) {
             let function = HirFunction(this, (it as AstFunction).name.value, functionDisambiguator)
             functionDisambiguator = functionDisambiguator + 1
             return (function as HirDeclaration)
-          }
-          if (it is AstProperty) {
-            return (HirProperty(this, (it as AstProperty).name.value) as HirDeclaration)
           }
           throw "Shouldn't reach this."
         })
@@ -298,8 +299,8 @@ impl HirImpl: HasAst<AstImpl> & HasDeclarations {
     })
   }
 
-  fun astDeclarations(context: QueryContext<List<CompilerError>>): List<AstFunction | AstProperty> {
-    query<List<AstFunction | AstProperty>, List<CompilerError>>(context, "HirImpl.astDeclarations", this, {
+  fun astDeclarations(context: QueryContext<List<CompilerError>>): List<AstFunction> {
+    query<List<AstFunction>, List<CompilerError>>(context, "HirImpl.astDeclarations", this, {
       Tuple(ast(context).innerDeclarations, List.empty<CompilerError>())
     })
   }
@@ -310,15 +311,12 @@ impl HirImpl: HasAst<AstImpl> & HasDeclarations {
   public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
     query<List<HirDeclaration>, List<CompilerError>>(context, "HirImpl.declarations", this, {
       mut let functionDisambiguator = 0
-      let declarations = (ast(context).innerDeclarations as Iterable<AstFunction | AstProperty>)
+      let declarations = (ast(context).innerDeclarations as Iterable<AstFunction>)
         .map<HirDeclaration>({
           if (it is AstFunction) {
             let function = HirFunction(this, (it as AstFunction).name.value, functionDisambiguator)
             functionDisambiguator = functionDisambiguator + 1
             return (function as HirDeclaration)
-          }
-          if (it is AstProperty) {
-            return (HirProperty(this, (it as AstProperty).name.value) as HirDeclaration)
           }
           throw "Shouldn't reach this."
         })
@@ -340,18 +338,8 @@ impl HirType: HasAst<AstType> & HasDeclarations {
     })
   }
 
-  fun astDeclarations(
-    context: QueryContext<List<CompilerError>>
-  ): List<AstTrait | AstType | AstFunction | AstProperty> {
-    query<List<AstTrait | AstType | AstFunction | AstProperty>, List<CompilerError>>(
-      context,
-      "HirType.astDeclarations",
-      this,
-      { Tuple(ast(context).innerDeclarations, List.empty<CompilerError>()) },
-    )
-  }
   fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any> {
-    astDeclarations(context) as List<Any>
+    List.empty<Any>()
   }
 
   public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
@@ -359,23 +347,7 @@ impl HirType: HasAst<AstType> & HasDeclarations {
       context,
       "HirType.declarations",
       this,
-      {
-        mut let functionDisambiguator = 0
-        let declarations = (ast(context).innerDeclarations as Iterable<AstTrait | AstType | AstFunction | AstProperty>)
-          .map<HirDeclaration>({
-            if (it is AstTrait) { return HirTrait(this, (it as AstTrait).name.value) }
-            if (it is AstType) { return HirType(this, (it as AstType).name.value) }
-            if (it is AstFunction) {
-              let function = HirFunction(this, (it as AstFunction).name.value, functionDisambiguator)
-              functionDisambiguator = functionDisambiguator + 1
-              return function
-            }
-            if it is AstProperty { return HirProperty(this, (it as AstProperty).name.value) }
-            throw "Shouldn't reach this."
-          })
-          .toList()
-        Tuple(declarations, List.empty<CompilerError>())
-      }
+      { Tuple(List.empty<HirDeclaration>(), List.empty<CompilerError>()) },
     )
   }
 }
@@ -400,35 +372,6 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic {
 
   fun isStatic(context: QueryContext<List<CompilerError>>): Bool {
     query<Bool, List<CompilerError>>(context, "HirFunction.isStatic", this, {
-      let ast = ast(context)
-      Tuple(containsStaticModifier(ast.modifiers), List.empty<CompilerError>())
-    })
-  }
-}
-
-impl HirProperty: HasAst<AstProperty> & HasDeclarations & CanBeStatic {
-  fun ast(context: QueryContext<List<CompilerError>>): AstProperty {
-    query<AstProperty, List<CompilerError>>(context, "HirProperty.ast", this, {
-      let ast = ((parent as HasDeclarations).declarations(context) as Iterable<Any>)
-        .whereType<AstProperty>()
-        .where({ it.name.value == name() })
-        .single()
-        .unwrap()
-      Tuple(ast, List.empty<CompilerError>())
-    })
-  }
-
-  fun isMutable(context: QueryContext<List<CompilerError>>): Bool { ast(context).isMutable }
-
-  fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any> {
-    List.empty<Any>()
-  }
-  public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
-    List.empty<HirDeclaration>()
-  }
-
-  fun isStatic(context: QueryContext<List<CompilerError>>): Bool {
-    query<Bool, List<CompilerError>>(context, "HirProperty.isStatic", this, {
       let ast = ast(context)
       Tuple(containsStaticModifier(ast.modifiers), List.empty<CompilerError>())
     })

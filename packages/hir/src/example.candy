@@ -17,7 +17,7 @@ fun main() {
 
 fun declarationsExample(context: QueryContext<List<CompilerError>>) {
   print("Declarations Example")
-  let file = FancyFile(Package.core(context), Path.parse("src/module.candy"))
+  let file = FancyFile(Package.core(context), Path.parse("src/.candy"))
 
   let moduleHir = fileToHirModule(context, file)
   print("Module is {moduleHir}")
@@ -31,7 +31,7 @@ fun declarationsExample(context: QueryContext<List<CompilerError>>) {
 
 fun useLinesExample(context: QueryContext<List<CompilerError>>) {
   print("Use-Lines Example")
-  let file = FancyFile(Package.playground(context), Path.parse("src/UseLines/module.candy"))
+  let file = FancyFile(Package.playground(context), Path.parse("src/UseLines/.candy"))
   let moduleHir = fileToHirModule(context, file)
   for useLine in moduleHir.useLines(context) {
     print("Use line {useLine}: targetModule = {useLine.targetModule(context)}")
@@ -40,7 +40,9 @@ fun useLinesExample(context: QueryContext<List<CompilerError>>) {
 
 fun resolvingExample(context: QueryContext<List<CompilerError>>) {
   print("Resolving Example")
-  let file = FancyFile(Package.core(context), Path.parse("src/module.candy"))
+  let file = FancyFile(Package.core(context), Path.parse("src/.candy"))
+  let ast = fileToHirModule(context, file).innerModule("Primitives").astDeclarations(context)
+  print("AST primitives: {ast}")
   let primitives = fileToHirModule(context, file).innerModule("Primitives").declarations(context)
   let any = (primitives as Iterable<HirDeclaration>).first().unwrap()
   let never = "Never".resolveIdentifier(context, any)

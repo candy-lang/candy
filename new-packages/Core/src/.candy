@@ -1,4 +1,9 @@
+public use .Bool
 public use .Io
+public use .Loops
+public use .Maybe
+public use .Panic
 public use .Primitives
+public use .String
 
 type Foo = (bar: Foo)
