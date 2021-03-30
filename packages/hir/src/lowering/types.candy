@@ -68,11 +68,7 @@ fun astInlineTypeToHirInlineType(
         assert((declaration is HirType) || (declaration is HirTrait), "Declaration should be HirType or HirTrait.")
 
         let types = ((astType as AstNamedType).typeArguments as Iterable<AstTypeArgument>)
-          .map<HirInlineType>({
-            it.type
-              .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, scope) })
-              .orElse({ HirErrorType() })
-          })
+          .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it.type, scope) })
           .toList()
         return Tuple(
           HirNamedType((declaration as HirTrait | HirType), types),
@@ -80,7 +76,7 @@ fun astInlineTypeToHirInlineType(
         )
       }
 
-      if (astType is AstFunctionType) {
+      if (astType is AstFunctionType) { 
         return Tuple(
           HirFunctionType(
             (astType as AstFunctionType).receiverType

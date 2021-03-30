@@ -50,7 +50,7 @@ impl HirFunctionType: HirInlineType & Equals & Hash {
 public class HirTupleType {
   public let types: List<HirInlineType>
 
-  public let fieldNames = List.of10<String>(
+  public static let fieldNames = List.of10<String>(
     "first",
     "second",
     "third",
