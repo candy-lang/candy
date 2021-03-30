@@ -85,6 +85,13 @@ public class AstIntersectionType {
 impl AstIntersectionType: AstInlineType
 
 
+public class AstErrorType {
+  public let id: AstInlineTypeId
+  public let modifiers: List<AstIdentifier> = List.empty<AstIdentifier>()
+}
+impl AstErrorType: AstInlineType
+
+
 public class AstTypeParameterId {
   let parentId: AstDeclarationId
   let name: String
@@ -107,5 +114,5 @@ impl AstTypeArgumentId: AstNodeId
 
 public class AstTypeArgument {
   public let id: AstTypeArgumentId
-  public let type: Maybe<AstInlineType>
+  public let type: AstInlineType
 }

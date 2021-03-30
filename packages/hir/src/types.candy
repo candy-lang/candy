@@ -49,6 +49,19 @@ impl HirFunctionType: HirInlineType & Equals & Hash {
 
 public class HirTupleType {
   public let types: List<HirInlineType>
+
+  public static let fieldNames = List.of10<String>(
+    "first",
+    "second",
+    "third",
+    "fourth",
+    "fifth",
+    "sixth",
+    "seventh",
+    "eight",
+    "nineth",
+    "tenth",
+  )
 }
 impl HirTupleType: HirInlineType & Equals & Hash {
   fun equals(other: This): Bool {

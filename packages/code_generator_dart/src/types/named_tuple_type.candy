@@ -1,0 +1,105 @@
+use compiler_utils
+use dart_code
+use hir
+use incremental
+
+public fun compileNamedTupleType(
+  context: QueryContext<List<CompilerError>>,
+  namedTupleType: HirNamedTupleType,
+): DartType {
+  query<DartType, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileNamedTupleType",
+    namedTupleType, {
+    let name = getCompiledNamedTupleTypeName(context, namedTupleType.types.keys().toSet())
+    let name = DartIdentifier(name, None<String>())
+    // TODO(JonasWanke): correct package URL
+
+    let sortedFields = fieldsInSortedOrder(namedTupleType)
+    let types = List.empty<DartType>()
+    // TODO(JonasWanke): Map the types
+
+    Tuple(DartNamedType(name, types), List.empty<CompilerError>())
+  })
+}
+
+public fun compileNamedTupleTypeDeclaration(
+  context: QueryContext<List<CompilerError>>,
+  fieldNames: Set<String>,
+): DartClass {
+  query<DartClass, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileNamedTupleTypeDeclaration",
+    fieldNames, {
+    let name = getCompiledNamedTupleTypeName(context, fieldNames)
+
+    let fields = (namedTupleType.types.keys().toList().unsafeSorted() as Iterable<(String, HirInlineType)>)
+      .map<(String, DartType)>({
+        let type = DartNamedType(DartIdentifier("T{it}", None<String>()), List.empty<DartType>())
+        Tuple(it, type)
+      })
+
+    let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
+
+    let constructor = DartConstructor(
+      className = name,
+      name = None<String>(),
+      annotations = List.empty<DartAnnotation>(),
+      isConst = true,
+      requiredParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      namedParameters = fields
+        .map<DartParameter | DartInitializingFormal>({
+          DartInitializingFormal(it.first, defaultValue = None<DartExpression>())
+        })
+        .toList(),
+      body = None<DartBody>(),
+    )
+    body.append(constructor)
+
+    let dartFields = fields
+      .map<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>({
+        DartField(
+          it.first,
+          isStatic = false,
+          mutability = DartFinal(),
+          type = Some<DartType>(it.second),
+          initialValue = None<DartExpression>(),
+        )
+      })
+    body.appendAll(dartFields)
+
+    let dartDeclaration = DartClass(
+      name = name,
+      annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
+      typeParameters = types
+        .map<DartTypeParameter>({ DartTypeParameter(it.second, None<DartType>()) })
+        .toList(),
+      extends_ = None<DartType>(),
+      implements_ = List.empty<DartType>(),
+      with_ = List.empty<DartType>(),
+      body = body,
+    )
+
+    Tuple(output, List.empty<CompilerError>())
+  })
+}
+
+fun fieldsInSortedOrder(namedTupleType: HirNamedTupleType): List<(String, HirInlineType)> {
+  namedTupleType.types.keys().toList().unsafeSorted()
+    .map<(String, HirInlineType)>({ Tuple(it, namedTupleType.types.get(it).unwrap()) })
+}
+
+public fun getCompiledNamedTupleTypeName(
+  context: QueryContext<List<CompilerError>>,
+  fieldNames: Set<String>,
+): String {
+  query<String, List<CompilerError>>(
+    context,
+    "code_generator_dart.getCompiledNamedTupleTypeName",
+    fieldNames, {
+    let fieldNames = fieldNames.toList().unsafeSorted()
+    let fieldNames = (fieldNames as Iterable<String>).join("$")
+    Tuple("NamedTuple${fieldNames}", List.empty<CompilerError>())
+  })
+}

@@ -10,11 +10,16 @@ class DartCompilationUnit {
 }
 
 class DartAnnotation {
-  /// @override
-  /// @sealed
+  /// E.g., `@override` or `@sealed`
 
   let expression: DartExpression
 }
+public let dartOverrideAnnotation = DartAnnotation(
+  DartExpression(DartIdentifier("override", Some<String>(dartCoreUrl))),
+)
+public let dartMetaSealedAnnotation = DartAnnotation(
+  DartExpression(DartIdentifier("sealed", Some<String>(dartPackageMetaUrl))),
+)
 
 // Directives.
 
@@ -88,6 +93,7 @@ class DartClass {
 
   let name: String
   let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
+  let typeParameters: List<DartTypeParameter> = List.empty<DartTypeParameter>()
   let extends_: Maybe<DartType> = None<DartType>()
   let implements_: List<DartType> = List.empty<DartType>()
   let with_: List<DartType> = List.empty<DartType>()
@@ -99,6 +105,7 @@ class DartConstructor {
   let className: String
   let name: Maybe<String>
   let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
+  let isConst: Bool = false
   let requiredParameters: List<DartParameter | DartInitializingFormal> = List.empty<DartParameter | DartInitializingFormal>()
   let positionalParameters: List<DartParameter | DartInitializingFormal> = List.empty<DartParameter | DartInitializingFormal>()
   let namedParameters: List<DartParameter | DartInitializingFormal> = List.empty<DartParameter | DartInitializingFormal>()
@@ -115,6 +122,7 @@ class DartInitializingFormal {
 class DartMixin {
   let name: String
   let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
+  let typeParameters: List<DartTypeParameter> = List.empty<DartTypeParameter>()
   let on_: Maybe<DartType> = None<DartType>()
   let body: List<DartGetter | DartSetter | DartFunction> = List.empty<DartGetter | DartSetter | DartFunction>()
 }
@@ -135,6 +143,7 @@ class DartFunction {
   let name: String
   let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
   let _returns: Maybe<DartType> = None<DartType>()
+  let typeParameters: List<DartTypeParameter> = List.empty<DartTypeParameter>()
   let requiredParameters: List<DartParameter> = List.empty<DartParameter>()
   let positionalParameters: List<DartParameter> = List.empty<DartParameter>()
   let namedParameters: List<DartParameter> = List.empty<DartParameter>()
@@ -238,6 +247,11 @@ class DartFunctionType {
 }
 impl DartFunctionType: DartExpression & DartType
 /// TODO(marcelgarus): Remove once the compiler realizes `DartType` implements `DartExpression`.
+
+class DartTypeParameter {
+  let name: String
+  let extends: Maybe<DartType> = None<DartType>()
+}
 
 // Expressions.
 

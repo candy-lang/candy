@@ -12,6 +12,14 @@ fun indent(code: String): String {
   s
 }
 
+fun typeParametersToCode(
+  importAllocator: DartImportAllocator,
+  typeParameters: Iterable<DartTypeParameter>,
+): String {
+  if (typeParameters.isEmpty()) { return "" }
+
+  "<{typeParameters.join(", ")}>"
+}
 fun parametersToCode(
   required: Iterable<String>,
   positional: Iterable<String>,
@@ -136,6 +144,7 @@ impl DartDeclaration: DartToCode
 impl DartClass: DartToCode {
   fun toCode(importAllocator: DartImportAllocator): String {
     mut let s = "{annotationsToCode(importAllocator, annotations)} class {name}"
+    s = "{s}{typeParametersToCode(importAllocator, typeParameters)}"
     if extends_ is Some {
       s = "{s} extends {(extends_.unwrap() as DartToCode).toCode(importAllocator)}"
     }
@@ -160,9 +169,8 @@ impl DartClass: DartToCode {
 impl DartConstructor: DartToCode {
   fun toCode(importAllocator: DartImportAllocator): String {
     mut let s = className
-    if name is Some {
-      s = "{s}.{name}"
-    }
+    if (name is Some) { s = "{s}.{name}" }
+    if (isConst) { s = "const {s}" }
     s = "{annotationsToCode(importAllocator, annotations)} {s}"
     let parameters = parametersToCode(
       (requiredParameters as Iterable<DartParameter | DartInitializingFormal>)
@@ -194,6 +202,7 @@ impl DartInitializingFormal: DartToCode {
 impl DartMixin: DartToCode {
   fun toCode(importAllocator: DartImportAllocator): String {
     mut let s = "{annotationsToCode(importAllocator, annotations)} mixin {name}"
+    s = "{s}{{typeParametersToCode(importAllocator, typeParameters)}}"
     if on_ is Some {
       s = "{s} on {(on_.unwrap() as DartToCode).toCode(importAllocator)}"
     }
@@ -205,7 +214,7 @@ impl DartMixin: DartToCode {
 }
 impl DartFunction: DartToCode {
   fun toCode(importAllocator: DartImportAllocator): String {
-    mut let s = name
+    mut let s = "{name}{typeParametersToCode(importAllocator, typeParameters)}"
     if _returns is Some {
       s = "{(_returns.unwrap() as DartToCode).toCode(importAllocator)} {s}"
     }
@@ -333,6 +342,15 @@ impl DartFunctionType: DartToCode {
       (namedParameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode(importAllocator) }),
     )
     "{s}(parameters)"
+  }
+}
+impl DartTypeParameter: DartToCode {
+  fun toCode(importAllocator: DartImportAllocator): String {
+    mut let s = name
+    if extends is Some {
+      s = "{s} extends {(extends.unwrap() as DartToCode).toCode(importAllocator)}"
+    }
+    s
   }
 }
 
