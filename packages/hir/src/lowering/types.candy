@@ -76,7 +76,7 @@ fun astInlineTypeToHirInlineType(
         )
       }
 
-      if (astType is AstFunctionType) { 
+      if (astType is AstFunctionType) {
         return Tuple(
           HirFunctionType(
             (astType as AstFunctionType).receiverType
