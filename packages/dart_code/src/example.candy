@@ -73,6 +73,7 @@ fun main() {
         annotations = List.of1<DartAnnotation>(
           DartAnnotation(DartIdentifier("data", prefix = None<String>())),
         ),
+        isAbstract = false,
         typeParameters = List.empty<DartTypeParameter>(),
         extends_ = Some<DartType>(
           DartNamedType(DartIdentifier("Bar", None<String>()), List.empty<DartType>()),

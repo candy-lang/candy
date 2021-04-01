@@ -93,6 +93,7 @@ class DartClass {
 
   let name: String
   let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
+  let isAbstract: Bool = false
   let typeParameters: List<DartTypeParameter> = List.empty<DartTypeParameter>()
   let extends_: Maybe<DartType> = None<DartType>()
   let implements_: List<DartType> = List.empty<DartType>()

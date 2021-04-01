@@ -143,7 +143,9 @@ impl DartPartOf: DartToCode {
 impl DartDeclaration: DartToCode
 impl DartClass: DartToCode {
   fun toCode(importAllocator: DartImportAllocator): String {
-    mut let s = "{annotationsToCode(importAllocator, annotations)} class {name}"
+    mut let s = "class {name}"
+    if (s.isAbstract) { s = "abstract {s}" }
+    s = "{annotationsToCode(importAllocator, annotations)} {s}"
     s = "{s}{typeParametersToCode(importAllocator, typeParameters)}"
     if extends_ is Some {
       s = "{s} extends {(extends_.unwrap() as DartToCode).toCode(importAllocator)}"
