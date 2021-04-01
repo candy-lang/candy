@@ -54,7 +54,7 @@ public class AstType {
   public let modifiers: List<AstIdentifier>
   public let name: AstIdentifier
   public let typeParameters: List<AstTypeParameter>
-  public let type: AstInlineType
+  public let type: Maybe<AstInlineType>
 }
 impl AstType: AstDeclaration
 

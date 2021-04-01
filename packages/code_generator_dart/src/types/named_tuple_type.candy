@@ -12,10 +12,11 @@ public fun compileNamedTupleType(
     "code_generator_dart.compileNamedTupleType",
     namedTupleType, {
     let name = getCompiledNamedTupleTypeName(context, namedTupleType.types.keys().toSet())
+    let fieldNames = sortedFields.map<String>({ it.first }).toSet()
+    let name = getCompiledNamedTupleTypeName(context, fieldNames)
     let name = DartIdentifier(name, None<String>())
     // TODO(JonasWanke): correct package URL
 
-    let sortedFields = fieldsInSortedOrder(namedTupleType)
     let types = List.empty<DartType>()
     // TODO(JonasWanke): Map the types
 
@@ -33,7 +34,8 @@ public fun compileNamedTupleTypeDeclaration(
     fieldNames, {
     let name = getCompiledNamedTupleTypeName(context, fieldNames)
 
-    let fields = (namedTupleType.types.keys().toList().unsafeSorted() as Iterable<(String, HirInlineType)>)
+    let sortedFields = (fieldsInSortedOrder(namedTupleType) as Iterable<(String, HirInlineType)>)
+    let fields = sortedFields.map<String>({ it.first })
       .map<(String, DartType)>({
         let type = DartNamedType(DartIdentifier("T{it}", None<String>()), List.empty<DartType>())
         Tuple(it, type)
