@@ -451,9 +451,7 @@ fun lowerType(
 
   if !isValid { return None<AstType>() }
   context.addIdMapping(cst.id, id)
-  Some<AstType>(
-    AstType(id, None<AstCandyDoc>(), modifiers, name.unwrap(), typeParameters, type.unwrap()),
-  )
+  Some<AstType>(AstType(id, None<AstCandyDoc>(), modifiers, name.unwrap(), typeParameters, type))
 }
 
 fun lowerFunction(

@@ -84,6 +84,7 @@ public fun compileTupleTypeDeclaration(
     let dartDeclaration = DartClass(
       name = name,
       annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
+      isAbstract = false,
       typeParameters = fields
         .map<DartTypeParameter>({ DartTypeParameter(it.second, None<DartType>()) })
         .toList(),
