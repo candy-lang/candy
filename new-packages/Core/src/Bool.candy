@@ -6,7 +6,13 @@ public type Bool = True | False
 public fun true(): Bool { Bool.True }
 public fun false(): Bool { Bool.False }
 
-## builtin impl Bool: Equals & And & Or & Opposite & Implies
+impl Bool: Equals & And & Or & Opposite & Implies {
+  builtin fun equals(other: Bool): Bool
+  builtin fun and(other: Bool): Bool
+  builtin fun or(other: Bool): Bool
+  builtin fun opposite(other: Bool): Bool
+  builtin fun implies(other: Bool): Bool
+}
 
 impl Bool {
   builtin fun then[T](body: () -> T): Maybe[T]
