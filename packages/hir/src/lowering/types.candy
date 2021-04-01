@@ -58,7 +58,7 @@ fun astInlineTypeToHirInlineType(
             HirErrorType(),
             List.of1<CompilerError>(
               // This cast from `Set<HirType | HirTrait | HirFunction | HirModule>` to
-              // `Set<HirType | HirTrait | HirModule>`succeeds because the name is uppercase, so no
+              // `Set<HirType | HirTrait | HirModule>` succeeds because the name is uppercase, so no
               // functions get resolved.
               AmbiguousTypeCompilerError(candidates as Set<HirType | HirTrait | HirModule>),
             ),
