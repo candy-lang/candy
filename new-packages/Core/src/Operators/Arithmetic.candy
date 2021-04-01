@@ -1,0 +1,57 @@
+use ...Numbers
+
+trait Add: BinaryPlus[This, This] {
+  ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
+
+  fun add(other: This): This
+
+  fun plus(other: This): This { add(other) }
+}
+
+trait Subtract: BinaryMinus[This, This] {
+  ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
+
+  fun subtract(other: This): This
+
+  fun minus(other: This): This { subtract(other) }
+}
+
+trait Negate: PrefixMinus[This] {
+  ## TODO(marcelgarus): Make this generic over the return type.
+
+  fun negate(): This
+
+  fun prefixMinus(): Result { negate() }
+}
+
+trait Multiply: BinaryStar[This, This] {
+  ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
+
+  fun multiply(other: This): This
+
+  fun star(other: This): This { multiply(other) }
+}
+
+trait Divide: BinarySlash[This, This] {
+  ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
+
+  fun divide(other: This): This
+
+  fun slash(other: This): This { divide(other) }
+}
+
+trait DivideTruncating: BinaryTildeSlash[This, This] {
+  ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
+
+  fun divideTruncating(other: This): Int
+
+  fun tildeSlash(other: This): This { divideTruncating(other) }
+}
+
+trait Modulo {
+  ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
+
+  fun modulo(other: This): This
+
+  fun percent(other: This): This { modulo(other) }
+}

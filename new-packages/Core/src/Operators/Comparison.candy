@@ -1,0 +1,24 @@
+use ..Equals
+
+trait Comparable: Equals
+  & BinaryLess[This, Bool]
+  & BinaryLessEqual[Other, Bool]
+  & BinaryGreater[Other, Bool]
+  & BinaryGreaterEqual[Other, Bool] {
+  ## TODO(marcelgarus): Make this generic over the `Other` type.
+
+  fun compareTo(other: This): Less | Equal | Greater
+
+  fun less(other: This): Bool { compareTo(other) is Less }
+  fun lessEqual(other: This): Bool { compareTo(other) is Less | Equal }
+  fun greater(other: This): Bool { compareTo(other) is Greater }
+  fun greaterEqual(other: This): Bool { compareTo(other) is Greater | Equal }
+}
+
+## TODO(marcelgarus): Maybe make these methods on `Iterable`?
+public fun min[T: Comparable](first: T, second: T): T {
+  if first <= second { first } else { second }
+}
+public fun max[T: Comparable](first: T, second: T): T {
+  if first >= second { first } else { second }
+}

@@ -1,0 +1,21 @@
+use ...Bool
+
+trait And: BinaryAnd[This, Bool] {
+  fun and(other: This): Bool
+}
+
+trait Or: BinaryBar[This, Bool] {
+  fun or(other: This): Bool
+}
+
+trait Opposite: PrefixExclamation[This] {
+  fun opposite(): This
+
+  fun exclamation(): This { opposite() }
+}
+
+trait Implies: BinaryEqualGreater[This, Bool] {
+  fun implies(other: This): Bool
+
+  fun equalGreater(other: This): Bool { implies(other) }
+}

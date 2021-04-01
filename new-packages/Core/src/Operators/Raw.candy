@@ -1,0 +1,105 @@
+## Binary operators.
+
+trait BinaryEqualEqual[Other, Result] {
+  # The binary `==` operator.
+
+  fun equalEqual(other: Other): Result
+}
+
+trait BinaryExclamationEqual[Other, Result] {
+  # The binary `!=` operator.
+
+  fun exclamationEqual(other: Other): Result
+}
+
+trait BinaryLess[Other, Result] {
+  # The binary `<` operator.
+
+  fun less(other: Other): Result
+}
+
+trait BinaryLessEqual[Other, Result] {
+  # The binary `<=`` operator.
+
+  fun lessEqual(other: Other): Result
+}
+
+trait BinaryGreater[Other, Result] {
+  # The binary `>` operator.
+
+  fun greater(other: Other): Result
+}
+
+trait BinaryGreaterEqual[Other, Result] {
+  # The binary `>=` operator.
+
+  fun greaterEqual(other: Other): Result
+}
+
+trait BinaryPlus[Other, Result] {
+  # The binary `+` operator.
+
+  fun plus(other: Other): Result
+}
+
+trait BinaryMinus[Other, Result] {
+  # The binary `-` operator.
+
+  fun minus(other: Other): Result
+}
+
+trait BinaryStar[Other, Result] {
+  # The binary `*` operator.
+
+  fun star(other: Other): Result
+}
+
+trait BinarySlash[Other, Result] {
+  # The binary `/` operator.
+
+  fun slash(other: Other): Result
+}
+
+trait BinaryTildeSlash[Other, Result] {
+  # The binary `~/` operator.
+
+  fun tildeSlash(other: Other): Result
+}
+
+trait BinaryPercent[Other, Result] {
+  # The binary `%` operator.
+
+  fun percent(other: Other): Result
+}
+
+trait BinaryAnd[Other, Result] {
+  # The binary `&` operator.
+
+  fun and(other: Other): Result
+}
+
+trait BinaryBar[Other, Result] {
+  # The binary `|` operator.
+
+  fun bar(other: Other): Result
+}
+
+trait BinaryEqualsGreater[Other, Result] {
+  # The binary `=>` operator.
+
+  fun bar(other: Other): Result
+}
+
+## Prefix operators.
+
+trait PrefixMinus[Other, Result] {
+  # The prefix `-` operator.
+
+  fun minus(): Result
+}
+
+trait PrefixExclamation[Other, Result] {
+  # The prefix `!` operator.
+
+  fun exclamation(): Result
+}
