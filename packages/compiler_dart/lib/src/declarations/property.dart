@@ -23,7 +23,7 @@ final compileProperty = Query<DeclarationId, dart.Field>(
       ..name = mangleName(propertyHir.name)
       ..type = compileType(context, propertyHir.type)
       // In classes, the constructor is reponsible for handling defaults.
-      ..assignment = isInsideClass
+      ..assignment = isInsideClass && !propertyHir.isStatic
           ? null
           : compilePropertyInitializer(context, declarationId).valueOrNull);
   },
