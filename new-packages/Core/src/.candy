@@ -1,3 +1,4 @@
+public use .Assert
 public use .Bool
 public use .Io
 public use .Loops
