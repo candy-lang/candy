@@ -40,8 +40,11 @@ final compileModule = Query<ModuleId, Unit>(
       try {
         source = _dartFmt.format(rawSource);
       } on FormatterException {
-        stderr.write(
-          'Syntax error in generated source of module $moduleId:\n$rawSource',
+        stderr.write('Syntax error in generated source of module $moduleId.');
+        context.config.buildArtifactManager.setContent(
+          context,
+          moduleIdToBuildArtifactId(context, moduleId),
+          rawSource,
         );
         rethrow;
       }
