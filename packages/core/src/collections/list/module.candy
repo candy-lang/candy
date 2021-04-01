@@ -137,6 +137,11 @@ public trait List<Item>: Iterable<Item> {
     result.unsafeSort()
     result
   }
+  fun unsafeSortedBy<T: Comparable>(selector: (Item) => T): List<Item> {
+    let result = toMutable()
+    result.unsafeSortBy<T>(selector)
+    result
+  }
 }
 
 public trait MutableList<Item>: List<Item> {
@@ -236,7 +241,8 @@ public trait MutableList<Item>: List<Item> {
     }
   }
 
-  fun unsafeSort() {
+  fun unsafeSort() { unsafeSortBy<Item>({ it as Comparable }) }
+  fun unsafeSortBy<T: Comparable>(selector: (Item) => T) {
     // TODO(JonasWanke): use something faster for larger lists
     // Currently using insertion sort.
     1.until(length()).do({ i =>
@@ -244,7 +250,7 @@ public trait MutableList<Item>: List<Item> {
       mut let j = i
       while j > 0 {
         let leftItem = get(j - 1).unwrap()
-        if (leftItem as Comparable) <= (item as Comparable) { break unit }
+        if ((selector(leftItem) as T) <= (selector(item) as T)) { break unit }
         set(j, leftItem as Item)
         j = j - 1
       }
