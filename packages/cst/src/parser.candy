@@ -1035,7 +1035,7 @@ class CstParser {
   }
   fun whitespace(): Parser<String, WhitespaceToken> {
     character(
-      { it == " " || it == "\t" || it == "\r" || it == "\n" },
+      { it == " " || it == "\t" || it == "\r" || it == "\n" || it == "\r\n" },
       "Whitespace expected.",
     )
         .plus()
@@ -1096,13 +1096,15 @@ class CstParser {
     )
   }
   fun lineBreak(): Parser<String, Token<String, String>> {
-    singleCharacter("\r", "'\\r' expected.")
-        .optional()
-        .sequence<String>(singleCharacter("\n", "'\\n' expected."))
-        .token()
-        .map<Token<String, String>>({
-          Token<String, String>((it.input as Iterable<String>).join(""), it.span, it.input as List<String>)
-        })
+    let lineFeed = singleCharacter("\n", "'\\n' expected.")
+    // Carriage return followed by a line feed is a single grapheme cluster.
+    let both = singleCharacter("\r\n", "'\\r\\n' expected.")
+    let carriageReturn = singleCharacter("\r", "'\\r' expected.")
+    choiceOf<String, String>(List.of3<Parser<String, String>>(lineFeed, both, carriageReturn))
+      .token()
+      .map<Token<String, String>>({
+        Token<String, String>((it.input as Iterable<String>).join(""), it.span, it.input as List<String>)
+      })
   }
 }
 let keywords = List.of9<String>(
