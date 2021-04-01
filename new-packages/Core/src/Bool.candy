@@ -15,9 +15,12 @@ impl Bool: Equals & And & Or & Opposite & Implies {
 }
 
 impl Bool {
+  fun lazyAnd(other: () -> Bool): Bool { !this.then({ false() }).else(other) }
+  fun lazyOr(other: () -> Bool): Bool { this.then({ true() }).else(other) }
+}
+
+impl Bool {
   builtin fun then[T](body: () -> T): Maybe[T]
 }
 
-public fun if[T](condition: Bool, thenBody: () -> T): Maybe[T] {
-  condition.then(thenBody)
-}
+public fun if[T](condition: Bool, thenBody: () -> T): Maybe[T] { condition.then(thenBody) }
