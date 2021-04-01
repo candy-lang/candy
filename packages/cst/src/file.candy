@@ -3,6 +3,7 @@ use ..node
 use ..tokens
 
 public class CstFile {
+  public let leadingTrivia: List<WhitespaceToken | CommentToken>
   public let content: List<CstNode<CstUseLine | CstDeclaration>>
 }
 

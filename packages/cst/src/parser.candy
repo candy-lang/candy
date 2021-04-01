@@ -47,14 +47,17 @@ class CstParser {
   // file
 
   fun file(): Parser<String, CstNode<CstFile>> {
-    let parser = choiceOf<String, CstNode<CstUseLine | CstDeclaration>>(
-      List.of2<Parser<String, CstNode<CstUseLine | CstDeclaration>>>(
-        useLine() as Parser<String, CstNode<CstUseLine | CstDeclaration>>,
-        declaration() as Parser<String, CstNode<CstUseLine | CstDeclaration>>,
-      ),
-    )
+    let parser = trivia()
+      .sequence<List<CstNode<CstUseLine | CstDeclaration>>>(
+        choiceOf<String, CstNode<CstUseLine | CstDeclaration>>(
+          List.of2<Parser<String, CstNode<CstUseLine | CstDeclaration>>>(
+            useLine() as Parser<String, CstNode<CstUseLine | CstDeclaration>>,
+            declaration() as Parser<String, CstNode<CstUseLine | CstDeclaration>>,
+          ),
+        )
         .star()
-        .map<CstFile>({ CstFile(it) })
+      )
+      .map<CstFile>({ CstFile(it.first, it.second) })
     node<CstFile>(parser)
   }
 
@@ -925,7 +928,7 @@ class CstParser {
 
     let parser = string(keyword, "'{keyword}' expected.")
         .token()
-        .sequence<List<WhitespaceToken | CommentToken>>(trailingTrivia())
+        .sequence<List<WhitespaceToken | CommentToken>>(trivia())
         .map<KeywordToken>({ KeywordToken(it.first.span, it.second, keyword) })
     node<KeywordToken>(parser)
   }
@@ -959,7 +962,7 @@ class CstParser {
           }
           Ok<Unit, String>(unit)
         })
-        .sequence<List<WhitespaceToken | CommentToken>>(trailingTrivia())
+        .sequence<List<WhitespaceToken | CommentToken>>(trivia())
         .map<IdentifierToken>({ IdentifierToken(it.first.span, it.second, it.first.value) })
     node<IdentifierToken>(parser)
   }
@@ -969,7 +972,7 @@ class CstParser {
         .plus()
         .map<Int>({ Int.parse((it as Iterable<String>).join("")) })
         .token()
-        .sequence<List<WhitespaceToken | CommentToken>>(trailingTrivia())
+        .sequence<List<WhitespaceToken | CommentToken>>(trivia())
         .map<IntLiteralToken>({ IntLiteralToken(it.first.span, it.second, it.first.value as Int) })
     node<IntLiteralToken>(parser)
   }
@@ -977,7 +980,7 @@ class CstParser {
   fun punctuation(punctuation: String): Parser<String, CstNode<PunctuationToken>> {
     let parser = string(punctuation, "'{punctuation}' expected.")
         .token()
-        .sequence<List<WhitespaceToken | CommentToken>>(trailingTrivia())
+        .sequence<List<WhitespaceToken | CommentToken>>(trivia())
         .map<PunctuationToken>({ PunctuationToken(it.first.span, it.second, punctuation) })
         node<PunctuationToken>(parser)
   }
@@ -1027,7 +1030,7 @@ class CstParser {
         .star()
   }
 
-  fun trailingTrivia(): Parser<String, List<WhitespaceToken | CommentToken>> {
+  fun trivia(): Parser<String, List<WhitespaceToken | CommentToken>> {
     whitespace().or<CommentToken>(comment()).star()
   }
   fun whitespace(): Parser<String, WhitespaceToken> {
