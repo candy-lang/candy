@@ -231,7 +231,17 @@ public trait Iterable<Item> {
   }
 
   // TODO(marcelgarus): flatMap
-  // TODO(marcelgarus): groupBy
+
+  fun groupBy<T: Hash & Equals>(keyOf: (Item) => T): Map<T, List<Item>> {
+    let map = MutableMap.empty<T, MutableList<Item>>()
+    for item in this {
+      map
+        .putIfAbsent(keyOf(item), MutableList.empty<Item>())
+        .append(item)
+    }
+    map
+  }
+  
   // TODO(marcelgarus): reversed
 
   fun zip<T>(other: Iterable<T>): Iterable<(Item, T)> {
