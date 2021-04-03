@@ -15,10 +15,10 @@ class DartAnnotation {
   let expression: DartExpression
 }
 public let dartOverrideAnnotation = DartAnnotation(
-  DartExpression(DartIdentifier("override", Some<String>(dartCoreUrl))),
+  DartIdentifier("override", Some<String>(dartCoreUrl)),
 )
 public let dartMetaSealedAnnotation = DartAnnotation(
-  DartExpression(DartIdentifier("sealed", Some<String>(dartPackageMetaUrl))),
+  DartIdentifier("sealed", Some<String>(dartPackageMetaUrl)),
 )
 
 // Directives.
