@@ -232,10 +232,10 @@ public trait Iterable<Item> {
     let map = MutableMap.empty<T, MutableList<Item>>()
     for item in this {
       map
-        .putIfAbsent(keyOf(item), MutableList.empty<Item>())
+        .putIfAbsent(keyOf(item), { MutableList.empty<Item>() })
         .append(item)
     }
-    map
+    (map as Map<T, List<Item>>)
   }
 
   // TODO(marcelgarus): reversed
