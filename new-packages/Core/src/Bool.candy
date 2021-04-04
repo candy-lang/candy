@@ -24,7 +24,10 @@ impl Bool: Implies {
 
 impl Bool {
   fun lazyAnd(other: () -> Bool): Bool { !this.then({ false() }).else(other) }
+  ## TODO(marcelgarus): Rename this to just `and` as soon as we support overloading.
+  
   fun lazyOr(other: () -> Bool): Bool { this.then({ true() }).else(other) }
+  ## TODO(marcelgarus): Rename this to just `or` as soon as we support overloading.
 }
 
 impl Bool {
