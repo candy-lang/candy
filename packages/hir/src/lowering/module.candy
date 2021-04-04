@@ -3,3 +3,4 @@ use incremental
 
 public use .declarations
 public use .functions
+public use .types
