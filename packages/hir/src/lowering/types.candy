@@ -385,15 +385,18 @@ fun makeSureImplsAreNotConflicting(context: QueryContext<List<CompilerError>>) {
       .groupBy<HirInlineType>({ it.implementedTrait(context).unwrap() })
       .values() {
       let solverTypesOfImpls = (implsForSameTrait as Iterable<HirImpl>)
-        .flatMap({ HirInlineTypeToSolverTypeAndGoals(it.baseType()).map<SolverType>({ it.first }) })
+        .maybeMap<SolverType>({
+          hirInlineTypeToSolverTypeAndGoals(context, it.baseType(context))
+            .map<SolverType>({ it.first })
+        })
         .toList()
       for base1 in solverTypesOfImpls {
-        for base2 in solverImpls {
+        for base2 in solverTypesOfImpls {
           let unified = base1.unify(base2)
           if unified is Some {
             // Unifying the impl types succeeded. This means there's a type to which both impls
             // apply. That's bad.
-            let conflicting = base1.substitute(unified.unwrap())
+            let conflicting = base1.substituteAll(unified.unwrap())
             return Tuple(
               unit,
               List.of1<CompilerError>(ConflictingImplsCompilerError(base1, base2, conflicting)),
