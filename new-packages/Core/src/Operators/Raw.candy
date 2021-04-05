@@ -60,10 +60,10 @@ trait BinarySlash[Other, Result] {
   fun slash(other: Other): Result
 }
 
-trait BinaryTildeSlash[Other, Result] {
-  # The binary `~/` operator.
+trait BinarySlashSlash[Other, Result] {
+  # The binary `//` operator.
 
-  fun tildeSlash(other: Other): Result
+  fun slashSlash(other: Other): Result
 }
 
 trait BinaryPercent[Other, Result] {

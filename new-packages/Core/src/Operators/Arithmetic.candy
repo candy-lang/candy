@@ -40,12 +40,12 @@ trait Divide: BinarySlash[This, This] {
   fun slash(other: This): This { divide(other) }
 }
 
-trait DivideTruncating: BinaryTildeSlash[This, This] {
+trait DivideTruncating: BinarySlashSlash[This, This] {
   ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
 
   fun divideTruncating(other: This): Int
 
-  fun tildeSlash(other: This): This { divideTruncating(other) }
+  fun slashSlash(other: This): This { divideTruncating(other) }
 }
 
 trait Modulo {
