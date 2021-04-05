@@ -4,7 +4,7 @@ use ..declarations
 use ..expressions
 use ..types
 
-public data class AstFileId {
+public class AstFileId {
   let file: FancyFile
 }
 impl AstFileId: AstNodeId & Equals & Hash {
@@ -32,7 +32,7 @@ impl AstFile: AstNode & Equals & Hash {
 }
 
 
-public data class AstUseLineId {
+public class AstUseLineId {
   public let parentId: AstFileId
   public let index: Int
 }
@@ -55,7 +55,8 @@ public class AstUseLine {
 impl AstUseLine: AstNode & Equals & Hash {
   fun equals(other: AstUseLine): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>).unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (modifiers as Iterable<AstIdentifier>)
+        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
       (target as Equals) == (other.target as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {

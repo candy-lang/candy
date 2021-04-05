@@ -184,7 +184,7 @@ impl AstFunction: AstDeclaration & Equals & Hash {
     (typeParameters as Iterable<AstTypeParameter>).unsafeHash<T>(hasher)
     (valueParameters as Iterable<AstValueParameter>).unsafeHash<T>(hasher)
     (returnType as Hash).hash<T>(hasher)
-    innerDeclarations.unsafeHash<T>(hasher)
+    body.unsafeHash<T>(hasher)
   }
 }
 
