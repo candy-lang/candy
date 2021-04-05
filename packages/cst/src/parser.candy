@@ -404,16 +404,14 @@ class CstParser {
       ),
     )
     // We have to make sure that this doesn't match nothing.
-    let enumTypeVariant = atLeastOne<
-      List<CstNode<IdentifierToken>>,
-      (CstNode<IdentifierToken>, Maybe<CstNode<CstInlineType>>),
-    >(
-      identifier(false).plus(),
-      identifier(true).sequence<Maybe<CstNode<CstInlineType>>>(enumTypeVariantValueType.optional()),
-    )
+    let enumTypeVariant = modifiers()
+      .sequence<(CstNode<IdentifierToken>, Maybe<CstNode<CstInlineType>>)>(
+        identifier(true)
+          .sequence<Maybe<CstNode<CstInlineType>>>(enumTypeVariantValueType.optional()),
+      )
       .map<CstEnumTypeVariant>({
-        let modifiers = it.first.orElse({ List.empty<CstNode<IdentifierToken>>() })
-        let nameAndValue = it.second
+        let modifiers = it.first
+        let nameAndValue = Some<(CstNode<IdentifierToken>, Maybe<CstNode<CstInlineType>>)>(it.second)
         CstEnumTypeVariant(modifiers, nameAndValue)
       })
     let enumTypeVariant = node<CstEnumTypeVariant>(enumTypeVariant)

@@ -10,5 +10,5 @@ public class SetOfString {
 }
 impl SetOfString: Equals & Hash {
   fun equals(other: This): Bool { value.unsafeEquals(other.value) }
-  fun hash<T>(hasher: Hasher<T>) { value.unsafeHash(hasher) }
+  fun hash<T>(hasher: Hasher<T>) { value.unsafeHash<T>(hasher) }
 }

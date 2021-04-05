@@ -241,15 +241,15 @@ public trait MutableList<Item>: List<Item> {
     }
   }
 
-  fun unsafeSort() { unsafeSortBy<Item>({ it as Comparable }) }
+  fun unsafeSort() { unsafeSortBy<Comparable>({ it as Comparable }) }
   fun unsafeSortBy<T: Comparable>(selector: (Item) => T) {
     // TODO(JonasWanke): use something faster for larger lists
     // Currently using insertion sort.
     1.until(length()).do({ i =>
-      let item = get(i).unwrap()
+      let item = (get(i).unwrap() as Item)
       mut let j = i
       while j > 0 {
-        let leftItem = get(j - 1).unwrap()
+        let leftItem = (get(j - 1).unwrap() as Item)
         if ((selector(leftItem) as T) <= (selector(item) as T)) { break unit }
         set(j, leftItem as Item)
         j = j - 1
