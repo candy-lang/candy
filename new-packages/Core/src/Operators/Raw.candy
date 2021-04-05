@@ -72,10 +72,10 @@ trait BinaryPercent[Other, Result] {
   fun percent(other: Other): Result
 }
 
-trait BinaryAnd[Other, Result] {
+trait BinaryAmpersand[Other, Result] {
   # The binary `&` operator.
 
-  fun and(other: Other): Result
+  fun ampersand(other: Other): Result
 }
 
 trait BinaryBar[Other, Result] {

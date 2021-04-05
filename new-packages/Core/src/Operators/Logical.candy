@@ -1,6 +1,6 @@
 use ...Bool
 
-trait And: BinaryAnd[This, Bool] {
+trait And: BinaryAmpersand[This, Bool] {
   fun and(other: This): Bool
 }
 
