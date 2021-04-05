@@ -7,56 +7,126 @@ use ..types
 public data class AstFileId {
   let file: FancyFile
 }
-impl AstFileId: AstNodeId
+impl AstFileId: AstNodeId & Equals & Hash {
+  fun equals(other: AstFileId): Bool { (file as Equals) == (other.file as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { (file as Hash).hash<T>(hasher) }
+}
 
 public class AstFile {
   public let id: AstFileId
   public let useLines: List<AstUseLine>
   public let declarations: List<AstModule | AstTrait | AstImpl | AstType | AstFunction>
 }
-impl AstFile: AstNode
+impl AstFile: AstNode & Equals & Hash {
+  fun equals(other: AstFile): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (useLines as Iterable<AstUseLine>).unsafeEquals(other.useLines as Iterable<AstUseLine>) &&
+      (declarations as Iterable<AstModule | AstTrait | AstImpl | AstType | AstFunction>)
+        .unsafeEquals(other.declarations as Iterable<AstModule | AstTrait | AstImpl | AstType | AstFunction>)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (useLines as Iterable<AstUseLine>).unsafeHash<T>(hasher)
+    (declarations as Iterable<AstUseLine>).unsafeHash<T>(hasher)
+  }
+}
 
 
 public data class AstUseLineId {
   public let parentId: AstFileId
   public let index: Int
 }
-impl AstUseLineId: AstNodeId
+impl AstUseLineId: AstNodeId & Equals & Hash {
+  fun equals(other: AstUseLineId): Bool {
+    (parentId as Equals) == (other.parentId as Equals) &&
+      (index as Equals) == (other.index as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (parentId as Hash).hash<T>(hasher)
+    (index as Hash).hash<T>(hasher)
+  }
+}
 
 public class AstUseLine {
   public let id: AstUseLineId
   public let modifiers: List<AstIdentifier>
   public let target: AstUseLineTarget
 }
-impl AstUseLine: AstNode
+impl AstUseLine: AstNode & Equals & Hash {
+  fun equals(other: AstUseLine): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (modifiers as Iterable<AstIdentifier>).unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (target as Equals) == (other.target as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (modifiers as Iterable<AstUseLine>).unsafeHash<T>(hasher)
+    (target as Hash).hash<T>(hasher)
+  }
+}
 
 
 public class AstUseLineTargetId {
   public let parentId: AstUseLineId
 }
-impl AstUseLineTargetId: AstNodeId
+impl AstUseLineTargetId: AstNodeId & Equals & Hash {
+  fun equals(other: AstUseLineTargetId): Bool { (parentId as Equals) == (other.parentId as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { (parentId as Hash).hash<T>(hasher) }
+}
 
-public trait /* enum */ AstUseLineTarget
+public trait /* enum */ AstUseLineTarget: Equals & Hash
 
 public class AstLocalAbsoluteUseLineTarget {
   public let id: AstUseLineTargetId
   public let path: List<AstIdentifier>
 }
-impl AstLocalAbsoluteUseLineTarget: AstUseLineTarget
+impl AstLocalAbsoluteUseLineTarget: AstUseLineTarget & Equals & Hash {
+  fun equals(other: AstLocalAbsoluteUseLineTarget): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (path as Iterable<AstIdentifier>).unsafeEquals(other.path as Iterable<AstIdentifier>)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (path as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+  }
+}
 
 public class AstLocalRelativeUseLineTarget {
   public let id: AstUseLineTargetId
   public let parentNavigations: Int
   public let path: List<AstIdentifier>
 }
-impl AstLocalRelativeUseLineTarget: AstUseLineTarget
+impl AstLocalRelativeUseLineTarget: AstUseLineTarget & Equals & Hash {
+  fun equals(other: AstLocalRelativeUseLineTarget): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (parentNavigations as Equals) == (other.parentNavigations as Equals) &&
+      (path as Iterable<AstIdentifier>).unsafeEquals(other.path as Iterable<AstIdentifier>)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (parentNavigations as Hash).hash<T>(hasher)
+    (path as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+  }
+}
 
 public class AstGlobalUseLineTarget {
   public let id: AstUseLineTargetId
   public let packagePath: List<AstIdentifier>
   public let moduleName: Maybe<AstIdentifier>
 }
-impl AstGlobalUseLineTarget: AstUseLineTarget
+impl AstGlobalUseLineTarget: AstUseLineTarget & Equals & Hash {
+  fun equals(other: AstGlobalUseLineTarget): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (packagePath as Iterable<AstIdentifier>)
+        .unsafeEquals(other.packagePath as Iterable<AstIdentifier>) &&
+      moduleName.unsafeEquals(other.moduleName)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (packagePath as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    moduleName.unsafeHash<T>(hasher)
+  }
+}
 
 
 public class AstIdentifierId {
@@ -69,9 +139,27 @@ public class AstIdentifierId {
       | AstExpressionId
   public let index: Int
 }
-impl AstIdentifierId: AstNodeId
+impl AstIdentifierId: AstNodeId & Equals & Hash {
+  fun equals(other: AstIdentifierId): Bool {
+    (parentId as Equals) == (other.parentId as Equals) &&
+      (index as Equals) == (other.index as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (parentId as Hash).hash<T>(hasher)
+    (index as Hash).hash<T>(hasher)
+  }
+}
 
 public class AstIdentifier {
   public let id: AstIdentifierId
   public let value: String
+}
+impl AstIdentifier: Equals & Hash {
+  fun equals(other: AstIdentifier): Bool {
+    (id as Equals) == (other.id as Equals) && (value as Equals) == (other.value as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (value as Hash).hash<T>(hasher)
+  }
 }

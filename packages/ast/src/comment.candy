@@ -4,11 +4,22 @@ use ..node
 public class AstCandyDocId {
   let parentId: AstDeclarationId
 }
-impl AstCandyDocId: AstNodeId
+impl AstCandyDocId: AstNodeId & Equals & Hash {
+  fun equals(other: AstCandyDocId): Bool { (parentId as Equals) == (other.parentId as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { (parentId as Hash).hash<T>(hasher) }
+}
 
 
 public class AstCandyDoc {
   public let id: AstCandyDocId
   public let content: String
 }
-impl AstCandyDoc: AstNode
+impl AstCandyDoc: AstNode & Equals & Hash {
+  fun equals(other: AstCandyDoc): Bool {
+    (id as Equals) == (other.id as Equals) && (content as Equals) == (other.content as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (content as Hash).hash<T>(hasher)
+  }
+}
