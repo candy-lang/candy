@@ -9,7 +9,7 @@ public fun false(): Bool { Bool.False }
 impl Bool: Equals {
   builtin fun equals(other: Bool): Bool
 }
-impl Bool: Any {
+impl Bool: And {
   builtin fun and(other: Bool): Bool
 }
 impl Bool: Or {
