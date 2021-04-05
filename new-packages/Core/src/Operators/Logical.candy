@@ -2,10 +2,14 @@ use ...Bool
 
 trait And: BinaryAmpersand[This, Bool] {
   fun and(other: This): Bool
+
+  fun ampersand(other: This): Bool { and(other) }
 }
 
 trait Or: BinaryBar[This, Bool] {
   fun or(other: This): Bool
+
+  fun bar(other: This): Bool { or(other) }
 }
 
 trait Opposite: PrefixExclamation[This] {
