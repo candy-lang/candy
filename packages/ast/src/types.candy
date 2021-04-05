@@ -12,12 +12,21 @@ public class AstInlineTypeId {
       | AstExpressionId
   let value: Int
 }
-impl AstInlineTypeId: AstNodeId
+impl AstInlineTypeId: AstNodeId & Equals & Hash {
+  fun equals(other: AstInlineTypeId): Bool {
+    (parentId as Equals) == (other.parentId as Equals) &&
+      (value as Equals) == (other.value as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (parentId as Hash).hash<T>(hasher)
+    (value as Hash).hash<T>(hasher)
+  }
+}
 
 public trait /* enum */ AstInlineType {
   let modifiers: List<AstIdentifier>
 }
-impl AstInlineType: AstNode
+impl AstInlineType: AstNode & Equals & Hash
 
 
 public class AstNamedType {
@@ -26,7 +35,23 @@ public class AstNamedType {
   public let nameParts: List<AstIdentifier>
   public let typeArguments: List<AstTypeArgument>
 }
-impl AstNamedType: AstInlineType
+impl AstNamedType: AstInlineType & Equals & Hash {
+  fun equals(other: AstNamedType): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (modifiers as Iterable<AstIdentifier>)
+        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (nameParts as Iterable<AstIdentifier>)
+        .unsafeEquals(other.nameParts as Iterable<AstIdentifier>) &&
+      (typeArguments as Iterable<AstTypeArgument>)
+        .unsafeEquals(other.typeArguments as Iterable<AstTypeArgument>)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (nameParts as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (typeArguments as Iterable<AstTypeArgument>).unsafeHash<T>(hasher)
+  }
+}
 
 
 public class AstFunctionType {
@@ -36,7 +61,24 @@ public class AstFunctionType {
   public let parameterTypes: List<AstInlineType>
   public let returnType: AstInlineType
 }
-impl AstFunctionType: AstInlineType
+impl AstFunctionType: AstInlineType & Equals & Hash {
+  fun equals(other: AstFunctionType): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (modifiers as Iterable<AstIdentifier>)
+        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      receiverType.unsafeEquals(other.receiverType) &&
+      (parameterTypes as Iterable<AstIdentifier>)
+        .unsafeEquals(other.parameterTypes as Iterable<AstIdentifier>) &&
+      (returnType as Equals) == (other.returnType as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    receiverType.unsafeHash<T>(hasher)
+    (parameterTypes as Iterable<AstInlineType>).unsafeHash<T>(hasher)
+    (returnType as Hash).hash<T>(hasher)
+  }
+}
 
 
 public class AstTupleType {
@@ -44,7 +86,19 @@ public class AstTupleType {
   public let modifiers: List<AstIdentifier>
   public let types: List<AstInlineType>
 }
-impl AstTupleType: AstInlineType
+impl AstTupleType: AstInlineType & Equals & Hash {
+  fun equals(other: AstTupleType): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (modifiers as Iterable<AstIdentifier>)
+        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (types as Iterable<AstInlineType>).unsafeEquals(other.types as Iterable<AstInlineType>)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (types as Iterable<AstInlineType>).unsafeHash<T>(hasher)
+  }
+}
 
 
 public class AstNamedTupleType {
@@ -52,13 +106,41 @@ public class AstNamedTupleType {
   public let modifiers: List<AstIdentifier>
   public let types: List<AstNamedTupleTypeField>
 }
-impl AstNamedTupleType: AstInlineType
+impl AstNamedTupleType: AstInlineType & Equals & Hash {
+  fun equals(other: AstNamedTupleType): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (modifiers as Iterable<AstIdentifier>)
+        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (types as Iterable<AstNamedTupleTypeField>)
+        .unsafeEquals(other.types as Iterable<AstNamedTupleTypeField>)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (types as Iterable<AstNamedTupleTypeField>).unsafeHash<T>(hasher)
+  }
+}
 
 public class AstNamedTupleTypeField {
   public let id: AstInlineTypeId
   public let modifiers: List<AstIdentifier>
   public let name: AstIdentifier
   public let type: AstInlineType
+}
+impl AstNamedTupleTypeField: Equals & Hash {
+  fun equals(other: AstNamedTupleTypeField): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (modifiers as Iterable<AstIdentifier>)
+        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      name.equals(other.name) &&
+      (type as Equals) == (other.type as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (name as Hash).hash<T>(hasher)
+    (type as Hash).hash<T>(hasher)
+  }
 }
 
 
@@ -67,13 +149,41 @@ public class AstEnumType {
   public let modifiers: List<AstIdentifier>
   public let variants: List<AstEnumTypeVariant>
 }
-impl AstEnumType: AstInlineType
+impl AstEnumType: AstInlineType & Equals & Hash {
+  fun equals(other: AstEnumType): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (modifiers as Iterable<AstIdentifier>)
+        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (variants as Iterable<AstEnumTypeVariant>)
+        .unsafeEquals(other.variants as Iterable<AstEnumTypeVariant>)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (variants as Iterable<AstEnumTypeVariant>).unsafeHash<T>(hasher)
+  }
+}
 
 public class AstEnumTypeVariant {
   public let id: AstInlineTypeId
   public let modifiers: List<AstIdentifier>
   public let name: AstIdentifier
   public let valueType: Maybe<AstInlineType>
+}
+impl AstEnumTypeVariant: Equals & Hash {
+  fun equals(other: AstEnumTypeVariant): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (modifiers as Iterable<AstIdentifier>)
+        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (name as Equals) == (other.name as Equals) &&
+      valueType.unsafeEquals(other.valueType)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (name as Hash).hash<T>(hasher)
+    valueType.unsafeHash<T>(hasher)
+  }
 }
 
 
@@ -82,21 +192,51 @@ public class AstIntersectionType {
   public let modifiers: List<AstIdentifier>
   public let types: List<AstInlineType>
 }
-impl AstIntersectionType: AstInlineType
+impl AstIntersectionType: AstInlineType & Equals & Hash {
+  fun equals(other: AstIntersectionType): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (modifiers as Iterable<AstIdentifier>)
+        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (types as Iterable<AstIdentifier>).unsafeEquals(other.types as Iterable<AstIdentifier>)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (types as Iterable<AstInlineType>).unsafeHash<T>(hasher)
+  }
+}
 
 
 public class AstErrorType {
   public let id: AstInlineTypeId
   public let modifiers: List<AstIdentifier> = List.empty<AstIdentifier>()
 }
-impl AstErrorType: AstInlineType
+impl AstErrorType: AstInlineType & Equals & Hash {
+  fun equals(other: AstErrorType): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (modifiers as Iterable<AstIdentifier>)
+        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+  }
+}
 
 
 public class AstTypeParameterId {
   let parentId: AstDeclarationId
   let name: String
 }
-impl AstTypeParameterId: AstNodeId
+impl AstTypeParameterId: AstNodeId & Equals & Hash {
+  fun equals(other: AstTypeParameterId): Bool {
+    (parentId as Equals) == (other.parentId as Equals) && (name as Equals) == (other.name as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (parentId as Hash).hash<T>(hasher)
+    (name as Hash).hash<T>(hasher)
+  }
+}
 
 public class AstTypeParameter {
   public let id: AstTypeParameterId
@@ -104,15 +244,48 @@ public class AstTypeParameter {
   public let name: AstIdentifier
   public let upperBound: Maybe<AstInlineType>
 }
+impl AstTypeParameter: Equals & Hash {
+  fun equals(other: AstTypeParameter): Bool {
+    (id as Equals) == (other.id as Equals) &&
+      (modifiers as Iterable<AstIdentifier>)
+        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (name as Equals) == (other.name as Equals) &&
+      upperBound.unsafeEquals(other.upperBound)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (name as Hash).hash<T>(hasher)
+    upperBound.unsafeHash<T>(hasher)
+  }
+}
 
 
 public class AstTypeArgumentId {
   let parentId: AstInlineTypeId | AstExpressionId
   let index: Int
 }
-impl AstTypeArgumentId: AstNodeId
+impl AstTypeArgumentId: AstNodeId & Equals & Hash {
+  fun equals(other: AstTypeArgumentId): Bool {
+    (parentId as Equals) == (other.parentId as Equals) &&
+      (index as Equals) == (other.index as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (parentId as Hash).hash<T>(hasher)
+    (index as Hash).hash<T>(hasher)
+  }
+}
 
 public class AstTypeArgument {
   public let id: AstTypeArgumentId
   public let type: AstInlineType
+}
+impl AstTypeArgument: Equals & Hash {
+  fun equals(other: AstTypeArgument): Bool {
+    (id as Equals) == (other.id as Equals) && (type as Equals) == (other.type as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (id as Hash).hash<T>(hasher)
+    (type as Hash).hash<T>(hasher)
+  }
 }

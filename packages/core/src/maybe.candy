@@ -1,3 +1,6 @@
+use ..bool
+use ..hash
+use ..operators
 use ..primitives
 
 public trait Maybe<Value> {
@@ -24,4 +27,15 @@ impl<Value> None<Value>: Maybe<Value> {
   fun unwrap(): Value { throw "Unwrapped `None`." }
   fun orElse(alternative: () => Value): Value { alternative() }
   fun flatMap<Out>(mapper: (Value) => Maybe<Out>): Maybe<Out> { None<Out>() }
+}
+
+impl<T> Maybe<T> {
+  fun unsafeEquals(other: Maybe<T>): Bool {
+    if (this is None) && (other is None) { return true }
+    if (this is Some) && (other is Some) {
+      return (this.unwrap() as Equals) == (other.unwrap() as Equals)
+    }
+    return false
+  }
+  fun unsafeHash<T>(hasher: Hasher<T>) { this.do({ it.hash<T>(hasher) }) }
 }
