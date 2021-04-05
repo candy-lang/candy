@@ -10,6 +10,9 @@ public trait Maybe<Value> {
   fun flatMap<Out>(mapper: (Value) => Maybe<Out>): Maybe<Out>
   fun cast<Out>(): Maybe<Out> { map<Out>({ it as Out }) }
   fun do(lambda: (Value) => Unit) { map<Unit>({ lambda(it) }) }
+
+  fun unsafeEquals(other: Maybe<Value>): Bool
+  fun unsafeHash<T>(hasher: Hasher<T>)
 }
 
 public class Some<Value> {
@@ -19,6 +22,12 @@ impl<Value> Some<Value>: Maybe<Value> {
   fun unwrap(): Value { value }
   fun orElse(alternative: () => Value): Value { value }
   fun flatMap<Out>(mapper: (Value) => Maybe<Out>): Maybe<Out> { mapper(value) }
+
+  fun unsafeEquals(other: Maybe<Value>): Bool {
+    if (other is Some) { return false }
+    (value as Equals) == (other.unwrap() as Equals)
+  }
+  fun unsafeHash<T>(hasher: Hasher<T>) { (value as Hash).hash<T>(hasher) }
 }
 
 // TODO(JonasWanke): remove type parameter when multi-impls are supported
@@ -27,15 +36,7 @@ impl<Value> None<Value>: Maybe<Value> {
   fun unwrap(): Value { throw "Unwrapped `None`." }
   fun orElse(alternative: () => Value): Value { alternative() }
   fun flatMap<Out>(mapper: (Value) => Maybe<Out>): Maybe<Out> { None<Out>() }
-}
 
-impl<T> Maybe<T> {
-  fun unsafeEquals(other: Maybe<T>): Bool {
-    if (this is None) && (other is None) { return true }
-    if (this is Some) && (other is Some) {
-      return (this.unwrap() as Equals) == (other.unwrap() as Equals)
-    }
-    return false
-  }
-  fun unsafeHash<T>(hasher: Hasher<T>) { this.do({ it.hash<T>(hasher) }) }
+  fun unsafeEquals(other: Maybe<Value>): Bool { (other is None) }
+  fun unsafeHash<T>(hasher: Hasher<T>) {}
 }

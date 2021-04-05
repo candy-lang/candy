@@ -13,7 +13,7 @@ public class AstInlineTypeId {
   let value: Int
 }
 impl AstInlineTypeId: AstNodeId & Equals & Hash {
-  fun equals(other: AstInlineTypeId): Bool {
+  fun equals(other: This): Bool {
     (parentId as Equals) == (other.parentId as Equals) &&
       (value as Equals) == (other.value as Equals)
   }
@@ -36,7 +36,7 @@ public class AstNamedType {
   public let typeArguments: List<AstTypeArgument>
 }
 impl AstNamedType: AstInlineType & Equals & Hash {
-  fun equals(other: AstNamedType): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
@@ -62,7 +62,7 @@ public class AstFunctionType {
   public let returnType: AstInlineType
 }
 impl AstFunctionType: AstInlineType & Equals & Hash {
-  fun equals(other: AstFunctionType): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
@@ -87,7 +87,7 @@ public class AstTupleType {
   public let types: List<AstInlineType>
 }
 impl AstTupleType: AstInlineType & Equals & Hash {
-  fun equals(other: AstTupleType): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
@@ -107,7 +107,7 @@ public class AstNamedTupleType {
   public let types: List<AstNamedTupleTypeField>
 }
 impl AstNamedTupleType: AstInlineType & Equals & Hash {
-  fun equals(other: AstNamedTupleType): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
@@ -128,7 +128,7 @@ public class AstNamedTupleTypeField {
   public let type: AstInlineType
 }
 impl AstNamedTupleTypeField: Equals & Hash {
-  fun equals(other: AstNamedTupleTypeField): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
@@ -150,7 +150,7 @@ public class AstEnumType {
   public let variants: List<AstEnumTypeVariant>
 }
 impl AstEnumType: AstInlineType & Equals & Hash {
-  fun equals(other: AstEnumType): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
@@ -171,7 +171,7 @@ public class AstEnumTypeVariant {
   public let valueType: Maybe<AstInlineType>
 }
 impl AstEnumTypeVariant: Equals & Hash {
-  fun equals(other: AstEnumTypeVariant): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
@@ -193,7 +193,7 @@ public class AstIntersectionType {
   public let types: List<AstInlineType>
 }
 impl AstIntersectionType: AstInlineType & Equals & Hash {
-  fun equals(other: AstIntersectionType): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
@@ -212,7 +212,7 @@ public class AstErrorType {
   public let modifiers: List<AstIdentifier> = List.empty<AstIdentifier>()
 }
 impl AstErrorType: AstInlineType & Equals & Hash {
-  fun equals(other: AstErrorType): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>)
@@ -229,7 +229,7 @@ public class AstTypeParameterId {
   let name: String
 }
 impl AstTypeParameterId: AstNodeId & Equals & Hash {
-  fun equals(other: AstTypeParameterId): Bool {
+  fun equals(other: This): Bool {
     (parentId as Equals) == (other.parentId as Equals) && (name as Equals) == (other.name as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
@@ -245,7 +245,7 @@ public class AstTypeParameter {
   public let upperBound: Maybe<AstInlineType>
 }
 impl AstTypeParameter: Equals & Hash {
-  fun equals(other: AstTypeParameter): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
@@ -266,7 +266,7 @@ public class AstTypeArgumentId {
   let index: Int
 }
 impl AstTypeArgumentId: AstNodeId & Equals & Hash {
-  fun equals(other: AstTypeArgumentId): Bool {
+  fun equals(other: This): Bool {
     (parentId as Equals) == (other.parentId as Equals) &&
       (index as Equals) == (other.index as Equals)
   }
@@ -281,7 +281,7 @@ public class AstTypeArgument {
   public let type: AstInlineType
 }
 impl AstTypeArgument: Equals & Hash {
-  fun equals(other: AstTypeArgument): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) && (type as Equals) == (other.type as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
