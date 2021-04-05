@@ -8,7 +8,7 @@ public class AstFileId {
   let file: FancyFile
 }
 impl AstFileId: AstNodeId & Equals & Hash {
-  fun equals(other: AstFileId): Bool { (file as Equals) == (other.file as Equals) }
+  fun equals(other: This): Bool { (file as Equals) == (other.file as Equals) }
   fun hash<T>(hasher: Hasher<T>) { (file as Hash).hash<T>(hasher) }
 }
 
@@ -18,7 +18,7 @@ public class AstFile {
   public let declarations: List<AstModule | AstTrait | AstImpl | AstType | AstFunction>
 }
 impl AstFile: AstNode & Equals & Hash {
-  fun equals(other: AstFile): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (useLines as Iterable<AstUseLine>).unsafeEquals(other.useLines as Iterable<AstUseLine>) &&
       (declarations as Iterable<AstModule | AstTrait | AstImpl | AstType | AstFunction>)
@@ -37,7 +37,7 @@ public class AstUseLineId {
   public let index: Int
 }
 impl AstUseLineId: AstNodeId & Equals & Hash {
-  fun equals(other: AstUseLineId): Bool {
+  fun equals(other: This): Bool {
     (parentId as Equals) == (other.parentId as Equals) &&
       (index as Equals) == (other.index as Equals)
   }
@@ -53,7 +53,7 @@ public class AstUseLine {
   public let target: AstUseLineTarget
 }
 impl AstUseLine: AstNode & Equals & Hash {
-  fun equals(other: AstUseLine): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
@@ -71,7 +71,7 @@ public class AstUseLineTargetId {
   public let parentId: AstUseLineId
 }
 impl AstUseLineTargetId: AstNodeId & Equals & Hash {
-  fun equals(other: AstUseLineTargetId): Bool { (parentId as Equals) == (other.parentId as Equals) }
+  fun equals(other: This): Bool { (parentId as Equals) == (other.parentId as Equals) }
   fun hash<T>(hasher: Hasher<T>) { (parentId as Hash).hash<T>(hasher) }
 }
 
@@ -82,7 +82,7 @@ public class AstLocalAbsoluteUseLineTarget {
   public let path: List<AstIdentifier>
 }
 impl AstLocalAbsoluteUseLineTarget: AstUseLineTarget & Equals & Hash {
-  fun equals(other: AstLocalAbsoluteUseLineTarget): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (path as Iterable<AstIdentifier>).unsafeEquals(other.path as Iterable<AstIdentifier>)
   }
@@ -98,7 +98,7 @@ public class AstLocalRelativeUseLineTarget {
   public let path: List<AstIdentifier>
 }
 impl AstLocalRelativeUseLineTarget: AstUseLineTarget & Equals & Hash {
-  fun equals(other: AstLocalRelativeUseLineTarget): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (parentNavigations as Equals) == (other.parentNavigations as Equals) &&
       (path as Iterable<AstIdentifier>).unsafeEquals(other.path as Iterable<AstIdentifier>)
@@ -116,7 +116,7 @@ public class AstGlobalUseLineTarget {
   public let moduleName: Maybe<AstIdentifier>
 }
 impl AstGlobalUseLineTarget: AstUseLineTarget & Equals & Hash {
-  fun equals(other: AstGlobalUseLineTarget): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (packagePath as Iterable<AstIdentifier>)
         .unsafeEquals(other.packagePath as Iterable<AstIdentifier>) &&
@@ -141,7 +141,7 @@ public class AstIdentifierId {
   public let index: Int
 }
 impl AstIdentifierId: AstNodeId & Equals & Hash {
-  fun equals(other: AstIdentifierId): Bool {
+  fun equals(other: This): Bool {
     (parentId as Equals) == (other.parentId as Equals) &&
       (index as Equals) == (other.index as Equals)
   }
@@ -156,7 +156,7 @@ public class AstIdentifier {
   public let value: String
 }
 impl AstIdentifier: Equals & Hash {
-  fun equals(other: AstIdentifier): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) && (value as Equals) == (other.value as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {

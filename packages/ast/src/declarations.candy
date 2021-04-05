@@ -9,7 +9,7 @@ public class AstDeclarationId {
   let name: String
 }
 impl AstDeclarationId: AstNodeId & Equals & Hash {
-  fun equals(other: AstDeclarationId): Bool {
+  fun equals(other: This): Bool {
     (parentId as Equals) == (other.parentId as Equals) && (name as Equals) == (other.name as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
@@ -22,7 +22,7 @@ public trait /* enum */ AstDeclaration {
   public let modifiers: List<AstIdentifier>
 }
 impl AstDeclaration: AstNode & Equals & Hash {
-  fun equals(other: AstDeclaration): Bool {
+  fun equals(other: This): Bool {
     (modifiers as Iterable<AstIdentifier>).unsafeEquals(other.modifiers as Iterable<AstIdentifier>)
   }
   fun hash<T>(hasher: Hasher<T>) { (modifiers as Hash).unsafeHash<T>(hasher) }
@@ -37,7 +37,7 @@ public class AstModule {
   public let innerDeclarations: List<AstModule | AstTrait | AstImpl | AstType | AstFunction>
 }
 impl AstModule: AstDeclaration & Equals & Hash {
-  fun equals(other: AstModule): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       candyDoc.unsafeEquals(other.candyDoc) &&
       (modifiers as Iterable<AstIdentifier>)
@@ -67,7 +67,7 @@ public class AstTrait {
   public let innerDeclarations: List<AstTrait | AstType | AstFunction>
 }
 impl AstTrait: AstDeclaration & Equals & Hash {
-  fun equals(other: AstTrait): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       candyDoc.unsafeEquals(other.candyDoc) &&
       (modifiers as Iterable<AstIdentifier>)
@@ -99,7 +99,7 @@ public class AstImpl {
   public let innerDeclarations: List<AstFunction>
 }
 impl AstImpl: AstDeclaration & Equals & Hash {
-  fun equals(other: AstImpl): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
@@ -131,7 +131,7 @@ public class AstType {
   public let type: Maybe<AstInlineType>
 }
 impl AstType: AstDeclaration & Equals & Hash {
-  fun equals(other: AstType): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       candyDoc.unsafeEquals(other.candyDoc) &&
       (modifiers as Iterable<AstIdentifier>)
@@ -163,7 +163,7 @@ public class AstFunction {
   public let body: Maybe<AstBlockBody | AstExpressionBody | AstDelegationBody>
 }
 impl AstFunction: AstDeclaration & Equals & Hash {
-  fun equals(other: AstFunction): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       candyDoc.unsafeEquals(other.candyDoc) &&
       (modifiers as Iterable<AstIdentifier>)
@@ -194,7 +194,7 @@ public class AstValueParameterId {
   let name: String
 }
 impl AstValueParameterId: AstNodeId & Equals & Hash {
-  fun equals(other: AstValueParameterId): Bool {
+  fun equals(other: This): Bool {
     (parentId as Equals) == (other.parentId as Equals) && (name as Equals) == (other.name as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
@@ -211,7 +211,7 @@ public class AstValueParameter {
   public let defaultValue: Maybe<AstExpression>
 }
 impl AstValueParameter: Equals & Hash {
-  fun equals(other: AstValueParameter): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
@@ -233,7 +233,7 @@ public class AstBodyId {
   let parentId: AstDeclarationId
 }
 impl AstBodyId: AstNodeId & Equals & Hash {
-  fun equals(other: AstBodyId): Bool { (parentId as Equals) == (other.parentId as Equals) }
+  fun equals(other: This): Bool { (parentId as Equals) == (other.parentId as Equals) }
   fun hash<T>(hasher: Hasher<T>) { (parentId as Hash).hash<T>(hasher) }
 }
 
@@ -242,7 +242,7 @@ public class AstBlockBody {
   public let expressions: List<AstExpression>
 }
 impl AstBlockBody: AstNode & Equals & Hash {
-  fun equals(other: AstBlockBody): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (expressions as Iterable<AstExpression>)
         .unsafeEquals(other.expressions as Iterable<AstExpression>)
@@ -257,7 +257,7 @@ public class AstExpressionBody {
   public let expression: Maybe<AstExpression>
 }
 impl AstExpressionBody: AstNode & Equals & Hash {
-  fun equals(other: AstExpressionBody): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) && expression.unsafeEquals(other.expression)
   }
   fun hash<T>(hasher: Hasher<T>) {
@@ -270,7 +270,7 @@ public class AstDelegationBody {
   public let expression: Maybe<AstExpression>
 }
 impl AstDelegationBody: AstNode & Equals & Hash {
-  fun equals(other: AstDelegationBody): Bool {
+  fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) && expression.unsafeEquals(other.expression)
   }
   fun hash<T>(hasher: Hasher<T>) {
