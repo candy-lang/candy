@@ -46,10 +46,7 @@ public fun compileTupleTypeDeclaration(
 
     let fields = (HirTupleType.fieldNames as Iterable<String>)
       .take(size)
-      .mapIndexed<(String, DartType)>({ name, index =>
-        let type = DartNamedType(DartIdentifier("T{index}", None<String>()), List.empty<DartType>())
-        Tuple(name, type)
-      })
+      .mapIndexed<(String, String)>({ name, index => Tuple(name, "T{index}") })
 
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
@@ -75,7 +72,9 @@ public fun compileTupleTypeDeclaration(
           it.first,
           isStatic = false,
           mutability = DartFinal(),
-          type = Some<DartType>(it.second),
+          type = Some<DartType>(
+            DartNamedType(DartIdentifier(it.second, None<String>()), List.empty<DartType>()),
+          ),
           initialValue = None<DartExpression>(),
         )
       })
@@ -94,7 +93,7 @@ public fun compileTupleTypeDeclaration(
       body = body,
     )
 
-    Tuple(output, List.empty<CompilerError>())
+    Tuple(dartDeclaration, List.empty<CompilerError>())
   })
 }
 

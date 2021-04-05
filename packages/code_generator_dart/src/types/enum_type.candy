@@ -1,0 +1,190 @@
+use compiler_utils
+use dart_code
+use hir
+use incremental
+
+public fun compileEnumType(
+  context: QueryContext<List<CompilerError>>,
+  enumType: HirEnumType,
+): DartType {
+  query<DartType, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileEnumType",
+    enumType, {
+    let variantNames = enumType.variants.keys()
+
+    let name = getCompiledEnumTypeName(context, variantNames.toSet())
+    let name = DartIdentifier(name, None<String>())
+    // TODO(JonasWanke): correct package URL
+
+    let sortedVariants = (variantNames.toList().unsafeSorted() as Iterable<String>)
+      .map<(String, HirInlineType)>({
+        // TODO(JonasWanke): use `Nothing` if a variant doesn't contain a value
+        Tuple(it, enumType.variants.get(it).unwrap().unwrap())
+      })
+    let types = List.empty<DartType>()
+    // TODO(JonasWanke): Map the types
+
+    Tuple(DartNamedType(name, types), List.empty<CompilerError>())
+  })
+}
+
+public fun compileEnumTypeDeclaration(
+  context: QueryContext<List<CompilerError>>,
+  variantNames: Set<String>,
+): List<DartClass> {
+  query<List<DartClass>, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileEnumTypeDeclaration",
+    SetOfString(variantNames), {
+    let classes = MutableList.empty<DartClass>()
+
+    classes.append(compileEnumTypeDeclarationBase(context, variantNames))
+
+    let variantClasses = variantNames.items()
+      .map<DartClass>({ compileEnumTypeDeclarationVariant(context, variantNames, it) })
+    classes.appendAll(variantClasses)
+
+    Tuple(classes, List.empty<CompilerError>())
+  })
+}
+fun compileEnumTypeDeclarationBase(
+  context: QueryContext<List<CompilerError>>,
+  variantNames: Set<String>,
+): DartClass {
+  query<DartClass, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileEnumTypeDeclarationBase",
+    SetOfString(variantNames), {
+    let name = getCompiledEnumTypeName(context, variantNames)
+
+    let variants = (variantNames.items().toList().unsafeSorted() as Iterable<String>)
+      .map<(String, String)>({ Tuple(it, "T{it}") })
+
+    let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
+
+    let constructor = DartConstructor(
+      className = name,
+      name = None<String>(),
+      annotations = List.empty<DartAnnotation>(),
+      isConst = true,
+      requiredParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      body = None<DartBody>(),
+    )
+    body.append(constructor)
+
+    let dartDeclaration = DartClass(
+      name = name,
+      annotations = List.empty<DartAnnotation>(),
+      isAbstract = true,
+      typeParameters = variants
+        .map<DartTypeParameter>({ DartTypeParameter(it.second, None<DartType>()) })
+        .toList(),
+      extends_ = None<DartType>(),
+      implements_ = List.empty<DartType>(),
+      with_ = List.empty<DartType>(),
+      body = body,
+    )
+
+    Tuple(dartDeclaration, List.empty<CompilerError>())
+  })
+}
+fun compileEnumTypeDeclarationVariant(
+  context: QueryContext<List<CompilerError>>,
+  variantNames: Set<String>,
+  variant: String,
+): DartClass {
+  query<DartClass, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileEnumTypeDeclarationVariant",
+    DataTuple2<SetOfString, String>(SetOfString(variantNames), variant), {
+    let name = getCompiledEnumVariantName(context, variantNames, variant)
+
+    let variants = (variantNames.items().toList().unsafeSorted() as Iterable<String>)
+      .map<(String, String)>({ Tuple(it, "T{it}") })
+    let fieldName = "$this"
+    let fieldType = variants.singleWhere({ it.first == variant }).unwrap().second
+
+    let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
+
+    let constructor = DartConstructor(
+      className = name,
+      name = None<String>(),
+      annotations = List.empty<DartAnnotation>(),
+      isConst = true,
+      requiredParameters = List.of1<DartParameter | DartInitializingFormal>(
+        DartInitializingFormal(fieldName, None<DartExpression>()),
+      ),
+      positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      body = None<DartBody>(),
+    )
+    body.append(constructor)
+
+    let field = DartField(
+      fieldName,
+      isStatic = false,
+      mutability = DartFinal(),
+      type = Some<DartType>(
+        DartNamedType(DartIdentifier(fieldType, None<String>()), List.empty<DartType>()),
+      ),
+      initialValue = None<DartExpression>(),
+    )
+
+    let dartDeclaration = DartClass(
+      name = name,
+      annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
+      isAbstract = false,
+      typeParameters = variants
+        .map<DartTypeParameter>({ DartTypeParameter(it.second, None<DartType>()) })
+        .toList(),
+      extends_ = Some<DartType>(
+        DartNamedType(
+          DartIdentifier(getCompiledEnumTypeName(context, variantNames), None<String>()),
+          variants
+            .map<DartType>({
+              DartNamedType(DartIdentifier(it.second, None<String>()), List.empty<DartType>())
+            })
+            .toList(),
+        ),
+      ),
+      implements_ = List.empty<DartType>(),
+      with_ = List.empty<DartType>(),
+      body = body,
+    )
+
+    Tuple(dartDeclaration, List.empty<CompilerError>())
+  })
+}
+
+public fun getCompiledEnumTypeName(
+  context: QueryContext<List<CompilerError>>,
+  variantNames: Set<String>,
+): String {
+  query<String, List<CompilerError>>(
+    context,
+    "code_generator_dart.getCompiledEnumTypeName",
+    SetOfString(variantNames), {
+    let variantNames = variantNames.items().toList().unsafeSorted()
+    let variantNames = (variantNames as Iterable<String>).join("$")
+    Tuple("Enum${variantNames}", List.empty<CompilerError>())
+  })
+}
+public fun getCompiledEnumVariantName(
+  context: QueryContext<List<CompilerError>>,
+  variantNames: Set<String>,
+  variant: String,
+): String {
+  query<String, List<CompilerError>>(
+    context,
+    "code_generator_dart.getCompiledEnumVariantName",
+    DataTuple2<SetOfString, String>(SetOfString(variantNames), variant), {
+    let variantNames = variantNames.items().toList().unsafeSorted()
+    let variantNames = (variantNames as Iterable<String>)
+      .map<String>({ if (it == variant) { "_{it}_" } else { it } })
+      .join("$")
+    Tuple("Enum${variantNames}", List.empty<CompilerError>())
+  })
+}

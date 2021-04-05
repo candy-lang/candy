@@ -11,7 +11,7 @@ public fun compileNamedTupleType(
     context,
     "code_generator_dart.compileNamedTupleType",
     namedTupleType, {
-    let name = getCompiledNamedTupleTypeName(context, namedTupleType.types.keys().toSet())
+    let sortedFields = (namedTupleType.types.unsafeSortedBy<String>({ it.first }) as Iterable<(String, HirInlineType)>)
     let fieldNames = sortedFields.map<String>({ it.first }).toSet()
     let name = getCompiledNamedTupleTypeName(context, fieldNames)
     let name = DartIdentifier(name, None<String>())
@@ -31,15 +31,11 @@ public fun compileNamedTupleTypeDeclaration(
   query<DartClass, List<CompilerError>>(
     context,
     "code_generator_dart.compileNamedTupleTypeDeclaration",
-    fieldNames, {
+    SetOfString(fieldNames), {
     let name = getCompiledNamedTupleTypeName(context, fieldNames)
 
-    let sortedFields = (fieldsInSortedOrder(namedTupleType) as Iterable<(String, HirInlineType)>)
-    let fields = sortedFields.map<String>({ it.first })
-      .map<(String, DartType)>({
-        let type = DartNamedType(DartIdentifier("T{it}", None<String>()), List.empty<DartType>())
-        Tuple(it, type)
-      })
+    let fields = (fieldNames.items().toList().unsafeSorted() as Iterable<String>)
+      .map<(String, String)>({ Tuple(it, "T{it}") })
 
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
@@ -65,7 +61,9 @@ public fun compileNamedTupleTypeDeclaration(
           it.first,
           isStatic = false,
           mutability = DartFinal(),
-          type = Some<DartType>(it.second),
+          type = Some<DartType>(
+            DartNamedType(DartIdentifier(it.second, None<String>()), List.empty<DartType>()),
+          ),
           initialValue = None<DartExpression>(),
         )
       })
@@ -75,7 +73,7 @@ public fun compileNamedTupleTypeDeclaration(
       name = name,
       annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
       isAbstract = false,
-      typeParameters = types
+      typeParameters = fields
         .map<DartTypeParameter>({ DartTypeParameter(it.second, None<DartType>()) })
         .toList(),
       extends_ = None<DartType>(),
@@ -84,13 +82,8 @@ public fun compileNamedTupleTypeDeclaration(
       body = body,
     )
 
-    Tuple(output, List.empty<CompilerError>())
+    Tuple(dartDeclaration, List.empty<CompilerError>())
   })
-}
-
-fun fieldsInSortedOrder(namedTupleType: HirNamedTupleType): List<(String, HirInlineType)> {
-  namedTupleType.types.keys().toList().unsafeSorted()
-    .map<(String, HirInlineType)>({ Tuple(it, namedTupleType.types.get(it).unwrap()) })
 }
 
 public fun getCompiledNamedTupleTypeName(
@@ -100,8 +93,8 @@ public fun getCompiledNamedTupleTypeName(
   query<String, List<CompilerError>>(
     context,
     "code_generator_dart.getCompiledNamedTupleTypeName",
-    fieldNames, {
-    let fieldNames = fieldNames.toList().unsafeSorted()
+    SetOfString(fieldNames), {
+    let fieldNames = fieldNames.items().toList().unsafeSorted()
     let fieldNames = (fieldNames as Iterable<String>).join("$")
     Tuple("NamedTuple${fieldNames}", List.empty<CompilerError>())
   })
