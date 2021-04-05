@@ -2,10 +2,10 @@ use ..Equals
 
 trait Comparable: Equals
   & BinaryLess[This, Bool]
-  & BinaryLessEqual[Other, Bool]
-  & BinaryGreater[Other, Bool]
-  & BinaryGreaterEqual[Other, Bool] {
-  ## TODO(marcelgarus): Make this generic over the `Other` type.
+  & BinaryLessEqual[This, Bool]
+  & BinaryGreater[This, Bool]
+  & BinaryGreaterEqual[This, Bool] {
+  ## TODO(marcelgarus): Make this generic over an `Other` type.
 
   fun compareTo(other: This): Less | Equal | Greater
 

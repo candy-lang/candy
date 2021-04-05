@@ -161,7 +161,7 @@ impl HirImpl {
   fun baseType(context: QueryContext<List<CompilerError>>): HirInlineType {
     // The base type of an impl. For example, `impl Foo[Int]` has the base type `Foo[Int]`.
 
-    query<HirInlineType, List<CompilerError>>(context, "hirImplToSolverRule", this as Equals & Hash, {
+    query<HirInlineType, List<CompilerError>>(context, "HirImpl.baseType", this as Equals & Hash, {
       Tuple(
         astInlineTypeToHirInlineType(context, this.ast(context).type, this),
         List.empty<CompilerError>(),
@@ -171,9 +171,9 @@ impl HirImpl {
 
   fun implementedTrait(context: QueryContext<List<CompilerError>>): Maybe<HirInlineType> {
     // The implemented trait of this impl. For example, `impl Foo: Equals` implements trait
-    // `Equals`, which `impl Foo { ... }` implements none.
+    // `Equals`, whereas `impl Foo { ... }` implements none.
 
-    query<Maybe<HirInlineType>, List<CompilerError>>(context, "hirImplToSolverRule", this as Equals & Hash, {
+    query<Maybe<HirInlineType>, List<CompilerError>>(context, "HirImpl.implementedTrait", this as Equals & Hash, {
       let traits = this.ast(context).traits
       if !((traits as Iterable).length() == 1) {
         // TODO(marcelgarus): Support impls for more than one trait.
@@ -219,7 +219,7 @@ fun hirImplToSolverRule(
                 Tuple(
                   result.unwrap().first as SolverVariable,
                   // `constraints.first` is a `HirParameterType` and turning that into a
-                  // `SolverType` always succeeds with an empty list list of goals.
+                  // `SolverType` always succeeds with an empty list of goals.
                   hirInlineTypeToSolverTypeAndGoals(context, constraint.first).unwrap().first,
                 ),
               ),
@@ -253,7 +253,7 @@ fun hirImplToSolverRule(
       // `A B -> C D` instead of only having one implicative result like `A B -> C` in the solver).
       // Or we need to somehow reduce this to multiple simple rules.
       // For now, we're probably fine with only implementing "simple" traits like `Iterable<Int>`.
-      // (As "primitives" types like `List` etc. are also traits, resolving this todo is somewhat of
+      // (As "primitive" types like `List` etc. are also traits, resolving this todo is somewhat of
       // a priority.)
       return Tuple(None<SolverRule>(), List.empty<CompilerError>())
     }
@@ -379,7 +379,6 @@ fun hirInlineTypeToSolverTypeAndGoals(
 
 fun makeSureImplsAreNotConflicting(context: QueryContext<List<CompilerError>>) {
   query<Unit, List<CompilerError>>( context, "HirType.implements", unit as Equals & Hash, {
-    todo("Implement makeSureImplsAreNotConflicting")
     for implsForSameTrait in (getAllImpls(context) as Iterable<HirImpl>)
       .where({ it.implementedTrait(context) is Some })
       .groupBy<HirInlineType>({ it.implementedTrait(context).unwrap() })
