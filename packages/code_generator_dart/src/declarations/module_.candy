@@ -18,7 +18,9 @@ fun compileModuleAndDescendants(
     let moduleResult = compileModule(context, package, moduleHir)
     output.set(moduleResult.first, moduleResult.second)
 
-    for moduleHir in (moduleHir as HasDeclarations).whereType<HirModule>() {
+    let innerDeclarations = ((moduleHir as HasDeclarations).declarations(context) as Iterable<HirDeclaration>)
+      .whereType<HirModule>()
+    for moduleHir in innerDeclarations {
       let result = compileModuleAndDescendants(context, package, moduleHir)
       output.setAll(result)
     }

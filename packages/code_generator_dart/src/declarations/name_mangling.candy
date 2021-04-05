@@ -2,6 +2,7 @@ use compiler_utils
 use hir
 use incremental
 
+/*
 fun getDeclarationName(context: QueryContext<List<CompilerError>>, hir: HirTrait | HirClass): String {
   query<String, List<CompilerError>>(context, "code_generator_dart.getDeclarationName", hir, {
     mut let name = if hir is HirTrait { (hir as HirTrait).name_ } else { (hir as HirClass).name_ }
@@ -27,6 +28,7 @@ fun getDeclarationStaticName(context: QueryContext<List<CompilerError>>, hir: Hi
     Tuple(mangleName(context, name), List.empty<CompilerError>())
   })
 }
+*/
 
 fun mangleName(context: QueryContext<List<CompilerError>>, name: String): String {
   query<String, List<CompilerError>>(context, "code_generator_dart.mangleName", name, {
