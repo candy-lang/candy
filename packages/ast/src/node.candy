@@ -6,4 +6,4 @@ impl AstNode: Equals & Hash {
   fun hash<T>(hasher: Hasher<T>) { (id as Hash).hash<T>(hasher) }
 }
 
-public trait /* enum */ AstNodeId: Equals & Hash
+public trait /* enum */ AstNodeId

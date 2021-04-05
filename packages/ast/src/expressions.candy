@@ -55,7 +55,7 @@ impl AstStringExpression: AstExpression & Equals & Hash {
 }
 
 
-public trait /* enum */ AstStringPart: Equals & Hash
+public trait /* enum */ AstStringPart
 
 public class AstLiteralStringPart {
   public let id: AstExpressionId
