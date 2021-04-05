@@ -2,8 +2,8 @@ public trait AstNode {
   public let id: AstNodeId
 }
 impl AstNode: Equals & Hash {
-  fun equals(other: AstNode): Bool { (id as Equals) == (other.id as Equals) }
+  fun equals(other: This): Bool { (id as Equals) == (other.id as Equals) }
   fun hash<T>(hasher: Hasher<T>) { (id as Hash).hash<T>(hasher) }
 }
 
-public trait /* enum */ AstNodeId: Equals & Hash
+public trait /* enum */ AstNodeId
