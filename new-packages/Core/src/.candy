@@ -1,7 +1,9 @@
+public use .Assert
 public use .Bool
 public use .Io
 public use .Loops
 public use .Maybe
+public use .Operators
 public use .Panic
 public use .Primitives
 public use .String

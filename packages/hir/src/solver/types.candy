@@ -3,15 +3,13 @@ use compiler_utils
 use ...declarations
 use ...types
 
-fun canonicalVariable(n: Int): HirInlineType {
+fun canonicalVariable(n: Int): HirParameterType {
   let canonicalType = HirType(HirTopLevelModule(Package(Path.parse("$canonical"))), "$")
   HirParameterType(canonicalType, "{n}")
 }
 
 trait SolverType {
   /// Either a `SolverVariable` or a `SolverValue`.
-
-  let type: HirInlineType
 
   fun toString_(): String
   fun containsVariable(variable: SolverVariable): Bool
@@ -167,7 +165,7 @@ class SolverVariable {
   /// * `?T`
   /// * `?0`
 
-  let type: HirInlineType
+  let type: HirParameterType
 }
 impl SolverVariable: SolverType {
   fun toString_(): String { "?{type}" }
@@ -200,7 +198,7 @@ class SolverValue {
   /// * `Set<Int>`
   /// * `Tuple<Int, String>`
 
-  let type: HirInlineType
+  let type: HirType
   let parameters: List<SolverType>
 }
 impl SolverValue: SolverType {

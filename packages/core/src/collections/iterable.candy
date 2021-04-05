@@ -216,10 +216,8 @@ public trait Iterable<Item> {
   // Conversion transformations.
   // These do more complicated stuff.
 
+  // TODO(marcelgarus): Decide on whether to name this `flatMap`.
   fun maybeMap<Out>(maybeMapper: (Item) => Maybe<Out>): Iterable<Out> {
-    // TODO(marcelgarus): As soon as implicit casts are available, maybe make the checker return a
-    // `MaybeMapResult`, which can be either `Map(value)` or `Drop`?
-
     // TODO(JonasWanke): Use `whereSome` as soon as that's available.
     map<Maybe<Out>>(maybeMapper).whereType<Some<Out>>().map<Out>({ it.value })
   }
@@ -230,8 +228,16 @@ public trait Iterable<Item> {
     ExpandIterable<Item, T>(this, expander)
   }
 
-  // TODO(marcelgarus): flatMap
-  // TODO(marcelgarus): groupBy
+  fun groupBy<T: Hash & Equals>(keyOf: (Item) => T): Map<T, List<Item>> {
+    let map = MutableMap.empty<T, MutableList<Item>>()
+    for item in this {
+      map
+        .putIfAbsent(keyOf(item), { MutableList.empty<Item>() })
+        .append(item)
+    }
+    (map as Map<T, List<Item>>)
+  }
+
   // TODO(marcelgarus): reversed
 
   fun zip<T>(other: Iterable<T>): Iterable<(Item, T)> {

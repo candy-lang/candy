@@ -6,12 +6,32 @@ public type Bool = True | False
 public fun true(): Bool { Bool.True }
 public fun false(): Bool { Bool.False }
 
-## builtin impl Bool: Equals & And & Or & Opposite & Implies
+impl Bool: Equals {
+  builtin fun equals(other: Bool): Bool
+}
+impl Bool: And {
+  builtin fun and(other: Bool): Bool
+}
+impl Bool: Or {
+  builtin fun or(other: Bool): Bool
+}
+impl Bool: Opposite {
+  builtin fun opposite(other: Bool): Bool
+}
+impl Bool: Implies {
+  builtin fun implies(other: Bool): Bool
+}
+
+impl Bool {
+  fun lazyAnd(other: () -> Bool): Bool { !this.then({ false() }).else(other) }
+  ## TODO(marcelgarus): Rename this to just `and` as soon as we support overloading.
+  
+  fun lazyOr(other: () -> Bool): Bool { this.then({ true() }).else(other) }
+  ## TODO(marcelgarus): Rename this to just `or` as soon as we support overloading.
+}
 
 impl Bool {
   builtin fun then[T](body: () -> T): Maybe[T]
 }
 
-public fun if[T](condition: Bool, thenBody: () -> T): Maybe[T] {
-  condition.then(thenBody)
-}
+public fun if[T](condition: Bool, thenBody: () -> T): Maybe[T] { condition.then(thenBody) }

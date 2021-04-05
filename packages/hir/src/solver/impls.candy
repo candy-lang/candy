@@ -22,8 +22,8 @@ class SolverGoal {
   }
   fun unify(other: SolverGoal): Maybe<Map<SolverVariable, SolverType>> {
     if !(trait_ == other.trait_) { return None<Map<SolverVariable, SolverType>>() }
-    SolverValue(canonicalVariable(0), parameters)
-      .unify(SolverValue(canonicalVariable(0), other.parameters))
+    SolverValue(canonicalVariable(0) as HirType, parameters)
+      .unify(SolverValue(canonicalVariable(0) as HirType, other.parameters))
   }
   fun substituteAll(substitutions: Map<SolverVariable, SolverType>): SolverGoal {
     SolverGoal(
@@ -36,7 +36,7 @@ class SolverGoal {
   fun canonicalize(): SolverGoal {
     SolverGoal(
       trait_,
-      (SolverValue(canonicalVariable(0), parameters).canonicalize() as SolverValue).parameters,
+      (SolverValue(canonicalVariable(0) as HirType, parameters).canonicalize() as SolverValue).parameters,
     )
   }
 }
