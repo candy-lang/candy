@@ -396,7 +396,9 @@ fun lowerImpl(
       })
       .orElse({ List.empty<AstNamedType | AstErrorType>() })
 
-  let innerDeclarations = lowerDeclarationContent(context, id, cst.child.content, false, false) as List<AstFunction>
+  let innerDeclarations = (lowerDeclarationContent(context, id, cst.child.content, false, false) as Iterable<AstDeclaration>)
+    .cast<AstFunction>()
+    .toList()
 
   if type is None<AstInlineType> { return None<AstImpl>() }
   context.addIdMapping(cst.id, id)
