@@ -3,6 +3,7 @@ use dart_code
 use hir
 use incremental
 use ..name_mangling
+use ..type
 
 fun compileModuleAndDescendants(
   context: QueryContext<List<CompilerError>>,
@@ -54,11 +55,11 @@ fun compileModule(
       //   // Impl contents are directly compiled into their target traits or classes.
       //   continue
       // }
-      // if declaration is HirType {
-      //   let compiledTypes = compileType(context, package, declaration as HirType)
-      //   declarations.appendAll((compiledTypes as Iterable<DartClass>).cast<DartDeclaration>())
-      //   continue
-      // }
+      if declaration is HirType {
+        let compiledTypes = compileType(context, package, declaration as HirType)
+        declarations.appendAll((compiledTypes as Iterable<DartClass>).cast<DartDeclaration>())
+        continue
+      }
       // if declaration is HirFunction {
       //   declarations.appendAll(compileGlobalFunction(context, package, declaration as HirFunction))
       //   continue
