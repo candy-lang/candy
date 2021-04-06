@@ -53,6 +53,7 @@ public fun compileTupleTypeDeclaration(
     let constructor = DartConstructor(
       className = name,
       name = None<String>(),
+      docComment = None<String>(),
       annotations = List.empty<DartAnnotation>(),
       isConst = true,
       requiredParameters = fields
@@ -70,6 +71,7 @@ public fun compileTupleTypeDeclaration(
       .map<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>({
         DartField(
           it.first,
+          docComment = None<String>(),
           isStatic = false,
           mutability = DartFinal(),
           type = Some<DartType>(
@@ -82,6 +84,8 @@ public fun compileTupleTypeDeclaration(
 
     let dartDeclaration = DartClass(
       name = name,
+      docComment = None<String>(),
+      // TODO(JonasWanke): Add the corresponding Candy code as the doc comment.
       annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
       isAbstract = false,
       typeParameters = fields

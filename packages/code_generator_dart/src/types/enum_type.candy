@@ -66,6 +66,7 @@ fun compileEnumTypeDeclarationBase(
     let constructor = DartConstructor(
       className = name,
       name = None<String>(),
+      docComment = None<String>(),
       annotations = List.empty<DartAnnotation>(),
       isConst = true,
       requiredParameters = List.empty<DartParameter | DartInitializingFormal>(),
@@ -77,6 +78,8 @@ fun compileEnumTypeDeclarationBase(
 
     let dartDeclaration = DartClass(
       name = name,
+      docComment = None<String>(),
+      // TODO(JonasWanke): Add the corresponding Candy code as the doc comment.
       annotations = List.empty<DartAnnotation>(),
       isAbstract = true,
       typeParameters = variants
@@ -112,6 +115,7 @@ fun compileEnumTypeDeclarationVariant(
     let constructor = DartConstructor(
       className = name,
       name = None<String>(),
+      docComment = None<String>(),
       annotations = List.empty<DartAnnotation>(),
       isConst = true,
       requiredParameters = List.of1<DartParameter | DartInitializingFormal>(
@@ -125,6 +129,7 @@ fun compileEnumTypeDeclarationVariant(
 
     let field = DartField(
       fieldName,
+      docComment = None<String>(),
       isStatic = false,
       mutability = DartFinal(),
       type = Some<DartType>(
@@ -135,6 +140,8 @@ fun compileEnumTypeDeclarationVariant(
 
     let dartDeclaration = DartClass(
       name = name,
+      docComment = None<String>(),
+      // TODO(JonasWanke): Add the corresponding Candy code as the doc comment.
       annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
       isAbstract = false,
       typeParameters = variants
