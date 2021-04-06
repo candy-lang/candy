@@ -1,5 +1,6 @@
 use ast
 use compiler_utils
+use cst
 use incremental
 
 use ..declarations
@@ -10,9 +11,10 @@ fun main() {
   let context = QueryContext.create<List<CompilerError>>()
   print("Core package path is {getCorePath(context)}.")
 
-  declarationsExample(context)
-  useLinesExample(context)
-  resolvingExample(context)
+  //declarationsExample(context)
+  //useLinesExample(context)
+  //resolvingExample(context)
+  solverExample(context)
 }
 
 fun declarationsExample(context: QueryContext<List<CompilerError>>) {
@@ -47,4 +49,15 @@ fun resolvingExample(context: QueryContext<List<CompilerError>>) {
   let any = (primitives as Iterable<HirDeclaration>).first().unwrap()
   let never = "Never".resolveIdentifier(context, any)
   print("Candidates for Never: {never}")
+}
+
+fun solverExample(context: QueryContext<List<CompilerError>>) {
+  let file = FancyFile(Package.playground(context), Path.parse("src/Types.candy"))
+  let declarations = (fileToHirModule(context, file) as HirInnerModule).declarations(context)
+  print("Declarations are {declarations}.")
+  let anImpl = ((declarations as Iterable<HirDeclaration>).third().unwrap() as HirImpl)
+  print("Impl is {anImpl}.")
+  let rule = hirImplToSolverRule(context, anImpl)
+  print("Rule is {rule}.")
+  //print("Does {type.toString_()} implement Equals? {environment.solve(equalsImpl(type)).toString_()}")
 }
