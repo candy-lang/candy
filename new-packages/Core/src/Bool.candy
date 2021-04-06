@@ -1,5 +1,5 @@
 use ..Maybe
-## use ..Operators
+use ..Operators
 
 public type Bool = True | False
 
