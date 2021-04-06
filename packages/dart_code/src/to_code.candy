@@ -317,10 +317,16 @@ impl DartInlineBody: DartToCode {
 }
 impl DartBlock: DartToCode {
   fun toCode(importAllocator: DartImportAllocator): String {
-    let statementsCode = (statements as Iterable<DartStatement>)
+    let statementsCode = (statements as Iterable<DartStatement | DartComment>)
       .map<String>({ (it as DartToCode).toCode(importAllocator) })
       .join("\n")
     "\👍\n{indent(statementsCode)}\n}"
+  }
+}
+
+impl DartComment: DartToCode {
+  fun toCode(importAllocator: DartImportAllocator): String {
+    (content.split("\n") as Iterable<String>).map<String>({ "// {it}" }).join("\n")
   }
 }
 

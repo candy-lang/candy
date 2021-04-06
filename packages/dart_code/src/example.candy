@@ -59,7 +59,7 @@ fun main() {
         namedParameters = List.empty<DartParameter>(),
         body = Some<DartBody>(
           DartBlock(
-            List.of1<DartStatement>(
+            List.of1<DartStatement | DartComment>(
               DartWhile(
                 condition = DartBoolLiteral(true),
                 label = Some<String>("foo"),
@@ -137,7 +137,7 @@ fun main() {
             ),
             body = Some<DartBody>(
               DartBlock(
-                List.of1<DartStatement>(
+                List.of1<DartStatement | DartComment>(
                   DartIf(
                     DartIdentifier("value", None<String>()),
                     then = DartBlock(

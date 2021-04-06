@@ -201,9 +201,13 @@ class DartInlineBody {
 impl DartInlineBody: DartBody
 
 class DartBlock {
-  let statements: List<DartStatement>
+  let statements: List<DartStatement | DartComment>
 }
 impl DartBlock: DartBody
+
+class DartComment {
+  let content: String
+}
 
 // Types.
 
