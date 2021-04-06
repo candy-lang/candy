@@ -92,6 +92,7 @@ class DartClass {
   /// }
 
   let name: String
+  let docComment: Maybe<String> = None<String>()
   let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
   let isAbstract: Bool = false
   let typeParameters: List<DartTypeParameter> = List.empty<DartTypeParameter>()
@@ -105,6 +106,7 @@ impl DartClass: DartDeclaration
 class DartConstructor {
   let className: String
   let name: Maybe<String>
+  let docComment: Maybe<String> = None<String>()
   let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
   let isConst: Bool = false
   let requiredParameters: List<DartParameter | DartInitializingFormal> = List.empty<DartParameter | DartInitializingFormal>()
@@ -122,6 +124,7 @@ class DartInitializingFormal {
 
 class DartMixin {
   let name: String
+  let docComment: Maybe<String> = None<String>()
   let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
   let typeParameters: List<DartTypeParameter> = List.empty<DartTypeParameter>()
   let on_: Maybe<DartType> = None<DartType>()
@@ -142,6 +145,7 @@ class DartFunction {
   /// }
 
   let name: String
+  let docComment: Maybe<String> = None<String>()
   let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
   let _returns: Maybe<DartType> = None<DartType>()
   let typeParameters: List<DartTypeParameter> = List.empty<DartTypeParameter>()
@@ -160,6 +164,7 @@ class DartParameter {
 
 class DartField {
   let name: String
+  let docComment: Maybe<String> = None<String>()
   let isStatic: Bool = false
   let mutability: DartMutability = DartVar()
   let type: Maybe<DartType> = None<DartType>()
@@ -176,12 +181,14 @@ impl DartConst: DartMutability
 
 class DartGetter {
   let name: String
+  let docComment: Maybe<String> = None<String>()
   let type: DartType
   let body: Maybe<DartBody> = None<DartBody>()
 }
 
 class DartSetter {
   let name: String
+  let docComment: Maybe<String> = None<String>()
   let parameter: DartParameter
   let body: Maybe<DartBody> = None<DartBody>()
 }
@@ -194,9 +201,13 @@ class DartInlineBody {
 impl DartInlineBody: DartBody
 
 class DartBlock {
-  let statements: List<DartStatement>
+  let statements: List<DartStatement | DartComment>
 }
 impl DartBlock: DartBody
+
+class DartComment {
+  let content: String
+}
 
 // Types.
 
