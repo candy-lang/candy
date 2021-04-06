@@ -177,7 +177,6 @@ impl HirImpl {
 
     query<Maybe<HirInlineType>, List<CompilerError>>(context, "HirImpl.implementedTrait", this as Equals & Hash, {
       let traits = this.ast(context).traits
-      print("Getting traits of impl {this}. Ast is {this.ast(context)}.")
       if !((traits as Iterable).length() == 1) {
         // TODO(marcelgarus): Support impls for more than one trait.
         return Tuple(
@@ -223,7 +222,6 @@ fun hirImplToSolverRule(
     let solverConstraints = MutableList.empty<SolverGoal>()
     for constraint in hirImpl.constraints().entries() {
       let result = hirInlineTypeToSolverTypeAndGoals(context, constraint.second)
-      print("Lowered constraint is {result}")
       if (result is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
       solverConstraints.appendAll(
         (result.unwrap().second as Iterable<SolverGoal>)
@@ -246,9 +244,7 @@ fun hirImplToSolverRule(
     // Lower the base type. For example, in the impl `impl Iterable[Int]: Foo`, the base type
     // `Iterable[Int]` gets lowered to `?0` with the goal `Iterable(Int, ?0)`.
     let baseType = hirImpl.baseType(context)
-    print("Base type is {baseType}")
     let solverBaseAndGoals = hirInlineTypeToSolverTypeAndGoals(context, baseType)
-    print("Lowered base type is {solverBaseAndGoals}")
     if (solverBaseAndGoals is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
     let solverBaseAndGoals: (SolverType, List<SolverGoal>) = solverBaseAndGoals.unwrap()
 
@@ -257,14 +253,12 @@ fun hirImplToSolverRule(
     // implement a trait – like `impl Foo { ... }` – don't correspond to a `SolverRule` and cause
     // this function to return `None`.
     let traitType = hirImpl.implementedTrait(context)
-    print("Trait type is {traitType}")
     if (traitType is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
     if (traitType.unwrap() is HirErrorType) {
       return Tuple(None<SolverRule>(), List.empty<CompilerError>())
     }
     let traitType = (traitType.unwrap() as HirNamedType)
     let solverTraitAndGoals = hirInlineTypeToSolverTypeAndGoals(context, traitType)
-    print("Lowered trait type is {solverTraitAndGoals}")
     if (solverTraitAndGoals is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
     let solverTraitAndGoals: (SolverType, List<SolverGoal>) = solverTraitAndGoals.unwrap()
     if ((solverTraitAndGoals.second as Iterable).length() > 1) {
