@@ -158,6 +158,7 @@ impl DartFunction: DartDeclaration
 
 class DartParameter {
   let name: String
+  let isRequired: Bool = false
   let type: Maybe<DartType> = None<DartType>()
   let defaultValue: Maybe<DartExpression> = None<DartExpression>()
 }
