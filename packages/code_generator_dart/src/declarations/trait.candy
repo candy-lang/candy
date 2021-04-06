@@ -3,36 +3,34 @@ use dart_code
 use hir
 use incremental
 use ..name_mangling
+use ..type
 
-public fun compileType(
+public fun compileTrait(
   context: QueryContext<List<CompilerError>>,
   package: Package,
-  typeHir: HirType,
+  typeHir: HirTrait,
 ): List<DartClass> {
   query<List<DartClass>, List<CompilerError>>(
     context,
-    "code_generator_dart.compileType",
-    DataTuple2<Package, HirType>(package, typeHir), {
+    "code_generator_dart.compileTrait",
+    DataTuple2<Package, HirTrait>(package, typeHir), {
     let output = List.of2<DartClass>(
-      compileInstanceType(context, package, typeHir),
-      compileStaticType(context, package, typeHir),
+      compileInstanceTrait(context, package, typeHir),
+      compileStaticTrait(context, package, typeHir),
     )
     Tuple(output, List.empty<CompilerError>())
   })
 }
 
-public let thisFieldName = "$this"
-public let staticInstanceGetterName = "$static"
-
-fun compileInstanceType(
+fun compileInstanceTrait(
   context: QueryContext<List<CompilerError>>,
   package: Package,
-  typeHir: HirType,
+  typeHir: HirTrait,
 ): DartClass {
   query<DartClass, List<CompilerError>>(
     context,
-    "code_generator_dart.compileInstanceType",
-    DataTuple2<Package, HirType>(package, typeHir), {
+    "code_generator_dart.compileInstanceTrait",
+    DataTuple2<Package, HirTrait>(package, typeHir), {
     let name = getDeclarationName(context, typeHir)
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
@@ -43,10 +41,12 @@ fun compileInstanceType(
       annotations = List.empty<DartAnnotation>(),
       isConst = true,
       requiredParameters = List.of1<DartParameter | DartInitializingFormal>(
-        DartInitializingFormal(thisFieldName, defaultValue = None<DartExpression>()),
+        DartInitializingFormal(staticInstanceGetterName, defaultValue = None<DartExpression>()),
       ),
       positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
       namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      // TODO(JonasWanke): Integrate implemented traits & impls.
+      // TODO(JonasWanke): Integrate functions.
       body = None<DartBody>(),
     ))
 
@@ -55,30 +55,17 @@ fun compileInstanceType(
       name = DartIdentifier(getDeclarationStaticName(context, typeHir), None<String>()),
       typeArguments = List.empty<DartType>(), // TODO(JonasWanke): Add type arguments.
     )
-    body.append(DartGetter(
+    body.append(DartField(
       staticInstanceGetterName,
       docComment = None<String>(),
-      type = staticInstanceType,
-      body = Some<DartBody>(DartInlineBody(
-        staticInstanceType.call(
-          positionalArguments = List.empty<DartExpression>(),
-          namedArguments = Map.empty<String, DartExpression>(),
-          typeArguments = List.empty<DartType>(),
-        ),
-      )),
+      isStatic = false,
+      mutability = DartFinal(),
+      type = Some<DartType>(staticInstanceType),
+      initialValue = None<DartExpression>(),
     ))
 
     // TODO(JonasWanke): Integrate implemented traits & impls.
     // TODO(JonasWanke): Integrate functions.
-
-    body.append(DartField(
-      thisFieldName,
-      docComment = None<String>(),
-      isStatic = false,
-      mutability = DartFinal(),
-      type = None<DartType>(), // TODO(JonasWanke): Lower the actual inline type.
-      initialValue = None<DartExpression>(),
-    ))
 
     let dartDeclaration = DartClass(
       name = name,
@@ -95,15 +82,15 @@ fun compileInstanceType(
     Tuple(dartDeclaration, List.empty<CompilerError>())
   })
 }
-fun compileStaticType(
+fun compileStaticTrait(
   context: QueryContext<List<CompilerError>>,
   package: Package,
-  typeHir: HirType,
+  typeHir: HirTrait,
 ): DartClass {
   query<DartClass, List<CompilerError>>(
     context,
-    "code_generator_dart.compileStaticType",
-    DataTuple2<Package, HirType>(package, typeHir), {
+    "code_generator_dart.compileStaticTrait",
+    DataTuple2<Package, HirTrait>(package, typeHir), {
     let name = getDeclarationStaticName(context, typeHir)
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
@@ -116,6 +103,8 @@ fun compileStaticType(
       requiredParameters = List.empty<DartParameter | DartInitializingFormal>(),
       positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
       namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      // TODO(JonasWanke): Integrate implemented traits & impls.
+      // TODO(JonasWanke): Integrate functions.
       body = None<DartBody>(),
     ))
 
