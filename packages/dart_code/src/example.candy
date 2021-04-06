@@ -45,6 +45,7 @@ fun main() {
         requiredParameters = List.of1<DartParameter>(
           DartParameter(
             "args",
+            isRequired = false,
             type = Some<DartType>(dartList(dartString)),
             defaultValue = None<DartExpression>(),
           ),
@@ -52,6 +53,7 @@ fun main() {
         positionalParameters = List.of1<DartParameter>(
           DartParameter(
             "number",
+            isRequired = false,
             type = Some<DartType>(dartInt),
             default = Some<DartExpression>(DartIntLiteral(123)),
           ),
@@ -132,6 +134,7 @@ fun main() {
             docComment = None<String>(),
             parameter = DartParameter(
               "value",
+              isRequired = false,
               type = Some<DartType>(dartBool),
               defaultValue = None<DartExpression>(),
             ),
@@ -181,6 +184,7 @@ fun main() {
             namedParameters = List.of1<DartParameter>(
               DartParameter(
                 "blub",
+                isRequired = false,
                 Some<DartType>(dartInt),
                 defaultValue = None<DartExpression>(),
               ),

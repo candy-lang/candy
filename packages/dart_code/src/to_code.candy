@@ -251,6 +251,7 @@ impl DartParameter: DartToCode {
     if defaultValue is Some {
       s = "{s} = {(defaultValue.unwrap() as DartToCode).toCode(importAllocator)}"
     }
+    if (isRequired) { s = "required {s}" }
     s
   }
 }
