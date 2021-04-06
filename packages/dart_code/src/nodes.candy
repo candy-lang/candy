@@ -251,7 +251,7 @@ impl DartFunctionType: DartExpression & DartType
 
 class DartTypeParameter {
   let name: String
-  let extends: Maybe<DartType> = None<DartType>()
+  let extends_: Maybe<DartType> = None<DartType>()
 }
 
 // Expressions.

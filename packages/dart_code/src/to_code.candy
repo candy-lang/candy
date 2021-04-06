@@ -349,8 +349,8 @@ impl DartFunctionType: DartToCode {
 impl DartTypeParameter: DartToCode {
   fun toCode(importAllocator: DartImportAllocator): String {
     mut let s = name
-    if extends is Some {
-      s = "{s} extends {(extends.unwrap() as DartToCode).toCode(importAllocator)}"
+    if extends_ is Some {
+      s = "{s} extends {(extends_.unwrap() as DartToCode).toCode(importAllocator)}"
     }
     s
   }
