@@ -15,7 +15,7 @@ fun resolveIdentifier(
 ): Set<HirType | HirTrait | HirFunction | HirModule> {
   query<Set<HirType | HirTrait | HirFunction | HirModule>, List<CompilerError>>(
     context,
-    "String.resolveIdentifier",
+    "resolveIdentifier",
     DataTuple2<String, HirDeclaration>(identifier, scope) as Equals & Hash,
     {
       let candidates = MutableSet.empty<HirType | HirTrait | HirFunction | HirModule>()
