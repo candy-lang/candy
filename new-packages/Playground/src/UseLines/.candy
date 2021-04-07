@@ -1,4 +1,5 @@
 use Core
 use .Blub
+use .Types
 
 type Bar = (bar: Foo)

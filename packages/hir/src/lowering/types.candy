@@ -49,15 +49,15 @@ fun astInlineTypeToHirInlineType(
         }
 
         // There should be exactly one candidate left.
-        if (candidates as Iterable).isEmpty() {
+        if (candidates.items() as Iterable).isEmpty() {
           return Tuple(
-            HirErrorType(),
+            HirErrorType() as HirInlineType,
             List.of1<CompilerError>(UnknownTypeCompilerError(astType as AstNamedType)),
           )
         }
-        if (candidates as Iterable).length() > 1 {
+        if (candidates.items() as Iterable).length() > 1 {
           return Tuple(
-            HirErrorType(),
+            HirErrorType() as HirInlineType,
             List.of1<CompilerError>(
               // This cast from `Set<HirType | HirTrait | HirFunction | HirModule>` to
               // `Set<HirType | HirTrait | HirModule>` succeeds because the name is uppercase, so no
@@ -66,14 +66,16 @@ fun astInlineTypeToHirInlineType(
             ),
           )
         }
-        let declaration = (candidates as Iterable<HirDeclaration>).single().unwrap()
+        let declaration = (candidates.items() as Iterable).cast<HirDeclaration>().single().unwrap()
+        // TODO(marcelgarus): Directly cast this to `Iterable<HirDeclaration>` when the generated
+        // Dart code is smarter.
         assert((declaration is HirType) || (declaration is HirTrait), "Declaration should be HirType or HirTrait.")
 
         let types = ((astType as AstNamedType).typeArguments as Iterable<AstTypeArgument>)
           .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it.type, scope) })
           .toList()
         return Tuple(
-          HirNamedType((declaration as HirTrait | HirType), types),
+          HirNamedType((declaration as HirTrait | HirType), types) as HirInlineType,
           List.empty<CompilerError>(),
         )
       }
@@ -87,7 +89,7 @@ fun astInlineTypeToHirInlineType(
               .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, scope) })
               .toList(),
             astInlineTypeToHirInlineType(context, (astType as AstFunctionType).returnType, scope),
-          ),
+          ) as HirInlineType,
           List.empty<CompilerError>()
         )
       }
@@ -98,7 +100,7 @@ fun astInlineTypeToHirInlineType(
             ((astType as AstTupleType).types as Iterable<AstInlineType>)
               .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, scope) })
               .toList(),
-          ),
+          ) as HirInlineType,
           List.empty<CompilerError>(),
         )
       }
@@ -111,7 +113,7 @@ fun astInlineTypeToHirInlineType(
                 Tuple(it.name.value, astInlineTypeToHirInlineType(context, it.type, scope))
               })
               .toList(),
-          ),
+          ) as HirInlineType,
           List.empty<CompilerError>(),
         )
       }
@@ -129,7 +131,7 @@ fun astInlineTypeToHirInlineType(
           HirEnumType(
             (loweredVariants as Iterable<(String, Maybe<HirInlineType>)>)
               .unsafeToMap<String, Maybe<HirInlineType>>(),
-          ),
+          ) as HirInlineType,
           List.empty<CompilerError>(),
         )
       }
@@ -140,7 +142,7 @@ fun astInlineTypeToHirInlineType(
             ((astType as AstIntersectionType).types as Iterable<AstInlineType>)
               .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, scope) })
               .toList(),
-          ),
+          ) as HirInlineType,
           List.empty<CompilerError>(),
         )
       }
@@ -178,13 +180,23 @@ impl HirImpl {
       let traits = this.ast(context).traits
       if !((traits as Iterable).length() == 1) {
         // TODO(marcelgarus): Support impls for more than one trait.
-        return Tuple(None<HirInlineType>(), List.empty<CompilerError>())
+        return Tuple(
+          None<HirInlineType>(),
+          List.empty<CompilerError>(
+            // UnsupportedFeatureCompilerError(
+            //   Location(, Span(0, 1)),
+            //   "This impl is for more than one trait: {this}",
+            // ),
+          ),
+        )
       }
       Tuple(
         Some<HirInlineType>(
           astInlineTypeToHirInlineType(
             context,
-            (traits as Iterable<AstInlineType>).single().unwrap(),
+            (traits as Iterable).cast<AstInlineType>().single().unwrap(),
+            // TODO(marcelgarus): Directly cast this into a `Iterable<AstInlineType>` when the Dart
+            // type system gets good enough.
             this,
           ),
         ),
@@ -243,6 +255,9 @@ fun hirImplToSolverRule(
     // this function to return `None`.
     let traitType = hirImpl.implementedTrait(context)
     if (traitType is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
+    if (traitType.unwrap() is HirErrorType) {
+      return Tuple(None<SolverRule>(), List.empty<CompilerError>())
+    }
     let traitType = (traitType.unwrap() as HirNamedType)
     let solverTraitAndGoals = hirInlineTypeToSolverTypeAndGoals(context, traitType)
     if (solverTraitAndGoals is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
@@ -310,31 +325,33 @@ fun hirInlineTypeToSolverTypeAndGoals(
     Maybe<(SolverType, List<SolverGoal>)>,
     List<CompilerError>,
   >(context, "hirInlineTypeToSolverTypeAndGoals", hirType as Equals & Hash, {
-    if (hirType is HirErrorType) { return None<(SolverType, List<SolverGoal>)>() }
+    if (hirType is HirErrorType) {
+      return Tuple(None<(SolverType, List<SolverGoal>)>(), List.empty<CompilerError>())
+    }
     if (hirType is HirNamedType) {
       let declaration = (hirType as HirNamedType).declaration
       let parameters = ((hirType as HirNamedType).parameterTypes as Iterable<HirInlineType>)
       if (declaration is HirTrait) {
+        // We'll return a substitution that will have to satisfy the trait. For example, given the
+        // trait `Equals`, we'll return `?0` with the goal `Equals(?0)`. The `?0` is this
+        // substitution.
+        // TODO(marcelgarus): In the long term, choose a more elegant substitution than just the
+        // 1000th.
+        let substitution = SolverVariable(canonicalVariable(1000))
         let goals = MutableList.of1<SolverGoal>(
-          SolverGoal(hirType as HirTrait, List.empty<SolverType>())
+          SolverGoal(declaration as HirTrait, List.of1<SolverType>(substitution))
         )
         let solverParameters = MutableList.empty<SolverType>()
         for parameter in parameters {
           let result = hirInlineTypeToSolverTypeAndGoals(context, parameter)
-          if (result is None) { return None<(SolverType, List<SolverGoal>)>() }
+          if (result is None) {
+            return Tuple(None<(SolverType, List<SolverGoal>)>(), List.empty<CompilerError>())
+          }
           goals.appendAll(result.unwrap().second)
           solverParameters.append(result.unwrap().first)
         }
-        // TODO(marcelgarus): In the long term, choose a more elegant substitution.
-        let substitution = SolverVariable(canonicalVariable(1000))
-        goals.append(SolverGoal(hirType as HirTrait, List.of1<SolverType>(substitution)))
         return Tuple(
-          Some<(SolverType, List<SolverGoal>)>(
-            Tuple(
-              substitution,
-              goals,
-            ),
-          ),
+          Some<(SolverType, List<SolverGoal>)>(Tuple(substitution, goals)),
           List.empty<CompilerError>(),
         )
       }
@@ -343,7 +360,9 @@ fun hirInlineTypeToSolverTypeAndGoals(
         let solverParameters = MutableList.empty<SolverType>()
         for parameter in parameters {
           let result = hirInlineTypeToSolverTypeAndGoals(context, parameter)
-          if (result is None) { return None<(SolverType, List<SolverGoal>)>() }
+          if (result is None) {
+            return Tuple(None<(SolverType, List<SolverGoal>)>(), List.empty<CompilerError>())
+          }
           goals.appendAll(result.unwrap().second)
           solverParameters.append(result.unwrap().first)
         }
