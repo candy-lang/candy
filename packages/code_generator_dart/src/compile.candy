@@ -1,5 +1,8 @@
 use compiler_utils
+use dart_code
+use hir
 use incremental
+use ..declarations
 
 public fun compile(context: QueryContext<List<CompilerError>>, package: Package): Unit {
   impureQuery<Unit, List<CompilerError>>(context, "code_generator_dart.compile", package, {

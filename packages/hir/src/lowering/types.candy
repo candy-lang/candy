@@ -6,6 +6,7 @@ use ...declarations
 use ...types
 use ...solver
 use ..declarations
+use ..resolving
 
 /// These impls make type system information available.
 
@@ -38,11 +39,11 @@ fun astInlineTypeToHirInlineType(
         // declarations.
         // TODO(marcelgarus): When resolving `Foo Bar`, we currently accept a `Bar` next to `Foo` if
         // `Foo` itself doesn't contain a `Bar`, as the resolver traverses parent scopes.
-        mut let candidates = nameParts.first().unwrap().resolveIdentifier(context, scope)
+        mut let candidates = resolveIdentifier(context, nameParts.first().unwrap(), scope)
         for namePart in nameParts.skip(1) {
           candidates = ((candidates as Iterable<HirDeclaration>)
             .expand<HirDeclaration>({
-              namePart.resolveIdentifier(context, it) as Iterable<HirDeclaration>
+              resolveIdentifier(context, namePart, it) as Iterable<HirDeclaration>
             })
             .toSet() as Set<HirType | HirTrait | HirFunction | HirModule>)
         }

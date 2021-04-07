@@ -137,9 +137,9 @@ public trait List<Item>: Iterable<Item> {
     result.unsafeSort()
     result
   }
-  fun unsafeSortedBy<T: Comparable>(selector: (Item) => T): List<Item> {
+  fun sortedBy<T: Comparable>(selector: (Item) => T): List<Item> {
     let result = toMutable()
-    result.unsafeSortBy<T>(selector)
+    result.sortBy<T>(selector)
     result
   }
 }
@@ -241,8 +241,8 @@ public trait MutableList<Item>: List<Item> {
     }
   }
 
-  fun unsafeSort() { unsafeSortBy<Comparable>({ it as Comparable }) }
-  fun unsafeSortBy<T: Comparable>(selector: (Item) => T) {
+  fun unsafeSort() { sortBy<Comparable>({ it as Comparable }) }
+  fun sortBy<T: Comparable>(selector: (Item) => T) {
     // TODO(JonasWanke): use something faster for larger lists
     // Currently using insertion sort.
     1.until(length()).do({ i =>

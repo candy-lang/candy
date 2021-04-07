@@ -47,7 +47,7 @@ fun resolvingExample(context: QueryContext<List<CompilerError>>) {
   print("AST primitives: {ast}")
   let primitives = fileToHirModule(context, file).innerModule("Primitives").declarations(context)
   let any = (primitives as Iterable<HirDeclaration>).first().unwrap()
-  let never = "Never".resolveIdentifier(context, any)
+  let never = resolveIdentifier(context, "Never", any)
   print("Candidates for Never: {never}")
 }
 

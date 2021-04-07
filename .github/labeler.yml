@@ -1,0 +1,36 @@
+version: 1
+labels:
+  - label: 'P: Compiler/Ast'
+    files:
+      - ^packages/ast/.*
+  - label: 'P: Compiler/CodeGeneratorDart'
+    files:
+      - ^packages/code_generator_dart/.*
+  - label: 'P: Compiler/Cst'
+    files:
+      - ^packages/cst/.*
+  - label: 'P: Compiler/Hir'
+    files:
+      - ^packages/hir/.*
+  - label: 'P: Compiler/Utils'
+    files:
+      - ^packages/compiler_utils/.*
+  - label: 'P: Core'
+    files:
+      - ^packages/core/.*
+      - ^new-packages/Core/.*
+  - label: 'P: DartCode'
+    files:
+      - ^packages/dart_code/.*
+  - label: 'P: Incremental'
+    files:
+      - ^packages/incremental/.*
+  - label: 'P: LspServer'
+    files:
+      - ^packages/lsp_server/.*
+  - label: 'P: PetitParser'
+    files:
+      - ^packages/petit_parser/.*
+  - label: 'P: ShoppingList'
+    files:
+      - ^new-packages/ShoppingList/.*

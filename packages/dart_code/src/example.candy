@@ -22,6 +22,7 @@ fun main() {
     declarations = List.of3<DartDeclaration>(
       DartFunction(
         "main",
+        docComment = None<String>(),
         annotations = List.of1<DartAnnotation>(
           DartAnnotation(
             (DartNamedType(
@@ -44,6 +45,7 @@ fun main() {
         requiredParameters = List.of1<DartParameter>(
           DartParameter(
             "args",
+            isRequired = false,
             type = Some<DartType>(dartList(dartString)),
             defaultValue = None<DartExpression>(),
           ),
@@ -51,6 +53,7 @@ fun main() {
         positionalParameters = List.of1<DartParameter>(
           DartParameter(
             "number",
+            isRequired = false,
             type = Some<DartType>(dartInt),
             default = Some<DartExpression>(DartIntLiteral(123)),
           ),
@@ -58,7 +61,7 @@ fun main() {
         namedParameters = List.empty<DartParameter>(),
         body = Some<DartBody>(
           DartBlock(
-            List.of1<DartStatement>(
+            List.of1<DartStatement | DartComment>(
               DartWhile(
                 condition = DartBoolLiteral(true),
                 label = Some<String>("foo"),
@@ -70,6 +73,7 @@ fun main() {
       ),
       DartClass(
         "Foo",
+        docComment = None<String>(),
         annotations = List.of1<DartAnnotation>(
           DartAnnotation(DartIdentifier("data", prefix = None<String>())),
         ),
@@ -91,6 +95,7 @@ fun main() {
           // static const numBlubs = 123;
           DartField(
             "numBlubs",
+            docComment = None<String>(),
             isStatic = true,
             mutability = DartConst(),
             type = None<DartType>(),
@@ -100,6 +105,7 @@ fun main() {
           DartConstructor(
             className = "Foo",
             name = None<String>(),
+            docComment = None<String>(),
             annotations = List.empty<DartAnnotation>(),
             isConst = false,
             requiredParameters = List.of1<DartParameter | DartInitializingFormal>(
@@ -112,6 +118,7 @@ fun main() {
           // bool get isEmpty => this.length == 0;
           DartGetter(
             "isEmpty",
+            docComment = None<String>(),
             type = dartBool,
             body = Some<DartBody>(DartInlineBody(this_.dot("length").equals(DartIntLiteral(0)))),
           ),
@@ -124,14 +131,16 @@ fun main() {
           // }
           DartSetter(
             "isEmpty",
+            docComment = None<String>(),
             parameter = DartParameter(
               "value",
+              isRequired = false,
               type = Some<DartType>(dartBool),
               defaultValue = None<DartExpression>(),
             ),
             body = Some<DartBody>(
               DartBlock(
-                List.of1<DartStatement>(
+                List.of1<DartStatement | DartComment>(
                   DartIf(
                     DartIdentifier("value", None<String>()),
                     then = DartBlock(
@@ -164,6 +173,7 @@ fun main() {
           ),
           DartFunction(
             "blub",
+            docComment = None<String>(),
             annotations = List.empty<DartAnnotation>(),
             _returns = Some<DartType>(
               DartNamedType(DartIdentifier("Blub", None<String>()), List.empty<DartType>()),
@@ -174,6 +184,7 @@ fun main() {
             namedParameters = List.of1<DartParameter>(
               DartParameter(
                 "blub",
+                isRequired = false,
                 Some<DartType>(dartInt),
                 defaultValue = None<DartExpression>(),
               ),
@@ -184,6 +195,7 @@ fun main() {
       ),
       DartMixin(
         "MyMixin",
+        docComment = None<String>(),
         annotations = List.of1<DartAnnotation>(
           DartAnnotation(DartIdentifier("data", prefix = None<String>())),
         ),

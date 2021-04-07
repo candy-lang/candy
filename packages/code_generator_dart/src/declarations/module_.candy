@@ -3,6 +3,8 @@ use dart_code
 use hir
 use incremental
 use ..name_mangling
+use ..trait
+use ..type
 
 fun compileModuleAndDescendants(
   context: QueryContext<List<CompilerError>>,
@@ -18,7 +20,9 @@ fun compileModuleAndDescendants(
     let moduleResult = compileModule(context, package, moduleHir)
     output.set(moduleResult.first, moduleResult.second)
 
-    for moduleHir in (moduleHir as HasDeclarations).whereType<HirModule>() {
+    let innerDeclarations = ((moduleHir as HasDeclarations).declarations(context) as Iterable<HirDeclaration>)
+      .whereType<HirModule>()
+    for moduleHir in innerDeclarations {
       let result = compileModuleAndDescendants(context, package, moduleHir)
       output.setAll(result)
     }
@@ -44,25 +48,22 @@ fun compileModule(
         // Compiled by `compileModuleAndDescendants`.
         continue
       }
-      // if declaration is HirTrait {
-      //   declarations.appendAll(compileTrait(context, package, declaration as HirTrait))
-      //   continue
-      // }
-      // if declaration is HirImpl {
-      //   // Impl contents are directly compiled into their target traits or classes.
-      //   continue
-      // }
-      // if declaration is HirType {
-      //   let compiledTypes = compileType(context, package, declaration as HirType)
-      //   declarations.appendAll((compiledTypes as Iterable<DartClass>).cast<DartDeclaration>())
-      //   continue
-      // }
+      if declaration is HirTrait {
+        let compiledTypes = compileTrait(context, package, declaration as HirTrait)
+        declarations.appendAll((compiledTypes as Iterable<DartClass>).cast<DartDeclaration>())
+        continue
+      }
+      if declaration is HirImpl {
+        // Impl contents are directly compiled into their target traits or types.
+        continue
+      }
+      if declaration is HirType {
+        let compiledTypes = compileType(context, package, declaration as HirType)
+        declarations.appendAll((compiledTypes as Iterable<DartClass>).cast<DartDeclaration>())
+        continue
+      }
       // if declaration is HirFunction {
       //   declarations.appendAll(compileGlobalFunction(context, package, declaration as HirFunction))
-      //   continue
-      // }
-      // if declaration is HirProperty {
-      //   declarations.appendAll(compileGlobalProperty(context, package, declaration as HirProperty))
       //   continue
       // }
       assert(false, "Unknown declaration type: {declaration}.")

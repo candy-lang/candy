@@ -1,0 +1,127 @@
+use compiler_utils
+use dart_code
+use hir
+use incremental
+use ..name_mangling
+use ..type
+
+public fun compileTrait(
+  context: QueryContext<List<CompilerError>>,
+  package: Package,
+  typeHir: HirTrait,
+): List<DartClass> {
+  query<List<DartClass>, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileTrait",
+    DataTuple2<Package, HirTrait>(package, typeHir), {
+    let output = List.of2<DartClass>(
+      compileInstanceTrait(context, package, typeHir),
+      compileStaticTrait(context, package, typeHir),
+    )
+    Tuple(output, List.empty<CompilerError>())
+  })
+}
+
+fun compileInstanceTrait(
+  context: QueryContext<List<CompilerError>>,
+  package: Package,
+  typeHir: HirTrait,
+): DartClass {
+  query<DartClass, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileInstanceTrait",
+    DataTuple2<Package, HirTrait>(package, typeHir), {
+    let name = getDeclarationName(context, typeHir)
+    let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
+
+    body.append(DartConstructor(
+      className = name,
+      name = None<String>(),
+      docComment = None<String>(),
+      annotations = List.empty<DartAnnotation>(),
+      isConst = true,
+      requiredParameters = List.of1<DartParameter | DartInitializingFormal>(
+        DartInitializingFormal(staticInstanceGetterName, defaultValue = None<DartExpression>()),
+      ),
+      positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      // TODO(JonasWanke): Integrate implemented traits & impls.
+      // TODO(JonasWanke): Integrate functions.
+      body = None<DartBody>(),
+    ))
+
+    // Instance reference to our "static" instance.
+    let staticInstanceType = DartNamedType(
+      name = DartIdentifier(getDeclarationStaticName(context, typeHir), None<String>()),
+      typeArguments = List.empty<DartType>(), // TODO(JonasWanke): Add type arguments.
+    )
+    body.append(DartField(
+      staticInstanceGetterName,
+      docComment = None<String>(),
+      isStatic = false,
+      mutability = DartFinal(),
+      type = Some<DartType>(staticInstanceType),
+      initialValue = None<DartExpression>(),
+    ))
+
+    // TODO(JonasWanke): Integrate implemented traits & impls.
+    // TODO(JonasWanke): Integrate functions.
+
+    let dartDeclaration = DartClass(
+      name = name,
+      docComment = None<String>(),
+      // TODO(JonasWanke): Add the corresponding Candy code as the doc comment.
+      annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
+      isAbstract = false,
+      typeParameters = List.empty<DartTypeParameter>(),
+      extends_ = None<DartType>(),
+      implements_ = List.empty<DartType>(),
+      with_ = List.empty<DartType>(),
+      body = body,
+    )
+    Tuple(dartDeclaration, List.empty<CompilerError>())
+  })
+}
+fun compileStaticTrait(
+  context: QueryContext<List<CompilerError>>,
+  package: Package,
+  typeHir: HirTrait,
+): DartClass {
+  query<DartClass, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileStaticTrait",
+    DataTuple2<Package, HirTrait>(package, typeHir), {
+    let name = getDeclarationStaticName(context, typeHir)
+    let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
+
+    body.append(DartConstructor(
+      className = name,
+      name = None<String>(),
+      docComment = None<String>(),
+      annotations = List.empty<DartAnnotation>(),
+      isConst = true,
+      requiredParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      // TODO(JonasWanke): Integrate implemented traits & impls.
+      // TODO(JonasWanke): Integrate functions.
+      body = None<DartBody>(),
+    ))
+
+    // TODO(JonasWanke): Integrate implemented traits & impls.
+    // TODO(JonasWanke): Integrate functions.
+
+    let dartDeclaration = DartClass(
+      name = name,
+      docComment = None<String>(),
+      annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
+      isAbstract = false,
+      typeParameters = List.empty<DartTypeParameter>(),
+      extends_ = None<DartType>(),
+      implements_ = List.empty<DartType>(),
+      with_ = List.empty<DartType>(),
+      body = body,
+    )
+    Tuple(dartDeclaration, List.empty<CompilerError>())
+  })
+}

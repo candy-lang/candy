@@ -1,0 +1,125 @@
+use compiler_utils
+use hir
+use incremental
+
+fun getMangledTraitMethodName(context: QueryContext<List<CompilerError>>, traitType: HirNamedType): String {
+  query<String, List<CompilerError>>(context, "code_generator_dart.getMangledTraitMethodName", traitType, {
+    // Inspired by https://rust-lang.github.io/rfcs/2603-rust-symbol-name-mangling-v0.html#syntax-of-mangled-names.
+    //
+    // * "P" <package>: **p**ackage
+    //
+    // Declarations:
+    //
+    // * "N" <module/trait/type>: **n**ested module/trait/type
+    //
+    // Types:
+    //
+    // * "C" <trait/type> <parameterType: inlineType>* "E": named type (**c**oncrete)
+    // * "F" <parameterTypes: inlineType>* <returnType: inlineType> "E": **f**unction type
+    // * "R" <receiverType: inlineType> <parameterTypes: inlineType>* <returnType: inlineType> "E":
+    //   function type with **r**eceiver
+    // * "T" <inlineType>{2,} "E": **t**uple type
+    // * "S" (<fieldName: identifier> <inlineType>)+ "E": named tuple type (**s**truct)
+    // * "U" (<variantName: identifier> <inlineType>?)+ "E": en**u**m type
+    // * "I" <inlineType>{2,} "E": **i**ntersection type
+    let name = encodeNamedType(context, traitType)
+
+    Tuple("$as{name}", List.empty<CompilerError>())
+  })
+}
+
+fun encodePackage(context: QueryContext<List<CompilerError>>, package: Package): String {
+  "P{encodeIdentifier(package.getName(context))}"
+}
+
+fun encodeModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule): String {
+  if (moduleHir is HirTopLevelModule) {
+    return encodePackage(context, (moduleHir as HirTopLevelModule).parent)
+  }
+
+  let moduleHir = (moduleHir as HirInnerModule)
+  "N{encodeModule(context, moduleHir.parent)}{encodeIdentifier(moduleHir.name_)}"
+}
+fun encodeTrait(context: QueryContext<List<CompilerError>>, traitHir: HirTrait): String {
+  "N{encodeModule(context, traitHir.parent)}{encodeIdentifier(traitHir.name_)}"
+}
+fun encodeType(context: QueryContext<List<CompilerError>>, typeHir: HirType): String {
+  "N{encodeModule(context, typeHir.parent)}{encodeIdentifier(typeHir.name_)}"
+}
+
+fun encodeInlineTypes(
+  context: QueryContext<List<CompilerError>>,
+  inlineTypes: Iterable<HirInlineType>,
+): String { inlineTypes.map<String>({ encodeInlineType(context, it) }).join("") }
+fun encodeInlineType(
+  context: QueryContext<List<CompilerError>>,
+  inlineType: HirInlineType,
+): String {
+  if (inlineType is HirNamedType) { return encodeNamedType(context, inlineType as HirNamedType) }
+  if (inlineType is HirFunctionType) {
+    return encodeFunctionType(context, inlineType as HirFunctionType)
+  }
+  if (inlineType is HirTupleType) { return encodeTupleType(context, inlineType as HirTupleType) }
+  if (inlineType is HirNamedTupleType) {
+    return encodeNamedTupleType(context, inlineType as HirNamedTupleType)
+  }
+  if (inlineType is HirEnumType) { return encodeEnumType(context, inlineType as HirEnumType) }
+  if (inlineType is HirIntersectionType) {
+    return encodeIntersectionType(context, inlineType as HirIntersectionType)
+  }
+  throw "Tried to mangle an invalid type: {inlineType}."
+}
+fun encodeNamedType(context: QueryContext<List<CompilerError>>, namedType: HirNamedType): String {
+  let declaration = if (namedType.declaration is HirTrait) {
+    encodeTrait(context, namedType.declaration as HirTrait)
+  } else {
+    encodeType(context, namedType.declaration as HirType)
+  }
+
+  "C{declaration}{encodeInlineTypes(context, namedType.parameterTypes)}E"
+}
+fun encodeFunctionType(
+  context: QueryContext<List<CompilerError>>,
+  functionType: HirFunctionType,
+): String {
+  let start = functionType.receiverType
+    .map<String>({ "R{encodeInlineType(context, it)}" })
+    .orElse({ "F" })
+  let parameterTypes = encodeInlineTypes(context, functionType.parameterTypes)
+  let returnType = encodeInlineType(context, functionType.returnType)
+  "{start}{parameterTypes}{returnType}E"
+}
+fun encodeTupleType(context: QueryContext<List<CompilerError>>, tupleType: HirTupleType): String {
+  "T{encodeInlineTypes(context, tupleType.types)}E"
+}
+fun encodeNamedTupleType(
+  context: QueryContext<List<CompilerError>>,
+  namedTupleType: HirNamedTupleType,
+): String {
+  let fields = (namedTupleType.types.sortedBy<String>({ it.first }) as Iterable<(String, HirInlineType)>)
+    .map<String>({ "{encodeIdentifier(it.first)}{encodeInlineType(context, it.second)}" })
+    .join("")
+  "S{fields}E"
+}
+fun encodeEnumType(
+  context: QueryContext<List<CompilerError>>,
+  enumType: HirEnumType,
+): String {
+  let variants = enumType.variants.entries().toList().sortedBy<String>({ it.first })
+  let variants = (variants as Iterable<(String, Maybe<HirInlineType>)>)
+    .map<String>({
+      let typeString = it.second.map<String>({ encodeInlineType(context, it) }).orElse({ "" })
+      "{encodeIdentifier(it.first)}{typeString}"
+    })
+    .join("")
+  "U{variants}E"
+}
+fun encodeIntersectionType(
+  context: QueryContext<List<CompilerError>>,
+  intersectionType: HirIntersectionType,
+): String {
+  // TODO(JonasWanke): order these
+  "I{encodeInlineTypes(context, intersectionType.types)}E"
+}
+
+fun encodeIdentifier(identifier: String): String { "{identifier.length()}{identifier}" }
