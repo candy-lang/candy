@@ -206,8 +206,17 @@ impl HirImpl {
   }
 }
 
-fun getAllImpls(context: QueryContext<List<CompilerError>>): List<HirImpl> {
-  todo("Implement getAllImpls")
+fun getAllImplsInScope(context: QueryContext<List<CompilerError>>, scope: Package): Set<HirImpl> {
+  query<List<HirImpl>, List<CompilerError>>(context, "getAllImplsInScope", scope as Equals & Hash, {
+    getTransitiveHullOfPackages(context, scope)
+      .map<Set<HirImpl>>({ package => getAllImplsOfModule(context, HirTopLevelModule(package)) })
+      .union()
+  })
+}
+fun getAllImplsOfModule(context: QueryContext<List<CompilerError>>, module: HirModule): Set<HirImpl> {
+  query<List<HirImpl>, List<CompilerError>>(context, "getAllImplsOfModule", module as Equals & Hash, {
+    todo("Implement getAllImplsOfModule")
+  })
 }
 
 fun hirImplToSolverRule(
