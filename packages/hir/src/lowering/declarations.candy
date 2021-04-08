@@ -4,6 +4,7 @@ use incremental
 
 use ..types
 use ...declarations
+use ...types
 
 // These impls make declarative information from the AST available in the HIR.
 
@@ -67,6 +68,18 @@ public trait HasDeclarations {
   /// `whereType()`.
 }
 impl HirDeclaration: HasDeclarations
+
+public trait HasTypeParameters {
+  fun typeParameters(context: QueryContext<List<CompilerError>>): List<HirParameterType>
+}
+fun hirParameterTypesFromAstTypeParameters(
+  declaration: HirTrait | HirImpl | HirType | HirFunction,
+  typeParameters: List<AstTypeParameter>,
+): List<HirParameterType> {
+  (typeParameters as Iterable<AstTypeParameter>)
+    .map<HirParameterType>({ HirParameterType(declaration, it.name.value) })
+    .toList()
+}
 
 // TODO(marcelgarus): `HirModule`s implement the `HasDeclarations` trait. Because the Dart lowering
 // is weird, we can't just add impls to traits (they will be mixed in, but the subclasses only
@@ -237,7 +250,7 @@ impl HirInnerModule: MightNotExist & HasAst<AstFile | AstModule> & HasDeclaratio
   }
 }
 
-impl HirTrait: HasAst<AstTrait> & HasDeclarations {
+impl HirTrait: HasAst<AstTrait> & HasDeclarations & HasTypeParameters {
   fun ast(context: QueryContext<List<CompilerError>>): AstTrait {
     query<AstTrait, List<CompilerError>>(context, "HirTrait.ast", this, {
       let ast = ((parent as HasDeclarations).typeUnsafeAstDeclarations(context) as Iterable<Any>)
@@ -286,9 +299,18 @@ impl HirTrait: HasAst<AstTrait> & HasDeclarations {
       }
     )
   }
+
+  fun typeParameters(context: QueryContext<List<CompilerError>>): List<HirParameterType> {
+    query<List<HirParameterType>, List<CompilerError>>(context, "HirTrait.typeParameters", this, {
+      Tuple(
+        hirParameterTypesFromAstTypeParameters(this, ast(context).typeParameters),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
 }
 
-impl HirImpl: HasAst<AstImpl> & HasDeclarations {
+impl HirImpl: HasAst<AstImpl> & HasDeclarations & HasTypeParameters {
   fun ast(context: QueryContext<List<CompilerError>>): AstImpl {
     query<AstImpl, List<CompilerError>>(context, "HirImpl.ast", this, {
       let ast = ((parent as HasDeclarations).typeUnsafeAstDeclarations(context) as Iterable<Any>)
@@ -324,9 +346,18 @@ impl HirImpl: HasAst<AstImpl> & HasDeclarations {
       Tuple(declarations, List.empty<CompilerError>())
     })
   }
+
+  fun typeParameters(context: QueryContext<List<CompilerError>>): List<HirParameterType> {
+    query<List<HirParameterType>, List<CompilerError>>(context, "HirImpl.typeParameters", this, {
+      Tuple(
+        hirParameterTypesFromAstTypeParameters(this, ast(context).typeParameters),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
 }
 
-impl HirType: HasAst<AstType> & HasDeclarations {
+impl HirType: HasAst<AstType> & HasDeclarations & HasTypeParameters {
   fun ast(context: QueryContext<List<CompilerError>>): AstType {
     query<AstType, List<CompilerError>>(context, "HirType.ast", this, {
       let ast = ((parent as HasDeclarations).typeUnsafeAstDeclarations(context) as Iterable<Any>)
@@ -350,9 +381,18 @@ impl HirType: HasAst<AstType> & HasDeclarations {
       { Tuple(List.empty<HirDeclaration>(), List.empty<CompilerError>()) },
     )
   }
+
+  fun typeParameters(context: QueryContext<List<CompilerError>>): List<HirParameterType> {
+    query<List<HirParameterType>, List<CompilerError>>(context, "HirType.typeParameters", this, {
+      Tuple(
+        hirParameterTypesFromAstTypeParameters(this, ast(context).typeParameters),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
 }
 
-impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic {
+impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeParameters {
   fun ast(context: QueryContext<List<CompilerError>>): AstFunction {
     query<AstFunction, List<CompilerError>>(context, "HirFunction.ast", this, {
       let ast = ((parent as HasDeclarations).declarations(context) as Iterable<Any>)
@@ -374,6 +414,15 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic {
     query<Bool, List<CompilerError>>(context, "HirFunction.isStatic", this, {
       let ast = ast(context)
       Tuple(containsStaticModifier(ast.modifiers), List.empty<CompilerError>())
+    })
+  }
+
+  fun typeParameters(context: QueryContext<List<CompilerError>>): List<HirParameterType> {
+    query<List<HirParameterType>, List<CompilerError>>(context, "HirFunction.typeParameters", this, {
+      Tuple(
+        hirParameterTypesFromAstTypeParameters(this, ast(context).typeParameters),
+        List.empty<CompilerError>(),
+      )
     })
   }
 }
