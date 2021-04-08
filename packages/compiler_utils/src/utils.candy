@@ -17,6 +17,28 @@ impl<T1: Equals & Hash, T2: Equals & Hash> DataTuple2<T1, T2>: Equals & Hash {
   }
 }
 
+public class DataTuple3<T1: Equals & Hash, T2: Equals & Hash, T3: Equals & Hash> {
+  // TODO(JonasWanke): delete this when `(Equals & Hash, Equals & Hash, Equals & Hash)` implements
+  // `(Equals & Hash)`.
+  public let first: T1
+  public let second: T2
+  public let third: T3
+}
+impl<T1: Equals & Hash, T2: Equals & Hash, T3: Equals & Hash> DataTuple3<T1, T2, T3>: Equals & Hash {
+  fun equals(other: This): Bool {
+    let other = (other as DataTuple3<T1, T2, T3>)
+    // TODO(marcelgarus): Remove this cast when our type system is smart enough to figure this out.
+    (first as Equals).equalsAny(other.first as Equals) &&
+      (second as Equals).equalsAny(other.second as Equals) &&
+      (third as Equals).equalsAny(other.third as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (first as Hash).hash<T>(hasher)
+    (second as Hash).hash<T>(hasher)
+    (third as Hash).hash<T>(hasher)
+  }
+}
+
 public class SetOfString {
   public let value: Set<String>
 }

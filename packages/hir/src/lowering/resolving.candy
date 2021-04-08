@@ -3,25 +3,27 @@ use compiler_utils
 use incremental
 
 use ..declarations
+use ..file
 use ...declarations
+use ...file
 use ...types
 
-// These impls make it possible to resolve identifiers.
+// These functions make it possible to resolve identifiers.
 
-fun resolveIdentifier(
+public fun resolveIdentifier(
   context: QueryContext<List<CompilerError>>,
   identifier: String,
   scope: HirDeclaration,
-): Set<HirType | HirTrait | HirFunction | HirModule | HirParameterType> {
-  query<Set<HirType | HirTrait | HirFunction | HirModule | HirParameterType>, List<CompilerError>>(
+): Set<HirModule | HirType | HirTrait | HirFunction | HirParameterType> {
+  query<Set<HirModule | HirType | HirTrait | HirFunction | HirParameterType>, List<CompilerError>>(
     context,
     "resolveIdentifier",
-    DataTuple2<String, HirDeclaration>(identifier, scope) as Equals & Hash,
+    DataTuple2<String, HirDeclaration>(identifier, scope),
     {
-      let candidates = MutableSet.empty<HirType | HirTrait | HirFunction | HirModule | HirParameterType>()
+      let candidates = MutableSet.empty<HirModule | HirType | HirTrait | HirFunction | HirParameterType>()
       for declaration in (scope as HasDeclarations).declarations(context) {
         if declaration.name() == identifier {
-          candidates.insert(declaration as HirType | HirTrait | HirFunction | HirModule)
+          candidates.insert(declaration as HirModule | HirType | HirTrait | HirFunction)
         }
       }
 
@@ -34,13 +36,16 @@ fun resolveIdentifier(
           })
       }
 
-      // If the `scope` is directly a file, search the use-lines.
+      // If the `scope` is a file, search the use-lines.
       if scope is HirModule {
-        let ast = (scope as HirModule).ast(context)
-        if ast is AstFile {
-          // TODO(marcelgarus): Search use-lines and add their candidates here.
+        if ((scope as HirModule).ast(context) is AstFile) {
+          candidates.addAll(
+            resolveIdentifierInUseLines(context, identifier, scope as HirModule, false)
+              .items()
+              .cast<HirModule | HirType | HirTrait | HirFunction | HirParameterType>(),
+          )
           return Tuple(
-            candidates as Set<HirType | HirTrait | HirFunction | HirModule | HirParameterType>,
+            candidates as Set<HirModule | HirType | HirTrait | HirFunction | HirParameterType>,
             List.empty<CompilerError>(),
           )
         }
@@ -54,13 +59,51 @@ fun resolveIdentifier(
       )
       candidates.addAll(
         resolveIdentifier(context, identifier, scope.parent as HirDeclaration).items() as Iterable<
-          HirType | HirTrait | HirFunction | HirModule | HirParameterType,
+          HirModule | HirType | HirTrait | HirFunction | HirParameterType,
         >
       )
       Tuple(
-        candidates as Set<HirType | HirTrait | HirFunction | HirModule | HirParameterType>,
-        List.empty<CompilerError>()
+        candidates as Set<HirModule | HirType | HirTrait | HirFunction | HirParameterType>,
+        List.empty<CompilerError>(),
       )
+    }
+  )
+}
+
+fun resolveIdentifierInUseLines(
+  context: QueryContext<List<CompilerError>>,
+  identifier: String,
+  moduleHir: HirModule,
+  onlySearchPublicUseLines: Bool,
+): Set<HirModule | HirType | HirTrait | HirFunction> {
+  query<Set<HirModule | HirType | HirTrait | HirFunction>, List<CompilerError>>(
+    context,
+    "resolveIdentifierInUseLines",
+    DataTuple3<String, HirDeclaration, Bool>(identifier, moduleHir, onlySearchPublicUseLines),
+    {
+      mut let useLines = (moduleHir.useLines(context) as Iterable<HirUseLine>)
+      if (onlySearchPublicUseLines) {
+        useLines = useLines.where({ (it as HasVisibility).isPublic(context) })
+      }
+
+      let candidates = useLines
+        .maybeMap<HirModule>({ it.targetModule(context) })
+        .expand<HirModule | HirType | HirTrait | HirFunction>({
+          let declarations = ((it as HasDeclarations).declarations(context) as Iterable<HirDeclaration>)
+            // Files/modules can't contains constructors directly.
+            .cast<HirModule | HirTrait | HirImpl | HirType | HirFunction>()
+            .where({ (it as HirDeclaration).name() == identifier })
+            .where({ (it as HasVisibility).isPublic(context) })
+          if (declarations.isNotEmpty()) {
+            // This file may not export other declarations via public use-lines, hence we don't have
+            // to visit these.
+            return declarations
+          }
+
+          return resolveIdentifierInUseLines(context, identifier, it, true).items()
+        })
+
+      Tuple(candidates.toSet(), List.empty<CompilerError>())
     }
   )
 }
