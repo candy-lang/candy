@@ -112,7 +112,7 @@ impl HirThisType: HirInlineType & Equals & Hash {
 
 
 public class HirParameterType {
-  public let declaration: HirTrait | HirType | HirFunction
+  public let declaration: HirTrait | HirImpl | HirType | HirFunction
   public let name: String
 }
 impl HirParameterType: HirInlineType & Equals & Hash {
