@@ -12,17 +12,26 @@ fun resolveIdentifier(
   context: QueryContext<List<CompilerError>>,
   identifier: String,
   scope: HirDeclaration,
-): Set<HirType | HirTrait | HirFunction | HirModule> {
-  query<Set<HirType | HirTrait | HirFunction | HirModule>, List<CompilerError>>(
+): Set<HirType | HirTrait | HirFunction | HirModule | HirParameterType> {
+  query<Set<HirType | HirTrait | HirFunction | HirModule | HirParameterType>, List<CompilerError>>(
     context,
     "resolveIdentifier",
     DataTuple2<String, HirDeclaration>(identifier, scope) as Equals & Hash,
     {
-      let candidates = MutableSet.empty<HirType | HirTrait | HirFunction | HirModule>()
+      let candidates = MutableSet.empty<HirType | HirTrait | HirFunction | HirModule | HirParameterType>()
       for declaration in (scope as HasDeclarations).declarations(context) {
         if declaration.name() == identifier {
           candidates.insert(declaration as HirType | HirTrait | HirFunction | HirModule)
         }
+      }
+
+      if (scope is HasTypeParameters) {
+        ((scope as HasTypeParameters).typeParameters(context) as Iterable<HirParameterType>)
+          .singleWhere({ it.name == identifier })
+          .do({
+            candidates.insert(it)
+            unit
+          })
       }
 
       // If the `scope` is directly a file, search the use-lines.
@@ -31,7 +40,7 @@ fun resolveIdentifier(
         if ast is AstFile {
           // TODO(marcelgarus): Search use-lines and add their candidates here.
           return Tuple(
-            candidates as Set<HirType | HirTrait | HirFunction | HirModule>,
+            candidates as Set<HirType | HirTrait | HirFunction | HirModule | HirParameterType>,
             List.empty<CompilerError>(),
           )
         }
@@ -44,11 +53,12 @@ fun resolveIdentifier(
         "Parent is a package, although this is not a file-level module."
       )
       candidates.addAll(
-        (resolveIdentifier(context, identifier, scope.parent as HirDeclaration).items() as Iterable<
-          HirType | HirTrait | HirFunction | HirModule>)
+        resolveIdentifier(context, identifier, scope.parent as HirDeclaration).items() as Iterable<
+          HirType | HirTrait | HirFunction | HirModule | HirParameterType,
+        >
       )
       Tuple(
-        candidates as Set<HirType | HirTrait | HirFunction | HirModule>,
+        candidates as Set<HirType | HirTrait | HirFunction | HirModule | HirParameterType>,
         List.empty<CompilerError>()
       )
     }
