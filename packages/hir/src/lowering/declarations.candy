@@ -81,6 +81,14 @@ fun hirParameterTypesFromAstTypeParameters(
     .toList()
 }
 
+public trait HasVisibility {
+  fun isPublic(context: QueryContext<List<CompilerError>>): Bool
+}
+public fun isPublicFromModifiers(modifiers: List<AstIdentifier>): Bool {
+  // TODO(JonasWanke): This should resolve modifier names when we support custom annotations.
+  (modifiers as Iterable<AstIdentifier>).any({ it.value == "public" })
+}
+
 // TODO(marcelgarus): `HirModule`s implement the `HasDeclarations` trait. Because the Dart lowering
 // is weird, we can't just add impls to traits (they will be mixed in, but the subclasses only
 // implement the trait, losing the specific implementation).
@@ -250,7 +258,7 @@ impl HirInnerModule: MightNotExist & HasAst<AstFile | AstModule> & HasDeclaratio
   }
 }
 
-impl HirTrait: HasAst<AstTrait> & HasDeclarations & HasTypeParameters {
+impl HirTrait: HasAst<AstTrait> & HasDeclarations & HasTypeParameters & HasVisibility {
   fun ast(context: QueryContext<List<CompilerError>>): AstTrait {
     query<AstTrait, List<CompilerError>>(context, "HirTrait.ast", this, {
       let ast = ((parent as HasDeclarations).typeUnsafeAstDeclarations(context) as Iterable<Any>)
@@ -308,6 +316,12 @@ impl HirTrait: HasAst<AstTrait> & HasDeclarations & HasTypeParameters {
       )
     })
   }
+
+  fun isPublic(context: QueryContext<List<CompilerError>>): Bool {
+    query<Bool, List<CompilerError>>(context, "HirTrait.isPublic", this, {
+      Tuple(isPublicFromModifiers(ast(context).modifiers), List.empty<CompilerError>())
+    })
+  }
 }
 
 impl HirImpl: HasAst<AstImpl> & HasDeclarations & HasTypeParameters {
@@ -355,6 +369,12 @@ impl HirImpl: HasAst<AstImpl> & HasDeclarations & HasTypeParameters {
       )
     })
   }
+
+  fun isPublic(context: QueryContext<List<CompilerError>>): Bool {
+    query<Bool, List<CompilerError>>(context, "HirImpl.isPublic", this, {
+      Tuple(isPublicFromModifiers(ast(context).modifiers), List.empty<CompilerError>())
+    })
+  }
 }
 
 impl HirType: HasAst<AstType> & HasDeclarations & HasTypeParameters {
@@ -390,6 +410,12 @@ impl HirType: HasAst<AstType> & HasDeclarations & HasTypeParameters {
       )
     })
   }
+
+  fun isPublic(context: QueryContext<List<CompilerError>>): Bool {
+    query<Bool, List<CompilerError>>(context, "HirType.isPublic", this, {
+      Tuple(isPublicFromModifiers(ast(context).modifiers), List.empty<CompilerError>())
+    })
+  }
 }
 
 impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeParameters {
@@ -412,8 +438,9 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
 
   fun isStatic(context: QueryContext<List<CompilerError>>): Bool {
     query<Bool, List<CompilerError>>(context, "HirFunction.isStatic", this, {
-      let ast = ast(context)
-      Tuple(containsStaticModifier(ast.modifiers), List.empty<CompilerError>())
+      // TODO(JonasWanke): This should resolve modifier names when we support custom annotations.
+      let modifiers = (ast(context).modifiers as Iterable<AstIdentifier>)
+      Tuple(modifiers.any({ it.value == "static" }), List.empty<CompilerError>())
     })
   }
 
@@ -425,6 +452,12 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
       )
     })
   }
+
+  fun isPublic(context: QueryContext<List<CompilerError>>): Bool {
+    query<Bool, List<CompilerError>>(context, "HirFunction.isPublic", this, {
+      Tuple(isPublicFromModifiers(ast(context).modifiers), List.empty<CompilerError>())
+    })
+  }
 }
 
 impl HirConstructor: HasDeclarations {
@@ -434,9 +467,4 @@ impl HirConstructor: HasDeclarations {
   public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
     List.empty<HirDeclaration>()
   }
-}
-
-fun containsStaticModifier(modifiers: List<AstIdentifier>): Bool {
-  // TODO(JonasWanke): This should resolve modifier names when we support custom annotations.
-  (modifiers as Iterable<AstIdentifier>).any({ it.value == "static" })
 }
