@@ -186,7 +186,22 @@ fun declarationsOfModule(
           }
           throw "Shouldn't reach this."
         })
-        .toList()
+        .toMutableList()
+      let ast = astOfModule(context, module)
+      if (ast is Some) {
+        if (ast.unwrap() is AstFile) {
+          for useLine in (ast.unwrap() as AstFile).useLines {
+            if (useLine.target is AstLocalRelativeUseLineTarget) {
+              let target = (useLine.target as AstLocalRelativeUseLineTarget)
+              if target.parentNavigations == 0 {
+                (target.path as Iterable<AstIdentifier>).single().do({
+                  declarations.appendAll(declarationsOfModule(context, module.innerModule(it.value)))
+                })
+              }
+            }
+          }
+        }
+      }
       Tuple(declarations, List.empty<CompilerError>())
     }
   )
