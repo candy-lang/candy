@@ -209,7 +209,7 @@ impl HirImpl {
 
 fun getAllImplsInScope(context: QueryContext<List<CompilerError>>, scope: Package): Set<HirImpl> {
   query<Set<HirImpl>, List<CompilerError>>(context, "getAllImplsInScope", scope as Equals & Hash, {
-    let impls = (getTransitiveHullOfPackages(context, scope) as Iterable<Package>)
+    let impls = (scope.getAllPackagesInCompilationOrder(context) as Iterable<Package>)
       .map<Set<HirImpl>>({ package => getAllImplsOfModule(context, HirTopLevelModule(package)) })
       .foldLeft<Set<HirImpl>>(Set.empty<HirImpl>(), { a, b => a.union(b) })
     Tuple(impls, List.empty<CompilerError>())
@@ -219,7 +219,6 @@ fun getAllImplsOfModule(context: QueryContext<List<CompilerError>>, module: HirM
   query<Set<HirImpl>, List<CompilerError>>(context, "getAllImplsOfModule", module as Equals & Hash, {
 
     let declarations = (declarationsOfModule(context, module) as Iterable<HirDeclaration>)
-    print("Getting impls of module {module}. Declarations: {declarations}")
     let impls = declarations
       .whereType<HirModule>()
       .expand<HirImpl>({ (getAllImplsOfModule(context, it) as Iterable<HirImpl>) })
