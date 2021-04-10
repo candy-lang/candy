@@ -50,7 +50,7 @@ trait HasTargetModule {
   fun targetModule(context: QueryContext<List<CompilerError>>): Maybe<HirModule>
 }
 
-impl HirUseLine: HasTargetModule
+impl HirUseLine: HasTargetModule & HasVisibility
 
 impl HirImplicitCoreUseLine: HasTargetModule {
   fun targetModule(context: QueryContext<List<CompilerError>>): Maybe<HirModule> {
@@ -58,6 +58,8 @@ impl HirImplicitCoreUseLine: HasTargetModule {
       Tuple(Some<HirModule>(HirModule.core(context)), List.empty<CompilerError>())
     })
   }
+
+  fun isPublic(context: QueryContext<List<CompilerError>>): Bool { false }
 }
 
 impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
@@ -166,6 +168,12 @@ impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
       }
 
       Tuple(Some<HirModule>(target), List.empty<CompilerError>())
+    })
+  }
+
+  fun isPublic(context: QueryContext<List<CompilerError>>): Bool {
+    query<Bool, List<CompilerError>>(context, "HirExplicitUseLine.isPublic", this, {
+      Tuple(isPublicFromModifiers(ast(context).modifiers), List.empty<CompilerError>())
     })
   }
 }
