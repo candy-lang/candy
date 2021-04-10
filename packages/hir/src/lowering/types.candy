@@ -53,7 +53,6 @@ fun astInlineTypeToHirInlineType(
         }
         let candidates = candidates.items()
           .where({ !(it is HirModule) })
-          .cast<HirType | HirTrait | HirFunction | HirParameterType>()
           // This cast from `HirType | HirTrait | HirFunction | HirParameterType` to
           // `HirType | HirTrait | HirParameterType` succeeds because the name is uppercase, so no
           // functions get resolved.
