@@ -6,7 +6,6 @@ use ...declarations
 use ...types
 use ...solver
 use ..declarations
-use ..packages
 use ..resolving
 
 /// These impls make type system information available.
