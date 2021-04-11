@@ -59,5 +59,8 @@ fun solverExample(context: QueryContext<List<CompilerError>>) {
   print("Impl is {anImpl}.")
   let rule = hirImplToSolverRule(context, anImpl)
   print("Rule is {rule}.")
+  print("")
+  print("All impls of core:")
+  print(getAllImplsInScope(context, Package.core(context)))
   //print("Does {type.toString_()} implement Equals? {environment.solve(equalsImpl(type)).toString_()}")
 }

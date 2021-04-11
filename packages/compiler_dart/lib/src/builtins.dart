@@ -635,6 +635,22 @@ class DartBuiltinCompiler extends BuiltinCompiler<dart.Spec> {
             ..body = dart.refer('path').wrapInCandyPath(context).code),
           dart.Method((b) => b
             ..returns = path
+            ..name = 'relativeTo'
+            ..requiredParameters.add(dart.Parameter((b) => b
+              ..name = 'other'
+              ..type = path))
+            ..body = dart
+                .refer('relative', packagePathUrl)
+                .call(
+                  [dart.refer('other.value.value')],
+                  {'from': dart.refer('value.value')},
+                  [],
+                )
+                .wrapInCandyString(context)
+                .wrapInCandyPath(context)
+                .code),
+          dart.Method((b) => b
+            ..returns = path
             ..name = 'normalized'
             ..body = dart
                 .refer('normalize', packagePathUrl)

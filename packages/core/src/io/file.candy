@@ -39,6 +39,7 @@ builtin class Path {
   builtin static fun current(): Path
   builtin static fun parse(path: String): Path
 
+  builtin fun relativeTo(other: Path): Path
   builtin fun normalized(): Path
 
   builtin fun isAbsolute(): Bool

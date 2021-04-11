@@ -25,6 +25,19 @@ public class FancyFile {
       Tuple(File(getResolvedPath(context)).read(), List.empty<CompilerError>())
     })
   }
+
+  // TODO(marcelgarus): This is quite ugly. We should rename this class to `FancyPath` and then
+  // create `FancyFile` and `FancyDirectory` wrappers that offer additional functionality.
+  fun children(context: QueryContext<List<CompilerError>>): List<FancyFile> {
+    impureQuery<List<FancyFile>, List<CompilerError>>(context, "FancyFile.children", (this as Equals & Hash), {
+      let packagePath = getResolvedPath(context)
+      let children = (Directory(getResolvedPath(context))
+        .listContents(false) as Iterable<FileSystemNode>)
+        .map<FancyFile>({ FancyFile(package, it.path.relativeTo(packagePath)) })
+        .toList()
+      Tuple(children, List.empty<CompilerError>())
+    })
+  }
 }
 impl FancyFile: Equals & Hash {
   fun equals(other: This): Bool {
