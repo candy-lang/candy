@@ -1,5 +1,3 @@
-use ...Numbers
-
 trait Add: BinaryPlus[This, This] {
   ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
 
