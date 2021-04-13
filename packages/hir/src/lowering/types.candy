@@ -77,7 +77,9 @@ fun astInlineTypeToHirInlineType(
           )
         }
         let candidate = (candidates.items() as Iterable<HirType | HirTrait | HirParameterType>).single().unwrap()
-        if (candidate is HirParameterType) { return (candidate as HirParameterType) }
+        if (candidate is HirParameterType) {
+          return Tuple(candidate as HirParameterType, List.empty<CompilerError>())
+        }
         let declaration = (candidate as HirTrait | HirType)
 
         let types = ((astType as AstNamedType).typeArguments as Iterable<AstTypeArgument>)
