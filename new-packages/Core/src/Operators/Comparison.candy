@@ -1,4 +1,4 @@
-use ..Equals
+use ..Equality
 
 trait Comparable: Equals
   & BinaryLess[This, Bool]
