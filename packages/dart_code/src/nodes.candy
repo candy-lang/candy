@@ -254,8 +254,8 @@ impl DartNamedType: DartExpression & DartType
 /// TODO(marcelgarus): Remove once the compiler realizes `DartType` implements `DartExpression`.
 
 class DartFunctionType {
-  let parameters: List<DartParameter> = List.empty<DartParameter>()
-  let positionalParameters: List<DartParameter> = List.empty<DartParameter>()
+  let parameters: List<DartType | DartParameter> = List.empty<DartType | DartParameter>()
+  let positionalParameters: List<DartType | DartParameter> = List.empty<DartType | DartParameter>()
   let namedParameters: List<DartParameter> = List.empty<DartParameter>()
   let _returns: Maybe<DartType> = None<DartType>()
 }
