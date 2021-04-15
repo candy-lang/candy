@@ -13,6 +13,16 @@ impl HirErrorType: HirInlineType & Equals & Hash {
 public class HirNamedType {
   public let declaration: HirTrait | HirType
   public let parameterTypes: List<HirInlineType>
+
+  static fun coreInt(context: QueryContext<List<CompilerError>>): HirNamedType {
+    HirNamedType(HirType.coreInt(context), List.empty<HirInlineType>())
+  }
+  static fun coreNever(context: QueryContext<List<CompilerError>>): HirNamedType {
+    HirNamedType(HirType.coreNever(context), List.empty<HirInlineType>())
+  }
+  static fun coreString(context: QueryContext<List<CompilerError>>): HirNamedType {
+    HirNamedType(HirType.coreString(context), List.empty<HirInlineType>())
+  }
 }
 impl HirNamedType: HirInlineType & Equals & Hash {
   fun equals(other: This): Bool {
