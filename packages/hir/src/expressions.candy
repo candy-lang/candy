@@ -128,20 +128,25 @@ public class HirExpressionCallExpression {
 }
 impl HirExpressionCallExpression: HirExpression
 
-public class HirConstructorCallExpression {
-  public let uri: HirExpressionUri<HirConstructorCallExpression>
+public class HirTypeInstantiationExpression {
+  public let uri: HirExpressionUri<HirTypeInstantiationExpression>
   public let receiver: HirExpressionUri<HirReflectionExpression<HirType>>
-  public let constructor: HirConstructor
   public let typeArguments: Map<String, HirType>
-  public let valueArguments: Map<String, HirExpressionUri<HirExpression>>
+  public let valueArgument: HirExpressionUri<HirExpression>
 }
-impl HirConstructorCallExpression: HirExpression
+impl HirTypeInstantiationExpression: HirExpression
 
 public class HirTupleExpression {
   public let uri: HirExpressionUri<HirTupleExpression>
   public let valueArguments: List<HirExpressionUri<HirExpression>>
 }
 impl HirTupleExpression: HirExpression
+
+public class HirNamedTupleExpression {
+  public let uri: HirExpressionUri<HirNamedTupleExpression>
+  public let valueArguments: Map<String, HirExpressionUri<HirExpression>>
+}
+impl HirNamedTupleExpression: HirExpression
 
 public class HirReturnExpression {
   public let uri: HirExpressionUri<HirReturnExpression>
