@@ -476,39 +476,11 @@ final getPropertyDeclarationParentAsType =
   provider: (context, declarationId) {
     final parentId = declarationId.parent;
     if (parentId.isTrait) {
-      final parentHir = getTraitDeclarationHir(context, parentId);
-      if (parentHir.typeParameters.isNotEmpty) {
-        throw CompilerError.unsupportedFeature(
-          'References to instance methods of traits with type parameters are not yet supported.',
-        );
-      }
-      return Some(UserCandyType(
-        declarationIdToModuleId(context, parentId.parent),
-        parentHir.name,
-      ));
+      return Some(getTraitDeclarationHir(context, parentId).thisType);
     } else if (parentId.isImpl) {
-      final parentHir = getImplDeclarationHir(context, parentId);
-      if (parentHir.typeParameters.isNotEmpty ||
-          parentHir.type.arguments.isNotEmpty) {
-        throw CompilerError.unsupportedFeature(
-          'References to instance methods of impls with type parameters (or for a type with type arguments) are not yet supported.',
-        );
-      }
-      return Some(UserCandyType(
-        declarationIdToModuleId(context, parentId.parent),
-        parentHir.type.name,
-      ));
+      return Some(getImplDeclarationHir(context, parentId).type);
     } else if (parentId.isClass) {
-      final parentHir = getClassDeclarationHir(context, parentId);
-      if (parentHir.typeParameters.isNotEmpty) {
-        throw CompilerError.unsupportedFeature(
-          'References to instance methods of classes with type parameters are not yet supported.',
-        );
-      }
-      return Some(UserCandyType(
-        declarationIdToModuleId(context, parentId.parent),
-        parentHir.name,
-      ));
+      return Some(getClassDeclarationHir(context, parentId).thisType);
     } else {
       assert(parentId.isModule);
       return None();
