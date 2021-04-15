@@ -1,4 +1,4 @@
-trait Add: BinaryPlus[This, This] {
+public trait Add: BinaryPlus[This, This] {
   ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
 
   fun add(other: This): This
@@ -6,7 +6,7 @@ trait Add: BinaryPlus[This, This] {
   fun plus(other: This): This { add(other) }
 }
 
-trait Subtract: BinaryMinus[This, This] {
+public trait Subtract: BinaryMinus[This, This] {
   ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
 
   fun subtract(other: This): This
@@ -14,7 +14,7 @@ trait Subtract: BinaryMinus[This, This] {
   fun minus(other: This): This { subtract(other) }
 }
 
-trait Negate: PrefixMinus[This] {
+public trait Negate: PrefixMinus[This] {
   ## TODO(marcelgarus): Make this generic over the return type.
 
   fun negate(): This
@@ -22,7 +22,7 @@ trait Negate: PrefixMinus[This] {
   fun prefixMinus(): Result { negate() }
 }
 
-trait Multiply: BinaryStar[This, This] {
+public trait Multiply: BinaryStar[This, This] {
   ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
 
   fun multiply(other: This): This
@@ -30,7 +30,7 @@ trait Multiply: BinaryStar[This, This] {
   fun star(other: This): This { multiply(other) }
 }
 
-trait Divide: BinarySlash[This, This] {
+public trait Divide: BinarySlash[This, This] {
   ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
 
   fun divide(other: This): This
@@ -38,7 +38,7 @@ trait Divide: BinarySlash[This, This] {
   fun slash(other: This): This { divide(other) }
 }
 
-trait DivideTruncating: BinarySlashSlash[This, This] {
+public trait DivideTruncating: BinarySlashSlash[This, This] {
   ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
 
   fun divideTruncating(other: This): Int
@@ -46,7 +46,7 @@ trait DivideTruncating: BinarySlashSlash[This, This] {
   fun slashSlash(other: This): This { divideTruncating(other) }
 }
 
-trait Modulo {
+public trait Modulo {
   ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
 
   fun modulo(other: This): This

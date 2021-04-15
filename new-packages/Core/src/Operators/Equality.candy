@@ -1,7 +1,7 @@
 use ...Bool
 use ..Raw
 
-trait Equals: BinaryEquals[This, Bool] & BinaryNotEquals[This, Bool] {
+public trait Equals: BinaryEquals[This, Bool] & BinaryNotEquals[This, Bool] {
   fun equals(other: This): Bool
   builtin fun equalsAny(other: Any): Bool
 

@@ -1,4 +1,4 @@
-builtin fun loop(body: () -> Nothing): Never
+public builtin fun loop(body: () -> Nothing): Never
 # Executes the body infinitely often.
 ## TODO(marcelgarus): Implement this in pure Candy once we have tail-call elimination.
 

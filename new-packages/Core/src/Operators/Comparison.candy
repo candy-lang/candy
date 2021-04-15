@@ -1,6 +1,6 @@
 use ..Equality
 
-trait Comparable: Equals
+public trait Comparable: Equals
   & BinaryLess[This, Bool]
   & BinaryLessEqual[This, Bool]
   & BinaryGreater[This, Bool]
