@@ -1,41 +1,77 @@
 use ..declarations
 use ..types
 
-public data class HirExpressionUri<E: HirExpression> {
-  public let declaration: HirConstructor | HirFunction
+public class HirExpressionUri<E: HirExpression> {
+  public let declaration: HirFunction
   public let index: Int
 }
+impl<E: HirExpression> HirExpressionUri<E>: Equals & Hash {
+  fun equals(other: This): Bool {
+    (declaration as Equals) == (other.declaration as Equals)
+      && (index as Equals) == (other.index as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    declaration.hash<T>(hasher)
+    index.hash<T>(hasher)
+  }
+}
+
 
 
 public trait HirExpression {
   public let uri: HirExpressionUri<HirExpression>
 }
+impl HirExpression: Equals & Hash
 
 
 public class HirIntExpression {
   public let uri: HirExpressionUri<HirIntExpression>
   public let value: Int
 }
-impl HirIntExpression: HirExpression
+impl HirIntExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (value as Equals) == (other.value as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    value.hash<T>(hasher)
+  }
+}
 
 
 public class HirStringExpression {
   public let uri: HirExpressionUri<HirStringExpression>
   public let parts: List<HirStringPart>
 }
-impl HirStringExpression: HirExpression
+impl HirStringExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (parts as Iterable<HirStringPart>).unsafeEquals(other.parts)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    parts.unsafeHash<T>(hasher)
+  }
+}
 
 trait /* enum */ HirStringPart
 
 public class HirLiteralStringPart {
   public let value: String
 }
-impl HirLiteralStringPart: HirStringPart
+impl HirLiteralStringPart: HirStringPart & Equals & Hash {
+  fun equals(other: This): Bool { (value as Equals) == (other.value as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { value.hash<T>(hasher) }
+}
 
 public class HirInterpolatedStringPart {
   public let value: HirExpressionUri<HirExpression>
 }
-impl HirInterpolatedStringPart: HirStringPart
+impl HirInterpolatedStringPart: HirStringPart & Equals & Hash {
+  fun equals(other: This): Bool { (value as Equals) == (other.value as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { value.hash<T>(hasher) }
+}
 
 
 public class HirLambdaExpression {
@@ -45,11 +81,36 @@ public class HirLambdaExpression {
   public let returnType: HirType
   public let receiverType: Maybe<HirType>
 }
-impl HirLambdaExpression: HirExpression
+impl HirLambdaExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (parameters as Iterable<HirLambdaParameter>).unsafeEquals(other.parameters)
+      && (expressions as Iterable<HirExpressionUri<HirExpression>>).unsafeEquals(other.expressions)
+      && (returnType as Equals) == (other.returnType as Equals)
+      && receiverType.unsafeEquals(other.receiverType)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    parameters.unsafeHash<T>(hasher)
+    expressions.unsafeHash<T>(hasher)
+    returnType.hash<T>(hasher)
+    receiverType.unsafeHash<T>(hasher)
+  }
+}
 
 public class HirLambdaParameter {
   public let name: String
   public let type: HirType
+}
+impl HirLambdaParameter: Equals & Hash {
+  fun equals(other: This): Bool {
+    (name as Equals) == (other.name as Equals)
+      && (type as Equals) == (other.type as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    name.hash<T>(hasher)
+    type.hash<T>(hasher)
+  }
 }
 
 
@@ -57,13 +118,31 @@ public class HirThisExpression {
   public let uri: HirExpressionUri<HirThisExpression>
   public let type: HirType
 }
-impl HirThisExpression: HirExpression
+impl HirThisExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (type as Equals) == (other.type as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    type.hash<T>(hasher)
+  }
+}
 
 public class HirSuperExpression {
   public let uri: HirExpressionUri<HirSuperExpression>
   public let type: HirNamedType
 }
-impl HirSuperExpression: HirExpression
+impl HirSuperExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (type as Equals) == (other.type as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    type.hash<T>(hasher)
+  }
+}
 
 
 public class HirReflectionExpression<
@@ -72,35 +151,86 @@ public class HirReflectionExpression<
   public let uri: HirExpressionUri<HirReflectionExpression<Target>>
   public let target: Target
 }
-impl HirReflectionExpression: HirExpression
+impl HirReflectionExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (target as Equals) == (other.target as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    (target as Hash).hash<T>(hasher)
+  }
+}
 
 public class HirParameterReferenceExpression {
   public let uri: HirExpressionUri<HirParameterReferenceExpression>
   public let scope: HirFunction | HirExpressionUri<HirLambdaExpression>
   public let name: String
 }
-impl HirParameterReferenceExpression: HirExpression
+impl HirParameterReferenceExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (scope as Equals) == (other.scope as Equals)
+      && (name as Equals) == (other.name as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    (scope as Hash).hash<T>(hasher)
+    name.hash<T>(hasher)
+  }
+}
 
 public class HirFunctionReferenceExpression {
   public let uri: HirExpressionUri<HirFunctionReferenceExpression>
   public let target: HirFunction
 }
-impl HirFunctionReferenceExpression: HirExpression
+impl HirFunctionReferenceExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (target as Equals) == (other.target as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    target.hash<T>(hasher)
+  }
+}
 
 
 public class HirLocalPropertyExpression {
   public let uri: HirExpressionUri<HirLocalPropertyExpression>
   public let name: String
   public let type: HirType
-  public let initializer: HirExpressionUri<HirExpression>
+  public let value: HirExpressionUri<HirExpression>
 }
-impl HirLocalPropertyExpression: HirExpression
+impl HirLocalPropertyExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (name as Equals) == (other.name as Equals)
+      && (type as Equals) == (other.type as Equals)
+      && (value as Equals) == (other.value as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    name.hash<T>(hasher)
+    type.hash<T>(hasher)
+    value.hash<T>(hasher)
+  }
+}
 
 public class HirLocalPropertyReferenceExpression {
   public let uri: HirExpressionUri<HirLocalPropertyReferenceExpression>
   public let target: HirExpressionUri<HirLocalPropertyExpression>
 }
-impl HirLocalPropertyReferenceExpression: HirExpression
+impl HirLocalPropertyReferenceExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (target as Equals) == (other.target as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    target.hash<T>(hasher)
+  }
+}
 
 
 public class HirNavigationExpression {
@@ -108,7 +238,18 @@ public class HirNavigationExpression {
   public let receiver: HirExpressionUri<HirExpression>
   public let target: HirFunction
 }
-impl HirNavigationExpression: HirExpression
+impl HirNavigationExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (receiver as Equals) == (other.receiver as Equals)
+      && (target as Equals) == (other.target as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    receiver.hash<T>(hasher)
+    target.hash<T>(hasher)
+  }
+}
 
 
 public class HirFunctionCallExpression {
@@ -119,14 +260,38 @@ public class HirFunctionCallExpression {
   public let typeArguments: Map<String, HirType>
   public let valueArguments: Map<String, HirExpressionUri<HirExpression>>
 }
-impl HirFunctionCallExpression: HirExpression
+impl HirFunctionCallExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (receiver as Equals) == (other.receiver as Equals)
+      && typeArguments.unsafeEquals(other.typeArguments)
+      && valueArguments.unsafeEquals(other.valueArguments)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    receiver.hash<T>(hasher)
+    typeArguments.unsafeHash<T>(hasher)
+    valueArguments.unsafeHash<T>(hasher)
+  }
+}
 
 public class HirExpressionCallExpression {
   public let uri: HirExpressionUri<HirExpressionCallExpression>
   public let receiver: HirExpressionUri<HirExpression>
   public let valueArguments: List<HirExpressionUri<HirExpression>>
 }
-impl HirExpressionCallExpression: HirExpression
+impl HirExpressionCallExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (receiver as Equals) == (other.receiver as Equals)
+      && (valueArguments as Iterable<HirExpressionUri<HirExpression>>).unsafeEquals(other.valueArguments)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    receiver.hash<T>(hasher)
+    valueArguments.unsafeHash<T>(hasher)
+  }
+}
 
 public class HirTypeInstantiationExpression {
   public let uri: HirExpressionUri<HirTypeInstantiationExpression>
@@ -134,31 +299,65 @@ public class HirTypeInstantiationExpression {
   public let typeArguments: Map<String, HirType>
   public let valueArgument: HirExpressionUri<HirExpression>
 }
-impl HirTypeInstantiationExpression: HirExpression
+impl HirTypeInstantiationExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (receiver as Equals) == (other.receiver as Equals)
+      && typeArguments.unsafeEquals(other.typeArguments)
+      && (valueArgument as Equals) == (other.valueArgument as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    receiver.hash<T>(hasher)
+    typeArguments.unsafeHash<T>(hasher)
+    valueArgument.hash<T>(hasher)
+  }
+}
 
 public class HirTupleExpression {
   public let uri: HirExpressionUri<HirTupleExpression>
   public let valueArguments: List<HirExpressionUri<HirExpression>>
 }
-impl HirTupleExpression: HirExpression
+impl HirTupleExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (valueArguments as Iterable<HirExpressionUri<HirExpression>>).unsafeEquals(other.valueArguments)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    valueArguments.unsafeHash<T>(hasher)
+  }
+}
 
 public class HirNamedTupleExpression {
   public let uri: HirExpressionUri<HirNamedTupleExpression>
   public let valueArguments: Map<String, HirExpressionUri<HirExpression>>
 }
-impl HirNamedTupleExpression: HirExpression
+impl HirNamedTupleExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && valueArguments.unsafeEquals(other.valueArguments)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    valueArguments.unsafeHash<T>(hasher)
+  }
+}
 
 public class HirReturnExpression {
   public let uri: HirExpressionUri<HirReturnExpression>
   public let scope: HirFunction | HirExpressionUri<HirLambdaExpression>
   public let expression: HirExpressionUri<HirExpression>
 }
-impl HirReturnExpression: HirExpression
-
-
-public class HirAssignmentExpression {
-  public let uri: HirExpressionUri<HirAssignmentExpression>
-  public let target: HirExpressionUri<HirLocalPropertyReferenceExpression>
-  public let value: HirExpressionUri<HirExpression>
+impl HirReturnExpression: HirExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (scope as Equals) == (other.scope as Equals)
+      && (expression as Equals) == (other.expression as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    (scope as Hash).hash<T>(hasher)
+    expression.hash<T>(hasher)
+  }
 }
-impl HirAssignmentExpression: HirExpression
