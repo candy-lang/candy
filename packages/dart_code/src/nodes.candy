@@ -235,6 +235,7 @@ static fun dartList(entry: DartType): DartType {
 static fun dartMap(key: DartType, value: DartType): DartType {
   DartNamedType(DartIdentifier("Map", Some<String>(dartCoreUrl)), List.of2<DartType>(key, value))
 }
+static let dartNever = DartNamedType(DartIdentifier("Never", Some<String>(dartCoreUrl)), List.empty<DartType>())
 static let dartNull = DartNamedType(DartIdentifier("Null", Some<String>(dartCoreUrl)), List.empty<DartType>())
 static let dartNum = DartNamedType(DartIdentifier("num", Some<String>(dartCoreUrl)), List.empty<DartType>())
 static let dartObject = DartNamedType(DartIdentifier("Object", Some<String>(dartCoreUrl)), List.empty<DartType>())
@@ -270,6 +271,13 @@ class DartTypeParameter {
 
 trait DartExpression {
   fun dot(property: String): DartNavigation { DartNavigation(this, property) }
+  public fun call1(positionalArgument: DartExpression): DartCall {
+    call(
+      positionalArguments = List.of1<DartExpression>(positionalArgument),
+      namedArguments = Map.empty<String, DartExpression>(),
+      typeArguments = List.empty<DartType>(),
+    )
+  }
   public fun call(
     positionalArguments: List<DartExpression>,
     namedArguments: Map<String, DartExpression>,
