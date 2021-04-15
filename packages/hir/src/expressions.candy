@@ -93,7 +93,6 @@ public class HirLocalPropertyExpression {
   public let name: String
   public let type: HirType
   public let initializer: HirExpressionUri<HirExpression>
-  public let isMutable: Bool
 }
 impl HirLocalPropertyExpression: HirExpression
 
