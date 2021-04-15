@@ -1,0 +1,47 @@
+use compiler_utils
+use dart_code
+use hir
+use incremental
+
+public use .enum_type
+public use .function_type
+public use .named_type
+public use .named_tuple_type
+public use .tuple_type
+
+public fun compileInlineType(
+  context: QueryContext<List<CompilerError>>,
+  inlineType: HirInlineType,
+): DartType {
+  query<DartType, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileInlineType",
+    inlineType, {
+    Tuple(compileInlineTypeHelper(context, inlineType), List.empty<CompilerError>())
+  })
+}
+
+fun compileInlineTypeHelper(
+  context: QueryContext<List<CompilerError>>,
+  inlineType: HirInlineType,
+): DartType {
+  if (inlineType is HirErrorType) { throw "Tried to compile an error type to Dart." }
+  if (inlineType is HirNamedType) { return compileNamedType(context, inlineType as HirNamedType) }
+  if (inlineType is HirFunctionType) {
+    return compileFunctionType(context, inlineType as HirFunctionType)
+  }
+  if (inlineType is HirTupleType) { return compileTupleType(context, inlineType as HirTupleType) }
+  if (inlineType is HirNamedTupleType) {
+    return compileNamedTupleType(context, inlineType as HirNamedTupleType)
+  }
+  if (inlineType is HirEnumType) { return compileEnumType(context, inlineType as HirEnumType) }
+  if (inlineType is HirIntersectionType) { return dartDynamic }
+  if (inlineType is HirThisType) { return dartDynamic }
+  if (inlineType is HirParameterType) {
+    let name = (inlineType as HirParameterType).name
+    return DartNamedType(DartIdentifier(name, None<String>()), List.empty<DartType>())
+  }
+  if (inlineType is HirReflectionType) {
+    todo("Compiling HirReflectionType to Dart is not yet implemented.")
+  }
+}

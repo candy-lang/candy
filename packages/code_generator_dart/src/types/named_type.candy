@@ -1,0 +1,30 @@
+use compiler_utils
+use dart_code
+use hir
+use incremental
+
+use ...types
+
+public fun compileNamedType(
+  context: QueryContext<List<CompilerError>>,
+  namedType: HirNamedType,
+): DartType {
+  query<DartType, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileNamedType",
+    namedType, {
+    if (namedType == HirNamedType.coreNever(context)) {
+      return Tuple(dartNever, List.empty<CompilerError>())
+    }
+
+    let name = (namedType.declaration as HirDeclaration).name()
+    let name = DartIdentifier(name, None<String>())
+    // TODO(JonasWanke): correct package URL
+
+    let types = (namedType.parameterTypes as Iterable<HirInlineType>)
+      .map<DartType>({ compileInlineType(context, it) })
+      .toList()
+
+    Tuple(DartNamedType(name, types), List.empty<CompilerError>())
+  })
+}

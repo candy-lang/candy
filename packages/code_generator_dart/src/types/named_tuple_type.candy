@@ -3,6 +3,8 @@ use dart_code
 use hir
 use incremental
 
+use ...types
+
 public fun compileNamedTupleType(
   context: QueryContext<List<CompilerError>>,
   namedTupleType: HirNamedTupleType,
@@ -17,8 +19,7 @@ public fun compileNamedTupleType(
     let name = DartIdentifier(name, None<String>())
     // TODO(JonasWanke): correct package URL
 
-    let types = List.empty<DartType>()
-    // TODO(JonasWanke): Map the types
+    let types = sortedFields.map<DartType>({ compileInlineType(context, it.second) }).toList()
 
     Tuple(DartNamedType(name, types), List.empty<CompilerError>())
   })
