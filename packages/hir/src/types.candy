@@ -1,3 +1,6 @@
+use compiler_utils
+use incremental
+
 use ..declarations
 
 public trait HirInlineType
@@ -19,6 +22,9 @@ public class HirNamedType {
   }
   static fun coreNever(context: QueryContext<List<CompilerError>>): HirNamedType {
     HirNamedType(HirType.coreNever(context), List.empty<HirInlineType>())
+  }
+  static fun coreNothing(context: QueryContext<List<CompilerError>>): HirNamedType {
+    HirNamedType(HirType.coreNothing(context), List.empty<HirInlineType>())
   }
   static fun coreString(context: QueryContext<List<CompilerError>>): HirNamedType {
     HirNamedType(HirType.coreString(context), List.empty<HirInlineType>())

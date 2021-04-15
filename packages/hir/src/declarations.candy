@@ -94,6 +94,9 @@ public class HirType {
   static fun coreNever(context: QueryContext<List<CompilerError>>): HirType {
     HirType(HirModule.corePrimitives(context), "Never")
   }
+  static fun coreNothing(context: QueryContext<List<CompilerError>>): HirType {
+    HirType(HirModule.corePrimitives(context), "Nothing")
+  }
   static fun coreString(context: QueryContext<List<CompilerError>>): HirType {
     HirType(HirModule.coreString(context), "String")
   }
