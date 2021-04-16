@@ -13,10 +13,6 @@ public fun compileNamedType(
     context,
     "code_generator_dart.compileNamedType",
     namedType, {
-    if (namedType == HirNamedType.coreNever(context)) {
-      return Tuple(dartNever, List.empty<CompilerError>())
-    }
-
     let name = (namedType.declaration as HirDeclaration).name()
     let name = DartIdentifier(name, None<String>())
     // TODO(JonasWanke): correct package URL
