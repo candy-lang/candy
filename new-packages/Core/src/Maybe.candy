@@ -1,5 +1,5 @@
-use ..Primitives
 use ..Bool
+use ..Primitives
 
 public type Maybe[T] = Some T | None
 
