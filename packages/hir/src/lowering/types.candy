@@ -439,7 +439,7 @@ fun getSolverEnvironmentOfScope(context: QueryContext<List<CompilerError>>, scop
 }
 
 fun makeSureImplsAreNotConflicting(context: QueryContext<List<CompilerError>>, scope: Package) {
-  query<Unit, List<CompilerError>>( context, "makeSureImplsAreNotConflicting", scope as Equals & Hash, {
+  query<Unit, List<CompilerError>>(context, "makeSureImplsAreNotConflicting", scope as Equals & Hash, {
     for implsForSameTrait in (getAllImplsInScope(context, scope) as Iterable<HirImpl>)
       .where({ it.implementedTrait(context) is Some })
       .groupBy<HirInlineType>({ it.implementedTrait(context).unwrap() })
