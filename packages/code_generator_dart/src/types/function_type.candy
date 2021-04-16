@@ -1,0 +1,31 @@
+use compiler_utils
+use dart_code
+use hir
+use incremental
+
+use ...types
+
+public fun compileFunctionType(
+  context: QueryContext<List<CompilerError>>,
+  functionType: HirFunctionType,
+): DartType {
+  query<DartType, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileFunctionType",
+    functionType, {
+    let parameterTypes = MutableList.empty<HirInlineType>()
+    functionType.receiverType.do({ parameterTypes.append(it) })
+    parameterTypes.appendAll(functionType.parameterTypes)
+    let parameterTypes = (parameterTypes as Iterable<HirInlineType>)
+      .map<DartType | DartParameter>({ compileInlineType(context, it) })
+      .toList()
+    
+    let functionType = DartFunctionType(
+      parameters = parameterTypes,
+      positionalParameters = List.empty<DartType | DartParameter>(),
+      namedParameters = List.empty<DartParameter>(),
+      _returns = compileInlineType(context, functionType.returnType),
+    )
+    Tuple(functionType, List.empty<CompilerError>())
+  })
+}

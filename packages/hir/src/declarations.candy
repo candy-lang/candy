@@ -14,6 +14,15 @@ public trait HirModule: HirDeclaration & Equals & Hash {
       Tuple(HirTopLevelModule(Package.core(context)), List.empty<CompilerError>())
     })
   }
+  static fun coreInt(context: QueryContext<List<CompilerError>>): HirModule {
+    core(context).innerModule("Int")
+  }
+  static fun corePrimitives(context: QueryContext<List<CompilerError>>): HirModule {
+    core(context).innerModule("Primitives")
+  }
+  static fun coreString(context: QueryContext<List<CompilerError>>): HirModule {
+    core(context).innerModule("String")
+  }
 
   let parent: Package | HirModule
   fun innerModule(name: String): HirInnerModule { HirInnerModule(this, name) }
@@ -78,6 +87,19 @@ impl HirImpl: HirDeclaration & Equals & Hash {
 public class HirType {
   public let parent: HirModule
   public let name_: String
+
+  static fun coreInt(context: QueryContext<List<CompilerError>>): HirType {
+    HirType(HirModule.coreInt(context), "Int")
+  }
+  static fun coreNever(context: QueryContext<List<CompilerError>>): HirType {
+    HirType(HirModule.corePrimitives(context), "Never")
+  }
+  static fun coreNothing(context: QueryContext<List<CompilerError>>): HirType {
+    HirType(HirModule.corePrimitives(context), "Nothing")
+  }
+  static fun coreString(context: QueryContext<List<CompilerError>>): HirType {
+    HirType(HirModule.coreString(context), "String")
+  }
 }
 impl HirType: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
