@@ -422,6 +422,22 @@ fun hirInlineTypeToSolverTypeAndGoals(
   })
 }
 
+fun getSolverEnvironmentOfScope(context: QueryContext<List<CompilerError>>, scope: Package): Environment {
+  query<Environment, List<CompilerError>>(
+    context, "getSolverEnvironmentOfScope", scope as Equals & Hash, {
+    let impls = getAllImplsInScope(context, scope)
+    let rules = impls
+      .items()
+      .maybeMap<SolverRule>({
+        let rule = hirImplToSolverRule(context, it)
+        print("Rule is {rule}")
+        rule
+      })
+      .toList()
+    Tuple(Environment(rules), List.empty<CompilerError>())
+  })
+}
+
 fun makeSureImplsAreNotConflicting(context: QueryContext<List<CompilerError>>, scope: Package) {
   query<Unit, List<CompilerError>>( context, "makeSureImplsAreNotConflicting", scope as Equals & Hash, {
     for implsForSameTrait in (getAllImplsInScope(context, scope) as Iterable<HirImpl>)
