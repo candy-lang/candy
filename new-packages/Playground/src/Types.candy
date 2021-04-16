@@ -1,5 +1,12 @@
-type Foo = Unit
+builtin type Blub
+builtin type Foo[T]
 
-trait Bar {}
+trait Bar {
+  fun baz(): Blub
+}
 
-impl Foo: Bar {}
+impl[T] Foo[T]: Bar {
+  fun baz(): Blub {
+    print("Hi.")
+  }
+}
