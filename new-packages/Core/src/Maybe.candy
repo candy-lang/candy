@@ -1,4 +1,5 @@
 use ..Bool
+use ..Operators
 use ..Primitives
 
 public type Maybe[T] = Some T | None
@@ -12,4 +13,15 @@ impl[T] Maybe[T] {
   fun do(body: (T) -> Nothing) { map[Nothing]({ body(it) }) }
   fun isSome(): Bool { todo("Implement Maybe.isSome") }
   fun isNone(): Bool { todo("Implement Maybe.isNone") }
+}
+impl[T: Equals] Maybe[T]: Equals {
+  fun equals(other: Maybe[T]): Bool {
+    if(this.isNone().and(other.isNone()), {
+      true
+    }).else({
+      if(this.isSome().and(other.isSome()), {
+        this.unwrap().equals(other.unwrap())
+      }).else({ false })
+    })
+  }
 }
