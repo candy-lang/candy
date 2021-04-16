@@ -3,7 +3,7 @@ use ..Primitives
 
 public type Maybe[T] = Some T | None
 
-impl Maybe[T] {
+impl[T] Maybe[T] {
   fun unwrap(): T
   fun else(alternative: () -> T): T { todo("Implement Maybe.else") }
   fun map[Out](mapper: (T) -> Out): Maybe[Out] { flatMap[Out]({ Maybe.Some[Out](mapper(it)) }) }
