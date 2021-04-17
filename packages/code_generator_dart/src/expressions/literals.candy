@@ -1,0 +1,20 @@
+use compiler_utils
+use dart_code
+use hir
+use incremental
+
+use ...types
+
+public fun compileIntExpression(
+  context: QueryContext<List<CompilerError>>,
+  expression: HirIntExpression,
+): DartExpression {
+  query<DartExpression, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileIntExpression",
+    expression, {
+    let value = (compileNamedType(context, HirNamedType.coreInt(context)) as DartExpression)
+      .call1(DartIntLiteral(expression.value))
+    Tuple(value, List.empty<CompilerError>())
+  })
+}

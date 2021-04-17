@@ -351,8 +351,8 @@ impl DartFunctionType: DartToCode {
       s = "{(_returns.unwrap() as DartToCode).toCode(importAllocator)} {s}"
     }
     let parameters = parametersToCode(
-      (parameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode(importAllocator) }),
-      (positionalParameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode(importAllocator) }),
+      (parameters as Iterable<DartType | DartParameter>).map<String>({ (it as DartToCode).toCode(importAllocator) }),
+      (positionalParameters as Iterable<DartType | DartParameter>).map<String>({ (it as DartToCode).toCode(importAllocator) }),
       (namedParameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode(importAllocator) }),
     )
     "{s}(parameters)"

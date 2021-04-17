@@ -3,6 +3,8 @@ use dart_code
 use hir
 use incremental
 
+use ...types
+
 public fun compileEnumType(
   context: QueryContext<List<CompilerError>>,
   enumType: HirEnumType,
@@ -17,13 +19,11 @@ public fun compileEnumType(
     let name = DartIdentifier(name, None<String>())
     // TODO(JonasWanke): correct package URL
 
-    let sortedVariants = (variantNames.toList().unsafeSorted() as Iterable<String>)
-      .map<(String, HirInlineType)>({
-        // TODO(JonasWanke): use `Nothing` if a variant doesn't contain a value
-        Tuple(it, enumType.variants.get(it).unwrap().unwrap())
+    let sortedVariantTypes = (variantNames.toList().unsafeSorted() as Iterable<String>)
+      .map<HirInlineType>({
+        enumType.variants.get(it).unwrap().orElse({ HirNamedType.coreNothing(context) })
       })
-    let types = List.empty<DartType>()
-    // TODO(JonasWanke): Map the types
+    let types = sortedVariantTypes.map<DartType>({ compileInlineType(context, it) }).toList()
 
     Tuple(DartNamedType(name, types), List.empty<CompilerError>())
   })
