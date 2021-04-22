@@ -271,6 +271,13 @@ class DartTypeParameter {
 
 trait DartExpression {
   fun dot(property: String): DartNavigation { DartNavigation(this, property) }
+  public fun call0(): DartCall {
+    call(
+      positionalArguments = List.empty<DartExpression>(),
+      namedArguments = Map.empty<String, DartExpression>(),
+      typeArguments = List.empty<DartType>(),
+    )
+  }
   public fun call1(positionalArgument: DartExpression): DartCall {
     call(
       positionalArguments = List.of1<DartExpression>(positionalArgument),
@@ -376,6 +383,11 @@ impl DartClosure: DartExpression
 trait DartStatement {}
 
 impl DartBlock: DartStatement
+
+class DartFieldStatement {
+  let field: DartField
+}
+impl DartFieldStatement: DartStatement
 
 class DartExpressionStatement {
   let expression: DartExpression

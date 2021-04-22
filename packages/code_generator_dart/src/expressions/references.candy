@@ -1,0 +1,19 @@
+use compiler_utils
+use dart_code
+use hir
+use incremental
+
+use ..utils
+
+public fun compileParameterReferenceExpression(
+  context: QueryContext<List<CompilerError>>,
+  expression: HirParameterReferenceExpression,
+): DartStatement {
+  query<DartStatement, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileParameterReferenceExpression",
+    expression, {
+    let identifier = DartIdentifier(expression.name, None<String>())
+    Tuple(saveExpression(context, expression, identifier), List.empty<CompilerError>())
+  })
+}
