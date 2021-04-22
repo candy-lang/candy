@@ -59,8 +59,8 @@ public class HirLambdaExpression {
   public let uri: HirExpressionUri<HirLambdaExpression>
   public let parameters: List<HirLambdaParameter>
   public let expressions: List<HirExpressionUri<HirExpression>>
-  public let returnType: HirType
-  public let receiverType: Maybe<HirType>
+  public let returnType: HirInlineType
+  public let receiverType: Maybe<HirInlineType>
 }
 impl HirLambdaExpression: HirExpression & Equals & Hash {
   fun equals(other: This): Bool {
@@ -81,7 +81,7 @@ impl HirLambdaExpression: HirExpression & Equals & Hash {
 
 public class HirLambdaParameter {
   public let name: String
-  public let type: HirType
+  public let type: HirInlineType
 }
 impl HirLambdaParameter: Equals & Hash {
   fun equals(other: This): Bool {
@@ -97,7 +97,7 @@ impl HirLambdaParameter: Equals & Hash {
 
 public class HirThisExpression {
   public let uri: HirExpressionUri<HirThisExpression>
-  public let type: HirType
+  public let type: HirInlineType
 }
 impl HirThisExpression: HirExpression & Equals & Hash {
   fun equals(other: This): Bool {
@@ -180,7 +180,7 @@ impl HirFunctionReferenceExpression: HirExpression & Equals & Hash {
 public class HirLocalPropertyExpression {
   public let uri: HirExpressionUri<HirLocalPropertyExpression>
   public let name: String
-  public let type: HirType
+  public let type: HirInlineType
   public let value: HirExpressionUri<HirExpression>
 }
 impl HirLocalPropertyExpression: HirExpression & Equals & Hash {
@@ -238,7 +238,7 @@ public class HirFunctionCallExpression {
   public let receiver: HirExpressionUri<
     HirFunctionReferenceExpression | HirReflectionExpression<HirFunction>
   >
-  public let typeArguments: Map<String, HirType>
+  public let typeArguments: Map<String, HirInlineType>
   public let valueArguments: Map<String, HirExpressionUri<HirExpression>>
 }
 impl HirFunctionCallExpression: HirExpression & Equals & Hash {
