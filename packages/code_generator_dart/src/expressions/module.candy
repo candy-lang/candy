@@ -4,6 +4,7 @@ use hir
 use incremental
 
 public use .literals
+public use .local_property
 public use .types
 
 public fun compileExpression(
@@ -57,15 +58,17 @@ fun compileExpressionHelper(
   //   )
   // }
 
-  // if (expression is HirLocalPropertyExpression) {
-  //   return compileLocalPropertyExpression(context, expression as HirLocalPropertyExpression)
-  // }
-  // if (expression is HirLocalPropertyReferenceExpression) {
-  //   return compileLocalPropertyReferenceExpression(
-  //     context,
-  //     expression as HirLocalPropertyReferenceExpression,
-  //   )
-  // }
+  if (expression is HirLocalPropertyExpression) {
+    return compileLocalPropertyExpression(context, expression as HirLocalPropertyExpression)
+  }
+  if (expression is HirLocalPropertyReferenceExpression) {
+    return List.of1<DartStatement>(
+      compileLocalPropertyReferenceExpression(
+        context,
+        expression as HirLocalPropertyReferenceExpression,
+      ),
+    )
+  }
 
   // if (expression is HirNavigationExpression) {
   //   return compileNavigationExpression(context, expression as HirNavigationExpression)

@@ -26,7 +26,7 @@ public fun compileTypeInstantiationExpression(
       context,
       expression,
       (compiledType as DartExpression)
-        .call1(getExpressionResultIdentifier(context, expression.valueArguments)),
+        .call1(getExpressionResultIdentifier(context, expression.valueArgument)),
     ))
     Tuple(statements, List.empty<CompilerError>())
   })
