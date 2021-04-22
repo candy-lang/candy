@@ -39,38 +39,19 @@ impl HirIntExpression: HirExpression & Equals & Hash {
   }
 }
 
-
 public class HirStringExpression {
   public let uri: HirExpressionUri<HirStringExpression>
-  public let parts: List<HirStringPart>
+  public let value: String
 }
 impl HirStringExpression: HirExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (uri as Equals) == (other.uri as Equals)
-      && (parts as Iterable<HirStringPart>).unsafeEquals(other.parts)
+      && (value as Equals) == (other.value as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     uri.hash<T>(hasher)
-    parts.unsafeHash<T>(hasher)
+    value.hash<T>(hasher)
   }
-}
-
-trait /* enum */ HirStringPart
-
-public class HirLiteralStringPart {
-  public let value: String
-}
-impl HirLiteralStringPart: HirStringPart & Equals & Hash {
-  fun equals(other: This): Bool { (value as Equals) == (other.value as Equals) }
-  fun hash<T>(hasher: Hasher<T>) { value.hash<T>(hasher) }
-}
-
-public class HirInterpolatedStringPart {
-  public let value: HirExpressionUri<HirExpression>
-}
-impl HirInterpolatedStringPart: HirStringPart & Equals & Hash {
-  fun equals(other: This): Bool { (value as Equals) == (other.value as Equals) }
-  fun hash<T>(hasher: Hasher<T>) { value.hash<T>(hasher) }
 }
 
 
