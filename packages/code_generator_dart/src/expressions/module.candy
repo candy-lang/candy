@@ -3,6 +3,7 @@ use dart_code
 use hir
 use incremental
 
+public use .lambda
 public use .literals
 public use .local_property
 public use .types
@@ -31,9 +32,9 @@ fun compileExpressionHelper(
     )
   }
 
-  // if (expression is HirLambdaExpression) {
-  //   return compileLambdaExpression(context, expression as HirLambdaExpression)
-  // }
+  if (expression is HirLambdaExpression) {
+    return compileLambdaExpression(context, expression as HirLambdaExpression)
+  }
 
   // if (expression is HirThisExpression) {
   //   return compileThisExpression(context, expression as HirThisExpression)
