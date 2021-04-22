@@ -1,105 +1,117 @@
-## Binary operators.
+## The Candy compiler knows the traits in this module and enables operators for types that implement
+## them.
 
-public trait BinaryEqualEqual[Other, Result] {
-  # The binary `==` operator.
+## TODO(marcelgarus): Document precedence here.
 
-  fun equalEqual(other: Other): Result
+
+## Infix operators.
+##
+## These are operators that are placed between two operands. For example, `+` is an infix operator
+## because you can write `a + b` to apply `+` to `a` and `b`.
+
+public trait InfixEqualEqual[Other, Result] {
+  # The infix `==` operator.
+
+  fun infixEqualEqual(other: Other): Result
 }
 
-public trait BinaryExclamationEqual[Other, Result] {
-  # The binary `!=` operator.
+public trait InfixExclamationEqual[Other, Result] {
+  # The infix `!=` operator.
 
-  fun exclamationEqual(other: Other): Result
+  fun infixExclamationEqual(other: Other): Result
 }
 
-public trait BinaryLess[Other, Result] {
-  # The binary `<` operator.
+public trait InfixLess[Other, Result] {
+  # The infix `<` operator.
 
-  fun less(other: Other): Result
+  fun infixLess(other: Other): Result
 }
 
-public trait BinaryLessEqual[Other, Result] {
-  # The binary `<=`` operator.
+public trait InfixLessEqual[Other, Result] {
+  # The infix `<=`` operator.
 
-  fun lessEqual(other: Other): Result
+  fun infixLessEqual(other: Other): Result
 }
 
-public trait BinaryGreater[Other, Result] {
-  # The binary `>` operator.
+public trait InfixGreater[Other, Result] {
+  # The infix `>` operator.
 
-  fun greater(other: Other): Result
+  fun infixGreater(other: Other): Result
 }
 
-public trait BinaryGreaterEqual[Other, Result] {
-  # The binary `>=` operator.
+public trait InfixGreaterEqual[Other, Result] {
+  # The infix `>=` operator.
 
-  fun greaterEqual(other: Other): Result
+  fun infixGreaterEqual(other: Other): Result
 }
 
-public trait BinaryPlus[Other, Result] {
-  # The binary `+` operator.
+public trait InfixPlus[Other, Result] {
+  # The infix `+` operator.
 
-  fun plus(other: Other): Result
+  fun infixPlus(other: Other): Result
 }
 
-public trait BinaryMinus[Other, Result] {
-  # The binary `-` operator.
+public trait InfixMinus[Other, Result] {
+  # The infix `-` operator.
 
-  fun minus(other: Other): Result
+  fun infixMinus(other: Other): Result
 }
 
-public trait BinaryStar[Other, Result] {
-  # The binary `*` operator.
+public trait InfixStar[Other, Result] {
+  # The infix `*` operator.
 
-  fun star(other: Other): Result
+  fun infixStar(other: Other): Result
 }
 
-public trait BinarySlash[Other, Result] {
-  # The binary `/` operator.
+public trait InfixSlash[Other, Result] {
+  # The infix `/` operator.
 
-  fun slash(other: Other): Result
+  fun infixSlash(other: Other): Result
 }
 
-public trait BinarySlashSlash[Other, Result] {
-  # The binary `//` operator.
+public trait InfixSlashSlash[Other, Result] {
+  # The infix `//` operator.
 
-  fun slashSlash(other: Other): Result
+  fun infixSlashSlash(other: Other): Result
 }
 
-public trait BinaryPercent[Other, Result] {
-  # The binary `%` operator.
+public trait InfixPercent[Other, Result] {
+  # The infix `%` operator.
 
-  fun percent(other: Other): Result
+  fun infixPercent(other: Other): Result
 }
 
-public trait BinaryAmpersand[Other, Result] {
-  # The binary `&` operator.
+public trait InfixAmpersand[Other, Result] {
+  # The infix `&` operator.
 
-  fun ampersand(other: Other): Result
+  fun infixAmpersand(other: Other): Result
 }
 
-public trait BinaryBar[Other, Result] {
-  # The binary `|` operator.
+public trait InfixBar[Other, Result] {
+  # The infix `|` operator.
 
-  fun bar(other: Other): Result
+  fun infixBar(other: Other): Result
 }
 
-public trait BinaryEqualsGreater[Other, Result] {
-  # The binary `=>` operator.
+public trait InfixEqualGreater[Other, Result] {
+  # The infix `=>` operator.
 
-  fun bar(other: Other): Result
+  fun infixEqualGreater(other: Other): Result
 }
 
 ## Prefix operators.
+##
+## These are operators placed before their operand. For example, `-` is (also) a prefix operator
+## because you can write `-5` to apply `-` to the `5`.
 
-public trait PrefixMinus[Other, Result] {
+public trait PrefixMinus[Result] {
   # The prefix `-` operator.
 
-  fun minus(): Result
+  fun prefixMinus(): Result
 }
 
-public trait PrefixExclamation[Other, Result] {
+public trait PrefixExclamation[Result] {
   # The prefix `!` operator.
 
-  fun exclamation(): Result
+  fun prefixExclamation(): Result
 }

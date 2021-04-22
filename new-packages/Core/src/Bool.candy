@@ -3,35 +3,47 @@ use ..Operators
 
 public type Bool = True | False
 
-public fun true(): Bool { Bool.True }
-public fun false(): Bool { Bool.False }
+public fun true(): Bool { Bool.True() }
+public fun false(): Bool { Bool.False() }
+
+impl Bool {
+  fun not(): Bool { this.match[Bool](true = { false }, false = { true }) }
+}
+
+impl Bool: And {
+  fun and(other: Bool): Bool { this.match[Bool](true = { other }, false = { false() }) }
+}
+
+impl Bool: Or {
+  fun or(other: Bool): Bool { this.match[Bool](true = { true }, false = { other }) }
+}
 
 impl Bool: Equals {
-  builtin fun equals(other: Bool): Bool
+  fun equals(other: Bool): Bool { this.match[Bool](true = { other }, false = { other.not() }) }
 }
-impl Bool: And {
-  builtin fun and(other: Bool): Bool
-}
-impl Bool: Or {
-  builtin fun or(other: Bool): Bool
-}
+
 impl Bool: Opposite {
-  builtin fun opposite(other: Bool): Bool
+  fun opposite(other: Bool): Bool { this.match[Bool](true = { false }, false = { true }) }
 }
+
 impl Bool: Implies {
-  builtin fun implies(other: Bool): Bool
+  fun implies(other: Bool): Bool { this.match[Bool](true = { other }, false = { true() }) }
 }
 
 impl Bool {
-  fun lazyAnd(other: () -> Bool): Bool { !this.then({ false() }).else(other) }
-  ## TODO(marcelgarus): Rename this to just `and` as soon as we support overloading.
+  public fun lazyAnd(other: () -> Bool): Bool {
+    ## TODO(marcelgarus): Rename this to just `and` as soon as we support overloading.
+    this.match[Bool](true = other, false = { false() })
+  }
   
-  fun lazyOr(other: () -> Bool): Bool { this.then({ true() }).else(other) }
-  ## TODO(marcelgarus): Rename this to just `or` as soon as we support overloading.
+  public fun lazyOr(other: () -> Bool): Bool {
+    ## TODO(marcelgarus): Rename this to just `or` as soon as we support overloading.
+    this.match[Bool](true = { true() }, false = other)
+  }
 }
 
 impl Bool {
-  builtin fun then[T](body: () -> T): Maybe[T]
+  public fun then[T](body: () -> T): Maybe[T] { if[T](this, body) }
 }
 
-public fun if[T](condition: Bool, thenBody: () -> T): Maybe[T] { condition.then(thenBody) }
+public builtin fun if[T](condition: Bool, thenBody: () -> T): Maybe[T]

@@ -1,55 +1,48 @@
-public trait Add: BinaryPlus[This, This] {
-  ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
-
+public trait Add {
   fun add(other: This): This
-
-  fun plus(other: This): This { add(other) }
+}
+impl Add: InfixPlus[This, This] {
+  fun infixPlus(other: This): This { this.add(other) }
 }
 
-public trait Subtract: BinaryMinus[This, This] {
-  ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
-
+public trait Subtract {
   fun subtract(other: This): This
-
-  fun minus(other: This): This { subtract(other) }
+}
+impl Subtract: InfixMinus[This, This] {
+  fun infixMinus(other: This): This { this.subtract(other) }
 }
 
-public trait Negate: PrefixMinus[This] {
-  ## TODO(marcelgarus): Make this generic over the return type.
-
+public trait Negate {
   fun negate(): This
-
-  fun prefixMinus(): Result { negate() }
+}
+impl Negate: PrefixMinus[This] {
+  fun prefixMinus(): Result { this.negate() }
 }
 
-public trait Multiply: BinaryStar[This, This] {
-  ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
-
+public trait Multiply {
   fun multiply(other: This): This
-
-  fun star(other: This): This { multiply(other) }
+}
+impl Multiply: InfixStar[This, This] {
+  fun infixStar(other: This): This { this.multiply(other) }
 }
 
-public trait Divide: BinarySlash[This, This] {
-  ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
-
+public trait Divide {
   fun divide(other: This): This
-
-  fun slash(other: This): This { divide(other) }
+}
+impl Divide: InfixSlash[This, This] {
+  fun infixSlash(other: This): This { this.divide(other) }
 }
 
-public trait DivideTruncating: BinarySlashSlash[This, This] {
-  ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
-
+public trait DivideTruncating {
   fun divideTruncating(other: This): Int
-
-  fun slashSlash(other: This): This { divideTruncating(other) }
+}
+impl DivideTruncating: InfixSlashSlash[This, This] {
+  fun infixSlashSlash(other: This): This { this.divideTruncating(other) }
 }
 
 public trait Modulo {
-  ## TODO(marcelgarus): Make this generic over the `Other` type and the return type.
-
   fun modulo(other: This): This
-
-  fun percent(other: This): This { modulo(other) }
+}
+impl Modulo: InfixPercent {
+  fun infixPercent(other: This): This { this.modulo(other) }
 }

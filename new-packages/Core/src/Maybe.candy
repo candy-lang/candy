@@ -1,27 +1,38 @@
 use ..Bool
 use ..Operators
+use ..Panic
 use ..Primitives
 
 public type Maybe[T] = Some T | None
 
 impl[T] Maybe[T] {
-  fun unwrap(): T
-  fun else(alternative: () -> T): T { todo("Implement Maybe.else") }
-  fun map[Out](mapper: (T) -> Out): Maybe[Out] { flatMap[Out]({ Maybe.Some[Out](mapper(it)) }) }
-  fun flatMap[Out](mapper: (T) -> Maybe[Out]): Maybe[Out] { todo("Implement Maybe.flatMap") }
-  fun cast[Out](): Maybe[Out] { map[Out]({ it.as[Out]().unwrap() }) }
-  fun do(body: (T) -> Nothing) { map[Nothing]({ body(it) }) }
-  fun isSome(): Bool { todo("Implement Maybe.isSome") }
-  fun isNone(): Bool { todo("Implement Maybe.isNone") }
+  public fun unwrap(): T {
+    this.else({ panic("Called unwrap on None.") })
+  }
+
+  public fun else(alternative: () -> T): T {
+    this.match[T](some = { it }, none = alternative)
+  }
+
+  public fun map[Out](mapper: (T) -> Out): Maybe[Out] {
+    this.flatMap[Out]({ Maybe[Out].Some(mapper(it)) })
+  }
+
+  public fun flatMap[Out](mapper: (T) -> Maybe[Out]): Maybe[Out] {
+    this.match[Maybe[Out]](some = { Maybe[Out].Some(mapper(it)) }, none = { None })
+  }
+
+  public fun do(body: (T) -> Nothing) { this.map[Nothing](body) }
+
+  public fun isSome(): Bool { this.match[Bool](some = { true() }, none = { false() }) }
+  public fun isNone(): Bool { !this.isSome() }
 }
+
 impl[T: Equals] Maybe[T]: Equals {
   fun equals(other: Maybe[T]): Bool {
-    if(this.isNone().and(other.isNone()), {
-      true
-    }).else({
-      if(this.isSome().and(other.isSome()), {
-        this.unwrap().equals(other.unwrap())
-      }).else({ false })
-    })
+    this.match[Bool](
+      some = { a -> other.match[Bool](some = { b -> a == b }, none = { false() }) }
+      none = { other.isNone() }
+    )
   }
 }

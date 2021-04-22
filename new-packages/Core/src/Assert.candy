@@ -8,5 +8,5 @@ public fun assert(condition: Bool, message: String = "Assert failed.") {
   # This function is useful for ensuring that your mental model of the state of your program matches
   # its actual state.
 
-  !condition.then({ panic(message) })
+  (!condition).then({ panic(message) })
 }

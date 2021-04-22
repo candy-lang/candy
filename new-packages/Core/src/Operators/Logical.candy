@@ -1,25 +1,29 @@
 use ...Bool
 
-public trait And: BinaryAmpersand[This, Bool] {
+public trait And {
   fun and(other: This): Bool
-
-  fun ampersand(other: This): Bool { and(other) }
+}
+impl And: InfixAmpersand[This, Bool] {
+  fun infixAmpersand(other: This): Bool { this.and(other) }
 }
 
-public trait Or: BinaryBar[This, Bool] {
+public trait Or {
   fun or(other: This): Bool
-
-  fun bar(other: This): Bool { or(other) }
+}
+impl Or: InfixBar[This, Bool] {
+  fun infixBar(other: This): Bool { this.or(other) }
 }
 
-public trait Opposite: PrefixExclamation[This] {
+public trait Opposite {
   fun opposite(): This
-
-  fun exclamation(): This { opposite() }
+}
+impl Opposite: PrefixExclamation[This] {
+  fun prefixExclamation(): This { this.opposite() }
 }
 
-public trait Implies: BinaryEqualGreater[This, Bool] {
+public trait Implies {
   fun implies(other: This): Bool
-
-  fun equalGreater(other: This): Bool { implies(other) }
+}
+impl InfixEqualGreater[This, Bool] {
+  fun infixEqualGreater(other: This): Bool { this.implies(other) }
 }
