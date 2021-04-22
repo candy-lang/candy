@@ -161,12 +161,26 @@ fun astInlineTypeToHirInlineType(
 }
 
 impl HirImpl {
-  fun constraints(): Map<HirParameterType, HirInlineType> {
+  fun constraints(context: QueryContext<List<CompilerError>>): Map<HirParameterType, HirInlineType> {
     // The type constraints of an impl. For example, `impl[T: Equals] Foo[T]: Equals` has the
     // constraints `T: Equals`.
 
-    // TODO(marcelgarus): Support constraints.
-    Map.empty<HirParameterType, HirInlineType>()
+    query<Map<HirParameterType, HirInlineType>, List<CompilerError>>(
+      context, "HirImpl.constraints", this as Equals & Hash, {
+
+      let constraints = MutableMap.empty<HirParameterType, HirInlineType>()
+
+      for parameter in this.ast(context).typeParameters {
+        if (parameter.upperBound is Some) {
+          constraints.set(
+            HirParameterType(this, parameter.name.value),
+            astInlineTypeToHirInlineType(context, parameter.upperBound.unwrap(), this),
+          )
+        }
+      }
+
+      Tuple(constraints, List.empty<CompilerError>())
+    })
   }
 
   fun baseType(context: QueryContext<List<CompilerError>>): HirInlineType {
@@ -246,7 +260,7 @@ fun hirImplToSolverRule(
     // Lower the constraints. For example, in the impl `impl[T: Equals] Foo[T]: Equals`, the
     // `solverConstraints` are a list containing `Equals(?T)`.
     let solverConstraints = MutableList.empty<SolverGoal>()
-    for constraint in hirImpl.constraints().entries() {
+    for constraint in hirImpl.constraints(context).entries() {
       let result = hirInlineTypeToSolverTypeAndGoals(context, constraint.second)
       if (result is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
       solverConstraints.appendAll(
