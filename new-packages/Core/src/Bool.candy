@@ -7,7 +7,7 @@ public fun true(): Bool { Bool.True() }
 public fun false(): Bool { Bool.False() }
 
 impl Bool {
-  fun not(): Bool { this.match[Bool](true = { false }, false = { true }) }
+  fun not(): Bool { this.match[Bool](true = { false() }, false = { true() }) }
 }
 
 impl Bool: And {
@@ -15,15 +15,11 @@ impl Bool: And {
 }
 
 impl Bool: Or {
-  fun or(other: Bool): Bool { this.match[Bool](true = { true }, false = { other }) }
+  fun or(other: Bool): Bool { this.match[Bool](true = { true() }, false = { other }) }
 }
 
 impl Bool: Equals {
   fun equals(other: Bool): Bool { this.match[Bool](true = { other }, false = { other.not() }) }
-}
-
-impl Bool: Opposite {
-  fun opposite(other: Bool): Bool { this.match[Bool](true = { false }, false = { true }) }
 }
 
 impl Bool: Implies {
@@ -46,4 +42,6 @@ impl Bool {
   public fun then[T](body: () -> T): Maybe[T] { if[T](this, body) }
 }
 
-public builtin fun if[T](condition: Bool, thenBody: () -> T): Maybe[T]
+public fun if[T](condition: Bool, thenBody: () -> T): Maybe[T] {
+  condition.match[Maybe[T]](true = { Maybe[T].Some(thenBody()) }, false = { Maybe[T].None() })
+}

@@ -1,13 +1,7 @@
-## The Candy compiler knows the traits in this module and enables operators for types that implement
-## them.
-
-## TODO(marcelgarus): Document precedence here.
-
-
-## Infix operators.
-##
-## These are operators that are placed between two operands. For example, `+` is an infix operator
-## because you can write `a + b` to apply `+` to `a` and `b`.
+# Infix operators.
+#
+# These are operators that are placed between two operands. For example, `+` is an infix operator
+# because you can write `a + b` to apply `+` to `a` and `b`.
 
 public trait InfixEqualEqual[Other, Result] {
   # The infix `==` operator.
@@ -97,21 +91,4 @@ public trait InfixEqualGreater[Other, Result] {
   # The infix `=>` operator.
 
   fun infixEqualGreater(other: Other): Result
-}
-
-## Prefix operators.
-##
-## These are operators placed before their operand. For example, `-` is (also) a prefix operator
-## because you can write `-5` to apply `-` to the `5`.
-
-public trait PrefixMinus[Result] {
-  # The prefix `-` operator.
-
-  fun prefixMinus(): Result
-}
-
-public trait PrefixExclamation[Result] {
-  # The prefix `!` operator.
-
-  fun prefixExclamation(): Result
 }

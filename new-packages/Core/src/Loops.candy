@@ -9,7 +9,9 @@ impl Int {
   public fun times(body: () -> Nothing) {
     # Executes the `body` `this` many times.
     
-    body()
-    (this - 1).times(body)
+    if(this > 0, {
+      body()
+      (this - 1).times(body)
+    })
   }
 }

@@ -14,13 +14,6 @@ impl Or: InfixBar[This, Bool] {
   fun infixBar(other: This): Bool { this.or(other) }
 }
 
-public trait Opposite {
-  fun opposite(): This
-}
-impl Opposite: PrefixExclamation[This] {
-  fun prefixExclamation(): This { this.opposite() }
-}
-
 public trait Implies {
   fun implies(other: This): Bool
 }

@@ -1,0 +1,10 @@
+# Prefix operators.
+#
+# These are operators placed before their operand. For example, `-` is (also) a prefix operator
+# because you can write `-5` to apply `-` to the `5`.
+
+public trait PrefixMinus[Result] {
+  # The prefix `-` operator.
+
+  fun prefixMinus(): Result
+}
