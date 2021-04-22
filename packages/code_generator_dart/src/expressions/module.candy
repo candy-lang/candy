@@ -95,9 +95,9 @@ fun compileExpressionHelper(
     return compileNamedTupleExpression(context, expression as HirNamedTupleExpression)
   }
 
-  // if (expression is HirReturnExpression) {
-  //   return compileReturnExpression(context, expression as HirReturnExpression)
-  // }
+  if (expression is HirReturnExpression) {
+    return compileReturnExpression(context, expression as HirReturnExpression)
+  }
 
   throw "Unknown expression: {expression}"
 }
