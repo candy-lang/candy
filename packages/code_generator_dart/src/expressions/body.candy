@@ -3,6 +3,7 @@ use dart_code
 use hir
 use incremental
 
+use ...compile
 use ...expressions
 use ...types
 use ..utils
@@ -116,65 +117,14 @@ fun getScopeObjectName(
 
 
 let nonLocalReturnExceptionName = "NonLocalReturnException"
-let nonLocalReturnExceptionIdentifier = DartIdentifier(nonLocalReturnExceptionName, None<String>())
-// TODO(JonasWanke): import url
+let nonLocalReturnExceptionIdentifier = DartIdentifier(
+  nonLocalReturnExceptionName,
+  Some<String>(candyDartUtilsImportUrl),
+)
 let nonLocalReturnExceptionType = DartNamedType(
   nonLocalReturnExceptionIdentifier,
   List.empty<DartType>(),
 )
-public fun compileNonLocalReturnExceptionDeclaration(
-  context: QueryContext<List<CompilerError>>,
-): DartClass {
-  query<DartClass, List<CompilerError>>(
-    context,
-    "code_generator_dart.compileNonLocalReturnExceptionDeclaration",
-    unit, {
-    let declaration = DartClass(
-      name = nonLocalReturnExceptionName,
-      docComment = None<String>(),
-      // TODO(JonasWanke): Add the corresponding Candy code as the doc comment.
-      annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
-      isAbstract = false,
-      typeParameters = List.empty<DartTypeParameter>(),
-      extends_ = None<DartType>(),
-      implements_ = List.empty<DartType>(),
-      with_ = List.empty<DartType>(),
-      body = List.of3<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>(
-        DartConstructor(
-          className = nonLocalReturnExceptionName,
-          name = None<String>(),
-          docComment = None<String>(),
-          annotations = List.empty<DartAnnotation>(),
-          isConst = true,
-          requiredParameters = List.of2<DartParameter | DartInitializingFormal>(
-            DartInitializingFormal("scope", defaultValue = None<DartExpression>()),
-            DartInitializingFormal("value", defaultValue = None<DartExpression>()),
-          ),
-          positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
-          namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
-          body = None<DartBody>(),
-        ),
-        DartField(
-          "scope",
-          docComment = None<String>(),
-          isStatic = false,
-          mutability = DartFinal(),
-          type = Some<DartType>(dartObject),
-          initialValue = None<DartExpression>(),
-        ),
-        DartField(
-          "value",
-          docComment = None<String>(),
-          isStatic = false,
-          mutability = DartFinal(),
-          type = Some<DartType>(dartDynamic),
-          initialValue = None<DartExpression>(),
-        ),
-      ),
-    )
-    Tuple(declaration, List.empty<CompilerError>())
-  })
-}
 
 
 class ListOfHirExpression {

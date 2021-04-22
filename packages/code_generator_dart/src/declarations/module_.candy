@@ -2,6 +2,8 @@ use compiler_utils
 use dart_code
 use hir
 use incremental
+
+use ...compile
 use ..name_mangling
 use ..trait
 use ..type
@@ -92,22 +94,14 @@ fun moduleHirToOutputPath(context: QueryContext<List<CompilerError>>, moduleHir:
     Tuple(dartSourcePath.child(projectName).append(path), List.empty<CompilerError>())
   })
 }
-fun moduleHirToImportUrl(
-  context: QueryContext<List<CompilerError>>,
-  package: Package,
-  moduleHir: HirModule,
-): String {
-  query<String, List<CompilerError>>(
-    context,
-    "code_generator_dart.moduleHirToImportUrl",
-    DataTuple2<Package, HirModule>(package, moduleHir), {
-    let currentProjectName = mangleName(context, package.getName(context))
+fun moduleHirToImportUrl(context: QueryContext<List<CompilerError>>, moduleHir: HirModule): String {
+  query<String, List<CompilerError>>(context, "code_generator_dart.moduleHirToImportUrl", moduleHir, {
     let projectName = mangleName(context, (moduleHir as HasPackageAndPath).package().getName(context))
     let path = ((moduleHir as HasPackageAndPath).path() as Iterable<String>)
         .map<String>({ mangleName(context, it) })
         .join("/")
     Tuple(
-      "package:{currentProjectName}/src/{projectName}/{path}.{dartFileExtension}",
+      "package:{outputPackageName}/{projectName}/{path}.{dartFileExtension}",
       List.empty<CompilerError>(),
     )
   })
