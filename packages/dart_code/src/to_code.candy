@@ -440,6 +440,11 @@ impl DartClosure: DartToCode {
 }
 
 impl DartStatement: DartToCode
+impl DartFieldStatement: DartToCode {
+  fun toCode(importAllocator: DartImportAllocator): String {
+    "{(field as DartToCode).toCode(importAllocator)};"
+  }
+}
 impl DartExpressionStatement: DartToCode {
   fun toCode(importAllocator: DartImportAllocator): String {
     "{(expression as DartToCode).toCode(importAllocator)};"

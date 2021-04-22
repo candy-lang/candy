@@ -377,6 +377,11 @@ trait DartStatement {}
 
 impl DartBlock: DartStatement
 
+class DartFieldStatement {
+  let field: DartField
+}
+impl DartFieldStatement: DartStatement
+
 class DartExpressionStatement {
   let expression: DartExpression
 }
