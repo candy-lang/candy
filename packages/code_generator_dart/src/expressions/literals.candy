@@ -4,17 +4,35 @@ use hir
 use incremental
 
 use ...types
+use ..utils
 
 public fun compileIntExpression(
   context: QueryContext<List<CompilerError>>,
   expression: HirIntExpression,
-): DartExpression {
-  query<DartExpression, List<CompilerError>>(
+): DartStatement {
+  query<DartStatement, List<CompilerError>>(
     context,
     "code_generator_dart.compileIntExpression",
     expression, {
-    let value = (compileNamedType(context, HirNamedType.coreInt(context)) as DartExpression)
+    let dartExpression = (compileNamedType(context, HirNamedType.coreInt(context)) as DartExpression)
       .call1(DartIntLiteral(expression.value))
-    Tuple(value, List.empty<CompilerError>())
+    let statement = saveExpression(context, expression, dartExpression)
+    Tuple(statement, List.empty<CompilerError>())
+  })
+}
+
+
+public fun compileStringExpression(
+  context: QueryContext<List<CompilerError>>,
+  expression: HirStringExpression,
+): DartStatement {
+  query<DartStatement, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileStringExpression",
+    expression, {
+    let dartExpression = (compileNamedType(context, HirNamedType.coreString(context)) as DartExpression)
+      .call1(DartStringLiteral(expression.value))
+    let statement = saveExpression(context, expression, dartExpression)
+    Tuple(statement, List.empty<CompilerError>())
   })
 }

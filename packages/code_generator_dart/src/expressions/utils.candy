@@ -1,0 +1,70 @@
+use compiler_utils
+use dart_code
+use hir
+use incremental
+
+use ...types
+
+public fun getExpression<E: HirExpression>(uri: HirExpressionUri<E>): E {
+  todo("Replace this with the actual HIR functionality of getting expressions.")
+}
+
+public fun getExpressionResultIdentifier(
+  context: QueryContext<List<CompilerError>>,
+  expressionUri: HirExpressionUri<HirExpression>,
+): DartIdentifier {
+  query<DartIdentifier, List<CompilerError>>(
+    context,
+    "code_generator_dart.getExpressionResultIdentifier",
+    expressionUri, {
+    let name = getExpressionResultName(context, expressionUri)
+    Tuple(DartIdentifier(name, None<String>()), List.empty<CompilerError>())
+  })
+}
+public fun getExpressionResultName(
+  context: QueryContext<List<CompilerError>>,
+  expressionUri: HirExpressionUri<HirExpression>,
+): String {
+  query<String, List<CompilerError>>(
+    context,
+    "code_generator_dart.getExpressionResultName",
+    expressionUri, {
+    Tuple("_{expressionUri.index}", List.empty<CompilerError>())
+  })
+}
+
+public fun saveSingleExpression(
+  context: QueryContext<List<CompilerError>>,
+  hirExpression: HirExpression,
+  dartExpression: DartExpression,
+): List<DartStatement> {
+  query<List<DartStatement>, List<CompilerError>>(
+    context,
+    "code_generator_dart.saveSingleExpression",
+    DataTuple2<HirExpression, DartExpression>(hirExpression, dartExpression), {
+    let statement = saveExpression(context, hirExpression, dartExpression)
+    Tuple(List.of1<DartStatement>(statement), List.empty<CompilerError>())
+  })
+}
+public fun saveExpression(
+  context: QueryContext<List<CompilerError>>,
+  hirExpression: HirExpression,
+  dartExpression: DartExpression,
+): DartStatement {
+  query<DartStatement, List<CompilerError>>(
+    context,
+    "code_generator_dart.saveExpression",
+    DataTuple2<HirExpression, DartExpression>(hirExpression, dartExpression), {
+    let field = DartField(
+      name = getExpressionResultName(context, hirExpression.uri),
+      docComment = None<String>(),
+      isStatic = false,
+      mutability = DartFinal(),
+      type = None<DartType>(),
+      // type = Some<DartType>(compileInlineType(context, hirExpression.type)),
+      // TODO(JonasWanke): add type information when we generate it
+      initialValue = Some<DartExpression>(dartExpression),
+    )
+    Tuple(DartFieldStatement(field), List.empty<CompilerError>())
+  })
+}
