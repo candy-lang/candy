@@ -167,8 +167,7 @@ impl HirParameterType {
       Tuple(
         (((this.declaration as HasAst).ast(context) as AstWithTypeParameters)
           .typeParameters as Iterable<AstTypeParameter>)
-          .where({ it.name.value == this.name })
-          .single()
+          .singleWhere({ it.name.value == this.name })
           .flatMap<AstInlineType>({ it.upperBound })
           .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this.declaration) }),
         List.empty<CompilerError>(),
@@ -191,7 +190,6 @@ impl HirImpl {
               upperBound => Tuple(it, upperBound)
             })
           })
-          .where({ (it.second is Some) })
           .unsafeToMap<HirParameterType, HirInlineType>(),
         List.empty<CompilerError>(),
       )

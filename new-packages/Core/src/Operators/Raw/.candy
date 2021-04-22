@@ -1,5 +1,5 @@
-## The Candy compiler knows the traits in this module and enables operators for the types that
-## implement them.
+# The Candy compiler knows the traits in this module and enables operators for the types that
+# implement them.
 
 ## TODO(marcelgarus): Document precedence here.
 
