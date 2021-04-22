@@ -24,7 +24,7 @@ public fun compileFunctionType(
       parameters = parameterTypes,
       positionalParameters = List.empty<DartType | DartParameter>(),
       namedParameters = List.empty<DartParameter>(),
-      _returns = compileInlineType(context, functionType.returnType),
+      _returns = Some<DartType>(compileInlineType(context, functionType.returnType)),
     )
     Tuple(functionType, List.empty<CompilerError>())
   })

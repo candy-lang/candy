@@ -538,7 +538,7 @@ impl DartThrow: DartToCode {
     "(throw {(exception as DartToCode).toCode(importAllocator)})"
   }
 }
-impl DartRethrow: DartRethrow {
+impl DartRethrow: DartToCode {
   fun toCode(importAllocator: DartImportAllocator): String {
     "rethrow;"
   }

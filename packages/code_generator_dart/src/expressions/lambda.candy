@@ -44,7 +44,7 @@ public fun compileLambdaExpression(
       requiredParameters = parameters,
       positionalParameters = List.empty<DartParameter>(),
       namedParameters = List.empty<DartParameter>(),
-      body = compileExpressionsToBody(context, expressions),
+      body = compileExpressionsToBody(context, expression.uri, expressions),
     )
     Tuple(saveExpression(context, expression, dartExpression), List.empty<CompilerError>())
   })

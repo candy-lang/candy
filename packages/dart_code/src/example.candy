@@ -65,7 +65,9 @@ fun main() {
               DartWhile(
                 condition = DartBoolLiteral(true),
                 label = Some<String>("foo"),
-                body = DartBlock(List.of1<DartStatement>(DartBreak(label = Some<String>("foo")))),
+                body = DartBlock(List.of1<DartStatement | DartComment>(
+                  DartBreak(label = Some<String>("foo")),
+                )),
               ),
             ),
           ),
@@ -144,7 +146,7 @@ fun main() {
                   DartIf(
                     DartIdentifier("value", None<String>()),
                     then = DartBlock(
-                      List.of1<DartStatement>(
+                      List.of1<DartStatement | DartComment>(
                         DartExpressionStatement(
                           DartAssignment(
                             DartIdentifier("length", None<String>()),
@@ -155,7 +157,7 @@ fun main() {
                     ),
                     else_ = Some<DartStatement>(
                       DartBlock(
-                        List.of1<DartStatement>(
+                        List.of1<DartStatement | DartComment>(
                           DartExpressionStatement(
                             DartIdentifier("length", None<String>()).dot("someCall").call(
                               List.of2<DartExpression>(DartIntLiteral(1), DartIntLiteral(2)),

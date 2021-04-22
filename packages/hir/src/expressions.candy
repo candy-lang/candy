@@ -74,7 +74,7 @@ impl HirLambdaExpression: HirExpression & Equals & Hash {
     uri.hash<T>(hasher)
     parameters.unsafeHash<T>(hasher)
     expressions.unsafeHash<T>(hasher)
-    returnType.hash<T>(hasher)
+    (returnType as Hash).hash<T>(hasher)
     receiverType.unsafeHash<T>(hasher)
   }
 }
@@ -90,7 +90,7 @@ impl HirLambdaParameter: Equals & Hash {
   }
   fun hash<T>(hasher: Hasher<T>) {
     name.hash<T>(hasher)
-    type.hash<T>(hasher)
+    (type as Hash).hash<T>(hasher)
   }
 }
 
@@ -106,7 +106,7 @@ impl HirThisExpression: HirExpression & Equals & Hash {
   }
   fun hash<T>(hasher: Hasher<T>) {
     uri.hash<T>(hasher)
-    type.hash<T>(hasher)
+    (type as Hash).hash<T>(hasher)
   }
 }
 
@@ -193,7 +193,7 @@ impl HirLocalPropertyExpression: HirExpression & Equals & Hash {
   fun hash<T>(hasher: Hasher<T>) {
     uri.hash<T>(hasher)
     name.hash<T>(hasher)
-    type.hash<T>(hasher)
+    (type as Hash).hash<T>(hasher)
     value.hash<T>(hasher)
   }
 }
