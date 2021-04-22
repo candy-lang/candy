@@ -28,6 +28,9 @@ impl AstDeclaration: AstNode & Equals & Hash {
   fun hash<T>(hasher: Hasher<T>) { (modifiers as Hash).unsafeHash<T>(hasher) }
 }
 
+public trait AstWithTypeParameters {
+  public let typeParameters: List<AstTypeParameter>
+}
 
 public class AstModule {
   public let id: AstDeclarationId
@@ -66,7 +69,7 @@ public class AstTrait {
   public let upperBound: Maybe<AstInlineType>
   public let innerDeclarations: List<AstTrait | AstType | AstFunction>
 }
-impl AstTrait: AstDeclaration & Equals & Hash {
+impl AstTrait: AstWithTypeParameters & AstDeclaration & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       candyDoc.unsafeEquals(other.candyDoc) &&
@@ -98,7 +101,7 @@ public class AstImpl {
   public let traits: List<AstNamedType | AstErrorType>
   public let innerDeclarations: List<AstFunction>
 }
-impl AstImpl: AstDeclaration & Equals & Hash {
+impl AstImpl: AstWithTypeParameters & AstDeclaration & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
@@ -130,7 +133,7 @@ public class AstType {
   public let typeParameters: List<AstTypeParameter>
   public let type: Maybe<AstInlineType>
 }
-impl AstType: AstDeclaration & Equals & Hash {
+impl AstType: AstWithTypeParameters & AstDeclaration & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       candyDoc.unsafeEquals(other.candyDoc) &&
@@ -162,7 +165,7 @@ public class AstFunction {
   public let returnType: AstInlineType
   public let body: Maybe<AstBlockBody | AstExpressionBody | AstDelegationBody>
 }
-impl AstFunction: AstDeclaration & Equals & Hash {
+impl AstFunction: AstWithTypeParameters & AstDeclaration & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       candyDoc.unsafeEquals(other.candyDoc) &&

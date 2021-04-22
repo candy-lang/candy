@@ -1,15 +1,17 @@
 use ...Bool
 use ..Raw
 
-trait Equals: BinaryEquals[This, Bool] & BinaryNotEquals[This, Bool] {
+public trait Equals {
   fun equals(other: This): Bool
-  builtin fun equalsAny(other: Any): Bool
-
-  fun notEquals(other: This): Bool { !equals(other) }
-  fun notEqualsAny(other: Any): Bool { !equalsAny(other) }
 }
-
-## impl[Other] Equals[Other]: BinaryEquals[Other, Bool] & BinaryNotEquals[Other, Bool] {
-##   fun equalsOperator(other: Other): Bool { /* this === other || */ equals(other) }
-##   fun notEqualsOperator(other: Other): Bool { equalsOperator(other).not() }
-## }
+impl Equals {
+  public fun notEquals(other: This): Bool { !this.equals(other) }
+  public fun equalsAny(other: Any): Bool { other.as[This]().map[Bool]({ it == this }).else({ false() }) }
+  public fun notEqualsAny(other: Any): Bool { !this.equalsAny(other) }
+}
+impl Equals: InfixEqual[This, Bool] {
+  fun infixEqual(other: This) { this.equals(other) }
+}
+impl Equals: InfixExclamationEqual[This, Bool] {
+  fun infixExclamationEqual(other: This) { this.notEquals(other) }
+}

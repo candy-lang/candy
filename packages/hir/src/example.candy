@@ -52,15 +52,25 @@ fun resolvingExample(context: QueryContext<List<CompilerError>>) {
 }
 
 fun solverExample(context: QueryContext<List<CompilerError>>) {
-  let file = FancyFile(Package.playground(context), Path.parse("src/Types.candy"))
+  let playground = Package.playground(context)
+  let file = FancyFile(playground, Path.parse("src/Types.candy"))
   let declarations = (fileToHirModule(context, file) as HirInnerModule).declarations(context)
   print("Declarations are {declarations}.")
-  let anImpl = ((declarations as Iterable<HirDeclaration>).third().unwrap() as HirImpl)
-  print("Impl is {anImpl}.")
-  let rule = hirImplToSolverRule(context, anImpl)
-  print("Rule is {rule}.")
   print("")
-  print("All impls of core:")
-  print(getAllImplsInScope(context, Package.core(context)))
+  print("Environment:")
+  print(getSolverEnvironmentOfScope(context, playground))
   //print("Does {type.toString_()} implement Equals? {environment.solve(equalsImpl(type)).toString_()}")
+  print("")
+  print("Outputs:")
+  for queryOutputs in context.outputs().entries() {
+    let queryName = queryOutputs.first
+    let inputsToErrors = queryOutputs.second
+    for entry in inputsToErrors.entries() {
+      let input = entry.first
+      let errors = entry.second
+      for error in errors {
+        print("{queryName}({input}): {error}")
+      }
+    }
+  }
 }

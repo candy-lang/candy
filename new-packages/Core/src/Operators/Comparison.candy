@@ -1,24 +1,38 @@
 use ..Equality
 
-trait Comparable: Equals
-  & BinaryLess[This, Bool]
-  & BinaryLessEqual[This, Bool]
-  & BinaryGreater[This, Bool]
-  & BinaryGreaterEqual[This, Bool] {
-  ## TODO(marcelgarus): Make this generic over an `Other` type.
-
+public trait Comparable {
   fun compareTo(other: This): Less | Equal | Greater
-
-  fun less(other: This): Bool { compareTo(other) is Less }
-  fun lessEqual(other: This): Bool { compareTo(other) is Less | Equal }
-  fun greater(other: This): Bool { compareTo(other) is Greater }
-  fun greaterEqual(other: This): Bool { compareTo(other) is Greater | Equal }
+}
+impl Comparable: InfixLess[This, Bool] {
+  fun infixLess(other: This): Bool {
+    this.compareTo(other).match[Bool](less = { true() }, equal = { false() }, greater = { false() })
+  }
+}
+impl Comparable: InfixLessEqual[This, Bool] {
+  fun infixLessEqual(other: This): Bool {
+    this.compareTo(other).match[Bool](less = { true() }, equal = { true() }, greater = { false() })
+  }
+}
+impl Comparable: Equals {
+  fun equals(other: This): Bool {
+    this.compareTo(other).match[Bool](less = { false() }, equal = { true() }, greater = { false() })
+  }
+}
+impl Comparable: InfixGreaterEqual[This, Bool] {
+  fun infixGreaterEqual(other: This): Bool {
+    this.compareTo(other).match[Bool](less = { false() }, equal = { true() }, greater = { true() })
+  }
+}
+impl Comparable: InfixGreater[This, Bool] {
+  fun infixGreater(other: This): Bool {
+    this.compareTo(other).match[Bool](less = { false() }, equal = { false() }, greater = { true() })
+  }
 }
 
-## TODO(marcelgarus): Maybe make these methods on `Iterable`?
+## TODO(marcelgarus): Maybe put these methods on `Iterable`?
 public fun min[T: Comparable](first: T, second: T): T {
-  if first <= second { first } else { second }
+  if[T](first <= second, { first }).else({ second })
 }
 public fun max[T: Comparable](first: T, second: T): T {
-  if first >= second { first } else { second }
+  if[T](first >= second, { first }).else({ second })
 }

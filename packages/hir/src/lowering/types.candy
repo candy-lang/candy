@@ -160,13 +160,40 @@ fun astInlineTypeToHirInlineType(
   )
 }
 
+impl HirParameterType {
+  fun upperBound(context: QueryContext<List<CompilerError>>): Maybe<HirInlineType> {
+    query<Maybe<HirInlineType>, List<CompilerError>>(
+      context, "HirParameterType.upperBound", this as Equals & Hash, {
+      Tuple(
+        (((this.declaration as HasAst).ast(context) as AstWithTypeParameters)
+          .typeParameters as Iterable<AstTypeParameter>)
+          .singleWhere({ it.name.value == this.name })
+          .flatMap<AstInlineType>({ it.upperBound })
+          .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this.declaration) }),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
+}
+
 impl HirImpl {
-  fun constraints(): Map<HirParameterType, HirInlineType> {
+  fun constraints(context: QueryContext<List<CompilerError>>): Map<HirParameterType, HirInlineType> {
     // The type constraints of an impl. For example, `impl[T: Equals] Foo[T]: Equals` has the
     // constraints `T: Equals`.
 
-    // TODO(marcelgarus): Support constraints.
-    Map.empty<HirParameterType, HirInlineType>()
+    query<Map<HirParameterType, HirInlineType>, List<CompilerError>>(
+      context, "HirImpl.constraints", this as Equals & Hash, {
+      Tuple(
+        (this.typeParameters(context) as Iterable<HirParameterType>)
+          .maybeMap<(HirParameterType, HirInlineType)>({
+            it.upperBound(context).map<(HirParameterType, HirInlineType)>({
+              upperBound => Tuple(it, upperBound)
+            })
+          })
+          .unsafeToMap<HirParameterType, HirInlineType>(),
+        List.empty<CompilerError>(),
+      )
+    })
   }
 
   fun baseType(context: QueryContext<List<CompilerError>>): HirInlineType {
@@ -246,7 +273,7 @@ fun hirImplToSolverRule(
     // Lower the constraints. For example, in the impl `impl[T: Equals] Foo[T]: Equals`, the
     // `solverConstraints` are a list containing `Equals(?T)`.
     let solverConstraints = MutableList.empty<SolverGoal>()
-    for constraint in hirImpl.constraints().entries() {
+    for constraint in hirImpl.constraints(context).entries() {
       let result = hirInlineTypeToSolverTypeAndGoals(context, constraint.second)
       if (result is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
       solverConstraints.appendAll(
@@ -422,8 +449,18 @@ fun hirInlineTypeToSolverTypeAndGoals(
   })
 }
 
+fun getSolverEnvironmentOfScope(context: QueryContext<List<CompilerError>>, scope: Package): Environment {
+  query<Environment, List<CompilerError>>(
+    context, "getSolverEnvironmentOfScope", scope as Equals & Hash, {
+    let rules = getAllImplsInScope(context, scope).items()
+      .maybeMap<SolverRule>({ hirImplToSolverRule(context, it) })
+      .toList()
+    Tuple(Environment(rules), List.empty<CompilerError>())
+  })
+}
+
 fun makeSureImplsAreNotConflicting(context: QueryContext<List<CompilerError>>, scope: Package) {
-  query<Unit, List<CompilerError>>( context, "makeSureImplsAreNotConflicting", scope as Equals & Hash, {
+  query<Unit, List<CompilerError>>(context, "makeSureImplsAreNotConflicting", scope as Equals & Hash, {
     for implsForSameTrait in (getAllImplsInScope(context, scope) as Iterable<HirImpl>)
       .where({ it.implementedTrait(context) is Some })
       .groupBy<HirInlineType>({ it.implementedTrait(context).unwrap() })

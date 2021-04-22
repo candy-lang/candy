@@ -1,0 +1,94 @@
+# Infix operators.
+#
+# These are operators that are placed between two operands. For example, `+` is an infix operator
+# because you can write `a + b` to apply `+` to `a` and `b`.
+
+public trait InfixEqualEqual[Other, Result] {
+  # The infix `==` operator.
+
+  fun infixEqualEqual(other: Other): Result
+}
+
+public trait InfixExclamationEqual[Other, Result] {
+  # The infix `!=` operator.
+
+  fun infixExclamationEqual(other: Other): Result
+}
+
+public trait InfixLess[Other, Result] {
+  # The infix `<` operator.
+
+  fun infixLess(other: Other): Result
+}
+
+public trait InfixLessEqual[Other, Result] {
+  # The infix `<=`` operator.
+
+  fun infixLessEqual(other: Other): Result
+}
+
+public trait InfixGreater[Other, Result] {
+  # The infix `>` operator.
+
+  fun infixGreater(other: Other): Result
+}
+
+public trait InfixGreaterEqual[Other, Result] {
+  # The infix `>=` operator.
+
+  fun infixGreaterEqual(other: Other): Result
+}
+
+public trait InfixPlus[Other, Result] {
+  # The infix `+` operator.
+
+  fun infixPlus(other: Other): Result
+}
+
+public trait InfixMinus[Other, Result] {
+  # The infix `-` operator.
+
+  fun infixMinus(other: Other): Result
+}
+
+public trait InfixStar[Other, Result] {
+  # The infix `*` operator.
+
+  fun infixStar(other: Other): Result
+}
+
+public trait InfixSlash[Other, Result] {
+  # The infix `/` operator.
+
+  fun infixSlash(other: Other): Result
+}
+
+public trait InfixSlashSlash[Other, Result] {
+  # The infix `//` operator.
+
+  fun infixSlashSlash(other: Other): Result
+}
+
+public trait InfixPercent[Other, Result] {
+  # The infix `%` operator.
+
+  fun infixPercent(other: Other): Result
+}
+
+public trait InfixAmpersand[Other, Result] {
+  # The infix `&` operator.
+
+  fun infixAmpersand(other: Other): Result
+}
+
+public trait InfixBar[Other, Result] {
+  # The infix `|` operator.
+
+  fun infixBar(other: Other): Result
+}
+
+public trait InfixEqualGreater[Other, Result] {
+  # The infix `=>` operator.
+
+  fun infixEqualGreater(other: Other): Result
+}
