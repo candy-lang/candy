@@ -6,6 +6,7 @@ use incremental
 public use .lambda
 public use .literals
 public use .local_property
+public use .references
 public use .types
 
 public fun compileExpression(
@@ -46,12 +47,14 @@ fun compileExpressionHelper(
   // if (expression is HirReflectionExpression) {
   //   return compileReflectionExpression(context, expression as HirReflectionExpression)
   // }
-  // if (expression is HirParameterReferenceExpression) {
-  //   return compileParameterReferenceExpression(
-  //     context,
-  //     expression as HirParameterReferenceExpression,
-  //   )
-  // }
+  if (expression is HirParameterReferenceExpression) {
+    return List.of1<DartStatement>(
+      compileParameterReferenceExpression(
+        context,
+        expression as HirParameterReferenceExpression,
+      ),
+    )
+  }
   // if (expression is HirFunctionReferenceExpression) {
   //   return compileFunctionReferenceExpression(
   //     context,
