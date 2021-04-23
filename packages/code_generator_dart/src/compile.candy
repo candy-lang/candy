@@ -36,8 +36,11 @@ fun compile_(context: QueryContext<List<CompilerError>>, package: Package): Map<
   query<Map<Path, String>, List<CompilerError>>(context, "code_generator_dart.compile_", package, {
     let output = MutableMap.empty<Path, String>()
 
-    let pubspec = generatePubspec(context, package)
+    let pubspec = generatePubspec(context)
     output.set(pubspec.first, pubspec.second)
+
+    let utils = generateUtils(context)
+    output.set(utils.first, utils.second)
 
     for dependency in package.getAllPackagesInCompilationOrder(context) {
       output.setAll(compileModuleAndDescendants(context, package, HirTopLevelModule(dependency)))
@@ -47,9 +50,12 @@ fun compile_(context: QueryContext<List<CompilerError>>, package: Package): Map<
   })
 }
 
-fun generatePubspec(context: QueryContext<List<CompilerError>>, package: Package): (Path, String) {
-  query<(Path, String), List<CompilerError>>(context, "code_generator_dart.generatePubspec", package, {
-    let content = "name: {package.getName(context)}
+public let outputPackageName = "diabetes"
+// The result of having lots of 🍭 Candy.
+
+fun generatePubspec(context: QueryContext<List<CompilerError>>): (Path, String) {
+  query<(Path, String), List<CompilerError>>(context, "code_generator_dart.generatePubspec", unit, {
+    let content = "name: {outputPackageName}
 environment:
   sdk: '>=2.12.0 <3.0.0'
 dependencies:
@@ -60,5 +66,17 @@ dev_dependencies:
   test: ^1.16.3"
 
     Tuple(Tuple(Path.parse(dartPubspecFileName), content), List.empty<CompilerError>())
+  })
+}
+
+let candyDartUtilsFileName = "candy_dart_utils.dart"
+public let candyDartUtilsImportUrl = "package:{outputPackageName}/{candyDartUtilsFileName}"
+fun generateUtils(context: QueryContext<List<CompilerError>>): (Path, String) {
+  query<(Path, String), List<CompilerError>>(context, "code_generator_dart.generatePubspec", unit, {
+    let sourcePath = getCorePath(context)
+      .append(Path.parse("../../packages/code_generator_dart/candy_dart_utils.dart"))
+      .normalized()
+    let content = File(sourcePath).read()
+    Tuple(Tuple(Path.parse("lib/{candyDartUtilsFileName}"), content), List.empty<CompilerError>())
   })
 }

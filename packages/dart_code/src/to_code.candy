@@ -495,3 +495,51 @@ impl DartWhile: DartToCode {
     "{s} {indent((body as DartToCode).toCode(importAllocator))}"
   }
 }
+
+impl DartTry: DartToCode {
+  fun toCode(importAllocator: DartImportAllocator): String {
+    mut let s = "try ({(body as DartToCode).toCode(importAllocator)})"
+    for catchClause in catchClauses {
+      s = "{s} {(catchClause as DartToCode).toCode(importAllocator)}"
+    }
+    s
+  }
+}
+impl DartCatch: DartToCode {
+  fun toCode(importAllocator: DartImportAllocator): String {
+    assert(
+      exceptionType is Some || exceptionParameterName is Some,
+      "At least on of `exceptionType` and `exceptionParameterName` must be set.",
+    )
+    assert(
+      exceptionParameterName is None || stackTraceParameterName is Some,
+      "`stackTraceParameterName` may only be set when `exceptionParameterName` is set too",
+    )
+
+    mut let s = ""
+    exceptionType.do({
+      s = "{s} on {(it as DartToCode).toCode(importAllocator)}"
+      unit
+    })
+    exceptionParameterName.do({
+      mut let parameters = it
+      stackTraceParameterName.do({
+        parameters = "{parameters}, {it}"
+        unit
+      })
+      s = "{s} catch ({parameters})"
+      unit
+    })
+    "{s} {indent((body as DartToCode).toCode(importAllocator))}"
+  }
+}
+impl DartThrow: DartToCode {
+  fun toCode(importAllocator: DartImportAllocator): String {
+    "(throw {(exception as DartToCode).toCode(importAllocator)})"
+  }
+}
+impl DartRethrow: DartToCode {
+  fun toCode(importAllocator: DartImportAllocator): String {
+    "rethrow;"
+  }
+}

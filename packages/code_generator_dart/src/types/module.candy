@@ -44,4 +44,5 @@ fun compileInlineTypeHelper(
   if (inlineType is HirReflectionType) {
     todo("Compiling HirReflectionType to Dart is not yet implemented.")
   }
+  throw "Unknown inline type: {inlineType}"
 }

@@ -3,19 +3,36 @@ use dart_code
 use hir
 use incremental
 
+use ...compile
 use ...expressions
 use ...types
 use ..utils
 
 public fun compileExpressionsToBody(
   context: QueryContext<List<CompilerError>>,
+  scope: HirFunction | HirExpressionUri<HirLambdaExpression>,
   expressions: List<HirExpression>,
 ): DartBlock {
   query<DartBlock, List<CompilerError>>(
     context,
     "code_generator_dart.compileExpressionsToBody",
-    ListOfHirExpression(expressions), {
-    let statements = (expressions as Iterable<HirExpression>)
+    DataTuple2<Equals & Hash, ListOfHirExpression>(
+      scope as Equals & Hash,
+      ListOfHirExpression(expressions),
+    ), {
+    let statements = MutableList.empty<DartStatement | DartComment>()
+
+    let scopeObjectName = getScopeObjectName(context, scope)
+    statements.append(DartFieldStatement(DartField(
+      name = scopeObjectName,
+      docComment = None<String>(),
+      isStatic = false,
+      mutability = DartFinal(),
+      type = Some<DartType>(dartObject),
+      initialValue = Some<DartExpression>((dartObject as DartExpression).call0()),
+    )))
+
+    let bodyStatements = (expressions as Iterable<HirExpression>)
       .expand<DartStatement | DartComment>({
         let comment = DartComment("{it}")
         let statements = compileExpression(context, it)
@@ -23,9 +40,92 @@ public fun compileExpressionsToBody(
           .followedBy((statements as Iterable<DartStatement>).cast<DartStatement | DartComment>())
       })
       .toList()
+    let exceptionParameterName = "exception"
+    let exceptionParameter = DartIdentifier("exception", None<String>())
+    statements.append(DartTry(
+      body = DartBlock(bodyStatements),
+      catchClauses = List.of1<DartCatch>(DartCatch(
+        exceptionType = Some<DartIdentifier>(nonLocalReturnExceptionIdentifier),
+        exceptionParameterName = Some<String>(exceptionParameterName),
+        stackTraceParameterName = None<String>(),
+        body = DartBlock(List.of1<DartStatement | DartComment>(
+          DartIf(
+            condition = (exceptionParameter as DartExpression).is_(nonLocalReturnExceptionType)
+              .and(
+                exceptionParameter.dot("scope")
+                  .equals(DartIdentifier(scopeObjectName, None<String>())),
+              ),
+            then = DartBlock(List.of1<DartStatement | DartComment>(
+              DartReturn(Some<DartExpression>(exceptionParameter.dot("value"))),
+            )),
+            else_ = Some<DartStatement>(DartRethrow()),
+          ),
+        )),
+      )),
+    ))
     Tuple(DartBlock(statements), List.empty<CompilerError>())
   })
 }
+
+public fun compileReturnExpression(
+  context: QueryContext<List<CompilerError>>,
+  expression: HirReturnExpression,
+): List<DartStatement> {
+  query<List<DartStatement>, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileReturnExpression",
+    expression, {
+    let statements = compileExpression(context,
+      getExpression<HirExpression>(expression.expression),
+    ).toMutable()
+
+    statements.append(DartExpressionStatement(DartThrow(
+      (nonLocalReturnExceptionType as DartExpression).call(
+        positionalArguments = List.of2<DartExpression>(
+          (getScopeObjectName(context, expression.scope) as DartExpression).call0(),
+          getExpressionResultIdentifier(context, expression.expression),
+        ),
+        namedArguments = Map.empty<String, DartExpression>(),
+        typeArguments = List.empty<DartType>(),
+      ),
+    )))
+    Tuple(statements, List.empty<CompilerError>())
+  })
+}
+
+
+fun getScopeObjectName(
+  context: QueryContext<List<CompilerError>>,
+  scope: HirFunction | HirExpressionUri<HirLambdaExpression>,
+): String {
+  query<String, List<CompilerError>>(
+    context,
+    "code_generator_dart.getScopeObjectName",
+    scope as Equals & Hash, {
+    let name = if (scope is HirFunction) {
+      // As function declarations can't be nested, a function is always the outermost scope, of
+      // which there can only be one. Hence, we don't have to disambiguate it.
+      "$scope$function"
+    } else {
+      // As function declarations can't be nested, all expressions have the same function as their
+      // parent and the index is sufficient to disambiguate them.
+      "$scope$expression${(scope as HirExpressionUri<HirLambdaExpression>).index}"
+    }
+    Tuple(name, List.empty<CompilerError>())
+  })
+}
+
+
+let nonLocalReturnExceptionName = "NonLocalReturnException"
+let nonLocalReturnExceptionIdentifier = DartIdentifier(
+  nonLocalReturnExceptionName,
+  Some<String>(candyDartUtilsImportUrl),
+)
+let nonLocalReturnExceptionType = DartNamedType(
+  nonLocalReturnExceptionIdentifier,
+  List.empty<DartType>(),
+)
+
 
 class ListOfHirExpression {
   // TODO(JonasWanke): remove this when we no longer need `unsafeEquals` and `unsafeHash`

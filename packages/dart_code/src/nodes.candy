@@ -422,3 +422,23 @@ class DartWhile {
   let body: DartStatement
 }
 impl DartWhile: DartStatement
+
+class DartTry {
+  let body: DartBlock
+  let catchClauses: List<DartCatch>
+}
+impl DartTry: DartStatement
+class DartCatch {
+  let exceptionType: Maybe<DartIdentifier>
+  let exceptionParameterName: Maybe<String>
+  let stackTraceParameterName: Maybe<String>
+  let body: DartBlock
+}
+
+class DartThrow {
+  let exception: DartExpression
+}
+impl DartThrow: DartExpression
+
+class DartRethrow
+impl DartRethrow: DartStatement
