@@ -1,3 +1,6 @@
+use ...Int
+use ..Raw
+
 public trait Add {
   fun add(other: This): This
 }
