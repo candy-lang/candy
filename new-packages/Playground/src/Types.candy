@@ -1,19 +1,16 @@
-builtin type Blub
-builtin type Foo[T]
+builtin type Foo
 
-trait Bar[T] {
-}
-trait Baz[T] {
-  fun baz(): Blub
-}
+trait Bar {}
+trait Baz[T] {}
 
-impl[T] Foo[T]: Bar {
-  fun baz(): Blub {
-    print("Hi.")
-  }
-}
-impl[T] Bar[T]: Baz[T] {
-  fun baz(): Blub {
-    print("Hi.")
-  }
-}
+## Type implements trait
+impl Foo: Bar {}
+
+## Trait implements trait
+impl Bar: Baz[Foo] {}
+
+## Type implements trait with This
+impl Foo: Baz[This] {}
+
+## Trait implements trait with This
+impl Bar: Baz[This] {}
