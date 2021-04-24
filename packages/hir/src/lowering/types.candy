@@ -35,6 +35,24 @@ fun astInlineTypeToHirInlineType(
         let nameParts = ((astType as AstNamedType).nameParts as Iterable<AstIdentifier>)
           .map<String>({ it.value })
 
+        if ((nameParts as Iterable).length() == 1) {
+          if (nameParts as Iterable<String>).first().unwrap() == "This" {
+            if (scope is HirTrait || scope is HirImpl) {
+              return Tuple(
+                HirThisType(scope as HirTrait | HirImpl) as HirInlineType,
+                List.empty<CompilerError>()
+              )
+            } else {
+              return Tuple(
+                HirErrorType() as HirInlineType,
+                List.of1<CompilerError>(
+                  ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError((astType as AstNamedType), scope),
+                ),
+              )
+            }
+          }
+        }
+
         // Try to find the first part of the `nameParts`. Then, find children inside its
         // declarations.
         // TODO(marcelgarus): When resolving `Foo Bar`, we currently accept a `Bar` next to `Foo` if
@@ -502,6 +520,20 @@ impl HirType {
       // })
     })
   }
+}
+
+public class ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError {
+  public let thisType: AstNamedType
+  public let scope: HirDeclaration
+}
+impl ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError: CompilerError {
+  public fun id(): String { "this-type-can-only-be-used-in-impl-or-trait" }
+
+  public fun location(): Location {
+    todo("Implement ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError.location") // TODO(marcelgarus)
+  }
+  public fun title(): String { "The This type can only be used in impls or traits." }
+  public fun description(): String { "You can't use the This type in modules or type definitions" }
 }
 
 public class CannotImplementTraitOfTraitCompilerError {
