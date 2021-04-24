@@ -411,9 +411,7 @@ fun hirInlineTypeToSolverTypeAndGoals(
         // TODO(marcelgarus): In the long term, choose a more elegant substitution than just the
         // 1000th.
         let substitution = SolverVariable(canonicalVariable(1000))
-        let goals = MutableList.of1<SolverGoal>(
-          SolverGoal(declaration as HirTrait, List.of1<SolverType>(substitution))
-        )
+        let goals = MutableList.empty<SolverGoal>()
         let solverParameters = MutableList.empty<SolverType>()
         for parameter in parameters {
           let result = hirInlineTypeToSolverTypeAndGoals(context, parameter)
@@ -423,6 +421,12 @@ fun hirInlineTypeToSolverTypeAndGoals(
           goals.appendAll(result.unwrap().second)
           solverParameters.append(result.unwrap().first)
         }
+        goals.append(
+          SolverGoal(
+            declaration as HirTrait,
+            (solverParameters as Iterable<SolverType>).followedBy(List.of1<SolverType>(substitution)).toList(),
+          )
+        )
         return Tuple(
           Some<(SolverType, List<SolverGoal>)>(Tuple(substitution, goals)),
           List.empty<CompilerError>(),
