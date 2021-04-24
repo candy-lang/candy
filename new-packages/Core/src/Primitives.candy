@@ -44,8 +44,7 @@ public builtin type Nothing
 # * function calls of functions without an explicit return value like `print("Hello, world!")`
 # * the explicit nothing instance: `nothing`
 
-public fun nothing(): Nothing { functionThatReturnsNothing() }
-fun functionThatReturnsNothing(): Nothing {}
+public fun nothing(): Nothing {}
 
 ## Because the `Never` type contains itself, it's impossible to instantiate.
 public type Never = Never
