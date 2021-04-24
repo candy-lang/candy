@@ -456,7 +456,40 @@ fun hirInlineTypeToSolverTypeAndGoals(
     // TODO(marcelgarus): Handle HirNamedTupleType
     // TODO(marcelgarus): Handle HirEnumType
     // TODO(marcelgarus): Handle HirIntersectionType
-    // TODO(marcelgarus): Handle HirThisType
+    if (hirType is HirThisType) {
+      let declaration = (hirType as HirThisType).declaration
+      if (declaration is HirTrait) {
+        // We don't need to lower `This` types in traits to solver types because we only use impls
+        // for logical type solving.
+        todo("Don't call hirTypeToSolverType for a This type in a trait")
+      }
+      if (declaration is HirImpl) {
+        // If a `This` type is used inside an impl, it just assumes the solver type of the base
+        // type.
+        //
+        // Whether that solver type is a `SolverVariable` or `SolverValue` depends on whether the
+        // impl is for a trait or type:
+        //
+        // * `impl Int: InfixAmpersand[This, Int]` has the lowered base type `Int`, so the `This`
+        //   gets replaced with `Int`, resulting in `InfixAmpersand(Int, Bool)`.
+        // * `impl And: InfixAmpersand[This, Bool]` has the lowered base type `?0` with the
+        //   additional goal `And(?0)`, so the `This` gets replaced with `?0`, resulting in
+        //   `InfixAmpersand(?0, Bool) <- And(?0)`.
+        let loweredBaseType = hirInlineTypeToSolverTypeAndGoals(
+          context,
+          (declaration as HirImpl).baseType(context),
+        )
+        if (loweredBaseType is None) {
+          // The failed lowering already produced errors.
+          return Tuple(None<(SolverType, List<SolverGoal>)>(), List.empty<CompilerError>())
+        }
+        let baseSolverType = loweredBaseType.unwrap().first
+        return Tuple(
+          Some<(SolverType, List<SolverGoal>)>(Tuple(baseSolverType, List.empty<SolverGoal>())),
+          List.empty<CompilerError>(),
+        )
+      }
+    }
     if (hirType is HirParameterType) {
       return Tuple(
         Some<(SolverType, List<SolverGoal>)>(
