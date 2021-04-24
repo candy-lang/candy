@@ -65,20 +65,20 @@ fun solverExample(context: QueryContext<List<CompilerError>>) {
     print("The rule is {rule.unwrap().toString_()}.")
   }
 
-  // print("Environment:")
-  // print(getSolverEnvironmentOfScope(context, playground))
+  print("Environment:")
+  print(getSolverEnvironmentOfScope(context, playground).toString_())
   // print("Does {type.toString_()} implement Equals? {environment.solve(equalsImpl(type)).toString_()}")
-  // print("")
-  // print("Outputs:")
-  // for queryOutputs in context.outputs().entries() {
-  //   let queryName = queryOutputs.first
-  //   let inputsToErrors = queryOutputs.second
-  //   for entry in inputsToErrors.entries() {
-  //     let input = entry.first
-  //     let errors = entry.second
-  //     for error in errors {
-  //       print("{queryName}({input}): {error}")
-  //     }
-  //   }
-  // }
+  print("")
+  print("Outputs:")
+  for queryOutputs in context.outputs().entries() {
+    let queryName = queryOutputs.first
+    let inputsToErrors = queryOutputs.second
+    for entry in inputsToErrors.entries() {
+      let input = entry.first
+      let errors = entry.second
+      for error in errors {
+        print("{queryName}({input}): {error}")
+      }
+    }
+  }
 }
