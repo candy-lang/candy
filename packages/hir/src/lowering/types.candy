@@ -323,7 +323,10 @@ fun hirImplToSolverRule(
       // For now, we're probably fine with only implementing "simple" traits like `Iterable<Int>`.
       // (As "primitive" types like `List` etc. are also traits, resolving this todo is somewhat of
       // a priority.)
-      return Tuple(None<SolverRule>(), List.empty<CompilerError>())
+      return Tuple(
+        None<SolverRule>(),
+        List.of1<CompilerError>(CannotImplementTraitOfTraitCompilerError(hirImpl)),
+      )
     }
     assert((solverTraitAndGoals.second as Iterable).length() == 1, "Foo")
 
@@ -499,6 +502,21 @@ impl HirType {
       // })
     })
   }
+}
+
+public class CannotImplementTraitOfTraitCompilerError {
+  public let theImpl: HirImpl
+}
+impl CannotImplementTraitOfTraitCompilerError: CompilerError {
+  public fun id(): String { "cannot-implement-trait-of-trait" }
+
+  public fun location(): Location {
+    todo("Implement CannotImplementTraitOfTraitCompilerError.location") // TODO(marcelgarus)
+  }
+  public fun title(): String {
+    "You cannot implement a trait containing another trait as a generic parameter yet."
+  }
+  public fun description(): String { "The offending impl: {theImpl}" }
 }
 
 public class ConflictingImplsCompilerError {
