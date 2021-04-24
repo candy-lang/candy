@@ -43,6 +43,6 @@ impl DivideTruncating: InfixSlashSlash[This, This] {
 public trait Modulo {
   fun modulo(other: This): This
 }
-impl Modulo: InfixPercent {
+impl Modulo: InfixPercent[This, This] {
   fun infixPercent(other: This): This { this.modulo(other) }
 }
