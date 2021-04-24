@@ -346,7 +346,7 @@ fun hirImplToSolverRule(
         List.of1<CompilerError>(CannotImplementTraitOfTraitCompilerError(hirImpl)),
       )
     }
-    assert((solverTraitAndGoals.second as Iterable).length() == 1, "Foo")
+    assert((solverTraitAndGoals.second as Iterable).length() == 1, "Should never happen.")
 
     // Let's play this through for the impl `impl[T: Equals] Iterable[T]: Equals`.
     //
