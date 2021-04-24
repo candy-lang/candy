@@ -19,7 +19,7 @@ impl[T] Maybe[T] {
   }
 
   public fun flatMap[Out](mapper: (T) -> Maybe[Out]): Maybe[Out] {
-    this.match[Maybe[Out]](some = { Maybe[Out].Some(mapper(it)) }, none = { Maybe[Out].None() })
+    this.match[Maybe[Out]](some = { mapper(it) }, none = { Maybe[Out].None() })
   }
 
   public fun do(body: (T) -> Nothing) { this.map[Nothing](body) }
