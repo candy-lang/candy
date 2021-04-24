@@ -1,11 +1,18 @@
 builtin type Blub
 builtin type Foo[T]
 
-trait Bar {
+trait Bar[T] {
+}
+trait Baz[T] {
   fun baz(): Blub
 }
 
 impl[T] Foo[T]: Bar {
+  fun baz(): Blub {
+    print("Hi.")
+  }
+}
+impl[T] Bar[T]: Baz[T] {
   fun baz(): Blub {
     print("Hi.")
   }
