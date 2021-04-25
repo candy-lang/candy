@@ -40,7 +40,7 @@ fun astInlineTypeToHirInlineType(
             if (scope is HirTrait || scope is HirImpl) {
               return Tuple(
                 HirThisType(scope as HirTrait | HirImpl) as HirInlineType,
-                List.empty<CompilerError>()
+                List.empty<CompilerError>(),
               )
             } else {
               return Tuple(
