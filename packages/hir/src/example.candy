@@ -57,9 +57,17 @@ fun solverExample(context: QueryContext<List<CompilerError>>) {
   let declarations = (fileToHirModule(context, file) as HirInnerModule).declarations(context)
   print("Declarations are {declarations}.")
   print("")
+  let anImpl = ((declarations as Iterable<HirDeclaration>).get(5).unwrap() as HirImpl)
+  let rule = hirImplToSolverRule(context, anImpl)
+  if (rule is None) {
+    print("Couldn't lower impl to rule.")
+  } else {
+    print("The rule is {rule.unwrap().toString_()}.")
+  }
+
   print("Environment:")
-  print(getSolverEnvironmentOfScope(context, playground))
-  //print("Does {type.toString_()} implement Equals? {environment.solve(equalsImpl(type)).toString_()}")
+  print(getSolverEnvironmentOfScope(context, playground).toString_())
+  // print("Does {type.toString_()} implement Equals? {environment.solve(equalsImpl(type)).toString_()}")
   print("")
   print("Outputs:")
   for queryOutputs in context.outputs().entries() {

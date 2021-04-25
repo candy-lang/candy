@@ -120,10 +120,12 @@ impl HirIntersectionType: Equals & Hash & HirInlineType {
 }
 
 
-public class HirThisType
+public class HirThisType {
+  public let declaration: HirTrait | HirImpl
+}
 impl HirThisType: Equals & Hash & HirInlineType {
-  fun equals(other: This): Bool { true }
-  fun hash<T>(hasher: Hasher<T>) {}
+  fun equals(other: This): Bool { (declaration as Equals).equals(other.declaration as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { (declaration as Hash).hash<T>(hasher) }
 }
 
 

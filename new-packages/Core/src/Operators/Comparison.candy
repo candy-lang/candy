@@ -1,4 +1,6 @@
+use ...Bool
 use ..Equality
+use ..Raw
 
 public trait Comparable {
   fun compareTo(other: This): Less | Equal | Greater

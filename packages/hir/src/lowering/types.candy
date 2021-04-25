@@ -35,6 +35,24 @@ fun astInlineTypeToHirInlineType(
         let nameParts = ((astType as AstNamedType).nameParts as Iterable<AstIdentifier>)
           .map<String>({ it.value })
 
+        if ((nameParts as Iterable).length() == 1) {
+          if (nameParts as Iterable<String>).first().unwrap() == "This" {
+            if (scope is HirTrait || scope is HirImpl) {
+              return Tuple(
+                HirThisType(scope as HirTrait | HirImpl) as HirInlineType,
+                List.empty<CompilerError>(),
+              )
+            } else {
+              return Tuple(
+                HirErrorType() as HirInlineType,
+                List.of1<CompilerError>(
+                  ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError((astType as AstNamedType), scope),
+                ),
+              )
+            }
+          }
+        }
+
         // Try to find the first part of the `nameParts`. Then, find children inside its
         // declarations.
         // TODO(marcelgarus): When resolving `Foo Bar`, we currently accept a `Bar` next to `Foo` if
@@ -323,9 +341,12 @@ fun hirImplToSolverRule(
       // For now, we're probably fine with only implementing "simple" traits like `Iterable<Int>`.
       // (As "primitive" types like `List` etc. are also traits, resolving this todo is somewhat of
       // a priority.)
-      return Tuple(None<SolverRule>(), List.empty<CompilerError>())
+      return Tuple(
+        None<SolverRule>(),
+        List.of1<CompilerError>(CannotImplementTraitOfTraitCompilerError(hirImpl)),
+      )
     }
-    assert((solverTraitAndGoals.second as Iterable).length() == 1, "Foo")
+    assert((solverTraitAndGoals.second as Iterable).length() == 1, "Should never happen.")
 
     // Let's play this through for the impl `impl[T: Equals] Iterable[T]: Equals`.
     //
@@ -390,9 +411,7 @@ fun hirInlineTypeToSolverTypeAndGoals(
         // TODO(marcelgarus): In the long term, choose a more elegant substitution than just the
         // 1000th.
         let substitution = SolverVariable(canonicalVariable(1000))
-        let goals = MutableList.of1<SolverGoal>(
-          SolverGoal(declaration as HirTrait, List.of1<SolverType>(substitution))
-        )
+        let goals = MutableList.empty<SolverGoal>()
         let solverParameters = MutableList.empty<SolverType>()
         for parameter in parameters {
           let result = hirInlineTypeToSolverTypeAndGoals(context, parameter)
@@ -402,6 +421,12 @@ fun hirInlineTypeToSolverTypeAndGoals(
           goals.appendAll(result.unwrap().second)
           solverParameters.append(result.unwrap().first)
         }
+        goals.append(
+          SolverGoal(
+            declaration as HirTrait,
+            (solverParameters as Iterable<SolverType>).followedBy(List.of1<SolverType>(substitution)).toList(),
+          )
+        )
         return Tuple(
           Some<(SolverType, List<SolverGoal>)>(Tuple(substitution, goals)),
           List.empty<CompilerError>(),
@@ -435,7 +460,40 @@ fun hirInlineTypeToSolverTypeAndGoals(
     // TODO(marcelgarus): Handle HirNamedTupleType
     // TODO(marcelgarus): Handle HirEnumType
     // TODO(marcelgarus): Handle HirIntersectionType
-    // TODO(marcelgarus): Handle HirThisType
+    if (hirType is HirThisType) {
+      let declaration = (hirType as HirThisType).declaration
+      if (declaration is HirTrait) {
+        // We don't need to lower `This` types in traits to solver types because we only use impls
+        // for logical type solving.
+        todo("Don't call hirTypeToSolverType for a This type in a trait")
+      }
+      if (declaration is HirImpl) {
+        // If a `This` type is used inside an impl, it just assumes the solver type of the base
+        // type.
+        //
+        // Whether that solver type is a `SolverVariable` or `SolverValue` depends on whether the
+        // impl is for a trait or type:
+        //
+        // * `impl Int: InfixAmpersand[This, Int]` has the lowered base type `Int`, so the `This`
+        //   gets replaced with `Int`, resulting in `InfixAmpersand(Int, Bool)`.
+        // * `impl And: InfixAmpersand[This, Bool]` has the lowered base type `?0` with the
+        //   additional goal `And(?0)`, so the `This` gets replaced with `?0`, resulting in
+        //   `InfixAmpersand(?0, Bool) <- And(?0)`.
+        let loweredBaseType = hirInlineTypeToSolverTypeAndGoals(
+          context,
+          (declaration as HirImpl).baseType(context),
+        )
+        if (loweredBaseType is None) {
+          // The failed lowering already produced errors.
+          return Tuple(None<(SolverType, List<SolverGoal>)>(), List.empty<CompilerError>())
+        }
+        let baseSolverType = loweredBaseType.unwrap().first
+        return Tuple(
+          Some<(SolverType, List<SolverGoal>)>(Tuple(baseSolverType, List.empty<SolverGoal>())),
+          List.empty<CompilerError>(),
+        )
+      }
+    }
     if (hirType is HirParameterType) {
       return Tuple(
         Some<(SolverType, List<SolverGoal>)>(
@@ -499,6 +557,35 @@ impl HirType {
       // })
     })
   }
+}
+
+public class ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError {
+  public let thisType: AstNamedType
+  public let scope: HirDeclaration
+}
+impl ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError: CompilerError {
+  public fun id(): String { "this-type-can-only-be-used-in-impl-or-trait" }
+
+  public fun location(): Location {
+    todo("Implement ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError.location") // TODO(marcelgarus)
+  }
+  public fun title(): String { "The This type can only be used in impls or traits." }
+  public fun description(): String { "You can't use the This type in modules or type definitions" }
+}
+
+public class CannotImplementTraitOfTraitCompilerError {
+  public let theImpl: HirImpl
+}
+impl CannotImplementTraitOfTraitCompilerError: CompilerError {
+  public fun id(): String { "cannot-implement-trait-of-trait" }
+
+  public fun location(): Location {
+    todo("Implement CannotImplementTraitOfTraitCompilerError.location") // TODO(marcelgarus)
+  }
+  public fun title(): String {
+    "You cannot implement a trait containing another trait as a generic parameter yet."
+  }
+  public fun description(): String { "The offending impl: {theImpl}" }
 }
 
 public class ConflictingImplsCompilerError {

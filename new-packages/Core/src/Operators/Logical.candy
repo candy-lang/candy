@@ -1,4 +1,5 @@
 use ...Bool
+use ..Raw
 
 public trait And {
   fun and(other: This): Bool
@@ -17,6 +18,6 @@ impl Or: InfixBar[This, Bool] {
 public trait Implies {
   fun implies(other: This): Bool
 }
-impl InfixEqualGreater[This, Bool] {
+impl Implies: InfixEqualGreater[This, Bool] {
   fun infixEqualGreater(other: This): Bool { this.implies(other) }
 }
