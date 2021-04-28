@@ -31,7 +31,7 @@ impl Bool {
     ## TODO(marcelgarus): Rename this to just `and` as soon as we support overloading.
     this.match[Bool](true = other, false = { false() })
   }
-  
+
   public fun lazyOr(other: () -> Bool): Bool {
     ## TODO(marcelgarus): Rename this to just `or` as soon as we support overloading.
     this.match[Bool](true = { true() }, false = other)

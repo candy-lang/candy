@@ -16,7 +16,7 @@ Future<void> main(List<String> args) async {
       .replaceAll('\\', '\\\\') // Separators from paths on Windows.
       .replaceAllMapped(
         RegExp(
-          '("(?:path|value|name|identifier|keyword|punctuation|content)":) ([^"{\\d][^,}"]*|["{](?=[,}]))',
+          '("(?:path|value|name|identifier|keyword|punctuation|content|type)":) ([^"{\\d][^,}"]*|["{](?=[,}]))',
         ),
         (it) => '${it[1]} "${it[2]}"',
       )

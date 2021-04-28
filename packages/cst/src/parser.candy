@@ -466,15 +466,35 @@ class CstParser {
         })
     let functionTypeParameterTypes = node<CstFunctionTypeParameterTypes>(functionTypeParameterTypes)
     // TODO(JonasWanke): allow modifiers
-    functionType.delegate = node<CstInlineType>(
+    let functionTypeReceiverAndParameterTypes = choiceOf<
+      String,
+      (Maybe<CstNode<CstInlineType>>, Maybe<CstNode<CstFunctionTypeParameterTypes>>),
+    >(
+      List.of2<
+        Parser<
+          String,
+          (Maybe<CstNode<CstInlineType>>, Maybe<CstNode<CstFunctionTypeParameterTypes>>),
+        >,
+      >(
+        node<CstInlineType>(groupType)
+          .map<Maybe<CstNode<CstInlineType>>>({ Some<CstNode<CstInlineType>>(it) })
+          .sequence<Maybe<CstNode<CstFunctionTypeParameterTypes>>>(
+            functionTypeParameterTypes.map<Maybe<CstNode<CstFunctionTypeParameterTypes>>>({
+              Some<CstNode<CstFunctionTypeParameterTypes>>(it)
+            })
+          ),
+        node<CstInlineType>(
           choiceOf<String, CstInlineType>(
-            List.of4<Parser<String, CstInlineType>>(enumType, intersectionType, groupType, namedType),
+            List.of3<Parser<String, CstInlineType>>(enumType, intersectionType, namedType),
           ),
         )
-        .optional()
-        .sequence<Maybe<CstNode<CstFunctionTypeParameterTypes>>>(
-          functionTypeParameterTypes.optional()
-        )
+          .optional()
+          .sequence<Maybe<CstNode<CstFunctionTypeParameterTypes>>>(
+            functionTypeParameterTypes.optional()
+          ),
+      ),
+    )
+    functionType.delegate = functionTypeReceiverAndParameterTypes
         .sequence<CstNode<PunctuationToken>>(punctuation("->"))
         .sequence<Maybe<CstNode<CstInlineType>>>(
           node<CstInlineType>(
@@ -698,7 +718,11 @@ class CstParser {
 
 
     let navigationPostfix = punctuation(".")
-        .sequence<Maybe<CstNode<IdentifierToken>>>(identifier(false).optional())
+        .sequence<Maybe<CstNode<IdentifierToken>>>(
+          choiceOf<String, CstNode<IdentifierToken>>(
+            List.of2<Parser<String, CstNode<IdentifierToken>>>(identifier(false), identifier(true)),
+          ).optional(),
+        )
         .map<(CstNode<CstExpression>) => CstExpression>({
           { receiver: CstNode<CstExpression> =>
             CstNavigationExpression(receiver, it.first, it.second)
