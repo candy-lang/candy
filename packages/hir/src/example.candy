@@ -6,6 +6,7 @@ use incremental
 use ..declarations
 use ..file
 use ..lowering
+use ..types
 
 fun main() {
   let context = QueryContext.create<List<CompilerError>>()
@@ -54,10 +55,10 @@ fun resolvingExample(context: QueryContext<List<CompilerError>>) {
 fun solverExample(context: QueryContext<List<CompilerError>>) {
   let playground = Package.playground(context)
   let file = FancyFile(playground, Path.parse("src/Types.candy"))
-  let declarations = (fileToHirModule(context, file) as HirInnerModule).declarations(context)
+  let declarations = ((fileToHirModule(context, file) as HirInnerModule).declarations(context) as Iterable<HirDeclaration>)
   print("Declarations are {declarations}.")
   print("")
-  let anImpl = ((declarations as Iterable<HirDeclaration>).get(5).unwrap() as HirImpl)
+  let anImpl = (declarations.get(5).unwrap() as HirImpl)
   let rule = hirImplToSolverRule(context, anImpl)
   if (rule is None) {
     print("Couldn't lower impl to rule.")
@@ -65,6 +66,16 @@ fun solverExample(context: QueryContext<List<CompilerError>>) {
     print("The rule is {rule.unwrap().toString_()}.")
   }
 
+  print("Declarations: {declarations}")
+
+  let foo = HirNamedType(declarations.get(0).unwrap() as HirTrait | HirType, List.empty<HirInlineType>())
+  let a = HirNamedType(declarations.get(1).unwrap() as HirTrait | HirType, List.empty<HirInlineType>())
+  let mapAA = HirNamedType(declarations.get(3).unwrap() as HirTrait | HirType, List.of2<HirInlineType>(a, a))
+
+  let theImpl = implFor(context, foo as HirInlineType, mapAA as HirInlineType, playground)
+  print("The impl: {theImpl}")
+
+  print("")
   print("Environment:")
   print(getSolverEnvironmentOfScope(context, playground).toString_())
   // print("Does {type.toString_()} implement Equals? {environment.solve(equalsImpl(type)).toString_()}")
