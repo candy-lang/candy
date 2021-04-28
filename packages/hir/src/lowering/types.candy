@@ -364,6 +364,7 @@ fun hirImplToSolverRule(
     Tuple(
       Some<SolverRule>(
         SolverRule(
+          hirImpl,
           (solverTraitAndGoals.second as Iterable<SolverGoal>)
             .single()
             .unwrap() // We checked the length above.
@@ -519,18 +520,27 @@ fun getSolverEnvironmentOfScope(context: QueryContext<List<CompilerError>>, scop
 
 fun makeSureImplsAreNotConflicting(context: QueryContext<List<CompilerError>>, scope: Package) {
   query<Unit, List<CompilerError>>(context, "makeSureImplsAreNotConflicting", scope as Equals & Hash, {
-    for implsForSameTrait in (getAllImplsInScope(context, scope) as Iterable<HirImpl>)
+    for implsForSameTrait in (getAllImplsInScope(context, scope).items() as Iterable<HirImpl>)
       .where({ it.implementedTrait(context) is Some })
       .groupBy<HirInlineType>({ it.implementedTrait(context).unwrap() })
       .values() {
-      let solverTypesOfImpls = (implsForSameTrait as Iterable<HirImpl>)
-        .maybeMap<SolverType>({
+      let implsAndBasesForCurrentTrait = (implsForSameTrait as Iterable<HirImpl>)
+        .maybeMap<(HirImpl, SolverType)>({
           hirInlineTypeToSolverTypeAndGoals(context, it.baseType(context))
-            .map<SolverType>({ it.first })
+            .map<(HirImpl, SolverType)>({ solverTypeAndGoals => Tuple(it, solverTypeAndGoals.first) })
         })
         .toList()
-      for base1 in solverTypesOfImpls {
-        for base2 in solverTypesOfImpls {
+      for implAndBase1 in implsAndBasesForCurrentTrait {
+        for implAndBase2 in implsAndBasesForCurrentTrait {
+          let impl1 = implAndBase1.first
+          let impl2 = implAndBase2.first
+          let base1 = implAndBase1.second
+          let base2 = implAndBase2.second
+
+          if (impl1 as Equals) == (impl2 as Equals) {
+            continue
+          }
+
           let unified = base1.unify(base2)
           if unified is Some {
             // Unifying the impl types succeeded. This means there's a type to which both impls
@@ -538,7 +548,9 @@ fun makeSureImplsAreNotConflicting(context: QueryContext<List<CompilerError>>, s
             let conflicting = base1.substituteAll(unified.unwrap())
             return Tuple(
               unit,
-              List.of1<CompilerError>(ConflictingImplsCompilerError(base1, base2, conflicting)),
+              List.of1<CompilerError>(
+                ConflictingImplsCompilerError(impl1, impl2, base1, base2, conflicting),
+              ),
             )
           }
         }
@@ -548,15 +560,51 @@ fun makeSureImplsAreNotConflicting(context: QueryContext<List<CompilerError>>, s
   })
 }
 
-impl HirType {
-  fun implFor(context: QueryContext<List<CompilerError>>, trait_: HirTrait): Maybe<HirImpl> {
-    query<Maybe<HirImpl>, List<CompilerError>>( context, "HirType.implements", this as Equals & Hash, {
-      todo("Implement HirType.implFor")
-      // let impls = (getAllImpls(context) as Iterable<HirImpl>).where({ it.trait_ == trait_ }).where({
-      //   it.type_.unify(this) is Some
-      // })
-    })
-  }
+// TODO(marcelgarus): Support getting the impl for a trait with generics. This would basically
+// mean we'd have to accept an arbitrary `HirInlineType` as the `trait_`.
+fun implFor(
+  context: QueryContext<List<CompilerError>>,
+  base: HirInlineType,
+  trait_: HirInlineType,
+  scope: Package,
+): Maybe<HirImpl> {
+  query<Maybe<HirImpl>, List<CompilerError>>(context, "HirType.implements", base as Equals & Hash, {
+    let environment = getSolverEnvironmentOfScope(context, scope)
+    let baseSolverAndGoals = hirInlineTypeToSolverTypeAndGoals(context, base)
+    let traitSolverAndGoals = hirInlineTypeToSolverTypeAndGoals(context, trait_)
+    if (baseSolverAndGoals is None || traitSolverAndGoals is None) {
+      return Tuple(None<HirImpl>(), List.empty<CompilerError>())
+    }
+    let baseType = baseSolverAndGoals.unwrap().first
+    let traitType = traitSolverAndGoals.unwrap().first
+    let baseGoals = baseSolverAndGoals.unwrap().second
+    let traitGoals = traitSolverAndGoals.unwrap().second
+
+    if (traitType is SolverValue) {
+      todo("This shouldn't happen. Trait should be lowered to a SolverVariable.")
+    }
+    if !((traitGoals as Iterable).length() == 1) {
+      return Tuple(
+        None<HirImpl>(),
+        List.of1<CompilerError>(TryingToFindImplForTraitWithTraitAsParameterCompilerError(trait_)),
+      )
+    }
+
+    let solution = environment.solve(
+      (traitGoals as Iterable<SolverGoal>).single().unwrap().substituteAll(
+        Map.of1<SolverVariable, SolverType>(Tuple((traitType as SolverVariable), baseType)),
+      ),
+      baseGoals,
+    )
+    if (solution is SolverSolutionUnique) {
+      Tuple(
+        Some<HirImpl>((solution as SolverSolutionUnique).usedRule.originalImpl),
+        List.empty<CompilerError>(),
+      )
+    } else {
+      Tuple(None<HirImpl>(), List.empty<CompilerError>())
+    }
+  })
 }
 
 public class ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError {
@@ -588,7 +636,24 @@ impl CannotImplementTraitOfTraitCompilerError: CompilerError {
   public fun description(): String { "The offending impl: {theImpl}" }
 }
 
+public class TryingToFindImplForTraitWithTraitAsParameterCompilerError {
+  public let trait_: HirInlineType
+}
+impl TryingToFindImplForTraitWithTraitAsParameterCompilerError: CompilerError {
+  public fun id(): String { "trying-to-find-impl-for-trait-with-trait-as-parameter" }
+
+  public fun location(): Location {
+    todo("Implement TryingToFindImplForTraitWithTraitAsParameterCompilerError.location") // TODO(marcelgarus)
+  }
+  public fun title(): String { "Conflicting impls." }
+  public fun description(): String {
+    "Trying to find an impl for trait {trait_}, which has another trait as a type parameter. That's not supported yet."
+  }
+}
+
 public class ConflictingImplsCompilerError {
+  public let impl1: HirImpl
+  public let impl2: HirImpl
   public let base1: SolverType
   public let base2: SolverType
   public let conflictingType: SolverType
