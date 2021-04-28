@@ -3,6 +3,7 @@ use dart_code
 use hir
 use incremental
 
+use ...declarations
 use ...types
 
 public fun compileNamedType(
@@ -13,9 +14,9 @@ public fun compileNamedType(
     context,
     "code_generator_dart.compileNamedType",
     namedType, {
-    let name = (namedType.declaration as HirDeclaration).name()
-    let name = DartIdentifier(name, None<String>())
-    // TODO(JonasWanke): correct package URL
+    let declaration = (namedType.declaration as HirDeclaration)
+    let importUrl = moduleHirToImportUrl(context, declaration.parent as HirModule)
+    let name = DartIdentifier(declaration.name(), Some<String>(importUrl))
 
     let types = (namedType.parameterTypes as Iterable<HirInlineType>)
       .map<DartType>({ compileInlineType(context, it) })
