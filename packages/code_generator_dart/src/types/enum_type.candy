@@ -3,6 +3,7 @@ use dart_code
 use hir
 use incremental
 
+use ...declarations
 use ...types
 
 public fun compileEnumType(
@@ -16,8 +17,8 @@ public fun compileEnumType(
     let variantNames = enumType.variants.keys()
 
     let name = getCompiledEnumTypeName(context, variantNames.toSet())
-    let name = DartIdentifier(name, None<String>())
-    // TODO(JonasWanke): correct package URL
+    let importUrl = moduleHirToImportUrl(context, HirModule.syntheticEnums(context))
+    let name = DartIdentifier(name, Some<String>(importUrl))
 
     let sortedVariantTypes = (variantNames.toList().unsafeSorted() as Iterable<String>)
       .map<HirInlineType>({
@@ -29,7 +30,24 @@ public fun compileEnumType(
   })
 }
 
-public fun compileEnumTypeDeclaration(
+public fun compileEnumTypeDeclarations(
+  context: QueryContext<List<CompilerError>>,
+  package: Package,
+): (HirModule, List<DartDeclaration>) {
+  query<(HirModule, List<DartDeclaration>), List<CompilerError>>(
+    context,
+    "code_generator_dart.compileEnumTypeDeclarations",
+    package, {
+    // TODO(JonasWanke): visit all enum types and store their variant names
+    let variantNames = Set.empty<Set<String>>()
+
+    let classes = variantNames.items()
+      .expand<DartDeclaration>({ compileEnumTypeDeclaration(context, it) as Iterable<DartDeclaration> })
+      .toList()
+    Tuple(Tuple(HirModule.syntheticEnums(context), classes), List.empty<CompilerError>())
+  })
+}
+fun compileEnumTypeDeclaration(
   context: QueryContext<List<CompilerError>>,
   variantNames: Set<String>,
 ): List<DartClass> {

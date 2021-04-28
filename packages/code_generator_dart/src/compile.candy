@@ -2,7 +2,9 @@ use compiler_utils
 use dart_code
 use hir
 use incremental
+
 use ..declarations
+use ..types
 
 public fun compile(context: QueryContext<List<CompilerError>>, package: Package): Unit {
   impureQuery<Unit, List<CompilerError>>(context, "code_generator_dart.compile", package, {
@@ -42,6 +44,8 @@ fun compile_(context: QueryContext<List<CompilerError>>, package: Package): Map<
     let utils = generateUtils(context)
     output.set(utils.first, utils.second)
 
+    output.setAll(generateSyntheticPackage(context, package))
+
     for dependency in package.getAllPackagesInCompilationOrder(context) {
       output.setAll(compileModuleAndDescendants(context, package, HirTopLevelModule(dependency)))
     }
@@ -78,5 +82,33 @@ fun generateUtils(context: QueryContext<List<CompilerError>>): (Path, String) {
       .normalized()
     let content = File(sourcePath).read()
     Tuple(Tuple(Path.parse("lib/{candyDartUtilsFileName}"), content), List.empty<CompilerError>())
+  })
+}
+
+fun generateSyntheticPackage(context: QueryContext<List<CompilerError>>, package: Package): Map<Path, String> {
+  query<Map<Path, String>, List<CompilerError>>(context, "code_generator_dart.generateSyntheticPackage", package, {
+    let declarations = (List.of3<(HirModule, List<DartDeclaration>)>(
+      compileEnumTypeDeclarations(context, package),
+      compileNamedTupleTypeDeclarations(context, package),
+      compileTupleTypeDeclarations(context, package),
+    ) as Iterable<(HirModule, List<DartDeclaration>)>)
+    assert(
+      declarations.all({ (it.first as HasPackageAndPath).package() == Package.synthetic(context) }),
+      "Generated synthetic declarations specify a non-synthetic target module.",
+    )
+
+    let result = MutableMap.empty<Path, String>()
+    declarations.do({
+      let content = DartCompilationUnit(
+        directives = List.empty<DartDirective>(),
+        declarations = it.second,
+      )
+      let importAllocator = DartSimplePrefixingImportAllocator(MutableMap.empty<String, String>())
+      let content = (content as DartToCode).toCode(importAllocator)
+      result.set(moduleHirToOutputPath(context, it.first), content)
+      unit
+    })
+
+    Tuple(result, List.empty<CompilerError>())
   })
 }

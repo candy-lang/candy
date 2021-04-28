@@ -8,7 +8,7 @@ use ..name_mangling
 use ..trait
 use ..type
 
-fun compileModuleAndDescendants(
+public fun compileModuleAndDescendants(
   context: QueryContext<List<CompilerError>>,
   package: Package,
   moduleHir: HirModule,
@@ -84,7 +84,7 @@ fun compileModule(
   })
 }
 
-fun moduleHirToOutputPath(context: QueryContext<List<CompilerError>>, moduleHir: HirModule): Path {
+public fun moduleHirToOutputPath(context: QueryContext<List<CompilerError>>, moduleHir: HirModule): Path {
   query<Path, List<CompilerError>>(context, "code_generator_dart.moduleHirToOutputPath", moduleHir, {
     let projectName = mangleName(context, (moduleHir as HasPackageAndPath).package().getName(context))
     let path = ((moduleHir as HasPackageAndPath).path() as Iterable<String>)
@@ -94,7 +94,7 @@ fun moduleHirToOutputPath(context: QueryContext<List<CompilerError>>, moduleHir:
     Tuple(dartSourcePath.child(projectName).append(path), List.empty<CompilerError>())
   })
 }
-fun moduleHirToImportUrl(context: QueryContext<List<CompilerError>>, moduleHir: HirModule): String {
+public fun moduleHirToImportUrl(context: QueryContext<List<CompilerError>>, moduleHir: HirModule): String {
   query<String, List<CompilerError>>(context, "code_generator_dart.moduleHirToImportUrl", moduleHir, {
     let projectName = mangleName(context, (moduleHir as HasPackageAndPath).package().getName(context))
     let path = ((moduleHir as HasPackageAndPath).path() as Iterable<String>)

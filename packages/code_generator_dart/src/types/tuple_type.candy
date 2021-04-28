@@ -3,6 +3,7 @@ use dart_code
 use hir
 use incremental
 
+use ...declarations
 use ...types
 
 public fun compileTupleType(
@@ -21,8 +22,8 @@ public fun compileTupleType(
     )
 
     let name = getCompiledTupleTypeName(context, size)
-    let name = DartIdentifier(name, None<String>())
-    // TODO(JonasWanke): correct package URL
+    let importUrl = moduleHirToImportUrl(context, HirModule.syntheticTuples(context))
+    let name = DartIdentifier(name, Some<String>(importUrl))
 
     let types = types.map<DartType>({ compileInlineType(context, it) }).toList()
 
@@ -30,7 +31,24 @@ public fun compileTupleType(
   })
 }
 
-public fun compileTupleTypeDeclaration(
+public fun compileTupleTypeDeclarations(
+  context: QueryContext<List<CompilerError>>,
+  package: Package,
+): (HirModule, List<DartDeclaration>) {
+  query<(HirModule, List<DartDeclaration>), List<CompilerError>>(
+    context,
+    "code_generator_dart.compileTupleTypeDeclarations",
+    package, {
+    // TODO(JonasWanke): visit all tuple types and store their sizes
+    let sizes = Set.empty<Int>()
+
+    let classes = (sizes.items().toList().unsafeSorted() as Iterable<Int>)
+      .map<DartDeclaration>({ compileTupleTypeDeclaration(context, it) })
+      .toList()
+    Tuple(Tuple(HirModule.syntheticTuples(context), classes), List.empty<CompilerError>())
+  })
+}
+fun compileTupleTypeDeclaration(
   context: QueryContext<List<CompilerError>>,
   size: Int,
 ): DartClass {
