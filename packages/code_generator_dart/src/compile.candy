@@ -80,7 +80,7 @@ dev_dependencies:
 let candyDartUtilsFileName = "candy_dart_utils.dart"
 public let candyDartUtilsImportUrl = "package:{outputPackageName}/{candyDartUtilsFileName}"
 fun generateUtils(context: QueryContext<List<CompilerError>>): (Path, String) {
-  query<(Path, String), List<CompilerError>>(context, "code_generator_dart.generatePubspec", unit, {
+  query<(Path, String), List<CompilerError>>(context, "code_generator_dart.generateUtils", unit, {
     let sourcePath = getCorePath(context)
       .append(Path.parse("../../packages/code_generator_dart/candy_dart_utils.dart"))
       .normalized()
