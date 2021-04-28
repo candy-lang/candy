@@ -450,7 +450,7 @@ fun hirInlineTypeToSolverTypeAndGoals(
           List.empty<CompilerError>(),
         )
       }
-      todo("We should a {hirType} referring to {declaration}")
+      todo("We should handle a {hirType} referring to {declaration}")
     }
     // TODO(marcelgarus): For now, we only support impls for nominal types. If we want to support
     // `impl A | B: Equals` or `impl (name: String, age: UInt): Clone`, we'll need to add support
@@ -601,8 +601,7 @@ impl ConflictingImplsCompilerError: CompilerError {
   }
   public fun title(): String { "Conflicting impls." }
   public fun description(): String {
-    /// TODO(marcelgarus): add a description for this error
-    ""
+    "Impl {impl1} conflicts with {impl2}, because both bases {base1} and {base2} apply to the same type {conflictingType}."
   }
 }
 
