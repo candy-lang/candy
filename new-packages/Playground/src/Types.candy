@@ -1,16 +1,8 @@
 builtin type Foo
+builtin type A
+builtin type B
 
-trait Bar {}
-trait Baz[T] {}
+trait Map[K, V] {}
 
-## Type implements trait
-impl Foo: Bar {}
-
-## Trait implements trait
-impl Bar: Baz[Foo] {}
-
-## Type implements trait with This
-impl Foo: Baz[This] {}
-
-## Trait implements trait with This
-impl Bar: Baz[This] {}
+impl[T] Foo: Map[T, A] {}
+impl[T] Foo: Map[B, T] {}
