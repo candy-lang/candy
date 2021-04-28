@@ -698,7 +698,11 @@ class CstParser {
 
 
     let navigationPostfix = punctuation(".")
-        .sequence<Maybe<CstNode<IdentifierToken>>>(identifier(false).optional())
+        .sequence<Maybe<CstNode<IdentifierToken>>>(
+          choiceOf<String, CstNode<IdentifierToken>>(
+            List.of2<Parser<String, CstNode<IdentifierToken>>>(identifier(false), identifier(true)),
+          ).optional(),
+        )
         .map<(CstNode<CstExpression>) => CstExpression>({
           { receiver: CstNode<CstExpression> =>
             CstNavigationExpression(receiver, it.first, it.second)
