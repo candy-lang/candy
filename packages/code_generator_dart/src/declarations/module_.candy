@@ -78,8 +78,6 @@ fun compileModule(
     let importAllocator = DartSimplePrefixingImportAllocator(MutableMap.empty<String, String>())
     let code = (compilationUnit as DartToCode).toCode(importAllocator)
 
-    // TODO(JonasWanke): generate tests
-
     Tuple(Tuple(outputPath, code), List.empty<CompilerError>())
   })
 }
