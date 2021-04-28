@@ -162,7 +162,7 @@ public class AstFunction {
   public let name: AstIdentifier
   public let typeParameters: List<AstTypeParameter>
   public let valueParameters: List<AstValueParameter>
-  public let returnType: AstInlineType
+  public let returnType: Maybe<AstInlineType>
   public let body: Maybe<AstBlockBody | AstExpressionBody | AstDelegationBody>
 }
 impl AstFunction: AstWithTypeParameters & AstDeclaration & Equals & Hash {
@@ -176,7 +176,7 @@ impl AstFunction: AstWithTypeParameters & AstDeclaration & Equals & Hash {
         .unsafeEquals(other.typeParameters as Iterable<AstTypeParameter>) &&
       (valueParameters as Iterable<AstValueParameter>)
         .unsafeEquals(other.valueParameters as Iterable<AstValueParameter>) &&
-      (returnType as Equals) == (other.returnType as Equals) &&
+      returnType.unsafeEquals(other.returnType) &&
       body.unsafeEquals(other.body)
   }
   fun hash<T>(hasher: Hasher<T>) {
@@ -186,7 +186,7 @@ impl AstFunction: AstWithTypeParameters & AstDeclaration & Equals & Hash {
     (name as Hash).hash<T>(hasher)
     (typeParameters as Iterable<AstTypeParameter>).unsafeHash<T>(hasher)
     (valueParameters as Iterable<AstValueParameter>).unsafeHash<T>(hasher)
-    (returnType as Hash).hash<T>(hasher)
+    returnType.unsafeHash<T>(hasher)
     body.unsafeHash<T>(hasher)
   }
 }

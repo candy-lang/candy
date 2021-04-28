@@ -488,18 +488,14 @@ fun lowerFunction(
         List.empty<AstValueParameter>()
       })
 
-  let returnType = if cst.child.returnType is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)> {
-    context.addError(ExpectedFunctionReturnTypeCompilerError(context.file, cst))
-    context.createErrorType(id)
-  } else {
-    let returnType = cst.child.returnType.unwrap()
-    if returnType.second is None<CstNode<CstInlineType>> {
+  let returnType = cst.child.returnType.map<AstInlineType>({
+    if it.second is None<CstNode<CstInlineType>> {
       context.addError(ExpectedFunctionReturnTypeCompilerError(context.file, cst))
       context.createErrorType(id)
     } else {
-      lowerInlineType(context, id, returnType.second.unwrap())
+      lowerInlineType(context, id, it.second.unwrap())
     }
-  }
+  })
 
   let body = if cst.child.body is None<CstNode<CstBlockBody | CstExpressionBody>> {
     None<AstBlockBody | AstExpressionBody | AstDelegationBody>()
