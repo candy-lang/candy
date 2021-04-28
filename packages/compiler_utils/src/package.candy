@@ -18,6 +18,11 @@ public class Package /* FilePackage */ {
       Tuple(Package(getCorePath(context)), List.empty<CompilerError>())
     })
   }
+  public static fun synthetic(context: QueryContext<List<CompilerError>>): Package {
+    query<Package, List<CompilerError>>(context, "Package.synthetic", unit, {
+      Tuple(Package(Path.parse("$synthetic")), List.empty<CompilerError>())
+    })
+  }
   public static fun playground(context: QueryContext<List<CompilerError>>): Package {
     query<Package, List<CompilerError>>(context, "Package.playground", unit, {
       Tuple(Package(getPlaygroundPath(context)), List.empty<CompilerError>())

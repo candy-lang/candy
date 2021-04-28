@@ -3,6 +3,7 @@ use dart_code
 use hir
 use incremental
 
+use ...declarations
 use ...types
 
 public fun compileNamedTupleType(
@@ -16,8 +17,8 @@ public fun compileNamedTupleType(
     let sortedFields = (namedTupleType.types.sortedBy<String>({ it.first }) as Iterable<(String, HirInlineType)>)
     let fieldNames = sortedFields.map<String>({ it.first }).toSet()
     let name = getCompiledNamedTupleTypeName(context, fieldNames)
-    let name = DartIdentifier(name, None<String>())
-    // TODO(JonasWanke): correct package URL
+    let importUrl = moduleHirToImportUrl(context, HirModule.syntheticNamedTuples(context))
+    let name = DartIdentifier(name, Some<String>(importUrl))
 
     let types = sortedFields.map<DartType>({ compileInlineType(context, it.second) }).toList()
 
@@ -25,7 +26,24 @@ public fun compileNamedTupleType(
   })
 }
 
-public fun compileNamedTupleTypeDeclaration(
+public fun compileNamedTupleTypeDeclarations(
+  context: QueryContext<List<CompilerError>>,
+  package: Package,
+): (HirModule, List<DartDeclaration>) {
+  query<(HirModule, List<DartDeclaration>), List<CompilerError>>(
+    context,
+    "code_generator_dart.compileNamedTupleTypeDeclarations",
+    package, {
+    // TODO(JonasWanke): visit all named tuple types and store their field names
+    let fieldNames = Set.empty<Set<String>>()
+
+    let classes = fieldNames.items()
+      .map<DartDeclaration>({ compileNamedTupleTypeDeclaration(context, it) })
+      .toList()
+    Tuple(Tuple(HirModule.syntheticNamedTuples(context), classes), List.empty<CompilerError>())
+  })
+}
+fun compileNamedTupleTypeDeclaration(
   context: QueryContext<List<CompilerError>>,
   fieldNames: Set<String>,
 ): DartClass {

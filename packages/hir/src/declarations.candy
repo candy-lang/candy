@@ -24,6 +24,21 @@ public trait HirModule: HirDeclaration & Equals & Hash {
     core(context).innerModule("String")
   }
 
+  static fun synthetic(context: QueryContext<List<CompilerError>>): HirTopLevelModule {
+    query<HirTopLevelModule, List<CompilerError>>(context, "HirModule.synthetic", unit, {
+      Tuple(HirTopLevelModule(Package.synthetic(context)), List.empty<CompilerError>())
+    })
+  }
+  static fun syntheticEnums(context: QueryContext<List<CompilerError>>): HirModule {
+    synthetic(context).innerModule("Enums")
+  }
+  static fun syntheticNamedTuples(context: QueryContext<List<CompilerError>>): HirModule {
+    synthetic(context).innerModule("NamedTuples")
+  }
+  static fun syntheticTuples(context: QueryContext<List<CompilerError>>): HirModule {
+    synthetic(context).innerModule("Tuples")
+  }
+
   let parent: Package | HirModule
   fun innerModule(name: String): HirInnerModule { HirInnerModule(this, name) }
 }
