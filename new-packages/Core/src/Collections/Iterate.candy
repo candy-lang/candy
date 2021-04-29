@@ -1,0 +1,420 @@
+use ...Assert
+use ...Bool
+use ...hash
+use ...Int
+use ...Operators
+use ...Maybe
+use ...Mutable
+use ...Primitives
+use ...String
+use ...todo
+use ..List
+use ..Map
+use ..Set
+
+public trait Iterate[Item] {
+  # A thing that can be iterated over.
+
+  fun iterate(): Maybe[(Item, Iterate[Item])]
+  # Returns `Some` with the next item and an `Iterate` containing the remaining items, or `None` if
+  # it finished iterating.
+}
+
+impl[Item] Iterate[Item] {
+  ## Getters
+
+  fun get(index: Int /* UInt */): Maybe[Item] {
+    # Returns the [index]th element.
+    assert(index >= 0, "Can't access a negative index in an `Iterate`.")
+
+    this.iterate().map[Item]({
+      if(index == 0, {
+        it.first
+      }).else({
+        it.second.get(index - 1)
+      })
+    })
+  }
+
+  fun first(): Maybe[Item] { get(0) }
+  fun second(): Maybe[Item] { get(1) }
+  fun third(): Maybe[Item] { get(2) }
+  fun fourth(): Maybe[Item] { get(3) }
+  fun fifth(): Maybe[Item] { get(4) }
+
+  fun nthLast(index: Int): Maybe[Item] {
+    ## TODO(marcelgarus): Make this way more efficient.
+    let list = this.toList()
+    list.get(list.length() - index - 1)
+  }
+
+  fun last(): Maybe[Item] { nthLast(0) }
+  fun secondLast(): Maybe[Item] { nthLast(1) }
+  fun thirdLast(): Maybe[Item] { nthLast(2) }
+  fun fourthLast(): Maybe[Item] { nthLast(3) }
+  fun fifthLast(): Maybe[Item] { nthLast(4) }
+
+  fun single(): Maybe[Item] {
+    this.iterate().flatMap({
+      let item = it.first
+      if(it.second.iterate().isSome(), { Maybe[Item].None() }).else({ Maybe[Item].Some(item) })
+    })
+  }
+
+  ## Properties.
+
+  fun length(): Int /* UInt */ { this.foldLeft[Int](0, { result, item -> result + 1 }) }
+
+  ## Boolean checks.
+
+  fun isEmpty(): Bool { this.first().isNone() }
+  fun isNotEmpty(): Bool { this.isEmpty().not() }
+
+  fun all(tester: (Item) -> Bool): Bool {
+    this.foldLeft[Out](true(), { result, item -> result & tester(item) })
+  }
+  fun any(tester: (Item) -> Bool): Bool {
+    this.foldLeft[Out](false(), { result, item -> result | tester(item) })
+  }
+
+  ## Reductions.
+
+  fun foldLeft[Out](initial: Out, combine: (Out, Item) -> Out): Out {
+    let result = Mutable[Out](initial)
+    this.do({ result.set(combine(result.get(), it)) })
+    result.get()
+  }
+  fun foldRight[Out](initial: Out, combine: (Item, Out) -> Out): Out {
+    this.toList().reversed().foldLeft[Out](initial, { result, item -> combine(item, result) })
+  }
+  fun reduceLeft(combine: (Item, Item) -> Item): Maybe[Item] {
+    this.iterate().map[Item]({ it.second.foldLeft[Out](it.first, combine) })
+  }
+  ## TODO(marcelgarus): reduceRight
+
+  fun minBy[C: Comparable](selector: (Item) -> C): Maybe[Item] {
+    this.reduceLeft[Item]({ result, item ->
+      if(selector(result) <= selector(item), { result }).else({ item })
+    })
+  }
+  fun maxBy[C: Comparable](selector: (Item) -> C): Maybe[Item] {
+    this.reduceLeft[Item]({ result, item ->
+      if(selector(result) >= selector(item), { result }).else({ item })
+    })
+  }
+  ## TODO(JonasWanke): sumBy, averageBy
+
+  ## Filtering.
+
+  fun firstWhere(checker: (Item) -> Bool): Maybe[Item] { this.where(checker).first() }
+  ## TODO(marcelgarus): firstIndexWhere
+  fun lastWhere(checker: (Item) -> Bool): Maybe[Item] { this.where(checker).last() }
+  ## TODO(marcelgarus): lastIndexWhere
+  fun singleWhere(checker: (Item) -> Bool): Maybe[Item] { this.where(checker).single() }
+  ## TODO(JonasWanke): singleIndexWhere
+
+  ## Mapping transformations.
+  ## These return an `Iterate` with the same length, but a different type.
+
+  fun map[Out](mapper: (Item) -> Out): Iterate[Out] {
+    this.mapIndexed[Out]({ index, item -> mapper(item) })
+  }
+  fun mapIndexed[Out](mapper: (Int, Item) -> Out): Iterate[Out] {
+    MappedIterate[Item, Out](this, mapper, 0)
+  }
+  fun withIndex(): Iterate[(Int /* UInt */, Item)] {
+    this.mapIndexed[(Int, Item)]({ index, item -> (index, item) })
+  }
+
+  fun cast[Type](): Iterate[Maybe[Item & Type]] {
+    this.map[Item & Type]({ it.as[Item & Type]() })
+  }
+
+  ## Selection transformations.
+  ## These return an `Iterate` with a subset of the items.
+
+  fun where(checker: (Item) -> Bool): Iterate[Item] {
+    ## TODO(marcelgarus): As soon as implicit casts are available, maybe make the `checker` return a
+    ##   `WhereResult`, which can be either `Keep` or `Drop`?
+    this.whereWithState[Nothing](unit, { item, _ -> Tuple(checker(item), unit) })
+  }
+  fun whereWithState[State](
+    initialState: State,
+    checker: (Item, State) -> (Bool, State),
+  ): Iterate[Item] { WhereIterate[Item, State](this, initialState, checker) }
+
+  fun whereNot(checker: (Item) -> Bool): Iterate[Item] { this.where({ checker(it).not() }) }
+
+  fun whereType[Result](): Iterate[Item & Result] { this.cast[Result]().whereSome() }
+
+  fun skip(n: Int): Iterate[Item] {
+    this.whereWithState[Int](0, { item, index -> (index >= n, index + 1) })
+  }
+  fun skipWhile(checker: (Item) -> Bool): Iterate[Item] {
+    this.whereWithState[Bool](
+      true(),
+      { item, isSkipping ->
+        if(isSkipping, {
+          let newIsSkipping = checker(item)
+          (!newIsSkipping, newIsSkipping)
+        }).else({
+          (true, false)
+        })
+      },
+    )
+  }
+
+  fun slice(start: Int, end: Int): Iterate[Item] { this.skip(start).take(end - start) }
+
+  fun take(n: Int): Iterate[Item] {
+    this.whereWithState[Int](0, { item, index -> (index < n, index + 1) })
+  }
+  fun takeWhile(checker: (Item) -> Bool): Iterate[Item] {
+    ## TODO(marcelgarus): Implement more efficiently.
+
+    this.whereWithState[Bool](
+      true,
+      { item, isTaking ->
+        if(isTaking, {
+          let newIsTaking = checker(item)
+          (newIsTaking, newIsTaking)
+        }).else({
+          (false, false)
+        })
+      },
+    )
+  }
+
+  ## Conversion transformations.
+  ## These do more complicated stuff.
+
+  ## TODO(marcelgarus): Decide on whether to name this `flatMap`.
+  fun maybeMap[Out](maybeMapper: (Item) -> Maybe[Out]): Iterate[Out] {
+    this.map[Maybe[Out]](maybeMapper).whereSome()
+  }
+
+  ## TODO(marcelgarus): distinctBy
+
+  fun expand[Out](expander: (Item) -> Iterate[Out]): Iterate[Out] {
+    ExpandIterate[Item, Out](this, expander)
+  }
+
+  ## TODO(JonasWanke): readd this
+  ## fun groupBy[T: Hash & Equals](keyOf: (Item) -> T): Map[T, List[Item]] {
+  ##   let map = MutableMap.empty<T, MutableList[Item]>()
+  ##   for item in this {
+  ##     map
+  ##       .putIfAbsent(keyOf(item), { MutableList.empty[Item]() })
+  ##       .append(item)
+  ##   }
+  ##   (map as Map[T, List[Item]])
+  ## }
+
+  ## TODO(marcelgarus): reversed
+
+  fun zip[Other](other: Iterate[Other]): Iterate[(Item, Other)] {
+    ZipIterate[Item, Other](this, other)
+  }
+
+  ## Action.
+
+  fun do(action: (Item) -> Nothing) {
+    let initialResult = this.iterate().else({ return })
+    action(initialResult.first)
+    let iterate = Mutable[Iterate[Item]](initialResult.second)
+    loop({
+      let result = iterate.iterate().else({ return })
+      action(result.first)
+      iterate.set(result.second)
+    })
+  }
+
+  ## Conversions.
+
+  ## TODO(JonasWanke): readd these
+  ## fun toList(): List[Item] { toMutableList() }
+  ## fun toMutableList(): MutableList[Item] {
+  ##   let list = MutableList.empty[Item]()
+  ##   do({ list.append(it) })
+  ##   list
+  ## }
+  ##
+  ## fun toSet(): Set[Item] { toMutableSet() }
+  ## fun toMutableSet(): MutableSet[Item] {
+  ##   let iter = iterator()
+  ##   let set = MutableSet.empty[Item]()
+  ##   do({
+  ##     set.insert(it)
+  ##     unit
+  ##   })
+  ##   set
+  ## }
+
+  ## Extras:
+
+  ## TODO(marcelgarus): + operator for joining Iterates
+  ## TODO(marcelgarus): for Iterate<Equals>: contains
+
+  ## TODO(marcelgarus): for Iterate<(A, B)>: map with 2 args, unzip
+  ## TODO(marcelgarus): for Iterate<Iterate<T>>: flatten
+  ## TODO(marcelgarus): for Iterate<Number>: average, sum, min, max
+  ## TODO(marcelgarus): for Iterate<Maybe<T>>: whereSome, unwrapAll
+
+  fun join(separator: String): String {
+    this.withIndex().foldLeft[String]("", { result, indexAndItem ->
+      if(indexAndItem.first == 0, {
+        indexAndItem.second.toString()
+      }).else({
+        "{result}{separator}{indexAndItem.second}"
+      })
+    })
+  }
+
+  ## fun unsafeToMap<K: Equals & Hash, V>(): Map<K, V> {
+  ##   # Collects all items into a map. Crashes if `this` is not an `Iterate<(K, V)>`.
+  ## 
+  ##   let result = MutableMap.empty<K, V>()
+  ##   for item in cast<(K, V)>() {
+  ##     result.set(item.first, item.second)
+  ##   }
+  ##   result
+  ## }
+  ## fun unsafeToSet<T: Equals & Hash>(): Set<T> {
+  ##   # Collects all items into a set. Crashes if items don't implement `Equals & Hash`.
+  ## 
+  ##   let result = MutableSet.empty<T>()
+  ##   for item in cast<T>() { result.insert(item) }
+  ##   result
+  ## }
+}
+
+impl[Item] Iterate[Maybe[Item]] {
+  fun whereSome(): Iterate[Item] {
+    this.where({ it.isSome() }).map[Item]({ it.unwrap() })
+  }
+}
+
+impl[Item: Equals] Iterate[Item]: Equals {
+  fun equals(other: Iterate[Item]): Bool {
+    # Checks if this `Iterate` is equal to the `other` one.
+
+    this.length() == other.length() && this.zip[Item](other).all({ it.first == it.second })
+  }
+
+  fun contains(item: Item): Bool { this.any({ it == item }) }
+}
+## impl[Item: Hash] Iterate[Item]: Hash {
+##   fun hash(hasher: Hasher) {
+##     # Hashes this `Iterate`.
+##
+##     this.do({ it.hash(hasher) })
+##   }
+## }
+
+impl[Item] Iterate[Item]: Add {
+  fun add(other: This): This { FollowedByIterate[Item](this, other) }
+}
+
+type MappedIterate[In, Out] = (parent: Iterate<In>, mapper: (Int, In) -> Out, index: Int = 0)
+impl[In, Out] MappedIterate[In, Out]: Iterate[Out] {
+  fun iterate(): Maybe[(Out, Iterate[Out])] {
+    this.parent.iterate().map[(Out, Iterate[Out])]({
+      let item = it.first
+      let newParent = it.second
+      (mapper(index, item), MappedIterate[In, Out](newParent, this.mapper, this.index + 1))
+    })
+  }
+}
+
+type WhereIterate[Item, State] = (
+  parent: Iterate[Item],
+  state: State,
+  checker: (Item, State) -> (Bool, State),
+)
+impl[Item, State] WhereIterate[Item, State]: Iterate[Item] {
+  fun iterate(): Maybe[(Item, Iterate[Item])] {
+    let state = Mutable[State](this.state)
+    loop({
+      let parentResult = this.parent.iterate().else({ return Maybe[(Item, Iterate[Item])].None() })
+      let checkerResult = this.checker(parentResult.first, state.get())
+      state.set(checkerResult.second)
+      if(checkerResult.first, {
+        return Maybe[(Item, Iterate[Item])].Some((
+          parentResult.first,
+          WhereIterate[Item, State](parentResult.second, state.get(), this.checker),
+        ))
+      })
+    })
+  }
+}
+
+type ExpandIterate[In, Out] = (
+  parent: Iterate[In],
+  expander: (In) -> Iterate[Out],
+  expanded: Maybe[Iterate[Out]] = Maybe[Iterate[Out]].None(),
+)
+impl[In, Out] ExpandIterate[In, Out]: Iterate[Out] {
+  fun iterate(): Maybe[(Out, Iterate[Out])] {
+    let parent = Mutable[Iterate[In]](this.parent)
+    let expanded = Mutable[Iterate[In]](this.expanded)
+    loop({
+      expanded.get().flatMap[(Out, Iterate[Out])]({ it.iterate() }).do({
+        return Maybe[(Out, Iterate[Out])].Some((
+          it.first,
+          ExpandIterate[In, Out](parent, this.expander, it.second),
+        ))
+      })
+
+      let parentResult = parent.get().iterate().else({ return Maybe[(Out, Iterate[Out])].None() })
+      parent.set(parentResult.second)
+      expanded.set(Maybe[Iterate[Out]].Some(parentResult.first))
+    })
+  }
+}
+
+type ZipIterate[Item, Other] = (parent: Iterate[Item], other: Iterate[Other])
+impl[Item, Other] ZipIterate[Item, Other]: Iterate[(Item, Other)] {
+  fun iterate(): Maybe[((Item, Other), Iterate[(Item, Other)])] {
+    this.parent.iterate().flatMap[((Item, Other), Iterate[(Item, Other)])]({ parentResult ->
+      other.iterate().map[((Item, Other), Iterate[(Item, Other)])]({
+        ((parentResult.first, it.first), (parentResult.second, it.second))
+      })
+    })
+  }
+}
+
+type FollowedByIterate[Item] = (parent: Iterate[Item], following: Iterate[Item])
+impl[Item] FollowedByIterate[Item]: Iterate[Item] {
+  fun iterate(): Maybe[(Item, Iterate[Item])] {
+    this.parent.iterate()
+      .map[(Item, Iterate[Item])]({
+        (it.first, FollowedByIterate[Item](it.second, this.following))
+      })
+      .else({ following.iterate() })
+  }
+}
+
+
+impl Int {
+  fun until(endExclusive: Int): Iterate<Int> {
+    assert(
+      endExclusive >= this,
+      "Exclusive end must be greater than or equal to that start, but {this} > {endExclusive}.",
+    )
+    UntilIterate(this, endExclusive)
+  }
+}
+type UntilIterate = (value: Int, this.endExclusive: Int)
+impl UntilIterate: Iterate[Int] {
+  fun iterate(): Maybe[(Int, Iterate[Int])] {
+    assert(
+      this.value <= this.endExclusive,
+      "Value must be smaller than or equal to endExclusive, but {this.value} > {this.endExclusive}."
+    )
+    if(this.value == this.endExclusive, {
+      Maybe[(Int, Iterate[Int])].None()
+    }).else({
+      Maybe[(Int, Iterate[Int])].Some((this.value, UntilIterate(this.value + 1, this.endExclusive)))
+    })
+  }
+}

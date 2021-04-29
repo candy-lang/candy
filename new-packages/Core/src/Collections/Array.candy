@@ -1,0 +1,39 @@
+use ...Int
+use ..Iterate
+use ..List
+
+public builtin type Array[Item]
+# A structure that holds a fixed number of `Item`s.
+
+impl[Item] Array[Item] {
+  public static fun filled[Item](length: Int /* UInt */, item: Item): Array[Item] {
+    # Creates a new `Array` of the given `length`, where every slot is filled with the same `item`.
+
+    generate[Item](length, { item })
+  }
+
+  public static builtin fun generate[Item](length: Int, generator: (Int) -> Item): Array[Item]
+  # Creates a new `Array` of the given `length` where the `generator` is invoked with indizes to
+  # generate items to fill the slots.
+
+  public builtin fun length(): Int
+
+  public builtin fun get(index: Int /* UInt */): Maybe[Item]
+}
+
+impl[Item] Array[Item]: Iterate[Item] {
+  fun iterate(): Maybe[(Item, Iterate[Item])] { ArrayIterate[Item](this, 0).iterate() }
+}
+type ArrayIterate[Item] = (array: Array[Item], cursor: Int = 0)
+impl[Item] ArrayIterate[Item]: Iterate[Item] {
+  fun iterate(): Maybe[(Item, Iterate[Item])] {
+    if(this.cursor == this.array.length(), {
+      Maybe[(Item, Iterate[Item])].None()
+    }).else({
+      Maybe[(Item, Iterate[Item])].Some((
+        this.array.get(this.cursor),
+        ArrayIterate[Item](this.array, this.cursor + 1),
+      ))
+    })
+  }
+}
