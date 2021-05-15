@@ -254,7 +254,8 @@ public trait Iterate[Item] {
 
   ## TODO(marcelgarus): for Iterate<(A, B)>: map with 2 args, unzip
   ## TODO(marcelgarus): for Iterate<Iterate<T>>: flatten
-  ## TODO(marcelgarus): for Iterate<Number>: average, sum, min, max
+  ## TODO(marcelgarus): for Iterate<Number>: average, min, max
+  fun sumBy(selector: (Item) -> Int): Int { this.map[Int](selector).sum() }
 
   fun join(separator: String): String {
     this.withIndex().foldLeft[String]("", { result, indexAndItem ->
@@ -266,15 +267,6 @@ public trait Iterate[Item] {
     })
   }
 
-  ## fun unsafeToMap<K: Equals & Hash, V>(): Map<K, V> {
-  ##   # Collects all items into a map. Crashes if `this` is not an `Iterate<(K, V)>`.
-  ## 
-  ##   let result = MutableMap.empty<K, V>()
-  ##   for item in cast<(K, V)>() {
-  ##     result.set(item.first, item.second)
-  ##   }
-  ##   result
-  ## }
   ## fun unsafeToSet<T: Equals & Hash>(): Set<T> {
   ##   # Collects all items into a set. Crashes if items don't implement `Equals & Hash`.
   ## 
@@ -284,6 +276,9 @@ public trait Iterate[Item] {
   ## }
 }
 
+impl Iterate[Int] {
+  fun sum(): Int { this.foldLeft[Int](0, { result, item -> result + item }) }
+}
 impl[Item] Iterate[Maybe[Item]] {
   fun whereSome(): Iterate[Item] { this.where({ it.isSome() }).unwrapAll() }
   fun unwrapAll(): Iterate[Item] { this.map[Item]({ it.unwrap() }) }
@@ -311,6 +306,16 @@ impl[Item] Iterate[Item]: InfixPlus[Item, Iterate[Item]] {
 }
 impl[Item] Iterate[Item]: InfixPlus[Iterate[Item], Iterate[Item]] {
   fun add(other: Iterate[Item]): Iterate[Item] { FollowedByIterate[Item](this, other) }
+}
+
+impl[Key: Equals & Hash, Value] Iterate[(Key, Value)] {
+  fun toMap(): Map[Key, Value] {
+    # Collects all items into a map.
+
+    this.foldLeft[Map[Key, Value]](Map[Key, Value].empty(), { result, item ->
+      result.set(item.first, item.second)
+    })
+  }
 }
 
 type MappedIterate[In, Out] = (parent: Iterate<In>, mapper: (Int, In) -> Out, index: Int = 0)

@@ -1,0 +1,32 @@
+use ....Int
+use ....Maybe
+use ....Hash
+use ...Iterate
+use ...List
+use ..
+
+public type LinkedHashMap[Key: Equals & Hash, Value] = List[(Key, Value)]
+# An inefficient "mini-map" (it's typically pretty small).
+
+class LinkedHashMap[Key: Equals & Hash, Value] {
+  static fun empty(): LinkedHashMap[Key, Value] {
+    LinkedHashMap[Key, Value](List.empty[(Key, Value)]())
+  }
+
+  fun entryForKey(key: Key): Maybe[(Key, Value)] { this.value.singleWhere({ it.key == key }) }
+}
+impl[Key: Equals & Hash, Value] LinkedHashMap[Key, Value]: Map[Key, Value] {
+  fun length(): Int { this.value.length() }
+
+  fun get(key: Key): Maybe[Value] { this.entryForKey(key).map[Value]({ it.value }) }
+
+  fun set(key: Key, value: Value): Map[Key, Value] {
+    LinkedHashMap[Key, Value](this.values.whereNot({ it.key == key }).toList() + (key, value))
+  }
+
+  fun remove(key: Key): Map[Key, Value] {
+    LinkedHashMap[Key, Value](this.values.whereNot({ it.key == key }).toList())
+  }
+
+  fun entries(): Iterate[(Key, Value)] { this.value }
+}

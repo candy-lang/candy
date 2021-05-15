@@ -1,0 +1,42 @@
+use ....Bool
+use ....Hash
+use ....Maybe
+use ....Numbers
+use ....Operators
+use ...Iterate
+use ...List
+use ..
+
+## TODO(marcelgarus): Make the `BucketMap` implementation way more efficient.
+## TODO(marcelgarus): Typealias Bucket as LinkedHashMap.
+
+public type BucketMap[Key: Equals & Hash, Value] = List[LinkedHashMap[Key, Value]]
+public impl[Key: Equals & Hash, Value] BucketMap[Key, Value] {
+  static fun empty(): BucketMap[Key, Value] {
+    BucketMap[Key, Value](
+      List[LinkedHashMap[Key, Value]].filled(8, LinkedHashMap.empty[Key, Value]()),
+    )
+  }
+}
+impl[Key: Equals & Hash, Value] BucketMap[Key, Value]: Map[Key, Value] {
+  fun length(): Int { this.value.sumBy({ it.length() }) }
+
+  fun get(key: Key): Maybe[Value] { this.bucketByKey(key).get(key) }
+
+  fun set(key: Key, value: Value): Map[Key, Value] {
+    BucketMap[Key, Value](this.value.update(this.bucketIndexByKey(key), { it.set(key, value) }))
+  }
+
+  fun remove(key: Key): (Map[Key, Value], Maybe[Value]) {
+    BucketMap[Key, Value](this.value.update(this.bucketIndexByKey(key), { it.remove(key, value) }))
+  }
+
+  fun entries(): Iterate[(Key, Value)] { this.value.expand[(Key, Value)]({ it.entries() }) }
+}
+
+impl[Key: Equals & Hash, Value] BucketMap[Key, Value] {
+  fun bucketByKey(key: Key): LinkedHashMap[Key, Value] {
+    this.value.get(this.bucketIndexByKey(key))
+  }
+  fun bucketIndexByKey(key: Key): Int { key.hashCode() % this.value.length() }
+}

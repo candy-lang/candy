@@ -8,6 +8,9 @@ use ..Iterate
 public use .Array
 
 public trait List[Item]: Iterate[Item] {
+  public static fun filled(length: Int /* UInt */, item: Item): List[Item] {
+    Array[Item].filled(length, item)
+  }
   public static fun generate(length: Int, generator: (Int) -> Item): List[Item] {
     Array[Item].generate(length, generator)
   }
@@ -31,14 +34,14 @@ public trait List[Item]: Iterate[Item] {
     })
   }
 
-  fun update(index: Int, updater: (Item) -> Item) {
+  fun update(index: Int, updater: (Item) -> Item): List[Item] {
     List[Item].generate(this.length(), {
       this.get(index).unwrap().map[Item]({ item ->
         if(it == index, { updater(item) }).else({ item })
       })
     })
   }
-  fun updateAll(updater: (Item) -> Item) {
+  fun updateAll(updater: (Item) -> Item): List[Item] {
     List[Item].generate(this.length(), { updater(this.get(index).unwrap()) })
   }
 
