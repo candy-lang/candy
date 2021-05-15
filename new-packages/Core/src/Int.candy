@@ -1,5 +1,4 @@
-## use ..hash
-## use ..numbers
+use ..Hash
 ## use ..operators
 ## use ..primitives
 ## use ..random
@@ -14,9 +13,9 @@ public builtin type Int
 ## builtin impl Int: Equals & Comparable
 ## builtin impl Int: Add & Subtract & Negate & Multiply & DivideTruncating & Modulo
 
-## impl Int: Hash {
-##   fun hash<Result>(hasher: Hasher<Result>) { hasher.write(this) }
-## }
+impl Int: Hash {
+  fun hash[Result](hasher: Hasher[Result]): Hasher[Result] { hasher.write(this) }
+}
 ## impl Int {
 ##   fun times(action: (Int) => Unit) {
 ##     mut let index = 0
