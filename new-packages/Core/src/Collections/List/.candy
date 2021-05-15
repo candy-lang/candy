@@ -84,7 +84,7 @@ public trait List[Item]: Iterate[Item] {
     List[Item].generate(end - start, { this.get(start + it).unwrap() })
   }
 
-  fun reversed(): List[Item] {
+  fun reverse(): List[Item] {
     ## TODO(JonasWanke): make this more efficient by creating a view of the original list
     List[Item].generate(this.length(), { this.get(this.length() - it - 1).unwrap() })
   }

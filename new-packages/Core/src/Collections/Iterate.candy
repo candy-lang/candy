@@ -202,18 +202,14 @@ public trait Iterate[Item] {
     ExpandIterate[Item, Out](this, expander)
   }
 
-  ## TODO(JonasWanke): readd this
-  ## fun groupBy[T: Hash & Equals](keyOf: (Item) -> T): Map[T, List[Item]] {
-  ##   let map = MutableMap.empty<T, MutableList[Item]>()
-  ##   for item in this {
-  ##     map
-  ##       .putIfAbsent(keyOf(item), { MutableList.empty[Item]() })
-  ##       .append(item)
-  ##   }
-  ##   (map as Map[T, List[Item]])
-  ## }
+  fun groupBy[Key: Hash & Equals](keyOf: (Item) -> Key): Map[Key, List[Item]] {
+    this.foldLeft[Map[Key, List[Item]]](Map[Key, List[Item]].empty(), { result, item ->
+      let key = keyOf(item)
+      result.putIfAbsent(key, { List[Item].empty() }).update(key, { it + item })
+    })
+  }
 
-  ## TODO(marcelgarus): reversed
+  fun reverse(): Iterate[Item] { this.toList().reverse() }
 
   fun zip[Other](other: Iterate[Other]): Iterate[(Item, Other)] {
     ZipIterate[Item, Other](this, other)
