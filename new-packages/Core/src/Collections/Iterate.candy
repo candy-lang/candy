@@ -234,21 +234,9 @@ public trait Iterate[Item] {
 
   ## Conversions.
 
-  ## TODO(JonasWanke): readd these
   fun toList(): List[Item] {
     this.foldLeft[List[Item]](List[Item].empty(), { result, item -> result + item })
   }
-
-  ## fun toSet(): Set[Item] { toMutableSet() }
-  ## fun toMutableSet(): MutableSet[Item] {
-  ##   let iter = iterator()
-  ##   let set = MutableSet.empty[Item]()
-  ##   do({
-  ##     set.insert(it)
-  ##     unit
-  ##   })
-  ##   set
-  ## }
 
   ## Extras:
 
@@ -266,14 +254,6 @@ public trait Iterate[Item] {
       })
     })
   }
-
-  ## fun unsafeToSet<T: Equals & Hash>(): Set<T> {
-  ##   # Collects all items into a set. Crashes if items don't implement `Equals & Hash`.
-  ## 
-  ##   let result = MutableSet.empty<T>()
-  ##   for item in cast<T>() { result.insert(item) }
-  ##   result
-  ## }
 }
 
 impl Iterate[Int] {
@@ -306,16 +286,6 @@ impl[Item] Iterate[Item]: InfixPlus[Item, Iterate[Item]] {
 }
 impl[Item] Iterate[Item]: InfixPlus[Iterate[Item], Iterate[Item]] {
   fun add(other: Iterate[Item]): Iterate[Item] { FollowedByIterate[Item](this, other) }
-}
-
-impl[Key: Equals & Hash, Value] Iterate[(Key, Value)] {
-  fun toMap(): Map[Key, Value] {
-    # Collects all items into a map.
-
-    this.foldLeft[Map[Key, Value]](Map[Key, Value].empty(), { result, item ->
-      result.set(item.first, item.second)
-    })
-  }
 }
 
 type MappedIterate[In, Out] = (parent: Iterate<In>, mapper: (Int, In) -> Out, index: Int = 0)

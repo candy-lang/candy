@@ -105,10 +105,10 @@ public trait List[Item]: Iterate[Item] {
 }
 
 impl[Item] List[Item]: InfixPlus[Item, List[Item]] {
-  fun add(other: Item): List[Item] { this.add(List[Item].of(other)) }
+  fun infixPlus(other: Item): List[Item] { this + List[Item].of(other) }
 }
 impl[Item] List[Item]: InfixPlus[List[Item], List[Item]] {
-  fun add(other: List[Item]): List[Item] {
+  fun infixPlus(other: List[Item]): List[Item] {
     Array[item].generate(this.length() + other.length(), {
       if(it < this.length(), { this.get(it) }).else({ other.get(it - this.length()) }).unwrap()
     })
