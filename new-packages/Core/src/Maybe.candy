@@ -13,7 +13,7 @@ impl[T] Maybe[T] {
   public fun else(alternative: () -> T): T {
     this.match[T](some = { it }, none = alternative)
   }
-  public fun orElse(alternative: () -> Maybe[T]): Maybe[T] {
+  public fun else(alternative: () -> Maybe[T]): Maybe[T] {
     this.match[Maybe[T]](some = { Maybe[T].Some(it) }, none = alternative)
   }
 
