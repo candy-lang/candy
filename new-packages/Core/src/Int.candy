@@ -1,27 +1,17 @@
 use ..Hash
-## use ..operators
-## use ..primitives
-## use ..random
-## use ..string
+use ..Operators
+use ..Primitives
+use ..String
 
 public builtin type Int
 
-## builtin impl Int {
-##   static fun parse(value: String): Int
-## }
+impl Int {
+  public static builtin fun parse(value: String): Int
+}
 
-## builtin impl Int: Equals & Comparable
-## builtin impl Int: Add & Subtract & Negate & Multiply & DivideTruncating & Modulo
+builtin impl Int: Equals & Comparable
+builtin impl Int: Add & Subtract & Negate & Multiply & DivideTruncating & Modulo
 
 impl Int: Hash {
   fun hash[Result](hasher: Hasher[Result]): Hasher[Result] { hasher.write(this) }
 }
-## impl Int {
-##   fun times(action: (Int) => Unit) {
-##     mut let index = 0
-##     while index < this {
-##       action(index)
-##       index = index + 1
-##     }
-##   }
-## }

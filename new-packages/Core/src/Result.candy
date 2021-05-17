@@ -1,0 +1,21 @@
+use ..Panic
+
+public type Result[Success, ErrorType] =
+  # The result of an operation that might fail.
+  #
+  # The following cases exist:
+  # * In the success case, a `Result Ok` is returned, containing the returned value.
+  # * In the error case, a `Result Error` is returned, containing an error describing what went wrong.
+  | Ok Success
+    # The result of an operation that succeeded.
+  | Error ErrorType
+    # The result of an operation that failed.
+
+impl[Success, ErrorType] Result[Success, ErrorType] {
+  public fun unwrap(): Success {
+    this.match[Success](
+      ok = { it },
+      error = { panic("Unwrapped `Result Error`: {it}.")},
+    )
+  }
+}
