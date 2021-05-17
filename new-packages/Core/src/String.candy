@@ -2,6 +2,7 @@ use ..Bool
 use ..Collections
 use ..Hash
 use ..Int
+use ..Mutable
 use ..Operators
 
 public builtin type String
@@ -29,4 +30,31 @@ impl String: Hash {
 
 impl String: InfixPlus[This, This] {
   builtin fun infixPlus(other: This): This
+}
+
+
+impl String {
+  public static fun build(builder: (StringBuilder) -> Nothing): String {
+    # An easy way to construct more complex `String`s from multiple parts.
+    #
+    # Example:
+    #
+    # ```
+    # let myString = String.build({
+    #   it.add("foo")
+    #   if(someBool, { it.add("bar") })
+    #   5.times({ it.add("baz") })
+    # })
+    # ```
+    let theBuilder = StringBuilder(Mutable[String](""))
+    builder(theBuilder)
+    theBuilder.build()
+  }
+}
+public type StringBuilder = Mutable[String]
+impl StringBuilder {
+  public fun add(value: String) {
+    this.value.set(this.value.get() + value)
+  }
+  public fun build(): String { this.value.get() }
 }
