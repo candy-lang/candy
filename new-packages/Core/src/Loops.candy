@@ -6,9 +6,9 @@ public builtin fun loop(body: () -> Nothing): Never
 ## TODO(marcelgarus): Implement this in pure Candy once we have tail-call elimination.
 
 impl Int {
-  public fun times(body: (Int) -> Nothing) {
+  public fun times(body: () -> Nothing) {
     # Executes the `body` `this` many times.
 
-    0.until(this).do(action)
+    0.until(this).do({ body() })
   }
 }
