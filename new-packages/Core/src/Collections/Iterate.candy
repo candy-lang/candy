@@ -1,6 +1,6 @@
 use ...Assert
 use ...Bool
-use ...hash
+use ...Hash
 use ...Int
 use ...Operators
 use ...Maybe
@@ -29,11 +29,11 @@ public trait Iterate[Item] {
     this.firstWhereIndexed({ i, item -> i == index })
   }
 
-  fun first(): Maybe[Item] { get(0) }
-  fun second(): Maybe[Item] { get(1) }
-  fun third(): Maybe[Item] { get(2) }
-  fun fourth(): Maybe[Item] { get(3) }
-  fun fifth(): Maybe[Item] { get(4) }
+  fun first(): Maybe[Item] { this.get(0) }
+  fun second(): Maybe[Item] { this.get(1) }
+  fun third(): Maybe[Item] { this.get(2) }
+  fun fourth(): Maybe[Item] { this.get(3) }
+  fun fifth(): Maybe[Item] { this.get(4) }
 
   fun nthLast(index: Int): Maybe[Item] {
     assert(index >= 0, "Can't access a negative index in an `Iterate`.")
@@ -43,11 +43,11 @@ public trait Iterate[Item] {
     list.get(list.length() - index - 1)
   }
 
-  fun last(): Maybe[Item] { nthLast(0) }
-  fun secondLast(): Maybe[Item] { nthLast(1) }
-  fun thirdLast(): Maybe[Item] { nthLast(2) }
-  fun fourthLast(): Maybe[Item] { nthLast(3) }
-  fun fifthLast(): Maybe[Item] { nthLast(4) }
+  fun last(): Maybe[Item] { this.nthLast(0) }
+  fun secondLast(): Maybe[Item] { this.nthLast(1) }
+  fun thirdLast(): Maybe[Item] { this.nthLast(2) }
+  fun fourthLast(): Maybe[Item] { this.nthLast(3) }
+  fun fifthLast(): Maybe[Item] { this.nthLast(4) }
 
   fun single(): Maybe[Item] {
     this.iterate().flatMap({
@@ -98,7 +98,7 @@ public trait Iterate[Item] {
     })
   }
   fun sumBy(selector: (Item) -> Int): Int { this.map[Int](selector).sum() }
-  ## TODO(JonasWanke): sumBy, averageBy
+  ## TODO(JonasWanke): averageBy
 
   ## Filtering.
 
@@ -137,7 +137,7 @@ public trait Iterate[Item] {
   fun where(checker: (Item) -> Bool): Iterate[Item] {
     ## TODO(marcelgarus): As soon as implicit casts are available, maybe make the `checker` return a
     ##   `WhereResult`, which can be either `Keep` or `Drop`?
-    this.whereWithState[Nothing](unit, { item, _ -> Tuple(checker(item), unit) })
+    this.whereWithState[Nothing](nothing, { item, _ -> Tuple(checker(item), unit) })
   }
   fun whereWithState[State](
     initialState: State,
@@ -217,16 +217,7 @@ public trait Iterate[Item] {
 
   ## Action.
 
-  fun do(action: (Item) -> Nothing) {
-    let initialResult = this.iterate().else({ return })
-    action(initialResult.first)
-    let iterate = Mutable[Iterate[Item]](initialResult.second)
-    loop({
-      let result = iterate.iterate().else({ return })
-      action(result.first)
-      iterate.set(result.second)
-    })
-  }
+  fun do(action: (Item) -> Nothing) { this.map[Nothing](action) }
 
   ## Conversions.
 
@@ -263,7 +254,7 @@ impl[Item: Equals] Iterate[Item]: Equals {
   fun equals(other: Iterate[Item]): Bool {
     # Checks if this `Iterate` is equal to the `other` one.
 
-    this.length() == other.length() && this.zip[Item](other).all({ it.first == it.second })
+    this.length() == other.length() & this.zip[Item](other).all({ it.first == it.second })
   }
 
   fun contains(item: Item): Bool { this.any({ it == item }) }
@@ -283,7 +274,7 @@ impl[Item] Iterate[Item]: InfixPlus[Iterate[Item], Iterate[Item]] {
   fun add(other: Iterate[Item]): Iterate[Item] { FollowedByIterate[Item](this, other) }
 }
 
-type MappedIterate[In, Out] = (parent: Iterate<In>, mapper: (Int, In) -> Out, index: Int = 0)
+type MappedIterate[In, Out] = (parent: Iterate[In], mapper: (Int, In) -> Out, index: Int = 0)
 impl[In, Out] MappedIterate[In, Out]: Iterate[Out] {
   fun iterate(): Maybe[(Out, Iterate[Out])] {
     this.parent.iterate().map[(Out, Iterate[Out])]({

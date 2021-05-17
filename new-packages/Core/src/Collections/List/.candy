@@ -35,8 +35,9 @@ public trait List[Item]: Iterate[Item] {
 
     if(index > this.length(), { return this })
     List[Item].generate(this.length() + 1, {
-      if(it < index, { this.get(index).unwrap()})
-        .else({ if(it == index, { item }).else({ this.get(it - 1) }) })
+      if(it < index, { this.get(index).unwrap()}).else({
+        if(it == index, { item }).else({ this.get(it - 1) })
+      })
     })
   }
 
@@ -62,17 +63,17 @@ public trait List[Item]: Iterate[Item] {
     })
   }
 
-  fun removeFirst(): List[Item] { removeAt(0) }
-  fun removeSecond(): List[Item] { removeAt(1) }
-  fun removeThird(): List[Item] { removeAt(2) }
-  fun removeFourth(): List[Item] { removeAt(3) }
-  fun removeFifth(): List[Item] { removeAt(4) }
+  fun removeFirst(): List[Item] { this.removeAt(0) }
+  fun removeSecond(): List[Item] { this.removeAt(1) }
+  fun removeThird(): List[Item] { this.removeAt(2) }
+  fun removeFourth(): List[Item] { this.removeAt(3) }
+  fun removeFifth(): List[Item] { this.removeAt(4) }
 
-  fun removeLast(): List[Item] { removeAt(length() - 1) }
-  fun removeSecondLast(): List[Item] { removeAt(length() - 2) }
-  fun removeThirdLast(): List[Item] { removeAt(length() - 3) }
-  fun removeFourthLast(): List[Item] { removeAt(length() - 4) }
-  fun removeFifthLast(): List[Item] { removeAt(length() - 5) }
+  fun removeLast(): List[Item] { this.removeAt(length() - 1) }
+  fun removeSecondLast(): List[Item] { this.removeAt(length() - 2) }
+  fun removeThirdLast(): List[Item] { this.removeAt(length() - 3) }
+  fun removeFourthLast(): List[Item] { this.removeAt(length() - 4) }
+  fun removeFifthLast(): List[Item] { this.removeAt(length() - 5) }
 
   fun removeFirstWhere(checker: (Item) -> Bool): List[Item] {
     this.firstIndexWhere(checker)
