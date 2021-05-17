@@ -60,11 +60,14 @@ impl Path {
 
   public builtin fun isAbsolute(): Bool
   public builtin fun parent(): Maybe[Path]
-  public builtin fun child(name: String): Path
   public builtin fun baseName(): String
   public builtin fun baseNameWithoutExtension(): String
-
-  public builtin fun append(other: Path): Path
+}
+impl Path: InfixSlash[String, Path] {
+  builtin fun infixSlash(other: String): Path
+}
+impl Path: InfixSlash[Path, Path] {
+  builtin fun infixSlash(other: Path): Path
 }
 impl Path: Equals {
   fun equals(other: Path): Bool { this.value == other.value }
