@@ -30,7 +30,7 @@ impl DefaultHasher: Hasher[Int] {
     ## TODO(marcelgarus): Make this better. By a lot.
     DefaultHasher((this.entropy + value) % 100)
   }
-  fun writeList(value: List[Int]): Hasher[Int] {
+  fun write(value: List[Int]): Hasher[Int] {
     value.foldLeft[Hasher[Int]](this, { result, item -> result.write(item) })
   }
 
