@@ -97,6 +97,7 @@ public trait Iterate[Item] {
       if(selector(result) >= selector(item), { result }).else({ item })
     })
   }
+  fun sumBy(selector: (Item) -> Int): Int { this.map[Int](selector).sum() }
   ## TODO(JonasWanke): sumBy, averageBy
 
   ## Filtering.
@@ -191,7 +192,6 @@ public trait Iterate[Item] {
   ## Conversion transformations.
   ## These do more complicated stuff.
 
-  ## TODO(marcelgarus): Decide on whether to name this `flatMap`.
   fun maybeMap[Out](maybeMapper: (Item) -> Maybe[Out]): Iterate[Out] {
     this.map[Maybe[Out]](maybeMapper).whereSome()
   }
@@ -239,7 +239,6 @@ public trait Iterate[Item] {
   ## TODO(marcelgarus): for Iterate<(A, B)>: map with 2 args, unzip
   ## TODO(marcelgarus): for Iterate<Iterate<T>>: flatten
   ## TODO(marcelgarus): for Iterate<Number>: average, min, max
-  fun sumBy(selector: (Item) -> Int): Int { this.map[Int](selector).sum() }
 
   fun join(separator: String): String {
     this.withIndex().foldLeft[String]("", { result, indexAndItem ->

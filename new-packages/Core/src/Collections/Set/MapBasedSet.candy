@@ -20,7 +20,6 @@ impl[Item: Equals & Hash] MapBasedSet[Item]: Set[Item] {
   fun contains(item: Item): Bool { this.value.containsKey(item) }
 
   fun items(): Iterate[Item] { this.value.keys() }
-}
-impl[Item: Equals & Hash] MapBasedSet[Item]: InfixPlus[Item, Set[Item]] {
-  fun infixPlus(other: Item): Set[Item] { MapBasedSet[Item](this.value.set(other, nothing)) }
+
+  fun add(item: Item): Set[Item] { MapBasedSet[Item](this.value.set(other, nothing)) }
 }
