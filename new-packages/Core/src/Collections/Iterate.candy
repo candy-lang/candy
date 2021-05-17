@@ -25,6 +25,15 @@ public trait Iterate[Item] {
     assert(index >= 0, "`index` is negative: {index}")
     assert(index < this.length(), "`index` is too large: {index}, length: {this.length()}")
 
+    let remaining = Mutable[Iterate[(Int, Item)]](this.withIndex())
+    loop({
+      remaining.get().iterate()
+        .map({
+          if(it.first.first == index, { return Maybe[Item].Some(it.first.second) })
+          remaining.set(it.second)
+        })
+        .else({ return Maybe[Item].None() })
+    })
     this.firstWhereIndexed({ i, item -> i == index })
   }
 
