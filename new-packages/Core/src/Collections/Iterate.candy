@@ -34,7 +34,6 @@ public trait Iterate[Item] {
         })
         .else({ return Maybe[Item].None() })
     })
-    this.firstWhereIndexed({ i, item -> i == index })
   }
 
   fun first(): Maybe[Item] { this.get(0) }
