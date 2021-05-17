@@ -22,11 +22,17 @@ public trait List[Item]: Iterate[Item] {
   }
 
   fun set(index: Int, item: Item): List[Item] {
+    assert(index >= 0, "`index` is negative: {index}")
+    assert(index < this.length(), "`index` is too large: {index}, length: {this.length()}")
+
     List[Item].generate(this.length(), {
       if(it == index, { item }).else({ this.get(it).unwrap() })
     })
   }
   fun insert(index: Int, item: Item): List[Item] {
+    assert(index >= 0, "`index` is negative: {index}")
+    assert(index <= this.length(), "`index` is too large: {index}, length: {this.length()}")
+
     if(index > this.length(), { return this })
     List[Item].generate(this.length() + 1, {
       if(it < index, { this.get(index).unwrap()})
@@ -35,6 +41,9 @@ public trait List[Item]: Iterate[Item] {
   }
 
   fun update(index: Int, updater: (Item) -> Item): List[Item] {
+    assert(index >= 0, "`index` is negative: {index}")
+    assert(index < this.length(), "`index` is too large: {index}, length: {this.length()}")
+
     List[Item].generate(this.length(), {
       this.get(index).unwrap().map[Item]({ item ->
         if(it == index, { updater(item) }).else({ item })
@@ -46,12 +55,11 @@ public trait List[Item]: Iterate[Item] {
   }
 
   fun removeAt(index: Int): List[Item] {
-    if(index < 0 | index >= this.length(), {
-      this
-    }).else({
-      List[Item].generate(this.length() - 1, {
-        if(it < index, { this.get(it) }).else({ this.get(it + 1) }).unwrap()
-      })
+    assert(index >= 0, "`index` is negative: {index}")
+    assert(index < this.length(), "`index` is too large: {index}, length: {this.length()}")
+
+    List[Item].generate(this.length() - 1, {
+      if(it < index, { this.get(it) }).else({ this.get(it + 1) }).unwrap()
     })
   }
 
@@ -76,9 +84,9 @@ public trait List[Item]: Iterate[Item] {
   fun subList(start: Int = 0, end: Int = this.length()): List[Item] {
     ## TODO(JonasWanke): accept a range when we add those.
     assert(0 <= start, "`start` must be non-negative.")
-    assert(start < this.length(), "`start` must be inside this list.")
+    assert(start < this.length(), "start is too large: {index}, length: {this.length()}")
     assert(0 <= end, "`end` must be non-negative.")
-    assert(end <= this.length(), "`end` must be inside this list.")
+    assert(end <= this.length(), "`end` is too large: {index}, length: {this.length()}")
     assert(start <= end, "`end` must be larger or equal to `start`.")
 
     List[Item].generate(end - start, { this.get(start + it).unwrap() })

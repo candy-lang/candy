@@ -23,7 +23,8 @@ public trait Iterate[Item] {
 
   fun get(index: Int /* UInt */): Maybe[Item] {
     # Returns the [index]th element.
-    assert(index >= 0, "Can't access a negative index in an `Iterate`.")
+    assert(index >= 0, "`index` is negative: {index}")
+    assert(index < this.length(), "`index` is too large: {index}, length: {this.length()}")
 
     this.iterate().map[Item]({
       if(index == 0, {
@@ -41,7 +42,9 @@ public trait Iterate[Item] {
   fun fifth(): Maybe[Item] { get(4) }
 
   fun nthLast(index: Int): Maybe[Item] {
+    assert(index >= 0, "Can't access a negative index in an `Iterate`.")
     ## TODO(marcelgarus): Make this way more efficient.
+
     let list = this.toList()
     list.get(list.length() - index - 1)
   }
@@ -105,6 +108,9 @@ public trait Iterate[Item] {
   ## Filtering.
 
   fun firstWhere(checker: (Item) -> Bool): Maybe[Item] { this.where(checker).first() }
+  fun firstWhereIndexed(checker: (Int, Item) -> Bool): Maybe[Item] {
+    this.withIndex().firstWhere({ checker(it.first, it.second) })
+  }
   fun firstIndexWhere(checker: (Item) -> Bool): Maybe[Int] {
     this.withIndex().firstWhere({ checker(it.second) }).map[Int]({ it.first })
   }
