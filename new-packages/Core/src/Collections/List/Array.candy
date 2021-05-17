@@ -51,3 +51,33 @@ impl[Item] ArrayIterate[Item]: Iterate[Item] {
     })
   }
 }
+
+
+impl List[Item] {
+  public static fun build(builder: (ListBuilder[Item]) -> Nothing): List[Item] {
+    # An easy way to construct more complex `List[Item]`s from multiple parts.
+    #
+    # Example:
+    #
+    # ```
+    # let myList = List[Int].build({
+    #   it.add(4)
+    #   if(someBool, { it.add(10) })
+    #   5.times({ it.add(5) })
+    # })
+    # ```
+
+    let theBuilder = ListBuilder[Item](Mutable[LinkedList[Item]](""))
+    builder(theBuilder)
+    theBuilder.build()
+  }
+}
+public type ListBuilder[Item] = Mutable[LinkedList[Item]]
+impl ListBuilder[Item] {
+  public fun add(item: List[Item]) {
+    this.value.set(LinkedList[Item](Maybe[(Item, LinkedList[Item])].Some((item, this.value.get()))))
+  }
+  public fun addAll(items: Iterate[Item]) { items.do({ this.add(it) }) }
+
+  public fun build(): List[Item] { this.value.get().reverse().toArray() }
+}
