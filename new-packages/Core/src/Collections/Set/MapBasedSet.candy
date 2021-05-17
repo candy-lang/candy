@@ -1,0 +1,25 @@
+use ....Bool
+use ....Hash
+use ....Int
+use ....Operators
+use ....Primitives
+use ...Iterate
+use ...Map
+use ...Set
+
+public type MapBasedSet[Item: Equals & Hash] = Map[Item, Nothing]
+
+impl[Item: Equals & Hash] MapBasedSet[Item] {
+  public static fun empty(): MapBasedSet[Item] {
+    MapBasedSet[Item](Map[Item, Nothing].empty())
+  }
+}
+impl[Item: Equals & Hash] MapBasedSet[Item]: Set[Item] {
+  fun length(): Int { this.value.length() }
+
+  fun contains(item: Item): Bool { this.value.containsKey(item) }
+
+  fun items(): Iterate[Item] { this.value.keys() }
+
+  fun add(item: Item): Set[Item] { MapBasedSet[Item](this.value.set(other, nothing)) }
+}

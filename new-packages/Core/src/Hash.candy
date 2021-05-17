@@ -1,0 +1,38 @@
+use ..Collections
+use ..Int
+
+public trait Hash {
+  # Implemented by types that can be hashed.
+
+  fun hash[Result](hasher: Hasher[Result]): Hasher[Result]
+
+  fun hashCode(): Int { Hasher.default().write(this).finish() }
+}
+
+trait Hasher[Result] {
+  # A trait for hashing an arbitrary stream of bytes.
+
+  static fun default(): Hasher[Int] { DefaultHasher(0) }
+
+  fun write(value: Int /* UInt8 */): Hasher[Result]
+  fun write(value: List[Int] /* List[UInt8] */): Hasher[Result]
+
+  fun write(value: Hash): Hasher[Result] {
+    value.hash[Result](this)
+  }
+
+  fun finish(): Result
+}
+
+type DefaultHasher = (entropy: Int = 0)
+impl DefaultHasher: Hasher[Int] {
+  fun write(value: Int): Hasher[Int] {
+    ## TODO(marcelgarus): Make this better. By a lot.
+    DefaultHasher((this.entropy + value) % 100)
+  }
+  fun write(value: List[Int]): Hasher[Int] {
+    value.foldLeft[Hasher[Int]](this, { result, item -> result.write(item) })
+  }
+
+  fun finish(): Int { this.entropy }
+}

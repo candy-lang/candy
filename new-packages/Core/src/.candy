@@ -1,5 +1,7 @@
 public use .Assert
 public use .Bool
+public use .Collections
+public use .Hash
 public use .Int
 public use .Io
 public use .Loops
