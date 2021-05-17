@@ -15,7 +15,7 @@ impl[Success, ErrorType] Result[Success, ErrorType] {
   public fun unwrap(): Success {
     this.match[Success](
       ok = { it },
-      error = { panic("Unwrapped `Result Error`: {it}.")}
+      error = { panic("Unwrapped `Result Error`: {it}.")},
     )
   }
 }

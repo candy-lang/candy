@@ -16,7 +16,11 @@ public trait FileSystemNode: Equals & Hash {
 }
 
 public type Directory = Path
-builtin impl Directory: FileSystemNode
+impl Directory: FileSystemNode {
+  builtin fun path(): Path
+  builtin fun doesExist(): Bool
+  builtin fun create(recursive: Bool = true())
+}
 impl Directory {
   public builtin fun delete(recursive: Bool = true())
 
@@ -30,7 +34,11 @@ impl Directory: Hash {
 }
 
 public type File = Path
-builtin impl File: FileSystemNode
+impl File: FileSystemNode {
+  builtin fun path(): Path
+  builtin fun doesExist(): Bool
+  builtin fun create(recursive: Bool = true())
+}
 impl File {
   public builtin fun read(): String
   public builtin fun write(content: String)

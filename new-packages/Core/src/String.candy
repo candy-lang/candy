@@ -16,7 +16,7 @@ impl String {
   public builtin fun length(): Int
 
   public builtin fun split(pattern: String): List[String]
-  public builtin fun trimmed(): String
+  public builtin fun trim(): String
 }
 
 builtin impl String: Equals & Comparable
@@ -27,4 +27,6 @@ impl String: Hash {
   }
 }
 
-builtin impl String: InfixPlus[This, This]
+impl String: InfixPlus[This, This] {
+  builtin fun infixPlus(other: This): This
+}

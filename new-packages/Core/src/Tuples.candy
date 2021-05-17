@@ -6,5 +6,5 @@
 # parenthesis to create them on-the-fly:
 #
 # ```
-# let a: (String, Int) = ("foo", 42)`
+# let a: (String, Int) = ("foo", 42)
 # ```
