@@ -45,9 +45,8 @@ public trait List[Item]: Iterate[Item] {
     assert(index < this.length(), "`index` is too large: {index}, length: {this.length()}")
 
     List[Item].generate(this.length(), {
-      this.get(index).unwrap().map[Item]({ item ->
-        if(it == index, { updater(item) }).else({ item })
-      })
+      let item = this.get(index).unwrap()
+      if(it == index, { updater(item) }).else({ item })
     })
   }
   fun updateAll(updater: (Item) -> Item): List[Item] {

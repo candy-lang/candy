@@ -26,13 +26,7 @@ public trait Iterate[Item] {
     assert(index >= 0, "`index` is negative: {index}")
     assert(index < this.length(), "`index` is too large: {index}, length: {this.length()}")
 
-    this.iterate().map[Item]({
-      if(index == 0, {
-        it.first
-      }).else({
-        it.second.get(index - 1)
-      })
-    })
+    this.firstWhereIndexed({ i, item -> i == index })
   }
 
   fun first(): Maybe[Item] { get(0) }
