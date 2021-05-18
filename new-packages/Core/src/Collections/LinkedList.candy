@@ -12,7 +12,10 @@ use ..List
 public type LinkedList[Item] = Maybe[(Item, LinkedList[Item])]
 
 impl[Item] LinkedList[Item] {
-  fun toArray(): Array[Item] {
+  public fun prepend(item: Item): LinkedList[Item] {
+    This(Maybe[(Item, LinkedList[Item])].Some((item, this)))
+  }
+  public fun toArray(): Array[Item] {
     let remaining = Mutable[(Int, LinkedList[Item])]((0, this))
     Array[Item].generate(this.length(), { index ->
       let currentlyRemaining = remaining.get()
@@ -29,7 +32,9 @@ impl[Item] LinkedList[Item] {
   }
 }
 
-impl[Item] LinkedList[Item]: List[Item]
+impl[Item] LinkedList[Item]: List[Item] {
+  static fun empty(): LinkedList[Item] { This(Maybe[(Item, LinkedList[Item])].None()) }
+}
 impl[Item] LinkedList[Item]: Iterate[Item] {
   fun iterate(): Maybe[(Item, Iterate[Item])] {
     ## TODO(JonasWanke): Remove the `map` call when we support variance.
@@ -39,7 +44,7 @@ impl[Item] LinkedList[Item]: Iterate[Item] {
   fun reverse(): LinkedList[Item] {
     this.foldLeft[Maybe[(Item, LinkedList[Item])]](
       Maybe[(Item, LinkedList[Item])].None(),
-      { result, item -> Maybe[(Item, LinkedList[Item])].Some((item, result)) },
+      { result, item -> result.prepend(item) },
     )
   }
 }
