@@ -55,7 +55,7 @@ impl[Item] ArrayIterate[Item]: Iterate[Item] {
 
 impl List[Item] {
   public static fun build(builder: (ListBuilder[Item]) -> Nothing): List[Item] {
-    # An easy way to construct more complex `List[Item]`s from multiple parts.
+    # An easy way to construct more complex `List[Item]`s from multiple elements.
     #
     # Example:
     #
@@ -67,7 +67,7 @@ impl List[Item] {
     # })
     # ```
 
-    let theBuilder = ListBuilder[Item](Mutable[LinkedList[Item]](""))
+    let theBuilder = ListBuilder[Item](Mutable[LinkedList[Item]](LinkedList[Item].empty()))
     builder(theBuilder)
     theBuilder.build()
   }
