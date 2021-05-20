@@ -10,18 +10,9 @@ public builtin type Int
 ##   static fun parse(value: String): Int
 ## }
 
-## builtin impl Int: Equals & Comparable
+## builtin impl Int: Equals & Compare
 ## builtin impl Int: Add & Subtract & Negate & Multiply & DivideTruncating & Modulo
 
 impl Int: Hash {
-  fun hash[Result](hasher: Hasher[Result]): Hasher[Result] { hasher.write(this) }
+  fun hash[H: Hasher](): H { H.primitive(this) }
 }
-## impl Int {
-##   fun times(action: (Int) => Unit) {
-##     mut let index = 0
-##     while index < this {
-##       action(index)
-##       index = index + 1
-##     }
-##   }
-## }

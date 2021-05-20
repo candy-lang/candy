@@ -1,5 +1,15 @@
+use ..Bool
 use ..Int
+use ..Maybe
 use ..Primitives
+
+impl Bool {
+  public fun then[T](body: () -> T): Maybe[T] { if[T](this, body) }
+}
+
+public fun if[T](condition: Bool, thenBody: () -> T): Maybe[T] {
+  condition.match[Maybe[T]](true = { Maybe[T].Some(thenBody()) }, false = { Maybe[T].None() })
+}
 
 public builtin fun loop(body: () -> Nothing): Never
 # Executes the body infinitely often.

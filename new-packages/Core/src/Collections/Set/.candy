@@ -64,11 +64,10 @@ impl[Item: Equals & Hash] Set[Item]: Equals {
   }
 }
 impl[Item: Equals & Hash] Set[Item]: Hash {
-  fun hash[Result](hasher: Hasher[Result]): Hasher[Result] {
-    this.items().foldLeft[Hasher[Result]](hasher, { result, item -> result.write(item) })
+  fun hash[H: Hasher](): H {
+    H.combine(this.items().map[H]({ item.hash[H]() }))
   }
 }
-
 
 impl[Item: Equals & Hash] Iterate[Item] {
   fun toSet(): Set[Item] { Set[Item].empty().addAll(this) }

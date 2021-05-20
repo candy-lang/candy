@@ -1,40 +1,40 @@
 use ...Bool
-use ..Equality
+use ..Equals
 use ..Raw
 
-public trait Comparable {
+public trait Compare {
   fun compareTo(other: This): Less | Equal | Greater
 }
-impl Comparable: InfixLess[This, Bool] {
+impl Compare: InfixLess[This, Bool] {
   fun infixLess(other: This): Bool {
     this.compareTo(other).match[Bool](less = { true() }, equal = { false() }, greater = { false() })
   }
 }
-impl Comparable: InfixLessEqual[This, Bool] {
+impl Compare: InfixLessEqual[This, Bool] {
   fun infixLessEqual(other: This): Bool {
     this.compareTo(other).match[Bool](less = { true() }, equal = { true() }, greater = { false() })
   }
 }
-impl Comparable: Equals {
+impl Compare: Equals {
   fun equals(other: This): Bool {
     this.compareTo(other).match[Bool](less = { false() }, equal = { true() }, greater = { false() })
   }
 }
-impl Comparable: InfixGreaterEqual[This, Bool] {
+impl Compare: InfixGreaterEqual[This, Bool] {
   fun infixGreaterEqual(other: This): Bool {
     this.compareTo(other).match[Bool](less = { false() }, equal = { true() }, greater = { true() })
   }
 }
-impl Comparable: InfixGreater[This, Bool] {
+impl Compare: InfixGreater[This, Bool] {
   fun infixGreater(other: This): Bool {
     this.compareTo(other).match[Bool](less = { false() }, equal = { false() }, greater = { true() })
   }
 }
 
 ## TODO(marcelgarus): Maybe put these methods on `Iterable`?
-public fun min[T: Comparable](first: T, second: T): T {
+public fun min[T: Compare](first: T, second: T): T {
   if[T](first <= second, { first }).else({ second })
 }
-public fun max[T: Comparable](first: T, second: T): T {
+public fun max[T: Compare](first: T, second: T): T {
   if[T](first >= second, { first }).else({ second })
 }

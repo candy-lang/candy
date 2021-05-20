@@ -94,12 +94,12 @@ public trait Iterate[Item] {
   }
   ## TODO(marcelgarus): reduceRight
 
-  fun minBy[C: Comparable](selector: (Item) -> C): Maybe[Item] {
+  fun minBy[C: Compare](selector: (Item) -> C): Maybe[Item] {
     this.reduceLeft[Item]({ result, item ->
       if(selector(result) <= selector(item), { result }).else({ item })
     })
   }
-  fun maxBy[C: Comparable](selector: (Item) -> C): Maybe[Item] {
+  fun maxBy[C: Compare](selector: (Item) -> C): Maybe[Item] {
     this.reduceLeft[Item]({ result, item ->
       if(selector(result) >= selector(item), { result }).else({ item })
     })
@@ -267,16 +267,9 @@ impl[Item: Equals] Iterate[Item]: Equals {
   fun contains(item: Item): Bool { this.any({ it == item }) }
 }
 impl[Item: Hash] Iterate[Item]: Hash {
-  fun hash[Result](hasher: Hasher[Result]): Hasher[Result] {
-    # Hashes this `Iterate`.
-
-    this.foldLeft[Hasher[Result]](hasher, { result, item -> result.write(item) })
-  }
+  fun hash[H: Hasher](): H { H.combine(this.map({ it.hash[H]() })) }
 }
 
-impl[Item] Iterate[Item]: InfixPlus[Item, Iterate[Item]] {
-  fun add(other: Item): Iterate[Item] { this.add(List[Item].of(other)) }
-}
 impl[Item] Iterate[Item]: InfixPlus[Iterate[Item], Iterate[Item]] {
   fun add(other: Iterate[Item]): Iterate[Item] { FollowedByIterate[Item](this, other) }
 }

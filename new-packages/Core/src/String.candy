@@ -15,18 +15,24 @@ public builtin type String
 ## builtin fun length(): Int
 
 ## builtin fun split(pattern: String): List<String>
-## builtin fun trimmed(): String
+## builtin fun trim(): String
 
-## builtin impl String: Equals & Comparable
-## impl String: Hash {
-##   fun hash<Result>(hasher: Hasher<Result>) {
-##     hasher.write(length())
-##     hasher.writeList(
-##       characters()
-##         .map<Int>({ 0 })
-##         .toList()
-##     )
-##   }
-## }
+impl String: Equals {
+  ## TODO(marcelgarus): Implement `Compare` instead, which automatically implements `Equals`.
+
+  fun equals(other: String): Bool {
+    this.length() == other.length()
+      & this.characters().zip(other.characters()).all({ it.first == it.second })
+  }
+}
+
+impl String: Hash {
+  fun hash[H: Hasher](): H {
+    H.combine(List.of(
+      H.primitive(this.length),
+      H.combine(this.characters().map({ it.hash[H]() })),
+    ))
+  }
+}
 
 ## builtin impl String: PlusOperator<This, This>
