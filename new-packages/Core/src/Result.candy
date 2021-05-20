@@ -29,5 +29,10 @@ impl[Success: Equals, ErrorType: Equals] Result[Success, ErrorType]: Equals {
   }
 }
 impl[Success: Hash, ErrorType: Hash] Result[Success, ErrorType]: Hash {
-  fun hash[H: Hasher](): H { this.match[H](ok = { it.hash[H]() }, error = { it.hash[H]() }) }
+  fun hash[H: Hasher](): H {
+    this.match[H](
+      ok = { H.combine(List[H].of(H.primitive(0), it.hash[H]())) },
+      error = { H.combine(List[H].of(H.primitive(1), it.hash[H]())) },
+    )
+  }
 }

@@ -43,8 +43,8 @@ impl[T: Equals] Maybe[T]: Equals {
 impl[T: Hash] Maybe[T]: Hash {
   fun hash[H: Hasher](): H {
     this.match[H](
-      some = { H.combine(List[H].of(H.primitive(0), it.hash[H]())) },
-      none = { H.primitive(1) }
+      some = { H.combine(List[H].of(H.primitive(1), it.hash[H]())) },
+      none = { H.primitive(0) }
     )
   }
 }
