@@ -1,0 +1,166 @@
+use ast
+use compiler_utils
+use incremental
+
+use ..declarations
+use ..file
+use ...declarations
+use ...expressions
+use ...file
+use ...types
+
+fun lowerFunctionBody(
+  context: QueryContext<List<CompilerError>>,
+  function: HirFunction,
+): (List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>) {
+  query<List<HirValueExpression>, List<CompilerError>>(context, "lowerFunctionBody", function, {
+    let ast = function.ast(context)
+    let context = LoweirngContext(
+      NameScope(None<LoweringContext>(), MutableMap.empty<String, HirValueExpressionUri>()),
+      Mutablemap.empty<HirValueExpressionUri, HirValueExpression>(),
+      0,
+    )
+    todo("Lower function body of {function}.")
+  })
+}
+
+class BodyGlobalState {
+  let function: HirFunction
+  let expressions: MutableMap<HirValueExpressionUri, HirValueExpression>
+  mut let nextExpressionId: Int
+}
+class LoweringContext {
+  let global: BodyGlobalState
+  let parent: Maybe<LoweringContext>
+  let localProperties: MutableMap<String, HirValueExpressionUri>
+}
+impl LoweringContext {
+  fun register(expression: HirValueExpression): HirValueExpressionUri {
+    let uri = HirValueExpressionUri(
+      this.global.function,
+      this.global.nextExpressionId,
+    )
+    this.global.nextExpressionId = this.global.nextExpressionId + 1
+    this.global.expressions.put(uri, expression)
+    uri
+  }
+  
+  /// Lowers and registers the expression on this context and returns the uri.
+  fun lowerExpression(context: QueryContext<List<CompilerError>>, expression: AstExpression): HirValueExpression {
+    if (expression is AstIntExpression) {
+      return this.register(HirIntValueExpression((expression as AstIntExpression).value))
+    }
+
+    if (expression is AstStringExpression) {
+      // For String expressions, the interpolation is desugared string into multiple calls to `+`.
+      // "{name} is a great {type}" -> "" + name + " is a great " + type
+      mut let stringUri = this.register(HirStringValueExpression(""))
+
+      for part in (expression as AstStringExpression).parts {
+        let expressionToAdd: HirExpression
+        if (part is AstLiteralStringPart) {
+          (part as AstLiteralStringPart).value.value
+        } else {
+          lowerExpression(context, (part as AstInterpolatedStringPart).expression),
+        }
+
+        stringUri = this.register(HirFunctionCallValueExpression(
+          stringUri,
+          // TODO(marcelgarus): Directly call the `String`'s `add` function for better performance
+          // (and in case someone implements `+` for `String` a second time).
+          HirFunction.infixPlus(context),
+          Map.empty<String, HirInlineType>(),
+          Map.of1<String, HirValueExpressionUri>(Tuple("other", this.register(expressionToAdd))),
+        ))
+      }
+      return stringUri
+    }
+
+    if (expression is AstLambdaExpression) {
+      let expression = (expression as AstLambdaExpression)
+      return HirLambdaValueExpression(
+        (expression.valueParameters as Iterable<AstValueParameter>).map<HirLambdaParameter>({ lowerParameter(context, it) }).toList(),
+        (expression.expressions as Iterable<AstExpression>)
+          .map<HirValueExpressionUri>({ this.lowerExpression(context, it) })
+          .toList(),
+        todo("Find out the return type"),
+      )
+    }
+
+  //   if (expression is AstIdentifierExpression) {
+  //     return ...
+  //   }
+  //   if (expression is AstTupleExpression) {
+  //     return HirTupleValueExpression()
+  //   }
+    if (expression is AstBinaryExpression) {
+      // TODO: Lower to call.
+      return HirFunctionCallValueExpression(
+        uri,
+        this.lower(expression.leftOperand),
+        HirFunction,
+        Map.empty<String, HirInlineType>(), // Not type arguments.
+        Map.of1<String, HirValueExpressionUri>(
+          expression.rightOperand
+        )
+      )
+    }
+  //   if (expression is AstPropertyExpression) {
+  //     // TODO: Add to context.
+  //   }
+  //   if (expression is AstNavigationExpression) {
+  //     // TODO: If function, HirFunc... else ...
+  //   }
+  //   if (expression is AstCallExpression) {
+  //     // TODO: 
+  //   }
+  //   if (expression is AstValueArgument) {
+  //     // TODO:
+  //   }
+  //   if (expression is AstReturnExpression) {
+  //     return HirReturnValueExpression(
+  //       uri
+  //     )
+  //   }
+  }
+
+  fun lowerParameter(context: QueryContext<List<CompilerError>>, parameter: AstValueParameter): HirLambdaParameter {
+
+  }
+}
+
+// fun getMember(
+//   context: QueryContext<List<CompilerError>>,
+//   baseType: HirInlineType,
+//   name: String,
+//   moduleHir: HirModule,
+// ): Set<HirModule | HirType | HirTrait | HirFunction> {
+//   query<Set<HirModule | HirType | HirTrait | HirFunction>, List<CompilerError>>(
+//     context, "getMember", DataTuple3<String, HirDeclaration, Bool>(baseType, name, moduleHir),
+//     {
+//       mut let useLines = (moduleHir.useLines(context) as Iterable<HirUseLine>)
+//       if (onlySearchPublicUseLines) {
+//         useLines = useLines.where({ (it as HasVisibility).isPublic(context) })
+//       }
+
+//       let candidates = useLines
+//         .maybeMap<HirModule>({ it.targetModule(context) })
+//         .expand<HirModule | HirType | HirTrait | HirFunction>({
+//           let declarations = ((it as HasDeclarations).declarations(context) as Iterable<HirDeclaration>)
+//             // Files/modules can't contains constructors directly.
+//             .cast<HirModule | HirTrait | HirImpl | HirType | HirFunction>()
+//             .where({ (it as HirDeclaration).name() == identifier })
+//             .where({ (it as HasVisibility).isPublic(context) })
+//           if (declarations.isNotEmpty()) {
+//             // This file may not export other declarations via public use-lines, hence we don't have
+//             // to visit these.
+//             return declarations
+//           }
+
+//           return resolveIdentifierInUseLines(context, identifier, it, true).items()
+//         })
+
+//       Tuple(candidates.toSet(), List.empty<CompilerError>())
+//     }
+//   )
+// }
