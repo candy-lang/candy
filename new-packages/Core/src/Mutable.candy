@@ -1,0 +1,6 @@
+public builtin type Mutable[T] = T
+
+impl[T] Mutable[T] {
+  public builtin fun get(): T
+  public builtin fun set(value: T)
+}

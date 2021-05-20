@@ -13,6 +13,9 @@ impl[T] Maybe[T] {
   public fun else(alternative: () -> T): T {
     this.match[T](some = { it }, none = alternative)
   }
+  public fun else(alternative: () -> Maybe[T]): Maybe[T] {
+    this.match[Maybe[T]](some = { Maybe[T].Some(it) }, none = alternative)
+  }
 
   public fun map[Out](mapper: (T) -> Out): Maybe[Out] {
     this.flatMap[Out]({ Maybe[Out].Some(mapper(it)) })
@@ -35,4 +38,7 @@ impl[T: Equals] Maybe[T]: Equals {
       none = { other.isNone() }
     )
   }
+}
+impl[T: Hash] Maybe[T]: Hash {
+  fun hash[Result](hasher: Hasher[Result]): Hasher[Result] { this.do({ hasher.write(it) }) }
 }

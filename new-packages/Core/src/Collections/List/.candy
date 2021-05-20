@@ -1,0 +1,130 @@
+use ...Assert
+use ...Bool
+use ...Int
+use ...Maybe
+use ...Operators
+use ...Primitives
+use ..Iterate
+public use .Array
+
+public trait List[Item]: Iterate[Item] {
+  public static fun filled(length: Int /* UInt */, item: Item): List[Item] {
+    Array[Item].filled(length, item)
+  }
+  public static fun generate(length: Int, generator: (Int) -> Item): List[Item] {
+    Array[Item].generate(length, generator)
+  }
+  public static fun empty(): List[Item] { Array[Item].empty() }
+  public static fun of(first: Item): List[Item] { Array[Item].of(first) }
+  public static fun of(first: Item, second: Item): List[Item] { Array[Item].of(first, second) }
+  public static fun of(first: Item, second: Item, third: Item): List[Item] {
+    Array[Item].of(first, second, third)
+  }
+
+  fun set(index: Int, item: Item): List[Item] {
+    assert(index >= 0, "`index` is negative: {index}")
+    assert(index < this.length(), "`index` is too large: {index}, length: {this.length()}")
+
+    List[Item].generate(this.length(), {
+      if(it == index, { item }).else({ this.get(it).unwrap() })
+    })
+  }
+  fun insert(index: Int, item: Item): List[Item] {
+    assert(index >= 0, "`index` is negative: {index}")
+    assert(index <= this.length(), "`index` is too large: {index}, length: {this.length()}")
+
+    if(index > this.length(), { return this })
+    List[Item].generate(this.length() + 1, {
+      if(it < index, { this.get(index).unwrap()}).else({
+        if(it == index, { item }).else({ this.get(it - 1) })
+      })
+    })
+  }
+
+  fun update(index: Int, updater: (Item) -> Item): List[Item] {
+    assert(index >= 0, "`index` is negative: {index}")
+    assert(index < this.length(), "`index` is too large: {index}, length: {this.length()}")
+
+    List[Item].generate(this.length(), {
+      let item = this.get(index).unwrap()
+      if(it == index, { updater(item) }).else({ item })
+    })
+  }
+  fun updateAll(updater: (Item) -> Item): List[Item] {
+    List[Item].generate(this.length(), { updater(this.get(index).unwrap()) })
+  }
+
+  fun removeAt(index: Int): List[Item] {
+    assert(index >= 0, "`index` is negative: {index}")
+    assert(index < this.length(), "`index` is too large: {index}, length: {this.length()}")
+
+    List[Item].generate(this.length() - 1, {
+      if(it < index, { this.get(it) }).else({ this.get(it + 1) }).unwrap()
+    })
+  }
+
+  fun removeFirst(): List[Item] { this.removeAt(0) }
+  fun removeSecond(): List[Item] { this.removeAt(1) }
+  fun removeThird(): List[Item] { this.removeAt(2) }
+  fun removeFourth(): List[Item] { this.removeAt(3) }
+  fun removeFifth(): List[Item] { this.removeAt(4) }
+
+  fun removeLast(): List[Item] { this.removeAt(length() - 1) }
+  fun removeSecondLast(): List[Item] { this.removeAt(length() - 2) }
+  fun removeThirdLast(): List[Item] { this.removeAt(length() - 3) }
+  fun removeFourthLast(): List[Item] { this.removeAt(length() - 4) }
+  fun removeFifthLast(): List[Item] { this.removeAt(length() - 5) }
+
+  fun removeFirstWhere(checker: (Item) -> Bool): List[Item] {
+    this.firstIndexWhere(checker)
+      .map[List[Item]]({ this.removeAt(it) })
+      .else({ this })
+  }
+
+  fun subList(start: Int = 0, end: Int = this.length()): List[Item] {
+    ## TODO(JonasWanke): accept a range when we add those.
+    assert(0 <= start, "`start` must be non-negative.")
+    assert(start < this.length(), "start is too large: {index}, length: {this.length()}")
+    assert(0 <= end, "`end` must be non-negative.")
+    assert(end <= this.length(), "`end` is too large: {index}, length: {this.length()}")
+    assert(start <= end, "`end` must be larger or equal to `start`.")
+
+    List[Item].generate(end - start, { this.get(start + it).unwrap() })
+  }
+
+  fun reverse(): List[Item] {
+    ## TODO(JonasWanke): make this more efficient by creating a view of the original list
+    List[Item].generate(this.length(), { this.get(this.length() - it - 1).unwrap() })
+  }
+
+  fun toList(): List[Item] { this }
+
+  fun sortBy[T: Comparable](selector: (Item) -> T): List[Item] {
+    ## TODO(JonasWanke): Use something faster for larger lists.
+    ## Currently using insertion sort.
+    
+    1.until(length()).foldLeft(this, { result, i ->
+      let item = result.get(i).unwrap()
+      let value = selector(value)
+      ## TODO(JonasWanke): Use binary search if we continue using this implementation.
+      result.take(i).firstWhere({ value > selector(it) })
+        .map({ targetIndex -> result.removeAt(i).insert(targetIndex, item) })
+        .else({ result })
+    })
+  }
+}
+
+impl[Item] List[Item]: InfixPlus[Item, List[Item]] {
+  fun infixPlus(other: Item): List[Item] { this + List[Item].of(other) }
+}
+impl[Item] List[Item]: InfixPlus[List[Item], List[Item]] {
+  fun infixPlus(other: List[Item]): List[Item] {
+    Array[item].generate(this.length() + other.length(), {
+      if(it < this.length(), { this.get(it) }).else({ other.get(it - this.length()) }).unwrap()
+    })
+  }
+}
+
+impl[Item: Comparable] List[Item] {
+  fun sort(): List[Item] { sortBy[Item]({ it}) }
+}

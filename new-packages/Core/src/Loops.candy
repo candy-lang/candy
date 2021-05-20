@@ -8,10 +8,7 @@ public builtin fun loop(body: () -> Nothing): Never
 impl Int {
   public fun times(body: () -> Nothing) {
     # Executes the `body` `this` many times.
-    
-    if(this > 0, {
-      body()
-      (this - 1).times(body)
-    })
+
+    0.until(this).do({ body() })
   }
 }
