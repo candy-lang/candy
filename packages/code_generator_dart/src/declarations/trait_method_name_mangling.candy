@@ -50,7 +50,12 @@ fun encodeType(context: QueryContext<List<CompilerError>>, typeHir: HirType): St
 fun encodeInlineTypes(
   context: QueryContext<List<CompilerError>>,
   inlineTypes: Iterable<HirInlineType>,
-): String { inlineTypes.map<String>({ encodeInlineType(context, it) }).join("") }
+  isOrdered: Bool = true,
+): String {
+  mut let strings = inlineTypes.map<String>({ encodeInlineType(context, it) }).toList()
+  if(!isOrdered) { strings = strings.unsafeSorted() }
+  strings.join("")
+}
 fun encodeInlineType(
   context: QueryContext<List<CompilerError>>,
   inlineType: HirInlineType,
@@ -76,7 +81,7 @@ fun encodeNamedType(context: QueryContext<List<CompilerError>>, namedType: HirNa
     encodeType(context, namedType.declaration as HirType)
   }
 
-  "C{declaration}{encodeInlineTypes(context, namedType.parameterTypes)}E"
+  "C{declaration}{encodeInlineTypes(context, namedType.parameterTypes, true)}E"
 }
 fun encodeFunctionType(
   context: QueryContext<List<CompilerError>>,
@@ -85,12 +90,12 @@ fun encodeFunctionType(
   let start = functionType.receiverType
     .map<String>({ "R{encodeInlineType(context, it)}" })
     .orElse({ "F" })
-  let parameterTypes = encodeInlineTypes(context, functionType.parameterTypes)
+  let parameterTypes = encodeInlineTypes(context, functionType.parameterTypes, true)
   let returnType = encodeInlineType(context, functionType.returnType)
   "{start}{parameterTypes}{returnType}E"
 }
 fun encodeTupleType(context: QueryContext<List<CompilerError>>, tupleType: HirTupleType): String {
-  "T{encodeInlineTypes(context, tupleType.types)}E"
+  "T{encodeInlineTypes(context, tupleType.types, true)}E"
 }
 fun encodeNamedTupleType(
   context: QueryContext<List<CompilerError>>,
@@ -117,9 +122,6 @@ fun encodeEnumType(
 fun encodeIntersectionType(
   context: QueryContext<List<CompilerError>>,
   intersectionType: HirIntersectionType,
-): String {
-  // TODO(JonasWanke): order these
-  "I{encodeInlineTypes(context, intersectionType.types)}E"
-}
+): String { "I{encodeInlineTypes(context, intersectionType.types, false)}E" }
 
 fun encodeIdentifier(identifier: String): String { "{identifier.length()}{identifier}" }
