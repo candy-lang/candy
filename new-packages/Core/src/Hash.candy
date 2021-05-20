@@ -9,8 +9,8 @@ public trait Hash {
   # single `H`.
   #
   # The `H` can be used to customize how good and fast the hash is. For example, for simple
-  # microcontroller programms, you might want to hash into a `UInt16` efficiently, but for a big
-  # book library server, you might want a strong hash with a few hundred bits of entropy.
+  # microcontroller programs, you might want to hash into a `UInt16` efficiently, but for a big book
+  # library server, you might want a strong hash with a few hundred bits of entropy.
 
   fun hashCode(): Int { this.hash[IntHasher]().finish() }
   # Hashes `this` into an `Int` using the default `IntHasher`.
@@ -34,6 +34,6 @@ public trait Hasher {
 type IntHasher = Int
 impl IntHasher: Hasher {
   static fun primitive(value: Int): This { IntHasher(value) }
-  static fun combineUnordered(values: Iterate[This]): This { values.map({ it.value }).sum() }
+  static fun combineUnordered(values: Iterate[This]): This { values.sumBy({ it.value }) }
   fun finish(): Int { this.value }
 }

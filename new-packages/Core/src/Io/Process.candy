@@ -3,7 +3,7 @@ use ...Int
 use ...String
 use ..File
 
-public static builtin fun runProcess(
+public builtin fun runProcess(
   executable: Path,
   arguments: List[String],
   workingDirectory: Path,

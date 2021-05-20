@@ -20,22 +20,11 @@ impl String {
   public builtin fun trim(): String
 }
 
-impl String: Equals {
-  ## TODO(marcelgarus): Implement `Compare` instead, which automatically implements `Equals`.
-
-  fun equals(other: String): Bool {
-    this.length() == other.length()
-      & this.characters().zip(other.characters()).all({ it.first == it.second })
-  }
+impl String: Comparable {
+  builtin fun compareTo(other: String): Less | Equal | Greater
 }
-
 impl String: Hash {
-  fun hash[H: Hasher](): H {
-    H.combine(List[H].of(
-      H.primitive(this.length),
-      H.combine(this.characters().map({ it.hash[H]() })),
-    ))
-  }
+  builtin fun hash[H: Hasher](): H
 }
 
 impl String: InfixPlus[This, This] {
