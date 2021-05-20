@@ -5,6 +5,7 @@ use incremental
 
 use ...declarations
 use ...types
+use ..type_collection
 
 public fun compileNamedTupleType(
   context: QueryContext<List<CompilerError>>,
@@ -34,9 +35,12 @@ public fun compileNamedTupleTypeDeclarations(
     context,
     "code_generator_dart.compileNamedTupleTypeDeclarations",
     package, {
-    // TODO(JonasWanke): visit all named tuple types and store their field names
-    let fieldNames = Set.empty<Set<String>>()
-
+    let fieldNames = getAllInlineTypes(context, package).items()
+      .whereType<HirNamedTupleType>()
+      .map<Set<String>>({
+        (it.types as Iterable<(String, HirInlineType)>).map<String>({ it.first }).toSet()
+      })
+      .toSet()
     let classes = fieldNames.items()
       .map<DartDeclaration>({ compileNamedTupleTypeDeclaration(context, it) })
       .toList()

@@ -69,7 +69,7 @@ public trait HasDeclarations {
 }
 impl HirDeclaration: HasDeclarations
 
-public trait HasTypeParameters {
+public trait HasTypeParameters: Equals & Hash {
   fun typeParameters(context: QueryContext<List<CompilerError>>): List<HirParameterType>
 }
 fun hirParameterTypesFromAstTypeParameters(

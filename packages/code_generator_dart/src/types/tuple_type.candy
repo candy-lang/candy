@@ -5,6 +5,7 @@ use incremental
 
 use ...declarations
 use ...types
+use ..type_collection
 
 public fun compileTupleType(
   context: QueryContext<List<CompilerError>>,
@@ -39,9 +40,10 @@ public fun compileTupleTypeDeclarations(
     context,
     "code_generator_dart.compileTupleTypeDeclarations",
     package, {
-    // TODO(JonasWanke): visit all tuple types and store their sizes
-    let sizes = Set.empty<Int>()
-
+    let sizes = getAllInlineTypes(context, package).items()
+      .whereType<HirTupleType>()
+      .map<Int>({ (it.types as Iterable<HirInlineType>).length() })
+      .toSet()
     let classes = (sizes.items().toList().unsafeSorted() as Iterable<Int>)
       .map<DartDeclaration>({ compileTupleTypeDeclaration(context, it) })
       .toList()
