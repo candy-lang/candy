@@ -65,7 +65,7 @@ impl[Item: Equals & Hash] Set[Item]: Equals {
 }
 impl[Item: Equals & Hash] Set[Item]: Hash {
   fun hash[H: Hasher](): H {
-    H.combine(this.items().map[H]({ item.hash[H]() }))
+    H.combineUnordered(this.items().map[H]({ item.hash[H]() }))
   }
 }
 

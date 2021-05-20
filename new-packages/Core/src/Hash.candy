@@ -5,8 +5,8 @@ public trait Hash {
   # A type that can be hashed.
 
   fun hash[H: Hasher](): H
-  # Uses `H`'s static `primitive` and `combine` functions to hash primitive bytes into `H`s and
-  # combine multiple `H`s into one single `H`.
+  # Uses `H`'s static functions to hash primitive bytes into `H`s and combine multiple `H`s into one
+  # single `H`.
   #
   # The `H` can be used to customize how good and fast the hash is. For example, for simple
   # microcontroller programms, you might want to hash into a `UInt16` efficiently, but for a big
@@ -23,13 +23,17 @@ public trait Hasher {
   # Creates a new hash value based on a `Int`.
   ## TODO(marcelgarus): Make this accept a UInt8.
 
-  static fun combine(values: Iterate[This]): This
+  static fun combine(values: Iterate[This]): This { this.combineUnordered(values) }
   # Combines multiple values of this type into a single one.
+
+  static fun combineUnordered(values: Iterate[This]): This
+  # Combines multiple values of this type into a single one in such a way that the order doesn't
+  # matter.
 }
 
 type IntHasher = Int
 impl IntHasher: Hasher {
   static fun primitive(value: Int): This { IntHasher(value) }
-  static fun combine(values: Iterate[This]): This { values.map({ it.value }).sum() }
+  static fun combineUnordered(values: Iterate[This]): This { values.map({ it.value }).sum() }
   fun finish(): Int { this.value }
 }
