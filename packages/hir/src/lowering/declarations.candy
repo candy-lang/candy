@@ -474,12 +474,3 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
     })
   }
 }
-
-impl HirConstructor: HasDeclarations {
-  fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any> {
-    List.empty<Any>()
-  }
-  public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
-    List.empty<HirDeclaration>()
-  }
-}
