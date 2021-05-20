@@ -5,6 +5,7 @@ use incremental
 
 use ...declarations
 use ...types
+use ..type_collection
 
 public fun compileEnumType(
   context: QueryContext<List<CompilerError>>,
@@ -38,9 +39,10 @@ public fun compileEnumTypeDeclarations(
     context,
     "code_generator_dart.compileEnumTypeDeclarations",
     package, {
-    // TODO(JonasWanke): visit all enum types and store their variant names
-    let variantNames = Set.empty<Set<String>>()
-
+    let variantNames = getAllInlineTypes(context, package).items()
+      .whereType<HirEnumType>()
+      .map<Set<String>>({ it.variants.keys().toSet() })
+      .toSet()
     let classes = variantNames.items()
       .expand<DartDeclaration>({ compileEnumTypeDeclaration(context, it) as Iterable<DartDeclaration> })
       .toList()

@@ -7,7 +7,7 @@ public fun true(): Bool { Bool.True() }
 public fun false(): Bool { Bool.False() }
 
 impl Bool {
-  fun not(): Bool { this.match[Bool](true = { false() }, false = { true() }) }
+  public fun not(): Bool { this.match[Bool](true = { false() }, false = { true() }) }
 }
 
 impl Bool: And {
