@@ -20,7 +20,7 @@ impl String {
   public builtin fun trim(): String
 }
 
-impl String: Comparable {
+impl String: Compare {
   builtin fun compareTo(other: String): Less | Equal | Greater
 }
 impl String: Hash {
