@@ -97,6 +97,8 @@ public trait List[Item]: Iterate[Item] {
     List[Item].generate(this.length(), { this.get(this.length() - it - 1).unwrap() })
   }
 
+  fun toList(): List[Item] { this }
+
   fun sortBy[T: Compare](selector: (Item) -> T): List[Item] {
     ## TODO(JonasWanke): Use something faster for larger lists.
     ## Currently using insertion sort.

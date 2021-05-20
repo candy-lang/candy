@@ -1,0 +1,77 @@
+use ...Bool
+use ...Collections
+use ...Hash
+use ...Maybe
+use ...Operators
+use ...String
+
+## Note: All definitions inside this module are temporary until we have a proper cross-platform file
+## system abstraction in pure Candy.
+
+public trait FileSystemNode: Equals & Hash {
+  fun path(): Path
+
+  fun doesExist(): Bool
+  fun create(recursive: Bool = true())
+}
+
+public type Directory = Path
+impl Directory: FileSystemNode {
+  builtin fun path(): Path
+  builtin fun doesExist(): Bool
+  builtin fun create(recursive: Bool = true())
+}
+impl Directory {
+  public builtin fun delete(recursive: Bool = true())
+
+  public builtin fun listContents(recursive: Bool = false()): List[FileSystemNode]
+}
+impl Directory: Equals {
+  fun equals(other: Directory): Bool { this.value == other.value }
+}
+impl Directory: Hash {
+  fun hash[H: Hasher](): H { this.value.hash[H]() }
+}
+
+public type File = Path
+impl File: FileSystemNode {
+  builtin fun path(): Path
+  builtin fun doesExist(): Bool
+  builtin fun create(recursive: Bool = true())
+}
+impl File {
+  public builtin fun read(): String
+  public builtin fun write(content: String)
+}
+impl File: Equals {
+  fun equals(other: File): Bool { this.value == other.value }
+}
+impl File: Hash {
+  fun hash[H: Hasher](): H { this.value.hash[H]() }
+}
+
+public type Path = String
+impl Path {
+  public builtin static fun current(): Path
+  public builtin static fun parse(path: String): Path
+
+  public builtin fun relativeTo(other: Path): Path
+  public builtin fun normalized(): Path
+
+  public builtin fun isAbsolute(): Bool
+  public builtin fun parent(): Maybe[Path]
+  public builtin fun baseName(): String
+  public builtin fun baseNameWithoutExtension(): String
+}
+impl Path: InfixSlash[String, Path] {
+  builtin fun infixSlash(other: String): Path
+}
+impl Path: InfixSlash[Path, Path] {
+  builtin fun infixSlash(other: Path): Path
+}
+impl Path: Equals {
+  fun equals(other: Path): Bool { this.value == other.value }
+}
+impl Path: Hash {
+  fun hash[H: Hasher](): H { this.value.hash[H]() }
+}

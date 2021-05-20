@@ -65,7 +65,7 @@ public trait Iterate[Item] {
 
   ## Properties.
 
-  fun length(): Int /* UInt */ { this.foldLeft[Int](0, { result, item -> result + 1 }) }
+  fun length(): Int /* UInt */ { this.sumBy({ 1 }) }
 
   ## Boolean checks.
 
@@ -87,7 +87,7 @@ public trait Iterate[Item] {
     result.get()
   }
   fun foldRight[Out](initial: Out, combine: (Item, Out) -> Out): Out {
-    this.toList().reversed().foldLeft[Out](initial, { result, item -> combine(item, result) })
+    this.toList().reverse().foldLeft[Out](initial, { result, item -> combine(item, result) })
   }
   fun reduceLeft(combine: (Item, Item) -> Item): Maybe[Item] {
     this.iterate().map[Item]({ it.second.foldLeft[Out](it.first, combine) })

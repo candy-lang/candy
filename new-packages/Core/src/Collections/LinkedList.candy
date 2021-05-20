@@ -1,0 +1,50 @@
+use ...Assert
+use ...Bool
+use ...Hash
+use ...Int
+use ...Operators
+use ...Maybe
+use ...Mutable
+use ...Primitives
+use ...String
+use ..List
+
+public type LinkedList[Item] = Maybe[(Item, LinkedList[Item])]
+
+impl[Item] LinkedList[Item] {
+  public fun prepend(item: Item): LinkedList[Item] {
+    This(Maybe[(Item, LinkedList[Item])].Some((item, this)))
+  }
+  public fun toArray(): Array[Item] {
+    let remaining = Mutable[(Int, LinkedList[Item])]((0, this))
+    Array[Item].generate(this.length(), { index ->
+      let currentlyRemaining = remaining.get()
+      if(index != currentlyRemaining.first, {
+        panic(
+          "`Array.generate` called the generator in invalid order: expected index "
+          "{currentlyRemaining.first} to be requested next, but {index} was requested.",
+        )
+      })
+      let iterated = currentlyRemaining.second.iterate()
+      remaining.set((currentlyRemaining.first + 1, iterated.second))
+      iterated.first
+    })
+  }
+}
+
+impl[Item] LinkedList[Item]: List[Item] {
+  static fun empty(): LinkedList[Item] { This(Maybe[(Item, LinkedList[Item])].None()) }
+}
+impl[Item] LinkedList[Item]: Iterate[Item] {
+  fun iterate(): Maybe[(Item, Iterate[Item])] {
+    ## TODO(JonasWanke): Remove the `map` call when we support variance.
+    this.value.map[(Item, Iterate[Item])]({ (it.first, it.second) })
+  }
+
+  fun reverse(): LinkedList[Item] {
+    this.foldLeft[Maybe[(Item, LinkedList[Item])]](
+      Maybe[(Item, LinkedList[Item])].None(),
+      { result, item -> result.prepend(item) },
+    )
+  }
+}

@@ -1,0 +1,17 @@
+use ...Collections
+use ...Int
+use ...String
+use ..File
+
+public static builtin fun runProcess(
+  executable: Path,
+  arguments: List[String],
+  workingDirectory: Path,
+): ProcessResult
+
+public type ProcessResult = (
+  exitCode: Int,
+  processId: Int,
+  standardOutput: String,
+  standardError: String,
+)

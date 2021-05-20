@@ -1,21 +1,24 @@
-## use ..bool
-## use ..collections
-## use ..hash
-## use ..numbers
-## use ..operators
+use ..Bool
+use ..Collections
+use ..Hash
+use ..Int
+use ..Mutable
+use ..Operators
 
 public builtin type String
 # A valid Unicode string.
 
-## builtin fun characters(): Iterable<String>
-## builtin fun substring(offset: Int, length: Int): String
+impl String {
+  public builtin fun characters(): Iterate[String]
+  public builtin fun substring(offset: Int, length: Int): String
 
-## builtin fun isEmpty(): Bool
-## builtin fun isNotEmpty(): Bool
-## builtin fun length(): Int
+  public builtin fun isEmpty(): Bool
+  public builtin fun isNotEmpty(): Bool
+  public builtin fun length(): Int
 
-## builtin fun split(pattern: String): List<String>
-## builtin fun trim(): String
+  public builtin fun split(pattern: String): List[String]
+  public builtin fun trim(): String
+}
 
 impl String: Equals {
   ## TODO(marcelgarus): Implement `Compare` instead, which automatically implements `Equals`.
@@ -35,4 +38,33 @@ impl String: Hash {
   }
 }
 
-## builtin impl String: PlusOperator<This, This>
+impl String: InfixPlus[This, This] {
+  builtin fun infixPlus(other: This): This
+}
+
+
+impl String {
+  public static fun build(builder: (StringBuilder) -> Nothing): String {
+    # An easy way to construct more complex `String`s from multiple parts.
+    #
+    # Example:
+    #
+    # ```
+    # let myString = String.build({
+    #   it.add("foo")
+    #   if(someBool, { it.add("bar") })
+    #   5.times({ it.add("baz") })
+    # })
+    # ```
+    let theBuilder = StringBuilder(Mutable[String](""))
+    builder(theBuilder)
+    theBuilder.build()
+  }
+}
+public type StringBuilder = Mutable[String]
+impl StringBuilder {
+  public fun add(value: String) {
+    this.value.set(this.value.get() + value)
+  }
+  public fun build(): String { this.value.get() }
+}
