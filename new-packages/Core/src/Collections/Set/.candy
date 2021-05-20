@@ -73,3 +73,11 @@ impl[Item: Equals & Hash] Set[Item]: Hash {
 impl[Item: Equals & Hash] Iterate[Item] {
   fun toSet(): Set[Item] { Set[Item].empty().addAll(this) }
 }
+impl[Item: Equals & Hash] Iterate[Set[Item]] {
+  public fun intersect(): Set[Item] {
+    this.foldLeft[Set[Item]](Set[Item].empty(), { result, item -> result & item })
+  }
+  public fun union(): Set[Item] {
+    this.foldLeft[Set[Item]](Set[Item].empty(), { result, item -> result | item })
+  }
+}
