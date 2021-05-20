@@ -1,10 +1,10 @@
 public use .Assert
 public use .Bool
 public use .Collections
+public use .ControlFlow
 public use .Hash
 public use .Int
 public use .Io
-public use .Loops
 public use .Maybe
 public use .Operators
 public use .Panic

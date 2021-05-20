@@ -39,6 +39,12 @@ impl[T: Equals] Maybe[T]: Equals {
     )
   }
 }
+
 impl[T: Hash] Maybe[T]: Hash {
-  fun hash[Result](hasher: Hasher[Result]): Hasher[Result] { this.do({ hasher.write(it) }) }
+  fun hash[H: Hasher](): H {
+    this.match[H](
+      some = { H.combine(List[H].of(H.primitive(1), it.hash[H]())) },
+      none = { H.primitive(0) }
+    )
+  }
 }

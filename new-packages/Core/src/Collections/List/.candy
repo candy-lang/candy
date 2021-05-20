@@ -99,7 +99,7 @@ public trait List[Item]: Iterate[Item] {
 
   fun toList(): List[Item] { this }
 
-  fun sortBy[T: Comparable](selector: (Item) -> T): List[Item] {
+  fun sortBy[T: Compare](selector: (Item) -> T): List[Item] {
     ## TODO(JonasWanke): Use something faster for larger lists.
     ## Currently using insertion sort.
     
@@ -125,6 +125,6 @@ impl[Item] List[Item]: InfixPlus[List[Item], List[Item]] {
   }
 }
 
-impl[Item: Comparable] List[Item] {
+impl[Item: Compare] List[Item] {
   fun sort(): List[Item] { sortBy[Item]({ it}) }
 }

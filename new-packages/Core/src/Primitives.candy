@@ -1,3 +1,7 @@
+use ..Bool
+use ..Hash
+use ..Operators
+
 # This module contains the bread of the type-system-sandwich:
 #
 # * A top type: `Any`
@@ -45,6 +49,13 @@ public builtin type Nothing
 # * the explicit nothing instance: `nothing`
 
 public fun nothing(): Nothing {}
+
+impl Nothing: Equals {
+  fun equals(other: This) { true() }
+}
+impl Nothing: Hash {
+  fun hash[H: Hasher](): H { H.primitive(0) }
+}
 
 ## Because the `Never` type contains itself, it's impossible to instantiate.
 public type Never = Never
