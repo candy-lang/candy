@@ -83,7 +83,7 @@ impl[Key: Equals & Hash, Value: Equals] Map[Key, Value]: Equals {
 impl[Key: Equals & Hash, Value: Hash] Map[Key, Value]: Hash {
   fun hash(hasher: Hasher) {
     H.combineUnordered(this.entries().map({
-      H.combine(List.of(it.first.hash[H](), it.second.hash[H]()))
+      H.combine(List[H].of(it.first.hash[H](), it.second.hash[H]()))
     }))
   }
 }

@@ -31,7 +31,7 @@ impl String: Equals {
 
 impl String: Hash {
   fun hash[H: Hasher](): H {
-    H.combine(List.of(
+    H.combine(List[H].of(
       H.primitive(this.length),
       H.combine(this.characters().map({ it.hash[H]() })),
     ))
