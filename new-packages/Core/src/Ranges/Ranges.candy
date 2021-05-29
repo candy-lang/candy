@@ -1,5 +1,6 @@
 use ...Bool
 use ...Collections
+use ...Hash
 use ...Int
 use ...Operators
 
