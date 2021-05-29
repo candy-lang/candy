@@ -1,0 +1,208 @@
+use ...Bool
+use ...Collections
+use ...Int
+use ...Operators
+
+public trait Range[T: Compare]: Equals {
+  fun startBound(): RangeBound[T]
+  fun endBound(): RangeBound[T]
+
+  fun contains(item: T): Bool {
+    let startMatches = this.startBound().match[Bool](
+      included = { it <= item },
+      excluded = { it < item },
+      unbounded = { true() },
+    )
+    let endMatches = this.endBound().match[Bool](
+      included = { item <= it },
+      excluded = { item < it },
+      unbounded = { true() },
+    )
+    startMatches & endMatches
+  }
+}
+
+
+public type RangeBound[T: Compare] = Included T | Excluded T | Unbounded
+impl[T: Compare] RangeBound[T]: Equals {
+  fun equals(other: This): Bool {
+    this.match(
+      included = { value ->
+        other.match(included = { value == it }, excluded = { false() }, unbounded = { false() })
+      },
+      excluded = { value ->
+        other.match(included = { false() }, excluded = { value == it }, unbounded = { false() })
+      },
+      unbounded = {
+        other.match(included = { false() }, excluded = { false() }, unbounded = { true() })
+      },
+    )
+  }
+}
+impl[T: Compare & Hash] RangeBound[T]: Hash {
+  fun hash[H: Hasher](): H {
+    this.match(
+      included = { H.combine(List[H].of(0.hash[H](), it.hash[H]())) },
+      excluded = { H.combine(List[H].of(1.hash[H](), it.hash[H]())) },
+      unbounded = { 2.hash[H]() },
+    )
+  }
+}
+
+
+## Inclusive start
+
+public type ClosedRange[T: Compare] = (start: T, end: T)
+# A `Range` where `this.start` and `this.end` are inclusive (`this.start=..=this.end`).
+
+impl[T: Compare] ClosedRange[T]: Range[T] {
+  fun startBound(): RangeBound[T] { RangeBound[T].Included(this.start) }
+  fun endBound(): RangeBound[T] { RangeBound[T].Included(this.end) }
+}
+impl[T: Compare] ClosedRange[T]: Equals {
+  fun equals(other: This): Bool { this.start == other.start & this.end == other.end }
+}
+impl[T: Compare] ClosedRange[T]: Hash {
+  fun hash[H: Hasher](): H { H.combine(List[H].of(this.start.hash[H](), this.end.hash[H]())) }
+}
+
+
+public type ClosedOpenRange[T: Compare] = (start: T, end: T)
+# A `Range` where `this.start` is inclusive and `this.end` is exclusive (`this.start=..this.end`).
+
+impl[T: Compare] ClosedOpenRange[T]: Range[T] {
+  fun startBound(): RangeBound[T] { RangeBound[T].Included(this.start) }
+  fun endBound(): RangeBound[T] { RangeBound[T].Excluded(this.end) }
+}
+impl[T: Compare] ClosedOpenRange[T]: Equals {
+  fun equals(other: This): Bool { this.start == other.start & this.end == other.end }
+}
+impl[T: Compare] ClosedOpenRange[T]: Hash {
+  fun hash[H: Hasher](): H { H.combine(List[H].of(this.start.hash[H](), this.end.hash[H]())) }
+}
+impl ClosedOpenRange[Int] {
+  public fun toClosedRange(): ClosedRange[Int] { ClosedRange(this.start, this.end - 1) }
+}
+
+
+public type ClosedUnboundedRange[T: Compare] = (start: T)
+# A `Range` where `this.start` is inclusive and without an upper bound (`this.start=..`).
+
+impl[T: Compare] ClosedUnboundedRange[T]: Range[T] {
+  fun startBound(): RangeBound[T] { RangeBound[T].Included(this.start) }
+  fun endBound(): RangeBound[T] { RangeBound[T].Unbounded() }
+}
+impl[T: Compare] ClosedUnboundedRange[T]: Equals {
+  fun equals(other: This): Bool { this.start == other.start }
+}
+impl[T: Compare] ClosedUnboundedRange[T]: Hash {
+  fun hash[H: Hasher](): H { this.start.hash[H]() }
+}
+
+## Exclusive start
+
+public type OpenClosedRange[T: Compare] = (start: T, end: T)
+# A `Range` where `this.start` is exclusive and `this.end` is inclusive (`this.start..=this.end`).
+
+impl[T: Compare] OpenClosedRange[T]: Range[T] {
+  fun startBound(): RangeBound[T] { RangeBound[T].Excluded(this.start) }
+  fun endBound(): RangeBound[T] { RangeBound[T].Included(this.end) }
+}
+impl[T: Compare] OpenClosedRange[T]: Equals {
+  fun equals(other: This): Bool { this.start == other.start & this.end == other.end }
+}
+impl[T: Compare] OpenClosedRange[T]: Hash {
+  fun hash[H: Hasher](): H { H.combine(List[H].of(this.start.hash[H](), this.end.hash[H]())) }
+}
+impl OpenClosedRange[Int] {
+  public fun toClosedRange(): ClosedRange[Int] { ClosedRange(this.start + 1, this.end) }
+}
+
+
+public type OpenRange[T: Compare] = (start: T, end: T)
+# A `Range` where `this.start` and `this.end` are exclusive (`this.start..this.end`).
+
+impl[T: Compare] OpenRange[T]: Range[T] {
+  fun startBound(): RangeBound[T] { RangeBound[T].Excluded(this.start) }
+  fun endBound(): RangeBound[T] { RangeBound[T].Excluded(this.end) }
+}
+impl[T: Compare] OpenRange[T]: Equals {
+  fun equals(other: This): Bool { this.start == other.start & this.end == other.end }
+}
+impl[T: Compare] OpenRange[T]: Hash {
+  fun hash[H: Hasher](): H { H.combine(List[H].of(this.start.hash[H](), this.end.hash[H]())) }
+}
+impl OpenRange[Int] {
+  public fun toClosedRange(): ClosedRange[Int] { ClosedRange(this.start + 1, this.end - 1) }
+}
+
+
+public type OpenUnboundedRange[T: Compare] = (start: T)
+# A `Range` where `this.start` is exclusive and without an upper bound (`this.start..`).
+
+impl[T: Compare] OpenUnboundedRange[T]: Range[T] {
+  fun startBound(): RangeBound[T] { RangeBound[T].Excluded(this.start) }
+  fun endBound(): RangeBound[T] { RangeBound[T].Unbounded() }
+}
+impl[T: Compare] OpenUnboundedRange[T]: Equals {
+  fun equals(other: This): Bool { this.start == other.start }
+}
+impl[T: Compare] OpenUnboundedRange[T]: Hash {
+  fun hash[H: Hasher](): H { this.start.hash[H]() }
+}
+impl OpenUnboundedRange[Int] {
+  public fun toClosedUnboundedRange(): ClosedUnboundedRange[Int] {
+    ClosedUnboundedRange(this.start + 1)
+  }
+}
+
+## Unbounded start
+
+public type UnboundedClosedRange[T: Compare] = (end: T)
+# A `Range` where `this.end` is inclusive and without a lower bound (`..=this.end`).
+
+impl[T: Compare] UnboundedClosedRange[T]: Range[T] {
+  fun startBound(): RangeBound[T] { RangeBound[T].Unbounded() }
+  fun endBound(): RangeBound[T] { RangeBound[T].Included(this.end) }
+}
+impl[T: Compare] UnboundedClosedRange[T]: Equals {
+  fun equals(other: This): Bool { this.end == other.end }
+}
+impl[T: Compare] UnboundedClosedRange[T]: Hash {
+  fun hash[H: Hasher](): H { this.end.hash[H]() }
+}
+
+
+public type UnboundedOpenRange[T: Compare] = (end: T)
+# A `Range` where `this.end` is exclusive and without a lower bound (`..this.end`).
+
+impl[T: Compare] UnboundedOpenRange[T]: Range[T] {
+  fun startBound(): RangeBound[T] { RangeBound[T].Unbounded() }
+  fun endBound(): RangeBound[T] { RangeBound[T].Excluded(this.end) }
+}
+impl[T: Compare] UnboundedOpenRange[T]: Equals {
+  fun equals(other: This): Bool { this.end == other.end }
+}
+impl[T: Compare] UnboundedOpenRange[T]: Hash {
+  fun hash[H: Hasher](): H { this.end.hash[H]() }
+}
+impl UnboundedOpenRange[Int] {
+  public fun toUnboundedClosedRange(): UnboundedClosedRange[Int] {
+    UnboundedClosedRange(this.end - 1)
+  }
+}
+
+
+public type UnboundedRange[T: Compare] = Unit
+# A `Range` without a lower or upper bound (`..`).
+
+impl[T: Compare] UnboundedRange[T]: Range[T] {
+  fun startBound(): RangeBound[T] { RangeBound[T].Unbounded() }
+  fun endBound(): RangeBound[T] { RangeBound[T].Unbounded() }
+}
+impl[T: Compare] UnboundedRange[T]: Equals {
+  fun equals(other: This): Bool { true() }
+}
+impl[T: Compare] UnboundedRange[T]: Hash {
+  fun hash[H: Hasher](): H { unit().hash[H]() }
+}
