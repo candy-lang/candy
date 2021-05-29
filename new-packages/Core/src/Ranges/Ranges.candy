@@ -3,6 +3,7 @@ use ...Collections
 use ...Hash
 use ...Int
 use ...Operators
+use ..Progressions
 
 public trait Range[T: Compare]: Equals {
   fun startBound(): RangeBound[T]
@@ -66,6 +67,12 @@ impl[T: Compare] ClosedRange[T]: Equals {
 impl[T: Compare] ClosedRange[T]: Hash {
   fun hash[H: Hasher](): H { H.combine(List[H].of(this.start.hash[H](), this.end.hash[H]())) }
 }
+impl ClosedRange[Int] {
+  public fun toClosedOpenRange(): ClosedOpenRange[Int] { ClosedOpenRange(this.start, this.end + 1) }
+  public fun toProgression(stepSize: Int): ClosedIntProgression {
+    this.toClosedOpenRange().toProgression()
+  }
+}
 
 
 public type ClosedOpenRange[T: Compare] = (start: T, end: T)
@@ -82,7 +89,10 @@ impl[T: Compare] ClosedOpenRange[T]: Hash {
   fun hash[H: Hasher](): H { H.combine(List[H].of(this.start.hash[H](), this.end.hash[H]())) }
 }
 impl ClosedOpenRange[Int] {
-  public fun toClosedRange(): ClosedRange[Int] { ClosedRange(this.start, this.end - 1) }
+  public fun toProgression(stepSize: Int): ClosedIntProgression {
+    let actualEnd = this.end - (this.end - this.start) % stepSize
+    ClosedIntProgression(this.start, actualEnd, stepSize)
+  }
 }
 
 
@@ -98,6 +108,11 @@ impl[T: Compare] ClosedUnboundedRange[T]: Equals {
 }
 impl[T: Compare] ClosedUnboundedRange[T]: Hash {
   fun hash[H: Hasher](): H { this.start.hash[H]() }
+}
+impl ClosedUnboundedRange[Int] {
+  public fun toProgression(stepSize: Int): FromIntProgression {
+    FromIntProgression(this.start, stepSize)
+  }
 }
 
 ## Exclusive start
@@ -116,7 +131,12 @@ impl[T: Compare] OpenClosedRange[T]: Hash {
   fun hash[H: Hasher](): H { H.combine(List[H].of(this.start.hash[H](), this.end.hash[H]())) }
 }
 impl OpenClosedRange[Int] {
-  public fun toClosedRange(): ClosedRange[Int] { ClosedRange(this.start + 1, this.end) }
+  public fun toClosedOpenRange(): ClosedOpenRange[Int] {
+    ClosedOpenRange(this.start + 1, this.end + 1)
+  }
+  public fun toProgression(stepSize: Int): ClosedIntProgression {
+    this.toClosedOpenRange().toProgression(stepSize)
+  }
 }
 
 
@@ -134,7 +154,10 @@ impl[T: Compare] OpenRange[T]: Hash {
   fun hash[H: Hasher](): H { H.combine(List[H].of(this.start.hash[H](), this.end.hash[H]())) }
 }
 impl OpenRange[Int] {
-  public fun toClosedRange(): ClosedRange[Int] { ClosedRange(this.start + 1, this.end - 1) }
+  public fun toClosedOpenRange(): ClosedOpenRange[Int] { ClosedOpenRange(this.start + 1, this.end) }
+  public fun toProgression(stepSize: Int): ClosedIntProgression {
+    this.toClosedOpenRange().toProgression(stepSize)
+  }
 }
 
 
@@ -155,6 +178,9 @@ impl OpenUnboundedRange[Int] {
   public fun toClosedUnboundedRange(): ClosedUnboundedRange[Int] {
     ClosedUnboundedRange(this.start + 1)
   }
+  public fun toProgression(stepSize: Int): FromIntProgression {
+    this.toClosedUnboundedRange().toProgression(stepSize)
+  }
 }
 
 ## Unbounded start
@@ -171,6 +197,9 @@ impl[T: Compare] UnboundedClosedRange[T]: Equals {
 }
 impl[T: Compare] UnboundedClosedRange[T]: Hash {
   fun hash[H: Hasher](): H { this.end.hash[H]() }
+}
+impl UnboundedClosedRange[Int] {
+  public fun toProgression(stepSize: Int): ToIntProgression { ToIntProgression(this.end) }
 }
 
 
@@ -191,6 +220,9 @@ impl UnboundedOpenRange[Int] {
   public fun toUnboundedClosedRange(): UnboundedClosedRange[Int] {
     UnboundedClosedRange(this.end - 1)
   }
+  public fun toProgression(stepSize: Int): ToIntProgression {
+    this.toUnboundedClosedRange().toProgression(stepSize)
+  }
 }
 
 
@@ -206,4 +238,7 @@ impl[T: Compare] UnboundedRange[T]: Equals {
 }
 impl[T: Compare] UnboundedRange[T]: Hash {
   fun hash[H: Hasher](): H { unit().hash[H]() }
+}
+impl UnboundedRange[Int] {
+  public fun toProgression(stepSize: Int): UnboundedIntProgression { UnboundedIntProgression() }
 }

@@ -1,0 +1,114 @@
+use ...Bool
+use ...Collections
+use ...Int
+use ...Maybe
+use ...Operators
+
+public trait IntProgression: Equals {
+  fun startBound(): Maybe[Int]
+  fun endBound(): Maybe[Int]
+  fun stepSize(): Int
+
+  fun contains(item: Int): Bool {
+    let startMatches = this.startBound()
+      .map[Bool]({ it <= item & (item - it) % this.stepSize() == 0 })
+      .else({ true() })
+    let endMatches = this.endBound()
+      .map[Bool]({ item <= it & (it - item) % this.stepSize() == 0 })
+      .else({ true() })
+    startMatches & endMatches
+  }
+}
+
+
+public type BoundedIntProgression = (start: Int, end: Int, step: Int)
+# A `Progression` where `this.start` is inclusive and `this.end` is exclusive.
+#
+# Invariants:
+# * `this step != 0`
+# * `(this step > 0) then { this end > this start } else { this end < this start }`
+# * `(this end - 1 - this start) % this step == 0`
+
+impl BoundedIntProgression: IntProgression {
+  fun startBound(): Maybe[Int] { Maybe[Int].Some(this.start) }
+  fun endBound(): Maybe[Int] { Maybe[Int].Some(this.end) }
+  fun stepSize(): Int { this.step }
+}
+impl BoundedIntProgression: Equals {
+  fun equals(other: This): Bool {
+    this.start == other.start & this.end == other.end & this.step = other.step
+  }
+}
+impl BoundedIntProgression: Hash {
+  fun hash[H: Hasher](): H {
+    H.combine(List[H].of(this.start.hash[H](), this.end.hash[H](), this.step.hash[H]()))
+  }
+}
+impl BoundedIntProgression: Iterate[Int] {
+  fun iterate(): Maybe[(Int, Iterate[Int])] {
+    (this.end > this.start).then[(Int, Iterate[Int])]({
+      (this.start, BoundedIntProgression(this.start + this.step, this.end, this.step))
+    })
+  }
+
+  ## TODO(JonasWanke): Add a constant-time `contains(item)` when we have something like
+  ## where-clauses for generic types and `iterate.contains` can be declared directly inside
+  ## `Iterate`. Same for the progressions below.
+
+  fun length(): Int {
+    if (this.start == this.end, { 0 })
+      .else({ this.end - 1 - this.start) // this.step + 1 })
+  }
+}
+
+
+public type FromIntProgression = (start: Int, step: Int)
+# A `Progression` where `this.start` is inclusive and without an end.
+#
+# Invariant: `this step != 0`
+
+impl FromIntProgression: IntProgression {
+  fun startBound(): Maybe[Int] { Maybe[Int].Some(this.start) }
+  fun endBound(): Maybe[Int] { Maybe[Int].None() }
+  fun stepSize(): Int { this.step }
+}
+impl FromIntProgression: Equals {
+  fun equals(other: This): Bool { this.start == other.start & this.step = other.step }
+}
+impl FromIntProgression: Hash {
+  fun hash[H: Hasher](): H {
+    H.combine(List[H].of(this.start.hash[H](), this.step.hash[H]()))
+  }
+}
+impl FromIntProgression: Iterate[Int] {
+  fun iterate(): Maybe[(Int, Iterate[Int])] {
+    Maybe[(Int, Iterate[Int])]
+      .Some((this.start, FromIntProgression(this.start + this.step, this.step)))
+  }
+}
+impl FromIntProgression {
+  public fun reverse(): ToIntProgression { ToIntProgression(this.start + 1, -this.step) }
+}
+
+
+public type ToIntProgression = (end: Int, step: Int)
+# A `Progression` where `this.end` is exclusive and without a start.
+#
+# Invariant: `this step != 0`
+
+impl ToIntProgression: IntProgression {
+  fun startBound(): Maybe[Int] { Maybe[Int].None() }
+  fun endBound(): Maybe[Int] { Maybe[Int].Some(this.end) }
+  fun stepSize(): Int { this.step }
+}
+impl ToIntProgression: Equals {
+  fun equals(other: This): Bool { this.end == other.end & this.step = other.step }
+}
+impl ToIntProgression: Hash {
+  fun hash[H: Hasher](): H {
+    H.combine(List[H].of(this.end.hash[H](), this.step.hash[H]()))
+  }
+}
+impl ToIntProgression {
+  fun reverse(): FromIntProgression { FromIntProgression(this.end - 1, -this.step) }
+}
