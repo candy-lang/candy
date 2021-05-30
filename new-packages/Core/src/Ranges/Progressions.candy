@@ -26,7 +26,7 @@ public type BoundedIntProgression = (start: Int, end: Int, step: Int)
 #
 # Invariants:
 # * `this step != 0`
-# * `(this step > 0) then { this end > this start } else { this end < this start }`
+# * `(this step > 0) then { this end >= this start } else { this end <= this start }`
 # * `(this end - 1 - this start) % this step == 0`
 
 impl BoundedIntProgression: IntProgression {
