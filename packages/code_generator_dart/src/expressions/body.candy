@@ -8,17 +8,17 @@ use ...expressions
 use ...types
 use ..utils
 
-public fun compileExpressionsToBody(
+public fun compileValueExpressionsToBody(
   context: QueryContext<List<CompilerError>>,
-  scope: HirFunction | HirExpressionUri<HirLambdaExpression>,
-  expressions: List<HirExpression>,
+  scope: HirFunction | HirValueExpressionUri<HirLambdaExpression>,
+  expressions: List<HirValueExpression>,
 ): DartBlock {
   query<DartBlock, List<CompilerError>>(
     context,
-    "code_generator_dart.compileExpressionsToBody",
-    DataTuple2<Equals & Hash, ListOfHirExpression>(
+    "code_generator_dart.compileValueExpressionsToBody",
+    DataTuple2<Equals & Hash, ListOfHirValueExpression>(
       scope as Equals & Hash,
-      ListOfHirExpression(expressions),
+      ListOfHirValueExpression(expressions),
     ), {
     let statements = MutableList.empty<DartStatement | DartComment>()
 
@@ -32,7 +32,7 @@ public fun compileExpressionsToBody(
       initialValue = Some<DartExpression>((dartObject as DartExpression).call0()),
     )))
 
-    let bodyStatements = (expressions as Iterable<HirExpression>)
+    let bodyStatements = (expressions as Iterable<HirValueExpression>)
       .expand<DartStatement | DartComment>({
         let comment = DartComment("{it}")
         let statements = compileExpression(context, it)
@@ -76,7 +76,7 @@ public fun compileReturnExpression(
     "code_generator_dart.compileReturnExpression",
     expression, {
     let statements = compileExpression(context,
-      getExpression<HirExpression>(expression.expression),
+      getExpression<HirValueExpression>(expression.expression),
     ).toMutable()
 
     statements.append(DartExpressionStatement(DartThrow(
@@ -96,7 +96,7 @@ public fun compileReturnExpression(
 
 fun getScopeObjectName(
   context: QueryContext<List<CompilerError>>,
-  scope: HirFunction | HirExpressionUri<HirLambdaExpression>,
+  scope: HirFunction | HirValueExpressionUri<HirLambdaExpression>,
 ): String {
   query<String, List<CompilerError>>(
     context,
@@ -109,7 +109,7 @@ fun getScopeObjectName(
     } else {
       // As function declarations can't be nested, all expressions have the same function as their
       // parent and the index is sufficient to disambiguate them.
-      "$scope$expression${(scope as HirExpressionUri<HirLambdaExpression>).index}"
+      "$scope$expression${(scope as HirValueExpressionUri<HirLambdaExpression>).index}"
     }
     Tuple(name, List.empty<CompilerError>())
   })
@@ -127,11 +127,13 @@ let nonLocalReturnExceptionType = DartNamedType(
 )
 
 
-class ListOfHirExpression {
+class ListOfHirValueExpression {
   // TODO(JonasWanke): remove this when we no longer need `unsafeEquals` and `unsafeHash`
-  public let value: List<HirExpression>
+  public let value: List<HirValueExpression>
 }
-impl ListOfHirExpression: Equals & Hash {
-  fun equals(other: This): Bool { (value as Iterable<HirExpression>).unsafeEquals(other.value) }
+impl ListOfHirValueExpression: Equals & Hash {
+  fun equals(other: This): Bool {
+    (value as Iterable<HirValueExpression>).unsafeEquals(other.value)
+  }
   fun hash<T>(hasher: Hasher<T>) { value.unsafeHash<T>(hasher) }
 }

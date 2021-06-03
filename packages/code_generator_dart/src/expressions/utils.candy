@@ -5,50 +5,50 @@ use incremental
 
 use ...types
 
-public fun getExpression<E: HirExpression>(uri: HirExpressionUri<E>): E {
+public fun getValueExpression(uri: HirValueExpressionUri): HirValueExpression {
   todo("Replace this with the actual HIR functionality of getting expressions.")
 }
 
-public fun getExpressionResultIdentifier(
+public fun getValueExpressionResultIdentifier(
   context: QueryContext<List<CompilerError>>,
-  expressionUri: HirExpressionUri<HirExpression>,
+  expressionUri: HirValueExpressionUri,
 ): DartIdentifier {
   query<DartIdentifier, List<CompilerError>>(
     context,
-    "code_generator_dart.getExpressionResultIdentifier",
+    "code_generator_dart.getValueExpressionResultIdentifier",
     expressionUri, {
-    let name = getExpressionResultName(context, expressionUri)
+    let name = getValueExpressionResultName(context, expressionUri)
     Tuple(DartIdentifier(name, None<String>()), List.empty<CompilerError>())
   })
 }
-public fun getExpressionResultName(
+public fun getValueExpressionResultName(
   context: QueryContext<List<CompilerError>>,
-  expressionUri: HirExpressionUri<HirExpression>,
+  expressionUri: HirValueExpressionUri,
 ): String {
   query<String, List<CompilerError>>(
     context,
-    "code_generator_dart.getExpressionResultName",
+    "code_generator_dart.getValueExpressionResultName",
     expressionUri, {
     Tuple("_{expressionUri.index}", List.empty<CompilerError>())
   })
 }
 
-public fun saveSingleExpression(
-  context: QueryContext<List<CompilerError>>,
-  hirExpression: HirExpression,
-  dartExpression: DartExpression,
-): List<DartStatement> {
-  query<List<DartStatement>, List<CompilerError>>(
-    context,
-    "code_generator_dart.saveSingleExpression",
-    DataTuple2<HirExpression, DartExpression>(hirExpression, dartExpression), {
-    let statement = saveExpression(context, hirExpression, dartExpression)
-    Tuple(List.of1<DartStatement>(statement), List.empty<CompilerError>())
-  })
-}
+// public fun saveSingleExpression(
+//   context: QueryContext<List<CompilerError>>,
+//   hirExpression: HirValueExpression,
+//   dartExpression: DartExpression,
+// ): List<DartStatement> {
+//   query<List<DartStatement>, List<CompilerError>>(
+//     context,
+//     "code_generator_dart.saveSingleExpression",
+//     DataTuple2<HirValueExpression, DartExpression>(hirExpression, dartExpression), {
+//     let statement = saveValueExpression(context, hirExpression, dartExpression)
+//     Tuple(List.of1<DartStatement>(statement), List.empty<CompilerError>())
+//   })
+// }
 public fun saveNothing(
   context: QueryContext<List<CompilerError>>,
-  hirExpression: HirExpression,
+  hirExpression: HirValueExpression,
 ): DartStatement {
   query<DartStatement, List<CompilerError>>(
     context,
@@ -67,15 +67,15 @@ public fun saveNothing(
   })
 }
 
-public fun saveExpression(
+public fun saveValueExpression(
   context: QueryContext<List<CompilerError>>,
-  hirExpression: HirExpression,
+  hirExpression: HirValueExpression,
   dartExpression: DartExpression,
 ): DartStatement {
   query<DartStatement, List<CompilerError>>(
     context,
-    "code_generator_dart.saveExpression",
-    DataTuple2<HirExpression, DartExpression>(hirExpression, dartExpression), {
+    "code_generator_dart.saveValueExpression",
+    DataTuple2<HirValueExpression, DartExpression>(hirExpression, dartExpression), {
     let field = DartField(
       name = getExpressionResultName(context, hirExpression.uri),
       docComment = None<String>(),

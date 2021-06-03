@@ -5,15 +5,28 @@ use incremental
 
 use ..utils
 
-public fun compileParameterReferenceExpression(
+public fun compileParameterReferenceValueExpression(
   context: QueryContext<List<CompilerError>>,
-  expression: HirParameterReferenceExpression,
+  expression: HirParameterReferenceValueExpression,
 ): DartStatement {
   query<DartStatement, List<CompilerError>>(
     context,
-    "code_generator_dart.compileParameterReferenceExpression",
+    "code_generator_dart.compileParameterReferenceValueExpression",
     expression, {
     let identifier = DartIdentifier(expression.name, None<String>())
-    Tuple(saveExpression(context, expression, identifier), List.empty<CompilerError>())
+    Tuple(saveValueExpression(context, expression, identifier), List.empty<CompilerError>())
+  })
+}
+
+public fun compileLocalPropertyReferenceValueExpression(
+  context: QueryContext<List<CompilerError>>,
+  expression: HirLocalPropertyReferenceValueExpression,
+): DartStatement {
+  query<DartStatement, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileLocalPropertyReferenceValueExpression",
+    expression, {
+    let identifier = getValueExpressionResultIdentifier(expression.value)
+    Tuple(saveValueExpression(context, expression, identifier), List.empty<CompilerError>())
   })
 }
