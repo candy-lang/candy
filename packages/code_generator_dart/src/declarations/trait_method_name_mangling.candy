@@ -52,7 +52,7 @@ fun encodeInlineTypes(
   isOrdered: Bool = true,
 ): String {
   mut let strings = inlineTypes.map<String>({ encodeInlineType(context, it) }).toList()
-  if(!isOrdered) { strings = strings.unsafeSorted() }
+  if (!isOrdered) { strings = strings.unsafeSorted() }
   strings.join("")
 }
 fun encodeInlineType(
