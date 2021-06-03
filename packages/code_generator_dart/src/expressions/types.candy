@@ -32,37 +32,6 @@ public fun compileTypeInstantiationValueExpression(
   })
 }
 
-public fun compileTupleValueExpression(
-  context: QueryContext<List<CompilerError>>,
-  expression: HirTupleValueExpression,
-): List<DartStatement> {
-  query<List<DartStatement>, List<CompilerError>>(
-    context,
-    "code_generator_dart.compileTupleValueExpression",
-    expression, {
-    let statements = MutableList.empty<DartStatement>()
-    statements.appendAll(
-      (expression.valueArguments as Iterable<HirValueExpressionUri<HirValueExpression>>)
-        .expand<DartStatement>({ compileValueExpression(context, getValueExpression(it)) })
-    )
-
-    // TODO(JonasWanke): use `compileTupleType` when we can get the tuple type of this expression
-    let compiledType = DartNamedType(DartIdentifier("Tuple", None<String>()), List.empty<DartType>())
-    statements.append(saveValueExpression(
-      context,
-      expression,
-      (compiledType as DartValueExpression).call(
-        positionalArguments = (expression.valueArguments as Iterable<HirValueExpressionUri<HirValueExpression>>)
-          .map<DartValueExpression>({ getValueExpressionResultIdentifier(context, it) })
-          .toList(),
-        namedArguments = Map.empty<String, DartValueExpression>(),
-        typeArguments = List.empty<DartType>(),
-      ),
-    ))
-    Tuple(statements, List.empty<CompilerError>())
-  })
-}
-
 public fun compileNamedTupleValueExpression(
   context: QueryContext<List<CompilerError>>,
   expression: HirNamedTupleValueExpression,

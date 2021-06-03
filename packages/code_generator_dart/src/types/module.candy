@@ -7,7 +7,6 @@ public use .enum_type
 public use .function_type
 public use .named_type
 public use .named_tuple_type
-public use .tuple_type
 
 public fun compileInlineType(
   context: QueryContext<List<CompilerError>>,
@@ -30,7 +29,6 @@ fun compileInlineTypeHelper(
   if (inlineType is HirFunctionType) {
     return compileFunctionType(context, inlineType as HirFunctionType)
   }
-  if (inlineType is HirTupleType) { return compileTupleType(context, inlineType as HirTupleType) }
   if (inlineType is HirNamedTupleType) {
     return compileNamedTupleType(context, inlineType as HirNamedTupleType)
   }
