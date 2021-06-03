@@ -15,9 +15,9 @@ fun lowerFunctionBody(
 ): (List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>) {
   query<List<HirValueExpression>, List<CompilerError>>(context, "lowerFunctionBody", function, {
     let ast = function.ast(context)
-    let context = LoweirngContext(
+    let context = LoweringContext(
       NameScope(None<LoweringContext>(), MutableMap.empty<String, HirValueExpressionUri>()),
-      Mutablemap.empty<HirValueExpressionUri, HirValueExpression>(),
+      MutableMap.empty<HirValueExpressionUri, HirValueExpression>(),
       0,
     )
     todo("Lower function body of {function}.")
