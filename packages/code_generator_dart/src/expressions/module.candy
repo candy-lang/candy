@@ -62,9 +62,9 @@ fun compileValueExpressionHelper(
     )
   }
 
-  // if (expression is HirFunctionCallValueExpression) {
-  //   return compileFunctionCallValueExpression(context, expression as HirFunctionCallValueExpression)
-  // }
+  if (expression is HirFunctionCallValueExpression) {
+    return compileFunctionCallValueExpression(context, expression as HirFunctionCallValueExpression)
+  }
 
   // if (expression is HirPropertyNavigationValueExpression) {
   //   return compilePropertyNavigationValueExpression(
