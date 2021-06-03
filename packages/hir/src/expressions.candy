@@ -111,6 +111,23 @@ impl HirLocalPropertyReferenceExpression: HirValueExpression & Equals & Hash {
   fun hash<T>(hasher: Hasher<T>) { target.hash<T>(hasher) }
 }
 
+/// An expression that references a parameter.
+///
+/// Example:
+///
+/// ```
+/// fun foo {
+///   a # The `a` becomes a HirParameterReferenceValueExpression
+/// }
+/// ```
+public class HirParameterReferenceValueExpression {
+  public let name: String
+}
+impl HirLocalPropertyReferenceExpression: HirValueExpression & Equals & Hash {
+  fun equals(other: This): Bool { (name as Equals) == (other.name as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { name.hash<T>(hasher) }
+}
+
 /// A function call expression.
 ///
 /// Examples:
