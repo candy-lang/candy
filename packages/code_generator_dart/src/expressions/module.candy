@@ -65,12 +65,6 @@ fun compileValueExpressionHelper(
   // if (expression is HirFunctionCallValueExpression) {
   //   return compileFunctionCallValueExpression(context, expression as HirFunctionCallValueExpression)
   // }
-  // if (expression is HirValueExpressionCallValueExpression) {
-  //   return compileValueExpressionCallValueExpression(
-  //     context,
-  //     expression as HirValueExpressionCallValueExpression,
-  //   )
-  // }
 
   // if (expression is HirPropertyNavigationValueExpression) {
   //   return compilePropertyNavigationValueExpression(
