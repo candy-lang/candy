@@ -92,7 +92,7 @@ impl LoweringContext {
       let expression = (expression as AstLambdaExpression)
       return HirLambdaValueExpression(
         (expression.valueParameters as Iterable<AstValueParameter>)
-          .map<HirLambdaParameter>({ lowerParameter(context, it) })
+          .map<HirLambdaParameter>({ this.lowerParameter(context, it) })
           .toList(),
         (expression.expressions as Iterable<AstExpression>)
           .map<HirValueExpressionUri>({ this.lowerExpression(context, it) })
@@ -208,6 +208,11 @@ impl LoweringContext {
   }
 
   fun lowerParameter(context: QueryContext<List<CompilerError>>, parameter: AstValueParameter): HirLambdaParameter {
-
+    HirLambdaParameter(
+      parameter.name.value,
+      // TODO(marcelgarus): Support type inference for parameters.
+      parameter.type.map<HirInlineType>({ astInlineTypeToHirInlineType(context, it) })
+        .expect("Lambda parameter without specified type."),
+    )
   }
 }
