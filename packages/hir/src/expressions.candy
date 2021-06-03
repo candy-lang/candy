@@ -179,29 +179,6 @@ impl HirValueExpressionCallValueExpression: HirValueExpression & Equals & Hash {
   }
 }
 
-/// A property navigation expression.
-///
-/// Examples:
-///
-/// * `foo.bar`
-/// * `foo.baz`
-public class HirPropertyNavigationValueExpression {
-  public let receiver: HirValueExpressionUri
-  public let name: String
-}
-impl HirPropertyNavigationValueExpression: HirValueExpression & Equals & Hash {
-  fun equals(other: This): Bool {
-    (uri as Equals) == (other.uri as Equals)
-      && (receiver as Equals) == (other.receiver as Equals)
-      && (name as Equals) == (other.name as Equals)
-  }
-  fun hash<T>(hasher: Hasher<T>) {
-    uri.hash<T>(hasher)
-    receiver.hash<T>(hasher)
-    name.hash<T>(hasher)
-  }
-}
-
 /// A type instantiation expression.
 ///
 /// Examples:
@@ -226,20 +203,9 @@ impl HirTypeInstantiationValueExpression: HirValueExpression & Equals & Hash {
   }
 }
 
-/// A tuple expression.
-///
-/// Example: `("hey", 3)`
-public class HirTupleValueExpression {
-  public let valueArguments: List<HirValueExpressionUri>
-}
-impl HirTupleValueExpression: HirValueExpression & Equals & Hash {
-  fun equals(other: This): Bool {
-    (valueArguments as Iterable<HirValueExpressionUri>).unsafeEquals(other.valueArguments)
-  }
-  fun hash<T>(hasher: Hasher<T>) { valueArguments.unsafeHash<T>(hasher) }
-}
-
 /// A named tuple expression.
+/// Non-named tuples like `("Bar", 42)` automatically get lowered to named tuples like
+/// `(first: "Bar", second: 42)`.
 ///
 /// Example: `(foo: "Bar", baz: 42)`
 public class HirNamedTupleValueExpression {
@@ -248,6 +214,29 @@ public class HirNamedTupleValueExpression {
 impl HirNamedTupleValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool { valueArguments.unsafeEquals(other.valueArguments) }
   fun hash<T>(hasher: Hasher<T>) { valueArguments.unsafeHash<T>(hasher) }
+}
+
+/// An access of a named tuple's field.
+///
+/// Examples:
+///
+/// * `foo.bar`
+/// * `foo.baz`
+public class HirNamedTupleFieldAccessValueExpression {
+  public let receiver: HirValueExpressionUri
+  public let name: String
+}
+impl HirNamedTupleFieldAccessValueExpression: HirValueExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (uri as Equals) == (other.uri as Equals)
+      && (receiver as Equals) == (other.receiver as Equals)
+      && (name as Equals) == (other.name as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    uri.hash<T>(hasher)
+    receiver.hash<T>(hasher)
+    name.hash<T>(hasher)
+  }
 }
 
 /// A return expression.
