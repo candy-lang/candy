@@ -164,12 +164,12 @@ impl HirFunctionCallExpression: HirValueExpression & Equals & Hash {
 ///   let a = { ... }
 ///   a()
 ///   ```
-public class HirExpressionCallValueExpression {
+public class HirValueExpressionCallValueExpression {
   public let receiver: HirValueExpressionUri
   public let typeArguments: List<HirInlineType>
   public let valueArguments: List<HirValueExpressionUri>
 }
-impl HirExpressionCallValueExpression: HirValueExpression & Equals & Hash {
+impl HirValueExpressionCallValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
       && (typeArguments as Iterable<HirInlineType>).unsafeEquals(other.typeArguments)
