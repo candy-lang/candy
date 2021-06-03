@@ -53,18 +53,15 @@ impl HirStringValueExpression: HirValueExpression & Equals & Hash {
 public class HirLambdaValueExpression {
   public let parameters: List<HirLambdaParameter>
   public let expressions: List<HirValueExpressionUri>
-  public let returnType: HirInlineType
 }
 impl HirLambdaValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (parameters as Iterable<HirLambdaParameter>).unsafeEquals(other.parameters)
       && (expressions as Iterable<HirValueExpressionUri>).unsafeEquals(other.expressions)
-      && (returnType as Equals) == (other.returnType as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     parameters.unsafeHash<T>(hasher)
     expressions.unsafeHash<T>(hasher)
-    (returnType as Hash).hash<T>(hasher)
   }
 }
 public class HirLambdaParameter {
