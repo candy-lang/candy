@@ -156,7 +156,7 @@ impl HirExpressionCallValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
       && (typeArguments as Iterable<HirInlineType>).unsafeEquals(other.typeArguments)
-      && (valueArguments as Iterable<HirExpressionUri<HirExpression>>).unsafeEquals(other.valueArguments)
+      && (valueArguments as Iterable<HirValueExpressionUri<HirValueExpression>>).unsafeEquals(other.valueArguments)
   }
   fun hash<T>(hasher: Hasher<T>) {
     receiver.hash<T>(hasher)
@@ -218,7 +218,7 @@ impl HirTypeInstantiationValueExpression: HirValueExpression & Equals & Hash {
 public class HirTupleValueExpression {
   public let valueArguments: List<HirValueExpressionUri>
 }
-impl HirTupleValueExpression: HirExpression & Equals & Hash {
+impl HirTupleValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (valueArguments as Iterable<HirValueExpressionUri>).unsafeEquals(other.valueArguments)
   }
@@ -231,7 +231,7 @@ impl HirTupleValueExpression: HirExpression & Equals & Hash {
 public class HirNamedTupleValueExpression {
   public let valueArguments: Map<String, HirValueExpressionUri>
 }
-impl HirNamedTupleValueExpression: HirExpression & Equals & Hash {
+impl HirNamedTupleValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool { valueArguments.unsafeEquals(other.valueArguments) }
   fun hash<T>(hasher: Hasher<T>) { valueArguments.unsafeHash<T>(hasher) }
 }
@@ -248,7 +248,7 @@ public class HirReturnValueExpression {
   public let scope: HirFunction
   public let expression: HirValueExpressionUri
 }
-impl HirReturnExpression: HirExpression & Equals & Hash {
+impl HirReturnExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (scope as Equals) == (other.scope as Equals)
       && (expression as Equals) == (other.expression as Equals)
@@ -282,9 +282,9 @@ impl HirTypeExpression: Equals & Hash {
 /// * `Core`
 /// * `GitHub`
 public trait HirModuleExpression {
-  public let module: HirModule
+  public let moduleHir: HirModule
 }
 impl HirModuleExpression: Equals & Hash {
-  fun equals(other: This): Bool { (module as Equals) == (other.module as Equals) }
-  fun hash<T>(hasher: Hasher<T>) { module.hash<T>(hasher) }
+  fun equals(other: This): Bool { (moduleHir as Equals) == (other.moduleHir as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { moduleHir.hash<T>(hasher) }
 }
