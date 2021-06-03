@@ -118,7 +118,7 @@ impl HirLocalPropertyReferenceExpression: HirValueExpression & Equals & Hash {
 /// * `foo()`
 /// * `foo.bar()` (the whole `.bar()` is one expression with `foo` as the receiver)
 public class HirFunctionCallValueExpression {
-  public let receiver: Maybe<HirValueExpressionUri>
+  public let receiver: Maybe<HirValueExpressionUri | HirTypeExpression>
   public let function: HirFunction
   public let typeArguments: Map<String, HirInlineType>
   public let valueArguments: Map<String, HirValueExpressionUri>
