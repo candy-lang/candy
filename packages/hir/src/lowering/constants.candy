@@ -3,6 +3,24 @@ use incremental
 
 use ...declarations
 
+fun neverInlineType(context: QueryContext<List<CompilerError>>): HirInlineType {
+  let module_ = HirTopLevelModule(Package.core(context))
+      .innerModule("Primitives")
+  HirNamedType(HirType(module_, "Never"), List.empty<HirInlineType>())
+}
+
+fun intInlineType(context: QueryContext<List<CompilerError>>): HirInlineType {
+  let module_ = HirTopLevelModule(Package.core(context))
+      .innerModule("Int")
+  HirNamedType(HirType(module_, "Int"), List.empty<HirInlineType>())
+}
+
+fun stringInlineType(context: QueryContext<List<CompilerError>>): HirInlineType {
+  let module_ = HirTopLevelModule(Package.core(context))
+      .innerModule("String")
+  HirNamedType(HirType(module_, "String"), List.empty<HirInlineType>())
+}
+
 fun infixFunction(
   context: QueryContext<List<CompilerError>>,
   traitName: String,

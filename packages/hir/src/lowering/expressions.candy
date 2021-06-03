@@ -44,12 +44,14 @@ impl LoweringContext {
     uri
   }
 
-  fun resolveLocalProperty(
+  fun resolve(
     context: QueryContext<List<CompilerError>>,
     name: String,
-  ): HirValueExpressionUri {
+  ): Set<HirValueExpressionUri | HirModule | HirType | HirTrait | HirFunction | HirParameterType> {
     this.localProperties.get(name).or({
-      this.parent.flatMap<HirValueExpressionUri>({ it.resolveLocalProperty(context, name) })
+      this.parent
+        .map<Maybe<HirValueExpressionUri>>({ it.resolve(context, name) })
+        .orElse({ resolveIdentifier(context, name, this.global.function) })
     })
   }
 
@@ -57,7 +59,7 @@ impl LoweringContext {
   fun lowerExpression(
     context: QueryContext<List<CompilerError>>,
     expression: AstExpression,
-  ): HirValueExpression {
+  ): HirValueExpression | HirTypeExpression | HirModuleExpression {
     if (expression is AstIntExpression) {
       return this.register(HirIntValueExpression((expression as AstIntExpression).value))
     }
@@ -68,11 +70,10 @@ impl LoweringContext {
       mut let stringUri = this.register(HirStringValueExpression(""))
 
       for part in (expression as AstStringExpression).parts {
-        let expressionToAdd: HirExpression
-        if (part is AstLiteralStringPart) {
+        let expressionToAdd: HirExpression = if (part is AstLiteralStringPart) {
           (part as AstLiteralStringPart).value.value
         } else {
-          lowerExpression(context, (part as AstInterpolatedStringPart).expression),
+          this.lowerExpression(context, (part as AstInterpolatedStringPart).expression)
         }
 
         stringUri = this.register(HirFunctionCallValueExpression(
@@ -89,25 +90,20 @@ impl LoweringContext {
 
     if (expression is AstLambdaExpression) {
       let expression = (expression as AstLambdaExpression)
-      let body = (expression.expressions as Iterable<AstExpression>)
-        .map<HirValueExpressionUri>({ this.lowerExpression(context, it) })
-        .toList()
       return HirLambdaValueExpression(
         (expression.valueParameters as Iterable<AstValueParameter>)
           .map<HirLambdaParameter>({ lowerParameter(context, it) })
           .toList(),
-        body,
-        body.last().returnType,
+        (expression.expressions as Iterable<AstExpression>)
+          .map<HirValueExpressionUri>({ this.lowerExpression(context, it) })
+          .toList(),
       )
     }
 
     if (expression is AstIdentifierExpression) {
       let expression = (expression as AstIdentifierExpression)
       let name = expression.identifier.name
-      let property = this.resolveLocalProperty(context, name).or<HirValueExpressionUri>({
-        let matchingDeclarations = resolveIdentifier(context, name, this.global.function)
-        todo("Choose the appropriate matching declaration.")
-      })
+      let property = this.resolve(context, name)
     }
 
     if (expression is AstTupleExpression) {
@@ -165,18 +161,38 @@ impl LoweringContext {
       let receiver = expression.receiver
       let typeArguments = expression.typeArguments
       let valueArguments = expression.valueArguments
+
       if (receiver is AstIdentifierExpression) {
-        todo("Lower top-level function")
-        let function = resolveIdentifier(context, name, this.global.function).
-        return HirFunctionCallValueExpression(
-          None<HirValueExpressionUri>(), // No receiver.
-          ,
-          this.lowerExpression(context, receiver),
-          
-        )
+        // This is a top-level function, defined globally.
+        let function = this.resolve(context, name)
+        if (function.length() == 1) {
+          return HirFunctionCallValueExpression(
+            None<HirValueExpressionUri>(), // No receiver.
+            function.single(),
+            typeArguments.update({
+              (this.resolve(context, it.name).single() as HirTypeExpression).type
+            }),
+            valueArguments.update({
+              (this.resolve(context, it.name).single() as HirValueExpressionUri)
+            }),
+          )
+        }
       }
       if (receiver is AstNavigationExpression) {
-        todo("Lower method")
+        // This is a function defined in an impl.
+        let function = resolve(context, name)
+        if (function.length() == 1) {
+          return HirFunctionCallValueExpression(
+            Some<HirValueExpressionUri>(this.lowerExpression(receiver)),
+            function.single(),
+            typeArguments.update({
+              (this.resolve(context, it.name).single() as HirTypeExpression).type
+            }),
+            valueArguments.update({
+              (this.resolve(context, it.name).single() as HirValueExpressionUri)
+            }),
+          )
+        }
       }
       todo("Lower lambda")
     }
@@ -195,39 +211,3 @@ impl LoweringContext {
 
   }
 }
-
-// fun getMember(
-//   context: QueryContext<List<CompilerError>>,
-//   baseType: HirInlineType,
-//   name: String,
-//   moduleHir: HirModule,
-// ): Set<HirModule | HirType | HirTrait | HirFunction> {
-//   query<Set<HirModule | HirType | HirTrait | HirFunction>, List<CompilerError>>(
-//     context, "getMember", DataTuple3<String, HirDeclaration, Bool>(baseType, name, moduleHir),
-//     {
-//       mut let useLines = (moduleHir.useLines(context) as Iterable<HirUseLine>)
-//       if (onlySearchPublicUseLines) {
-//         useLines = useLines.where({ (it as HasVisibility).isPublic(context) })
-//       }
-
-//       let candidates = useLines
-//         .maybeMap<HirModule>({ it.targetModule(context) })
-//         .expand<HirModule | HirType | HirTrait | HirFunction>({
-//           let declarations = ((it as HasDeclarations).declarations(context) as Iterable<HirDeclaration>)
-//             // Files/modules can't contains constructors directly.
-//             .cast<HirModule | HirTrait | HirImpl | HirType | HirFunction>()
-//             .where({ (it as HirDeclaration).name() == identifier })
-//             .where({ (it as HasVisibility).isPublic(context) })
-//           if (declarations.isNotEmpty()) {
-//             // This file may not export other declarations via public use-lines, hence we don't have
-//             // to visit these.
-//             return declarations
-//           }
-
-//           return resolveIdentifierInUseLines(context, identifier, it, true).items()
-//         })
-
-//       Tuple(candidates.toSet(), List.empty<CompilerError>())
-//     }
-//   )
-// }
