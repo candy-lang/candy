@@ -24,10 +24,10 @@ A sweet programming language, mainly inspired by Kotlin, Rust, Elixir, and Dart.
   You can implement traits for existing types, even the ones from the standard library.
   ```rust
   trait Foo {
-    fun foo(): String
+    fun foo: String
   }
   impl Bool: Foo {
-    fun foo(): String { "blub" }
+    fun foo: String { "blub" }
   }
   ## You can use Bool where a Foo is expected.
   ```
@@ -42,33 +42,34 @@ A sweet programming language, mainly inspired by Kotlin, Rust, Elixir, and Dart.
   someLambda()
   ```
   If a lambda is the last parameter passed to a function, you can write it behind the parameter list's parentheses.
-  You can even omit the parentheses completely if the lambda is the only parameter:
+  You can even omit the parentheses completely if there's no parameter or just a lambda:
   ```rust
   someFunction { a, b -> a + b }
+  someOtherFunction
   ```
   If it's inferred from the context that the lambda accepts a single parameter and you don't specify one, it's bound to the `it` variable.
 * **Indentation-aware.**
   Candy uses indentation to find out what's an expression.
-  We still keep brackets and parentheses for clarity – it's an essential piece of information that you leave the scope of a long class.
+  We still keep brackets and parentheses for clarity – it's an essential piece of information that you leave the scope of a long trait.
   We only use indentation so that dots for navigation and semicolons between expressions are no longer necessary:
   ```swift
   let candy = programmingLanguages
     where { it name == "Candy" & it age < 3 years }
     map { it specification }
-    single()
+    single
   ```
 * **Keep magic to a minimum.**
   All types and functions are defined in Candy (although some are marked `builtin`, which means the compiler implements them).
   For example, here's the definition of `Bool`:
   ```rust
   type Bool = True | False
-  let true = Bool True
-  let false = Bool False
+  fun true = Bool True
+  fun false = Bool False
   ```
   Most "control-flow structures" are just functions – take the following code:
   ```rust
-  let foo = if (true) { 1 }  ## foo = Some(1)
-  let bar = if (false) { 2 } ## bar = None
+  let foo = if (true) { 1 }  ## foo = Maybe Some(1)
+  let bar = if (false) { 2 } ## bar = Maybe None
   let baz = if (true) { 3 } else { 4 } ## baz = 3
   ```
   `if` is just a `builtin` function that takes a `Bool` and another function, usually provided as a trailing lambda.
@@ -82,9 +83,8 @@ A sweet programming language, mainly inspired by Kotlin, Rust, Elixir, and Dart.
   ```
   Note we also want to add pattern matching on the language-level, but we didn't decide on a final design yet, because other features were more urgent.
 * **Be modular.**
-  All elements are private by default. The `public` modifier makes functions, properties and types available if the module gets imported.
-  Rust very much inspires the module system itself – you can use folders, files, and explicit `module` declarations interchangeably.
-  Also, defining traits creates implicit modules.  
+  All elements are private by default. The `public` modifier makes functions, properties, and types available if the module gets imported.
+  Rust very much inspires the module system itself – you can use folders, files, and explicit `module` declarations interchangeably.  
   We call our imports *use-lines* because they look like this:
   ```rust
   use MongoDB
@@ -107,9 +107,9 @@ A sweet programming language, mainly inspired by Kotlin, Rust, Elixir, and Dart.
   You can define your own keywords, which are similar to macros in other languages.
   There's a `keyword` keyword to do that:
   ```rust
-  keyword let foobar = ... ## A code transformer
-  foobar class Baz { ... }
-  async fun doStuff() { ... }
+  keyword fun foobar = ... ## A code transformer
+  foobar type Baz = ...
+  async fun doStuff { ... }
   ```
 * **Tooling.**
   Of course, we want to offer great tooling, including syntax highlighting, autocomplete based on the popularity of code and its documentation, a package ecosystem, etc.  
@@ -122,10 +122,10 @@ A sweet programming language, mainly inspired by Kotlin, Rust, Elixir, and Dart.
 We implemented a first version of the Candy compiler in Dart.
 Currently, we're working on making Candy self-hosting, so we're working on creating the Candy compiler in Candy.
 
-Some features are not implemented yet and will be added later (most notably indentation-based expressions and trailing lambdas).
+Some features are not implemented yet and will be added later (most notably indentation-based expressions, optional parentheses, and enums).
 The first version also contains a lot of magic like `if` and `while`, and the type system is fragile.
 
-Regarding tooling, we already have a language server that provides syntax highlighting and go-to-definition.
+Regarding tooling, we already have a language server that provides syntax highlighting, inline type hints, tooltips, folding, and go-to-definition.
 
 ## How to use Candy
 

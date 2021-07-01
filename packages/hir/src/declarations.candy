@@ -133,23 +133,6 @@ impl HirType: HirDeclaration & Equals & Hash {
   }
 }
 
-// TODO(marcelgarus): Decide what to do with this one.
-public class HirConstructor {
-  public let parent: HirType
-  public let disambiguator: Int
-}
-impl HirConstructor: HirDeclaration & Equals & Hash {
-  fun name(): String { "constructor" }
-  fun toString(): String { "{parent}:{name()}" }
-  fun equals(other: This): Bool {
-    (parent as Equals) == (other.parent as Equals) && disambiguator == other.disambiguator
-  }
-  fun hash<T>(hasher: Hasher<T>) {
-    (parent as Hash).hash<T>(hasher)
-    (disambiguator as Hash).hash<T>(hasher)
-  }
-}
-
 public class HirFunction {
   public let parent: HirModule | HirTrait | HirImpl
   public let name_: String

@@ -19,3 +19,20 @@ impl[Success, ErrorType] Result[Success, ErrorType] {
     )
   }
 }
+
+impl[Success: Equals, ErrorType: Equals] Result[Success, ErrorType]: Equals {
+  fun equals(other: Result[Success, ErrorType]): Bool {
+    this.match[Bool](
+      ok = { thisSuccess -> other.match[Bool](ok = { thisSuccess == it }, error = { false() }) },
+      error = { thisError -> other.match[Bool](ok = { false() }, error = { thisError == it }) },
+    )
+  }
+}
+impl[Success: Hash, ErrorType: Hash] Result[Success, ErrorType]: Hash {
+  fun hash[H: Hasher](): H {
+    this.match[H](
+      ok = { H.combine(List[H].of(H.primitive(0), it.hash[H]())) },
+      error = { H.combine(List[H].of(H.primitive(1), it.hash[H]())) },
+    )
+  }
+}

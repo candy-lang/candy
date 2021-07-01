@@ -53,8 +53,8 @@ fun encodeInlineTypes(
   isOrdered: Bool = true,
 ): String {
   mut let strings = inlineTypes.map<String>({ encodeInlineType(context, it) }).toList()
-  if(!isOrdered) { strings = strings.unsafeSorted() }
-  strings.join("")
+  if (!isOrdered) { strings = (strings.unsafeSorted()) }
+  (strings as Iterable<String>).join("")
 }
 fun encodeInlineType(
   context: QueryContext<List<CompilerError>>,

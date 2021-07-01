@@ -2,37 +2,38 @@ use ..Collections
 use ..Int
 
 public trait Hash {
-  # Implemented by types that can be hashed.
+  # A type that can be hashed.
 
-  fun hash[Result](hasher: Hasher[Result]): Hasher[Result]
+  fun hash[H: Hasher](): H
+  # Uses `H`'s static functions to hash primitive bytes into `H`s and combine multiple `H`s into one
+  # single `H`.
+  #
+  # The `H` can be used to customize how good and fast the hash is. For example, for simple
+  # microcontroller programs, you might want to hash into a `UInt16` efficiently, but for a big book
+  # library server, you might want a strong hash with a few hundred bits of entropy.
 
-  fun hashCode(): Int { Hasher.default().write(this).finish() }
+  fun hashCode(): Int { this.hash[IntHasher]().finish() }
+  # Hashes `this` into an `Int` using the default `IntHasher`.
 }
 
-trait Hasher[Result] {
-  # A trait for hashing an arbitrary stream of bytes.
+public trait Hasher {
+  # A trait for hashing arbitrary bytes.
 
-  static fun default(): Hasher[Int] { DefaultHasher(0) }
+  static fun primitive(value: Int): This
+  # Creates a new hash value based on a `Int`.
+  ## TODO(marcelgarus): Make this accept a UInt8.
 
-  fun write(value: Int /* UInt8 */): Hasher[Result]
-  fun write(value: List[Int] /* List[UInt8] */): Hasher[Result]
+  static fun combine(values: Iterate[This]): This { this.combineUnordered(values) }
+  # Combines multiple values of this type into a single one.
 
-  fun write(value: Hash): Hasher[Result] {
-    value.hash[Result](this)
-  }
-
-  fun finish(): Result
+  static fun combineUnordered(values: Iterate[This]): This
+  # Combines multiple values of this type into a single one in such a way that the order doesn't
+  # matter.
 }
 
-type DefaultHasher = (entropy: Int = 0)
-impl DefaultHasher: Hasher[Int] {
-  fun write(value: Int): Hasher[Int] {
-    ## TODO(marcelgarus): Make this better. By a lot.
-    DefaultHasher((this.entropy + value) % 100)
-  }
-  fun write(value: List[Int]): Hasher[Int] {
-    value.foldLeft[Hasher[Int]](this, { result, item -> result.write(item) })
-  }
-
-  fun finish(): Int { this.entropy }
+type IntHasher = Int
+impl IntHasher: Hasher {
+  static fun primitive(value: Int): This { IntHasher(value) }
+  static fun combineUnordered(values: Iterate[This]): This { values.sumBy({ it.value }) }
+  fun finish(): Int { this.value }
 }

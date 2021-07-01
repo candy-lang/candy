@@ -20,12 +20,11 @@ impl String {
   public builtin fun trim(): String
 }
 
-builtin impl String: Equals & Comparable
+impl String: Compare {
+  builtin fun compareTo(other: String): Less | Equal | Greater
+}
 impl String: Hash {
-  fun hash[Result](hasher: Hasher[Result]): Hasher[Result] {
-    hasher.write(this.length())
-    hasher.write(this.characters().map[Int]({ 0 }).toList())
-  }
+  builtin fun hash[H: Hasher](): H
 }
 
 impl String: InfixPlus[This, This] {

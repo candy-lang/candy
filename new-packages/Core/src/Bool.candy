@@ -7,7 +7,7 @@ public fun true(): Bool { Bool.True() }
 public fun false(): Bool { Bool.False() }
 
 impl Bool {
-  fun not(): Bool { this.match[Bool](true = { false() }, false = { true() }) }
+  public fun not(): Bool { this.match[Bool](true = { false() }, false = { true() }) }
 }
 
 impl Bool: And {
@@ -27,21 +27,10 @@ impl Bool: Implies {
 }
 
 impl Bool {
-  public fun lazyAnd(other: () -> Bool): Bool {
-    ## TODO(marcelgarus): Rename this to just `and` as soon as we support overloading.
-    this.match[Bool](true = other, false = { false() })
-  }
-
-  public fun lazyOr(other: () -> Bool): Bool {
-    ## TODO(marcelgarus): Rename this to just `or` as soon as we support overloading.
-    this.match[Bool](true = { true() }, false = other)
-  }
+  public fun and(other: () -> Bool): Bool { this.match[Bool](true = other, false = { false() }) }
+  public fun or(other: () -> Bool): Bool { this.match[Bool](true = { true() }, false = other) }
 }
 
-impl Bool {
-  public fun then[T](body: () -> T): Maybe[T] { if[T](this, body) }
-}
-
-public fun if[T](condition: Bool, thenBody: () -> T): Maybe[T] {
-  condition.match[Maybe[T]](true = { Maybe[T].Some(thenBody()) }, false = { Maybe[T].None() })
+impl Bool: Hash {
+  fun hash[H: Hasher](): H { H.primitive(this.match[Int](true = { 1 }, false = { 0 })) }
 }
