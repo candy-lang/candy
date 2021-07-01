@@ -636,8 +636,9 @@ fun getAllImplementedTraitsFor(
   query<Set<HirImpl>, List<CompilerError>>(context, "getAllImplementedTraitsFor", DataTuple2(base, scope), {
     getAllTraitsInScope(context, scope)
       .items()
-      .where({ implFor(context, base, it, scope).isSome() })
+      .where({ (implFor(context, base, it, scope) is Some) })
       .toSet()
+  })
 }
 
 fun getAllImplsFor(
@@ -692,9 +693,9 @@ fun typeOf(
     return (typeOf(expression.receiver) as HirFunctionType).returnType
   }
   if (expression is HirNamedTupleValueExpression) {
-    return HirTupleType(
-      expression.valueArguments.entries()
-      .map<HirInlineType>({ (it.first, typeOf(context, scope, uriMapping, it.second)) })
+    return HirNamedTupleType(
+      expression.valueArguments
+        .map<String, HirInlineType>({ Tuple(it.first, typeOf(context, scope, uriMapping, it.second)) })
     )
   }
   if (expression is HirNamedTupleFieldAccessValueExpression) {

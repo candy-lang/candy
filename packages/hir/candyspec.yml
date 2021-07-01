@@ -4,6 +4,9 @@ dependencies:
   petit_parser:
     # remove this when we support transitive dependencies
     path: ../petit_parser
+  incremental:
+    # remove this when we support transitive dependencies
+    path: ../incremental
   compiler_utils:
     path: ../compiler_utils
   cst:
@@ -11,5 +14,3 @@ dependencies:
     path: ../cst
   ast:
     path: ../ast
-  incremental:
-    path: ../incremental

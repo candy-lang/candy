@@ -71,7 +71,7 @@ public class HirTrait {
   public let parent: HirModule
   public let name_: String
 
-  static fun coreToString(context: QueryContext<List<CompilerError>>): HirType {
+  static fun coreToString(context: QueryContext<List<CompilerError>>): HirTrait {
     HirTrait(HirModule.coreString(context), "ToString")
   }
 }
