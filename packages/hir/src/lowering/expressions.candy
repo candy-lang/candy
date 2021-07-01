@@ -1,0 +1,233 @@
+use ast
+use compiler_utils
+use incremental
+
+use ..declarations
+use ..file
+use ...declarations
+use ...expressions
+use ...file
+use ...types
+
+fun lowerFunctionBody(
+  context: QueryContext<List<CompilerError>>,
+  function: HirFunction,
+): (List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>) {
+  query<List<HirValueExpression>, List<CompilerError>>(context, "lowerFunctionBody", function, {
+    let ast = function.ast(context)
+    let context = LoweringContext(
+      NameScope(None<LoweringContext>(), MutableMap.empty<String, HirValueExpressionUri>()),
+      MutableMap.empty<HirValueExpressionUri, HirValueExpression>(),
+      0,
+    )
+  })
+}
+
+class BodyGlobalState {
+  let function: HirFunction
+  let expressions: MutableMap<HirValueExpressionUri, HirValueExpression>
+  mut let nextExpressionId: Int
+}
+class LoweringContext {
+  let global: BodyGlobalState
+  let parent: Maybe<LoweringContext>
+  let localProperties: MutableMap<String, HirValueExpressionUri>
+}
+impl LoweringContext {
+  fun register(expression: HirValueExpression): HirValueExpressionUri {
+    let uri = HirValueExpressionUri(
+      this.global.function,
+      this.global.nextExpressionId,
+    )
+    this.global.nextExpressionId = this.global.nextExpressionId + 1
+    this.global.expressions.put(uri, expression)
+    uri
+  }
+
+  fun resolveLocalProperty(
+    context: QueryContext<List<CompilerError>>,
+    name: String,
+  ): HirValueExpressionUri {
+    this.localProperties.get(name).or({
+      this.parent.flatMap<HirValueExpressionUri>({ it.resolveLocalProperty(context, name) })
+    })
+  }
+
+  /// Lowers and registers the expression on this context and returns the uri.
+  fun lowerExpression(
+    context: QueryContext<List<CompilerError>>,
+    expression: AstExpression,
+  ): HirValueExpression {
+    if (expression is AstIntExpression) {
+      return this.register(HirIntValueExpression((expression as AstIntExpression).value))
+    }
+
+    if (expression is AstStringExpression) {
+      // For String expressions, the interpolation is desugared string into multiple calls to `+`.
+      // "{name} is a great {type}" -> "" + name + " is a great " + type
+      mut let stringUri = this.register(HirStringValueExpression(""))
+
+      for part in (expression as AstStringExpression).parts {
+        let expressionToAdd: HirExpression
+        if (part is AstLiteralStringPart) {
+          (part as AstLiteralStringPart).value.value
+        } else {
+          lowerExpression(context, (part as AstInterpolatedStringPart).expression),
+        }
+
+        stringUri = this.register(HirFunctionCallValueExpression(
+          stringUri,
+          // TODO(marcelgarus): Directly call the `String`'s `add` function for better performance
+          // (and in case someone implements `+` for `String` a second time).
+          HirFunction.infixPlus(context),
+          Map.empty<String, HirInlineType>(),
+          Map.of1<String, HirValueExpressionUri>(Tuple("other", this.register(expressionToAdd))),
+        ))
+      }
+      return stringUri
+    }
+
+    if (expression is AstLambdaExpression) {
+      let expression = (expression as AstLambdaExpression)
+      let body = (expression.expressions as Iterable<AstExpression>)
+        .map<HirValueExpressionUri>({ this.lowerExpression(context, it) })
+        .toList()
+      return HirLambdaValueExpression(
+        (expression.valueParameters as Iterable<AstValueParameter>)
+          .map<HirLambdaParameter>({ lowerParameter(context, it) })
+          .toList(),
+        body,
+        body.last().returnType,
+      )
+    }
+
+    if (expression is AstIdentifierExpression) {
+      let expression = (expression as AstIdentifierExpression)
+      let name = expression.identifier.name
+      let property = this.resolveLocalProperty(context, name).or<HirValueExpressionUri>({
+        let matchingDeclarations = resolveIdentifier(context, name, this.global.function)
+        todo("Choose the appropriate matching declaration.")
+      })
+    }
+
+    if (expression is AstTupleExpression) {
+      let expression = (expression as AstTupleExpression)
+      return HirTupleValueExpression(
+        (expression.expressions as Iterable<AstExpression>)
+          .map<HirValueExpressionUri>({ this.lowerExpression(context, it) })
+          .toList(),
+      )
+    }
+
+    if (expression is AstBinaryExpression) {
+      let expression = (expression as AstBinaryExpression)
+      mut let function = HirFunction.infixEqualEqual(context)
+      let name = expression.identifier.name
+      if (name == "==") { function = HirFunction.infixEqualEqual(context) }
+      if (name == "!=") { function = HirFunction.infixExclamationEqual(context) }
+      if (name == "<")  { function = HirFunction.infixLess(context) }
+      if (name == "<=") { function = HirFunction.infixLessEqual(context) }
+      if (name == ">")  { function = HirFunction.infixGreater(context) }
+      if (name == ">=") { function = HirFunction.infixGreaterEqual(context) }
+      if (name == "+")  { function = HirFunction.infixPlus(context) }
+      if (name == "-")  { function = HirFunction.infixMinus(context) }
+      if (name == "*")  { function = HirFunction.infixStar(context) }
+      if (name == "/")  { function = HirFunction.infixSlash(context) }
+      if (name == "//") { function = HirFunction.infixSlashSlash(context) }
+      if (name == "%")  { function = HirFunction.infixPercent(context) }
+      if (name == "&")  { function = HirFunction.infixAmpersand(context) }
+      if (name == "|")  { function = HirFunction.infixBar(context) }
+      if (name == "=>") { function = HirFunction.infixEqualGreater(context) }
+      return HirFunctionCallValueExpression(
+        this.lowerExpression(expression.leftOperand),
+        function,
+        Map.empty<String, HirInlineType>(),
+        Map.of1<String, HirValueExpressionUri>(this.lowerExpression(expression.rightOperand)),
+      )
+    }
+
+    if (expression is AstPropertyExpression) {
+      let expression = (expression as AstPropertyExpression)
+      let uri = this.lowerExpression(context, expression.initializer.unwrap())
+      this.localProperties.put(expression.name, uri)
+    }
+
+    if (expression is AstNavigationExpression) {
+      // This ia an AstNavigationExpression that has is not inside an AstCallExpression – otherwise,
+      // the lowering of the surrounding AstCallExpression would have also handled the inner
+      // AstNavigationExpression. So, this is a function invocation without any parameters.
+      // But that doesn't work for now.
+      todo("Function call with omitted parentheses")
+    }
+
+    if (expression is AstCallExpression) {
+      let expression = (expression as AstCallExpression)
+      let receiver = expression.receiver
+      let typeArguments = expression.typeArguments
+      let valueArguments = expression.valueArguments
+      if (receiver is AstIdentifierExpression) {
+        todo("Lower top-level function")
+        let function = resolveIdentifier(context, name, this.global.function).
+        return HirFunctionCallValueExpression(
+          None<HirValueExpressionUri>(), // No receiver.
+          ,
+          this.lowerExpression(context, receiver),
+          
+        )
+      }
+      if (receiver is AstNavigationExpression) {
+        todo("Lower method")
+      }
+      todo("Lower lambda")
+    }
+
+    if (expression is AstReturnExpression) {
+      let expression = (expression as AstReturnExpression)
+      let returnValue = expression.value.orElse({ HirExpression.unit(context) })
+      return HirReturnValueExpression(
+        this.global.function,
+        this.lowerExpression(context, returnValue),
+      )
+    }
+  }
+
+  fun lowerParameter(context: QueryContext<List<CompilerError>>, parameter: AstValueParameter): HirLambdaParameter {
+
+  }
+}
+
+// fun getMember(
+//   context: QueryContext<List<CompilerError>>,
+//   baseType: HirInlineType,
+//   name: String,
+//   moduleHir: HirModule,
+// ): Set<HirModule | HirType | HirTrait | HirFunction> {
+//   query<Set<HirModule | HirType | HirTrait | HirFunction>, List<CompilerError>>(
+//     context, "getMember", DataTuple3<String, HirDeclaration, Bool>(baseType, name, moduleHir),
+//     {
+//       mut let useLines = (moduleHir.useLines(context) as Iterable<HirUseLine>)
+//       if (onlySearchPublicUseLines) {
+//         useLines = useLines.where({ (it as HasVisibility).isPublic(context) })
+//       }
+
+//       let candidates = useLines
+//         .maybeMap<HirModule>({ it.targetModule(context) })
+//         .expand<HirModule | HirType | HirTrait | HirFunction>({
+//           let declarations = ((it as HasDeclarations).declarations(context) as Iterable<HirDeclaration>)
+//             // Files/modules can't contains constructors directly.
+//             .cast<HirModule | HirTrait | HirImpl | HirType | HirFunction>()
+//             .where({ (it as HirDeclaration).name() == identifier })
+//             .where({ (it as HasVisibility).isPublic(context) })
+//           if (declarations.isNotEmpty()) {
+//             // This file may not export other declarations via public use-lines, hence we don't have
+//             // to visit these.
+//             return declarations
+//           }
+
+//           return resolveIdentifierInUseLines(context, identifier, it, true).items()
+//         })
+
+//       Tuple(candidates.toSet(), List.empty<CompilerError>())
+//     }
+//   )
+// }

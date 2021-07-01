@@ -6,33 +6,33 @@ use incremental
 use ...types
 use ..utils
 
-public fun compileIntExpression(
+public fun compileIntValueExpression(
   context: QueryContext<List<CompilerError>>,
-  expression: HirIntExpression,
+  expression: HirIntValueExpression,
 ): DartStatement {
   query<DartStatement, List<CompilerError>>(
     context,
-    "code_generator_dart.compileIntExpression",
+    "code_generator_dart.compileIntValueExpression",
     expression, {
-    let dartExpression = (compileNamedType(context, HirNamedType.coreInt(context)) as DartExpression)
+    let dartExpression = (compileNamedType(context, HirNamedType.coreInt(context)) as DartValueExpression)
       .call1(DartIntLiteral(expression.value))
-    let statement = saveExpression(context, expression, dartExpression)
+    let statement = saveValueExpression(context, expression, dartExpression)
     Tuple(statement, List.empty<CompilerError>())
   })
 }
 
 
-public fun compileStringExpression(
+public fun compileStringValueExpression(
   context: QueryContext<List<CompilerError>>,
-  expression: HirStringExpression,
+  expression: HirStringValueExpression,
 ): DartStatement {
   query<DartStatement, List<CompilerError>>(
     context,
-    "code_generator_dart.compileStringExpression",
+    "code_generator_dart.compileStringValueExpression",
     expression, {
-    let dartExpression = (compileNamedType(context, HirNamedType.coreString(context)) as DartExpression)
+    let dartExpression = (compileNamedType(context, HirNamedType.coreString(context)) as DartValueExpression)
       .call1(DartStringLiteral(expression.value))
-    let statement = saveExpression(context, expression, dartExpression)
+    let statement = saveValueExpression(context, expression, dartExpression)
     Tuple(statement, List.empty<CompilerError>())
   })
 }

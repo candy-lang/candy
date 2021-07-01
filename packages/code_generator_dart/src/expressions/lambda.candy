@@ -10,20 +10,14 @@ use ..utils
 
 let thisParameterName = "$this"
 
-public fun compileLambdaExpression(
+public fun compileLambdaValueExpression(
   context: QueryContext<List<CompilerError>>,
-  expression: HirLambdaExpression,
+  expression: HirLambdaValueExpression,
 ): DartStatement {
   query<DartStatement, List<CompilerError>>(
     context,
-    "code_generator_dart.compileLambdaExpression",
+    "code_generator_dart.compileLambdaValueExpression",
     expression, {
-    mut let parameters = expression.parameters
-    expression.receiverType.do({
-      parameters = List.of1<HirLambdaParameter>(HirLambdaParameter(thisParameterName, it))
-        .followedByList(parameters)
-      unit
-    })
     let parameters = (expression.parameters as Iterable<HirLambdaParameter>)
       .map<DartParameter>({
         DartParameter(
@@ -35,8 +29,8 @@ public fun compileLambdaExpression(
       })
       .toList()
 
-    let expressions = (expression.expressions as Iterable<HirExpressionUri<HirExpression>>)
-      .map<HirExpression>({ getExpression<HirExpression>(it) })
+    let expressions = (expression.expressions as Iterable<HirValueExpressionUri>)
+      .map<HirValueExpression>({ getValueExpression(it) })
       .toList()
 
     let dartExpression = DartClosure(
@@ -46,6 +40,6 @@ public fun compileLambdaExpression(
       namedParameters = List.empty<DartParameter>(),
       body = compileExpressionsToBody(context, expression.uri, expressions),
     )
-    Tuple(saveExpression(context, expression, dartExpression), List.empty<CompilerError>())
+    Tuple(saveValueExpression(context, expression, dartExpression), List.empty<CompilerError>())
   })
 }

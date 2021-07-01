@@ -91,10 +91,9 @@ fun generateUtils(context: QueryContext<List<CompilerError>>): (Path, String) {
 
 fun generateSyntheticPackage(context: QueryContext<List<CompilerError>>, package: Package): Map<Path, String> {
   query<Map<Path, String>, List<CompilerError>>(context, "code_generator_dart.generateSyntheticPackage", package, {
-    let declarations = (List.of3<(HirModule, List<DartDeclaration>)>(
+    let declarations = (List.of2<(HirModule, List<DartDeclaration>)>(
       compileEnumTypeDeclarations(context, package),
       compileNamedTupleTypeDeclarations(context, package),
-      compileTupleTypeDeclarations(context, package),
     ) as Iterable<(HirModule, List<DartDeclaration>)>)
     assert(
       declarations.all({ (it.first as HasPackageAndPath).package() == Package.synthetic(context) }),

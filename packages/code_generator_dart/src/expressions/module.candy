@@ -6,100 +6,85 @@ use incremental
 public use .body
 public use .lambda
 public use .literals
-public use .local_property
 public use .references
 public use .types
 
-public fun compileExpression(
+public fun compileValueExpression(
   context: QueryContext<List<CompilerError>>,
-  expression: HirExpression,
+  expression: HirValueExpression,
 ): List<DartStatement> {
   query<List<DartStatement>, List<CompilerError>>(
     context,
-    "code_generator_dart.compileExpression",
+    "code_generator_dart.compileValueExpression",
     expression as Equals & Hash, {
-    Tuple(compileExpressionHelper(context, expression), List.empty<CompilerError>())
+    Tuple(compileValueExpressionHelper(context, expression), List.empty<CompilerError>())
   })
 }
-fun compileExpressionHelper(
+fun compileValueExpressionHelper(
   context: QueryContext<List<CompilerError>>,
-  expression: HirExpression,
+  expression: HirValueExpression,
 ): List<DartStatement> {
-  if (expression is HirIntExpression) {
-    return List.of1<DartStatement>(compileIntExpression(context, expression as HirIntExpression))
-  }
-  if (expression is HirStringExpression) {
+  if (expression is HirIntValueExpression) {
     return List.of1<DartStatement>(
-      compileStringExpression(context, expression as HirStringExpression),
+      compileIntValueExpression(context, expression as HirIntValueExpression),
+    )
+  }
+  if (expression is HirStringValueExpression) {
+    return List.of1<DartStatement>(
+      compileStringValueExpression(context, expression as HirStringValueExpression),
     )
   }
 
-  if (expression is HirLambdaExpression) {
+  if (expression is HirLambdaValueExpression) {
     return List.of1<DartStatement>(
-      compileLambdaExpression(context, expression as HirLambdaExpression),
+      compileLambdaValueExpression(context, expression as HirLambdaValueExpression),
     )
   }
 
-  // if (expression is HirThisExpression) {
-  //   return compileThisExpression(context, expression as HirThisExpression)
-  // }
-  // if (expression is HirSuperExpression) {
-  //   return compileSuperExpression(context, expression as HirSuperExpression)
+  // if (expression is HirThisValueExpression) {
+  //   return compileThisValueExpression(context, expression as HirThisValueExpression)
   // }
 
-  // if (expression is HirReflectionExpression) {
-  //   return compileReflectionExpression(context, expression as HirReflectionExpression)
+  // if (expression is HirParameterReferenceExpression) {
+  //   return List.of1<DartStatement>(
+  //     compileParameterReferenceExpression(
+  //       context,
+  //       expression as HirParameterReferenceExpression,
+  //     ),
+  //   )
   // }
-  if (expression is HirParameterReferenceExpression) {
+  if (expression is HirLocalPropertyReferenceValueExpression) {
     return List.of1<DartStatement>(
-      compileParameterReferenceExpression(
+      compileLocalPropertyReferenceValueExpression(
         context,
-        expression as HirParameterReferenceExpression,
+        expression as HirLocalPropertyReferenceValueExpression,
       ),
     )
   }
-  // if (expression is HirFunctionReferenceExpression) {
-  //   return compileFunctionReferenceExpression(
+
+  if (expression is HirFunctionCallValueExpression) {
+    return compileFunctionCallValueExpression(context, expression as HirFunctionCallValueExpression)
+  }
+
+  // if (expression is HirPropertyNavigationValueExpression) {
+  //   return compilePropertyNavigationValueExpression(
   //     context,
-  //     expression as HirFunctionReferenceExpression,
+  //     expression as HirPropertyNavigationValueExpression,
   //   )
   // }
 
-  if (expression is HirLocalPropertyExpression) {
-    return compileLocalPropertyExpression(context, expression as HirLocalPropertyExpression)
-  }
-  if (expression is HirLocalPropertyReferenceExpression) {
-    return List.of1<DartStatement>(
-      compileLocalPropertyReferenceExpression(
-        context,
-        expression as HirLocalPropertyReferenceExpression,
-      ),
+  if (expression is HirTypeInstantiationValueExpression) {
+    return compileTypeInstantiationValueExpression(
+      context,
+      expression as HirTypeInstantiationValueExpression,
     )
   }
-
-  // if (expression is HirNavigationExpression) {
-  //   return compileNavigationExpression(context, expression as HirNavigationExpression)
-  // }
-
-  // if (expression is HirFunctionCallExpression) {
-  //   return compileFunctionCallExpression(context, expression as HirFunctionCallExpression)
-  // }
-  // if (expression is HirExpressionCallExpression) {
-  //   return compileExpressionCallExpression(context, expression as HirExpressionCallExpression)
-  // }
-
-  if (expression is HirTypeInstantiationExpression) {
-    return compileTypeInstantiationExpression(context, expression as HirTypeInstantiationExpression)
-  }
-  if (expression is HirTupleExpression) {
-    return compileTupleExpression(context, expression as HirTupleExpression)
-  }
-  if (expression is HirNamedTupleExpression) {
-    return compileNamedTupleExpression(context, expression as HirNamedTupleExpression)
+  if (expression is HirNamedTupleValueExpression) {
+    return compileNamedTupleValueExpression(context, expression as HirNamedTupleValueExpression)
   }
 
-  if (expression is HirReturnExpression) {
-    return compileReturnExpression(context, expression as HirReturnExpression)
+  if (expression is HirReturnValueExpression) {
+    return compileReturnValueExpression(context, expression as HirReturnValueExpression)
   }
 
   throw "Unknown expression: {expression}"

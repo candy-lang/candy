@@ -177,7 +177,7 @@ public class AstPropertyExpression {
   public let modifiers: List<AstIdentifier>
   public let name: AstIdentifier
   public let type: Maybe<AstInlineType>
-  public let initializer: Maybe<AstExpression>
+  public let initializer: AstExpression
 }
 impl AstPropertyExpression: AstExpression & Equals & Hash {
   fun equals(other: This): Bool {
@@ -186,7 +186,7 @@ impl AstPropertyExpression: AstExpression & Equals & Hash {
       (modifiers as Iterable<AstIdentifier>).unsafeEquals(other.modifiers) &&
       (name as Equals) == (other.name as Equals) &&
       type.unsafeEquals(other.type) &&
-      initializer.unsafeEquals(other.initializer)
+      (initializer as Equals) == (other.initializer as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
@@ -194,7 +194,7 @@ impl AstPropertyExpression: AstExpression & Equals & Hash {
     (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
     (name as Hash).hash<T>(hasher)
     type.unsafeHash<T>(hasher)
-    initializer.unsafeHash<T>(hasher)
+    (initializer as Hash).hash<T>(hasher)
   }
 }
 
