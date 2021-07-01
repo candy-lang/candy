@@ -91,7 +91,7 @@ impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
             List.of1<CompilerError>(
               UnsupportedFeatureCompilerError(
                 // TODO(JonasWanke): add the actual location of this compiler error
-                Location(ast.id.parentId.file, Span(0, 1)),
+                Some<Location>(Location(ast.id.parentId.file, Span(0, 1))),
                 "Grouped packages are not yet supported.",
               ),
             ),
@@ -103,7 +103,7 @@ impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
             List.of1<CompilerError>(
               UnsupportedFeatureCompilerError(
                 // TODO(JonasWanke): add the actual location of this compiler error
-                Location(ast.id.parentId.file, Span(0, 1)),
+                Some<Location>(Location(ast.id.parentId.file, Span(0, 1))),
                 "Named exports of packages are not yet supported.",
               ),
             ),

@@ -23,13 +23,13 @@ impl InternalCompilerError: CompilerError {
 }
 
 public class UnsupportedFeatureCompilerError {
-  public let location_: Location
+  public let location_: Maybe<Location>
   public let description_: String
 }
 impl UnsupportedFeatureCompilerError: CompilerError {
   public fun id(): String { "unsupported-feature" }
 
-  public fun location(): Location { location_ }
+  public fun location(): Location { location_.orElse({ todo("No location known.") }) }
   public fun title(): String { "Unsupported feature" }
   public fun description(): String { description_ }
 }

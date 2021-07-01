@@ -18,6 +18,13 @@ impl HirValueExpressionUri: Equals & Hash {
 public trait HirValueExpression {}
 impl HirValueExpression: Equals & Hash
 
+/// A placeholder for an expression that couldn't be lowered.
+public class HirErrorValueExpression {}
+impl HirErrorValueExpression: HirValueExpression & Equals & Hash {
+  fun equals(other: This): Bool { true }
+  fun hash<T>(hasher: Hasher<T>) {}
+}
+
 /// An `Int` literal.
 ///
 /// Examples:

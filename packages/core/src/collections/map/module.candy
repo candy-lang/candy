@@ -64,6 +64,15 @@ public trait Map<Key: Equals & Hash, Value> {
   fun keys(): Iterable<Key> { entries().map<Key>({ it.first }) }
   fun values(): Iterable<Value> { entries().map<Value>({ it.second }) }
 
+  fun map<NewKey, NewValue>(mapper: (Key, Value) => (NewKey, NewValue)): Map<NewKey, NewValue> {
+    let map = MutableMap.empty<Key, Value>()
+    for entry in entries() {
+      let new = mapper(entry.first, entry.second)
+      map.set(new.first, new.second)
+    }
+    map
+  }
+
   fun toMutable(): MutableMap<Key, Value> {
     let map = MutableMap.empty<Key, Value>()
     for entry in entries() {

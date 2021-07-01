@@ -237,7 +237,7 @@ impl HirImpl {
           None<HirInlineType>(),
           List.empty<CompilerError>(
             // UnsupportedFeatureCompilerError(
-            //   Location(, Span(0, 1)),
+            //   Some<Location>(Location(, Span(0, 1))),
             //   "This impl is for more than one trait: {this}",
             // ),
           ),
@@ -607,6 +607,62 @@ fun implFor(
   })
 }
 
+fun getAllTraitsInScope(context: QueryContext<List<CompilerError>>, scope: Package): Set<HirTrait> {
+  query<Set<HirTrait>, List<CompilerError>>(context, "getAllTraitsInScope", scope as Equals & Hash, {
+    let traits = (scope.getAllPackagesInCompilationOrder(context) as Iterable<Package>)
+      .map<Set<HirTrait>>({ package => getAllTraitsOfModule(context, HirTopLevelModule(package)) })
+      .foldLeft<Set<HirTrait>>(Set.empty<HirTrait>(), { a, b => a.union(b) })
+    Tuple(traits, List.empty<CompilerError>())
+  })
+}
+fun getAllTraitsOfModule(context: QueryContext<List<CompilerError>>, module: HirModule): Set<HirTrait> {
+  query<Set<HirTrait>, List<CompilerError>>(context, "getAllTraitsOfModule", module as Equals & Hash, {
+
+    let declarations = (declarationsOfModule(context, module) as Iterable<HirDeclaration>)
+    let traits = declarations
+      .whereType<HirModule>()
+      .expand<HirTrait>({ (getAllTraitsOfModule(context, it) as Iterable<HirTrait>) })
+      .followedBy(declarations.whereType<HirTrait>())
+      .toSet()
+    Tuple(traits, List.empty<CompilerError>())
+  })
+}
+
+fun getAllImplementedTraitsFor(
+  context: QueryContext<List<CompilerError>>,
+  base: HirInlineType,
+  scope: Package,
+): Set<HirTrait> {
+  query<Set<HirImpl>, List<CompilerError>>(context, "getAllImplementedTraitsFor", DataTuple2(base, scope), {
+    getAllTraitsInScope(context, scope)
+      .items()
+      .where({ implFor(context, base, it, scope).isSome() })
+      .toSet()
+}
+
+fun getAllImplsFor(
+  context: QueryContext<List<CompilerError>>,
+  base: HirInlineType,
+  scope: Package,
+): Set<HirImpl> {
+  query<Set<HirImpl>, List<CompilerError>>(context, "getAllImplsFor", DataTuple2(base, scope), {
+    let implementedTraits = getAllImplementedTraitsFor(context, base, scope).
+    getAllImplsInScope(context, scope)
+      .where({ it.baseType(context) == implementedTraits })
+      .followedBy({ getAllImplsInScope(context, scope).where({ it.baseType(context) == base }) })
+      .toSet()
+  })
+}
+
+// fun resolveFunctionOnInlineType(
+//   context: QueryContext<List<CompilerError>>,
+//   base: HirInlineType,
+//   functionName: String,
+//   scope: Package,
+// ): Set<HirFunction> {
+//   getAllImplsInScope()
+// }
+
 fun typeOf(
   context: QueryContext<List<CompilerError>>,
   scope: HirFunction | HirType,
@@ -614,6 +670,8 @@ fun typeOf(
   uri: HirValueExpressionUri,
 ): HirInlineType {
   let expression = uriMapping.get(uri)
+
+  if (expression is HirErrorValueExpression) { return HirErrorType() }
   if (expression is HirIntValueExpression) { return intInlineType(context) }
   if (expression is HirStringValueExpression) { return stringInlineType(context) }
   if (expression is HirLambdaValueExpression) {
