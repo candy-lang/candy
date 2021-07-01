@@ -69,7 +69,7 @@ public trait HasDeclarations {
 }
 impl HirDeclaration: HasDeclarations
 
-public trait HasTypeParameters {
+public trait HasTypeParameters: Equals & Hash {
   fun typeParameters(context: QueryContext<List<CompilerError>>): List<HirParameterType>
 }
 fun hirParameterTypesFromAstTypeParameters(
@@ -472,14 +472,5 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
     query<Bool, List<CompilerError>>(context, "HirFunction.isPublic", this, {
       Tuple(isPublicFromModifiers(ast(context).modifiers), List.empty<CompilerError>())
     })
-  }
-}
-
-impl HirConstructor: HasDeclarations {
-  fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any> {
-    List.empty<Any>()
-  }
-  public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
-    List.empty<HirDeclaration>()
   }
 }
