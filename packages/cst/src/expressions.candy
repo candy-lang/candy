@@ -64,6 +64,7 @@ public class CstTypeArgumentsExpression {
   public let value: CstNode<CstExpression>
   public let typeArguments: CstNode<CstTypeArguments>
 }
+impl CstTypeArgumentsExpression: CstExpression
 
 
 public class CstGroupExpression {

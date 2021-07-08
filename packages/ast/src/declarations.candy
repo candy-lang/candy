@@ -25,7 +25,7 @@ impl AstDeclaration: AstNode & Equals & Hash {
   fun equals(other: This): Bool {
     (modifiers as Iterable<AstIdentifier>).unsafeEquals(other.modifiers as Iterable<AstIdentifier>)
   }
-  fun hash<T>(hasher: Hasher<T>) { (modifiers as Hash).unsafeHash<T>(hasher) }
+  fun hash<T>(hasher: Hasher<T>) { (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher) }
 }
 
 public trait AstWithTypeParameters {

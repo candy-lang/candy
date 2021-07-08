@@ -1517,32 +1517,41 @@ fun lowerExpression(
     let typeArgumentsExpression = cst.cast<CstTypeArgumentsExpression>()
     let child = typeArgumentsExpression.child.value
 
+    // mut let result = None<AstExpression>()
+    // mut let wereTypeArgumentsAppropriate = false
+
     if child.child is CstIdentifierExpression {
       let expression = lowerIdentifierExpression(context, parentId, child.cast<CstIdentifierExpression>())
-      let typeArguments = lowerTypeArguments(context, expression.id, typeArgumentsExpression)
+      let typeArguments = lowerTypeArguments(context, expression.id, typeArgumentsExpression.child.typeArguments)
       return Some<AstExpression>(AstIdentifierExpression(expression.id, expression.value, typeArguments))
     }
 
     if child.child is CstNavigationExpression {
-      let expression = lowerNavigationExpression(context, parentId, child.cast<CstNavigationExpression>())
-      let typeArguments = lowerTypeArguments(context, expression.id, typeArgumentsExpression)
-      return Some<AstExpression>(
-        AstNavigationExpression(expression.id, expression.receiver, expression.target, typeArguments),
-      )
+      return lowerNavigationExpression(context, parentId, child.cast<CstNavigationExpression>())
+        .map<AstExpression>({
+          if (it is AstNavigationExpression) {
+            let expression = (it as AstNavigationExpression)
+            let typeArguments = lowerTypeArguments(context, expression.id, typeArgumentsExpression.child.typeArguments)
+            AstNavigationExpression(expression.id, expression.receiver, expression.target, typeArguments)
+          } else {
+            it
+          }
+        })
     }
 
-    if child.child is CstCallExpression {
-      let expression = lowerCallExpression(context, parentId, child.cast<CstCallExpression>())
-      let typeArguments = lowerTypeArguments(context, expression.id, typeArgumentsExpression)
-      return Some<AstExpression>(
-        AstCallExpression(expression.id, expression.receiver, typeArguments, expression.valueArguments),
+    // Lowered but ignored so that inner errors are still generated.
+    if (parentId is AstInlineTypeId || parentId is AstExpressionId) {
+      // TODO(JonasWanke): Lower even if the parent is a declaration.
+      lowerTypeArguments(
+        context,
+        parentId as AstInlineTypeId | AstExpressionId,
+        typeArgumentsExpression.child.typeArguments,
       )
     }
-
-    context.registerError(
+    context.addError(
       UnexpectedTypeArgumentsError(context.file, cst.cast<CstTypeArgumentsExpression>()),
     )
-    return None
+    return None<AstExpression>()
   }
   if cst.child is CstGroupExpression {
     return lowerGroupExpression(context, parentId, cst.cast<CstGroupExpression>())
@@ -1745,7 +1754,7 @@ fun lowerIdentifierExpression(
   context: LoweringContext,
   parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstIdentifierExpression>,
-): AstExpression {
+): AstIdentifierExpression {
   let id = context.getExpressionId(parentId)
 
   let value = lowerIdentifier(context, id, cst.child.value, 0)
@@ -2003,7 +2012,9 @@ fun lowerNavigationExpression(
   let target = lowerIdentifier(context, id, cst.child.target.unwrap(), 0)
 
   context.addIdMapping(cst.id, id)
-  receiver.map<AstExpression>({ receiver => AstNavigationExpression(id, receiver, target) })
+  receiver.map<AstExpression>({
+    AstNavigationExpression(id, it, target, List.empty<AstTypeArgument>())
+  })
 }
 
 fun lowerCallExpression(
@@ -2015,9 +2026,15 @@ fun lowerCallExpression(
 
   let receiver = lowerExpression(context, id, cst.child.receiver)
 
-  let typeArguments = cst.child.typeArguments
-      .map<List<AstTypeArgument>>({ lowerTypeArguments(context, id, it) })
-      .orElse({ List.empty<AstTypeArgument>() })
+  let typeArguments = if (cst.child.receiver.child is CstTypeArgumentsExpression) {
+    lowerTypeArguments(
+      context,
+      id,
+      cst.child.receiver.cast<CstTypeArgumentsExpression>().child.typeArguments,
+    )
+  } else {
+    List.empty<AstTypeArgument>()
+  }
 
   let valueArguments = lowerValueArguments(context, id, cst.child.valueArguments)
 
