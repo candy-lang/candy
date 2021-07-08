@@ -1,0 +1,50 @@
+use ..Bool
+use ..Int
+use ..Maybe
+use ..Primitives
+
+impl Bool {
+  public fun then[T](body: () -> T): Maybe[T] { if[T](this, body) }
+}
+
+public fun if[T](condition: Bool, thenBody: () -> T): Maybe[T] {
+  condition.match[Maybe[T]](true = { Maybe[T].Some(thenBody()) }, false = { Maybe[T].None() })
+}
+
+public builtin fun loop(body: () -> Nothing): Never
+# Executes the body infinitely often.
+## TODO(marcelgarus): Implement this in pure Candy once we have tail-call elimination.
+
+impl Int {
+  public fun times(body: () -> Nothing) {
+    # Executes the `body` `this` many times.
+
+    0.until(this).do({ body() })
+  }
+}
+
+public fun run[T](body: () -> T): T { body() }
+# A function that runs the given `body` with no arguments.
+#
+# Calling this function is the same as calling the `body` by adding parenthesis at the end, but it
+# looks nicer:
+#
+# ```
+# let a = run {
+#   // Some code that can create local variables without cluttering the surrounding namespace.
+# }
+# ```
+
+public fun doNotRun(code: () -> Nothing) {}
+# A function that doesn't run the given `body`.
+#
+# This function is useful during development to mark code that's not ready to run yet. In contrast
+# to commenting out the code, the code is still part of the analyzed program.
+#
+# These are some of the benefits over commenting code out:
+#
+# * Refactorings, like renaming of classes, also affect the code.
+# * Candy stops reporting linter warnings for fields and functions in the outer scope that are
+#   only used in the code.
+# * Making the code invalid (for example, by deleting needed classes, functions, or properties)
+#   results in compiler errors.

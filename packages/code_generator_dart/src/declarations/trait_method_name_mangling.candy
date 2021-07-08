@@ -18,8 +18,7 @@ fun getMangledTraitMethodName(context: QueryContext<List<CompilerError>>, traitT
     // * "F" <parameterTypes: inlineType>* <returnType: inlineType> "E": **f**unction type
     // * "R" <receiverType: inlineType> <parameterTypes: inlineType>* <returnType: inlineType> "E":
     //   function type with **r**eceiver
-    // * "T" <inlineType>{2,} "E": **t**uple type
-    // * "S" (<fieldName: identifier> <inlineType>)+ "E": named tuple type (**s**truct)
+    // * "T" (<fieldName: identifier> <inlineType>)+ "E": named **t**uple type
     // * "U" (<variantName: identifier> <inlineType>?)+ "E": en**u**m type
     // * "I" <inlineType>{2,} "E": **i**ntersection type
     let name = encodeNamedType(context, traitType)
@@ -53,8 +52,8 @@ fun encodeInlineTypes(
   isOrdered: Bool = true,
 ): String {
   mut let strings = inlineTypes.map<String>({ encodeInlineType(context, it) }).toList()
-  if(!isOrdered) { strings = strings.unsafeSorted() }
-  strings.join("")
+  if (!isOrdered) { strings = (strings.unsafeSorted()) }
+  (strings as Iterable<String>).join("")
 }
 fun encodeInlineType(
   context: QueryContext<List<CompilerError>>,
@@ -64,7 +63,6 @@ fun encodeInlineType(
   if (inlineType is HirFunctionType) {
     return encodeFunctionType(context, inlineType as HirFunctionType)
   }
-  if (inlineType is HirTupleType) { return encodeTupleType(context, inlineType as HirTupleType) }
   if (inlineType is HirNamedTupleType) {
     return encodeNamedTupleType(context, inlineType as HirNamedTupleType)
   }
@@ -94,9 +92,6 @@ fun encodeFunctionType(
   let returnType = encodeInlineType(context, functionType.returnType)
   "{start}{parameterTypes}{returnType}E"
 }
-fun encodeTupleType(context: QueryContext<List<CompilerError>>, tupleType: HirTupleType): String {
-  "T{encodeInlineTypes(context, tupleType.types, true)}E"
-}
 fun encodeNamedTupleType(
   context: QueryContext<List<CompilerError>>,
   namedTupleType: HirNamedTupleType,
@@ -104,7 +99,7 @@ fun encodeNamedTupleType(
   let fields = (namedTupleType.types.sortedBy<String>({ it.first }) as Iterable<(String, HirInlineType)>)
     .map<String>({ "{encodeIdentifier(it.first)}{encodeInlineType(context, it.second)}" })
     .join("")
-  "S{fields}E"
+  "T{fields}E"
 }
 fun encodeEnumType(
   context: QueryContext<List<CompilerError>>,

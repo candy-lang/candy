@@ -65,7 +65,7 @@ public trait Map<Key: Equals & Hash, Value> {
   fun values(): Iterable<Value> { entries().map<Value>({ it.second }) }
 
   fun map<NewKey, NewValue>(mapper: (Key, Value) => (NewKey, NewValue)): Map<NewKey, NewValue> {
-    let map = MutableMap.empty<Key, Value>()
+    let map = MutableMap.empty<NewKey, NewValue>()
     for entry in entries() {
       let new = mapper(entry.first, entry.second)
       map.set(new.first, new.second)

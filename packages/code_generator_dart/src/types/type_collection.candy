@@ -1,0 +1,267 @@
+use compiler_utils
+use dart_code
+use hir
+use incremental
+
+use ...types
+
+public fun getAllInlineTypes(
+  context: QueryContext<List<CompilerError>>,
+  package: Package,
+): Set<HirInlineType> {
+  query<Set<HirInlineType>, List<CompilerError>>(
+    context,
+    "code_generator_dart.getAllInlineTypes",
+    package, {
+    let inlineTypes = (package.getAllPackagesInCompilationOrder(context) as Iterable<Package>)
+      .expand<HirInlineType>({ getAllInlineTypesInside(context, HirTopLevelModule(it)).items() })
+      .toSet()
+    Tuple(inlineTypes, List.empty<CompilerError>())
+  })
+}
+
+fun getAllInlineTypesInside(
+  context: QueryContext<List<CompilerError>>,
+  declarationHir: HirDeclaration,
+): Set<HirInlineType> {
+  let inlineTypes = MutableSet.empty<HirInlineType>()
+  if (declarationHir is HirModule) {}
+  if (declarationHir is HirTrait) {
+    inlineTypes.addAll(getAllInlineTypesInsideTrait(context, declarationHir as HirTrait).items())
+  }
+  if (declarationHir is HirImpl) {
+    inlineTypes.addAll(getAllInlineTypesInsideImpl(context, declarationHir as HirImpl).items())
+  }
+  if (declarationHir is HirType) {
+    inlineTypes.addAll(getAllInlineTypesInsideType(context, declarationHir as HirType).items())
+  }
+  if (declarationHir is HirFunction) {
+    inlineTypes.addAll(
+      getAllInlineTypesInsideFunction(context, declarationHir as HirFunction).items(),
+    )
+  }
+  inlineTypes.addAll(getAllNestedInlineTypesInsideDeclaration(context, declarationHir).items())
+  inlineTypes
+}
+fun getAllInlineTypesInsideTrait(
+  context: QueryContext<List<CompilerError>>,
+  traitHir: HirTrait,
+): Set<HirInlineType> {
+  query<Set<HirInlineType>, List<CompilerError>>(
+    context,
+    "code_generator_dart.getAllInlineTypesInsideTrait",
+    traitHir, {
+    let inlineTypes = getAllInlineTypesInsideTypeParameters(context, traitHir)
+    // TODO(JonasWanke): Traverse upper bound
+    Tuple(inlineTypes, List.empty<CompilerError>())
+  })
+}
+fun getAllInlineTypesInsideImpl(
+  context: QueryContext<List<CompilerError>>,
+  implHir: HirImpl,
+): Set<HirInlineType> {
+  query<Set<HirInlineType>, List<CompilerError>>(
+    context,
+    "code_generator_dart.getAllInlineTypesInsideImpl",
+    implHir, {
+    let inlineTypes = getAllInlineTypesInsideTypeParameters(context, implHir)
+      .union(getAllInlineTypesInsideInlineType(context, implHir.baseType(context)))
+      .union(
+        implHir.implementedTrait(context)
+          .map<Set<HirInlineType>>({ getAllInlineTypesInsideInlineType(context, it) })
+          .orElse({ Set.empty<HirInlineType>() }),
+      )
+    Tuple(inlineTypes, List.empty<CompilerError>())
+  })
+}
+fun getAllInlineTypesInsideType(
+  context: QueryContext<List<CompilerError>>,
+  typeHir: HirType,
+): Set<HirInlineType> {
+  query<Set<HirInlineType>, List<CompilerError>>(
+    context,
+    "code_generator_dart.getAllInlineTypesInsideType",
+    typeHir, {
+    let inlineTypes = getAllInlineTypesInsideTypeParameters(context, typeHir)
+    // TODO(JonasWanke): Traverse inline type
+    Tuple(inlineTypes, List.empty<CompilerError>())
+  })
+}
+fun getAllInlineTypesInsideFunction(
+  context: QueryContext<List<CompilerError>>,
+  functionHir: HirFunction,
+): Set<HirInlineType> {
+  query<Set<HirInlineType>, List<CompilerError>>(
+    context,
+    "code_generator_dart.getAllInlineTypesInsideFunction",
+    functionHir, {
+    let inlineTypes = getAllInlineTypesInsideTypeParameters(context, functionHir)
+    // TODO(JonasWanke): Traverse return type & body
+    Tuple(inlineTypes, List.empty<CompilerError>())
+  })
+}
+fun getAllNestedInlineTypesInsideDeclaration(
+  context: QueryContext<List<CompilerError>>,
+  declarationHir: HirDeclaration,
+): Set<HirInlineType> {
+  ((declarationHir as HasDeclarations).declarations(context) as Iterable<HirDeclaration>)
+    .expand<HirInlineType>({ getAllInlineTypesInside(context, it).items() })
+    .toSet()
+}
+
+fun getAllInlineTypesInsideTypeParameters(
+  context: QueryContext<List<CompilerError>>,
+  declarationHir: HasTypeParameters,
+): Set<HirInlineType> {
+  query<Set<HirInlineType>, List<CompilerError>>(
+    context,
+    "code_generator_dart.getAllInlineTypesInsideTypeParameters",
+    declarationHir, {
+    let inlineTypes = (declarationHir.typeParameters(context) as Iterable<HirParameterType>)
+      .maybeMap<HirInlineType>({ it.upperBound(context) })
+      .toSet()
+    Tuple(inlineTypes, List.empty<CompilerError>())
+  })
+}
+
+fun getAllInlineTypesInsideInlineTypes(
+  context: QueryContext<List<CompilerError>>,
+  inlineTypes: List<HirInlineType>,
+): Set<HirInlineType> {
+  (inlineTypes as Iterable<HirInlineType>)
+    .expand<HirInlineType>({ getAllInlineTypesInsideInlineType(context, it).items() })
+    .toSet()
+}
+fun getAllInlineTypesInsideInlineType(
+  context: QueryContext<List<CompilerError>>,
+  inlineType: HirInlineType,
+): Set<HirInlineType> {
+  query<Set<HirInlineType>, List<CompilerError>>(
+    context,
+    "code_generator_dart.getAllInlineTypesInsideInlineType",
+    inlineType, {
+    let inlineTypes = MutableSet.of1<HirInlineType>(inlineType)
+    if (inlineType is HirErrorType) { throw "Tried to compile an error type to Dart." }
+    if (inlineType is HirNamedType) {
+      inlineTypes.addAll(
+        getAllInlineTypesInsideNamedType(context, inlineType as HirNamedType).items(),
+      )
+    }
+    if (inlineType is HirFunctionType) {
+      inlineTypes.addAll(
+        getAllInlineTypesInsideFunctionType(context, inlineType as HirFunctionType).items(),
+      )
+    }
+    if (inlineType is HirTupleType) {
+      inlineTypes.addAll(
+        getAllInlineTypesInsideTupleType(context, inlineType as HirTupleType).items(),
+      )
+    }
+    if (inlineType is HirNamedTupleType) {
+      inlineTypes.addAll(
+        getAllInlineTypesInsideNamedTupleType(context, inlineType as HirNamedTupleType).items(),
+      )
+    }
+    if (inlineType is HirEnumType) {
+      inlineTypes.addAll(
+        getAllInlineTypesInsideEnumType(context, inlineType as HirEnumType).items(),
+      )
+    }
+    if (inlineType is HirIntersectionType) {
+      inlineTypes.addAll(
+        getAllInlineTypesInsideIntersectionType(context, inlineType as HirIntersectionType).items(),
+      )
+    }
+    if (inlineType is HirThisType) {}
+    if (inlineType is HirParameterType) {}
+    if (inlineType is HirReflectionType) {}
+    Tuple(inlineTypes, List.empty<CompilerError>())
+  })
+}
+fun getAllInlineTypesInsideNamedType(
+  context: QueryContext<List<CompilerError>>,
+  namedType: HirNamedType,
+): Set<HirInlineType> {
+  query<Set<HirInlineType>, List<CompilerError>>(
+    context,
+    "code_generator_dart.getAllInlineTypesInsideNamedType",
+    namedType, {
+    let inlineTypes = getAllInlineTypesInsideInlineTypes(context, namedType.parameterTypes)
+    Tuple(inlineTypes, List.empty<CompilerError>())
+  })
+}
+fun getAllInlineTypesInsideFunctionType(
+  context: QueryContext<List<CompilerError>>,
+  functionType: HirFunctionType,
+): Set<HirInlineType> {
+  query<Set<HirInlineType>, List<CompilerError>>(
+    context,
+    "code_generator_dart.getAllInlineTypesInsideFunctionType",
+    functionType, {
+    let inlineTypes = MutableSet.empty<HirInlineType>()
+    functionType.receiverType.do({
+      inlineTypes.insert(it)
+      unit
+    })
+    inlineTypes.addAll(
+      getAllInlineTypesInsideInlineTypes(context, functionType.parameterTypes).items(),
+    )
+    inlineTypes.addAll(getAllInlineTypesInsideInlineType(context, functionType.returnType).items())
+    Tuple(inlineTypes, List.empty<CompilerError>())
+  })
+}
+fun getAllInlineTypesInsideTupleType(
+  context: QueryContext<List<CompilerError>>,
+  tupleType: HirTupleType,
+): Set<HirInlineType> {
+  query<Set<HirInlineType>, List<CompilerError>>(
+    context,
+    "code_generator_dart.getAllInlineTypesInsideTupleType",
+    tupleType, {
+    Tuple(getAllInlineTypesInsideInlineTypes(context, tupleType.types), List.empty<CompilerError>())
+  })
+}
+fun getAllInlineTypesInsideNamedTupleType(
+  context: QueryContext<List<CompilerError>>,
+  namedTupleType: HirNamedTupleType,
+): Set<HirInlineType> {
+  query<Set<HirInlineType>, List<CompilerError>>(
+    context,
+    "code_generator_dart.getAllInlineTypesInsideNamedTupleType",
+    namedTupleType, {
+    let inlineTypes = getAllInlineTypesInsideInlineTypes(
+      context,
+      (namedTupleType.types as Iterable<(String, HirInlineType)>)
+        .map<HirInlineType>({ it.second })
+        .toList(),
+    )
+    Tuple(inlineTypes, List.empty<CompilerError>())
+  })
+}
+fun getAllInlineTypesInsideEnumType(
+  context: QueryContext<List<CompilerError>>,
+  enumType: HirEnumType,
+): Set<HirInlineType> {
+  query<Set<HirInlineType>, List<CompilerError>>(
+    context,
+    "code_generator_dart.getAllInlineTypesInsideEnumType",
+    enumType, {
+    let inlineTypes = getAllInlineTypesInsideInlineTypes(
+      context,
+      enumType.variants.values().maybeMap<HirInlineType>({ it }).toList(),
+    )
+    Tuple(inlineTypes, List.empty<CompilerError>())
+  })
+}
+fun getAllInlineTypesInsideIntersectionType(
+  context: QueryContext<List<CompilerError>>,
+  intersectionType: HirIntersectionType,
+): Set<HirInlineType> {
+  query<Set<HirInlineType>, List<CompilerError>>(
+    context,
+    "code_generator_dart.getAllInlineTypesInsideIntersectionType",
+    intersectionType, {
+    let inlineTypes = getAllInlineTypesInsideInlineTypes(context, intersectionType.types)
+    Tuple(inlineTypes, List.empty<CompilerError>())
+  })
+}

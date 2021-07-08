@@ -71,7 +71,7 @@ public class HirTrait {
   public let parent: HirModule
   public let name_: String
 
-  static fun coreToString(context: QueryContext<List<CompilerError>>): HirType {
+  static fun coreToString(context: QueryContext<List<CompilerError>>): HirTrait {
     HirTrait(HirModule.coreString(context), "ToString")
   }
 }
@@ -130,23 +130,6 @@ impl HirType: HirDeclaration & Equals & Hash {
   fun hash<T>(hasher: Hasher<T>) {
     (parent as Hash).hash<T>(hasher)
     (name_ as Hash).hash<T>(hasher)
-  }
-}
-
-// TODO(marcelgarus): Decide what to do with this one.
-public class HirConstructor {
-  public let parent: HirType
-  public let disambiguator: Int
-}
-impl HirConstructor: HirDeclaration & Equals & Hash {
-  fun name(): String { "constructor" }
-  fun toString(): String { "{parent}:{name()}" }
-  fun equals(other: This): Bool {
-    (parent as Equals) == (other.parent as Equals) && disambiguator == other.disambiguator
-  }
-  fun hash<T>(hasher: Hasher<T>) {
-    (parent as Hash).hash<T>(hasher)
-    (disambiguator as Hash).hash<T>(hasher)
   }
 }
 

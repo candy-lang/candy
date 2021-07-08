@@ -9,9 +9,29 @@ impl Int {
   public static builtin fun parse(value: String): Int
 }
 
-builtin impl Int: Equals & Comparable
-builtin impl Int: Add & Subtract & Negate & Multiply & DivideTruncating & Modulo
+impl Int: Comparable {
+  builtin fun compareTo(other: Int): Less | Equal | Greater
+}
+
+impl Int: Add {
+  builtin fun add(other: Int): Int
+}
+impl Int: Subtract {
+  builtin fun subtract(other: Int): Int
+}
+impl Int: Negate {
+  builtin fun negate(): Int
+}
+impl Int: Multiply {
+  builtin fun multiply(other: Int): Int
+}
+impl Int: DivideTruncating {
+  builtin fun divideTruncating(other: Int): Int
+}
+impl Int: Modulo {
+  builtin fun modulo(other: Int): Int
+}
 
 impl Int: Hash {
-  fun hash[Result](hasher: Hasher[Result]): Hasher[Result] { hasher.write(this) }
+  fun hash[H: Hasher](): H { H.primitive(this) }
 }

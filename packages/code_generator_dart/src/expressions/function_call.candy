@@ -1,0 +1,76 @@
+use ast
+use compiler_utils
+use dart_code
+use hir
+use incremental
+
+use ...types
+use ..utils
+
+public fun compileFunctionCallValueExpression(
+  context: QueryContext<List<CompilerError>>,
+  expression: HirFunctionCallValueExpression,
+): DartStatement {
+  query<DartStatement, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileFunctionCallValueExpression",
+    expression, {
+    // TODO(JonasWanke): Handle static function calls.
+    // TODO(JonasWanke): Handle calls of functions inside modules.
+    let receiver = getValueExpressionResultIdentifier(
+      context,
+      expression.receiver.unwrap() as HirValueExpressionUri,
+    )
+
+    // TODO(JonasWanke): Cast the receiver to the correct trait.
+    let function = receiver.dot(expression.function.name())
+
+    let declaredTypeParameters = (expression.function.typeParameters(context) as Iterable<HirParameterType>)
+    assert(
+      declaredTypeParameters.map<String>({ it.name }).toSet()
+        .unsafeEquals(expression.typeArguments.keys().toSet()),
+      "Supplied type parameters for a function call don't exactly match the function's declared type parameters."
+    )
+    let typeArgumentsInCorrectOrder = declaredTypeParameters
+      .map<HirInlineType>({ expression.typeArguments.get(it.name).unwrap() })
+    let typeArguments = typeArgumentsInCorrectOrder
+      .map<DartType>({ compileInlineType(context, it) })
+      .toList()
+
+    let valueArgumentsInCorrectOrder = (expression.function.ast(context).valueParameters as Iterable<AstValueParameter>)
+      .map<HirValueExpressionUri>({ expression.valueArguments.get(it.name.value).unwrap() })
+    let valueArguments = typeArgumentsInCorrectOrder
+    // TODO(JonasWanke): Transform these types to the static instance classes.
+      .map<DartExpression>({ DartIdentifier("SomeType", None<String>()) })
+      .followedBy(
+        valueArgumentsInCorrectOrder
+          .map<DartExpression>({ getValueExpressionResultIdentifier(context, it ) }),
+      )
+      .toList()
+
+    let result = function.call(
+      positionalArguments = valueArguments,
+      namedArguments = Map.empty<String, DartExpression>(),
+      typeArguments = typeArguments,
+    )
+    Tuple(saveValueExpression(context, expression, result), List.empty<CompilerError>())
+  })
+}
+
+
+public fun getTypeParameterValueParameterName(
+  context: QueryContext<List<CompilerError>>,
+  typeParameter: HirParameterType,
+): String {
+  query<String, List<CompilerError>>(
+    context,
+    "code_generator_dart.getTypeParameterValueParameterName",
+    typeParameter, {
+    assert(
+      typeParameter.declaration is HirFunction,
+      "Value parameters for type parameters only work for function calls.",
+    )
+
+    Tuple("$type_{typeParameter.name}", List.empty<CompilerError>())
+  })
+}

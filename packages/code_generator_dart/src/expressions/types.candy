@@ -7,87 +7,56 @@ use ...expressions
 use ...types
 use ..utils
 
-public fun compileTypeInstantiationExpression(
+public fun compileTypeInstantiationValueExpression(
   context: QueryContext<List<CompilerError>>,
-  expression: HirTypeInstantiationExpression,
+  expression: HirTypeInstantiationValueExpression,
 ): List<DartStatement> {
   query<List<DartStatement>, List<CompilerError>>(
     context,
-    "code_generator_dart.compileTypeInstantiationExpression",
+    "code_generator_dart.compileTypeInstantiationValueExpression",
     expression, {
     let statements = MutableList.empty<DartStatement>()
     statements.appendAll(
-      compileExpression(context, getExpression<HirExpression>(expression.valueArgument)),
+      compileValueExpression(context, getValueExpression(expression.valueArgument)),
     )
 
     // TODO(JonasWanke): use `compileNamedType` and supply type arguments when we can get the type of this expression
     let compiledType = DartNamedType(DartIdentifier("SomeType", None<String>()), List.empty<DartType>())
-    statements.append(saveExpression(
+    statements.append(saveValueExpression(
       context,
       expression,
-      (compiledType as DartExpression)
-        .call1(getExpressionResultIdentifier(context, expression.valueArgument)),
+      (compiledType as DartValueExpression)
+        .call1(getValueExpressionResultIdentifier(context, expression.valueArgument)),
     ))
     Tuple(statements, List.empty<CompilerError>())
   })
 }
 
-public fun compileTupleExpression(
+public fun compileNamedTupleValueExpression(
   context: QueryContext<List<CompilerError>>,
-  expression: HirTupleExpression,
+  expression: HirNamedTupleValueExpression,
 ): List<DartStatement> {
   query<List<DartStatement>, List<CompilerError>>(
     context,
-    "code_generator_dart.compileTupleExpression",
+    "code_generator_dart.compileNamedTupleValueExpression",
     expression, {
     let statements = MutableList.empty<DartStatement>()
     statements.appendAll(
-      (expression.valueArguments as Iterable<HirExpressionUri<HirExpression>>)
-        .expand<DartStatement>({ compileExpression(context, getExpression<HirExpression>(it)) })
-    )
-
-    // TODO(JonasWanke): use `compileTupleType` when we can get the tuple type of this expression
-    let compiledType = DartNamedType(DartIdentifier("Tuple", None<String>()), List.empty<DartType>())
-    statements.append(saveExpression(
-      context,
-      expression,
-      (compiledType as DartExpression).call(
-        positionalArguments = (expression.valueArguments as Iterable<HirExpressionUri<HirExpression>>)
-          .map<DartExpression>({ getExpressionResultIdentifier(context, it) })
-          .toList(),
-        namedArguments = Map.empty<String, DartExpression>(),
-        typeArguments = List.empty<DartType>(),
-      ),
-    ))
-    Tuple(statements, List.empty<CompilerError>())
-  })
-}
-
-public fun compileNamedTupleExpression(
-  context: QueryContext<List<CompilerError>>,
-  expression: HirNamedTupleExpression,
-): List<DartStatement> {
-  query<List<DartStatement>, List<CompilerError>>(
-    context,
-    "code_generator_dart.compileNamedTupleExpression",
-    expression, {
-    let statements = MutableList.empty<DartStatement>()
-    statements.appendAll(
-      (expression.valueArguments as Iterable<HirExpressionUri<HirExpression>>)
-        .expand<DartStatement>({ compileExpression(context, getExpression<HirExpression>(it)) })
+      (expression.valueArguments as Iterable<HirValueExpressionUri<HirValueExpression>>)
+        .expand<DartStatement>({ compileValueExpression(context, getValueExpression(it)) })
     )
 
     // TODO(JonasWanke): use `compileNamedTupleType` when we can get the named tuple type of this expression
     let compiledType = DartNamedType(DartIdentifier("NamedTuple", None<String>()), List.empty<DartType>())
-    statements.append(saveExpression(
+    statements.append(saveValueExpression(
       context,
       expression,
-      (compiledType as DartExpression).call(
+      (compiledType as DartValueExpression).call(
         positionalArguments = (expression.valueArguments.entries().toList()
-          .sortedBy<String>({ it.first }) as Iterable<(String, HirExpressionUri<HirExpression>)>)
-          .map<DartExpression>({ getExpressionResultIdentifier(context, it.second) })
+          .sortedBy<String>({ it.first }) as Iterable<(String, HirValueExpressionUri<HirValueExpression>)>)
+          .map<DartValueExpression>({ getValueExpressionResultIdentifier(context, it.second) })
           .toList(),
-        namedArguments = Map.empty<String, DartExpression>(),
+        namedArguments = Map.empty<String, DartValueExpression>(),
         typeArguments = List.empty<DartType>(),
       ),
     ))

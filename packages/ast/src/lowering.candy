@@ -1862,11 +1862,19 @@ fun lowerPropertyExpression(
     context.addError(MissingPropertyNameCompilerError(context.file, cst))
     isValid = false
   }
+  if (initializer is None) { isValid = false }
 
   if !isValid { return None<AstExpression>() }
   context.addIdMapping(cst.id, id)
   Some<AstExpression>(
-    AstPropertyExpression(id, None<AstCandyDoc>(), modifiers, name.unwrap(), type, initializer),
+    AstPropertyExpression(
+      id,
+      None<AstCandyDoc>(),
+      modifiers,
+      name.unwrap(),
+      type,
+      initializer.unwrap(),
+    ),
   )
 }
 

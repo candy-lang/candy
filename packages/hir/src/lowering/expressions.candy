@@ -4,6 +4,7 @@ use incremental
 
 use ..declarations
 use ..file
+use ..resolving
 use ...declarations
 use ...expressions
 use ...file
@@ -13,18 +14,19 @@ fun lowerFunctionBody(
   context: QueryContext<List<CompilerError>>,
   function: HirFunction,
 ): (List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>) {
-  query<List<HirValueExpression>, List<CompilerError>>(context, "lowerFunctionBody", function, {
+  query<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>), List<CompilerError>>(context, "lowerFunctionBody", function, {
     let ast = function.ast(context)
     let context = LoweringContext(
       BodyGlobalState(
         function,
-        MutableMap.empty<String, HirValueExpressionUri>(),
+        MutableMap.empty<HirValueExpressionUri, HirValueExpression>(),
         0,
         MutableList.empty<CompilerError>(),
       ),
       None<LoweringContext>(),
       MutableMap.empty<String, HirValueExpressionUri>(),
     )
+    todo("")
   })
 }
 
@@ -46,12 +48,12 @@ impl LoweringContext {
       this.global.nextExpressionId,
     )
     this.global.nextExpressionId = this.global.nextExpressionId + 1
-    this.global.expressions.put(uri, expression)
+    this.global.expressions.set(uri, expression)
     uri
   }
 
   fun registerError(error: CompilerError): HirValueExpressionUri {
-    this.global.errors.add(error)
+    this.global.errors.append(error)
     this.register(HirErrorValueExpression())
   }
 
@@ -59,16 +61,18 @@ impl LoweringContext {
     context: QueryContext<List<CompilerError>>,
     name: String,
   ): Set<HirValueExpressionUri | HirModule | HirType | HirTrait | HirFunction | HirParameterType> {
-    this.localProperties.get(name)
+    (this.localProperties as Map<String, HirValueExpressionUri>).get(name)
       .map<Set<HirValueExpressionUri | HirModule | HirType | HirTrait | HirFunction | HirParameterType>>({
         Set.of1<HirValueExpressionUri | HirModule | HirType | HirTrait | HirFunction | HirParameterType>(it)
       })
-      .or({
+      .orElse({
         this.parent
           .map<Set<HirValueExpressionUri | HirModule | HirType | HirTrait | HirFunction | HirParameterType>>({
             it.resolve(context, name)
           })
-          .orElse({ resolveIdentifier(context, name, this.global.function) })
+          .orElse({
+            (resolveIdentifier(context, name, this.global.function) as Set<HirValueExpressionUri | HirModule | HirType | HirTrait | HirFunction | HirParameterType>)
+          })
       })
   }
 
@@ -76,11 +80,11 @@ impl LoweringContext {
     context: QueryContext<List<CompilerError>>,
     expression: AstExpression,
   ): HirValueExpressionUri {
-    let expressionToStringify = this.lowerExpression(context, (part as AstInterpolatedStringPart).expression)
-    if (expressionToStringify is HirTypeExpression || expressionToStringify is HirModuleExpression) {
-      this.registerError(InvalidValueExpressionError(expressionToStringify as HirTypeExpression | HirModuleExpression))
+    let lowered = this.lowerExpression(context, expression)
+    if (lowered is HirTypeExpression || lowered is HirModuleExpression) {
+      this.registerError(InvalidValueExpressionError(lowered as HirTypeExpression | HirModuleExpression))
     } else {
-      (expressionToStringify as HirValueExpressionUri)
+      (lowered as HirValueExpressionUri)
     }
   }
 
@@ -99,7 +103,7 @@ impl LoweringContext {
       mut let stringUri = this.register(HirStringValueExpression(""))
 
       for part in (expression as AstStringExpression).parts {
-        let expressionToAdd: HirExpression = if (part is AstLiteralStringPart) {
+        let expressionToAdd: HirValueExpression = if (part is AstLiteralStringPart) {
           HirStringValueExpression((part as AstLiteralStringPart).value.value)
         } else {
           let expressionToStringify = this.lowerExpressionToValueExpression(
@@ -112,10 +116,10 @@ impl LoweringContext {
             this.global.expressions,
             expressionToStringify,
           )
-          let implementsToString = implFor(context, expressionType
+          let implementsToString = (implFor(context, expressionType,
             HirTrait.coreString(context),
             (this.global.function as HasPackageAndPath).package(),
-          ).isSome()
+          ) is Some)
           if (!implementsToString) {
             this.registerError(InvalidInterpolatedExpressionError(expressionToStringify))
           } else {

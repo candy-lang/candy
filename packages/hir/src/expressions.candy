@@ -91,7 +91,7 @@ impl HirLambdaParameter: Equals & Hash {
 public class HirThisValueExpression {
   public let type: HirInlineType
 }
-impl HirThisExpression: HirValueExpression & Equals & Hash {
+impl HirThisValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool { (type as Equals) == (other.type as Equals) }
   fun hash<T>(hasher: Hasher<T>) { (type as Hash).hash<T>(hasher) }
 }
@@ -110,9 +110,9 @@ impl HirThisExpression: HirValueExpression & Equals & Hash {
 public class HirLocalPropertyReferenceValueExpression {
   public let value: HirValueExpressionUri
 }
-impl HirLocalPropertyReferenceExpression: HirValueExpression & Equals & Hash {
-  fun equals(other: This): Bool { (target as Equals) == (other.target as Equals) }
-  fun hash<T>(hasher: Hasher<T>) { target.hash<T>(hasher) }
+impl HirLocalPropertyReferenceValueExpression: HirValueExpression & Equals & Hash {
+  fun equals(other: This): Bool { (value as Equals) == (other.value as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { value.hash<T>(hasher) }
 }
 
 /// An expression that references a parameter.
@@ -144,12 +144,12 @@ public class HirFunctionCallValueExpression {
   public let typeArguments: Map<String, HirInlineType>
   public let valueArguments: Map<String, HirValueExpressionUri>
 }
-impl HirFunctionCallExpression: HirValueExpression & Equals & Hash {
+impl HirFunctionCallValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
       && (function as Equals) == (other.function as Equals)
-      && (typeArguments as Iterable<HirInlineType>).unsafeEquals(other.typeArguments)
-      && (valueArguments as Iterable<HirValueExpressionUri>).unsafeEquals(other.valueArguments)
+      && typeArguments.unsafeEquals(other.typeArguments)
+      && valueArguments.unsafeEquals(other.valueArguments)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (receiver as Hash).hash<T>(hasher)
@@ -177,7 +177,7 @@ impl HirValueExpressionCallValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
       && (typeArguments as Iterable<HirInlineType>).unsafeEquals(other.typeArguments)
-      && (valueArguments as Iterable<HirValueExpressionUri<HirValueExpression>>).unsafeEquals(other.valueArguments)
+      && (valueArguments as Iterable<HirValueExpressionUri>).unsafeEquals(other.valueArguments)
   }
   fun hash<T>(hasher: Hasher<T>) {
     receiver.hash<T>(hasher)
@@ -204,7 +204,7 @@ impl HirTypeInstantiationValueExpression: HirValueExpression & Equals & Hash {
       && (valueArgument as Equals) == (other.valueArgument as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
-    receiver.hash<T>(hasher)
+    (receiver as Hash).hash<T>(hasher)
     typeArguments.unsafeHash<T>(hasher)
     valueArgument.hash<T>(hasher)
   }
@@ -235,12 +235,10 @@ public class HirNamedTupleFieldAccessValueExpression {
 }
 impl HirNamedTupleFieldAccessValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
-    (uri as Equals) == (other.uri as Equals)
-      && (receiver as Equals) == (other.receiver as Equals)
+    (receiver as Equals) == (other.receiver as Equals)
       && (name as Equals) == (other.name as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
-    uri.hash<T>(hasher)
     receiver.hash<T>(hasher)
     name.hash<T>(hasher)
   }
@@ -258,7 +256,7 @@ public class HirReturnValueExpression {
   public let scope: HirFunction
   public let expression: HirValueExpressionUri
 }
-impl HirReturnExpression: HirValueExpression & Equals & Hash {
+impl HirReturnValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (scope as Equals) == (other.scope as Equals)
       && (expression as Equals) == (other.expression as Equals)
@@ -282,7 +280,7 @@ public trait HirTypeExpression {
 }
 impl HirTypeExpression: Equals & Hash {
   fun equals(other: This): Bool { (type as Equals) == (other.type as Equals) }
-  fun hash<T>(hasher: Hasher<T>) { type.hash<T>(hasher) }
+  fun hash<T>(hasher: Hasher<T>) { (type as Hash).hash<T>(hasher) }
 }
 
 /// An expression that references a module.
@@ -296,5 +294,5 @@ public trait HirModuleExpression {
 }
 impl HirModuleExpression: Equals & Hash {
   fun equals(other: This): Bool { (moduleHir as Equals) == (other.moduleHir as Equals) }
-  fun hash<T>(hasher: Hasher<T>) { moduleHir.hash<T>(hasher) }
+  fun hash<T>(hasher: Hasher<T>) { (moduleHir as Hash).hash<T>(hasher) }
 }

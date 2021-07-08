@@ -3,14 +3,11 @@ use ...Int
 use ...String
 use ..File
 
-public builtin type Process
-impl Process {
-  public static builtin fun run(
-    executable: Path,
-    arguments: List[String],
-    workingDirectory: Path,
-  ): ProcessResult
-}
+public builtin fun runProcess(
+  executable: Path,
+  arguments: List[String],
+  workingDirectory: Path,
+): ProcessResult
 
 public type ProcessResult = (
   exitCode: Int,
