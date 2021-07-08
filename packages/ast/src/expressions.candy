@@ -110,14 +110,19 @@ impl AstLambdaExpression: AstExpression & Equals & Hash {
 public class AstIdentifierExpression {
   public let id: AstExpressionId
   public let value: AstIdentifier
+  public let typeArguments: List<AstTypeArgument>
 }
 impl AstIdentifierExpression: AstExpression & Equals & Hash {
   fun equals(other: This): Bool {
-    (id as Equals) == (other.id as Equals) && (value as Equals) == (other.value as Equals)
+    (id as Equals) == (other.id as Equals)
+      && (value as Equals) == (other.value as Equals)
+      && (typeArguments as Iterable<AstTypeArgument>)
+        .unsafeEquals(other.typeArguments as Iterable<AstTypeArgument>)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
     (value as Hash).hash<T>(hasher)
+    (typeArguments as Iterable<AstTypeArgument>).unsafeHash<T>(hasher)
   }
 }
 
@@ -203,17 +208,21 @@ public class AstNavigationExpression {
   public let id: AstExpressionId
   public let receiver: AstExpression
   public let target: AstIdentifier
+  public let typeArguments: List<AstTypeArgument>
 }
 impl AstNavigationExpression: AstExpression & Equals & Hash {
   fun equals(other: This): Bool {
-    (id as Equals) == (other.id as Equals) &&
-      (receiver as Equals) == (other.receiver as Equals) &&
-      (target as Equals) == (other.target as Equals)
+    (id as Equals) == (other.id as Equals)
+      && (receiver as Equals) == (other.receiver as Equals)
+      && (target as Equals) == (other.target as Equals)
+      && (typeArguments as Iterable<AstTypeArgument>)
+        .unsafeEquals(other.typeArguments as Iterable<AstTypeArgument>)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
     (receiver as Hash).hash<T>(hasher)
     (target as Hash).hash<T>(hasher)
+    (typeArguments as Iterable<AstTypeArgument>).unsafeHash<T>(hasher)
   }
 }
 
@@ -225,10 +234,10 @@ public class AstCallExpression {
 }
 impl AstCallExpression: AstExpression & Equals & Hash {
   fun equals(other: This): Bool {
-    (id as Equals) == (other.id as Equals) &&
-      (receiver as Equals) == (other.receiver as Equals) &&
-      (typeArguments as Iterable<AstTypeArgument>).unsafeEquals(other.typeArguments) &&
-      (valueArguments as Iterable<AstValueArgument>).unsafeEquals(other.valueArguments)
+    (id as Equals) == (other.id as Equals)
+      && (receiver as Equals) == (other.receiver as Equals)
+      && (typeArguments as Iterable<AstTypeArgument>).unsafeEquals(other.typeArguments)
+      && (valueArguments as Iterable<AstValueArgument>).unsafeEquals(other.valueArguments)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)

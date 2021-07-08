@@ -1535,6 +1535,22 @@ fun lowerExpression(
   throw "Unknown expression: {cst}."
 }
 
+fun lowerTypeArgumentsExpression(
+  context: LoweringContext,
+  parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
+  cst: CstNode<CstExpression>,
+): (Maybe<AstExpression>, Maybe<List<TypeArgument>>) {
+  mut let node = cst.child
+  mut let typeArguments = None<List<TypeArgument>>()
+
+  if node is CstTypeArgumentsExpression {
+    typeArguments = Some<List<TypeArgument>>(lowerTypeArguments(context, parentId, node))
+    node = node.child
+  }
+
+  Tuple(lowerExpression(node), typeArguments)
+}
+
 fun lowerIntExpression(
   context: LoweringContext,
   parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,

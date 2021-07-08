@@ -729,21 +729,21 @@ class CstParser {
           }
         })
 
-    let callPostfix = typeArguments()
-        .optional()
-        .sequence<CstNode<CstValueArguments>>(valueArguments())
-        .map<(CstNode<CstExpression>) => CstExpression>({
-          { receiver: CstNode<CstExpression> =>
-            CstCallExpression(receiver, it.first, it.second)
-          }
-        })
+    let callPostfix = valueArguments().map<(CstNode<CstExpression>) => CstExpression>({
+      { receiver: CstNode<CstExpression> => CstCallExpression(receiver, it) }
+    })
+
+    let typeArgumentsPostfix = typeArguments().map<(CstNode<CstExpression>) => CstExpression>({
+      { receiver: CstNode<CstExpression> => CstTypeArgumentsExpression(receiver, it) }
+    })
 
     let postfixExpressions = primitiveExpressions
         .sequence<List<(CstNode<CstExpression>) => CstExpression>>(
           choiceOf<String, (CstNode<CstExpression>) => CstExpression>(
-            List.of2<Parser<String, (CstNode<CstExpression>) => CstExpression>>(
+            List.of3<Parser<String, (CstNode<CstExpression>) => CstExpression>>(
               navigationPostfix,
               callPostfix,
+              typeArgumentsPostfix,
             ),
           ).star()
         )
