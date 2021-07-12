@@ -17,6 +17,9 @@ public class HirNamedType {
   public let declaration: HirTrait | HirType
   public let parameterTypes: List<HirInlineType>
 
+  static fun coreAny(context: QueryContext<List<CompilerError>>): HirNamedType {
+    HirNamedType(HirType.coreAny(context), List.empty<HirInlineType>())
+  }
   static fun coreInt(context: QueryContext<List<CompilerError>>): HirNamedType {
     HirNamedType(HirType.coreInt(context), List.empty<HirInlineType>())
   }

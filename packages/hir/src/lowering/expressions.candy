@@ -116,10 +116,12 @@ impl LoweringContext {
             this.global.expressions,
             expressionToStringify,
           )
-          let implementsToString = (implFor(context, expressionType,
+          let implementsToString = isAssignableTo(
+            context,
+            expressionType,
             HirTrait.coreString(context),
             (this.global.function as HasPackageAndPath).package(),
-          ) is Some)
+          )
           if (!implementsToString) {
             this.registerError(InvalidInterpolatedExpressionError(expressionToStringify))
           } else {
@@ -160,7 +162,7 @@ impl LoweringContext {
       let expression = (expression as AstIdentifierExpression)
       let name = expression.identifier.name
       let possibleProperties = this.resolve(context, name)
-      if (possibleProperties.length() == 0) {
+      if (possibleProperties.isEmpty()) {
         return this.registerError(UnresolvedIdentifierError(name))
       }
 
@@ -172,19 +174,57 @@ impl LoweringContext {
       assert(possibleProperties.length() == 1, "Ambiguous lowering can only occur for overloaded functions.")
 
       if (property is HirValueExpressionUri) {
+        if ((expression.typeArguments as Iterable<AstTypeArgument>).isNotEmpty()) {
+          this.registerError(InvalidTypeArgumentsError(property as HirValueExpressionUri))
+        }
         return (property as HirValueExpressionUri)
       }
 
       if (property is HirModule) {
+        if ((expression.typeArguments as Iterable<AstTypeArgument>).isNotEmpty()) {
+          this.registerError(InvalidTypeArgumentsError(property as HirModule))
+        }
         return HirModuleExpression(property as HirModule)
       }
 
       if (property is HirParameterType) {
+        if ((expression.typeArguments as Iterable<AstTypeArgument>).isNotEmpty()) {
+          this.registerError(InvalidTypeArgumentsError(property as HirParameterType))
+        }
         return (property as HirParameterType)
       }
 
-      // TODO: Lower HirType and HirTrait
-      return HirErrorValueExpression()
+      // That leaves us with `HirType` and `HirTrait` and lots of fun…
+      let typeArguments = (expression.typeArguments as Iterable<AstTypeArgument>)
+        .map<HirInlineType>({
+          astInlineTypeToHirInlineType(context, it.type, this.global.function)
+        })
+        .toList()
+      
+      let typeParameters = (property as HasTypeParameters).typeParameters(context)
+      let suppliedTypeArgumentCount = (typeArguments as Iterable<HirInlineType>).length()
+      let requiredTypeArgumentCount = (typeParameters as Iterable<HirParameterType>).length()
+      if (!(suppliedTypeArgumentCount == requiredTypeArgumentCount)) {
+        return this.registerError(
+          WrongNumberOfTypeArgumentsError(suppliedTypeArgumentCount, requiredTypeArgumentCount),
+        )
+      }
+
+      let anyTypeArgumentIsInvalid = (typeArguments as Iterable<HirInlineType>)
+        .zip<HirParameterType>(typeParameters)
+        .any({
+          let argument = it.first
+          let parameter = it.second
+          let upperBound = parameter.upperBound(context)
+          if (!isAssignableTo(context, argument, upperBound, (this.global.function as HasPackageAndPath).package())) {
+            context.registerError(InvalidTypeArgumentError(argument, upperBound))
+            return false
+          }
+          true
+        })
+      if (anyTypeArgumentIsInvalid) { return this.register(HirErrorValueExpression()) }
+
+      return HirNamedType(parameter as HirTrait | HirType, typeArguments)
     }
 
     if (expression is AstTupleExpression) {
@@ -232,7 +272,7 @@ impl LoweringContext {
     }
 
     if (expression is AstNavigationExpression) {
-      // This ia an AstNavigationExpression that has is not inside an AstCallExpression – otherwise,
+      // This is an AstNavigationExpression that has is not inside an AstCallExpression – otherwise,
       // the lowering of the surrounding AstCallExpression would have also handled the inner
       // AstNavigationExpression. So, this is a function invocation without any parameters.
       // But that doesn't work for now.
@@ -365,5 +405,58 @@ impl UncalledFunctionError: CompilerError {
   public fun description(): String {
     /// TODO(marcelgarus): add a description for this error
     "The uncalled function or one of the overloads is {this.function}."
+  }
+}
+
+public class InvalidTypeArgumentsError {
+  public let inner: HirValueExpressionUri | HirModule | HirParameterType
+}
+impl InvalidTypeArgumentsError: CompilerError {
+  public fun id(): String { "invalid-type-arguments" }
+
+  public fun location(): Location {
+    todo("Implement InvalidTypeArgumentsError.location") // TODO(marcelgarus)
+  }
+  public fun title(): String { "Cannot add type arguments to module or type parameter references, or some expressions." }
+  public fun description(): String {
+    /// TODO(marcelgarus): add a description for this error
+    "This is the improper expression: {this.inner}"
+  }
+}
+
+public class WrongNumberOfTypeArgumentsError {
+  public let suppliedCount: Int
+  public let requiredCount: Int
+}
+impl WrongNumberOfTypeArgumentsError: CompilerError {
+  public fun id(): String { "wrong-number-of-type-arguments" }
+
+  public fun location(): Location {
+    todo("Implement WrongNumberOfTypeArgumentsError.location") // TODO(marcelgarus)
+  }
+  public fun title(): String {
+    "Wrong number of type arguments were supplied: {this.suppliedCount}, required: {this.requiredCount}."
+  }
+  public fun description(): String {
+    /// TODO(marcelgarus): add a description for this error
+    ""
+  }
+}
+public class InvalidTypeArgumentError {
+  public let actualType: HirInlineType
+  public let upperBound: HirInlineType
+}
+impl InvalidTypeArgumentError: CompilerError {
+  public fun id(): String { "invalid-type-arguments" }
+
+  public fun location(): Location {
+    todo("Implement InvalidTypeArgumentError.location") // TODO(marcelgarus)
+  }
+  public fun title(): String {
+    "Type argument is not assignable to the type parameter's upper bound."
+  }
+  public fun description(): String {
+    /// TODO(marcelgarus): add a description for this error
+    "Type argument was {this.actualType}, but is not assignable to {this.upperBound}."
   }
 }
