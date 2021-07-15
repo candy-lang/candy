@@ -88,12 +88,10 @@ impl HirLambdaParameter: Equals & Hash {
 /// A this expression.
 ///
 /// Example: `This` (and this is the only example)
-public class HirThisValueExpression {
-  public let type: HirInlineType
-}
+public class HirThisValueExpression {}
 impl HirThisValueExpression: HirValueExpression & Equals & Hash {
-  fun equals(other: This): Bool { (type as Equals) == (other.type as Equals) }
-  fun hash<T>(hasher: Hasher<T>) { (type as Hash).hash<T>(hasher) }
+  fun equals(other: This): Bool { true }
+  fun hash<T>(hasher: Hasher<T>) {}
 }
 
 /// An expression that references a local property.
@@ -120,16 +118,16 @@ impl HirLocalPropertyReferenceValueExpression: HirValueExpression & Equals & Has
 /// Example:
 ///
 /// ```
-/// fun foo {
-///   a # The `a` becomes a HirParameterReferenceValueExpression
+/// fun foo(a: Bar) {
+///   a ## The `a` becomes a `HirParameterReferenceValueExpression`
 /// }
 /// ```
 public class HirParameterReferenceValueExpression {
-  public let name: String
+  public let parameter: HirValueParameter
 }
 impl HirParameterReferenceValueExpression: HirValueExpression & Equals & Hash {
-  fun equals(other: This): Bool { (name as Equals) == (other.name as Equals) }
-  fun hash<T>(hasher: Hasher<T>) { name.hash<T>(hasher) }
+  fun equals(other: This): Bool { parameter == other.parameter }
+  fun hash<T>(hasher: Hasher<T>) { (parameter as Hash).hash<T>(hasher) }
 }
 
 /// A function call expression.

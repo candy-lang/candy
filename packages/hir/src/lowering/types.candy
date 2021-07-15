@@ -677,51 +677,6 @@ fun getAllImplsFor(
 //   getAllImplsInScope()
 // }
 
-fun typeOf(
-  context: QueryContext<List<CompilerError>>,
-  scope: HirFunction | HirType,
-  uriMapping: Map<HirValueExpressionUri, HirValueExpression>,
-  uri: HirValueExpressionUri,
-): HirInlineType {
-  let expression = uriMapping.get(uri).unwrap()
-
-  if (expression is HirErrorValueExpression) { return HirErrorType() }
-  if (expression is HirIntValueExpression) { return HirNamedType.coreInt(context) }
-  if (expression is HirStringValueExpression) { return HirNamedType.coreString(context) }
-  if (expression is HirLambdaValueExpression) {
-    // TODO(marcelgarus): Get the supertype of all occurrences of `return` and the last expression.
-    return expression.returnType
-  }
-  if (expression is HirThisValueExpression) { return thisTypeInScope(context, scope) }
-  if (expression is HirParameterReferenceValueExpression) {
-    return expression.ast(context).valueParameters.type_
-  }
-  if (expression is HirFunctionCallValueExpression) {
-    return expression.function.returnType
-  }
-  if (expression is HirValueExpressionCallValueExpression) {
-    return (typeOf(expression.receiver) as HirFunctionType).returnType
-  }
-  if (expression is HirNamedTupleValueExpression) {
-    return HirNamedTupleType(
-      expression.valueArguments
-        .map<String, HirInlineType>({ Tuple(it.first, typeOf(context, scope, uriMapping, it.second)) }),
-    )
-  }
-  if (expression is HirNamedTupleFieldAccessValueExpression) {
-    return (typeOf(context, scope, uriMapping, expression.receiver) as HirNamedTupleType).types
-      .firstWhere({ it.first == expression.name }).second
-  }
-  if (expression is HirReturnValueExpression) { return neverInlineType(context) }
-  throw "Unknown expression type: {expression}"
-}
-fun thisTypeInScope(context: QueryContext<List<CompilerError>>, scope: HirFunction | HirType | HirTrait | HirImpl): HirInlineType {
-  if (scope is HirType) { return HirInlineType(scope, List.empty<HirInlineType>()) }
-  if (scope is HirFunction) { return thisTypeInScoppe(context, scope.parent) }
-  if (scope is HirTrait) { return HirInlineType(scope, List.empty<HirInlineType>()) }
-  if (scope is HirImpl) { return thisTypeInScope(context, scope.baseType(context)) }
-}
-
 public class ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError {
   public let thisType: AstNamedType
   public let scope: HirDeclaration

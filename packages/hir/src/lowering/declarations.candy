@@ -468,9 +468,50 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
     })
   }
 
+  fun valueParameters(context: QueryContext<List<CompilerError>>): List<HirValueParameter> {
+    query<List<HirValueParameter>, List<CompilerError>>(context, "HirFunction.valueParameters", this, {
+      Tuple(
+        (ast(context).valueParameters as Iterable<AstValueParameter>)
+          .map<HirValueParameter>({ HirValueParameter(this, it.name.value) })
+          .toList(),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
+
   fun isPublic(context: QueryContext<List<CompilerError>>): Bool {
     query<Bool, List<CompilerError>>(context, "HirFunction.isPublic", this, {
       Tuple(isPublicFromModifiers(ast(context).modifiers), List.empty<CompilerError>())
+    })
+  }
+}
+
+impl HirValueParameter: HasAst<AstValueParameter> {
+  fun ast(context: QueryContext<List<CompilerError>>): Ast {
+    query<Ast, List<CompilerError>>(context, "HirValueParameter.ast", this, {
+      if (this.parent is HirValueExpressionUri) { todo("Implement HirExpression.ast(…)") }
+
+      let ast = (parent as HirFunction).ast(context).valueParameters
+        .singleWhere({ it.name.value == this.name })
+        .unwrap()
+      Tuple(ast, List.empty<CompilerError>())
+    })
+  }
+
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType {
+    query<HirInlineType, List<CompilerError>>(context, "HirValueParameter.type", this, {
+      if (this.parent is HirValueExpressionUri) {
+        todo("Implement HirValueParameter.type(…) for lambda parameters")
+      }
+
+      Tuple(
+        astInlineTypeToHirInlineType(
+          context,
+          this.ast(context).type.unwrap(),
+          this.parent as HirFunction,
+        ),
+        List.empty<CompilerError>(),
+      )
     })
   }
 }

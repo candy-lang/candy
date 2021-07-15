@@ -1,6 +1,7 @@
 use compiler_utils
 use incremental
 
+use ..expressions
 use ..types
 
 public trait HirDeclaration {
@@ -229,5 +230,20 @@ impl HirFunction: HirDeclaration & Equals & Hash {
     (parent as Hash).hash<T>(hasher)
     (name_ as Hash).hash<T>(hasher)
     (disambiguator as Hash).hash<T>(hasher)
+  }
+}
+
+public class HirValueParameter {
+  public let scope: HirFunction | HirValueExpressionUri
+  /// The function or URI of the lambda that the parameter is a part of.
+  public let name: String
+}
+impl HirValueParameter: Equals & Hash {
+  fun equals(other: This): Bool {
+    (scope as Equals) == (other.scope as Equals) && name == other.name
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (scope as Hash).hash<T>(hasher)
+    name.hash<T>(hasher)
   }
 }
