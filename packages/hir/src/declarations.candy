@@ -142,55 +142,55 @@ public class HirFunction {
   public let name_: String
   public let disambiguator: Int
 
-  public static fun coreToString(context: QueryContext<List<CompilerError>>) {
+  public static fun coreToString(context: QueryContext<List<CompilerError>>): HirFunction {
     HirFunction(HirTrait.coreToString(context), "toString", 0)
   }
-  public static fun infixEqualEqual(context: QueryContext<List<CompilerError>>) {
+  public static fun infixEqualEqual(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixEqualEqual", "infixEqualEqual")
   }
-  public static fun infixExclamationEqual(context: QueryContext<List<CompilerError>>) {
+  public static fun infixExclamationEqual(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixExclamationEqual", "infixExclamationEqual")
   }
-  public static fun infixLess(context: QueryContext<List<CompilerError>>) {
+  public static fun infixLess(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixLess", "infixLess")
   }
-  public static fun infixLessEqual(context: QueryContext<List<CompilerError>>) {
+  public static fun infixLessEqual(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixLessEqual", "infixLessEqual")
   }
-  public static fun infixGreater(context: QueryContext<List<CompilerError>>) {
+  public static fun infixGreater(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixGreater", "infixGreater")
   }
-  public static fun infixGreaterEqual(context: QueryContext<List<CompilerError>>) {
+  public static fun infixGreaterEqual(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixGreaterEqual", "infixGreaterEqual")
   }
-  public static fun infixPlus(context: QueryContext<List<CompilerError>>) {
+  public static fun infixPlus(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixPlus", "infixPlus")
   }
-  public static fun infixMinus(context: QueryContext<List<CompilerError>>) {
+  public static fun infixMinus(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixMinus", "infixMinus")
   }
-  public static fun infixStar(context: QueryContext<List<CompilerError>>) {
+  public static fun infixStar(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixStar", "infixStar")
   }
-  public static fun infixSlash(context: QueryContext<List<CompilerError>>) {
+  public static fun infixSlash(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixSlash", "infixSlash")
   }
-  public static fun infixSlashSlash(context: QueryContext<List<CompilerError>>) {
+  public static fun infixSlashSlash(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixSlashSlash", "infixSlashSlash")
   }
-  public static fun infixPercent(context: QueryContext<List<CompilerError>>) {
+  public static fun infixPercent(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixPercent", "infixPercent")
   }
-  public static fun infixAmpersand(context: QueryContext<List<CompilerError>>) {
+  public static fun infixAmpersand(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixAmpersand", "infixAmpersand")
   }
-  public static fun infixBar(context: QueryContext<List<CompilerError>>) {
+  public static fun infixBar(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixBar", "infixBar")
   }
-  public static fun infixEqualGreater(context: QueryContext<List<CompilerError>>) {
+  public static fun infixEqualGreater(context: QueryContext<List<CompilerError>>): HirFunction {
     infix(context, "InfixEqualGreater", "infixEqualGreater")
   }
-  public static fun prefixMinus(context: QueryContext<List<CompilerError>>) {
+  public static fun prefixMinus(context: QueryContext<List<CompilerError>>): HirFunction {
     prefix(context, "PrefixMinus", "prefixMinus")
   }
 

@@ -1,3 +1,6 @@
+use compiler_utils
+use incremental
+
 use ..declarations
 use ..types
 
@@ -58,31 +61,13 @@ impl HirStringValueExpression: HirValueExpression & Equals & Hash {
 /// * `{ print("Hi!") }`
 /// * `{ a, b -> a + b }`
 public class HirLambdaValueExpression {
-  public let parameters: List<HirLambdaParameter>
   public let expressions: List<HirValueExpressionUri>
 }
 impl HirLambdaValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
-    (parameters as Iterable<HirLambdaParameter>).unsafeEquals(other.parameters)
-      && (expressions as Iterable<HirValueExpressionUri>).unsafeEquals(other.expressions)
+    (expressions as Iterable<HirValueExpressionUri>).unsafeEquals(other.expressions)
   }
-  fun hash<T>(hasher: Hasher<T>) {
-    parameters.unsafeHash<T>(hasher)
-    expressions.unsafeHash<T>(hasher)
-  }
-}
-public class HirLambdaParameter {
-  public let name: String
-  public let type: HirInlineType
-}
-impl HirLambdaParameter: Equals & Hash {
-  fun equals(other: This): Bool {
-    (name as Equals) == (other.name as Equals) && (type as Equals) == (other.type as Equals)
-  }
-  fun hash<T>(hasher: Hasher<T>) {
-    name.hash<T>(hasher)
-    (type as Hash).hash<T>(hasher)
-  }
+  fun hash<T>(hasher: Hasher<T>) { expressions.unsafeHash<T>(hasher) }
 }
 
 /// A this expression.
@@ -141,6 +126,17 @@ public class HirFunctionCallValueExpression {
   public let function: HirFunction
   public let typeArguments: Map<String, HirInlineType>
   public let valueArguments: Map<String, HirValueExpressionUri>
+
+  public static fun coreNothing(
+    context: QueryContext<List<CompilerError>>,
+  ): HirFunctionCallValueExpression {
+    HirFunctionCallValueExpression(
+      None<HirValueExpressionUri, HirTypeExpression>(),
+      HirFunction(HirModule.corePrimitives(context), "nothing"),
+      Map.empty<String, HirInlineType>(),
+      Map.empty<String, HirValueExpressionUri>(),
+    )
+  }
 }
 impl HirFunctionCallValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
@@ -273,7 +269,7 @@ impl HirReturnValueExpression: HirValueExpression & Equals & Hash {
 ///
 /// * `Foo`
 /// * `List[Int]`
-public trait HirTypeExpression {
+public class HirTypeExpression {
   public let type: HirInlineType
 }
 impl HirTypeExpression: Equals & Hash {
@@ -287,7 +283,7 @@ impl HirTypeExpression: Equals & Hash {
 ///
 /// * `Core`
 /// * `GitHub`
-public trait HirModuleExpression {
+public class HirModuleExpression {
   public let moduleHir: HirModule
 }
 impl HirModuleExpression: Equals & Hash {

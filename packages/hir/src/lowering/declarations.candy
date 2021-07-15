@@ -4,6 +4,7 @@ use incremental
 
 use ..types
 use ...declarations
+use ...expressions
 use ...types
 
 // These impls make declarative information from the AST available in the HIR.
@@ -487,11 +488,11 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
 }
 
 impl HirValueParameter: HasAst<AstValueParameter> {
-  fun ast(context: QueryContext<List<CompilerError>>): Ast {
-    query<Ast, List<CompilerError>>(context, "HirValueParameter.ast", this, {
-      if (this.parent is HirValueExpressionUri) { todo("Implement HirExpression.ast(…)") }
+  fun ast(context: QueryContext<List<CompilerError>>): AstValueParameter {
+    query<AstValueParameter, List<CompilerError>>(context, "HirValueParameter.ast", this, {
+      if (this.scope is HirValueExpressionUri) { todo("Implement HirExpression.ast(…)") }
 
-      let ast = (parent as HirFunction).ast(context).valueParameters
+      let ast = ((scope as HirFunction).ast(context).valueParameters as Iterable<AstValueParameter>)
         .singleWhere({ it.name.value == this.name })
         .unwrap()
       Tuple(ast, List.empty<CompilerError>())
@@ -500,7 +501,7 @@ impl HirValueParameter: HasAst<AstValueParameter> {
 
   fun type(context: QueryContext<List<CompilerError>>): HirInlineType {
     query<HirInlineType, List<CompilerError>>(context, "HirValueParameter.type", this, {
-      if (this.parent is HirValueExpressionUri) {
+      if (this.scope is HirValueExpressionUri) {
         todo("Implement HirValueParameter.type(…) for lambda parameters")
       }
 
@@ -508,7 +509,7 @@ impl HirValueParameter: HasAst<AstValueParameter> {
         astInlineTypeToHirInlineType(
           context,
           this.ast(context).type.unwrap(),
-          this.parent as HirFunction,
+          this.scope as HirFunction,
         ),
         List.empty<CompilerError>(),
       )

@@ -32,6 +32,9 @@ public class HirNamedType {
   static fun coreString(context: QueryContext<List<CompilerError>>): HirNamedType {
     HirNamedType(HirType.coreString(context), List.empty<HirInlineType>())
   }
+  static fun coreToString(context: QueryContext<List<CompilerError>>): HirNamedType {
+    HirNamedType(HirTrait.coreToString(context), List.empty<HirInlineType>())
+  }
 }
 impl HirNamedType: Equals & Hash & HirInlineType {
   fun equals(other: This): Bool {
