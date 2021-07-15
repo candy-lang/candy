@@ -91,6 +91,12 @@ public trait Map<Key: Equals & Hash, Value> {
       (entry.second as Hash).hash<T>(hasher)
     }
   }
+
+  fun copyAndSet(key: Key, value: Value): Map<Key, Value> {
+    let map = this.toMutable()
+    map.set(key, value)
+    map
+  }
 }
 
 // TODO(marcelgarus): impl Map<Key, Value>: GetOperator<Key, Maybe<Value>>

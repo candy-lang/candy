@@ -142,6 +142,12 @@ public trait List<Item>: Iterable<Item> {
     result.sortBy<T>(selector)
     result
   }
+
+  fun copyAndAdd(item: Item): List<Item> {
+    let result = this.toMutable()
+    result.append(item)
+    result
+  }
 }
 
 public trait MutableList<Item>: List<Item> {
