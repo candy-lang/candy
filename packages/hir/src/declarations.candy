@@ -36,7 +36,7 @@ public trait HirModule: HirDeclaration & Equals & Hash {
   static fun syntheticNamedTuples(context: QueryContext<List<CompilerError>>): HirModule {
     synthetic(context).innerModule("NamedTuples")
   }
-  static fun syntheticTuples(context: QueryContext<List<CompilerError>>): HirModule {
+  static fun syntheticPositionalTuples(context: QueryContext<List<CompilerError>>): HirModule {
     synthetic(context).innerModule("Tuples")
   }
 

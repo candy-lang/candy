@@ -6,5 +6,6 @@
 # parenthesis to create them on-the-fly:
 #
 # ```
-# let a: (String, Int) = ("foo", 42)
+# let a: (String, Int) = ("foo", 42) # Positional tuple
+# let b: (foo: String, bar: Int) = (foo: "foo", bar: 42) # Named tuple
 # ```

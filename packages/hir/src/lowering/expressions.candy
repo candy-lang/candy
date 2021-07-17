@@ -418,17 +418,17 @@ impl LoweringContext {
       )
     }
 
-    if (expression is AstTupleExpression) {
-      let expression = (expression as AstTupleExpression)
+    if (expression is AstPositionalTupleExpression) {
+      let expression = (expression as AstPositionalTupleExpression)
       let innerResult = this.lowerExpressionsToValueExpressions(expression.expressions)
       return innerResult.first.register(
         HirNamedTupleValueExpression(
-          (HirTupleType.fieldNames as Iterable<String>)
+          (HirPositionalTupleType.fieldNames as Iterable<String>)
             .zip<HirValueExpressionUri>(innerResult.second)
             .unsafeToMap<String, HirValueExpressionUri>(),
         ),
         HirNamedTupleType(
-          (HirTupleType.fieldNames as Iterable<String>)
+          (HirPositionalTupleType.fieldNames as Iterable<String>)
             .zip<HirInlineType>(
               (innerResult.second as Iterable<HirValueExpressionUri>)
                 .map<HirInlineType>({ innerResult.first.typeOf(it) }),

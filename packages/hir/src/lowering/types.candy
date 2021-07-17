@@ -121,10 +121,10 @@ public fun astInlineTypeToHirInlineType(
         )
       }
 
-      if (astType is AstTupleType) {
+      if (astType is AstPositionalTupleType) {
         return Tuple(
-          HirTupleType(
-            ((astType as AstTupleType).types as Iterable<AstInlineType>)
+          HirPositionalTupleType(
+            ((astType as AstPositionalTupleType).types as Iterable<AstInlineType>)
               .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, scope) })
               .toList(),
           ) as HirInlineType,
@@ -469,7 +469,7 @@ fun hirInlineTypeToSolverTypeAndGoals(
     // `impl A | B: Equals` or `impl (name: String, age: UInt): Clone`, we'll need to add support
     // for other `HirInlineTypes` as well.
     // TODO(never, marcelgarus): Handle HirFunctionType
-    // TODO(never, marcelgarus): Handle HirTupleType
+    // TODO(never, marcelgarus): Handle HirPositionalTupleType
     // TODO(never, marcelgarus): Handle HirNamedTupleType
     // TODO(never, marcelgarus): Handle HirEnumType
     // TODO(never, marcelgarus): Handle HirIntersectionType
