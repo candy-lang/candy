@@ -13,7 +13,7 @@ public fun if[T](condition: Bool, thenBody: () -> T): Maybe[T] {
 
 public builtin fun loop(body: () -> Nothing): Never
 # Executes the body infinitely often.
-## TODO(marcelgarus): Implement this in pure Candy once we have tail-call elimination.
+## TODO(later, marcelgarus): Implement this in pure Candy once we have tail-call elimination.
 
 impl Int {
   public fun times(body: () -> Nothing) {

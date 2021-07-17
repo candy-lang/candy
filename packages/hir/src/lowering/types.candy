@@ -20,7 +20,7 @@ impl HirReflectionType: HasDeclarations {
   }
 }
 
-// TODO(marcelgarus): Convert this into extension methods on Ast as soon as impls for types from
+// TODO(never, marcelgarus): Convert this into extension methods on Ast as soon as impls for types from
 // other packages work.
 public fun astInlineTypeToHirInlineType(
   context: QueryContext<List<CompilerError>>,
@@ -56,7 +56,7 @@ public fun astInlineTypeToHirInlineType(
 
         // Try to find the first part of the `nameParts`. Then, find children inside its
         // declarations.
-        // TODO(marcelgarus): When resolving `Foo Bar`, we currently accept a `Bar` next to `Foo` if
+        // TODO(never, marcelgarus): When resolving `Foo Bar`, we currently accept a `Bar` next to `Foo` if
         // `Foo` itself doesn't contain a `Bar`, as the resolver traverses parent scopes.
         mut let candidates = resolveIdentifier(context, nameParts.first().unwrap(), scope)
         for namePart in nameParts.skip(1) {
@@ -174,7 +174,11 @@ public fun astInlineTypeToHirInlineType(
         )
       }
 
-      todo("Implement astInlineTypeToHirInlineType for {astType}")
+      if (astType is AstErrorType) {
+        return Tuple(HirErrorType(), List.emtpy<CompilerError>())
+      }
+
+      throw "Unknown AST type: {astType}"
     }
   )
 }
@@ -189,6 +193,19 @@ impl HirParameterType {
       Tuple(
         astTypeParameter.upperBound
           .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this.declaration) })
+          .orElse({ HirNamedType.coreAny(context) }),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
+}
+
+impl HirTrait {
+  fun upperBound(context: QueryContext<List<CompilerError>>): HirInlineType {
+    query<HirInlineType, List<CompilerError>>(context, "HirTrait.upperBound", this, {
+      Tuple(
+        (this as HasAst).ast(context).upperBound
+          .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
           .orElse({ HirNamedType.coreAny(context) }),
         List.empty<CompilerError>(),
       )
@@ -230,7 +247,7 @@ impl HirImpl {
     query<Maybe<HirInlineType>, List<CompilerError>>(context, "HirImpl.implementedTrait", this as Equals & Hash, {
       let traits = this.ast(context).traits
       if !((traits as Iterable).length() == 1) {
-        // TODO(marcelgarus): Support impls for more than one trait.
+        // TODO(never, marcelgarus): Support impls for more than one trait.
         return Tuple(
           None<HirInlineType>(),
           List.empty<CompilerError>(
@@ -246,7 +263,7 @@ impl HirImpl {
           astInlineTypeToHirInlineType(
             context,
             (traits as Iterable).cast<AstInlineType>().single().unwrap(),
-            // TODO(marcelgarus): Directly cast this into a `Iterable<AstInlineType>` when the Dart
+            // TODO(never, marcelgarus): Directly cast this into a `Iterable<AstInlineType>` when the Dart
             // type system gets good enough.
             this,
           ),
@@ -331,7 +348,7 @@ fun hirImplToSolverRule(
     if (solverTraitAndGoals is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
     let solverTraitAndGoals: (SolverType, List<SolverGoal>) = solverTraitAndGoals.unwrap()
     if ((solverTraitAndGoals.second as Iterable).length() > 1) {
-      // TODO(marcelgarus): We can't implement a trait that contains another trait yet, like
+      // TODO(never, marcelgarus): We can't implement a trait that contains another trait yet, like
       // `Iterable<Equals>`. This does work in Rust (with boxing and explicit dynamism), so we'll
       // probably have to look at how to put general-purpose logic implications in our solver (like
       // `A B -> C D` instead of only having one implicative result like `A B -> C` in the solver).
@@ -407,7 +424,7 @@ fun hirInlineTypeToSolverTypeAndGoals(
         // We'll return a substitution that will have to satisfy the trait. For example, given the
         // trait `Equals`, we'll return `?0` with the goal `Equals(?0)`. The `?0` is this
         // substitution.
-        // TODO(marcelgarus): In the long term, choose a more elegant substitution than just the
+        // TODO(never, marcelgarus): In the long term, choose a more elegant substitution than just the
         // 1000th.
         let substitution = SolverVariable(canonicalVariable(1000))
         let goals = MutableList.empty<SolverGoal>()
@@ -449,22 +466,22 @@ fun hirInlineTypeToSolverTypeAndGoals(
           List.empty<CompilerError>(),
         )
       }
-      todo("We should handle a {hirType} referring to {declaration}")
+      throw "HirNamedType references an invalid declaration: {declaration}"
     }
-    // TODO(marcelgarus): For now, we only support impls for nominal types. If we want to support
+    // TODO(never, marcelgarus): For now, we only support impls for nominal types. If we want to support
     // `impl A | B: Equals` or `impl (name: String, age: UInt): Clone`, we'll need to add support
     // for other `HirInlineTypes` as well.
-    // TODO(marcelgarus): Handle HirFunctionType
-    // TODO(marcelgarus): Handle HirTupleType
-    // TODO(marcelgarus): Handle HirNamedTupleType
-    // TODO(marcelgarus): Handle HirEnumType
-    // TODO(marcelgarus): Handle HirIntersectionType
+    // TODO(never, marcelgarus): Handle HirFunctionType
+    // TODO(never, marcelgarus): Handle HirTupleType
+    // TODO(never, marcelgarus): Handle HirNamedTupleType
+    // TODO(never, marcelgarus): Handle HirEnumType
+    // TODO(never, marcelgarus): Handle HirIntersectionType
     if (hirType is HirThisType) {
       let declaration = (hirType as HirThisType).declaration
       if (declaration is HirTrait) {
         // We don't need to lower `This` types in traits to solver types because we only use impls
         // for logical type solving.
-        todo("Don't call hirTypeToSolverType for a This type in a trait")
+        throw "Don't call hirTypeToSolverType for a This type in a trait"
       }
       if (declaration is HirImpl) {
         // If a `This` type is used inside an impl, it just assumes the solver type of the base
@@ -501,8 +518,11 @@ fun hirInlineTypeToSolverTypeAndGoals(
         List.empty<CompilerError>(),
       )
     }
-    // TODO(marcelgarus): Handle HirReflectionType
-    todo("Implement hirTypeToSolverType for {hirType}")
+    if (hirType is HirReflectionType) {
+      todo("soon, marcelgarus: Handle HirReflectionType")
+    }
+
+    throw "Unexpected HirType: {hirType}"
   })
 }
 
@@ -568,7 +588,7 @@ public fun isAssignableTo(
     Tuple(implFor(context, base, trait_, scope) is Some<HirImpl>, List.empty<CompilerError>())
   })
 }
-// TODO(marcelgarus): Support getting the impl for a trait with generics. This would basically
+// TODO(soon, marcelgarus): Support getting the impl for a trait with generics. This would basically
 // mean we'd have to accept an arbitrary `HirInlineType` as the `trait_`.
 public fun implFor(
   context: QueryContext<List<CompilerError>>,
@@ -589,7 +609,7 @@ public fun implFor(
     let traitGoals = traitSolverAndGoals.unwrap().second
 
     if (traitType is SolverValue) {
-      todo("This shouldn't happen. Trait should be lowered to a SolverVariable.")
+      throw "This shouldn't happen. Trait should be lowered to a SolverVariable."
     }
     if !((traitGoals as Iterable).length() == 1) {
       return Tuple(
@@ -642,7 +662,7 @@ fun getAllImplementedTraitsFor(
   scope: Package,
 ): Set<HirNamedType> {
   query<Set<HirNamedType>, List<CompilerError>>(context, "getAllImplementedTraitsFor", DataTuple2<HirInlineType, Package>(base, scope), {
-    todo("marcelgarus")
+    todo("soon, marcelgarus")
     // getAllTraitsInScope(context, scope)
     //   .items()
     //   .where({ isAssignableTo(context, base, it, scope) })
@@ -685,7 +705,7 @@ impl ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError: CompilerError {
   public fun id(): String { "this-type-can-only-be-used-in-impl-or-trait" }
 
   public fun location(): Location {
-    todo("Implement ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError.location")
   }
   public fun title(): String { "The This type can only be used in impls or traits." }
   public fun description(): String { "You can't use the This type in modules or type definitions" }
@@ -698,7 +718,7 @@ impl CannotImplementTraitOfTraitCompilerError: CompilerError {
   public fun id(): String { "cannot-implement-trait-of-trait" }
 
   public fun location(): Location {
-    todo("Implement CannotImplementTraitOfTraitCompilerError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement CannotImplementTraitOfTraitCompilerError.location")
   }
   public fun title(): String {
     "You cannot implement a trait containing another trait as a generic parameter yet."
@@ -713,7 +733,7 @@ impl TryingToFindImplForTraitWithTraitAsParameterCompilerError: CompilerError {
   public fun id(): String { "trying-to-find-impl-for-trait-with-trait-as-parameter" }
 
   public fun location(): Location {
-    todo("Implement TryingToFindImplForTraitWithTraitAsParameterCompilerError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement TryingToFindImplForTraitWithTraitAsParameterCompilerError.location")
   }
   public fun title(): String { "Conflicting impls." }
   public fun description(): String {
@@ -732,7 +752,7 @@ impl ConflictingImplsCompilerError: CompilerError {
   public fun id(): String { "conflicting-impls" }
 
   public fun location(): Location {
-    todo("Implement ConflictingImplsCompilerError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement ConflictingImplsCompilerError.location")
   }
   public fun title(): String { "Conflicting impls." }
   public fun description(): String {
@@ -747,11 +767,11 @@ impl AmbiguousTypeCompilerError: CompilerError {
   public fun id(): String { "ambiguous-type" }
 
   public fun location(): Location {
-    todo("Implement AmbiguousTypeCompilerError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement AmbiguousTypeCompilerError.location")
   }
   public fun title(): String { "Ambiguous type. Candidates are {candidates}." }
   public fun description(): String {
-    /// TODO(marcelgarus): add a description for this error
+    /// TODO(never, marcelgarus): add a description for this error
     ""
   }
 }
@@ -763,11 +783,11 @@ impl UnknownTypeCompilerError: CompilerError {
   public fun id(): String { "could-not-resolve-type" }
 
   public fun location(): Location {
-    todo("Implement UnknownTypeCompilerError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement UnknownTypeCompilerError.location")
   }
   public fun title(): String { "Couldn't resolve type {astType.nameParts}." }
   public fun description(): String {
-    /// TODO(marcelgarus): add a description for this error
+    /// TODO(never, marcelgarus): add a description for this error
     ""
   }
 }

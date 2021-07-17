@@ -10,8 +10,8 @@ use ...list
 use ...map
 use ..linked_hash_map
 
-// TODO(marcelgarus): Make the `BucketMap` implementation way more efficient.
-// TODO(marcelgarus): Typedef Bucket as LinkedHashMap.
+// TODO(never, marcelgarus): Make the `BucketMap` implementation way more efficient.
+// TODO(never, marcelgarus): Typedef Bucket as LinkedHashMap.
 
 class BucketMap<Key: Equals & Hash, Value> {
   static fun empty<Key: Equals & Hash, Value>(): BucketMap<Key, Value> {
@@ -70,7 +70,7 @@ impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: MutableMap<Key, Value> {
     None<Value>()
   }
 
-  // TODO(marcelgarus): Implement `cast` more efficiently than the default one. We can do this by
+  // TODO(never, marcelgarus): Implement `cast` more efficiently than the default one. We can do this by
   // using the precomputed `hash`es – regardless of the type, those won't change. That also means
   // the buckets stay the same.
   // fun cast<NewKey, NewValue>(): Map<NewKey, NewValue>

@@ -7,7 +7,7 @@ use ..Iterate
 public use .BucketMap
 public use .LinkedHashMap
 
-## TODO(marcelgarus): Create type alias `MapKey` for `Equals & Hash`.
+## TODO(later, marcelgarus): Create type alias `MapKey` for `Equals & Hash`.
 
 public trait Map[Key: Equals & Hash, Value] {
   static fun empty(): Map[Key, Value] { BucketMap[Key, Value].empty() }

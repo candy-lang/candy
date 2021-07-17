@@ -11,7 +11,7 @@ impl MissingExpressionInInterpolationCompilerError: CompilerError {
   public fun location(): Location { Location(file, node.child.openingCurlyBrace.child.span) }
   public fun title(): String { "Missing expression in string interpolation." }
   public fun description(): String {
-    /// TODO(JonasWanke): explain what a string interpolation is and how to escape a `{`
+    /// TODO(never, JonasWanke): explain what a string interpolation is and how to escape a `{`
     "Your string interpolation doesn't contain any expression."
   }
 }

@@ -30,7 +30,7 @@ public fun compileLambdaValueExpression(
       .toList()
 
     let expressions = (expression.expressions as Iterable<HirValueExpressionUri>)
-      .map<HirValueExpression>({ getValueExpression(it) })
+      .map<HirValueExpression>({ resolveHirValueExpressionUri(context, it) })
       .toList()
 
     let dartExpression = DartClosure(

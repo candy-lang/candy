@@ -7,7 +7,7 @@ public trait Random {
 // fun random<T: Random>(source: RandomSource): T { T.randomSample(source) }
 
 
-// TODO(JonasWanke): add this when we have ranges
+// TODO(never, JonasWanke): add this when we have ranges
 // trait RandomInRange: Comparable {
 //   fun randomInRange(range: Range<This>): This
 // }

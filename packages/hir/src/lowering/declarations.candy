@@ -20,7 +20,7 @@ trait CanBeStatic {
 }
 
 fun fileToHirModule(context: QueryContext<List<CompilerError>>, file: FancyFile): HirModule {
-  // TODO(marcelgarus): Implement this as a static function on `HirModule` (`HirModule fromFile`) as
+  // TODO(never, marcelgarus): Implement this as a static function on `HirModule` (`HirModule fromFile`) as
   // soon as adding static functions through impls works.
 
   query<HirModule, List<CompilerError>>(context, "HirModule.fromFile", (file as Equals & Hash), {
@@ -86,11 +86,11 @@ public trait HasVisibility {
   fun isPublic(context: QueryContext<List<CompilerError>>): Bool
 }
 public fun isPublicFromModifiers(modifiers: List<AstIdentifier>): Bool {
-  // TODO(JonasWanke): This should resolve modifier names when we support custom annotations.
+  // TODO(never, JonasWanke): This should resolve modifier names when we support custom annotations.
   (modifiers as Iterable<AstIdentifier>).any({ it.value == "public" })
 }
 
-// TODO(marcelgarus): `HirModule`s implement the `HasDeclarations` trait. Because the Dart lowering
+// TODO(never, marcelgarus): `HirModule`s implement the `HasDeclarations` trait. Because the Dart lowering
 // is weird, we can't just add impls to traits (they will be mixed in, but the subclasses only
 // implement the trait, losing the specific implementation).
 // So, we put the code of the impl into the following few functions, which are used by the concrete
@@ -116,7 +116,7 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule
 
     // Follow the directory structure down as much as possible.
     while segments.isNotEmpty() {
-      // TODO(marcelgarus): Move this into the while condition once the && is lazy.
+      // TODO(never, marcelgarus): Move this into the while condition once the && is lazy.
       let newPath = path.child(segments.first().unwrap())
       let resolvedPath = FancyFile(package, newPath).getResolvedPath(context)
       if !Directory(resolvedPath).doesExist() { break unit }
@@ -127,7 +127,7 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule
 
     // Choose the correct file, default to ".candy".
     //
-    // TODO(marcelgarus): Inline the condition into the `if` once the && is lazy.
+    // TODO(never, marcelgarus): Inline the condition into the `if` once the && is lazy.
     mut let condition = segments.isNotEmpty()
     if condition {
       condition = FancyFile(package, path.child("{segments.first().unwrap()}.candy"))
@@ -144,10 +144,9 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule
       return Tuple(None<AstFile | AstModule>(), List.empty<CompilerError>())
     }
 
-    // TODO(marcelgarus): Navigate through the AST to find the inline `AstModule`.
     let ast = parseAstOfFile(context, FancyFile(package, path)).first
     if segments.isNotEmpty() {
-      todo("Support getting the AST of inline modules.")
+      todo("never, marcelgarus: Support getting the AST of inline modules by navigating through the AST.")
     }
 
     return Tuple(Some<AstFile | AstModule>(ast), List.empty<CompilerError>())
@@ -454,7 +453,7 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
 
   fun isStatic(context: QueryContext<List<CompilerError>>): Bool {
     query<Bool, List<CompilerError>>(context, "HirFunction.isStatic", this, {
-      // TODO(JonasWanke): This should resolve modifier names when we support custom annotations.
+      // TODO(never, JonasWanke): This should resolve modifier names when we support custom annotations.
       let modifiers = (ast(context).modifiers as Iterable<AstIdentifier>)
       Tuple(modifiers.any({ it.value == "static" }), List.empty<CompilerError>())
     })
@@ -485,12 +484,18 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
       Tuple(isPublicFromModifiers(ast(context).modifiers), List.empty<CompilerError>())
     })
   }
+
+  fun returnType(context: QueryContext<List<CompilerError>>): HirType {
+    todo("soon: Implement HirFunction.returnType")
+  }
 }
 
 impl HirValueParameter: HasAst<AstValueParameter> {
   fun ast(context: QueryContext<List<CompilerError>>): AstValueParameter {
     query<AstValueParameter, List<CompilerError>>(context, "HirValueParameter.ast", this, {
-      if (this.scope is HirValueExpressionUri) { todo("Implement HirExpression.ast(…)") }
+      if (this.scope is HirValueExpressionUri) {
+        todo("never, Implement HirValueParameter.ast(…) for lambda parameters")
+      }
 
       let ast = ((scope as HirFunction).ast(context).valueParameters as Iterable<AstValueParameter>)
         .singleWhere({ it.name.value == this.name })
@@ -502,7 +507,7 @@ impl HirValueParameter: HasAst<AstValueParameter> {
   fun type(context: QueryContext<List<CompilerError>>): HirInlineType {
     query<HirInlineType, List<CompilerError>>(context, "HirValueParameter.type", this, {
       if (this.scope is HirValueExpressionUri) {
-        todo("Implement HirValueParameter.type(…) for lambda parameters")
+        todo("never, Implement HirValueParameter.type(…) for lambda parameters")
       }
 
       Tuple(

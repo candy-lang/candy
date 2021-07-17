@@ -30,7 +30,7 @@ impl<Value> Some<Value>: Maybe<Value> {
   fun unsafeHash<T>(hasher: Hasher<T>) { (value as Hash).hash<T>(hasher) }
 }
 
-// TODO(JonasWanke): remove type parameter when multi-impls are supported
+// TODO(never, JonasWanke): remove type parameter when multi-impls are supported
 public class None<Value>
 impl<Value> None<Value>: Maybe<Value> {
   fun unwrap(): Value { throw "Unwrapped `None`." }

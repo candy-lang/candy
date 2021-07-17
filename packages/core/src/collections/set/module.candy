@@ -110,7 +110,7 @@ public trait MutableSet<Item: Equals & Hash>: Set<Item> {
     set
   }
 
-  // TODO(JonasWanke): Rename to add as soon as the naming conflict with + is resolved.
+  // TODO(never, JonasWanke): Rename to add as soon as the naming conflict with + is resolved.
   fun insert(item: Item): Bool
   /// Returns `true` if `item` (or an equal value) was not yet in the set. Otherwise, returns
   /// `false` and the set is not modified.

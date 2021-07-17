@@ -40,7 +40,7 @@ fun compileInlineTypeHelper(
     return DartNamedType(DartIdentifier(name, None<String>()), List.empty<DartType>())
   }
   if (inlineType is HirReflectionType) {
-    todo("Compiling HirReflectionType to Dart is not yet implemented.")
+    todo("soon, Compile HirReflectionType to Dart")
   }
   throw "Unknown inline type: {inlineType}"
 }

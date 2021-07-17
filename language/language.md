@@ -570,8 +570,6 @@ fun bar() {
 
 ### 9.4. If
 
-TODO: If-let
-
 Single-line `if`s/`else`s use parentheses around the condition, while multiline bodies require curly braces anyway, which means you don't need parentheses around the condition.
 
 The return value of an `if`-expression is the last expression of each branch.
@@ -844,7 +842,7 @@ class Foo
 
 Compiler Plugin:
 
-- runs in separate process; communication via stdin/stdout → TODO: protocol
+- runs in separate process; communication via stdin/stdout → TODO(later): protocol
 - can request execution per class, per function
   - can be filtered to classes/methods with specific annotations
 - runs only on the target module and not on its dependencies

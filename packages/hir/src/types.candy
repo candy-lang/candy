@@ -116,7 +116,7 @@ impl HirEnumType: Equals & Hash & HirInlineType {
 
 public class HirIntersectionType {
   public let types: List<HirInlineType>
-  // TODO(JonasWanke): Use a `Set<HirInlineType>` when we have sets that keep insertion order.
+  // TODO(never, JonasWanke): Use a `Set<HirInlineType>` when we have sets that keep insertion order.
 }
 impl HirIntersectionType: Equals & Hash & HirInlineType {
   fun equals(other: This): Bool {

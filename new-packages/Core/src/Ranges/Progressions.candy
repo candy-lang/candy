@@ -51,7 +51,7 @@ impl BoundedIntProgression: Iterate[Int] {
     })
   }
 
-  ## TODO(JonasWanke): Add a constant-time `contains(item)` when we have something like
+  ## TODO(later, JonasWanke): Add a constant-time `contains(item)` when we have something like
   ## where-clauses for generic types and `iterate.contains` can be declared directly inside
   ## `Iterate`. Same for the progressions below.
 

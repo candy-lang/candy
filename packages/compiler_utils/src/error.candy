@@ -29,7 +29,7 @@ public class UnsupportedFeatureCompilerError {
 impl UnsupportedFeatureCompilerError: CompilerError {
   public fun id(): String { "unsupported-feature" }
 
-  public fun location(): Location { location_.orElse({ todo("No location known.") }) }
+  public fun location(): Location { location_.orElse({ todo("never, No location known.") }) }
   public fun title(): String { "Unsupported feature" }
   public fun description(): String { description_ }
 }

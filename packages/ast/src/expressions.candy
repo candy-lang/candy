@@ -156,7 +156,7 @@ public class AstBinaryExpression {
   /// * assignment & comparison: `=`, `==`, `!=`, `<`, `<=`, `>`, `>=`
   /// * logical: `&`, `|`, `=>`
   ///
-  /// TODO(JonasWanke): convert this to an enum when we support these
+  /// TODO(never, JonasWanke): convert this to an enum when we support these
 
   public let rightOperand: AstExpression
 }

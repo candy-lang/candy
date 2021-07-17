@@ -11,7 +11,7 @@ impl ExpectedReturnTypeInFunctionTypeCompilerError: CompilerError {
   public fun location(): Location { Location(file, node.child.arrow.child.span) }
   public fun title(): String { "Missing return type in function type." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description
+    /// TODO(never, JonasWanke): add a description
     ""
   }
 }

@@ -214,7 +214,7 @@ class DartComment {
 
 public trait DartType: DartExpression
 
-// TODO(JonasWanke): Move these to `DartType` when we support static properties in traits.
+// TODO(never, JonasWanke): Move these to `DartType` when we support static properties in traits.
 static let dartBool = DartNamedType(DartIdentifier("bool", Some<String>(dartCoreUrl)), List.empty<DartType>())
 static fun dartComparable(t: DartType): DartType {
   DartNamedType(DartIdentifier("Comparable", Some<String>(dartCoreUrl)), List.of1<DartType>(t))
@@ -251,7 +251,7 @@ class DartNamedType {
   let typeArguments: List<DartType> = List.empty<DartType>()
 }
 impl DartNamedType: DartExpression & DartType
-/// TODO(marcelgarus): Remove once the compiler realizes `DartType` implements `DartExpression`.
+/// TODO(never, marcelgarus): Remove once the compiler realizes `DartType` implements `DartExpression`.
 
 class DartFunctionType {
   let parameters: List<DartType | DartParameter> = List.empty<DartType | DartParameter>()
@@ -260,7 +260,7 @@ class DartFunctionType {
   let _returns: Maybe<DartType> = None<DartType>()
 }
 impl DartFunctionType: DartExpression & DartType
-/// TODO(marcelgarus): Remove once the compiler realizes `DartType` implements `DartExpression`.
+/// TODO(never, marcelgarus): Remove once the compiler realizes `DartType` implements `DartExpression`.
 
 class DartTypeParameter {
   let name: String

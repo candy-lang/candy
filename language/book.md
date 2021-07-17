@@ -11,7 +11,7 @@ This book assumes you're familiar with another programming language already, but
 
 ## Getting started
 
-TODO: Installing Candy
+TODO(later, marcelgarus): Installing Candy
 
 ### Hello world
 
@@ -54,5 +54,3 @@ print("Hello, world!")
 The built-in `print`-function simply prints its argument to the command line.
 
 ## Variables
-
-

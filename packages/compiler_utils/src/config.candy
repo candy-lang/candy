@@ -3,7 +3,7 @@ use ..error
 use ..package
 
 // Assuming the `build/dart` folder is our current working directory.
-// TODO(JonasWanke): read these paths from a dynamic config
+// TODO(never, JonasWanke): read these paths from a dynamic config
 let newPackagesPath_ = Path.current().append(Path.parse("../../../../new-packages")).normalized()
 
 fun getCorePath(context: QueryContext<List<CompilerError>>): Path {

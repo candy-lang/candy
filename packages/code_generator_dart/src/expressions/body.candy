@@ -128,7 +128,7 @@ let nonLocalReturnExceptionType = DartNamedType(
 
 
 class ListOfHirValueExpression {
-  // TODO(JonasWanke): remove this when we no longer need `unsafeEquals` and `unsafeHash`
+  // TODO(never, JonasWanke): remove this when we no longer need `unsafeEquals` and `unsafeHash`
   public let value: List<HirValueExpression>
 }
 impl ListOfHirValueExpression: Equals & Hash {

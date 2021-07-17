@@ -57,6 +57,7 @@ public fun resolveIdentifier(
         !(parent is Package),
         "Parent is a package, although this is not a file-level module."
       )
+      // TODO(soon, JonasWanke): handle cycles in exports
       candidates.addAll(
         resolveIdentifier(context, identifier, scope.parent as HirDeclaration).items() as Iterable<
           HirModule | HirType | HirTrait | HirFunction | HirParameterType,
@@ -103,7 +104,7 @@ fun resolveIdentifierInUseLines(
           return resolveIdentifierInUseLines(context, identifier, it, true).items()
         })
 
-      // TODO(JonasWanke): Check for multiple modules/trait/types with conflicting names.
+      // TODO(soon, JonasWanke): Check for multiple modules/trait/types with conflicting names.
 
       Tuple(candidates.toSet(), List.empty<CompilerError>())
     }

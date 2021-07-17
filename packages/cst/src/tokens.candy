@@ -19,7 +19,7 @@ public class KeywordToken {
   /// * declarations: module, trait, impl, type, fun, let
   /// * control flow: return
   ///
-  /// TODO(JonasWanke): convert this to an enum when we support these
+  /// TODO(never, JonasWanke): convert this to an enum when we support these
 }
 impl KeywordToken: CstToken & CstContentToken
 
@@ -57,7 +57,7 @@ public class PunctuationToken {
   /// `-`, `->`, `,`, `:`, `!=`, `"`, `(`, `)`, `{`, `}`, `[`, `]`, `*`, `/`,
   /// `&`, `%`,`+`, `<`, `<=`, `=`, `==`, `=>`, `>`, `>=`, `|`, `~/`, `.`, `\`
   ///
-  /// TODO(JonasWanke): convert this to an enum when we support these
+  /// TODO(never, JonasWanke): convert this to an enum when we support these
 }
 impl PunctuationToken: CstToken & CstContentToken
 

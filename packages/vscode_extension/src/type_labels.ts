@@ -65,7 +65,7 @@ export class TypeLabelsDecorations implements vs.Disposable {
       // might be stale (eg. we sent two updates, and the type from in between them just
       // arrived). In this case, we'll just bail and do nothing, assuming a future update will
       // have the correct info.
-      // TODO(JonasWanke): do we really need this check?
+      // TODO(later, JonasWanke): do we really need this check?
       const finalCharacterPosition = labelRange.end;
       if (finalCharacterPosition.character < 1) return;
 

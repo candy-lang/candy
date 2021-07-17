@@ -20,7 +20,7 @@ fun lowerFunctionBody(
     ast.body
       .map<(Maybe<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)>, List<CompilerError>)>({
         if (it is AstExpressionBody | AstDelegationBody) {
-          todo("Support non-block bodies")
+          todo("never, Support non-block bodies")
         }
 
         let body = (it as AstBlockBody)
@@ -43,6 +43,16 @@ fun lowerFunctionBody(
           List.empty<CompilerError>(),
         )
       })
+  })
+}
+
+fun resolveHirValueExpressionUri(
+  context: QueryContext<List<CompilerError>>,
+  uri: HirValueExpressionUri,
+): HirValueExpression {
+  query<HirValueExpression, List<CompilerError>>(context, "resolveHirValueExpressionUri", uri, {
+    let loweredBody = lowerFunctionBody(context, uri.declaration).unwrap()
+    Tuple(loweredBody.second.get(uri).unwrap(), List.empty<CompilerError>())
   })
 }
 
@@ -87,7 +97,7 @@ class LoweringContext {
     }
 
     for parameter in function.valueParameters(context) {
-      // TODO(marcelgarus): `this` is not a valid parameter name.
+      // TODO(never, marcelgarus): `this` is not a valid parameter name.
       let result = loweringContext.register(
         HirParameterReferenceValueExpression(parameter),
         parameter.type(context),
@@ -258,7 +268,7 @@ impl LoweringContext {
         result = expressionToAdd.first.register(
           HirFunctionCallValueExpression(
             Some<HirValueExpressionUri | HirTypeExpression>(result.second),
-            // TODO(marcelgarus): Directly call the `String`'s `add` function for better performance
+            // TODO(never, marcelgarus): Directly call the `String`'s `add` function for better performance
             // (and in case someone implements `+` for `String` a second time).
             HirFunction.infixPlus(expressionToAdd.first.global.context),
             Map.empty<String, HirInlineType>(),
@@ -459,12 +469,12 @@ impl LoweringContext {
           Map.empty<String, HirInlineType>(),
           Map.of1<String, HirValueExpressionUri>(Tuple("other", loweredRight.second)),
         ),
-        todo("marcelgarus: Find the correct impl and retrieve the return type"),
+        todo("soon, marcelgarus: Find the correct impl and retrieve the return type"),
       )
     }
 
     if (expression is AstPropertyExpression) {
-      // TODO(marcelgarus): `this` is not a valid property name.
+      // TODO(never, marcelgarus): `this` is not a valid property name.
       let expression = (expression as AstPropertyExpression)
       let result = this.lowerExpressionToValueExpression(expression.initializer)
       let context = LoweringContext(
@@ -480,7 +490,7 @@ impl LoweringContext {
       // the lowering of the surrounding AstCallExpression would have also handled the inner
       // AstNavigationExpression. So, this is a function invocation without any parameters.
       // But that doesn't work for now.
-      todo("Function call with omitted parentheses")
+      todo("never, Function call with omitted parentheses")
     }
 
     if (expression is AstCallExpression) {
@@ -499,21 +509,21 @@ impl LoweringContext {
             Some<HirValueExpressionUri>(lowered.second),
           )
         } else {
-          todo("Unsupported function call receiver: {receiver}")
+          todo("never, Unsupported function call receiver: {receiver}")
         }
       }
       mut let context = contextAndNameAndReceiver.first
       let name = contextAndNameAndReceiver.second
       let receiver = contextAndNameAndReceiver.third
 
-      // TODO(marcelgarus): The function might have a receiver.
+      // TODO(soon, marcelgarus): The function might have a receiver.
       let function = context.resolve(name).items()
         .cast<HirValueExpressionUri | HirFunction>()
-      // TODO(marcelgarus): Support overloading.
+      // TODO(soon, marcelgarus): Support overloading.
       let function = if (function.length() == 1) {
         let function = function.single().unwrap()
         if (function is HirValueExpressionUri) {
-          todo("Callable expressions are not yet supported: {function}")
+          todo("soon, Callable expressions are not yet supported: {function}")
         }
         (function as HirFunction)
       } else {
@@ -523,11 +533,11 @@ impl LoweringContext {
         ))
       }
 
-      // TODO(marcelgarus): This is a work in progress. Continue working on it.
+      // TODO(soon, marcelgarus): This is a work in progress. Continue working on it.
       let typeArguments = (expression.typeArguments as Iterable<AstTypeArgument>)
         .map<(String, HirInlineType)>({
           Tuple(
-            todo("Zip with the type arguments of the function"),
+            todo("soon, Zip with the type arguments of the function"),
             astInlineTypeToHirInlineType(context.global.context, it.type, context.global.function),
           )
         })
@@ -536,7 +546,7 @@ impl LoweringContext {
       for argument in expression.valueArguments {
         let lowered = context.lowerExpressionToValueExpression(argument.value)
         context = lowered.first
-        valueArguments.set(todo("match value arguments to the parameters"), lowered.second)
+        valueArguments.set(todo("soon, match value arguments to the parameters"), lowered.second)
       }
 
       return this.register(
@@ -546,7 +556,7 @@ impl LoweringContext {
           typeArguments,
           valueArguments,
         ),
-        todo("function call type"),
+        todo("soon, function call type"),
       )
     }
 
@@ -583,11 +593,11 @@ impl InvalidValueExpressionError: CompilerError {
   public fun id(): String { "invalid-value-expression" }
 
   public fun location(): Location {
-    todo("Implement InvalidValueExpressionError.location") // TODO(marcelgarus)
+    todo("never, Implement InvalidValueExpressionError.location")
   }
   public fun title(): String { "Cannot use this expression here; expected a value expression." }
   public fun description(): String {
-    /// TODO(marcelgarus): add a description for this error
+    /// TODO(never, marcelgarus): add a description for this error
     "This is the non-value expression: {this.expression}"
   }
 }
@@ -599,11 +609,11 @@ impl InvalidInterpolatedExpressionError: CompilerError {
   public fun id(): String { "invalid-interpolated-expression" }
 
   public fun location(): Location {
-    todo("Implement InvalidInterpolatedExpressionError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement InvalidInterpolatedExpressionError.location")
   }
   public fun title(): String { "This expression does not implement ToString." }
   public fun description(): String {
-    /// TODO(marcelgarus): add a description for this error
+    /// TODO(never, marcelgarus): add a description for this error
     "This is the non-ToString expression: {this.expression}"
   }
 }
@@ -615,11 +625,11 @@ impl UnresolvedIdentifierError: CompilerError {
   public fun id(): String { "unresolved-identifier" }
 
   public fun location(): Location {
-    todo("Implement UnresolvedIdentifierError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement UnresolvedIdentifierError.location")
   }
   public fun title(): String { "Unresolved identifier." }
   public fun description(): String {
-    /// TODO(marcelgarus): add a description for this error
+    /// TODO(never, marcelgarus): add a description for this error
     "The unresolved identifier is {this.identifier}."
   }
 }
@@ -631,11 +641,11 @@ impl UncalledFunctionError: CompilerError {
   public fun id(): String { "uncalled-function" }
 
   public fun location(): Location {
-    todo("Implement UncalledFunctionError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement UncalledFunctionError.location")
   }
   public fun title(): String { "You didn't call a function." }
   public fun description(): String {
-    /// TODO(marcelgarus): add a description for this error
+    /// TODO(never, marcelgarus): add a description for this error
     "The uncalled function or one of the overloads is {this.function}."
   }
 }
@@ -647,11 +657,11 @@ impl InvalidTypeArgumentsError: CompilerError {
   public fun id(): String { "invalid-type-arguments" }
 
   public fun location(): Location {
-    todo("Implement InvalidTypeArgumentsError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement InvalidTypeArgumentsError.location")
   }
   public fun title(): String { "Cannot add type arguments to module or type parameter references, or some expressions." }
   public fun description(): String {
-    /// TODO(marcelgarus): add a description for this error
+    /// TODO(never, marcelgarus): add a description for this error
     "This is the improper expression: {this.inner}"
   }
 }
@@ -664,13 +674,13 @@ impl WrongNumberOfTypeArgumentsError: CompilerError {
   public fun id(): String { "wrong-number-of-type-arguments" }
 
   public fun location(): Location {
-    todo("Implement WrongNumberOfTypeArgumentsError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement WrongNumberOfTypeArgumentsError.location")
   }
   public fun title(): String {
     "Wrong number of type arguments were supplied: {this.suppliedCount}, required: {this.requiredCount}."
   }
   public fun description(): String {
-    /// TODO(marcelgarus): add a description for this error
+    /// TODO(never, marcelgarus): add a description for this error
     ""
   }
 }
@@ -682,13 +692,13 @@ impl InvalidTypeArgumentError: CompilerError {
   public fun id(): String { "invalid-type-arguments" }
 
   public fun location(): Location {
-    todo("Implement InvalidTypeArgumentError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement InvalidTypeArgumentError.location")
   }
   public fun title(): String {
     "Type argument is not assignable to the type parameter's upper bound."
   }
   public fun description(): String {
-    /// TODO(marcelgarus): add a description for this error
+    /// TODO(never, marcelgarus): add a description for this error
     "Type argument was {this.actualType}, but is not assignable to {this.upperBound}."
   }
 }

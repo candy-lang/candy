@@ -32,7 +32,7 @@ public builtin class Array<Item> {
   }
 }
 
-// TODO(marcelgarus): Make `Array` `Iterable`, this clashes with `Iterable.get`, which should return
+// TODO(never, marcelgarus): Make `Array` `Iterable`, this clashes with `Iterable.get`, which should return
 // `Maybe<Item>`.
 // impl<Item> Array<Item>: Iterable<Item> {
 //   fun iterator(): Iterator<Item> {

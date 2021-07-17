@@ -43,7 +43,7 @@ public trait Iterable<Item> {
   fun fifth(): Maybe<Item> { get(4) }
 
   fun nthLast(index: Int): Maybe<Item> {
-    // TODO(marcelgarus): Make this way more efficient.
+    // TODO(never, marcelgarus): Make this way more efficient.
     let list = (toList() as Iterable<Item>)
     list.get(list.length() - index - 1)
   }
@@ -114,7 +114,7 @@ public trait Iterable<Item> {
     for item in skip(1) { result = combine(result, item) }
     Some<Item>(result)
   }
-  // TODO(marcelgarus): reduceRight
+  // TODO(never, marcelgarus): reduceRight
 
   fun minBy<C: Comparable>(selector: (Item) => C): Maybe<Item> {
     reduceLeft({ result, item => if selector(result) <= selector(item) { result } else { item } })
@@ -122,16 +122,16 @@ public trait Iterable<Item> {
   fun maxBy<C: Comparable>(selector: (Item) => C): Maybe<Item> {
     reduceLeft({ result, item => if selector(result) >= selector(item) { result } else { item } })
   }
-  // TODO(JonasWanke): sumBy, averageBy
+  // TODO(never, JonasWanke): sumBy, averageBy
 
   // Searching.
 
   fun firstWhere(checker: (Item) => Bool): Maybe<Item> { where(checker).first() }
-  // TODO(marcelgarus): firstIndexWhere
+  // TODO(never, marcelgarus): firstIndexWhere
   fun lastWhere(checker: (Item) => Bool): Maybe<Item> { where(checker).last() }
-  // TODO(marcelgarus): lastIndexWhere
+  // TODO(never, marcelgarus): lastIndexWhere
   fun singleWhere(checker: (Item) => Bool): Maybe<Item> { where(checker).single() }
-  // TODO(JonasWanke): singleIndexWhere
+  // TODO(never, JonasWanke): singleIndexWhere
 
   // Mapping transformations.
   // These return an `Iterable` with the same length, but a different type.
@@ -147,7 +147,7 @@ public trait Iterable<Item> {
     map<Type>({ it as Type })
   }
 
-  // // TODO(marcelgarus): Maybe rename this to `indexed`?
+  // // TODO(never, marcelgarus): Maybe rename this to `indexed`?
   // fun enumerate(): Iterable<(Int, Item)> {
   //   mut let index = 0
   //   map<(Int, Item)>({
@@ -173,7 +173,7 @@ public trait Iterable<Item> {
   }
 
   fun whereType<Result>(): Iterable<Result> {
-    // TODO(JonasWanke): return `Iterable<Item & Result>` when our type system gets smarter
+    // TODO(never, JonasWanke): return `Iterable<Item & Result>` when our type system gets smarter
     where({ it is Result }).cast<Result>()
   }
 
@@ -200,7 +200,7 @@ public trait Iterable<Item> {
     whereWithState<Int>(0, { item, index => Tuple(index < n, index + 1) })
   }
   fun takeWhile(checker: (Item) => Bool): Iterable<Item> {
-    // TODO(marcelgarus): Implement more efficiently.
+    // TODO(never, marcelgarus): Implement more efficiently.
 
     whereWithState<Bool>(
       true,
@@ -216,13 +216,13 @@ public trait Iterable<Item> {
   // Conversion transformations.
   // These do more complicated stuff.
 
-  // TODO(marcelgarus): Decide on whether to name this `flatMap`.
+  // TODO(never, marcelgarus): Decide on whether to name this `flatMap`.
   fun maybeMap<Out>(maybeMapper: (Item) => Maybe<Out>): Iterable<Out> {
-    // TODO(JonasWanke): Use `whereSome` as soon as that's available.
+    // TODO(never, JonasWanke): Use `whereSome` as soon as that's available.
     map<Maybe<Out>>(maybeMapper).whereType<Some<Out>>().map<Out>({ it.value })
   }
 
-  // TODO(marcelgarus): distinctBy
+  // TODO(never, marcelgarus): distinctBy
 
   fun expand<T>(expander: (Item) => Iterable<T>): Iterable<T> {
     ExpandIterable<Item, T>(this, expander)
@@ -238,7 +238,7 @@ public trait Iterable<Item> {
     (map as Map<T, List<Item>>)
   }
 
-  // TODO(marcelgarus): reversed
+  // TODO(never, marcelgarus): reversed
 
   fun zip<T>(other: Iterable<T>): Iterable<(Item, T)> {
     ZipIterable<Item, T>(this, other)
@@ -278,13 +278,13 @@ public trait Iterable<Item> {
 
   // Extras:
 
-  // TODO(marcelgarus): + operator for joining Iterables
-  // TODO(marcelgarus): for Iterable<Equals>: contains
+  // TODO(never, marcelgarus): + operator for joining Iterables
+  // TODO(never, marcelgarus): for Iterable<Equals>: contains
 
-  // TODO(marcelgarus): for Iterable<(A, B)>: map with 2 args, unzip
-  // TODO(marcelgarus): for Iterable<Iterable<T>>: flatten
-  // TODO(marcelgarus): for Iterable<Number>: average, sum, min, max
-  // TODO(marcelgarus): for Iterable<Maybe<T>>: whereSome, unwrapAll
+  // TODO(never, marcelgarus): for Iterable<(A, B)>: map with 2 args, unzip
+  // TODO(never, marcelgarus): for Iterable<Iterable<T>>: flatten
+  // TODO(never, marcelgarus): for Iterable<Number>: average, sum, min, max
+  // TODO(never, marcelgarus): for Iterable<Maybe<T>>: whereSome, unwrapAll
 
   fun join(separator: String): String {
     mut let s = ""
@@ -358,7 +358,7 @@ impl<In, Out> MappedIterator<In, Out>: Iterator<Out> {
 }
 
 class WhereIterable<Item, State> {
-  // TODO(marcelgarus): As soon as implicit casts are available, maybe make the updater return a
+  // TODO(never, marcelgarus): As soon as implicit casts are available, maybe make the updater return a
   //   `WhereResult`, which can be either `Keep` or `Drop`?
   let parent: Iterable<Item>
   let initialState: State
@@ -472,10 +472,10 @@ impl<Item> FollowedByIterator<Item>: Iterator<Item> {
 
 trait EqualsIterable<Item: Equals>: Iterable<Item> {
   fun contains(item: Item): Bool {
-    todo("Implement Iterable<Equals>.contains")
+    todo("never, Implement Iterable<Equals>.contains")
   }
   
-  // TODO(marcelgarus): Implement distinct, indexOf, lastIndexOf
+  // TODO(never, marcelgarus): Implement distinct, indexOf, lastIndexOf
 }
 // impl<Item: Equals> Iterable<Item>: EqualsIterable<Item>
 

@@ -4,7 +4,7 @@ use cst
 public class DuplicateValueParameterNameCompilerError {
   public let file: FancyFile
   public let node: CstNode<CstValueParameter>
-  // TODO(JonasWanke): highlight previous occurrences of that name
+  // TODO(never, JonasWanke): highlight previous occurrences of that name
 }
 impl DuplicateValueParameterNameCompilerError: CompilerError {
   public fun id(): String { "duplicate-value-parameter-name" }
@@ -12,7 +12,7 @@ impl DuplicateValueParameterNameCompilerError: CompilerError {
   public fun location(): Location { Location(file, node.child.name.child.span) }
   public fun title(): String { "Duplicate value parameter name" }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description for this error
+    /// TODO(never, JonasWanke): add a description for this error
     ""
   }
 }

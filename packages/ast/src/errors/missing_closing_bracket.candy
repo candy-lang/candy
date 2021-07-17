@@ -68,7 +68,7 @@ impl MissingClosingBracketCompilerError: CompilerError {
   public fun location(): Location { Location(file, span()) }
   public fun title(): String { "Missing closing bracket." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description for this error
+    /// TODO(never, JonasWanke): add a description for this error
     ""
   }
 }

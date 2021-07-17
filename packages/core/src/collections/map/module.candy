@@ -8,7 +8,7 @@ use ..iterable
 use .bucket_map
 use .linked_hash_map
 
-// TODO(marcelgarus): Create type alias `MapKey` for `Equals & Hash`.
+// TODO(never, marcelgarus): Create type alias `MapKey` for `Equals & Hash`.
 
 public trait Map<Key: Equals & Hash, Value> {
   static fun empty<Key: Equals & Hash, Value>(): Map<Key, Value> {
@@ -99,7 +99,7 @@ public trait Map<Key: Equals & Hash, Value> {
   }
 }
 
-// TODO(marcelgarus): impl Map<Key, Value>: GetOperator<Key, Maybe<Value>>
+// TODO(never, marcelgarus): impl Map<Key, Value>: GetOperator<Key, Maybe<Value>>
 
 public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
   static fun empty<Key: Equals & Hash, Value>(): MutableMap<Key, Value> {
@@ -213,6 +213,6 @@ public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
   }
 
   fun cast<NewKey, NewValue>(): Map<NewKey, NewValue> {
-    todo("Implement MutableMap.cast")
+    todo("never, Implement MutableMap.cast")
   }
 }

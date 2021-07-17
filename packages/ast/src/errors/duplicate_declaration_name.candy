@@ -5,7 +5,7 @@ use petit_parser
 public class DuplicateDeclarationNameCompilerError {
   public let file: FancyFile
   public let node: CstNode<CstModule | CstTrait | CstType>
-  // TODO(JonasWanke): highlight previous occurrences of that name
+  // TODO(never, JonasWanke): highlight previous occurrences of that name
 }
 impl DuplicateDeclarationNameCompilerError: CompilerError {
   public fun id(): String { "duplicate-declaration-name" }
@@ -15,7 +15,7 @@ impl DuplicateDeclarationNameCompilerError: CompilerError {
   }
   public fun title(): String { "Duplicate declaration name." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description for this error
+    /// TODO(never, JonasWanke): add a description for this error
     ""
   }
 }

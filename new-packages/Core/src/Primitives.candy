@@ -31,11 +31,6 @@ public trait Any {
   }
 }
 
-## TODO(marcelgarus): Move this somewhere else.
-## public builtin trait ToString {
-##   fun toString(): String
-## }
-
 public builtin type Nothing
 # The default type for expressions that don't have an explicit result.
 #

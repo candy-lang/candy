@@ -7,8 +7,8 @@ use ...Iterate
 use ...List
 use ..
 
-## TODO(marcelgarus): Make the `BucketMap` implementation way more efficient.
-## TODO(marcelgarus): Typealias Bucket as LinkedHashMap.
+## TODO(later, marcelgarus): Make the `BucketMap` implementation way more efficient.
+## TODO(later, marcelgarus): Typealias Bucket as LinkedHashMap.
 
 public type BucketMap[Key: Equals & Hash, Value] = List[LinkedHashMap[Key, Value]]
 impl[Key: Equals & Hash, Value] BucketMap[Key, Value] {
