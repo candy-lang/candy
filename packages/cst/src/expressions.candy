@@ -105,7 +105,7 @@ public class CstPropertyExpression {
   public let keyword: CstNode<KeywordToken>
   public let name: Maybe<CstNode<IdentifierToken>>
   public let type: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>
-  public let initializer: Maybe<CstNode<CstDelegationBody>>
+  public let initializer: Maybe<CstNode<CstExpressionBody>>
 }
 impl CstPropertyExpression: CstExpression
 
