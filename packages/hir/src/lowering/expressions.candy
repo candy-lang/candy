@@ -423,12 +423,12 @@ impl LoweringContext {
       let innerResult = this.lowerExpressionsToValueExpressions(expression.expressions)
       return innerResult.first.register(
         HirNamedTupleValueExpression(
-          (HirPositionalTupleType.fieldNames as Iterable<String>)
+          (HirNamedTupleType.positionalFieldNames as Iterable<String>)
             .zip<HirValueExpressionUri>(innerResult.second)
             .unsafeToMap<String, HirValueExpressionUri>(),
         ),
         HirNamedTupleType(
-          (HirPositionalTupleType.fieldNames as Iterable<String>)
+          (HirNamedTupleType.positionalFieldNames as Iterable<String>)
             .zip<HirInlineType>(
               (innerResult.second as Iterable<HirValueExpressionUri>)
                 .map<HirInlineType>({ innerResult.first.typeOf(it) }),

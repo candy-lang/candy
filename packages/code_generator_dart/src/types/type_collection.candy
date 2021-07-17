@@ -152,11 +152,6 @@ fun getAllInlineTypesInsideInlineType(
         getAllInlineTypesInsideFunctionType(context, inlineType as HirFunctionType).items(),
       )
     }
-    if (inlineType is HirPositionalTupleType) {
-      inlineTypes.addAll(
-        getAllInlineTypesInsidePositionalTupleType(context, inlineType as HirPositionalTupleType).items(),
-      )
-    }
     if (inlineType is HirNamedTupleType) {
       inlineTypes.addAll(
         getAllInlineTypesInsideNamedTupleType(context, inlineType as HirNamedTupleType).items(),
@@ -208,17 +203,6 @@ fun getAllInlineTypesInsideFunctionType(
     )
     inlineTypes.addAll(getAllInlineTypesInsideInlineType(context, functionType.returnType).items())
     Tuple(inlineTypes, List.empty<CompilerError>())
-  })
-}
-fun getAllInlineTypesInsidePositionalTupleType(
-  context: QueryContext<List<CompilerError>>,
-  positionalTupleType: HirPositionalTupleType,
-): Set<HirInlineType> {
-  query<Set<HirInlineType>, List<CompilerError>>(
-    context,
-    "code_generator_dart.getAllInlineTypesInsidePositionalTupleType",
-    positionalTupleType, {
-    Tuple(getAllInlineTypesInsideInlineTypes(context, positionalTupleType.types), List.empty<CompilerError>())
   })
 }
 fun getAllInlineTypesInsideNamedTupleType(
