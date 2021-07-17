@@ -175,7 +175,7 @@ public fun astInlineTypeToHirInlineType(
       }
 
       if (astType is AstErrorType) {
-        return Tuple(HirErrorType(), List.emtpy<CompilerError>())
+        return Tuple(HirErrorType(), List.empty<CompilerError>())
       }
 
       throw "Unknown AST type: {astType}"
@@ -275,8 +275,8 @@ impl HirImpl {
 }
 
 impl HirFunction {
-  fun returnType(context: QueryContext<List<CompilerError>>): HirType {
-    query<HirNamedType, List<CompilerError>>(context, "HirFunction.returnType", this, {
+  fun returnType(context: QueryContext<List<CompilerError>>): HirInlineType {
+    query<HirInlineType, List<CompilerError>>(context, "HirFunction.returnType", this, {
       Tuple(
         this.ast(context).returnType
           .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
@@ -321,17 +321,16 @@ fun hirImplToSolverRule(
     let solverConstraints = MutableList.empty<SolverGoal>()
     for constraint in hirImpl.constraints(context).entries() {
       let result = hirInlineTypeToSolverTypeAndGoals(context, constraint.second)
-      if (result is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
       solverConstraints.appendAll(
-        (result.unwrap().second as Iterable<SolverGoal>)
+        (result.second as Iterable<SolverGoal>)
           .map<SolverGoal>({
             it.substituteAll(
               Map.of1<SolverVariable, SolverType>(
                 Tuple(
-                  result.unwrap().first as SolverVariable,
+                  result.first as SolverVariable,
                   // `constraints.first` is a `HirParameterType` and turning that into a
                   // `SolverType` always succeeds with an empty list of goals.
-                  hirInlineTypeToSolverTypeAndGoals(context, constraint.first).unwrap().first,
+                  hirInlineTypeToSolverTypeAndGoals(context, constraint.first).first,
                 ),
               ),
             )
@@ -344,8 +343,6 @@ fun hirImplToSolverRule(
     // `Iterable[Int]` gets lowered to `?0` with the goal `Iterable(Int, ?0)`.
     let baseType = hirImpl.baseType(context)
     let solverBaseAndGoals = hirInlineTypeToSolverTypeAndGoals(context, baseType)
-    if (solverBaseAndGoals is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
-    let solverBaseAndGoals: (SolverType, List<SolverGoal>) = solverBaseAndGoals.unwrap()
 
     // Lower the trait. For example, in the impl `impl Foo: Iterable[Int]`, the implemented trait
     // `Iterable[Int]` gets lowered to `?0` with the goals `Iterable(Int, ?0)`. Impls that don't
@@ -358,8 +355,6 @@ fun hirImplToSolverRule(
     }
     let traitType = (traitType.unwrap() as HirNamedType)
     let solverTraitAndGoals = hirInlineTypeToSolverTypeAndGoals(context, traitType)
-    if (solverTraitAndGoals is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
-    let solverTraitAndGoals: (SolverType, List<SolverGoal>) = solverTraitAndGoals.unwrap()
     if ((solverTraitAndGoals.second as Iterable).length() > 1) {
       // TODO(never, marcelgarus): We can't implement a trait that contains another trait yet, like
       // `Iterable<Equals>`. This does work in Rust (with boxing and explicit dynamism), so we'll
@@ -413,7 +408,7 @@ fun hirImplToSolverRule(
 fun hirInlineTypeToSolverTypeAndGoals(
   context: QueryContext<List<CompilerError>>,
   hirType: HirInlineType,
-): Maybe<(SolverType, List<SolverGoal>)> {
+): (SolverType, List<SolverGoal>) {
   // Turns a `HirInlineType` into a `SolverType` and a list of `SolverGoal`s.
   //
   // Examples:
@@ -424,11 +419,11 @@ fun hirInlineTypeToSolverTypeAndGoals(
   // * `Iterable[Equals]` -> `?0` and goals `Iterable(?1, ?0)`, `Equals(?1)`
 
   query<
-    Maybe<(SolverType, List<SolverGoal>)>,
+    (SolverType, List<SolverGoal>),
     List<CompilerError>,
-  >(context, "hirInlineTypeToSolverTypeAndGoals", hirType as Equals & Hash, {
+  >(context, "hirInlineTypeToSolverTypeAndGoals", hirType, {
     if (hirType is HirErrorType) {
-      return Tuple(None<(SolverType, List<SolverGoal>)>(), List.empty<CompilerError>())
+      todo("soon, marcelgarus: handle like `Never`")
     }
     if (hirType is HirNamedType) {
       let declaration = (hirType as HirNamedType).declaration
@@ -444,11 +439,8 @@ fun hirInlineTypeToSolverTypeAndGoals(
         let solverParameters = MutableList.empty<SolverType>()
         for parameter in parameters {
           let result = hirInlineTypeToSolverTypeAndGoals(context, parameter)
-          if (result is None) {
-            return Tuple(None<(SolverType, List<SolverGoal>)>(), List.empty<CompilerError>())
-          }
-          goals.appendAll(result.unwrap().second)
-          solverParameters.append(result.unwrap().first)
+          goals.appendAll(result.second)
+          solverParameters.append(result.first)
         }
         goals.append(
           SolverGoal(
@@ -456,26 +448,18 @@ fun hirInlineTypeToSolverTypeAndGoals(
             (solverParameters as Iterable<SolverType>).followedBy(List.of1<SolverType>(substitution)).toList(),
           )
         )
-        return Tuple(
-          Some<(SolverType, List<SolverGoal>)>(Tuple(substitution, goals)),
-          List.empty<CompilerError>(),
-        )
+        return Tuple(Tuple(substitution, goals), List.empty<CompilerError>())
       }
       if (declaration is HirType) {
         let goals = MutableList.empty<SolverGoal>()
         let solverParameters = MutableList.empty<SolverType>()
         for parameter in parameters {
           let result = hirInlineTypeToSolverTypeAndGoals(context, parameter)
-          if (result is None) {
-            return Tuple(None<(SolverType, List<SolverGoal>)>(), List.empty<CompilerError>())
-          }
-          goals.appendAll(result.unwrap().second)
-          solverParameters.append(result.unwrap().first)
+          goals.appendAll(result.second)
+          solverParameters.append(result.first)
         }
         return Tuple(
-          Some<(SolverType, List<SolverGoal>)>(
-            Tuple(SolverValue(declaration as HirType, solverParameters), goals),
-          ),
+          Tuple(SolverValue(declaration as HirType, solverParameters), goals),
           List.empty<CompilerError>(),
         )
       }
@@ -512,22 +496,16 @@ fun hirInlineTypeToSolverTypeAndGoals(
           context,
           (declaration as HirImpl).baseType(context),
         )
-        if (loweredBaseType is None) {
-          // The failed lowering already produced errors.
-          return Tuple(None<(SolverType, List<SolverGoal>)>(), List.empty<CompilerError>())
-        }
-        let baseSolverType = loweredBaseType.unwrap().first
+        let baseSolverType = loweredBaseType.first
         return Tuple(
-          Some<(SolverType, List<SolverGoal>)>(Tuple(baseSolverType, List.empty<SolverGoal>())),
+          Tuple(baseSolverType, List.empty<SolverGoal>()),
           List.empty<CompilerError>(),
         )
       }
     }
     if (hirType is HirParameterType) {
       return Tuple(
-        Some<(SolverType, List<SolverGoal>)>(
-          Tuple(SolverVariable(hirType as HirParameterType), List.empty<SolverGoal>()),
-        ),
+        Tuple(SolverVariable(hirType as HirParameterType), List.empty<SolverGoal>()),
         List.empty<CompilerError>(),
       )
     }
@@ -556,9 +534,9 @@ fun makeSureImplsAreNotConflicting(context: QueryContext<List<CompilerError>>, s
       .groupBy<HirInlineType>({ it.implementedTrait(context).unwrap() })
       .values() {
       let implsAndBasesForCurrentTrait = (implsForSameTrait as Iterable<HirImpl>)
-        .maybeMap<(HirImpl, SolverType)>({
-          hirInlineTypeToSolverTypeAndGoals(context, it.baseType(context))
-            .map<(HirImpl, SolverType)>({ solverTypeAndGoals => Tuple(it, solverTypeAndGoals.first) })
+        .map<(HirImpl, SolverType)>({
+          let result = hirInlineTypeToSolverTypeAndGoals(context, it.baseType(context))
+          Tuple(it, result.first)
         })
         .toList()
       for implAndBase1 in implsAndBasesForCurrentTrait {
@@ -601,8 +579,6 @@ public fun isAssignableTo(
     Tuple(implFor(context, base, trait_, scope) is Some<HirImpl>, List.empty<CompilerError>())
   })
 }
-// TODO(soon, marcelgarus): Support getting the impl for a trait with generics. This would basically
-// mean we'd have to accept an arbitrary `HirInlineType` as the `trait_`.
 public fun implFor(
   context: QueryContext<List<CompilerError>>,
   base: HirInlineType,
@@ -612,14 +588,11 @@ public fun implFor(
   query<Maybe<HirImpl>, List<CompilerError>>(context, "implFor", DataTuple3<HirInlineType, HirInlineType, Package>(base, trait_, scope), {
     let environment = getSolverEnvironmentOfScope(context, scope)
     let baseSolverAndGoals = hirInlineTypeToSolverTypeAndGoals(context, base)
+    let baseType = baseSolverAndGoals.first
+    let baseGoals = baseSolverAndGoals.second
     let traitSolverAndGoals = hirInlineTypeToSolverTypeAndGoals(context, trait_)
-    if (baseSolverAndGoals is None || traitSolverAndGoals is None) {
-      return Tuple(None<HirImpl>(), List.empty<CompilerError>())
-    }
-    let baseType = baseSolverAndGoals.unwrap().first
-    let traitType = traitSolverAndGoals.unwrap().first
-    let baseGoals = baseSolverAndGoals.unwrap().second
-    let traitGoals = traitSolverAndGoals.unwrap().second
+    let traitType = traitSolverAndGoals.first
+    let traitGoals = traitSolverAndGoals.second
 
     if (traitType is SolverValue) {
       throw "This shouldn't happen. Trait should be lowered to a SolverVariable."
