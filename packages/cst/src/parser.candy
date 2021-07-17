@@ -672,6 +672,26 @@ class CstParser {
           CstGroupExpression(openingParenthesis, expression, closingParenthesis)
         })
 
+    let namedTupleExpressionField = atLeastOne<
+      CstNode<IdentifierToken>,
+      (CstNode<PunctuationToken>, Maybe<CstNode<CstExpression>>),
+    >(
+      identifier(false),
+      punctuation(":").sequence<Maybe<CstNode<CstExpression>>>(expression_.optional()),
+    ).map<CstNamedTupleExpressionField>({ CstNamedTupleExpressionField(it.first, it.second) })
+    let namedTupleExpressionField = node<CstNamedTupleExpressionField>(namedTupleExpressionField)
+    let namedTupleExpression = punctuation("(")
+      .sequence<List<CstNode<CstNamedTupleExpressionField | PunctuationToken>>>(
+        commaSeparated<CstNamedTupleExpressionField>(namedTupleExpressionField),
+      )
+      .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd(")"))
+      .map<CstExpression>({
+        let openingParenthesis = it.first.first
+        let valueArguments = it.first.second
+        let closingParenthesis = it.second
+        CstNamedTupleExpression(openingParenthesis, valueArguments, closingParenthesis)
+      })
+
     let positionalTupleExpression = punctuation("(")
         .sequence<List<CstNode<CstExpression | PunctuationToken>>>(commaSeparated<CstExpression>(expression_))
         .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd(")"))
@@ -699,14 +719,15 @@ class CstParser {
           })
 
     let primitiveExpressions = choiceOf<String, CstExpression>(
-        List.of7<Parser<String, CstExpression>>(
+        List.of8<Parser<String, CstExpression>>(
           propertyExpression,
           intExpression,
           stringExpression,
           lambdaExpression,
           identifierExpression,
           groupExpression,
-          positionalTupleExpression
+          namedTupleExpression,
+          positionalTupleExpression,
         ),
       )
 

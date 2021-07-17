@@ -82,6 +82,17 @@ public class CstPositionalTupleExpression {
 }
 impl CstPositionalTupleExpression: CstExpression
 
+public class CstNamedTupleExpression {
+  public let openingParenthesis: CstNode<PunctuationToken>
+  public let fields: List<CstNode<CstNamedTupleExpressionField | PunctuationToken>>
+  public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
+}
+impl CstNamedTupleExpression: CstExpression
+
+public class CstNamedTupleExpressionField {
+  public let name: Maybe<CstNode<IdentifierToken>>
+  public let value: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstExpression>>)>
+}
 
 public class CstBinaryExpression {
   public let leftOperand: Maybe<CstNode<CstExpression>>
