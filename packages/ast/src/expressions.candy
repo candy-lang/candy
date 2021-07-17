@@ -127,11 +127,11 @@ impl AstIdentifierExpression: AstExpression & Equals & Hash {
 }
 
 
-public class AstTupleExpression {
+public class AstPositionalTupleExpression {
   public let id: AstExpressionId
   public let expressions: List<AstExpression>
 }
-impl AstTupleExpression: AstExpression & Equals & Hash {
+impl AstPositionalTupleExpression: AstExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (expressions as Iterable<AstExpression>)
