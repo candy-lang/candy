@@ -6,6 +6,7 @@ use ...Operators
 use ...Maybe
 use ...Mutable
 use ...Primitives
+use ...Ranges
 use ...String
 use ..List
 use ..Map
@@ -44,7 +45,7 @@ public trait Iterate[Item] {
 
   fun nthLast(index: Int): Maybe[Item] {
     assert(index >= 0, "Can't access a negative index in an `Iterate`.")
-    ## TODO(marcelgarus): Make this way more efficient.
+    ## TODO(later, marcelgarus): Make this way more efficient.
 
     let list = this.toList()
     list.get(list.length() - index - 1)
@@ -92,7 +93,7 @@ public trait Iterate[Item] {
   fun reduceLeft(combine: (Item, Item) -> Item): Maybe[Item] {
     this.iterate().map[Item]({ it.second.foldLeft[Out](it.first, combine) })
   }
-  ## TODO(marcelgarus): reduceRight
+  ## TODO(later, marcelgarus): reduceRight
 
   fun minBy[C: Compare](selector: (Item) -> C): Maybe[Item] {
     this.reduceLeft[Item]({ result, item ->
@@ -105,7 +106,7 @@ public trait Iterate[Item] {
     })
   }
   fun sumBy(selector: (Item) -> Int): Int { this.map[Int](selector).sum() }
-  ## TODO(JonasWanke): averageBy
+  ## TODO(later, JonasWanke): averageBy
 
   ## Filtering.
 
@@ -117,9 +118,9 @@ public trait Iterate[Item] {
     this.withIndex().firstWhere({ checker(it.second) }).map[Int]({ it.first })
   }
   fun lastWhere(checker: (Item) -> Bool): Maybe[Item] { this.where(checker).last() }
-  ## TODO(marcelgarus): lastIndexWhere
+  ## TODO(later, marcelgarus): lastIndexWhere
   fun singleWhere(checker: (Item) -> Bool): Maybe[Item] { this.where(checker).single() }
-  ## TODO(JonasWanke): singleIndexWhere
+  ## TODO(later, JonasWanke): singleIndexWhere
 
   ## Mapping transformations.
   ## These return an `Iterate` with the same length, but a different type.
@@ -142,7 +143,7 @@ public trait Iterate[Item] {
   ## These return an `Iterate` with a subset of the items.
 
   fun where(checker: (Item) -> Bool): Iterate[Item] {
-    ## TODO(marcelgarus): As soon as implicit casts are available, maybe make the `checker` return a
+    ## TODO(later, marcelgarus): As soon as implicit casts are available, maybe make the `checker` return a
     ##   `WhereResult`, which can be either `Keep` or `Drop`?
     this.whereWithState[Nothing](nothing, { item, _ -> Tuple(checker(item), unit) })
   }
@@ -172,8 +173,8 @@ public trait Iterate[Item] {
     )
   }
 
-  fun slice(start: Int, end: Int): Iterate[Item] {
-    ## TODO(JonasWanke): accept a range when we add those.
+  fun slice(range: ClosedOpenRange[Int]): Iterate[Item] {
+    ## TODO(later, JonasWanke): accept any range
     this.skip(start).take(end - start)
   }
 
@@ -181,7 +182,7 @@ public trait Iterate[Item] {
     this.whereWithState[Int](0, { item, index -> (index < n, index + 1) })
   }
   fun takeWhile(checker: (Item) -> Bool): Iterate[Item] {
-    ## TODO(marcelgarus): Implement more efficiently.
+    ## TODO(later, marcelgarus): Implement more efficiently.
 
     this.whereWithState[Bool](
       true,
@@ -203,7 +204,7 @@ public trait Iterate[Item] {
     this.map[Maybe[Out]](maybeMapper).whereSome()
   }
 
-  ## TODO(marcelgarus): distinctBy
+  ## TODO(later, marcelgarus): distinctBy
 
   fun expand[Out](expander: (Item) -> Iterate[Out]): Iterate[Out] {
     ExpandIterate[Item, Out](this, expander)
@@ -234,9 +235,10 @@ public trait Iterate[Item] {
 
   ## Extras:
 
-  ## TODO(marcelgarus): for Iterate<(A, B)>: map with 2 args, unzip
-  ## TODO(marcelgarus): for Iterate<Iterate<T>>: flatten
-  ## TODO(marcelgarus): for Iterate<Number>: average, min, max
+  ## TODO(later, marcelgarus): for Iterate[(A, B)]: map with 2 args, unzip
+  ## TODO(later, marcelgarus): for Iterate[Iterate[T]]: flatten
+  ## TODO(later, marcelgarus): for Iterate[Number]: average
+  ## TODO(later, marcelgarus): for Iterate[Compare]: min, max
 
   fun join(separator: String): String {
     this.withIndex().foldLeft[String]("", { result, indexAndItem ->
@@ -355,26 +357,11 @@ impl[Item] FollowedByIterate[Item]: Iterate[Item] {
 
 
 impl Int {
-  fun until(endExclusive: Int): Iterate<Int> {
-    ## TODO(JonasWanke): This should produce a range when we add those.
+  fun until(endExclusive: Int): ClosedOpenRange[Int] {
     assert(
       endExclusive >= this,
       "Exclusive end must be greater than or equal to that start, but {this} > {endExclusive}.",
     )
-    UntilIterate(this, endExclusive)
-  }
-}
-type UntilIterate = (value: Int, this.endExclusive: Int)
-impl UntilIterate: Iterate[Int] {
-  fun iterate(): Maybe[(Int, Iterate[Int])] {
-    assert(
-      this.value <= this.endExclusive,
-      "Value must be smaller than or equal to endExclusive, but {this.value} > {this.endExclusive}."
-    )
-    if(this.value == this.endExclusive, {
-      Maybe[(Int, Iterate[Int])].None()
-    }).else({
-      Maybe[(Int, Iterate[Int])].Some((this.value, UntilIterate(this.value + 1, this.endExclusive)))
-    })
+    ClosedOpenRange(this, endExclusive)
   }
 }

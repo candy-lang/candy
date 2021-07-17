@@ -53,7 +53,7 @@ fun compileInstanceType(
     // Instance reference to our "static" instance.
     let staticInstanceType = DartNamedType(
       name = DartIdentifier(getDeclarationStaticName(context, typeHir), None<String>()),
-      typeArguments = List.empty<DartType>(), // TODO(JonasWanke): Add type arguments.
+      typeArguments = List.empty<DartType>(), // TODO(soon, JonasWanke): Add type arguments.
     )
     body.append(DartGetter(
       staticInstanceGetterName,
@@ -68,22 +68,22 @@ fun compileInstanceType(
       )),
     ))
 
-    // TODO(JonasWanke): Integrate implemented traits & impls.
-    // TODO(JonasWanke): Integrate functions.
+    // TODO(soon, JonasWanke): Integrate implemented traits & impls.
+    // TODO(soon, JonasWanke): Integrate functions.
 
     body.append(DartField(
       thisFieldName,
       docComment = None<String>(),
       isStatic = false,
       mutability = DartFinal(),
-      type = None<DartType>(), // TODO(JonasWanke): Lower the actual inline type.
+      type = None<DartType>(), // TODO(soon, JonasWanke): Lower the actual inline type.
       initialValue = None<DartExpression>(),
     ))
 
     let dartDeclaration = DartClass(
       name = name,
       docComment = None<String>(),
-      // TODO(JonasWanke): Add the corresponding Candy code as the doc comment.
+      // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
       annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
       isAbstract = false,
       typeParameters = List.empty<DartTypeParameter>(),
@@ -119,8 +119,8 @@ fun compileStaticType(
       body = None<DartBody>(),
     ))
 
-    // TODO(JonasWanke): Integrate implemented traits & impls.
-    // TODO(JonasWanke): Integrate functions.
+    // TODO(soon, JonasWanke): Integrate implemented traits & impls.
+    // TODO(soon, JonasWanke): Integrate functions.
 
     let dartDeclaration = DartClass(
       name = name,

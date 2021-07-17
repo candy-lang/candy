@@ -26,7 +26,7 @@ class ExpressionGroup<Item, Output> {
   }
   fun buildWrapper(inner: Parser<Item, Output>): Parser<Item, Output> { buildChoiceOf(wrappers, inner) }
 
-  // TODO(JonasWanke): prefix, postfix
+  // TODO(never, JonasWanke): prefix, postfix
 
   let infixRights: MutableList<Parser<Item, (Output, Output) => Output>>
   public fun infixRight<OperatorOutput>(

@@ -45,15 +45,15 @@ fun compileInstanceTrait(
       ),
       positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
       namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
-      // TODO(JonasWanke): Integrate implemented traits & impls.
-      // TODO(JonasWanke): Integrate functions.
+      // TODO(soon, JonasWanke): Integrate implemented traits & impls.
+      // TODO(soon, JonasWanke): Integrate functions.
       body = None<DartBody>(),
     ))
 
     // Instance reference to our "static" instance.
     let staticInstanceType = DartNamedType(
       name = DartIdentifier(getDeclarationStaticName(context, typeHir), None<String>()),
-      typeArguments = List.empty<DartType>(), // TODO(JonasWanke): Add type arguments.
+      typeArguments = List.empty<DartType>(), // TODO(soon, JonasWanke): Add type arguments.
     )
     body.append(DartField(
       staticInstanceGetterName,
@@ -64,13 +64,13 @@ fun compileInstanceTrait(
       initialValue = None<DartExpression>(),
     ))
 
-    // TODO(JonasWanke): Integrate implemented traits & impls.
-    // TODO(JonasWanke): Integrate functions.
+    // TODO(soon, JonasWanke): Integrate implemented traits & impls.
+    // TODO(soon, JonasWanke): Integrate functions.
 
     let dartDeclaration = DartClass(
       name = name,
       docComment = None<String>(),
-      // TODO(JonasWanke): Add the corresponding Candy code as the doc comment.
+      // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
       annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
       isAbstract = false,
       typeParameters = List.empty<DartTypeParameter>(),
@@ -103,13 +103,13 @@ fun compileStaticTrait(
       requiredParameters = List.empty<DartParameter | DartInitializingFormal>(),
       positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
       namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
-      // TODO(JonasWanke): Integrate implemented traits & impls.
-      // TODO(JonasWanke): Integrate functions.
+      // TODO(soon, JonasWanke): Integrate implemented traits & impls.
+      // TODO(soon, JonasWanke): Integrate functions.
       body = None<DartBody>(),
     ))
 
-    // TODO(JonasWanke): Integrate implemented traits & impls.
-    // TODO(JonasWanke): Integrate functions.
+    // TODO(soon, JonasWanke): Integrate implemented traits & impls.
+    // TODO(soon, JonasWanke): Integrate functions.
 
     let dartDeclaration = DartClass(
       name = name,

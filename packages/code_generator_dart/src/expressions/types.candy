@@ -17,10 +17,13 @@ public fun compileTypeInstantiationValueExpression(
     expression, {
     let statements = MutableList.empty<DartStatement>()
     statements.appendAll(
-      compileValueExpression(context, getValueExpression(expression.valueArgument)),
+      compileValueExpression(
+        context,
+        resolveHirValueExpressionUri(context, expression.valueArgument),
+      ),
     )
 
-    // TODO(JonasWanke): use `compileNamedType` and supply type arguments when we can get the type of this expression
+    // TODO(soon, JonasWanke): use `compileNamedType` and supply type arguments when we can get the type of this expression
     let compiledType = DartNamedType(DartIdentifier("SomeType", None<String>()), List.empty<DartType>())
     statements.append(saveValueExpression(
       context,
@@ -43,10 +46,12 @@ public fun compileNamedTupleValueExpression(
     let statements = MutableList.empty<DartStatement>()
     statements.appendAll(
       (expression.valueArguments as Iterable<HirValueExpressionUri<HirValueExpression>>)
-        .expand<DartStatement>({ compileValueExpression(context, getValueExpression(it)) })
+        .expand<DartStatement>({
+          compileValueExpression(context, resolveHirValueExpressionUri(context, it))
+        })
     )
 
-    // TODO(JonasWanke): use `compileNamedTupleType` when we can get the named tuple type of this expression
+    // TODO(soon, JonasWanke): use `compileNamedTupleType` when we can get the named tuple type of this expression
     let compiledType = DartNamedType(DartIdentifier("NamedTuple", None<String>()), List.empty<DartType>())
     statements.append(saveValueExpression(
       context,

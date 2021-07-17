@@ -3,6 +3,7 @@ use compiler_utils
 use incremental
 
 use ...declarations
+use ...expressions
 use ...types
 use ...solver
 use ..declarations
@@ -19,9 +20,9 @@ impl HirReflectionType: HasDeclarations {
   }
 }
 
-// TODO(marcelgarus): Convert this into extension methods on Ast as soon as impls for types from
+// TODO(never, marcelgarus): Convert this into extension methods on Ast as soon as impls for types from
 // other packages work.
-fun astInlineTypeToHirInlineType(
+public fun astInlineTypeToHirInlineType(
   context: QueryContext<List<CompilerError>>,
   astType: AstInlineType,
   scope: HirDeclaration,
@@ -55,7 +56,7 @@ fun astInlineTypeToHirInlineType(
 
         // Try to find the first part of the `nameParts`. Then, find children inside its
         // declarations.
-        // TODO(marcelgarus): When resolving `Foo Bar`, we currently accept a `Bar` next to `Foo` if
+        // TODO(never, marcelgarus): When resolving `Foo Bar`, we currently accept a `Bar` next to `Foo` if
         // `Foo` itself doesn't contain a `Bar`, as the resolver traverses parent scopes.
         mut let candidates = resolveIdentifier(context, nameParts.first().unwrap(), scope)
         for namePart in nameParts.skip(1) {
@@ -173,21 +174,39 @@ fun astInlineTypeToHirInlineType(
         )
       }
 
-      todo("Implement astInlineTypeToHirInlineType for {astType}")
+      if (astType is AstErrorType) {
+        return Tuple(HirErrorType(), List.empty<CompilerError>())
+      }
+
+      throw "Unknown AST type: {astType}"
     }
   )
 }
 
 impl HirParameterType {
-  fun upperBound(context: QueryContext<List<CompilerError>>): Maybe<HirInlineType> {
-    query<Maybe<HirInlineType>, List<CompilerError>>(
-      context, "HirParameterType.upperBound", this as Equals & Hash, {
+  fun upperBound(context: QueryContext<List<CompilerError>>): HirInlineType {
+    query<HirInlineType, List<CompilerError>>(context, "HirParameterType.upperBound", this, {
+      let astTypeParameter = (((this.declaration as HasAst).ast(context) as AstWithTypeParameters)
+        .typeParameters as Iterable<AstTypeParameter>)
+        .singleWhere({ it.name.value == this.name })
+        .unwrap()
       Tuple(
-        (((this.declaration as HasAst).ast(context) as AstWithTypeParameters)
-          .typeParameters as Iterable<AstTypeParameter>)
-          .singleWhere({ it.name.value == this.name })
-          .flatMap<AstInlineType>({ it.upperBound })
-          .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this.declaration) }),
+        astTypeParameter.upperBound
+          .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this.declaration) })
+          .orElse({ HirNamedType.coreAny(context) }),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
+}
+
+impl HirTrait {
+  fun upperBound(context: QueryContext<List<CompilerError>>): HirInlineType {
+    query<HirInlineType, List<CompilerError>>(context, "HirTrait.upperBound", this, {
+      Tuple(
+        this.ast(context).upperBound
+          .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
+          .orElse({ HirNamedType.coreAny(context) }),
         List.empty<CompilerError>(),
       )
     })
@@ -200,26 +219,22 @@ impl HirImpl {
     // constraints `T: Equals`.
 
     query<Map<HirParameterType, HirInlineType>, List<CompilerError>>(
-      context, "HirImpl.constraints", this as Equals & Hash, {
+      context, "HirImpl.constraints", this, {
       Tuple(
         (this.typeParameters(context) as Iterable<HirParameterType>)
-          .maybeMap<(HirParameterType, HirInlineType)>({
-            it.upperBound(context).map<(HirParameterType, HirInlineType)>({
-              upperBound => Tuple(it, upperBound)
-            })
-          })
+          .map<(HirParameterType, HirInlineType)>({ Tuple(it, it.upperBound(context)) })
           .unsafeToMap<HirParameterType, HirInlineType>(),
         List.empty<CompilerError>(),
       )
     })
   }
 
-  fun baseType(context: QueryContext<List<CompilerError>>): HirInlineType {
+  fun baseType(context: QueryContext<List<CompilerError>>): HirNamedType {
     // The base type of an impl. For example, `impl Foo[Int]` has the base type `Foo[Int]`.
 
-    query<HirInlineType, List<CompilerError>>(context, "HirImpl.baseType", this as Equals & Hash, {
+    query<HirNamedType, List<CompilerError>>(context, "HirImpl.baseType", this as Equals & Hash, {
       Tuple(
-        astInlineTypeToHirInlineType(context, this.ast(context).type, this),
+        astInlineTypeToHirInlineType(context, this.ast(context).type, this) as HirNamedType,
         List.empty<CompilerError>(),
       )
     })
@@ -232,12 +247,12 @@ impl HirImpl {
     query<Maybe<HirInlineType>, List<CompilerError>>(context, "HirImpl.implementedTrait", this as Equals & Hash, {
       let traits = this.ast(context).traits
       if !((traits as Iterable).length() == 1) {
-        // TODO(marcelgarus): Support impls for more than one trait.
+        // TODO(never, marcelgarus): Support impls for more than one trait.
         return Tuple(
           None<HirInlineType>(),
           List.empty<CompilerError>(
             // UnsupportedFeatureCompilerError(
-            //   Location(, Span(0, 1)),
+            //   Some<Location>(Location(, Span(0, 1))),
             //   "This impl is for more than one trait: {this}",
             // ),
           ),
@@ -248,11 +263,24 @@ impl HirImpl {
           astInlineTypeToHirInlineType(
             context,
             (traits as Iterable).cast<AstInlineType>().single().unwrap(),
-            // TODO(marcelgarus): Directly cast this into a `Iterable<AstInlineType>` when the Dart
+            // TODO(never, marcelgarus): Directly cast this into a `Iterable<AstInlineType>` when the Dart
             // type system gets good enough.
             this,
           ),
         ),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
+}
+
+impl HirFunction {
+  fun returnType(context: QueryContext<List<CompilerError>>): HirInlineType {
+    query<HirInlineType, List<CompilerError>>(context, "HirFunction.returnType", this, {
+      Tuple(
+        this.ast(context).returnType
+          .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
+          .orElse({ HirNamedType.coreNothing(context) }),
         List.empty<CompilerError>(),
       )
     })
@@ -293,17 +321,16 @@ fun hirImplToSolverRule(
     let solverConstraints = MutableList.empty<SolverGoal>()
     for constraint in hirImpl.constraints(context).entries() {
       let result = hirInlineTypeToSolverTypeAndGoals(context, constraint.second)
-      if (result is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
       solverConstraints.appendAll(
-        (result.unwrap().second as Iterable<SolverGoal>)
+        (result.second as Iterable<SolverGoal>)
           .map<SolverGoal>({
             it.substituteAll(
               Map.of1<SolverVariable, SolverType>(
                 Tuple(
-                  result.unwrap().first as SolverVariable,
+                  result.first as SolverVariable,
                   // `constraints.first` is a `HirParameterType` and turning that into a
                   // `SolverType` always succeeds with an empty list of goals.
-                  hirInlineTypeToSolverTypeAndGoals(context, constraint.first).unwrap().first,
+                  hirInlineTypeToSolverTypeAndGoals(context, constraint.first).first,
                 ),
               ),
             )
@@ -316,8 +343,6 @@ fun hirImplToSolverRule(
     // `Iterable[Int]` gets lowered to `?0` with the goal `Iterable(Int, ?0)`.
     let baseType = hirImpl.baseType(context)
     let solverBaseAndGoals = hirInlineTypeToSolverTypeAndGoals(context, baseType)
-    if (solverBaseAndGoals is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
-    let solverBaseAndGoals: (SolverType, List<SolverGoal>) = solverBaseAndGoals.unwrap()
 
     // Lower the trait. For example, in the impl `impl Foo: Iterable[Int]`, the implemented trait
     // `Iterable[Int]` gets lowered to `?0` with the goals `Iterable(Int, ?0)`. Impls that don't
@@ -330,10 +355,8 @@ fun hirImplToSolverRule(
     }
     let traitType = (traitType.unwrap() as HirNamedType)
     let solverTraitAndGoals = hirInlineTypeToSolverTypeAndGoals(context, traitType)
-    if (solverTraitAndGoals is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
-    let solverTraitAndGoals: (SolverType, List<SolverGoal>) = solverTraitAndGoals.unwrap()
     if ((solverTraitAndGoals.second as Iterable).length() > 1) {
-      // TODO(marcelgarus): We can't implement a trait that contains another trait yet, like
+      // TODO(never, marcelgarus): We can't implement a trait that contains another trait yet, like
       // `Iterable<Equals>`. This does work in Rust (with boxing and explicit dynamism), so we'll
       // probably have to look at how to put general-purpose logic implications in our solver (like
       // `A B -> C D` instead of only having one implicative result like `A B -> C` in the solver).
@@ -385,7 +408,7 @@ fun hirImplToSolverRule(
 fun hirInlineTypeToSolverTypeAndGoals(
   context: QueryContext<List<CompilerError>>,
   hirType: HirInlineType,
-): Maybe<(SolverType, List<SolverGoal>)> {
+): (SolverType, List<SolverGoal>) {
   // Turns a `HirInlineType` into a `SolverType` and a list of `SolverGoal`s.
   //
   // Examples:
@@ -396,11 +419,11 @@ fun hirInlineTypeToSolverTypeAndGoals(
   // * `Iterable[Equals]` -> `?0` and goals `Iterable(?1, ?0)`, `Equals(?1)`
 
   query<
-    Maybe<(SolverType, List<SolverGoal>)>,
+    (SolverType, List<SolverGoal>),
     List<CompilerError>,
-  >(context, "hirInlineTypeToSolverTypeAndGoals", hirType as Equals & Hash, {
+  >(context, "hirInlineTypeToSolverTypeAndGoals", hirType, {
     if (hirType is HirErrorType) {
-      return Tuple(None<(SolverType, List<SolverGoal>)>(), List.empty<CompilerError>())
+      todo("soon, marcelgarus: handle like `Never`")
     }
     if (hirType is HirNamedType) {
       let declaration = (hirType as HirNamedType).declaration
@@ -409,18 +432,15 @@ fun hirInlineTypeToSolverTypeAndGoals(
         // We'll return a substitution that will have to satisfy the trait. For example, given the
         // trait `Equals`, we'll return `?0` with the goal `Equals(?0)`. The `?0` is this
         // substitution.
-        // TODO(marcelgarus): In the long term, choose a more elegant substitution than just the
+        // TODO(never, marcelgarus): In the long term, choose a more elegant substitution than just the
         // 1000th.
         let substitution = SolverVariable(canonicalVariable(1000))
         let goals = MutableList.empty<SolverGoal>()
         let solverParameters = MutableList.empty<SolverType>()
         for parameter in parameters {
           let result = hirInlineTypeToSolverTypeAndGoals(context, parameter)
-          if (result is None) {
-            return Tuple(None<(SolverType, List<SolverGoal>)>(), List.empty<CompilerError>())
-          }
-          goals.appendAll(result.unwrap().second)
-          solverParameters.append(result.unwrap().first)
+          goals.appendAll(result.second)
+          solverParameters.append(result.first)
         }
         goals.append(
           SolverGoal(
@@ -428,45 +448,37 @@ fun hirInlineTypeToSolverTypeAndGoals(
             (solverParameters as Iterable<SolverType>).followedBy(List.of1<SolverType>(substitution)).toList(),
           )
         )
-        return Tuple(
-          Some<(SolverType, List<SolverGoal>)>(Tuple(substitution, goals)),
-          List.empty<CompilerError>(),
-        )
+        return Tuple(Tuple(substitution, goals), List.empty<CompilerError>())
       }
       if (declaration is HirType) {
         let goals = MutableList.empty<SolverGoal>()
         let solverParameters = MutableList.empty<SolverType>()
         for parameter in parameters {
           let result = hirInlineTypeToSolverTypeAndGoals(context, parameter)
-          if (result is None) {
-            return Tuple(None<(SolverType, List<SolverGoal>)>(), List.empty<CompilerError>())
-          }
-          goals.appendAll(result.unwrap().second)
-          solverParameters.append(result.unwrap().first)
+          goals.appendAll(result.second)
+          solverParameters.append(result.first)
         }
         return Tuple(
-          Some<(SolverType, List<SolverGoal>)>(
-            Tuple(SolverValue(declaration as HirType, solverParameters), goals),
-          ),
+          Tuple(SolverValue(declaration as HirType, solverParameters), goals),
           List.empty<CompilerError>(),
         )
       }
-      todo("We should handle a {hirType} referring to {declaration}")
+      throw "HirNamedType references an invalid declaration: {declaration}"
     }
-    // TODO(marcelgarus): For now, we only support impls for nominal types. If we want to support
+    // TODO(never, marcelgarus): For now, we only support impls for nominal types. If we want to support
     // `impl A | B: Equals` or `impl (name: String, age: UInt): Clone`, we'll need to add support
     // for other `HirInlineTypes` as well.
-    // TODO(marcelgarus): Handle HirFunctionType
-    // TODO(marcelgarus): Handle HirTupleType
-    // TODO(marcelgarus): Handle HirNamedTupleType
-    // TODO(marcelgarus): Handle HirEnumType
-    // TODO(marcelgarus): Handle HirIntersectionType
+    // TODO(never, marcelgarus): Handle HirFunctionType
+    // TODO(never, marcelgarus): Handle HirTupleType
+    // TODO(never, marcelgarus): Handle HirNamedTupleType
+    // TODO(never, marcelgarus): Handle HirEnumType
+    // TODO(never, marcelgarus): Handle HirIntersectionType
     if (hirType is HirThisType) {
       let declaration = (hirType as HirThisType).declaration
       if (declaration is HirTrait) {
         // We don't need to lower `This` types in traits to solver types because we only use impls
         // for logical type solving.
-        todo("Don't call hirTypeToSolverType for a This type in a trait")
+        throw "Don't call hirTypeToSolverType for a This type in a trait"
       }
       if (declaration is HirImpl) {
         // If a `This` type is used inside an impl, it just assumes the solver type of the base
@@ -484,27 +496,24 @@ fun hirInlineTypeToSolverTypeAndGoals(
           context,
           (declaration as HirImpl).baseType(context),
         )
-        if (loweredBaseType is None) {
-          // The failed lowering already produced errors.
-          return Tuple(None<(SolverType, List<SolverGoal>)>(), List.empty<CompilerError>())
-        }
-        let baseSolverType = loweredBaseType.unwrap().first
+        let baseSolverType = loweredBaseType.first
         return Tuple(
-          Some<(SolverType, List<SolverGoal>)>(Tuple(baseSolverType, List.empty<SolverGoal>())),
+          Tuple(baseSolverType, List.empty<SolverGoal>()),
           List.empty<CompilerError>(),
         )
       }
     }
     if (hirType is HirParameterType) {
       return Tuple(
-        Some<(SolverType, List<SolverGoal>)>(
-          Tuple(SolverVariable(hirType as HirParameterType), List.empty<SolverGoal>()),
-        ),
+        Tuple(SolverVariable(hirType as HirParameterType), List.empty<SolverGoal>()),
         List.empty<CompilerError>(),
       )
     }
-    // TODO(marcelgarus): Handle HirReflectionType
-    todo("Implement hirTypeToSolverType for {hirType}")
+    if (hirType is HirReflectionType) {
+      todo("soon, marcelgarus: Handle HirReflectionType")
+    }
+
+    throw "Unexpected HirType: {hirType}"
   })
 }
 
@@ -525,9 +534,9 @@ fun makeSureImplsAreNotConflicting(context: QueryContext<List<CompilerError>>, s
       .groupBy<HirInlineType>({ it.implementedTrait(context).unwrap() })
       .values() {
       let implsAndBasesForCurrentTrait = (implsForSameTrait as Iterable<HirImpl>)
-        .maybeMap<(HirImpl, SolverType)>({
-          hirInlineTypeToSolverTypeAndGoals(context, it.baseType(context))
-            .map<(HirImpl, SolverType)>({ solverTypeAndGoals => Tuple(it, solverTypeAndGoals.first) })
+        .map<(HirImpl, SolverType)>({
+          let result = hirInlineTypeToSolverTypeAndGoals(context, it.baseType(context))
+          Tuple(it, result.first)
         })
         .toList()
       for implAndBase1 in implsAndBasesForCurrentTrait {
@@ -560,28 +569,33 @@ fun makeSureImplsAreNotConflicting(context: QueryContext<List<CompilerError>>, s
   })
 }
 
-// TODO(marcelgarus): Support getting the impl for a trait with generics. This would basically
-// mean we'd have to accept an arbitrary `HirInlineType` as the `trait_`.
-fun implFor(
+public fun isAssignableTo(
+  context: QueryContext<List<CompilerError>>,
+  base: HirInlineType,
+  trait_: HirInlineType,
+  scope: Package,
+): Bool {
+  query<Bool, List<CompilerError>>(context, "isAssignableTo", DataTuple3<HirInlineType, HirInlineType, Package>(base, trait_, scope), {
+    Tuple(implFor(context, base, trait_, scope) is Some<HirImpl>, List.empty<CompilerError>())
+  })
+}
+public fun implFor(
   context: QueryContext<List<CompilerError>>,
   base: HirInlineType,
   trait_: HirInlineType,
   scope: Package,
 ): Maybe<HirImpl> {
-  query<Maybe<HirImpl>, List<CompilerError>>(context, "HirType.implements", base as Equals & Hash, {
+  query<Maybe<HirImpl>, List<CompilerError>>(context, "implFor", DataTuple3<HirInlineType, HirInlineType, Package>(base, trait_, scope), {
     let environment = getSolverEnvironmentOfScope(context, scope)
     let baseSolverAndGoals = hirInlineTypeToSolverTypeAndGoals(context, base)
+    let baseType = baseSolverAndGoals.first
+    let baseGoals = baseSolverAndGoals.second
     let traitSolverAndGoals = hirInlineTypeToSolverTypeAndGoals(context, trait_)
-    if (baseSolverAndGoals is None || traitSolverAndGoals is None) {
-      return Tuple(None<HirImpl>(), List.empty<CompilerError>())
-    }
-    let baseType = baseSolverAndGoals.unwrap().first
-    let traitType = traitSolverAndGoals.unwrap().first
-    let baseGoals = baseSolverAndGoals.unwrap().second
-    let traitGoals = traitSolverAndGoals.unwrap().second
+    let traitType = traitSolverAndGoals.first
+    let traitGoals = traitSolverAndGoals.second
 
     if (traitType is SolverValue) {
-      todo("This shouldn't happen. Trait should be lowered to a SolverVariable.")
+      throw "This shouldn't happen. Trait should be lowered to a SolverVariable."
     }
     if !((traitGoals as Iterable).length() == 1) {
       return Tuple(
@@ -607,6 +621,68 @@ fun implFor(
   })
 }
 
+fun getAllTraitsInScope(context: QueryContext<List<CompilerError>>, scope: Package): Set<HirTrait> {
+  query<Set<HirTrait>, List<CompilerError>>(context, "getAllTraitsInScope", scope as Equals & Hash, {
+    let traits = (scope.getAllPackagesInCompilationOrder(context) as Iterable<Package>)
+      .map<Set<HirTrait>>({ package => getAllTraitsOfModule(context, HirTopLevelModule(package)) })
+      .foldLeft<Set<HirTrait>>(Set.empty<HirTrait>(), { a, b => a.union(b) })
+    Tuple(traits, List.empty<CompilerError>())
+  })
+}
+fun getAllTraitsOfModule(context: QueryContext<List<CompilerError>>, module: HirModule): Set<HirTrait> {
+  query<Set<HirTrait>, List<CompilerError>>(context, "getAllTraitsOfModule", module as Equals & Hash, {
+
+    let declarations = (declarationsOfModule(context, module) as Iterable<HirDeclaration>)
+    let traits = declarations
+      .whereType<HirModule>()
+      .expand<HirTrait>({ (getAllTraitsOfModule(context, it) as Iterable<HirTrait>) })
+      .followedBy(declarations.whereType<HirTrait>())
+      .toSet()
+    Tuple(traits, List.empty<CompilerError>())
+  })
+}
+
+fun getAllImplementedTraitsFor(
+  context: QueryContext<List<CompilerError>>,
+  base: HirInlineType,
+  scope: Package,
+): Set<HirNamedType> {
+  query<Set<HirNamedType>, List<CompilerError>>(context, "getAllImplementedTraitsFor", DataTuple2<HirInlineType, Package>(base, scope), {
+    todo("soon, marcelgarus: implement getAllImplementedTraitsFor")
+    // getAllTraitsInScope(context, scope)
+    //   .items()
+    //   .where({ isAssignableTo(context, base, it, scope) })
+    //   .toSet()
+  })
+}
+
+fun getAllImplsFor(
+  context: QueryContext<List<CompilerError>>,
+  base: HirInlineType,
+  scope: Package,
+): Set<HirImpl> {
+  query<Set<HirImpl>, List<CompilerError>>(context, "getAllImplsFor", DataTuple2<HirInlineType, Package>(base, scope), {
+    let implementedTraits = getAllImplementedTraitsFor(context, base, scope)
+    let impls = getAllImplsInScope(context, scope)
+      .items()
+      .where({ impl_ => implementedTraits.contains(impl_.baseType(context)) })
+      .followedBy(
+        getAllImplsInScope(context, scope).items().where({ base == it.baseType(context) }),
+      )
+      .toSet()
+    Tuple(impls, List.empty<CompilerError>())
+  })
+}
+
+// fun resolveFunctionOnInlineType(
+//   context: QueryContext<List<CompilerError>>,
+//   base: HirInlineType,
+//   functionName: String,
+//   scope: Package,
+// ): Set<HirFunction> {
+//   getAllImplsInScope()
+// }
+
 public class ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError {
   public let thisType: AstNamedType
   public let scope: HirDeclaration
@@ -615,7 +691,7 @@ impl ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError: CompilerError {
   public fun id(): String { "this-type-can-only-be-used-in-impl-or-trait" }
 
   public fun location(): Location {
-    todo("Implement ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement ThisTypeCanOnlyBeUsedInImplOrTraitCompilerError.location")
   }
   public fun title(): String { "The This type can only be used in impls or traits." }
   public fun description(): String { "You can't use the This type in modules or type definitions" }
@@ -628,7 +704,7 @@ impl CannotImplementTraitOfTraitCompilerError: CompilerError {
   public fun id(): String { "cannot-implement-trait-of-trait" }
 
   public fun location(): Location {
-    todo("Implement CannotImplementTraitOfTraitCompilerError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement CannotImplementTraitOfTraitCompilerError.location")
   }
   public fun title(): String {
     "You cannot implement a trait containing another trait as a generic parameter yet."
@@ -643,7 +719,7 @@ impl TryingToFindImplForTraitWithTraitAsParameterCompilerError: CompilerError {
   public fun id(): String { "trying-to-find-impl-for-trait-with-trait-as-parameter" }
 
   public fun location(): Location {
-    todo("Implement TryingToFindImplForTraitWithTraitAsParameterCompilerError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement TryingToFindImplForTraitWithTraitAsParameterCompilerError.location")
   }
   public fun title(): String { "Conflicting impls." }
   public fun description(): String {
@@ -662,7 +738,7 @@ impl ConflictingImplsCompilerError: CompilerError {
   public fun id(): String { "conflicting-impls" }
 
   public fun location(): Location {
-    todo("Implement ConflictingImplsCompilerError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement ConflictingImplsCompilerError.location")
   }
   public fun title(): String { "Conflicting impls." }
   public fun description(): String {
@@ -677,11 +753,11 @@ impl AmbiguousTypeCompilerError: CompilerError {
   public fun id(): String { "ambiguous-type" }
 
   public fun location(): Location {
-    todo("Implement AmbiguousTypeCompilerError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement AmbiguousTypeCompilerError.location")
   }
   public fun title(): String { "Ambiguous type. Candidates are {candidates}." }
   public fun description(): String {
-    /// TODO(marcelgarus): add a description for this error
+    /// TODO(never, marcelgarus): add a description for this error
     ""
   }
 }
@@ -693,11 +769,11 @@ impl UnknownTypeCompilerError: CompilerError {
   public fun id(): String { "could-not-resolve-type" }
 
   public fun location(): Location {
-    todo("Implement UnknownTypeCompilerError.location") // TODO(marcelgarus)
+    todo("never, marcelgarus: Implement UnknownTypeCompilerError.location")
   }
   public fun title(): String { "Couldn't resolve type {astType.nameParts}." }
   public fun description(): String {
-    /// TODO(marcelgarus): add a description for this error
+    /// TODO(never, marcelgarus): add a description for this error
     ""
   }
 }

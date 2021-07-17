@@ -20,9 +20,9 @@ trait Hasher<Result> {
     DefaultHasher(0)
   }
 
-  fun write(value: Int /* Uint8 */)
-  // TODO(marcelgarus): Rename this to `write` as soon as we have some kind of name mangling.
-  fun writeList(value: List<Int> /* List<Uint8> */)
+  fun write(value: Int /* UInt8 */)
+  // TODO(never, marcelgarus): Rename this to `write` as soon as we have some kind of name mangling.
+  fun writeList(value: List<Int> /* List<UInt8> */)
 
   fun finish(): Result
 }
@@ -32,7 +32,7 @@ class DefaultHasher {
 }
 impl DefaultHasher: Hasher<Int> {
   fun write(value: Int) {
-    // TODO(marcelgarus): Make this better. By a lot.
+    // TODO(never, marcelgarus): Make this better. By a lot.
     entropy = (entropy + value) % 100
   }
 

@@ -55,10 +55,10 @@ builtin impl Path: Equals & Hash
 
 /*
 trait FileSystem {
-  // TODO(marcelgarus): Getterize!
+  // TODO(never, marcelgarus): Getterize!
   builtin static fun default()
 
-  // TODO(marcelgarus): Give it a different value based on the platform.
+  // TODO(never, marcelgarus): Give it a different value based on the platform.
   public let separator = "/"
   public let currentDirectorySymbol = "."
   public let parentDirectorySymbol = ".."
@@ -71,7 +71,7 @@ trait FileSystem {
     }
 
     let segments = segments.map {
-      // TODO(marcelgarus): Matchify!
+      // TODO(never, marcelgarus): Matchify!
       if it.isEmpty {
         CurrentSegment(isEmpty = true)
       } else if it == fileSystem.currentDirectorySymbol {
@@ -88,7 +88,7 @@ trait FileSystem {
 
   public fun stringifyPath(path: Path): String {
     (if path.isAbsolute "/" else "") + path.segments.map { segment ->
-      // TODO(marcelgarus): Matchify!
+      // TODO(never, marcelgarus): Matchify!
       if it is ChildSegment {
         return it.name
       } else if it is CurrentSegment {
@@ -114,7 +114,7 @@ class Path {
 
   static fun unsafe(segments: List<Segment>, isAbsolute: Bool): Path {
     /// Creates a Path instance without checking if it's valid.
-    todo()
+    todo(never, marcelgarus): implement
   }
 
   public static fun fromSegments(segments: List<Segment>, isAbsolute: Bool): Result<Path, ...> {
@@ -154,7 +154,7 @@ class Path {
   let isAbsolute: Bool
   /// Whether this `Path` is absolute, i.e., if it's independent of the current directory.
 
-  // TODO(marcelgarus): Getterize!
+  // TODO(never, marcelgarus): Getterize!
   fun isRelative(): Bool { !isAbsolute }
 
   fun depth(): Int {
@@ -174,7 +174,7 @@ class Path {
 
     let normalized = MutableList<Segment>()
     for segment in segments {
-      // TODO(marcelgarus): Matchify!
+      // TODO(never, marcelgarus): Matchify!
       if segment is ChildSegment {
         normalized.add(segment)
       } else if segment is ParentSegment {
@@ -188,7 +188,7 @@ class Path {
     Path.unsafe(normalized, isAbsolute)
   }
 
-  // TODO(marcelgarus): Getterize!
+  // TODO(never, marcelgarus): Getterize!
   fun parent(): Option<Path> {
     let segments = segments.toMutableList()
     while segments.last() is Option<CurrentSegment> {
@@ -206,9 +206,8 @@ class Path {
     }
   }
 
-  // TODO(marcelgarus): Walk up the path.
   fun ancestors(): Iterable<Path> {
-    todo()
+    todo("never, marcelgarus: Walk up the path.")
   }
 
   fun startsWith(prefix: List<Segment>): Bool {
@@ -230,7 +229,7 @@ class Path {
     )
   }
 
-  // TODO(marcelgarus): Enumerize!
+  // TODO(never, marcelgarus): Enumerize!
   trait Segment
 
   class ChildSegment {
@@ -251,7 +250,7 @@ impl Path: OperatorSlash<Path>, ToString, Iterable<Path.Segment> {
   fun iterator(): Iterator<Segment> => segments.iterator()
 }
 
-// TODO(marcelgarus): Enumerize!
+// TODO(never, marcelgarus): Enumerize!
 trait FileSystemNode {
   let path: Path
 }

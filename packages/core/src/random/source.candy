@@ -17,7 +17,7 @@ public trait RandomSource {
     result
   }
 
-  // TODO(JonasWanke): rename this to `default` when we support mangling names
+  // TODO(never, JonasWanke): rename this to `default` when we support mangling names
   static fun default_(): RandomSource { DefaultRandomSource() }
   static fun defaultWithSeed(seed: Int): RandomSource { DefaultRandomSource.withSeed(seed) }
 }

@@ -94,7 +94,7 @@ impl SolverRule: Equals & Hash {
 class Environment {
   let rules: List<SolverRule>
 
-  // TODO(marcelgarus): Somehow support solving logic that has multiple results. Currently, rules
+  // TODO(never, marcelgarus): Somehow support solving logic that has multiple results. Currently, rules
   // are of the form `consequence <- conditions` (with only one consequence), but we'd need multiple
   // consequences to express something like "Implement `Iterable[Equals]`". That's because there's
   // no single `SolverGoal` that the trait `Iterable[Equals]` can be lowered to – `Iterable(Equals)`

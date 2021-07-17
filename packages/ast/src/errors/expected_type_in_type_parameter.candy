@@ -13,7 +13,7 @@ impl ExpectedTypeInTypeParameterCompilerError: CompilerError {
   }
   public fun title(): String { "Missing type in type parameter." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description
+    /// TODO(never, JonasWanke): add a description
     ""
   }
 }

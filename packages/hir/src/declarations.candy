@@ -1,6 +1,7 @@
 use compiler_utils
 use incremental
 
+use ..expressions
 use ..types
 
 public trait HirDeclaration {
@@ -70,6 +71,10 @@ impl HirInnerModule: HirDeclaration & Equals & Hash & HirModule {
 public class HirTrait {
   public let parent: HirModule
   public let name_: String
+
+  static fun coreToString(context: QueryContext<List<CompilerError>>): HirTrait {
+    HirTrait(HirModule.coreString(context), "ToString")
+  }
 }
 impl HirTrait: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
@@ -103,6 +108,9 @@ public class HirType {
   public let parent: HirModule
   public let name_: String
 
+  static fun coreAny(context: QueryContext<List<CompilerError>>): HirType {
+    HirType(HirModule.corePrimitives(context), "Any")
+  }
   static fun coreInt(context: QueryContext<List<CompilerError>>): HirType {
     HirType(HirModule.coreInt(context), "Int")
   }
@@ -133,6 +141,82 @@ public class HirFunction {
   public let parent: HirModule | HirTrait | HirImpl
   public let name_: String
   public let disambiguator: Int
+
+  public static fun coreToString(context: QueryContext<List<CompilerError>>): HirFunction {
+    HirFunction(HirTrait.coreToString(context), "toString", 0)
+  }
+  public static fun infixEqualEqual(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixEqualEqual", "infixEqualEqual")
+  }
+  public static fun infixExclamationEqual(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixExclamationEqual", "infixExclamationEqual")
+  }
+  public static fun infixLess(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixLess", "infixLess")
+  }
+  public static fun infixLessEqual(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixLessEqual", "infixLessEqual")
+  }
+  public static fun infixGreater(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixGreater", "infixGreater")
+  }
+  public static fun infixGreaterEqual(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixGreaterEqual", "infixGreaterEqual")
+  }
+  public static fun infixPlus(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixPlus", "infixPlus")
+  }
+  public static fun infixMinus(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixMinus", "infixMinus")
+  }
+  public static fun infixStar(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixStar", "infixStar")
+  }
+  public static fun infixSlash(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixSlash", "infixSlash")
+  }
+  public static fun infixSlashSlash(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixSlashSlash", "infixSlashSlash")
+  }
+  public static fun infixPercent(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixPercent", "infixPercent")
+  }
+  public static fun infixAmpersand(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixAmpersand", "infixAmpersand")
+  }
+  public static fun infixBar(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixBar", "infixBar")
+  }
+  public static fun infixEqualGreater(context: QueryContext<List<CompilerError>>): HirFunction {
+    infix(context, "InfixEqualGreater", "infixEqualGreater")
+  }
+  public static fun prefixMinus(context: QueryContext<List<CompilerError>>): HirFunction {
+    prefix(context, "PrefixMinus", "prefixMinus")
+  }
+
+  static fun infix(
+    context: QueryContext<List<CompilerError>>,
+    traitName: String,
+    functionName: String,
+  ): HirFunction {
+    let module_ = HirTopLevelModule(Package.core(context))
+        .innerModule("Operators")
+        .innerModule("Raw")
+        .innerModule("Infix")
+    HirFunction(HirTrait(module_, traitName), functionName, 0)
+  }
+
+  static fun prefix(
+    context: QueryContext<List<CompilerError>>,
+    traitName: String,
+    functionName: String,
+  ): HirFunction {
+    let module_ = HirTopLevelModule(Package.core(context))
+        .innerModule("Operators")
+        .innerModule("Raw")
+        .innerModule("Prefix")
+    HirFunction(HirTrait(module_, traitName), functionName, 0)
+  }
 }
 impl HirFunction: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
@@ -146,5 +230,20 @@ impl HirFunction: HirDeclaration & Equals & Hash {
     (parent as Hash).hash<T>(hasher)
     (name_ as Hash).hash<T>(hasher)
     (disambiguator as Hash).hash<T>(hasher)
+  }
+}
+
+public class HirValueParameter {
+  public let scope: HirFunction | HirValueExpressionUri
+  /// The function or URI of the lambda that the parameter is a part of.
+  public let name: String
+}
+impl HirValueParameter: Equals & Hash {
+  fun equals(other: This): Bool {
+    (scope as Equals) == (other.scope as Equals) && name == other.name
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (scope as Hash).hash<T>(hasher)
+    name.hash<T>(hasher)
   }
 }

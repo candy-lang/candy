@@ -31,7 +31,7 @@ impl Compare: InfixGreater[This, Bool] {
   }
 }
 
-## TODO(marcelgarus): Maybe put these methods on `Iterable`?
+## TODO(later, marcelgarus): Maybe put these methods on `Iterate`?
 public fun min[T: Compare](first: T, second: T): T {
   if[T](first <= second, { first }).else({ second })
 }

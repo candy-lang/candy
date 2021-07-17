@@ -110,13 +110,13 @@ fun lowerLocalRelativeUseLineTarget(
   for node in cst.child.path {
     if node.child is PunctuationToken {
       if !punctuationExpectedNext {
-        /// TODO(JonasWanke)
+        /// TODO(never, JonasWanke)
       } else {
         punctuationExpectedNext = false
       }
     } else {
       if punctuationExpectedNext {
-        /// TODO(JonasWanke)
+        /// TODO(never, JonasWanke)
       }
       path.append(
         lowerIdentifier(
@@ -130,7 +130,7 @@ fun lowerLocalRelativeUseLineTarget(
     }
   }
   if !punctuationExpectedNext {
-    // TODO(JonasWanke)
+    // TODO(never, JonasWanke)
   }
 
   context.addIdMapping(cst.id, id)
@@ -148,13 +148,13 @@ fun lowerGlobalUseLineTarget(
   for node in cst.child.packagePath {
     if node.child is PunctuationToken {
       if !punctuationExpectedNext {
-        /// TODO(JonasWanke)
+        /// TODO(never, JonasWanke)
       } else {
         punctuationExpectedNext = false
       }
     } else {
       if punctuationExpectedNext {
-        /// TODO(JonasWanke)
+        /// TODO(never, JonasWanke)
       }
       packagePath.append(
         lowerIdentifier(
@@ -168,7 +168,7 @@ fun lowerGlobalUseLineTarget(
     }
   }
   if !punctuationExpectedNext {
-    // TODO(JonasWanke)
+    // TODO(never, JonasWanke)
   }
 
   let moduleName = None<AstIdentifier>()
@@ -681,13 +681,13 @@ fun lowerValueParameterList(
   for node in csts {
     if node.child is PunctuationToken {
       if !punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       } else {
         punctuationExpectedNext = false
       }
     } else {
       if punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       }
       let lowered = lowerValueParameter(
         context,
@@ -815,13 +815,13 @@ fun lowerNamedType(
   for node in cst.child.nameParts {
     if node.child is PunctuationToken {
       if !punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       } else {
         punctuationExpectedNext = false
       }
     } else {
       if punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       }
       nameParts.append(
         lowerIdentifier(
@@ -835,7 +835,7 @@ fun lowerNamedType(
     }
   }
   if !punctuationExpectedNext {
-    // TODO(JonasWanke)
+    // TODO(never, JonasWanke)
   }
 
   let typeArguments = cst.child.typeArguments
@@ -857,7 +857,7 @@ fun lowerGroupType(
       context.createErrorType(parentId)
     })
 
-  // TODO(JonasWanke): support modifiers on group types
+  // TODO(never, JonasWanke): support modifiers on group types
   if cst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
     let upcastedCst = cst.cast<CstDeclarationContent
         | CstBlockBody
@@ -915,13 +915,13 @@ fun lowerFunctionTypeParameterTypes(
   for node in cst.child.parameterTypes {
     if node.child is PunctuationToken {
       if !punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       } else {
         punctuationExpectedNext = false
       }
     } else {
       if punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       }
       parameterTypes.append(lowerInlineType(context, parentId, node.cast<CstInlineType>()))
       punctuationExpectedNext = true
@@ -963,13 +963,13 @@ fun lowerTupleType(
   for node in cst.child.types {
     if node.child is PunctuationToken {
       if !punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       } else {
         punctuationExpectedNext = false
       }
     } else {
       if punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       }
       types.append(lowerInlineType(context, id, node.cast<CstInlineType>()))
       punctuationExpectedNext = true
@@ -1023,13 +1023,13 @@ fun lowerNamedTupleType(
   for node in cst.child.fields {
     if node.child is PunctuationToken {
       if !punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       } else {
         punctuationExpectedNext = false
       }
     } else {
       if punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       }
 
       let field = lowerNamedTupleTypeField(
@@ -1124,7 +1124,7 @@ impl MissingNamedTupleTypeFieldNameCompilerError: CompilerError {
   }
   public fun title(): String { "Missing field name." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description for this error
+    /// TODO(never, JonasWanke): add a description for this error
     ""
   }
 }
@@ -1132,7 +1132,7 @@ impl MissingNamedTupleTypeFieldNameCompilerError: CompilerError {
 public class DuplicateNamedTupleTypeFieldNameCompilerError {
   public let file: FancyFile
   public let node: CstNode<CstNamedTupleTypeField>
-  // TODO(JonasWanke): highlight previous occurrences of that name
+  // TODO(never, JonasWanke): highlight previous occurrences of that name
 }
 impl DuplicateNamedTupleTypeFieldNameCompilerError: CompilerError {
   public fun id(): String { "duplicate-named-tuple-type-field-name" }
@@ -1142,7 +1142,7 @@ impl DuplicateNamedTupleTypeFieldNameCompilerError: CompilerError {
   }
   public fun title(): String { "Duplicate field name." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description for this error
+    /// TODO(never, JonasWanke): add a description for this error
     ""
   }
 }
@@ -1160,7 +1160,7 @@ impl MissingNamedTupleTypeFieldTypeCompilerError: CompilerError {
   }
   public fun title(): String { "Missing field type." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description for this error
+    /// TODO(never, JonasWanke): add a description for this error
     ""
   }
 }
@@ -1191,13 +1191,13 @@ fun lowerEnumType(
   for node in cstVariants {
     if node.child is PunctuationToken {
       if !punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       } else {
         punctuationExpectedNext = false
       }
     } else {
       if punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       }
 
       let variant = lowerEnumTypeVariant(
@@ -1227,12 +1227,12 @@ impl ExpectedTwoOrMoreEnumVariantsCompilerError: CompilerError {
   public fun id(): String { "expected-two-or-more-enum-variants" }
 
   public fun location(): Location {
-    // TODO(JonasWanke): report the actual position
+    // TODO(never, JonasWanke): report the actual position
     Location(file, Span(0, 1))
   }
   public fun title(): String { "Expected two or more variants in an enum." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description
+    /// TODO(never, JonasWanke): add a description
     ""
   }
 }
@@ -1285,7 +1285,7 @@ impl MissingEnumVariantNameCompilerError: CompilerError {
   }
   public fun title(): String { "Missing enum variant name." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description for this error
+    /// TODO(never, JonasWanke): add a description for this error
     ""
   }
 }
@@ -1293,7 +1293,7 @@ impl MissingEnumVariantNameCompilerError: CompilerError {
 public class DuplicateEnumVariantNameCompilerError {
   public let file: FancyFile
   public let node: CstNode<CstEnumTypeVariant>
-  // TODO(JonasWanke): highlight previous occurrences of that name
+  // TODO(never, JonasWanke): highlight previous occurrences of that name
 }
 impl DuplicateEnumVariantNameCompilerError: CompilerError {
   public fun id(): String { "duplicate-enum-variant-name" }
@@ -1303,7 +1303,7 @@ impl DuplicateEnumVariantNameCompilerError: CompilerError {
   }
   public fun title(): String { "Duplicate enum variant name." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description for this error
+    /// TODO(never, JonasWanke): add a description for this error
     ""
   }
 }
@@ -1354,13 +1354,13 @@ fun lowerTypeParameters(
   for node in cst.child.typeParameters {
     if node.child is PunctuationToken {
       if !punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       } else {
         punctuationExpectedNext = false
       }
     } else {
       if punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       }
       let lowered = lowerTypeParameter(
         context,
@@ -1445,13 +1445,13 @@ fun lowerTypeArguments(
   for node in cst.child.typeArguments {
     if node.child is PunctuationToken {
       if !punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       } else {
         punctuationExpectedNext = false
       }
     } else {
       if punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       }
       result.append(lowerTypeArgument(context, parentId, node.cast<CstTypeArgument>(), index))
       index = index + 1
@@ -1509,7 +1509,49 @@ fun lowerExpression(
     return lowerLambdaExpression(context, parentId, cst.cast<CstLambdaExpression>())
   }
   if cst.child is CstIdentifierExpression {
-    return lowerIdentifierExpression(context, parentId, cst.cast<CstIdentifierExpression>())
+    return Some<AstIdentifierExpression>(
+      lowerIdentifierExpression(context, parentId, cst.cast<CstIdentifierExpression>()),
+    )
+  }
+  if cst.child is CstTypeArgumentsExpression {
+    let typeArgumentsExpression = cst.cast<CstTypeArgumentsExpression>()
+    let child = typeArgumentsExpression.child.value
+
+    // mut let result = None<AstExpression>()
+    // mut let wereTypeArgumentsAppropriate = false
+
+    if child.child is CstIdentifierExpression {
+      let expression = lowerIdentifierExpression(context, parentId, child.cast<CstIdentifierExpression>())
+      let typeArguments = lowerTypeArguments(context, expression.id, typeArgumentsExpression.child.typeArguments)
+      return Some<AstExpression>(AstIdentifierExpression(expression.id, expression.value, typeArguments))
+    }
+
+    if child.child is CstNavigationExpression {
+      return lowerNavigationExpression(context, parentId, child.cast<CstNavigationExpression>())
+        .map<AstExpression>({
+          if (it is AstNavigationExpression) {
+            let expression = (it as AstNavigationExpression)
+            let typeArguments = lowerTypeArguments(context, expression.id, typeArgumentsExpression.child.typeArguments)
+            AstNavigationExpression(expression.id, expression.receiver, expression.target, typeArguments)
+          } else {
+            it
+          }
+        })
+    }
+
+    // Lowered but ignored so that inner errors are still generated.
+    if (parentId is AstInlineTypeId || parentId is AstExpressionId) {
+      // TODO(never, JonasWanke): Lower even if the parent is a declaration.
+      lowerTypeArguments(
+        context,
+        parentId as AstInlineTypeId | AstExpressionId,
+        typeArgumentsExpression.child.typeArguments,
+      )
+    }
+    context.addError(
+      UnexpectedTypeArgumentsError(context.file, cst.cast<CstTypeArgumentsExpression>()),
+    )
+    return None<AstExpression>()
   }
   if cst.child is CstGroupExpression {
     return lowerGroupExpression(context, parentId, cst.cast<CstGroupExpression>())
@@ -1533,6 +1575,23 @@ fun lowerExpression(
     return lowerReturnExpression(context, parentId, cst.cast<CstReturnExpression>())
   }
   throw "Unknown expression: {cst}."
+}
+
+public class UnexpectedTypeArgumentsError {
+  public let file: FancyFile
+  public let node: CstNode<CstTypeArgumentsExpression>
+}
+impl UnexpectedTypeArgumentsError: CompilerError {
+  public fun id(): String { "unexpected-type-arguments" }
+
+  public fun location(): Location {
+    Location(file, node.cast<CstDeclarationWithName>().child.name.unwrap().child.span)
+  }
+  public fun title(): String { "Unexpected type arguments." }
+  public fun description(): String {
+    /// TODO(never, JonasWanke): add a description for this error
+    ""
+  }
 }
 
 fun lowerIntExpression(
@@ -1695,13 +1754,13 @@ fun lowerIdentifierExpression(
   context: LoweringContext,
   parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   cst: CstNode<CstIdentifierExpression>,
-): Maybe<AstExpression> {
+): AstIdentifierExpression {
   let id = context.getExpressionId(parentId)
 
   let value = lowerIdentifier(context, id, cst.child.value, 0)
 
   context.addIdMapping(cst.id, id)
-  Some<AstExpression>(AstIdentifierExpression(id, value))
+  AstIdentifierExpression(id, value, List.empty<AstTypeArgument>())
 }
 
 fun lowerGroupExpression(
@@ -1754,13 +1813,13 @@ fun lowerTupleExpression(
   for node in cst.child.expressions {
     if node.child is PunctuationToken {
       if !punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       } else {
         punctuationExpectedNext = false
       }
     } else {
       if punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       }
       let expression = lowerExpression(context, parentId, node.cast<CstExpression>())
       expression.do({ expressions.append(it) })
@@ -1846,11 +1905,19 @@ fun lowerPropertyExpression(
     context.addError(MissingPropertyNameCompilerError(context.file, cst))
     isValid = false
   }
+  if (initializer is None) { isValid = false }
 
   if !isValid { return None<AstExpression>() }
   context.addIdMapping(cst.id, id)
   Some<AstExpression>(
-    AstPropertyExpression(id, None<AstCandyDoc>(), modifiers, name.unwrap(), type, initializer),
+    AstPropertyExpression(
+      id,
+      None<AstCandyDoc>(),
+      modifiers,
+      name.unwrap(),
+      type,
+      initializer.unwrap(),
+    ),
   )
 }
 
@@ -1864,7 +1931,7 @@ impl MissingPropertyNameCompilerError: CompilerError {
   public fun location(): Location { Location(file, node.child.keyword.child.span) }
   public fun title(): String { "Missing property name." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description for this error
+    /// TODO(never, JonasWanke): add a description for this error
     ""
   }
 }
@@ -1879,7 +1946,7 @@ impl MissingPropertyInitializerCompilerError: CompilerError {
   public fun location(): Location { Location(file, node.child.keyword.child.span) }
   public fun title(): String { "Missing property initializer." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description for this error
+    /// TODO(never, JonasWanke): add a description for this error
     ""
   }
 }
@@ -1945,7 +2012,9 @@ fun lowerNavigationExpression(
   let target = lowerIdentifier(context, id, cst.child.target.unwrap(), 0)
 
   context.addIdMapping(cst.id, id)
-  receiver.map<AstExpression>({ receiver => AstNavigationExpression(id, receiver, target) })
+  receiver.map<AstExpression>({
+    AstNavigationExpression(id, it, target, List.empty<AstTypeArgument>())
+  })
 }
 
 fun lowerCallExpression(
@@ -1957,9 +2026,15 @@ fun lowerCallExpression(
 
   let receiver = lowerExpression(context, id, cst.child.receiver)
 
-  let typeArguments = cst.child.typeArguments
-      .map<List<AstTypeArgument>>({ lowerTypeArguments(context, id, it) })
-      .orElse({ List.empty<AstTypeArgument>() })
+  let typeArguments = if (cst.child.receiver.child is CstTypeArgumentsExpression) {
+    lowerTypeArguments(
+      context,
+      id,
+      cst.child.receiver.cast<CstTypeArgumentsExpression>().child.typeArguments,
+    )
+  } else {
+    List.empty<AstTypeArgument>()
+  }
 
   let valueArguments = lowerValueArguments(context, id, cst.child.valueArguments)
 
@@ -1980,13 +2055,13 @@ fun lowerValueArguments(
   for node in cst.child.valueArguments {
     if node.child is PunctuationToken {
       if !punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       } else {
         punctuationExpectedNext = false
       }
     } else {
       if punctuationExpectedNext {
-        // TODO(JonasWanke)
+        // TODO(never, JonasWanke)
       }
       lowerValueArgument(context, parentId, node.cast<CstValueArgument>(), index)
           .do({ result.append(it) })
@@ -2089,7 +2164,7 @@ class LoweringContext {
   fun removeTypeIdMapping(astId: AstInlineTypeId) {
     idMapping.removeWhere({ _, value =>
       if !(value is AstInlineTypeId) { return false }
-      // TODO(JonasWanke): this only works because type IDs are currently numbered per file
+      // TODO(never, JonasWanke): this only works because type IDs are currently numbered per file
       (value as AstInlineTypeId).value == astId.value
     })
   }
@@ -2109,7 +2184,7 @@ class LoweringContext {
       | AstValueParameterId
       | AstExpressionId,
     ): AstInlineTypeId {
-    // TODO(JonasWanke): number these per parent when IDs implement `Equals & Hash`
+    // TODO(never, JonasWanke): number these per parent when IDs implement `Equals & Hash`
 
     let id = AstInlineTypeId(parentId, nextTypeId)
     nextTypeId = nextTypeId + 1
@@ -2128,7 +2203,7 @@ class LoweringContext {
   fun getExpressionId(
     parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
   ): AstExpressionId {
-    // TODO(JonasWanke): number these per parent when IDs implement `Equals & Hash`
+    // TODO(never, JonasWanke): number these per parent when IDs implement `Equals & Hash`
 
     let id = AstExpressionId(parentId, nextExpressionId)
     nextExpressionId = nextExpressionId + 1

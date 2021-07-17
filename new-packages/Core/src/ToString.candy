@@ -1,0 +1,7 @@
+use ..String
+
+public trait ToString {
+  fun toString(): String
+}
+
+## TODO(later, JonasWanke): add `ToDebugString`

@@ -60,6 +60,13 @@ public class CstIdentifierExpression {
 impl CstIdentifierExpression: CstExpression
 
 
+public class CstTypeArgumentsExpression {
+  public let value: CstNode<CstExpression>
+  public let typeArguments: CstNode<CstTypeArguments>
+}
+impl CstTypeArgumentsExpression: CstExpression
+
+
 public class CstGroupExpression {
   public let openingParenthesis: CstNode<PunctuationToken>
   public let expression: Maybe<CstNode<CstExpression>>
@@ -86,7 +93,7 @@ public class CstBinaryExpression {
   /// * assignment & comparison: `=`, `==`, `!=`, `<`, `<=`, `>`, `>=`
   /// * logical: `&`, `|`, `=>`
   ///
-  /// TODO(JonasWanke): convert this to an enum when we support these
+  /// TODO(never, JonasWanke): convert this to an enum when we support these
 
   public let rightOperand: Maybe<CstNode<CstExpression>>
 }
@@ -112,7 +119,6 @@ impl CstNavigationExpression: CstExpression
 
 public class CstCallExpression {
   public let receiver: CstNode<CstExpression>
-  public let typeArguments: Maybe<CstNode<CstTypeArguments>>
   public let valueArguments: CstNode<CstValueArguments>
 }
 impl CstCallExpression: CstExpression

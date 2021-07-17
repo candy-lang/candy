@@ -32,7 +32,7 @@ class QueryContext<S> {
   fun run<T: Equals & Hash>(query: Query<T, S>): T {
     let signature = Tuple(query.name, query.input)
 
-    // TODO(marcelgarus): Use stack.contains(signature) once it exists.
+    // TODO(never, marcelgarus): Use stack.contains(signature) once it exists.
     if (stack as Iterable<(String, Equals & Hash)>).where({
       it.first as Equals == signature.first as Equals && it.second == signature.second
     }).isNotEmpty() {

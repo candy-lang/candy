@@ -23,7 +23,7 @@ impl<Item, Output> PossessiveRepeatingParser<Item, Output>: Parser<Item, List<Ou
     }
 
     loop {
-      // TODO(JonasWanke): use a while-loop when we re-add lazy evaluation of disjunctions
+      // TODO(never, JonasWanke): use a while-loop when we re-add lazy evaluation of disjunctions
       if maximum is Some<Int> {
         if ((elements as Iterable<Output>).length() >= maximum.unwrap()) { break unit }
       }

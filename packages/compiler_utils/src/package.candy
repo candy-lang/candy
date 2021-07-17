@@ -5,7 +5,7 @@ use ..error
 
 /*
 public trait Package: Equals & Hash {
-  // TODO(JonasWanke): provide a query to get the name of a package
+  // TODO(never, JonasWanke): provide a query to get the name of a package
 
   fun getResolvedPath(context: QueryContext<List<CompilerError>>): Path
 }
@@ -57,7 +57,7 @@ public class GitPackage {
 impl GitPackage: Package & Equals & Hash {
   fun getResolvedPath(context: QueryContext<List<CompilerError>>): Path {
     query<Path, List<CompilerError>>(context, "GitPackage.getResolvedPath", (this as Equals & Hash), {
-      todo("Support Git packages.")
+      todo("never, Support Git packages.")
     })
   }
 
@@ -81,7 +81,7 @@ public class HostedPackage {
 impl HostedPackage: Package & Equals & Hash {
   fun getResolvedPath(context: QueryContext<List<CompilerError>>): Path {
     query<Path, List<CompilerError>>(context, "HostedPackage.getResolvedPath", (this as Equals & Hash), {
-      todo("Support hosted packages.")
+      todo("never, Support hosted packages.")
     })
   }
 

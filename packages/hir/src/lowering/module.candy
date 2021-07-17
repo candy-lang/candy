@@ -2,6 +2,5 @@ use compiler_utils
 use incremental
 
 public use .declarations
-public use .functions
 public use .resolving
 public use .types

@@ -5,7 +5,7 @@ use ...array
 use ...iterable
 use ...list
 
-// TODO(marcelgarus): For now, this never shrinks. We should implement that later, although a very
+// TODO(never, marcelgarus): For now, this never shrinks. We should implement that later, although a very
 // conservative shrinking heuristic is probably enough (we don't want to shrink too early).
 public class ArrayList<Item> {
   /// A wrapper around `Array` that grows dynamically.
@@ -162,7 +162,7 @@ public class ArrayList<Item> {
   mut let items: Array<Maybe<Item>>
   mut let length_: Int /* UInt */
 
-  // TODO(marcelgarus): Getterize!
+  // TODO(never, marcelgarus): Getterize!
   fun capacity(): Int /* UInt */ { items.length() }
 
   fun grow() {
@@ -181,7 +181,7 @@ public class ArrayList<Item> {
 
 impl<Item> ArrayList<Item>: Iterable<Item> {
   fun iterator(): Iterator<Item> {
-    // TODO(marcelgarus): Remove the second argument as soon as default arguments are supported.
+    // TODO(never, marcelgarus): Remove the second argument as soon as default arguments are supported.
     ArrayListIterator<Item>(this, 0)
   }
 }

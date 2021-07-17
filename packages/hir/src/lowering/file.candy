@@ -90,8 +90,8 @@ impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
             None<HirModule>(),
             List.of1<CompilerError>(
               UnsupportedFeatureCompilerError(
-                // TODO(JonasWanke): add the actual location of this compiler error
-                Location(ast.id.parentId.file, Span(0, 1)),
+                // TODO(never, JonasWanke): add the actual location of this compiler error
+                Some<Location>(Location(ast.id.parentId.file, Span(0, 1))),
                 "Grouped packages are not yet supported.",
               ),
             ),
@@ -102,8 +102,8 @@ impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
             None<HirModule>(),
             List.of1<CompilerError>(
               UnsupportedFeatureCompilerError(
-                // TODO(JonasWanke): add the actual location of this compiler error
-                Location(ast.id.parentId.file, Span(0, 1)),
+                // TODO(never, JonasWanke): add the actual location of this compiler error
+                Some<Location>(Location(ast.id.parentId.file, Span(0, 1))),
                 "Named exports of packages are not yet supported.",
               ),
             ),
@@ -137,7 +137,7 @@ impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
         let targetAst = (ast.target as AstLocalRelativeUseLineTarget)
         mut let target = parent
 
-        // TODO(JonasWanke): use `int.times` when we support non-local returns
+        // TODO(never, JonasWanke): use `int.times` when we support non-local returns
         mut let i = 0
         while i < targetAst.parentNavigations {
           let newTarget = target.parent
@@ -179,7 +179,7 @@ impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
 }
 
 public class TooManyUpNavigationsInUseLineCompilerError {
-  // TODO(JonasWanke): add the actual location of this compiler error
+  // TODO(never, JonasWanke): add the actual location of this compiler error
   public let file: FancyFile
 }
 impl TooManyUpNavigationsInUseLineCompilerError: CompilerError {
@@ -188,13 +188,13 @@ impl TooManyUpNavigationsInUseLineCompilerError: CompilerError {
   public fun location(): Location { Location(file, Span(0, 1)) }
   public fun title(): String { "Too many up navigations in use-line." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description for this error
+    /// TODO(never, JonasWanke): add a description for this error
     ""
   }
 }
 
 public class UseLineTargetNotFoundCompilerError {
-  // TODO(JonasWanke): add the actual location of this compiler error
+  // TODO(never, JonasWanke): add the actual location of this compiler error
   public let file: FancyFile
 }
 impl UseLineTargetNotFoundCompilerError: CompilerError {
@@ -203,7 +203,7 @@ impl UseLineTargetNotFoundCompilerError: CompilerError {
   public fun location(): Location { Location(file, Span(0, 1)) }
   public fun title(): String { "Use-line target not found." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description for this error
+    /// TODO(never, JonasWanke): add a description for this error
     ""
   }
 }

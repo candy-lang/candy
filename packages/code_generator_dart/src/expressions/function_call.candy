@@ -15,14 +15,14 @@ public fun compileFunctionCallValueExpression(
     context,
     "code_generator_dart.compileFunctionCallValueExpression",
     expression, {
-    // TODO(JonasWanke): Handle static function calls.
-    // TODO(JonasWanke): Handle calls of functions inside modules.
+    // TODO(soon, JonasWanke): Handle static function calls.
+    // TODO(soon, JonasWanke): Handle calls of functions inside modules.
     let receiver = getValueExpressionResultIdentifier(
       context,
       expression.receiver.unwrap() as HirValueExpressionUri,
     )
 
-    // TODO(JonasWanke): Cast the receiver to the correct trait.
+    // TODO(soon, JonasWanke): Cast the receiver to the correct trait.
     let function = receiver.dot(expression.function.name())
 
     let declaredTypeParameters = (expression.function.typeParameters(context) as Iterable<HirParameterType>)
@@ -40,7 +40,7 @@ public fun compileFunctionCallValueExpression(
     let valueArgumentsInCorrectOrder = (expression.function.ast(context).valueParameters as Iterable<AstValueParameter>)
       .map<HirValueExpressionUri>({ expression.valueArguments.get(it.name.value).unwrap() })
     let valueArguments = typeArgumentsInCorrectOrder
-    // TODO(JonasWanke): Transform these types to the static instance classes.
+    // TODO(soon, JonasWanke): Transform these types to the static instance classes.
       .map<DartExpression>({ DartIdentifier("SomeType", None<String>()) })
       .followedBy(
         valueArgumentsInCorrectOrder

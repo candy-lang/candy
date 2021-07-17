@@ -12,7 +12,7 @@ impl MissingTypeParameterNameCompilerError: CompilerError {
   public fun location(): Location { Location(file, node.child.upperBound.unwrap().first.child.span) }
   public fun title(): String { "Missing type parameter name." }
   public fun description(): String {
-    /// TODO(JonasWanke): add a description for this error
+    /// TODO(never, JonasWanke): add a description for this error
     ""
   }
 }

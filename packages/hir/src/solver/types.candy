@@ -47,7 +47,7 @@ trait SolverType {
     ///   would lead to types of infinite size:
     ///   `?A = Ping<?B> = Ping<Pong<?A>> = Ping<Pong<Ping<?B>>> = Ping<Pong<Ping<Pong<?A>>>> = ...`
     //
-    // TODO(marcelgarus): Write property-based tests for this. For example, generate random types
+    // TODO(never, marcelgarus): Write property-based tests for this. For example, generate random types
     // and then check that the order of unifying doesn't matter and that applying the substitutions
     // actually results in the same type.
 

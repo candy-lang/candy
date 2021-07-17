@@ -48,7 +48,7 @@ public trait List<Item>: Iterable<Item> {
     ArrayList.of12<Item>(first, second, third, fourth, fifth, sixth, seventh, eigth, ninth, tenth, eleventh, twelfth)
   }
 
-  // TODO(marcelgarus): Getterize!
+  // TODO(never, marcelgarus): Getterize!
   fun isEmpty(): Bool { length() == 0 }
 
   fun copy(): List<Item> {
@@ -63,7 +63,7 @@ public trait List<Item>: Iterable<Item> {
     result
   }
   fun subList(start: Int, end: Int): List<Item> {
-    /// TODO(JonasWanke): make this more efficient by creating a view of the original list
+    /// TODO(never, JonasWanke): make this more efficient by creating a view of the original list
 
     assert(start >= 0, "start must be non-negative")
     assert(start < length(), "start must be inside this list")
@@ -101,7 +101,7 @@ public trait List<Item>: Iterable<Item> {
   }
 
   fun reversed(): List<Item> {
-    /// TODO(JonasWanke): make this more efficient by creating a view of the original list
+    /// TODO(never, JonasWanke): make this more efficient by creating a view of the original list
 
     let length = (this as Iterable<Item>).length()
     let result = ArrayList.create<Item>(length)
@@ -140,6 +140,12 @@ public trait List<Item>: Iterable<Item> {
   fun sortedBy<T: Comparable>(selector: (Item) => T): List<Item> {
     let result = toMutable()
     result.sortBy<T>(selector)
+    result
+  }
+
+  fun copyAndAdd(item: Item): List<Item> {
+    let result = this.toMutable()
+    result.append(item)
     result
   }
 }
@@ -184,7 +190,7 @@ public trait MutableList<Item>: List<Item> {
   }
 
   fun set(index: Int /* UInt */, item: Item)
-  // TODO(marcelgarus): Rename to add as soon as the naming conflict with + is resolved.
+  // TODO(never, marcelgarus): Rename to add as soon as the naming conflict with + is resolved.
   fun append(item: Item)
   fun appendAll(items: Iterable<Item>) {
     for item in items {
@@ -243,7 +249,7 @@ public trait MutableList<Item>: List<Item> {
 
   fun unsafeSort() { sortBy<Comparable>({ it as Comparable }) }
   fun sortBy<T: Comparable>(selector: (Item) => T) {
-    // TODO(JonasWanke): use something faster for larger lists
+    // TODO(never, JonasWanke): use something faster for larger lists
     // Currently using insertion sort.
     1.until(length()).do({ i =>
       let item = (get(i).unwrap() as Item)

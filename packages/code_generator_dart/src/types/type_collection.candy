@@ -52,7 +52,7 @@ fun getAllInlineTypesInsideTrait(
     "code_generator_dart.getAllInlineTypesInsideTrait",
     traitHir, {
     let inlineTypes = getAllInlineTypesInsideTypeParameters(context, traitHir)
-    // TODO(JonasWanke): Traverse upper bound
+      .union(getAllInlineTypesInsideInlineType(context, traitHir.upperBound(context)))
     Tuple(inlineTypes, List.empty<CompilerError>())
   })
 }
@@ -83,7 +83,7 @@ fun getAllInlineTypesInsideType(
     "code_generator_dart.getAllInlineTypesInsideType",
     typeHir, {
     let inlineTypes = getAllInlineTypesInsideTypeParameters(context, typeHir)
-    // TODO(JonasWanke): Traverse inline type
+    // TODO(soon, JonasWanke): Traverse inline type
     Tuple(inlineTypes, List.empty<CompilerError>())
   })
 }
@@ -96,7 +96,7 @@ fun getAllInlineTypesInsideFunction(
     "code_generator_dart.getAllInlineTypesInsideFunction",
     functionHir, {
     let inlineTypes = getAllInlineTypesInsideTypeParameters(context, functionHir)
-    // TODO(JonasWanke): Traverse return type & body
+    // TODO(soon, JonasWanke): Traverse return type & body
     Tuple(inlineTypes, List.empty<CompilerError>())
   })
 }

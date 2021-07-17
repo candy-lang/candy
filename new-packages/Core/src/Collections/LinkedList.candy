@@ -37,7 +37,7 @@ impl[Item] LinkedList[Item]: List[Item] {
 }
 impl[Item] LinkedList[Item]: Iterate[Item] {
   fun iterate(): Maybe[(Item, Iterate[Item])] {
-    ## TODO(JonasWanke): Remove the `map` call when we support variance.
+    ## TODO(later, JonasWanke): Remove the `map` call when we support variance.
     this.value.map[(Item, Iterate[Item])]({ (it.first, it.second) })
   }
 

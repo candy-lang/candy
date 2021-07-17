@@ -1,7 +1,7 @@
 use ....parsers
 
 class NotParser<Item, Output> {
-  // TODO(JonasWanke): remove Output type parameter when we support out-variance
+  // TODO(never, JonasWanke): remove Output type parameter when we support out-variance
   let parser: Parser<Item, Output>
   let message: String
 }

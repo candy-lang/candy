@@ -84,7 +84,7 @@ fun compileNamedTupleTypeDeclaration(
         DartField(
           it.first,
           docComment = None<String>(),
-          // TODO(JonasWanke): Add the corresponding Candy code as the doc comment.
+          // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
           isStatic = false,
           mutability = DartFinal(),
           type = Some<DartType>(
@@ -98,7 +98,7 @@ fun compileNamedTupleTypeDeclaration(
     let dartDeclaration = DartClass(
       name = name,
       docComment = None<String>(),
-      // TODO(JonasWanke): Add the corresponding Candy code as the doc comment.
+      // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
       annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
       isAbstract = false,
       typeParameters = fields

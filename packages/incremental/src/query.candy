@@ -41,7 +41,7 @@ public fun impureQuery<T, S>(
   input: Equals & Hash,
   runner: () => (T, S),
 ): T {
-  /// TODO(JonasWanke): merge this with `query` when we support optional arguments
+  /// TODO(never, JonasWanke): merge this with `query` when we support optional arguments
 
   let query = Query<T, S>(name, input, runner, false)
   context.run<T>(query)

@@ -243,8 +243,8 @@ class CstParser {
     node<CstValueParameters>(valueParameters)
   }
   fun valueParameter(): Parser<String, CstNode<CstValueParameter>> {
-    // TODO(JonasWanke): allow modifiers
-    // TODO(JonasWanke): allow parameters without a name
+    // TODO(never, JonasWanke): allow modifiers
+    // TODO(soon, JonasWanke): allow parameters without a name
     let valueParameter = identifier(false)
         .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>>(
           punctuation(":")
@@ -362,7 +362,7 @@ class CstParser {
           CstTupleType(modifiers, openingParenthesis, types, closingParenthesis)
         })
 
-    // TODO(JonasWanke): Allow modifiers before named tuple type fields.
+    // TODO(never, JonasWanke): Allow modifiers before named tuple type fields.
     let namedTupleTypeField = atLeastOne<
         CstNode<IdentifierToken>,
         (CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>),
@@ -465,7 +465,7 @@ class CstParser {
           CstFunctionTypeParameterTypes(it.first.first, it.first.second, it.second)
         })
     let functionTypeParameterTypes = node<CstFunctionTypeParameterTypes>(functionTypeParameterTypes)
-    // TODO(JonasWanke): allow modifiers
+    // TODO(never, JonasWanke): allow modifiers
     let functionTypeReceiverAndParameterTypes = choiceOf<
       String,
       (Maybe<CstNode<CstInlineType>>, Maybe<CstNode<CstFunctionTypeParameterTypes>>),
@@ -729,21 +729,21 @@ class CstParser {
           }
         })
 
-    let callPostfix = typeArguments()
-        .optional()
-        .sequence<CstNode<CstValueArguments>>(valueArguments())
-        .map<(CstNode<CstExpression>) => CstExpression>({
-          { receiver: CstNode<CstExpression> =>
-            CstCallExpression(receiver, it.first, it.second)
-          }
-        })
+    let callPostfix = valueArguments().map<(CstNode<CstExpression>) => CstExpression>({
+      { receiver: CstNode<CstExpression> => CstCallExpression(receiver, it) }
+    })
+
+    let typeArgumentsPostfix = typeArguments().map<(CstNode<CstExpression>) => CstExpression>({
+      { receiver: CstNode<CstExpression> => CstTypeArgumentsExpression(receiver, it) }
+    })
 
     let postfixExpressions = primitiveExpressions
         .sequence<List<(CstNode<CstExpression>) => CstExpression>>(
           choiceOf<String, (CstNode<CstExpression>) => CstExpression>(
-            List.of2<Parser<String, (CstNode<CstExpression>) => CstExpression>>(
+            List.of3<Parser<String, (CstNode<CstExpression>) => CstExpression>>(
               navigationPostfix,
               callPostfix,
+              typeArgumentsPostfix,
             ),
           ).star()
         )
@@ -769,7 +769,7 @@ class CstParser {
     let buildBinaryLeftAssociative = {
         operators: List<String>,
         higherPrecedenceParser: Parser<String, CstExpression> =>
-      // TODO(JonasWanke): support things like "+1" and "1++1"
+      // TODO(never, JonasWanke): support things like "+1" and "1++1"
 
       node<CstExpression>(higherPrecedenceParser)
           .sequence<List<(Maybe<CstNode<CstExpression>>) => CstExpression>>(
@@ -801,7 +801,7 @@ class CstParser {
     let buildBinaryRightAssociative = {
         operators: List<String>,
         higherPrecedenceParser: Parser<String, CstExpression> =>
-      // TODO(JonasWanke): support things like "+1" and "1++1"
+      // TODO(never, JonasWanke): support things like "+1" and "1++1"
       let parser = notYetDefined<String, CstExpression>("Parser not yet defined.")
 
       parser.delegate = higherPrecedenceParser
@@ -1007,7 +1007,7 @@ class CstParser {
         node<PunctuationToken>(parser)
   }
   fun rawPunctuation(punctuation: String): Parser<String, PunctuationToken> {
-    /// TODO(JonasWanke): detect punctuation separated by whitespace, e.g., "> =" as ">="
+    /// TODO(never, JonasWanke): detect punctuation separated by whitespace, e.g., "> =" as ">="
 
     string(punctuation, "'{punctuation}' expected.")
         .token()

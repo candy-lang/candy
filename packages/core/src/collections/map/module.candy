@@ -8,7 +8,7 @@ use ..iterable
 use .bucket_map
 use .linked_hash_map
 
-// TODO(marcelgarus): Create type alias `MapKey` for `Equals & Hash`.
+// TODO(never, marcelgarus): Create type alias `MapKey` for `Equals & Hash`.
 
 public trait Map<Key: Equals & Hash, Value> {
   static fun empty<Key: Equals & Hash, Value>(): Map<Key, Value> {
@@ -64,6 +64,15 @@ public trait Map<Key: Equals & Hash, Value> {
   fun keys(): Iterable<Key> { entries().map<Key>({ it.first }) }
   fun values(): Iterable<Value> { entries().map<Value>({ it.second }) }
 
+  fun map<NewKey, NewValue>(mapper: (Key, Value) => (NewKey, NewValue)): Map<NewKey, NewValue> {
+    let map = MutableMap.empty<NewKey, NewValue>()
+    for entry in entries() {
+      let new = mapper(entry.first, entry.second)
+      map.set(new.first, new.second)
+    }
+    map
+  }
+
   fun toMutable(): MutableMap<Key, Value> {
     let map = MutableMap.empty<Key, Value>()
     for entry in entries() {
@@ -82,9 +91,15 @@ public trait Map<Key: Equals & Hash, Value> {
       (entry.second as Hash).hash<T>(hasher)
     }
   }
+
+  fun copyAndSet(key: Key, value: Value): Map<Key, Value> {
+    let map = this.toMutable()
+    map.set(key, value)
+    map
+  }
 }
 
-// TODO(marcelgarus): impl Map<Key, Value>: GetOperator<Key, Maybe<Value>>
+// TODO(never, marcelgarus): impl Map<Key, Value>: GetOperator<Key, Maybe<Value>>
 
 public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
   static fun empty<Key: Equals & Hash, Value>(): MutableMap<Key, Value> {
@@ -198,6 +213,6 @@ public trait MutableMap<Key: Equals & Hash, Value>: Map<Key, Value> {
   }
 
   fun cast<NewKey, NewValue>(): Map<NewKey, NewValue> {
-    todo("Implement MutableMap.cast")
+    todo("never, Implement MutableMap.cast")
   }
 }

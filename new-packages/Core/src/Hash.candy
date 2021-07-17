@@ -21,7 +21,7 @@ public trait Hasher {
 
   static fun primitive(value: Int): This
   # Creates a new hash value based on a `Int`.
-  ## TODO(marcelgarus): Make this accept a UInt8.
+  ## TODO(later, marcelgarus): Make this accept a UInt8.
 
   static fun combine(values: Iterate[This]): This { this.combineUnordered(values) }
   # Combines multiple values of this type into a single one.

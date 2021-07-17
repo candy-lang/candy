@@ -5,10 +5,6 @@ use incremental
 
 use ...types
 
-public fun getValueExpression(uri: HirValueExpressionUri): HirValueExpression {
-  todo("Replace this with the actual HIR functionality of getting expressions.")
-}
-
 public fun getValueExpressionResultIdentifier(
   context: QueryContext<List<CompilerError>>,
   expressionUri: HirValueExpressionUri,

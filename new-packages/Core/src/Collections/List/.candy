@@ -81,32 +81,32 @@ public trait List[Item]: Iterate[Item] {
       .else({ this })
   }
 
-  fun subList(start: Int = 0, end: Int = this.length()): List[Item] {
-    ## TODO(JonasWanke): accept a range when we add those.
-    assert(0 <= start, "`start` must be non-negative.")
-    assert(start < this.length(), "start is too large: {index}, length: {this.length()}")
-    assert(0 <= end, "`end` must be non-negative.")
-    assert(end <= this.length(), "`end` is too large: {index}, length: {this.length()}")
-    assert(start <= end, "`end` must be larger or equal to `start`.")
+  fun subList(range: ClosedOpenRange[Int]): List[Item] {
+    ## TODO(later, JonasWanke): accept any range
+    assert(0 <= range.start, "`start` must be non-negative.")
+    assert(range.start < this.length(), "start is too large: {index}, length: {this.length()}")
+    assert(0 <= range.end, "`end` must be non-negative.")
+    assert(range.end <= this.length(), "`end` is too large: {index}, length: {this.length()}")
+    assert(range.start <= range.end, "`end` must be larger or equal to `start`.")
 
-    List[Item].generate(end - start, { this.get(start + it).unwrap() })
+    List[Item].generate(range.end - range.start, { this.get(range.start + it).unwrap() })
   }
 
   fun reverse(): List[Item] {
-    ## TODO(JonasWanke): make this more efficient by creating a view of the original list
+    ## TODO(later, JonasWanke): make this more efficient by creating a view of the original list
     List[Item].generate(this.length(), { this.get(this.length() - it - 1).unwrap() })
   }
 
   fun toList(): List[Item] { this }
 
   fun sortBy[T: Compare](selector: (Item) -> T): List[Item] {
-    ## TODO(JonasWanke): Use something faster for larger lists.
+    ## TODO(later, JonasWanke): Use something faster for larger lists.
     ## Currently using insertion sort.
     
     1.until(length()).foldLeft(this, { result, i ->
       let item = result.get(i).unwrap()
       let value = selector(value)
-      ## TODO(JonasWanke): Use binary search if we continue using this implementation.
+      ## TODO(later, JonasWanke): Use binary search if we continue using this implementation.
       result.take(i).firstWhere({ value > selector(it) })
         .map({ targetIndex -> result.removeAt(i).insert(targetIndex, item) })
         .else({ result })
