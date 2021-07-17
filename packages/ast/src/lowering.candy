@@ -694,6 +694,7 @@ fun lowerValueParameterList(
         parentId,
         node.cast<CstValueParameter>(),
         previousNames as Set<String>,
+        (result as Iterable<AstValueParameter>).length(),
       )
       if lowered is Some<AstValueParameter> {
         let valueParameter = lowered.unwrap()
@@ -711,29 +712,41 @@ fun lowerValueParameter(
   parentId: AstDeclarationId | AstExpressionId,
   cst: CstNode<CstValueParameter>,
   previousNames: Set<String>,
+  index: Int,
 ): Maybe<AstValueParameter> {
-  let name = cst.child.name.child.identifier
-  if previousNames.contains(name) {
-    context.addError(DuplicateValueParameterNameCompilerError(context.file, cst))
-    return None<AstValueParameter>()
+  let name = cst.child.name
+  if (name is Some<CstToken<IdentifierToken>>) {
+    if (previousNames.contains(name.unwrap().child.identifier)) {
+      context.addError(DuplicateValueParameterNameCompilerError(context.file, cst))
+      return None<AstValueParameter>()
+    }
   }
 
-  let id = AstValueParameterId(parentId, name)
+  let missingName = "unnamed-parameter#{index}"
+  let id = AstValueParameterId(
+    parentId,
+    name.map<String>({ it.child.identifier }).orElse({ missingName }),
+  )
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
-  let name = lowerIdentifier(context, id, cst.child.name, 0)
+  let name = name
+    .map<AstIdentifier>({ lowerIdentifier(context, id, it, 0) })
+    .orElse({
+      context.addError(MissingValueParameterNameCompilerError(context.file, cst))
+      AstIdentifier(AstIdentifierId(id, 0), missingName)
+    })
 
   // Value parameters only occur in functions and lambdas, which we can differentiate using
   // `parentId`.
   let isFunctionParameter = (parentId is AstDeclarationId)
   let type = if isFunctionParameter {
     if cst.child.type is None<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)> {
-      context.addError(FunctionValueParameterTypeMissingCompilerError(context.file, cst))
+      context.addError(MissingFunctionValueParameterTypeCompilerError(context.file, cst))
       Some<AstInlineType>(context.createErrorType(id))
     } else {
       if cst.child.type.unwrap().second is None<CstNode<CstInlineType>> {
-        context.addError(FunctionValueParameterTypeMissingCompilerError(context.file, cst))
+        context.addError(MissingFunctionValueParameterTypeCompilerError(context.file, cst))
         Some<AstInlineType>(context.createErrorType(id))
       } else {
         Some<AstInlineType>(lowerInlineType(context, id, cst.child.type.unwrap().second.unwrap()))
@@ -744,7 +757,7 @@ fun lowerValueParameter(
       None<AstInlineType>()
     } else {
       if cst.child.type.unwrap().second is None<CstNode<CstInlineType>> {
-        context.addError(LambdaValueParameterTypeExpectedCompilerError(context.file, cst))
+        context.addError(ExpectedLambdaValueParameterTypeCompilerError(context.file, cst))
         Some<AstInlineType>(context.createErrorType(id))
       } else {
         Some<AstInlineType>(lowerInlineType(context, id, cst.child.type.unwrap().second.unwrap()))
@@ -770,6 +783,75 @@ fun lowerValueParameter(
   context.addIdMapping(cst.id, id)
   Some<AstValueParameter>(AstValueParameter(id, modifiers, name, type, defaultValue))
 }
+
+public class DuplicateValueParameterNameCompilerError {
+  public let file: FancyFile
+  public let node: CstNode<CstValueParameter>
+  // TODO(never, JonasWanke): highlight previous occurrences of that name
+}
+impl DuplicateValueParameterNameCompilerError: CompilerError {
+  public fun id(): String { "duplicate-value-parameter-name" }
+
+  public fun nameToken(): IdentifierToken { this.node.child.name.unwrap().child }
+
+  public fun location(): Location { Location(file, this.nameToken().span) }
+  public fun title(): String { "Duplicate value parameter name: {this.nameToken().identifier}." }
+  public fun description(): String {
+    /// TODO(never, JonasWanke): add a description for this error
+    ""
+  }
+}
+
+public class MissingValueParameterNameCompilerError {
+  public let file: FancyFile
+  public let node: CstNode<CstValueParameter>
+}
+impl MissingValueParameterNameCompilerError: CompilerError {
+  public fun id(): String { "missing-value-parameter-name" }
+
+  public fun location(): Location { Location(file, this.node.child.type.unwrap().first.child.span) }
+  public fun title(): String { "Missing name for value parameter." }
+  public fun description(): String { "Try adding a name." }
+}
+
+public class MissingFunctionValueParameterTypeCompilerError {
+  public let file: FancyFile
+  public let node: CstNode<CstValueParameter>
+}
+impl MissingFunctionValueParameterTypeCompilerError: CompilerError {
+  public fun id(): String { "missing-function-value-parameter-type" }
+
+  public fun parameterName() {
+    this.node.child.name.map<String>({ it.child.identifier}).orElse({ "<no name>" })
+  }
+
+  public fun location(): Location { Location(file, this.node.child.name.unwrap().child.span) }
+  public fun title(): String { "Missing type for value parameter {this.parameterName()}." }
+  public fun description(): String {
+    "Try adding an explicit type: `{this.parameterName()}: MyType`."
+  }
+}
+
+public class ExpectedLambdaValueParameterTypeCompilerError {
+  public let file: FancyFile
+  public let node: CstNode<CstValueParameter>
+}
+impl ExpectedLambdaValueParameterTypeCompilerError: CompilerError {
+  public fun id(): String { "expected-lambda-value-parameter-type" }
+
+  public fun parameterName() {
+    node.child.name.map<String>({ it.child.identifier}).orElse({ "<no name>" })
+  }
+
+  public fun location(): Location { Location(file, this.node.child.name.unwrap().child.span) }
+  public fun title(): String {
+    "Expected type for value parameter {this.parameterName()} after the colon."
+  }
+  public fun description(): String {
+    "Try adding a type: `{this.parameterName()}: MyType`."
+  }
+}
+
 
 // types
 

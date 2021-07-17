@@ -245,21 +245,21 @@ class CstParser {
   fun valueParameter(): Parser<String, CstNode<CstValueParameter>> {
     // TODO(never, JonasWanke): allow modifiers
     // TODO(soon, JonasWanke): allow parameters without a name
-    let valueParameter = identifier(false)
-        .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>>(
-          punctuation(":")
-              .sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional())
-              .optional()
+    let valueParameter = atLeastOne<
+      CstNode<IdentifierToken>,
+      (CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>),
+    >(
+      identifier(false),
+      punctuation(":").sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional()),
+    ).sequence<Maybe<CstNode<CstExpressionBody>>>(expressionBody().optional())
+      .map<CstValueParameter>({
+        CstValueParameter(
+          List.empty<CstNode<IdentifierToken>>(),
+          it.first.first,
+          it.first.second,
+          it.second,
         )
-        .sequence<Maybe<CstNode<CstExpressionBody>>>(expressionBody().optional())
-        .map<CstValueParameter>({
-          CstValueParameter(
-            List.empty<CstNode<IdentifierToken>>(),
-            it.first.first,
-            it.first.second,
-            it.second,
-          )
-        })
+      })
     node<CstValueParameter>(valueParameter)
   }
 
