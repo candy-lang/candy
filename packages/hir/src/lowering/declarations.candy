@@ -484,6 +484,25 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
       Tuple(isPublicFromModifiers(ast(context).modifiers), List.empty<CompilerError>())
     })
   }
+
+  fun parentFunction(context: QueryContext<List<CompilerError>>): Maybe<HirFunction> {
+    query<Maybe<HirFunction>, List<CompilerError>>(context, "HirFunction.parentFunction", this, {
+      let parentIsImplWithoutTrait = this.parent is HirImpl
+        && (this.parent as HirImpl).implementedTrait(context) is None<HirInlineType>
+      if (this.parent is HirModule || parentIsImplWithoutTrait) {
+        return Tuple(None<HirFunction>(), List.empty<CompilerError>())
+      }
+
+      let thisType = if (this.parent is HirTrait) {
+        (this.parent as HirTrait).upperBound(context)
+      } else {
+        (this.parent as HirImpl).implementedTrait(context).unwrap()
+      }
+      let thisType = (thisType as HirNamedType)
+      assert(thisType.declaration is HirTrait, "Impls can only implement traits")
+      Tuple(todo("soon, JonasWanke: check base implementations"), List.empty<CompilerError>())
+    })
+  }
 }
 
 impl HirValueParameter: HasAst<AstValueParameter> {
