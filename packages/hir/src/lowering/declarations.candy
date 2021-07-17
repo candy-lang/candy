@@ -484,10 +484,6 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
       Tuple(isPublicFromModifiers(ast(context).modifiers), List.empty<CompilerError>())
     })
   }
-
-  fun returnType(context: QueryContext<List<CompilerError>>): HirType {
-    todo("soon: Implement HirFunction.returnType")
-  }
 }
 
 impl HirValueParameter: HasAst<AstValueParameter> {
