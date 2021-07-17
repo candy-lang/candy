@@ -344,7 +344,7 @@ class CstParser {
           CstGroupType(modifiers, openingParenthesis, type, closingParenthesis)
         })
 
-    let tupleType = modifiers()
+    let positionalTupleType = modifiers()
         .sequence<CstNode<PunctuationToken>>(punctuation("("))
         .sequence<List<CstNode<CstInlineType | PunctuationToken>>>(commaSeparated<CstInlineType>(inlineType))
         .sequence<Maybe<CstNode<PunctuationToken>>>(closingParenthesisOrOtherEndDetection)
@@ -353,7 +353,7 @@ class CstParser {
           let openingParenthesis = it.first.first.second
           let types = it.first.second
           let closingParenthesis = it.second
-          CstTupleType(modifiers, openingParenthesis, types, closingParenthesis)
+          CstPositionalTupleType(modifiers, openingParenthesis, types, closingParenthesis)
         })
 
     // TODO(never, JonasWanke): Allow modifiers before named tuple type fields.
@@ -392,7 +392,7 @@ class CstParser {
           functionType,
           groupType,
           namedTupleType,
-          tupleType,
+          positionalTupleType,
           namedType,
         ),
       ),
@@ -515,7 +515,7 @@ class CstParser {
           functionType,
           groupType,
           namedTupleType,
-          tupleType,
+          positionalTupleType,
           namedType,
         ),
       ),
@@ -672,14 +672,14 @@ class CstParser {
           CstGroupExpression(openingParenthesis, expression, closingParenthesis)
         })
 
-    let tupleExpression = punctuation("(")
+    let positionalTupleExpression = punctuation("(")
         .sequence<List<CstNode<CstExpression | PunctuationToken>>>(commaSeparated<CstExpression>(expression_))
         .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd(")"))
         .map<CstExpression>({
           let openingParenthesis = it.first.first
           let valueArguments = it.first.second
           let closingParenthesis = it.second
-          CstTupleExpression(openingParenthesis, valueArguments, closingParenthesis)
+          CstPositionalTupleExpression(openingParenthesis, valueArguments, closingParenthesis)
         })
 
     let propertyExpression = declarationBeginningWithName("let", false)
@@ -706,7 +706,7 @@ class CstParser {
           lambdaExpression,
           identifierExpression,
           groupExpression,
-          tupleExpression
+          positionalTupleExpression
         ),
       )
 

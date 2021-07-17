@@ -577,12 +577,12 @@ fun lowerDeclarationContent(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstTupleType
+        | CstPositionalTupleType
         | CstNamedTupleType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstTupleExpression
+        | CstPositionalTupleExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -608,12 +608,12 @@ fun lowerBlockBody(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstTupleType
+        | CstPositionalTupleType
         | CstNamedTupleType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstTupleExpression
+        | CstPositionalTupleExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -657,12 +657,12 @@ fun lowerValueParameters(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstTupleType
+        | CstPositionalTupleType
         | CstNamedTupleType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstTupleExpression
+        | CstPositionalTupleExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -869,8 +869,8 @@ fun lowerInlineType(
   if cst.child is CstFunctionType {
     return lowerFunctionType(context, parentId, cst.cast<CstFunctionType>())
   }
-  if cst.child is CstTupleType {
-    return lowerTupleType(context, parentId, cst.cast<CstTupleType>())
+  if cst.child is CstPositionalTupleType {
+    return lowerPositionalTupleType(context, parentId, cst.cast<CstPositionalTupleType>())
   }
   if cst.child is CstNamedTupleType {
     return lowerNamedTupleType(context, parentId, cst.cast<CstNamedTupleType>())
@@ -946,12 +946,12 @@ fun lowerGroupType(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstTupleType
+        | CstPositionalTupleType
         | CstNamedTupleType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstTupleExpression
+        | CstPositionalTupleExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1016,12 +1016,12 @@ fun lowerFunctionTypeParameterTypes(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstTupleType
+        | CstPositionalTupleType
         | CstNamedTupleType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstTupleExpression
+        | CstPositionalTupleExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1030,10 +1030,10 @@ fun lowerFunctionTypeParameterTypes(
   parameterTypes
 }
 
-fun lowerTupleType(
+fun lowerPositionalTupleType(
   context: LoweringContext,
   parentId: AstDeclarationId | AstInlineTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
-  cst: CstNode<CstTupleType>,
+  cst: CstNode<CstPositionalTupleType>,
 ): AstInlineType {
   let id = context.getInlineTypeId(parentId)
   mut let isValid = true
@@ -1060,9 +1060,9 @@ fun lowerTupleType(
   if (types as Iterable<AstInlineType>).length() < 2 {
     isValid = false
     context.addError(
-      ExpectedTwoOrMoreItemsInTupleCompilerError(
+      ExpectedTwoOrMoreItemsInPositionalTupleCompilerError(
         context.file,
-        cst.cast<CstTupleType | CstTupleExpression>(),
+        cst.cast<CstPositionalTupleType | CstPositionalTupleExpression>(),
       ),
     )
   }
@@ -1073,12 +1073,12 @@ fun lowerTupleType(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstTupleType
+        | CstPositionalTupleType
         | CstNamedTupleType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstTupleExpression
+        | CstPositionalTupleExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1086,7 +1086,7 @@ fun lowerTupleType(
 
   if !isValid { return context.createErrorType(id) }
   context.addIdMapping(cst.id, id)
-  AstTupleType(id, modifiers, types)
+  AstPositionalTupleType(id, modifiers, types)
 }
 
 fun lowerNamedTupleType(
@@ -1134,12 +1134,12 @@ fun lowerNamedTupleType(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstTupleType
+        | CstPositionalTupleType
         | CstNamedTupleType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstTupleExpression
+        | CstPositionalTupleExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1465,12 +1465,12 @@ fun lowerTypeParameters(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstTupleType
+        | CstPositionalTupleType
         | CstNamedTupleType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstTupleExpression
+        | CstPositionalTupleExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1547,12 +1547,12 @@ fun lowerTypeArguments(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstTupleType
+        | CstPositionalTupleType
         | CstNamedTupleType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstTupleExpression
+        | CstPositionalTupleExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1638,8 +1638,8 @@ fun lowerExpression(
   if cst.child is CstGroupExpression {
     return lowerGroupExpression(context, parentId, cst.cast<CstGroupExpression>())
   }
-  if cst.child is CstTupleExpression {
-    return lowerTupleExpression(context, parentId, cst.cast<CstTupleExpression>())
+  if cst.child is CstPositionalTupleExpression {
+    return lowerPositionalTupleExpression(context, parentId, cst.cast<CstPositionalTupleExpression>())
   }
   if cst.child is CstBinaryExpression {
     return lowerBinaryExpression(context, parentId, cst.cast<CstBinaryExpression>())
@@ -1779,12 +1779,12 @@ fun lowerInterpolatedStringPart(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstTupleType
+        | CstPositionalTupleType
         | CstNamedTupleType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstTupleExpression
+        | CstPositionalTupleExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1868,12 +1868,12 @@ fun lowerGroupExpression(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstTupleType
+        | CstPositionalTupleType
         | CstNamedTupleType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstTupleExpression
+        | CstPositionalTupleExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1882,10 +1882,10 @@ fun lowerGroupExpression(
   return expression
 }
 
-fun lowerTupleExpression(
+fun lowerPositionalTupleExpression(
   context: LoweringContext,
   parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
-  cst: CstNode<CstTupleExpression>,
+  cst: CstNode<CstPositionalTupleExpression>,
 ): Maybe<AstExpression> {
   let id = context.getExpressionId(parentId)
   mut let isValid = true
@@ -1912,9 +1912,9 @@ fun lowerTupleExpression(
   if (expressions as Iterable<AstExpression>).length() < 2 {
     isValid = false
     context.addError(
-      ExpectedTwoOrMoreItemsInTupleCompilerError(
+      ExpectedTwoOrMoreItemsInPositionalTupleCompilerError(
         context.file,
-        cst.cast<CstTupleType | CstTupleExpression>(),
+        cst.cast<CstPositionalTupleType | CstPositionalTupleExpression>(),
       ),
     )
   }
@@ -1925,12 +1925,12 @@ fun lowerTupleExpression(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstTupleType
+        | CstPositionalTupleType
         | CstNamedTupleType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstTupleExpression
+        | CstPositionalTupleExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1938,7 +1938,7 @@ fun lowerTupleExpression(
 
   if !isValid { return None<AstExpression>() }
   context.addIdMapping(cst.id, id)
-  Some<AstExpression>(AstTupleExpression(id, expressions))
+  Some<AstExpression>(AstPositionalTupleExpression(id, expressions))
 }
 
 fun lowerPropertyExpression(
@@ -2158,12 +2158,12 @@ fun lowerValueArguments(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstTupleType
+        | CstPositionalTupleType
         | CstNamedTupleType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstTupleExpression
+        | CstPositionalTupleExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))

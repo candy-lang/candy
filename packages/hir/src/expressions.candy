@@ -205,7 +205,7 @@ impl HirTypeInstantiationValueExpression: HirValueExpression & Equals & Hash {
 }
 
 /// A named tuple expression.
-/// Non-named tuples like `("Bar", 42)` automatically get lowered to named tuples like
+/// Positional tuples like `("Bar", 42)` automatically get lowered to named tuples like
 /// `(first: "Bar", second: 42)`.
 ///
 /// Example: `(foo: "Bar", baz: 42)`

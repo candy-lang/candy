@@ -37,13 +37,13 @@ public class CstFunctionTypeParameterTypes {
 }
 
 
-public class CstTupleType {
+public class CstPositionalTupleType {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let openingParenthesis: CstNode<PunctuationToken>
   public let types: List<CstNode<CstInlineType | PunctuationToken>>
   public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
 }
-impl CstTupleType: CstInlineType
+impl CstPositionalTupleType: CstInlineType
 
 
 public class CstNamedTupleType {

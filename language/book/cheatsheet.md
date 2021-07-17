@@ -62,8 +62,8 @@ In Candy, every variable has a static type.
 
 These are the ways to define new types:
 
-* **Tuples** like `(String, Int)`.
-  Tuples always contain all their members.
+* **Positional tuples** like `(String, Int)`.
+  Positional tuples always contain all their members.
   You can create instances using `("Foo", 2)` and access members using the functions `first`, `second`, etc.: `myTuple first`
 * **Named tuples** like `(foo: String, bar: Int)`.
   Named tuples always contain all their members.

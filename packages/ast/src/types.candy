@@ -81,12 +81,12 @@ impl AstFunctionType: AstInlineType & Equals & Hash {
 }
 
 
-public class AstTupleType {
+public class AstPositionalTupleType {
   public let id: AstInlineTypeId
   public let modifiers: List<AstIdentifier>
   public let types: List<AstInlineType>
 }
-impl AstTupleType: AstInlineType & Equals & Hash {
+impl AstPositionalTupleType: AstInlineType & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
