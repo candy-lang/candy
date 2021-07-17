@@ -19,8 +19,8 @@ fun lowerFunctionBody(
     let ast = function.ast(context)
     ast.body
       .map<(Maybe<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)>, List<CompilerError>)>({
-        if (it is AstExpressionBody | AstDelegationBody) {
-          todo("never, Support non-block bodies")
+        if (it is AstExpressionBody) {
+          todo("never, Support expression bodies")
         }
 
         let body = (it as AstBlockBody)

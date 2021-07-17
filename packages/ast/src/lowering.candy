@@ -498,15 +498,15 @@ fun lowerFunction(
   })
 
   let body = if cst.child.body is None<CstNode<CstBlockBody | CstExpressionBody>> {
-    None<AstBlockBody | AstExpressionBody | AstDelegationBody>()
+    None<AstBlockBody | AstExpressionBody>()
   } else {
     let body = cst.child.body.unwrap()
     if body.child is CstBlockBody {
-      Some<AstBlockBody | AstExpressionBody | AstDelegationBody>(
+      Some<AstBlockBody | AstExpressionBody>(
         lowerBlockBody(context, id, body.cast<CstBlockBody>()),
       )
     } else {
-      Some<AstBlockBody | AstExpressionBody | AstDelegationBody>(
+      Some<AstBlockBody | AstExpressionBody>(
         lowerExpressionBody(context, id, body.cast<CstExpressionBody>()),
       )
     }
@@ -635,7 +635,7 @@ fun lowerExpressionBody(
     context.addError(
       ExpectedExpressionCompilerError(
         context.file,
-        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
+        cst.cast<CstExpressionBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
       ),
     )
   }
@@ -758,7 +758,7 @@ fun lowerValueParameter(
           context.addError(
             ExpectedExpressionCompilerError(
               context.file,
-              it.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
+              it.cast<CstExpressionBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
             ),
           )
           None<AstExpression>()
@@ -1775,7 +1775,7 @@ fun lowerGroupExpression(
     context.addError(
       ExpectedExpressionCompilerError(
         context.file,
-        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
+        cst.cast<CstExpressionBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
       ),
     )
   }
@@ -1893,7 +1893,7 @@ fun lowerPropertyExpression(
       context.addError(
         ExpectedExpressionCompilerError(
           context.file,
-          it.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
+          it.cast<CstExpressionBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
         ),
       )
       None<AstExpression>()
@@ -1901,7 +1901,7 @@ fun lowerPropertyExpression(
       lowerExpression(context, id, it.child.expression.unwrap())
     }
   })
-  if (cst.child.initializer is None<CstDelegationBody>) {
+  if (cst.child.initializer is None<CstExpressionBody>) {
     context.addError(MissingPropertyNameCompilerError(context.file, cst))
     isValid = false
   }
@@ -1965,7 +1965,7 @@ fun lowerBinaryExpression(
     context.addError(
       ExpectedExpressionCompilerError(
         context.file,
-        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
+        cst.cast<CstExpressionBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
       )
     )
   }
@@ -2115,7 +2115,7 @@ fun lowerValueArgument(
     context.addError(
       ExpectedExpressionCompilerError(
         context.file,
-        cst.cast<CstExpressionBody | CstDelegationBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
+        cst.cast<CstExpressionBody | CstGroupExpression | CstBinaryExpression | CstValueArgument>(),
       ),
     )
   }
