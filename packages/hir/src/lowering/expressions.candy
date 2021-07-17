@@ -533,13 +533,13 @@ impl LoweringContext {
       }
       let function = (function as HirFunction)
 
+      // Type Arguments
       let typeArguments = (expression.typeArguments as Iterable<AstTypeArgument>)
         .map<HirInlineType>({
           astInlineTypeToHirInlineType(this.global.context, it.type, this.global.function)
         })
         .toList()
 
-      // Type Arguments
       let typeParameters = (function as HasTypeParameters).typeParameters(this.global.context)
       let suppliedTypeArgumentCount = (typeArguments as Iterable<HirInlineType>).length()
       let requiredTypeArgumentCount = (typeParameters as Iterable<HirParameterType>).length()
@@ -568,7 +568,7 @@ impl LoweringContext {
           !anyTypeArgumentIsInvalid,
         )
       }
-      let typeArguments = typeArgumentsAndAreTheyValid.first
+      let actualTypeArguments = typeArgumentsAndAreTheyValid.first
       let areTypeArgumentsValid = typeArgumentsAndAreTheyValid.second
 
       // Value Arguments
@@ -617,29 +617,29 @@ impl LoweringContext {
           !anyTypeArgumentIsInvalid,
         )
       }
-      let valueArguments = valueArgumentsAndAreTheyValid.first
+      let actualValueArguments = valueArgumentsAndAreTheyValid.first
       areValueArgumentsValid = areValueArgumentsValid && valueArgumentsAndAreTheyValid.second
-
-      // let valueArguments = MutableMap.empty<String, HirValueExpressionUri>()
-      // for argument in expression.valueArguments {
-      //   let isValid = if (argument)
-      //   let lowered = context.lowerExpressionToValueExpression(argument.value)
-      //   context = lowered.first
-      //   valueArguments.set(todo("soon, match value arguments to the parameters"), lowered.second)
-      // }
 
       if (!areTypeArgumentsValid || !areValueArgumentsValid) {
         return context.register(HirErrorValueExpression(), HirErrorType())
       }
 
+      // Return Type
+      let substitutions = (typeParameters as Iterable<HirParameterType>)
+        .zip<HirInlineType>(typeArguments)
+        // .map<(HirParameterType, HirInlineType)>({  })
+        .unsafeToMap<HirInlineType, HirInlineType>()
+      let returnType = (function.returnType(context.global.context) as HirInlineType)
+        .substitute(substitutions)
+
       return this.register(
         HirFunctionCallValueExpression(
           receiver.cast<HirValueExpressionUri | HirTypeExpression>(),
           function,
-          typeArguments,
-          valueArguments,
+          actualTypeArguments,
+          actualValueArguments,
         ),
-        todo("soon, function call type"),
+        returnType,
       )
     }
 

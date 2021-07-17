@@ -3,13 +3,19 @@ use incremental
 
 use ..declarations
 
-public trait HirInlineType: Equals & Hash
+public trait HirInlineType: Equals & Hash {
+  fun substitute(substitutions: Map<HirInlineType, HirInlineType>): This {
+    substitutions.get(this).orElse({ this.substituteChildren(substitutions) })
+  }
+  fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This
+}
 
 
 public class HirErrorType {}
 impl HirErrorType: Equals & Hash & HirInlineType {
   fun equals(other: This): Bool { true }
   fun hash<T>(hasher: Hasher<T>) {}
+  fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This { this }
 }
 
 
@@ -46,6 +52,14 @@ impl HirNamedType: Equals & Hash & HirInlineType {
     (declaration as Hash).hash<T>(hasher)
     parameterTypes.unsafeHash<T>(hasher)
   }
+  fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
+    HirNamedType(
+      declaration,
+      (parameterTypes as Iterable<HirInlineType>)
+        .map<HirInlineType>({ it.substituteChildren(substitutions) })
+        .toList(),
+    )
+  }
 }
 
 
@@ -65,6 +79,15 @@ impl HirFunctionType: Equals & Hash & HirInlineType {
     (receiverType as Hash).hash<T>(hasher)
     parameterTypes.unsafeHash<T>(hasher)
     (returnType as Hash).hash<T>(hasher)
+  }
+  fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
+    HirFunctionType(
+      receiverType.map<HirInlineType>({ it.substituteChildren(substitutions) }),
+      (parameterTypes as Iterable<HirInlineType>)
+        .map<HirInlineType>({ it.substituteChildren(substitutions) })
+        .toList(),
+      returnType.substituteChildren(substitutions),
+    )
   }
 }
 
@@ -90,6 +113,13 @@ impl HirTupleType: Equals & Hash & HirInlineType {
     (types as Iterable<HirInlineType>).unsafeEquals(other.types as Iterable<HirInlineType>)
   }
   fun hash<T>(hasher: Hasher<T>) { types.unsafeHash<T>(hasher) }
+  fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
+    HirTupleType(
+      (types as Iterable<HirInlineType>)
+        .map<HirInlineType>({ it.substituteChildren(substitutions) })
+        .toList(),
+    )
+  }
 }
 
 
@@ -102,6 +132,13 @@ impl HirNamedTupleType: Equals & Hash & HirInlineType {
       .unsafeEquals(other.types as Iterable<(String, HirInlineType)>)
   }
   fun hash<T>(hasher: Hasher<T>) { types.unsafeHash<T>(hasher) }
+  fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
+    HirNamedTupleType(
+      (types as Iterable<HirInlineType>)
+        .map<(String, HirInlineType)>({ Tuple(it.first, it.second.substituteChildren(substitutions)) })
+        .toList(),
+    )
+  }
 }
 
 
@@ -111,6 +148,13 @@ public class HirEnumType {
 impl HirEnumType: Equals & Hash & HirInlineType {
   fun equals(other: This): Bool { variants.unsafeEquals(other.variants) }
   fun hash<T>(hasher: Hasher<T>) { variants.unsafeHash<T>(hasher) }
+  fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
+    HirEnumType(
+      variants.entries()
+        .map<(String, HirInlineType)>({ Tuple(it.first, it.second.substituteChildren(substitutions)) })
+        .toList(),
+    )
+  }
 }
 
 
@@ -123,6 +167,13 @@ impl HirIntersectionType: Equals & Hash & HirInlineType {
     (types as Iterable<HirInlineType>).unsafeEquals(other.types as Iterable<HirInlineType>)
   }
   fun hash<T>(hasher: Hasher<T>) { types.unsafeHash<T>(hasher) }
+  fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
+    HirIntersectionType(
+      (types as Iterable<HirInlineType>)
+        .map<HirInlineType>({ it.substituteChildren(substitutions) })
+        .toList(),
+    )
+  }
 }
 
 
@@ -132,6 +183,7 @@ public class HirThisType {
 impl HirThisType: Equals & Hash & HirInlineType {
   fun equals(other: This): Bool { (declaration as Equals).equals(other.declaration as Equals) }
   fun hash<T>(hasher: Hasher<T>) { (declaration as Hash).hash<T>(hasher) }
+  fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This { this }
 }
 
 
@@ -147,6 +199,7 @@ impl HirParameterType: Equals & Hash & HirInlineType {
     (declaration as Hash).hash<T>(hasher)
     name.hash<T>(hasher)
   }
+  fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This { this }
 }
 
 
@@ -156,4 +209,5 @@ public class HirReflectionType {
 impl HirReflectionType: Equals & Hash & HirInlineType {
   fun equals(other: This): Bool { (target as Equals) == (other.target as Equals) }
   fun hash<T>(hasher: Hasher<T>) { (target as Hash).hash<T>(hasher) }
+  fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This { this }
 }
