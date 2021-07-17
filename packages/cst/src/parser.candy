@@ -251,7 +251,7 @@ class CstParser {
               .sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional())
               .optional()
         )
-        .sequence<Maybe<CstNode<CstDelegationBody>>>(delegationBody().optional())
+        .sequence<Maybe<CstNode<CstExpressionBody>>>(expressionBody().optional())
         .map<CstValueParameter>({
           CstValueParameter(
             List.empty<CstNode<IdentifierToken>>(),
@@ -273,16 +273,10 @@ class CstParser {
     node<CstBlockBody>(blockBody)
   }
   fun expressionBody(): Parser<String, CstNode<CstExpressionBody>> {
-    let expressionBody = punctuation("->")
+    let expressionBody = punctuation("=")
         .sequence<Maybe<CstNode<CstExpression>>>(expression_.optional())
         .map<CstExpressionBody>({ CstExpressionBody(it.first, it.second) })
     node<CstExpressionBody>(expressionBody)
-  }
-  fun delegationBody(): Parser<String, CstNode<CstDelegationBody>> {
-    let delegationBody = punctuation("=")
-        .sequence<Maybe<CstNode<CstExpression>>>(expression_.optional())
-        .map<CstDelegationBody>({ CstDelegationBody(it.first, it.second) })
-    node<CstDelegationBody>(delegationBody)
   }
 
   // types
@@ -694,7 +688,7 @@ class CstParser {
                 .sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional())
                 .optional()
           )
-          .sequence<Maybe<CstNode<CstDelegationBody>>>(delegationBody().optional())
+          .sequence<Maybe<CstNode<CstExpressionBody>>>(expressionBody().optional())
           .map<CstExpression>({
             let modifiers = it.first.first.first.first
             let keyword = it.first.first.first.second

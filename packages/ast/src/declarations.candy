@@ -163,7 +163,7 @@ public class AstFunction {
   public let typeParameters: List<AstTypeParameter>
   public let valueParameters: List<AstValueParameter>
   public let returnType: Maybe<AstInlineType>
-  public let body: Maybe<AstBlockBody | AstExpressionBody | AstDelegationBody>
+  public let body: Maybe<AstBlockBody | AstExpressionBody>
 }
 impl AstFunction: AstWithTypeParameters & AstDeclaration & Equals & Hash {
   fun equals(other: This): Bool {
@@ -260,19 +260,6 @@ public class AstExpressionBody {
   public let expression: Maybe<AstExpression>
 }
 impl AstExpressionBody: AstNode & Equals & Hash {
-  fun equals(other: This): Bool {
-    (id as Equals) == (other.id as Equals) && expression.unsafeEquals(other.expression)
-  }
-  fun hash<T>(hasher: Hasher<T>) {
-    (id as Hash).hash<T>(hasher)
-    expression.unsafeHash<T>(hasher)
-  }
-}
-public class AstDelegationBody {
-  public let id: AstBodyId
-  public let expression: Maybe<AstExpression>
-}
-impl AstDelegationBody: AstNode & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) && expression.unsafeEquals(other.expression)
   }

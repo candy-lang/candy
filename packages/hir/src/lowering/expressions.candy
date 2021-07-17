@@ -19,8 +19,8 @@ fun lowerFunctionBody(
     let ast = function.ast(context)
     ast.body
       .map<(Maybe<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)>, List<CompilerError>)>({
-        if (it is AstExpressionBody | AstDelegationBody) {
-          todo("never, Support non-block bodies")
+        if (it is AstExpressionBody) {
+          todo("never, Support expression bodies")
         }
 
         let body = (it as AstBlockBody)
@@ -516,9 +516,18 @@ impl LoweringContext {
       let name = contextAndNameAndReceiver.second
       let receiver = contextAndNameAndReceiver.third
 
-      // TODO(soon, marcelgarus): The function might have a receiver.
+      if (receiver is Some<HirValueExpressionUri>) {
+        todo("soon, marcelgarus): Handle function call with a receiver.")
+      }
       let function = context.resolve(name).items()
         .cast<HirValueExpressionUri | HirFunction>()
+        .where({
+          if (it is HirValueExpressionUri) {
+            true
+          } else {
+            (it as HirFunction).parent is HirModule
+          }
+        })
       if (function.length() > 1) {
         // TODO(soon, marcelgarus): Support overloading.
         return context.registerError(UnsupportedFeatureCompilerError(

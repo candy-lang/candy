@@ -73,7 +73,7 @@ public class CstValueParameter {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let name: CstNode<IdentifierToken>
   public let type: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>
-  public let defaultValue: Maybe<CstNode<CstDelegationBody>>
+  public let defaultValue: Maybe<CstNode<CstExpressionBody>>
 }
 
 
@@ -89,10 +89,6 @@ public class CstBlockBody {
   public let closingCurlyBrace: Maybe<CstNode<PunctuationToken>>
 }
 public class CstExpressionBody {
-  public let arrow: CstNode<PunctuationToken>
-  public let expression: Maybe<CstNode<CstExpression>>
-}
-public class CstDelegationBody {
   public let equalsSign: CstNode<PunctuationToken>
   public let expression: Maybe<CstNode<CstExpression>>
 }

@@ -131,8 +131,8 @@ public class HirFunctionCallValueExpression {
     context: QueryContext<List<CompilerError>>,
   ): HirFunctionCallValueExpression {
     HirFunctionCallValueExpression(
-      None<HirValueExpressionUri, HirTypeExpression>(),
-      HirFunction(HirModule.corePrimitives(context), "nothing"),
+      None<HirValueExpressionUri | HirTypeExpression>(),
+      HirFunction(HirModule.corePrimitives(context), "nothing", 0),
       Map.empty<String, HirInlineType>(),
       Map.empty<String, HirValueExpressionUri>(),
     )
