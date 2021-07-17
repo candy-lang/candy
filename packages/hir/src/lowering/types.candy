@@ -204,7 +204,7 @@ impl HirTrait {
   fun upperBound(context: QueryContext<List<CompilerError>>): HirInlineType {
     query<HirInlineType, List<CompilerError>>(context, "HirTrait.upperBound", this, {
       Tuple(
-        (this as HasAst).ast(context).upperBound
+        this.ast(context).upperBound
           .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
           .orElse({ HirNamedType.coreAny(context) }),
         List.empty<CompilerError>(),
@@ -268,6 +268,19 @@ impl HirImpl {
             this,
           ),
         ),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
+}
+
+impl HirFunction {
+  fun returnType(context: QueryContext<List<CompilerError>>): HirType {
+    query<HirNamedType, List<CompilerError>>(context, "HirFunction.returnType", this, {
+      Tuple(
+        this.ast(context).returnType
+          .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
+          .orElse({ HirNamedType.coreNothing(context) }),
         List.empty<CompilerError>(),
       )
     })
@@ -662,7 +675,7 @@ fun getAllImplementedTraitsFor(
   scope: Package,
 ): Set<HirNamedType> {
   query<Set<HirNamedType>, List<CompilerError>>(context, "getAllImplementedTraitsFor", DataTuple2<HirInlineType, Package>(base, scope), {
-    todo("soon, marcelgarus")
+    todo("soon, marcelgarus: implement getAllImplementedTraitsFor")
     // getAllTraitsInScope(context, scope)
     //   .items()
     //   .where({ isAssignableTo(context, base, it, scope) })
