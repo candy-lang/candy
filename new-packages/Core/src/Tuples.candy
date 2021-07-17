@@ -1,7 +1,5 @@
 # Tuples are types that can hold multiple other types.
 #
-# They're kind of like a class, but without a name and without giving the fields names.
-#
 # There is nothing to see here, because tuples are actually built into the compiler. Just use
 # parenthesis to create them on-the-fly:
 #
