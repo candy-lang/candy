@@ -4,6 +4,7 @@ use hir
 use incremental
 
 use ...expressions
+use ...types
 use ..name_mangling
 use ..type
 
@@ -15,37 +16,38 @@ public fun compileGlobalFunction(
     context,
     "code_generator_dart.compileFunction",
     functionHir, {
-    let statements = compileValueExpressionsToBody(
-      context,
-      functionHir,
-      lowerFunctionBody(context, functionHir).unwrap().first,
-    )
     let output = DartFunction(
       name = mangleName(context, functionHir.name()),
       docComment = Some<String>("{functionHir}"),
       annotations = List.empty<DartAnnotation>(),
-      _returns = Some<DartType>(compileType(context, functionHir.returnType(context))),
+      _returns = Some<DartType>(compileInlineType(context, functionHir.returnType(context))),
       typeParameters = ((functionHir as HasTypeParameters).typeParameters(context) as Iterable<HirParameterType>)
         .map<DartTypeParameter>({
           DartTypeParameter(
             it.name,
-            Some<DartType>(compileType(context, it.upperBound(context))),
+            Some<DartType>(compileInlineType(context, it.upperBound(context))),
           )
         })
         .toList(),
-      requiredParameters = (functionHirvalueParameters(context) as Iterable<HirValueParameter>)
+      requiredParameters = (functionHir.valueParameters(context) as Iterable<HirValueParameter>)
         .map<DartParameter>({
           DartParameter(
             it.name,
             true,
-            Some<DartType>(compileType(context, it.type(context))),
+            Some<DartType>(compileInlineType(context, it.type(context))),
             None<DartExpression>(),
           )
         })
         .toList(),
       positionalParameters = List.empty<DartParameter>(),
       namedParameters = List.empty<DartParameter>(),
-      body = Some<DartBody>(DartBlock(statements)),
+      body = Some<DartBody>(
+        compileValueExpressionsToBody(
+          context,
+          functionHir,
+          lowerFunctionBody(context, functionHir).unwrap().first,
+        ),
+      ),
     )
     Tuple(output, List.empty<CompilerError>())
   })

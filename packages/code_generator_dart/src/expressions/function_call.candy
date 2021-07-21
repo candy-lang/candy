@@ -65,7 +65,7 @@ public fun compileFunctionCallValueExpression(
       namedArguments = Map.empty<String, DartExpression>(),
       typeArguments = typeArguments,
     )
-    statements.append(saveValueExpression(context, context, expression, result))
+    statements.append(saveValueExpression(context, uri, expression, result))
     Tuple(statements, List.empty<CompilerError>())
   })
 }

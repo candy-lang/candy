@@ -118,7 +118,7 @@ fun getAllInlineTypesInsideTypeParameters(
     "code_generator_dart.getAllInlineTypesInsideTypeParameters",
     declarationHir, {
     let inlineTypes = (declarationHir.typeParameters(context) as Iterable<HirParameterType>)
-      .maybeMap<HirInlineType>({ it.upperBound(context) })
+      .map<HirInlineType>({ it.upperBound(context) })
       .toSet()
     Tuple(inlineTypes, List.empty<CompilerError>())
   })

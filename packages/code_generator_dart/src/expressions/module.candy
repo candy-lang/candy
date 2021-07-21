@@ -4,6 +4,7 @@ use hir
 use incremental
 
 public use .body
+public use .function_call
 public use .lambda
 public use .literals
 public use .references
