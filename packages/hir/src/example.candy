@@ -59,12 +59,8 @@ fun solverExample(context: QueryContext<List<CompilerError>>) {
   print("Declarations are {declarations}.")
   print("")
   let anImpl = (declarations.get(5).unwrap() as HirImpl)
-  let rule = hirImplToSolverRule(context, anImpl)
-  if (rule is None) {
-    print("Couldn't lower impl to rule.")
-  } else {
-    print("The rule is {rule.unwrap().toString_()}.")
-  }
+  let rules = hirImplToSolverRules(context, anImpl)
+  print("The rules are {rules}.")
 
   print("Declarations: {declarations}")
 

@@ -165,27 +165,32 @@ class SolverVariable {
   /// * `?T`
   /// * `?0`
 
-  let type: HirParameterType
+  let type: Maybe<HirParameterType>
+  /// None stands for the corresponding error type.
+
+  static fun error(): SolverVariable {
+    SolverVariable(None<HirParameterType>())
+  }
 }
 impl SolverVariable: SolverType {
   fun toString_(): String { "?{type}" }
-  fun containsVariable(variable: SolverVariable): Bool {
-    (type as Equals) == (variable.type as Equals)
-  }
+  fun containsVariable(variable: SolverVariable): Bool { this == variable }
 
   fun substituteAll(substitutions: Map<SolverVariable, SolverType>): SolverType {
-    substitutions.get(SolverVariable(type)).orElse({ this })
+    substitutions.get(SolverVariable(Some<HirParameterType>(type))).orElse({ this })
   }
 
   fun canonicalizeInternal(mapping: MutableMap<SolverVariable, SolverVariable>): SolverVariable {
     mapping.putIfAbsent(this, {
-      SolverVariable(canonicalVariable((mapping as Map).entries().length()))
+      SolverVariable(Some<HirParameterType>(
+        canonicalVariable((mapping as Map).entries().length())
+      ))
     })
   }
 }
 impl SolverVariable: Equals & Hash {
-  fun equals(other: This): Bool { (type as Equals) == (other.type as Equals) }
-  fun hash<T>(hasher: Hasher<T>) { (type as Hash).hash<T>(hasher) }
+  fun equals(other: This): Bool { type.unsafeEquals(other.type) }
+  fun hash<T>(hasher: Hasher<T>) { type.unsafeHash<T>(hasher) }
 }
 
 class SolverValue {

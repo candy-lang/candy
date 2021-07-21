@@ -36,6 +36,9 @@ public trait HirModule: HirDeclaration & Equals & Hash {
   static fun syntheticNamedTuples(context: QueryContext<List<CompilerError>>): HirModule {
     synthetic(context).innerModule("NamedTuples")
   }
+  static fun syntheticError(context: QueryContext<List<CompilerError>>): HirModule {
+    synthetic(context).innerModule("Error")
+  }
 
   let parent: Package | HirModule
   fun innerModule(name: String): HirInnerModule { HirInnerModule(this, name) }
@@ -119,6 +122,9 @@ public class HirType {
   }
   static fun coreString(context: QueryContext<List<CompilerError>>): HirType {
     HirType(HirModule.coreString(context), "String")
+  }
+  static fun syntheticError(context: QueryContext<List<CompilerError>>): HirType {
+    HirType(HirModule.syntheticError(context), "Error")
   }
 }
 impl HirType: HirDeclaration & Equals & Hash {
