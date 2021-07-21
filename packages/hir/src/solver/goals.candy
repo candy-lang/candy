@@ -2,7 +2,7 @@ use compiler_utils
 
 use ...declarations
 use ...types
-use ..types
+use ..values
 
 class SolverGoal {
   /// The fact that a type implements a trait.

@@ -591,7 +591,7 @@ fun ruleThatEveryTypeImplementsError(context: QueryContext<List<CompilerError>>)
   let errorType = HirType.syntheticError(context)
   return SolverRule(
     errorType,
-    SolverGoal(errorType, List.of1<SolverType>(SolverVariable.error()))),
+    SolverGoal(errorType, List.of1<SolverType>(SolverVariable.error())),
     List.empty<SolverGoal>(),
   )
 }
@@ -600,7 +600,7 @@ fun ruleThatEveryTypeImplementsAny(context: QueryContext<List<CompilerError>>) {
   let anyType = HirTrait.coreAny(context)
   return SolverRule(
     anyType,
-    SolverGoal(anyType, List.of1<SolverType>(SolverVariable(None<HirParameterType>())))),
+    SolverGoal(anyType, List.of1<SolverType>(SolverVariable(None<HirParameterType>()))),
     List.empty<SolverGoal>(),
   )
 }
