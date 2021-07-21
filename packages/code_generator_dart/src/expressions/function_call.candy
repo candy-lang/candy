@@ -39,8 +39,8 @@ public fun compileFunctionCallValueExpression(
 
     let declaredTypeParameters = (expression.function.typeParameters(context) as Iterable<HirParameterType>)
     assert(
-      declaredTypeParameters.map<String>({ it.name }).toSet()
-        .unsafeEquals(expression.typeArguments.keys().toSet()),
+      (declaredTypeParameters.map<String>({ it.name }).toSet() as Equals)
+        == (expression.typeArguments.keys().toSet() as Equals),
       "Supplied type parameters for a function call don't exactly match the function's declared type parameters."
     )
     let typeArgumentsInCorrectOrder = declaredTypeParameters

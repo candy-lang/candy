@@ -17,10 +17,7 @@ public fun compileValueExpressionsToBody(
   query<DartBlock, List<CompilerError>>(
     context,
     "code_generator_dart.compileValueExpressionsToBody",
-    DataTuple2<Equals & Hash, ListOfHirValueExpressionUri>(
-      scope as Equals & Hash,
-      ListOfHirValueExpressionUri(expressionUris),
-    ), {
+    DataTuple2<Equals & Hash, List<HirValueExpressionUri>>(scope, expressionUris), {
     let statements = MutableList.empty<DartStatement | DartComment>()
 
     let scopeObjectName = getScopeObjectName(context, scope)
@@ -126,15 +123,3 @@ let nonLocalReturnExceptionType = DartNamedType(
   nonLocalReturnExceptionIdentifier,
   List.empty<DartType>(),
 )
-
-
-class ListOfHirValueExpressionUri {
-  // TODO(never, JonasWanke): remove this when we no longer need `unsafeEquals` and `unsafeHash`
-  public let value: List<HirValueExpressionUri>
-}
-impl ListOfHirValueExpressionUri: Equals & Hash {
-  fun equals(other: This): Bool {
-    (value as Iterable<HirValueExpressionUri>).unsafeEquals(other.value)
-  }
-  fun hash<T>(hasher: Hasher<T>) { value.unsafeHash<T>(hasher) }
-}

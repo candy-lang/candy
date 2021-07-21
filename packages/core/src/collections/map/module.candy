@@ -10,7 +10,7 @@ use .linked_hash_map
 
 // TODO(never, marcelgarus): Create type alias `MapKey` for `Equals & Hash`.
 
-public trait Map<Key: Equals & Hash, Value> {
+public trait Map<Key: Equals & Hash, Value>: Equals & Hash {
   static fun empty<Key: Equals & Hash, Value>(): Map<Key, Value> {
     MutableMap.empty<Key, Value>()
   }
@@ -81,11 +81,11 @@ public trait Map<Key: Equals & Hash, Value> {
     map
   }
 
-  fun unsafeEquals(other: Map<Key, Value>): Bool {
-    keys().toSet().unsafeEquals(other.keys().toSet())
+  fun equals(other: Map<Key, Value>): Bool {
+    (keys().toSet() as Equals) == (other.keys().toSet() as Equals)
       && keys().all({ (get(it) as Equals) == (other.get(it) as Equals) })
   }
-  fun unsafeHash<T>(hasher: Hasher<T>) {
+  fun hash<T>(hasher: Hasher<T>) {
     for entry in entries() {
       (entry.first as Hash).hash<T>(hasher)
       (entry.second as Hash).hash<T>(hasher)

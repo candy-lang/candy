@@ -56,7 +56,7 @@ fun compileEnumTypeDeclaration(
   query<List<DartClass>, List<CompilerError>>(
     context,
     "code_generator_dart.compileEnumTypeDeclaration",
-    SetOfString(variantNames), {
+    variantNames, {
     let classes = MutableList.empty<DartClass>()
 
     classes.append(compileEnumTypeDeclarationBase(context, variantNames))
@@ -75,7 +75,7 @@ fun compileEnumTypeDeclarationBase(
   query<DartClass, List<CompilerError>>(
     context,
     "code_generator_dart.compileEnumTypeDeclarationBase",
-    SetOfString(variantNames), {
+    variantNames, {
     let name = getCompiledEnumTypeName(context, variantNames)
 
     let variants = (variantNames.items().toList().unsafeSorted() as Iterable<String>)
@@ -122,7 +122,7 @@ fun compileEnumTypeDeclarationVariant(
   query<DartClass, List<CompilerError>>(
     context,
     "code_generator_dart.compileEnumTypeDeclarationVariant",
-    DataTuple2<SetOfString, String>(SetOfString(variantNames), variant), {
+    DataTuple2<Set<String>, String>(variantNames, variant), {
     let name = getCompiledEnumVariantName(context, variantNames, variant)
 
     let variants = (variantNames.items().toList().unsafeSorted() as Iterable<String>)
@@ -193,7 +193,7 @@ public fun getCompiledEnumTypeName(
   query<String, List<CompilerError>>(
     context,
     "code_generator_dart.getCompiledEnumTypeName",
-    SetOfString(variantNames), {
+    variantNames, {
     let variantNames = variantNames.items().toList().unsafeSorted()
     let variantNames = (variantNames as Iterable<String>).join("$")
     Tuple("Enum${variantNames}", List.empty<CompilerError>())
@@ -207,7 +207,7 @@ public fun getCompiledEnumVariantName(
   query<String, List<CompilerError>>(
     context,
     "code_generator_dart.getCompiledEnumVariantName",
-    DataTuple2<SetOfString, String>(SetOfString(variantNames), variant), {
+    DataTuple2<Set<String>, String>(variantNames, variant), {
     let variantNames = variantNames.items().toList().unsafeSorted()
     let variantNames = (variantNames as Iterable<String>)
       .map<String>({ if (it == variant) { "_{it}_" } else { it } })

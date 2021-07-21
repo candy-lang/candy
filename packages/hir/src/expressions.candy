@@ -67,13 +67,13 @@ public class HirLambdaValueExpression {
 }
 impl HirLambdaValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
-    (parameters as Iterable<HirLambdaValueParameter>).unsafeEquals(other.parameters)
-      && (expressions as Iterable<HirValueExpressionUri>).unsafeEquals(other.expressions)
+    (parameters as Equals) == (other.parameters as Equals)
+      && (expressions as Equals) == (other.expressions as Equals)
       && (returnType as Equals) == (other.returnType as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
-    parameters.unsafeHash<T>(hasher)
-    expressions.unsafeHash<T>(hasher)
+    (parameters as Hash).hash<T>(hasher)
+    (expressions as Hash).hash<T>(hasher)
     (returnType as Hash).hash<T>(hasher)
   }
 }
@@ -150,8 +150,8 @@ impl HirFunctionCallValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
       && (function as Equals) == (other.function as Equals)
-      && typeArguments.unsafeEquals(other.typeArguments)
-      && valueArguments.unsafeEquals(other.valueArguments)
+      && (typeArguments as Equals) == (other.typeArguments as Equals)
+      && (valueArguments as Equals) == (other.valueArguments as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (receiver as Hash).hash<T>(hasher)
@@ -178,13 +178,13 @@ public class HirValueExpressionCallValueExpression {
 impl HirValueExpressionCallValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
-      && (typeArguments as Iterable<HirInlineType>).unsafeEquals(other.typeArguments)
-      && (valueArguments as Iterable<HirValueExpressionUri>).unsafeEquals(other.valueArguments)
+      && (typeArguments as Equals) == (other.typeArguments as Equals)
+      && (valueArguments as Equals) == (other.valueArguments as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     receiver.hash<T>(hasher)
-    typeArguments.unsafeHash<T>(hasher)
-    valueArguments.unsafeHash<T>(hasher)
+    (typeArguments as Hash).hash<T>(hasher)
+    (valueArguments as Hash).hash<T>(hasher)
   }
 }
 
@@ -202,13 +202,13 @@ public class HirTypeInstantiationValueExpression {
 impl HirTypeInstantiationValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
-      && typeArguments.unsafeEquals(other.typeArguments)
+      && (typeArguments as Equals) == (other.typeArguments as Equals)
       && (valueArgument as Equals) == (other.valueArgument as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (receiver as Hash).hash<T>(hasher)
-    typeArguments.unsafeHash<T>(hasher)
-    valueArgument.hash<T>(hasher)
+    (typeArguments as Hash).hash<T>(hasher)
+    (valueArgument as Hash).hash<T>(hasher)
   }
 }
 
@@ -221,8 +221,8 @@ public class HirNamedTupleValueExpression {
   public let valueArguments: Map<String, HirValueExpressionUri>
 }
 impl HirNamedTupleValueExpression: HirValueExpression & Equals & Hash {
-  fun equals(other: This): Bool { valueArguments.unsafeEquals(other.valueArguments) }
-  fun hash<T>(hasher: Hasher<T>) { valueArguments.unsafeHash<T>(hasher) }
+  fun equals(other: This): Bool { (valueArguments as Equals) == (other.valueArguments as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { valueArguments.hash<T>(hasher) }
 }
 
 /// An access of a named tuple's field.

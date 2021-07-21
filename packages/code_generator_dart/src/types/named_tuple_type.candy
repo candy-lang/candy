@@ -54,7 +54,7 @@ fun compileNamedTupleTypeDeclaration(
   query<DartClass, List<CompilerError>>(
     context,
     "code_generator_dart.compileNamedTupleTypeDeclaration",
-    SetOfString(fieldNames), {
+    fieldNames, {
     let name = getCompiledNamedTupleTypeName(context, fieldNames)
 
     let fields = (fieldNames.items().toList().unsafeSorted() as Iterable<String>)
@@ -121,7 +121,7 @@ public fun getCompiledNamedTupleTypeName(
   query<String, List<CompilerError>>(
     context,
     "code_generator_dart.getCompiledNamedTupleTypeName",
-    SetOfString(fieldNames), {
+    fieldNames, {
     let fieldNames = fieldNames.items().toList().unsafeSorted()
     let fieldNames = (fieldNames as Iterable<String>).join("$")
     Tuple("NamedTuple${fieldNames}", List.empty<CompilerError>())

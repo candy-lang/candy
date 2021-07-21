@@ -16,7 +16,7 @@ public trait Iterator<Item> {
   /// Returns `Some` if there's another item ot iterate over and `None` if it finished iterating.
 }
 
-public trait Iterable<Item> {
+public trait Iterable<Item>: Equals & Hash {
   /// A thing that can create an `Iterator<Item>`.
 
   fun /* let */ iterator(): Iterator<Item>
@@ -301,7 +301,7 @@ public trait Iterable<Item> {
     s
   }
 
-  fun unsafeEquals(other: Iterable<Item>): Bool {
+  fun equals(other: This): Bool {
     /// Checks if this `Iterable` is equal to the `other` one. Crashes if `Item` does not implement
     /// `Equals`.
 
@@ -309,7 +309,7 @@ public trait Iterable<Item> {
       && zip<Item>(other).all({ (it.first as Equals) == (it.second as Equals) })
   }
 
-  fun unsafeHash<T>(hasher: Hasher<T>) {
+  fun hash<T>(hasher: Hasher<T>) {
     /// Hashes this `Iterable`. Crashes if `Item` does not implement `Hash`.
 
     for item in this {
