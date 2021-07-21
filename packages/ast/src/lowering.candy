@@ -715,7 +715,7 @@ fun lowerValueParameter(
   index: Int,
 ): Maybe<AstValueParameter> {
   let name = cst.child.name
-  if (name is Some<CstToken<IdentifierToken>>) {
+  if (name is Some<IdentifierToken>) {
     if (previousNames.contains(name.unwrap().child.identifier)) {
       context.addError(DuplicateValueParameterNameCompilerError(context.file, cst))
       return None<AstValueParameter>()
@@ -2106,17 +2106,20 @@ fun lowerCallExpression(
 ): Maybe<AstExpression> {
   let id = context.getExpressionId(parentId)
 
-  let receiver = lowerExpression(context, id, cst.child.receiver)
-
-  let typeArguments = if (cst.child.receiver.child is CstTypeArgumentsExpression) {
-    lowerTypeArguments(
-      context,
-      id,
-      cst.child.receiver.cast<CstTypeArgumentsExpression>().child.typeArguments,
+  let receiverAndTypeArguments = if (cst.child.receiver.child is CstTypeArgumentsExpression) {
+    Tuple(
+      (cst.child.receiver.child as CstTypeArgumentsExpression).value,
+      lowerTypeArguments(
+        context,
+        id,
+        cst.child.receiver.cast<CstTypeArgumentsExpression>().child.typeArguments,
+      ),
     )
   } else {
-    List.empty<AstTypeArgument>()
+    Tuple(cst.child.receiver, List.empty<AstTypeArgument>())
   }
+  let receiver = lowerExpression(context, id, receiverAndTypeArguments.first)
+  let typeArguments = receiverAndTypeArguments.second
 
   let valueArguments = lowerValueArguments(context, id, cst.child.valueArguments)
 
