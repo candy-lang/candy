@@ -4,35 +4,37 @@ use dart_code
 use hir
 use incremental
 
+use ...declarations
+use ...expressions
 use ...types
 use ..utils
 
 public fun compileFunctionCallValueExpression(
   context: QueryContext<List<CompilerError>>,
+  uri: HirValueExpressionUri,
   expression: HirFunctionCallValueExpression,
-): DartStatement {
-  query<DartStatement, List<CompilerError>>(
+): List<DartStatement> {
+  query<List<DartStatement>, List<CompilerError>>(
     context,
     "code_generator_dart.compileFunctionCallValueExpression",
-    expression, {
+    DataTuple2<HirValueExpressionUri, HirFunctionCallValueExpression>(uri, expression), {
     // TODO(soon, JonasWanke): Handle static function calls.
     let statements = MutableList.empty<DartStatement>()
     let receiver = expression.receiver
-      .map<HirValueExpressionUri>({
-        statements.appendAll(
-          compileValueExpression(context, resolveHirValueExpressionUri(context, it)),
-        )
-        getValueExpressionResultIdentifier(context, it)
+      .map<DartExpression>({
+        if (it is HirTypeExpression) { todo("soon, JonasWanke: support type instantiations") }
+        statements.appendAll(compileValueExpression(context, it as HirValueExpressionUri))
+        // TODO(soon, JonasWanke): Cast the receiver to the correct trait.
+        getValueExpressionResultIdentifier(context, it as HirValueExpressionUri)
       })
       .orElse({
         let moduleHir = (expression.function.parent as HirModule)
         DartIdentifier(
-          expression.function.name(),
+          mangleName(context, expression.function.name()),
           Some<String>(moduleHirToImportUrl(context, moduleHir)),
         )
       })
 
-    // TODO(soon, JonasWanke): Cast the receiver to the correct trait.
     let function = receiver.dot(expression.function.name())
 
     let declaredTypeParameters = (expression.function.typeParameters(context) as Iterable<HirParameterType>)
@@ -63,7 +65,7 @@ public fun compileFunctionCallValueExpression(
       namedArguments = Map.empty<String, DartExpression>(),
       typeArguments = typeArguments,
     )
-    statements.append(saveValueExpression(context, expression, result))
+    statements.append(saveValueExpression(context, context, expression, result))
     Tuple(statements, List.empty<CompilerError>())
   })
 }

@@ -11,14 +11,15 @@ use ..utils
 public fun compileValueExpressionsToBody(
   context: QueryContext<List<CompilerError>>,
   scope: HirFunction | HirValueExpressionUri,
-  expressions: List<HirValueExpression>,
+  // TODO(later, JonasWanke): Get expressions from the scope directly.
+  expressionUris: List<HirValueExpressionUri>,
 ): DartBlock {
   query<DartBlock, List<CompilerError>>(
     context,
     "code_generator_dart.compileValueExpressionsToBody",
-    DataTuple2<Equals & Hash, ListOfHirValueExpression>(
+    DataTuple2<Equals & Hash, ListOfHirValueExpressionUri>(
       scope as Equals & Hash,
-      ListOfHirValueExpression(expressions),
+      ListOfHirValueExpressionUri(expressionUris),
     ), {
     let statements = MutableList.empty<DartStatement | DartComment>()
 
@@ -32,7 +33,7 @@ public fun compileValueExpressionsToBody(
       initialValue = Some<DartExpression>((dartObject as DartExpression).call0()),
     )))
 
-    let bodyStatements = (expressions as Iterable<HirValueExpression>)
+    let bodyStatements = (expressionUris as Iterable<HirValueExpressionUri>)
       .expand<DartStatement | DartComment>({
         let comment = DartComment("{it}")
         let statements = compileValueExpression(context, it)
@@ -69,16 +70,14 @@ public fun compileValueExpressionsToBody(
 
 public fun compileReturnValueExpression(
   context: QueryContext<List<CompilerError>>,
+  uri: HirValueExpressionUri,
   expression: HirReturnValueExpression,
 ): List<DartStatement> {
   query<List<DartStatement>, List<CompilerError>>(
     context,
     "code_generator_dart.compileReturnValueExpression",
-    expression, {
-    let statements = compileValueExpression(
-      context,
-      resolveHirValueExpressionUri(context, expression.expression),
-    ).toMutable()
+    DataTuple2<HirValueExpressionUri, HirReturnValueExpression>(uri, expression), {
+    let statements = compileValueExpression(context, expression.expression).toMutable()
 
     statements.append(DartExpressionStatement(DartThrow(
       (nonLocalReturnExceptionType as DartExpression).call(
@@ -90,6 +89,7 @@ public fun compileReturnValueExpression(
         typeArguments = List.empty<DartType>(),
       ),
     )))
+    statements.append(saveNothing(context, uri))
     Tuple(statements, List.empty<CompilerError>())
   })
 }
@@ -128,13 +128,13 @@ let nonLocalReturnExceptionType = DartNamedType(
 )
 
 
-class ListOfHirValueExpression {
+class ListOfHirValueExpressionUri {
   // TODO(never, JonasWanke): remove this when we no longer need `unsafeEquals` and `unsafeHash`
-  public let value: List<HirValueExpression>
+  public let value: List<HirValueExpressionUri>
 }
-impl ListOfHirValueExpression: Equals & Hash {
+impl ListOfHirValueExpressionUri: Equals & Hash {
   fun equals(other: This): Bool {
-    (value as Iterable<HirValueExpression>).unsafeEquals(other.value)
+    (value as Iterable<HirValueExpressionUri>).unsafeEquals(other.value)
   }
   fun hash<T>(hasher: Hasher<T>) { value.unsafeHash<T>(hasher) }
 }

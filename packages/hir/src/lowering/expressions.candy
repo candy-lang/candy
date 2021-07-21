@@ -302,19 +302,22 @@ impl LoweringContext {
         Map.empty<String, HirValueExpressionUri>(),
       )
 
+      let valueParameters = MutableList.empty<HirLambdaValueParameter>()
       for astParameter in expression.valueParameters {
         // TODO(marcelgarus): `this` is not a valid parameter name.
-        let hirParameter = HirValueParameter(lambdaUri, astParameter.name.value)
-        let type = astInlineTypeToHirInlineType(
+        let name = astParameter.name.value
+        let type_ = astInlineTypeToHirInlineType(
           innerContext.global.context,
           astParameter.type.unwrap(),
           innerContext.global.function,
         )
-        let result = innerContext.register(HirParameterReferenceValueExpression(hirParameter), type)
+        let hirParameter = HirLambdaValueParameter(lambdaUri, name, type_)
+        valueParameters.append(hirParameter)
+        let result = innerContext.register(HirParameterReferenceValueExpression(hirParameter), type_)
         innerContext = LoweringContext(
           result.first.global,
           result.first.parent,
-          innerContext.localProperties.copyAndSet(astParameter.name.value, result.second),
+          innerContext.localProperties.copyAndSet(name, result.second),
         )
       }
 
@@ -324,7 +327,7 @@ impl LoweringContext {
       let returnType = (expressionUris as Iterable<HirValueExpressionUri>).last()
         .map<HirInlineType>({ innerContext.typeOf(it) })
         .orElse({ HirNamedType.coreNothing(innerContext.global.context) })
-      let lambdaExpression = HirLambdaValueExpression(expressionUris)
+      let lambdaExpression = HirLambdaValueExpression(valueParameters, expressionUris, returnType)
 
       return Tuple(
         LoweringContext(

@@ -4,6 +4,7 @@ use hir
 use incremental
 
 use ...compile
+use ..function
 use ..name_mangling
 use ..trait
 use ..type
@@ -64,10 +65,10 @@ fun compileModule(
         declarations.appendAll((compiledTypes as Iterable<DartClass>).cast<DartDeclaration>())
         continue
       }
-      // if declaration is HirFunction {
-      //   declarations.appendAll(compileGlobalFunction(context, package, declaration as HirFunction))
-      //   continue
-      // }
+      if declaration is HirFunction {
+        declarations.append(compileGlobalFunction(context, declaration as HirFunction))
+        continue
+      }
       assert(false, "Unknown declaration type: {declaration}.")
     }
 

@@ -61,14 +61,41 @@ impl HirStringValueExpression: HirValueExpression & Equals & Hash {
 /// * `{ print("Hi!") }`
 /// * `{ a, b -> a + b }`
 public class HirLambdaValueExpression {
+  public let parameters: List<HirLambdaValueParameter>
   public let expressions: List<HirValueExpressionUri>
+  public let returnType: HirInlineType
 }
 impl HirLambdaValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
-    (expressions as Iterable<HirValueExpressionUri>).unsafeEquals(other.expressions)
+    (parameters as Iterable<HirLambdaValueParameter>).unsafeEquals(other.parameters)
+      && (expressions as Iterable<HirValueExpressionUri>).unsafeEquals(other.expressions)
+      && (returnType as Equals) == (other.returnType as Equals)
   }
-  fun hash<T>(hasher: Hasher<T>) { expressions.unsafeHash<T>(hasher) }
+  fun hash<T>(hasher: Hasher<T>) {
+    parameters.unsafeHash<T>(hasher)
+    expressions.unsafeHash<T>(hasher)
+    (returnType as Hash).hash<T>(hasher)
+  }
 }
+
+public class HirLambdaValueParameter {
+  public let lambdaUri: HirValueExpressionUri
+  public let name: String
+  public let type_: HirInlineType
+}
+impl HirLambdaValueParameter: HirValueExpression & Equals & Hash {
+  fun equals(other: This): Bool {
+    (lambdaUri as Equals) == (other.lambdaUri as Equals)
+      && (name as Equals) == (other.name as Equals)
+      && (type_ as Equals) == (other.type_ as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (lambdaUri as Hash).hash<T>(hasher)
+    (name as Hash).hash<T>(hasher)
+    (type_ as Hash).hash<T>(hasher)
+  }
+}
+
 
 /// A this expression.
 ///
@@ -89,7 +116,7 @@ impl HirThisValueExpression: HirValueExpression & Equals & Hash {
 /// }
 /// ```
 public class HirParameterReferenceValueExpression {
-  public let parameter: HirValueParameter
+  public let parameter: HirValueParameter | HirLambdaValueParameter
 }
 impl HirParameterReferenceValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool { parameter == other.parameter }
