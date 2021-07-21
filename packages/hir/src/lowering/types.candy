@@ -430,6 +430,7 @@ fun hirInlineTypeToSolverTypeAndGoalsAndRules(
   ///     Int($Never) <- <empty>,
   ///     Int(?0) <- Error(?0),
   ///     Error(?0) <- <empty>,
+  ///     Any(?0) <- <empty>,
   ///   ],
   /// )
 
@@ -442,7 +443,10 @@ fun hirInlineTypeToSolverTypeAndGoalsAndRules(
         Tuple(
           SolverVariable(None<HirParameterType>()),
           List.of1<SolverGoal>(),
-          List.empty<SolverRule>(ruleThatEveryTypeImplementsError(context)),
+          List.of2<SolverRule>(
+            ruleThatEveryTypeImplementsError(context),
+            ruleThatEveryTypeImplementsAny(context),
+          ),
         ),
         List.empty<CompilerError>(),
       )
@@ -544,6 +548,7 @@ fun hirTypeOrTraitToSolverRule(
       //   Int($Never) <- <empty>,
       //   Int(?0) <- Error(?0),
       //   Error(?0) <- <empty>,
+      //   Any(?0) <- <empty>,
       // ]
 
       let rules = MutableSet.empty<SolverGoal>()
@@ -558,8 +563,10 @@ fun hirTypeOrTraitToSolverRule(
       let errorType = HirType.syntheticError(context)
       let errorVariable = SolverVariable.error()
       return Tuple(
-        Set.of4<SolverRule>(
+        Set.of5<SolverRule>(
+          // T($T) <- <empty>
           SolverRule(declaration, SolverGoal(declaration, solverParameters), goals),
+          // T($Never) <- <empty>
           SolverRule(
             declaration,
             SolverGoal(
@@ -568,12 +575,14 @@ fun hirTypeOrTraitToSolverRule(
             ),
             List.empty<SolverGoal>(),
           ),
+          // T(?0) <- Error(?0)
           SolverRule(
             declaration,
             SolverGoal(declaration, List.of1<SolverType>(errorVariable)),
             List.of1<SolverGoal>(SolverGoal(errorType, List.of1<SolverType>(errorVariable))),
           ),
           ruleThatEveryTypeImplementsError(context),
+          ruleThatEveryTypeImplementsAny(context),
         ).union(rules),
         List.empty<CompilerError>(),
       )
@@ -586,6 +595,15 @@ fun ruleThatEveryTypeImplementsError(context: QueryContext<List<CompilerError>>)
   return SolverRule(
     errorType,
     SolverGoal(errorType, List.of1<SolverType>(SolverVariable.error()))),
+    List.empty<SolverGoal>(),
+  )
+}
+
+fun ruleThatEveryTypeImplementsAny(context: QueryContext<List<CompilerError>>) {
+  let anyType = HirTrait.coreAny(context)
+  return SolverRule(
+    anyType,
+    SolverGoal(anyType, List.of1<SolverType>(SolverVariable(None<HirParameterType>())))),
     List.empty<SolverGoal>(),
   )
 }
