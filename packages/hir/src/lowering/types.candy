@@ -310,41 +310,42 @@ fun getAllImplsOfModule(context: QueryContext<List<CompilerError>>, module: HirM
   })
 }
 
-fun hirImplToSolverRule(
+fun hirImplToSolverRules(
   context: QueryContext<List<CompilerError>>,
   hirImpl: HirImpl,
-): Maybe<SolverRule> {
-  query<Maybe<SolverRule>, List<CompilerError>>(
+): Set<SolverRule> {
+  query<Set<SolverRule>, List<CompilerError>>(
     context,
     "hirImplToSolverRule",
     hirImpl as Equals & Hash, {
     // Lower the constraints. For example, in the impl `impl[T: Equals] Foo[T]: Equals`, the
     // `solverConstraints` are a list containing `Equals(?T)`.
+    let rules = MutableSet.empty<SolverRule>()
     let solverConstraints = MutableList.empty<SolverGoal>()
     for constraint in hirImpl.constraints(context).entries() {
       let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, constraint.second)
+      rules.addAll(result.third)
       solverConstraints.appendAll(
-        (result.second as Iterable<SolverGoal>)
-          .map<SolverGoal>({
-            it.substituteAll(
-              Map.of1<SolverVariable, SolverType>(
-                Tuple(
-                  result.first as SolverVariable,
-                  // `constraints.first` is a `HirParameterType` and turning that into a
-                  // `SolverType` always succeeds with an empty list of goals.
-                  hirInlineTypeToSolverTypeAndGoalsAndRules(context, constraint.first).first,
-                ),
+        (result.second as Iterable<SolverGoal>).map<SolverGoal>({
+          it.substituteAll(
+            Map.of1<SolverVariable, SolverType>(
+              Tuple(
+                result.first as SolverVariable,
+                SolverVariable(Some<HirParameterType>(constraint.first)),
               ),
-            )
-          })
-          .toList()
+            ),
+          )
+        }),
       )
     }
 
     // Lower the base type. For example, in the impl `impl Iterable[Int]: Foo`, the base type
     // `Iterable[Int]` gets lowered to `?0` with the goal `Iterable(Int, ?0)`.
     let baseType = hirImpl.baseType(context)
-    let solverBaseAndGoals = hirInlineTypeToSolverTypeAndGoalsAndRules(context, baseType)
+    let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, baseType)
+    rules.addAll(result.third)
+    solverConstraints.appendAll(result.second)
+    let solverBase = result.first
 
     // Lower the trait. For example, in the impl `impl Foo: Iterable[Int]`, the implemented trait
     // `Iterable[Int]` gets lowered to `?0` with the goals `Iterable(Int, ?0)`. Impls that don't
@@ -356,8 +357,11 @@ fun hirImplToSolverRule(
       return Tuple(None<SolverRule>(), List.empty<CompilerError>())
     }
     let traitType = (traitType.unwrap() as HirNamedType)
-    let solverTraitAndGoals = hirInlineTypeToSolverTypeAndGoalsAndRules(context, traitType)
-    if ((solverTraitAndGoals.second as Iterable).length() > 1) {
+    let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, traitType)
+    let solverTrait = (result.first as SolverVariable) // Traits get lowered to `SolverVariable`s.
+    let traitGoals = result.second
+    rules.addAll(result.third)
+    if ((traitGoals as Iterable).length() > 1) {
       // TODO(never, marcelgarus): We can't implement a trait that contains another trait yet, like
       // `Iterable<Equals>`. This does work in Rust (with boxing and explicit dynamism), so we'll
       // probably have to look at how to put general-purpose logic implications in our solver (like
@@ -371,7 +375,8 @@ fun hirImplToSolverRule(
         List.of1<CompilerError>(CannotImplementTraitOfTraitCompilerError(hirImpl)),
       )
     }
-    assert((solverTraitAndGoals.second as Iterable).length() == 1, "Should never happen.")
+    assert((traitGoals as Iterable).length() == 1, "Should never happen.")
+    let traitGoal = (traitGoals as Iterable<SolverGoal>).single().unwrap()
 
     // Let's play this through for the impl `impl[T: Equals] Iterable[T]: Equals`.
     //
@@ -387,21 +392,13 @@ fun hirImplToSolverRule(
     // To achieve that goal, we have to satisfy the goals of the `solverBase` and the `constraints`.
     // So, our total `SolverRule` would look like this: `Equals(?0) <- Iterable(?T, ?0), Equals(?T)`
     Tuple(
-      Some<SolverRule>(
+      Set.of1<SolverRule>(
         SolverRule(
           hirImpl,
-          (solverTraitAndGoals.second as Iterable<SolverGoal>)
-            .single()
-            .unwrap() // We checked the length above.
-            .substituteAll(
-              Map.of1<SolverVariable, SolverType>(
-                // We are sure that the solver trait got lowered to a `SolverVariable`.
-                Tuple(solverTraitAndGoals.first as SolverVariable, solverBaseAndGoals.first),
-              ),
-            ),
-          (solverBaseAndGoals.second as Iterable<SolverGoal>).followedBy(solverConstraints).toList(),
+          traitGoal.substituteAll(Map.of1<SolverVariable, SolverType>(Tuple(solverTrait, solverBase))),
+          solverConstraints,
         ),
-      ),
+      ).union(rules),
       List.empty<CompilerError>(),
     )
   })
