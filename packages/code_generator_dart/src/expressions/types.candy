@@ -28,7 +28,7 @@ public fun compileTypeInstantiationValueExpression(
     statements.append(saveValueExpression(
       context,
       expression,
-      (compiledType as DartValueExpression)
+      (compiledType as DartExpression)
         .call1(getValueExpressionResultIdentifier(context, expression.valueArgument)),
     ))
     Tuple(statements, List.empty<CompilerError>())
@@ -45,7 +45,7 @@ public fun compileNamedTupleValueExpression(
     expression, {
     let statements = MutableList.empty<DartStatement>()
     statements.appendAll(
-      (expression.valueArguments as Iterable<HirValueExpressionUri<HirValueExpression>>)
+      (expression.valueArguments as Iterable<HirValueExpressionUri>)
         .expand<DartStatement>({
           compileValueExpression(context, resolveHirValueExpressionUri(context, it))
         })
@@ -56,12 +56,12 @@ public fun compileNamedTupleValueExpression(
     statements.append(saveValueExpression(
       context,
       expression,
-      (compiledType as DartValueExpression).call(
+      (compiledType as DartExpression).call(
         positionalArguments = (expression.valueArguments.entries().toList()
-          .sortedBy<String>({ it.first }) as Iterable<(String, HirValueExpressionUri<HirValueExpression>)>)
-          .map<DartValueExpression>({ getValueExpressionResultIdentifier(context, it.second) })
+          .sortedBy<String>({ it.first }) as Iterable<(String, HirValueExpressionUri)>)
+          .map<DartExpression>({ getValueExpressionResultIdentifier(context, it.second) })
           .toList(),
-        namedArguments = Map.empty<String, DartValueExpression>(),
+        namedArguments = Map.empty<String, DartExpression>(),
         typeArguments = List.empty<DartType>(),
       ),
     ))

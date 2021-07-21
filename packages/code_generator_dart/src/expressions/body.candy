@@ -10,7 +10,7 @@ use ..utils
 
 public fun compileValueExpressionsToBody(
   context: QueryContext<List<CompilerError>>,
-  scope: HirFunction | HirValueExpressionUri<HirLambdaExpression>,
+  scope: HirFunction | HirValueExpressionUri,
   expressions: List<HirValueExpression>,
 ): DartBlock {
   query<DartBlock, List<CompilerError>>(
@@ -35,7 +35,7 @@ public fun compileValueExpressionsToBody(
     let bodyStatements = (expressions as Iterable<HirValueExpression>)
       .expand<DartStatement | DartComment>({
         let comment = DartComment("{it}")
-        let statements = compileExpression(context, it)
+        let statements = compileValueExpression(context, it)
         (List.of1<DartStatement | DartComment>(comment) as Iterable<DartStatement | DartComment>)
           .followedBy((statements as Iterable<DartStatement>).cast<DartStatement | DartComment>())
       })
@@ -67,16 +67,17 @@ public fun compileValueExpressionsToBody(
   })
 }
 
-public fun compileReturnExpression(
+public fun compileReturnValueExpression(
   context: QueryContext<List<CompilerError>>,
-  expression: HirReturnExpression,
+  expression: HirReturnValueExpression,
 ): List<DartStatement> {
   query<List<DartStatement>, List<CompilerError>>(
     context,
-    "code_generator_dart.compileReturnExpression",
+    "code_generator_dart.compileReturnValueExpression",
     expression, {
-    let statements = compileExpression(context,
-      getExpression<HirValueExpression>(expression.expression),
+    let statements = compileValueExpression(
+      context,
+      resolveHirValueExpressionUri(context, expression.expression),
     ).toMutable()
 
     statements.append(DartExpressionStatement(DartThrow(
@@ -96,7 +97,7 @@ public fun compileReturnExpression(
 
 fun getScopeObjectName(
   context: QueryContext<List<CompilerError>>,
-  scope: HirFunction | HirValueExpressionUri<HirLambdaExpression>,
+  scope: HirFunction | HirValueExpressionUri,
 ): String {
   query<String, List<CompilerError>>(
     context,
@@ -109,7 +110,7 @@ fun getScopeObjectName(
     } else {
       // As function declarations can't be nested, all expressions have the same function as their
       // parent and the index is sufficient to disambiguate them.
-      "$scope$expression${(scope as HirValueExpressionUri<HirLambdaExpression>).index}"
+      "$scope$expression${(scope as HirValueExpressionUri).index}"
     }
     Tuple(name, List.empty<CompilerError>())
   })

@@ -36,9 +36,7 @@ fun compileValueExpressionHelper(
   }
 
   if (expression is HirLambdaValueExpression) {
-    return List.of1<DartStatement>(
-      compileLambdaValueExpression(context, expression as HirLambdaValueExpression),
-    )
+    return compileLambdaValueExpression(context, expression as HirLambdaValueExpression)
   }
 
   // if (expression is HirThisValueExpression) {
