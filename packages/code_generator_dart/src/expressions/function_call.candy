@@ -16,11 +16,21 @@ public fun compileFunctionCallValueExpression(
     "code_generator_dart.compileFunctionCallValueExpression",
     expression, {
     // TODO(soon, JonasWanke): Handle static function calls.
-    // TODO(soon, JonasWanke): Handle calls of functions inside modules.
-    let receiver = getValueExpressionResultIdentifier(
-      context,
-      expression.receiver.unwrap() as HirValueExpressionUri,
-    )
+    let statements = MutableList.empty<DartStatement>()
+    let receiver = expression.receiver
+      .map<HirValueExpressionUri>({
+        statements.appendAll(
+          compileValueExpression(context, resolveHirValueExpressionUri(context, it)),
+        )
+        getValueExpressionResultIdentifier(context, it)
+      })
+      .orElse({
+        let moduleHir = (expression.function.parent as HirModule)
+        DartIdentifier(
+          expression.function.name(),
+          Some<String>(moduleHirToImportUrl(context, moduleHir)),
+        )
+      })
 
     // TODO(soon, JonasWanke): Cast the receiver to the correct trait.
     let function = receiver.dot(expression.function.name())
@@ -53,7 +63,8 @@ public fun compileFunctionCallValueExpression(
       namedArguments = Map.empty<String, DartExpression>(),
       typeArguments = typeArguments,
     )
-    Tuple(saveValueExpression(context, expression, result), List.empty<CompilerError>())
+    statements.append(saveValueExpression(context, expression, result))
+    Tuple(statements, List.empty<CompilerError>())
   })
 }
 
