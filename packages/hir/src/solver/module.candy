@@ -1,2 +1,2 @@
-public use .types
-public use .impls
+public use .goals
+public use .values

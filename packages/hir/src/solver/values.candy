@@ -165,7 +165,8 @@ class SolverVariable {
   /// * `?T`
   /// * `?0`
 
-  let type: HirParameterType
+  let type: HirParameterType | HirType | HirTrait
+  /// A HirType or HirTrait stands for the corresponding error type.
 }
 impl SolverVariable: SolverType {
   fun toString_(): String { "?{type}" }

@@ -407,10 +407,10 @@ fun hirImplToSolverRule(
   })
 }
 
-fun hirInlineTypeToSolverTypeAndGoals(
+fun hirInlineTypeToSolverTypeAndGoalsAndRules(
   context: QueryContext<List<CompilerError>>,
   hirType: HirInlineType,
-): (SolverType, List<SolverGoal>) {
+): (SolverType, List<SolverGoal>, List<SolverRule>) {
   // Turns a `HirInlineType` into a `SolverType` and a list of `SolverGoal`s.
   //
   // Examples:
@@ -425,7 +425,10 @@ fun hirInlineTypeToSolverTypeAndGoals(
     List<CompilerError>,
   >(context, "hirInlineTypeToSolverTypeAndGoals", hirType, {
     if (hirType is HirErrorType) {
-      todo("soon, marcelgarus: handle like `Never`")
+      return Tuple(
+        Tuple(substitution, List.empty<SolverGoal>()),
+        List.empty<CompilerError>(),
+      )
     }
     if (hirType is HirNamedType) {
       let declaration = (hirType as HirNamedType).declaration
@@ -517,6 +520,66 @@ fun hirInlineTypeToSolverTypeAndGoals(
     throw "Unexpected HirType: {hirType}"
   })
 }
+
+fun hirTypeOrTraitToSolverRule(
+  context: QueryContext<List<CompilerError>>,
+  declaration: HirType | HirTrait,
+): Maybe<Set<SolverRule>> {
+  query<Maybe<Set<SolverRule>>, List<CompilerError>>(
+    context,
+    "hirTypeOrTraitToSolverRule",
+    declaration as Equals & Hash, {
+      // We create several synthetic types and impls to allow for correct handling of error types
+      // and the `Never` type.
+      //
+      // For example:
+      //
+      // hirTypeOrTraitToSolverRule(Int) == [
+      //   Int($Int) <- <empty>,
+      //   Int($Never) <- <empty>,
+      //   Int(?0) <- Error(?0),
+      //   Error(?0) <- <empty>,
+      // ]
+
+      let rules = MutableSet.empty<SolverGoal>()
+      let goals = MutableList.empty<SolverGoal>()
+      let solverParameters = MutableList.empty<SolverType>()
+      for parameter in (declaration as HasTypeParameter).typeParameters(context) {
+        let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, parameter.upperBound(context))
+        solverParameters.append(result.first)
+        goals.appendAll(result.second)
+        rules.addAll(result.third)
+      }
+      let errorType = HirType.syntheticError(context)
+      let errorVariable = SolverVariable(declaration)
+      return Tuple(
+        Set.of4<SolverRule>(
+          SolverRule(declaration, SolverGoal(declaration, solverParameters), goals),
+          SolverRule(
+            declaration,
+            SolverGoal(
+              declaration,
+              List.of1<SolverType>(SolverValue(HirType.coreNever(context), List.empty<SolverType>())),
+            ),
+            List.empty<SolverGoal>(),
+          ),
+          SolverRule(
+            declaration,
+            SolverGoal(declaration, List.of1<SolverType>(errorVariable)),
+            List.of1<SolverGoal>(SolverGoal(errorType, List.of1<SolverType>(errorVariable))),
+          ),
+          SolverRule(
+            declaration,
+            SolverGoal(errorType, List.of1<SolverType>(SolverVariable(errorType))),
+            List.empty<SolverGoal>(),
+          ),
+        ).union(rules),
+        List.empty<CompilerError>(),
+      )
+    }
+  )
+}
+
 
 fun getSolverEnvironmentOfScope(context: QueryContext<List<CompilerError>>, scope: Package): Environment {
   query<Environment, List<CompilerError>>(
