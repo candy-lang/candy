@@ -316,7 +316,7 @@ fun hirImplToSolverRules(
 ): Set<SolverRule> {
   query<Set<SolverRule>, List<CompilerError>>(
     context,
-    "hirImplToSolverRule",
+    "hirImplToSolverRules",
     hirImpl as Equals & Hash, {
     // Lower the constraints. For example, in the impl `impl[T: Equals] Foo[T]: Equals`, the
     // `solverConstraints` are a list containing `Equals(?T)`.
@@ -610,8 +610,8 @@ fun getSolverEnvironmentOfScope(context: QueryContext<List<CompilerError>>, scop
   query<Environment, List<CompilerError>>(
     context, "getSolverEnvironmentOfScope", scope as Equals & Hash, {
     let rules = getAllImplsInScope(context, scope).items()
-      .maybeMap<SolverRule>({ hirImplToSolverRule(context, it) })
-      .toList()
+      .maybeMap<Set<SolverRule>>({ hirImplToSolverRules(context, it) })
+      .reduce({ a, b => a.union(b) })
     Tuple(Environment(rules), List.empty<CompilerError>())
   })
 }
