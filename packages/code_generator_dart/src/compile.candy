@@ -8,6 +8,12 @@ use ..types
 
 public fun compile(context: QueryContext<List<CompilerError>>, package: Package): Unit {
   impureQuery<Unit, List<CompilerError>>(context, "code_generator_dart.compile", package, {
+    compilePackage(context, package)
+    let containsErrors = context.outputs().entries().any({ keyToEntry =>
+      keyAndEntry.second.entries().any({ inputAndErrors => inputAndErrors.second.isNotEmpty() })
+    })
+    if (containsErrors) { return }
+
     let outputPath = package.getOutputPath(context, "Dart")
     let outputDirectory = Directory(outputPath)
     if outputDirectory.doesExist() {
@@ -53,6 +59,34 @@ fun compile_(context: QueryContext<List<CompilerError>>, package: Package): Map<
     Tuple(output, List.empty<CompilerError>())
   })
 }
+
+/// Tries to compile everything in this package and its dependencies.
+fun compilePackage(context: QueryContext<List<CompilerError>>, package: Package) {
+  query<Unit, List<CompilerError>>(context, "code_generator_dart.compilePackage", package, {
+    (package.getAllPackagesInCompilationOrder(context) as Iterable<Package>)
+      .do<HirInlineType>({ compileDeclaration(context, HirTopLevelModule(it)) })
+    Tuple(unit, List.empty<CompilerError>())
+  })
+}
+fun compileDeclaration(context: QueryContext<List<CompilerError>>, declarationHir: HirDeclaration) {
+  ((declarationHir as HasDeclarations).declarations(context) as Iterable<HirDeclaration>)
+    .do<HirInlineType>({ compileDeclaration(context, it) })
+  if (declarationHir is HasTypeParameters) {
+    compileTypeParameters(context, declarationHir as HasTypeParameters)
+  }
+
+  if (declarationHir is HirTrait) {
+    (declarationHir as HirTrait).upperBound(context)
+  }
+  if (declarationHir is HirImpl) {
+    (declarationHir as HirImpl).baseType(context)
+    (declarationHir as HirImpl).implementedTrait(context)
+  }
+  if (declarationHir is HirFunction) {
+    lowerFunctionBody(context, (functionHir as HirFunction))
+  }
+}
+
 
 public let outputPackageName = "diabetes"
 // The result of having lots of 🍭 Candy.
