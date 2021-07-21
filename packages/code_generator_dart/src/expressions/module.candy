@@ -51,14 +51,6 @@ fun compileValueExpressionHelper(
   //     ),
   //   )
   // }
-  if (expression is HirLocalPropertyReferenceValueExpression) {
-    return List.of1<DartStatement>(
-      compileLocalPropertyReferenceValueExpression(
-        context,
-        expression as HirLocalPropertyReferenceValueExpression,
-      ),
-    )
-  }
 
   if (expression is HirFunctionCallValueExpression) {
     return compileFunctionCallValueExpression(context, expression as HirFunctionCallValueExpression)

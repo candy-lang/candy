@@ -79,25 +79,6 @@ impl HirThisValueExpression: HirValueExpression & Equals & Hash {
   fun hash<T>(hasher: Hasher<T>) {}
 }
 
-/// An expression that references a local property.
-///
-/// This already abstracts from the name of the property and only has its uri – basically, it's a
-/// direct pointer to the right side of a `let foo = ...` expression.
-///
-/// Example:
-///
-/// ```
-/// let a = 5
-/// a + 8 # The `a` becomes a HirLocalPropertyReferenceValueExpression
-/// ```
-public class HirLocalPropertyReferenceValueExpression {
-  public let value: HirValueExpressionUri
-}
-impl HirLocalPropertyReferenceValueExpression: HirValueExpression & Equals & Hash {
-  fun equals(other: This): Bool { (value as Equals) == (other.value as Equals) }
-  fun hash<T>(hasher: Hasher<T>) { value.hash<T>(hasher) }
-}
-
 /// An expression that references a parameter.
 ///
 /// Example:

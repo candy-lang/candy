@@ -17,16 +17,3 @@ public fun compileParameterReferenceValueExpression(
     Tuple(saveValueExpression(context, expression, identifier), List.empty<CompilerError>())
   })
 }
-
-public fun compileLocalPropertyReferenceValueExpression(
-  context: QueryContext<List<CompilerError>>,
-  expression: HirLocalPropertyReferenceValueExpression,
-): DartStatement {
-  query<DartStatement, List<CompilerError>>(
-    context,
-    "code_generator_dart.compileLocalPropertyReferenceValueExpression",
-    expression, {
-    let identifier = getValueExpressionResultIdentifier(expression.value)
-    Tuple(saveValueExpression(context, expression, identifier), List.empty<CompilerError>())
-  })
-}
