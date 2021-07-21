@@ -197,7 +197,7 @@ impl AstIntersectionType: AstInlineType & Equals & Hash {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
-      (types as Iterable<AstIdentifier>).unsafeEquals(other.types as Iterable<AstIdentifier>)
+      (types as Iterable<AstInlineType>).unsafeEquals(other.types as Iterable<AstInlineType>)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)

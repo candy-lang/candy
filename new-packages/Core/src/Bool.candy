@@ -1,3 +1,5 @@
+use ..Hash
+use ..Int
 use ..Maybe
 use ..Operators
 

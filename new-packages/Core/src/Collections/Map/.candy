@@ -1,7 +1,7 @@
 use ...Bool
 use ...Hash
 use ...Maybe
-use ...Numbers
+use ...Int
 use ...Operators
 use ..Iterate
 public use .BucketMap
