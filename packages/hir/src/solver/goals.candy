@@ -68,7 +68,7 @@ class SolverRule {
   ///   `Clone` if both `?0` and `?1` implement `Clone`
   /// * `Any(?T) <- <nothing>`: the fact that every `?T` implements `Any`
 
-  let originalImpl: HirType | HirImpl
+  let originalImpl: HirType | HirTrait | HirImpl
   let goal: SolverGoal
   let subgoals: List<SolverGoal>
 

@@ -177,7 +177,9 @@ impl SolverVariable: SolverType {
   fun containsVariable(variable: SolverVariable): Bool { this == variable }
 
   fun substituteAll(substitutions: Map<SolverVariable, SolverType>): SolverType {
-    substitutions.get(SolverVariable(Some<HirParameterType>(type))).orElse({ this })
+    this.type
+      .flatMap<SolverType>({ substitutions.get(SolverVariable(Some<HirParameterType>(it))) })
+      .orElse({ this })
   }
 
   fun canonicalizeInternal(mapping: MutableMap<SolverVariable, SolverVariable>): SolverVariable {

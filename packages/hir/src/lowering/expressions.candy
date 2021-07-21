@@ -11,7 +11,7 @@ use ...expressions
 use ...file
 use ...types
 
-fun lowerFunctionBody(
+public fun lowerFunctionBody(
   context: QueryContext<List<CompilerError>>,
   function: HirFunction,
 ): Maybe<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)> {
@@ -46,7 +46,7 @@ fun lowerFunctionBody(
   })
 }
 
-fun resolveHirValueExpressionUri(
+public fun resolveHirValueExpressionUri(
   context: QueryContext<List<CompilerError>>,
   uri: HirValueExpressionUri,
 ): HirValueExpression {

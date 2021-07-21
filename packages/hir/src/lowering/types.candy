@@ -125,8 +125,8 @@ public fun astInlineTypeToHirInlineType(
         return Tuple(
           HirNamedTupleType(
             ((astType as AstPositionalTupleType).types as Iterable<AstInlineType>)
-              .mapIndexed<HirInlineType>({ type, index =>
-                Tuple("${index}", astInlineTypeToHirInlineType(context, it, scope))
+              .mapIndexed<(String, HirInlineType)>({ type, index =>
+                Tuple("${index}", astInlineTypeToHirInlineType(context, type, scope))
               })
               .toList(),
           ) as HirInlineType,
@@ -432,14 +432,14 @@ fun hirInlineTypeToSolverTypeAndGoalsAndRules(
   /// )
 
   query<
-    (SolverType, List<SolverGoal>),
+    (SolverType, List<SolverGoal>, List<SolverRule>),
     List<CompilerError>,
   >(context, "hirInlineTypeToSolverTypeAndGoals", hirType, {
     if (hirType is HirErrorType) {
       return Tuple(
         Tuple(
           SolverVariable(None<HirParameterType>()),
-          List.of1<SolverGoal>(),
+          List.empty<SolverGoal>(),
           List.of2<SolverRule>(
             ruleThatEveryTypeImplementsError(context),
             ruleThatEveryTypeImplementsAny(context),
@@ -530,8 +530,8 @@ fun hirInlineTypeToSolverTypeAndGoalsAndRules(
 fun hirTypeOrTraitToSolverRule(
   context: QueryContext<List<CompilerError>>,
   declaration: HirType | HirTrait,
-): Maybe<Set<SolverRule>> {
-  query<Maybe<Set<SolverRule>>, List<CompilerError>>(
+): Set<SolverRule> {
+  query<Set<SolverRule>, List<CompilerError>>(
     context,
     "hirTypeOrTraitToSolverRule",
     declaration as Equals & Hash, {
@@ -548,10 +548,10 @@ fun hirTypeOrTraitToSolverRule(
       //   Any(?0) <- <empty>,
       // ]
 
-      let rules = MutableSet.empty<SolverGoal>()
+      let rules = MutableSet.empty<SolverRule>()
       let goals = MutableList.empty<SolverGoal>()
       let solverParameters = MutableList.empty<SolverType>()
-      for parameter in (declaration as HasTypeParameter).typeParameters(context) {
+      for parameter in (declaration as HasTypeParameters).typeParameters(context) {
         let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, parameter.upperBound(context))
         solverParameters.append(result.first)
         goals.appendAll(result.second)
@@ -587,18 +587,18 @@ fun hirTypeOrTraitToSolverRule(
   )
 }
 
-fun ruleThatEveryTypeImplementsError(context: QueryContext<List<CompilerError>>) {
+fun ruleThatEveryTypeImplementsError(context: QueryContext<List<CompilerError>>): SolverRule {
   let errorType = HirType.syntheticError(context)
-  return SolverRule(
+  SolverRule(
     errorType,
     SolverGoal(errorType, List.of1<SolverType>(SolverVariable.error())),
     List.empty<SolverGoal>(),
   )
 }
 
-fun ruleThatEveryTypeImplementsAny(context: QueryContext<List<CompilerError>>) {
+fun ruleThatEveryTypeImplementsAny(context: QueryContext<List<CompilerError>>): SolverRule {
   let anyType = HirTrait.coreAny(context)
-  return SolverRule(
+  SolverRule(
     anyType,
     SolverGoal(anyType, List.of1<SolverType>(SolverVariable(None<HirParameterType>()))),
     List.empty<SolverGoal>(),
@@ -610,9 +610,9 @@ fun getSolverEnvironmentOfScope(context: QueryContext<List<CompilerError>>, scop
   query<Environment, List<CompilerError>>(
     context, "getSolverEnvironmentOfScope", scope as Equals & Hash, {
     let rules = getAllImplsInScope(context, scope).items()
-      .maybeMap<Set<SolverRule>>({ hirImplToSolverRules(context, it) })
-      .reduce({ a, b => a.union(b) })
-    Tuple(Environment(rules), List.empty<CompilerError>())
+      .map<Set<SolverRule>>({ hirImplToSolverRules(context, it) })
+      .foldLeft<Set<SolverRule>>(Set.empty<SolverRule>(), { a, b => a.union(b) })
+    Tuple(Environment(rules.items().toList()), List.empty<CompilerError>())
   })
 }
 
@@ -675,6 +675,8 @@ public fun implFor(
   scope: Package,
 ): Maybe<HirImpl> {
   query<Maybe<HirImpl>, List<CompilerError>>(context, "implFor", DataTuple3<HirInlineType, HirInlineType, Package>(base, trait_, scope), {
+    assert(!(trait_ is HirErrorType), "Can't reveal the impl for the error type")
+
     let environment = getSolverEnvironmentOfScope(context, scope)
     let baseSolverAndGoals = hirInlineTypeToSolverTypeAndGoalsAndRules(context, base)
     let baseType = baseSolverAndGoals.first
@@ -701,7 +703,7 @@ public fun implFor(
     )
     if (solution is SolverSolutionUnique) {
       Tuple(
-        Some<HirImpl>((solution as SolverSolutionUnique).usedRule.originalImpl),
+        Some<HirImpl>((solution as SolverSolutionUnique).usedRule.originalImpl as HirImpl),
         List.empty<CompilerError>(),
       )
     } else {

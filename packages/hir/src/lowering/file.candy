@@ -6,7 +6,7 @@ use ...declarations
 use ...file
 use ..declarations
 
-trait HasUseLines {
+public trait HasUseLines {
   fun useLines(context: QueryContext<List<CompilerError>>): List<HirUseLine>
 }
 impl HirModule: HasUseLines {
@@ -46,7 +46,7 @@ fun useLines_(context: QueryContext<List<CompilerError>>, moduleHir: HirModule):
 }
 
 
-trait HasTargetModule {
+public trait HasTargetModule {
   fun targetModule(context: QueryContext<List<CompilerError>>): Maybe<HirModule>
 }
 

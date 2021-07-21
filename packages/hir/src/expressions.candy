@@ -244,7 +244,7 @@ impl HirNamedTupleFieldAccessValueExpression: HirValueExpression & Equals & Hash
 ///
 /// * `return "Foo"`
 /// * `return@blub 5`
-/// * `return`
+/// * `return` (implicitly returns `nothing`)
 // TODO(never): For now, returns always return to the surrounding function.
 public class HirReturnValueExpression {
   public let scope: HirFunction
