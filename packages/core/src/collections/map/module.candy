@@ -81,7 +81,7 @@ public trait Map<Key: Equals & Hash, Value>: Equals & Hash {
     map
   }
 
-  fun equals(other: Map<Key, Value>): Bool {
+  fun equals(other: This): Bool {
     (keys().toSet() as Equals) == (other.keys().toSet() as Equals)
       && keys().all({ (get(it) as Equals) == (other.get(it) as Equals) })
   }

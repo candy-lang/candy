@@ -32,7 +32,7 @@ impl[T] Maybe[T] {
 }
 
 impl[T: Equals] Maybe[T]: Equals {
-  fun equals(other: Maybe[T]): Bool {
+  fun equals(other: This): Bool {
     this.match[Bool](
       some = { a -> other.match[Bool](some = { b -> a == b }, none = { false() }) }
       none = { other.isNone() }

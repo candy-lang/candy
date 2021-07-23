@@ -75,7 +75,7 @@ public trait Map[Key: Equals & Hash, Value] {
 }
 
 impl[Key: Equals & Hash, Value: Equals] Map[Key, Value]: Equals {
-  fun equals(other: Map[Key, Value]): Bool {
+  fun equals(other: This): Bool {
     this.keys().toSet() == other.keys().toSet()
       & this.keys.all({ this.get(it) == other.get(it) })
   }

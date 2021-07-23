@@ -339,7 +339,7 @@ class MappedIterable<In, Out> {
   let parent: Iterable<In>
   let mapper: (In, Int) => Out
 }
-impl<In, Out> MappedIterable<In, Out>: Iterable<Out> {
+impl<In, Out> MappedIterable<In, Out>: Equals & Hash & Iterable<Out> {
   fun iterator(): Iterator<Out> {
     MappedIterator<In, Out>(parent.iterator(), mapper, 0)
   }
@@ -364,7 +364,7 @@ class WhereIterable<Item, State> {
   let initialState: State
   let checker: (Item, State) => (Bool, State)
 }
-impl<Item, State> WhereIterable<Item, State>: Iterable<Item> {
+impl<Item, State> WhereIterable<Item, State>: Equals & Hash & Iterable<Item> {
   fun iterator(): Iterator<Item> {
     WhereIterator<Item, State>(parent.iterator(), initialState, checker)
   }
@@ -393,7 +393,7 @@ class ExpandIterable<Item, T> {
   let parent: Iterable<Item>
   let expander: (Item) => Iterable<T>
 }
-impl<Item, T> ExpandIterable<Item, T>: Iterable<T> {
+impl<Item, T> ExpandIterable<Item, T>: Equals & Hash & Iterable<T> {
   fun iterator(): Iterator<T> {
     ExpandIterator<Item, T>(parent.iterator(), expander, None<Iterator<T>>())
   }
@@ -426,7 +426,7 @@ class ZipIterable<Item, T> {
   let parent: Iterable<Item>
   let other: Iterable<T>
 }
-impl<Item, T> ZipIterable<Item, T>: Iterable<(Item, T)> {
+impl<Item, T> ZipIterable<Item, T>: Equals & Hash & Iterable<(Item, T)> {
   fun iterator(): Iterator<(Item, T)> {
     ZipIterator<Item, T>(parent.iterator(), other.iterator())
   }
@@ -451,7 +451,7 @@ class FollowedByIterable<Item> {
   let parent: Iterable<Item>
   let following: Iterable<Item>
 }
-impl<Item> FollowedByIterable<Item>: Iterable<Item> {
+impl<Item> FollowedByIterable<Item>: Equals & Hash & Iterable<Item> {
   fun iterator(): Iterator<Item> {
     FollowedByIterator<Item>(parent.iterator(), following.iterator())
   }
@@ -470,15 +470,6 @@ impl<Item> FollowedByIterator<Item>: Iterator<Item> {
   }
 }
 
-trait EqualsIterable<Item: Equals>: Iterable<Item> {
-  fun contains(item: Item): Bool {
-    todo("never, Implement Iterable<Equals>.contains")
-  }
-  
-  // TODO(never, marcelgarus): Implement distinct, indexOf, lastIndexOf
-}
-// impl<Item: Equals> Iterable<Item>: EqualsIterable<Item>
-
 impl Int {
   fun until(endExclusive: Int): Iterable<Int> {
     assert(
@@ -492,7 +483,7 @@ class UntilIterable {
   let start: Int
   let endExclusive: Int
 }
-impl UntilIterable: Iterable<Int> {
+impl UntilIterable: Equals & Hash & Iterable<Int> {
   fun iterator(): Iterator<Int> { UntilIterator(start, endExclusive) }
 }
 class UntilIterator {

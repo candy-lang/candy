@@ -1,5 +1,7 @@
+use ....hash
 use ....maybe
 use ....numbers
+use ....operators
 use ....todo
 use ...array
 use ...iterable
@@ -179,7 +181,7 @@ public class ArrayList<Item> {
   }
 }
 
-impl<Item> ArrayList<Item>: Iterable<Item> {
+impl<Item> ArrayList<Item>: Equals & Hash & Iterable<Item> {
   fun iterator(): Iterator<Item> {
     // TODO(never, marcelgarus): Remove the second argument as soon as default arguments are supported.
     ArrayListIterator<Item>(this, 0)

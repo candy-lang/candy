@@ -49,7 +49,7 @@ public trait Set<Item: Equals & Hash>: Equals & Hash {
     set
   }
 
-  fun equals(other: Set<Item>): Bool {
+  fun equals(other: This): Bool {
     let len = length()
     len == other.length() && union(other).length() == len
   }

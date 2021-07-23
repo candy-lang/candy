@@ -9,7 +9,7 @@ use ..iterable
 use ..array
 public use .array_list
 
-public trait List<Item>: Iterable<Item> {
+public trait List<Item>: Equals & Hash & Iterable<Item> {
   static fun empty<Item>(): List<Item> { ArrayList.empty<Item>() }
   static fun of1<Item>(first: Item): List<Item> {
     ArrayList.of1<Item>(first)
@@ -150,7 +150,7 @@ public trait List<Item>: Iterable<Item> {
   }
 }
 
-public trait MutableList<Item>: List<Item> {
+public trait MutableList<Item>: Equals & Hash & List<Item> {
   static fun empty<Item>(): MutableList<Item> { ArrayList.empty<Item>() }
   static fun of1<Item>(first: Item): MutableList<Item> {
     ArrayList.of1<Item>(first)
