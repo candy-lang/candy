@@ -423,9 +423,9 @@ impl LoweringContext {
     }
 
     if (expression is AstStructExpression) {
-      let expression = (expression as AstStructExpression)
+      let astExpression = (expression as AstStructExpression)
       mut let areValueArgumentsValid = true
-      let fields = (expression.valueArguments as Iterable<AstValueArgument>)
+      let fields = (astExpression.valueArguments as Iterable<AstValueArgument>)
         .map<HirValueExpressionUri>({
           if (it.name is None<AstIdentifier>) {
             areValueArgumentsValid = false
