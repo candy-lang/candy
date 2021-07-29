@@ -457,7 +457,7 @@ impl HirType: HasAst<AstType> & HasDeclarations & HasTypeParameters & HasVisibil
   }
 }
 
-impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeParameters {
+impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeParameters & HasVisibility {
   fun ast(context: QueryContext<List<CompilerError>>): AstFunction {
     query<AstFunction, List<CompilerError>>(context, "HirFunction.ast", this, {
       let ast = ((parent as HasDeclarations).typeUnsafeAstDeclarations(context) as Iterable<Any>)

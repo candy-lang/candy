@@ -24,7 +24,7 @@ impl<Value> Some<Value>: Equals & Hash & Maybe<Value> {
   fun flatMap<Out>(mapper: (Value) => Maybe<Out>): Maybe<Out> { mapper(value) }
 
   fun equals(other: This): Bool {
-    if (other is Some) { return false }
+    if (other is None) { return false }
     (value as Equals) == (other.unwrap() as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) { (value as Hash).hash<T>(hasher) }

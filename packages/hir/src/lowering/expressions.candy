@@ -473,7 +473,8 @@ impl LoweringContext {
           Map.empty<String, HirInlineType>(),
           Map.of1<String, HirValueExpressionUri>(Tuple("other", loweredRight.second)),
         ),
-        todo("soon, marcelgarus: Find the correct impl and retrieve the return type"),
+        // TODO(soon, marcelgarus): Find the correct impl and retrieve the return type
+        HirNamedType.coreNever(context),
       )
     }
 
