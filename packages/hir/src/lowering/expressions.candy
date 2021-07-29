@@ -423,7 +423,27 @@ impl LoweringContext {
     }
 
     if (expression is AstStructExpression) {
-      todo("soon, Lower struct expressions.")
+      let expression = (expression as AstStructExpression)
+      mut let areValueArgumentsValid = true
+      let fields = (expression.valueArguments as Iterable<AstValueArgument>)
+        .map<HirValueExpressionUri>({
+          if (it.name is None<AstIdentifier>) {
+            areValueArgumentsValid = false
+            context = context.registerError(
+              UnsupportedFeatureCompilerError(None<Location>(), "You need to use names for fields at struct creation"),
+            ).first
+          }
+          let result = context.lowerExpressionToValueExpression(it.value)
+          context = result.first
+          if (it.name as Some<AstIdentifier>) {
+            Tuple(it.name.unwrap, result.second)
+          }
+        })
+        .unsafeToMap<String, HirValueExpressionUri>()
+      return this.register(
+        HirStructValueExpression(fields),
+        todo("soon, marcelgarus: The type of the struct.")
+      )
     }
 
     if (expression is AstBinaryExpression) {

@@ -216,11 +216,11 @@ impl HirTypeInstantiationValueExpression: HirValueExpression & Equals & Hash {
 ///
 /// Example: `(foo: "Bar", baz: 42)`
 public class HirStructValueExpression {
-  public let valueArguments: Map<String, HirValueExpressionUri>
+  public let fields: Map<String, HirValueExpressionUri>
 }
 impl HirStructValueExpression: HirValueExpression & Equals & Hash {
-  fun equals(other: This): Bool { (valueArguments as Equals) == (other.valueArguments as Equals) }
-  fun hash<T>(hasher: Hasher<T>) { valueArguments.hash<T>(hasher) }
+  fun equals(other: This): Bool { (fields as Equals) == (other.fields as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { fields.hash<T>(hasher) }
 }
 
 /// An access of a struct's field.
