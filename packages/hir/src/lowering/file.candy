@@ -37,7 +37,7 @@ fun useLines_(context: QueryContext<List<CompilerError>>, moduleHir: HirModule):
     let isCoreImported = (useLines as Iterable<HirUseLine>)
       .maybeMap<HirModule>({ it.targetModule(context) })
       .any({ it == HirModule.core(context) })
-    if !(moduleHir.package() == Package.core(context)) && !isCoreImported {
+    if !((moduleHir as HasPackageAndPath).package() == Package.core(context)) && !isCoreImported {
       useLines.append(HirImplicitCoreUseLine(moduleHir))
     }
 
@@ -111,7 +111,7 @@ impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
         }
 
         let packageName = (targetAst.packagePath as Iterable<AstIdentifier>).single().unwrap().value
-        let package = parent.package().getDependencyByName(context, packageName)
+        let package = (this.parent as HasPackageAndPath).package().getDependencyByName(context, packageName)
         if package is None<Package> {
           return Tuple(
             None<HirModule>(),
@@ -132,10 +132,10 @@ impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
 
       let targetAndRemainingPath = if ast.target is AstLocalAbsoluteUseLineTarget {
         let targetAst = (ast.target as AstLocalAbsoluteUseLineTarget)
-        Tuple(HirTopLevelModule(parent.package()) as HirModule, targetAst.path)
+        Tuple(HirTopLevelModule((this.parent as HasPackageAndPath).package()) as HirModule, targetAst.path)
       } else {
         let targetAst = (ast.target as AstLocalRelativeUseLineTarget)
-        mut let target = parent
+        mut let target = this.parent
 
         // TODO(never, JonasWanke): use `int.times` when we support non-local returns
         mut let i = 0

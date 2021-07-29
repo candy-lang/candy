@@ -42,18 +42,42 @@ trait HasPackageAndPath {
   fun package(): Package
   fun path(): List<String>
 }
-impl HirModule: HasPackageAndPath {
+impl HirDeclaration: HasPackageAndPath {
   fun package(): Package
   fun path(): List<String>
 }
 impl HirTopLevelModule: HasPackageAndPath {
-  fun package(): Package { parent }
+  fun package(): Package { this.parent }
   fun path(): List<String> { List.empty<String>() }
 }
 impl HirInnerModule: HasPackageAndPath {
-  fun package(): Package { parent.package() }
+  fun package(): Package { (this.parent as HasPackageAndPath).package() }
   fun path(): List<String> {
-    (parent.path() as Iterable<String>).followedBy(List.of1<String>(name())).toList()
+    (this.parent as HasPackageAndPath).path().followedByList(List.of1<String>(this.name()))
+  }
+}
+impl HirTrait: HasPackageAndPath {
+  fun package(): Package { (this.parent as HasPackageAndPath).package() }
+  fun path(): List<String> {
+    (this.parent as HasPackageAndPath).path().followedByList(List.of1<String>(this.name()))
+  }
+}
+impl HirImpl: HasPackageAndPath {
+  fun package(): Package { (this.parent as HasPackageAndPath).package() }
+  fun path(): List<String> {
+    (this.parent as HasPackageAndPath).path().followedByList(List.of1<String>(this.name()))
+  }
+}
+impl HirType: HasPackageAndPath {
+  fun package(): Package { (this.parent as HasPackageAndPath).package() }
+  fun path(): List<String> {
+    (this.parent as HasPackageAndPath).path().followedByList(List.of1<String>(this.name()))
+  }
+}
+impl HirFunction: HasPackageAndPath {
+  fun package(): Package { (this.parent as HasPackageAndPath).package() }
+  fun path(): List<String> {
+    (this.parent as HasPackageAndPath).path().followedByList(List.of1<String>(this.name()))
   }
 }
 
@@ -110,8 +134,8 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule
     // the name of the next submodule, defaulting to module.candy if it doesn't exist. Finally, read
     // that file and find a inline module nested.
 
-    let package = moduleHir.package()
-    mut let segments = moduleHir.path() as Iterable<String>
+    let package = (moduleHir as HasPackageAndPath).package()
+    mut let segments = (moduleHir as HasPackageAndPath).path() as Iterable<String>
     mut let path = Path.parse("src")
 
     // Follow the directory structure down as much as possible.

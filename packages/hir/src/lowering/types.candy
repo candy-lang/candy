@@ -324,7 +324,7 @@ fun hirImplToSolverRules(
     let solverConstraints = MutableList.empty<SolverGoal>()
     for constraint in hirImpl.constraints(context).entries() {
       let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, constraint.second)
-      rules.addAll(result.third)
+      rules.addAll(result.third.items())
       solverConstraints.appendAll(
         (result.second as Iterable<SolverGoal>).map<SolverGoal>({
           it.substituteAll(
@@ -343,7 +343,7 @@ fun hirImplToSolverRules(
     // `Iterable[Int]` gets lowered to `?0` with the goal `Iterable(Int, ?0)`.
     let baseType = hirImpl.baseType(context)
     let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, baseType)
-    rules.addAll(result.third)
+    rules.addAll(result.third.items())
     solverConstraints.appendAll(result.second)
     let solverBase = result.first
 
@@ -352,15 +352,15 @@ fun hirImplToSolverRules(
     // implement a trait – like `impl Foo { ... }` – don't correspond to a `SolverRule` and cause
     // this function to return `None`.
     let traitType = hirImpl.implementedTrait(context)
-    if (traitType is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
+    if (traitType is None) { return Tuple(Set.empty<SolverRule>(), List.empty<CompilerError>()) }
     if (traitType.unwrap() is HirErrorType) {
-      return Tuple(None<SolverRule>(), List.empty<CompilerError>())
+      return Tuple(Set.empty<SolverRule>(), List.empty<CompilerError>())
     }
     let traitType = (traitType.unwrap() as HirNamedType)
     let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, traitType)
     let solverTrait = (result.first as SolverVariable) // Traits get lowered to `SolverVariable`s.
     let traitGoals = result.second
-    rules.addAll(result.third)
+    rules.addAll(result.third.items())
     if ((traitGoals as Iterable).length() > 1) {
       // TODO(never, marcelgarus): We can't implement a trait that contains another trait yet, like
       // `Iterable<Equals>`. This does work in Rust (with boxing and explicit dynamism), so we'll
@@ -371,7 +371,7 @@ fun hirImplToSolverRules(
       // (As "primitive" types like `List` etc. are also traits, resolving this todo is somewhat of
       // a priority.)
       return Tuple(
-        None<SolverRule>(),
+        Set.empty<SolverRule>(),
         List.of1<CompilerError>(CannotImplementTraitOfTraitCompilerError(hirImpl)),
       )
     }
@@ -407,8 +407,8 @@ fun hirImplToSolverRules(
 fun hirInlineTypeToSolverTypeAndGoalsAndRules(
   context: QueryContext<List<CompilerError>>,
   hirType: HirInlineType,
-): (SolverType, List<SolverGoal>, List<SolverRule>) {
-  /// Turns a `HirInlineType` into a `SolverType` and a list of `SolverGoal`s as well as a list of
+): (SolverType, List<SolverGoal>, Set<SolverRule>) {
+  /// Turns a `HirInlineType` into a `SolverType` and a list of `SolverGoal`s as well as a set of
   /// `SolverRule`s.
   ///
   /// Example:
@@ -432,7 +432,7 @@ fun hirInlineTypeToSolverTypeAndGoalsAndRules(
   /// )
 
   query<
-    (SolverType, List<SolverGoal>, List<SolverRule>),
+    (SolverType, List<SolverGoal>, Set<SolverRule>),
     List<CompilerError>,
   >(context, "hirInlineTypeToSolverTypeAndGoals", hirType, {
     if (hirType is HirErrorType) {
@@ -440,7 +440,7 @@ fun hirInlineTypeToSolverTypeAndGoalsAndRules(
         Tuple(
           SolverVariable(None<HirParameterType>()),
           List.empty<SolverGoal>(),
-          List.of2<SolverRule>(
+          Set.of2<SolverRule>(
             ruleThatEveryTypeImplementsError(context),
             ruleThatEveryTypeImplementsAny(context),
           ),
@@ -458,7 +458,7 @@ fun hirInlineTypeToSolverTypeAndGoalsAndRules(
         let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, parameter)
         solverParameters.append(result.first)
         goals.appendAll(result.second)
-        rules.addAll(result.third)
+        rules.addAll(result.third.items())
       }
       // We'll return a substitution that will have to satisfy the trait. For example, given the
       // trait `Equals`, we'll return `?0` with the goal `Equals(?0)`. The `?0` is this
@@ -470,15 +470,26 @@ fun hirInlineTypeToSolverTypeAndGoalsAndRules(
           (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(substitution)),
         ),
       )
-      return Tuple(Tuple(substitution, goals, rules), List.empty<CompilerError>())
+      return Tuple(
+        Tuple(substitution, goals as List<SolverGoal>, rules as Set<SolverRule>),
+        List.empty<CompilerError>(),
+      )
     }
     // TODO(never, marcelgarus): For now, we only support impls for nominal types. If we want to support
     // `impl A | B: Equals` or `impl (name: String, age: UInt): Clone`, we'll need to add support
     // for other `HirInlineTypes` as well.
-    // TODO(never, marcelgarus): Handle HirFunctionType
-    // TODO(never, marcelgarus): Handle HirNamedTupleType
-    // TODO(never, marcelgarus): Handle HirEnumType
-    // TODO(never, marcelgarus): Handle HirIntersectionType
+    if (hirType is HirFunctionType) {
+      todo("never, marcelgarus: Handle HirFunctionType")
+    }
+    if (hirType is HirNamedTupleType) {
+      todo("never, marcelgarus: Handle HirNamedTupleType")
+    }
+    if (hirType is HirEnumType) {
+      todo("never, marcelgarus: Handle HirEnumType")
+    }
+    if (hirType is HirIntersectionType) {
+      todo("never, marcelgarus: Handle HirIntersectionType")
+    }
     if (hirType is HirThisType) {
       let declaration = (hirType as HirThisType).declaration
       if (declaration is HirTrait) {
@@ -514,7 +525,7 @@ fun hirInlineTypeToSolverTypeAndGoalsAndRules(
         Tuple(
           SolverVariable(Some<HirParameterType>(hirType as HirParameterType)),
           List.empty<SolverGoal>(),
-          List.empty<SolverRule>(),
+          Set.empty<SolverRule>(),
         ),
         List.empty<CompilerError>(),
       )
@@ -555,7 +566,7 @@ fun hirTypeOrTraitToSolverRule(
         let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, parameter.upperBound(context))
         solverParameters.append(result.first)
         goals.appendAll(result.second)
-        rules.addAll(result.third)
+        rules.addAll(result.third.items())
       }
       let errorType = HirType.syntheticError(context)
       let errorVariable = SolverVariable.error()
