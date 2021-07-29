@@ -18,7 +18,7 @@ public fun getMangledTraitMethodName(context: QueryContext<List<CompilerError>>,
     // * "F" <parameterTypes: inlineType>* <returnType: inlineType> "E": **f**unction type
     // * "R" <receiverType: inlineType> <parameterTypes: inlineType>* <returnType: inlineType> "E":
     //   function type with **r**eceiver
-    // * "T" (<fieldName: identifier> <inlineType>)+ "E": named **t**uple type
+    // * "S" (<fieldName: identifier> <inlineType>)+ "E": **s**truct type
     // * "U" (<variantName: identifier> <inlineType>?)+ "E": en**u**m type
     // * "I" <inlineType>{2,} "E": **i**ntersection type
     let name = encodeNamedType(context, traitType)
@@ -63,8 +63,8 @@ fun encodeInlineType(
   if (inlineType is HirFunctionType) {
     return encodeFunctionType(context, inlineType as HirFunctionType)
   }
-  if (inlineType is HirNamedTupleType) {
-    return encodeNamedTupleType(context, inlineType as HirNamedTupleType)
+  if (inlineType is HirStructType) {
+    return encodeStructType(context, inlineType as HirStructType)
   }
   if (inlineType is HirEnumType) { return encodeEnumType(context, inlineType as HirEnumType) }
   if (inlineType is HirIntersectionType) {
@@ -92,14 +92,14 @@ fun encodeFunctionType(
   let returnType = encodeInlineType(context, functionType.returnType)
   "{start}{parameterTypes}{returnType}E"
 }
-fun encodeNamedTupleType(
+fun encodeStructType(
   context: QueryContext<List<CompilerError>>,
-  namedTupleType: HirNamedTupleType,
+  strictType: HirStructType,
 ): String {
-  let fields = (namedTupleType.types.sortedBy<String>({ it.first }) as Iterable<(String, HirInlineType)>)
+  let fields = (structType.types.sortedBy<String>({ it.first }) as Iterable<(String, HirInlineType)>)
     .map<String>({ "{encodeIdentifier(it.first)}{encodeInlineType(context, it.second)}" })
     .join("")
-  "T{fields}E"
+  "S{fields}E"
 }
 fun encodeEnumType(
   context: QueryContext<List<CompilerError>>,

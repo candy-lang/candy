@@ -344,34 +344,22 @@ class CstParser {
           CstGroupType(modifiers, openingParenthesis, type, closingParenthesis)
         })
 
-    let positionalTupleType = modifiers()
-        .sequence<CstNode<PunctuationToken>>(punctuation("("))
-        .sequence<List<CstNode<CstInlineType | PunctuationToken>>>(commaSeparated<CstInlineType>(inlineType))
-        .sequence<Maybe<CstNode<PunctuationToken>>>(closingParenthesisOrOtherEndDetection)
-        .map<CstInlineType>({
-          let modifiers = it.first.first.first
-          let openingParenthesis = it.first.first.second
-          let types = it.first.second
-          let closingParenthesis = it.second
-          CstPositionalTupleType(modifiers, openingParenthesis, types, closingParenthesis)
-        })
-
-    // TODO(never, JonasWanke): Allow modifiers before named tuple type fields.
-    let namedTupleTypeField = atLeastOne<
+    // TODO(never, JonasWanke): Allow modifiers before struct type fields.
+    let structTypeField = atLeastOne<
         CstNode<IdentifierToken>,
         (CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>),
       >(
         identifier(false),
         punctuation(":").sequence<Maybe<CstNode<CstInlineType>>>(inlineType.optional()),
       )
-      .map<CstNamedTupleTypeField>({
-        CstNamedTupleTypeField(List.empty<CstNode<IdentifierToken>>(), it.first, it.second)
+      .map<CstStructTypeField>({
+        CstStructTypeField(List.empty<CstNode<IdentifierToken>>(), it.first, it.second)
       })
-    let namedTupleTypeField = node<CstNamedTupleTypeField>(namedTupleTypeField)
-    let namedTupleType = modifiers()
+    let structTypeField = node<CstStructTypeField>(structTypeField)
+    let structType = modifiers()
         .sequence<CstNode<PunctuationToken>>(punctuation("("))
-        .sequence<List<CstNode<CstNamedTupleTypeField | PunctuationToken>>>(
-          commaSeparated<CstNamedTupleTypeField>(namedTupleTypeField),
+        .sequence<List<CstNode<CstStructTypeField | PunctuationToken>>>(
+          commaSeparated<CstStructTypeField>(structTypeField),
         )
         .sequence<Maybe<CstNode<PunctuationToken>>>(closingParenthesisOrOtherEndDetection)
         .map<CstInlineType>({
@@ -387,12 +375,11 @@ class CstParser {
 
     let enumTypeVariantValueType = node<CstInlineType>(
       choiceOf<String, CstInlineType>(
-        List.of6<Parser<String, CstInlineType>>(
+        List.of5<Parser<String, CstInlineType>>(
           intersectionType,
           functionType,
           groupType,
-          namedTupleType,
-          positionalTupleType,
+          structType,
           namedType,
         ),
       ),
@@ -509,13 +496,12 @@ class CstParser {
 
     inlineType.delegate = node<CstInlineType>(
       choiceOf<String, CstInlineType>(
-        List.of7<Parser<String, CstInlineType>>(
+        List.of6<Parser<String, CstInlineType>>(
           enumType,
           intersectionType,
           functionType,
           groupType,
-          namedTupleType,
-          positionalTupleType,
+          structType,
           namedType,
         ),
       ),
@@ -672,35 +658,7 @@ class CstParser {
           CstGroupExpression(openingParenthesis, expression, closingParenthesis)
         })
 
-    let namedTupleExpressionField = atLeastOne<
-      CstNode<IdentifierToken>,
-      (CstNode<PunctuationToken>, Maybe<CstNode<CstExpression>>),
-    >(
-      identifier(false),
-      punctuation(":").sequence<Maybe<CstNode<CstExpression>>>(expression_.optional()),
-    ).map<CstNamedTupleExpressionField>({ CstNamedTupleExpressionField(it.first, it.second) })
-    let namedTupleExpressionField = node<CstNamedTupleExpressionField>(namedTupleExpressionField)
-    let namedTupleExpression = punctuation("(")
-      .sequence<List<CstNode<CstNamedTupleExpressionField | PunctuationToken>>>(
-        commaSeparated<CstNamedTupleExpressionField>(namedTupleExpressionField),
-      )
-      .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd(")"))
-      .map<CstExpression>({
-        let openingParenthesis = it.first.first
-        let valueArguments = it.first.second
-        let closingParenthesis = it.second
-        CstNamedTupleExpression(openingParenthesis, valueArguments, closingParenthesis)
-      })
-
-    let positionalTupleExpression = punctuation("(")
-        .sequence<List<CstNode<CstExpression | PunctuationToken>>>(commaSeparated<CstExpression>(expression_))
-        .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd(")"))
-        .map<CstExpression>({
-          let openingParenthesis = it.first.first
-          let valueArguments = it.first.second
-          let closingParenthesis = it.second
-          CstPositionalTupleExpression(openingParenthesis, valueArguments, closingParenthesis)
-        })
+    let structExpression = valueParameters().map({ CstStructExpression(it) })
 
     let propertyExpression = declarationBeginningWithName("let", false)
           .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>>(
@@ -719,15 +677,14 @@ class CstParser {
           })
 
     let primitiveExpressions = choiceOf<String, CstExpression>(
-        List.of8<Parser<String, CstExpression>>(
+        List.of7<Parser<String, CstExpression>>(
           propertyExpression,
           intExpression,
           stringExpression,
           lambdaExpression,
           identifierExpression,
           groupExpression,
-          namedTupleExpression,
-          positionalTupleExpression,
+          structExpression,
         ),
       )
 

@@ -7,18 +7,18 @@ use ...declarations
 use ...types
 use ..type_collection
 
-public fun compileNamedTupleType(
+public fun compileStructType(
   context: QueryContext<List<CompilerError>>,
-  namedTupleType: HirNamedTupleType,
+  structType: HirStructType,
 ): DartType {
   query<DartType, List<CompilerError>>(
     context,
-    "code_generator_dart.compileNamedTupleType",
-    namedTupleType, {
-    let sortedFields = (namedTupleType.types.sortedBy<String>({ it.first }) as Iterable<(String, HirInlineType)>)
+    "code_generator_dart.compileStructType",
+    structType, {
+    let sortedFields = (structType.types.sortedBy<String>({ it.first }) as Iterable<(String, HirInlineType)>)
     let fieldNames = sortedFields.map<String>({ it.first }).toSet()
-    let name = getCompiledNamedTupleTypeName(context, fieldNames)
-    let importUrl = moduleHirToImportUrl(context, HirModule.syntheticNamedTuples(context))
+    let name = getCompiledStructTypeName(context, fieldNames)
+    let importUrl = moduleHirToImportUrl(context, HirModule.syntheticStructs(context))
     let name = DartIdentifier(name, Some<String>(importUrl))
 
     let types = sortedFields.map<DartType>({ compileInlineType(context, it.second) }).toList()
@@ -27,35 +27,35 @@ public fun compileNamedTupleType(
   })
 }
 
-public fun compileNamedTupleTypeDeclarations(
+public fun compileStructTypeDeclarations(
   context: QueryContext<List<CompilerError>>,
   package: Package,
 ): (HirModule, List<DartDeclaration>) {
   query<(HirModule, List<DartDeclaration>), List<CompilerError>>(
     context,
-    "code_generator_dart.compileNamedTupleTypeDeclarations",
+    "code_generator_dart.compileStructTypeDeclarations",
     package, {
     let fieldNames = getAllInlineTypes(context, package).items()
-      .whereType<HirNamedTupleType>()
+      .whereType<HirStructType>()
       .map<Set<String>>({
         (it.types as Iterable<(String, HirInlineType)>).map<String>({ it.first }).toSet()
       })
       .toSet()
     let classes = fieldNames.items()
-      .map<DartDeclaration>({ compileNamedTupleTypeDeclaration(context, it) })
+      .map<DartDeclaration>({ compileStructTypeDeclaration(context, it) })
       .toList()
-    Tuple(Tuple(HirModule.syntheticNamedTuples(context), classes), List.empty<CompilerError>())
+    Tuple(Tuple(HirModule.syntheticStructs(context), classes), List.empty<CompilerError>())
   })
 }
-fun compileNamedTupleTypeDeclaration(
+fun compileStructTypeDeclaration(
   context: QueryContext<List<CompilerError>>,
   fieldNames: Set<String>,
 ): DartClass {
   query<DartClass, List<CompilerError>>(
     context,
-    "code_generator_dart.compileNamedTupleTypeDeclaration",
+    "code_generator_dart.compileStructTypeDeclaration",
     SetOfString(fieldNames), {
-    let name = getCompiledNamedTupleTypeName(context, fieldNames)
+    let name = getCompiledStructTypeName(context, fieldNames)
 
     let fields = (fieldNames.items().toList().unsafeSorted() as Iterable<String>)
       .map<(String, String)>({ Tuple(it, "T{it}") })
@@ -114,16 +114,16 @@ fun compileNamedTupleTypeDeclaration(
   })
 }
 
-public fun getCompiledNamedTupleTypeName(
+public fun getCompiledStructTypeName(
   context: QueryContext<List<CompilerError>>,
   fieldNames: Set<String>,
 ): String {
   query<String, List<CompilerError>>(
     context,
-    "code_generator_dart.getCompiledNamedTupleTypeName",
+    "code_generator_dart.getCompiledStructTypeName",
     SetOfString(fieldNames), {
     let fieldNames = fieldNames.items().toList().unsafeSorted()
     let fieldNames = (fieldNames as Iterable<String>).join("$")
-    Tuple("NamedTuple${fieldNames}", List.empty<CompilerError>())
+    Tuple("Struct${fieldNames}", List.empty<CompilerError>())
   })
 }

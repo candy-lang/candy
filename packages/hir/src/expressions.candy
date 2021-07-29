@@ -212,30 +212,28 @@ impl HirTypeInstantiationValueExpression: HirValueExpression & Equals & Hash {
   }
 }
 
-/// A named tuple expression.
-/// Positional tuples like `("Bar", 42)` automatically get lowered to named tuples like
-/// `(first: "Bar", second: 42)`.
+/// A struct expression.
 ///
 /// Example: `(foo: "Bar", baz: 42)`
-public class HirNamedTupleValueExpression {
+public class HirStructValueExpression {
   public let valueArguments: Map<String, HirValueExpressionUri>
 }
-impl HirNamedTupleValueExpression: HirValueExpression & Equals & Hash {
+impl HirStructValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool { valueArguments.unsafeEquals(other.valueArguments) }
   fun hash<T>(hasher: Hasher<T>) { valueArguments.unsafeHash<T>(hasher) }
 }
 
-/// An access of a named tuple's field.
+/// An access of a struct's field.
 ///
 /// Examples:
 ///
 /// * `foo.bar`
 /// * `foo.baz`
-public class HirNamedTupleFieldAccessValueExpression {
+public class HirStructFieldAccessValueExpression {
   public let receiver: HirValueExpressionUri
   public let name: String
 }
-impl HirNamedTupleFieldAccessValueExpression: HirValueExpression & Equals & Hash {
+impl HirStructFieldAccessValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
       && (name as Equals) == (other.name as Equals)

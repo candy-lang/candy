@@ -317,7 +317,7 @@ fun lowerTrait(
           context.addError(
             ExpectedTypeCompilerError(
               context.file,
-              cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
+              cst.cast<CstTrait | CstImpl | CstType | CstStructTypeField | CstIntersectionType>(),
             ),
           )
           context.createErrorType(id)
@@ -359,7 +359,7 @@ fun lowerImpl(
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
+        cst.cast<CstTrait | CstImpl | CstType | CstStructTypeField | CstIntersectionType>(),
       ),
     )
   }
@@ -371,7 +371,7 @@ fun lowerImpl(
           context.addError(
             ExpectedTypeCompilerError(
               context.file,
-              cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
+              cst.cast<CstTrait | CstImpl | CstType | CstStructTypeField | CstIntersectionType>(),
             ),
           )
           context.createErrorType(id)
@@ -443,7 +443,7 @@ fun lowerType(
     if (it.second is None<CstNode<CstInlineType>>) {
       context.addError(ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
+        cst.cast<CstTrait | CstImpl | CstType | CstStructTypeField | CstIntersectionType>(),
       ))
       isValid = false
       return context.createErrorType(id)
@@ -577,12 +577,11 @@ fun lowerDeclarationContent(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstPositionalTupleType
-        | CstNamedTupleType
+        | CstStructType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstPositionalTupleExpression
+        | CstStructExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -608,12 +607,11 @@ fun lowerBlockBody(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstPositionalTupleType
-        | CstNamedTupleType
+        | CstStructType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstPositionalTupleExpression
+        | CstStructExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -657,12 +655,11 @@ fun lowerValueParameters(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstPositionalTupleType
-        | CstNamedTupleType
+        | CstStructType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstPositionalTupleExpression
+        | CstStructExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -869,11 +866,8 @@ fun lowerInlineType(
   if cst.child is CstFunctionType {
     return lowerFunctionType(context, parentId, cst.cast<CstFunctionType>())
   }
-  if cst.child is CstPositionalTupleType {
-    return lowerPositionalTupleType(context, parentId, cst.cast<CstPositionalTupleType>())
-  }
-  if cst.child is CstNamedTupleType {
-    return lowerNamedTupleType(context, parentId, cst.cast<CstNamedTupleType>())
+  if cst.child is CstStructType {
+    return lowerStructType(context, parentId, cst.cast<CstStructType>())
   }
   if cst.child is CstEnumType {
     return lowerEnumType(context, parentId, cst.cast<CstEnumType>())
@@ -946,12 +940,11 @@ fun lowerGroupType(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstPositionalTupleType
-        | CstNamedTupleType
+        | CstStructType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstPositionalTupleExpression
+        | CstStructExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1016,12 +1009,11 @@ fun lowerFunctionTypeParameterTypes(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstPositionalTupleType
-        | CstNamedTupleType
+        | CstStructType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstPositionalTupleExpression
+        | CstStructExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1030,76 +1022,17 @@ fun lowerFunctionTypeParameterTypes(
   parameterTypes
 }
 
-fun lowerPositionalTupleType(
+fun lowerStructType(
   context: LoweringContext,
   parentId: AstDeclarationId | AstInlineTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
-  cst: CstNode<CstPositionalTupleType>,
+  cst: CstNode<CstStructType>,
 ): AstInlineType {
   let id = context.getInlineTypeId(parentId)
   mut let isValid = true
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
-  let types = MutableList.empty<AstInlineType>()
-  mut let punctuationExpectedNext = false
-  for node in cst.child.types {
-    if node.child is PunctuationToken {
-      if !punctuationExpectedNext {
-        // TODO(never, JonasWanke)
-      } else {
-        punctuationExpectedNext = false
-      }
-    } else {
-      if punctuationExpectedNext {
-        // TODO(never, JonasWanke)
-      }
-      types.append(lowerInlineType(context, id, node.cast<CstInlineType>()))
-      punctuationExpectedNext = true
-    }
-  }
-  if (types as Iterable<AstInlineType>).length() < 2 {
-    isValid = false
-    context.addError(
-      ExpectedTwoOrMoreItemsInPositionalTupleCompilerError(
-        context.file,
-        cst.cast<CstPositionalTupleType | CstPositionalTupleExpression>(),
-      ),
-    )
-  }
-
-  if cst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
-    let upcastedCst = cst.cast<CstDeclarationContent
-        | CstBlockBody
-        | CstValueParameters
-        | CstGroupType
-        | CstFunctionTypeParameterTypes
-        | CstPositionalTupleType
-        | CstNamedTupleType
-        | CstTypeParameters
-        | CstTypeArguments
-        | CstGroupExpression
-        | CstPositionalTupleExpression
-        | CstInterpolatedStringPart
-        | CstValueArguments>()
-    context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
-  }
-
-  if !isValid { return context.createErrorType(id) }
-  context.addIdMapping(cst.id, id)
-  AstPositionalTupleType(id, modifiers, types)
-}
-
-fun lowerNamedTupleType(
-  context: LoweringContext,
-  parentId: AstDeclarationId | AstInlineTypeId | AstTypeParameterId | AstTypeArgumentId | AstValueParameterId | AstExpressionId,
-  cst: CstNode<CstNamedTupleType>,
-): AstInlineType {
-  let id = context.getInlineTypeId(parentId)
-  mut let isValid = true
-
-  let modifiers = lowerModifiers(context, id, cst.child.modifiers)
-
-  let fields = MutableList.empty<AstNamedTupleTypeField>()
+  let fields = MutableList.empty<AstStructTypeField>()
   let previousNames = MutableSet.empty<String>()
   mut let punctuationExpectedNext = false
   for node in cst.child.fields {
@@ -1114,13 +1047,13 @@ fun lowerNamedTupleType(
         // TODO(never, JonasWanke)
       }
 
-      let field = lowerNamedTupleTypeField(
+      let field = lowerStructTypeField(
         context,
         id,
-        node.cast<CstNamedTupleTypeField>(),
+        node.cast<CstStructTypeField>(),
         previousNames,
       )
-      if field is Some<AstNamedTupleTypeField> {
+      if field is Some<AstStructTypeField> {
         fields.append(field.unwrap())
         previousNames.insert(field.unwrap().name.value)
       }
@@ -1134,12 +1067,11 @@ fun lowerNamedTupleType(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstPositionalTupleType
-        | CstNamedTupleType
+        | CstStructType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstPositionalTupleExpression
+        | CstStructExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1147,26 +1079,26 @@ fun lowerNamedTupleType(
 
   if !isValid { return context.createErrorType(id) }
   context.addIdMapping(cst.id, id)
-  AstNamedTupleType(id, modifiers, fields)
+  AstStructType(id, modifiers, fields)
 }
-fun lowerNamedTupleTypeField(
+fun lowerStructTypeField(
   context: LoweringContext,
   parentId: AstInlineTypeId,
-  cst: CstNode<CstNamedTupleTypeField>,
+  cst: CstNode<CstStructTypeField>,
   previousNames: Set<String>,
-): Maybe<AstNamedTupleTypeField> {
+): Maybe<AstStructTypeField> {
   let id = context.getInlineTypeId(parentId)
   mut let isValid = true
 
   let modifiers = lowerModifiers(context, id, cst.child.modifiers)
 
   if (cst.child.name is None<CstNode<IdentifierToken>>) {
-    context.addError(MissingNamedTupleTypeFieldNameCompilerError(context.file, cst))
+    context.addError(MissingStructTypeFieldNameCompilerError(context.file, cst))
     isValid = false
   }
   let name = cst.child.name.map<AstIdentifier>({
     if (previousNames.contains(it.child.identifier)) {
-      context.addError(DuplicateNamedTupleTypeFieldNameCompilerError(context.file, cst))
+      context.addError(DuplicateStructTypeFieldNameCompilerError(context.file, cst))
       isValid = false
     }
     lowerIdentifier(context, id, it, 0)
@@ -1177,28 +1109,28 @@ fun lowerNamedTupleTypeField(
       if (it.second is None<CstNode<CstInlineType>>) {
         context.addError(ExpectedTypeCompilerError(
           context.file,
-          cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
+          cst.cast<CstTrait | CstImpl | CstType | CstStructTypeField | CstIntersectionType>(),
         ))
         return context.createErrorType(id)
       }
       lowerInlineType(context, id, it.second.unwrap())
     })
     .orElse({
-      context.addError(MissingNamedTupleTypeFieldTypeCompilerError(context.file, cst))
+      context.addError(MissingStructTypeFieldTypeCompilerError(context.file, cst))
       context.createErrorType(id)
     })
 
-  if !isValid { return None<AstNamedTupleTypeField>() }
+  if !isValid { return None<AstStructTypeField>() }
   context.addIdMapping(cst.id, id)
-  Some<AstNamedTupleTypeField>(AstNamedTupleTypeField(id, modifiers, name.unwrap(), type))
+  Some<AstStructTypeField>(AstStructTypeField(id, modifiers, name.unwrap(), type))
 }
 
-public class MissingNamedTupleTypeFieldNameCompilerError {
+public class MissingStructTypeFieldNameCompilerError {
   public let file: FancyFile
-  public let node: CstNode<CstNamedTupleTypeField>
+  public let node: CstNode<CstStructTypeField>
 }
-impl MissingNamedTupleTypeFieldNameCompilerError: CompilerError {
-  public fun id(): String { "missing-named-tuple-type-field-name" }
+impl MissingStructTypeFieldNameCompilerError: CompilerError {
+  public fun id(): String { "missing-struct-type-field-name" }
 
   public fun location(): Location {
     // At least one of `name` and `type` must be set.
@@ -1211,13 +1143,13 @@ impl MissingNamedTupleTypeFieldNameCompilerError: CompilerError {
   }
 }
 
-public class DuplicateNamedTupleTypeFieldNameCompilerError {
+public class DuplicateStructTypeFieldNameCompilerError {
   public let file: FancyFile
-  public let node: CstNode<CstNamedTupleTypeField>
+  public let node: CstNode<CstStructTypeField>
   // TODO(never, JonasWanke): highlight previous occurrences of that name
 }
-impl DuplicateNamedTupleTypeFieldNameCompilerError: CompilerError {
-  public fun id(): String { "duplicate-named-tuple-type-field-name" }
+impl DuplicateStructTypeFieldNameCompilerError: CompilerError {
+  public fun id(): String { "duplicate-struct-type-field-name" }
 
   public fun location(): Location {
     Location(file, node.child.name.unwrap().child.span)
@@ -1229,12 +1161,12 @@ impl DuplicateNamedTupleTypeFieldNameCompilerError: CompilerError {
   }
 }
 
-public class MissingNamedTupleTypeFieldTypeCompilerError {
+public class MissingStructTypeFieldTypeCompilerError {
   public let file: FancyFile
-  public let node: CstNode<CstNamedTupleTypeField>
+  public let node: CstNode<CstStructTypeField>
 }
-impl MissingNamedTupleTypeFieldTypeCompilerError: CompilerError {
-  public fun id(): String { "missing-named-tuple-type-field-type" }
+impl MissingStructTypeFieldTypeCompilerError: CompilerError {
+  public fun id(): String { "missing-struct-type-field-type" }
 
   public fun location(): Location {
     // At least one of `name` and `type` must be set.
@@ -1414,7 +1346,7 @@ fun lowerIntersectionType(
     context.addError(
       ExpectedTypeCompilerError(
         context.file,
-        cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
+        cst.cast<CstTrait | CstImpl | CstType | CstStructTypeField | CstIntersectionType>(),
       ),
     )
   } else {
@@ -1465,12 +1397,11 @@ fun lowerTypeParameters(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstPositionalTupleType
-        | CstNamedTupleType
+        | CstStructType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstPositionalTupleExpression
+        | CstStructExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1547,12 +1478,11 @@ fun lowerTypeArguments(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstPositionalTupleType
-        | CstNamedTupleType
+        | CstStructType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstPositionalTupleExpression
+        | CstStructExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1638,8 +1568,10 @@ fun lowerExpression(
   if cst.child is CstGroupExpression {
     return lowerGroupExpression(context, parentId, cst.cast<CstGroupExpression>())
   }
-  if cst.child is CstPositionalTupleExpression {
-    return lowerPositionalTupleExpression(context, parentId, cst.cast<CstPositionalTupleExpression>())
+  if cst.child is CstStructExpression {
+    return Some<AstExpression>(
+      lowerStructExpression(context, parentId, cst.cast<CstStructStructExpression>()),
+    )
   }
   if cst.child is CstBinaryExpression {
     return lowerBinaryExpression(context, parentId, cst.cast<CstBinaryExpression>())
@@ -1779,12 +1711,11 @@ fun lowerInterpolatedStringPart(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstPositionalTupleType
-        | CstNamedTupleType
+        | CstStructType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstPositionalTupleExpression
+        | CstStructExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1868,12 +1799,11 @@ fun lowerGroupExpression(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstPositionalTupleType
-        | CstNamedTupleType
+        | CstStructType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstPositionalTupleExpression
+        | CstStructExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
@@ -1882,63 +1812,17 @@ fun lowerGroupExpression(
   return expression
 }
 
-fun lowerPositionalTupleExpression(
+fun lowerStructExpression(
   context: LoweringContext,
   parentId: AstDeclarationId | AstBodyId | AstValueParameterId | AstExpressionId,
-  cst: CstNode<CstPositionalTupleExpression>,
-): Maybe<AstExpression> {
+  cst: CstNode<CstStructExpression>,
+): AstStructExpression {
   let id = context.getExpressionId(parentId)
-  mut let isValid = true
 
-  let expressions = MutableList.empty<AstExpression>()
-  mut let punctuationExpectedNext = false
-  for node in cst.child.expressions {
-    if node.child is PunctuationToken {
-      if !punctuationExpectedNext {
-        // TODO(never, JonasWanke)
-      } else {
-        punctuationExpectedNext = false
-      }
-    } else {
-      if punctuationExpectedNext {
-        // TODO(never, JonasWanke)
-      }
-      let expression = lowerExpression(context, parentId, node.cast<CstExpression>())
-      expression.do({ expressions.append(it) })
-      if expression is None<AstExpression> { isValid = false }
-      punctuationExpectedNext = true
-    }
-  }
-  if (expressions as Iterable<AstExpression>).length() < 2 {
-    isValid = false
-    context.addError(
-      ExpectedTwoOrMoreItemsInPositionalTupleCompilerError(
-        context.file,
-        cst.cast<CstPositionalTupleType | CstPositionalTupleExpression>(),
-      ),
-    )
-  }
+  let valueArguments = lowerValueArguments(context, id, cst.child.valueArguments)
 
-  if cst.child.closingParenthesis is None<CstNode<PunctuationToken>> {
-    let upcastedCst = cst.cast<CstDeclarationContent
-        | CstBlockBody
-        | CstValueParameters
-        | CstGroupType
-        | CstFunctionTypeParameterTypes
-        | CstPositionalTupleType
-        | CstNamedTupleType
-        | CstTypeParameters
-        | CstTypeArguments
-        | CstGroupExpression
-        | CstPositionalTupleExpression
-        | CstInterpolatedStringPart
-        | CstValueArguments>()
-    context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))
-  }
-
-  if !isValid { return None<AstExpression>() }
   context.addIdMapping(cst.id, id)
-  Some<AstExpression>(AstPositionalTupleExpression(id, expressions))
+  AstStructExpression(id, valueArguments)
 }
 
 fun lowerPropertyExpression(
@@ -1962,7 +1846,7 @@ fun lowerPropertyExpression(
       context.addError(
         ExpectedTypeCompilerError(
           context.file,
-          cst.cast<CstTrait | CstImpl | CstType | CstNamedTupleTypeField | CstIntersectionType>(),
+          cst.cast<CstTrait | CstImpl | CstType | CstStructTypeField | CstIntersectionType>(),
         ),
       )
       return context.createErrorType(id)
@@ -2161,12 +2045,11 @@ fun lowerValueArguments(
         | CstValueParameters
         | CstGroupType
         | CstFunctionTypeParameterTypes
-        | CstPositionalTupleType
-        | CstNamedTupleType
+        | CstStructType
         | CstTypeParameters
         | CstTypeArguments
         | CstGroupExpression
-        | CstPositionalTupleExpression
+        | CstStructExpression
         | CstInterpolatedStringPart
         | CstValueArguments>()
     context.addError(MissingClosingBracketCompilerError(context.file, upcastedCst))

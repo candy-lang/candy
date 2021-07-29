@@ -6,7 +6,7 @@ use incremental
 public use .enum_type
 public use .function_type
 public use .named_type
-public use .named_tuple_type
+public use .struct_type
 
 public fun compileInlineType(
   context: QueryContext<List<CompilerError>>,
@@ -29,9 +29,7 @@ fun compileInlineTypeHelper(
   if (inlineType is HirFunctionType) {
     return compileFunctionType(context, inlineType as HirFunctionType)
   }
-  if (inlineType is HirNamedTupleType) {
-    return compileNamedTupleType(context, inlineType as HirNamedTupleType)
-  }
+  if (inlineType is HirStructType) { return compileStructType(context, inlineType as HirStructType) }
   if (inlineType is HirEnumType) { return compileEnumType(context, inlineType as HirEnumType) }
   if (inlineType is HirIntersectionType) { return dartDynamic }
   if (inlineType is HirThisType) { return dartDynamic }

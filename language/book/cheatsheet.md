@@ -62,12 +62,9 @@ In Candy, every variable has a static type.
 
 These are the ways to define new types:
 
-* **Positional tuples** like `(String, Int)`.
-  Positional tuples always contain all their members.
-  You can create instances using `("Foo", 2)` and access members using the functions `first`, `second`, etc.: `myTuple first`
-* **Named tuples** like `(foo: String, bar: Int)`.
-  Named tuples always contain all their members.
-  You can create instances using `(foo = "String", bar = 42)` and access the members using their name: `myTuple foo`
+* **Structs** like `(foo: String, bar: Int)`.
+  Structs always contain all their members.
+  You can create instances using `(foo = "String", bar = 42)` and access the members using their name: `myStruct foo`
 * **Enum types** like `Foo | Bar String`.
   Enums define a type that is either one of the variant types.
   It's constructed by combining multiple variants using a pipe `|`.

@@ -81,53 +81,33 @@ impl AstFunctionType: AstInlineType & Equals & Hash {
 }
 
 
-public class AstPositionalTupleType {
+public class AstStructType {
   public let id: AstInlineTypeId
   public let modifiers: List<AstIdentifier>
-  public let types: List<AstInlineType>
+  public let types: List<AstStructTypeField>
 }
-impl AstPositionalTupleType: AstInlineType & Equals & Hash {
+impl AstStructType: AstInlineType & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)
         .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
-      (types as Iterable<AstInlineType>).unsafeEquals(other.types as Iterable<AstInlineType>)
+      (types as Iterable<AstStructTypeField>)
+        .unsafeEquals(other.types as Iterable<AstStructTypeField>)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
     (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
-    (types as Iterable<AstInlineType>).unsafeHash<T>(hasher)
+    (types as Iterable<AstStructTypeField>).unsafeHash<T>(hasher)
   }
 }
 
-
-public class AstNamedTupleType {
-  public let id: AstInlineTypeId
-  public let modifiers: List<AstIdentifier>
-  public let types: List<AstNamedTupleTypeField>
-}
-impl AstNamedTupleType: AstInlineType & Equals & Hash {
-  fun equals(other: This): Bool {
-    (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
-      (types as Iterable<AstNamedTupleTypeField>)
-        .unsafeEquals(other.types as Iterable<AstNamedTupleTypeField>)
-  }
-  fun hash<T>(hasher: Hasher<T>) {
-    (id as Hash).hash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
-    (types as Iterable<AstNamedTupleTypeField>).unsafeHash<T>(hasher)
-  }
-}
-
-public class AstNamedTupleTypeField {
+public class AstStructTypeField {
   public let id: AstInlineTypeId
   public let modifiers: List<AstIdentifier>
   public let name: AstIdentifier
   public let type: AstInlineType
 }
-impl AstNamedTupleTypeField: Equals & Hash {
+impl AstStructTypeField: Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Iterable<AstIdentifier>)

@@ -1,9 +1,8 @@
-# Tuples are types that can hold multiple other types.
+# Structs are types that can hold multiple other types.
 #
-# There is nothing to see here, because tuples are actually built into the compiler. Just use
+# There is nothing to see here, because structs are actually built into the compiler. Just use
 # parenthesis to create them on-the-fly:
 #
 # ```
-# let a: (String, Int) = ("foo", 42) # Positional tuple
-# let b: (foo: String, bar: Int) = (foo: "foo", bar: 42) # Named tuple
+# let b: (foo: String, bar: Int) = (foo: "foo", bar: 42) # Struct
 # ```

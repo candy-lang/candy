@@ -152,9 +152,9 @@ fun getAllInlineTypesInsideInlineType(
         getAllInlineTypesInsideFunctionType(context, inlineType as HirFunctionType).items(),
       )
     }
-    if (inlineType is HirNamedTupleType) {
+    if (inlineType is HirStructType) {
       inlineTypes.addAll(
-        getAllInlineTypesInsideNamedTupleType(context, inlineType as HirNamedTupleType).items(),
+        getAllInlineTypesInsideStructType(context, inlineType as HirStructType).items(),
       )
     }
     if (inlineType is HirEnumType) {
@@ -205,17 +205,17 @@ fun getAllInlineTypesInsideFunctionType(
     Tuple(inlineTypes, List.empty<CompilerError>())
   })
 }
-fun getAllInlineTypesInsideNamedTupleType(
+fun getAllInlineTypesInsideStructType(
   context: QueryContext<List<CompilerError>>,
-  namedTupleType: HirNamedTupleType,
+  structType: HirStructType,
 ): Set<HirInlineType> {
   query<Set<HirInlineType>, List<CompilerError>>(
     context,
-    "code_generator_dart.getAllInlineTypesInsideNamedTupleType",
-    namedTupleType, {
+    "code_generator_dart.getAllInlineTypesInsideStructType",
+    structType, {
     let inlineTypes = getAllInlineTypesInsideInlineTypes(
       context,
-      (namedTupleType.types as Iterable<(String, HirInlineType)>)
+      (structType.types as Iterable<(String, HirInlineType)>)
         .map<HirInlineType>({ it.second })
         .toList(),
     )

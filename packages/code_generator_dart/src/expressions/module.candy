@@ -76,8 +76,8 @@ fun compileValueExpressionHelper(
       expression as HirTypeInstantiationValueExpression,
     )
   }
-  if (expression is HirNamedTupleValueExpression) {
-    return compileNamedTupleValueExpression(context, uri, expression as HirNamedTupleValueExpression)
+  if (expression is HirStructValueExpression) {
+    return compileStructValueExpression(context, uri, expression as HirStructValueExpression)
   }
 
   if (expression is HirReturnValueExpression) {

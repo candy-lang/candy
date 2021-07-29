@@ -10,8 +10,7 @@ public class MissingClosingBracketCompilerError {
     | CstValueParameters
     | CstGroupType
     | CstFunctionTypeParameterTypes
-    | CstPositionalTupleType
-    | CstNamedTupleType
+    | CstStructType
     | CstTypeParameters
     | CstTypeArguments
     | CstGroupExpression
@@ -39,11 +38,8 @@ impl MissingClosingBracketCompilerError: CompilerError {
     if node.child is CstFunctionTypeParameterTypes {
       return node.cast<CstFunctionTypeParameterTypes>().child.openingParenthesis.child.span
     }
-    if node.child is CstPositionalTupleType {
-      return node.cast<CstPositionalTupleType>().child.openingParenthesis.child.span
-    }
-    if node.child is CstNamedTupleType {
-      return node.cast<CstNamedTupleType>().child.openingParenthesis.child.span
+    if node.child is CstStructType {
+      return node.cast<CstStructType>().child.openingParenthesis.child.span
     }
     if node.child is CstTypeParameters {
       return node.cast<CstTypeParameters>().child.openingAngleBracket.child.span

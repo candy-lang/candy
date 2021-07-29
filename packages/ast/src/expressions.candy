@@ -127,19 +127,19 @@ impl AstIdentifierExpression: AstExpression & Equals & Hash {
 }
 
 
-public class AstPositionalTupleExpression {
+public class AstStructExpression {
   public let id: AstExpressionId
-  public let expressions: List<AstExpression>
+  public let valueArguments: List<AstValueArgument>
 }
-impl AstPositionalTupleExpression: AstExpression & Equals & Hash {
+impl AstStructExpression: AstExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (expressions as Iterable<AstExpression>)
-        .unsafeEquals(other.expressions as Iterable<AstExpression>)
+      (valueArguments as Iterable<AstValueArgument>)
+        .unsafeEquals(other.valueArguments as Iterable<AstValueArgument>)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (expressions as Iterable<AstExpression>).unsafeHash<T>(hasher)
+    (valueArguments as Iterable<AstValueArgument>).unsafeHash<T>(hasher)
   }
 }
 

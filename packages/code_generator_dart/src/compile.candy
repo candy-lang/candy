@@ -61,18 +61,18 @@ fun compile_(context: QueryContext<List<CompilerError>>, package: Package): Map<
 }
 
 /// Tries to compile everything in this package and its dependencies.
-fun compilePackage(context: QueryContext<List<CompilerError>>, package: Package) {
-  query<Unit, List<CompilerError>>(context, "code_generator_dart.compilePackage", package, {
+fun checkPackage(context: QueryContext<List<CompilerError>>, package: Package) {
+  query<Unit, List<CompilerError>>(context, "code_generator_dart.checkPackage", package, {
     (package.getAllPackagesInCompilationOrder(context) as Iterable<Package>)
-      .do<HirInlineType>({ compileDeclaration(context, HirTopLevelModule(it)) })
+      .do<HirInlineType>({ checkDeclaration(context, HirTopLevelModule(it)) })
     Tuple(unit, List.empty<CompilerError>())
   })
 }
-fun compileDeclaration(context: QueryContext<List<CompilerError>>, declarationHir: HirDeclaration) {
+fun checkDeclaration(context: QueryContext<List<CompilerError>>, declarationHir: HirDeclaration) {
   ((declarationHir as HasDeclarations).declarations(context) as Iterable<HirDeclaration>)
-    .do<HirInlineType>({ compileDeclaration(context, it) })
+    .do<HirInlineType>({ checkDeclaration(context, it) })
   if (declarationHir is HasTypeParameters) {
-    compileTypeParameters(context, declarationHir as HasTypeParameters)
+    (declarationHir as HasTypeParameters).typeParameters(context)
   }
 
   if (declarationHir is HirTrait) {
@@ -127,7 +127,7 @@ fun generateSyntheticPackage(context: QueryContext<List<CompilerError>>, package
   query<Map<Path, String>, List<CompilerError>>(context, "code_generator_dart.generateSyntheticPackage", package, {
     let declarations = (List.of2<(HirModule, List<DartDeclaration>)>(
       compileEnumTypeDeclarations(context, package),
-      compileNamedTupleTypeDeclarations(context, package),
+      compileStructTypeDeclarations(context, package),
     ) as Iterable<(HirModule, List<DartDeclaration>)>)
     assert(
       declarations.all({ (it.first as HasPackageAndPath).package() == Package.synthetic(context) }),

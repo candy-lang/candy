@@ -32,23 +32,23 @@ public fun compileTypeInstantiationValueExpression(
   })
 }
 
-public fun compileNamedTupleValueExpression(
+public fun compileStructValueExpression(
   context: QueryContext<List<CompilerError>>,
   uri: HirValueExpressionUri,
-  expression: HirNamedTupleValueExpression,
+  expression: HirStructValueExpression,
 ): List<DartStatement> {
   query<List<DartStatement>, List<CompilerError>>(
     context,
-    "code_generator_dart.compileNamedTupleValueExpression",
-    DataTuple2<HirValueExpressionUri, HirNamedTupleValueExpression>(uri, expression), {
+    "code_generator_dart.compileStructValueExpression",
+    DataTuple2<HirValueExpressionUri, HirStructValueExpression>(uri, expression), {
     let statements = MutableList.empty<DartStatement>()
     statements.appendAll(
       (expression.valueArguments as Iterable<HirValueExpressionUri>)
         .expand<DartStatement>({ compileValueExpression(context, it) }),
     )
 
-    // TODO(soon, JonasWanke): use `compileNamedTupleType` when we can get the named tuple type of this expression
-    let compiledType = DartNamedType(DartIdentifier("NamedTuple", None<String>()), List.empty<DartType>())
+    // TODO(soon, JonasWanke): use `compileStructType` when we can get the struct type of this expression
+    let compiledType = DartNamedType(DartIdentifier("Struct", None<String>()), List.empty<DartType>())
     statements.append(saveValueExpression(
       context,
       uri,
