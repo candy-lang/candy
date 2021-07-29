@@ -62,15 +62,21 @@ trait SolverType {
         // Being equal to itself is no bound, so no substitution `?A = ?A` is necessary.
         return Some<Map<SolverVariable, SolverType>>(Map.empty<SolverVariable, SolverType>())
       } else {
-        if (this_.type as HirParameterType).name < (other_.type as HirParameterType).name {
-          return Some<Map<SolverVariable, SolverType>>(
-            Map.of1<SolverVariable, SolverType>(Tuple(this_, other_)),
-          )
-        } else {
+        if (this_.type is Some && other_.type is Some) {
+          if ((this_.type as HirParameterType).name < (other_.type as HirParameterType).name) {
+            return Some<Map<SolverVariable, SolverType>>(
+              Map.of1<SolverVariable, SolverType>(Tuple(this_, other_)),
+            )
+          }
+        }
+        if (this_.type is Some) {
           return Some<Map<SolverVariable, SolverType>>(
             Map.of1<SolverVariable, SolverType>(Tuple(other_, this_)),
           )
         }
+        return Some<Map<SolverVariable, SolverType>>(
+          Map.of1<SolverVariable, SolverType>(Tuple(this_, other_)),
+        )
       }
     }
 

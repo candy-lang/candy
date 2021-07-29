@@ -311,7 +311,7 @@ fun hirImplToSolverRules(
     let solverConstraints = MutableList.empty<SolverGoal>()
     for constraint in hirImpl.constraints(context).entries() {
       let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, constraint.second)
-      rules.addAll(result.third)
+      rules.addAll(result.third.items())
       solverConstraints.appendAll(
         (result.second as Iterable<SolverGoal>).map<SolverGoal>({
           it.substituteAll(
@@ -330,7 +330,7 @@ fun hirImplToSolverRules(
     // `Iterable[Int]` gets lowered to `?0` with the goal `Iterable(Int, ?0)`.
     let baseType = hirImpl.baseType(context)
     let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, baseType)
-    rules.addAll(result.third)
+    rules.addAll(result.third.items())
     solverConstraints.appendAll(result.second)
     let solverBase = result.first
 
@@ -339,15 +339,15 @@ fun hirImplToSolverRules(
     // implement a trait – like `impl Foo { ... }` – don't correspond to a `SolverRule` and cause
     // this function to return `None`.
     let traitType = hirImpl.implementedTrait(context)
-    if (traitType is None) { return Tuple(None<SolverRule>(), List.empty<CompilerError>()) }
+    if (traitType is None) { return Tuple(Set.empty<SolverRule>(), List.empty<CompilerError>()) }
     if (traitType.unwrap() is HirErrorType) {
-      return Tuple(None<SolverRule>(), List.empty<CompilerError>())
+      return Tuple(Set.empty<SolverRule>(), List.empty<CompilerError>())
     }
     let traitType = (traitType.unwrap() as HirNamedType)
     let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, traitType)
     let solverTrait = (result.first as SolverVariable) // Traits get lowered to `SolverVariable`s.
     let traitGoals = result.second
-    rules.addAll(result.third)
+    rules.addAll(result.third.items())
     if ((traitGoals as Iterable).length() > 1) {
       // TODO(never, marcelgarus): We can't implement a trait that contains another trait yet, like
       // `Iterable<Equals>`. This does work in Rust (with boxing and explicit dynamism), so we'll
@@ -358,7 +358,7 @@ fun hirImplToSolverRules(
       // (As "primitive" types like `List` etc. are also traits, resolving this todo is somewhat of
       // a priority.)
       return Tuple(
-        None<SolverRule>(),
+        Set.empty<SolverRule>(),
         List.of1<CompilerError>(CannotImplementTraitOfTraitCompilerError(hirImpl)),
       )
     }
@@ -393,79 +393,182 @@ fun hirImplToSolverRules(
 
 fun hirInlineTypeToSolverTypeAndGoalsAndRules(
   context: QueryContext<List<CompilerError>>,
-  hirType: HirInlineType,
-): (SolverType, List<SolverGoal>, List<SolverRule>) {
-  /// Turns a `HirInlineType` into a `SolverType` and a list of `SolverGoal`s as well as a list of
+  inlineType: HirInlineType,
+): (SolverType, List<SolverGoal>, Set<SolverRule>) {
+  /// Turns a `HirInlineType` into a `SolverType` and a list of `SolverGoal`s as well as a set of
   /// `SolverRule`s.
-  ///
-  /// Example:
-  ///
-  /// hirInlineTypeToSolverStuff(Tuple(String, Int)) == (
-  ///   ?0,
-  ///   Tuple(?0, ?1, ?2), String(?1), Int(?2),
-  ///   [
-  ///     Tuple($Tuple[?1, ?2], ?1, ?2) <- <empty>,
-  ///     Tuple($Never, ?1, ?2) <- <empty>,
-  ///     Tuple(?0, ?1, ?2) <- Error(?0),
-  ///     String($String) <- <empty>,
-  ///     String($Never) <- <empty>,
-  ///     String(?0) <- Error(?0),
-  ///     Int($Int) <- <empty>,
-  ///     Int($Never) <- <empty>,
-  ///     Int(?0) <- Error(?0),
-  ///     Error(?0) <- <empty>,
-  ///     Any(?0) <- <empty>,
-  ///   ],
-  /// )
 
   query<
-    (SolverType, List<SolverGoal>, List<SolverRule>),
+    (SolverType, List<SolverGoal>, Set<SolverRule>),
     List<CompilerError>,
-  >(context, "hirInlineTypeToSolverTypeAndGoals", hirType, {
+  >(context, "hirInlineTypeToSolverTypeAndGoalsAndRules", inlineType, {
+    let loweringContext = LoweringContext.create(context)
+    let result = loweringContext.hirInlineTypeToSolverTypeAndGoals(inlineType)
+    Tuple(Tuple(result.first, result.second, loweringContext.rules), List.empty<CompilerError>())
+  })
+}
+
+class LoweringContext {
+  let context: QueryContext<List<CompilerError>>
+
+  mut let nextCanonicalIndex: Int
+  fun getNextCanonicalVariable(): HirParameterType {
+    let result = canonicalVariable(this.nextCanonicalIndex)
+    this.nextCanonicalIndex = this.nextCanonicalIndex + 1
+    result
+  }
+
+  let rules: MutableSet<SolverRule>
+
+  static fun create(context: QueryContext<List<CompilerError>>): LoweringContext {
+    let loweringContext = LoweringContext(context, 0, MutableSet.empty<SolverRule>())
+    let errorType = HirType.syntheticError(context)
+    loweringContext.rules.insert(SolverRule(
+      errorType,
+      SolverGoal(errorType, List.of1<SolverType>(SolverVariable.error())),
+      List.empty<SolverGoal>(),
+    ))
+    let anyType = HirTrait.coreAny(context)
+    loweringContext.rules.insert(SolverRule(
+      anyType,
+      SolverGoal(anyType, List.of1<SolverType>(SolverVariable(None<HirParameterType>()))),
+      List.empty<SolverGoal>(),
+    ))
+    loweringContext
+  }
+
+  fun hirInlineTypeToSolverTypeAndGoals(
+    hirType: HirInlineType,
+  ): (SolverVariable, List<SolverGoal>) {
     if (hirType is HirErrorType) {
-      return Tuple(
-        Tuple(
-          SolverVariable(None<HirParameterType>()),
-          List.empty<SolverGoal>(),
-          List.of2<SolverRule>(
-            ruleThatEveryTypeImplementsError(context),
-            ruleThatEveryTypeImplementsAny(context),
-          ),
-        ),
-        List.empty<CompilerError>(),
-      )
+      return Tuple(SolverVariable(None<HirParameterType>()), List.empty<SolverGoal>())
     }
     if (hirType is HirNamedType) {
+      /// Example:
+      ///
+      /// hirInlineTypeToSolverStuff(Foo[String, Int]) == (
+      ///   ?0,
+      ///   Foo(?0, ?1, ?2), String(?1), Int(?2),
+      ///   [
+      ///     Foo($Foo[?1, ?2], ?1, ?2) <- <empty>,
+      ///     Foo($Never, ?1, ?2) <- <empty>,
+      ///     Foo(?0, ?1, ?2) <- Error(?0),
+      ///     ## Generated transitively:
+      ///     String($String) <- <empty>,
+      ///     String($Never) <- <empty>,
+      ///     String(?0) <- Error(?0),
+      ///     Int($Int) <- <empty>,
+      ///     Int($Never) <- <empty>,
+      ///     Int(?0) <- Error(?0),
+      ///     Error(?0) <- <empty>,
+      ///     Any(?0) <- <empty>,
+      ///   ],
+      /// )
+
       let declaration = (hirType as HirNamedType).declaration
-      let parameters = ((hirType as HirNamedType).parameterTypes as Iterable<HirInlineType>)
-      let rules = MutableSet.empty<SolverRule>()
       let goals = MutableList.empty<SolverGoal>()
       let solverParameters = MutableList.empty<SolverType>()
-      for parameter in parameters {
-        let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, parameter)
+      this.registerHirTypeOrTraitSolverRules(declaration)
+      for parameter in (hirType as HirNamedType).parameterTypes {
+        let result = this.hirInlineTypeToSolverTypeAndGoals(parameter)
         solverParameters.append(result.first)
         goals.appendAll(result.second)
-        rules.addAll(result.third)
       }
       // We'll return a substitution that will have to satisfy the trait. For example, given the
       // trait `Equals`, we'll return `?0` with the goal `Equals(?0)`. The `?0` is this
       // substitution.
-      let substitution = SolverVariable(Some<HirParameterType>(canonicalVariable(-1)))
+      let substitution = SolverVariable(Some<HirParameterType>(this.getNextCanonicalVariable()))
       goals.append(
         SolverGoal(
           declaration,
           (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(substitution)),
         ),
       )
-      return Tuple(Tuple(substitution, goals, rules), List.empty<CompilerError>())
+      return Tuple(substitution, goals as List<SolverGoal>)
     }
     // TODO(never, marcelgarus): For now, we only support impls for nominal types. If we want to support
     // `impl A | B: Equals` or `impl (name: String, age: UInt): Clone`, we'll need to add support
     // for other `HirInlineTypes` as well.
-    // TODO(never, marcelgarus): Handle HirFunctionType
-    // TODO(never, marcelgarus): Handle HirStructType
-    // TODO(never, marcelgarus): Handle HirEnumType
-    // TODO(never, marcelgarus): Handle HirIntersectionType
+    if (hirType is HirFunctionType) {
+      todo("never, marcelgarus: Handle HirFunctionType")
+    }
+    if (hirType is HirStructType) {
+      /// Example:
+      ///
+      /// hirInlineTypeToSolverStuff((foo: String, bar: Int)) == (
+      ///   ?0,
+      ///   Tuple$bar$foo(?1, ?2, ?0), Int(?1), String(?2),
+      ///   [
+      ///     Tuple$bar$foo(?0, ?1, $Tuple$bar$foo[?0, ?1]) <- <empty>,
+      ///     Tuple$bar$foo(?0, ?1, $Never) <- <empty>,
+      ///     Tuple$bar$foo(?0, ?1, ?2) <- Error(?2),
+      ///     ## Generated transitively:
+      ///     String($String) <- <empty>,
+      ///     String($Never) <- <empty>,
+      ///     String(?0) <- Error(?0),
+      ///     Int($Int) <- <empty>,
+      ///     Int($Never) <- <empty>,
+      ///     Int(?0) <- Error(?0),
+      ///     Error(?0) <- <empty>,
+      ///     Any(?0) <- <empty>,
+      ///   ],
+      /// )
+
+      let goals = MutableList.empty<SolverGoal>()
+      let solverParameters = MutableList.empty<SolverType>()
+      let declaration = this.registerTupleSolverRules(hirType as HirStructType)
+      let types = ((hirType as HirStructType).types.sortedBy<String>({ it.first }) as Iterable<(String, HirInlineType)>)
+        .map<HirInlineType>({ it.second })
+      for parameter in types {
+        let result = this.hirInlineTypeToSolverTypeAndGoals(parameter)
+        solverParameters.append(result.first)
+        goals.appendAll(result.second)
+      }
+      // We'll return a substitution that will have to satisfy the trait. For example, given the
+      // trait `Equals`, we'll return `?0` with the goal `Equals(?0)`. The `?0` is this
+      // substitution.
+      let substitution = SolverVariable(Some<HirParameterType>(this.getNextCanonicalVariable()))
+      goals.append(
+        SolverGoal(
+          declaration,
+          (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(substitution)),
+        ),
+      )
+      return Tuple(substitution, goals as List<SolverGoal>)
+    }
+    if (hirType is HirEnumType) {
+      todo("never, marcelgarus: Handle HirEnumType")
+    }
+    if (hirType is HirIntersectionType) {
+      /// Example:
+      ///
+      /// hirInlineTypeToSolverStuff(Equals & Hash) == (
+      ///   ?0,
+      ///   Equals(?0), Hash(?0)
+      ///   [
+      ///     ## Generated transitively:
+      ///     Equals($Equals) <- <empty>,
+      ///     Equals($Never) <- <empty>,
+      ///     Equals(?0) <- Error(?0),
+      ///     Hash($Hash) <- <empty>,
+      ///     Hash($Never) <- <empty>,
+      ///     Hash(?0) <- Error(?0),
+      ///     Error(?0) <- <empty>,
+      ///     Any(?0) <- <empty>,
+      ///   ],
+      /// )
+
+      let goals = MutableList.empty<SolverGoal>()
+      let substitution = SolverVariable(Some<HirParameterType>(this.getNextCanonicalVariable()))
+      for type_ in (hirType as HirIntersectionType).types {
+        let result = this.hirInlineTypeToSolverTypeAndGoals(type_)
+        let substitutions = Map.of1<SolverVariable, SolverType>(Tuple(result.first, substitution))
+        let substitutedGoals = (result.second as Iterable<SolverGoal>)
+          .map<SolverGoal>({ it.substituteAll(substitutions) })
+        goals.appendAll(substitutedGoals)
+      }
+      return Tuple(substitution, goals as List<SolverGoal>)
+    }
     if (hirType is HirThisType) {
       let declaration = (hirType as HirThisType).declaration
       if (declaration is HirTrait) {
@@ -485,25 +588,17 @@ fun hirInlineTypeToSolverTypeAndGoalsAndRules(
         // * `impl And: InfixAmpersand[This, Bool]` has the lowered base type `?0` with the
         //   additional goal `And(?0)`, so the `This` gets replaced with `?0`, resulting in
         //   `InfixAmpersand(?0, Bool) <- And(?0)`.
-        let loweredBaseType = hirInlineTypeToSolverTypeAndGoalsAndRules(
-          context,
+        let loweredBaseType = this.hirInlineTypeToSolverTypeAndGoals(
           (declaration as HirImpl).baseType(context),
         )
         let baseSolverType = loweredBaseType.first
-        return Tuple(
-          Tuple(baseSolverType, List.empty<SolverGoal>(), loweredBaseType.third),
-          List.empty<CompilerError>(),
-        )
+        return Tuple(baseSolverType, List.empty<SolverGoal>())
       }
     }
     if (hirType is HirParameterType) {
       return Tuple(
-        Tuple(
-          SolverVariable(Some<HirParameterType>(hirType as HirParameterType)),
-          List.empty<SolverGoal>(),
-          List.empty<SolverRule>(),
-        ),
-        List.empty<CompilerError>(),
+        SolverVariable(Some<HirParameterType>(hirType as HirParameterType)),
+        List.empty<SolverGoal>(),
       )
     }
     if (hirType is HirReflectionType) {
@@ -511,85 +606,161 @@ fun hirInlineTypeToSolverTypeAndGoalsAndRules(
     }
 
     throw "Unexpected HirType: {hirType}"
-  })
-}
+  }
 
-fun hirTypeOrTraitToSolverRule(
-  context: QueryContext<List<CompilerError>>,
-  declaration: HirType | HirTrait,
-): Set<SolverRule> {
-  query<Set<SolverRule>, List<CompilerError>>(
-    context,
-    "hirTypeOrTraitToSolverRule",
-    declaration as Equals & Hash, {
-      // We create several synthetic types and impls to allow for correct handling of error types
-      // and the `Never` type.
-      //
-      // For example:
-      //
-      // hirTypeOrTraitToSolverRule(Int) == [
-      //   Int($Int) <- <empty>,
-      //   Int($Never) <- <empty>,
-      //   Int(?0) <- Error(?0),
-      //   Error(?0) <- <empty>,
-      //   Any(?0) <- <empty>,
-      // ]
+  fun registerHirTypeOrTraitSolverRules(declaration: HirType | HirTrait) {
+    // We create several synthetic types and impls to allow for correct handling of error types
+    // and the `Never` type.
+    //
+    // Example 1:
+    //
+    // registerHirTypeOrTraitSolverRules(Int) -> [
+    //   Int($Int) <- <empty>,
+    //   Int($Never) <- <empty>,
+    //   Int(?0) <- Error(?0),
+    //   Error(?0) <- <empty>,
+    //   Any(?0) <- <empty>,
+    // ]
+    //
+    // Example 2:
+    //
+    // registerHirTypeOrTraitSolverRules(LinkedList) -> [
+    //   LinkedList(?0, $LinkedList(?0)) <- <empty>,
+    //   LinkedList(?0, $Never) <- <empty>,
+    //   LinkedList(?0, ?1) <- Error(?1),
+    //   Error(?0) <- <empty>,
+    //   Any(?0) <- <empty>,
+    // ]
 
-      let rules = MutableSet.empty<SolverRule>()
-      let goals = MutableList.empty<SolverGoal>()
-      let solverParameters = MutableList.empty<SolverType>()
-      for parameter in (declaration as HasTypeParameters).typeParameters(context) {
-        let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, parameter.upperBound(context))
-        solverParameters.append(result.first)
-        goals.appendAll(result.second)
-        rules.addAll(result.third)
-      }
-      let errorType = HirType.syntheticError(context)
-      let errorVariable = SolverVariable.error()
-      return Tuple(
-        Set.of5<SolverRule>(
-          // T($T) <- <empty>
-          SolverRule(declaration, SolverGoal(declaration, solverParameters), goals),
-          // T($Never) <- <empty>
-          SolverRule(
+    let goals = MutableList.empty<SolverGoal>()
+    let solverParameters = MutableList.empty<SolverType>()
+    for parameter in (declaration as HasTypeParameters).typeParameters(context) {
+      let result = this.hirInlineTypeToSolverTypeAndGoals(parameter.upperBound(context))
+      solverParameters.append(result.first)
+      goals.appendAll(result.second)
+    }
+
+    // T($T) <- <empty>
+    if (declaration is HirType) {
+      let primitive = HirType((declaration as HirType).parent, "${(declaration as HirType).name()}")
+      let primitive = SolverValue(primitive, solverParameters)
+      this.rules.insert(
+        SolverRule(
+          declaration,
+          SolverGoal(
             declaration,
-            SolverGoal(
-              declaration,
-              List.of1<SolverType>(SolverValue(HirType.coreNever(context), List.empty<SolverType>())),
-            ),
-            List.empty<SolverGoal>(),
+            (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(primitive)),
           ),
-          // T(?0) <- Error(?0)
-          SolverRule(
-            declaration,
-            SolverGoal(declaration, List.of1<SolverType>(errorVariable)),
-            List.of1<SolverGoal>(SolverGoal(errorType, List.of1<SolverType>(errorVariable))),
-          ),
-          ruleThatEveryTypeImplementsError(context),
-          ruleThatEveryTypeImplementsAny(context),
-        ).union(rules),
-        List.empty<CompilerError>(),
+          goals,
+        ),
       )
     }
-  )
-}
 
-fun ruleThatEveryTypeImplementsError(context: QueryContext<List<CompilerError>>): SolverRule {
-  let errorType = HirType.syntheticError(context)
-  SolverRule(
-    errorType,
-    SolverGoal(errorType, List.of1<SolverType>(SolverVariable.error())),
-    List.empty<SolverGoal>(),
-  )
-}
+    // T($Never) <- <empty>
+    this.rules.insert(SolverRule(
+      declaration,
+      SolverGoal(
+        declaration,
+        (solverParameters as List<SolverType>).followedByList(
+          List.of1<SolverType>(SolverValue(HirType.coreNever(context), List.empty<SolverType>())),
+        ),
+      ),
+      List.empty<SolverGoal>(),
+    ))
 
-fun ruleThatEveryTypeImplementsAny(context: QueryContext<List<CompilerError>>): SolverRule {
-  let anyType = HirTrait.coreAny(context)
-  SolverRule(
-    anyType,
-    SolverGoal(anyType, List.of1<SolverType>(SolverVariable(None<HirParameterType>()))),
-    List.empty<SolverGoal>(),
-  )
+    // T(?0) <- Error(?0)
+    let errorType = HirType.syntheticError(context)
+    let errorVariable = SolverVariable.error()
+    this.rules.insert(SolverRule(
+      declaration,
+      SolverGoal(
+        declaration,
+        (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(errorVariable)),
+      ),
+      List.of1<SolverGoal>(SolverGoal(errorType, List.of1<SolverType>(errorVariable))),
+    ))
+  }
+
+  fun registerTupleSolverRules(tupleType: HirStructType): HirType {
+    // We create several synthetic types and impls to allow for correct handling of error types
+    // and the `Never` type.
+    //
+    // For example:
+    //
+    // registerTupleSolverRules((foo: String, bar: Int)) -> [
+    //   Tuple$bar$foo(?0, ?1, $Tuple$bar$foo(?0, ?1)) <- <empty>,
+    //   Tuple$bar$foo(?0, ?1, $Never) <- <empty>,
+    //   Tuple$bar$foo(?0, ?1, ?2) <- Error(?2),
+    //   ## Generated transitively:
+    //   String($String) <- <empty>,
+    //   String($Never) <- <empty>,
+    //   String(?0) <- Error(?0),
+    //   Int($Int) <- <empty>,
+    //   Int($Never) <- <empty>,
+    //   Int(?0) <- Error(?0),
+    //   Error(?0) <- <empty>,
+    //   Any(?0) <- <empty>,
+    // ]
+
+    let fieldNames = (tupleType.types as Iterable<(String, HirInlineType)>)
+      .map<String>({ it.first })
+      .toList()
+      .unsafeSorted()
+    let fieldNames = (fieldNames as Iterable<String>).join("$")
+    let declaration = HirType(HirModule.syntheticStructs(this.context), "Tuple${fieldNames}")
+
+    let goals = MutableList.empty<SolverGoal>()
+    let solverParameters = MutableList.empty<SolverType>()
+    mut let parameterIndex = 0
+    for inlineType in (tupleType.types as Iterable<(String, HirInlineType)>).map<HirInlineType>({ it.second }) {
+      // This adds rules for the specific "type arguments".
+      this.hirInlineTypeToSolverTypeAndGoals(inlineType)
+      solverParameters.append(
+        SolverVariable(Some<HirParameterType>(canonicalVariable(parameterIndex))),
+      )
+      parameterIndex = parameterIndex + 1
+    }
+
+    // T($T) <- <empty>
+    let primitive = HirType((declaration as HirType).parent, "${declaration.name()}")
+    let primitive = SolverValue(primitive, solverParameters)
+    this.rules.insert(
+      SolverRule(
+        declaration,
+        SolverGoal(
+          declaration,
+          (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(primitive)),
+        ),
+        goals,
+      ),
+    )
+
+    // T($Never) <- <empty>
+    this.rules.insert(SolverRule(
+      declaration,
+      SolverGoal(
+        declaration,
+        (solverParameters as List<SolverType>).followedByList(
+          List.of1<SolverType>(SolverValue(HirType.coreNever(context), List.empty<SolverType>())),
+        ),
+      ),
+      List.empty<SolverGoal>(),
+    ))
+
+    // T(?0) <- Error(?0)
+    let errorType = HirType.syntheticError(context)
+    let errorVariable = SolverVariable.error()
+    this.rules.insert(SolverRule(
+      declaration,
+      SolverGoal(
+        declaration,
+        (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(errorVariable)),
+      ),
+      List.of1<SolverGoal>(SolverGoal(errorType, List.of1<SolverType>(errorVariable))),
+    ))
+
+    declaration
+  }
 }
 
 

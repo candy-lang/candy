@@ -111,9 +111,6 @@ public class HirType {
   public let parent: HirModule
   public let name_: String
 
-  static fun coreAny(context: QueryContext<List<CompilerError>>): HirType {
-    HirType(HirModule.corePrimitives(context), "Any")
-  }
   static fun coreInt(context: QueryContext<List<CompilerError>>): HirType {
     HirType(HirModule.coreInt(context), "Int")
   }

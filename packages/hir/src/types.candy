@@ -4,8 +4,8 @@ use incremental
 use ..declarations
 
 public trait HirInlineType: Equals & Hash {
-  fun substitute(substitutions: Map<HirInlineType, HirInlineType>): This {
-    substitutions.get(this).orElse({ this.substituteChildren(substitutions) })
+  fun substitute(substitutions: Map<HirInlineType, HirInlineType>): HirInlineType {
+    substitutions.get(this).orElse({ (this.substituteChildren(substitutions) as HirInlineType) })
   }
   fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This
 }
@@ -24,7 +24,7 @@ public class HirNamedType {
   public let parameterTypes: List<HirInlineType>
 
   static fun coreAny(context: QueryContext<List<CompilerError>>): HirNamedType {
-    HirNamedType(HirType.coreAny(context), List.empty<HirInlineType>())
+    HirNamedType(HirTrait.coreAny(context), List.empty<HirInlineType>())
   }
   static fun coreInt(context: QueryContext<List<CompilerError>>): HirNamedType {
     HirNamedType(HirType.coreInt(context), List.empty<HirInlineType>())
@@ -55,7 +55,7 @@ impl HirNamedType: Equals & Hash & HirInlineType {
     HirNamedType(
       declaration,
       (parameterTypes as Iterable<HirInlineType>)
-        .map<HirInlineType>({ it.substituteChildren(substitutions) })
+        .map<HirInlineType>({ it.substitute(substitutions) })
         .toList(),
     )
   }
@@ -80,11 +80,11 @@ impl HirFunctionType: Equals & Hash & HirInlineType {
   }
   fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
     HirFunctionType(
-      receiverType.map<HirInlineType>({ it.substituteChildren(substitutions) }),
+      receiverType.map<HirInlineType>({ it.substitute(substitutions) }),
       (parameterTypes as Iterable<HirInlineType>)
-        .map<HirInlineType>({ it.substituteChildren(substitutions) })
+        .map<HirInlineType>({ it.substitute(substitutions) })
         .toList(),
-      returnType.substituteChildren(substitutions),
+      returnType.substitute(substitutions),
     )
   }
 }
@@ -111,7 +111,7 @@ impl HirStructType: Equals & Hash & HirInlineType {
   fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
     HirStructType(
       (types as Iterable<(String, HirInlineType)>)
-        .map<(String, HirInlineType)>({ Tuple(it.first, it.second.substituteChildren(substitutions)) })
+        .map<(String, HirInlineType)>({ Tuple(it.first, it.second.substitute(substitutions)) })
         .toList(),
     )
   }
@@ -128,7 +128,7 @@ impl HirEnumType: Equals & Hash & HirInlineType {
     HirEnumType(
       variants.entries()
         .map<(String, Maybe<HirInlineType>)>({
-          Tuple(it.first, it.second.map<HirInlineType>({ it.substituteChildren(substitutions) }))
+          Tuple(it.first, it.second.map<HirInlineType>({ it.substitute(substitutions) }))
         })
         .unsafeToMap<String, Maybe<HirInlineType>>(),
     )
@@ -148,7 +148,7 @@ impl HirIntersectionType: Equals & Hash & HirInlineType {
   fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
     HirIntersectionType(
       (types as Iterable<HirInlineType>)
-        .map<HirInlineType>({ it.substituteChildren(substitutions) })
+        .map<HirInlineType>({ it.substitute(substitutions) })
         .toList(),
     )
   }
