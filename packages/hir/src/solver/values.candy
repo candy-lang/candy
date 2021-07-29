@@ -62,15 +62,21 @@ trait SolverType {
         // Being equal to itself is no bound, so no substitution `?A = ?A` is necessary.
         return Some<Map<SolverVariable, SolverType>>(Map.empty<SolverVariable, SolverType>())
       } else {
-        if (this_.type as HirParameterType).name < (other_.type as HirParameterType).name {
-          return Some<Map<SolverVariable, SolverType>>(
-            Map.of1<SolverVariable, SolverType>(Tuple(this_, other_)),
-          )
-        } else {
+        if (this_.type is Some && other_.type is Some) {
+          if ((this_.type as HirParameterType).name < (other_.type as HirParameterType).name) {
+            return Some<Map<SolverVariable, SolverType>>(
+              Map.of1<SolverVariable, SolverType>(Tuple(this_, other_)),
+            )
+          }
+        }
+        if (this_.type is Some) {
           return Some<Map<SolverVariable, SolverType>>(
             Map.of1<SolverVariable, SolverType>(Tuple(other_, this_)),
           )
         }
+        return Some<Map<SolverVariable, SolverType>>(
+          Map.of1<SolverVariable, SolverType>(Tuple(this_, other_)),
+        )
       }
     }
 
@@ -177,7 +183,9 @@ impl SolverVariable: SolverType {
   fun containsVariable(variable: SolverVariable): Bool { this == variable }
 
   fun substituteAll(substitutions: Map<SolverVariable, SolverType>): SolverType {
-    substitutions.get(SolverVariable(Some<HirParameterType>(type))).orElse({ this })
+    this.type
+      .flatMap<SolverType>({ substitutions.get(SolverVariable(Some<HirParameterType>(it))) })
+      .orElse({ this })
   }
 
   fun canonicalizeInternal(mapping: MutableMap<SolverVariable, SolverVariable>): SolverVariable {
@@ -189,8 +197,8 @@ impl SolverVariable: SolverType {
   }
 }
 impl SolverVariable: Equals & Hash {
-  fun equals(other: This): Bool { type.unsafeEquals(other.type) }
-  fun hash<T>(hasher: Hasher<T>) { type.unsafeHash<T>(hasher) }
+  fun equals(other: This): Bool { (type as Equals) == (other.type as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { (type as Hash).hash<T>(hasher) }
 }
 
 class SolverValue {
@@ -240,14 +248,10 @@ impl SolverValue: SolverType {
 impl SolverValue: Equals & Hash {
   fun equals(other: This): Bool {
     (type as Equals) == (other.type as Equals)
-      && (parameters as Iterable<SolverType>)
-        .unsafeEquals(other.parameters as Iterable<SolverType>)
+      && (parameters as Equals) == (other.parameters as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (type as Hash).hash<T>(hasher)
-    (parameters as Iterable).length().hash<T>(hasher)
-    for parameter in parameters {
-      (parameter as Hash).hash<T>(hasher)
-    }
+    (parameters as Hash).hash<T>(hasher)
   }
 }

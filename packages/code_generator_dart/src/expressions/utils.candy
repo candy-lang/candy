@@ -44,15 +44,15 @@ public fun getValueExpressionResultName(
 // }
 public fun saveNothing(
   context: QueryContext<List<CompilerError>>,
-  hirExpression: HirValueExpression,
+  uri: HirValueExpressionUri,
 ): DartStatement {
   query<DartStatement, List<CompilerError>>(
     context,
     "code_generator_dart.saveNothing",
-    hirExpression as Equals & Hash, {
+    uri, {
     let nothingType = compileInlineType(context, HirNamedType.coreNothing(context))
     let field = DartField(
-      name = getExpressionResultName(context, hirExpression.uri),
+      name = getValueExpressionResultName(context, uri),
       docComment = None<String>(),
       isStatic = false,
       mutability = DartFinal(),
@@ -65,15 +65,16 @@ public fun saveNothing(
 
 public fun saveValueExpression(
   context: QueryContext<List<CompilerError>>,
+  uri: HirValueExpressionUri,
   hirExpression: HirValueExpression,
   dartExpression: DartExpression,
 ): DartStatement {
   query<DartStatement, List<CompilerError>>(
     context,
     "code_generator_dart.saveValueExpression",
-    DataTuple2<HirValueExpression, DartExpression>(hirExpression, dartExpression), {
+    DataTuple3<HirValueExpressionUri, HirValueExpression, DartExpression>(uri, hirExpression, dartExpression), {
     let field = DartField(
-      name = getExpressionResultName(context, hirExpression.uri),
+      name = getValueExpressionResultName(context, uri),
       docComment = None<String>(),
       isStatic = false,
       mutability = DartFinal(),

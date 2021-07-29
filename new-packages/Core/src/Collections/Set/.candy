@@ -58,7 +58,7 @@ impl[Item: Equals & Hash] Set[Item]: InfixBar[Iterate[Item], Set[Item]] {
 }
 
 impl[Item: Equals & Hash] Set[Item]: Equals {
-  fun equals(other: Set[Item]): Bool {
+  fun equals(other: This): Bool {
     let length = this.length()
     length == other.length() & (this | other).length() == length
   }

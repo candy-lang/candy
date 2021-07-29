@@ -2,7 +2,7 @@ use compiler_utils
 use hir
 use incremental
 
-fun getDeclarationName(context: QueryContext<List<CompilerError>>, hir: HirTrait | HirType): String {
+public fun getDeclarationName(context: QueryContext<List<CompilerError>>, hir: HirTrait | HirType): String {
   query<String, List<CompilerError>>(context, "code_generator_dart.getDeclarationName", hir, {
     mut let name = if hir is HirTrait { (hir as HirTrait).name_ } else { (hir as HirType).name_ }
     mut let parent = if hir is HirTrait { (hir as HirTrait).parent } else { (hir as HirType).parent }
@@ -21,14 +21,14 @@ fun getDeclarationName(context: QueryContext<List<CompilerError>>, hir: HirTrait
     Tuple(mangleName(context, name), List.empty<CompilerError>())
   })
 }
-fun getDeclarationStaticName(context: QueryContext<List<CompilerError>>, hir: HirTrait | HirType): String {
+public fun getDeclarationStaticName(context: QueryContext<List<CompilerError>>, hir: HirTrait | HirType): String {
   query<String, List<CompilerError>>(context, "code_generator_dart.getDeclarationStaticName", hir, {
     let name = "{getDeclarationName(context, hir)}$Static"
     Tuple(mangleName(context, name), List.empty<CompilerError>())
   })
 }
 
-fun mangleName(context: QueryContext<List<CompilerError>>, name: String): String {
+public fun mangleName(context: QueryContext<List<CompilerError>>, name: String): String {
   query<String, List<CompilerError>>(context, "code_generator_dart.mangleName", name, {
     let reservedIdentifiers = MutableSet.empty<String>()
     // Some of these are only reserved in some contexts, e.g., "await" is a valid identifier except

@@ -27,7 +27,7 @@ class BucketMap<Key: Equals & Hash, Value> {
   fun bucketByHash(hash: Int): LinkedHashMap<Key, Value> { buckets.get(hash % buckets.length()) }
   fun bucketByKey(key: Key): LinkedHashMap<Key, Value> { bucketByHash(key.hashCode_()) }
 }
-impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: Map<Key, Value> {
+impl<Key: Equals & Hash, Value> BucketMap<Key, Value>: Equals & Hash & Map<Key, Value> {
   fun length(): Int { numEntries }
 
   fun get(key: Key): Maybe<Value> { bucketByKey(key).get(key) }

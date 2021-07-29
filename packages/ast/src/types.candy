@@ -38,18 +38,15 @@ public class AstNamedType {
 impl AstNamedType: AstInlineType & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
-      (nameParts as Iterable<AstIdentifier>)
-        .unsafeEquals(other.nameParts as Iterable<AstIdentifier>) &&
-      (typeArguments as Iterable<AstTypeArgument>)
-        .unsafeEquals(other.typeArguments as Iterable<AstTypeArgument>)
+      (modifiers as Equals) == (other.modifiers as Equals) &&
+      (nameParts as Equals) == (other.nameParts as Equals) &&
+      (typeArguments as Equals) == (other.typeArguments as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
-    (nameParts as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
-    (typeArguments as Iterable<AstTypeArgument>).unsafeHash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
+    (nameParts as Hash).hash<T>(hasher)
+    (typeArguments as Hash).hash<T>(hasher)
   }
 }
 
@@ -64,18 +61,16 @@ public class AstFunctionType {
 impl AstFunctionType: AstInlineType & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
-      receiverType.unsafeEquals(other.receiverType) &&
-      (parameterTypes as Iterable<AstIdentifier>)
-        .unsafeEquals(other.parameterTypes as Iterable<AstIdentifier>) &&
+      (modifiers as Equals) == (other.modifiers as Equals) &&
+      (receiverType as Equals) == (other.receiverType as Equals) &&
+      (parameterTypes as Equals) == (other.parameterTypes as Equals) &&
       (returnType as Equals) == (other.returnType as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
-    receiverType.unsafeHash<T>(hasher)
-    (parameterTypes as Iterable<AstInlineType>).unsafeHash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
+    (receiverType as Hash).hash<T>(hasher)
+    (parameterTypes as Hash).hash<T>(hasher)
     (returnType as Hash).hash<T>(hasher)
   }
 }
@@ -89,14 +84,13 @@ public class AstPositionalTupleType {
 impl AstPositionalTupleType: AstInlineType & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
-      (types as Iterable<AstInlineType>).unsafeEquals(other.types as Iterable<AstInlineType>)
+      (modifiers as Equals) == (other.modifiers as Equals) &&
+      (types as Equals) == (other.types as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
-    (types as Iterable<AstInlineType>).unsafeHash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
+    (types as Hash).hash<T>(hasher)
   }
 }
 
@@ -109,15 +103,13 @@ public class AstNamedTupleType {
 impl AstNamedTupleType: AstInlineType & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
-      (types as Iterable<AstNamedTupleTypeField>)
-        .unsafeEquals(other.types as Iterable<AstNamedTupleTypeField>)
+      (modifiers as Equals) == (other.modifiers as Equals) &&
+      (types as Equals) == (other.types as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
-    (types as Iterable<AstNamedTupleTypeField>).unsafeHash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
+    (types as Hash).hash<T>(hasher)
   }
 }
 
@@ -130,14 +122,13 @@ public class AstNamedTupleTypeField {
 impl AstNamedTupleTypeField: Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
-      name.equals(other.name) &&
+      (modifiers as Equals) == (other.modifiers as Equals) &&
+      (name as Equals) == (other.name as Equals) &&
       (type as Equals) == (other.type as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
     (name as Hash).hash<T>(hasher)
     (type as Hash).hash<T>(hasher)
   }
@@ -152,15 +143,13 @@ public class AstEnumType {
 impl AstEnumType: AstInlineType & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
-      (variants as Iterable<AstEnumTypeVariant>)
-        .unsafeEquals(other.variants as Iterable<AstEnumTypeVariant>)
+      (modifiers as Equals) == (other.modifiers as Equals) &&
+      (variants as Equals) == (other.variants as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
-    (variants as Iterable<AstEnumTypeVariant>).unsafeHash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
+    (variants as Hash).hash<T>(hasher)
   }
 }
 
@@ -173,16 +162,15 @@ public class AstEnumTypeVariant {
 impl AstEnumTypeVariant: Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (modifiers as Equals) == (other.modifiers as Equals) &&
       (name as Equals) == (other.name as Equals) &&
-      valueType.unsafeEquals(other.valueType)
+      (valueType as Equals) == (other.valueType as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
     (name as Hash).hash<T>(hasher)
-    valueType.unsafeHash<T>(hasher)
+    (valueType as Hash).hash<T>(hasher)
   }
 }
 
@@ -195,14 +183,13 @@ public class AstIntersectionType {
 impl AstIntersectionType: AstInlineType & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
-      (types as Iterable<AstIdentifier>).unsafeEquals(other.types as Iterable<AstIdentifier>)
+      (modifiers as Equals) == (other.modifiers as Equals) &&
+      (types as Equals) == (other.types as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
-    (types as Iterable<AstInlineType>).unsafeHash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
+    (types as Hash).hash<T>(hasher)
   }
 }
 
@@ -214,12 +201,11 @@ public class AstErrorType {
 impl AstErrorType: AstInlineType & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>)
+      (modifiers as Equals) == (other.modifiers as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
   }
 }
 
@@ -247,16 +233,15 @@ public class AstTypeParameter {
 impl AstTypeParameter: Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (modifiers as Equals) == (other.modifiers as Equals) &&
       (name as Equals) == (other.name as Equals) &&
-      upperBound.unsafeEquals(other.upperBound)
+      (upperBound as Equals) == (other.upperBound as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
     (name as Hash).hash<T>(hasher)
-    upperBound.unsafeHash<T>(hasher)
+    (upperBound as Hash).hash<T>(hasher)
   }
 }
 

@@ -4,6 +4,7 @@ use hir
 use incremental
 
 public use .body
+public use .function_call
 public use .lambda
 public use .literals
 public use .references
@@ -11,64 +12,59 @@ public use .types
 
 public fun compileValueExpression(
   context: QueryContext<List<CompilerError>>,
-  expression: HirValueExpression,
+  uri: HirValueExpressionUri,
 ): List<DartStatement> {
   query<List<DartStatement>, List<CompilerError>>(
     context,
     "code_generator_dart.compileValueExpression",
-    expression as Equals & Hash, {
-    Tuple(compileValueExpressionHelper(context, expression), List.empty<CompilerError>())
+    uri as Equals & Hash, {
+    Tuple(compileValueExpressionHelper(context, uri), List.empty<CompilerError>())
   })
 }
 fun compileValueExpressionHelper(
   context: QueryContext<List<CompilerError>>,
-  expression: HirValueExpression,
+  uri: HirValueExpressionUri,
 ): List<DartStatement> {
+  let expression = resolveHirValueExpressionUri(context, uri)
   if (expression is HirIntValueExpression) {
     return List.of1<DartStatement>(
-      compileIntValueExpression(context, expression as HirIntValueExpression),
+      compileIntValueExpression(context, uri, expression as HirIntValueExpression),
     )
   }
   if (expression is HirStringValueExpression) {
     return List.of1<DartStatement>(
-      compileStringValueExpression(context, expression as HirStringValueExpression),
+      compileStringValueExpression(context, uri, expression as HirStringValueExpression),
     )
   }
 
   if (expression is HirLambdaValueExpression) {
     return List.of1<DartStatement>(
-      compileLambdaValueExpression(context, expression as HirLambdaValueExpression),
+      compileLambdaValueExpression(context, uri, expression as HirLambdaValueExpression),
     )
   }
 
   // if (expression is HirThisValueExpression) {
-  //   return compileThisValueExpression(context, expression as HirThisValueExpression)
+  //   return compileThisValueExpression(context, uri, expression as HirThisValueExpression)
   // }
 
   // if (expression is HirParameterReferenceExpression) {
   //   return List.of1<DartStatement>(
   //     compileParameterReferenceExpression(
   //       context,
+  //       uri,
   //       expression as HirParameterReferenceExpression,
   //     ),
   //   )
   // }
-  if (expression is HirLocalPropertyReferenceValueExpression) {
-    return List.of1<DartStatement>(
-      compileLocalPropertyReferenceValueExpression(
-        context,
-        expression as HirLocalPropertyReferenceValueExpression,
-      ),
-    )
-  }
 
   if (expression is HirFunctionCallValueExpression) {
-    return compileFunctionCallValueExpression(context, expression as HirFunctionCallValueExpression)
+    return compileFunctionCallValueExpression(context, uri, expression as HirFunctionCallValueExpression)
   }
 
   // if (expression is HirPropertyNavigationValueExpression) {
   //   return compilePropertyNavigationValueExpression(
   //     context,
+  //     uri,
   //     expression as HirPropertyNavigationValueExpression,
   //   )
   // }
@@ -76,15 +72,16 @@ fun compileValueExpressionHelper(
   if (expression is HirTypeInstantiationValueExpression) {
     return compileTypeInstantiationValueExpression(
       context,
+      uri,
       expression as HirTypeInstantiationValueExpression,
     )
   }
   if (expression is HirNamedTupleValueExpression) {
-    return compileNamedTupleValueExpression(context, expression as HirNamedTupleValueExpression)
+    return compileNamedTupleValueExpression(context, uri, expression as HirNamedTupleValueExpression)
   }
 
   if (expression is HirReturnValueExpression) {
-    return compileReturnValueExpression(context, expression as HirReturnValueExpression)
+    return compileReturnValueExpression(context, uri, expression as HirReturnValueExpression)
   }
 
   throw "Unknown expression: {expression}"

@@ -46,9 +46,7 @@ class SolverGoal {
 impl SolverGoal: Equals & Hash {
   fun equals(other: This): Bool {
     (trait_ as Equals) == (other.trait_ as Equals)
-      && (parameters as Iterable<SolverType>)
-        .zip<SolverType>(other.parameters)
-        .all({ (it.first as Equals) == (it.second as Equals) })
+      && (parameters as Equals) == (other.parameters as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (trait_ as Hash).hash<T>(hasher)
@@ -68,7 +66,7 @@ class SolverRule {
   ///   `Clone` if both `?0` and `?1` implement `Clone`
   /// * `Any(?T) <- <nothing>`: the fact that every `?T` implements `Any`
 
-  let originalImpl: HirType | HirImpl
+  let originalImpl: HirType | HirTrait | HirImpl
   let goal: SolverGoal
   let subgoals: List<SolverGoal>
 
@@ -80,9 +78,7 @@ impl SolverRule: Equals & Hash {
   fun equals(other: This): Bool {
     (originalImpl as Equals) == (other.originalImpl as Equals)
       && (goal as Equals) == (other.goal as Equals)
-      && (subgoals as Iterable<SolverType>)
-        .zip<SolverType>(other.subgoals as Iterable<SolverType>)
-        .all({ (it.first as Equals) == (it.second as Equals) })
+      && (subgoals as Equals) == (other.subgoals as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (originalImpl as Hash).hash<T>(hasher)
@@ -123,7 +119,7 @@ class Environment {
     let canonicalConditions = (conditions as Iterable<SolverGoal>).map<SolverGoal>({
       SolverGoal(
         it.trait_,
-        (SolverValue(canonicalVariable(0) as HirType, it.parameters)
+        (SolverValue(canonicalVariable(0).declaration as HirType, it.parameters)
           .canonicalizeInternal(canonicalMapping) as SolverValue).parameters,
       )
     })

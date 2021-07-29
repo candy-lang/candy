@@ -12,25 +12,22 @@ let thisParameterName = "$this"
 
 public fun compileLambdaValueExpression(
   context: QueryContext<List<CompilerError>>,
+  uri: HirValueExpressionUri,
   expression: HirLambdaValueExpression,
 ): DartStatement {
   query<DartStatement, List<CompilerError>>(
     context,
     "code_generator_dart.compileLambdaValueExpression",
-    expression, {
-    let parameters = (expression.parameters as Iterable<HirLambdaParameter>)
+    DataTuple2<HirValueExpressionUri, HirLambdaValueExpression>(uri, expression), {
+    let parameters = (expression.parameters as Iterable<HirLambdaValueParameter>)
       .map<DartParameter>({
         DartParameter(
           name = it.name,
           isRequired = true,
-          type = Some<DartType>(compileInlineType(context, it.type)),
+          type = Some<DartType>(compileInlineType(context, it.type_)),
           defaultValue = None<DartExpression>(),
         )
       })
-      .toList()
-
-    let expressions = (expression.expressions as Iterable<HirValueExpressionUri>)
-      .map<HirValueExpression>({ resolveHirValueExpressionUri(context, it) })
       .toList()
 
     let dartExpression = DartClosure(
@@ -38,8 +35,8 @@ public fun compileLambdaValueExpression(
       requiredParameters = parameters,
       positionalParameters = List.empty<DartParameter>(),
       namedParameters = List.empty<DartParameter>(),
-      body = compileExpressionsToBody(context, expression.uri, expressions),
+      body = compileValueExpressionsToBody(context, uri, expression.expressions),
     )
-    Tuple(saveValueExpression(context, expression, dartExpression), List.empty<CompilerError>())
+    Tuple(saveValueExpression(context, uri, expression, dartExpression), List.empty<CompilerError>())
   })
 }

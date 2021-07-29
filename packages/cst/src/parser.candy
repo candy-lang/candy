@@ -672,6 +672,16 @@ class CstParser {
           CstGroupExpression(openingParenthesis, expression, closingParenthesis)
         })
 
+    let positionalTupleExpression = punctuation("(")
+        .sequence<List<CstNode<CstExpression | PunctuationToken>>>(commaSeparated<CstExpression>(expression_))
+        .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd(")"))
+        .map<CstExpression>({
+          let openingParenthesis = it.first.first
+          let valueArguments = it.first.second
+          let closingParenthesis = it.second
+          CstPositionalTupleExpression(openingParenthesis, valueArguments, closingParenthesis)
+        })
+
     let namedTupleExpressionField = atLeastOne<
       CstNode<IdentifierToken>,
       (CstNode<PunctuationToken>, Maybe<CstNode<CstExpression>>),
@@ -691,16 +701,6 @@ class CstParser {
         let closingParenthesis = it.second
         CstNamedTupleExpression(openingParenthesis, valueArguments, closingParenthesis)
       })
-
-    let positionalTupleExpression = punctuation("(")
-        .sequence<List<CstNode<CstExpression | PunctuationToken>>>(commaSeparated<CstExpression>(expression_))
-        .sequence<Maybe<CstNode<PunctuationToken>>>(punctuationOrEnd(")"))
-        .map<CstExpression>({
-          let openingParenthesis = it.first.first
-          let valueArguments = it.first.second
-          let closingParenthesis = it.second
-          CstPositionalTupleExpression(openingParenthesis, valueArguments, closingParenthesis)
-        })
 
     let propertyExpression = declarationBeginningWithName("let", false)
           .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>>(
@@ -726,8 +726,8 @@ class CstParser {
           lambdaExpression,
           identifierExpression,
           groupExpression,
-          namedTupleExpression,
           positionalTupleExpression,
+          namedTupleExpression,
         ),
       )
 

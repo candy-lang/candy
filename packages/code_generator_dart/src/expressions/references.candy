@@ -7,26 +7,19 @@ use ..utils
 
 public fun compileParameterReferenceValueExpression(
   context: QueryContext<List<CompilerError>>,
+  uri: HirValueExpressionUri,
   expression: HirParameterReferenceValueExpression,
 ): DartStatement {
   query<DartStatement, List<CompilerError>>(
     context,
     "code_generator_dart.compileParameterReferenceValueExpression",
-    expression, {
-    let identifier = DartIdentifier(expression.name, None<String>())
-    Tuple(saveValueExpression(context, expression, identifier), List.empty<CompilerError>())
-  })
-}
-
-public fun compileLocalPropertyReferenceValueExpression(
-  context: QueryContext<List<CompilerError>>,
-  expression: HirLocalPropertyReferenceValueExpression,
-): DartStatement {
-  query<DartStatement, List<CompilerError>>(
-    context,
-    "code_generator_dart.compileLocalPropertyReferenceValueExpression",
-    expression, {
-    let identifier = getValueExpressionResultIdentifier(expression.value)
-    Tuple(saveValueExpression(context, expression, identifier), List.empty<CompilerError>())
+    DataTuple2<HirValueExpressionUri, HirParameterReferenceValueExpression>(uri, expression), {
+    let parameterName = if (expression.parameter is HirValueParameter) {
+      (expression.parameter as HirValueParameter).name
+    } else {
+      (expression.parameter as HirLambdaValueParameter).name
+    }
+    let identifier = DartIdentifier(parameterName, None<String>())
+    Tuple(saveValueExpression(context, uri, expression, identifier), List.empty<CompilerError>())
   })
 }

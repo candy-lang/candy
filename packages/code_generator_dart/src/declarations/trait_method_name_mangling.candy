@@ -2,7 +2,7 @@ use compiler_utils
 use hir
 use incremental
 
-fun getMangledTraitMethodName(context: QueryContext<List<CompilerError>>, traitType: HirNamedType): String {
+public fun getMangledTraitMethodName(context: QueryContext<List<CompilerError>>, traitType: HirNamedType): String {
   query<String, List<CompilerError>>(context, "code_generator_dart.getMangledTraitMethodName", traitType, {
     // Inspired by https://rust-lang.github.io/rfcs/2603-rust-symbol-name-mangling-v0.html#syntax-of-mangled-names.
     //

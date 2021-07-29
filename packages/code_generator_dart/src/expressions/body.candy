@@ -10,16 +10,14 @@ use ..utils
 
 public fun compileValueExpressionsToBody(
   context: QueryContext<List<CompilerError>>,
-  scope: HirFunction | HirValueExpressionUri<HirLambdaExpression>,
-  expressions: List<HirValueExpression>,
+  scope: HirFunction | HirValueExpressionUri,
+  // TODO(later, JonasWanke): Get expressions from the scope directly.
+  expressionUris: List<HirValueExpressionUri>,
 ): DartBlock {
   query<DartBlock, List<CompilerError>>(
     context,
     "code_generator_dart.compileValueExpressionsToBody",
-    DataTuple2<Equals & Hash, ListOfHirValueExpression>(
-      scope as Equals & Hash,
-      ListOfHirValueExpression(expressions),
-    ), {
+    DataTuple2<Equals & Hash, List<HirValueExpressionUri>>(scope, expressionUris), {
     let statements = MutableList.empty<DartStatement | DartComment>()
 
     let scopeObjectName = getScopeObjectName(context, scope)
@@ -32,10 +30,10 @@ public fun compileValueExpressionsToBody(
       initialValue = Some<DartExpression>((dartObject as DartExpression).call0()),
     )))
 
-    let bodyStatements = (expressions as Iterable<HirValueExpression>)
+    let bodyStatements = (expressionUris as Iterable<HirValueExpressionUri>)
       .expand<DartStatement | DartComment>({
         let comment = DartComment("{it}")
-        let statements = compileExpression(context, it)
+        let statements = compileValueExpression(context, it)
         (List.of1<DartStatement | DartComment>(comment) as Iterable<DartStatement | DartComment>)
           .followedBy((statements as Iterable<DartStatement>).cast<DartStatement | DartComment>())
       })
@@ -67,17 +65,16 @@ public fun compileValueExpressionsToBody(
   })
 }
 
-public fun compileReturnExpression(
+public fun compileReturnValueExpression(
   context: QueryContext<List<CompilerError>>,
-  expression: HirReturnExpression,
+  uri: HirValueExpressionUri,
+  expression: HirReturnValueExpression,
 ): List<DartStatement> {
   query<List<DartStatement>, List<CompilerError>>(
     context,
-    "code_generator_dart.compileReturnExpression",
-    expression, {
-    let statements = compileExpression(context,
-      getExpression<HirValueExpression>(expression.expression),
-    ).toMutable()
+    "code_generator_dart.compileReturnValueExpression",
+    DataTuple2<HirValueExpressionUri, HirReturnValueExpression>(uri, expression), {
+    let statements = compileValueExpression(context, expression.expression).toMutable()
 
     statements.append(DartExpressionStatement(DartThrow(
       (nonLocalReturnExceptionType as DartExpression).call(
@@ -89,6 +86,7 @@ public fun compileReturnExpression(
         typeArguments = List.empty<DartType>(),
       ),
     )))
+    statements.append(saveNothing(context, uri))
     Tuple(statements, List.empty<CompilerError>())
   })
 }
@@ -96,7 +94,7 @@ public fun compileReturnExpression(
 
 fun getScopeObjectName(
   context: QueryContext<List<CompilerError>>,
-  scope: HirFunction | HirValueExpressionUri<HirLambdaExpression>,
+  scope: HirFunction | HirValueExpressionUri,
 ): String {
   query<String, List<CompilerError>>(
     context,
@@ -109,7 +107,7 @@ fun getScopeObjectName(
     } else {
       // As function declarations can't be nested, all expressions have the same function as their
       // parent and the index is sufficient to disambiguate them.
-      "$scope$expression${(scope as HirValueExpressionUri<HirLambdaExpression>).index}"
+      "$scope$expression${(scope as HirValueExpressionUri).index}"
     }
     Tuple(name, List.empty<CompilerError>())
   })
@@ -125,15 +123,3 @@ let nonLocalReturnExceptionType = DartNamedType(
   nonLocalReturnExceptionIdentifier,
   List.empty<DartType>(),
 )
-
-
-class ListOfHirValueExpression {
-  // TODO(never, JonasWanke): remove this when we no longer need `unsafeEquals` and `unsafeHash`
-  public let value: List<HirValueExpression>
-}
-impl ListOfHirValueExpression: Equals & Hash {
-  fun equals(other: This): Bool {
-    (value as Iterable<HirValueExpression>).unsafeEquals(other.value)
-  }
-  fun hash<T>(hasher: Hasher<T>) { value.unsafeHash<T>(hasher) }
-}
