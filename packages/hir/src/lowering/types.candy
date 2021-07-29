@@ -497,11 +497,11 @@ class LoweringContext {
       ///
       /// hirInlineTypeToSolverStuff((foo: String, bar: Int)) == (
       ///   ?0,
-      ///   Tuple$bar$foo(?1, ?2, ?0), Int(?1), String(?2),
+      ///   Struct$bar$foo(?1, ?2, ?0), Int(?1), String(?2),
       ///   [
-      ///     Tuple$bar$foo(?0, ?1, $Tuple$bar$foo[?0, ?1]) <- <empty>,
-      ///     Tuple$bar$foo(?0, ?1, $Never) <- <empty>,
-      ///     Tuple$bar$foo(?0, ?1, ?2) <- Error(?2),
+      ///     Struct$bar$foo(?0, ?1, $Struct$bar$foo[?0, ?1]) <- <empty>,
+      ///     Struct$bar$foo(?0, ?1, $Never) <- <empty>,
+      ///     Struct$bar$foo(?0, ?1, ?2) <- Error(?2),
       ///     ## Generated transitively:
       ///     String($String) <- <empty>,
       ///     String($Never) <- <empty>,
@@ -516,7 +516,7 @@ class LoweringContext {
 
       let goals = MutableList.empty<SolverGoal>()
       let solverParameters = MutableList.empty<SolverType>()
-      let declaration = this.registerTupleSolverRules(hirType as HirStructType)
+      let declaration = this.registerStructSolverRules(hirType as HirStructType)
       let types = ((hirType as HirStructType).types.sortedBy<String>({ it.first }) as Iterable<(String, HirInlineType)>)
         .map<HirInlineType>({ it.second })
       for parameter in types {
@@ -681,16 +681,16 @@ class LoweringContext {
     ))
   }
 
-  fun registerTupleSolverRules(tupleType: HirStructType): HirType {
+  fun registerStructSolverRules(tupleType: HirStructType): HirType {
     // We create several synthetic types and impls to allow for correct handling of error types
     // and the `Never` type.
     //
     // For example:
     //
-    // registerTupleSolverRules((foo: String, bar: Int)) -> [
-    //   Tuple$bar$foo(?0, ?1, $Tuple$bar$foo(?0, ?1)) <- <empty>,
-    //   Tuple$bar$foo(?0, ?1, $Never) <- <empty>,
-    //   Tuple$bar$foo(?0, ?1, ?2) <- Error(?2),
+    // registerStructSolverRules((foo: String, bar: Int)) -> [
+    //   Struct$bar$foo(?0, ?1, $Struct$bar$foo(?0, ?1)) <- <empty>,
+    //   Struct$bar$foo(?0, ?1, $Never) <- <empty>,
+    //   Struct$bar$foo(?0, ?1, ?2) <- Error(?2),
     //   ## Generated transitively:
     //   String($String) <- <empty>,
     //   String($Never) <- <empty>,
@@ -707,7 +707,7 @@ class LoweringContext {
       .toList()
       .unsafeSorted()
     let fieldNames = (fieldNames as Iterable<String>).join("$")
-    let declaration = HirType(HirModule.syntheticStructs(this.context), "Tuple${fieldNames}")
+    let declaration = HirType(HirModule.syntheticStructs(this.context), "Struct${fieldNames}")
 
     let goals = MutableList.empty<SolverGoal>()
     let solverParameters = MutableList.empty<SolverType>()
