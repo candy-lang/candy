@@ -9,10 +9,11 @@ use ..types
 public fun compile(context: QueryContext<List<CompilerError>>, package: Package): Unit {
   impureQuery<Unit, List<CompilerError>>(context, "code_generator_dart.compile", package, {
     compilePackage(context, package)
-    let containsErrors = context.outputs().entries().any({ keyToEntry =>
-      keyAndEntry.second.entries().any({ inputAndErrors => inputAndErrors.second.isNotEmpty() })
+    let containsErrors = context.outputs().entries().any({ keyAndEntry =>
+      keyAndEntry.second.entries()
+        .any({ inputAndErrors => (inputAndErrors.second as Iterable<CompilerError>).isNotEmpty() })
     })
-    if (containsErrors) { return }
+    if (containsErrors) { return Tuple(unit, List.empty<CompilerError>()) }
 
     let outputPath = package.getOutputPath(context, "Dart")
     let outputDirectory = Directory(outputPath)
@@ -83,7 +84,7 @@ fun checkDeclaration(context: QueryContext<List<CompilerError>>, declarationHir:
     (declarationHir as HirImpl).implementedTrait(context)
   }
   if (declarationHir is HirFunction) {
-    lowerFunctionBody(context, (functionHir as HirFunction))
+    lowerFunctionBody(context, (declarationHir as HirFunction))
   }
 }
 

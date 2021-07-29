@@ -1,3 +1,5 @@
+use ..Hash
+use ..Int
 use ..Maybe
 use ..Operators
 
@@ -19,7 +21,7 @@ impl Bool: Or {
 }
 
 impl Bool: Equals {
-  fun equals(other: Bool): Bool { this.match[Bool](true = { other }, false = { other.not() }) }
+  fun equals(other: This): Bool { this.match[Bool](true = { other }, false = { other.not() }) }
 }
 
 impl Bool: Implies {

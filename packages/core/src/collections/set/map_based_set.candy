@@ -14,7 +14,7 @@ class MapBasedSet<Item: Equals & Hash> {
 
   let map: MutableMap<Item, Unit>
 }
-impl<Item: Equals & Hash> MapBasedSet<Item>: Set<Item> {
+impl<Item: Equals & Hash> MapBasedSet<Item>: Equals & Hash & Set<Item> {
   fun length(): Int { (map as Map<Item, Unit>).length() }
 
   fun contains(item: Item): Bool { (map as Map<Item, Unit>).containsKey(item) }

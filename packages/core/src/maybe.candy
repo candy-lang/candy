@@ -3,7 +3,7 @@ use ..hash
 use ..operators
 use ..primitives
 
-public trait Maybe<Value> {
+public trait Maybe<Value>: Equals & Hash {
   fun unwrap(): Value
   fun orElse(alternative: () => Value): Value
   fun map<Out>(mapper: (Value) => Out): Maybe<Out> { flatMap<Out>({ Some<Out>(mapper(it)) }) }
@@ -11,32 +11,32 @@ public trait Maybe<Value> {
   fun cast<Out>(): Maybe<Out> { map<Out>({ it as Out }) }
   fun do(lambda: (Value) => Unit) { map<Unit>({ lambda(it) }) }
 
-  fun unsafeEquals(other: Maybe<Value>): Bool
-  fun unsafeHash<T>(hasher: Hasher<T>)
+  fun equals(other: This): Bool
+  fun hash<T>(hasher: Hasher<T>)
 }
 
 public class Some<Value> {
   let value: Value
 }
-impl<Value> Some<Value>: Maybe<Value> {
+impl<Value> Some<Value>: Equals & Hash & Maybe<Value> {
   fun unwrap(): Value { value }
   fun orElse(alternative: () => Value): Value { value }
   fun flatMap<Out>(mapper: (Value) => Maybe<Out>): Maybe<Out> { mapper(value) }
 
-  fun unsafeEquals(other: Maybe<Value>): Bool {
+  fun equals(other: This): Bool {
     if (other is Some) { return false }
     (value as Equals) == (other.unwrap() as Equals)
   }
-  fun unsafeHash<T>(hasher: Hasher<T>) { (value as Hash).hash<T>(hasher) }
+  fun hash<T>(hasher: Hasher<T>) { (value as Hash).hash<T>(hasher) }
 }
 
 // TODO(never, JonasWanke): remove type parameter when multi-impls are supported
 public class None<Value>
-impl<Value> None<Value>: Maybe<Value> {
+impl<Value> None<Value>: Equals & Hash & Maybe<Value> {
   fun unwrap(): Value { throw "Unwrapped `None`." }
   fun orElse(alternative: () => Value): Value { alternative() }
   fun flatMap<Out>(mapper: (Value) => Maybe<Out>): Maybe<Out> { None<Out>() }
 
-  fun unsafeEquals(other: Maybe<Value>): Bool { (other is None) }
-  fun unsafeHash<T>(hasher: Hasher<T>) {}
+  fun equals(other: This): Bool { (other is None) }
+  fun hash<T>(hasher: Hasher<T>) {}
 }

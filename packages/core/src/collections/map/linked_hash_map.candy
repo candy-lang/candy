@@ -29,7 +29,7 @@ class LinkedHashMap<Key: Equals & Hash, Value> {
     entries.where({ it.key == key }).single()
   }
 }
-impl<Key: Equals & Hash, Value> LinkedHashMap<Key, Value>: Map<Key, Value> {
+impl<Key: Equals & Hash, Value> LinkedHashMap<Key, Value>: Equals & Hash & Map<Key, Value> {
   fun length(): Int { (entries_ as Iterable<LinkedHashMap<Key, Value>>).length() }
 
   fun get(key: Key): Maybe<Value> { entryForKey(key).map<Value>({ it.value }) }

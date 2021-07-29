@@ -45,12 +45,11 @@ public class HirNamedType {
 impl HirNamedType: Equals & Hash & HirInlineType {
   fun equals(other: This): Bool {
     declaration == other.declaration
-      && (parameterTypes as Iterable<HirInlineType>)
-        .unsafeEquals(other.parameterTypes as Iterable<HirInlineType>)
+      && (parameterTypes as Equals) == (other.parameterTypes as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (declaration as Hash).hash<T>(hasher)
-    parameterTypes.unsafeHash<T>(hasher)
+    (parameterTypes as Hash).hash<T>(hasher)
   }
   fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
     HirNamedType(
@@ -71,13 +70,12 @@ public class HirFunctionType {
 impl HirFunctionType: Equals & Hash & HirInlineType {
   fun equals(other: This): Bool {
     (receiverType as Equals) == (other.receiverType as Equals)
-      && (parameterTypes as Iterable<HirInlineType>)
-        .unsafeEquals(other.parameterTypes as Iterable<HirInlineType>)
+      && (parameterTypes as Equals) == (other.parameterTypes as Equals)
       && (returnType as Equals) == (other.returnType as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (receiverType as Hash).hash<T>(hasher)
-    parameterTypes.unsafeHash<T>(hasher)
+    (parameterTypes as Hash).hash<T>(hasher)
     (returnType as Hash).hash<T>(hasher)
   }
   fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
@@ -97,10 +95,19 @@ public class HirStructType {
 }
 impl HirStructType: Equals & Hash & HirInlineType {
   fun equals(other: This): Bool {
-    (types as Iterable<(String, HirInlineType)>)
-      .unsafeEquals(other.types as Iterable<(String, HirInlineType)>)
+    ((types as Iterable<(String, HirInlineType)>)
+      .map<DataTuple2<String, HirInlineType>>({
+        DataTuple2<String, HirInlineType>(it.first, it.second)
+      }) as Equals) == ((other.types as Iterable<(String, HirInlineType)>)
+          .map<DataTuple2<String, HirInlineType>>({
+            DataTuple2<String, HirInlineType>(it.first, it.second)
+          }) as Equals)
   }
-  fun hash<T>(hasher: Hasher<T>) { types.unsafeHash<T>(hasher) }
+  fun hash<T>(hasher: Hasher<T>) {
+    ((types as Iterable<(String, HirInlineType)>).map<DataTuple2<String, HirInlineType>>({
+      DataTuple2<String, HirInlineType>(it.first, it.second)
+    }) as Hash).hash<T>(hasher)
+  }
   fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
     HirStructType(
       (types as Iterable<(String, HirInlineType)>)
@@ -115,8 +122,8 @@ public class HirEnumType {
   public let variants: Map<String, Maybe<HirInlineType>>
 }
 impl HirEnumType: Equals & Hash & HirInlineType {
-  fun equals(other: This): Bool { variants.unsafeEquals(other.variants) }
-  fun hash<T>(hasher: Hasher<T>) { variants.unsafeHash<T>(hasher) }
+  fun equals(other: This): Bool { (variants as Equals) == (other.variants as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { (variants as Hash).hash<T>(hasher) }
   fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
     HirEnumType(
       variants.entries()
@@ -135,9 +142,9 @@ public class HirIntersectionType {
 }
 impl HirIntersectionType: Equals & Hash & HirInlineType {
   fun equals(other: This): Bool {
-    (types as Iterable<HirInlineType>).unsafeEquals(other.types as Iterable<HirInlineType>)
+    (types as Equals) == (other.types as Equals)
   }
-  fun hash<T>(hasher: Hasher<T>) { types.unsafeHash<T>(hasher) }
+  fun hash<T>(hasher: Hasher<T>) { (types as Hash).hash<T>(hasher) }
   fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
     HirIntersectionType(
       (types as Iterable<HirInlineType>)

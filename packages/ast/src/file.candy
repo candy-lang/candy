@@ -20,14 +20,13 @@ public class AstFile {
 impl AstFile: AstNode & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (useLines as Iterable<AstUseLine>).unsafeEquals(other.useLines as Iterable<AstUseLine>) &&
-      (declarations as Iterable<AstModule | AstTrait | AstImpl | AstType | AstFunction>)
-        .unsafeEquals(other.declarations as Iterable<AstModule | AstTrait | AstImpl | AstType | AstFunction>)
+      (useLines as Equals) == (other.useLines as Equals) &&
+      (declarations as Equals) == (other.declarations as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (useLines as Iterable<AstUseLine>).unsafeHash<T>(hasher)
-    (declarations as Iterable<AstUseLine>).unsafeHash<T>(hasher)
+    (useLines as Hash).hash<T>(hasher)
+    (declarations as Hash).hash<T>(hasher)
   }
 }
 
@@ -55,13 +54,12 @@ public class AstUseLine {
 impl AstUseLine: AstNode & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (modifiers as Equals) == (other.modifiers as Equals) &&
       (target as Equals) == (other.target as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (modifiers as Iterable<AstUseLine>).unsafeHash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
     (target as Hash).hash<T>(hasher)
   }
 }
@@ -84,11 +82,11 @@ public class AstLocalAbsoluteUseLineTarget {
 impl AstLocalAbsoluteUseLineTarget: AstUseLineTarget & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (path as Iterable<AstIdentifier>).unsafeEquals(other.path as Iterable<AstIdentifier>)
+      (path as Equals) == (other.path as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (path as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (path as Hash).hash<T>(hasher)
   }
 }
 
@@ -101,12 +99,12 @@ impl AstLocalRelativeUseLineTarget: AstUseLineTarget & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (parentNavigations as Equals) == (other.parentNavigations as Equals) &&
-      (path as Iterable<AstIdentifier>).unsafeEquals(other.path as Iterable<AstIdentifier>)
+      (path as Equals) == (other.path as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
     (parentNavigations as Hash).hash<T>(hasher)
-    (path as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (path as Hash).hash<T>(hasher)
   }
 }
 
@@ -118,14 +116,13 @@ public class AstGlobalUseLineTarget {
 impl AstGlobalUseLineTarget: AstUseLineTarget & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (packagePath as Iterable<AstIdentifier>)
-        .unsafeEquals(other.packagePath as Iterable<AstIdentifier>) &&
-      moduleName.unsafeEquals(other.moduleName)
+      (packagePath as Equals) == (other.packagePath as Equals) &&
+      (moduleName as Equals) == (other.moduleName as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (packagePath as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
-    moduleName.unsafeHash<T>(hasher)
+    (packagePath as Iterable<AstIdentifier>).hash<T>(hasher)
+    (moduleName as Hash).hash<T>(hasher)
   }
 }
 

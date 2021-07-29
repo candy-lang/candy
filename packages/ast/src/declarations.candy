@@ -23,7 +23,7 @@ public trait /* enum */ AstDeclaration {
 }
 impl AstDeclaration: AstNode & Equals & Hash {
   fun equals(other: This): Bool {
-    (modifiers as Iterable<AstIdentifier>).unsafeEquals(other.modifiers as Iterable<AstIdentifier>)
+    (modifiers as Equals) == (other.modifiers as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) { (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher) }
 }
@@ -42,20 +42,17 @@ public class AstModule {
 impl AstModule: AstDeclaration & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      candyDoc.unsafeEquals(other.candyDoc) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (candyDoc as Equals) == (other.candyDoc as Equals) &&
+      (modifiers as Equals) == (other.modifiers as Equals) &&
       (name as Equals) == (other.name as Equals) &&
-      (innerDeclarations as Iterable<AstModule | AstTrait | AstImpl | AstType | AstFunction>)
-        .unsafeEquals(other.innerDeclarations as Iterable<AstModule | AstTrait | AstImpl | AstType | AstFunction>)
+      (innerDeclarations as Equals) == (other.innerDeclarations as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    candyDoc.unsafeHash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (candyDoc as Hash).hash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
     (name as Hash).hash<T>(hasher)
-    (innerDeclarations as Iterable<AstModule | AstTrait | AstImpl | AstType | AstFunction>)
-      .unsafeHash<T>(hasher)
+    (innerDeclarations as Hash).hash<T>(hasher)
   }
 }
 
@@ -72,24 +69,21 @@ public class AstTrait {
 impl AstTrait: AstWithTypeParameters & AstDeclaration & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      candyDoc.unsafeEquals(other.candyDoc) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (candyDoc as Equals) == (other.candyDoc as Equals) &&
+      (modifiers as Equals) == (other.modifiers as Equals) &&
       (name as Equals) == (other.name as Equals) &&
-      (typeParameters as Iterable<AstTypeParameter>)
-        .unsafeEquals(other.typeParameters as Iterable<AstTypeParameter>) &&
-      upperBound.unsafeEquals(other.upperBound) &&
-      (innerDeclarations as Iterable<AstTrait | AstType | AstFunction>)
-        .unsafeEquals(other.innerDeclarations as Iterable<AstTrait | AstType | AstFunction>)
+      (typeParameters as Equals) == (other.typeParameters as Equals) &&
+      (upperBound as Equals) == (other.upperBound as Equals) &&
+      (innerDeclarations as Equals) == (other.innerDeclarations as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    candyDoc.unsafeHash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (candyDoc as Hash).hash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
     (name as Hash).hash<T>(hasher)
-    (typeParameters as Iterable<AstTypeParameter>).unsafeHash<T>(hasher)
+    (typeParameters as Hash).hash<T>(hasher)
     (upperBound as Hash).hash<T>(hasher)
-    (innerDeclarations as Iterable<AstTrait | AstType | AstFunction>).unsafeHash<T>(hasher)
+    (innerDeclarations as Hash).hash<T>(hasher)
   }
 }
 
@@ -104,23 +98,19 @@ public class AstImpl {
 impl AstImpl: AstWithTypeParameters & AstDeclaration & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
-      (typeParameters as Iterable<AstTypeParameter>)
-        .unsafeEquals(other.typeParameters as Iterable<AstTypeParameter>) &&
+      (modifiers as Equals) == (other.modifiers as Equals) &&
+      (typeParameters as Equals) == (other.typeParameters as Equals) &&
       (type as Equals) == (other.type as Equals) &&
-      (traits as Iterable<AstNamedType | AstErrorType>)
-        .unsafeEquals(other.traits as Iterable<AstNamedType | AstErrorType>) &&
-      (innerDeclarations as Iterable<AstFunction>)
-        .unsafeEquals(other.innerDeclarations as Iterable<AstFunction>)
+      (traits as Equals) == (other.traits as Equals) &&
+      (innerDeclarations as Equals) == (other.innerDeclarations as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
-    (typeParameters as Iterable<AstTypeParameter>).unsafeHash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
+    (typeParameters as Hash).hash<T>(hasher)
     (type as Hash).hash<T>(hasher)
-    (traits as Iterable<AstNamedType | AstErrorType>).unsafeHash<T>(hasher)
-    (innerDeclarations as Iterable<AstFunction>).unsafeHash<T>(hasher)
+    (traits as Hash).hash<T>(hasher)
+    (innerDeclarations as Hash).hash<T>(hasher)
   }
 }
 
@@ -136,20 +126,18 @@ public class AstType {
 impl AstType: AstWithTypeParameters & AstDeclaration & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      candyDoc.unsafeEquals(other.candyDoc) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (candyDoc as Equals) == (other.candyDoc as Equals) &&
+      (modifiers as Equals) == (other.modifiers as Equals) &&
       (name as Equals) == (other.name as Equals) &&
-      (typeParameters as Iterable<AstTypeParameter>)
-        .unsafeEquals(other.typeParameters as Iterable<AstTypeParameter>) &&
-      type.unsafeEquals(other.type)
+      (typeParameters as Equals) == (other.typeParameters as Equals) &&
+      (type as Equals) == (other.type as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    candyDoc.unsafeHash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (candyDoc as Hash).hash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
     (name as Hash).hash<T>(hasher)
-    (typeParameters as Iterable<AstTypeParameter>).unsafeHash<T>(hasher)
+    (typeParameters as Hash).hash<T>(hasher)
     (type as Hash).hash<T>(hasher)
   }
 }
@@ -168,26 +156,23 @@ public class AstFunction {
 impl AstFunction: AstWithTypeParameters & AstDeclaration & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      candyDoc.unsafeEquals(other.candyDoc) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (candyDoc as Equals) == (other.candyDoc as Equals) &&
+      (modifiers as Equals) == (other.modifiers as Equals) &&
       (name as Equals) == (other.name as Equals) &&
-      (typeParameters as Iterable<AstTypeParameter>)
-        .unsafeEquals(other.typeParameters as Iterable<AstTypeParameter>) &&
-      (valueParameters as Iterable<AstValueParameter>)
-        .unsafeEquals(other.valueParameters as Iterable<AstValueParameter>) &&
-      returnType.unsafeEquals(other.returnType) &&
-      body.unsafeEquals(other.body)
+      (typeParameters as Equals) == (other.typeParameters as Equals) &&
+      (valueParameters as Equals) == (other.valueParameters as Equals) &&
+      (returnType as Equals) == (other.returnType as Equals) &&
+      (body as Equals) == (other.body as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    candyDoc.unsafeHash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (candyDoc as Hash).hash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
     (name as Hash).hash<T>(hasher)
-    (typeParameters as Iterable<AstTypeParameter>).unsafeHash<T>(hasher)
-    (valueParameters as Iterable<AstValueParameter>).unsafeHash<T>(hasher)
-    returnType.unsafeHash<T>(hasher)
-    body.unsafeHash<T>(hasher)
+    (typeParameters as Hash).hash<T>(hasher)
+    (valueParameters as Hash).hash<T>(hasher)
+    (returnType as Hash).hash<T>(hasher)
+    (body as Hash).hash<T>(hasher)
   }
 }
 
@@ -216,18 +201,17 @@ public class AstValueParameter {
 impl AstValueParameter: Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (modifiers as Iterable<AstIdentifier>)
-        .unsafeEquals(other.modifiers as Iterable<AstIdentifier>) &&
+      (modifiers as Equals) == (other.modifiers as Equals) &&
       (name as Equals) == (other.name as Equals) &&
-      type.unsafeEquals(other.type) &&
-      defaultValue.unsafeEquals(other.defaultValue)
+      (type as Equals) == (other.type as Equals) &&
+      (defaultValue as Equals) == (other.defaultValue as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (modifiers as Hash).hash<T>(hasher)
     (name as Hash).hash<T>(hasher)
-    type.unsafeHash<T>(hasher)
-    defaultValue.unsafeHash<T>(hasher)
+    (type as Hash).hash<T>(hasher)
+    (defaultValue as Hash).hash<T>(hasher)
   }
 }
 
@@ -247,12 +231,11 @@ public class AstBlockBody {
 impl AstBlockBody: AstNode & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (expressions as Iterable<AstExpression>)
-        .unsafeEquals(other.expressions as Iterable<AstExpression>)
+      (expressions as Equals) == (other.expressions as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (expressions as Iterable<AstExpression>).unsafeHash<T>(hasher)
+    (expressions as Hash).hash<T>(hasher)
   }
 }
 public class AstExpressionBody {
@@ -261,10 +244,10 @@ public class AstExpressionBody {
 }
 impl AstExpressionBody: AstNode & Equals & Hash {
   fun equals(other: This): Bool {
-    (id as Equals) == (other.id as Equals) && expression.unsafeEquals(other.expression)
+    (id as Equals) == (other.id as Equals) && (expression as Equals) == (other.expression as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    expression.unsafeHash<T>(hasher)
+    (expression as Hash).hash<T>(hasher)
   }
 }

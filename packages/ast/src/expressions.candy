@@ -46,11 +46,11 @@ public class AstStringExpression {
 impl AstStringExpression: AstExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (parts as Iterable<AstStringPart>).unsafeEquals(other.parts as Iterable<AstStringPart>)
+      (parts as Equals) == (other.parts as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (parts as Iterable<AstStringPart>).unsafeHash<T>(hasher)
+    (parts as Hash).hash<T>(hasher)
   }
 }
 
@@ -94,15 +94,13 @@ public class AstLambdaExpression {
 impl AstLambdaExpression: AstExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (valueParameters as Iterable<AstValueParameter>)
-        .unsafeEquals(other.valueParameters as Iterable<AstValueParameter>) &&
-      (expressions as Iterable<AstExpression>)
-        .unsafeEquals(other.expressions as Iterable<AstExpression>)
+      (valueParameters as Equals) == (other.valueParameters as Equals) &&
+      (expressions as Equals) == (other.expressions as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (valueParameters as Iterable<AstValueParameter>).unsafeHash<T>(hasher)
-    (expressions as Iterable<AstExpression>).unsafeHash<T>(hasher)
+    (valueParameters as Hash).hash<T>(hasher)
+    (expressions as Hash).hash<T>(hasher)
   }
 }
 
@@ -116,13 +114,12 @@ impl AstIdentifierExpression: AstExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals)
       && (value as Equals) == (other.value as Equals)
-      && (typeArguments as Iterable<AstTypeArgument>)
-        .unsafeEquals(other.typeArguments as Iterable<AstTypeArgument>)
+      && (typeArguments as Equals) == (other.typeArguments as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
     (value as Hash).hash<T>(hasher)
-    (typeArguments as Iterable<AstTypeArgument>).unsafeHash<T>(hasher)
+    (typeArguments as Hash).hash<T>(hasher)
   }
 }
 
@@ -134,12 +131,11 @@ public class AstStructExpression {
 impl AstStructExpression: AstExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      (valueArguments as Iterable<AstValueArgument>)
-        .unsafeEquals(other.valueArguments as Iterable<AstValueArgument>)
+      (valueArguments as Equals) == (other.valueArguments as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    (valueArguments as Iterable<AstValueArgument>).unsafeHash<T>(hasher)
+    (valueArguments as Hash).hash<T>(hasher)
   }
 }
 
@@ -187,18 +183,18 @@ public class AstPropertyExpression {
 impl AstPropertyExpression: AstExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      candyDoc.unsafeEquals(other.candyDoc) &&
-      (modifiers as Iterable<AstIdentifier>).unsafeEquals(other.modifiers) &&
+      (candyDoc as Equals) == (other.candyDoc as Equals) &&
+      (modifiers as Equals) == (other.modifiers as Equals) &&
       (name as Equals) == (other.name as Equals) &&
-      type.unsafeEquals(other.type) &&
+      (type as Equals) == (other.type as Equals) &&
       (initializer as Equals) == (other.initializer as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    candyDoc.unsafeHash<T>(hasher)
-    (modifiers as Iterable<AstIdentifier>).unsafeHash<T>(hasher)
+    (candyDoc as Hash).hash<T>(hasher)
+    (modifiers as Iterable<AstIdentifier>).hash<T>(hasher)
     (name as Hash).hash<T>(hasher)
-    type.unsafeHash<T>(hasher)
+    (type as Hash).hash<T>(hasher)
     (initializer as Hash).hash<T>(hasher)
   }
 }
@@ -215,14 +211,13 @@ impl AstNavigationExpression: AstExpression & Equals & Hash {
     (id as Equals) == (other.id as Equals)
       && (receiver as Equals) == (other.receiver as Equals)
       && (target as Equals) == (other.target as Equals)
-      && (typeArguments as Iterable<AstTypeArgument>)
-        .unsafeEquals(other.typeArguments as Iterable<AstTypeArgument>)
+      && (typeArguments as Equals) == (other.typeArguments as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
     (receiver as Hash).hash<T>(hasher)
     (target as Hash).hash<T>(hasher)
-    (typeArguments as Iterable<AstTypeArgument>).unsafeHash<T>(hasher)
+    (typeArguments as Iterable<AstTypeArgument>).hash<T>(hasher)
   }
 }
 
@@ -236,14 +231,14 @@ impl AstCallExpression: AstExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals)
       && (receiver as Equals) == (other.receiver as Equals)
-      && (typeArguments as Iterable<AstTypeArgument>).unsafeEquals(other.typeArguments)
-      && (valueArguments as Iterable<AstValueArgument>).unsafeEquals(other.valueArguments)
+      && (typeArguments as Equals) == (other.typeArguments as Equals)
+      && (valueArguments as Equals) == (other.valueArguments as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
     (receiver as Hash).hash<T>(hasher)
-    (typeArguments as Iterable<AstTypeArgument>).unsafeHash<T>(hasher)
-    (valueArguments as Iterable<AstValueArgument>).unsafeHash<T>(hasher)
+    (typeArguments as Hash).hash<T>(hasher)
+    (valueArguments as Hash).hash<T>(hasher)
   }
 }
 
@@ -255,12 +250,12 @@ public class AstValueArgument {
 impl AstValueArgument: Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
-      name.unsafeEquals(other.name) &&
+      (name as Equals) == (other.name as Equals) &&
       (value as Equals) == (other.value as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    name.unsafeHash<T>(hasher)
+    (name as Hash).hash<T>(hasher)
     (value as Hash).hash<T>(hasher)
   }
 }
@@ -272,10 +267,10 @@ public class AstReturnExpression {
 }
 impl AstReturnExpression: AstExpression & Equals & Hash {
   fun equals(other: This): Bool {
-    (id as Equals) == (other.id as Equals) && value.unsafeEquals(other.value)
+    (id as Equals) == (other.id as Equals) && (value as Equals) == (other.value as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (id as Hash).hash<T>(hasher)
-    value.unsafeHash<T>(hasher)
+    value.hash<T>(hasher)
   }
 }

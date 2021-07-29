@@ -54,7 +54,7 @@ fun compileStructTypeDeclaration(
   query<DartClass, List<CompilerError>>(
     context,
     "code_generator_dart.compileStructTypeDeclaration",
-    SetOfString(fieldNames), {
+    fieldNames, {
     let name = getCompiledStructTypeName(context, fieldNames)
 
     let fields = (fieldNames.items().toList().unsafeSorted() as Iterable<String>)
@@ -121,7 +121,7 @@ public fun getCompiledStructTypeName(
   query<String, List<CompilerError>>(
     context,
     "code_generator_dart.getCompiledStructTypeName",
-    SetOfString(fieldNames), {
+    fieldNames, {
     let fieldNames = fieldNames.items().toList().unsafeSorted()
     let fieldNames = (fieldNames as Iterable<String>).join("$")
     Tuple("Struct${fieldNames}", List.empty<CompilerError>())

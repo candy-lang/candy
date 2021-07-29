@@ -38,11 +38,3 @@ impl<T1: Equals & Hash, T2: Equals & Hash, T3: Equals & Hash> DataTuple3<T1, T2,
     (third as Hash).hash<T>(hasher)
   }
 }
-
-public class SetOfString {
-  public let value: Set<String>
-}
-impl SetOfString: Equals & Hash {
-  fun equals(other: This): Bool { value.unsafeEquals(other.value) }
-  fun hash<T>(hasher: Hasher<T>) { value.unsafeHash<T>(hasher) }
-}
