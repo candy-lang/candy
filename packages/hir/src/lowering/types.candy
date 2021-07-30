@@ -263,6 +263,17 @@ impl HirImpl {
   }
 }
 
+impl HirType {
+  fun type(context: QueryContext<List<CompilerError>>): Maybe<HirInlineType> {
+    query<Maybe<HirInlineType>, List<CompilerError>>(context, "HirType.type", this, {
+      Tuple(
+        this.ast(context).type.map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) }),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
+}
+
 impl HirFunction {
   fun returnType(context: QueryContext<List<CompilerError>>): HirInlineType {
     query<HirInlineType, List<CompilerError>>(context, "HirFunction.returnType", this, {

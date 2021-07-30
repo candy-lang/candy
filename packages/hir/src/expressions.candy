@@ -223,6 +223,17 @@ impl HirStructValueExpression: HirValueExpression & Equals & Hash {
   fun hash<T>(hasher: Hasher<T>) { fields.hash<T>(hasher) }
 }
 
+/// An access of a `HirType`'s value.
+///
+/// Example: `foo value` (maybe)
+public class HirTypeValueValueExpression {
+  public let receiver: HirValueExpressionUri
+}
+impl HirTypeValueValueExpression: HirValueExpression & Equals & Hash {
+  fun equals(other: This): Bool { (receiver as Equals) == (other.receiver as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { receiver.hash<T>(hasher) }
+}
+
 /// An access of a struct's field.
 ///
 /// Examples:

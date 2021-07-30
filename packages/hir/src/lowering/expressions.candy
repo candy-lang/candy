@@ -494,6 +494,46 @@ impl LoweringContext {
     }
 
     if (expression is AstNavigationExpression) {
+      let astExpression = (expression as AstNavigationExpression)
+      let name = astExpression.target.value
+
+      // TODO(soon, JonasWanke): Error if the navigation has type arguments.
+
+      let result = this.lowerExpressionToValueExpression(expression.receiver)
+      let context = result.first
+      let receiver = result.second
+      let receiverType = context.typeOf(receiver)
+
+      if (receiverType is HirErrorType) {
+        return result
+      }
+      if (receiverType is HirNamedType) {
+        let declaration = (receiverType as HirNamedType).declaration
+        if (declaration is HirType) {
+          let declaration = (declaration as HirType)
+          let declarationType = declaration.type(context.global.context)
+          // TODO(soon, JonasWanke): Substitute parameters.
+
+          if (declarationType is HirStructType) {
+            let fields = (declarationType as HirStructType).fields
+            let field = (fields as Iterable<(String, HirInlineType)>)
+              .singleWhere({ it.first == name })
+            if (field is None) {
+              return context.registerError(...)
+            }
+
+            let result = context.register(HirTypeValueValueExpression(receiver), declarationType)
+            let context = result.first
+            let valueValueExpressionUri = result.second
+            context.register(
+              HirStructFieldAccessValueExpression(valueValueExpressionUri, name),
+              field.unwrap().second,
+            )
+          }
+          
+        }
+      }
+
       // This is an AstNavigationExpression that has is not inside an AstCallExpression – otherwise,
       // the lowering of the surrounding AstCallExpression would have also handled the inner
       // AstNavigationExpression. So, this is a function invocation without any parameters.
@@ -553,7 +593,6 @@ impl LoweringContext {
           todo("soon, Support static functions")
         }
 
-        
         // TODO(soon, marcelgarus): Handle function call with a receiver.
         let result = context.register(
           HirStringValueExpression("<compiler-generated> TODO(soon, marcelgarus): Handle function call with a receiver."),
