@@ -65,7 +65,7 @@ fun compile_(context: QueryContext<List<CompilerError>>, package: Package): Map<
 fun checkPackage(context: QueryContext<List<CompilerError>>, package: Package) {
   query<Unit, List<CompilerError>>(context, "code_generator_dart.checkPackage", package, {
     (package.getAllPackagesInCompilationOrder(context) as Iterable<Package>)
-      .do<HirInlineType>({ checkDeclaration(context, HirTopLevelModule(it)) })
+      .do({ checkDeclaration(context, HirTopLevelModule(it)) })
     Tuple(unit, List.empty<CompilerError>())
   })
 }
