@@ -227,8 +227,8 @@ impl HirStructValueExpression: HirValueExpression & Equals & Hash {
 ///
 /// Examples:
 ///
-/// * `foo.bar`
-/// * `foo.baz`
+/// * `foo bar`
+/// * `foo baz`
 public class HirStructFieldAccessValueExpression {
   public let receiver: HirValueExpressionUri
   public let name: String
