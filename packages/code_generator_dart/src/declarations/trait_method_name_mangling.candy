@@ -94,7 +94,7 @@ fun encodeFunctionType(
 }
 fun encodeStructType(
   context: QueryContext<List<CompilerError>>,
-  strictType: HirStructType,
+  structType: HirStructType,
 ): String {
   let fields = (structType.types.sortedBy<String>({ it.first }) as Iterable<(String, HirInlineType)>)
     .map<String>({ "{encodeIdentifier(it.first)}{encodeInlineType(context, it.second)}" })

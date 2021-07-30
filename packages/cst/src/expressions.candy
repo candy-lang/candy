@@ -76,7 +76,7 @@ impl CstGroupExpression: CstExpression
 
 
 public class CstStructExpression {
-  public let fields: CstValueParameters
+  public let fields: CstNode<CstValueArguments>
 }
 impl CstStructExpression: CstExpression
 

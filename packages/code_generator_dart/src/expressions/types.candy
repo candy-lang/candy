@@ -43,7 +43,7 @@ public fun compileStructValueExpression(
     DataTuple2<HirValueExpressionUri, HirStructValueExpression>(uri, expression), {
     let statements = MutableList.empty<DartStatement>()
     statements.appendAll(
-      (expression.valueArguments as Iterable<HirValueExpressionUri>)
+      (expression.fields.values() as Iterable<HirValueExpressionUri>)
         .expand<DartStatement>({ compileValueExpression(context, it) }),
     )
 
@@ -54,7 +54,7 @@ public fun compileStructValueExpression(
       uri,
       expression,
       (compiledType as DartExpression).call(
-        positionalArguments = (expression.valueArguments.entries().toList()
+        positionalArguments = (expression.fields.entries().toList()
           .sortedBy<String>({ it.first }) as Iterable<(String, HirValueExpressionUri)>)
           .map<DartExpression>({ getValueExpressionResultIdentifier(context, it.second) })
           .toList(),

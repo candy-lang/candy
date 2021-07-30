@@ -1570,7 +1570,7 @@ fun lowerExpression(
   }
   if cst.child is CstStructExpression {
     return Some<AstExpression>(
-      lowerStructExpression(context, parentId, cst.cast<CstStructStructExpression>()),
+      lowerStructExpression(context, parentId, cst.cast<CstStructExpression>()),
     )
   }
   if cst.child is CstBinaryExpression {
@@ -1819,10 +1819,10 @@ fun lowerStructExpression(
 ): AstStructExpression {
   let id = context.getExpressionId(parentId)
 
-  let valueArguments = lowerValueArguments(context, id, cst.child.valueArguments)
+  let fields = lowerValueArguments(context, id, cst.child.fields)
 
   context.addIdMapping(cst.id, id)
-  AstStructExpression(id, valueArguments)
+  AstStructExpression(id, fields)
 }
 
 fun lowerPropertyExpression(

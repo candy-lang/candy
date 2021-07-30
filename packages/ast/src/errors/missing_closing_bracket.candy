@@ -14,7 +14,7 @@ public class MissingClosingBracketCompilerError {
     | CstTypeParameters
     | CstTypeArguments
     | CstGroupExpression
-    | CstPositionalTupleExpression
+    | CstStructExpression
     | CstInterpolatedStringPart
     | CstValueArguments
   >
@@ -50,8 +50,8 @@ impl MissingClosingBracketCompilerError: CompilerError {
     if node.child is CstGroupExpression {
       return node.cast<CstGroupExpression>().child.openingParenthesis.child.span
     }
-    if node.child is CstPositionalTupleExpression {
-      node.cast<CstPositionalTupleExpression>().child.openingParenthesis.child.span
+    if node.child is CstStructExpression {
+      node.cast<CstStructExpression>().child.fields.child.openingParenthesis.child.span
     }
     if node.child is CstInterpolatedStringPart {
       node.cast<CstInterpolatedStringPart>().child.openingCurlyBrace.child.span

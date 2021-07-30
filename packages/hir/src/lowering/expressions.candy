@@ -425,8 +425,9 @@ impl LoweringContext {
     if (expression is AstStructExpression) {
       let astExpression = (expression as AstStructExpression)
       mut let areValueArgumentsValid = true
+      mut let context = this
       let fields = (astExpression.valueArguments as Iterable<AstValueArgument>)
-        .maybeMap<HirValueExpressionUri>({
+        .maybeMap<(String, HirValueExpressionUri)>({
           if (it.name is None<AstIdentifier>) {
             areValueArgumentsValid = false
             context = context.registerError(
@@ -435,10 +436,10 @@ impl LoweringContext {
           }
           let result = context.lowerExpressionToValueExpression(it.value)
           context = result.first
-          it.name.map({ Tuple(it, result.second) })
+          it.name.map<(String, HirValueExpressionUri)>({ Tuple(it.value, result.second) })
         })
         .unsafeToMap<String, HirValueExpressionUri>()
-      return this.register(
+      return context.register(
         HirStructValueExpression(fields),
         todo("soon, marcelgarus: The type of the struct.")
       )

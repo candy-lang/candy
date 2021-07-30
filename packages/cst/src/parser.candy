@@ -367,7 +367,7 @@ class CstParser {
           let openingParenthesis = it.first.first.second
           let fields = it.first.second
           let closingParenthesis = it.second
-          CstNamedTupleType(modifiers, openingParenthesis, fields, closingParenthesis)
+          CstStructType(modifiers, openingParenthesis, fields, closingParenthesis)
         })
 
     let intersectionType = notYetDefined<String, CstInlineType>("Parser not yet defined.")
@@ -658,7 +658,7 @@ class CstParser {
           CstGroupExpression(openingParenthesis, expression, closingParenthesis)
         })
 
-    let structExpression = valueParameters().map({ CstStructExpression(it) })
+    let structExpression = valueArguments().map<CstExpression>({ CstStructExpression(it) })
 
     let propertyExpression = declarationBeginningWithName("let", false)
           .sequence<Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>>(
