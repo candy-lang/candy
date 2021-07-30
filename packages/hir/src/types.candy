@@ -90,24 +90,10 @@ impl HirFunctionType: Equals & Hash & HirInlineType {
 }
 
 
-public class HirNamedTupleType {
+public class HirStructType {
   public let types: List<(String, HirInlineType)>
-
-  public static let positionalFieldNames = List.of10<String>(
-    "first",
-    "second",
-    "third",
-    "fourth",
-    "fifth",
-    "sixth",
-    "seventh",
-    "eight",
-    "nineth",
-    "tenth",
-  )
-  /// Field names used by positional tuples.
 }
-impl HirNamedTupleType: Equals & Hash & HirInlineType {
+impl HirStructType: Equals & Hash & HirInlineType {
   fun equals(other: This): Bool {
     ((types as Iterable<(String, HirInlineType)>)
       .map<DataTuple2<String, HirInlineType>>({
@@ -123,7 +109,7 @@ impl HirNamedTupleType: Equals & Hash & HirInlineType {
     }) as Hash).hash<T>(hasher)
   }
   fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
-    HirNamedTupleType(
+    HirStructType(
       (types as Iterable<(String, HirInlineType)>)
         .map<(String, HirInlineType)>({ Tuple(it.first, it.second.substitute(substitutions)) })
         .toList(),

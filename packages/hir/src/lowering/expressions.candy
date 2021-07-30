@@ -422,23 +422,26 @@ impl LoweringContext {
       )
     }
 
-    if (expression is AstPositionalTupleExpression) {
-      let astExpression = (expression as AstPositionalTupleExpression)
-      let innerResult = this.lowerExpressionsToValueExpressions(astExpression.expressions)
-      return innerResult.first.register(
-        HirNamedTupleValueExpression(
-          (HirNamedTupleType.positionalFieldNames as Iterable<String>)
-            .zip<HirValueExpressionUri>(innerResult.second)
-            .unsafeToMap<String, HirValueExpressionUri>(),
-        ),
-        HirNamedTupleType(
-          (HirNamedTupleType.positionalFieldNames as Iterable<String>)
-            .zip<HirInlineType>(
-              (innerResult.second as Iterable<HirValueExpressionUri>)
-                .map<HirInlineType>({ innerResult.first.typeOf(it) }),
-            )
-            .toList(),
-        ),
+    if (expression is AstStructExpression) {
+      let astExpression = (expression as AstStructExpression)
+      mut let areValueArgumentsValid = true
+      mut let context = this
+      let fields = (astExpression.valueArguments as Iterable<AstValueArgument>)
+        .maybeMap<(String, HirValueExpressionUri)>({
+          if (it.name is None<AstIdentifier>) {
+            areValueArgumentsValid = false
+            context = context.registerError(
+              UnsupportedFeatureCompilerError(None<Location>(), "You need to use names for fields at struct creation"),
+            ).first
+          }
+          let result = context.lowerExpressionToValueExpression(it.value)
+          context = result.first
+          it.name.map<(String, HirValueExpressionUri)>({ Tuple(it.value, result.second) })
+        })
+        .unsafeToMap<String, HirValueExpressionUri>()
+      return context.register(
+        HirStructValueExpression(fields),
+        todo("soon, marcelgarus: The type of the struct.")
       )
     }
 

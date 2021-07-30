@@ -10,12 +10,11 @@ public class MissingClosingBracketCompilerError {
     | CstValueParameters
     | CstGroupType
     | CstFunctionTypeParameterTypes
-    | CstPositionalTupleType
-    | CstNamedTupleType
+    | CstStructType
     | CstTypeParameters
     | CstTypeArguments
     | CstGroupExpression
-    | CstPositionalTupleExpression
+    | CstStructExpression
     | CstInterpolatedStringPart
     | CstValueArguments
   >
@@ -39,11 +38,8 @@ impl MissingClosingBracketCompilerError: CompilerError {
     if node.child is CstFunctionTypeParameterTypes {
       return node.cast<CstFunctionTypeParameterTypes>().child.openingParenthesis.child.span
     }
-    if node.child is CstPositionalTupleType {
-      return node.cast<CstPositionalTupleType>().child.openingParenthesis.child.span
-    }
-    if node.child is CstNamedTupleType {
-      return node.cast<CstNamedTupleType>().child.openingParenthesis.child.span
+    if node.child is CstStructType {
+      return node.cast<CstStructType>().child.openingParenthesis.child.span
     }
     if node.child is CstTypeParameters {
       return node.cast<CstTypeParameters>().child.openingAngleBracket.child.span
@@ -54,8 +50,8 @@ impl MissingClosingBracketCompilerError: CompilerError {
     if node.child is CstGroupExpression {
       return node.cast<CstGroupExpression>().child.openingParenthesis.child.span
     }
-    if node.child is CstPositionalTupleExpression {
-      node.cast<CstPositionalTupleExpression>().child.openingParenthesis.child.span
+    if node.child is CstStructExpression {
+      node.cast<CstStructExpression>().child.fields.child.openingParenthesis.child.span
     }
     if node.child is CstInterpolatedStringPart {
       node.cast<CstInterpolatedStringPart>().child.openingCurlyBrace.child.span

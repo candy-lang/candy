@@ -37,24 +37,15 @@ public class CstFunctionTypeParameterTypes {
 }
 
 
-public class CstPositionalTupleType {
+public class CstStructType {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let openingParenthesis: CstNode<PunctuationToken>
-  public let types: List<CstNode<CstInlineType | PunctuationToken>>
+  public let fields: List<CstNode<CstStructTypeField | PunctuationToken>>
   public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
 }
-impl CstPositionalTupleType: CstInlineType
+impl CstStructType: CstInlineType
 
-
-public class CstNamedTupleType {
-  public let modifiers: List<CstNode<IdentifierToken>>
-  public let openingParenthesis: CstNode<PunctuationToken>
-  public let fields: List<CstNode<CstNamedTupleTypeField | PunctuationToken>>
-  public let closingParenthesis: Maybe<CstNode<PunctuationToken>>
-}
-impl CstNamedTupleType: CstInlineType
-
-public class CstNamedTupleTypeField {
+public class CstStructTypeField {
   public let modifiers: List<CstNode<IdentifierToken>>
   public let name: Maybe<CstNode<IdentifierToken>>
   public let type: Maybe<(CstNode<PunctuationToken>, Maybe<CstNode<CstInlineType>>)>

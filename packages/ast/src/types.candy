@@ -76,12 +76,12 @@ impl AstFunctionType: AstInlineType & Equals & Hash {
 }
 
 
-public class AstPositionalTupleType {
+public class AstStructType {
   public let id: AstInlineTypeId
   public let modifiers: List<AstIdentifier>
-  public let types: List<AstInlineType>
+  public let types: List<AstStructTypeField>
 }
-impl AstPositionalTupleType: AstInlineType & Equals & Hash {
+impl AstStructType: AstInlineType & Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Equals) == (other.modifiers as Equals) &&
@@ -94,32 +94,13 @@ impl AstPositionalTupleType: AstInlineType & Equals & Hash {
   }
 }
 
-
-public class AstNamedTupleType {
-  public let id: AstInlineTypeId
-  public let modifiers: List<AstIdentifier>
-  public let types: List<AstNamedTupleTypeField>
-}
-impl AstNamedTupleType: AstInlineType & Equals & Hash {
-  fun equals(other: This): Bool {
-    (id as Equals) == (other.id as Equals) &&
-      (modifiers as Equals) == (other.modifiers as Equals) &&
-      (types as Equals) == (other.types as Equals)
-  }
-  fun hash<T>(hasher: Hasher<T>) {
-    (id as Hash).hash<T>(hasher)
-    (modifiers as Hash).hash<T>(hasher)
-    (types as Hash).hash<T>(hasher)
-  }
-}
-
-public class AstNamedTupleTypeField {
+public class AstStructTypeField {
   public let id: AstInlineTypeId
   public let modifiers: List<AstIdentifier>
   public let name: AstIdentifier
   public let type: AstInlineType
 }
-impl AstNamedTupleTypeField: Equals & Hash {
+impl AstStructTypeField: Equals & Hash {
   fun equals(other: This): Bool {
     (id as Equals) == (other.id as Equals) &&
       (modifiers as Equals) == (other.modifiers as Equals) &&

@@ -4,6 +4,8 @@ dependencies:
   petit_parser:
     # remove this when we support transitive dependencies
     path: ../petit_parser
+  incremental:
+    path: ../incremental
   compiler_utils:
     path: ../compiler_utils
   cst:
@@ -14,7 +16,5 @@ dependencies:
     path: ../ast
   hir:
     path: ../hir
-  incremental:
-    path: ../incremental
   dart_code:
     path: ../dart_code
