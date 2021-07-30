@@ -4,5 +4,5 @@
 # parentheses to create them on-the-fly:
 #
 # ```
-# let b: (foo: String, bar: Int) = (foo: "foo", bar: 42) # Struct
+# let b: (foo: String, bar: Int) = (foo = "foo", bar = 42)
 # ```
