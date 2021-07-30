@@ -214,7 +214,7 @@ impl HirTypeInstantiationValueExpression: HirValueExpression & Equals & Hash {
 
 /// A struct expression.
 ///
-/// Example: `(foo: "Bar", baz: 42)`
+/// Example: `(foo = "Bar", baz = 42)`
 public class HirStructValueExpression {
   public let fields: Map<String, HirValueExpressionUri>
 }
