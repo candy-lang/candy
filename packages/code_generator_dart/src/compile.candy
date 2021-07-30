@@ -71,7 +71,7 @@ fun checkPackage(context: QueryContext<List<CompilerError>>, package: Package) {
 }
 fun checkDeclaration(context: QueryContext<List<CompilerError>>, declarationHir: HirDeclaration) {
   ((declarationHir as HasDeclarations).declarations(context) as Iterable<HirDeclaration>)
-    .do<HirInlineType>({ checkDeclaration(context, it) })
+    .do({ checkDeclaration(context, it) })
   if (declarationHir is HasTypeParameters) {
     (declarationHir as HasTypeParameters).typeParameters(context)
   }
