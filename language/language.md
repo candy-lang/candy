@@ -426,7 +426,7 @@ impl MyClass: Abc<Foo, Tn: Bar, T2: Baz>
   where <ValueConstraints> {}
 ```
 
-The behavior of struct type arguments is the same as that of function calls.
+The behavior of named/positional type arguments is the same as that of function calls.
 
 
 ## 8. Annotations
