@@ -8,7 +8,7 @@ use ..types
 
 public fun compile(context: QueryContext<List<CompilerError>>, package: Package): Unit {
   impureQuery<Unit, List<CompilerError>>(context, "code_generator_dart.compile", package, {
-    compilePackage(context, package)
+    checkPackage(context, package)
     let containsErrors = context.outputs().entries().any({ keyAndEntry =>
       keyAndEntry.second.entries()
         .any({ inputAndErrors => (inputAndErrors.second as Iterable<CompilerError>).isNotEmpty() })
