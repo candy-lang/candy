@@ -497,15 +497,24 @@ impl LoweringContext {
       let astExpression = (expression as AstNavigationExpression)
       let name = astExpression.target.value
 
-      // TODO(soon, JonasWanke): Error if the navigation has type arguments.
+      mut let context = this
+      if ((astExpression.typeArguments as Iterable<AstTypeArgument>).isNotEmpty()) {
+        context = context.registerError(NavigationWithTypeArgumentsError(astExpression))
+      }
 
-      let result = this.lowerExpressionToValueExpression(expression.receiver)
+      let result = context.lowerExpressionToValueExpression(expression.receiver)
       let context = result.first
       let receiver = result.second
-      let receiverType = context.typeOf(receiver)
+      mut let receiverType = context.typeOf(receiver)
 
       if (receiverType is HirErrorType) {
         return result
+      }
+      if (receiverType is HirThisType) {
+        todo("soon, Change receiverType to the surrounding type")
+      }
+      if (receiverType is HirParameterType) {
+        todo("soon, Change receiverType to the upper bound")
       }
       if (receiverType is HirNamedType) {
         let declaration = (receiverType as HirNamedType).declaration
@@ -519,7 +528,7 @@ impl LoweringContext {
             let field = (fields as Iterable<(String, HirInlineType)>)
               .singleWhere({ it.first == name })
             if (field is None) {
-              return context.registerError(...)
+              return context.registerError(UnknownFieldError(name))
             }
 
             let result = context.register(HirTypeValueValueExpression(receiver), declarationType)
@@ -533,12 +542,11 @@ impl LoweringContext {
           
         }
       }
+      if (receiverType is HirStructType) {
+        todo("soon, Allow navigation to struct fields.")
+      }
 
-      // This is an AstNavigationExpression that has is not inside an AstCallExpression – otherwise,
-      // the lowering of the surrounding AstCallExpression would have also handled the inner
-      // AstNavigationExpression. So, this is a function invocation without any parameters.
-      // But that doesn't work for now.
-      todo("never, Function call with omitted parentheses")
+      context.registerError(UnsupportedFeatureCompilerError("never, Function call with omitted parentheses"))
     }
 
     if (expression is AstCallExpression) {
@@ -928,5 +936,39 @@ impl InvalidValueArgumentError: CompilerError {
   public fun description(): String {
     /// TODO(never, marcelgarus): add a description for this error
     "Value argument's type was {this.argumentType}, but is not assignable to {this.parameterType}."
+  }
+}
+
+public class NavigationWithTypeArgumentsError {
+  public let navigation: AstNavigationExpression
+}
+impl NavigationWithTypeArgumentsError: CompilerError {
+  public fun id(): String { "navigation-with-type-arguments" }
+
+  public fun location(): Location {
+    todo("never, marcelgarus: Implement NavigationWithTypeArgumentsError.location")
+  }
+  public fun title(): String {
+    "Navigation expressions can't have type arguments."
+  }
+  public fun description(): String {
+    "But this one has them: {this.navigation}."
+  }
+}
+
+public class UnknownFieldError {
+  public let name: String
+}
+impl UnknownFieldError: CompilerError {
+  public fun id(): String { "unknown-field" }
+
+  public fun location(): Location {
+    todo("never, marcelgarus: Implement UnknownFieldError.location")
+  }
+  public fun title(): String {
+    "Navigation to a field that doesn't exist: {name}"
+  }
+  public fun description(): String {
+    ""
   }
 }
