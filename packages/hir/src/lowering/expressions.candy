@@ -436,7 +436,7 @@ impl LoweringContext {
           let result = context.lowerExpressionToValueExpression(it.value)
           context = result.first
           if (it.name as Some<AstIdentifier>) {
-            Tuple(it.name.unwrap, result.second)
+            Tuple(it.name.unwrap(), result.second)
           }
         })
         .unsafeToMap<String, HirValueExpressionUri>()
