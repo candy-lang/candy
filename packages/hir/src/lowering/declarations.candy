@@ -617,23 +617,58 @@ impl HirValueParameter: HasAst<AstValueParameter> {
 }
 
 impl HirInlineType {
+  fun allFunctions(context: QueryContext<List<CompilerError>>, scope: Package): Set<HirFunction> {
+    query<Set<HirFunction>, List<CompilerError>>(
+      context, "HirInlineType.allFunctions", DataTuple2<HirInlineType, Package>(this, scope), {
+      getAllImpls(context, this, scope)
+        .expand({ it.declarations(context) })
+        .whereType<HirFunction>()
+        .toSet()
+    })
+  }
+
   fun staticFunctions(context: QueryContext<List<CompilerError>>, scope: Package): Set<HirFunction> {
-    query<Set<HirFunction>, List<CompilerError>>(context, "HirInlineType.staticFunctions", this, {
+    query<Set<HirFunction>, List<CompilerError>>(
+      context, "HirInlineType.staticFunctions", DataTuple2<HirInlineType, Package>(this, scope), {
       this.allFunctions(context, scope).items().where({ it.isStatic(context) }).toSet()
     })
   }
 
   fun instanceFunctions(context: QueryContext<List<CompilerError>>, scope: Package): Set<HirFunction> {
-    query<Set<HirFunction>, List<CompilerError>>(context, "HirInlineType.instanceFunctions", this, {
+    query<Set<HirFunction>, List<CompilerError>>(
+      context, "HirInlineType.instanceFunctions", DataTuple2<HirInlineType, Package>(this, scope), {
       this.allFunctions(context, scope).items().where({ !it.isStatic(context) }).toSet()
     })
   }
 
-  fun allFunctions(context: QueryContext<List<CompilerError>>, scope: Package): Set<HirFunction> {
-    query<Set<HirFunction>, List<CompilerError>>(context, "HirInlineType.allFunctions", this, {
-      getAllImpls(context, this, scope)
-        .expand({ it.declarations(context) })
-        .whereType<HirFunction>()
+  fun instanceFunctionsWithName(context: QueryContext<List<CompilerError>>, name: String, scope: Package): Set<HirFunction> {
+    query<Set<HirFunction>, List<CompilerError>>(
+      context, "HirInlineType.instanceFunctionsWithName",
+      DataTuple3<HirInlineType, String, Package>(this, name, scope), {
+      this.instanceFunctions(context, scope).items().where({ it.name() == name }).toSet()
+    })
+  }
+
+  fun leafInstanceFunctionsWithNameAsWellAsTheirParameterTypesAndTheReturnType(
+    context: QueryContext<List<CompilerError>>,
+    name: String,
+    scope: Package,
+  ): Set<(HirFunction, Map<String, HirInlineType>, HirInlineType)> {
+    query<Set<(HirFunction, Map<String, HirInlineType>, HirInlineType)>, List<CompilerError>>(
+      context, "HirInlineType.leafInstanceFunctionsWithNameAsWellAsTheirParameterTypesAndTheReturnType",
+      DataTuple3<HirInlineType, String, Package>(this, name, scope), {
+      this.instanceFunctionsWithName(context, name, scope)
+        .items()
+        .map<(HirFunction, Map<String, HirInlineType>, HirInlineType)>({
+          todo("soon, JonasWanke: Chase substitution maps up the impl chain.")
+          // let parentFunctions = functions.items()
+          //   .map({ it.parentFunction(context.global.context, context.global.function.package()) })
+          //   .toSet()
+          // let functions = functions
+          //   .items()
+          //   .whereNot({ parentFunction.contains(it) })
+          //   .toSet()
+        })
         .toSet()
     })
   }

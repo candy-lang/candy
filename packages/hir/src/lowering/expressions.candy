@@ -532,7 +532,28 @@ impl LoweringContext {
       let name = contextAndNameAndReceiver.second
       let receiver = contextAndNameAndReceiver.third
 
-      if (receiver is Some<HirValueExpressionUri>) {
+      if (receiver is Some) {
+        let receiver = receiver.unwrap()
+
+        if (receiver is HirValueExpressionUri) {
+          let receiverType = this.typeOf(receiver)
+          if (receiverType is HirErrorType) {
+            return Tuple(this, receiver)
+          }
+          if (receiverType is HirNamedType) {
+            let functions = (receiverType as HirNamedType)
+              .leafInstanceFunctionsWithNameAsWellAsTheirParameterTypesAndTheReturnType(
+                context.global.context,
+                name,
+                context.global.function.package(),
+              )
+          }
+        }
+        if (receiverType is HirTypeExpression) {
+          todo("soon, Support static functions")
+        }
+
+        
         // TODO(soon, marcelgarus): Handle function call with a receiver.
         let result = context.register(
           HirStringValueExpression("<compiler-generated> TODO(soon, marcelgarus): Handle function call with a receiver."),
