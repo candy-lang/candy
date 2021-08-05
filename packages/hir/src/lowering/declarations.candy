@@ -82,15 +82,41 @@ impl HirFunction: HasPackageAndPath {
 }
 
 public trait HasDeclarations {
-  fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration>
-  /// Returns the child declarations of this declaration.
-  ///
-  /// Note that some declarations can never have any child declarations (for example, functions or
-  /// properties). These always return empty lists.
+  fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
+    /// Returns the child declarations of this declaration.
+    ///
+    /// Note that some declarations can never have any child declarations (for example, functions or
+    /// properties). These always return empty lists.
 
-  fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any>
+    this.realDeclarations(context).orElse({ List.empty<HirDeclaration>() })
+      .followedByList(this.syntheticDeclarations(context).map<HirDeclaration>({ it.id }).toList())
+  }
+
+  fun realDeclarations(context: QueryContext<List<CompilerError>>): Maybe<List<HirDeclaration>>
+
+  fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): Maybe<List<Any>>
   /// Getter for ast declarations, but type unsafe. Still useful if it's immediately followed by
   /// `whereType()`.
+
+  fun syntheticDeclarations(context: QueryContext<List<CompilerError>>): List<HirSyntheticDeclaration>
+
+  fun syntheticDeclaration(context: QueryContext<List<CompilerError>>): Maybe<HirSyntheticDeclaration> {
+    query<Maybe<HirSyntheticDeclaration>, List<CompilerError>>(
+      context, "HasDeclarations.syntheticDeclaration", this, {
+      if (this.isSynthetic()) {
+        let declaration = this.parent
+        .syntheticDeclarations(context)
+        .singleWhere({ it.id == this })
+        assert(
+          declaration is Some<HirSyntheticDeclaration>,
+          "This should have a synthetic declaration",
+        )
+        declaration
+      } else {
+        None<HirSyntheticDeclaration>()
+      }
+    })
+  }
 }
 impl HirDeclaration: HasDeclarations
 
@@ -121,7 +147,7 @@ public fun isPublicFromModifiers(modifiers: List<AstIdentifier>): Bool {
 // types `HirTopLevelModule` and `HirInnerModule`, passing themselves as parameters.
 
 fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule): Maybe<AstFile | AstModule> {
-  /// Returns the ast of the given `moduleHir`, or `None` if it doesn't exist.
+  /// Returns the ast of the given `moduleHir`, or `None` if it's synthetic.
   
   query<Maybe<AstFile | AstModule>, List<CompilerError>>(context, "HirModule.ast", (moduleHir as Equals & Hash), {
     // These are all the ways that modules can be declared with decreasing priority:
@@ -133,6 +159,10 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule
     // First, go into directories with correct names as long as possible. Then, look for a file with
     // the name of the next submodule, defaulting to module.candy if it doesn't exist. Finally, read
     // that file and find a inline module nested.
+
+    if ((moduleHir as HirDeclaration).isSynthetic()) {
+      return Tuple(None<AstFile | AstModule>(), List.empty<CompilerError>())
+    }
 
     let package = (moduleHir as HasPackageAndPath).package()
     mut let segments = (moduleHir as HasPackageAndPath).path() as Iterable<String>
@@ -164,8 +194,7 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule
       path = path.child(".candy")
     }
     if !FancyFile(package, path).doesExist(context) {
-      print("File at {path} doesn't exist.")
-      return Tuple(None<AstFile | AstModule>(), List.empty<CompilerError>())
+      throw "File at {path} doesn't exist."
     }
 
     let ast = parseAstOfFile(context, FancyFile(package, path)).first
@@ -179,77 +208,98 @@ fun astOfModule(context: QueryContext<List<CompilerError>>, moduleHir: HirModule
 fun astDeclarationsOfModule(
   context: QueryContext<List<CompilerError>>,
   module: HirModule,
-): List<AstModule | AstTrait | AstImpl | AstType | AstFunction> {
+): Maybe<List<AstModule | AstTrait | AstImpl | AstType | AstFunction>> {
   query<
-    List<AstModule | AstTrait | AstImpl | AstType | AstFunction>,
+    Maybe<List<AstModule | AstTrait | AstImpl | AstType | AstFunction>>,
     List<CompilerError>,
   >(context, "HirModule.astDeclarations", (module as Equals & Hash), {
     let ast = astOfModule(context, module)
     if ast is None<AstFile | AstModule> {
       return Tuple(
-        List.empty<AstModule | AstTrait | AstImpl | AstType | AstFunction>(),
+        None<List<AstModule | AstTrait | AstImpl | AstType | AstFunction>>(),
         List.empty<CompilerError>(),
       )
     }
     let ast = ast.unwrap()
-    if (ast is AstFile) {
-      return Tuple((ast as AstFile).declarations, List.empty<CompilerError>())
+    let declarations = if (ast is AstFile) {
+      (ast as AstFile).declarations
+    } else {
+      (ast as AstModule).innerDeclarations
     }
-    if (ast is AstModule) {
-      return Tuple((ast as AstModule).innerDeclarations, List.empty<CompilerError>())
-    }
-    throw "Shouldn't reach this."
+    return Tuple(
+      Some<List<AstModule | AstTrait | AstImpl | AstType | AstFunction>>(declarations),
+      List.empty<CompilerError>(),
+    )
   })
 }
-fun declarationsOfModule(
+fun realDeclarationsOfModule(
   context: QueryContext<List<CompilerError>>,
   module: HirModule,
-): List<HirDeclaration> {
-  query<List<HirDeclaration>, List<CompilerError>>(
+): Maybe<List<HirDeclaration>> {
+  query<Maybe<List<HirDeclaration>>, List<CompilerError>>(
     context,
-    "HirModule.declarations",
+    "HirModule.realDeclarations",
     module as Equals & Hash,
     {
       mut let implDisambiguator = 0
       mut let functionDisambiguator = 0
-      let declarations = (astDeclarationsOfModule(context, module) as Iterable<AstModule | AstTrait | AstImpl | AstType | AstFunction>)
-        .map<HirDeclaration>({
-          if (it is AstModule) { return HirInnerModule(module, (it as AstModule).name.value) as HirDeclaration }
-          if (it is AstTrait) {
-            return HirTrait(module, (it as AstTrait).name.value) as HirDeclaration
-          }
-          if (it is AstImpl) {
-            let impl_ = HirImpl(module, implDisambiguator)
-            implDisambiguator = implDisambiguator + 1
-            return impl_ as HirDeclaration
-          }
-          if (it is AstType) { return HirType(module, (it as AstType).name.value) as HirDeclaration }
-          if (it is AstFunction) {
-            let function = HirFunction(module, (it as AstFunction).name.value, functionDisambiguator)
-            functionDisambiguator = functionDisambiguator + 1
-            return function as HirDeclaration
-          }
-          throw "Shouldn't reach this."
-        })
-        .toMutableList()
-      let ast = astOfModule(context, module)
-      if (ast is Some) {
-        if (ast.unwrap() is AstFile) {
-          for useLine in (ast.unwrap() as AstFile).useLines {
-            if (useLine.target is AstLocalRelativeUseLineTarget) {
-              let target = (useLine.target as AstLocalRelativeUseLineTarget)
-              if target.parentNavigations == 0 {
-                (target.path as Iterable<AstIdentifier>).single().do({
-                  declarations.appendAll(declarationsOfModule(context, module.innerModule(it.value)))
-                })
+      astDeclarationsOfModule(context, module)
+        .map<List<HirDeclaration>>({
+          let declarations = (it as Iterable<AstModule | AstTrait | AstImpl | AstType | AstFunction>)
+            .map<HirDeclaration>({
+              if (it is AstModule) { return HirInnerModule(module, (it as AstModule).name.value) as HirDeclaration }
+              if (it is AstTrait) {
+                return HirTrait(module, (it as AstTrait).name.value) as HirDeclaration
+              }
+              if (it is AstImpl) {
+                let impl_ = HirImpl(module, implDisambiguator)
+                implDisambiguator = implDisambiguator + 1
+                return impl_ as HirDeclaration
+              }
+              if (it is AstType) { return HirType(module, (it as AstType).name.value) as HirDeclaration }
+              if (it is AstFunction) {
+                let function = HirFunction(module, (it as AstFunction).name.value, functionDisambiguator)
+                functionDisambiguator = functionDisambiguator + 1
+                return function as HirDeclaration
+              }
+              throw "Shouldn't reach this."
+            })
+            .toMutableList()
+          astOfModule(context, module).do({
+            if (it is AstFile) {
+              for useLine in (it as AstFile).useLines {
+                if (useLine.target is AstLocalRelativeUseLineTarget) {
+                  let target = (useLine.target as AstLocalRelativeUseLineTarget)
+                  if target.parentNavigations == 0 {
+                    (target.path as Iterable<AstIdentifier>).single().do({
+                      declarations.appendAll(declarationsOfModule(context, module.innerModule(it.value)))
+                    })
+                  }
+                }
               }
             }
-          }
-        }
-      }
+          })
+          declarations
+        })
+        .orElse({ (module as HirDeclaration).syntheticDeclarations() })
       Tuple(declarations, List.empty<CompilerError>())
     }
   )
+}
+fun syntheticDeclarationsOfModule(
+  context: QueryContext<List<CompilerError>>,
+  module: HirModule,
+): List<HirSyntheticDeclaration> {
+  query<List<HirSyntheticDeclaration>, List<CompilerError>>(
+    context, "HirModule.syntheticDeclarations", module as Equals & Hash, {
+    let declarations = this.syntheticDeclaration(context)
+      .map<List<HirSyntheticDeclaration>>({ (it as HirSyntheticModule).declarations() })
+      .orElse({
+        // TODO: Run macros.
+        List.empty<HirSyntheticDeclaration>()
+      })
+    Tuple(declarations, List.empty<CompilerError>())
+  })
 }
 impl HirModule: MightNotExist & HasAst<AstFile | AstModule> & HasDeclarations {
   fun doesExist(context: QueryContext<List<CompilerError>>): Bool
@@ -257,6 +307,8 @@ impl HirModule: MightNotExist & HasAst<AstFile | AstModule> & HasDeclarations {
   fun astDeclarations(
     context: QueryContext<List<CompilerError>>,
   ): List<AstModule | AstTrait | AstImpl | AstType | AstFunction>
+  
+  fun syntheticDeclarations(context: QueryContext<List<CompilerError>>): List<HirSyntheticDeclaration>
 }
 impl HirTopLevelModule: MightNotExist & HasAst<AstFile | AstModule> & HasDeclarations {
   fun doesExist(context: QueryContext<List<CompilerError>>): Bool {
@@ -273,8 +325,11 @@ impl HirTopLevelModule: MightNotExist & HasAst<AstFile | AstModule> & HasDeclara
   fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any> {
     astDeclarations(context) as List<Any>
   }
-  public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
-    declarationsOfModule(context, this)
+  public fun realDeclarations(context: QueryContext<List<CompilerError>>): Maybe<List<HirDeclaration>> {
+    realDeclarationsOfModule(context, this)
+  }
+  fun syntheticDeclarations(context: QueryContext<List<CompilerError>>): List<HirSyntheticDeclaration> {
+    syntheticDeclarationsOfModule(this)
   }
 }
 impl HirInnerModule: MightNotExist & HasAst<AstFile | AstModule> & HasDeclarations {
@@ -292,8 +347,11 @@ impl HirInnerModule: MightNotExist & HasAst<AstFile | AstModule> & HasDeclaratio
   fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any> {
     astDeclarations(context) as List<Any>
   }
-  public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
-    declarationsOfModule(context, this)
+  public fun realDeclarations(context: QueryContext<List<CompilerError>>): Maybe<List<HirDeclaration>> {
+    realDeclarationsOfModule(context, this)
+  }
+  fun syntheticDeclarations(context: QueryContext<List<CompilerError>>): List<HirSyntheticDeclaration> {
+    syntheticDeclarationsOfModule(this)
   }
 }
 
@@ -323,28 +381,34 @@ impl HirTrait: HasAst<AstTrait> & HasDeclarations & HasTypeParameters & HasVisib
     astDeclarations(context) as List<Any>
   }
 
-  public fun declarations(
+  public fun realDeclarations(
     context: QueryContext<List<CompilerError>>,
-  ): List<HirDeclaration> {
-    query<List<HirDeclaration>, List<CompilerError>>(
+  ): Maybe<List<HirDeclaration>> {
+    query<Maybe<List<HirDeclaration>>, List<CompilerError>>(
       context,
-      "HirTrait.declarations",
+      "HirTrait.realDeclarations",
       this,
       {
-      mut let functionDisambiguator = 0
-      let declarations = (astDeclarations(context) as Iterable<AstTrait | AstType | AstFunction>)
-        .map<HirDeclaration>({
-          if (it is AstFunction) {
-            let function = HirFunction(this, (it as AstFunction).name.value, functionDisambiguator)
-            functionDisambiguator = functionDisambiguator + 1
-            return (function as HirDeclaration)
-          }
-          throw "Shouldn't reach this."
-        })
-        .toList()
+        let declarations = astDeclarations(context).map<List<HirDeclaration>>({
+        mut let functionDisambiguator = 0
+        (it as Iterable<AstTrait | AstType | AstFunction>)
+          .map<HirDeclaration>({
+            if (it is AstFunction) {
+              let function = HirFunction(this, (it as AstFunction).name.value, functionDisambiguator)
+              functionDisambiguator = functionDisambiguator + 1
+              return (function as HirDeclaration)
+            }
+            throw "Shouldn't reach this."
+          })
+          .toList()
+      })
       Tuple(declarations, List.empty<CompilerError>())
       }
     )
+  }
+
+  fun syntheticDeclarations(context: QueryContext<List<CompilerError>>): List<HirSyntheticDeclaration> {
+    List.empty<HirSyntheticDeclaration>()
   }
 
   fun typeParameters(context: QueryContext<List<CompilerError>>): List<HirParameterType> {
@@ -383,21 +447,74 @@ impl HirImpl: HasAst<AstImpl> & HasDeclarations & HasTypeParameters {
     astDeclarations(context) as List<Any>
   }
 
-  public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
-    query<List<HirDeclaration>, List<CompilerError>>(context, "HirImpl.declarations", this, {
-      mut let functionDisambiguator = 0
-      let declarations = (ast(context).innerDeclarations as Iterable<AstFunction>)
-        .map<HirDeclaration>({
-          if (it is AstFunction) {
-            let function = HirFunction(this, (it as AstFunction).name.value, functionDisambiguator)
-            functionDisambiguator = functionDisambiguator + 1
-            return (function as HirDeclaration)
-          }
-          throw "Shouldn't reach this."
-        })
-        .toList()
+  public fun realDeclarations(context: QueryContext<List<CompilerError>>): Maybe<List<HirDeclaration>> {
+    query<Maybe<List<HirDeclaration>>, List<CompilerError>>(context, "HirImpl.realDeclarations", this, {
+      let declarations = ast(context).map<List<HirDeclaration>>({
+        mut let functionDisambiguator = 0
+        (it.innerDeclarations as Iterable<AstFunction>)
+          .map<HirDeclaration>({
+            if (it is AstFunction) {
+              let function = HirFunction(this, (it as AstFunction).name.value, functionDisambiguator)
+              functionDisambiguator = functionDisambiguator + 1
+              return (function as HirDeclaration)
+            }
+            throw "Shouldn't reach this."
+          })
+          .toList()
+      })
       Tuple(declarations, List.empty<CompilerError>())
     })
+  }
+
+  fun syntheticDeclarations(context: QueryContext<List<CompilerError>>): List<HirSyntheticDeclaration> {
+    if (this.isSynthetic()) { return List.empty<HirSyntheticDeclaration>() }
+    it.implementedTrait(context)
+      .maybeMap<HirNamedType>({
+        if (this is HirErrorType) { return None() }
+        Some<HirNamedType>(this as HirNamedType)
+      })
+      .map<List<HirSyntheticDeclaration>>({
+        let trait = (it.declaration as HirTrait)
+        let parentFunctions = (trait.declarations(context) as Iterable<HirDeclaration>)
+          .cast<HirFunction>()
+        let overwrittenFunctions = this.realDeclarations(context)
+          .whereType<HirFunction>()
+          .map<HirFunction>({ it.parentFunction(context) })
+          .toSet()
+        let nonOverwrittenFunctions = parentFunctions
+          .where({ !overwrittenFunctions.contains(it) })
+          .toList()
+        let upperBound = trait.upperBound(context)
+        let substitutions = upperBound.substitutionMap(context)
+        nonOverwrittenFunctions
+          .map<HirSyntheticDeclaration>({
+            HirSyntheticFunction(
+              it,
+              it.modifiers,
+              it.name.value,
+              it.typeParameters(context)
+                .map<HirSyntheticTypeParameter>({
+                  HirSyntheticTypeParameter(it.name.value, it.upperBound.substitute(substitutions))
+                })
+                .toList(),
+              it.valueParameters(context)
+                .map<HirSyntheticValueParameter>({
+                  HirSyntheticValueParameter(
+                    it.name.value,
+                    it.type.substitute(substitutions),
+                    it.defaultValue.map<HirSyntheticExpression>({
+                      // TODO: Lower default value to HirSyntheticExpressions.
+                    }),
+                  )
+                })
+                .toList(),
+              it.returnType(context),
+              it.body(context), // TODO: Lower to HirSyntheticBody
+            )
+          })
+          .toList()
+      })
+      .orElse({ List.empty<HirSyntheticDeclaration>() })
   }
 
   fun typeParameters(context: QueryContext<List<CompilerError>>): List<HirParameterType> {
@@ -432,13 +549,18 @@ impl HirType: HasAst<AstType> & HasDeclarations & HasTypeParameters & HasVisibil
     List.empty<Any>()
   }
 
-  public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
-    query<List<HirDeclaration>, List<CompilerError>>(
+  public fun realDeclarations(context: QueryContext<List<CompilerError>>): Maybe<List<HirDeclaration>> {
+    query<Maybe<List<HirDeclaration>>, List<CompilerError>>(
       context,
-      "HirType.declarations",
-      this,
-      { Tuple(List.empty<HirDeclaration>(), List.empty<CompilerError>()) },
-    )
+      "HirType.realDeclarations",
+      this, {
+      let declarations = if (this.isSynthetic() {
+        None<List<HirDeclaration>>()
+      } else {
+        Some<List<HirDeclaration>>(List.empty<HirDeclaration>())
+      }
+      Tuple(declarations, List.empty<CompilerError>())
+    })
   }
 
   fun typeParameters(context: QueryContext<List<CompilerError>>): List<HirParameterType> {
@@ -471,8 +593,18 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
   fun typeUnsafeAstDeclarations(context: QueryContext<List<CompilerError>>): List<Any> {
     List.empty<Any>()
   }
-  public fun declarations(context: QueryContext<List<CompilerError>>): List<HirDeclaration> {
-    List.empty<HirDeclaration>()
+  public fun realDeclarations(context: QueryContext<List<CompilerError>>): Maybe<List<HirDeclaration>> {
+    query<Maybe<List<HirDeclaration>>, List<CompilerError>>(
+      context,
+      "HirFunction.realDeclarations",
+      this, {
+      let declarations = if (this.isSynthetic() {
+        None<List<HirDeclaration>>()
+      } else {
+        Some<List<HirDeclaration>>(List.empty<HirDeclaration>())
+      }
+      Tuple(declarations, List.empty<CompilerError>())
+    })
   }
 
   fun isStatic(context: QueryContext<List<CompilerError>>): Bool {
