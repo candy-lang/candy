@@ -64,7 +64,7 @@ public class AstTrait {
   public let modifiers: List<AstIdentifier>
   public let name: AstIdentifier
   public let typeParameters: List<AstTypeParameter>
-  public let upperBound: Maybe<AstInlineType>
+  public let upperBound: List<AstNamedType | AstErrorType>
   public let innerDeclarations: List<AstTrait | AstType | AstFunction>
 }
 impl AstTrait: AstWithTypeParameters & AstDeclaration & Equals & Hash {

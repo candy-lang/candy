@@ -322,7 +322,23 @@ fun lowerTrait(
           )
           context.createErrorType(id)
         } else {
-          lowerInlineType(context, id, it.second.unwrap())
+          let type = lowerInlineType(context, id, it.second.unwrap())
+          if (type is AstNamedType) {
+            return List.of1<AstNamedType | AstErrorType>(type as AstNamedType | AstErrorType)
+          }
+          if (type is AstErrorType) {
+            return List.of1<AstNamedType | AstErrorType>(type as AstNamedType | AstErrorType)
+          }
+          if (type is AstIntersectionType) {
+            return ((type as AstIntersectionType).types as Iterable<AstInlineType>)
+              .map<AstNamedType | AstErrorType>({
+                if (it is AstNamedType) { return (it as AstNamedType | AstErrorType) }
+                if (it is AstErrorType) { return (it as AstNamedType | AstErrorType) }
+                context.addError()
+                return AstErrorType(it.id, it.modifiers)
+              })
+              .toList()
+          }
         }
       })
 
@@ -342,6 +358,18 @@ fun lowerTrait(
     ),
   )
 }
+class AstTraitCanOnlyHaveIntersectionOfNamedTypesAsUpperBoundCompilerError {
+  public let file: FancyFile
+  public let type: AstInlineType
+}
+impl MissingValueParametersCompilerError: CompilerError {
+  public fun id(): String { "ast-trait-can-only-have-intersection-of-named-types-as-upper-bound" }
+
+  public fun location(): Location { Location(file, todo("todo")) }
+  public fun title(): String { "AST trait can only have intersection of named types as upper bound." }
+  public fun description(): String { "" }
+}
+
 fun lowerImpl(
   context: LoweringContext,
   parentId: AstFileId | AstDeclarationId | AstExpressionId,
