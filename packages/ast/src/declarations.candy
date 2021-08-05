@@ -19,6 +19,7 @@ impl AstDeclarationId: AstNodeId & Equals & Hash {
 }
 
 public trait /* enum */ AstDeclaration {
+  public let id: AstDeclarationId
   public let modifiers: List<AstIdentifier>
 }
 impl AstDeclaration: AstNode & Equals & Hash {
