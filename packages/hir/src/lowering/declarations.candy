@@ -517,17 +517,72 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
         return Tuple(None<HirFunction>(), List.empty<CompilerError>())
       }
 
-      let thisType = if (this.parent is HirTrait) {
+      let parentType = if (this.parent is HirTrait) {
         (this.parent as HirTrait).upperBound(context)
       } else {
         (this.parent as HirImpl).implementedTrait(context).unwrap()
       }
-      let thisType = (thisType as HirNamedType)
-      assert(thisType.declaration is HirTrait, "Impls can only implement traits")
-      Tuple(todo("soon, JonasWanke: check base implementations"), List.empty<CompilerError>())
+      let parentType = (parentType as HirNamedType)
+      assert(parentType.declaration is HirTrait, "Impls can only implement traits")
+
+      let scope = this.package()
+      let substitutionMap = parentType.substitutionMap(context)
+      let valueParameters = this.valueParameters(context)
+      let returnType = this.returnType(context)
+      let functionCandidates = parentType
+        .instanceFunctions(context, scope)
+        .items()
+        .where({
+          if (!(it.name() == this.name())) {
+            return false
+          }
+          let otherReturnType = it.returnType(context)
+          if (!isAssignableTo(context, returnType, otherReturnType, scope)) {
+            return false
+          }
+          let otherValueParameters = it.valueParameters(context)
+          if (!((valueParameters as Iterable<HirValueParameter>).length() == (otherValueParameters as Iterable<HirValueParameter>).length())) {
+            return false
+          }
+          valueParameters
+            .zip(otherValueParameters as Iterable<HirValueParameter>)
+            .all({
+              let parameter = it.first
+              let otherParameter = it.second
+              parameter.name == otherParameter.name
+                && isAssignableTo(context, otherParameter.type(context), parameter.type(context), scope)
+            })
+        })
+        .toList()
+      let functionCandidates = (functionCandidates as Iterable<HirFunction>)
+
+      if (functionCandidates.length() > 1) {
+        return Tuple(
+          Some<HirFunction>(functionCandidates.first().unwrap()),
+          List.of1<CompilerError>(TraitsWithConflictingFunctionsImplementedCompilerError(this)),
+        )
+      }
+      Tuple(functionCandidates.single(), List.empty<CompilerError>())
     })
   }
 }
+
+public class TraitsWithConflictingFunctionsImplementedCompilerError {
+  public let function: HirFunction
+}
+impl TraitsWithConflictingFunctionsImplementedCompilerError: CompilerError {
+  public fun id(): String { "traits-with-conflicting-functions-implemented" }
+
+  public fun location(): Location {
+    todo("never, marcelgarus: Implement TraitsWithConflictingFunctionsImplementedCompilerError.location")
+  }
+  public fun title(): String { "A function matches multiple functions in parent traits: {this.function}" }
+  public fun description(): String {
+    /// TODO(never, marcelgarus): add a description for this error
+    ""
+  }
+}
+
 
 impl HirValueParameter: HasAst<AstValueParameter> {
   fun ast(context: QueryContext<List<CompilerError>>): AstValueParameter {
@@ -557,6 +612,64 @@ impl HirValueParameter: HasAst<AstValueParameter> {
         ),
         List.empty<CompilerError>(),
       )
+    })
+  }
+}
+
+impl HirInlineType {
+  fun allFunctions(context: QueryContext<List<CompilerError>>, scope: Package): Set<HirFunction> {
+    query<Set<HirFunction>, List<CompilerError>>(
+      context, "HirInlineType.allFunctions", DataTuple2<HirInlineType, Package>(this, scope), {
+      getAllImpls(context, this, scope)
+        .expand({ it.declarations(context) })
+        .whereType<HirFunction>()
+        .toSet()
+    })
+  }
+
+  fun staticFunctions(context: QueryContext<List<CompilerError>>, scope: Package): Set<HirFunction> {
+    query<Set<HirFunction>, List<CompilerError>>(
+      context, "HirInlineType.staticFunctions", DataTuple2<HirInlineType, Package>(this, scope), {
+      this.allFunctions(context, scope).items().where({ it.isStatic(context) }).toSet()
+    })
+  }
+
+  fun instanceFunctions(context: QueryContext<List<CompilerError>>, scope: Package): Set<HirFunction> {
+    query<Set<HirFunction>, List<CompilerError>>(
+      context, "HirInlineType.instanceFunctions", DataTuple2<HirInlineType, Package>(this, scope), {
+      this.allFunctions(context, scope).items().where({ !it.isStatic(context) }).toSet()
+    })
+  }
+
+  fun instanceFunctionsWithName(context: QueryContext<List<CompilerError>>, name: String, scope: Package): Set<HirFunction> {
+    query<Set<HirFunction>, List<CompilerError>>(
+      context, "HirInlineType.instanceFunctionsWithName",
+      DataTuple3<HirInlineType, String, Package>(this, name, scope), {
+      this.instanceFunctions(context, scope).items().where({ it.name() == name }).toSet()
+    })
+  }
+
+  fun leafInstanceFunctionsWithNameAsWellAsTheirParameterTypesAndTheReturnType(
+    context: QueryContext<List<CompilerError>>,
+    name: String,
+    scope: Package,
+  ): Set<(HirFunction, Map<String, HirInlineType>, HirInlineType)> {
+    query<Set<(HirFunction, Map<String, HirInlineType>, HirInlineType)>, List<CompilerError>>(
+      context, "HirInlineType.leafInstanceFunctionsWithNameAsWellAsTheirParameterTypesAndTheReturnType",
+      DataTuple3<HirInlineType, String, Package>(this, name, scope), {
+      this.instanceFunctionsWithName(context, name, scope)
+        .items()
+        .map<(HirFunction, Map<String, HirInlineType>, HirInlineType)>({
+          todo("soon, JonasWanke: Chase substitution maps up the impl chain.")
+          // let parentFunctions = functions.items()
+          //   .map({ it.parentFunction(context.global.context, context.global.function.package()) })
+          //   .toSet()
+          // let functions = functions
+          //   .items()
+          //   .whereNot({ parentFunction.contains(it) })
+          //   .toSet()
+        })
+        .toSet()
     })
   }
 }

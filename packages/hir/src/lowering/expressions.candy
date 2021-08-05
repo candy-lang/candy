@@ -477,11 +477,59 @@ impl LoweringContext {
     }
 
     if (expression is AstNavigationExpression) {
-      // This is an AstNavigationExpression that has is not inside an AstCallExpression – otherwise,
-      // the lowering of the surrounding AstCallExpression would have also handled the inner
-      // AstNavigationExpression. So, this is a function invocation without any parameters.
-      // But that doesn't work for now.
-      todo("never, Function call with omitted parentheses")
+      let astExpression = (expression as AstNavigationExpression)
+      let name = astExpression.target.value
+
+      mut let context = this
+      if ((astExpression.typeArguments as Iterable<AstTypeArgument>).isNotEmpty()) {
+        context = context.registerError(NavigationWithTypeArgumentsError(astExpression))
+      }
+
+      let result = context.lowerExpressionToValueExpression(expression.receiver)
+      let context = result.first
+      let receiver = result.second
+      mut let receiverType = context.typeOf(receiver)
+
+      if (receiverType is HirErrorType) {
+        return result
+      }
+      if (receiverType is HirThisType) {
+        todo("soon, Change receiverType to the surrounding type")
+      }
+      if (receiverType is HirParameterType) {
+        todo("soon, Change receiverType to the upper bound")
+      }
+      if (receiverType is HirNamedType) {
+        let declaration = (receiverType as HirNamedType).declaration
+        if (declaration is HirType) {
+          let declaration = (declaration as HirType)
+          let declarationType = declaration.type(context.global.context)
+          // TODO(soon, JonasWanke): Substitute parameters.
+
+          if (declarationType is HirStructType) {
+            let fields = (declarationType as HirStructType).fields
+            let field = (fields as Iterable<(String, HirInlineType)>)
+              .singleWhere({ it.first == name })
+            if (field is None) {
+              return context.registerError(UnknownFieldError(name))
+            }
+
+            let result = context.register(HirTypeValueValueExpression(receiver), declarationType)
+            let context = result.first
+            let valueValueExpressionUri = result.second
+            context.register(
+              HirStructFieldAccessValueExpression(valueValueExpressionUri, name),
+              field.unwrap().second,
+            )
+          }
+          
+        }
+      }
+      if (receiverType is HirStructType) {
+        todo("soon, Allow navigation to struct fields.")
+      }
+
+      context.registerError(UnsupportedFeatureCompilerError("never, Function call with omitted parentheses"))
     }
 
     if (expression is AstCallExpression) {
@@ -515,7 +563,27 @@ impl LoweringContext {
       let name = contextAndNameAndReceiver.second
       let receiver = contextAndNameAndReceiver.third
 
-      if (receiver is Some<HirValueExpressionUri | HirTypeExpression>) {
+      if (receiver is Some) {
+        let receiver = receiver.unwrap()
+
+        if (receiver is HirValueExpressionUri) {
+          let receiverType = this.typeOf(receiver)
+          if (receiverType is HirErrorType) {
+            return Tuple(this, receiver)
+          }
+          if (receiverType is HirNamedType) {
+            let functions = (receiverType as HirNamedType)
+              .leafInstanceFunctionsWithNameAsWellAsTheirParameterTypesAndTheReturnType(
+                context.global.context,
+                name,
+                context.global.function.package(),
+              )
+          }
+        }
+        if (receiverType is HirTypeExpression) {
+          todo("soon, Support static functions")
+        }
+
         // TODO(soon, marcelgarus): Handle function call with a receiver.
         let result = context.register(
           HirStringValueExpression("<compiler-generated> TODO(soon, marcelgarus): Handle function call with a receiver."),
@@ -932,5 +1000,39 @@ impl MultipleFunctionsMatchArgumentsError: CompilerError {
   public fun description(): String {
     /// TODO(never, marcelgarus): add a description for this error
     "Possible functions: {(this.functions as Iterable<HirValueExpressionUri | HirFunction>).join(", ")}"
+  }
+}
+
+public class NavigationWithTypeArgumentsError {
+  public let navigation: AstNavigationExpression
+}
+impl NavigationWithTypeArgumentsError: CompilerError {
+  public fun id(): String { "navigation-with-type-arguments" }
+
+  public fun location(): Location {
+    todo("never, marcelgarus: Implement NavigationWithTypeArgumentsError.location")
+  }
+  public fun title(): String {
+    "Navigation expressions can't have type arguments."
+  }
+  public fun description(): String {
+    "But this one has them: {this.navigation}."
+  }
+}
+
+public class UnknownFieldError {
+  public let name: String
+}
+impl UnknownFieldError: CompilerError {
+  public fun id(): String { "unknown-field" }
+
+  public fun location(): Location {
+    todo("never, marcelgarus: Implement UnknownFieldError.location")
+  }
+  public fun title(): String {
+    "Navigation to a field that doesn't exist: {name}"
+  }
+  public fun description(): String {
+    ""
   }
 }

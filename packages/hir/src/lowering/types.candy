@@ -263,6 +263,17 @@ impl HirImpl {
   }
 }
 
+impl HirType {
+  fun type(context: QueryContext<List<CompilerError>>): Maybe<HirInlineType> {
+    query<Maybe<HirInlineType>, List<CompilerError>>(context, "HirType.type", this, {
+      Tuple(
+        this.ast(context).type.map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) }),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
+}
+
 impl HirFunction {
   fun returnType(context: QueryContext<List<CompilerError>>): HirInlineType {
     query<HirInlineType, List<CompilerError>>(context, "HirFunction.returnType", this, {
@@ -897,11 +908,14 @@ fun getAllImplementedTraitsFor(
   scope: Package,
 ): Set<HirNamedType> {
   query<Set<HirNamedType>, List<CompilerError>>(context, "getAllImplementedTraitsFor", DataTuple2<HirInlineType, Package>(base, scope), {
-    todo("soon, marcelgarus: implement getAllImplementedTraitsFor")
-    // getAllTraitsInScope(context, scope)
-    //   .items()
-    //   .where({ isAssignableTo(context, base, it, scope) })
-    //   .toSet()
+    let traits = getAllImplsFor(context, base, scope)
+      .items()
+      .maybeMap<HirNamedType>({ it.upperBound(context) })
+      .toMutableSet()
+    if (base.declaration is HirTrait) {
+      traits.insert((base.declaration as HirTrait).upperBound(context))
+    }
+    Tuple(traits, List.empty<CompilerError>())
   })
 }
 
@@ -921,6 +935,24 @@ fun getAllImplsFor(
       .toSet()
     Tuple(impls, List.empty<CompilerError>())
   })
+}
+
+impl HirNamedType {
+  fun substitutionMap(context: QueryContext<List<CompilerError>>): Map<HirParameterType, HirInlineType> {
+    query<
+      Map<HirParameterType, HirInlineType>,
+      List<CompilerError>,
+    >(context, "HirNamedType.substitutionMap", this as Equals & Hash, {
+      let typeArguments = this.parameterTypes
+      let typeParameters = (this.declaration as HasTypeParameters).typeParameters(context)
+      assert((typeArguments as Iterable<HirInlineType>).length() == (typeParameters as Iterable<HirParameterType>).length())
+
+      let substitutionMap = typeParameters
+        .zip(typeArguments as Iterable<HirInlineType>)
+        .unsafeToMap<HirParameterType, HirInlineType>()
+      Tuple(substitutionMap, List.empty<CompilerError>())
+    })
+  }
 }
 
 // fun resolveFunctionOnInlineType(
