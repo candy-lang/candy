@@ -1,0 +1,94 @@
+use compiler_utils
+use incremental
+
+use ..declarations
+use ..expressions
+use ..types
+
+public trait HirSyntheticDeclaration {
+  let id: HirDeclaration
+  fun declarations(): List<HirSyntheticDeclaration>
+}
+
+public class HirSyntheticModule {
+  public let id: HirModule
+  public let modifiers: List<String>
+  public let name: String
+  public let innerDeclarations: List<HirSyntheticModule | HirSyntheticTrait | HirSyntheticImpl | HirSyntheticType | HirSyntheticFunction>
+}
+impl HirSyntheticModule: HirSyntheticDeclaration {
+  fun declarations(): List<HirSyntheticDeclaration> {
+    this.innerDeclarations.cast<HirSyntheticDeclaration>()
+  }
+}
+
+public class HirSyntheticTrait {
+  public let id: HirTrait
+  public let modifiers: List<String>
+  public let name: String
+  public let typeParameters: List<HirSyntheticTypeParameter>
+  public let upperBound: HirInlineType
+  public let innerDeclarations: List<HirSyntheticTrait | HirSyntheticType | HirSyntheticFunction>
+}
+impl HirSyntheticTrait: HirSyntheticDeclaration {
+  fun declarations(): List<HirSyntheticDeclaration> {
+    this.innerDeclarations.cast<HirSyntheticDeclaration>()
+  }
+}
+
+public class HirSyntheticImpl {
+  public let id: HirImpl
+  public let modifiers: List<String>
+  public let typeParameters: List<HirSyntheticTypeParameter>
+  public let type: HirInlineType
+  public let traits: Maybe<HirNamedType>
+  public let innerDeclarations: List<HirSyntheticFunction>
+}
+impl HirSyntheticImpl: HirSyntheticDeclaration {
+  fun declarations(): List<HirSyntheticDeclaration> {
+    this.innerDeclarations.cast<HirSyntheticDeclaration>()
+  }
+}
+
+public class HirSyntheticType {
+  public let id: HirType
+  public let modifiers: List<String>
+  public let name: String
+  public let typeParameters: List<HirSyntheticTypeParameter>
+  public let type: HirInlineType
+}
+impl HirSyntheticType: HirSyntheticDeclaration {
+  fun declarations(): List<HirSyntheticDeclaration> { List.empty<HirSyntheticDeclaration>() }
+}
+
+public class HirSyntheticFunction {
+  public let id: HirFunction
+  public let modifiers: List<String>
+  public let name: String
+  public let typeParameters: List<HirSyntheticTypeParameter>
+  public let valueParameters: List<HirSyntheticValueParameter>
+  public let returnType: HirInlineType
+  public let body: HirSyntheticBody
+}
+impl HirSyntheticFunction: HirSyntheticDeclaration {
+  fun declarations(): List<HirSyntheticDeclaration> { List.empty<HirSyntheticDeclaration>() }
+}
+public class HirSyntheticBody {
+  let uris: List<HirValueExpressionUri>
+  let expressions: Map<HirValueExpressionUri, (HirValueExpression, HirInlineType)>
+}
+
+public class HirSyntheticTypeParameter {
+  public let name: String
+  public let upperBound: HirInlineType
+}
+
+public class HirSyntheticValueParameter {
+  public let name: String
+  public let type: HirInlineType
+  public let defaultValue: Maybe<HirSyntheticExpression>
+}
+public class HirSyntheticExpression {
+  let uri: HirValueExpressionUri
+  let expressions: Map<HirValueExpressionUri, (HirValueExpression, HirInlineType)>
+}
