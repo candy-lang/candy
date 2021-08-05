@@ -190,6 +190,14 @@ impl HirParameterType {
 }
 
 impl HirTrait {
+  fun thisType(context: QueryContext<List<CompilerError>>): HirInlineType {
+    query<HirInlineType, List<CompilerError>>(context, "HirTrait.thisType", this, {
+      Tuple(
+        HirNamedType(this, this.typeParameters(context)),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
   fun upperBound(context: QueryContext<List<CompilerError>>): HirInlineType {
     query<HirInlineType, List<CompilerError>>(context, "HirTrait.upperBound", this, {
       Tuple(
@@ -264,6 +272,14 @@ impl HirImpl {
 }
 
 impl HirType {
+  fun thisType(context: QueryContext<List<CompilerError>>): HirInlineType {
+    query<HirInlineType, List<CompilerError>>(context, "HirTrait.thisType", this, {
+      Tuple(
+        HirNamedType(this, this.typeParameters(context)),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
   fun type(context: QueryContext<List<CompilerError>>): Maybe<HirInlineType> {
     query<Maybe<HirInlineType>, List<CompilerError>>(context, "HirType.type", this, {
       Tuple(
@@ -844,6 +860,20 @@ public fun implFor(
   scope: Package,
 ): Maybe<HirImpl> {
   query<Maybe<HirImpl>, List<CompilerError>>(context, "implFor", DataTuple3<HirInlineType, HirInlineType, Package>(base, trait_, scope), {
+    Tuple(
+      findUniqueSolverSolutionFor(context, base, trait_, scope)
+        .map<HirImpl>({ it.usedRule.originalImpl as HirImpl }),
+      List.empty<CompilerError>(),
+    )
+  })
+}
+public fun findUniqueSolverSolutionFor(
+  context: QueryContext<List<CompilerError>>,
+  base: HirInlineType,
+  trait_: HirInlineType,
+  scope: Package,
+): Maybe<SolverSolutionUnique> {
+  query<Maybe<SolverSolutionUnique>, List<CompilerError>>(context, "findUniqueSolverSolutionFor", DataTuple3<HirInlineType, HirInlineType, Package>(base, trait_, scope), {
     assert(!(trait_ is HirErrorType), "Can't reveal the impl for the error type")
 
     let environment = getSolverEnvironmentOfScope(context, scope)
@@ -859,7 +889,7 @@ public fun implFor(
     }
     if !((traitGoals as Iterable).length() == 1) {
       return Tuple(
-        None<HirImpl>(),
+        None<SolverSolutionUnique>(),
         List.of1<CompilerError>(TryingToFindImplForTraitWithTraitAsParameterCompilerError(trait_)),
       )
     }
@@ -872,11 +902,11 @@ public fun implFor(
     )
     if (solution is SolverSolutionUnique) {
       Tuple(
-        Some<HirImpl>((solution as SolverSolutionUnique).usedRule.originalImpl as HirImpl),
+        Some<SolverSolutionUnique>(solution as SolverSolutionUnique),
         List.empty<CompilerError>(),
       )
     } else {
-      Tuple(None<HirImpl>(), List.empty<CompilerError>())
+      Tuple(None<SolverSolutionUnique>(), List.empty<CompilerError>())
     }
   })
 }
@@ -902,38 +932,84 @@ fun getAllTraitsOfModule(context: QueryContext<List<CompilerError>>, module: Hir
   })
 }
 
-fun getAllImplementedTraitsFor(
+fun getAllImplementedTraitsWithSubstitutionsFor(
   context: QueryContext<List<CompilerError>>,
   base: HirInlineType,
   scope: Package,
-): Set<HirNamedType> {
-  query<Set<HirNamedType>, List<CompilerError>>(context, "getAllImplementedTraitsFor", DataTuple2<HirInlineType, Package>(base, scope), {
-    let traits = getAllImplsFor(context, base, scope)
+): Set<(HirNamedType, Map<HirInlineType, HirInlineType>)> {
+  query<Set<(HirNamedType, Map<HirInlineType, HirInlineType>)>, List<CompilerError>>(context, "getAllImplementedTraitsWithSubstitutionsFor", DataTuple2<HirInlineType, Package>(base, scope), {
+    let traits = getAllImplsWithSubstitutionsFor(context, base, scope)
       .items()
-      .maybeMap<HirNamedType>({ it.upperBound(context) })
+      .map<(HirNamedType, Map<HirInlineType, HirInlineType>)>({
+        Tuple(it.first.baseType(context), it.second)
+      })
       .toMutableSet()
     if (base.declaration is HirTrait) {
-      traits.insert((base.declaration as HirTrait).upperBound(context))
+      let upperBound = (base.declaration as HirTrait).upperBound(context)
+      let substitutions = (upperBound.typeParameters(context) as Iterable<HirParameterType>)
+        .cast<HirInlineType>()
+        .zip<HirInlineType>(base.parameterTypes)
+        .unsafeToMap<HirInlineType, HirInlineType>()
+      traits.insert(Tuple(upperBound, substitutions))
     }
     Tuple(traits, List.empty<CompilerError>())
   })
 }
 
-fun getAllImplsFor(
+fun getAllImplsWithSubstitutionsFor(
   context: QueryContext<List<CompilerError>>,
   base: HirInlineType,
   scope: Package,
-): Set<HirImpl> {
-  query<Set<HirImpl>, List<CompilerError>>(context, "getAllImplsFor", DataTuple2<HirInlineType, Package>(base, scope), {
-    let implementedTraits = getAllImplementedTraitsFor(context, base, scope)
-    let impls = getAllImplsInScope(context, scope)
-      .items()
-      .where({ impl_ => implementedTraits.contains(impl_.baseType(context)) })
-      .followedBy(
-        getAllImplsInScope(context, scope).items().where({ base == it.baseType(context) }),
-      )
-      .toSet()
-    Tuple(impls, List.empty<CompilerError>())
+): Set<(HirImpl, Map<HirInlineType, HirInlineType>)> {
+  query<Set<(HirImpl, Map<HirInlineType, HirInlineType>)>, List<CompilerError>>(context, "getAllImplsWithSubstitutionsFor", DataTuple2<HirInlineType, Package>(base, scope), {
+    if (base is HirErrorType) { return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>() }
+    if (base is HirNamedType) {
+      return getAllImplsInScope(context, scope).items()
+        .maybeMap<SolverSolutionUnique>({
+          findUniqueSolverSolutionFor(context, base, it.baseType(context), scope)
+        })
+        .map<(HirImpl, Map<HirInlineType, HirInlineType>)>({
+          let substitutions = hirInlineTypeToSolverTypeAndGoalsAndRules(context, base).first
+            .unify(it.refinedGoal)
+            .unwrap()
+          Tuple(it, substitutions)
+        })
+        .toSet()
+    }
+    if (base is HirFunctionType) {
+      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+    }
+    if (base is HirStructType) {
+      // TODO(soon): create synthetic impls for struct types
+      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+    }
+    if (base is HirEnumType) {
+      // TODO(soon): create synthetic impls for enum types
+      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+    }
+    if (base is HirIntersectionType) {
+      return ((base as HirIntersectionType).types as Iterable<HirInlineType>)
+        .expand<HirFunction>({ it.allFunctions(context, scope)})
+        .toSet()
+    }
+    if (base is HirThisType) {
+      let declaration = (base as HirThisType).declaration
+      let baseType = if (declaration is HirTrait) {
+        (declaration as HirTrait).thisType(context)
+      } else {
+        (declaration as HirType).thisType(context)
+      }
+      return getAllImplsWithSubstitutionsFor(context, thisType, scope)
+    }
+    if (base is HirParameterType) {
+      let upperBound = (base as HirParameterType).upperBound(context)
+      return getAllImplsWithSubstitutionsFor(context, upperBound, scope)
+    }
+    if (base is HirReflectionType) {
+      // TODO(never): create synthetic impls for reflection types
+      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+    }
+    throw "Unknown HirInlineType: {base}"
   })
 }
 
