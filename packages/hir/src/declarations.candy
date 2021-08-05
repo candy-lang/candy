@@ -7,6 +7,7 @@ use ..types
 public trait HirDeclaration {
   let parent: Package | HirModule | HirTrait | HirImpl
   fun name(): String
+  let isSynthetic(): Bool
 }
 
 public trait HirModule: HirDeclaration & Equals & Hash {
@@ -48,6 +49,7 @@ public class HirTopLevelModule {
 }
 impl HirTopLevelModule: HirDeclaration & Equals & Hash & HirModule {
   fun name(): String { "<{parent}>" }
+  let isSynthetic(): Bool { false }
   fun toString(): String { "{parent.path}" }
   fun equals(other: This): Bool { (parent as Equals) == (other.parent as Equals) }
   fun hash<T>(hasher: Hasher<T>) { (parent as Hash).hash<T>(hasher) }
@@ -55,6 +57,7 @@ impl HirTopLevelModule: HirDeclaration & Equals & Hash & HirModule {
 public class HirInnerModule {
   public let parent: HirModule
   public let name_: String
+  public let isSynthetic_: Bool
 }
 impl HirInnerModule: HirDeclaration & Equals & Hash & HirModule {
   fun name(): String { name_ }
@@ -71,6 +74,7 @@ impl HirInnerModule: HirDeclaration & Equals & Hash & HirModule {
 public class HirTrait {
   public let parent: HirModule
   public let name_: String
+  public let isSynthetic_: Bool
 
   static fun coreAny(context: QueryContext<List<CompilerError>>): HirTrait {
     HirTrait(HirModule.corePrimitives(context), "Any")
@@ -81,6 +85,7 @@ public class HirTrait {
 }
 impl HirTrait: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
+  let isSynthetic(): Bool { this.isSynthetic_ }
   fun toString(): String { "{parent}:{name()}" }
   fun equals(other: This): Bool {
     (parent as Equals) == (other.parent as Equals) && name_ == other.name_
@@ -94,9 +99,11 @@ impl HirTrait: HirDeclaration & Equals & Hash {
 public class HirImpl {
   public let parent: HirModule
   public let disambiguator: Int
+  public let isSynthetic_: Bool
 }
 impl HirImpl: HirDeclaration & Equals & Hash {
   fun name(): String { "impl#{disambiguator}" }
+  let isSynthetic(): Bool { this.isSynthetic_ }
   fun toString(): String { "{parent}:{name()}" }
   fun equals(other: This): Bool {
     (parent as Equals) == (other.parent as Equals) && disambiguator == other.disambiguator
@@ -110,6 +117,7 @@ impl HirImpl: HirDeclaration & Equals & Hash {
 public class HirType {
   public let parent: HirModule
   public let name_: String
+  public let isSynthetic_: Bool
 
   static fun coreInt(context: QueryContext<List<CompilerError>>): HirType {
     HirType(HirModule.coreInt(context), "Int")
@@ -129,6 +137,7 @@ public class HirType {
 }
 impl HirType: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
+  let isSynthetic(): Bool { this.isSynthetic_ }
   fun toString(): String { "{parent}:{name()}" }
   fun equals(other: This): Bool {
     (parent as Equals) == (other.parent as Equals)
@@ -144,6 +153,7 @@ public class HirFunction {
   public let parent: HirModule | HirTrait | HirImpl
   public let name_: String
   public let disambiguator: Int
+  public let isSynthetic_: Bool
 
   public static fun coreToString(context: QueryContext<List<CompilerError>>): HirFunction {
     HirFunction(HirTrait.coreToString(context), "toString", 0)
@@ -223,6 +233,7 @@ public class HirFunction {
 }
 impl HirFunction: HirDeclaration & Equals & Hash {
   fun name(): String { name_ }
+  let isSynthetic(): Bool { this.isSynthetic_ }
   fun toString(): String { "{parent}:{name()}#{disambiguator}" }
   fun equals(other: This): Bool {
     (parent as Equals) == (other.parent as Equals)
