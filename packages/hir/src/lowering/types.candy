@@ -198,7 +198,7 @@ impl HirTrait {
       )
     })
   }
-  fun upperBound(context: QueryContext<List<CompilerError>>): HirInlineType {
+  fun upperBound(context: QueryContext<List<CompilerError>>): List<HirNamedType | HirErrorType> {
     query<HirInlineType, List<CompilerError>>(context, "HirTrait.upperBound", this, {
       Tuple(
         this.ast(context).upperBound
