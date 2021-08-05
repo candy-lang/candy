@@ -172,23 +172,6 @@ impl LoweringContext {
       })
   }
 
-  // fun lowerLambda(
-  //   context: QueryContext<List<CompilerError>>,
-  //   lambda: AstLambdaExpression,
-  // ): LoweringContext {
-  //   let context = LoweringContext(
-  //     this.global,
-  //     Some<LoweringContext>(this),
-  //     MutableMap.empty<String, HirValueExpressionUri>(),
-  //   )
-  //   let parameters = 
-  //   for parameter in function.valueParameters(context) {
-  //     let uri = context.register(HirParameterReferenceValueExpression(parameter))
-  //     context.localProperties.set(parameter.name, uri)
-  //   }
-  //   context
-  // }
-
   fun lowerExpressionsToValueExpressions(
     expressions: List<AstExpression>,
   ): (LoweringContext, List<HirValueExpressionUri>) {
@@ -532,7 +515,7 @@ impl LoweringContext {
       let name = contextAndNameAndReceiver.second
       let receiver = contextAndNameAndReceiver.third
 
-      if (receiver is Some<HirValueExpressionUri>) {
+      if (receiver is Some<HirValueExpressionUri | HirTypeExpression>) {
         // TODO(soon, marcelgarus): Handle function call with a receiver.
         let result = context.register(
           HirStringValueExpression("<compiler-generated> TODO(soon, marcelgarus): Handle function call with a receiver."),
@@ -553,7 +536,7 @@ impl LoweringContext {
           HirNamedType.coreNever(context.global.context),
         )
       }
-      let function = context.resolve(name).items()
+      let functions = context.resolve(name).items()
         .cast<HirValueExpressionUri | HirFunction>()
         .where({
           if (it is HirValueExpressionUri) {
@@ -562,131 +545,56 @@ impl LoweringContext {
             (it as HirFunction).parent is HirModule
           }
         })
-      if (function.isEmpty()) {
+        .toList()
+      if ((functions as Iterable<HirValueExpressionUri | HirFunction>).isEmpty()) {
         return context.registerError(UnresolvedIdentifierError(name))
       }
-      if (function.length() > 1) {
-        // TODO(soon, marcelgarus): Support overloading.
-        return context.registerError(UnsupportedFeatureCompilerError(
-          None<Location>(),
-          "Function overloading is not yet supported.",
+
+      let possibleCalls = (functions as Iterable<HirValueExpressionUri | HirFunction>)
+        .map<(LoweringContext, HirValueExpressionUri, Bool, HirValueExpressionUri | HirFunction)>({ function =>
+          if (function is HirValueExpressionUri) {
+            // TODO(soon): Callable expressions
+            let result = context.registerError(
+              UnsupportedFeatureCompilerError(
+                None<Location>(),
+                "Callable expressions are not yet supported: {function}",
+              ),
+            )
+            return Tuple(result.first, result.second, false, function)
+          }
+
+          let function = (function as HirFunction)
+          let result = context.matchFunctionCall(
+            function,
+            receiver,
+            astExpression.typeArguments,
+            astExpression.valueArguments,
+          )
+          Tuple(result.first, result.second, result.third, function)
+        })
+        .toList()
+      let possibleCalls = (possibleCalls as Iterable<(LoweringContext, HirValueExpressionUri, Bool, HirValueExpressionUri | HirFunction)>)
+      if (possibleCalls.length() == 1) {
+        let call = possibleCalls.single().unwrap()
+        return Tuple(call.first, call.second)
+      }
+
+      let matchingCalls = possibleCalls
+        .where({ it.third })
+        .map<(LoweringContext, HirValueExpressionUri, HirValueExpressionUri | HirFunction)>({
+          Tuple(it.first, it.second, it.fourth)
+        })
+      if (matchingCalls.isEmpty()) {
+        return context.registerError(NoFunctionMatchesArgumentsError(functions))
+      }
+      if (matchingCalls.length() > 1) {
+        return context.registerError(MultipleFunctionsMatchArgumentsError(
+          matchingCalls.map<HirValueExpressionUri | HirFunction>({ it.third }).toList(),
         ))
       }
 
-      let function = function.single().unwrap()
-      if (function is HirValueExpressionUri) {
-        todo("soon, Callable expressions are not yet supported: {function}")
-      }
-      let function = (function as HirFunction)
-
-      // Type Arguments
-      let typeArguments = (astExpression.typeArguments as Iterable<AstTypeArgument>)
-        .map<HirInlineType>({
-          astInlineTypeToHirInlineType(context.global.context, it.type, context.global.function)
-        })
-        .toList()
-
-      let typeParameters = (function as HasTypeParameters).typeParameters(context.global.context)
-      let suppliedTypeArgumentCount = (typeArguments as Iterable<HirInlineType>).length()
-      let requiredTypeArgumentCount = (typeParameters as Iterable<HirParameterType>).length()
-      let typeArgumentsAndAreTheyValid = if (!(suppliedTypeArgumentCount == requiredTypeArgumentCount)) {
-        context = context.registerError(
-          WrongNumberOfTypeArgumentsError(suppliedTypeArgumentCount, requiredTypeArgumentCount),
-        ).first
-        Tuple(Map.empty<String, HirInlineType>(), false)
-      } else {
-        let zipped = (typeArguments as Iterable<HirInlineType>)
-          .zip<HirParameterType>(typeParameters)
-        let anyTypeArgumentIsInvalid = zipped.any({
-          let argument = it.first
-          let parameter = it.second
-          let upperBound = parameter.upperBound(context.global.context)
-          if (!isAssignableTo(context.global.context, argument, upperBound, (context.global.function as HasPackageAndPath).package())) {
-            context = context.registerError(InvalidTypeArgumentError(argument, upperBound)).first
-            return false
-          }
-          true
-        })
-        Tuple(
-          zipped
-            .map<(String, HirInlineType)>({ Tuple(it.second.name, it.first) })
-            .unsafeToMap<String, HirInlineType>(),
-          !anyTypeArgumentIsInvalid,
-        )
-      }
-      let actualTypeArguments = typeArgumentsAndAreTheyValid.first
-      let areTypeArgumentsValid = typeArgumentsAndAreTheyValid.second
-
-      // Value Arguments
-      mut let areValueArgumentsValid = true
-      let valueArguments = (astExpression.valueArguments as Iterable<AstValueArgument>)
-        .map<HirValueExpressionUri>({
-          if (it.name is Some<AstIdentifier>) {
-            areValueArgumentsValid = false
-            context = context.registerError(
-              UnsupportedFeatureCompilerError(None<Location>(), "Named arguments"),
-            ).first
-          }
-          let result = context.lowerExpressionToValueExpression(it.value)
-          context = result.first
-          result.second
-        })
-        .toList()
-
-      let valueParameters = function.valueParameters(context.global.context)
-      let suppliedValueArgumentCount = (valueArguments as Iterable<HirValueExpressionUri>).length()
-      let requiredValueArgumentCount = (valueParameters as Iterable<HirValueParameter>).length()
-      let valueArgumentsAndAreTheyValid = if (!(suppliedValueArgumentCount == requiredValueArgumentCount)) {
-        context = context.registerError(
-          WrongNumberOfValueArgumentsError(suppliedValueArgumentCount, requiredValueArgumentCount),
-        ).first
-        Tuple(Map.empty<String, HirValueExpressionUri>(), false)
-      } else {
-        let zipped = (valueArguments as Iterable<HirValueExpressionUri>)
-          .zip<HirValueParameter>(valueParameters)
-        let anyTypeArgumentIsInvalid = zipped.any({
-          let argument = it.first
-          let argumentType = context.typeOf(argument)
-          let parameter = it.second
-          let parameterType = parameter.type(context.global.context)
-          let package = (context.global.function as HasPackageAndPath).package()
-          if (!isAssignableTo(context.global.context, argumentType, parameterType, package)) {
-            context = context.registerError(InvalidValueArgumentError(argumentType, parameterType)).first
-            return false
-          }
-          true
-        })
-        Tuple(
-          zipped
-            .map<(String, HirValueExpressionUri)>({ Tuple(it.second.name, it.first) })
-            .unsafeToMap<String, HirValueExpressionUri>(),
-          !anyTypeArgumentIsInvalid,
-        )
-      }
-      let actualValueArguments = valueArgumentsAndAreTheyValid.first
-      areValueArgumentsValid = areValueArgumentsValid && valueArgumentsAndAreTheyValid.second
-
-      if (!areTypeArgumentsValid || !areValueArgumentsValid) {
-        return context.register(HirErrorValueExpression(), HirErrorType())
-      }
-
-      // Return Type
-      let substitutions = (typeParameters as Iterable<HirParameterType>)
-        .zip<HirInlineType>(typeArguments)
-        // .map<(HirParameterType, HirInlineType)>({  })
-        .unsafeToMap<HirInlineType, HirInlineType>()
-      let returnType = (function.returnType(context.global.context) as HirInlineType)
-        .substitute(substitutions)
-
-      return context.register(
-        HirFunctionCallValueExpression(
-          receiver.cast<HirValueExpressionUri | HirTypeExpression>(),
-          function,
-          actualTypeArguments,
-          actualValueArguments,
-        ),
-        returnType,
-      )
+      let match = matchingCalls.single().unwrap()
+      return Tuple(match.first, match.second)
     }
 
     if (expression is AstReturnExpression) {
@@ -708,6 +616,125 @@ impl LoweringContext {
     }
 
     throw "Unreachable"
+  }
+
+  fun matchFunctionCall(
+    function: HirFunction,
+    receiver: Maybe<HirValueExpressionUri | HirTypeExpression>,
+    typeArguments: List<AstTypeArgument>,
+    valueArguments: List<AstValueArgument>,
+  ): (LoweringContext, HirValueExpressionUri, Bool) {
+    mut let context = this
+
+    // Type Arguments
+    let typeArguments = (typeArguments as Iterable<AstTypeArgument>)
+      .map<HirInlineType>({
+        astInlineTypeToHirInlineType(context.global.context, it.type, context.global.function)
+      })
+      .toList()
+
+    let typeParameters = (function as HasTypeParameters).typeParameters(context.global.context)
+    let suppliedTypeArgumentCount = (typeArguments as Iterable<HirInlineType>).length()
+    let requiredTypeArgumentCount = (typeParameters as Iterable<HirParameterType>).length()
+    let typeArgumentsAndAreTheyValid = if (!(suppliedTypeArgumentCount == requiredTypeArgumentCount)) {
+      context = context.registerError(
+        WrongNumberOfTypeArgumentsError(suppliedTypeArgumentCount, requiredTypeArgumentCount),
+      ).first
+      Tuple(Map.empty<String, HirInlineType>(), false)
+    } else {
+      let zipped = (typeArguments as Iterable<HirInlineType>)
+        .zip<HirParameterType>(typeParameters)
+      let anyTypeArgumentIsInvalid = zipped.any({
+        let argument = it.first
+        let parameter = it.second
+        let upperBound = parameter.upperBound(context.global.context)
+        if (!isAssignableTo(context.global.context, argument, upperBound, (context.global.function as HasPackageAndPath).package())) {
+          context = context.registerError(InvalidTypeArgumentError(argument, upperBound)).first
+          return false
+        }
+        true
+      })
+      Tuple(
+        zipped
+          .map<(String, HirInlineType)>({ Tuple(it.second.name, it.first) })
+          .unsafeToMap<String, HirInlineType>(),
+        !anyTypeArgumentIsInvalid,
+      )
+    }
+    let actualTypeArguments = typeArgumentsAndAreTheyValid.first
+    let areTypeArgumentsValid = typeArgumentsAndAreTheyValid.second
+
+    // Value Arguments
+    mut let areValueArgumentsValid = true
+    let valueArguments = (valueArguments as Iterable<AstValueArgument>)
+      .map<HirValueExpressionUri>({
+        if (it.name is Some<AstIdentifier>) {
+          areValueArgumentsValid = false
+          context = context.registerError(
+            UnsupportedFeatureCompilerError(None<Location>(), "Named arguments"),
+          ).first
+        }
+        let result = context.lowerExpressionToValueExpression(it.value)
+        context = result.first
+        result.second
+      })
+      .toList()
+
+    let valueParameters = function.valueParameters(context.global.context)
+    let suppliedValueArgumentCount = (valueArguments as Iterable<HirValueExpressionUri>).length()
+    let requiredValueArgumentCount = (valueParameters as Iterable<HirValueParameter>).length()
+    let valueArgumentsAndAreTheyValid = if (!(suppliedValueArgumentCount == requiredValueArgumentCount)) {
+      context = context.registerError(
+        WrongNumberOfValueArgumentsError(suppliedValueArgumentCount, requiredValueArgumentCount),
+      ).first
+      Tuple(Map.empty<String, HirValueExpressionUri>(), false)
+    } else {
+      let zipped = (valueArguments as Iterable<HirValueExpressionUri>)
+        .zip<HirValueParameter>(valueParameters)
+      let anyTypeArgumentIsInvalid = zipped.any({
+        let argument = it.first
+        let argumentType = context.typeOf(argument)
+        let parameter = it.second
+        let parameterType = parameter.type(context.global.context)
+        let package = (context.global.function as HasPackageAndPath).package()
+        if (!isAssignableTo(context.global.context, argumentType, parameterType, package)) {
+          context = context.registerError(InvalidValueArgumentError(argumentType, parameterType)).first
+          return false
+        }
+        true
+      })
+      Tuple(
+        zipped
+          .map<(String, HirValueExpressionUri)>({ Tuple(it.second.name, it.first) })
+          .unsafeToMap<String, HirValueExpressionUri>(),
+        !anyTypeArgumentIsInvalid,
+      )
+    }
+    let actualValueArguments = valueArgumentsAndAreTheyValid.first
+    areValueArgumentsValid = areValueArgumentsValid && valueArgumentsAndAreTheyValid.second
+
+    if (!areTypeArgumentsValid || !areValueArgumentsValid) {
+      let result = context.register(HirErrorValueExpression(), HirErrorType())
+      return Tuple(result.first, result.second, false)
+    }
+
+    // Return Type
+    let substitutions = (typeParameters as Iterable<HirParameterType>)
+      .zip<HirInlineType>(typeArguments)
+      .unsafeToMap<HirInlineType, HirInlineType>()
+    let returnType = (function.returnType(context.global.context) as HirInlineType)
+      .substitute(substitutions)
+
+    let result = context.register(
+      HirFunctionCallValueExpression(
+        receiver.cast<HirValueExpressionUri | HirTypeExpression>(),
+        function,
+        actualTypeArguments,
+        actualValueArguments,
+      ),
+      returnType,
+    )
+    Tuple(result.first, result.second, true)
   }
 
   fun typeOf(uri: HirValueExpressionUri): HirInlineType {
@@ -868,5 +895,42 @@ impl InvalidValueArgumentError: CompilerError {
   public fun description(): String {
     /// TODO(never, marcelgarus): add a description for this error
     "Value argument's type was {this.argumentType}, but is not assignable to {this.parameterType}."
+  }
+}
+
+public class NoFunctionMatchesArgumentsError {
+  public let functions: List<HirValueExpressionUri | HirFunction>
+  // TODO(never, marcelgarus): include the reason why each function doesn't match.
+}
+impl NoFunctionMatchesArgumentsError: CompilerError {
+  public fun id(): String { "no-function-matches-arguments" }
+
+  public fun location(): Location {
+    todo("never, marcelgarus: Implement NoFunctionMatchesArgumentsError.location")
+  }
+  public fun title(): String {
+    "No function matches the given type or value arguments."
+  }
+  public fun description(): String {
+    /// TODO(never, marcelgarus): add a description for this error
+    "Possible functions: {(this.functions as Iterable<HirValueExpressionUri | HirFunction>).join(", ")}"
+  }
+}
+
+public class MultipleFunctionsMatchArgumentsError {
+  public let functions: List<HirValueExpressionUri | HirFunction>
+}
+impl MultipleFunctionsMatchArgumentsError: CompilerError {
+  public fun id(): String { "multiple-functions-match-arguments" }
+
+  public fun location(): Location {
+    todo("never, marcelgarus: Implement MultipleFunctionsMatchArgumentsError.location")
+  }
+  public fun title(): String {
+    "Multiple functions match the given type and value arguments."
+  }
+  public fun description(): String {
+    /// TODO(never, marcelgarus): add a description for this error
+    "Possible functions: {(this.functions as Iterable<HirValueExpressionUri | HirFunction>).join(", ")}"
   }
 }
