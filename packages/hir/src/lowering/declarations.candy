@@ -105,8 +105,8 @@ public trait HasDeclarations {
       context, "HasDeclarations.syntheticDeclaration", this, {
       if (this.isSynthetic()) {
         let declaration = this.parent
-        .syntheticDeclarations(context)
-        .singleWhere({ it.id == this })
+          .syntheticDeclarations(context)
+          .singleWhere({ it.id == this })
         assert(
           declaration is Some<HirSyntheticDeclaration>,
           "This should have a synthetic declaration",
@@ -724,8 +724,11 @@ impl HirValueParameter: HasAst<AstValueParameter> {
         todo("never, Implement HirValueParameter.ast(…) for lambda parameters")
       }
 
-      let ast = ((scope as HirFunction).ast(context).valueParameters as Iterable<AstValueParameter>)
-        .singleWhere({ it.name.value == this.name })
+      let ast = ((scope as HirFunction).ast(context)
+        .flatMap<AstValueParameter>({
+          it.valueParameters as Iterable<AstValueParameter>)
+            .singleWhere({ it.name.value == this.name })
+        })
       Tuple(ast, List.empty<CompilerError>())
     })
   }
@@ -736,14 +739,21 @@ impl HirValueParameter: HasAst<AstValueParameter> {
         todo("never, Implement HirValueParameter.type(…) for lambda parameters")
       }
 
-      Tuple(
-        astInlineTypeToHirInlineType(
-          context,
-          this.ast(context).type.unwrap(),
-          this.scope as HirFunction,
-        ),
-        List.empty<CompilerError>(),
-      )
+      let inlineType = (this.scope as HirFunction).syntheticDeclaration()
+        .map<HirInlineType>({
+          it.valueParameters
+            .singleWhere({ it.name == this.name })
+            .unwrap()
+            .type
+        })
+        .orElse({
+          astInlineTypeToHirInlineType(
+            context,
+            this.ast(context).unwrap().type.unwrap(),
+            this.scope as HirFunction,
+          )
+        })
+      Tuple(inlineType, List.empty<CompilerError>())
     })
   }
 }

@@ -16,8 +16,22 @@ public fun lowerFunctionBody(
   function: HirFunction,
 ): Maybe<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)> {
   query<Maybe<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)>, List<CompilerError>>(context, "lowerFunctionBody", function, {
-    let ast = function.ast(context)
-    ast.body
+    if (function.isSynthetic()) {
+      let body = function.syntheticDeclaration(context).unwrap().body
+      return Tuple(
+        Some<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)>(
+          Tuple(
+            body.uris,
+            body.expressions.map<HirValueExpressionUri, HirValueExpression>({ key, value =>
+              Tuple(key, value.first)
+            }),
+          ),
+        ),
+        List.empty<CompilerError>(),
+      )
+    }
+
+    function.ast(context).unwrap().body
       .map<(Maybe<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)>, List<CompilerError>)>({
         if (it is AstExpressionBody) {
           todo("never, Support expression bodies")

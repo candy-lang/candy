@@ -27,6 +27,8 @@ impl HirInnerModule: HasUseLines {
 fun useLines_(context: QueryContext<List<CompilerError>>, moduleHir: HirModule): List<HirUseLine> {
   query<List<HirUseLine>, List<CompilerError>>(context, "HirModule.useLines", (moduleHir as Equals & Hash), {
     let ast = moduleHir.ast(context)
+    if (ast is None) { return Tuple(List.empty<HirUseLine>(), List.empty<CompilerError>()) }
+    let ast = ast.unwrap()
     if !(ast is AstFile) { return Tuple(List.empty<HirUseLine>(), List.empty<CompilerError>()) }
 
     let useLines = MutableList.empty<HirUseLine>()
@@ -82,7 +84,7 @@ impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
 
   fun targetModule(context: QueryContext<List<CompilerError>>): Maybe<HirModule> {
     query<Maybe<HirModule>, List<CompilerError>>(context, "HirExplicitUseLine.targetModule", (this as Equals & Hash), {
-      let ast = this.ast(context)
+      let ast = this.ast(context).unwrap()
       if ast.target is AstGlobalUseLineTarget {
         let targetAst = (ast.target as AstGlobalUseLineTarget)
         if (targetAst.packagePath as Iterable<AstIdentifier>).length() > 1 {

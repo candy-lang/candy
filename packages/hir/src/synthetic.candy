@@ -27,7 +27,7 @@ public class HirSyntheticTrait {
   public let modifiers: List<String>
   public let name: String
   public let typeParameters: List<HirSyntheticTypeParameter>
-  public let upperBound: HirInlineType
+  public let upperBound: List<HirNamedType | HirErrorType>
   public let innerDeclarations: List<HirSyntheticTrait | HirSyntheticType | HirSyntheticFunction>
 }
 impl HirSyntheticTrait: HirSyntheticDeclaration {
@@ -40,8 +40,8 @@ public class HirSyntheticImpl {
   public let id: HirImpl
   public let modifiers: List<String>
   public let typeParameters: List<HirSyntheticTypeParameter>
-  public let type: HirInlineType
-  public let traits: Maybe<HirNamedType>
+  public let baseType: HirNamedType | HirErrorType
+  public let implementedTrait: Maybe<HirNamedType>
   public let innerDeclarations: List<HirSyntheticFunction>
 }
 impl HirSyntheticImpl: HirSyntheticDeclaration {

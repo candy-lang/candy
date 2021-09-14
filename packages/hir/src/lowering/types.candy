@@ -217,9 +217,13 @@ impl HirTrait {
   fun upperBound(context: QueryContext<List<CompilerError>>): List<HirNamedType | HirErrorType> {
     query<HirInlineType, List<CompilerError>>(context, "HirTrait.upperBound", this, {
       Tuple(
-        this.ast(context).upperBound
-          .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
-          .orElse({ HirNamedType.coreAny(context) }),
+        this.syntheticDeclaration(context)
+          .map<List<HirNamedType | HirErrorType>>({ it.upperBound })
+          .orElse({
+            this.ast(context).upperBound
+              .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
+              .orElse({ HirNamedType.coreAny(context) })
+          }),
         List.empty<CompilerError>(),
       )
     })
@@ -242,12 +246,16 @@ impl HirImpl {
     })
   }
 
-  fun baseType(context: QueryContext<List<CompilerError>>): HirNamedType {
+  fun baseType(context: QueryContext<List<CompilerError>>): HirNamedType | HirErrorType {
     // The base type of an impl. For example, `impl Foo[Int]` has the base type `Foo[Int]`.
 
     query<HirNamedType, List<CompilerError>>(context, "HirImpl.baseType", this as Equals & Hash, {
       Tuple(
-        astInlineTypeToHirInlineType(context, this.ast(context).type, this) as HirNamedType,
+        this.syntheticDeclaration(context)
+          .map<HirNamedType | HirErrorType>({ it.baseType })
+          .orElse({
+            astInlineTypeToHirInlineType(context, this.ast(context).type, this) as HirNamedType | HirErrorType
+          }),
         List.empty<CompilerError>(),
       )
     })
@@ -258,7 +266,14 @@ impl HirImpl {
     // `Equals`, whereas `impl Foo { ... }` implements none.
 
     query<Maybe<HirInlineType>, List<CompilerError>>(context, "HirImpl.implementedTrait", this as Equals & Hash, {
-      let traits = this.ast(context).traits
+      if (this.isSynthetic()) {
+        return Tuple(
+          this.syntheticDeclaration(context).unwrap().implementedTrait,
+          List.empty<CompilerError>(),
+        )
+      }
+
+      let traits = this.ast(context).unwrap().traits
       if !((traits as Iterable).length() == 1) {
         // TODO(never, marcelgarus): Support impls for more than one trait.
         return Tuple(
@@ -299,7 +314,12 @@ impl HirType {
   fun type(context: QueryContext<List<CompilerError>>): Maybe<HirInlineType> {
     query<Maybe<HirInlineType>, List<CompilerError>>(context, "HirType.type", this, {
       Tuple(
-        this.ast(context).type.map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) }),
+        this.syntheticDeclaration(context)
+          .map<Maybe<HirInlineType>>({ Some<HirInlineType>(it.type) })
+          .orElse({
+            this.ast(context).unwrap().type
+              .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
+          }),
         List.empty<CompilerError>(),
       )
     })
@@ -310,9 +330,13 @@ impl HirFunction {
   fun returnType(context: QueryContext<List<CompilerError>>): HirInlineType {
     query<HirInlineType, List<CompilerError>>(context, "HirFunction.returnType", this, {
       Tuple(
-        this.ast(context).returnType
-          .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
-          .orElse({ HirNamedType.coreNothing(context) }),
+        this.syntheticDeclaration(context)
+          .map<HirInlineType>({ it.returnType })
+          .orElse({
+            this.ast(context).returnType
+              .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
+              .orElse({ HirNamedType.coreNothing(context) })
+          }),
         List.empty<CompilerError>(),
       )
     })
