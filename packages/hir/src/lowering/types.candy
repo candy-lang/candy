@@ -175,16 +175,32 @@ public fun astInlineTypeToHirInlineType(
 impl HirParameterType {
   fun upperBound(context: QueryContext<List<CompilerError>>): HirInlineType {
     query<HirInlineType, List<CompilerError>>(context, "HirParameterType.upperBound", this, {
-      let astTypeParameter = (((this.declaration as HasAst).ast(context) as AstWithTypeParameters)
-        .typeParameters as Iterable<AstTypeParameter>)
-        .singleWhere({ it.name.value == this.name })
-        .unwrap()
-      Tuple(
+      let ast = (this.declaration as HasAst).ast(context)
+      let upperBound = ast.map({
+        let astTypeParameter = ((it as AstWithTypeParameters)
+          .typeParameters as Iterable<AstTypeParameter>)
+          .singleWhere({ it.name.value == this.name })
+          .unwrap()
         astTypeParameter.upperBound
           .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this.declaration) })
-          .orElse({ HirNamedType.coreAny(context) }),
-        List.empty<CompilerError>(),
-      )
+          .orElse({ HirNamedType.coreAny(context) })
+      }).orElse({
+        let declaration = this.syntheticDeclarations(context).unwrap()
+        if (declaration is HirSyntheticTrait) {
+          return (declaration as HirSyntheticTrait).typeParameters.singleWhere({ it.name == this.name }).unwrap()
+        }
+        if (declaration is HirSyntheticImpl) {
+          return (declaration as HirSyntheticImpl).typeParameters.singleWhere({ it.name == this.name }).unwrap()
+        }
+        if (declaration is HirSyntheticType) {
+          return (declaration as HirSyntheticType).typeParameters.singleWhere({ it.name == this.name }).unwrap()
+        }
+        if (declaration is HirSyntheticFunction) {
+          return (declaration as HirSyntheticFunction).typeParameters.singleWhere({ it.name == this.name }).unwrap()
+        }
+        throw "Unknown synthetic declaration: {declaration}"
+      })
+      Tuple(upperBound, List.empty<CompilerError>())
     })
   }
 }

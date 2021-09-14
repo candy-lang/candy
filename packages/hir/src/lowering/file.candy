@@ -63,9 +63,9 @@ impl HirImplicitCoreUseLine: HasTargetModule {
 }
 
 impl HirExplicitUseLine: HasAst<AstUseLine> & HasTargetModule {
-  fun ast(context: QueryContext<List<CompilerError>>): AstUseLine {
-    query<AstUseLine, List<CompilerError>>(context, "HirExplicitUseLine.ast", (this as Equals & Hash), {
-      let moduleAst = parent.ast(context)
+  fun ast(context: QueryContext<List<CompilerError>>): Maybe<AstUseLine> {
+    query<Maybe<AstUseLine>, List<CompilerError>>(context, "HirExplicitUseLine.ast", (this as Equals & Hash), {
+      let moduleAst = parent.ast(context).unwrap()
       if moduleAst is AstModule {
         assert(false, "Explicit module declarations can't have use-lines.")
       }
