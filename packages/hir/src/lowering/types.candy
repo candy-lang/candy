@@ -1033,13 +1033,7 @@ fun getAllImplsWithSubstitutionsFor(
         .toSet()
     }
     if (base is HirThisType) {
-      let declaration = (base as HirThisType).declaration
-      let baseType = if (declaration is HirTrait) {
-        (declaration as HirTrait).thisType(context)
-      } else {
-        (declaration as HirType).thisType(context)
-      }
-      return getAllImplsWithSubstitutionsFor(context, thisType, scope)
+      return getAllImplsWithSubstitutionsFor(context, (base as HirThisType).resolve(context), scope)
     }
     if (base is HirParameterType) {
       let upperBound = (base as HirParameterType).upperBound(context)
@@ -1067,6 +1061,18 @@ impl HirNamedType {
         .zip(typeArguments as Iterable<HirInlineType>)
         .unsafeToMap<HirParameterType, HirInlineType>()
       Tuple(substitutionMap, List.empty<CompilerError>())
+    })
+  }
+}
+impl HirThisType {
+  fun resolve(context: QueryContext<List<CompilerError>>): HirInlineType {
+    query<HirInlineType, List<CompilerError>>(context, "HirThisType.resolve", this, {
+      let baseType = if (this.declaration is HirTrait) {
+        (this.declaration as HirTrait).thisType(context)
+      } else {
+        (this.declaration as HirType).thisType(context)
+      }
+      Tuple(baseType, List.empty<CompilerError>())
     })
   }
 }
