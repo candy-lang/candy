@@ -302,7 +302,7 @@ impl LoweringContext {
 
       let valueParameters = MutableList.empty<HirLambdaValueParameter>()
       for astParameter in astExpression.valueParameters {
-        // TODO(marcelgarus): `this` is not a valid parameter name.
+        // TODO(never, marcelgarus): `this` is not a valid parameter name.
         let name = astParameter.name.value
         let type_ = astInlineTypeToHirInlineType(
           innerContext.global.context,
@@ -500,48 +500,49 @@ impl LoweringContext {
       }
 
       let result = context.lowerExpressionToValueExpression(astExpression.receiver)
-      let context = result.first
-      let receiver = result.second
+      mut let context = result.first
+      mut let receiver = result.second
       mut let receiverType = context.typeOf(receiver)
 
-      if (receiverType is HirErrorType) {
-        return result
-      }
+      if (receiverType is HirErrorType) { return result }
       if (receiverType is HirThisType) {
-        todo("soon, Change receiverType to the surrounding type")
+        receiverType = (receiverType as HirThisType).resolve(context)
       }
       if (receiverType is HirParameterType) {
-        todo("soon, Change receiverType to the upper bound")
+        receiverType = (receiverType as HirParameterType).upperBound(context)
       }
       if (receiverType is HirNamedType) {
         let declaration = (receiverType as HirNamedType).declaration
         if (declaration is HirType) {
           let declaration = (declaration as HirType)
-          let declarationType = declaration.type(context.global.context)
-          // TODO(soon, JonasWanke): Substitute parameters.
+          let declarationType = declaration.type(context.global.context).map<HirInlineType>({
+            it.substitute((receiverType as HirNamedType).substitutionMap(context.global.context))
+          })
 
-          if (declarationType is Some){
+          if (declarationType is Some) {
             if (declarationType.unwrap() is HirStructType) {
-              let structType = (declarationType.unwrap() as HirStructType)
-              let field = (structType.types as Iterable<(String, HirInlineType)>)
-                .singleWhere({ it.first == name })
-              if (field is None) {
-                return context.registerError(UnknownFieldError(name))
-              }
-
-              let result = context.register(HirTypeValueValueExpression(receiver), structType)
-              let context = result.first
-              let valueValueExpressionUri = result.second
-              context.register(
-                HirStructFieldAccessValueExpression(valueValueExpressionUri, name),
-                field.unwrap().second,
-              )
+              // TODO(soon, JonasWanke): Check that the type is also available
+              let result = context.register(HirTypeValueValueExpression(receiver))
+              context = result.first
+              receiver = result.second
+              receiverType = (declarationType.unwrap() as HirStructType)
             }
           }
         }
       }
       if (receiverType is HirStructType) {
-        todo("soon, Allow navigation to struct fields.")
+        let structType = (receiverType as HirStructType)
+        let field = (structType.types as Iterable<(String, HirInlineType)>)
+          .singleWhere({ it.first == name })
+        if (field is None) {
+          return context.registerError(UnknownFieldError(name))
+        }
+
+        // TODO(soon, JonasWanke): update to the new type storage
+        return context.register(
+          HirStructFieldAccessValueExpression(receiver, name),
+          field.unwrap().second,
+        )
       }
 
       context.registerError(
