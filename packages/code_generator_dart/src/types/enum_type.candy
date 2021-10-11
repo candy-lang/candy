@@ -11,20 +11,25 @@ public fun compileEnumType(
   context: QueryContext<List<CompilerError>>,
   enumType: HirEnumType,
 ): DartType {
+  /// Example: `True | False Int` -> `Enum$False$True<Int, Nothing>`
+
   query<DartType, List<CompilerError>>(
     context,
     "code_generator_dart.compileEnumType",
     enumType, {
     let variantNames = enumType.variants.keys()
 
-    let name = getCompiledEnumTypeName(context, variantNames.toSet())
-    let importUrl = moduleHirToImportUrl(context, HirModule.syntheticEnums(context))
-    let name = DartIdentifier(name, Some<String>(importUrl))
+    // In our example: "Enum$False$True"
+    let name = DartIdentifier(
+      getCompiledEnumTypeName(context, variantNames.toSet()),
+      Some<String>(moduleHirToImportUrl(context, HirModule.syntheticEnums(context))),
+    )
 
     let sortedVariantTypes = (variantNames.toList().unsafeSorted() as Iterable<String>)
       .map<HirInlineType>({
         enumType.variants.get(it).unwrap().orElse({ HirNamedType.coreNothing(context) })
       })
+    // In our example: ["Int", "Nothing"]
     let types = sortedVariantTypes.map<DartType>({ compileInlineType(context, it) }).toList()
 
     Tuple(DartNamedType(name, types), List.empty<CompilerError>())
@@ -35,6 +40,8 @@ public fun compileEnumTypeDeclarations(
   context: QueryContext<List<CompilerError>>,
   package: Package,
 ): (HirModule, List<DartDeclaration>) {
+  /// Visits all used enum types and generates their Dart code.
+
   query<(HirModule, List<DartDeclaration>), List<CompilerError>>(
     context,
     "code_generator_dart.compileEnumTypeDeclarations",
@@ -44,7 +51,9 @@ public fun compileEnumTypeDeclarations(
       .map<Set<String>>({ it.variants.keys().toSet() })
       .toSet()
     let classes = variantNames.items()
-      .expand<DartDeclaration>({ compileEnumTypeDeclaration(context, it) as Iterable<DartDeclaration> })
+      .expand<DartDeclaration>({
+        (compileEnumTypeDeclaration(context, it) as Iterable<DartDeclaration>)
+      })
       .toList()
     Tuple(Tuple(HirModule.syntheticEnums(context), classes), List.empty<CompilerError>())
   })
@@ -58,13 +67,11 @@ fun compileEnumTypeDeclaration(
     "code_generator_dart.compileEnumTypeDeclaration",
     variantNames, {
     let classes = MutableList.empty<DartClass>()
-
     classes.append(compileEnumTypeDeclarationBase(context, variantNames))
-
-    let variantClasses = variantNames.items()
-      .map<DartClass>({ compileEnumTypeDeclarationVariant(context, variantNames, it) })
-    classes.appendAll(variantClasses)
-
+    classes.appendAll(
+      variantNames.items()
+        .map<DartClass>({ compileEnumTypeDeclarationVariant(context, variantNames, it) }),
+    )
     Tuple(classes, List.empty<CompilerError>())
   })
 }
@@ -83,7 +90,7 @@ fun compileEnumTypeDeclarationBase(
 
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
-    let constructor = DartConstructor(
+    body.append(DartConstructor(
       className = name,
       name = None<String>(),
       docComment = None<String>(),
@@ -93,8 +100,19 @@ fun compileEnumTypeDeclarationBase(
       positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
       namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
       body = None<DartBody>(),
-    )
-    body.append(constructor)
+    ))
+
+    body.append(DartFunction(
+      name = "match",
+      docComment = None<String>(),
+      annotations = List.empty<DartAnnotation>(),
+      _returns = Some<DartType>(typeT),
+      typeParameters = List.empty<DartTypeParameter>(),
+      requiredParameters = generateMatchValueParameters(variants),
+      positionalParameters = List.empty<DartParameter>(),
+      namedParameters = List.empty<DartParameter>(),
+      body = None<DartBody>(),
+    ))
 
     let dartDeclaration = DartClass(
       name = name,
@@ -110,7 +128,6 @@ fun compileEnumTypeDeclarationBase(
       with_ = List.empty<DartType>(),
       body = body,
     )
-
     Tuple(dartDeclaration, List.empty<CompilerError>())
   })
 }
@@ -127,12 +144,12 @@ fun compileEnumTypeDeclarationVariant(
 
     let variants = (variantNames.items().toList().unsafeSorted() as Iterable<String>)
       .map<(String, String)>({ Tuple(it, "T{it}") })
-    let fieldName = "$this"
+    let fieldName = "value"
     let fieldType = variants.singleWhere({ it.first == variant }).unwrap().second
 
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
-    let constructor = DartConstructor(
+    body.append(DartConstructor(
       className = name,
       name = None<String>(),
       docComment = None<String>(),
@@ -144,10 +161,9 @@ fun compileEnumTypeDeclarationVariant(
       positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
       namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
       body = None<DartBody>(),
-    )
-    body.append(constructor)
+    ))
 
-    let field = DartField(
+    body.append(DartField(
       fieldName,
       docComment = None<String>(),
       isStatic = false,
@@ -156,7 +172,22 @@ fun compileEnumTypeDeclarationVariant(
         DartNamedType(DartIdentifier(fieldType, None<String>()), List.empty<DartType>()),
       ),
       initialValue = None<DartExpression>(),
-    )
+    ))
+
+    body.append(DartFunction(
+      name = "match",
+      docComment = None<String>(),
+      annotations = List.empty<DartAnnotation>(),
+      _returns = Some<DartType>(typeT),
+      typeParameters = List.empty<DartTypeParameter>(),
+      requiredParameters = generateMatchValueParameters(variants),
+      positionalParameters = List.empty<DartParameter>(),
+      namedParameters = List.empty<DartParameter>(),
+      body = Some<DartBody>(DartInlineBody(
+        (DartIdentifier("value{variant}", None<String>()) as DartExpression)
+          .call1(DartIdentifier("value", None<String>()) as DartExpression),
+      )),
+    ))
 
     let dartDeclaration = DartClass(
       name = name,
@@ -181,15 +212,34 @@ fun compileEnumTypeDeclarationVariant(
       with_ = List.empty<DartType>(),
       body = body,
     )
-
     Tuple(dartDeclaration, List.empty<CompilerError>())
   })
+}
+let typeT = DartNamedType(DartIdentifier("T", None<String>()), List.empty<DartType>())
+fun generateMatchValueParameters(variants: Iterable<(String, String)>): List<DartParameter> {
+  variants
+    .map<DartParameter>({
+      DartParameter(
+        name = DartIdentifier("value{it.first}", None<String>()),
+        isRequired = true,
+        type = Some<DartType>(DartFunctionType(
+          parameters = List.of1<DartType | DartParameter>(it.second),
+          positionalParameters = List.empty<DartType | DartParameter>(),
+          namedParameters = List.empty<DartParameter>(),
+          _returns = Some<DartType>(typeT),
+        )),
+        defaultValue = None<DartExpression>(),
+      )
+    })
+    .toList()
 }
 
 public fun getCompiledEnumTypeName(
   context: QueryContext<List<CompilerError>>,
   variantNames: Set<String>,
 ): String {
+  /// Example: `True | False Int` -> `Enum$False$True`
+
   query<String, List<CompilerError>>(
     context,
     "code_generator_dart.getCompiledEnumTypeName",
@@ -204,6 +254,8 @@ public fun getCompiledEnumVariantName(
   variantNames: Set<String>,
   variant: String,
 ): String {
+  /// Example: `True` in `True | False Int` -> `Enum$False$_True_`
+
   query<String, List<CompilerError>>(
     context,
     "code_generator_dart.getCompiledEnumVariantName",
