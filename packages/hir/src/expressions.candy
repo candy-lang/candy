@@ -104,7 +104,7 @@ public class HirLambdaValueParameter {
   public let name: String
   public let type_: HirInlineType
 }
-impl HirLambdaValueParameter: HirValueExpression & Equals & Hash {
+impl HirLambdaValueParameter: Equals & Hash {
   fun equals(other: This): Bool {
     (lambdaUri as Equals) == (other.lambdaUri as Equals)
       && (name as Equals) == (other.name as Equals)
