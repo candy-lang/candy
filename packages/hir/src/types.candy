@@ -5,9 +5,25 @@ use ..declarations
 
 public trait HirInlineType: Equals & Hash {
   fun substitute(substitutions: Map<HirInlineType, HirInlineType>): HirInlineType {
+    assert(
+      substitutions.keys.none({ it is HirErrorType }),
+      "Can't substitute error types with other types.",
+    )
+  
     substitutions.get(this).orElse({ (this.substituteChildren(substitutions) as HirInlineType) })
   }
   fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This
+}
+
+public fun substituteSubstitutionMap(
+  substitutionMap: Map<HirInlineType, HirInlineType>,
+  substitutions: Map<HirInlineType, HirInlineType>,
+): Map<HirInlineType, HirInlineType> {
+  let result = substitutionMap
+    .map<HirInlineType, HirInlineType>({ key, value => (key, value.substitute(substitions)) })
+    .toMutable()
+  result.setAll(substitions)
+  result
 }
 
 

@@ -24,6 +24,7 @@ impl AstInlineTypeId: AstNodeId & Equals & Hash {
 }
 
 public trait /* enum */ AstInlineType {
+  let id: AstInlineTypeId
   let modifiers: List<AstIdentifier>
 }
 impl AstInlineType: AstNode & Equals & Hash

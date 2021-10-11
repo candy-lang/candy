@@ -38,16 +38,19 @@ public fun resolveIdentifier(
 
       // If the `scope` is a file, search the use-lines.
       if scope is HirModule {
-        if ((scope as HirModule).ast(context) is AstFile) {
-          candidates.addAll(
-            resolveIdentifierInUseLines(context, identifier, scope as HirModule, false)
-              .items()
-              .cast<HirModule | HirType | HirTrait | HirFunction | HirParameterType>(),
-          )
-          return Tuple(
-            candidates as Set<HirModule | HirType | HirTrait | HirFunction | HirParameterType>,
-            List.empty<CompilerError>(),
-          )
+        let scopeAst = (scope as HirModule).ast(context)
+        if (scopeAst is Some) {
+          if (scopeAst.unwrap() is AstFile) {
+            candidates.addAll(
+              resolveIdentifierInUseLines(context, identifier, scope as HirModule, false)
+                .items()
+                .cast<HirModule | HirType | HirTrait | HirFunction | HirParameterType>(),
+            )
+            return Tuple(
+              candidates as Set<HirModule | HirType | HirTrait | HirFunction | HirParameterType>,
+              List.empty<CompilerError>(),
+            )
+          }
         }
       }
 

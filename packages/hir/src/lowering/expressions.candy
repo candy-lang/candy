@@ -16,8 +16,22 @@ public fun lowerFunctionBody(
   function: HirFunction,
 ): Maybe<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)> {
   query<Maybe<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)>, List<CompilerError>>(context, "lowerFunctionBody", function, {
-    let ast = function.ast(context)
-    ast.body
+    if (function.isSynthetic()) {
+      let body = function.syntheticDeclaration(context).unwrap().body
+      return Tuple(
+        Some<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)>(
+          Tuple(
+            body.uris,
+            body.expressions.map<HirValueExpressionUri, HirValueExpression>({ key, value =>
+              Tuple(key, value.first)
+            }),
+          ),
+        ),
+        List.empty<CompilerError>(),
+      )
+    }
+
+    function.ast(context).unwrap().body
       .map<(Maybe<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)>, List<CompilerError>)>({
         if (it is AstExpressionBody) {
           todo("never, Support expression bodies")
@@ -60,7 +74,7 @@ public fun resolveHirValueExpressionUri(
 class BodyGlobalState {
   let context: QueryContext<List<CompilerError>>
   let function: HirFunction
-  let expressions: Map<HirValueExpressionUri, (HirValueExpression, HirInlineType)>
+  let expressions: Map<HirValueExpressionUri, HirValueExpression>
   mut let nextExpressionId: Int
   let errors: List<CompilerError>
 }
@@ -85,24 +99,18 @@ class LoweringContext {
       Map.empty<String, HirValueExpressionUri>(),
     )
 
-    if (function.parent is HirTrait | HirImpl && !function.isStatic(context)) {
-      let result = loweringContext.register(
-        HirThisValueExpression(),
-        HirThisType(function.parent as HirTrait | HirImpl),
-      )
+    function.thisType(context).do({
+      let result = loweringContext.register(HirThisValueExpression(it))
       loweringContext = LoweringContext(
         result.first.global,
         result.first.parent,
         result.first.localProperties.copyAndSet("this", result.second),
       )
-    }
+    })
 
     for parameter in function.valueParameters(context) {
       // TODO(never, marcelgarus): `this` is not a valid parameter name.
-      let result = loweringContext.register(
-        HirParameterReferenceValueExpression(parameter),
-        parameter.type(context),
-      )
+      let result = loweringContext.register(HirParameterReferenceValueExpression(parameter))
       loweringContext = LoweringContext(
         result.first.global,
         result.first.parent,
@@ -113,17 +121,14 @@ class LoweringContext {
   }
 }
 impl LoweringContext {
-  fun register(
-    expression: HirValueExpression,
-    expressionType: HirInlineType,
-  ): (LoweringContext, HirValueExpressionUri) {
+  fun register(expression: HirValueExpression): (LoweringContext, HirValueExpressionUri) {
     let uri = HirValueExpressionUri(this.global.function, this.global.nextExpressionId)
     Tuple(
       LoweringContext(
         BodyGlobalState(
           this.global.context,
           this.global.function,
-          this.global.expressions.copyAndSet(uri, Tuple(expression, expressionType)),
+          this.global.expressions.copyAndSet(uri, expression),
           this.global.nextExpressionId + 1,
           this.global.errors,
         ),
@@ -146,7 +151,7 @@ impl LoweringContext {
       this.parent,
       this.localProperties,
     )
-    contextWithError.register(HirErrorValueExpression(), HirErrorType())
+    contextWithError.register(HirErrorValueExpression())
   }
 
   fun resolve(
@@ -157,7 +162,7 @@ impl LoweringContext {
         Set.of1<HirValueExpressionUri | HirModule | HirType | HirTrait | HirFunction | HirParameterType>(it)
       })
       .orElse({
-        // TODO(JonasWanke): Check type parameters of the function.
+        // TODO(soon, JonasWanke): Check type parameters of the function.
         this.parent
           .map<Set<HirValueExpressionUri | HirModule | HirType | HirTrait | HirFunction | HirParameterType>>({
             it.resolve(name)
@@ -201,25 +206,18 @@ impl LoweringContext {
     expression: AstExpression,
   ): (LoweringContext, HirValueExpressionUri | HirTypeExpression | HirModuleExpression) {
     if (expression is AstIntExpression) {
-      return this.register(
-        HirIntValueExpression((expression as AstIntExpression).value),
-        HirNamedType.coreInt(this.global.context),
-      )
+      return this.register(HirIntValueExpression((expression as AstIntExpression).value))
     }
 
     if (expression is AstStringExpression) {
       // For String expressions, the interpolation is desugared string into multiple calls to `+`.
       // "{name} is a great {type}" -> "" + name + " is a great " + type
-      mut let result = this.register(
-        HirStringValueExpression(""),
-        HirNamedType.coreString(this.global.context),
-      )
+      mut let result = this.register(HirStringValueExpression(""))
 
       for part in (expression as AstStringExpression).parts {
         let expressionToAdd = if (part is AstLiteralStringPart) {
           result.first.register(
             HirStringValueExpression((part as AstLiteralStringPart).value.value),
-            HirNamedType.coreString(result.first.global.context),
           )
         } else {
           let expressionToStringify = result.first.lowerExpressionToValueExpression(
@@ -244,7 +242,6 @@ impl LoweringContext {
                 Map.empty<String, HirInlineType>(),
                 Map.empty<String, HirValueExpressionUri>(),
               ),
-              HirNamedType.coreString(expressionToStringify.first.global.context),
             )
           }
         }
@@ -258,7 +255,6 @@ impl LoweringContext {
             Map.empty<String, HirInlineType>(),
             Map.of1<String, HirValueExpressionUri>(Tuple("other", expressionToAdd.second)),
           ),
-          HirNamedType.coreString(expressionToAdd.first.global.context),
         )
       }
       return result
@@ -288,7 +284,7 @@ impl LoweringContext {
 
       let valueParameters = MutableList.empty<HirLambdaValueParameter>()
       for astParameter in astExpression.valueParameters {
-        // TODO(marcelgarus): `this` is not a valid parameter name.
+        // TODO(never, marcelgarus): `this` is not a valid parameter name.
         let name = astParameter.name.value
         let type_ = astInlineTypeToHirInlineType(
           innerContext.global.context,
@@ -297,7 +293,7 @@ impl LoweringContext {
         )
         let hirParameter = HirLambdaValueParameter(lambdaUri, name, type_)
         valueParameters.append(hirParameter)
-        let result = innerContext.register(HirParameterReferenceValueExpression(hirParameter), type_)
+        let result = innerContext.register(HirParameterReferenceValueExpression(hirParameter))
         innerContext = LoweringContext(
           result.first.global,
           result.first.parent,
@@ -318,8 +314,7 @@ impl LoweringContext {
           BodyGlobalState(
             innerContext.global.context,
             innerContext.global.function,
-            innerContext.global.expressions
-              .copyAndSet(lambdaUri, Tuple(lambdaExpression, returnType)),
+            innerContext.global.expressions.copyAndSet(lambdaUri, lambdaExpression),
             innerContext.global.nextExpressionId,
             innerContext.global.errors,
           ),
@@ -396,7 +391,7 @@ impl LoweringContext {
           true
         })
       if (anyTypeArgumentIsInvalid) {
-        return this.register(HirErrorValueExpression(), HirErrorType())
+        return this.register(HirErrorValueExpression())
       }
 
       return Tuple(
@@ -410,7 +405,7 @@ impl LoweringContext {
       mut let areValueArgumentsValid = true
       mut let context = this
       let fields = (astExpression.valueArguments as Iterable<AstValueArgument>)
-        .maybeMap<(String, HirValueExpressionUri)>({
+        .maybeMap<(String, DataTuple2<HirValueExpressionUri, HirInlineType>)>({
           if (it.name is None<AstIdentifier>) {
             areValueArgumentsValid = false
             context = context.registerError(
@@ -419,13 +414,18 @@ impl LoweringContext {
           }
           let result = context.lowerExpressionToValueExpression(it.value)
           context = result.first
-          it.name.map<(String, HirValueExpressionUri)>({ Tuple(it.value, result.second) })
+          it.name.map<(String, DataTuple2<HirValueExpressionUri, HirInlineType>)>({
+            Tuple(
+              it.value,
+              DataTuple2<HirValueExpressionUri, HirInlineType>(
+                result.second,
+                context.typeOf(result.second),
+              ),
+            )
+          })
         })
-        .unsafeToMap<String, HirValueExpressionUri>()
-      return context.register(
-        HirStructValueExpression(fields),
-        todo("soon, marcelgarus: The type of the struct.")
-      )
+        .unsafeToMap<String, DataTuple2<HirValueExpressionUri, HirInlineType>>()
+      return context.register(HirStructValueExpression(fields))
     }
 
     if (expression is AstBinaryExpression) {
@@ -459,8 +459,6 @@ impl LoweringContext {
           Map.empty<String, HirInlineType>(),
           Map.of1<String, HirValueExpressionUri>(Tuple("other", loweredRight.second)),
         ),
-        // TODO(soon, marcelgarus): Find the correct impl and retrieve the return type
-        HirNamedType.coreNever(context),
       )
     }
 
@@ -477,11 +475,55 @@ impl LoweringContext {
     }
 
     if (expression is AstNavigationExpression) {
-      // This is an AstNavigationExpression that has is not inside an AstCallExpression – otherwise,
-      // the lowering of the surrounding AstCallExpression would have also handled the inner
-      // AstNavigationExpression. So, this is a function invocation without any parameters.
-      // But that doesn't work for now.
-      todo("never, Function call with omitted parentheses")
+      let astExpression = (expression as AstNavigationExpression)
+      let name = astExpression.target.value
+
+      mut let context = this
+      if ((astExpression.typeArguments as Iterable<AstTypeArgument>).isNotEmpty()) {
+        context = context.registerError(NavigationWithTypeArgumentsError(astExpression)).first
+      }
+
+      let result = context.lowerExpressionToValueExpression(astExpression.receiver)
+      mut let context = result.first
+      mut let receiver = result.second
+      mut let receiverType = context.typeOf(receiver)
+
+      if (receiverType is HirErrorType) { return result }
+      if (name == "value") {
+        if (receiverType is HirThisType) {
+          receiverType = (receiverType as HirThisType).resolve(context)
+        }
+        if (receiverType is HirNamedType) {
+          let declaration = (receiverType as HirNamedType).declaration
+          if (declaration is HirType) {
+            let declaration = (declaration as HirType)
+            let declarationType = declaration.type(context.global.context).map<HirInlineType>({
+              it.substitute((receiverType as HirNamedType).substitutionMap(context.global.context))
+            })
+
+            if (declarationType is Some) {
+              return context.register(HirTypeValueValueExpression(receiver, declarationType.unwrap()))
+            }
+          }
+        }
+      }
+      if (receiverType is HirStructType) {
+        let structType = (receiverType as HirStructType)
+        let field = (structType.types as Iterable<(String, HirInlineType)>)
+          .singleWhere({ it.first == name })
+        if (field is None) {
+          return context.registerError(UnknownFieldError(name))
+        }
+
+        return context.register(HirStructFieldAccessValueExpression(receiver, name, field.second))
+      }
+
+      context.registerError(
+        UnsupportedFeatureCompilerError(
+          None<Location>(),
+          "never, Function call with omitted parentheses",
+        ),
+      )
     }
 
     if (expression is AstCallExpression) {
@@ -515,54 +557,84 @@ impl LoweringContext {
       let name = contextAndNameAndReceiver.second
       let receiver = contextAndNameAndReceiver.third
 
-      if (receiver is Some<HirValueExpressionUri | HirTypeExpression>) {
-        // TODO(soon, marcelgarus): Handle function call with a receiver.
-        let result = context.register(
-          HirStringValueExpression("<compiler-generated> TODO(soon, marcelgarus): Handle function call with a receiver."),
-          HirNamedType.coreString(context.global.context),
-        )
-        context = result.first
-        return context.register(
-          HirFunctionCallValueExpression(
-            None<HirValueExpressionUri | HirTypeExpression>(),
-            HirFunction(
-              HirInnerModule(HirTopLevelModule(Package.core(context.global.context)), "Panic"),
-              "panic",
-              0,
-            ),
-            Map.empty<String, HirInlineType>(),
-            Map.of1<String, HirValueExpressionUri>(Tuple("message", result.second)),
-          ),
-          HirNamedType.coreNever(context.global.context),
-        )
-      }
-      let functions = context.resolve(name).items()
-        .cast<HirValueExpressionUri | HirFunction>()
-        .where({
-          if (it is HirValueExpressionUri) {
-            true
+      let functions = receiver
+        .map<List<HirFunction>>({ receiver =>
+          if (receiver is HirValueExpressionUri) {
+            let leafInstanceFunctionsForType = { inlineType: HirInlineType =>
+              return (receiverType as HirInlineType)
+                .leafInstanceFunctionsWithNameAsWellAsTheirParameterTypesAndTheReturnType(
+                  context.global.context,
+                  name,
+                  context.global.function.package(),
+                )
+            }
+            let receiverType = this.typeOf(receiver as HirValueExpressionUri)
+            if (receiverType is HirErrorType) { return Tuple(this, receiver) }
+            if (receiverType is HirNamedType) {
+              return (receiverType as HirInlineType)
+                .leafInstanceFunctionsWithNameAsWellAsTheirParameterTypesAndTheReturnType(
+                  context.global.context,
+                  name,
+                  context.global.function.package(),
+                )
+            }
+            if (receiverType is HirFunctionType) { todo("never, Support expression calls") }
+            if (receiverType is HirStructType) {
+              todo("never, Handle struct field accesses as method calls")
+            }
+            if (receiverType is HirEnumType) { todo("never, Support match calls") }
+            if (receiverType is HirIntersectionType) {
+              return (receiverType as HirIntersectionType)
+                .leafInstanceFunctionsWithNameAsWellAsTheirParameterTypesAndTheReturnType(
+                  context.global.context,
+                  name,
+                  context.global.function.package(),
+                )
+            }
           } else {
-            (it as HirFunction).parent is HirModule
+            let receiver = (receiver as HirTypeExpression)
+            todo("soon, Support static function calls")
           }
+
+          // TODO(soon, marcelgarus): Handle function call with a receiver.
+          let result = context.register(
+            HirStringValueExpression(
+              "<compiler-generated> TODO(soon, marcelgarus): Handle function call with a receiver.",
+            ),
+          )
+          context = result.first
+          return context.register(
+            HirFunctionCallValueExpression(
+              None<HirValueExpressionUri | HirTypeExpression>(),
+              HirFunction(
+                HirInnerModule(HirTopLevelModule(Package.core(context.global.context)), "Panic"),
+                "panic",
+                0,
+              ),
+              Map.empty<String, HirInlineType>(),
+              Map.of1<String, HirValueExpressionUri>(Tuple("message", result.second)),
+            ),
+          )
         })
-        .toList()
-      if ((functions as Iterable<HirValueExpressionUri | HirFunction>).isEmpty()) {
+        .orElse({
+          context.resolve(name).items()
+            .cast<HirValueExpressionUri | HirFunction>()
+            .where({
+              if (it is HirValueExpressionUri) {
+                todo("soon: Callable expressions are not yet supported: {function}")
+              } else {
+                (it as HirFunction).parent is HirModule
+              }
+            })
+            .cast<HirFunction>()
+            .toList()
+        })
+      if ((functions as Iterable<HirFunction>).isEmpty()) {
         return context.registerError(UnresolvedIdentifierError(name))
       }
 
-      let possibleCalls = (functions as Iterable<HirValueExpressionUri | HirFunction>)
-        .map<(LoweringContext, HirValueExpressionUri, Bool, HirValueExpressionUri | HirFunction)>({ function =>
-          if (function is HirValueExpressionUri) {
-            // TODO(soon): Callable expressions
-            let result = context.registerError(
-              UnsupportedFeatureCompilerError(
-                None<Location>(),
-                "Callable expressions are not yet supported: {function}",
-              ),
-            )
-            return Tuple(result.first, result.second, false, function)
-          }
-
+      let possibleCalls = (functions as Iterable<HirFunction>)
+        .map<(LoweringContext, HirValueExpressionUri, Bool, HirFunction)>({ function =>
           let function = (function as HirFunction)
           let result = context.matchFunctionCall(
             function,
@@ -573,7 +645,7 @@ impl LoweringContext {
           Tuple(result.first, result.second, result.third, function)
         })
         .toList()
-      let possibleCalls = (possibleCalls as Iterable<(LoweringContext, HirValueExpressionUri, Bool, HirValueExpressionUri | HirFunction)>)
+      let possibleCalls = (possibleCalls as Iterable<(LoweringContext, HirValueExpressionUri, Bool, HirFunction)>)
       if (possibleCalls.length() == 1) {
         let call = possibleCalls.single().unwrap()
         return Tuple(call.first, call.second)
@@ -581,7 +653,7 @@ impl LoweringContext {
 
       let matchingCalls = possibleCalls
         .where({ it.third })
-        .map<(LoweringContext, HirValueExpressionUri, HirValueExpressionUri | HirFunction)>({
+        .map<(LoweringContext, HirValueExpressionUri, HirFunction)>({
           Tuple(it.first, it.second, it.fourth)
         })
       if (matchingCalls.isEmpty()) {
@@ -589,7 +661,7 @@ impl LoweringContext {
       }
       if (matchingCalls.length() > 1) {
         return context.registerError(MultipleFunctionsMatchArgumentsError(
-          matchingCalls.map<HirValueExpressionUri | HirFunction>({ it.third }).toList(),
+          matchingCalls.map<HirFunction>({ it.third }).toList(),
         ))
       }
 
@@ -604,14 +676,10 @@ impl LoweringContext {
           this.lowerExpressionToValueExpression(it)
         })
         .orElse({
-          this.register(
-            HirFunctionCallValueExpression.coreNothing(this.global.context),
-            HirNamedType.coreNothing(this.global.context),
-          )
+          this.register(HirFunctionCallValueExpression.coreNothing(this.global.context))
         })
       return returnValue.first.register(
         HirReturnValueExpression(this.global.function, returnValue.second),
-        HirNamedType.coreNever(this.global.context),
       )
     }
 
@@ -623,8 +691,28 @@ impl LoweringContext {
     receiver: Maybe<HirValueExpressionUri | HirTypeExpression>,
     typeArguments: List<AstTypeArgument>,
     valueArguments: List<AstValueArgument>,
+    // substitutions: Map<HirInlineType, HirInlineType>,
   ): (LoweringContext, HirValueExpressionUri, Bool) {
     mut let context = this
+
+    let substitutions = receiver
+      .map<Map<HirInlineType, HirInlineType>>({
+        let type = if (it is HirValueExpressionUri) {
+          context.typeOf(it as HirValueExpressionUri)
+        } else {
+          (it as HirTypeExpression).type
+        }
+        if (type is HirNamedType) {
+          return (type as HirNamedType).substitutionMap(context)
+        } else {
+          assert(
+            type is HirErrorType,
+            "Function call with a receiver that's not a named nor an error type.",
+          )
+          return Map.empty<HirInlineType, HirInlineType>()
+        }
+      })
+      .orElse({ Map.empty<HirInlineType, HirInlineType>() })
 
     // Type Arguments
     let typeArguments = (typeArguments as Iterable<AstTypeArgument>)
@@ -647,7 +735,7 @@ impl LoweringContext {
       let anyTypeArgumentIsInvalid = zipped.any({
         let argument = it.first
         let parameter = it.second
-        let upperBound = parameter.upperBound(context.global.context)
+        let upperBound = parameter.upperBound(context.global.context).substitute(substitutions)
         if (!isAssignableTo(context.global.context, argument, upperBound, (context.global.function as HasPackageAndPath).package())) {
           context = context.registerError(InvalidTypeArgumentError(argument, upperBound)).first
           return false
@@ -695,7 +783,7 @@ impl LoweringContext {
         let argument = it.first
         let argumentType = context.typeOf(argument)
         let parameter = it.second
-        let parameterType = parameter.type(context.global.context)
+        let parameterType = parameter.type(context.global.context).substitute(substitutions)
         let package = (context.global.function as HasPackageAndPath).package()
         if (!isAssignableTo(context.global.context, argumentType, parameterType, package)) {
           context = context.registerError(InvalidValueArgumentError(argumentType, parameterType)).first
@@ -714,16 +802,17 @@ impl LoweringContext {
     areValueArgumentsValid = areValueArgumentsValid && valueArgumentsAndAreTheyValid.second
 
     if (!areTypeArgumentsValid || !areValueArgumentsValid) {
-      let result = context.register(HirErrorValueExpression(), HirErrorType())
+      let result = context.register(HirErrorValueExpression())
       return Tuple(result.first, result.second, false)
     }
 
     // Return Type
-    let substitutions = (typeParameters as Iterable<HirParameterType>)
+    let localSubstitutions = (typeParameters as Iterable<HirParameterType>)
       .zip<HirInlineType>(typeArguments)
       .unsafeToMap<HirInlineType, HirInlineType>()
     let returnType = (function.returnType(context.global.context) as HirInlineType)
       .substitute(substitutions)
+      .substitute(localSubstitutions)
 
     let result = context.register(
       HirFunctionCallValueExpression(
@@ -731,14 +820,14 @@ impl LoweringContext {
         function,
         actualTypeArguments,
         actualValueArguments,
+        returnType,
       ),
-      returnType,
     )
     Tuple(result.first, result.second, true)
   }
 
   fun typeOf(uri: HirValueExpressionUri): HirInlineType {
-    this.global.expressions.get(uri).unwrap().second
+    this.global.expressions.get(uri).unwrap().type(this.global.context)
   }
 }
 
@@ -932,5 +1021,39 @@ impl MultipleFunctionsMatchArgumentsError: CompilerError {
   public fun description(): String {
     /// TODO(never, marcelgarus): add a description for this error
     "Possible functions: {(this.functions as Iterable<HirValueExpressionUri | HirFunction>).join(", ")}"
+  }
+}
+
+public class NavigationWithTypeArgumentsError {
+  public let navigation: AstNavigationExpression
+}
+impl NavigationWithTypeArgumentsError: CompilerError {
+  public fun id(): String { "navigation-with-type-arguments" }
+
+  public fun location(): Location {
+    todo("never, marcelgarus: Implement NavigationWithTypeArgumentsError.location")
+  }
+  public fun title(): String {
+    "Navigation expressions can't have type arguments."
+  }
+  public fun description(): String {
+    "But this one has them: {this.navigation}."
+  }
+}
+
+public class UnknownFieldError {
+  public let name: String
+}
+impl UnknownFieldError: CompilerError {
+  public fun id(): String { "unknown-field" }
+
+  public fun location(): Location {
+    todo("never, marcelgarus: Implement UnknownFieldError.location")
+  }
+  public fun title(): String {
+    "Navigation to a field that doesn't exist: {name}"
+  }
+  public fun description(): String {
+    ""
   }
 }

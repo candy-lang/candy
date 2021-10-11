@@ -49,8 +49,8 @@ public fun compileFunctionCallValueExpression(
       .map<DartType>({ compileInlineType(context, it) })
       .toList()
 
-    let valueArgumentsInCorrectOrder = (expression.function.ast(context).valueParameters as Iterable<AstValueParameter>)
-      .map<HirValueExpressionUri>({ expression.valueArguments.get(it.name.value).unwrap() })
+    let valueArgumentsInCorrectOrder = (expression.function.valueParameters(context) as Iterable<HirValueParameter>)
+      .map<HirValueExpressionUri>({ expression.valueArguments.get(it.name).unwrap() })
     let valueArguments = typeArgumentsInCorrectOrder
     // TODO(soon, JonasWanke): Transform these types to the static instance classes.
       .map<DartExpression>({ DartIdentifier("SomeType", None<String>()) })

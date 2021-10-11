@@ -175,27 +175,55 @@ public fun astInlineTypeToHirInlineType(
 impl HirParameterType {
   fun upperBound(context: QueryContext<List<CompilerError>>): HirInlineType {
     query<HirInlineType, List<CompilerError>>(context, "HirParameterType.upperBound", this, {
-      let astTypeParameter = (((this.declaration as HasAst).ast(context) as AstWithTypeParameters)
-        .typeParameters as Iterable<AstTypeParameter>)
-        .singleWhere({ it.name.value == this.name })
-        .unwrap()
-      Tuple(
+      let ast = (this.declaration as HasAst).ast(context)
+      let upperBound = ast.map({
+        let astTypeParameter = ((it as AstWithTypeParameters)
+          .typeParameters as Iterable<AstTypeParameter>)
+          .singleWhere({ it.name.value == this.name })
+          .unwrap()
         astTypeParameter.upperBound
           .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this.declaration) })
-          .orElse({ HirNamedType.coreAny(context) }),
-        List.empty<CompilerError>(),
-      )
+          .orElse({ HirNamedType.coreAny(context) })
+      }).orElse({
+        let declaration = this.syntheticDeclarations(context).unwrap()
+        if (declaration is HirSyntheticTrait) {
+          return (declaration as HirSyntheticTrait).typeParameters.singleWhere({ it.name == this.name }).unwrap()
+        }
+        if (declaration is HirSyntheticImpl) {
+          return (declaration as HirSyntheticImpl).typeParameters.singleWhere({ it.name == this.name }).unwrap()
+        }
+        if (declaration is HirSyntheticType) {
+          return (declaration as HirSyntheticType).typeParameters.singleWhere({ it.name == this.name }).unwrap()
+        }
+        if (declaration is HirSyntheticFunction) {
+          return (declaration as HirSyntheticFunction).typeParameters.singleWhere({ it.name == this.name }).unwrap()
+        }
+        throw "Unknown synthetic declaration: {declaration}"
+      })
+      Tuple(upperBound, List.empty<CompilerError>())
     })
   }
 }
 
 impl HirTrait {
-  fun upperBound(context: QueryContext<List<CompilerError>>): HirInlineType {
+  fun thisType(context: QueryContext<List<CompilerError>>): HirNamedType {
+    query<HirNamedType, List<CompilerError>>(context, "HirTrait.thisType", this, {
+      Tuple(
+        HirNamedType(this, this.typeParameters(context)),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
+  fun upperBound(context: QueryContext<List<CompilerError>>): List<HirNamedType | HirErrorType> {
     query<HirInlineType, List<CompilerError>>(context, "HirTrait.upperBound", this, {
       Tuple(
-        this.ast(context).upperBound
-          .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
-          .orElse({ HirNamedType.coreAny(context) }),
+        this.syntheticDeclaration(context)
+          .map<List<HirNamedType | HirErrorType>>({ it.upperBound })
+          .orElse({
+            this.ast(context).upperBound
+              .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
+              .orElse({ HirNamedType.coreAny(context) })
+          }),
         List.empty<CompilerError>(),
       )
     })
@@ -218,12 +246,16 @@ impl HirImpl {
     })
   }
 
-  fun baseType(context: QueryContext<List<CompilerError>>): HirNamedType {
+  fun baseType(context: QueryContext<List<CompilerError>>): HirNamedType | HirErrorType {
     // The base type of an impl. For example, `impl Foo[Int]` has the base type `Foo[Int]`.
 
     query<HirNamedType, List<CompilerError>>(context, "HirImpl.baseType", this as Equals & Hash, {
       Tuple(
-        astInlineTypeToHirInlineType(context, this.ast(context).type, this) as HirNamedType,
+        this.syntheticDeclaration(context)
+          .map<HirNamedType | HirErrorType>({ it.baseType })
+          .orElse({
+            astInlineTypeToHirInlineType(context, this.ast(context).type, this) as HirNamedType | HirErrorType
+          }),
         List.empty<CompilerError>(),
       )
     })
@@ -234,7 +266,14 @@ impl HirImpl {
     // `Equals`, whereas `impl Foo { ... }` implements none.
 
     query<Maybe<HirInlineType>, List<CompilerError>>(context, "HirImpl.implementedTrait", this as Equals & Hash, {
-      let traits = this.ast(context).traits
+      if (this.isSynthetic()) {
+        return Tuple(
+          this.syntheticDeclaration(context).unwrap().implementedTrait,
+          List.empty<CompilerError>(),
+        )
+      }
+
+      let traits = this.ast(context).unwrap().traits
       if !((traits as Iterable).length() == 1) {
         // TODO(never, marcelgarus): Support impls for more than one trait.
         return Tuple(
@@ -263,13 +302,53 @@ impl HirImpl {
   }
 }
 
+impl HirType {
+  fun thisType(context: QueryContext<List<CompilerError>>): HirInlineType {
+    query<HirInlineType, List<CompilerError>>(context, "HirTrait.thisType", this, {
+      Tuple(
+        HirNamedType(this, this.typeParameters(context)),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
+  fun type(context: QueryContext<List<CompilerError>>): Maybe<HirInlineType> {
+    query<Maybe<HirInlineType>, List<CompilerError>>(context, "HirType.type", this, {
+      Tuple(
+        this.syntheticDeclaration(context)
+          .map<Maybe<HirInlineType>>({ Some<HirInlineType>(it.type) })
+          .orElse({
+            this.ast(context).unwrap().type
+              .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
+          }),
+        List.empty<CompilerError>(),
+      )
+    })
+  }
+}
+
 impl HirFunction {
+  fun thisType(context: QueryContext<List<CompilerError>>): Maybe<HirThisType> {
+    query<HirInlineType, List<CompilerError>>(context, "HirFunction.thisType", this, {
+      Tuple(
+        if (this.parent is HirTrait | HirImpl && !this.isStatic(context)) {
+          Some<HirThisType>(HirThisType(this.parent as HirTrait | HirImpl))
+        } else {
+          None<HirThisType>()
+        },
+        List.empty<CompilerError>(),
+      )
+    })
+  }
   fun returnType(context: QueryContext<List<CompilerError>>): HirInlineType {
     query<HirInlineType, List<CompilerError>>(context, "HirFunction.returnType", this, {
       Tuple(
-        this.ast(context).returnType
-          .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
-          .orElse({ HirNamedType.coreNothing(context) }),
+        this.syntheticDeclaration(context)
+          .map<HirInlineType>({ it.returnType })
+          .orElse({
+            this.ast(context).returnType
+              .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
+              .orElse({ HirNamedType.coreNothing(context) })
+          }),
         List.empty<CompilerError>(),
       )
     })
@@ -833,6 +912,20 @@ public fun implFor(
   scope: Package,
 ): Maybe<HirImpl> {
   query<Maybe<HirImpl>, List<CompilerError>>(context, "implFor", DataTuple3<HirInlineType, HirInlineType, Package>(base, trait_, scope), {
+    Tuple(
+      findUniqueSolverSolutionFor(context, base, trait_, scope)
+        .map<HirImpl>({ it.usedRule.originalImpl as HirImpl }),
+      List.empty<CompilerError>(),
+    )
+  })
+}
+public fun findUniqueSolverSolutionFor(
+  context: QueryContext<List<CompilerError>>,
+  base: HirInlineType,
+  trait_: HirInlineType,
+  scope: Package,
+): Maybe<SolverSolutionUnique> {
+  query<Maybe<SolverSolutionUnique>, List<CompilerError>>(context, "findUniqueSolverSolutionFor", DataTuple3<HirInlineType, HirInlineType, Package>(base, trait_, scope), {
     assert(!(trait_ is HirErrorType), "Can't reveal the impl for the error type")
 
     let environment = getSolverEnvironmentOfScope(context, scope)
@@ -848,7 +941,7 @@ public fun implFor(
     }
     if !((traitGoals as Iterable).length() == 1) {
       return Tuple(
-        None<HirImpl>(),
+        None<SolverSolutionUnique>(),
         List.of1<CompilerError>(TryingToFindImplForTraitWithTraitAsParameterCompilerError(trait_)),
       )
     }
@@ -861,11 +954,11 @@ public fun implFor(
     )
     if (solution is SolverSolutionUnique) {
       Tuple(
-        Some<HirImpl>((solution as SolverSolutionUnique).usedRule.originalImpl as HirImpl),
+        Some<SolverSolutionUnique>(solution as SolverSolutionUnique),
         List.empty<CompilerError>(),
       )
     } else {
-      Tuple(None<HirImpl>(), List.empty<CompilerError>())
+      Tuple(None<SolverSolutionUnique>(), List.empty<CompilerError>())
     }
   })
 }
@@ -891,36 +984,109 @@ fun getAllTraitsOfModule(context: QueryContext<List<CompilerError>>, module: Hir
   })
 }
 
-fun getAllImplementedTraitsFor(
+fun getAllImplementedTraitsWithSubstitutionsFor(
   context: QueryContext<List<CompilerError>>,
   base: HirInlineType,
   scope: Package,
-): Set<HirNamedType> {
-  query<Set<HirNamedType>, List<CompilerError>>(context, "getAllImplementedTraitsFor", DataTuple2<HirInlineType, Package>(base, scope), {
-    todo("soon, marcelgarus: implement getAllImplementedTraitsFor")
-    // getAllTraitsInScope(context, scope)
-    //   .items()
-    //   .where({ isAssignableTo(context, base, it, scope) })
-    //   .toSet()
+): Set<(HirNamedType, Map<HirInlineType, HirInlineType>)> {
+  query<Set<(HirNamedType, Map<HirInlineType, HirInlineType>)>, List<CompilerError>>(context, "getAllImplementedTraitsWithSubstitutionsFor", DataTuple2<HirInlineType, Package>(base, scope), {
+    let traits = getAllImplsWithSubstitutionsFor(context, base, scope)
+      .items()
+      .map<(HirNamedType, Map<HirInlineType, HirInlineType>)>({
+        Tuple(it.first.baseType(context), it.second)
+      })
+      .toMutableSet()
+    if (base.declaration is HirTrait) {
+      let upperBound = (base.declaration as HirTrait).upperBound(context)
+      let substitutions = (upperBound.typeParameters(context) as Iterable<HirParameterType>)
+        .cast<HirInlineType>()
+        .zip<HirInlineType>(base.parameterTypes)
+        .unsafeToMap<HirInlineType, HirInlineType>()
+      traits.insert(Tuple(upperBound, substitutions))
+    }
+    Tuple(traits, List.empty<CompilerError>())
   })
 }
 
-fun getAllImplsFor(
+fun getAllImplsWithSubstitutionsFor(
   context: QueryContext<List<CompilerError>>,
   base: HirInlineType,
   scope: Package,
-): Set<HirImpl> {
-  query<Set<HirImpl>, List<CompilerError>>(context, "getAllImplsFor", DataTuple2<HirInlineType, Package>(base, scope), {
-    let implementedTraits = getAllImplementedTraitsFor(context, base, scope)
-    let impls = getAllImplsInScope(context, scope)
-      .items()
-      .where({ impl_ => implementedTraits.contains(impl_.baseType(context)) })
-      .followedBy(
-        getAllImplsInScope(context, scope).items().where({ base == it.baseType(context) }),
-      )
-      .toSet()
-    Tuple(impls, List.empty<CompilerError>())
+): Set<(HirImpl, Map<HirInlineType, HirInlineType>)> {
+  query<Set<(HirImpl, Map<HirInlineType, HirInlineType>)>, List<CompilerError>>(context, "getAllImplsWithSubstitutionsFor", DataTuple2<HirInlineType, Package>(base, scope), {
+    if (base is HirErrorType) { return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>() }
+    if (base is HirNamedType) {
+      return getAllImplsInScope(context, scope).items()
+        .maybeMap<SolverSolutionUnique>({
+          findUniqueSolverSolutionFor(context, base, it.baseType(context), scope)
+        })
+        .map<(HirImpl, Map<HirInlineType, HirInlineType>)>({
+          let substitutions = hirInlineTypeToSolverTypeAndGoalsAndRules(context, base).first
+            .unify(it.refinedGoal)
+            .unwrap()
+          Tuple(it, substitutions)
+        })
+        .toSet()
+    }
+    if (base is HirFunctionType) {
+      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+    }
+    if (base is HirStructType) {
+      // TODO(soon): create synthetic impls for struct types
+      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+    }
+    if (base is HirEnumType) {
+      // TODO(soon): create synthetic impls for enum types
+      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+    }
+    if (base is HirIntersectionType) {
+      return ((base as HirIntersectionType).types as Iterable<HirInlineType>)
+        .expand<HirFunction>({ it.allFunctions(context, scope)})
+        .toSet()
+    }
+    if (base is HirThisType) {
+      return getAllImplsWithSubstitutionsFor(context, (base as HirThisType).resolve(context), scope)
+    }
+    if (base is HirParameterType) {
+      let upperBound = (base as HirParameterType).upperBound(context)
+      return getAllImplsWithSubstitutionsFor(context, upperBound, scope)
+    }
+    if (base is HirReflectionType) {
+      // TODO(never): create synthetic impls for reflection types
+      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+    }
+    throw "Unknown HirInlineType: {base}"
   })
+}
+
+impl HirNamedType {
+  fun substitutionMap(context: QueryContext<List<CompilerError>>): Map<HirParameterType, HirInlineType> {
+    query<
+      Map<HirParameterType, HirInlineType>,
+      List<CompilerError>,
+    >(context, "HirNamedType.substitutionMap", this as Equals & Hash, {
+      let typeArguments = this.parameterTypes
+      let typeParameters = (this.declaration as HasTypeParameters).typeParameters(context)
+      assert((typeArguments as Iterable<HirInlineType>).length() == (typeParameters as Iterable<HirParameterType>).length())
+
+      let substitutionMap = typeParameters
+        .zip(typeArguments as Iterable<HirInlineType>)
+        .unsafeToMap<HirParameterType, HirInlineType>()
+      Tuple(substitutionMap, List.empty<CompilerError>())
+    })
+  }
+}
+impl HirThisType {
+  fun resolve(context: QueryContext<List<CompilerError>>): HirInlineType {
+    query<HirInlineType, List<CompilerError>>(context, "HirThisType.resolve", this, {
+      let baseType = if (this.declaration is HirTrait) {
+        (this.declaration as HirTrait).thisType(context)
+      } else {
+        (this.declaration as HirImpl).baseType(context)
+      }
+      Tuple(baseType, List.empty<CompilerError>())
+    })
+  }
 }
 
 // fun resolveFunctionOnInlineType(
