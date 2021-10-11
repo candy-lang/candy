@@ -120,7 +120,7 @@ impl HirLambdaValueParameter: Equals & Hash {
 
 /// A this expression.
 ///
-/// Example: `This` (and this is the only example)
+/// Example: `this` (and this is the only example)
 public class HirThisValueExpression {
   let thisType: HirThisType
 }
