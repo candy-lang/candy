@@ -45,7 +45,7 @@ public fun compileGlobalFunction(
         compileValueExpressionsToBody(
           context,
           functionHir,
-          lowerFunctionBody(context, functionHir).unwrap().first,
+          lowerFunctionBody(context, functionHir).unwrap(),
         ),
       ),
     )

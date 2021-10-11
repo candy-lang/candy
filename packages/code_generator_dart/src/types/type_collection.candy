@@ -82,8 +82,11 @@ fun getAllInlineTypesInsideType(
     context,
     "code_generator_dart.getAllInlineTypesInsideType",
     typeHir, {
-    let inlineTypes = getAllInlineTypesInsideTypeParameters(context, typeHir)
-    // TODO(soon, JonasWanke): Traverse inline type
+    let inlineTypes = getAllInlineTypesInsideTypeParameters(context, typeHir).union(
+      typeHir.type(context)
+        .map<Set<HirInlineType>>({ getAllInlineTypesInsideInlineType(context, it) })
+        .orElse({ Set.empty<HirInlineType>() }),
+    )
     Tuple(inlineTypes, List.empty<CompilerError>())
   })
 }
@@ -96,7 +99,20 @@ fun getAllInlineTypesInsideFunction(
     "code_generator_dart.getAllInlineTypesInsideFunction",
     functionHir, {
     let inlineTypes = getAllInlineTypesInsideTypeParameters(context, functionHir)
-    // TODO(soon, JonasWanke): Traverse return type & body
+      .union(
+        (functionHir.valueParameters(context) as Iterable<HirValueParameter>)
+          .expand<Set<HirInlineType>>({
+            getAllInlineTypesInsideInlineType(context, it.type(context)).items()
+          })
+          .toSet(),
+      )
+      .union(
+        getAllInlineTypesInsideExpressions(
+          context,
+          (lowerFunctionBody(context, functionHir)
+            .orElse({ List.empty<HirValueExpressionUri>() }) as Iterable<HirValueExpressionUri>),
+        ),
+      )
     Tuple(inlineTypes, List.empty<CompilerError>())
   })
 }
@@ -118,7 +134,7 @@ fun getAllInlineTypesInsideTypeParameters(
     "code_generator_dart.getAllInlineTypesInsideTypeParameters",
     declarationHir, {
     let inlineTypes = (declarationHir.typeParameters(context) as Iterable<HirParameterType>)
-      .map<HirInlineType>({ it.upperBound(context) })
+      .map<HirInlineType>({ getAllInlineTypesInsideInlineType(context, it.upperBound(context)) })
       .toSet()
     Tuple(inlineTypes, List.empty<CompilerError>())
   })
@@ -144,27 +160,44 @@ fun getAllInlineTypesInsideInlineType(
     if (inlineType is HirErrorType) { throw "Tried to compile an error type to Dart." }
     if (inlineType is HirNamedType) {
       inlineTypes.addAll(
-        getAllInlineTypesInsideNamedType(context, inlineType as HirNamedType).items(),
+        getAllInlineTypesInsideInlineTypes(context, (inlineType as HirNamedType).parameterTypes)
+          .items(),
       )
     }
     if (inlineType is HirFunctionType) {
+      let functionType = (inlineType as HirFunctionType)
+      functionType.receiverType.do({
+        inlineTypes.insert(it)
+        unit
+      })
       inlineTypes.addAll(
-        getAllInlineTypesInsideFunctionType(context, inlineType as HirFunctionType).items(),
+        getAllInlineTypesInsideInlineTypes(context, functionType.parameterTypes).items(),
+      )
+      inlineTypes.addAll(
+        getAllInlineTypesInsideInlineType(context, functionType.returnType).items(),
       )
     }
     if (inlineType is HirStructType) {
       inlineTypes.addAll(
-        getAllInlineTypesInsideStructType(context, inlineType as HirStructType).items(),
+        getAllInlineTypesInsideInlineTypes(
+          context,
+          ((inlineType as HirStructType).types as Iterable<(String, HirInlineType)>)
+            .map<HirInlineType>({ it.second })
+            .toList(),
+        ),
       )
     }
     if (inlineType is HirEnumType) {
       inlineTypes.addAll(
-        getAllInlineTypesInsideEnumType(context, inlineType as HirEnumType).items(),
+        getAllInlineTypesInsideInlineTypes(
+          context,
+          (inlineType as HirEnumType).variants.values().toList(),
+        ),
       )
     }
     if (inlineType is HirIntersectionType) {
       inlineTypes.addAll(
-        getAllInlineTypesInsideIntersectionType(context, inlineType as HirIntersectionType).items(),
+        getAllInlineTypesInsideInlineTypes(context, (inlineType as HirIntersectionType).types),
       )
     }
     if (inlineType is HirThisType) {}
@@ -173,79 +206,117 @@ fun getAllInlineTypesInsideInlineType(
     Tuple(inlineTypes, List.empty<CompilerError>())
   })
 }
-fun getAllInlineTypesInsideNamedType(
+
+fun getAllInlineTypesInsideExpressions(
   context: QueryContext<List<CompilerError>>,
-  namedType: HirNamedType,
+  expressionUris: List<HirValueExpressionUri>,
 ): Set<HirInlineType> {
-  query<Set<HirInlineType>, List<CompilerError>>(
-    context,
-    "code_generator_dart.getAllInlineTypesInsideNamedType",
-    namedType, {
-    let inlineTypes = getAllInlineTypesInsideInlineTypes(context, namedType.parameterTypes)
-    Tuple(inlineTypes, List.empty<CompilerError>())
-  })
+  (expressionUris as Iterable<HirValueExpressionUri>)
+    .expand<HirInlineType>({ getAllInlineTypesInsideExpression(context, it).items() })
+    .toSet()
 }
-fun getAllInlineTypesInsideFunctionType(
+fun getAllInlineTypesInsideExpression(
   context: QueryContext<List<CompilerError>>,
-  functionType: HirFunctionType,
+  expressionUri: HirValueExpressionUri,
 ): Set<HirInlineType> {
   query<Set<HirInlineType>, List<CompilerError>>(
     context,
-    "code_generator_dart.getAllInlineTypesInsideFunctionType",
-    functionType, {
-    let inlineTypes = MutableSet.empty<HirInlineType>()
-    functionType.receiverType.do({
-      inlineTypes.insert(it)
-      unit
-    })
-    inlineTypes.addAll(
-      getAllInlineTypesInsideInlineTypes(context, functionType.parameterTypes).items(),
-    )
-    inlineTypes.addAll(getAllInlineTypesInsideInlineType(context, functionType.returnType).items())
-    Tuple(inlineTypes, List.empty<CompilerError>())
-  })
-}
-fun getAllInlineTypesInsideStructType(
-  context: QueryContext<List<CompilerError>>,
-  structType: HirStructType,
-): Set<HirInlineType> {
-  query<Set<HirInlineType>, List<CompilerError>>(
-    context,
-    "code_generator_dart.getAllInlineTypesInsideStructType",
-    structType, {
-    let inlineTypes = getAllInlineTypesInsideInlineTypes(
-      context,
-      (structType.types as Iterable<(String, HirInlineType)>)
-        .map<HirInlineType>({ it.second })
-        .toList(),
-    )
-    Tuple(inlineTypes, List.empty<CompilerError>())
-  })
-}
-fun getAllInlineTypesInsideEnumType(
-  context: QueryContext<List<CompilerError>>,
-  enumType: HirEnumType,
-): Set<HirInlineType> {
-  query<Set<HirInlineType>, List<CompilerError>>(
-    context,
-    "code_generator_dart.getAllInlineTypesInsideEnumType",
-    enumType, {
-    let inlineTypes = getAllInlineTypesInsideInlineTypes(
-      context,
-      enumType.variants.values().maybeMap<HirInlineType>({ it }).toList(),
-    )
-    Tuple(inlineTypes, List.empty<CompilerError>())
-  })
-}
-fun getAllInlineTypesInsideIntersectionType(
-  context: QueryContext<List<CompilerError>>,
-  intersectionType: HirIntersectionType,
-): Set<HirInlineType> {
-  query<Set<HirInlineType>, List<CompilerError>>(
-    context,
-    "code_generator_dart.getAllInlineTypesInsideIntersectionType",
-    intersectionType, {
-    let inlineTypes = getAllInlineTypesInsideInlineTypes(context, intersectionType.types)
+    "code_generator_dart.getAllInlineTypesInsideExpression",
+    expressionUri, {
+    let expression = resolveHirValueExpressionUri(context, expressionUri)
+    let inlineTypes = getAllInlineTypesInsideInlineType(context, expression.type(context))
+      .toMutable()
+
+    if (expression is HirErrorValueExpression) {
+      throw "Tried to compile an error expression to Dart."
+    }
+    if (expression is HirIntValueExpression) {}
+    if (expression is HirStringValueExpression) {}
+    if (expression is HirLambdaValueExpression) {
+      let expression = (expression as HirLambdaValueParameter)
+      let parameterTypes = expression.parameters.map<HirInlineType>({ it.type_ }).toList()
+      inlineTypes.addAll(getAllInlineTypesInsideInlineTypes(context, parameterTypes).items())
+      inlineTypes.addAll(
+        getAllInlineTypesInsideExpressions(context, expression.expressions).items(),
+      )
+      inlineTypes.addAll(getAllInlineTypesInsideInlineType(context, expression.returnType).items())
+    }
+    if (expression is HirThisValueExpression) {
+      let expression = (expression as HirThisValueExpression)
+      inlineTypes.addAll(getAllInlineTypesInsideInlineType(context, expression.thisType).items())
+    }
+    if (expression is HirParameterReferenceValueExpression) {}
+    if (expression is HirFunctionCallValueExpression) {
+      let expression = (expression as HirFunctionCallValueExpression)
+      expression.receiver.do({
+        if (it is HirValueExpressionUri) {
+          inlineTypes.addAll(
+            getAllInlineTypesInsideExpression(context, it as HirValueExpressionUri).items(),
+          )
+        } else {
+          inlineTypes.addAll(
+            getAllInlineTypesInsideInlineType(context, (it as HirTypeExpression).type).items(),
+          )
+        }
+        unit
+      })
+      inlineTypes.addAll(
+        getAllInlineTypesInsideInlineTypes(context, expression.typeArguments.values()).items(),
+      )
+      inlineTypes.addAll(
+        getAllInlineTypesInsideExpressions(context, expression.valueArguments.values().toList())
+          .items(),
+      )
+      inlineTypes.addAll(getAllInlineTypesInsideExpression(context, expression.returnType).items())
+    }
+    if (expression is HirValueExpressionCallValueExpression) {
+      let expression = (expression as HirValueExpressionCallValueExpression)
+      inlineTypes.addAll(getAllInlineTypesInsideExpression(context, expression.receiver).items())
+      inlineTypes.addAll(getAllInlineTypesInsideExpression(context, expression.returnType).items())
+      inlineTypes.addAll(
+        getAllInlineTypesInsideInlineTypes(context, expression.typeArguments).items(),
+      )
+      inlineTypes.addAll(
+        getAllInlineTypesInsideExpressions(context, expression.valueArguments).items(),
+      )
+    }
+    if (expression is HirTypeInstantiationValueExpression) {
+      let expression = (expression as HirTypeInstantiationValueExpression)
+      inlineTypes.addAll(getAllInlineTypesInsideInlineType(context, expression.receiver).items())
+      inlineTypes.addAll(
+        getAllInlineTypesInsideExpression(context, expression.valueArgument).items(),
+      )
+    }
+    if (expression is HirStructValueExpression) {
+      let expression = (expression as HirStructValueExpression)
+      let fields = expression.fields.values()
+      inlineTypes.addAll(
+        getAllInlineTypesInsideExpressions(
+          context,
+          fields.map<HirValueExpressionUri>({ it.first }).toList(),
+        ).items(),
+      )
+      inlineTypes.addAll(
+        getAllInlineTypesInsideInlineTypes(
+          context,
+          fields.map<HirInlineType>({ it.second }).toList(),
+        ).items(),
+      )
+    }
+    if (expression is HirTypeValueValueExpression) {
+      let expression = (expression as HirTypeValueValueExpression)
+      inlineTypes.addAll(getAllInlineTypesInsideExpression(context, expression.receiver).items())
+      inlineTypes.addAll(getAllInlineTypesInsideInlineType(context, expression.type_).items())
+    }
+    if (expression is HirStructFieldAccessValueExpression) {
+      let expression = (expression as HirStructFieldAccessValueExpression)
+      inlineTypes.addAll(getAllInlineTypesInsideExpression(context, expression.receiver).items())
+      inlineTypes.addAll(getAllInlineTypesInsideInlineType(context, expression.type_).items())
+    }
+    if (expression is HirReturnValueExpression) {
+      let expression = (expression as HirReturnValueExpression)
+      inlineTypes.addAll(getAllInlineTypesInsideExpression(context, expression.expression).items())
+    }
     Tuple(inlineTypes, List.empty<CompilerError>())
   })
 }

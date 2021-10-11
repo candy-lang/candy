@@ -14,8 +14,19 @@ use ...types
 public fun lowerFunctionBody(
   context: QueryContext<List<CompilerError>>,
   function: HirFunction,
+): Maybe<List<HirValueExpressionUri>> {
+  query<Maybe<List<HirValueExpressionUri>>, List<CompilerError>>(context, "lowerFunctionBody", function, {
+    Tuple(
+      lowerFunctionBodyInternal(context, function).map<List<HirValueExpressionUri>>({ it.first }),
+      List.empty<CompilerError>(),
+    )
+  })
+}
+public fun lowerFunctionBodyInternal(
+  context: QueryContext<List<CompilerError>>,
+  function: HirFunction,
 ): Maybe<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)> {
-  query<Maybe<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)>, List<CompilerError>>(context, "lowerFunctionBody", function, {
+  query<Maybe<(List<HirValueExpressionUri>, Map<HirValueExpressionUri, HirValueExpression>)>, List<CompilerError>>(context, "lowerFunctionBodyInternal", function, {
     if (function.isSynthetic()) {
       let body = function.syntheticDeclaration(context).unwrap().body
       return Tuple(
@@ -66,7 +77,7 @@ public fun resolveHirValueExpressionUri(
   uri: HirValueExpressionUri,
 ): HirValueExpression {
   query<HirValueExpression, List<CompilerError>>(context, "resolveHirValueExpressionUri", uri, {
-    let loweredBody = lowerFunctionBody(context, uri.declaration).unwrap()
+    let loweredBody = lowerFunctionBodyInternal(context, uri.declaration).unwrap()
     Tuple(loweredBody.second.get(uri).unwrap(), List.empty<CompilerError>())
   })
 }
