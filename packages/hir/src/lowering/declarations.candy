@@ -98,7 +98,9 @@ public trait HasDeclarations {
   /// Getter for ast declarations, but type unsafe. Still useful if it's immediately followed by
   /// `whereType()`.
 
-  fun syntheticDeclarations(context: QueryContext<List<CompilerError>>): List<HirSyntheticDeclaration>
+  fun syntheticDeclarations(context: QueryContext<List<CompilerError>>): List<HirSyntheticDeclaration> {
+    List.empty<HirSyntheticDeclaration>()
+  }
 
   fun syntheticDeclaration(context: QueryContext<List<CompilerError>>): Maybe<HirSyntheticDeclaration> {
     query<Maybe<HirSyntheticDeclaration>, List<CompilerError>>(
@@ -406,79 +408,6 @@ impl HirTrait: HasAst<AstTrait> & HasDeclarations & HasTypeParameters & HasVisib
     )
   }
 
-  fun syntheticDeclarations(context: QueryContext<List<CompilerError>>): List<HirSyntheticDeclaration> {
-    let functionsFromUpperBounds = (this.upperBound(context) as Iterable<HirNamedType | HirErrorType>)
-      .whereType<HirNamedType>()
-      .expand<DataTuple2<HirFunction, Map<HirInlineType, HirInlineType>>({ upperBound =>
-        (upperBound as HirInlineType).allFunctionsWithSubstitutions().items
-          .map<DataTuple2<HirFunction, Map<HirInlineType, HirInlineType>>>({
-            DataTuple2<HirFunction, Map<HirInlineType, HirInlineType>>(
-              it.first,
-              substituteSubstitutionMap(it.second, upperBound.substitutionMap(context)),
-            )
-          })
-      })
-      .unsafeToSet()
-
-    let ourFunctions = (this.innerDeclarations(context) as Iterable<HirDeclaration>)
-      .whereType<HirFunction>()
-      .toList()
-    let parentFunctionsOfOurFunctions = (ourFunctions as Iterable<HirFunction>)
-      .map<HirFunction>({ it.parentFunction(context) })
-      .unsafeToSet()
-    let functions = functionsFromUpperBounds.items()
-      .whereNot({ parentFunctionsOfOurFunctions.contains(it) })
-      .unsafeToSet()
-
-    mut let nextDisambiguator = (ourFunctions as Iterable<HirFunction>)
-      .maxBy<Int>({ it.disambiguator })
-      .map<Int>({ it.disambiguator + 1 })
-      .orElse({ 0 })
-    leafFunctionsWithSubstitutionsFromSet(functions).items
-      .map<HirSyntheticDeclaration>({
-        let oldFunction = it.first
-        let substitutionMap = it.second
-
-        let disambiguator = nextDisambiguator
-        nextDisambiguator = nextDisambiguator + 1
-
-        let newFunction = HirFunction(this, oldFunction.name(), disambiguator, true)
-        HirSyntheticFunction(
-          newFunction,
-          List.empty<String>(),
-          oldFunction.name(),
-          (oldFunction.typeParameters(context) as Iterable<HirParameterType>)
-            .map<HirSyntheticTypeParameter>({
-              HirSyntheticTypeParameter(
-                it.name,
-                it.upperBound(context).substitute(substitutionMap),
-              )
-            })
-            .toList(),
-          (oldFunction.valueParameters(context) as Iterable<HirValueParameter>)
-            .map<HirSyntheticValueParameter>({
-              HirSyntheticValueParameter(
-                it.name,
-                it.type(context).substitute(substitutionMap),
-              )
-            })
-            .toList(),
-          oldFunction.returnType(context).substitute(substitutionMap),
-          lowerFunctionBody(oldFunction).map<HirSyntheticBody>({
-            HirSyntheticBody(
-              (it.uris as Iterable<HirValueExpressionUri>)
-                .map<HirValueExpressionUri>({ HirValueExpressionUri(this, it.index) })
-                .toList(),
-              it.expressions.map<HirValueExpressionUri, HirValueExpression>({ uri, expression =>
-                (uri, expression.copyToFunction(context, oldFunction, newFunction))
-              }),
-            )
-          }),
-        )
-      })
-      .toList()
-  }
-
   fun typeParameters(context: QueryContext<List<CompilerError>>): List<HirParameterType> {
     query<List<HirParameterType>, List<CompilerError>>(context, "HirTrait.typeParameters", this, {
       Tuple(
@@ -531,57 +460,6 @@ impl HirImpl: HasAst<AstImpl> & HasDeclarations & HasTypeParameters {
       })
       Tuple(declarations, List.empty<CompilerError>())
     })
-  }
-
-  fun syntheticDeclarations(context: QueryContext<List<CompilerError>>): List<HirSyntheticDeclaration> {
-    if (this.isSynthetic()) { return List.empty<HirSyntheticDeclaration>() }
-    it.implementedTrait(context)
-      .maybeMap<HirNamedType>({
-        if (this is HirErrorType) { return None() }
-        Some<HirNamedType>(this as HirNamedType)
-      })
-      .map<List<HirSyntheticDeclaration>>({
-        let trait = (it.declaration as HirTrait)
-        let parentFunctions = (trait.declarations(context) as Iterable<HirDeclaration>)
-          .cast<HirFunction>()
-        let overwrittenFunctions = this.realDeclarations(context)
-          .whereType<HirFunction>()
-          .map<HirFunction>({ it.parentFunction(context) })
-          .toSet()
-        let nonOverwrittenFunctions = parentFunctions
-          .where({ !overwrittenFunctions.contains(it) })
-          .toList()
-        let upperBound = trait.upperBound(context)
-        let substitutions = upperBound.substitutionMap(context)
-        nonOverwrittenFunctions
-          .map<HirSyntheticDeclaration>({
-            HirSyntheticFunction(
-              it,
-              it.modifiers,
-              it.name.value,
-              it.typeParameters(context)
-                .map<HirSyntheticTypeParameter>({
-                  HirSyntheticTypeParameter(it.name.value, it.upperBound.substitute(substitutions))
-                })
-                .toList(),
-              it.valueParameters(context)
-                .map<HirSyntheticValueParameter>({
-                  HirSyntheticValueParameter(
-                    it.name.value,
-                    it.type.substitute(substitutions),
-                    it.defaultValue.map<HirSyntheticExpression>({
-                      // TODO: Lower default value to HirSyntheticExpressions.
-                    }),
-                  )
-                })
-                .toList(),
-              it.returnType(context),
-              it.body(context), // TODO: Lower to HirSyntheticBody
-            )
-          })
-          .toList()
-      })
-      .orElse({ List.empty<HirSyntheticDeclaration>() })
   }
 
   fun typeParameters(context: QueryContext<List<CompilerError>>): List<HirParameterType> {

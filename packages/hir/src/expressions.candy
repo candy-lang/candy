@@ -20,103 +20,6 @@ impl HirValueExpressionUri: Equals & Hash {
 }
 public trait HirValueExpression {
   fun type(context: QueryContext<List<CompilerError>>): HirInlineType
-  fun copyToFunction(
-    context: QueryContext,
-    newFunction: HirFunction,
-    implementedType: HirNamedType,
-  ): This { this }
-}
-fun copyInlineTypeToFunction(
-  context: QueryContext,
-  inlineType: HirInlineType,
-  newFunction: HirFunction,
-  implementedType: HirNamedType,
-): HirInlineType {
-  if (inlineType is HirErrorType) { return inlineType }
-  if (inlineType is HirNamedType) {
-    return HirNamedType(
-      (inlineType as HirNamedType).declaration,
-      ((inlineType as HirNamedType).parameterTypes as Iterable<HirInlineType>)
-        .map<HirInlineType>({ copyInlineTypeToFunction(context, it, newFunction, implementedType) })
-        .toList(),
-    )
-  }
-  if (inlineType is HirFunctionType) {
-    let inlineType = (inlineType as HirFunctionType)
-    return HirFunctionType(
-      inlineType.receiverType.map<HirInlineType>({
-        copyInlineTypeToFunction(context, it, newFunction, implementedType)
-      }),
-      (inlineType.parameterTypes as Iterable<HirInlineType>)
-        .map<HirInlineType>({ copyInlineTypeToFunction(context, it, newFunction, implementedType) })
-        .toList(),
-      copyInlineTypeToFunction(context, inlineType.returnType, newFunction, implementedType),
-    )
-  }
-  if (inlineType is HirStructType) {
-    return HirStructType(
-      ((inlineType as HirStructType).types as Iterable<(String, HirInlineType)>)
-        .map<(String, HirInlineType)>({
-          Tuple(
-            it.first,
-            copyInlineTypeToFunction(context, it.second, newFunction, implementedType),
-          )
-        })
-        .toList(),
-    )
-  }
-  if (inlineType is HirEnumType) {
-    return HirEnumType(
-      (inlineType as HirEnumType).variants.map<String, Maybe<HirInlineType>>({ key, value =>
-        Tuple(
-          key,
-          value.map<HirInlineType>({
-            copyInlineTypeToFunction(context, it, newFunction, implementedType)
-          }),
-        )
-      }),
-    )
-  }
-  if (inlineType is HirIntersectionType) {
-    return HirIntersectionType(
-      ((inlineType as HirIntersectionType).types as Iterable<HirInlineType>)
-        .map<HirInlineType>({
-          copyInlineTypeToFunction(context, it.second, newFunction, implementedType)
-        })
-        .toList(),
-    )
-  }
-  if (inlineType is HirThisType) {
-    return newFunction.thisType(context).unwrap()
-  }
-  if (inlineType is HirParameterType) {
-    let inlineType = (inlineType as HirParameterType)
-    if (inlineType.declaration is HirTrait) {
-      let parentTrait = (implementedType.declaration as HirTrait)
-      let parameterIndex = parentTrait.typeParameters(context)
-        .singleIndexWhere({ it.name == inlineType.name })
-        .unwrap()
-      return implementedType.parameterTypes.get(parameterIndex).unwrap()
-    }
-    if (inlineType.declaration is HirImpl) {
-      // TODO(soon)
-    }
-    if (inlineType.declaration is HirType) {
-      throw "Function {newFunction} contains impossible type parameter reference to {inlineType}."
-    }
-    if (inlineType.declaration is HirFunction) {
-      let newFunctionTypeParameters = (newFunction.typeParameters(context) as Iterable<HirParameterType>)
-      let newTypeParameter = newFunctionTypeParameters.singleWhere({ it.name == inlineType.name })
-      assert(
-        newTypeParameter is Some,
-        "Overwritten function {newFunction} is missing type parameter {inlineType} of its parent function.",
-      )
-      return newTypeParameter.unwrap()
-    }
-    throw "Unknown declaratoin of `HirParameterType`: {inlineType}"
-  }
-  if (inlineType is HirReflectionType) { return inlineType }
-  throw "Unknown inline type: {inlineType}"
 }
 impl HirValueExpression: Equals & Hash
 
@@ -184,21 +87,6 @@ impl HirLambdaValueExpression: HirValueExpression & Equals & Hash {
       this.returnType,
     )
   }
-  fun copyToFunction(
-    context: QueryContext,
-    newFunction: HirFunction,
-    implementedType: HirNamedType,
-  ): This {
-    HirLambdaValueExpression(
-      (this.parameters as Iterable<HirLambdaValueParameter>)
-        .map<HirLambdaValueParameter>({ it.copyToFunction(context, newFunction) })
-        .toList(),
-      (this.expressions as Iterable<HirValueExpressionUri>)
-        .map<HirValueExpressionUri>({ HirValueExpressionUri(newFunction, it.index) })
-        .toList(),
-      copyInlineTypeToFunction(context, this.returnType, newFunction),
-    )
-  }
 
   fun equals(other: This): Bool {
     (parameters as Equals) == (other.parameters as Equals)
@@ -216,18 +104,6 @@ public class HirLambdaValueParameter {
   public let lambdaUri: HirValueExpressionUri
   public let name: String
   public let type_: HirInlineType
-
-  fun copyToFunction(
-    context: QueryContext,
-    newFunction: HirFunction,
-    implementedType: HirNamedType,
-  ): HirLambdaValueParameter {
-    HirLambdaValueParameter(
-      HirValueExpressionUri(newFunction, this.lambdaUri.index),
-      this.name,
-      copyInlineTypeToFunction(context, this.type_, newFunction, implementedType),
-    )
-  }
 }
 impl HirLambdaValueParameter: Equals & Hash {
   fun equals(other: This): Bool {
@@ -251,13 +127,6 @@ public class HirThisValueExpression {
 }
 impl HirThisValueExpression: HirValueExpression & Equals & Hash {
   fun type(context: QueryContext<List<CompilerError>>): HirInlineType { this.thisType }
-  fun copyToFunction(
-    context: QueryContext,
-    newFunction: HirFunction,
-    implementedType: HirNamedType,
-  ): HirThisValueExpression {
-    HirThisValueExpression(copyInlineTypeToFunction(context, this.thisType, newFunction, implementedType))
-  }
 
   fun equals(other: This): Bool { (this.thisType as Equals) == (other.thisType as Equals) }
   fun hash<T>(hasher: Hasher<T>) { (this.thisType as Hash).hash<T>(hasher) }
@@ -281,21 +150,6 @@ impl HirParameterReferenceValueExpression: HirValueExpression & Equals & Hash {
       (this.parameter as HirValueParameter).type(context)
     } else {
       (this.parameter as HirLambdaValueParameter).type_
-    }
-  }
-  fun copyToFunction(
-    context: QueryContext,
-    newFunction: HirFunction,
-    implementedType: HirNamedType,
-  ): This {
-    if (this.parameter is HirValueParameter) {
-      HirParameterReferenceValueExpression(
-        HirValueParameter(newFunction, (this.parameter as HirValueParameter).name),
-      )
-    } else {
-      HirParameterReferenceValueExpression(
-        (this.parameter as HirLambdaValueParameter).copyToFunction(context, newFunction, implementedType),
-      )
     }
   }
 
@@ -329,63 +183,6 @@ public class HirFunctionCallValueExpression {
 }
 impl HirFunctionCallValueExpression: HirValueExpression & Equals & Hash {
   fun type(context: QueryContext<List<CompilerError>>): HirInlineType { this.returnType }
-  fun copyToFunction(
-    context: QueryContext,
-    newFunction: HirFunction,
-    implementedType: HirNamedType,
-  ): This {
-    // TODO(never): tighten `this.function` if the receiver's type is `This`
-    HirFunctionCallValueExpression(
-      receiver.map<HirValueExpressionUri | HirTypeExpression>({
-        if (it is HirValueExpressionUri) {
-          HirValueExpressionUri(newFunction, (it as HirValueExpressionUri).index)
-        } else {
-          it
-        }
-      }),
-      this.receiver
-        .map<HirFunction>({
-          if (it is HirValueExpressionUri) {
-            if ((it as HirValueExpressionUri).type(context) is HirThisType) {
-              let thisType = ((it as HirValueExpressionUri).type(context) as HirThisType)
-
-              // function is already defined on `this` directly
-              assert(
-                !(this.function.parent is HirModule),
-                "Module-level function called on a receiver.",
-              )
-              if (this.function.parent is HirTrait) {
-                if ((this.function.parent as HirTrait).thisType(context).declaration
-                  == thisType.declaration) {
-                  // TODO(never): tighten this to the synthetic, overwritten variant
-                  return this.function
-                }
-              }
-              if (this.function.parent is HirImpl) {
-                if ((this.function.parent as HirImpl).baseType(context).declaration
-                  == thisType.declaration) {
-                  // TODO(never): tighten this to the synthetic, overwritten variant
-                  return this.function
-                }
-              }
-
-              // function is defined in a parent trait
-              // TODO(soon)
-              // function is defined in some impl
-              // TODO(soon)
-            }
-          }
-          this.function
-        })
-        .orElse({ this.function })
-      this.typeArguments.map<String, HirInlineType>({ key, value =>
-        Tuple(key, copyInlineTypeToFunction(context, value, newFunction, implementedType))
-      }),
-      this.valueArguments.map<String, HirValueExpressionUri>({ key, value =>
-        Tuple(key, HirValueExpressionUri(function, value.index))
-      }),
-    )
-  }
 
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
@@ -420,26 +217,6 @@ public class HirValueExpressionCallValueExpression {
 }
 impl HirValueExpressionCallValueExpression: HirValueExpression & Equals & Hash {
   fun type(context: QueryContext<List<CompilerError>>): HirInlineType { this.returnType }
-  fun copyToFunction(
-    context: QueryContext,
-    newFunction: HirFunction,
-    implementedType: HirNamedType,
-  ): This {
-    HirValueExpressionCallValueExpression(
-      HirValueExpressionUri(newFunction, this.receiver.index),
-      copyInlineTypeToFunction(context, this.returnType, newFunction, implementedType),
-      (this.typeArguments as Iterable<HirInlineType>)
-        .map<HirInlineType>({ key, value =>
-          Tuple(key, copyInlineTypeToFunction(context, value, newFunction, implementedType))
-        })
-        .toList(),
-      (this.valueArguments as Iterable<HirValueExpressionUri>)
-        .map<String, HirValueExpressionUri>({ key, value =>
-          Tuple(key, HirValueExpressionUri(newFunction, value.index))
-        })
-        .toList(),
-    )
-  }
 
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
@@ -475,19 +252,6 @@ impl HirTypeInstantiationValueExpression: HirValueExpression & Equals & Hash {
         .toList(),
     )
   }
-  fun copyToFunction(
-    context: QueryContext,
-    newFunction: HirFunction,
-    implementedType: HirNamedType,
-  ): This {
-    HirTypeInstantiationValueExpression(
-      this.receiver,
-      this.typeArguments.map<String, HirInlineType>({ key, value =>
-        Tuple(key, copyInlineTypeToFunction(context, value, newFunction, implementedType))
-      }),
-      HirValueExpressionUri(newFunction, this.valueArgument.index),
-    )
-  }
 
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
@@ -511,23 +275,6 @@ impl HirStructValueExpression: HirValueExpression & Equals & Hash {
   fun type(context: QueryContext<List<CompilerError>>): HirInlineType {
     HirStructType(this.fields.entries.map<(String, HirInlineType)>({ it.second }).toList())
   }
-  fun copyToFunction(
-    context: QueryContext,
-    newFunction: HirFunction,
-    implementedType: HirNamedType,
-  ): This {
-    HirStructValueExpression(
-      this.fields.map<String, DataTuple2<HirValueExpressionUri, HirInlineType>>({ key, value =>
-        Tuple(
-          key,
-          DataTuple2<HirValueExpressionUri, HirInlineType>(
-            HirValueExpressionUri(newFunction, value.first.index),
-            copyInlineTypeToFunction(context, value.second, newFunction, implementedType),
-          ),
-        )
-      }),
-    )
-  }
 
   fun equals(other: This): Bool { (fields as Equals) == (other.fields as Equals) }
   fun hash<T>(hasher: Hasher<T>) { fields.hash<T>(hasher) }
@@ -545,13 +292,6 @@ impl HirTypeValueValueExpression: HirValueExpression & Equals & Hash {
     (wrapperType.declaration as HirType)
       .type(context.global.context)
       .map<HirInlineType>({ it.substitute(wrapperType.substitutionMap(context.global.context)) })
-  }
-  fun copyToFunction(
-    context: QueryContext,
-    newFunction: HirFunction,
-    implementedType: HirNamedType,
-  ): This {
-    HirTypeValueValueExpression(HirValueExpressionUri(newFunction, this.receiver.index))
   }
 
   fun equals(other: This): Bool { (receiver as Equals) == (other.receiver as Equals) }
@@ -575,16 +315,6 @@ impl HirStructFieldAccessValueExpression: HirValueExpression & Equals & Hash {
       .singleWhere({ it.first == this.name })
       .unwrap()
       .second
-  }
-  fun copyToFunction(
-    context: QueryContext,
-    newFunction: HirFunction,
-    implementedType: HirNamedType,
-  ): This {
-    HirStructFieldAccessValueExpression(
-      HirValueExpressionUri(newFunction, this.receiver.index),
-      this.name,
-    )
   }
 
   fun equals(other: This): Bool {
@@ -612,16 +342,6 @@ public class HirReturnValueExpression {
 impl HirReturnValueExpression: HirValueExpression & Equals & Hash {
   fun type(context: QueryContext<List<CompilerError>>): HirInlineType {
     HirNamedType.coreNever(context)
-  }
-  fun copyToFunction(
-    context: QueryContext,
-    newFunction: HirFunction,
-    implementedType: HirNamedType,
-  ): This {
-    HirReturnValueExpression(
-      newFunction,
-      HirValueExpressionUri(newFunction, this.expression.index),
-    )
   }
 
   fun equals(other: This): Bool {
