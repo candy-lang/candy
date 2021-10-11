@@ -282,20 +282,22 @@ impl HirStructValueExpression: HirValueExpression & Equals & Hash {
 
 /// An access of a `HirType`'s value.
 ///
-/// Example: `foo value` (maybe)
+/// Example: `foo value`
 public class HirTypeValueValueExpression {
   public let receiver: HirValueExpressionUri
+  public let type_: HirInlineType
 }
 impl HirTypeValueValueExpression: HirValueExpression & Equals & Hash {
-  fun type(context: QueryContext<List<CompilerError>>): HirInlineType {
-    let wrapperType = (resolveHirValueExpressionUri(this.receiver).type(context) as HirNamedType)
-    (wrapperType.declaration as HirType)
-      .type(context.global.context)
-      .map<HirInlineType>({ it.substitute(wrapperType.substitutionMap(context.global.context)) })
-  }
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType { this.type_ }
 
-  fun equals(other: This): Bool { (receiver as Equals) == (other.receiver as Equals) }
-  fun hash<T>(hasher: Hasher<T>) { receiver.hash<T>(hasher) }
+  fun equals(other: This): Bool {
+    (this.receiver as Equals) == (other.receiver as Equals)
+      && (this.type_ as Equals) == (other.type_ as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    this.receiver.hash<T>(hasher)
+    (this.type_ as Hash).hash<T>(hasher)
+  }
 }
 
 /// An access of a struct's field.
@@ -307,23 +309,20 @@ impl HirTypeValueValueExpression: HirValueExpression & Equals & Hash {
 public class HirStructFieldAccessValueExpression {
   public let receiver: HirValueExpressionUri
   public let name: String
+  public let type_: HirInlineType
 }
 impl HirStructFieldAccessValueExpression: HirValueExpression & Equals & Hash {
-  fun type(context: QueryContext<List<CompilerError>>): HirInlineType {
-    let structType = (resolveHirValueExpressionUri(this.receiver).type(context) as HirStructType)
-    (structType.types as Iterable<(String, HirInlineType)>)
-      .singleWhere({ it.first == this.name })
-      .unwrap()
-      .second
-  }
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType { this.type_ }
 
   fun equals(other: This): Bool {
-    (receiver as Equals) == (other.receiver as Equals)
-      && (name as Equals) == (other.name as Equals)
+    (this.receiver as Equals) == (other.receiver as Equals)
+      && (this.name as Equals) == (other.name as Equals)
+      && (this.type_ as Equals) == (other.type_ as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
-    receiver.hash<T>(hasher)
-    name.hash<T>(hasher)
+    this.receiver.hash<T>(hasher)
+    this.name.hash<T>(hasher)
+    this.type_.hash<T>(hasher)
   }
 }
 
