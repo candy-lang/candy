@@ -558,6 +558,7 @@ impl LoweringContext {
       let receiver = astExpression.receiver
 
       let contextAndNameAndReceiver: (LoweringContext, String, Maybe<HirValueExpressionUri | HirTypeExpression> ) = if (receiver is AstIdentifierExpression) {
+        // TODO(soon, JonasWanke): use type arguments
         Tuple(
           this,
           (receiver as AstIdentifierExpression).value.value,
@@ -584,6 +585,7 @@ impl LoweringContext {
       let name = contextAndNameAndReceiver.second
       let receiver = contextAndNameAndReceiver.third
 
+      // TODO(soon, JonasWanke): lower type instantiations
       let functions = receiver
         .map<List<HirFunction>>({ receiver =>
           if (receiver is HirValueExpressionUri) {

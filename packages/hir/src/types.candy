@@ -26,6 +26,7 @@ impl HirErrorType: Equals & Hash & HirInlineType {
 
 public class HirNamedType {
   public let declaration: HirTrait | HirType
+  // TODO(never, JonasWanke): rename this to `typeArguments`
   public let parameterTypes: List<HirInlineType>
 
   static fun coreAny(context: QueryContext<List<CompilerError>>): HirNamedType {
