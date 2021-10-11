@@ -99,17 +99,14 @@ class LoweringContext {
       Map.empty<String, HirValueExpressionUri>(),
     )
 
-    if (function.parent is HirTrait | HirImpl && !function.isStatic(context)) {
-      let result = loweringContext.register(
-        HirThisValueExpression(),
-        HirThisType(function.parent as HirTrait | HirImpl),
-      )
+    function.thisType(context).do({
+      let result = loweringContext.register(HirThisValueExpression(it))
       loweringContext = LoweringContext(
         result.first.global,
         result.first.parent,
         result.first.localProperties.copyAndSet("this", result.second),
       )
-    }
+    })
 
     for parameter in function.valueParameters(context) {
       // TODO(never, marcelgarus): `this` is not a valid parameter name.

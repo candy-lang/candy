@@ -327,6 +327,18 @@ impl HirType {
 }
 
 impl HirFunction {
+  fun thisType(context: QueryContext<List<CompilerError>>): Maybe<HirThisType> {
+    query<HirInlineType, List<CompilerError>>(context, "HirFunction.thisType", this, {
+      Tuple(
+        if (this.parent is HirTrait | HirImpl && !this.isStatic(context)) {
+          Some<HirThisType>(HirThisType(this.parent as HirTrait | HirImpl))
+        } else {
+          None<HirThisType>()
+        },
+        List.empty<CompilerError>(),
+      )
+    })
+  }
   fun returnType(context: QueryContext<List<CompilerError>>): HirInlineType {
     query<HirInlineType, List<CompilerError>>(context, "HirFunction.returnType", this, {
       Tuple(
