@@ -162,7 +162,7 @@ impl LoweringContext {
         Set.of1<HirValueExpressionUri | HirModule | HirType | HirTrait | HirFunction | HirParameterType>(it)
       })
       .orElse({
-        // TODO(JonasWanke): Check type parameters of the function.
+        // TODO(soon, JonasWanke): Check type parameters of the function.
         this.parent
           .map<Set<HirValueExpressionUri | HirModule | HirType | HirTrait | HirFunction | HirParameterType>>({
             it.resolve(name)
