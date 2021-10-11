@@ -825,3 +825,20 @@ impl HirInlineType {
     })
   }
 }
+
+public fun leafFunctionsWithSubstitutionsFromSet(
+  context: QueryContext<List<CompilerError>>,
+  functions: Set<DataTuple2<HirFunction, Map<HirInlineType, HirInlineType>>>,
+): Set<DataTuple2<HirFunction, Map<HirInlineType, HirInlineType>>> {
+  query<Set<DataTuple2<HirFunction, Map<HirInlineType, HirInlineType>>>, List<CompilerError>>(
+    context, "leafFunctionsWithSubstitutionsFromSet",
+    DataTuple2<HirInlineType, Set<DataTuple2<HirFunction, Map<HirInlineType, HirInlineType>>>>(this, functions), {
+    let parentFunctions = functions.items()
+      .map<HirFunction>({ it.first.parentFunction(context) })
+      .unsafeToSet()
+    let functions = functions.items()
+      .whereNot({ parentFunction.contains(it) })
+      .unsafeToSet()
+    Tuple(functions, List.empty<CompilerError>())
+  })
+}
