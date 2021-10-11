@@ -691,9 +691,28 @@ impl LoweringContext {
     receiver: Maybe<HirValueExpressionUri | HirTypeExpression>,
     typeArguments: List<AstTypeArgument>,
     valueArguments: List<AstValueArgument>,
-    substitutions: Map<HirInlineType, HirInlineType>,
+    // substitutions: Map<HirInlineType, HirInlineType>,
   ): (LoweringContext, HirValueExpressionUri, Bool) {
     mut let context = this
+
+    let substitutions = receiver
+      .map<Map<HirInlineType, HirInlineType>>({
+        let type = if (it is HirValueExpressionUri) {
+          context.typeOf(it as HirValueExpressionUri)
+        } else {
+          (it as HirTypeExpression).type
+        }
+        if (type is HirNamedType) {
+          return (type as HirNamedType).substitutionMap(context)
+        } else {
+          assert(
+            type is HirErrorType,
+            "Function call with a receiver that's not a named nor an error type.",
+          )
+          return Map.empty<HirInlineType, HirInlineType>()
+        }
+      })
+      .orElse({ Map.empty<HirInlineType, HirInlineType>() })
 
     // Type Arguments
     let typeArguments = (typeArguments as Iterable<AstTypeArgument>)
