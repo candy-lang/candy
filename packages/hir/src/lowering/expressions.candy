@@ -704,7 +704,6 @@ impl LoweringContext {
     receiver: Maybe<HirValueExpressionUri | HirTypeExpression>,
     typeArguments: List<AstTypeArgument>,
     valueArguments: List<AstValueArgument>,
-    // substitutions: Map<HirInlineType, HirInlineType>,
   ): (LoweringContext, HirValueExpressionUri, Bool) {
     mut let context = this
 
