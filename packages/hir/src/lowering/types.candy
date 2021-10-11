@@ -1082,7 +1082,7 @@ impl HirThisType {
       let baseType = if (this.declaration is HirTrait) {
         (this.declaration as HirTrait).thisType(context)
       } else {
-        (this.declaration as HirType).thisType(context)
+        (this.declaration as HirImpl).baseType(context)
       }
       Tuple(baseType, List.empty<CompilerError>())
     })
