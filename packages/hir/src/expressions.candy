@@ -195,19 +195,16 @@ impl HirValueExpressionCallValueExpression: HirValueExpression & Equals & Hash {
 /// * `Foo()`
 /// * `Bar[Blub](foo, something)`
 public class HirTypeInstantiationValueExpression {
-  public let receiver: HirInlineType
-  public let typeArguments: Map<String, HirType>
+  public let receiver: HirNamedType
   public let valueArgument: HirValueExpressionUri
 }
 impl HirTypeInstantiationValueExpression: HirValueExpression & Equals & Hash {
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
-      && (typeArguments as Equals) == (other.typeArguments as Equals)
       && (valueArgument as Equals) == (other.valueArgument as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (receiver as Hash).hash<T>(hasher)
-    (typeArguments as Hash).hash<T>(hasher)
     (valueArgument as Hash).hash<T>(hasher)
   }
 }
