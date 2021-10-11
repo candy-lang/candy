@@ -407,12 +407,76 @@ impl HirTrait: HasAst<AstTrait> & HasDeclarations & HasTypeParameters & HasVisib
   }
 
   fun syntheticDeclarations(context: QueryContext<List<CompilerError>>): List<HirSyntheticDeclaration> {
-    (this.upperBound(context) as Iterable<HirNamedType | HirErrorType>)
+    let functionsFromUpperBounds = (this.upperBound(context) as Iterable<HirNamedType | HirErrorType>)
       .whereType<HirNamedType>()
-      .map<>({
-        (it as HirInlineType).allFunctionsWithSubstitutions()
+      .expand<DataTuple2<HirFunction, Map<HirInlineType, HirInlineType>>({ upperBound =>
+        (upperBound as HirInlineType).allFunctionsWithSubstitutions().items
+          .map<DataTuple2<HirFunction, Map<HirInlineType, HirInlineType>>>({
+            DataTuple2<HirFunction, Map<HirInlineType, HirInlineType>>(
+              it.first,
+              substituteSubstitutionMap(it.second, upperBound.substitutionMap(context)),
+            )
+          })
       })
-    List.empty<HirSyntheticDeclaration>()
+      .unsafeToSet()
+
+    let ourFunctions = (this.innerDeclarations(context) as Iterable<HirDeclaration>)
+      .whereType<HirFunction>()
+      .toList()
+    let parentFunctionsOfOurFunctions = (ourFunctions as Iterable<HirFunction>)
+      .map<HirFunction>({ it.parentFunction(context) })
+      .unsafeToSet()
+    let functions = functionsFromUpperBounds.items()
+      .whereNot({ parentFunctionsOfOurFunctions.contains(it) })
+      .unsafeToSet()
+
+    mut let nextDisambiguator = (ourFunctions as Iterable<HirFunction>)
+      .maxBy<Int>({ it.disambiguator })
+      .map<Int>({ it.disambiguator + 1 })
+      .orElse({ 0 })
+    leafFunctionsWithSubstitutionsFromSet(functions).items
+      .map<HirSyntheticDeclaration>({
+        let oldFunction = it.first
+        let substitutionMap = it.second
+
+        let disambiguator = nextDisambiguator
+        nextDisambiguator = nextDisambiguator + 1
+
+        let newFunction = HirFunction(this, oldFunction.name(), disambiguator, true)
+        HirSyntheticFunction(
+          newFunction,
+          List.empty<String>(),
+          oldFunction.name(),
+          (oldFunction.typeParameters(context) as Iterable<HirParameterType>)
+            .map<HirSyntheticTypeParameter>({
+              HirSyntheticTypeParameter(
+                it.name,
+                it.upperBound(context).substitute(substitutionMap),
+              )
+            })
+            .toList(),
+          (oldFunction.valueParameters(context) as Iterable<HirValueParameter>)
+            .map<HirSyntheticValueParameter>({
+              HirSyntheticValueParameter(
+                it.name,
+                it.type(context).substitute(substitutionMap),
+              )
+            })
+            .toList(),
+          oldFunction.returnType(context).substitute(substitutionMap),
+          lowerFunctionBody(oldFunction).map<HirSyntheticBody>({
+            HirSyntheticBody(
+              (it.uris as Iterable<HirValueExpressionUri>)
+                .map<HirValueExpressionUri>({ HirValueExpressionUri(this, it.index) })
+                .toList(),
+              it.expressions.map<HirValueExpressionUri, HirValueExpression>({ uri, expression =>
+                (uri, expression.copyToFunction(context, oldFunction, newFunction))
+              }),
+            )
+          }),
+        )
+      })
+      .toList()
   }
 
   fun typeParameters(context: QueryContext<List<CompilerError>>): List<HirParameterType> {
@@ -611,15 +675,23 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
   fun isStatic(context: QueryContext<List<CompilerError>>): Bool {
     query<Bool, List<CompilerError>>(context, "HirFunction.isStatic", this, {
       // TODO(never, JonasWanke): This should resolve modifier names when we support custom annotations.
-      let modifiers = (ast(context).modifiers as Iterable<AstIdentifier>)
-      Tuple(modifiers.any({ it.value == "static" }), List.empty<CompilerError>())
+      let modifiers = this.syntheticDeclaration(context)
+          .map<Iterable<String>>({ (it as HirSyntheticFunction).modifiers })
+          .orElse({ (ast(context).modifiers as Iterable<AstIdentifier>).map<String>({ it.value}) })
+      Tuple(modifiers.any({ it == "static" }), List.empty<CompilerError>())
     })
   }
 
   fun typeParameters(context: QueryContext<List<CompilerError>>): List<HirParameterType> {
     query<List<HirParameterType>, List<CompilerError>>(context, "HirFunction.typeParameters", this, {
       Tuple(
-        hirParameterTypesFromAstTypeParameters(this, ast(context).typeParameters),
+        this.syntheticDeclaration(context)
+          .map<List<HirTypeParameter>>({
+            ((it as HirSyntheticFunction).typeParameters as Iterable<HirSyntheticTypeParameter>)
+              .map<HirTypeParameter>({ HirTypeParameter(this, it.name) })
+              .toList()
+          })
+          .else({ hirParameterTypesFromAstTypeParameters(this, ast(context).typeParameters) }),
         List.empty<CompilerError>(),
       )
     })
@@ -628,9 +700,17 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
   fun valueParameters(context: QueryContext<List<CompilerError>>): List<HirValueParameter> {
     query<List<HirValueParameter>, List<CompilerError>>(context, "HirFunction.valueParameters", this, {
       Tuple(
-        (ast(context).valueParameters as Iterable<AstValueParameter>)
-          .map<HirValueParameter>({ HirValueParameter(this, it.name.value) })
-          .toList(),
+        this.syntheticDeclaration(context)
+          .map<List<HirValueParameter>>({
+            ((it as HirSyntheticFunction).valueParameters as Iterable<HirSyntheticValueParameter>)
+              .map<HirValueParameter>({ HirValueParameter(this, it.name) })
+              .toList()
+          })
+          .else({
+            (ast(context).valueParameters as Iterable<AstValueParameter>)
+              .map<HirValueParameter>({ HirValueParameter(this, it.name.value) })
+              .toList()
+          }),
         List.empty<CompilerError>(),
       )
     })
@@ -638,6 +718,7 @@ impl HirFunction: HasAst<AstFunction> & HasDeclarations & CanBeStatic & HasTypeP
 
   fun isPublic(context: QueryContext<List<CompilerError>>): Bool {
     query<Bool, List<CompilerError>>(context, "HirFunction.isPublic", this, {
+      // TODO(soon): support synthetic functions
       Tuple(isPublicFromModifiers(ast(context).modifiers), List.empty<CompilerError>())
     })
   }
