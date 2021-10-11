@@ -74,7 +74,7 @@ public fun resolveHirValueExpressionUri(
 class BodyGlobalState {
   let context: QueryContext<List<CompilerError>>
   let function: HirFunction
-  let expressions: Map<HirValueExpressionUri, (HirValueExpression, HirInlineType)>
+  let expressions: Map<HirValueExpressionUri, HirValueExpression>
   mut let nextExpressionId: Int
   let errors: List<CompilerError>
 }
@@ -110,10 +110,7 @@ class LoweringContext {
 
     for parameter in function.valueParameters(context) {
       // TODO(never, marcelgarus): `this` is not a valid parameter name.
-      let result = loweringContext.register(
-        HirParameterReferenceValueExpression(parameter),
-        parameter.type(context),
-      )
+      let result = loweringContext.register(HirParameterReferenceValueExpression(parameter))
       loweringContext = LoweringContext(
         result.first.global,
         result.first.parent,
@@ -124,17 +121,14 @@ class LoweringContext {
   }
 }
 impl LoweringContext {
-  fun register(
-    expression: HirValueExpression,
-    expressionType: HirInlineType,
-  ): (LoweringContext, HirValueExpressionUri) {
+  fun register(expression: HirValueExpression): (LoweringContext, HirValueExpressionUri) {
     let uri = HirValueExpressionUri(this.global.function, this.global.nextExpressionId)
     Tuple(
       LoweringContext(
         BodyGlobalState(
           this.global.context,
           this.global.function,
-          this.global.expressions.copyAndSet(uri, Tuple(expression, expressionType)),
+          this.global.expressions.copyAndSet(uri, expression),
           this.global.nextExpressionId + 1,
           this.global.errors,
         ),
@@ -157,7 +151,7 @@ impl LoweringContext {
       this.parent,
       this.localProperties,
     )
-    contextWithError.register(HirErrorValueExpression(), HirErrorType())
+    contextWithError.register(HirErrorValueExpression())
   }
 
   fun resolve(
@@ -212,25 +206,18 @@ impl LoweringContext {
     expression: AstExpression,
   ): (LoweringContext, HirValueExpressionUri | HirTypeExpression | HirModuleExpression) {
     if (expression is AstIntExpression) {
-      return this.register(
-        HirIntValueExpression((expression as AstIntExpression).value),
-        HirNamedType.coreInt(this.global.context),
-      )
+      return this.register(HirIntValueExpression((expression as AstIntExpression).value))
     }
 
     if (expression is AstStringExpression) {
       // For String expressions, the interpolation is desugared string into multiple calls to `+`.
       // "{name} is a great {type}" -> "" + name + " is a great " + type
-      mut let result = this.register(
-        HirStringValueExpression(""),
-        HirNamedType.coreString(this.global.context),
-      )
+      mut let result = this.register(HirStringValueExpression(""))
 
       for part in (expression as AstStringExpression).parts {
         let expressionToAdd = if (part is AstLiteralStringPart) {
           result.first.register(
             HirStringValueExpression((part as AstLiteralStringPart).value.value),
-            HirNamedType.coreString(result.first.global.context),
           )
         } else {
           let expressionToStringify = result.first.lowerExpressionToValueExpression(
@@ -255,7 +242,6 @@ impl LoweringContext {
                 Map.empty<String, HirInlineType>(),
                 Map.empty<String, HirValueExpressionUri>(),
               ),
-              HirNamedType.coreString(expressionToStringify.first.global.context),
             )
           }
         }
@@ -269,7 +255,6 @@ impl LoweringContext {
             Map.empty<String, HirInlineType>(),
             Map.of1<String, HirValueExpressionUri>(Tuple("other", expressionToAdd.second)),
           ),
-          HirNamedType.coreString(expressionToAdd.first.global.context),
         )
       }
       return result
@@ -308,7 +293,7 @@ impl LoweringContext {
         )
         let hirParameter = HirLambdaValueParameter(lambdaUri, name, type_)
         valueParameters.append(hirParameter)
-        let result = innerContext.register(HirParameterReferenceValueExpression(hirParameter), type_)
+        let result = innerContext.register(HirParameterReferenceValueExpression(hirParameter))
         innerContext = LoweringContext(
           result.first.global,
           result.first.parent,
@@ -329,8 +314,7 @@ impl LoweringContext {
           BodyGlobalState(
             innerContext.global.context,
             innerContext.global.function,
-            innerContext.global.expressions
-              .copyAndSet(lambdaUri, Tuple(lambdaExpression, returnType)),
+            innerContext.global.expressions.copyAndSet(lambdaUri, lambdaExpression),
             innerContext.global.nextExpressionId,
             innerContext.global.errors,
           ),
@@ -407,7 +391,7 @@ impl LoweringContext {
           true
         })
       if (anyTypeArgumentIsInvalid) {
-        return this.register(HirErrorValueExpression(), HirErrorType())
+        return this.register(HirErrorValueExpression())
       }
 
       return Tuple(
@@ -421,7 +405,7 @@ impl LoweringContext {
       mut let areValueArgumentsValid = true
       mut let context = this
       let fields = (astExpression.valueArguments as Iterable<AstValueArgument>)
-        .maybeMap<(String, HirValueExpressionUri)>({
+        .maybeMap<(String, DataTuple2<HirValueExpressionUri, HirInlineType>)>({
           if (it.name is None<AstIdentifier>) {
             areValueArgumentsValid = false
             context = context.registerError(
@@ -430,13 +414,18 @@ impl LoweringContext {
           }
           let result = context.lowerExpressionToValueExpression(it.value)
           context = result.first
-          it.name.map<(String, HirValueExpressionUri)>({ Tuple(it.value, result.second) })
+          it.name.map<(String, DataTuple2<HirValueExpressionUri, HirInlineType>)>({
+            Tuple(
+              it.value,
+              DataTuple2<HirValueExpressionUri, HirInlineType>(
+                result.second,
+                context.typeOf(result.second),
+              ),
+            )
+          })
         })
-        .unsafeToMap<String, HirValueExpressionUri>()
-      return context.register(
-        HirStructValueExpression(fields),
-        todo("soon, marcelgarus: The type of the struct.")
-      )
+        .unsafeToMap<String, DataTuple2<HirValueExpressionUri, HirInlineType>>()
+      return context.register(HirStructValueExpression(fields))
     }
 
     if (expression is AstBinaryExpression) {
@@ -470,8 +459,6 @@ impl LoweringContext {
           Map.empty<String, HirInlineType>(),
           Map.of1<String, HirValueExpressionUri>(Tuple("other", loweredRight.second)),
         ),
-        // TODO(soon, marcelgarus): Find the correct impl and retrieve the return type
-        HirNamedType.coreNever(context),
       )
     }
 
@@ -518,7 +505,6 @@ impl LoweringContext {
 
           if (declarationType is Some) {
             if (declarationType.unwrap() is HirStructType) {
-              // TODO(soon, JonasWanke): Check that the type is also available
               let result = context.register(HirTypeValueValueExpression(receiver))
               context = result.first
               receiver = result.second
@@ -535,11 +521,7 @@ impl LoweringContext {
           return context.registerError(UnknownFieldError(name))
         }
 
-        // TODO(soon, JonasWanke): update to the new type storage
-        return context.register(
-          HirStructFieldAccessValueExpression(receiver, name),
-          field.unwrap().second,
-        )
+        return context.register(HirStructFieldAccessValueExpression(receiver, name))
       }
 
       context.registerError(
@@ -622,8 +604,9 @@ impl LoweringContext {
 
           // TODO(soon, marcelgarus): Handle function call with a receiver.
           let result = context.register(
-            HirStringValueExpression("<compiler-generated> TODO(soon, marcelgarus): Handle function call with a receiver."),
-            HirNamedType.coreString(context.global.context),
+            HirStringValueExpression(
+              "<compiler-generated> TODO(soon, marcelgarus): Handle function call with a receiver.",
+            ),
           )
           context = result.first
           return context.register(
@@ -637,7 +620,6 @@ impl LoweringContext {
               Map.empty<String, HirInlineType>(),
               Map.of1<String, HirValueExpressionUri>(Tuple("message", result.second)),
             ),
-            HirNamedType.coreNever(context.global.context),
           )
         })
         .orElse({
@@ -700,14 +682,10 @@ impl LoweringContext {
           this.lowerExpressionToValueExpression(it)
         })
         .orElse({
-          this.register(
-            HirFunctionCallValueExpression.coreNothing(this.global.context),
-            HirNamedType.coreNothing(this.global.context),
-          )
+          this.register(HirFunctionCallValueExpression.coreNothing(this.global.context))
         })
       return returnValue.first.register(
         HirReturnValueExpression(this.global.function, returnValue.second),
-        HirNamedType.coreNever(this.global.context),
       )
     }
 
@@ -811,7 +789,7 @@ impl LoweringContext {
     areValueArgumentsValid = areValueArgumentsValid && valueArgumentsAndAreTheyValid.second
 
     if (!areTypeArgumentsValid || !areValueArgumentsValid) {
-      let result = context.register(HirErrorValueExpression(), HirErrorType())
+      let result = context.register(HirErrorValueExpression())
       return Tuple(result.first, result.second, false)
     }
 
@@ -829,14 +807,14 @@ impl LoweringContext {
         function,
         actualTypeArguments,
         actualValueArguments,
+        returnType,
       ),
-      returnType,
     )
     Tuple(result.first, result.second, true)
   }
 
   fun typeOf(uri: HirValueExpressionUri): HirInlineType {
-    this.global.expressions.get(uri).unwrap().second
+    this.global.expressions.get(uri).unwrap().type(this.global.context)
   }
 }
 

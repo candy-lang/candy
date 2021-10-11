@@ -75,7 +75,7 @@ impl HirSyntheticFunction: HirSyntheticDeclaration {
 }
 public class HirSyntheticBody {
   let uris: List<HirValueExpressionUri>
-  let expressions: Map<HirValueExpressionUri, (HirValueExpression, HirInlineType)>
+  let expressions: Map<HirValueExpressionUri, HirValueExpression>
 }
 
 public class HirSyntheticTypeParameter {
@@ -90,5 +90,5 @@ public class HirSyntheticValueParameter {
 }
 public class HirSyntheticExpression {
   let uri: HirValueExpressionUri
-  let expressions: Map<HirValueExpressionUri, (HirValueExpression, HirInlineType)>
+  let expressions: Map<HirValueExpressionUri, HirValueExpression>
 }
