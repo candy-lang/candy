@@ -109,11 +109,8 @@ fun encodeEnumType(
   enumType: HirEnumType,
 ): String {
   let variants = enumType.variants.entries().toList().sortedBy<String>({ it.first })
-  let variants = (variants as Iterable<(String, Maybe<HirInlineType>)>)
-    .map<String>({
-      let typeString = it.second.map<String>({ encodeInlineType(context, it) }).orElse({ "" })
-      "{encodeIdentifier(it.first)}{typeString}"
-    })
+  let variants = (variants as Iterable<(String, HirInlineType)>)
+    .map<String>({ "{encodeIdentifier(it.first)}{encodeInlineType(context, it.second)}" })
     .join("")
   "U{variants}E"
 }

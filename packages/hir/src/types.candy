@@ -136,18 +136,15 @@ impl HirStructType: Equals & Hash & HirInlineType {
 
 
 public class HirEnumType {
-  public let variants: Map<String, Maybe<HirInlineType>>
+  public let variants: Map<String, HirInlineType>
 }
 impl HirEnumType: Equals & Hash & HirInlineType {
   fun equals(other: This): Bool { (variants as Equals) == (other.variants as Equals) }
   fun hash<T>(hasher: Hasher<T>) { (variants as Hash).hash<T>(hasher) }
   fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This {
     HirEnumType(
-      variants.entries()
-        .map<(String, Maybe<HirInlineType>)>({
-          Tuple(it.first, it.second.map<HirInlineType>({ it.substitute(substitutions) }))
-        })
-        .unsafeToMap<String, Maybe<HirInlineType>>(),
+      variants
+        .map<String, HirInlineType>({ key, value => Tuple(key, value.substitute(substitutions)) }),
     )
   }
 }

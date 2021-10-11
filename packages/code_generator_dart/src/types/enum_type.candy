@@ -26,9 +26,7 @@ public fun compileEnumType(
     )
 
     let sortedVariantTypes = (variantNames.toList().unsafeSorted() as Iterable<String>)
-      .map<HirInlineType>({
-        enumType.variants.get(it).unwrap().orElse({ HirNamedType.coreNothing(context) })
-      })
+      .map<HirInlineType>({ enumType.variants.get(it).unwrap() })
     // In our example: ["Int", "Nothing"]
     let types = sortedVariantTypes.map<DartType>({ compileInlineType(context, it) }).toList()
 
