@@ -248,8 +248,8 @@ impl HirFunction: HirDeclaration & Equals & Hash {
 }
 
 public class HirValueParameter {
-  public let scope: HirFunction | HirValueExpressionUri
-  /// The function or URI of the lambda that the parameter is a part of.
+  public let scope: HirFunction
+  /// The function that the parameter is a part of.
   public let name: String
 }
 impl HirValueParameter: Equals & Hash {
