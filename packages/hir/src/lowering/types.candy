@@ -206,8 +206,8 @@ impl HirParameterType {
 }
 
 impl HirTrait {
-  fun thisType(context: QueryContext<List<CompilerError>>): HirInlineType {
-    query<HirInlineType, List<CompilerError>>(context, "HirTrait.thisType", this, {
+  fun thisType(context: QueryContext<List<CompilerError>>): HirNamedType {
+    query<HirNamedType, List<CompilerError>>(context, "HirTrait.thisType", this, {
       Tuple(
         HirNamedType(this, this.typeParameters(context)),
         List.empty<CompilerError>(),
