@@ -16,7 +16,7 @@ public fun compileNamedType(
     namedType, {
     let declaration = (namedType.declaration as HirDeclaration)
     let importUrl = moduleHirToImportUrl(context, declaration.parent as HirModule)
-    let name = DartIdentifier(declaration.name(), Some<String>(importUrl))
+    let name = DartIdentifier(mangleName(declaration.name()), Some<String>(importUrl))
 
     let types = (namedType.parameterTypes as Iterable<HirInlineType>)
       .map<DartType>({ compileInlineType(context, it) })
@@ -24,4 +24,64 @@ public fun compileNamedType(
 
     Tuple(DartNamedType(name, types), List.empty<CompilerError>())
   })
+}
+
+public fun compileNamedTypeStatic(
+  context: QueryContext<List<CompilerError>>,
+  namedType: HirNamedType,
+): DartExpression {
+  query<DartExpression, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileNamedTypeStatic",
+    namedType, {
+    Tuple(compileNamedTypeForStatic(namedType), List.empty<CompilerError>())
+  })
+}
+fun compileInlineTypeForStatic(
+  context: QueryContext<List<CompilerError>>,
+  inlineType: HirInlineType,
+): DartExpression {
+  if (inlineType is HirErrorType) { throw "Tried to compile with an error type." }
+  if (inlineType is HirNamedType) {
+    return compileNamedTypeForStatic(context, inlineType as HirNamedType)
+  }
+  if (inlineType is HirFunctionType) {
+    throw "Tried to compile a function type as a static reference."
+  }
+  if (inlineType is HirStructType) { throw "Tried to compile a struct type as a static reference." }
+  if (inlineType is HirEnumType) { throw "Tried to compile an enum type as a static reference." }
+  if (inlineType is HirIntersectionType) {
+    todo("later: compile intersection types as static references")
+  }
+  if (inlineType is HirThisType) { todo("later: compile this types as static references") }
+  if (inlineType is HirParameterType) {
+    return compileParameterTypeForStatic(context, inlineType as HirParameterType)
+  }
+  if (inlineType is HirReflectionType) {
+    throw "Tried to compile a reflection type as a static reference."
+  }
+  throw "Unknown `HirInlineType`: {inlineType}"
+}
+fun compileNamedTypeForStatic(
+  context: QueryContext<List<CompilerError>>,
+  namedType: HirNamedType,
+): DartExpression {
+  let declaration = (namedType.declaration as HirDeclaration)
+  let name = "{mangleName(declaration.name())}$Static"
+  let importUrl = moduleHirToImportUrl(context, declaration.parent as HirModule)
+  let name = DartIdentifier(name, Some<String>(importUrl))
+
+  (name as DartExpression).call(
+    positionalArguments = (namedType.parameterTypes as Iterable<HirInlineType>)
+      .map<DartExpression>({ compileInlineTypeForStatic(context, it) })
+      .toList(),
+    namedArguments = Map.empty<String, DartExpression>(),
+    typeArguments = List.empty<DartType>(),
+  )
+}
+fun compileParameterTypeForStatic(
+  context: QueryContext<List<CompilerError>>,
+  parameterType: HirParameterType,
+): DartExpression {
+  DartIdentifier("type${parameterType.name}", None<String>())
 }
