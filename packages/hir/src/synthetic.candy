@@ -13,7 +13,6 @@ public trait HirSyntheticDeclaration {
 public class HirSyntheticModule {
   public let id: HirModule
   public let modifiers: List<String>
-  public let name: String
   public let innerDeclarations: List<HirSyntheticModule | HirSyntheticTrait | HirSyntheticImpl | HirSyntheticType | HirSyntheticFunction>
 }
 impl HirSyntheticModule: HirSyntheticDeclaration {
@@ -25,7 +24,6 @@ impl HirSyntheticModule: HirSyntheticDeclaration {
 public class HirSyntheticTrait {
   public let id: HirTrait
   public let modifiers: List<String>
-  public let name: String
   public let typeParameters: List<HirSyntheticTypeParameter>
   public let upperBound: List<HirNamedType | HirErrorType>
   public let innerDeclarations: List<HirSyntheticTrait | HirSyntheticType | HirSyntheticFunction>
@@ -53,7 +51,6 @@ impl HirSyntheticImpl: HirSyntheticDeclaration {
 public class HirSyntheticType {
   public let id: HirType
   public let modifiers: List<String>
-  public let name: String
   public let typeParameters: List<HirSyntheticTypeParameter>
   public let type: HirInlineType
 }
@@ -64,7 +61,6 @@ impl HirSyntheticType: HirSyntheticDeclaration {
 public class HirSyntheticFunction {
   public let id: HirFunction
   public let modifiers: List<String>
-  public let name: String
   public let typeParameters: List<HirSyntheticTypeParameter>
   public let valueParameters: List<HirSyntheticValueParameter>
   public let returnType: HirInlineType
@@ -75,7 +71,7 @@ impl HirSyntheticFunction: HirSyntheticDeclaration {
 }
 public class HirSyntheticBody {
   let uris: List<HirValueExpressionUri>
-  let expressions: Map<HirValueExpressionUri, (HirValueExpression, HirInlineType)>
+  let expressions: Map<HirValueExpressionUri, HirValueExpression>
 }
 
 public class HirSyntheticTypeParameter {
@@ -90,5 +86,5 @@ public class HirSyntheticValueParameter {
 }
 public class HirSyntheticExpression {
   let uri: HirValueExpressionUri
-  let expressions: Map<HirValueExpressionUri, (HirValueExpression, HirInlineType)>
+  let expressions: Map<HirValueExpressionUri, HirValueExpression>
 }

@@ -15,6 +15,17 @@ public trait HirInlineType: Equals & Hash {
   fun substituteChildren(substitutions: Map<HirInlineType, HirInlineType>): This
 }
 
+public fun substituteSubstitutionMap(
+  substitutionMap: Map<HirInlineType, HirInlineType>,
+  substitutions: Map<HirInlineType, HirInlineType>,
+): Map<HirInlineType, HirInlineType> {
+  let result = substitutionMap
+    .map<HirInlineType, HirInlineType>({ key, value => (key, value.substitute(substitions)) })
+    .toMutable()
+  result.setAll(substitions)
+  result
+}
+
 
 public class HirErrorType {}
 impl HirErrorType: Equals & Hash & HirInlineType {

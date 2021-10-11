@@ -18,12 +18,16 @@ impl HirValueExpressionUri: Equals & Hash {
     index.hash<T>(hasher)
   }
 }
-public trait HirValueExpression {}
+public trait HirValueExpression {
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType
+}
 impl HirValueExpression: Equals & Hash
 
 /// A placeholder for an expression that couldn't be lowered.
 public class HirErrorValueExpression {}
 impl HirErrorValueExpression: HirValueExpression & Equals & Hash {
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType { HirErrorType() }
+
   fun equals(other: This): Bool { true }
   fun hash<T>(hasher: Hasher<T>) {}
 }
@@ -38,6 +42,10 @@ public class HirIntValueExpression {
   public let value: Int
 }
 impl HirIntValueExpression: HirValueExpression & Equals & Hash {
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType {
+    HirNamedType.coreInt(context)
+  }
+
   fun equals(other: This): Bool { (value as Equals) == (other.value as Equals) }
   fun hash<T>(hasher: Hasher<T>) { value.hash<T>(hasher) }
 }
@@ -50,6 +58,10 @@ public class HirStringValueExpression {
   public let value: String
 }
 impl HirStringValueExpression: HirValueExpression & Equals & Hash {
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType {
+    HirNamedType.coreString(context)
+  }
+
   fun equals(other: This): Bool { (value as Equals) == (other.value as Equals) }
   fun hash<T>(hasher: Hasher<T>) { value.hash<T>(hasher) }
 }
@@ -66,6 +78,16 @@ public class HirLambdaValueExpression {
   public let returnType: HirInlineType
 }
 impl HirLambdaValueExpression: HirValueExpression & Equals & Hash {
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType {
+    HirFunctionType(
+      None<HirInlineType>(),
+      (this.parameters as Iterable<HirLambdaValueParameter>)
+        .map({ type_ })
+        .toList(),
+      this.returnType,
+    )
+  }
+
   fun equals(other: This): Bool {
     (parameters as Equals) == (other.parameters as Equals)
       && (expressions as Equals) == (other.expressions as Equals)
@@ -83,7 +105,7 @@ public class HirLambdaValueParameter {
   public let name: String
   public let type_: HirInlineType
 }
-impl HirLambdaValueParameter: HirValueExpression & Equals & Hash {
+impl HirLambdaValueParameter: Equals & Hash {
   fun equals(other: This): Bool {
     (lambdaUri as Equals) == (other.lambdaUri as Equals)
       && (name as Equals) == (other.name as Equals)
@@ -99,11 +121,15 @@ impl HirLambdaValueParameter: HirValueExpression & Equals & Hash {
 
 /// A this expression.
 ///
-/// Example: `This` (and this is the only example)
-public class HirThisValueExpression {}
+/// Example: `this` (and this is the only example)
+public class HirThisValueExpression {
+  let thisType: HirThisType
+}
 impl HirThisValueExpression: HirValueExpression & Equals & Hash {
-  fun equals(other: This): Bool { true }
-  fun hash<T>(hasher: Hasher<T>) {}
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType { this.thisType }
+
+  fun equals(other: This): Bool { (this.thisType as Equals) == (other.thisType as Equals) }
+  fun hash<T>(hasher: Hasher<T>) { (this.thisType as Hash).hash<T>(hasher) }
 }
 
 /// An expression that references a parameter.
@@ -119,6 +145,14 @@ public class HirParameterReferenceValueExpression {
   public let parameter: HirValueParameter | HirLambdaValueParameter
 }
 impl HirParameterReferenceValueExpression: HirValueExpression & Equals & Hash {
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType {
+    if (this.parameter is HirValueParameter) {
+      (this.parameter as HirValueParameter).type(context)
+    } else {
+      (this.parameter as HirLambdaValueParameter).type_
+    }
+  }
+
   fun equals(other: This): Bool { parameter == other.parameter }
   fun hash<T>(hasher: Hasher<T>) { (parameter as Hash).hash<T>(hasher) }
 }
@@ -134,6 +168,7 @@ public class HirFunctionCallValueExpression {
   public let function: HirFunction
   public let typeArguments: Map<String, HirInlineType>
   public let valueArguments: Map<String, HirValueExpressionUri>
+  public let returnType: HirInlineType
 
   public static fun coreNothing(
     context: QueryContext<List<CompilerError>>,
@@ -147,17 +182,21 @@ public class HirFunctionCallValueExpression {
   }
 }
 impl HirFunctionCallValueExpression: HirValueExpression & Equals & Hash {
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType { this.returnType }
+
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
       && (function as Equals) == (other.function as Equals)
       && (typeArguments as Equals) == (other.typeArguments as Equals)
       && (valueArguments as Equals) == (other.valueArguments as Equals)
+      && (returnType as Equals) == (other.returnType as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     (receiver as Hash).hash<T>(hasher)
     (function as Hash).hash<T>(hasher)
     (typeArguments as Hash).hash<T>(hasher)
     (valueArguments as Hash).hash<T>(hasher)
+    (returnType as Hash).hash<T>(hasher)
   }
 }
 
@@ -172,17 +211,22 @@ impl HirFunctionCallValueExpression: HirValueExpression & Equals & Hash {
 ///   ```
 public class HirValueExpressionCallValueExpression {
   public let receiver: HirValueExpressionUri
+  public let returnType: HirInlineType
   public let typeArguments: List<HirInlineType>
   public let valueArguments: List<HirValueExpressionUri>
 }
 impl HirValueExpressionCallValueExpression: HirValueExpression & Equals & Hash {
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType { this.returnType }
+
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
+      && (returnType as Equals) == (other.returnType as Equals)
       && (typeArguments as Equals) == (other.typeArguments as Equals)
       && (valueArguments as Equals) == (other.valueArguments as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
     receiver.hash<T>(hasher)
+    (returnType as Hash).hash<T>(hasher)
     (typeArguments as Hash).hash<T>(hasher)
     (valueArguments as Hash).hash<T>(hasher)
   }
@@ -199,6 +243,15 @@ public class HirTypeInstantiationValueExpression {
   public let valueArgument: HirValueExpressionUri
 }
 impl HirTypeInstantiationValueExpression: HirValueExpression & Equals & Hash {
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType {
+    HirNamedType(
+      this.receiver,
+      (this.receiver.typeParameters(context) as Iterable<HirParameterType>)
+        .map<HirInlineType>({ this.typeArguments.get(it.name).unwrap() })
+        .toList(),
+    )
+  }
+
   fun equals(other: This): Bool {
     (receiver as Equals) == (other.receiver as Equals)
       && (valueArgument as Equals) == (other.valueArgument as Equals)
@@ -213,22 +266,35 @@ impl HirTypeInstantiationValueExpression: HirValueExpression & Equals & Hash {
 ///
 /// Example: `(foo = "Bar", baz = 42)`
 public class HirStructValueExpression {
-  public let fields: Map<String, HirValueExpressionUri>
+  public let fields: Map<String, DataTuple2<HirValueExpressionUri, HirInlineType>>
 }
 impl HirStructValueExpression: HirValueExpression & Equals & Hash {
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType {
+    HirStructType(this.fields.entries.map<(String, HirInlineType)>({ it.second }).toList())
+  }
+
   fun equals(other: This): Bool { (fields as Equals) == (other.fields as Equals) }
   fun hash<T>(hasher: Hasher<T>) { fields.hash<T>(hasher) }
 }
 
 /// An access of a `HirType`'s value.
 ///
-/// Example: `foo value` (maybe)
+/// Example: `foo value`
 public class HirTypeValueValueExpression {
   public let receiver: HirValueExpressionUri
+  public let type_: HirInlineType
 }
 impl HirTypeValueValueExpression: HirValueExpression & Equals & Hash {
-  fun equals(other: This): Bool { (receiver as Equals) == (other.receiver as Equals) }
-  fun hash<T>(hasher: Hasher<T>) { receiver.hash<T>(hasher) }
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType { this.type_ }
+
+  fun equals(other: This): Bool {
+    (this.receiver as Equals) == (other.receiver as Equals)
+      && (this.type_ as Equals) == (other.type_ as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    this.receiver.hash<T>(hasher)
+    (this.type_ as Hash).hash<T>(hasher)
+  }
 }
 
 /// An access of a struct's field.
@@ -240,15 +306,20 @@ impl HirTypeValueValueExpression: HirValueExpression & Equals & Hash {
 public class HirStructFieldAccessValueExpression {
   public let receiver: HirValueExpressionUri
   public let name: String
+  public let type_: HirInlineType
 }
 impl HirStructFieldAccessValueExpression: HirValueExpression & Equals & Hash {
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType { this.type_ }
+
   fun equals(other: This): Bool {
-    (receiver as Equals) == (other.receiver as Equals)
-      && (name as Equals) == (other.name as Equals)
+    (this.receiver as Equals) == (other.receiver as Equals)
+      && (this.name as Equals) == (other.name as Equals)
+      && (this.type_ as Equals) == (other.type_ as Equals)
   }
   fun hash<T>(hasher: Hasher<T>) {
-    receiver.hash<T>(hasher)
-    name.hash<T>(hasher)
+    this.receiver.hash<T>(hasher)
+    this.name.hash<T>(hasher)
+    this.type_.hash<T>(hasher)
   }
 }
 
@@ -265,6 +336,10 @@ public class HirReturnValueExpression {
   public let expression: HirValueExpressionUri
 }
 impl HirReturnValueExpression: HirValueExpression & Equals & Hash {
+  fun type(context: QueryContext<List<CompilerError>>): HirInlineType {
+    HirNamedType.coreNever(context)
+  }
+
   fun equals(other: This): Bool {
     (scope as Equals) == (other.scope as Equals)
       && (expression as Equals) == (other.expression as Equals)

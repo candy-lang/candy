@@ -131,7 +131,9 @@ public trait Iterable<Item>: Equals & Hash {
   fun lastWhere(checker: (Item) => Bool): Maybe<Item> { where(checker).last() }
   // TODO(never, marcelgarus): lastIndexWhere
   fun singleWhere(checker: (Item) => Bool): Maybe<Item> { where(checker).single() }
-  // TODO(never, JonasWanke): singleIndexWhere
+  fun singleIndexWhere(checker: (Item) => Bool): Maybe<Int> {
+    this.withIndex().singleWhere({ checker(it.first) }).map<Int>({ it.second })
+  }
 
   // Mapping transformations.
   // These return an `Iterable` with the same length, but a different type.
@@ -141,6 +143,9 @@ public trait Iterable<Item>: Equals & Hash {
   }
   fun mapIndexed<Out>(mapper: (Item, Int) => Out): Iterable<Out> {
     MappedIterable<Item, Out>(this, mapper)
+  }
+  fun withIndex(): Iterable<(Item, Int)> {
+    this.mapIndexed<(Item, Int)>({ item, index => Tuple(item, index) })
   }
 
   fun cast<Type>(): Iterable<Type> {
