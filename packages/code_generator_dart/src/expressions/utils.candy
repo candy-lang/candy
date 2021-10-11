@@ -3,18 +3,34 @@ use dart_code
 use hir
 use incremental
 
+use ...declarations
 use ...types
 
 public fun getValueExpressionResultIdentifier(
   context: QueryContext<List<CompilerError>>,
   expressionUri: HirValueExpressionUri,
-): DartIdentifier {
-  query<DartIdentifier, List<CompilerError>>(
+  expectedType: HirInlineType
+): DartExpression {
+  query<DartExpression, List<CompilerError>>(
     context,
     "code_generator_dart.getValueExpressionResultIdentifier",
-    expressionUri, {
+    DataTuple2<HirValueExpressionUri, HirInlineType>(expressionUri, expectedType), {
     let name = getValueExpressionResultName(context, expressionUri)
-    Tuple(DartIdentifier(name, None<String>()), List.empty<CompilerError>())
+    let identifier = DartIdentifier(name, None<String>())
+    
+    mut let result = (identifier as DartExpression)
+    let actualType = resolveHirValueExpressionUri(context, expressionUri).type(context)
+    if (expectedType is HirNamedType && !(expectedType == actualType)) {
+      if ((expectedType as HirNamedType).declaration is HirTrait) {
+        let mangledTraitName = getTraitNameMangledForMethodName(
+          context,
+          expectedType as HirNamedType,
+        )
+        result = identifier.dot("as{mangledTraitName}")
+      }
+    }
+
+    Tuple(result, List.empty<CompilerError>())
   })
 }
 public fun getValueExpressionResultName(
@@ -25,7 +41,7 @@ public fun getValueExpressionResultName(
     context,
     "code_generator_dart.getValueExpressionResultName",
     expressionUri, {
-    Tuple("_{expressionUri.index}", List.empty<CompilerError>())
+    Tuple("${expressionUri.index}", List.empty<CompilerError>())
   })
 }
 
@@ -78,9 +94,7 @@ public fun saveValueExpression(
       docComment = None<String>(),
       isStatic = false,
       mutability = DartFinal(),
-      type = None<DartType>(),
-      // type = Some<DartType>(compileInlineType(context, hirExpression.type)),
-      // TODO(JonasWanke): add type information when we generate it
+      type = Some<DartType>(compileInlineType(context, hirExpression.type(context))),
       initialValue = Some<DartExpression>(dartExpression),
     )
     Tuple(DartFieldStatement(field), List.empty<CompilerError>())

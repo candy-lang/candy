@@ -80,7 +80,11 @@ public fun compileReturnValueExpression(
       (nonLocalReturnExceptionType as DartExpression).call(
         positionalArguments = List.of2<DartExpression>(
           (getScopeObjectName(context, expression.scope) as DartExpression).call0(),
-          getValueExpressionResultIdentifier(context, expression.expression),
+          getValueExpressionResultIdentifier(
+            context,
+            expression.expression,
+            expression.scope.returnType(context),
+          ),
         ),
         namedArguments = Map.empty<String, DartExpression>(),
         typeArguments = List.empty<DartType>(),

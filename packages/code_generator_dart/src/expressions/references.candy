@@ -5,6 +5,20 @@ use incremental
 
 use ..utils
 
+public fun compileThisReferenceValueExpression(
+  context: QueryContext<List<CompilerError>>,
+  uri: HirValueExpressionUri,
+  expression: HirThisReferenceValueExpression,
+): DartStatement {
+  query<DartStatement, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileThisReferenceValueExpression",
+    DataTuple2<HirValueExpressionUri, HirThisReferenceValueExpression>(uri, expression), {
+    let identifier = DartIdentifier("this", None<String>())
+    Tuple(saveValueExpression(context, uri, expression, identifier), List.empty<CompilerError>())
+  })
+}
+
 public fun compileParameterReferenceValueExpression(
   context: QueryContext<List<CompilerError>>,
   uri: HirValueExpressionUri,

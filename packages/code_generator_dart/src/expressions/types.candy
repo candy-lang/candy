@@ -19,15 +19,18 @@ public fun compileTypeInstantiationValueExpression(
     let statements = MutableList.empty<DartStatement>()
     statements.appendAll(compileValueExpression(context, expression.valueArgument))
 
-    // TODO(soon, JonasWanke): use `compileNamedType` and supply type arguments when we can get the type of this expression
-    let compiledType = DartNamedType(DartIdentifier("SomeType", None<String>()), List.empty<DartType>())
-    statements.append(saveValueExpression(
+    let expectedValueArgumentType = (expression.receiver.declaration as HirType)
+      .type(context)
+      .unwrap()
+      .substitute(expression.receiver.substitutionMap(context))
+    let reference = getValueExpressionResultIdentifier(
       context,
-      uri,
-      expression,
-      (compiledType as DartExpression)
-        .call1(getValueExpressionResultIdentifier(context, expression.valueArgument)),
-    ))
+      expression.valueArgument,
+      expectedValueArgumentType,
+    )
+    let compiledType = (compileNamedType(context, expression.receiver) as DartExpression)
+      .call1(reference)
+    statements.append(saveValueExpression(context, uri, expression, compiledType))
     Tuple(statements, List.empty<CompilerError>())
   })
 }
@@ -47,20 +50,82 @@ public fun compileStructValueExpression(
         .expand<DartStatement>({ compileValueExpression(context, it) }),
     )
 
-    // TODO(soon, JonasWanke): use `compileStructType` when we can get the struct type of this expression
-    let compiledType = DartNamedType(DartIdentifier("Struct", None<String>()), List.empty<DartType>())
+    let structType = (expression.type(context) as HirStructType)
     statements.append(saveValueExpression(
       context,
       uri,
       expression,
-      (compiledType as DartExpression).call(
-        positionalArguments = (expression.fields.entries().toList()
-          .sortedBy<String>({ it.first }) as Iterable<(String, HirValueExpressionUri)>)
-          .map<DartExpression>({ getValueExpressionResultIdentifier(context, it.second) })
-          .toList(),
-        namedArguments = Map.empty<String, DartExpression>(),
+      (compileStructType(context, structType) as DartExpression).call(
+        positionalArguments = List.empty<DartExpression>(),
+        namedArguments = expression.fields.map<String, DartExpression>({ key, value =>
+          let expectedType = (structType.types as Iterable<(String, HirInlineType)>)
+            .singleWhere({ it.first == key })
+            .unwrap()
+            .value
+          Tuple(key, getValueExpressionResultIdentifier(context, it.second, expectedType))
+        }),
         typeArguments = List.empty<DartType>(),
       ),
+    ))
+    Tuple(statements, List.empty<CompilerError>())
+  })
+}
+
+public fun compileTypeValueValueExpression(
+  context: QueryContext<List<CompilerError>>,
+  uri: HirValueExpressionUri,
+  expression: HirTypeValueValueExpression,
+): List<DartStatement> {
+  query<List<DartStatement>, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileTypeValueValueExpression",
+    DataTuple2<HirValueExpressionUri, HirTypeValueValueExpression>(uri, expression), {
+    let statements = MutableList.empty<DartStatement>()
+    statements.appendAll(compileValueExpression(context, expression.receiver))
+
+    let receiverType = resolveHirValueExpressionUri(context, expression.receiver).type(context)
+    assert(
+      receiverType is HirNamedType,
+      "A `HirTypeValueValueExpression`'s receiver must be a type, but isn't a HirNamedType.",
+    )
+    assert(
+      (receiverType as HirNamedType).declaration is HirType,
+      "A `HirTypeValueValueExpression`'s receiver must be a type, but isn't a HirType.",
+    )
+
+    statements.append(saveValueExpression(
+      context,
+      uri,
+      expression,
+      getValueExpressionResultIdentifier(context, expression.receiver, receiverType).dot("value"),
+    ))
+    Tuple(statements, List.empty<CompilerError>())
+  })
+}
+
+public fun compileStructFieldAccessValueExpression(
+  context: QueryContext<List<CompilerError>>,
+  uri: HirValueExpressionUri,
+  expression: HirStructFieldAccessValueExpression,
+): List<DartStatement> {
+  query<List<DartStatement>, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileStructFieldAccessValueExpression",
+    DataTuple2<HirValueExpressionUri, HirStructFieldAccessValueExpression>(uri, expression), {
+    let statements = MutableList.empty<DartStatement>()
+    statements.appendAll(compileValueExpression(context, expression.receiver))
+
+    let receiverType = resolveHirValueExpressionUri(context, expression.receiver).type(context)
+    assert(
+      receiverType is HirStructType,
+      "A `HirStructFieldAccessValueExpression`'s receiver must be a struct type.",
+    )
+
+    statements.append(saveValueExpression(
+      context,
+      uri,
+      expression,
+      getValueExpressionResultIdentifier(context, expression.receiver, receiverType).dot("name"),
     ))
     Tuple(statements, List.empty<CompilerError>())
   })
