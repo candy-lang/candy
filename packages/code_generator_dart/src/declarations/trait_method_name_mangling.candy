@@ -26,7 +26,7 @@ public fun getTraitNameMangledForMethodName(
     // * "I" <inlineType>{2,} "E": **i**ntersection type
     let name = encodeNamedType(context, traitType)
 
-    Tuple("$as{name}", List.empty<CompilerError>())
+    Tuple("as{name}", List.empty<CompilerError>())
   })
 }
 

@@ -26,7 +26,7 @@ public fun getValueExpressionResultIdentifier(
           context,
           expectedType as HirNamedType,
         )
-        result = identifier.dot("as{mangledTraitName}")
+        result = identifier.dot(mangledTraitName)
       }
     }
 
