@@ -39,7 +39,7 @@ public fun compileGlobalFunction(
       .toList()
     let output = DartFunction(
       name = mangleName(context, functionHir.name()),
-      docComment = Some<String>("{functionHir}"),
+      docComment = None<String>(),
       annotations = List.empty<DartAnnotation>(),
       _returns = Some<DartType>(compileInlineType(context, functionHir.returnType(context))),
       typeParameters = ((functionHir as HasTypeParameters).typeParameters(context) as Iterable<HirParameterType>)
