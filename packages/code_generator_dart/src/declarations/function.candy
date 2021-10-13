@@ -21,8 +21,9 @@ public fun compileGlobalFunction(
         DartParameter(
           "type${it.name}",
           true,
-          // TODO: what if the upper bound is an error, another type parameter, the this type?
-          Some<DartType>(compileNamedTypeStaticType(context, it.upperBound(context))),
+          Some<DartType>(compileNamedTypeStaticType(
+            resolveInlineTypeAsNamedType(context, it.upperBound(context)),
+          )),
           None<DartExpression>(),
         )
       })
@@ -63,4 +64,22 @@ public fun compileGlobalFunction(
     )
     Tuple(output, List.empty<CompilerError>())
   })
+}
+
+fun resolveInlineTypeAsNamedType(
+  context: QueryContext<List<CompilerError>>,
+  inlineType: HirInlineType,
+): HirNamedType {
+  if (inlineType is HirErrorType) { throw "Tried to compile an error type to Dart." }
+  if (inlineType is HirNamedType) { return (inlineType as HirNamedType) }
+  if (inlineType is HirIntersectionType) {
+    todo("never, Support intersection types as type parameters")
+  }
+  if (inlineType is HirThisType) {
+    return resolveInlineTypeAsNamedType(context, (inlineType as HirThisType).resolve(context))
+  }
+  if (inlineType is HirParameterType) {
+    return resolveInlineTypeAsNamedType(context, (inlineType as HirParameterType).upperBound(context))
+  }
+  throw "Unexpected inline type: {inlineType}"
 }
