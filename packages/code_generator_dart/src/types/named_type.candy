@@ -26,6 +26,21 @@ public fun compileNamedType(
   })
 }
 
+public fun compileNamedTypeStaticType(
+  context: QueryContext<List<CompilerError>>,
+  namedType: HirNamedType,
+): DartExpression {
+  query<DartExpression, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileNamedTypeStaticType",
+    namedType, {
+    let declaration = (namedType.declaration as HirDeclaration)
+    let name = "{mangleName(declaration.name())}$Static"
+    let importUrl = moduleHirToImportUrl(context, declaration.parent as HirModule)
+    let name = DartIdentifier(name, Some<String>(importUrl))
+    Tuple(DartNamedType(name, List.empty<DartType>()), List.empty<CompilerError>())
+  })
+}
 public fun compileNamedTypeStatic(
   context: QueryContext<List<CompilerError>>,
   namedType: HirNamedType,

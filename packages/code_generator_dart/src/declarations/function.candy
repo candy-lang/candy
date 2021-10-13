@@ -16,6 +16,27 @@ public fun compileGlobalFunction(
     context,
     "code_generator_dart.compileFunction",
     functionHir, {
+    let typeValueParameters = (functionHir.typeParameters(context) as Iterable<HirParameterType>)
+      .map<DartParameter>({
+        DartParameter(
+          "type${it.name}",
+          true,
+          // TODO: what if the upper bound is an error, another type parameter, the this type?
+          Some<DartType>(compileNamedTypeStaticType(context, it.upperBound(context))),
+          None<DartExpression>(),
+        )
+      })
+      .toList()
+    let valueParameters = (functionHir.valueParameters(context) as Iterable<HirValueParameter>)
+      .map<DartParameter>({
+        DartParameter(
+          it.name,
+          true,
+          Some<DartType>(compileInlineType(context, it.type(context))),
+          None<DartExpression>(),
+        )
+      })
+      .toList()
     let output = DartFunction(
       name = mangleName(context, functionHir.name()),
       docComment = Some<String>("{functionHir}"),
@@ -29,16 +50,7 @@ public fun compileGlobalFunction(
           )
         })
         .toList(),
-      requiredParameters = (functionHir.valueParameters(context) as Iterable<HirValueParameter>)
-        .map<DartParameter>({
-          DartParameter(
-            it.name,
-            true,
-            Some<DartType>(compileInlineType(context, it.type(context))),
-            None<DartExpression>(),
-          )
-        })
-        .toList(),
+      requiredParameters = typeValueParameters.followedByList(valueParameters),
       positionalParameters = List.empty<DartParameter>(),
       namedParameters = List.empty<DartParameter>(),
       body = Some<DartBody>(
