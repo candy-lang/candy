@@ -2,22 +2,29 @@ use compiler_utils
 use dart_code
 use hir
 use incremental
+
 use ..name_mangling
 use ..type
+use ..utils
 
 public fun compileTrait(
   context: QueryContext<List<CompilerError>>,
   package: Package,
-  typeHir: HirTrait,
-): List<DartClass> {
-  query<List<DartClass>, List<CompilerError>>(
+  traitHir: HirTrait,
+): List<DartDeclaration> {
+  query<List<DartDeclaration>, List<CompilerError>>(
     context,
     "code_generator_dart.compileTrait",
-    DataTuple2<Package, HirTrait>(package, typeHir), {
-    let output = List.of2<DartClass>(
-      compileInstanceTrait(context, package, typeHir),
-      compileStaticTrait(context, package, typeHir),
-    )
+    DataTuple2<Package, HirTrait>(package, traitHir), {
+    let output = List
+      .of2<DartDeclaration>(
+        compileInstanceTrait(context, package, traitHir),
+        compileStaticTrait(context, package, traitHir),
+      )
+      .followedByList(compileInstanceFunctionFunctions(context, package, traitHir))
+      .followedByList(compileInstanceAsFunctions(context, package, traitHir))
+      .followedByList(compileStaticFunctionFunctions(context, package, traitHir))
+      .followedByList(compileStaticAsFunctions(context, package, traitHir))
     Tuple(output, List.empty<CompilerError>())
   })
 }
@@ -25,46 +32,54 @@ public fun compileTrait(
 fun compileInstanceTrait(
   context: QueryContext<List<CompilerError>>,
   package: Package,
-  typeHir: HirTrait,
+  traitHir: HirTrait,
 ): DartClass {
   query<DartClass, List<CompilerError>>(
     context,
     "code_generator_dart.compileInstanceTrait",
-    DataTuple2<Package, HirTrait>(package, typeHir), {
-    let name = getDeclarationName(context, typeHir)
+    DataTuple2<Package, HirTrait>(package, traitHir), {
+    let name = getDeclarationName(context, traitHir)
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
+
+    let functions = ...
 
     body.append(DartConstructor(
       className = name,
-      name = None<String>(),
+      name = Some<String>("_"),
       docComment = None<String>(),
       annotations = List.empty<DartAnnotation>(),
       isConst = true,
       requiredParameters = List.of1<DartParameter | DartInitializingFormal>(
-        DartInitializingFormal(staticInstanceGetterName, defaultValue = None<DartExpression>()),
+        DartInitializingFormal("type", defaultValue = None<DartExpression>()),
+        DartInitializingFormal("value", defaultValue = None<DartExpression>()),
+        // TODO(soon, JonasWanke): Add a parameter for every function.
       ),
       positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
       namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
-      // TODO(soon, JonasWanke): Integrate implemented traits & impls.
-      // TODO(soon, JonasWanke): Integrate functions.
       body = None<DartBody>(),
     ))
 
-    // Instance reference to our "static" instance.
-    let staticInstanceType = DartNamedType(
-      name = DartIdentifier(getDeclarationStaticName(context, typeHir), None<String>()),
-      typeArguments = List.empty<DartType>(), // TODO(soon, JonasWanke): Add type arguments.
-    )
+    // Reference to our type.
     body.append(DartField(
-      staticInstanceGetterName,
+      "type",
       docComment = None<String>(),
       isStatic = false,
       mutability = DartFinal(),
-      type = Some<DartType>(staticInstanceType),
+      // TODO(soon, JonasWanke): Replace with concrete `$Static` type.
+      type = Some<DartType>(candyTraitInlineTypeType),
       initialValue = None<DartExpression>(),
     ))
 
-    // TODO(soon, JonasWanke): Integrate implemented traits & impls.
+    // Instance reference to our value.
+    body.append(DartField(
+      "value",
+      docComment = None<String>(),
+      isStatic = false,
+      mutability = DartFinal(),
+      type = Some<DartType>(candyValueType),
+      initialValue = None<DartExpression>(),
+    ))
+
     // TODO(soon, JonasWanke): Integrate functions.
 
     let dartDeclaration = DartClass(
@@ -73,8 +88,12 @@ fun compileInstanceTrait(
       // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
       annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
       isAbstract = false,
-      typeParameters = List.empty<DartTypeParameter>(),
-      extends_ = None<DartType>(),
+      typeParameters = (traitHir.typeParameters(context) as Iterable<HirParameterType>)
+        .map<DartTypeParameter>({
+          DartTypeParameter(it.name, compileInlineType(context, it.upperBound(context)))
+        })
+        .toList(),
+      extends_ = Some<DartType>(candyValueType),
       implements_ = List.empty<DartType>(),
       with_ = List.empty<DartType>(),
       body = body,
@@ -82,16 +101,33 @@ fun compileInstanceTrait(
     Tuple(dartDeclaration, List.empty<CompilerError>())
   })
 }
+
+fun compileInstanceFunctionFunctions(
+  context: QueryContext<List<CompilerError>>,
+  package: Package,
+  traitHir: HirTrait,
+): List<DartDeclaration> {
+  // ...
+}
+
+fun compileInstanceAsFunctions(
+  context: QueryContext<List<CompilerError>>,
+  package: Package,
+  traitHir: HirTrait,
+): List<DartDeclaration> {
+  // ...
+}
+
 fun compileStaticTrait(
   context: QueryContext<List<CompilerError>>,
   package: Package,
-  typeHir: HirTrait,
+  traitHir: HirTrait,
 ): DartClass {
   query<DartClass, List<CompilerError>>(
     context,
     "code_generator_dart.compileStaticTrait",
-    DataTuple2<Package, HirTrait>(package, typeHir), {
-    let name = getDeclarationStaticName(context, typeHir)
+    DataTuple2<Package, HirTrait>(package, traitHir), {
+    let name = getDeclarationStaticName(context, traitHir)
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
     body.append(DartConstructor(
@@ -101,14 +137,30 @@ fun compileStaticTrait(
       annotations = List.empty<DartAnnotation>(),
       isConst = true,
       requiredParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      // TODO(soon, JonasWanke): Integrate type value parameters.
+      // TODO(soon, JonasWanke): Integrate functions.
       positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
       namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
-      // TODO(soon, JonasWanke): Integrate implemented traits & impls.
-      // TODO(soon, JonasWanke): Integrate functions.
       body = None<DartBody>(),
     ))
 
-    // TODO(soon, JonasWanke): Integrate implemented traits & impls.
+    body.append(DartFunction(
+      name = "create",
+      docComment = None<String>(),
+      annotations = List.empty<DartAnnotation>(),
+      // TODO(soon, JonasWanke): instance type
+      _returns = None<DartType>(),
+      typeParameters = List.empty<DartTypeParameter>(),
+      // TODO(soon, JonasWanke): parameters
+      requiredParameters = List.empty<DartParameter>(),
+      positionalParameters = List.empty<DartParameter>(),
+      namedParameters = List.empty<DartParameter>(),
+      // TODO(soon, JonasWanke): body
+      body = None<DartBody>(),
+    ))
+
+    // TODO(soon, JonasWanke): Create function for creating an instance.
+    // TODO(soon, JonasWanke): Integrate type value parameters.
     // TODO(soon, JonasWanke): Integrate functions.
 
     let dartDeclaration = DartClass(
@@ -116,12 +168,32 @@ fun compileStaticTrait(
       docComment = None<String>(),
       annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
       isAbstract = false,
-      typeParameters = List.empty<DartTypeParameter>(),
-      extends_ = None<DartType>(),
+      typeParameters = (traitHir.typeParameters(context) as Iterable<HirParameterType>)
+        .map<DartTypeParameter>({
+          DartTypeParameter(it.name, compileInlineType(context, it.upperBound(context)))
+        })
+        .toList(),
+      extends_ = Some<DartType>(candyTraitInlineTypeType),
       implements_ = List.empty<DartType>(),
       with_ = List.empty<DartType>(),
       body = body,
     )
     Tuple(dartDeclaration, List.empty<CompilerError>())
   })
+}
+
+fun compileStaticFunctionFunctions(
+  context: QueryContext<List<CompilerError>>,
+  package: Package,
+  traitHir: HirTrait,
+): List<DartDeclaration> {
+  // ...
+}
+
+fun compileStaticAsFunctions(
+  context: QueryContext<List<CompilerError>>,
+  package: Package,
+  traitHir: HirTrait,
+): List<DartDeclaration> {
+  // ...
 }

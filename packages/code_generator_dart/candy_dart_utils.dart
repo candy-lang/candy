@@ -17,3 +17,20 @@ class NonLocalReturnException {
   final Object scope;
   final dynamic value;
 }
+
+/// This is the base class for all Candy values.
+abstract class CandyValue {
+  const CandyValue();
+}
+
+/// This is the base class for all generated `$Static` classes.
+abstract class CandyInlineType {
+  const CandyInlineType();
+}
+
+abstract class CandyTypeInlineType {
+  const CandyTypeInlineType();
+}
+abstract class CandyTraitInlineType {
+  const CandyTraitInlineType();
+}
