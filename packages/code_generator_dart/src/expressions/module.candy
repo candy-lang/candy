@@ -26,6 +26,10 @@ fun compileValueExpressionHelper(
   uri: HirValueExpressionUri,
 ): List<DartStatement> {
   let expression = resolveHirValueExpressionUri(context, uri)
+  if (expression is HirErrorValueExpression) {
+    throw "Code couldn't be lowered to the HIR and hence can't be compiled to Dart"
+  }
+
   if (expression is HirIntValueExpression) {
     return List.of1<DartStatement>(
       compileIntValueExpression(context, uri, expression as HirIntValueExpression),
@@ -43,30 +47,26 @@ fun compileValueExpressionHelper(
     )
   }
 
-  // if (expression is HirThisValueExpression) {
-  //   return compileThisValueExpression(context, uri, expression as HirThisValueExpression)
-  // }
-
-  // if (expression is HirParameterReferenceExpression) {
-  //   return List.of1<DartStatement>(
-  //     compileParameterReferenceExpression(
-  //       context,
-  //       uri,
-  //       expression as HirParameterReferenceExpression,
-  //     ),
-  //   )
-  // }
+  if (expression is HirThisValueExpression) {
+    return List.of1<DartStatement>(
+      compileThisValueExpression(context, uri, expression as HirThisValueExpression),
+    )
+  }
+  if (expression is HirParameterReferenceExpression) {
+    return List.of1<DartStatement>(
+      compileParameterReferenceExpression(
+        context,
+        uri,
+        expression as HirParameterReferenceExpression,
+      ),
+    )
+  }
 
   if (expression is HirFunctionCallValueExpression) {
     return compileFunctionCallValueExpression(context, uri, expression as HirFunctionCallValueExpression)
   }
-
-  // if (expression is HirPropertyNavigationValueExpression) {
-  //   return compilePropertyNavigationValueExpression(
-  //     context,
-  //     uri,
-  //     expression as HirPropertyNavigationValueExpression,
-  //   )
+  // if (expression is HirValueExpressionCallValueExpression) {
+  //   return compileValueExpressionCallValueExpression(context, uri, expression as HirValueExpressionCallValueExpression)
   // }
 
   if (expression is HirTypeInstantiationValueExpression) {
@@ -78,6 +78,16 @@ fun compileValueExpressionHelper(
   }
   if (expression is HirStructValueExpression) {
     return compileStructValueExpression(context, uri, expression as HirStructValueExpression)
+  }
+  if (expression is HirTypeValueValueExpression) {
+    return compileTypeValueValueExpression(context, uri, expression as HirTypeValueValueExpression)
+  }
+  if (expression is HirStructFieldAccessValueExpression) {
+    return compileStructFieldAccessValueExpression(
+      context,
+      uri,
+      expression as HirStructFieldAccessValueExpression,
+    )
   }
 
   if (expression is HirReturnValueExpression) {

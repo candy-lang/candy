@@ -11,6 +11,8 @@ public fun compileStructType(
   context: QueryContext<List<CompilerError>>,
   structType: HirStructType,
 ): DartType {
+  /// Example: `(first: Foo, second: Bar)` -> `Struct$first$second<Foo, Bar>`
+
   query<DartType, List<CompilerError>>(
     context,
     "code_generator_dart.compileStructType",
@@ -31,6 +33,8 @@ public fun compileStructTypeDeclarations(
   context: QueryContext<List<CompilerError>>,
   package: Package,
 ): (HirModule, List<DartDeclaration>) {
+  /// Visits all used struct types and generates their Dart code.
+
   query<(HirModule, List<DartDeclaration>), List<CompilerError>>(
     context,
     "code_generator_dart.compileStructTypeDeclarations",
@@ -62,44 +66,44 @@ fun compileStructTypeDeclaration(
 
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
-    let constructor = DartConstructor(
+    body.append(DartConstructor(
       className = name,
       name = None<String>(),
       docComment = None<String>(),
       annotations = List.empty<DartAnnotation>(),
       isConst = true,
-      requiredParameters = List.empty<DartParameter | DartInitializingFormal>(),
-      positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
-      namedParameters = fields
+      requiredParameters = fields
         .map<DartParameter | DartInitializingFormal>({
-          DartInitializingFormal(it.first, defaultValue = None<DartExpression>())
+          DartInitializingFormal(
+            mangleName(context, it.first),
+            defaultValue = None<DartExpression>(),
+          )
         })
         .toList(),
+      positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
       body = None<DartBody>(),
-    )
-    body.append(constructor)
+    ))
 
-    let dartFields = fields
-      .map<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>({
-        DartField(
-          it.first,
-          docComment = None<String>(),
-          // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
-          isStatic = false,
-          mutability = DartFinal(),
-          type = Some<DartType>(
-            DartNamedType(DartIdentifier(it.second, None<String>()), List.empty<DartType>()),
-          ),
-          initialValue = None<DartExpression>(),
-        )
-      })
-    body.appendAll(dartFields)
+    body.appendAll(fields.map<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>({
+      DartField(
+        mangleName(context, it.first),
+        docComment = None<String>(),
+        // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
+        isStatic = false,
+        mutability = DartFinal(),
+        type = Some<DartType>(
+          DartNamedType(DartIdentifier(it.second, None<String>()), List.empty<DartType>()),
+        ),
+        initialValue = None<DartExpression>(),
+      )
+    }))
 
     let dartDeclaration = DartClass(
       name = name,
       docComment = None<String>(),
       // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
-      annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
+      annotations = List.empty<DartAnnotation>(),
       isAbstract = false,
       typeParameters = fields
         .map<DartTypeParameter>({ DartTypeParameter(it.second, None<DartType>()) })
@@ -109,7 +113,6 @@ fun compileStructTypeDeclaration(
       with_ = List.empty<DartType>(),
       body = body,
     )
-
     Tuple(dartDeclaration, List.empty<CompilerError>())
   })
 }
@@ -118,6 +121,8 @@ public fun getCompiledStructTypeName(
   context: QueryContext<List<CompilerError>>,
   fieldNames: Set<String>,
 ): String {
+  /// Example: `(first: Foo, second: Bar)` -> `Struct$first$second`
+
   query<String, List<CompilerError>>(
     context,
     "code_generator_dart.getCompiledStructTypeName",

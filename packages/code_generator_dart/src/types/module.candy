@@ -29,7 +29,9 @@ fun compileInlineTypeHelper(
   if (inlineType is HirFunctionType) {
     return compileFunctionType(context, inlineType as HirFunctionType)
   }
-  if (inlineType is HirStructType) { return compileStructType(context, inlineType as HirStructType) }
+  if (inlineType is HirStructType) {
+    return compileStructType(context, inlineType as HirStructType)
+  }
   if (inlineType is HirEnumType) { return compileEnumType(context, inlineType as HirEnumType) }
   if (inlineType is HirIntersectionType) { return dartDynamic }
   if (inlineType is HirThisType) { return dartDynamic }

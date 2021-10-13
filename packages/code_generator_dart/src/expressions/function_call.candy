@@ -18,16 +18,24 @@ public fun compileFunctionCallValueExpression(
     context,
     "code_generator_dart.compileFunctionCallValueExpression",
     DataTuple2<HirValueExpressionUri, HirFunctionCallValueExpression>(uri, expression), {
-    // TODO(soon, JonasWanke): Handle static function calls.
     let statements = MutableList.empty<DartStatement>()
     let receiver = expression.receiver
       .map<DartExpression>({
-        if (it is HirTypeExpression) { todo("soon, JonasWanke: support type instantiations") }
+        if (it is HirTypeExpression) {
+          // static function
+          todo("soon, JonasWanke: support static functions")
+        }
+
+        // instance function
         statements.appendAll(compileValueExpression(context, it as HirValueExpressionUri))
-        // TODO(soon, JonasWanke): Cast the receiver to the correct trait.
-        getValueExpressionResultIdentifier(context, it as HirValueExpressionUri)
+        getValueExpressionResultIdentifier(
+          context,
+          it as HirValueExpressionUri,
+          expression.function.thisType(context).unwrap().resolve(context),
+        )
       })
       .orElse({
+        // function in a module
         let moduleHir = (expression.function.parent as HirModule)
         DartIdentifier(
           mangleName(context, expression.function.name()),
@@ -35,7 +43,7 @@ public fun compileFunctionCallValueExpression(
         )
       })
 
-    let function = receiver.dot(expression.function.name())
+    let function = receiver.dot(mangleName(expression.function.name()))
 
     let declaredTypeParameters = (expression.function.typeParameters(context) as Iterable<HirParameterType>)
     assert(
@@ -52,8 +60,7 @@ public fun compileFunctionCallValueExpression(
     let valueArgumentsInCorrectOrder = (expression.function.valueParameters(context) as Iterable<HirValueParameter>)
       .map<HirValueExpressionUri>({ expression.valueArguments.get(it.name).unwrap() })
     let valueArguments = typeArgumentsInCorrectOrder
-    // TODO(soon, JonasWanke): Transform these types to the static instance classes.
-      .map<DartExpression>({ DartIdentifier("SomeType", None<String>()) })
+      .map<DartExpression>({ compileNamedTypeStatic(context, it) })
       .followedBy(
         valueArgumentsInCorrectOrder
           .map<DartExpression>({ getValueExpressionResultIdentifier(context, it ) }),
@@ -67,23 +74,5 @@ public fun compileFunctionCallValueExpression(
     )
     statements.append(saveValueExpression(context, uri, expression, result))
     Tuple(statements, List.empty<CompilerError>())
-  })
-}
-
-
-public fun getTypeParameterValueParameterName(
-  context: QueryContext<List<CompilerError>>,
-  typeParameter: HirParameterType,
-): String {
-  query<String, List<CompilerError>>(
-    context,
-    "code_generator_dart.getTypeParameterValueParameterName",
-    typeParameter, {
-    assert(
-      typeParameter.declaration is HirFunction,
-      "Value parameters for type parameters only work for function calls.",
-    )
-
-    Tuple("$type_{typeParameter.name}", List.empty<CompilerError>())
   })
 }

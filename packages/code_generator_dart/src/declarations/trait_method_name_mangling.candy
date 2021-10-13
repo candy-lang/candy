@@ -2,8 +2,11 @@ use compiler_utils
 use hir
 use incremental
 
-public fun getMangledTraitMethodName(context: QueryContext<List<CompilerError>>, traitType: HirNamedType): String {
-  query<String, List<CompilerError>>(context, "code_generator_dart.getMangledTraitMethodName", traitType, {
+public fun getTraitNameMangledForMethodName(
+  context: QueryContext<List<CompilerError>>,
+  traitType: HirNamedType,
+): String {
+  query<String, List<CompilerError>>(context, "code_generator_dart.getTraitNameMangledForMethodName", traitType, {
     // Inspired by https://rust-lang.github.io/rfcs/2603-rust-symbol-name-mangling-v0.html#syntax-of-mangled-names.
     //
     // * "P" <package>: **p**ackage
@@ -23,7 +26,7 @@ public fun getMangledTraitMethodName(context: QueryContext<List<CompilerError>>,
     // * "I" <inlineType>{2,} "E": **i**ntersection type
     let name = encodeNamedType(context, traitType)
 
-    Tuple("$as{name}", List.empty<CompilerError>())
+    Tuple("as{name}", List.empty<CompilerError>())
   })
 }
 
@@ -106,11 +109,8 @@ fun encodeEnumType(
   enumType: HirEnumType,
 ): String {
   let variants = enumType.variants.entries().toList().sortedBy<String>({ it.first })
-  let variants = (variants as Iterable<(String, Maybe<HirInlineType>)>)
-    .map<String>({
-      let typeString = it.second.map<String>({ encodeInlineType(context, it) }).orElse({ "" })
-      "{encodeIdentifier(it.first)}{typeString}"
-    })
+  let variants = (variants as Iterable<(String, HirInlineType)>)
+    .map<String>({ "{encodeIdentifier(it.first)}{encodeInlineType(context, it.second)}" })
     .join("")
   "U{variants}E"
 }

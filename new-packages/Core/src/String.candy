@@ -57,7 +57,3 @@ impl StringBuilder {
   }
   public fun build(): String { this.value.get() }
 }
-
-public trait ToString {
-  fun toString(): String
-}

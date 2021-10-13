@@ -136,17 +136,19 @@ public fun astInlineTypeToHirInlineType(
 
       if (astType is AstEnumType) {
         let loweredVariants = ((astType as AstEnumType).variants as Iterable<AstEnumTypeVariant>)
-          .map<(String, Maybe<HirInlineType>)>({
-            let valueType = it.valueType.map<HirInlineType>({ valueType =>
-              astInlineTypeToHirInlineType(context, valueType, scope)
-            })
+          .map<(String, HirInlineType)>({
+            let valueType = it.valueType
+              .map<HirInlineType>({ valueType =>
+                astInlineTypeToHirInlineType(context, valueType, scope)
+              })
+              .orElse({ HirNamedType.coreNothing(context) })
             Tuple(it.name.value, valueType)
           })
           .toList()
         return Tuple(
           HirEnumType(
-            (loweredVariants as Iterable<(String, Maybe<HirInlineType>)>)
-              .unsafeToMap<String, Maybe<HirInlineType>>(),
+            (loweredVariants as Iterable<(String, HirInlineType)>)
+              .unsafeToMap<String, HirInlineType>(),
           ) as HirInlineType,
           List.empty<CompilerError>(),
         )
