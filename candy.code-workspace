@@ -10,15 +10,15 @@
     },
     {
       "name": "🧸 Playground (new)",
-      "path": "new-packages\\Playground"
+      "path": "new-packages/Playground"
     },
     {
       "name": "Core (new)",
-      "path": "new-packages\\Core"
+      "path": "new-packages/Core"
     },
     {
       "name": "🛒 Shopping List (example)",
-      "path": "new-packages\\ShoppingList"
+      "path": "new-packages/ShoppingList"
     },
     {
       "name": "🧸 Playground",
@@ -26,66 +26,66 @@
     },
     {
       "name": "Core",
-      "path": "packages\\core"
+      "path": "packages/core"
     },
     {
       "name": "Dart Code",
-      "path": "packages\\dart_code"
+      "path": "packages/dart_code"
     },
     {
       "name": "Glados",
-      "path": "packages\\glados"
+      "path": "packages/glados"
     },
     {
       "name": "Incremental",
-      "path": "packages\\incremental"
+      "path": "packages/incremental"
     },
     {
       "name": "PetitParser",
-      "path": "packages\\petit_parser"
+      "path": "packages/petit_parser"
     },
     {
       "name": "Compiler: CST",
-      "path": "packages\\cst"
+      "path": "packages/cst"
     },
     {
       "name": "Compiler: AST",
-      "path": "packages\\ast"
+      "path": "packages/ast"
     },
     {
       "name": "Compiler: HIR",
-      "path": "packages\\hir"
+      "path": "packages/hir"
     },
     {
       "name": "Compiler: Code Generator Dart",
-      "path": "packages\\code_generator_dart"
+      "path": "packages/code_generator_dart"
     },
     {
       "name": "Compiler: Utils",
-      "path": "packages\\compiler_utils"
+      "path": "packages/compiler_utils"
     },
     {
       "name": "Dart-Compiler: parser",
-      "path": "packages\\parser"
+      "path": "packages/parser"
     },
     {
       "name": "Dart-Compiler: compiler",
-      "path": "packages\\compiler"
+      "path": "packages/compiler"
     },
     {
       "name": "Dart-Compiler: compiler_dart",
-      "path": "packages\\compiler_dart"
+      "path": "packages/compiler_dart"
     },
     {
       "name": "Dart-Compiler: lsp_server",
-      "path": "packages\\lsp_server"
+      "path": "packages/lsp_server"
     },
     {
       "name": "Dart-Compiler: vscode_extension",
-      "path": "packages\\vscode_extension"
+      "path": "packages/vscode_extension"
     },
     {
-      "path": "packages\\name_checker"
+      "path": "packages/name_checker"
     }
   ],
   "launch": {
