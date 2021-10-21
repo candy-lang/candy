@@ -21,7 +21,8 @@ fun main() {
     ),
     declarations = List.of3<DartDeclaration>(
       DartFunction(
-        "main",
+        isStatic = false,
+        name = "main",
         docComment = None<String>(),
         annotations = List.of1<DartAnnotation>(
           DartAnnotation(
@@ -174,7 +175,8 @@ fun main() {
             ),
           ),
           DartFunction(
-            "blub",
+            isStatic = false,
+            name = "blub",
             docComment = None<String>(),
             annotations = List.empty<DartAnnotation>(),
             _returns = Some<DartType>(

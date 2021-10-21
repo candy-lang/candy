@@ -226,6 +226,7 @@ impl DartFunction: DartToCode {
     if _returns is Some {
       s = "{(_returns.unwrap() as DartToCode).toCode(importAllocator)} {s}"
     }
+    if isStatic { s = "static {s}" }
     s = "{docCommentToCode(docComment)}{annotationsToCode(importAllocator, annotations)} {s}"
     let parameters = parametersToCode(
       (requiredParameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode(importAllocator) }),

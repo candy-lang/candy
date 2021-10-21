@@ -144,6 +144,7 @@ class DartFunction {
   ///   print('a=$a, b=$b, c=$c');
   /// }
 
+  let isStatic: Bool = false
   let name: String
   let docComment: Maybe<String> = None<String>()
   let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
