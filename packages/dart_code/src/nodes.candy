@@ -274,15 +274,14 @@ class DartTypeParameter {
 trait DartExpression {
   fun dot(property: String): DartNavigation { DartNavigation(this, property) }
   public fun call0(): DartCall {
-    call(
-      positionalArguments = List.empty<DartExpression>(),
-      namedArguments = Map.empty<String, DartExpression>(),
-      typeArguments = List.empty<DartType>(),
-    )
+    callPositional(List.empty<DartExpression>())
   }
   public fun call1(positionalArgument: DartExpression): DartCall {
+    callPositional(List.of1<DartExpression>(positionalArgument))
+  }
+  public fun callPositional(positionalArguments: List<DartExpression>): DartCall {
     call(
-      positionalArguments = List.of1<DartExpression>(positionalArgument),
+      positionalArguments = positionalArguments,
       namedArguments = Map.empty<String, DartExpression>(),
       typeArguments = List.empty<DartType>(),
     )
