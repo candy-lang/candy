@@ -352,6 +352,11 @@ class DartNavigation {
 }
 impl DartNavigation: DartExpression
 
+class DartParenthesizedExpression {
+  let target: DartExpression
+}
+impl DartParenthesizedExpression: DartExpression
+
 class DartBinaryOperator {
   let left: DartExpression
   let operator: String

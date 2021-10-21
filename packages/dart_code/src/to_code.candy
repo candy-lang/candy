@@ -410,6 +410,11 @@ impl DartNavigation: DartToCode {
     "{(target as DartToCode).toCode(importAllocator)}.{property}"
   }
 }
+impl DartParenthesizedExpression: DartToCode {
+  fun toCode(importAllocator: DartImportAllocator): String {
+    "({(target as DartToCode).toCode(importAllocator)})"
+  }
+}
 impl DartBinaryOperator: DartToCode {
   fun toCode(importAllocator: DartImportAllocator): String {
     "{(left as DartToCode).toCode(importAllocator)} {operator} {(right as DartToCode).toCode(importAllocator)}"
