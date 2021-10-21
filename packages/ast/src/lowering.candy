@@ -393,6 +393,12 @@ fun lowerImpl(
   }
   let type = cst.child.type.map<AstInlineType>({ lowerInlineType(context, id, it) })
 
+  if (cst.child.traits is None) {
+    context.addError(UnsupportedFeatureCompilerError(
+      None<Location>(),
+      "Impls without an implemented trait are not yet supported.",
+    ))
+  }
   let traits = cst.child.traits
       .map<AstInlineType>({
         if it.second is None<CstNode<CstInlineType>> {
