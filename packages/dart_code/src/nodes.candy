@@ -321,6 +321,7 @@ class DartIdentifier {
 impl DartIdentifier: DartExpression
 
 let this_ = DartIdentifier("this", None<String>())
+let dartAssert = DartIdentifier("assert", None<String>())
 
 class DartNullLiteral {}
 impl DartNullLiteral: DartExpression
