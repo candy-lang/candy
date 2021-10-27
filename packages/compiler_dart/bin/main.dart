@@ -1,10 +1,10 @@
 import 'dart:io';
 
 import 'package:args/args.dart';
-import 'package:path/path.dart' as p;
 import 'package:args/command_runner.dart';
 import 'package:compiler/compiler.dart';
 import 'package:compiler_dart/compiler_dart.dart';
+import 'package:path/path.dart' as p;
 
 const _optionCandyDirectory = 'core-path';
 
