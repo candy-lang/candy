@@ -57,7 +57,7 @@ public fun compileEnumTypeDeclarations(
         (compileEnumTypeDeclaration(context, it) as Iterable<DartDeclaration>)
       })
       .toList()
-    Tuple(Tuple(HirModule.syntheticEnums(context), classes), List.empty<CompilerError>())
+    Tuple(Tuple(HirModule.syntheticEnumTypes(context), classes), List.empty<CompilerError>())
   })
 }
 fun compileEnumTypeDeclaration(
@@ -350,11 +350,11 @@ fun compileEnumTypeInlineType(
     )
 
     let dartDeclaration = DartClass(
-      name = compileRawEnumType(context, variantNames, "InlineType").name,
+      name = name.name,
       docComment = None<String>(),
       // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
-      annotations = List.empty<DartAnnotation>(),
-      isAbstract = true,
+      annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
+      isAbstract = false,
       typeParameters = List.empty<DartTypeParameter>(),
       extends_ = None<DartType>(),
       implements_ = List.of1<DartType>(enumInlineTypeType),
