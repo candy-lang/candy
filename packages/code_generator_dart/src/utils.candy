@@ -31,3 +31,13 @@ let traitInlineTypeType = DartNamedType(
   DartIdentifier("InlineType$Trait", Some<String>(candyDartUtilsImportUrl)),
   List.empty<DartType>(),
 )
+
+// Enums
+let enumValueType = DartNamedType(
+  DartIdentifier("Value$Enum", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+let enumInlineTypeType = DartNamedType(
+  DartIdentifier("InlineType$Enum", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)

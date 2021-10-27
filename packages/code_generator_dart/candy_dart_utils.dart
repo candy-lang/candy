@@ -18,19 +18,39 @@ class NonLocalReturnException {
   final dynamic value;
 }
 
-/// This is the base class for all Candy values.
-abstract class CandyValue {
-  const CandyValue();
+/// This is the base class for all generated `Value$` classes.
+abstract class Value {
+  InlineType get inlineType;
 }
 
-/// This is the base class for all generated `$Static` classes.
-abstract class CandyInlineType {
-  const CandyInlineType();
+/// This is the base class for all generated `InlineType$` classes.
+abstract class InlineType {
+  bool equals(InlineType other);
 }
 
-abstract class CandyTypeInlineType {
-  const CandyTypeInlineType();
+// Type declarations
+
+@sealed
+class Value$Type implements Value {
+  const Value$Type(this.inlineType, this.value);
+
+  @override
+  final InlineType inlineType;
+
+  final Value value;
 }
-abstract class CandyTraitInlineType {
-  const CandyTraitInlineType();
+
+abstract class InlineType$Type implements InlineType {}
+
+// Trait declarations
+
+abstract class Value$Trait implements Value {}
+
+abstract class InlineType$Trait implements InlineType {}
 }
+
+// Enums
+
+abstract class Value$Enum implements Value {}
+
+abstract class InlineType$Enum implements InlineType {}
