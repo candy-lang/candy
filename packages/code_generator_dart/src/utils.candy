@@ -1,0 +1,33 @@
+use dart_code
+use hir
+
+use ..compile
+
+let valueType = DartNamedType(
+  DartIdentifier("Value", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+let inlineTypeType = DartNamedType(
+  DartIdentifier("InlineType", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+
+// Type declarations
+let typeValueType = DartNamedType(
+  DartIdentifier("Value$Type", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+let typeInlineTypeType = DartNamedType(
+  DartIdentifier("InlineType$Type", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+
+// Trait declarations
+let traitValueType = DartNamedType(
+  DartIdentifier("Value$Trait", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+let traitInlineTypeType = DartNamedType(
+  DartIdentifier("InlineType$Trait", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)

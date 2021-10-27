@@ -3,9 +3,9 @@ use dart_code
 use hir
 use incremental
 
+use ...utils
 use ..name_mangling
 use ..type
-use ..utils
 
 public fun compileTrait(
   context: QueryContext<List<CompilerError>>,
@@ -76,7 +76,7 @@ fun compileInstanceTrait(
       docComment = None<String>(),
       isStatic = false,
       mutability = DartFinal(),
-      type = Some<DartType>(candyValueType),
+      type = Some<DartType>(valueType),
       initialValue = None<DartExpression>(),
     ))
 

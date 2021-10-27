@@ -2,6 +2,7 @@ use compiler_utils
 use dart_code
 use hir
 use incremental
+
 use ..name_mangling
 
 public fun compileType(
