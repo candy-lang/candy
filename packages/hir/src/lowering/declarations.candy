@@ -141,6 +141,10 @@ public fun isPublicFromModifiers(modifiers: List<AstIdentifier>): Bool {
   // TODO(never, JonasWanke): This should resolve modifier names when we support custom annotations.
   (modifiers as Iterable<AstIdentifier>).any({ it.value == "public" })
 }
+public fun isBuiltinFromModifiers(modifiers: List<AstIdentifier>): Bool {
+  // TODO(never, JonasWanke): This should resolve modifier names when we support custom annotations.
+  (modifiers as Iterable<AstIdentifier>).any({ it.value == "builtin" })
+}
 
 // TODO(never, marcelgarus): `HirModule`s implement the `HasDeclarations` trait. Because the Dart lowering
 // is weird, we can't just add impls to traits (they will be mixed in, but the subclasses only
@@ -519,6 +523,11 @@ impl HirType: HasAst<AstType> & HasDeclarations & HasTypeParameters & HasVisibil
   fun isPublic(context: QueryContext<List<CompilerError>>): Bool {
     query<Bool, List<CompilerError>>(context, "HirType.isPublic", this, {
       Tuple(isPublicFromModifiers(ast(context).modifiers), List.empty<CompilerError>())
+    })
+  }
+  fun isBuiltin(context: QueryContext<List<CompilerError>>): Bool {
+    query<Bool, List<CompilerError>>(context, "HirType.isBuiltin", this, {
+      Tuple(isBuiltinFromModifiers(ast(context).modifiers), List.empty<CompilerError>())
     })
   }
 }

@@ -31,8 +31,8 @@ abstract class InlineType {
 // Type declarations
 
 @sealed
-class Value$Type implements Value {
-  const Value$Type(this.inlineType, this.value);
+class Value$Named$Type implements Value {
+  const Value$Named$Type(this.inlineType, this.value);
 
   @override
   final InlineType inlineType;
@@ -40,13 +40,13 @@ class Value$Type implements Value {
   final Value value;
 }
 
-abstract class InlineType$Type implements InlineType {}
+abstract class InlineType$Named$Type implements InlineType {}
 
 // Trait declarations
 
-abstract class Value$Trait implements Value {}
+abstract class Value$Named$Trait implements Value {}
 
-abstract class InlineType$Trait implements InlineType {}
+abstract class InlineType$Named$Trait implements InlineType {}
 }
 
 // Functions

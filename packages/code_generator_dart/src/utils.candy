@@ -13,22 +13,22 @@ let inlineTypeType = DartNamedType(
 )
 
 // Type declarations
-let typeValueType = DartNamedType(
-  DartIdentifier("Value$Type", Some<String>(candyDartUtilsImportUrl)),
+let typeNamedValueType = DartNamedType(
+  DartIdentifier("Value$Named$Type", Some<String>(candyDartUtilsImportUrl)),
   List.empty<DartType>(),
 )
-let typeInlineTypeType = DartNamedType(
-  DartIdentifier("InlineType$Type", Some<String>(candyDartUtilsImportUrl)),
+let typeNamedInlineTypeType = DartNamedType(
+  DartIdentifier("InlineType$Named$Type", Some<String>(candyDartUtilsImportUrl)),
   List.empty<DartType>(),
 )
 
 // Trait declarations
-let traitValueType = DartNamedType(
-  DartIdentifier("Value$Trait", Some<String>(candyDartUtilsImportUrl)),
+let traitNamedValueType = DartNamedType(
+  DartIdentifier("Value$Named$Trait", Some<String>(candyDartUtilsImportUrl)),
   List.empty<DartType>(),
 )
-let traitInlineTypeType = DartNamedType(
-  DartIdentifier("InlineType$Trait", Some<String>(candyDartUtilsImportUrl)),
+let traitNamedInlineTypeType = DartNamedType(
+  DartIdentifier("InlineType$Named$Trait", Some<String>(candyDartUtilsImportUrl)),
   List.empty<DartType>(),
 )
 

@@ -31,6 +31,9 @@ public trait HirModule: HirDeclaration & Equals & Hash {
       Tuple(HirTopLevelModule(Package.synthetic(context)), List.empty<CompilerError>())
     })
   }
+  static fun syntheticNamedTypes(context: QueryContext<List<CompilerError>>): HirModule {
+    synthetic(context).innerModule("NamedTypes")
+  }
   static fun syntheticFunctionTypes(context: QueryContext<List<CompilerError>>): HirModule {
     synthetic(context).innerModule("FunctionTypes")
   }
