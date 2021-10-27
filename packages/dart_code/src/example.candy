@@ -123,7 +123,7 @@ fun main() {
             "isEmpty",
             docComment = None<String>(),
             type = dartBool,
-            body = Some<DartBody>(DartInlineBody(this_.dot("length").equals(DartIntLiteral(0)))),
+            body = Some<DartBody>(DartInlineBody(dartThis.dot("length").equals(DartIntLiteral(0)))),
           ),
           // set isEmpty(bool value) {
           //   if (value) {
