@@ -8,36 +8,56 @@ public use .function_type
 public use .named_type
 public use .struct_type
 
-public fun compileInlineType(
+public fun compileInlineTypeValue(
   context: QueryContext<List<CompilerError>>,
   inlineType: HirInlineType,
-): DartType {
-  query<DartType, List<CompilerError>>(
+): DartIdentifier {
+  query<DartIdentifier, List<CompilerError>>(
     context,
-    "code_generator_dart.compileInlineType",
+    "code_generator_dart.compileInlineTypeValue",
     inlineType, {
-    Tuple(compileInlineTypeHelper(context, inlineType), List.empty<CompilerError>())
+    Tuple(compileInlineType(context, inlineType, "Value"), List.empty<CompilerError>())
   })
 }
-
-fun compileInlineTypeHelper(
+public fun compileInlineTypeInlineType(
   context: QueryContext<List<CompilerError>>,
   inlineType: HirInlineType,
-): DartType {
+): DartIdentifier {
+  query<DartIdentifier, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileInlineTypeInlineType",
+    inlineType, {
+    Tuple(compileInlineType(context, inlineType, "InlineType"), List.empty<CompilerError>())
+  })
+}
+fun compileInlineType(
+  context: QueryContext<List<CompilerError>>,
+  inlineType: HirInlineType,
+  prefix: String,
+): DartIdentifier {
   if (inlineType is HirErrorType) { throw "Tried to compile an error type to Dart." }
-  if (inlineType is HirNamedType) { return compileNamedType(context, inlineType as HirNamedType) }
+  if (inlineType is HirNamedType) {
+    return compileNamedType(context, inlineType as HirNamedType, prefix)
+  }
   if (inlineType is HirFunctionType) {
-    return compileFunctionType(context, inlineType as HirFunctionType)
+    return compileFunctionType(context, inlineType as HirFunctionType, prefix)
   }
   if (inlineType is HirStructType) {
-    return compileStructType(context, inlineType as HirStructType)
+    return compileStructType(context, inlineType as HirStructType, prefix)
   }
-  if (inlineType is HirEnumType) { return compileEnumType(context, inlineType as HirEnumType) }
+  if (inlineType is HirEnumType) {
+    return compileEnumType(context, inlineType as HirEnumType, prefix)
+  }
+  // TODO(soon): Can intersection and this types stay like this?
   if (inlineType is HirIntersectionType) { return dartDynamic }
   if (inlineType is HirThisType) { return dartDynamic }
   if (inlineType is HirParameterType) {
-    let name = (inlineType as HirParameterType).name
-    return DartNamedType(DartIdentifier(name, None<String>()), List.empty<DartType>())
+    assert(prefix == "InlineType", "Parameter types can't be compiled to value types.")
+    let parameterType = (inlineType as HirParameterType)
+    if (parameterType.declaration is HirImpl || parameterType.declaration is HirFunction) {
+      return DartIdentifier("typeArgument${parameterType.name}", None<String>())
+    }
+    return DartIdentifier("inlineType", None<String>()).dot("typeArgument${parameterType.name}")
   }
   if (inlineType is HirReflectionType) {
     todo("soon, Compile HirReflectionType to Dart")

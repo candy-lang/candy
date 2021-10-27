@@ -32,6 +32,26 @@ let traitNamedInlineTypeType = DartNamedType(
   List.empty<DartType>(),
 )
 
+// Functions
+let functionValueType = DartNamedType(
+  DartIdentifier("Value$Function", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+let functionInlineTypeType = DartNamedType(
+  DartIdentifier("InlineType$Function", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+
+// Structs
+let structValueType = DartNamedType(
+  DartIdentifier("Value$Struct", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+let structInlineTypeType = DartNamedType(
+  DartIdentifier("InlineType$Struct", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+
 // Enums
 let enumValueType = DartNamedType(
   DartIdentifier("Value$Enum", Some<String>(candyDartUtilsImportUrl)),

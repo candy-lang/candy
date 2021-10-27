@@ -42,7 +42,9 @@ public fun compileFunctionTypeDeclarations(
       .map<Int>({ getParameterCount(it) })
       .toSet()
     let classes = parameterCounts.items()
-      .map<DartDeclaration>({ compileFunctionTypeDeclaration(context, it) })
+      .map<DartDeclaration>({
+        (compileFunctionTypeDeclaration(context, it) as Iterable<DartClass>).cast<DartDeclaration>()
+      })
       .toList()
     Tuple(Tuple(HirModule.syntheticFunctionTypes(context), classes), List.empty<CompilerError>())
   })
@@ -290,7 +292,7 @@ fun compileFunctionTypeInlineType(
       docComment = None<String>(),
       // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
       annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
-      isAbstract = true,
+      isAbstract = false,
       typeParameters = List.empty<DartTypeParameter>(),
       extends_ = None<DartType>(),
       implements_ = List.of1<DartType>(functionInlineTypeType),

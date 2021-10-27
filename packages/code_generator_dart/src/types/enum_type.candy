@@ -51,7 +51,7 @@ public fun compileEnumTypeDeclarations(
       .toSet()
     let classes = variantCounts.items()
       .expand<DartDeclaration>({
-        (compileEnumTypeDeclaration(context, it) as Iterable<DartDeclaration>)
+        (compileEnumTypeDeclaration(context, it) as Iterable<DartClass>).cast<DartDeclaration>()
       })
       .toList()
     Tuple(Tuple(HirModule.syntheticEnumTypes(context), classes), List.empty<CompilerError>())
