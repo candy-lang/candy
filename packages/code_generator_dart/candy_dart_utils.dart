@@ -49,6 +49,12 @@ abstract class Value$Trait implements Value {}
 abstract class InlineType$Trait implements InlineType {}
 }
 
+// Structs
+
+abstract class Value$Struct implements Value {}
+
+abstract class InlineType$Struct implements InlineType {}
+
 // Enums
 
 abstract class Value$Enum implements Value {}
