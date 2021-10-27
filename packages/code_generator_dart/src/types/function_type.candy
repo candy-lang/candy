@@ -142,11 +142,11 @@ fun compileFunctionTypeInlineType(
       isConst = true,
       requiredParameters = 0.until(parameterCount)
         .map<DartParameter | DartInitializingFormal>({
-          DartInitializingFormal("typeParameter$T{it}", None<DartExpression>())
+          DartInitializingFormal("typeArgument${it}", None<DartExpression>())
         })
         .toList()
         .followedByList(List.of1<DartParameter | DartInitializingFormal>(
-          DartInitializingFormal("typeParameter$TReturn", None<DartExpression>()),
+          DartInitializingFormal("typeArgument$Return", None<DartExpression>()),
         )),
       positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
       namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
@@ -196,10 +196,10 @@ fun compileFunctionTypeInlineType(
         (DartIdentifier("isOfThisType", None<String>()) as DartExpression)
           .callPositional(
             0.until(parameterCount)
-              .map<DartExpression>({ DartIdentifier("typeParameter$T{it}", None<String>()) })
+              .map<DartExpression>({ DartIdentifier("typeArgument${it}", None<String>()) })
               .toList()
               .followedByList(List.of2<DartExpression>(
-                DartIdentifier("typeParameter$TReturn", None<String>()),
+                DartIdentifier("typeArgument$Return", None<String>()),
                 DartIdentifier("other", None<String>()),
               )),
           ),
@@ -215,7 +215,7 @@ fun compileFunctionTypeInlineType(
       requiredParameters = 0.until(parameterCount)
         .map<DartParameter>({
           DartParameter(
-            "typeParameter$T{it}",
+            "typeArgument${it}",
             isRequired = true,
             type = Some<DartType>(inlineTypeType),
             defaultValue = None<DartExpression>(),
@@ -224,7 +224,7 @@ fun compileFunctionTypeInlineType(
         .toList()
         .followedByList(List.of2<DartParameter>(
           DartParameter(
-            "typeParameter$TReturn",
+            "typeArgument$Return",
             isRequired = true,
             type = Some<DartType>(inlineTypeType),
             defaultValue = None<DartExpression>(),
@@ -241,11 +241,11 @@ fun compileFunctionTypeInlineType(
       body = Some<DartBody>(DartInlineBody(
         0.until(parameterCount)
           .map<DartExpression>({
-            (DartIdentifier("typeParameter$T{it}", None<String>()) as DartExpression)
+            (DartIdentifier("typeArgument${it}", None<String>()) as DartExpression)
               .dot("equals")
               .call1(
                 (DartIdentifier("inlineType", None<String>()) as DartExpression)
-                  .dot("typeParameter$T{it}"),
+                  .dot("typeArgument${it}"),
               )
           })
           .foldLeft<DartExpression>(
@@ -253,11 +253,11 @@ fun compileFunctionTypeInlineType(
             { result, item => result.and(item) },
           )
           .and(
-            (DartIdentifier("typeParameter$TReturn", None<String>()) as DartExpression)
+            (DartIdentifier("typeArgument$Return", None<String>()) as DartExpression)
               .dot("equals")
               .call1(
                 (DartIdentifier("inlineType", None<String>()) as DartExpression)
-                  .dot("typeParameter$TReturn"),
+                  .dot("typeArgument$Return"),
               ),
           ),
       )),
@@ -267,7 +267,7 @@ fun compileFunctionTypeInlineType(
       0.until(parameterCount)
         .map<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>({
           DartField(
-            "typeParameter$T{it}",
+            "typeArgument${it}",
             docComment = None<String>(),
             isStatic = false,
             mutability = DartFinal(),
@@ -277,7 +277,7 @@ fun compileFunctionTypeInlineType(
         }),
     )
     body.append(DartField(
-      "typeParameter$TReturn",
+      "typeArgument$Return",
       docComment = None<String>(),
       isStatic = false,
       mutability = DartFinal(),
