@@ -279,6 +279,12 @@ trait DartExpression {
   public fun call1(positionalArgument: DartExpression): DartCall {
     callPositional(List.of1<DartExpression>(positionalArgument))
   }
+  public fun call2(
+    firstPositionalArgument: DartExpression,
+    secondPositionalArgument: DartExpression,
+  ): DartCall {
+    callPositional(List.of2<DartExpression>(firstPositionalArgument, secondPositionalArgument))
+  }
   public fun callPositional(positionalArguments: List<DartExpression>): DartCall {
     call(
       positionalArguments = positionalArguments,
