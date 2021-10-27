@@ -13,17 +13,21 @@ public fun compileStructType(
   structType: HirStructType,
   prefix: String,
 ): DartIdentifier {
-  /// Example: `(first: Foo, second: Bar)` -> `Struct$first$second`
+  /// Example: `(first: Foo, second: Bar)` -> `Struct$2`
 
-  compileRawStructType(context, structType.types.map<String>({ it.first }).toSet(), prefix)
+  compileRawStructType(
+    context,
+    (structType.types as Iterable<(String, HirInlineType)>).length(),
+    prefix,
+  )
 }
 fun compileRawStructType(
   context: QueryContext<List<CompilerError>>,
-  fieldNames: Set<String>,
+  fieldCount: Int,
   prefix: String,
 ): DartIdentifier {
   DartIdentifier(
-    "{prefix}$Struct${orderStructFields(fieldNames).join("$")}",
+    "{prefix}$Struct${fieldCount}",
     Some<String>(moduleHirToImportUrl(context, HirModule.syntheticStructTypes(context))),
   )
 }
@@ -40,13 +44,11 @@ public fun compileStructTypeDeclarations(
     context,
     "code_generator_dart.compileStructTypeDeclarations",
     package, {
-    let fieldNames = getAllInlineTypes(context, package).items()
+    let fieldCounts = getAllInlineTypes(context, package).items()
       .whereType<HirStructType>()
-      .map<Set<String>>({
-        (it.types as Iterable<(String, HirInlineType)>).map<String>({ it.first }).toSet()
-      })
+      .map<Int>({ (it.types as Iterable<(String, HirInlineType)>).length() })
       .toSet()
-    let classes = fieldNames.items()
+    let classes = fieldCounts.items()
       .map<DartDeclaration>({ compileStructTypeDeclaration(context, it) })
       .toList()
     Tuple(Tuple(HirModule.syntheticStructTypes(context), classes), List.empty<CompilerError>())
@@ -54,15 +56,15 @@ public fun compileStructTypeDeclarations(
 }
 fun compileStructTypeDeclaration(
   context: QueryContext<List<CompilerError>>,
-  fieldNames: Set<String>,
+  fieldCount: Int,
 ): List<DartClass> {
   query<List<DartClass>, List<CompilerError>>(
     context,
     "code_generator_dart.compileStructTypeDeclaration",
-    fieldNames, {
+    fieldCount, {
     let classes = List.of2<DartClass>(
-      compileStructTypeValue(context, fieldNames),
-      compileStructTypeInlineType(context, fieldNames),
+      compileStructTypeValue(context, fieldCount),
+      compileStructTypeInlineType(context, fieldCount),
     )
     Tuple(classes, List.empty<CompilerError>())
   })
@@ -70,14 +72,13 @@ fun compileStructTypeDeclaration(
 
 fun compileStructTypeValue(
   context: QueryContext<List<CompilerError>>,
-  fieldNames: Set<String>,
+  fieldCount: Int,
 ): DartClass {
   query<DartClass, List<CompilerError>>(
     context,
     "code_generator_dart.compileStructTypeValue",
-    fieldNames, {
-    let name = compileRawStructType(context, fieldNames, "Value")
-    let fields = orderStructFields(fieldNames)
+    fieldCount, {
+    let name = compileRawStructType(context, fieldCount, "Value")
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
     body.append(DartConstructor(
@@ -91,9 +92,9 @@ fun compileStructTypeValue(
           DartInitializingFormal("inlineType", None<DartExpression>()),
         )
         .followedByList(
-          fields
+          0.until(fieldCount)
             .map<DartParameter | DartInitializingFormal>({
-              DartInitializingFormal(mangleName(context, it), defaultValue = None<DartExpression>())
+              DartInitializingFormal("value${it}", defaultValue = None<DartExpression>())
             })
             .toList(),
         ),
@@ -113,10 +114,10 @@ fun compileStructTypeValue(
     ))
 
     body.appendAll(
-      fields
+      0.until(fieldCount)
         .map<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>({
           DartField(
-            mangleName(context, it),
+            "value${it}",
             docComment = None<String>(),
             // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
             isStatic = false,
@@ -145,14 +146,13 @@ fun compileStructTypeValue(
 
 fun compileStructTypeInlineType(
   context: QueryContext<List<CompilerError>>,
-  fieldNames: Set<String>,
+  fieldCount: Int,
 ): DartClass {
   query<DartClass, List<CompilerError>>(
     context,
     "code_generator_dart.compileStructTypeInlineType",
-    fieldNames, {
-    let name = compileRawStructType(context, fieldNames, "InlineType")
-    let fields = orderStructFields(fieldNames)
+    fieldCount, {
+    let name = compileRawStructType(context, fieldCount, "InlineType")
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
     body.append(DartConstructor(
@@ -161,9 +161,9 @@ fun compileStructTypeInlineType(
       docComment = None<String>(),
       annotations = List.empty<DartAnnotation>(),
       isConst = true,
-      requiredParameters = fields
+      requiredParameters = 0.until(fieldCount)
         .map<DartParameter | DartInitializingFormal>({
-          DartInitializingFormal("typeParameter$T{it}", None<DartExpression>())
+          DartInitializingFormal("typeArgument${it}", None<DartExpression>())
         })
         .toList(),
       positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
@@ -178,10 +178,10 @@ fun compileStructTypeInlineType(
       annotations = List.empty<DartAnnotation>(),
       _returns = Some<DartType>(valueType),
       typeParameters = List.empty<DartTypeParameter>(),
-      requiredParameters = fields
+      requiredParameters = 0.until(fieldCount)
         .map<DartParameter>({
           DartParameter(
-            mangleName(context, it),
+            "value${it}",
             isRequired = true,
             type = Some<DartType>(valueType),
             defaultValue = None<DartExpression>(),
@@ -191,13 +191,15 @@ fun compileStructTypeInlineType(
       positionalParameters = List.empty<DartParameter>(),
       namedParameters = List.empty<DartParameter>(),
       body = Some<DartBody>(DartInlineBody(
-        (compileRawStructType(context, fieldNames, "Value") as DartExpression)
+        (compileRawStructType(context, fieldCount, "Value") as DartExpression)
           .dot("_")
           .callPositional(
             List
               .of1<DartExpression>(dartThis)
               .followedByList(
-                fields.map<DartExpression>({ DartIdentifier(mangleName(context, it)) }).toList(),
+                0.until(fieldCount)
+                  .map<DartExpression>({ DartIdentifier("value${it}", None<String>()) })
+                  .toList(),
               ),
           ),
       )),
@@ -222,7 +224,7 @@ fun compileStructTypeInlineType(
         (DartIdentifier("isOfThisType", None<String>()) as DartExpression)
           .callPositional(
             fields
-              .map<DartExpression>({ DartIdentifier("typeParameter$T{it}", None<String>()) })
+              .map<DartExpression>({ DartIdentifier("typeArgument${it}", None<String>()) })
               .toList()
               .followedByList(List.of1<DartExpression>(DartIdentifier("other", None<String>()))),
           ),
@@ -238,7 +240,7 @@ fun compileStructTypeInlineType(
       requiredParameters = fields
         .map<DartParameter>({
           DartParameter(
-            "typeParameter$T{it}",
+            "typeArgument${it}",
             isRequired = true,
             type = Some<DartType>(inlineTypeType),
             defaultValue = None<DartExpression>(),
@@ -254,13 +256,13 @@ fun compileStructTypeInlineType(
       positionalParameters = List.empty<DartParameter>(),
       namedParameters = List.empty<DartParameter>(),
       body = Some<DartBody>(DartInlineBody(
-        variants
+        fields
           .map<DartExpression>({
-            (DartIdentifier("typeParameter$T{it}", None<String>()) as DartExpression)
+            (DartIdentifier("typeArgument${it}", None<String>()) as DartExpression)
               .dot("equals")
               .call1(
                 (DartIdentifier("inlineType", None<String>()) as DartExpression)
-                  .dot("typeParameter$T{it}"),
+                  .dot("typeArgument${it}"),
               )
           })
           .foldLeft<DartExpression>(
@@ -274,7 +276,7 @@ fun compileStructTypeInlineType(
       fields
         .map<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>({
           DartField(
-            "typeParameter$T{it}",
+            "typeArgument${it}",
             docComment = None<String>(),
             isStatic = false,
             mutability = DartFinal(),
@@ -298,8 +300,4 @@ fun compileStructTypeInlineType(
     )
     Tuple(dartDeclaration, List.empty<CompilerError>())
   })
-}
-
-fun orderStructFields(fieldNames: Set<String>): Iterable<String> {
-  fieldNames.items().toList().unsafeSorted()
 }
