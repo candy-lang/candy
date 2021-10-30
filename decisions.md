@@ -65,7 +65,7 @@ This are the two options we considered:
 
     // Own functions
 
-    // Inherited functions
+    // Impl functions
     final Value Function() impl$MangledBar;
   }
   ```
