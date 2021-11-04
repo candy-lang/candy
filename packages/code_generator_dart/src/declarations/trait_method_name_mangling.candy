@@ -2,32 +2,113 @@ use compiler_utils
 use hir
 use incremental
 
-public fun getTraitNameMangledForMethodName(
-  context: QueryContext<List<CompilerError>>,
-  traitType: HirNamedType,
-): String {
-  query<String, List<CompilerError>>(context, "code_generator_dart.getTraitNameMangledForMethodName", traitType, {
-    // Inspired by https://rust-lang.github.io/rfcs/2603-rust-symbol-name-mangling-v0.html#syntax-of-mangled-names.
-    //
-    // * "P" <package>: **p**ackage
-    //
-    // Declarations:
-    //
-    // * "N" <module/trait/type>: **n**ested module/trait/type
-    //
-    // Types:
-    //
-    // * "C" <trait/type> <parameterType: inlineType>* "E": named type (**c**oncrete)
-    // * "F" <parameterTypes: inlineType>* <returnType: inlineType> "E": **f**unction type
-    // * "R" <receiverType: inlineType> <parameterTypes: inlineType>* <returnType: inlineType> "E":
-    //   function type with **r**eceiver
-    // * "S" (<fieldName: identifier> <inlineType>)+ "E": **s**truct type
-    // * "U" (<variantName: identifier> <inlineType>?)+ "E": en**u**m type
-    // * "I" <inlineType>{2,} "E": **i**ntersection type
-    let name = encodeNamedType(context, traitType)
+// Inspired by https://rust-lang.github.io/rfcs/2603-rust-symbol-name-mangling-v0.html#syntax-of-mangled-names.
+//
+// * "P" <package>: **p**ackage
+//
+// Declarations:
+//
+// * "N" <module/trait/type>: **n**ested module/trait/type
+//
+// Types:
+//
+// * "C" <trait/type> <parameterType: inlineType>* "E": named type (**c**oncrete)
+// * "F" <parameterTypes: inlineType>* <returnType: inlineType> "E": **f**unction type
+// * "R" <receiverType: inlineType> <parameterTypes: inlineType>* <returnType: inlineType> "E":
+//   function type with **r**eceiver
+// * "S" (<fieldName: identifier> <inlineType>)+ "E": **s**truct type
+// * "U" (<variantName: identifier> <inlineType>?)+ "E": en**u**m type
+// * "I" <inlineType>{2,} "E": **i**ntersection type
+// * "A" <parameterName><upperBound> "E": p**a**rameter type
+// TODO(JonasWanke, never): Use "M" for module and "N" for named types.
 
-    Tuple("as{name}", List.empty<CompilerError>())
+public fun getTraitUpperBoundImplFunctionName(
+  context: QueryContext<List<CompilerError>>,
+  traitHir: HirTrait,
+  upperBound: HirNamedType,
+  prefix: String,
+): String {
+  query<String, List<CompilerError>>(
+    context,
+    "code_generator_dart.getTraitUpperBoundImplFunctionName",
+    DataTuple3<HirTrait, HirNamedType, String>(traitHir, upperBound, prefix), {
+    assert(
+      namedType.declaration is HirTrait,
+      "Only traits can be the upper bound of traits.",
+    )
+    let mangledTrait = encodeInlineType(context, implHir.baseType(context))
+    let mangledUpperBound = encodeInlineType(context, implHir.implementedTrait(context).unwrap())
+    Tuple("impl${prefix}{mangledTrait}${mangledUpperBound}", List.empty<CompilerError>())
   })
+}
+public fun getTypeAnyImplFunctionName(
+  context: QueryContext<List<CompilerError>>,
+  typeHir: HirType,
+  prefix: String,
+): String {
+  query<String, List<CompilerError>>(
+    context,
+    "code_generator_dart.getTypeAnyImplFunctionName",
+    DataTuple2<HirImpl, String>(typeHir, prefix), {
+    let mangledFrom = encodeType(context, typeHir)
+    let mangledTo = encodeInlineType(context, HirNamedType.coreAny(context))
+    Tuple("impl${prefix}{mangledFrom}${mangledTo}", List.empty<CompilerError>())
+  })
+}
+public fun getImplImplFunctionName(
+  context: QueryContext<List<CompilerError>>,
+  implHir: HirImpl,
+  prefix: String,
+): String {
+  query<String, List<CompilerError>>(
+    context,
+    "code_generator_dart.getImplImplFunctionName",
+    DataTuple2<HirImpl, String>(implHir, prefix), {
+    Tuple("impl${prefix}${mangleImplInformation(context, implHir)}", List.empty<CompilerError>())
+  })
+}
+public fun getTypeArgumentUpperBoundImplFunctionName(
+  context: QueryContext<List<CompilerError>>,
+  typeParameter: ParameterType,
+): String {
+  query<String, List<CompilerError>>(context, "code_generator_dart.getTypeArgumentUpperBoundImplFunctionName", typeParameter, {
+    let mangledTo = encodeInlineType(context, typeParameter.upperBound(context))
+    let typeArgumentString = compileInlineType(context, typeParameter, "InlineType")
+    Tuple("impl${typeArgumentString}${mangledTo}", List.empty<CompilerError>())
+  })
+}
+public fun getTraitUpperBoundImplFunctionName(
+  context: QueryContext<List<CompilerError>>,
+  namedType: HirNamedType,
+): String {
+  query<String, List<CompilerError>>(context, "code_generator_dart.getTraitUpperBoundImplFunctionName", namedType, {
+    assert(
+      namedType.declaration is HirTrait,
+      "Only traits can be the upper bound of traits.",
+    )
+    Tuple("impl${encodeNamedType(context, namedType)}", List.empty<CompilerError>())
+  })
+}
+public fun getFunctionInImplName(
+  context: QueryContext<List<CompilerError>>,
+  functionHir: HirFunction,
+): String {
+  query<String, List<CompilerError>>(context, "code_generator_dart.getFunctionFunctionName", functionHir, {
+    assert(functionHir.parent is HirImpl, "Function must be in an impl.")
+    let prefix = if (functionHir.isStatic(context)) { "InlineType" } else { "Value" }
+    let mangledImpl = mangleImplInformation(functionHir.parent as HirImpl)
+    Tuple("fun${prefix}${mangledImpl}${functionHir.name}", List.empty<CompilerError>())
+  })
+}
+
+fun mangleImplInformation(context: QueryContext<List<CompilerError>>, implHir: HirImpl): String {
+  let mangledBase = encodeInlineType(context, implHir.baseType(context))
+  // TODO(never): Do we really have to mangle the type parameters' upper bounds?
+  let mangledTypeParameterBounds = (implHir.typeParameters(context) as Iterable<HirParameterType>)
+    .map<String>({ encodeInlineType(context, it.upperBound(context)) })
+    .join("")
+  let mangledImplementedTrait = encodeInlineType(context, implHir.implementedTrait(context).unwrap())
+  "{mangledBase}{mangledTypeParameterBounds}${mangledImplementedTrait}"
 }
 
 fun encodePackage(context: QueryContext<List<CompilerError>>, package: Package): String {
@@ -72,6 +153,9 @@ fun encodeInlineType(
   if (inlineType is HirEnumType) { return encodeEnumType(context, inlineType as HirEnumType) }
   if (inlineType is HirIntersectionType) {
     return encodeIntersectionType(context, inlineType as HirIntersectionType)
+  }
+  if (inlineType is HirParameterType) {
+    return encodeParameterType(context, inlineType as HirParameterType)
   }
   throw "Tried to mangle an invalid type: {inlineType}."
 }
@@ -118,5 +202,9 @@ fun encodeIntersectionType(
   context: QueryContext<List<CompilerError>>,
   intersectionType: HirIntersectionType,
 ): String { "I{encodeInlineTypes(context, intersectionType.types, false)}E" }
+fun encodeParameterType(
+  context: QueryContext<List<CompilerError>>,
+  parameterType: HirParameterType,
+): String { "A{encodeIdentifier(parameterType.name)}E" }
 
 fun encodeIdentifier(identifier: String): String { "{identifier.length()}{identifier}" }

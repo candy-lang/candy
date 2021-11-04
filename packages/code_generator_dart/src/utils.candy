@@ -71,3 +71,16 @@ let enumInlineTypeType = DartNamedType(
   DartIdentifier("InlineType$Enum", Some<String>(candyDartUtilsImportUrl)),
   List.empty<DartType>(),
 )
+
+let instanceImplFunctionType = DartFunctionType(
+  parameters = List.of1<DartType | DartParameter>(valueType),
+  positionalParameters = List.empty<DartType | DartParameter>(),
+  namedParameters = List.empty<DartParameter>(),
+  _returns = Some<DartType>(valueType),
+)
+let staticImplFunctionType = DartFunctionType(
+  parameters = List.of1<DartType | DartParameter>(inlineTypeType),
+  positionalParameters = List.empty<DartType | DartParameter>(),
+  namedParameters = List.empty<DartParameter>(),
+  _returns = Some<DartType>(inlineTypeType),
+)
