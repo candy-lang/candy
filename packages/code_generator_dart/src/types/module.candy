@@ -137,3 +137,111 @@ public fun generateInlineTypeCheck(
   }
   throw "Unknown inline type: {expectedType}"
 }
+
+public fun compileInlineTypeUpcast(
+  context: QueryContext<List<CompilerError>>,
+  expression: DartExpression,
+  actual: HirInlineType,
+  target: HirInlineType,
+  scope: Package,
+  prefix: String,
+): DartExpression {
+  query<DartIdentifier, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileInlineTypeUpcast",
+    DataTuple5<DartExpression, HirInlineType, HirInlineType, Package, String>(expression, actual, target, scope, prefix), {
+    Tuple(compileInlineTypeUpcastHelper(context, expression, actual, target, scope), List.empty<CompilerError>())
+  })
+}
+fun compileInlineTypeUpcastHelper(
+  context: QueryContext<List<CompilerError>>,
+  expression: DartExpression,
+  actual: HirInlineType,
+  target: HirInlineType,
+  scope: Package,
+  prefix: String,
+): DartExpression {
+  if (actual is HirErrorType) { throw "Encountered an error type while compiling to Dart." }
+  if (actual == target) { return expression }
+  if (actual == HirNamedType.coreNever(context)) {
+    return DartParenthesizedExpression(
+      DartThrow(DartStringLiteral("Tried to upcast an instance of `Never`.")),
+    )
+  }
+
+  if (target is HirErrorType) { throw "Encountered an error type while compiling to Dart." }
+  if (target is HirNamedType) {
+    let target = (target as HirNamedType)
+    if (target.declaration is HirType) {
+      throw "Generating an upcast to a type is not possible."
+    }
+
+    let source = sourceFor(context, actual, target, scope)
+    if (source is None) {
+      throw "Could not find an impl or upper bound allowing `{actual}` to be upcast to `{expected}`."
+    }
+    let source = source.unwrap()
+
+    if (source is HirTrait || source is HirType) {
+      if (target == HirNamedType.coreAny(context)) {
+        let implFunctionName = getTypeAnyImplFunctionName(context, source as HirType, prefix)
+        return (DartIdentifier(implFunctionName, None<String>()) as DartExpression)
+          .call1(expression)
+      }
+      throw "Tried to generate upcast code from `{actual}` to `{target}` and received an unknown upcast source: `{source}`."
+    }
+    if (source is HirNamedType) {
+      // Upper bound
+      let traitHir = ((actual as HirNamedType).declaration as HirTrait)
+      let expression = DartParenthesizedExpression(
+        expression.as_(compileNamedType(context, source, prefix)),
+      ).dot(getTraitUpperBoundImplFunctionName(context, traitHir, source as HirNamedType, prefix))
+        .call0()
+      return compileInlineTypeUpcast(context, expression, source, target, scope)
+    }
+    if (source is HirImpl) {
+      // Impl
+      let implImplFunctionName = getImplImplFunctionName(context, source as HirImpl, prefix)
+      let expression = (DartIdentifier(implImplFunctionName, None<String>()) as DartExpression)
+        .call1(expression)
+      return compileInlineTypeUpcast(context, expression, source, target, scope)
+    }
+    throw "Received an unknown upcast source type: `{source}`."
+  }
+  if (target is HirFunctionType) {
+    throw "Expression cannot currently be upcasted to function types."
+  }
+  if (target is HirStructType) {
+    throw "Expression cannot currently be upcasted to struct types."
+  }
+  if (target is HirEnumType) {
+    throw "Expression cannot currently be upcasted to enum types."
+  }
+  if (target is HirIntersectionType) {
+    todo("never: support upcasting to intersection types")
+  }
+  if (target is HirThisType) { todo("never: support upcasting to this types") }
+  if (target is HirParameterType) {
+    assert(
+      actual is HirParameterType,
+      "Only type parameters can be upcasted to a different type parameter.",
+    )
+    let implFunctionName = getTypeArgumentUpperBoundImplFunctionName(
+      context,
+      target as HirParameterType,
+    )
+    let actual = (actual as HirParameterType)
+    let implFunction = if (actual.declaration is HirFunction || actual.declaration is HirImpl) {
+      DartIdentifier(implFunctionName, None<String>())
+    } else {
+      DartIdentifier("$staticThis", None<String>()).dot(implFunctionName)
+    }
+    let expression = (implFunction as DartExpression).call0()
+    let newType = (actual as HirParameterType).upperBound(context)
+    return compileInlineTypeUpcast(context, newType, source, target, scope)
+  }
+  if (target is HirReflectionType) {
+    todo("never: support upcasting to reflection types")
+  }
+  throw "Unknown inline type: {target}"
+}

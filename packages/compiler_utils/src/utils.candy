@@ -38,3 +38,56 @@ impl<T1: Equals & Hash, T2: Equals & Hash, T3: Equals & Hash> DataTuple3<T1, T2,
     (third as Hash).hash<T>(hasher)
   }
 }
+
+public class DataTuple4<T1: Equals & Hash, T2: Equals & Hash, T3: Equals & Hash, T4: Equals & Hash> {
+  // TODO(never, JonasWanke): delete this when `(Equals & Hash, Equals & Hash, Equals & Hash, Equals & Hash)` implements
+  // `(Equals & Hash)`.
+  public let first: T1
+  public let second: T2
+  public let third: T3
+  public let fourth: T4
+}
+impl<T1: Equals & Hash, T2: Equals & Hash, T3: Equals & Hash, T4: Equals & Hash> DataTuple4<T1, T2, T3, T4>: Equals & Hash {
+  fun equals(other: This): Bool {
+    let other = (other as DataTuple4<T1, T2, T3, T4>)
+    // TODO(never, marcelgarus): Remove this cast when our type system is smart enough to figure this out.
+    (first as Equals).equalsAny(other.first as Equals) &&
+      (second as Equals).equalsAny(other.second as Equals) &&
+      (third as Equals).equalsAny(other.third as Equals) &&
+      (fourth as Equals).equalsAny(other.fourth as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (first as Hash).hash<T>(hasher)
+    (second as Hash).hash<T>(hasher)
+    (third as Hash).hash<T>(hasher)
+    (fourth as Hash).hash<T>(hasher)
+  }
+}
+
+public class DataTuple5<T1: Equals & Hash, T2: Equals & Hash, T3: Equals & Hash, T4: Equals & Hash, T5: Equals & Hash> {
+  // TODO(never, JonasWanke): delete this when `(Equals & Hash, Equals & Hash, Equals & Hash, Equals & Hash, Equals & Hash)` implements
+  // `(Equals & Hash)`.
+  public let first: T1
+  public let second: T2
+  public let third: T3
+  public let fourth: T4
+  public let fifth: T5
+}
+impl<T1: Equals & Hash, T2: Equals & Hash, T3: Equals & Hash, T4: Equals & Hash, T5: Equals & Hash> DataTuple5<T1, T2, T3, T4, T5>: Equals & Hash {
+  fun equals(other: This): Bool {
+    let other = (other as DataTuple5<T1, T2, T3, T4, T5>)
+    // TODO(never, marcelgarus): Remove this cast when our type system is smart enough to figure this out.
+    (first as Equals).equalsAny(other.first as Equals) &&
+      (second as Equals).equalsAny(other.second as Equals) &&
+      (third as Equals).equalsAny(other.third as Equals) &&
+      (fourth as Equals).equalsAny(other.fourth as Equals) &&
+      (fifth as Equals).equalsAny(other.fifth as Equals)
+  }
+  fun hash<T>(hasher: Hasher<T>) {
+    (first as Hash).hash<T>(hasher)
+    (second as Hash).hash<T>(hasher)
+    (third as Hash).hash<T>(hasher)
+    (fourth as Hash).hash<T>(hasher)
+    (fifth as Hash).hash<T>(hasher)
+  }
+}
