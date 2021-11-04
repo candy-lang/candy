@@ -318,7 +318,7 @@ fun compileDartFunctionType(parameterCount: Int): DartFunctionType {
   DartFunctionType(
     parameters = 0.until(parameterCount).map<DartType | DartParameter>({ valueType }).toList(),
     positionalParameters = List.empty<DartType | DartParameter>(),
-    namedParameters = List.empty<DartType | DartParameter>(),
+    namedParameters = List.empty<DartParameter>(),
     _returns = Some<DartType>(valueType),
   )
 }
