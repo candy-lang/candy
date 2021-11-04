@@ -264,6 +264,7 @@ impl HirImpl {
   }
 
   fun implementedTrait(context: QueryContext<List<CompilerError>>): Maybe<HirInlineType> {
+    // TODO(never): tighten the return type to `HirErrorType | HirNamedType`
     // The implemented trait of this impl. For example, `impl Foo: Equals` implements trait
     // `Equals`, whereas `impl Foo { ... }` implements none.
 
@@ -1209,6 +1210,7 @@ fun getAllImplementedTraitsWithSubstitutionsFor(
   base: HirInlineType,
   scope: Package,
 ): Set<(HirNamedType, Map<HirInlineType, HirInlineType>)> {
+  // TODO(never): can this be removed?
   query<Set<(HirNamedType, Map<HirInlineType, HirInlineType>)>, List<CompilerError>>(context, "getAllImplementedTraitsWithSubstitutionsFor", DataTuple2<HirInlineType, Package>(base, scope), {
     let traits = getAllImplsWithSubstitutionsFor(context, base, scope)
       .items()
