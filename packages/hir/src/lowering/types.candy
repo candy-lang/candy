@@ -1014,32 +1014,34 @@ fun getAllImplsWithSubstitutionsFor(
   context: QueryContext<List<CompilerError>>,
   base: HirInlineType,
   scope: Package,
-): Set<(HirImpl, Map<HirInlineType, HirInlineType>)> {
-  query<Set<(HirImpl, Map<HirInlineType, HirInlineType>)>, List<CompilerError>>(context, "getAllImplsWithSubstitutionsFor", DataTuple2<HirInlineType, Package>(base, scope), {
-    if (base is HirErrorType) { return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>() }
+): Set<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>> {
+  query<Set<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>>, List<CompilerError>>(context, "getAllImplsWithSubstitutionsFor", DataTuple2<HirInlineType, Package>(base, scope), {
+    if (base is HirErrorType) {
+      return Set.empty<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>>()
+    }
     if (base is HirNamedType) {
       return getAllImplsInScope(context, scope).items()
         .maybeMap<SolverSolutionUnique>({
           findUniqueSolverSolutionFor(context, base, it.baseType(context), scope)
         })
-        .map<(HirImpl, Map<HirInlineType, HirInlineType>)>({
+        .map<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>>({
           let substitutions = hirInlineTypeToSolverTypeAndGoalsAndRules(context, base).first
             .unify(it.refinedGoal)
             .unwrap()
-          Tuple(it, substitutions)
+          DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>(it, substitutions)
         })
         .toSet()
     }
     if (base is HirFunctionType) {
-      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+      return Set.empty<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>>()
     }
     if (base is HirStructType) {
       // TODO(soon): create synthetic impls for struct types
-      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+      return Set.empty<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>>()
     }
     if (base is HirEnumType) {
       // TODO(soon): create synthetic impls for enum types
-      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+      return Set.empty<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>>()
     }
     if (base is HirIntersectionType) {
       return ((base as HirIntersectionType).types as Iterable<HirInlineType>)
@@ -1055,7 +1057,7 @@ fun getAllImplsWithSubstitutionsFor(
     }
     if (base is HirReflectionType) {
       // TODO(never): create synthetic impls for reflection types
-      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+      return Set.empty<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>>()
     }
     throw "Unknown HirInlineType: {base}"
   })
