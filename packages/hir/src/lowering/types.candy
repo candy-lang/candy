@@ -774,7 +774,7 @@ class LoweringContext {
       for upperBound in upperBounds {
         let result = hirInlineTypeToSolverTypeAndGoals(upperBound)
         this.rules.insert(SolverRule(
-          declaration,
+          upperBound,
           SolverGoal(upperBound.declaration, List.of1<SolverType>(variable)),
           List.of1<SolverGoal>(SolverGoal(declaration, List.of1<SolverType>(variable))),
         ))
@@ -787,7 +787,7 @@ class LoweringContext {
       let primitive = SolverValue(primitive, solverParameters)
       this.rules.insert(
         SolverRule(
-          declaration,
+          declaration as HirType,
           SolverGoal(
             declaration,
             (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(primitive)),
@@ -863,7 +863,7 @@ class LoweringContext {
     }
 
     // T($T) <- <empty>
-    let primitive = HirType((declaration as HirType).parent, "${declaration.name()}")
+    let primitive = HirType(declaration.parent, "${declaration.name()}")
     let primitive = SolverValue(primitive, solverParameters)
     this.rules.insert(
       SolverRule(
@@ -944,7 +944,7 @@ class LoweringContext {
     }
 
     // T($T) <- <empty>
-    let primitive = HirType((declaration as HirType).parent, "${declaration.name()}")
+    let primitive = HirType(declaration.parent, "${declaration.name()}")
     let primitive = SolverValue(primitive, solverParameters)
     this.rules.insert(
       SolverRule(
@@ -1022,7 +1022,7 @@ class LoweringContext {
     }
 
     // T($T) <- <empty>
-    let primitive = HirType((declaration as HirType).parent, "${declaration.name()}")
+    let primitive = HirType(declaration.parent, "${declaration.name()}")
     let primitive = SolverValue(primitive, solverParameters)
     this.rules.insert(
       SolverRule(
@@ -1123,19 +1123,19 @@ public fun isAssignableTo(
   scope: Package,
 ): Bool {
   query<Bool, List<CompilerError>>(context, "isAssignableTo", DataTuple3<HirInlineType, HirInlineType, Package>(base, trait_, scope), {
-    Tuple(implFor(context, base, trait_, scope) is Some<HirImpl>, List.empty<CompilerError>())
+    Tuple(sourceFor(context, base, trait_, scope) is Some, List.empty<CompilerError>())
   })
 }
-public fun implFor(
+public fun sourceFor(
   context: QueryContext<List<CompilerError>>,
   base: HirInlineType,
   trait_: HirInlineType,
   scope: Package,
-): Maybe<HirImpl> {
-  query<Maybe<HirImpl>, List<CompilerError>>(context, "implFor", DataTuple3<HirInlineType, HirInlineType, Package>(base, trait_, scope), {
+): Maybe<HirTrait | HirType | HirNamedType | HirImpl> {
+  query<Maybe<HirTrait | HirType | HirNamedType | HirImpl>, List<CompilerError>>(context, "sourceFor", DataTuple3<HirInlineType, HirInlineType, Package>(base, trait_, scope), {
     Tuple(
       findUniqueSolverSolutionFor(context, base, trait_, scope)
-        .map<HirImpl>({ it.usedRule.originalImpl as HirImpl }),
+        .map<HirTrait | HirType | HirNamedType | HirImpl>({ it.usedRule.originalImpl as HirTrait | HirType | HirNamedType | HirImpl }),
       List.empty<CompilerError>(),
     )
   })

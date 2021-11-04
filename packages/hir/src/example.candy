@@ -68,8 +68,8 @@ fun solverExample(context: QueryContext<List<CompilerError>>) {
   let a = HirNamedType(declarations.get(1).unwrap() as HirTrait | HirType, List.empty<HirInlineType>())
   let mapAA = HirNamedType(declarations.get(3).unwrap() as HirTrait | HirType, List.of2<HirInlineType>(a, a))
 
-  let theImpl = implFor(context, foo as HirInlineType, mapAA as HirInlineType, playground)
-  print("The impl: {theImpl}")
+  let source = sourceFor(context, foo as HirInlineType, mapAA as HirInlineType, playground)
+  print("The impl: {source}")
 
   print("")
   print("Environment:")
