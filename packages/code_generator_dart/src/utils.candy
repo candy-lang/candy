@@ -32,6 +32,16 @@ let traitNamedInlineTypeType = DartNamedType(
   List.empty<DartType>(),
 )
 
+// Built-in primitives
+let builtinValueTypeIdentifier = DartIdentifier("Value$Builtin", Some<String>(candyDartUtilsImportUrl))
+let builtinNothingValueTypeName = DartNamedType(builtinValueTypeName, List.of1<DartType>(dartNull))
+let builtinIntValueTypeName = DartNamedType(builtinValueTypeName, List.of1<DartType>(dartInt))
+let builtinStringValueTypeName = DartNamedType(builtinValueTypeName, List.of1<DartType>(dartString))
+let builtinInlineTypeIdentifier = DartNamedType(
+  DartIdentifier("InlineType$Builtin", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+
 // Functions
 let functionValueType = DartNamedType(
   DartIdentifier("Value$Function", Some<String>(candyDartUtilsImportUrl)),

@@ -47,6 +47,32 @@ abstract class InlineType$Named$Type implements InlineType {}
 abstract class Value$Named$Trait implements Value {}
 
 abstract class InlineType$Named$Trait implements InlineType {}
+
+// Built-in primitives
+
+@sealed
+class Value$Builtin<T> implements Value {
+  const Value$Builtin._(this.inlineType, this.value);
+
+  @override
+  final InlineType inlineType;
+  final T value;
+}
+
+@sealed
+class InlineType$Builtin<T> implements InlineType {
+  const InlineType$Builtin();
+
+  Value create(T value) => Value$Builtin<T>._(this, value);
+
+  bool equals(InlineType other) => equals(other);
+  static bool isOfThisType<T>(InlineType inlineType) =>
+      inlineType is InlineType$Builtin<T>;
+
+  static Value nothing() => InlineType$Builtin<Null>().create(null);
+  static Value int_(int value) => InlineType$Builtin<int>().create(value);
+  static Value string_(String value) =>
+      InlineType$Builtin<String>().create(value);
 }
 
 // Functions
