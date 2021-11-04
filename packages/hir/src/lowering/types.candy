@@ -240,6 +240,8 @@ impl HirTrait {
         })
         .orElse({ List.empty<HirNamedType | HirErrorType>() })
         .followedByList(List.of1<HirNamedType | HirErrorType>(HirNamedType.coreAny(context)))
+        .toSet()
+        .toList()
       Tuple(upperBounds, List.empty<CompilerError>())
     })
   }
