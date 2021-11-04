@@ -217,17 +217,30 @@ impl HirTrait {
     })
   }
   fun upperBound(context: QueryContext<List<CompilerError>>): List<HirNamedType | HirErrorType> {
+    // TODO(never): return a set, not a list
     query<HirInlineType, List<CompilerError>>(context, "HirTrait.upperBound", this, {
-      Tuple(
-        this.syntheticDeclaration(context)
-          .map<List<HirNamedType | HirErrorType>>({ it.upperBound })
-          .orElse({
-            this.ast(context).upperBound
-              .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
-              .orElse({ HirNamedType.coreAny(context) })
-          }),
-        List.empty<CompilerError>(),
-      )
+      let upperBounds = this.ast(context)
+        .upperBound
+        .map<List<HirNamedType | HirErrorType>>({
+          let rawUpperBound = astInlineTypeToHirInlineType(context, it, this)
+          if (rawUpperBound is HirNamedType || rawUpperBound is HirErrorType) {
+            return List.of1<HirNamedType | HirErrorType>(rawUpperBound as HirNamedType | HirErrorType)
+          }
+          if (rawUpperBound is HirIntersectionType) {
+            return rawUpperBound.types
+              .map<HirNamedType | HirErrorType>({
+                if (it is HirNamedType || it is HirErrorType) {
+                  return (it as HirNamedType | HirErrorType)
+                }
+                throw "Unexpected type in upper bound of trait {this}: `{it}`."
+              })
+              .toList()
+          }
+          throw "Upper bound of trait {this} is invalid: `{rawUpperBound}`."
+        })
+        .orElse({ List.empty<HirNamedType | HirErrorType>() })
+        .followedByList(List.of1<HirNamedType | HirErrorType>(HirNamedType.coreAny(context)))
+      Tuple(upperBounds, List.empty<CompilerError>())
     })
   }
 }
@@ -510,12 +523,6 @@ class LoweringContext {
       SolverGoal(errorType, List.of1<SolverType>(SolverVariable.error())),
       List.empty<SolverGoal>(),
     ))
-    let anyType = HirTrait.coreAny(context)
-    loweringContext.rules.insert(SolverRule(
-      anyType,
-      SolverGoal(anyType, List.of1<SolverType>(SolverVariable(None<HirParameterType>()))),
-      List.empty<SolverGoal>(),
-    ))
     loweringContext
   }
 
@@ -781,8 +788,17 @@ class LoweringContext {
       }
     }
 
-    // T($T) <- <empty>
     if (declaration is HirType) {
+      // Any(?T) <- T(?T)
+      let anyType = HirTrait.coreAny(context)
+      let variable = SolverVariable(Some<HirParameterType>(this.getNextCanonicalVariable()))
+      this.rules.insert(SolverRule(
+        declaration as HirType,
+        SolverGoal(anyType, List.of1<SolverType>(variable)),
+        List.of1<SolverGoal>(SolverGoal(declaration, List.of1<SolverType>(variable))),
+      ))
+
+      // T($T) <- <empty>
       let primitive = HirType((declaration as HirType).parent, "${(declaration as HirType).name()}")
       let primitive = SolverValue(primitive, solverParameters)
       this.rules.insert(
