@@ -267,12 +267,16 @@ impl HirImpl {
     // The base type of an impl. For example, `impl Foo[Int]` has the base type `Foo[Int]`.
 
     query<HirNamedType, List<CompilerError>>(context, "HirImpl.baseType", this as Equals & Hash, {
+      let baseType = this.syntheticDeclaration(context)
+        .map<HirNamedType | HirErrorType>({ it.baseType })
+        .orElse({
+          astInlineTypeToHirInlineType(context, this.ast(context).type, this) as HirNamedType | HirErrorType
+        })
+      if (baseType == HirNamedType.coreAny(context)) {
+        todo("never: support `impl Any: Something`")
+      }
       Tuple(
-        this.syntheticDeclaration(context)
-          .map<HirNamedType | HirErrorType>({ it.baseType })
-          .orElse({
-            astInlineTypeToHirInlineType(context, this.ast(context).type, this) as HirNamedType | HirErrorType
-          }),
+        baseType,
         List.empty<CompilerError>(),
       )
     })
