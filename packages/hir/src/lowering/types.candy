@@ -765,6 +765,21 @@ class LoweringContext {
       goals.appendAll(result.second)
     }
 
+    if (declaration is HirTrait) {
+      // Upper bounds
+      let upperBounds = (declaration.upperBound(context) as Iterable<HirNamedType | HirErrorType>)
+        .whereType<HirNamedType>()
+      let variable = SolverVariable(Some<HirParameterType>(this.getNextCanonicalVariable()))
+      for upperBound in upperBounds {
+        let result = hirInlineTypeToSolverTypeAndGoals(upperBound)
+        this.rules.insert(SolverRule(
+          declaration,
+          SolverGoal(upperBound.declaration, List.of1<SolverType>(variable)),
+          List.of1<SolverGoal>(SolverGoal(declaration, List.of1<SolverType>(variable))),
+        ))
+      }
+    }
+
     // T($T) <- <empty>
     if (declaration is HirType) {
       let primitive = HirType((declaration as HirType).parent, "${(declaration as HirType).name()}")
