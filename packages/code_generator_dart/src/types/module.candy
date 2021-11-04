@@ -54,10 +54,17 @@ fun compileInlineType(
   if (inlineType is HirParameterType) {
     assert(prefix == "InlineType", "Parameter types can't be compiled to value types.")
     let parameterType = (inlineType as HirParameterType)
-    if (parameterType.declaration is HirImpl || parameterType.declaration is HirFunction) {
-      return DartIdentifier("typeArgument${parameterType.name}", None<String>())
+    if (parameterType.declaration is HirTrait) {
+      return DartIdentifier("$staticThis", None<String>())
+        .dot("typeArgument$trait${parameterType.name}")
     }
-    return DartIdentifier("inlineType", None<String>()).dot("typeArgument${parameterType.name}")
+    if (parameterType.declaration is HirImpl) {
+      return DartIdentifier("typeArgument$impl${parameterType.name}", None<String>())
+    }
+    if (parameterType.declaration is HirFunction) {
+      return DartIdentifier("typeArgument$function${parameterType.name}", None<String>())
+    }
+    throw "Tried to compile a reference to a type's type parameter to Dart: `{inlineType}`."
   }
   if (inlineType is HirReflectionType) {
     todo("soon, Compile HirReflectionType to Dart")
