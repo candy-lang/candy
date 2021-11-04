@@ -64,3 +64,69 @@ fun compileInlineType(
   }
   throw "Unknown inline type: {inlineType}"
 }
+
+public fun generateInlineTypeCheck(
+  context: QueryContext<List<CompilerError>>,
+  actualInlineTypeReference: DartExpression,
+  expectedType: HirInlineType,
+): DartExpression {
+  if (expectedType is HirErrorType) { throw "Encountered an error type while compiling to Dart." }
+  if (expectedType is HirNamedType) {
+    return compileInlineTypeInlineType(context, expectedType)
+      .dot("isOfThisType")
+      .callPositional(
+        ((expectedType as HirNamedType).parameterTypes as Iterable<HirInlineType>)
+          .map<DartExpression>({ compileInlineTypeInlineType(context, it) })
+          .followedByList(List.of1<DartExpression>(actualInlineTypeReference)),
+      )
+  }
+  if (expectedType is HirFunctionType) {
+    let functionType = (expectedType as HirFunctionType)
+    let parameterTypes = functionType.receiverType
+      .map<Iterable<HirInlineType>>({
+        List.of1<HirInlineType>(it).followedByList(functionType.parameterTypes)
+      })
+      .orElse({ functionType.parameterTypes })
+      .followedBy(functionType.returnType)
+    return compileInlineTypeInlineType(context, expectedType)
+      .dot("isOfThisType")
+      .callPositional(
+        parameterTypes
+          .map<DartExpression>({ compileInlineTypeInlineType(context, it) })
+          .followedByList(List.of1<DartExpression>(actualInlineTypeReference)),
+      )
+  }
+  if (expectedType is HirStructType) {
+    return compileInlineTypeInlineType(context, expectedType)
+      .dot("isOfThisType")
+      .callPositional(
+        (expectedType as HirStructType).types
+          .sortedBy({ it.first })
+          .map<DartExpression>({ compileInlineTypeInlineType(context, it.second) })
+          .followedByList(List.of1<DartExpression>(actualInlineTypeReference)),
+      )
+  }
+  if (expectedType is HirEnumType) {
+    return compileInlineTypeInlineType(context, expectedType)
+      .dot("isOfThisType")
+      .callPositional(
+        (expectedType as HirEnumType).variants.entries().toList()
+          .sortedBy({ it.first })
+          .map<DartExpression>({ compileInlineTypeInlineType(context, it) })
+          .followedByList(List.of1<DartExpression>(actualInlineTypeReference)),
+      )
+  }
+  if (expectedType is HirIntersectionType) {
+    todo("never: support intersection types as type arguments")
+  }
+  if (expectedType is HirThisType) { todo("never: support this types as type arguments") }
+  if (expectedType is HirParameterType) {
+    return compileInlineTypeInlineType(context, expectedType)
+      .dot("equals")
+      .call1(actualInlineTypeReference)
+  }
+  if (expectedType is HirReflectionType) {
+    todo("never: support reflection types as value arguments in impl base types")
+  }
+  throw "Unknown inline type: {expectedType}"
+}
