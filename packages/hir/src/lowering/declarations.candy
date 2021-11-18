@@ -780,6 +780,29 @@ impl HirInlineType {
     })
   }
 
+  public fun leafStaticFunctionsWithSubstitutions(
+    context: QueryContext<List<CompilerError>>,
+    scope: Package,
+  ): Set<DataTuple2<HirFunction, Map<HirInlineType, HirInlineType>>> {
+    query<Set<DataTuple2<HirFunction, Map<HirInlineType, HirInlineType>>>, List<CompilerError>>(
+      context, "HirInlineType.leafStaticFunctionsWithSubstitutions",
+      DataTuple2<HirInlineType, Package>(this, scope), {
+      let functions = this.staticFunctionsWithSubstitutions(context, scope)
+      Tuple(leafFunctionsWithSubstitutionsFromSet(functions), List.empty<CompilerError>())
+    })
+  }
+  public fun leafInstanceFunctionsWithSubstitutions(
+    context: QueryContext<List<CompilerError>>,
+    scope: Package,
+  ): Set<DataTuple2<HirFunction, Map<HirInlineType, HirInlineType>>> {
+    query<Set<DataTuple2<HirFunction, Map<HirInlineType, HirInlineType>>>, List<CompilerError>>(
+      context, "HirInlineType.leafInstanceFunctionsWithSubstitutions",
+      DataTuple2<HirInlineType, Package>(this, scope), {
+      let functions = this.instanceFunctionsWithSubstitutions(context, scope)
+      Tuple(leafFunctionsWithSubstitutionsFromSet(functions), List.empty<CompilerError>())
+    })
+  }
+
   public fun leafInstanceFunctionsWithSubstitutionsMatchingName(
     context: QueryContext<List<CompilerError>>,
     name: String,
