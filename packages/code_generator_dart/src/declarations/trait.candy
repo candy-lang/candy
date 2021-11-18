@@ -19,11 +19,11 @@ public fun compileTrait(
     let output = List
       .of1<DartDeclaration>(compileTraitValue(context, package, traitHir))
       .followedByList(compileInstanceFunctionFunctions(context, package, traitHir))
-      .followedByList(compileInstanceImplFunctions(context, package, traitHir))
+      .followedByList(compileImplImplFunctions(context, package, traitHir, true))
       .followedByList(List.of1<DartDeclaration>(compileTraitInlineType(context, package, traitHir)))
       .followedByList(compileStaticFunctionFunctions(context, package, traitHir))
       .followedByList(compileStaticUpperBoundImplFunctions(context, package, traitHir))
-      .followedByList(compileStaticImplImplFunctions(context, package, traitHir))
+      .followedByList(compileImplImplFunctions(context, package, traitHir, false))
     Tuple(output, List.empty<CompilerError>())
   })
 }
@@ -122,7 +122,7 @@ fun compileTraitValue(
           )
         }),
     )
-    
+
     // Function functions
     body.appendAll(
       (functions as Iterable<HirFunction>)
@@ -200,14 +200,6 @@ fun compileInstanceUpperBoundImplFunctions(
         .toList()
       Tuple(functions, List.empty<CompilerError>())
   })
-}
-
-fun compileInstanceImplFunctions(
-  context: QueryContext<List<CompilerError>>,
-  package: Package,
-  traitHir: HirTrait,
-): List<DartDeclaration> {
-  // ...
 }
 
 fun compileTraitInlineType(
@@ -525,15 +517,21 @@ fun compileStaticUpperBoundImplFunctions(
   })
 }
 
-fun compileStaticImplImplFunctions(
+fun compileImplImplFunctions(
   context: QueryContext<List<CompilerError>>,
   package: Package,
   traitHir: HirTrait,
+  isStatic: Bool,
 ): List<DartDeclaration> {
+  // TODO(soon): continue implementing this
   query<DartClass, List<CompilerError>>(
     context,
-    "code_generator_dart.compileStaticImplImplFunctions",
-    DataTuple2<Package, HirTrait>(package, traitHir), {
+    "code_generator_dart.compileImplImplFunctions",
+    DataTuple3<Package, HirTrait, Bool>(package, traitHir, isStatic), {
+      let isStaticString = if (isStatic) { "InlineType" } else { "Value" }
+      let thisString = if (isStatic) { "$staticThis" } else { "$instanceThis" }
+      let implFunctionType = if (isStatic) { staticImplFunctionType } else { instanceImplFunctionType }
+
       let impls = getImplImplFunctionName(context, traitHir, package)
         .items()
         .where({ it.implementedTrait(context) is Some })
@@ -545,6 +543,7 @@ fun compileStaticImplImplFunctions(
 
           let overridingFunctions = ((implHir as HasDeclarations).declarations(context) as Iterable<HirDeclaration>)
             .whereType<HirFunction>()
+            .where({ it.isStatic(context) == isStatic })
             .toList()
           let functionFunctionClosuresCommonTypeArgumentValueParameters = (implHir.typeParameters(context) as Iterable<HirParameterType>)
             .expand<DartParameter>({
@@ -558,7 +557,7 @@ fun compileStaticImplImplFunctions(
                 DartParameter(
                   name = getTypeArgumentUpperBoundImplFunctionName(context, it),
                   isRequired = true,
-                  type = Some<DartType>(staticImplFunctionType),
+                  type = Some<DartType>(implFunctionType),
                   defaultValue = None<DartExpression>(),
                 ),
               )
@@ -573,12 +572,296 @@ fun compileStaticImplImplFunctions(
             })
             .toList()
 
+          let argumentTypeCheck = DartExpressionStatement(
+            (dartAssert as DartExpression).call1(generateInlineTypeCheck(
+              context,
+              if (isStatic) {
+                DartIdentifier(thisString, None<String>())
+              } else {
+                DartIdentifier(thisString, None<String>()).dot("inlineType")
+              },
+              baseType,
+            )),
+          )
+          let body = DartBlock(
+            if (isStatic) {
+              List.of2<DartStatement | DartComment>(
+                argumentTypeCheck,
+                DartReturn(
+                  (compileNamedType(context, implementedTraitNamedType) as DartExpression).callPositional(
+                    (implementedTraitNamedType.parameterTypes as Iterable<HirInlineType>)
+                      .zip<HirParameterType>(implementedTrait.typeParameters(context))
+                      .expand<DartExpression>({
+                        // Type arguments and impl functions for their upper bounds
+                        let typeArgument = it.first
+                        let typeParameter = it.second
+                        let compiledInlineType = compileInlineType(context, typeArgument)
+                        List.of2<DartExpression>(
+                          compiledInlineType,
+                          compileInlineTypeUpcast(
+                            context,
+                            compiledInlineType,
+                            typeArgument,
+                            typeParameter.upperBound(context),
+                            package,
+                            isStaticString,
+                          ),
+                        )
+                      })
+                      .toList()
+                      // Impl functions for upper bounds
+                      .followedByList(
+                        (implementedTrait.upperBound(context) as Iterable<HirNamedType | HirErrorType>)
+                          .cast<HirNamedType>()
+                          .map<DartExpression>({
+                            compileInlineTypeUpcast(
+                              context,
+                              (DartIdentifier(thisString, None<String>()) as DartExpression),
+                              baseType,
+                              it,
+                              isStaticString,
+                            )
+                          })
+                          .toList(),
+                      )
+                      // Function functions
+                      .followedByList(
+                        ((implementedTrait as HasDeclarations).declarations(context) as Iterable<HirDeclaration>)
+                          .whereType<HirFunction>()
+                          .where({ it.parentFunction(context) is None && it.isStatic(context) })
+                          .map<DartExpression>({ overriddenFunction =>
+                            let overridingFunction = overridingFunctions
+                              .singleWhere({
+                                it.parentFunction(context).unwrap() == overriddenFunction
+                              })
+                              .unwrap()
+                            DartClosure(
+                              returns = Some<DartType>(valueType),
+                              requiredParameters = functionFunctionClosuresCommonTypeArgumentValueParameters
+                                .followedByList(
+                                  (overridingFunction.typeParameters(context) as Iterable<HirParameterType>)
+                                    .expand<DartParameter>({
+                                      List.of2<DartParameter>(
+                                        DartParameter(
+                                          name = "typeArgument$function${it.name}",
+                                          isRequired = true,
+                                          type = Some<DartType>(inlineTypeType),
+                                          defaultValue = None<DartExpression>(),
+                                        ),
+                                        DartParameter(
+                                          name = getTypeArgumentUpperBoundImplFunctionName(context, it),
+                                          isRequired = true,
+                                          type = Some<DartType>(implFunctionType),
+                                          defaultValue = None<DartExpression>(),
+                                        ),
+                                      )
+                                    })
+                                    .toList(),
+                                )
+                                .followedByList(
+                                  (overridingFunction.valueParameters(context) as Iterable<HirValueParameter>)
+                                    .map<DartParameter>({
+                                      DartParameter(
+                                        name = it.name,
+                                        isRequired = true,
+                                        type = Some<DartType>(valueType),
+                                        defaultValue = None<DartExpression>(),
+                                      )
+                                    })
+                                    .toList(),
+                                ),
+                              positionalParameters = List.empty<DartParameter>(),
+                              namedParameters = List.empty<DartParameter>(),
+                              body = DartInlineBody(
+                                (DartIdentifier(
+                                  getFunctionInImplName(context, overridingFunction),
+                                  None<String>(),
+                                ) as DartExpression)
+                                  .callPositional(
+                                    functionFunctionClosuresCommonTypeArgumentValueArguments
+                                      .followedByList(
+                                        (overridingFunction.typeParameters(context) as Iterable<HirParameterType>)
+                                          .expand<DartExpression>({
+                                            List.of2<DartExpression>(
+                                              DartIdentifier("typeArgument$function${it.name}", None<String>()),
+                                              DartIdentifier(getTypeArgumentUpperBoundImplFunctionName(context, it), None<String>()),
+                                            )
+                                          })
+                                          .toList(),
+                                      )
+                                      .followedByList<DartExpression>(List.of1<DartExpression>(
+                                        DartIdentifier(thisString, None<String>()),
+                                      ))
+                                      .followedByList(
+                                        (overridingFunction.valueParameters(context) as Iterable<HirValueParameter>)
+                                          .map<DartExpression>({ DartIdentifier(it.name, None<String>()) })
+                                          .toList(),
+                                      )
+                                  ),
+                              ),
+                            )
+                          })
+                          .toList(),
+                      ),
+                  ),
+                ),
+              )
+            } else {
+              List.of3<DartStatement | DartComment>(
+                argumentTypeCheck,
+                DartFieldStatement(DartField(
+                  name = "staticInstance",
+                  docComment = None<String>(),
+                  isStatic = false,
+                  mutability = DartFinal(),
+                  type = Some<DartType>(inlineTypeType),
+                  initialValue = Some<DartExpression>(
+                    (DartIdentifier(getImplImplFunctionName(context, implHir, "InlineType"), None<String>()) as DartExpression)
+                      .call1(
+                        DartParenthesizedExpression(
+                          (DartIdentifier(thisString, None<String>()) as DartExpression)
+                            .as_(DartNamedType(
+                              compileInlineTypeValue(context, implHir.baseType(context)),
+                              List.empty<DartType>(),
+                            )),
+                        ).as_(DartNamedType(
+                          compileInlineTypeInlineType(context, implHir.baseType(context)),
+                          List.empty<DartType>(),
+                        )),
+                      ),
+                  ),
+                )),
+                DartReturn(
+                  DartParenthesizedExpression(
+                    (DartIdentifier("staticInstance", None<String>()) as DartExpression)
+                      .as_(DartType(
+                        compileNamedType(context, implementedTraitNamedType),
+                        List.empty<DartType>(),
+                      )),
+                  ).dot("create")
+                    .callPositional(
+                      (implementedTraitNamedType.parameterTypes as Iterable<HirInlineType>)
+                        .zip<HirParameterType>(implementedTrait.typeParameters(context))
+                        .map<DartExpression>({
+                          // Impl functions for upper bounds of type arguments
+                          let typeArgument = it.first
+                          let typeParameter = it.second
+                          compileInlineTypeUpcast(
+                            context,
+                            compileInlineType(context, typeArgument),
+                            typeArgument,
+                            typeParameter.upperBound(context),
+                            package,
+                            isStaticString,
+                          )
+                        })
+                        .toList()
+                        // Impl functions for upper bounds
+                        .followedByList(
+                          (implementedTrait.upperBound(context) as Iterable<HirNamedType | HirErrorType>)
+                            .cast<HirNamedType>()
+                            .map<DartExpression>({
+                              compileInlineTypeUpcast(
+                                context,
+                                (DartIdentifier(thisString, None<String>()) as DartExpression),
+                                baseType,
+                                it,
+                                isStaticString,
+                              )
+                            })
+                            .toList(),
+                        )
+                        // Function functions
+                        .followedByList(
+                          ((implementedTrait as HasDeclarations).declarations(context) as Iterable<HirDeclaration>)
+                            .whereType<HirFunction>()
+                            .where({ it.parentFunction(context) is None && it.isStatic(context) })
+                            .map<DartExpression>({ overriddenFunction =>
+                              let overridingFunction = overridingFunctions
+                                .singleWhere({
+                                  it.parentFunction(context).unwrap() == overriddenFunction
+                                })
+                                .unwrap()
+                              DartClosure(
+                                returns = Some<DartType>(valueType),
+                                requiredParameters = functionFunctionClosuresCommonTypeArgumentValueParameters
+                                  .followedByList(
+                                    (overridingFunction.typeParameters(context) as Iterable<HirParameterType>)
+                                      .expand<DartParameter>({
+                                        List.of2<DartParameter>(
+                                          DartParameter(
+                                            name = "typeArgument$function${it.name}",
+                                            isRequired = true,
+                                            type = Some<DartType>(inlineTypeType),
+                                            defaultValue = None<DartExpression>(),
+                                          ),
+                                          DartParameter(
+                                            name = getTypeArgumentUpperBoundImplFunctionName(context, it),
+                                            isRequired = true,
+                                            type = Some<DartType>(implFunctionType),
+                                            defaultValue = None<DartExpression>(),
+                                          ),
+                                        )
+                                      })
+                                      .toList(),
+                                  )
+                                  .followedByList(
+                                    (overridingFunction.valueParameters(context) as Iterable<HirValueParameter>)
+                                      .map<DartParameter>({
+                                        DartParameter(
+                                          name = it.name,
+                                          isRequired = true,
+                                          type = Some<DartType>(valueType),
+                                          defaultValue = None<DartExpression>(),
+                                        )
+                                      })
+                                      .toList(),
+                                  ),
+                                positionalParameters = List.empty<DartParameter>(),
+                                namedParameters = List.empty<DartParameter>(),
+                                body = DartInlineBody(
+                                  (DartIdentifier(
+                                    getFunctionInImplName(context, overridingFunction),
+                                    None<String>(),
+                                  ) as DartExpression)
+                                    .callPositional(
+                                      functionFunctionClosuresCommonTypeArgumentValueArguments
+                                        .followedByList(
+                                          (overridingFunction.typeParameters(context) as Iterable<HirParameterType>)
+                                            .expand<DartExpression>({
+                                              List.of2<DartExpression>(
+                                                DartIdentifier("typeArgument$function${it.name}", None<String>()),
+                                                DartIdentifier(getTypeArgumentUpperBoundImplFunctionName(context, it), None<String>()),
+                                              )
+                                            })
+                                            .toList(),
+                                        )
+                                        .followedByList<DartExpression>(List.of1<DartExpression>(
+                                          DartIdentifier(thisString, None<String>()),
+                                        ))
+                                        .followedByList(
+                                          (overridingFunction.valueParameters(context) as Iterable<HirValueParameter>)
+                                            .map<DartExpression>({ DartIdentifier(it.name, None<String>()) })
+                                            .toList(),
+                                        )
+                                    ),
+                                ),
+                              )
+                            })
+                            .toList(),
+                        )
+                    ),
+                ),
+              )
+            },
+          )
+
           DartFunction(
             isStatic = false,
-            name = getImplImplFunctionName(context, implHir, "InlineType"),
+            name = getImplImplFunctionName(context, implHir, isStaticString),
             docComment = None<String>(),
             annotations = List.empty<DartAnnotation>(),
-            _returns = Some<DartType>(inlineTypeType),
+            _returns = Some<DartType>(if (isStatic) { inlineTypeType } else { valueType }),
             typeParameters = List.empty<DartTypeParameter>(),
             requiredParameters = (implHir.typeParameters(context) as Iterable<HirParameterType>)
               .expand<DartParameter>({
@@ -592,147 +875,21 @@ fun compileStaticImplImplFunctions(
                   DartParameter(
                     name = getTypeArgumentUpperBoundImplFunctionName(context, it),
                     isRequired = true,
-                    type = Some<DartType>(staticImplFunctionType),
+                    type = Some<DartType>(implFunctionType),
                     defaultValue = None<DartExpression>(),
                   ),
                 )
               })
               .toList()
               .followedByList(List.of1<DartParameter>(DartParameter(
-                name = "$staticThis",
+                name = thisString,
                 isRequired = true,
-                type = Some<DartType>(inlineTypeType),
+                type = Some<DartType>(if (isStatic) { inlineTypeType } else { valueType }),
                 defaultValue = None<DartExpression>(),
               ))),
             positionalParameters = List.empty<DartParameter>(),
             namedParameters = List.empty<DartParameter>(),
-            body = Some<DartBody>(DartBlock(List.of2<DartStatement | DartComment>(
-              DartExpressionStatement(
-                (dartAssert as DartExpression).call1(generateInlineTypeCheck(
-                  context,
-                  DartIdentifier("$staticThis", None<String>()),
-                  baseType,
-                )),
-              ),
-              DartReturn(
-                (compileNamedType(context, implementedTraitNamedType) as DartExpression).callPositional(
-                  (implementedTraitNamedType.parameterTypes as Iterable<HirInlineType>)
-                    .zip<HirParameterType>(implementedTrait.typeParameters(context))
-                    .expand<DartExpression>({
-                      // Type arguments and impl functions for their upper bounds
-                      let typeArgument = it.first
-                      let typeParameter = it.second
-                      let compiledInlineType = compileInlineType(context, typeArgument)
-                      List.of2<DartExpression>(
-                        compiledInlineType,
-                        compileInlineTypeUpcast(
-                          context,
-                          compiledInlineType,
-                          typeArgument,
-                          typeParameter.upperBound(context),
-                          package,
-                          "InlineType",
-                        ),
-                      )
-                    })
-                    .toList()
-                    // Impl functions for upper bounds
-                    .followedByList(
-                      (implementedTrait.upperBound(context) as Iterable<HirNamedType | HirErrorType>)
-                        .cast<HirNamedType>()
-                        .map<DartExpression>({
-                          compileInlineTypeUpcast(
-                            context,
-                            (DartIdentifier("$staticThis", None<String>()) as DartExpression),
-                            baseType,
-                            it,
-                            "InlineType",
-                          )
-                        })
-                        .toList(),
-                    )
-                    // Function functions
-                    .followedByList(
-                      ((implementedTrait as HasDeclarations).declarations(context) as Iterable<HirDeclaration>)
-                        .whereType<HirFunction>()
-                        .where({ it.parentFunction(context) is None && it.isStatic(context) })
-                        .map<DartExpression>({ overriddenFunction =>
-                          let overridingFunction = overridingFunctions
-                            .singleWhere({
-                              it.parentFunction(context).unwrap() == overriddenFunction
-                            })
-                            .unwrap()
-                          DartClosure(
-                            returns = Some<DartType>(valueType),
-                            requiredParameters = functionFunctionClosuresCommonTypeArgumentValueParameters
-                              .followedByList(
-                                (overridingFunction.typeParameters(context) as Iterable<HirParameterType>)
-                                  .expand<DartParameter>({
-                                    List.of2<DartParameter>(
-                                      DartParameter(
-                                        name = "typeArgument$function${it.name}",
-                                        isRequired = true,
-                                        type = Some<DartType>(inlineTypeType),
-                                        defaultValue = None<DartExpression>(),
-                                      ),
-                                      DartParameter(
-                                        name = getTypeArgumentUpperBoundImplFunctionName(context, it),
-                                        isRequired = true,
-                                        type = Some<DartType>(staticImplFunctionType),
-                                        defaultValue = None<DartExpression>(),
-                                      ),
-                                    )
-                                  })
-                                  .toList(),
-                              )
-                              .followedByList(
-                                (overridingFunction.valueParameters(context) as Iterable<HirValueParameter>)
-                                  .map<DartParameter>({
-                                    DartParameter(
-                                      name = it.name,
-                                      isRequired = true,
-                                      type = Some<DartType>(valueType),
-                                      defaultValue = None<DartExpression>(),
-                                    )
-                                  })
-                                  .toList(),
-                              ),
-                            positionalParameters = List.empty<DartParameter>(),
-                            namedParameters = List.empty<DartParameter>(),
-                            body = DartInlineBody(
-                              (DartIdentifier(
-                                getFunctionInImplName(context, overridingFunction),
-                                None<String>(),
-                              ) as DartExpression)
-                                .callPositional(
-                                  functionFunctionClosuresCommonTypeArgumentValueArguments
-                                    .followedByList(
-                                      (overridingFunction.typeParameters(context) as Iterable<HirParameterType>)
-                                        .expand<DartExpression>({
-                                          List.of2<DartExpression>(
-                                            DartIdentifier("typeArgument$function${it.name}", None<String>()),
-                                            DartIdentifier(getTypeArgumentUpperBoundImplFunctionName(context, it), None<String>()),
-                                          )
-                                        })
-                                        .toList(),
-                                    )
-                                    .followedByList<DartExpression>(List.of1<DartExpression>(
-                                      DartIdentifier("$staticThis", None<String>()),
-                                    ))
-                                    .followedByList(
-                                      (overridingFunction.valueParameters(context) as Iterable<HirValueParameter>)
-                                        .map<DartExpression>({ DartIdentifier(it.name, None<String>()) })
-                                        .toList(),
-                                    )
-                                ),
-                            ),
-                          )
-                        })
-                        .toList(),
-                    )
-                ),
-              ),
-            ),
+            body = Some<DartBody>(body),
           )
         })
         .toList()
@@ -740,3 +897,25 @@ fun compileStaticImplImplFunctions(
     Tuple(functions, List.empty<CompilerError>())
   })
 }
+
+
+// trait A[AT: ATU] {
+//   fun aStatic(aParameter: APS): ARS
+//   fun aInstance(aParameter: API): ARI
+// }
+
+// trait B[BT: BTU]: A[ATU] {
+//   fun bStatic(bParameter: BPS): BRS
+//   fun bInstance(bParameter: BPI): BRI
+// }
+
+// trait C[CT: CTU]
+
+// impl[CT: CTU] C[CT]: A[TU] {
+//   fun aStatic(aParameter: APS): ARS { todo() }
+//   fun aInstance(aParameter: API): ARI { todo() }
+// }
+// impl[CT: CTU] C[CT]: B[BTU] {
+//   fun bStatic(bParameter: BPS): BRS { todo() }
+//   fun bInstance(bParameter: BPI): BRI { todo() }
+// }
