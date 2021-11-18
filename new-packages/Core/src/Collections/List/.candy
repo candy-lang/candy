@@ -126,5 +126,5 @@ impl[Item] List[Item]: InfixPlus[List[Item], List[Item]] {
 }
 
 impl[Item: Compare] List[Item] {
-  fun sort(): List[Item] { sortBy[Item]({ it}) }
+  fun sort(): List[Item] { sortBy[Item]({ it }) }
 }

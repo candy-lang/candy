@@ -17,3 +17,78 @@ class NonLocalReturnException {
   final Object scope;
   final dynamic value;
 }
+
+/// This is the base class for all generated `Value$` classes.
+abstract class Value {
+  InlineType get inlineType;
+}
+
+/// This is the base class for all generated `InlineType$` classes.
+abstract class InlineType {
+  bool equals(InlineType other);
+}
+
+// Type declarations
+
+@sealed
+class Value$Named$Type implements Value {
+  const Value$Named$Type(this.inlineType, this.value);
+
+  @override
+  final InlineType inlineType;
+
+  final Value value;
+}
+
+abstract class InlineType$Named$Type implements InlineType {}
+
+// Trait declarations
+
+abstract class Value$Named$Trait implements Value {}
+
+abstract class InlineType$Named$Trait implements InlineType {}
+
+// Built-in primitives
+
+@sealed
+class Value$Builtin<T> implements Value {
+  const Value$Builtin._(this.inlineType, this.value);
+
+  @override
+  final InlineType inlineType;
+  final T value;
+}
+
+@sealed
+class InlineType$Builtin<T> implements InlineType {
+  const InlineType$Builtin();
+
+  Value create(T value) => Value$Builtin<T>._(this, value);
+
+  bool equals(InlineType other) => equals(other);
+  static bool isOfThisType<T>(InlineType inlineType) =>
+      inlineType is InlineType$Builtin<T>;
+
+  static Value nothing() => InlineType$Builtin<Null>().create(null);
+  static Value int_(int value) => InlineType$Builtin<int>().create(value);
+  static Value string_(String value) =>
+      InlineType$Builtin<String>().create(value);
+}
+
+// Functions
+
+abstract class Value$Function implements Value {}
+
+abstract class InlineType$Function implements InlineType {}
+
+// Structs
+
+abstract class Value$Struct implements Value {}
+
+abstract class InlineType$Struct implements InlineType {}
+
+// Enums
+
+abstract class Value$Enum implements Value {}
+
+abstract class InlineType$Enum implements InlineType {}

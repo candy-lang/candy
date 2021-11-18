@@ -21,7 +21,8 @@ fun main() {
     ),
     declarations = List.of3<DartDeclaration>(
       DartFunction(
-        "main",
+        isStatic = false,
+        name = "main",
         docComment = None<String>(),
         annotations = List.of1<DartAnnotation>(
           DartAnnotation(
@@ -122,7 +123,7 @@ fun main() {
             "isEmpty",
             docComment = None<String>(),
             type = dartBool,
-            body = Some<DartBody>(DartInlineBody(this_.dot("length").equals(DartIntLiteral(0)))),
+            body = Some<DartBody>(DartInlineBody(dartThis.dot("length").equals(DartIntLiteral(0)))),
           ),
           // set isEmpty(bool value) {
           //   if (value) {
@@ -174,7 +175,8 @@ fun main() {
             ),
           ),
           DartFunction(
-            "blub",
+            isStatic = false,
+            name = "blub",
             docComment = None<String>(),
             annotations = List.empty<DartAnnotation>(),
             _returns = Some<DartType>(

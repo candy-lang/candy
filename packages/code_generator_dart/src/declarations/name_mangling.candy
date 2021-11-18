@@ -2,32 +2,6 @@ use compiler_utils
 use hir
 use incremental
 
-public fun getDeclarationName(context: QueryContext<List<CompilerError>>, hir: HirTrait | HirType): String {
-  query<String, List<CompilerError>>(context, "code_generator_dart.getDeclarationName", hir, {
-    mut let name = if hir is HirTrait { (hir as HirTrait).name_ } else { (hir as HirType).name_ }
-    mut let parent = if hir is HirTrait { (hir as HirTrait).parent } else { (hir as HirType).parent }
-    loop {
-      if parent is HirModule { break unit }
-      if parent is HirTrait {
-        name = "{(parent as HirTrait).name_}_{name}"
-        parent = (parent as HirTrait).parent
-      }
-      if parent is HirType {
-        name = "{(parent as HirType).name_}_{name}"
-        parent = (parent as HirType).parent
-      }
-      assert(false, "Unknown declaration type of trait or type parent: {parent} of {hir}.")
-    }
-    Tuple(mangleName(context, name), List.empty<CompilerError>())
-  })
-}
-public fun getDeclarationStaticName(context: QueryContext<List<CompilerError>>, hir: HirTrait | HirType): String {
-  query<String, List<CompilerError>>(context, "code_generator_dart.getDeclarationStaticName", hir, {
-    let name = "{getDeclarationName(context, hir)}$Static"
-    Tuple(mangleName(context, name), List.empty<CompilerError>())
-  })
-}
-
 public fun mangleName(context: QueryContext<List<CompilerError>>, name: String): String {
   query<String, List<CompilerError>>(context, "code_generator_dart.mangleName", name, {
     let reservedIdentifiers = MutableSet.empty<String>()

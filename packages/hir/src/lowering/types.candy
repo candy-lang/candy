@@ -217,17 +217,32 @@ impl HirTrait {
     })
   }
   fun upperBound(context: QueryContext<List<CompilerError>>): List<HirNamedType | HirErrorType> {
+    // TODO(never): return a set, not a list
     query<HirInlineType, List<CompilerError>>(context, "HirTrait.upperBound", this, {
-      Tuple(
-        this.syntheticDeclaration(context)
-          .map<List<HirNamedType | HirErrorType>>({ it.upperBound })
-          .orElse({
-            this.ast(context).upperBound
-              .map<HirInlineType>({ astInlineTypeToHirInlineType(context, it, this) })
-              .orElse({ HirNamedType.coreAny(context) })
-          }),
-        List.empty<CompilerError>(),
-      )
+      let upperBounds = this.ast(context)
+        .upperBound
+        .map<List<HirNamedType | HirErrorType>>({
+          let rawUpperBound = astInlineTypeToHirInlineType(context, it, this)
+          if (rawUpperBound is HirNamedType || rawUpperBound is HirErrorType) {
+            return List.of1<HirNamedType | HirErrorType>(rawUpperBound as HirNamedType | HirErrorType)
+          }
+          if (rawUpperBound is HirIntersectionType) {
+            return rawUpperBound.types
+              .map<HirNamedType | HirErrorType>({
+                if (it is HirNamedType || it is HirErrorType) {
+                  return (it as HirNamedType | HirErrorType)
+                }
+                throw "Unexpected type in upper bound of trait {this}: `{it}`."
+              })
+              .toList()
+          }
+          throw "Upper bound of trait {this} is invalid: `{rawUpperBound}`."
+        })
+        .orElse({ List.empty<HirNamedType | HirErrorType>() })
+        .followedByList(List.of1<HirNamedType | HirErrorType>(HirNamedType.coreAny(context)))
+        .toSet()
+        .toList()
+      Tuple(upperBounds, List.empty<CompilerError>())
     })
   }
 }
@@ -252,18 +267,23 @@ impl HirImpl {
     // The base type of an impl. For example, `impl Foo[Int]` has the base type `Foo[Int]`.
 
     query<HirNamedType, List<CompilerError>>(context, "HirImpl.baseType", this as Equals & Hash, {
+      let baseType = this.syntheticDeclaration(context)
+        .map<HirNamedType | HirErrorType>({ it.baseType })
+        .orElse({
+          astInlineTypeToHirInlineType(context, this.ast(context).type, this) as HirNamedType | HirErrorType
+        })
+      if (baseType == HirNamedType.coreAny(context)) {
+        todo("never: support `impl Any: Something`")
+      }
       Tuple(
-        this.syntheticDeclaration(context)
-          .map<HirNamedType | HirErrorType>({ it.baseType })
-          .orElse({
-            astInlineTypeToHirInlineType(context, this.ast(context).type, this) as HirNamedType | HirErrorType
-          }),
+        baseType,
         List.empty<CompilerError>(),
       )
     })
   }
 
   fun implementedTrait(context: QueryContext<List<CompilerError>>): Maybe<HirInlineType> {
+    // TODO(never): tighten the return type to `HirErrorType | HirNamedType`
     // The implemented trait of this impl. For example, `impl Foo: Equals` implements trait
     // `Equals`, whereas `impl Foo { ... }` implements none.
 
@@ -375,6 +395,101 @@ fun getAllImplsOfModule(context: QueryContext<List<CompilerError>>, module: HirM
       .followedBy(declarations.whereType<HirImpl>())
       .toSet()
     Tuple(impls, List.empty<CompilerError>())
+  })
+}
+
+// TODO
+fun hirTraitUpperBoundToSolverRules(
+  context: QueryContext<List<CompilerError>>,
+  hirTrait: HirTrait,
+): Set<SolverRule> {
+  query<Set<SolverRule>, List<CompilerError>>(
+    context,
+    "hirTraitUpperBoundToSolverRules",
+    hirTrait as Equals & Hash, {
+    // Lower the constraints. For example, in the impl `impl[T: Equals] Foo[T]: Equals`, the
+    // `solverConstraints` are a list containing `Equals(?T)`.
+    let rules = MutableSet.empty<SolverRule>()
+    let solverConstraints = MutableList.empty<SolverGoal>()
+    for constraint in hirImpl.constraints(context).entries() {
+      let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, constraint.second)
+      rules.addAll(result.third.items())
+      solverConstraints.appendAll(
+        (result.second as Iterable<SolverGoal>).map<SolverGoal>({
+          it.substituteAll(
+            Map.of1<SolverVariable, SolverType>(
+              Tuple(
+                result.first as SolverVariable,
+                SolverVariable(Some<HirParameterType>(constraint.first)),
+              ),
+            ),
+          )
+        }),
+      )
+    }
+
+    // Lower the base type. For example, in the impl `impl Iterable[Int]: Foo`, the base type
+    // `Iterable[Int]` gets lowered to `?0` with the goal `Iterable(Int, ?0)`.
+    let baseType = hirImpl.baseType(context)
+    let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, baseType)
+    rules.addAll(result.third.items())
+    solverConstraints.appendAll(result.second)
+    let solverBase = result.first
+
+    // Lower the trait. For example, in the impl `impl Foo: Iterable[Int]`, the implemented trait
+    // `Iterable[Int]` gets lowered to `?0` with the goals `Iterable(Int, ?0)`. Impls that don't
+    // implement a trait – like `impl Foo { ... }` – don't correspond to a `SolverRule` and cause
+    // this function to return `None`.
+    let traitType = hirImpl.implementedTrait(context)
+    if (traitType is None) { return Tuple(Set.empty<SolverRule>(), List.empty<CompilerError>()) }
+    if (traitType.unwrap() is HirErrorType) {
+      return Tuple(Set.empty<SolverRule>(), List.empty<CompilerError>())
+    }
+    let traitType = (traitType.unwrap() as HirNamedType)
+    let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, traitType)
+    let solverTrait = (result.first as SolverVariable) // Traits get lowered to `SolverVariable`s.
+    let traitGoals = result.second
+    rules.addAll(result.third.items())
+    if ((traitGoals as Iterable).length() > 1) {
+      // TODO(never, marcelgarus): We can't implement a trait that contains another trait yet, like
+      // `Iterable<Equals>`. This does work in Rust (with boxing and explicit dynamism), so we'll
+      // probably have to look at how to put general-purpose logic implications in our solver (like
+      // `A B -> C D` instead of only having one implicative result like `A B -> C` in the solver).
+      // Or we need to somehow reduce this to multiple simple rules.
+      // For now, we're probably fine with only implementing "simple" traits like `Iterable<Int>`.
+      // (As "primitive" types like `List` etc. are also traits, resolving this todo is somewhat of
+      // a priority.)
+      return Tuple(
+        Set.empty<SolverRule>(),
+        List.of1<CompilerError>(CannotImplementTraitOfTraitCompilerError(hirImpl)),
+      )
+    }
+    assert((traitGoals as Iterable).length() == 1, "Should never happen.")
+    let traitGoal = (traitGoals as Iterable<SolverGoal>).single().unwrap()
+
+    // Let's play this through for the impl `impl[T: Equals] Iterable[T]: Equals`.
+    //
+    // These would be the values calculated above:
+    //
+    // * `constraints`: list with goal `Equals(?T)`
+    // * `solverBase`: type `?0` and goal `Iterable(?T, ?0)`
+    // * `solverTrait`: type `?1` and goal `Equals(?1)`
+    //
+    // The goal that this impl wants to achieve can be calculated by taking the `solverTrait`, which
+    // is guaranteed to have only one goal `Equals(?1)`, and replacing the `solverTrait`'s type `?1`
+    // with the `solverBase` type `?0` – which results in `Equals(?0)`.
+    // To achieve that goal, we have to satisfy the goals of the `solverBase` and the `constraints`.
+    // So, our total `SolverRule` would look like this: `Equals(?0) <- Iterable(?T, ?0), Equals(?T)`
+    Tuple(
+      Set.of1<SolverRule>(
+        SolverRule(
+          hirImpl,
+          traitGoal.substituteAll(Map.of1<SolverVariable, SolverType>(Tuple(solverTrait, solverBase))),
+          solverConstraints,
+        ),
+      ).union(rules),
+      List.empty<CompilerError>(),
+    )
   })
 }
 
@@ -509,12 +624,6 @@ class LoweringContext {
       SolverGoal(errorType, List.of1<SolverType>(SolverVariable.error())),
       List.empty<SolverGoal>(),
     ))
-    let anyType = HirTrait.coreAny(context)
-    loweringContext.rules.insert(SolverRule(
-      anyType,
-      SolverGoal(anyType, List.of1<SolverType>(SolverVariable(None<HirParameterType>()))),
-      List.empty<SolverGoal>(),
-    ))
     loweringContext
   }
 
@@ -571,7 +680,31 @@ class LoweringContext {
     // `impl A | B: Equals` or `impl (name: String, age: UInt): Clone`, we'll need to add support
     // for other `HirInlineTypes` as well.
     if (hirType is HirFunctionType) {
-      todo("never, marcelgarus: Handle HirFunctionType")
+      let goals = MutableList.empty<SolverGoal>()
+      let solverParameters = MutableList.empty<SolverType>()
+      let declaration = this.registerFunctionSolverRules(hirType as HirFunctionType)
+      
+      let types = functionType.receiverType
+        .map<List<HirInlineType>>({ List.of1<HirInlineType>(it) })
+        .orElse(List.empty<HirInlineType>())
+        .followedByList(functionType.parameterTypes)
+        .followedByList(List.of1<HirInlineType>(functionType.returnType))
+      for parameter in types {
+        let result = this.hirInlineTypeToSolverTypeAndGoals(parameter)
+        solverParameters.append(result.first)
+        goals.appendAll(result.second)
+      }
+      // We'll return a substitution that will have to satisfy the trait. For example, given the
+      // trait `Equals`, we'll return `?0` with the goal `Equals(?0)`. The `?0` is this
+      // substitution.
+      let substitution = SolverVariable(Some<HirParameterType>(this.getNextCanonicalVariable()))
+      goals.append(
+        SolverGoal(
+          declaration,
+          (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(substitution)),
+        ),
+      )
+      return Tuple(substitution, goals as List<SolverGoal>)
     }
     if (hirType is HirStructType) {
       /// Example:
@@ -618,7 +751,27 @@ class LoweringContext {
       return Tuple(substitution, goals as List<SolverGoal>)
     }
     if (hirType is HirEnumType) {
-      todo("never, marcelgarus: Handle HirEnumType")
+      let goals = MutableList.empty<SolverGoal>()
+      let solverParameters = MutableList.empty<SolverType>()
+      let declaration = this.registerEnumSolverRules(hirType as HirEnumType)
+      let types = ((hirType as HirEnumType).variants.entries().toList().sortedBy<String>({ it.first }) as Iterable<(String, HirInlineType)>)
+        .map<HirInlineType>({ it.second })
+      for parameter in types {
+        let result = this.hirInlineTypeToSolverTypeAndGoals(parameter)
+        solverParameters.append(result.first)
+        goals.appendAll(result.second)
+      }
+      // We'll return a substitution that will have to satisfy the trait. For example, given the
+      // trait `Equals`, we'll return `?0` with the goal `Equals(?0)`. The `?0` is this
+      // substitution.
+      let substitution = SolverVariable(Some<HirParameterType>(this.getNextCanonicalVariable()))
+      goals.append(
+        SolverGoal(
+          declaration,
+          (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(substitution)),
+        ),
+      )
+      return Tuple(substitution, goals as List<SolverGoal>)
     }
     if (hirType is HirIntersectionType) {
       /// Example:
@@ -721,13 +874,37 @@ class LoweringContext {
       goals.appendAll(result.second)
     }
 
-    // T($T) <- <empty>
+    if (declaration is HirTrait) {
+      // Upper bounds
+      let upperBounds = (declaration.upperBound(context) as Iterable<HirNamedType | HirErrorType>)
+        .whereType<HirNamedType>()
+      let variable = SolverVariable(Some<HirParameterType>(this.getNextCanonicalVariable()))
+      for upperBound in upperBounds {
+        let result = hirInlineTypeToSolverTypeAndGoals(upperBound)
+        this.rules.insert(SolverRule(
+          upperBound,
+          SolverGoal(upperBound.declaration, List.of1<SolverType>(variable)),
+          List.of1<SolverGoal>(SolverGoal(declaration, List.of1<SolverType>(variable))),
+        ))
+      }
+    }
+
     if (declaration is HirType) {
+      // Any(?T) <- T(?T)
+      let anyType = HirTrait.coreAny(context)
+      let variable = SolverVariable(Some<HirParameterType>(this.getNextCanonicalVariable()))
+      this.rules.insert(SolverRule(
+        declaration as HirType,
+        SolverGoal(anyType, List.of1<SolverType>(variable)),
+        List.of1<SolverGoal>(SolverGoal(declaration, List.of1<SolverType>(variable))),
+      ))
+
+      // T($T) <- <empty>
       let primitive = HirType((declaration as HirType).parent, "${(declaration as HirType).name()}")
       let primitive = SolverValue(primitive, solverParameters)
       this.rules.insert(
         SolverRule(
-          declaration,
+          declaration as HirType,
           SolverGoal(
             declaration,
             (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(primitive)),
@@ -762,6 +939,87 @@ class LoweringContext {
     ))
   }
 
+  fun registerFunctionSolverRules(functionType: HirFunctionType): HirType {
+    // We create several synthetic types and impls to allow for correct handling of error types
+    // and the `Never` type.
+    //
+    // For example:
+    //
+    // registerFunctionSolverRules(Int.(Int) -> String) -> [
+    //   Function$2(?0, ?1, ?2, $Function$2(?0, ?1, ?2)) <- <empty>,
+    //   Function$2(?0, ?1, ?2, $Never) <- <empty>,
+    //   Function$2(?0, ?1, ?2, ?3) <- Error(?3),
+    //   ## Generated transitively:
+    //   Int($Int) <- <empty>,
+    //   Int($Never) <- <empty>,
+    //   Int(?0) <- Error(?0),
+    //   String($String) <- <empty>,
+    //   String($Never) <- <empty>,
+    //   String(?0) <- Error(?0),
+    //   Error(?0) <- <empty>,
+    //   Any(?0) <- <empty>,
+    // ]
+
+    let allParameterTypes = functionType.receiverType
+      .map<List<HirInlineType>>({ List.of1<HirInlineType>(it) })
+      .orElse(List.empty<HirInlineType>())
+      .followedByList(functionType.parameterTypes)
+    let totalParameterCount = (allParameterTypes as Iterable<HirParameterType>).length()
+    let declaration = HirType(HirModule.syntheticFunctionTypes(this.context), "Function${totalParameterCount}")
+
+    let goals = MutableList.empty<SolverGoal>()
+    let solverParameters = MutableList.empty<SolverType>()
+    mut let parameterIndex = 0
+    for inlineType in allParameterTypes.followedByList(List.of1<HirInlineType>(functionType.returnType)) {
+      // This adds rules for the specific "type arguments".
+      this.hirInlineTypeToSolverTypeAndGoals(inlineType)
+      solverParameters.append(
+        SolverVariable(Some<HirParameterType>(canonicalVariable(parameterIndex))),
+      )
+      parameterIndex = parameterIndex + 1
+    }
+
+    // T($T) <- <empty>
+    let primitive = HirType(declaration.parent, "${declaration.name()}")
+    let primitive = SolverValue(primitive, solverParameters)
+    this.rules.insert(
+      SolverRule(
+        declaration,
+        SolverGoal(
+          declaration,
+          (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(primitive)),
+        ),
+        goals,
+      ),
+    )
+
+    // T($Never) <- <empty>
+    this.rules.insert(SolverRule(
+      declaration,
+      SolverGoal(
+        declaration,
+        (solverParameters as List<SolverType>).followedByList(
+          List.of1<SolverType>(SolverValue(HirType.coreNever(context), List.empty<SolverType>())),
+        ),
+      ),
+      List.empty<SolverGoal>(),
+    ))
+
+    // T(?0) <- Error(?0)
+    let errorType = HirType.syntheticError(context)
+    let errorVariable = SolverVariable.error()
+    this.rules.insert(SolverRule(
+      declaration,
+      SolverGoal(
+        declaration,
+        (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(errorVariable)),
+      ),
+      List.of1<SolverGoal>(SolverGoal(errorType, List.of1<SolverType>(errorVariable))),
+    ))
+
+    declaration
+  }
+
   fun registerStructSolverRules(tupleType: HirStructType): HirType {
     // We create several synthetic types and impls to allow for correct handling of error types
     // and the `Never` type.
@@ -788,7 +1046,7 @@ class LoweringContext {
       .toList()
       .unsafeSorted()
     let fieldNames = (fieldNames as Iterable<String>).join("$")
-    let declaration = HirType(HirModule.syntheticStructs(this.context), "Struct${fieldNames}")
+    let declaration = HirType(HirModule.syntheticStructTypes(this.context), "Struct${fieldNames}")
 
     let goals = MutableList.empty<SolverGoal>()
     let solverParameters = MutableList.empty<SolverType>()
@@ -803,7 +1061,85 @@ class LoweringContext {
     }
 
     // T($T) <- <empty>
-    let primitive = HirType((declaration as HirType).parent, "${declaration.name()}")
+    let primitive = HirType(declaration.parent, "${declaration.name()}")
+    let primitive = SolverValue(primitive, solverParameters)
+    this.rules.insert(
+      SolverRule(
+        declaration,
+        SolverGoal(
+          declaration,
+          (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(primitive)),
+        ),
+        goals,
+      ),
+    )
+
+    // T($Never) <- <empty>
+    this.rules.insert(SolverRule(
+      declaration,
+      SolverGoal(
+        declaration,
+        (solverParameters as List<SolverType>).followedByList(
+          List.of1<SolverType>(SolverValue(HirType.coreNever(context), List.empty<SolverType>())),
+        ),
+      ),
+      List.empty<SolverGoal>(),
+    ))
+
+    // T(?0) <- Error(?0)
+    let errorType = HirType.syntheticError(context)
+    let errorVariable = SolverVariable.error()
+    this.rules.insert(SolverRule(
+      declaration,
+      SolverGoal(
+        declaration,
+        (solverParameters as List<SolverType>).followedByList(List.of1<SolverType>(errorVariable)),
+      ),
+      List.of1<SolverGoal>(SolverGoal(errorType, List.of1<SolverType>(errorVariable))),
+    ))
+
+    declaration
+  }
+
+  fun registerEnumSolverRules(enumType: HirEnumType): HirType {
+    // We create several synthetic types and impls to allow for correct handling of error types
+    // and the `Never` type.
+    //
+    // For example:
+    //
+    // registerEnumSolverRules(Foo String | Bar Int) -> [
+    //   Enum$Bar$Foo(?0, ?1, $Enum$Bar$Foo(?0, ?1)) <- <empty>,
+    //   Enum$Bar$Foo(?0, ?1, $Never) <- <empty>,
+    //   Enum$Bar$Foo(?0, ?1, ?2) <- Error(?2),
+    //   ## Generated transitively:
+    //   String($String) <- <empty>,
+    //   String($Never) <- <empty>,
+    //   String(?0) <- Error(?0),
+    //   Int($Int) <- <empty>,
+    //   Int($Never) <- <empty>,
+    //   Int(?0) <- Error(?0),
+    //   Error(?0) <- <empty>,
+    //   Any(?0) <- <empty>,
+    // ]
+
+    let variantNames = enumType.variants.keys.toList().unsafeSorted()
+    let variantNames = (variantNames as Iterable<String>).join("$")
+    let declaration = HirType(HirModule.syntheticEnumTypes(this.context), "Enum${variantNames}")
+
+    let goals = MutableList.empty<SolverGoal>()
+    let solverParameters = MutableList.empty<SolverType>()
+    mut let parameterIndex = 0
+    for inlineType in enumType.variants.values().map<HirInlineType>({ it.second }) {
+      // This adds rules for the specific "type arguments".
+      this.hirInlineTypeToSolverTypeAndGoals(inlineType)
+      solverParameters.append(
+        SolverVariable(Some<HirParameterType>(canonicalVariable(parameterIndex))),
+      )
+      parameterIndex = parameterIndex + 1
+    }
+
+    // T($T) <- <empty>
+    let primitive = HirType(declaration.parent, "${declaration.name()}")
     let primitive = SolverValue(primitive, solverParameters)
     this.rules.insert(
       SolverRule(
@@ -904,19 +1240,19 @@ public fun isAssignableTo(
   scope: Package,
 ): Bool {
   query<Bool, List<CompilerError>>(context, "isAssignableTo", DataTuple3<HirInlineType, HirInlineType, Package>(base, trait_, scope), {
-    Tuple(implFor(context, base, trait_, scope) is Some<HirImpl>, List.empty<CompilerError>())
+    Tuple(sourceFor(context, base, trait_, scope) is Some, List.empty<CompilerError>())
   })
 }
-public fun implFor(
+public fun sourceFor(
   context: QueryContext<List<CompilerError>>,
   base: HirInlineType,
   trait_: HirInlineType,
   scope: Package,
-): Maybe<HirImpl> {
-  query<Maybe<HirImpl>, List<CompilerError>>(context, "implFor", DataTuple3<HirInlineType, HirInlineType, Package>(base, trait_, scope), {
+): Maybe<HirTrait | HirType | HirNamedType | HirImpl> {
+  query<Maybe<HirTrait | HirType | HirNamedType | HirImpl>, List<CompilerError>>(context, "sourceFor", DataTuple3<HirInlineType, HirInlineType, Package>(base, trait_, scope), {
     Tuple(
       findUniqueSolverSolutionFor(context, base, trait_, scope)
-        .map<HirImpl>({ it.usedRule.originalImpl as HirImpl }),
+        .map<HirTrait | HirType | HirNamedType | HirImpl>({ it.usedRule.originalImpl as HirTrait | HirType | HirNamedType | HirImpl }),
       List.empty<CompilerError>(),
     )
   })
@@ -986,11 +1322,29 @@ fun getAllTraitsOfModule(context: QueryContext<List<CompilerError>>, module: Hir
   })
 }
 
+fun getAllDirectImplsForTraitOrType(
+  context: QueryContext<List<CompilerError>>,
+  traitOrType: HirTrait | HirType,
+  scope: Package,
+): Set<HirImpl> {
+  query<Set<HirImpl>, List<CompilerError>>(context, "getAllDirectImplsForTraitOrType", DataTuple2<HirInlineType, Package>(traitOrType, scope), {
+    let impls = getAllImplsInScope(context, scope).items()
+      .where({
+        let baseType = it.baseType(context)
+        if (!(baseType is HirNamedType)) { return false }
+        (baseType as HirNamedType).declaration == traitOrType
+      })
+      .toSet()
+    Tuple(impls, List.empty<CompilerError>())
+  })
+}
+
 fun getAllImplementedTraitsWithSubstitutionsFor(
   context: QueryContext<List<CompilerError>>,
   base: HirInlineType,
   scope: Package,
 ): Set<(HirNamedType, Map<HirInlineType, HirInlineType>)> {
+  // TODO(never): can this be removed?
   query<Set<(HirNamedType, Map<HirInlineType, HirInlineType>)>, List<CompilerError>>(context, "getAllImplementedTraitsWithSubstitutionsFor", DataTuple2<HirInlineType, Package>(base, scope), {
     let traits = getAllImplsWithSubstitutionsFor(context, base, scope)
       .items()
@@ -1014,32 +1368,34 @@ fun getAllImplsWithSubstitutionsFor(
   context: QueryContext<List<CompilerError>>,
   base: HirInlineType,
   scope: Package,
-): Set<(HirImpl, Map<HirInlineType, HirInlineType>)> {
-  query<Set<(HirImpl, Map<HirInlineType, HirInlineType>)>, List<CompilerError>>(context, "getAllImplsWithSubstitutionsFor", DataTuple2<HirInlineType, Package>(base, scope), {
-    if (base is HirErrorType) { return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>() }
+): Set<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>> {
+  query<Set<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>>, List<CompilerError>>(context, "getAllImplsWithSubstitutionsFor", DataTuple2<HirInlineType, Package>(base, scope), {
+    if (base is HirErrorType) {
+      return Set.empty<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>>()
+    }
     if (base is HirNamedType) {
       return getAllImplsInScope(context, scope).items()
         .maybeMap<SolverSolutionUnique>({
           findUniqueSolverSolutionFor(context, base, it.baseType(context), scope)
         })
-        .map<(HirImpl, Map<HirInlineType, HirInlineType>)>({
+        .map<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>>({
           let substitutions = hirInlineTypeToSolverTypeAndGoalsAndRules(context, base).first
             .unify(it.refinedGoal)
             .unwrap()
-          Tuple(it, substitutions)
+          DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>(it, substitutions)
         })
         .toSet()
     }
     if (base is HirFunctionType) {
-      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+      return Set.empty<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>>()
     }
     if (base is HirStructType) {
       // TODO(soon): create synthetic impls for struct types
-      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+      return Set.empty<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>>()
     }
     if (base is HirEnumType) {
       // TODO(soon): create synthetic impls for enum types
-      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+      return Set.empty<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>>()
     }
     if (base is HirIntersectionType) {
       return ((base as HirIntersectionType).types as Iterable<HirInlineType>)
@@ -1055,7 +1411,7 @@ fun getAllImplsWithSubstitutionsFor(
     }
     if (base is HirReflectionType) {
       // TODO(never): create synthetic impls for reflection types
-      return Set.empty<(HirImpl, Map<HirInlineType, HirInlineType>)>()
+      return Set.empty<DataTuple2<HirImpl, Map<HirInlineType, HirInlineType>>>()
     }
     throw "Unknown HirInlineType: {base}"
   })

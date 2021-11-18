@@ -226,6 +226,7 @@ impl DartFunction: DartToCode {
     if _returns is Some {
       s = "{(_returns.unwrap() as DartToCode).toCode(importAllocator)} {s}"
     }
+    if isStatic { s = "static {s}" }
     s = "{docCommentToCode(docComment)}{annotationsToCode(importAllocator, annotations)} {s}"
     let parameters = parametersToCode(
       (requiredParameters as Iterable<DartParameter>).map<String>({ (it as DartToCode).toCode(importAllocator) }),
@@ -407,6 +408,11 @@ impl DartCall: DartToCode {
 impl DartNavigation: DartToCode {
   fun toCode(importAllocator: DartImportAllocator): String {
     "{(target as DartToCode).toCode(importAllocator)}.{property}"
+  }
+}
+impl DartParenthesizedExpression: DartToCode {
+  fun toCode(importAllocator: DartImportAllocator): String {
+    "({(target as DartToCode).toCode(importAllocator)})"
   }
 }
 impl DartBinaryOperator: DartToCode {

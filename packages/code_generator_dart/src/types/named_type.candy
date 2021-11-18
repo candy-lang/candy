@@ -9,94 +9,208 @@ use ...types
 public fun compileNamedType(
   context: QueryContext<List<CompilerError>>,
   namedType: HirNamedType,
-): DartType {
-  query<DartType, List<CompilerError>>(
-    context,
-    "code_generator_dart.compileNamedType",
-    namedType, {
-    let declaration = (namedType.declaration as HirDeclaration)
-    let importUrl = moduleHirToImportUrl(context, declaration.parent as HirModule)
-    let name = DartIdentifier(mangleName(declaration.name()), Some<String>(importUrl))
+  prefix: String,
+): DartIdentifier {
+  /// Example: `LinkedList[T]` -> `Named$Type$1`, `Equals` -> `Named$Trait$Equals`
 
-    let types = (namedType.parameterTypes as Iterable<HirInlineType>)
-      .map<DartType>({ compileInlineType(context, it) })
-      .toList()
-
-    Tuple(DartNamedType(name, types), List.empty<CompilerError>())
-  })
+  if (namedType.declaration is HirTrait) {
+    DartIdentifier(
+      "{prefix}$Named$Trait${(namedType.declaration as HirDeclaration).name()}",
+      Some<String>(moduleHirToImportUrl(context, namedType.parent as HirModule)),
+    )
+  } else {
+    if ((namedType.declaration as HirType).isBuiltin(context)) {
+      DartIdentifier(
+        "{prefix}$Named$Type${(namedType.declaration as HirDeclaration).name()}",
+        Some<String>(moduleHirToImportUrl(context, namedType.parent as HirModule)),
+      )
+    } else {
+      if (prefix == "InlineType") {
+        let typeParameters = (namedType.declaration as HirType).typeParameters(context)
+        compileRawTypeNamedType(
+          context,
+          (typeParameters as Iterable<HirParameterType>).length(),
+        )
+      } else {
+        typeNamedValueType.name
+      }
+    }
+  }
 }
-
-public fun compileNamedTypeStaticType(
+fun compileRawTypeNamedType(
   context: QueryContext<List<CompilerError>>,
-  namedType: HirNamedType,
-): DartExpression {
-  query<DartExpression, List<CompilerError>>(
-    context,
-    "code_generator_dart.compileNamedTypeStaticType",
-    namedType, {
-    let declaration = (namedType.declaration as HirDeclaration)
-    let name = "{mangleName(declaration.name())}$Static"
-    let importUrl = moduleHirToImportUrl(context, declaration.parent as HirModule)
-    let name = DartIdentifier(name, Some<String>(importUrl))
-    Tuple(DartNamedType(name, List.empty<DartType>()), List.empty<CompilerError>())
-  })
-}
-public fun compileNamedTypeStatic(
-  context: QueryContext<List<CompilerError>>,
-  namedType: HirNamedType,
-): DartExpression {
-  query<DartExpression, List<CompilerError>>(
-    context,
-    "code_generator_dart.compileNamedTypeStatic",
-    namedType, {
-    Tuple(compileNamedTypeForStatic(namedType), List.empty<CompilerError>())
-  })
-}
-fun compileInlineTypeForStatic(
-  context: QueryContext<List<CompilerError>>,
-  inlineType: HirInlineType,
-): DartExpression {
-  if (inlineType is HirErrorType) { throw "Tried to compile with an error type." }
-  if (inlineType is HirNamedType) {
-    return compileNamedTypeForStatic(context, inlineType as HirNamedType)
-  }
-  if (inlineType is HirFunctionType) {
-    throw "Tried to compile a function type as a static reference."
-  }
-  if (inlineType is HirStructType) { throw "Tried to compile a struct type as a static reference." }
-  if (inlineType is HirEnumType) { throw "Tried to compile an enum type as a static reference." }
-  if (inlineType is HirIntersectionType) {
-    todo("later: compile intersection types as static references")
-  }
-  if (inlineType is HirThisType) { todo("later: compile this types as static references") }
-  if (inlineType is HirParameterType) {
-    return compileParameterTypeForStatic(context, inlineType as HirParameterType)
-  }
-  if (inlineType is HirReflectionType) {
-    throw "Tried to compile a reflection type as a static reference."
-  }
-  throw "Unknown `HirInlineType`: {inlineType}"
-}
-fun compileNamedTypeForStatic(
-  context: QueryContext<List<CompilerError>>,
-  namedType: HirNamedType,
-): DartExpression {
-  let declaration = (namedType.declaration as HirDeclaration)
-  let name = "{mangleName(declaration.name())}$Static"
-  let importUrl = moduleHirToImportUrl(context, declaration.parent as HirModule)
-  let name = DartIdentifier(name, Some<String>(importUrl))
-
-  (name as DartExpression).call(
-    positionalArguments = (namedType.parameterTypes as Iterable<HirInlineType>)
-      .map<DartExpression>({ compileInlineTypeForStatic(context, it) })
-      .toList(),
-    namedArguments = Map.empty<String, DartExpression>(),
-    typeArguments = List.empty<DartType>(),
+  typeArgumentCount: Int,
+): DartIdentifier {
+  DartIdentifier(
+    "InlineType$Named$Type${typeArgumentCount}",
+    Some<String>(moduleHirToImportUrl(context, HirModule.syntheticNamedTypes(context))),
   )
 }
-fun compileParameterTypeForStatic(
+
+public fun compileNamedTypeDeclarations(
   context: QueryContext<List<CompilerError>>,
-  parameterType: HirParameterType,
-): DartExpression {
-  DartIdentifier("type${parameterType.name}", None<String>())
+  package: Package,
+): (HirModule, List<DartDeclaration>) {
+  /// Visits all used named types and generates their Dart code.
+
+  query<(HirModule, List<DartDeclaration>), List<CompilerError>>(
+    context,
+    "code_generator_dart.compileNamedTypeDeclarations",
+    package, {
+    let typeArgumentCounts = getAllInlineTypes(context, package).items()
+      .whereType<HirNamedType>()
+      .map<Int>({ (it.parameterTypes as Iterable<HirInlineType>).length() })
+      .toSet()
+    let classes = typeArgumentCounts.items()
+      .map<DartDeclaration>({
+        (compileTypeNamedTypeInlineType(context, it) as Iterable<DartClass>).cast<DartDeclaration>()
+      })
+      .toList()
+    Tuple(Tuple(HirModule.syntheticNamedTypes(context), classes), List.empty<CompilerError>())
+  })
+}
+
+fun compileTypeNamedTypeInlineType(
+  context: QueryContext<List<CompilerError>>,
+  typeArgumentCount: Int,
+): DartClass {
+  query<DartClass, List<CompilerError>>(
+    context,
+    "code_generator_dart.compileTypeNamedTypeInlineType",
+    typeArgumentCount, {
+    let name = compileRawTypeNamedType(context, typeArgumentCount, "InlineType")
+    let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
+
+    body.append(DartConstructor(
+      className = name,
+      name = None<String>(),
+      docComment = None<String>(),
+      annotations = List.empty<DartAnnotation>(),
+      isConst = true,
+      requiredParameters = 0.until(typeArgumentCount)
+        .map<DartParameter | DartInitializingFormal>({
+          DartInitializingFormal("typeArgument${it}", None<DartExpression>())
+        })
+        .toList(),
+      positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      body = None<DartBody>(),
+    ))
+
+    body.append(DartFunction(
+      isStatic = false,
+      name = "create",
+      docComment = None<String>(),
+      annotations = List.empty<DartAnnotation>(),
+      _returns = Some<DartType>(valueType),
+      typeParameters = List.empty<DartTypeParameter>(),
+      requiredParameters = DartParameter(
+        "value${it}",
+        isRequired = true,
+        type = Some<DartType>(valueType),
+        defaultValue = None<DartExpression>(),
+      ),
+      positionalParameters = List.empty<DartParameter>(),
+      namedParameters = List.empty<DartParameter>(),
+      body = Some<DartBody>(DartInlineBody(
+        (typeNamedValueType.name as DartExpression)
+          .call2(dartThis, DartIdentifier("value", None<String>())),
+      )),
+    ))
+
+    body.append(DartFunction(
+      isStatic = false,
+      name = "equals",
+      docComment = None<String>(),
+      annotations = List.of1<DartAnnotation>(dartOverrideAnnotation),
+      _returns = Some<DartType>(dartBool),
+      typeParameters = List.empty<DartTypeParameter>(),
+      requiredParameters = List.of1<DartParameter>(DartParameter(
+        "other",
+        isRequired = true,
+        type = Some<DartType>(inlineTypeType),
+        defaultValue = None<DartExpression>(),
+      )),
+      positionalParameters = List.empty<DartParameter>(),
+      namedParameters = List.empty<DartParameter>(),
+      body = Some<DartBody>(DartInlineBody(
+        (DartIdentifier("isOfThisType", None<String>()) as DartExpression)
+          .callPositional(
+            0.until(typeArgumentCount)
+              .map<DartExpression>({ DartIdentifier("typeArgument${it}", None<String>()) })
+              .toList()
+              .followedByList(List.of1<DartExpression>(DartIdentifier("other", None<String>()))),
+          ),
+      )),
+    ))
+    body.append(DartFunction(
+      isStatic = true,
+      name = "isOfThisType",
+      docComment = None<String>(),
+      annotations = List.empty<DartAnnotation>(),
+      _returns = Some<DartType>(dartBool),
+      typeParameters = List.empty<DartTypeParameter>(),
+      requiredParameters = 0.until(typeArgumentCount)
+        .map<DartParameter>({
+          DartParameter(
+            "typeArgument${it}",
+            isRequired = true,
+            type = Some<DartType>(inlineTypeType),
+            defaultValue = None<DartExpression>(),
+          )
+        })
+        .toList()
+        .followedByList(List.of1<DartParameter>(DartParameter(
+          "inlineType",
+          isRequired = true,
+          type = Some<DartType>(inlineTypeType),
+          defaultValue = None<DartExpression>(),
+        ))),
+      positionalParameters = List.empty<DartParameter>(),
+      namedParameters = List.empty<DartParameter>(),
+      body = Some<DartBody>(DartInlineBody(
+        0.until(typeArgumentCount)
+          .map<DartExpression>({
+            (DartIdentifier("typeArgument${it}", None<String>()) as DartExpression)
+              .dot("equals")
+              .call1(
+                (DartIdentifier("inlineType", None<String>()) as DartExpression)
+                  .dot("typeArgument${it}"),
+              )
+          })
+          .foldLeft<DartExpression>(
+            (DartIdentifier("inlineType", None<String>()) as DartExpression).is_(name),
+            { result, item => result.and(item) },
+          ),
+      )),
+    ))
+
+    body.appendAll(
+      0.until(typeArgumentCount)
+        .map<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>({
+          DartField(
+            "typeArgument${it}",
+            docComment = None<String>(),
+            isStatic = false,
+            mutability = DartFinal(),
+            type = Some<DartType>(inlineTypeType),
+            initialValue = None<DartExpression>(),
+          )
+        }),
+    )
+
+    let dartDeclaration = DartClass(
+      name = name.name,
+      docComment = None<String>(),
+      // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
+      annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
+      isAbstract = false,
+      typeParameters = List.empty<DartTypeParameter>(),
+      extends_ = None<DartType>(),
+      implements_ = List.of1<DartType>(typeNamedInlineTypeType),
+      with_ = List.empty<DartType>(),
+      body = body,
+    )
+    Tuple(dartDeclaration, List.empty<CompilerError>())
+  })
 }

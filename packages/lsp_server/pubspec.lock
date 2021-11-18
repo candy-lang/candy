@@ -302,13 +302,6 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "3.4.1"
-  lists:
-    dependency: transitive
-    description:
-      name: lists
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "0.1.6"
   logging:
     dependency: transitive
     description:
@@ -512,13 +505,6 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.0.5"
-  strings:
-    dependency: transitive
-    description:
-      name: strings
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "0.1.2"
   term_glyph:
     dependency: transitive
     description:
@@ -568,13 +554,6 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.2.0"
-  unicode:
-    dependency: transitive
-    description:
-      name: unicode
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "0.2.4"
   uri:
     dependency: transitive
     description:

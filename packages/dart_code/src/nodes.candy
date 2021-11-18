@@ -144,6 +144,7 @@ class DartFunction {
   ///   print('a=$a, b=$b, c=$c');
   /// }
 
+  let isStatic: Bool = false
   let name: String
   let docComment: Maybe<String> = None<String>()
   let annotations: List<DartAnnotation> = List.empty<DartAnnotation>()
@@ -164,6 +165,7 @@ class DartParameter {
 }
 
 class DartField {
+  // TODO(never, JonasWanke): support annotations, e.g., for `@override`
   let name: String
   let docComment: Maybe<String> = None<String>()
   let isStatic: Bool = false
@@ -255,7 +257,6 @@ impl DartNamedType: DartExpression & DartType
 
 class DartFunctionType {
   let parameters: List<DartType | DartParameter> = List.empty<DartType | DartParameter>()
-  // TODO(never, JonasWanke): simplify this to `List<DartType>`
   let positionalParameters: List<DartType | DartParameter> = List.empty<DartType | DartParameter>()
   let namedParameters: List<DartParameter> = List.empty<DartParameter>()
   let _returns: Maybe<DartType> = None<DartType>()
@@ -273,15 +274,20 @@ class DartTypeParameter {
 trait DartExpression {
   fun dot(property: String): DartNavigation { DartNavigation(this, property) }
   public fun call0(): DartCall {
-    call(
-      positionalArguments = List.empty<DartExpression>(),
-      namedArguments = Map.empty<String, DartExpression>(),
-      typeArguments = List.empty<DartType>(),
-    )
+    callPositional(List.empty<DartExpression>())
   }
   public fun call1(positionalArgument: DartExpression): DartCall {
+    callPositional(List.of1<DartExpression>(positionalArgument))
+  }
+  public fun call2(
+    firstPositionalArgument: DartExpression,
+    secondPositionalArgument: DartExpression,
+  ): DartCall {
+    callPositional(List.of2<DartExpression>(firstPositionalArgument, secondPositionalArgument))
+  }
+  public fun callPositional(positionalArguments: List<DartExpression>): DartCall {
     call(
-      positionalArguments = List.of1<DartExpression>(positionalArgument),
+      positionalArguments = positionalArguments,
       namedArguments = Map.empty<String, DartExpression>(),
       typeArguments = List.empty<DartType>(),
     )
@@ -320,7 +326,8 @@ class DartIdentifier {
 }
 impl DartIdentifier: DartExpression
 
-let this_ = DartIdentifier("this", None<String>())
+let dartThis = DartIdentifier("this", None<String>())
+let dartAssert = DartIdentifier("assert", None<String>())
 
 class DartNullLiteral {}
 impl DartNullLiteral: DartExpression
@@ -350,6 +357,11 @@ class DartNavigation {
   let property: String
 }
 impl DartNavigation: DartExpression
+
+class DartParenthesizedExpression {
+  let target: DartExpression
+}
+impl DartParenthesizedExpression: DartExpression
 
 class DartBinaryOperator {
   let left: DartExpression

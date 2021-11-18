@@ -1,0 +1,86 @@
+use dart_code
+use hir
+
+use ..compile
+
+let valueType = DartNamedType(
+  DartIdentifier("Value", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+let inlineTypeType = DartNamedType(
+  DartIdentifier("InlineType", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+
+// Type declarations
+let typeNamedValueType = DartNamedType(
+  DartIdentifier("Value$Named$Type", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+let typeNamedInlineTypeType = DartNamedType(
+  DartIdentifier("InlineType$Named$Type", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+
+// Trait declarations
+let traitNamedValueType = DartNamedType(
+  DartIdentifier("Value$Named$Trait", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+let traitNamedInlineTypeType = DartNamedType(
+  DartIdentifier("InlineType$Named$Trait", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+
+// Built-in primitives
+let builtinValueTypeIdentifier = DartIdentifier("Value$Builtin", Some<String>(candyDartUtilsImportUrl))
+let builtinNothingValueTypeName = DartNamedType(builtinValueTypeName, List.of1<DartType>(dartNull))
+let builtinIntValueTypeName = DartNamedType(builtinValueTypeName, List.of1<DartType>(dartInt))
+let builtinStringValueTypeName = DartNamedType(builtinValueTypeName, List.of1<DartType>(dartString))
+let builtinInlineTypeIdentifier = DartNamedType(
+  DartIdentifier("InlineType$Builtin", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+
+// Functions
+let functionValueType = DartNamedType(
+  DartIdentifier("Value$Function", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+let functionInlineTypeType = DartNamedType(
+  DartIdentifier("InlineType$Function", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+
+// Structs
+let structValueType = DartNamedType(
+  DartIdentifier("Value$Struct", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+let structInlineTypeType = DartNamedType(
+  DartIdentifier("InlineType$Struct", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+
+// Enums
+let enumValueType = DartNamedType(
+  DartIdentifier("Value$Enum", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+let enumInlineTypeType = DartNamedType(
+  DartIdentifier("InlineType$Enum", Some<String>(candyDartUtilsImportUrl)),
+  List.empty<DartType>(),
+)
+
+let instanceImplFunctionType = DartFunctionType(
+  parameters = List.of1<DartType | DartParameter>(valueType),
+  positionalParameters = List.empty<DartType | DartParameter>(),
+  namedParameters = List.empty<DartParameter>(),
+  _returns = Some<DartType>(valueType),
+)
+let staticImplFunctionType = DartFunctionType(
+  parameters = List.of1<DartType | DartParameter>(inlineTypeType),
+  positionalParameters = List.empty<DartType | DartParameter>(),
+  namedParameters = List.empty<DartParameter>(),
+  _returns = Some<DartType>(inlineTypeType),
+)

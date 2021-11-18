@@ -5,34 +5,35 @@ use incremental
 
 use ...declarations
 use ...types
+use ...utils
 use ..type_collection
 
 public fun compileEnumType(
   context: QueryContext<List<CompilerError>>,
   enumType: HirEnumType,
-): DartType {
-  /// Example: `True | False Int` -> `Enum$False$True<Int, Nothing>`
+  prefix: String,
+): DartIdentifier {
+  /// Example: `True | False Int` -> `Enum$2`
 
-  query<DartType, List<CompilerError>>(
-    context,
-    "code_generator_dart.compileEnumType",
-    enumType, {
-    let variantNames = enumType.variants.keys()
-
-    // In our example: "Enum$False$True"
-    let name = DartIdentifier(
-      getCompiledEnumTypeName(context, variantNames.toSet()),
-      Some<String>(moduleHirToImportUrl(context, HirModule.syntheticEnums(context))),
-    )
-
-    let sortedVariantTypes = (variantNames.toList().unsafeSorted() as Iterable<String>)
-      .map<HirInlineType>({ enumType.variants.get(it).unwrap() })
-    // In our example: ["Int", "Nothing"]
-    let types = sortedVariantTypes.map<DartType>({ compileInlineType(context, it) }).toList()
-
-    Tuple(DartNamedType(name, types), List.empty<CompilerError>())
-  })
+  compileRawEnumType(context, enumType.variants.length(), prefix)
 }
+fun compileRawEnumType(
+  context: QueryContext<List<CompilerError>>,
+  variantCount: Int,
+  prefix: String,
+): DartIdentifier {
+  DartIdentifier(
+    "{prefix}$Enum${variantCount}",
+    Some<String>(moduleHirToImportUrl(context, HirModule.syntheticEnumTypes(context))),
+  )
+}
+fun compileEnumVariantType(variantCount: Int, variantIndex: Int): String {
+  /// Example: `True` in `True | False Int` -> `Value$Enum$2$0`
+
+  "Value$Enum${variantCount}${variantIndex}"
+}
+
+// TODO(soon): generate impl functions and impl for Any
 
 public fun compileEnumTypeDeclarations(
   context: QueryContext<List<CompilerError>>,
@@ -44,146 +45,133 @@ public fun compileEnumTypeDeclarations(
     context,
     "code_generator_dart.compileEnumTypeDeclarations",
     package, {
-    let variantNames = getAllInlineTypes(context, package).items()
+    let variantCounts = getAllInlineTypes(context, package).items()
       .whereType<HirEnumType>()
-      .map<Set<String>>({ it.variants.keys().toSet() })
+      .map<Int>({ it.variants.length() })
       .toSet()
-    let classes = variantNames.items()
+    let classes = variantCounts.items()
       .expand<DartDeclaration>({
-        (compileEnumTypeDeclaration(context, it) as Iterable<DartDeclaration>)
+        (compileEnumTypeDeclaration(context, it) as Iterable<DartClass>).cast<DartDeclaration>()
       })
       .toList()
-    Tuple(Tuple(HirModule.syntheticEnums(context), classes), List.empty<CompilerError>())
+    Tuple(Tuple(HirModule.syntheticEnumTypes(context), classes), List.empty<CompilerError>())
   })
 }
 fun compileEnumTypeDeclaration(
   context: QueryContext<List<CompilerError>>,
-  variantNames: Set<String>,
+  variantCount: Int,
 ): List<DartClass> {
   query<List<DartClass>, List<CompilerError>>(
     context,
     "code_generator_dart.compileEnumTypeDeclaration",
-    variantNames, {
+    variantCount, {
     let classes = MutableList.empty<DartClass>()
-    classes.append(compileEnumTypeDeclarationBase(context, variantNames))
+    classes.append(compileEnumTypeValue(context, variantCount))
     classes.appendAll(
-      variantNames.items()
-        .map<DartClass>({ compileEnumTypeDeclarationVariant(context, variantNames, it) }),
+      0.until(variantCount)
+        .map<DartClass>({ compileEnumTypeVariantValue(context, variantCount, it) }),
     )
+    classes.append(compileEnumTypeInlineType(context, variantCount))
     Tuple(classes, List.empty<CompilerError>())
   })
 }
-fun compileEnumTypeDeclarationBase(
+
+fun compileEnumTypeValue(
   context: QueryContext<List<CompilerError>>,
-  variantNames: Set<String>,
+  variantCount: Int,
 ): DartClass {
   query<DartClass, List<CompilerError>>(
     context,
-    "code_generator_dart.compileEnumTypeDeclarationBase",
-    variantNames, {
-    let name = getCompiledEnumTypeName(context, variantNames)
-
-    let variants = (variantNames.items().toList().unsafeSorted() as Iterable<String>)
-      .map<(String, String)>({ Tuple(it, "T{it}") })
-
+    "code_generator_dart.compileEnumTypeValue",
+    variantCount, {
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
-    body.append(DartConstructor(
-      className = name,
-      name = None<String>(),
-      docComment = None<String>(),
-      annotations = List.empty<DartAnnotation>(),
-      isConst = true,
-      requiredParameters = List.empty<DartParameter | DartInitializingFormal>(),
-      positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
-      namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
-      body = None<DartBody>(),
-    ))
-
     body.append(DartFunction(
+      isStatic = false,
       name = "match",
       docComment = None<String>(),
       annotations = List.empty<DartAnnotation>(),
-      _returns = Some<DartType>(typeT),
+      _returns = Some<DartType>(valueType),
       typeParameters = List.empty<DartTypeParameter>(),
-      requiredParameters = generateMatchValueParameters(variants),
+      requiredParameters = generateMatchValueParameters(variantCount),
       positionalParameters = List.empty<DartParameter>(),
       namedParameters = List.empty<DartParameter>(),
       body = None<DartBody>(),
     ))
 
     let dartDeclaration = DartClass(
-      name = name,
+      name = compileRawEnumType(context, variantCount, "Value").name,
       docComment = None<String>(),
       // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
       annotations = List.empty<DartAnnotation>(),
       isAbstract = true,
-      typeParameters = variants
-        .map<DartTypeParameter>({ DartTypeParameter(it.second, None<DartType>()) })
-        .toList(),
+      typeParameters = List.empty<DartTypeParameter>(),
       extends_ = None<DartType>(),
-      implements_ = List.empty<DartType>(),
+      implements_ = List.of1<DartType>(enumValueType),
       with_ = List.empty<DartType>(),
       body = body,
     )
     Tuple(dartDeclaration, List.empty<CompilerError>())
   })
 }
-fun compileEnumTypeDeclarationVariant(
+fun compileEnumTypeVariantValue(
   context: QueryContext<List<CompilerError>>,
-  variantNames: Set<String>,
-  variant: String,
+  variantCount: Int,
+  variantIndex: Int,
 ): DartClass {
   query<DartClass, List<CompilerError>>(
     context,
-    "code_generator_dart.compileEnumTypeDeclarationVariant",
-    DataTuple2<Set<String>, String>(variantNames, variant), {
-    let name = getCompiledEnumVariantName(context, variantNames, variant)
-
-    let variants = (variantNames.items().toList().unsafeSorted() as Iterable<String>)
-      .map<(String, String)>({ Tuple(it, "T{it}") })
-    let fieldName = "value"
-    let fieldType = variants.singleWhere({ it.first == variant }).unwrap().second
-
+    "code_generator_dart.compileEnumTypeVariantValue",
+    DataTuple2<Int, Int>(variantCount, variantIndex), {
+    let name = compileEnumVariantType(variantCount, variantIndex)
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
     body.append(DartConstructor(
       className = name,
-      name = None<String>(),
+      name = Some<String>("_"),
       docComment = None<String>(),
       annotations = List.empty<DartAnnotation>(),
       isConst = true,
-      requiredParameters = List.of1<DartParameter | DartInitializingFormal>(
-        DartInitializingFormal(fieldName, None<DartExpression>()),
+      requiredParameters = List.of2<DartParameter | DartInitializingFormal>(
+        DartInitializingFormal("inlineType", None<DartExpression>()),
+        DartInitializingFormal("value", None<DartExpression>()),
       ),
       positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
       namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
       body = None<DartBody>(),
     ))
 
+    // TODO(never, JonasWanke): add `@override`
     body.append(DartField(
-      fieldName,
+      "inlineType",
       docComment = None<String>(),
       isStatic = false,
       mutability = DartFinal(),
-      type = Some<DartType>(
-        DartNamedType(DartIdentifier(fieldType, None<String>()), List.empty<DartType>()),
-      ),
+      type = Some<DartType>(inlineTypeType),
+      initialValue = None<DartExpression>(),
+    ))
+    body.append(DartField(
+      "value",
+      docComment = None<String>(),
+      isStatic = false,
+      mutability = DartFinal(),
+      type = Some<DartType>(valueType),
       initialValue = None<DartExpression>(),
     ))
 
     body.append(DartFunction(
+      isStatic = false,
       name = "match",
       docComment = None<String>(),
-      annotations = List.empty<DartAnnotation>(),
-      _returns = Some<DartType>(typeT),
+      annotations = List.of1<DartAnnotation>(dartOverrideAnnotation),
+      _returns = Some<DartType>(valueType),
       typeParameters = List.empty<DartTypeParameter>(),
-      requiredParameters = generateMatchValueParameters(variants),
+      requiredParameters = generateMatchValueParameters(variantCount),
       positionalParameters = List.empty<DartParameter>(),
       namedParameters = List.empty<DartParameter>(),
       body = Some<DartBody>(DartInlineBody(
-        (DartIdentifier("value{variant}", None<String>()) as DartExpression)
-          .call1(DartIdentifier("value", None<String>()) as DartExpression),
+        (DartIdentifier("value${variantIndex}", None<String>()) as DartExpression)
+          .call1(DartIdentifier("value", None<String>())),
       )),
     ))
 
@@ -193,38 +181,28 @@ fun compileEnumTypeDeclarationVariant(
       // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
       annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
       isAbstract = false,
-      typeParameters = variants
-        .map<DartTypeParameter>({ DartTypeParameter(it.second, None<DartType>()) })
-        .toList(),
-      extends_ = Some<DartType>(
-        DartNamedType(
-          DartIdentifier(getCompiledEnumTypeName(context, variantNames), None<String>()),
-          variants
-            .map<DartType>({
-              DartNamedType(DartIdentifier(it.second, None<String>()), List.empty<DartType>())
-            })
-            .toList(),
-        ),
+      typeParameters = List.empty<DartTypeParameter>(),
+      extends_ = None<DartType>(),
+      implements_ = List.of1<DartType>(
+        DartType(compileEnumType(context, variantCount, "Value"), List.empty<DartType>()),
       ),
-      implements_ = List.empty<DartType>(),
       with_ = List.empty<DartType>(),
       body = body,
     )
     Tuple(dartDeclaration, List.empty<CompilerError>())
   })
 }
-let typeT = DartNamedType(DartIdentifier("T", None<String>()), List.empty<DartType>())
-fun generateMatchValueParameters(variants: Iterable<(String, String)>): List<DartParameter> {
-  variants
+fun generateMatchValueParameters(variantCount: Int): List<DartParameter> {
+  0.until(variantCount)
     .map<DartParameter>({
       DartParameter(
-        name = DartIdentifier("value{it.first}", None<String>()),
+        name = DartIdentifier("value${it}", None<String>()),
         isRequired = true,
         type = Some<DartType>(DartFunctionType(
-          parameters = List.of1<DartType | DartParameter>(it.second),
+          parameters = List.of1<DartType | DartParameter>(valueType),
           positionalParameters = List.empty<DartType | DartParameter>(),
           namedParameters = List.empty<DartParameter>(),
-          _returns = Some<DartType>(typeT),
+          _returns = Some<DartType>(valueType),
         )),
         defaultValue = None<DartExpression>(),
       )
@@ -232,36 +210,153 @@ fun generateMatchValueParameters(variants: Iterable<(String, String)>): List<Dar
     .toList()
 }
 
-public fun getCompiledEnumTypeName(
+fun compileEnumTypeInlineType(
   context: QueryContext<List<CompilerError>>,
-  variantNames: Set<String>,
-): String {
-  /// Example: `True | False Int` -> `Enum$False$True`
-
-  query<String, List<CompilerError>>(
+  variantCount: Int,
+): DartClass {
+  query<DartClass, List<CompilerError>>(
     context,
-    "code_generator_dart.getCompiledEnumTypeName",
-    variantNames, {
-    let variantNames = variantNames.items().toList().unsafeSorted()
-    let variantNames = (variantNames as Iterable<String>).join("$")
-    Tuple("Enum${variantNames}", List.empty<CompilerError>())
-  })
-}
-public fun getCompiledEnumVariantName(
-  context: QueryContext<List<CompilerError>>,
-  variantNames: Set<String>,
-  variant: String,
-): String {
-  /// Example: `True` in `True | False Int` -> `Enum$False$_True_`
+    "code_generator_dart.compileEnumTypeInlineType",
+    variantCount, {
+    let name = compileRawEnumType(context, variantCount, "InlineType")
+    let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
-  query<String, List<CompilerError>>(
-    context,
-    "code_generator_dart.getCompiledEnumVariantName",
-    DataTuple2<Set<String>, String>(variantNames, variant), {
-    let variantNames = variantNames.items().toList().unsafeSorted()
-    let variantNames = (variantNames as Iterable<String>)
-      .map<String>({ if (it == variant) { "_{it}_" } else { it } })
-      .join("$")
-    Tuple("Enum${variantNames}", List.empty<CompilerError>())
+    body.append(DartConstructor(
+      className = name,
+      name = None<String>(),
+      docComment = None<String>(),
+      annotations = List.empty<DartAnnotation>(),
+      isConst = true,
+      requiredParameters = 0.until(variantCount)
+        .map<DartParameter | DartInitializingFormal>({
+          DartInitializingFormal("typeArgument${it}", None<DartExpression>())
+        })
+        .toList(),
+      positionalParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      namedParameters = List.empty<DartParameter | DartInitializingFormal>(),
+      body = None<DartBody>(),
+    ))
+
+    body.appendAll(
+      0.until(variantCount)
+        .map<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>({
+          DartFunction(
+            isStatic = false,
+            name = "create${it}",
+            docComment = None<String>(),
+            annotations = List.empty<DartAnnotation>(),
+            _returns = Some<DartType>(valueType),
+            typeParameters = List.empty<DartTypeParameter>(),
+            requiredParameters = List.of1<DartParameter>(DartParameter(
+              "value",
+              isRequired = true,
+              type = Some<DartType>(valueType),
+              defaultValue = None<DartExpression>(),
+            )),
+            positionalParameters = List.empty<DartParameter>(),
+            namedParameters = List.empty<DartParameter>(),
+            body = Some<DartBody>(DartInlineBody(
+              (DartIdentifier(compileEnumVariantType(variantCount, it), None<String>()) as DartExpression)
+                .dot("_")
+                .call2(dartThis, DartIdentifier("value", None<String>())),
+            )),
+          )
+        }),
+    )
+
+    body.append(DartFunction(
+      isStatic = false,
+      name = "equals",
+      docComment = None<String>(),
+      annotations = List.of1<DartAnnotation>(dartOverrideAnnotation),
+      _returns = Some<DartType>(dartBool),
+      typeParameters = List.empty<DartTypeParameter>(),
+      requiredParameters = List.of1<DartParameter>(DartParameter(
+        "other",
+        isRequired = true,
+        type = Some<DartType>(inlineTypeType),
+        defaultValue = None<DartExpression>(),
+      )),
+      positionalParameters = List.empty<DartParameter>(),
+      namedParameters = List.empty<DartParameter>(),
+      body = Some<DartBody>(DartInlineBody(
+        (DartIdentifier("isOfThisType", None<String>()) as DartExpression)
+          .callPositional(
+            0.until(variantCount)
+              .map<DartExpression>({ DartIdentifier("typeArgument${it}", None<String>()) })
+              .toList()
+              .followedByList(List.of1<DartExpression>(DartIdentifier("other", None<String>()))),
+          ),
+      )),
+    ))
+    body.append(DartFunction(
+      isStatic = true,
+      name = "isOfThisType",
+      docComment = None<String>(),
+      annotations = List.empty<DartAnnotation>(),
+      _returns = Some<DartType>(dartBool),
+      typeParameters = List.empty<DartTypeParameter>(),
+      requiredParameters = 0.until(variantCount)
+        .map<DartParameter>({
+          DartParameter(
+            "typeArgument${it}",
+            isRequired = true,
+            type = Some<DartType>(inlineTypeType),
+            defaultValue = None<DartExpression>(),
+          )
+        })
+        .toList()
+        .followedByList(List.of1<DartParameter>(DartParameter(
+          "inlineType",
+          isRequired = true,
+          type = Some<DartType>(inlineTypeType),
+          defaultValue = None<DartExpression>(),
+        ))),
+      positionalParameters = List.empty<DartParameter>(),
+      namedParameters = List.empty<DartParameter>(),
+      body = Some<DartBody>(DartInlineBody(
+        0.until(variantCount)
+          .map<DartExpression>({
+            (DartIdentifier("typeArgument${it}", None<String>()) as DartExpression)
+              .dot("equals")
+              .call1(
+                (DartIdentifier("inlineType", None<String>()) as DartExpression)
+                  .dot("typeArgument${it}"),
+              )
+          })
+          .foldLeft<DartExpression>(
+            (DartIdentifier("inlineType", None<String>()) as DartExpression).is_(name),
+            { result, item => result.and(item) },
+          ),
+      )),
+    ))
+
+    body.appendAll(
+      0.until(variantCount)
+        .map<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>({
+          DartField(
+            "typeArgument${it}",
+            docComment = None<String>(),
+            isStatic = false,
+            mutability = DartFinal(),
+            type = Some<DartType>(inlineTypeType),
+            initialValue = None<DartExpression>(),
+          )
+        }),
+    )
+
+    let dartDeclaration = DartClass(
+      name = name.name,
+      docComment = None<String>(),
+      // TODO(never, JonasWanke): Add the corresponding Candy code as the doc comment.
+      annotations = List.of1<DartAnnotation>(dartMetaSealedAnnotation),
+      isAbstract = false,
+      typeParameters = List.empty<DartTypeParameter>(),
+      extends_ = None<DartType>(),
+      implements_ = List.of1<DartType>(enumInlineTypeType),
+      with_ = List.empty<DartType>(),
+      body = body,
+    )
+    Tuple(dartDeclaration, List.empty<CompilerError>())
   })
 }

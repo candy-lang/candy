@@ -2,6 +2,7 @@ use compiler_utils
 use dart_code
 use hir
 use incremental
+
 use ..name_mangling
 
 public fun compileType(
@@ -33,7 +34,11 @@ fun compileInstanceType(
     context,
     "code_generator_dart.compileInstanceType",
     DataTuple2<Package, HirType>(package, typeHir), {
-    let name = getDeclarationName(context, typeHir)
+    let name = compileNamedType(
+      context,
+      HirNamedType(typeHir, List.empty<HirInlineType>()),
+      "Value",
+    ).name
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
     body.append(DartConstructor(
@@ -104,7 +109,11 @@ fun compileStaticType(
     context,
     "code_generator_dart.compileStaticType",
     DataTuple2<Package, HirType>(package, typeHir), {
-    let name = getDeclarationStaticName(context, typeHir)
+    let name = compileNamedType(
+      context,
+      HirNamedType(typeHir, List.empty<HirInlineType>()),
+      "InlineType",
+    ).name
     let body = MutableList.empty<DartConstructor | DartField | DartGetter | DartSetter | DartFunction>()
 
     body.append(DartConstructor(

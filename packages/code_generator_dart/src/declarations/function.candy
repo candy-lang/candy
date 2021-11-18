@@ -39,6 +39,7 @@ public fun compileGlobalFunction(
       })
       .toList()
     let output = DartFunction(
+      isStatic = false,
       name = mangleName(context, functionHir.name()),
       docComment = None<String>(),
       annotations = List.empty<DartAnnotation>(),

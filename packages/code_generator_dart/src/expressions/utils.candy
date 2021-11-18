@@ -22,6 +22,7 @@ public fun getValueExpressionResultIdentifier(
     let actualType = resolveHirValueExpressionUri(context, expressionUri).type(context)
     if (expectedType is HirNamedType && !(expectedType == actualType)) {
       if ((expectedType as HirNamedType).declaration is HirTrait) {
+        // TODO(soon, JonasWanke): use the renamed `getImplFunctionName`
         let mangledTraitName = getTraitNameMangledForMethodName(
           context,
           expectedType as HirNamedType,
