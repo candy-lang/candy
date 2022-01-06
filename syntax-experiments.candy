@@ -21,6 +21,25 @@ Syntax Ideas
 - function call: similar to Elm/Toit/Roc?
 - compiler plugins? @?
 
+4
+  blub
+a
+  b
+    c 2 (
+foo
+  2
+    ) 4
+  d
+e
+
+"a" [
+  "b" [
+    "c 2 3"
+  ]
+  "d"
+]
+"e"
+
 
 Playground
 
