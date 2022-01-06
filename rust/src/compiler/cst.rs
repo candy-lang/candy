@@ -1,10 +1,11 @@
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Cst {
     Int(Int),
-    String(String),
+    Text(String),
     Symbol(Symbol),
     Call(Call),
     Assignment(Assignment),
+    Error { rest: String, message: String },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -22,6 +23,6 @@ pub struct Call {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Assignment {
     pub name: String,
-    pub parameters: Vec<String>,
+    pub parameters: Vec<Cst>,
     pub body: Vec<Cst>,
 }

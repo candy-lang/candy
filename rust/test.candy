@@ -1,3 +1,7 @@
 print "Hello, world!"
 add
   1
+
+print "What's your name?"
+name = readLine
+add "Hello, " name "!" # string interpolation doesn't work yet
