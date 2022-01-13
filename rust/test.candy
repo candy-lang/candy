@@ -1,7 +1,13 @@
-print "Hello, world!"
-add
-  1
 
-print "What's your name?"
-name = readLine
-add "Hello, " name "!" # string interpolation doesn't work yet
+foo = add
+add
+  8646464
+  "Hi"
+
+myIterable
+  map { a b -> print the item on io }
+
+fibonacci n = foo
+fibonacci = { n ->
+  blub
+}

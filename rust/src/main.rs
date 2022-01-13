@@ -22,6 +22,9 @@ enum Candy {
 
 #[tokio::main]
 async fn main() {
+    run();
+    return;
+
     TermLogger::init(
         LevelFilter::Debug,
         Config::default(),
