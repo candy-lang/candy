@@ -4,7 +4,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_while, take_while_m_n},
     character::complete::{alphanumeric0, anychar, line_ending, not_line_ending, space0},
-    combinator::{fail, map, opt, success, verify},
+    combinator::{map, opt, success, verify},
     multi::{count, many0, many1},
     sequence::{delimited, tuple},
     IResult, Parser,
@@ -87,7 +87,7 @@ fn int(input: &str) -> ParserResult<Cst> {
 fn text(input: &str) -> ParserResult<Cst> {
     map(
         delimited(tag("\""), take_while(|it| it != '\"'), tag("\"")),
-        |string: &str| Cst::Text(string.to_owned()),
+        |string: &str| Cst::Text(Text(string.to_owned())),
     )
     .context("text")
     .parse(input)
@@ -126,6 +126,7 @@ fn lambda(input: &str, indentation: usize) -> ParserResult<Cst> {
             alt((
                 |input| csts1(input, indentation + 1),
                 map(|input| cst(input, indentation), |cst| vec![cst]),
+                success(vec![]),
             )),
             trailing_whitespace_and_comment,
             many0(line_ending),
@@ -164,17 +165,6 @@ fn call_without_arguments(input: &str) -> ParserResult<Cst> {
     )
     .context("call_without_arguments")
     .parse(input)
-    // let (input, name) = tuple((verify(anychar, |it| it.is_lowercase()), alphanumeric0))(input)
-    //     .map(|(input, (a, b))| (input, format!("{}{}", a, b)))?;
-    // let (input, _) = trailing_whitespace_and_comment(input)?;
-
-    // Ok((
-    //     input,
-    //     Cst::Call(Call {
-    //         name,
-    //         arguments: vec![],
-    //     }),
-    // ))
 }
 
 fn assignment(input: &str, indentation: usize) -> ParserResult<Cst> {
@@ -193,6 +183,7 @@ fn assignment(input: &str, indentation: usize) -> ParserResult<Cst> {
         let (input, body) = alt((
             |input| csts1(input, indentation + 1),
             map(|input| cst(input, indentation), |cst| vec![cst]),
+            success(vec![]),
         ))(input)?;
         Ok((
             input,
@@ -253,7 +244,7 @@ proptest! {
     #[test]
     fn test_text(value in "[\\w\\d\\s]*") {
         let stringified_text = format!("\"{}\"", value);
-        prop_assert_eq!(text(&stringified_text).unwrap(), ("", Cst::Text(value)));
+        prop_assert_eq!(text(&stringified_text).unwrap(), ("", Cst::Text(Text(value))));
     }
     #[test]
     fn test_symbol(value in "[A-Z][A-Za-z0-9]*") {
@@ -384,7 +375,7 @@ fn test_call() {
                 name: "print".to_owned(),
                 arguments: vec![
                     Cst::Int(Int(123)),
-                    Cst::Text("foo".to_owned()),
+                    Cst::Text(Text("foo".to_owned())),
                     Cst::Symbol(Symbol("Bar".to_owned()))
                 ]
             })

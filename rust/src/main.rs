@@ -1,6 +1,8 @@
 mod compiler;
 
+use crate::compiler::ast_to_hir::CompileVecAstsToHir;
 use crate::compiler::cst::Cst;
+use crate::compiler::cst_to_ast::LowerCstToAst;
 use crate::compiler::string_to_cst::StringToCst;
 use crate::compiler::*;
 use colored::Colorize;
@@ -22,9 +24,6 @@ enum Candy {
 
 #[tokio::main]
 async fn main() {
-    run();
-    return;
-
     TermLogger::init(
         LevelFilter::Debug,
         Config::default(),
@@ -32,6 +31,9 @@ async fn main() {
         ColorChoice::Auto,
     )
     .unwrap();
+
+    run();
+    return;
 
     let options = Candy::from_args();
     debug!("{:#?}", options);
@@ -44,8 +46,20 @@ fn run() {
     debug!("Running test.candy.\n");
 
     let test_code = std::fs::read_to_string("test.candy").expect("File test.candy not found.");
+
+    log::info!("Parsing string to CST…");
     let cst = test_code.parse_cst();
-    dbg!(cst);
+
+    log::info!("Lowering CST to AST…");
+    let (asts, errors) = cst.into_ast();
+    if !errors.is_empty() {
+        log::error!("Errors occurred while lowering CST to AST:\n{:?}", errors);
+        return;
+    }
+
+    log::info!("Compiling AST to HIR…");
+    let lambda = asts.compile_to_hir();
+    print!("Lambda: {}", lambda);
 
     // let code = {
     //     let core_code = std::fs::read_to_string("core.candy").expect("File core.candy not found.");

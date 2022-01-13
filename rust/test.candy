@@ -1,3 +1,32 @@
+print =
+readLine =
+add =
+the =
+item =
+on =
+io =
+map =
+myIterable =
+blub =
+
+main =
+  foo = 3
+  bar = { n -> 5 }
+  baz =
+    print "abc"
+    123
+  bar 5
+  foo
+
+main =
+  foo = 1
+  bar = { n -> 5 }
+  a = readLine
+  a
+
+main = {
+
+}
 
 foo = add
 add
