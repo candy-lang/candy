@@ -125,7 +125,10 @@ impl LambdaRunner {
                     Value::Lambda(lambda) => lambda,
                     value => panic!("Call called with a non-lambda: `{:?}`.", value),
                 };
-                log::debug!("Calling lambda {}", function);
+                log::debug!(
+                    "Calling function `{}`",
+                    self.lambda.hir.identifiers.get(&function).unwrap(),
+                );
                 assert_eq!(lambda.hir.parameter_count, arguments.len());
 
                 let value = LambdaRunner::new(

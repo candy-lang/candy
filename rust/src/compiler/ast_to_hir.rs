@@ -47,6 +47,13 @@ impl Compiler {
                     lambda: Lambda::new(self.lambda.next_id(), parameters.len()),
                     identifiers: self.identifiers.clone(),
                 };
+                for (index, parameter) in parameters.iter().enumerate() {
+                    inner
+                        .lambda
+                        .identifiers
+                        .insert(inner.lambda.first_id + index, parameter.to_owned());
+                }
+
                 inner.compile(body);
                 self.push(Expression::Lambda(inner.lambda))
             }
@@ -79,7 +86,8 @@ impl Compiler {
                 }
                 inner.compile(body);
                 let id = self.push(Expression::Lambda(inner.lambda));
-                self.identifiers.insert(name, id);
+                self.identifiers.insert(name.clone(), id);
+                self.lambda.identifiers.insert(id, name);
                 id
             }
         }

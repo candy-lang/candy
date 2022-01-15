@@ -74,7 +74,7 @@ impl fmt::Display for Expression {
         match self {
             Expression::Int(int) => write!(f, "int {}", int),
             Expression::Text(text) => write!(f, "text {:?}", text),
-            Expression::Symbol(symbol) => write!(f, "symbol :{}", symbol),
+            Expression::Symbol(symbol) => write!(f, "symbol {}", symbol),
             Expression::Lambda(lambda) => {
                 write!(
                     f,
@@ -102,8 +102,8 @@ impl fmt::Display for Expression {
 impl fmt::Display for Lambda {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} parameters\n", self.parameter_count)?;
-        for (id, action) in self.expressions.iter().enumerate() {
-            let id = sel
+        for (index, action) in self.expressions.iter().enumerate() {
+            let id = self.first_id + self.parameter_count + index;
             write!(f, "{} = {}\n", id, action)?;
         }
         write!(f, "out: {}\n", self.out)?;
