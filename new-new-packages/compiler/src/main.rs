@@ -1,19 +1,28 @@
 mod builtin_functions;
 mod compiler;
 mod interpreter;
+mod language_server;
 
 use crate::compiler::ast_to_hir::CompileVecAstsToHir;
 use crate::compiler::cst_to_ast::LowerCstToAst;
 use crate::compiler::string_to_cst::StringToCst;
 use crate::interpreter::fiber::FiberStatus;
 use crate::interpreter::*;
+use language_server::CandyLanguageServer;
 use log;
+use lspower::{LspService, Server};
 use simplelog::{ColorChoice, Config, LevelFilter, TermLogger, TerminalMode};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "candy", about = "The 🍭 Candy CLI.")]
+enum CandyOptions {
+    Run(CandyRunOptions),
+    Lsp,
+}
+
+#[derive(StructOpt, Debug)]
 struct CandyRunOptions {
     #[structopt(long)]
     print_cst: bool,
@@ -31,21 +40,16 @@ struct CandyRunOptions {
     file: PathBuf,
 }
 
-fn main() {
-    TermLogger::init(
-        LevelFilter::Debug,
-        Config::default(),
-        TerminalMode::Mixed,
-        ColorChoice::Auto,
-    )
-    .unwrap();
-
-    let options = CandyRunOptions::from_args();
-    log::debug!("{:#?}", options);
-    run(options)
+#[tokio::main]
+async fn main() {
+    match CandyOptions::from_args() {
+        CandyOptions::Run(options) => run(options),
+        CandyOptions::Lsp => lsp().await,
+    }
 }
 
 fn run(options: CandyRunOptions) {
+    init_logger(TerminalMode::Mixed);
     log::debug!("Running test.candy.\n");
 
     let test_code = std::fs::read_to_string(options.file).expect("File test.candy not found.");
@@ -82,76 +86,27 @@ fn run(options: CandyRunOptions) {
             FiberStatus::Panicked(value) => log::error!("Fiber panicked: {:?}", value),
         }
     }
+}
 
-    // let code = {
-    //     let core_code = std::fs::read_to_string("core.candy").expect("File core.candy not found.");
-    //     let test_code = std::fs::read_to_string("test.candy").expect("File test.candy not found.");
-    //     format!("{}\n{}", core_code, test_code)
-    // };
+async fn lsp() {
+    init_logger(TerminalMode::Stderr);
+    // language_server::run().unwrap();
+    let stdin = tokio::io::stdin();
+    let stdout = tokio::io::stdout();
 
-    // let ast = match code.parse_to_asts() {
-    //     Ok(it) => it,
-    //     Err(err) => panic!("Couldn't parse ASTs of core.candy: {}", err),
-    // };
-    // debug!("AST: {}\n", &ast);
+    let (service, messages) = LspService::new(|client| CandyLanguageServer { client });
+    Server::new(stdin, stdout)
+        .interleave(messages)
+        .serve(service)
+        .await;
+}
 
-    // let mut hir = ast.compile_to_hir();
-    // hir.optimize();
-    // debug!("HIR: {}", hir);
-
-    // let mut lir = hir.compile_to_lir();
-    // lir.optimize();
-    // debug!("LIR: {}", lir);
-
-    // debug!("Compiling to byte code...");
-    // let byte_code = lir.compile_to_byte_code();
-    // debug!("Byte code: {:?}", byte_code);
-
-    // debug!("Running in VM...");
-    // let mut ambients = HashMap::new();
-    // ambients.insert("stdout".into(), Value::ChannelSendEnd(0));
-    // ambients.insert("stdin".into(), Value::ChannelReceiveEnd(1));
-    // let mut fiber = Fiber::new(byte_code, ambients, Value::unit());
-    // loop {
-    //     fiber.run(30);
-    //     match fiber.status() {
-    //         FiberStatus::Running => {}
-    //         FiberStatus::Done(value) => {
-    //             println!("{}", format!("Done running: {}", value).green());
-    //             break;
-    //         }
-    //         FiberStatus::Panicked(value) => {
-    //             println!("{}", format!("Panicked: {}", value).red());
-    //             break;
-    //         }
-    //         FiberStatus::Sending(channel_id, message) => match channel_id {
-    //             0 => {
-    //                 let mut out = stdout();
-    //                 out.write(
-    //                     if let Value::String(string) = message {
-    //                         string
-    //                     } else {
-    //                         message.to_string()
-    //                     }
-    //                     .as_bytes(),
-    //                 )
-    //                 .unwrap();
-    //                 out.flush().unwrap();
-    //                 fiber.resolve_sending();
-    //             }
-    //             _ => panic!("Unknown channel id {}.", channel_id),
-    //         },
-    //         FiberStatus::Receiving(channel_id) => match channel_id {
-    //             1 => {
-    //                 let mut input = String::new();
-    //                 std::io::stdin()
-    //                     .read_line(&mut input)
-    //                     .expect("Couldn't read line.");
-    //                 fiber.resolve_receiving(Value::String(input));
-    //             }
-    //             _ => panic!("Unknown channel id {}.", channel_id),
-    //         },
-    //     }
-    // }
-    // debug!("{:?}", fiber);
+fn init_logger(terminal_mode: TerminalMode) {
+    TermLogger::init(
+        LevelFilter::Debug,
+        Config::default(),
+        terminal_mode,
+        ColorChoice::Auto,
+    )
+    .unwrap();
 }

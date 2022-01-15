@@ -74,7 +74,7 @@ function safeSpawn(): SpawnedProcess {
 class LoggingTransform extends stream.Transform {
   constructor(
     private readonly prefix: string,
-    private readonly onlyShowJson: boolean = true,
+    private readonly onlyShowJson: boolean = false,
     opts?: stream.TransformOptions
   ) {
     super(opts);
@@ -97,7 +97,13 @@ class LoggingTransform extends stream.Transform {
       console.info(`${this.prefix} ${toLog}`);
     }
 
-    this.push(chunk, encoding);
+    // TODO: This is a workaround because VSCode doesn't adhere to the LSP spec.
+    let fixedValue = value.replace(
+      '"prepareSupportDefaultBehavior":true',
+      '"prepareSupportDefaultBehavior":1'
+    );
+    console.info(fixedValue);
+    this.push(Buffer.from(fixedValue, 'utf8'), encoding);
     callback();
   }
 }
