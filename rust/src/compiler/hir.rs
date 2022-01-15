@@ -1,10 +1,11 @@
 use std::fmt;
 
+use im::HashMap;
 use itertools::Itertools;
 
 pub type Id = usize;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Expression {
     Int(u64),
     Text(String),
@@ -21,12 +22,13 @@ impl Expression {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Lambda {
     pub first_id: Id,
     pub parameter_count: usize,
     pub out: Id,
-    expressions: Vec<Expression>,
+    pub expressions: Vec<Expression>,
+    pub identifiers: HashMap<Id, String>,
 }
 
 impl Lambda {
@@ -36,6 +38,7 @@ impl Lambda {
             parameter_count,
             out: first_id,
             expressions: vec![],
+            identifiers: HashMap::new(),
         }
     }
     pub fn next_id(&self) -> Id {
@@ -62,67 +65,6 @@ impl Lambda {
             None
         } else {
             self.expressions.get_mut(index as usize)
-        }
-    }
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item = (Id, Expression)> {
-        Iter {
-            shift: self.first_id + self.parameter_count,
-            inner: self.expressions.clone().into_iter().enumerate(),
-        }
-    }
-    pub fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item = (Id, &mut Expression)> {
-        Iter {
-            shift: self.first_id + self.parameter_count,
-            inner: self.expressions.iter_mut().enumerate(),
-        }
-    }
-}
-pub struct Iter<T, I: Iterator<Item = (usize, T)>> {
-    shift: Id,
-    inner: I,
-}
-impl<T, I: Iterator<Item = (usize, T)>> Iterator for Iter<T, I> {
-    type Item = (Id, T);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner
-            .next()
-            .map(|(id, expression)| (id + self.shift, expression))
-    }
-}
-impl<T, I: DoubleEndedIterator<Item = (usize, T)>> DoubleEndedIterator for Iter<T, I> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.inner
-            .next_back()
-            .map(|(id, expression)| (id + self.shift, expression))
-    }
-}
-
-impl std::hash::Hash for Expression {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        core::mem::discriminant(self).hash(state);
-        match self {
-            Expression::Int(int) => int.hash(state),
-            Expression::Text(text) => text.hash(state),
-            Expression::Symbol(symbol) => symbol.hash(state),
-            Expression::Lambda(Lambda {
-                first_id,
-                parameter_count,
-                out,
-                expressions,
-            }) => {
-                first_id.hash(state);
-                parameter_count.hash(state);
-                out.hash(state);
-                expressions.hash(state);
-            }
-            Expression::Call {
-                function,
-                arguments,
-            } => {
-                function.hash(state);
-                arguments.hash(state);
-            }
         }
     }
 }
@@ -160,7 +102,8 @@ impl fmt::Display for Expression {
 impl fmt::Display for Lambda {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} parameters\n", self.parameter_count)?;
-        for (id, action) in self.iter() {
+        for (id, action) in self.expressions.iter().enumerate() {
+            let id = sel
             write!(f, "{} = {}\n", id, action)?;
         }
         write!(f, "out: {}\n", self.out)?;

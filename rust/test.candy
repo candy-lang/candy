@@ -1,13 +1,10 @@
-print =
+print text =
 readLine =
-add =
-the =
-item =
-on =
-io =
-map =
+add a b =
+map iterable mapper =
 myIterable =
 blub =
+call lambda =
 
 main =
   foo = 3
@@ -33,10 +30,17 @@ add
   8646464
   "Hi"
 
-myIterable
-  map { a b -> print the item on io }
+map
+  myIterable
+  { a b -> print "the item on io" }
 
 fibonacci n = foo
 fibonacci = { n ->
   blub
 }
+
+
+lambda =
+  foo = 1
+  bar = { foo }
+call lambda

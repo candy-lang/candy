@@ -1,10 +1,12 @@
 mod compiler;
+mod interpreter;
 
 use crate::compiler::ast_to_hir::CompileVecAstsToHir;
 use crate::compiler::cst::Cst;
 use crate::compiler::cst_to_ast::LowerCstToAst;
 use crate::compiler::string_to_cst::StringToCst;
 use crate::compiler::*;
+use crate::interpreter::*;
 use colored::Colorize;
 use log::debug;
 use lspower::jsonrpc::Result;
@@ -60,6 +62,11 @@ fn run() {
     log::info!("Compiling AST to HIR…");
     let lambda = asts.compile_to_hir();
     print!("Lambda: {}", lambda);
+
+    log::info!("Executing code…");
+    let mut fiber = fiber::Fiber::new(vec![], lambda);
+    fiber.run();
+    log::info!("Fiber status: {:?}", fiber.status());
 
     // let code = {
     //     let core_code = std::fs::read_to_string("core.candy").expect("File core.candy not found.");
