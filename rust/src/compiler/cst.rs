@@ -3,6 +3,7 @@ pub enum Cst {
     Int(Int),
     Text(Text),
     Symbol(Symbol),
+    Parenthesized(Box<Cst>),
     Lambda(Lambda),
     Call(Call),
     Assignment(Assignment),

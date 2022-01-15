@@ -1,9 +1,8 @@
-use std::fmt::Display;
-
+use super::cst::*;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while, take_while_m_n},
-    character::complete::{alphanumeric0, anychar, line_ending, not_line_ending, space0},
+    character::complete::{alphanumeric0, anychar, char, line_ending, not_line_ending, space0},
     combinator::{map, opt, success, verify},
     multi::{count, many0, many1},
     sequence::{delimited, tuple},
@@ -11,8 +10,6 @@ use nom::{
 };
 use nom_supreme::{error::ErrorTree, final_parser::final_parser, ParserExt};
 use proptest::prelude::*;
-
-use super::cst::*;
 
 type ParserResult<'a, T> = IResult<&'a str, T, ErrorTree<&'a str>>;
 
@@ -66,6 +63,7 @@ fn cst(input: &str, indentation: usize) -> ParserResult<Cst> {
         int,
         text,
         symbol,
+        |input| parenthesized(input, indentation),
         |input| lambda(input, indentation),
         |input| assignment(input, indentation),
         |input| call(input, indentation),
@@ -107,6 +105,15 @@ fn identifier(input: &str) -> ParserResult<String> {
         |(a, b)| format!("{}{}", a, b),
     )
     .context("identifier")
+    .parse(input)
+}
+
+fn parenthesized(input: &str, indentation: usize) -> ParserResult<Cst> {
+    map(
+        delimited(char('('), |input| cst(input, indentation), char(')')),
+        |cst| Cst::Parenthesized(Box::new(cst)),
+    )
+    .context("parenthesized")
     .parse(input)
 }
 
@@ -205,6 +212,7 @@ fn arguments(input: &str, indentation: usize) -> ParserResult<Vec<Cst>> {
                 int,
                 text,
                 symbol,
+                |input| parenthesized(input, indentation),
                 // TODO: only allow single-line lambdas
                 |input| lambda(input, indentation),
                 call_without_arguments,
@@ -451,19 +459,3 @@ fn test_comment() {
 //         todo!()
 //     }
 // }
-
-#[derive(Debug)]
-struct ParserError {
-    message: String,
-}
-impl ParserError {
-    fn new(message: String) -> Self {
-        Self { message }
-    }
-}
-impl Display for ParserError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.message.fmt(f)
-    }
-}
-impl std::error::Error for ParserError {}

@@ -1,3 +1,4 @@
+mod builtin_functions;
 mod compiler;
 mod interpreter;
 
@@ -6,19 +7,31 @@ use crate::compiler::cst_to_ast::LowerCstToAst;
 use crate::compiler::string_to_cst::StringToCst;
 use crate::interpreter::fiber::FiberStatus;
 use crate::interpreter::*;
-use log::debug;
+use log;
 use simplelog::{ColorChoice, Config, LevelFilter, TermLogger, TerminalMode};
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "candy", about = "The Candy CLI.")]
-enum Candy {
-    /// Runs a Candy file.
-    Run,
+#[structopt(name = "candy", about = "The 🍭 Candy CLI.")]
+struct CandyRunOptions {
+    #[structopt(long)]
+    print_cst: bool,
+
+    #[structopt(long)]
+    print_ast: bool,
+
+    #[structopt(long)]
+    print_hir: bool,
+
+    #[structopt(long)]
+    no_run: bool,
+
+    #[structopt(parse(from_os_str))]
+    file: PathBuf,
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     TermLogger::init(
         LevelFilter::Debug,
         Config::default(),
@@ -27,26 +40,27 @@ async fn main() {
     )
     .unwrap();
 
-    run();
-    return;
-
-    let options = Candy::from_args();
-    debug!("{:#?}", options);
-    match options {
-        Candy::Run => run(),
-    }
+    let options = CandyRunOptions::from_args();
+    log::debug!("{:#?}", options);
+    run(options)
 }
 
-fn run() {
-    debug!("Running test.candy.\n");
+fn run(options: CandyRunOptions) {
+    log::debug!("Running test.candy.\n");
 
-    let test_code = std::fs::read_to_string("test.candy").expect("File test.candy not found.");
+    let test_code = std::fs::read_to_string(options.file).expect("File test.candy not found.");
 
     log::info!("Parsing string to CST…");
     let cst = test_code.parse_cst();
+    if options.print_cst {
+        log::info!("CST: {:?}", cst);
+    }
 
     log::info!("Lowering CST to AST…");
     let (asts, errors) = cst.into_ast();
+    if options.print_ast {
+        log::info!("AST: {:?}", asts);
+    }
     if !errors.is_empty() {
         log::error!("Errors occurred while lowering CST to AST:\n{:?}", errors);
         return;
@@ -54,15 +68,19 @@ fn run() {
 
     log::info!("Compiling AST to HIR…");
     let lambda = asts.compile_to_hir();
-    print!("Lambda: {}", lambda);
+    if options.print_hir {
+        log::info!("HIR: {:?}", lambda);
+    }
 
-    log::info!("Executing code…");
-    let mut fiber = fiber::Fiber::new(vec![], lambda);
-    fiber.run();
-    match fiber.status() {
-        FiberStatus::Running => log::info!("Fiber is still running."),
-        FiberStatus::Done(value) => log::info!("Fiber is done: {:?}", value),
-        FiberStatus::Panicked(value) => log::error!("Fiber panicked: {:?}", value),
+    if !options.no_run {
+        log::info!("Executing code…");
+        let mut fiber = fiber::Fiber::new(lambda);
+        fiber.run();
+        match fiber.status() {
+            FiberStatus::Running => log::info!("Fiber is still running."),
+            FiberStatus::Done(value) => log::info!("Fiber is done: {:?}", value),
+            FiberStatus::Panicked(value) => log::error!("Fiber panicked: {:?}", value),
+        }
     }
 
     // let code = {

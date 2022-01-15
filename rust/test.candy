@@ -1,9 +1,101 @@
+# This is the Candy core library.
+
+typeOf value = builtinTypeOf value
+
+equals a b = builtinEquals a b
+
+panic message = builtinPanic message
+
+isInt value = equals (typeOf value) Int
+isText value = equals (typeOf value) Text
+isSymbol value = equals (typeOf value) Symbol
+
+isBool value =
+  isTrue = equals value True
+  isFalse = equals value False
+  builtinIfElse isTrue { True } { isFalse }
+
+needs condition =
+  builtinIfElse (isBool condition) {} { panic "needs was called with the wrong arguments." }
+  builtinIfElse
+    condition
+    {}
+    { panic "A function was called with the wrong arguments." }
+
+not a =
+  needs (isBool a)
+  builtinIfElse a { False } { True }
+and a b =
+  needs (isBool a)
+  needs (isBool b)
+  builtinIfElse a { b } { False }
+or a b =
+  needs (isBool a)
+  needs (isBool b)
+  builtinIfElse a { True } { b }
+
+check condition =
+  needs (isBool condition)
+  builtinIfElse
+    condition
+    {}
+    { panic "A check didn't succeed" }
+
+isFunction value = equals (typeOf value) Function
+getArgumentCount function =
+  needs (isFunction function)
+  builtinGetArgumentCount function
+isFunction0 value = and (isFunction value) (equals (getArgumentCount value) 0)
+isFunction1 value = and (isFunction value) (equals (getArgumentCount value) 1)
+isFunction2 value = and (isFunction value) (equals (getArgumentCount value) 2)
+isFunction3 value = and (isFunction value) (equals (getArgumentCount value) 3)
+isFunction4 value = and (isFunction value) (equals (getArgumentCount value) 4)
+isFunction5 value = and (isFunction value) (equals (getArgumentCount value) 5)
+
+ifElse condition then else =
+  needs (isBool condition)
+  needs (isFunction0 then)
+  needs (isFunction0 else)
+  builtinIfElse condition then else
+if condition then =
+  needs (isBool condition)
+  needs (isFunction0 then)
+  ifElse condition then {}
+
+call0 function =
+  needs (isFunction0 function)
+  builtinCall0 function
+call1 function argument =
+  needs (isFunction1 function)
+  builtinCall1 function argument
+call2 function argument0 argument1 =
+  needs (isFunction2 function)
+  builtinCall2 function argument0 argument1
+call3 function argument0 argument1 argument2 =
+  needs (isFunction3 function)
+  builtinCall3 function argument0 argument1 argument2
+call4 function argument0 argument1 argument2 argument3 =
+  needs (isFunction4 function)
+  builtinCall4 function argument0 argument1 argument2 argument3
+call5 function argument0 argument1 argument2 argument3 argument4 =
+  needs (isFunction5 function)
+  builtinCall5 function argument0 argument1 argument2 argument3 argument4
+
+add a b =
+  aIsInt = isInt a
+  needs aIsInt
+  bIsInt = isInt b
+  needs bIsInt
+  builtinAdd a b
+
+
+
 print text =
 readLine =
 add a b =
 map iterable mapper =
 myIterable =
-blub =
+blub = Blub
 call lambda =
 
 main =
@@ -44,3 +136,5 @@ lambda =
   foo = 1
   bar = { foo }
 call lambda
+
+True

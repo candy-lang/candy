@@ -127,6 +127,15 @@ The first version also contains a lot of magic like `if` and `while`, and the ty
 
 Regarding tooling, we already have a language server that provides syntax highlighting, inline type hints, tooltips, folding, and go-to-definition.
 
+Our TODO list:
+
+* [x] build a basic parser
+* [x] lower CST to AST
+* [x] lower AST to HIR
+* [x] build a basic interpreter
+* [ ] add CLI arguments for printing the CST, AST, or HIR
+* [ ] make functions independent of their order in source where possible
+
 ## How to use Candy
 
 1. Download the [latest release bundle](https://github.com/JonasWanke/candy/releases/latest).

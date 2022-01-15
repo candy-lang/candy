@@ -1,16 +1,24 @@
-use std::collections::HashMap;
-
 use super::ast::{self, Assignment, Ast, Int, Symbol, Text};
 use super::hir::{Expression, Id, Lambda};
+use crate::builtin_functions;
+use im::HashMap;
 
 pub trait CompileVecAstsToHir {
     fn compile_to_hir(self) -> Lambda;
 }
 impl CompileVecAstsToHir for Vec<Ast> {
     fn compile_to_hir(self) -> Lambda {
+        let builtin_identifiers = builtin_functions::VALUES
+            .iter()
+            .enumerate()
+            .map(|(index, builtin_function)| {
+                let string = format!("builtin{:?}", builtin_function);
+                (string, index)
+            })
+            .collect::<HashMap<_, _>>();
         let mut compiler = Compiler {
-            lambda: Lambda::new(0, 0),
-            identifiers: HashMap::new(),
+            lambda: Lambda::new(builtin_identifiers.len(), 0),
+            identifiers: builtin_identifiers,
         };
         compiler.compile(self);
         compiler.lambda

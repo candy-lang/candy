@@ -27,6 +27,7 @@ fn lower_cst(cst: Cst) -> (Option<Ast>, Vec<String>) {
         Cst::Int(int) => (Some(Ast::Int(lower_int(int))), vec![]),
         Cst::Text(text) => (Some(Ast::Text(lower_text(text))), vec![]),
         Cst::Symbol(symbol) => (Some(Ast::Symbol(lower_symbol(symbol))), vec![]),
+        Cst::Parenthesized(cst) => lower_cst(*cst),
         Cst::Lambda(lambda) => {
             let (lambda, errors) = lower_lambda(lambda);
             (Some(Ast::Lambda(lambda)), errors)

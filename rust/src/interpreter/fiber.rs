@@ -1,6 +1,9 @@
-use crate::compiler::hir::{self, Expression, Id};
+use crate::{
+    builtin_functions,
+    compiler::hir::{self, Expression, Id},
+};
+use im::HashMap;
 use log;
-use std::collections::HashMap;
 
 /// A fiber can execute some byte code. It's "single-threaded", a pure
 /// mathematical machine and only communicates with the outside world through
@@ -42,13 +45,13 @@ pub enum Value {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lambda {
     captured_environment: Environment,
-    hir: hir::Lambda,
+    pub hir: hir::Lambda,
 }
 
 impl Fiber {
-    pub fn new(builtin_values: Vec<Value>, hir: hir::Lambda) -> Self {
-        assert!(builtin_values.len() == hir.first_id);
-        let environment = Environment::new(Environment::bindings_from_vec(0, builtin_values));
+    pub fn new(hir: hir::Lambda) -> Self {
+        assert_eq!(builtin_functions::VALUES.len(), hir.first_id);
+        let environment = Environment::new(HashMap::new());
         Self {
             runner: LambdaRunner::new(
                 Lambda {
@@ -88,7 +91,7 @@ impl LambdaRunner {
         Self {
             instruction_pointer: 0,
             environment,
-            lambda: lambda,
+            lambda,
         }
     }
 
@@ -99,11 +102,7 @@ impl LambdaRunner {
         assert!(!self.lambda.hir.expressions.is_empty());
         while self.instruction_pointer < self.lambda.hir.expressions.len() {
             let expression = self.lambda.hir.get(self.current_id()).unwrap().clone();
-            log::debug!(
-                "Running instruction {}: {}",
-                self.current_id(),
-                expression.clone()
-            );
+            log::trace!("Running instruction {}: {}", self.current_id(), &expression);
             let value = self.run_expression(expression)?;
             self.environment.store(self.current_id(), value);
             self.instruction_pointer += 1;
@@ -113,7 +112,7 @@ impl LambdaRunner {
     fn run_expression(&mut self, expression: Expression) -> Result<Value, Value> {
         match expression {
             Expression::Int(int) => Ok(Value::Int(int)),
-            Expression::Text(string) => Ok(Value::Text(string)),
+            Expression::Text(string) => Ok(string.into()),
             Expression::Symbol(symbol) => Ok(Value::Symbol(symbol)),
             Expression::Lambda(lambda) => Ok(Value::Lambda(Lambda {
                 captured_environment: self.environment.clone(),
@@ -123,36 +122,36 @@ impl LambdaRunner {
                 function,
                 arguments,
             } => {
+                let arguments = arguments
+                    .into_iter()
+                    .map(|it| self.environment.get(it))
+                    .collect();
+
+                if let Some(builtin_function) = builtin_functions::VALUES.get(function) {
+                    return builtin_function.call(arguments, |lambda, arguments| {
+                        LambdaRunner::new(lambda, arguments).run()
+                    });
+                }
+
                 let lambda = match self.environment.get(function) {
                     Value::Lambda(lambda) => lambda,
                     value => {
-                        return Err(Value::Text(format!(
-                            "Tried to call a non-lambda: `{:?}`.",
-                            value
-                        )))
+                        return Err(format!("Tried to call a non-lambda: `{:?}`.", value).into())
                     }
                 };
                 let function_name = self.lambda.hir.identifiers.get(&function).unwrap();
-                log::debug!("Calling function `{}`", function_name.clone());
+                log::trace!("Calling function `{}`", &function_name);
 
                 if lambda.hir.parameter_count != arguments.len() {
-                    return Err(Value::Text(format!(
-                        "Function `{}` expects {} arguments, but {} were given.",
+                    return Err(Value::argument_count_mismatch_text(
                         function_name,
                         lambda.hir.parameter_count,
-                        arguments.len()
-                    )));
+                        arguments.len(),
+                    ));
                 }
 
-                let value = LambdaRunner::new(
-                    lambda,
-                    arguments
-                        .into_iter()
-                        .map(|it| self.environment.get(it))
-                        .collect(),
-                )
-                .run();
-                // log::debug!("Lambda returned {:?}", value);
+                let value = LambdaRunner::new(lambda, arguments).run();
+                // log::trace!("Lambda returned {:?}", value);
                 value
             }
         }
@@ -168,11 +167,12 @@ impl Environment {
     }
     fn store(&mut self, id: Id, value: Value) {
         assert!(
-            self.bindings.insert(id, value.clone()).is_none(),
+            !self.bindings.contains_key(&id),
             "Tried to overwrite a value at ID {}: {:?}",
-            id,
-            value
+            &id,
+            &value
         );
+        assert!(self.bindings.insert(id, value).is_none())
     }
     fn get(&self, id: Id) -> Value {
         self.bindings
@@ -196,5 +196,47 @@ impl Environment {
             .enumerate()
             .map(|(index, it)| (first_id + index, it))
             .collect()
+    }
+}
+impl Value {
+    pub fn nothing() -> Self {
+        Value::Symbol("Nothing".to_owned())
+    }
+    pub fn bool_true() -> Self {
+        Value::Symbol("True".to_owned())
+    }
+    pub fn bool_false() -> Self {
+        Value::Symbol("False".to_owned())
+    }
+    pub fn argument_count_mismatch_text(
+        function_name: &str,
+        parameter_count: usize,
+        argument_count: usize,
+    ) -> Value {
+        format!(
+            "Function `{}` expects {} arguments, but {} were given.",
+            function_name, parameter_count, argument_count
+        )
+        .into()
+    }
+}
+
+impl From<u64> for Value {
+    fn from(value: u64) -> Self {
+        Value::Int(value)
+    }
+}
+impl From<String> for Value {
+    fn from(value: String) -> Self {
+        Value::Text(value)
+    }
+}
+impl From<bool> for Value {
+    fn from(value: bool) -> Self {
+        if value {
+            Value::bool_true()
+        } else {
+            Value::bool_false()
+        }
     }
 }
