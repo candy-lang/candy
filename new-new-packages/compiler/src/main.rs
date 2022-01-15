@@ -11,8 +11,10 @@ use crate::interpreter::*;
 use language_server::CandyLanguageServer;
 use log;
 use lspower::{LspService, Server};
-use simplelog::{ColorChoice, Config, LevelFilter, TermLogger, TerminalMode};
-use std::path::PathBuf;
+use simplelog::{
+    ColorChoice, CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode, WriteLogger,
+};
+use std::{fs::File, path::PathBuf};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -90,12 +92,9 @@ fn run(options: CandyRunOptions) {
 
 async fn lsp() {
     init_logger(TerminalMode::Stderr);
-    // language_server::run().unwrap();
-    let stdin = tokio::io::stdin();
-    let stdout = tokio::io::stdout();
-
+    log::info!("Starting language server…");
     let (service, messages) = LspService::new(|client| CandyLanguageServer { client });
-    Server::new(stdin, stdout)
+    Server::new(tokio::io::stdin(), tokio::io::stdout())
         .interleave(messages)
         .serve(service)
         .await;
