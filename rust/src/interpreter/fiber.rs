@@ -1,5 +1,4 @@
 use crate::compiler::hir::{self, Expression, Id};
-use itertools::Itertools;
 use log;
 use std::collections::HashMap;
 
@@ -73,7 +72,10 @@ impl Fiber {
             "Called run on Fiber with a status that is not running."
         );
 
-        self.runner.run();
+        self.status = match self.runner.run() {
+            Ok(value) => FiberStatus::Done(value),
+            Err(value) => FiberStatus::Panicked(value),
+        };
     }
 }
 
@@ -93,7 +95,7 @@ impl LambdaRunner {
     fn current_id(&self) -> Id {
         self.lambda.hir.first_id + self.lambda.hir.parameter_count + self.instruction_pointer
     }
-    pub fn run(&mut self) -> Value {
+    pub fn run(&mut self) -> Result<Value, Value> {
         assert!(!self.lambda.hir.expressions.is_empty());
         while self.instruction_pointer < self.lambda.hir.expressions.len() {
             let expression = self.lambda.hir.get(self.current_id()).unwrap().clone();
@@ -102,34 +104,45 @@ impl LambdaRunner {
                 self.current_id(),
                 expression.clone()
             );
-            let value = self.run_expression(expression);
+            let value = self.run_expression(expression)?;
             self.environment.store(self.current_id(), value);
             self.instruction_pointer += 1;
         }
-        self.environment.get(self.current_id() - 1)
+        Ok(self.environment.get(self.current_id() - 1))
     }
-    fn run_expression(&mut self, expression: Expression) -> Value {
+    fn run_expression(&mut self, expression: Expression) -> Result<Value, Value> {
         match expression {
-            Expression::Int(int) => Value::Int(int),
-            Expression::Text(string) => Value::Text(string),
-            Expression::Symbol(symbol) => Value::Symbol(symbol),
-            Expression::Lambda(lambda) => Value::Lambda(Lambda {
+            Expression::Int(int) => Ok(Value::Int(int)),
+            Expression::Text(string) => Ok(Value::Text(string)),
+            Expression::Symbol(symbol) => Ok(Value::Symbol(symbol)),
+            Expression::Lambda(lambda) => Ok(Value::Lambda(Lambda {
                 captured_environment: self.environment.clone(),
                 hir: lambda,
-            }),
+            })),
             Expression::Call {
                 function,
                 arguments,
             } => {
                 let lambda = match self.environment.get(function) {
                     Value::Lambda(lambda) => lambda,
-                    value => panic!("Call called with a non-lambda: `{:?}`.", value),
+                    value => {
+                        return Err(Value::Text(format!(
+                            "Tried to call a non-lambda: `{:?}`.",
+                            value
+                        )))
+                    }
                 };
-                log::debug!(
-                    "Calling function `{}`",
-                    self.lambda.hir.identifiers.get(&function).unwrap(),
-                );
-                assert_eq!(lambda.hir.parameter_count, arguments.len());
+                let function_name = self.lambda.hir.identifiers.get(&function).unwrap();
+                log::debug!("Calling function `{}`", function_name.clone());
+
+                if lambda.hir.parameter_count != arguments.len() {
+                    return Err(Value::Text(format!(
+                        "Function `{}` expects {} arguments, but {} were given.",
+                        function_name,
+                        lambda.hir.parameter_count,
+                        arguments.len()
+                    )));
+                }
 
                 let value = LambdaRunner::new(
                     lambda,
