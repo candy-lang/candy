@@ -84,8 +84,8 @@ class LoggingTransform extends stream.Transform {
     encoding: BufferEncoding,
     callback: () => void
   ): void {
-    let value = (chunk as Buffer).toString();
-    let toLog = this.onlyShowJson
+    const value = (chunk as Buffer).toString();
+    const toLog = this.onlyShowJson
       ? value
           .split('\r\n')
           .filter(
@@ -98,11 +98,10 @@ class LoggingTransform extends stream.Transform {
     }
 
     // TODO: This is a workaround because VSCode doesn't adhere to the LSP spec.
-    let fixedValue = value.replace(
+    const fixedValue = value.replace(
       '"prepareSupportDefaultBehavior":true',
-      '"prepareSupportDefaultBehavior":1'
+      '"prepareSupportDefaultBehavior":   1'
     );
-    console.info(fixedValue);
     this.push(Buffer.from(fixedValue, 'utf8'), encoding);
     callback();
   }
