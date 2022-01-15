@@ -133,12 +133,31 @@ Our TODO list:
 * [x] lower CST to AST
 * [x] lower AST to HIR
 * [x] build a basic interpreter
-* [ ] add CLI arguments for printing the CST, AST, or HIR
+* [x] add CLI arguments for printing the CST, AST, or HIR
 * [ ] make functions independent of their order in source where possible
+* [ ] support importing other files
+* [ ] namespaces/modules including visibility modifiers
+* [ ] basic IDE support
+* [ ] lists
+* [ ] maps
+* [ ] sets
+* [ ] string interpolation
+* [ ] constant evaluation
+* [ ] fibers
+* [ ] channels
+* [ ] io
+* [ ] random
+* [ ] standard library
+* [ ] pipe operator
+* [ ] auto-fuzzing
+* [ ] "type" proofs
+* [ ] testing
+* [ ] fuzzing of the compiler itself
+* [ ] clean up repo (delete a bunch of stuff!)
 
 ## How to use Candy
 
-1. Download the [latest release bundle](https://github.com/JonasWanke/candy/releases/latest).
+1. Download the [latest release bundle](https://github.com/candy-lang/candy/releases/latest).
 2. Extract the files:
    * `candy2dart.exe`: the compiler
    * `lsp-server.exe`: the Language Server
