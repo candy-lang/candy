@@ -6,6 +6,7 @@ pub enum Ast {
     Lambda(Lambda),
     Call(Call),
     Assignment(Assignment),
+    Error,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

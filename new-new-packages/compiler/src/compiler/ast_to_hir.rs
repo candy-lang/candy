@@ -98,6 +98,8 @@ impl Compiler {
                 self.lambda.identifiers.insert(id, name);
                 id
             }
+            // TODO
+            Ast::Error => panic!("Error in AST"),
         }
     }
 }
