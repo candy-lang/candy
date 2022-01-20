@@ -1,23 +1,26 @@
-use im::HashMap;
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFilter, InitializeParams, InitializeResult, InitializedParams, MessageType,
     Registration, ServerCapabilities, ServerInfo, TextDocumentChangeRegistrationOptions,
-    TextDocumentRegistrationOptions, Url,
+    TextDocumentRegistrationOptions,
 };
 use lspower::{jsonrpc, Client, LanguageServer};
 use tokio::sync::Mutex;
 
+use self::open_file_manager::OpenFileManager;
+
+mod open_file_manager;
+
 #[derive(Debug)]
 pub struct CandyLanguageServer {
     pub client: Client,
-    pub open_files: Mutex<HashMap<Url, String>>,
+    pub open_file_manager: Mutex<OpenFileManager>,
 }
 impl CandyLanguageServer {
     pub fn from_client(client: Client) -> Self {
         Self {
             client,
-            open_files: Mutex::new(HashMap::new()),
+            open_file_manager: Mutex::new(OpenFileManager::new()),
         }
     }
 }
@@ -95,42 +98,14 @@ impl LanguageServer for CandyLanguageServer {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        match params.text_document.language_id.as_str() {
-            "candy" => {
-                let mut open_files = self.open_files.lock().await;
-                let current_value =
-                    open_files.insert(params.text_document.uri, params.text_document.text);
-                assert!(current_value.is_none());
-            }
-            _ => return,
-        }
+        self.open_file_manager.lock().await.did_open(params).await;
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        let mut open_files = self.open_files.lock().await;
-        let DidChangeTextDocumentParams {
-            content_changes,
-            text_document,
-        } = params;
-        open_files
-            .entry(text_document.uri)
-            .and_modify(move |text| {
-                for change in content_changes {
-                    match change.range {
-                        Some(range) => {
-                            log::info!("received did_change with range: {:?}", range);
-                        }
-                        None => *text = change.text,
-                    }
-                }
-            })
-            .or_insert_with(|| panic!("Received a change for a file that was not open."));
+        self.open_file_manager.lock().await.did_change(params).await;
     }
 
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
-        let mut open_files = self.open_files.lock().await;
-        open_files
-            .remove(&params.text_document.uri)
-            .expect("File was closed without being opened.");
+        self.open_file_manager.lock().await.did_close(params).await;
     }
 }
