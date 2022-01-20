@@ -137,7 +137,32 @@ Our TODO list:
 * [ ] make functions independent of their order in source where possible
 * [ ] support importing other files
 * [ ] namespaces/modules including visibility modifiers
-* [ ] basic IDE support
+* [ ] IDE support:
+  * [ ] completion, completion resolve
+  * [ ] hover
+  * [ ] signatureHelp
+  * [ ] declaration, definition
+  * [ ] typeDefinition
+  * [ ] implementation
+  * [ ] references
+  * [ ] documentHighlight
+  * [ ] documentSymbol
+  * [ ] codeAction, codeAction resolve
+  * [ ] codeLens, codeLens resolve, codeLens refresh
+  * [ ] documentLink, documentLink resolve
+  * [ ] documentColor
+  * [ ] colorPresentation
+  * [ ] formatting
+  * [ ] rangeFormatting
+  * [ ] onTypeFormatting
+  * [ ] rename, prepareRename
+  * [ ] foldingRange
+  * [ ] selectionRange
+  * [ ] prepareCallHierarchy
+  * [ ] callHierarchy incoming, callHierarchy outgoing
+  * [ ] semantic tokens
+  * [ ] linkedEditingRange
+  * [ ] moniker
 * [ ] lists
 * [ ] maps
 * [ ] sets

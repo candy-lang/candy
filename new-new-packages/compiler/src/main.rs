@@ -93,7 +93,7 @@ fn run(options: CandyRunOptions) {
 async fn lsp() {
     init_logger(TerminalMode::Stderr);
     log::info!("Starting language server…");
-    let (service, messages) = LspService::new(|client| CandyLanguageServer { client });
+    let (service, messages) = LspService::new(|client| CandyLanguageServer::from_client(client));
     Server::new(tokio::io::stdin(), tokio::io::stdout())
         .interleave(messages)
         .serve(service)
@@ -102,7 +102,7 @@ async fn lsp() {
 
 fn init_logger(terminal_mode: TerminalMode) {
     TermLogger::init(
-        LevelFilter::Debug,
+        LevelFilter::Trace,
         Config::default(),
         terminal_mode,
         ColorChoice::Auto,
