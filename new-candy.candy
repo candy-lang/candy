@@ -1,0 +1,39 @@
+(License mit | License apache) use
+
+# Gets stuff from a list.
+getFromList = { list, index ->
+  require(List(list))
+  require(Number(index))
+  require(0 <= index < list.len)
+
+  [1, 2, 3]
+    List.toIter
+    Iter.map { ... }
+    Iter.where { ... }
+    Iter.toList
+
+  require {
+    list[index]
+  }
+}
+test {
+
+}
+
+Job = {
+  matches it {
+    title: ...,
+    fdfds. ...,
+  }
+}
+
+main = {
+  file = ...
+  file open
+  ...
+  file close
+  file close # error in IDE
+}
+
+divide = ...
+log = ...

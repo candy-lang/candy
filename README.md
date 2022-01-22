@@ -127,9 +127,62 @@ The first version also contains a lot of magic like `if` and `while`, and the ty
 
 Regarding tooling, we already have a language server that provides syntax highlighting, inline type hints, tooltips, folding, and go-to-definition.
 
+Our TODO list:
+
+* [x] build a basic parser
+* [x] lower CST to AST
+* [x] lower AST to HIR
+* [x] build a basic interpreter
+* [x] add CLI arguments for printing the CST, AST, or HIR
+* [ ] make functions independent of their order in source where possible
+* [ ] support importing other files
+* [ ] namespaces/modules including visibility modifiers
+* [ ] IDE support:
+  * [ ] completion, completion resolve
+  * [ ] hover
+  * [ ] signatureHelp
+  * [ ] declaration, definition
+  * [ ] typeDefinition
+  * [ ] implementation
+  * [ ] references
+  * [ ] documentHighlight
+  * [ ] documentSymbol
+  * [ ] codeAction, codeAction resolve
+  * [ ] codeLens, codeLens resolve, codeLens refresh
+  * [ ] documentLink, documentLink resolve
+  * [ ] documentColor
+  * [ ] colorPresentation
+  * [ ] formatting
+  * [ ] rangeFormatting
+  * [ ] onTypeFormatting
+  * [ ] rename, prepareRename
+  * [x] foldingRange
+  * [ ] selectionRange
+  * [ ] prepareCallHierarchy
+  * [ ] callHierarchy incoming, callHierarchy outgoing
+  * [ ] semantic tokens
+  * [ ] linkedEditingRange
+  * [ ] moniker
+* [ ] lists
+* [ ] maps
+* [ ] sets
+* [ ] string interpolation
+* [ ] constant evaluation
+* [ ] fibers
+* [ ] channels
+* [ ] io
+* [ ] random
+* [ ] standard library
+* [ ] pipe operator
+* [ ] auto-fuzzing
+* [ ] "type" proofs
+* [ ] testing
+* [ ] fuzzing of the compiler itself
+* [ ] clean up repo (delete a bunch of stuff!)
+
 ## How to use Candy
 
-1. Download the [latest release bundle](https://github.com/JonasWanke/candy/releases/latest).
+1. Download the [latest release bundle](https://github.com/candy-lang/candy/releases/latest).
 2. Extract the files:
    * `candy2dart.exe`: the compiler
    * `lsp-server.exe`: the Language Server

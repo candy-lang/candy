@@ -1,0 +1,115 @@
+Syntax Ideas
+
+- ints: 5, 2r1010100100101, 64rab39i2XZ4I
+- strings: "Hi", ''"Someone said "Hello, {{name}}!" yesterday."''
+- symbols: independent of names? :colon or Uppercase? Make sure this doesn't conflict with modules, but Roc manages that.
+  - or tags instead of symbols? aka associated values? `Ok 5` and `Err`
+- maps: { Name: "Marcel", Age: 21 } or copyWith: { original | Name: "Jonas" }
+  - or = instead of :
+  - member access?
+    - dot: different than function application: me.Name
+    - arrow: me->Name
+- tuple/list: [1, 2, 3]
+- sets: Clojure has %{ value }
+  - or like Toit? {hey, you, there} for set, empty map is {:}
+- grouping: ()
+- assignments simply via =
+  - Elm-like call syntax?
+  - Most functional languages don't have the distinction of function vs value
+  - look at effect systems
+- code/lambdas: indentation?
+- function call: similar to Elm/Toit/Roc?
+- compiler plugins? @?
+
+4
+  blub
+a
+  b
+    c 2 (
+foo
+  2
+    ) 4
+  d
+e
+
+"a" [
+  "b" [
+    "c 2 3"
+  ]
+  "d"
+]
+"e"
+
+
+Playground
+
+# Function definition and function use resemble each other:
+foo a = blub "hallo" b = ...
+foo a b
+
+bar = 5
+
+# When breaking arguments onto multiple lines, you need to use indentation:
+foo
+  otherFun paramToOtherFun
+  5
+
+# You can also _only_ break the last parameter over multiple lines. Int an Map:
+foo 5 {
+  ...
+}
+
+greetWidget name =
+  Material.appBar
+    title = Text.text "Hi"
+    fab = Material.Buttons.icon Icons.add
+    body = Layout.column [
+      Layout.sizedBox height = 8,
+      Text.text "Hello, {name}!",
+      Layout.padding.all 8 (Text.text "Some other text"),
+    ]
+
+Licenses.mit
+  name = Core
+  author = "Marcel"
+  year = 2021
+  |> license
+
+# possible return values of a possibly-implemented root:
+Ok 4
+Error
+
+add a b =
+  needs isInt a
+  needs isInt b
+  + a b
+
+myRoot foo =
+  needs int foo
+  needs int isPositive "You can only get my root of positive numbers"
+  root foo
+
+executeFooAndIfItsTrueThenBar foo bar =
+  needs lambda foo
+  blub = foo
+  needs bool blub
+
+main =
+  executeFooAndIfItsTrueThenBar
+    fun = > getTime mittag
+    fun = print "Hello"
+  print Json.parse getQuoteOfTheDay
+
+runQuoteOfTheDayServer = { url ->
+  { url http.get unwrap ensure { it isJson } } StandardQuoteApi.parseQuoteEveryDayAndDisplay
+}
+
+runQuoteOfTheDayServer url =
+  StandardQuoteApi.parseQuoteEveryDayAndDisplay fun =
+    url
+      |> http.get
+      |> unwrap
+      |> ensure fun it = isJson it
+
+[1, 2, 3]
+  |> Iter.map fun = 

@@ -5,6 +5,14 @@
       "path": "."
     },
     {
+      "name": "Rust-Compiler",
+      "path": "new-new-packages/compiler"
+    },
+    {
+      "name": "Rust-Compiler: vscode_extension",
+      "path": "new-new-packages/vscode_extension"
+    },
+    {
       "name": "📖 Language",
       "path": "language"
     },
@@ -87,40 +95,5 @@
     {
       "path": "packages/name_checker"
     }
-  ],
-  "launch": {
-    "version": "0.2.0",
-    "configurations": [
-      {
-        "name": "compiler: build",
-        "program": "${workspaceFolder:compiler}/lib/main.dart",
-        "request": "launch",
-        "type": "dart",
-        "args": ["build", "${workspaceFolder:vscode_extension_test}"]
-      },
-      {
-        "name": "vsc extension: run",
-        "type": "extensionHost",
-        "request": "launch",
-        "runtimeExecutable": "${execPath}",
-        "args": [
-          "--extensionDevelopmentPath=${workspaceFolder:vscode_extension}"
-        ],
-        "outFiles": ["${workspaceFolder:vscode_extension}/out/**/*.js"],
-        "preLaunchTask": "${defaultBuildTask}"
-      },
-      {
-        "name": "vsc extension: tests",
-        "type": "extensionHost",
-        "request": "launch",
-        "runtimeExecutable": "${execPath}",
-        "args": [
-          "--extensionDevelopmentPath=${workspaceFolder:vscode_extension}",
-          "--extensionTestsPath=${workspaceFolder:vscode_extension}/out/test/suite/index"
-        ],
-        "outFiles": ["${workspaceFolder:vscode_extension}/out/test/**/*.js"],
-        "preLaunchTask": "${defaultBuildTask}"
-      }
-    ]
-  }
+  ]
 }
