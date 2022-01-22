@@ -156,7 +156,7 @@ Our TODO list:
   * [ ] rangeFormatting
   * [ ] onTypeFormatting
   * [ ] rename, prepareRename
-  * [ ] foldingRange
+  * [x] foldingRange
   * [ ] selectionRange
   * [ ] prepareCallHierarchy
   * [ ] callHierarchy incoming, callHierarchy outgoing
