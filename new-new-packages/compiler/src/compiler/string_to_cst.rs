@@ -18,17 +18,120 @@ pub trait StringToCst {
 }
 impl StringToCst for str {
     fn parse_cst(&self) -> Vec<Cst> {
-        let parser = |input| expressions0(self, input, 0);
-        let input = format!("\n{}", self);
-        let result: Result<_, ErrorTree<&str>> = final_parser(parser)(&input);
+        // TODO: handle trailing whitespace and comments properly
+        let source = format!("\n{}", self);
+        let parser = |input| expressions0(&source, input, 0);
+        let result: Result<_, ErrorTree<&str>> = final_parser(parser)(&source);
         match result {
-            Ok(parsed) => parsed,
+            Ok(parsed) => fix_offsets_csts(parsed),
             Err(err) => vec![Cst::Error {
                 offset: 0,
-                unparsable_input: input.clone(),
+                unparsable_input: self.to_owned(),
                 message: format!("An error occurred while parsing: {:?}", err),
             }],
         }
+    }
+}
+
+/// Because we don't parse the input directly, but prepend a newline to it, we
+/// need to adjust the offsets of the CSTs to account for that.
+fn fix_offsets_csts(csts: Vec<Cst>) -> Vec<Cst> {
+    csts.into_iter().map(|cst| fix_offsets_cst(cst)).collect()
+}
+fn fix_offsets_cst(cst: Cst) -> Cst {
+    match cst {
+        Cst::EqualsSign { offset } => Cst::EqualsSign { offset: offset - 1 },
+        Cst::OpeningParenthesis { offset } => Cst::OpeningParenthesis { offset: offset - 1 },
+        Cst::ClosingParenthesis { offset } => Cst::ClosingParenthesis { offset: offset - 1 },
+        Cst::OpeningCurlyBrace { offset } => Cst::OpeningCurlyBrace { offset: offset - 1 },
+        Cst::ClosingCurlyBrace { offset } => Cst::ClosingCurlyBrace { offset: offset - 1 },
+        Cst::Arrow { offset } => Cst::Arrow { offset: offset - 1 },
+        Cst::Int {
+            offset,
+            value,
+            source,
+        } => Cst::Int {
+            offset: offset - 1,
+            value,
+            source,
+        },
+        Cst::Text { offset, value } => Cst::Text {
+            offset: offset - 1,
+            value,
+        },
+        Cst::Identifier { offset, value } => Cst::Identifier {
+            offset: offset - 1,
+            value,
+        },
+        Cst::Symbol { offset, value } => Cst::Symbol {
+            offset: offset - 1,
+            value,
+        },
+        Cst::LeadingWhitespace { value, child } => Cst::LeadingWhitespace {
+            value,
+            child: Box::new(fix_offsets_cst(*child)),
+        },
+        Cst::LeadingComment { value, child } => Cst::LeadingComment {
+            value,
+            child: Box::new(fix_offsets_cst(*child)),
+        },
+        Cst::TrailingWhitespace { child, value } => Cst::TrailingWhitespace {
+            child: Box::new(fix_offsets_cst(*child)),
+            value,
+        },
+        Cst::TrailingComment { child, value } => Cst::TrailingComment {
+            child: Box::new(fix_offsets_cst(*child)),
+            value,
+        },
+        Cst::Parenthesized {
+            opening_parenthesis,
+            inner,
+            closing_parenthesis,
+        } => Cst::Parenthesized {
+            opening_parenthesis: Box::new(fix_offsets_cst(*opening_parenthesis)),
+            inner: Box::new(fix_offsets_cst(*inner)),
+            closing_parenthesis: Box::new(fix_offsets_cst(*closing_parenthesis)),
+        },
+        Cst::Lambda {
+            opening_curly_brace,
+            parameters_and_arrow,
+            body,
+            closing_curly_brace,
+        } => Cst::Lambda {
+            opening_curly_brace: Box::new(fix_offsets_cst(*opening_curly_brace)),
+            parameters_and_arrow: parameters_and_arrow.map(|(arguments, arrow)| {
+                (
+                    fix_offsets_csts(arguments),
+                    Box::new(fix_offsets_cst(*arrow)),
+                )
+            }),
+            body: fix_offsets_csts(body),
+            closing_curly_brace: Box::new(fix_offsets_cst(*closing_curly_brace)),
+        },
+        Cst::Call { name, arguments } => Cst::Call {
+            name: Box::new(fix_offsets_cst(*name)),
+            arguments: fix_offsets_csts(arguments),
+        },
+        Cst::Assignment {
+            name,
+            parameters,
+            equals_sign,
+            body,
+        } => Cst::Assignment {
+            name: Box::new(fix_offsets_cst(*name)),
+            parameters: fix_offsets_csts(parameters),
+            equals_sign: Box::new(fix_offsets_cst(*equals_sign)),
+            body: fix_offsets_csts(body),
+        },
+        Cst::Error {
+            offset,
+            unparsable_input,
+            message,
+        } => Cst::Error {
+            offset: offset - 1,
+            unparsable_input,
+            message,
+        },
     }
 }
 
