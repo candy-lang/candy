@@ -10,6 +10,7 @@ use tokio::sync::Mutex;
 use self::open_file_manager::OpenFileManager;
 
 mod open_file_manager;
+mod utils;
 
 #[derive(Debug)]
 pub struct CandyLanguageServer {
