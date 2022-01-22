@@ -168,16 +168,16 @@ impl Display for Cst {
 impl Cst {
     pub fn span(&self) -> Range<usize> {
         match self {
-            Cst::EqualsSign { offset } => *offset..(*offset + 2),
-            Cst::OpeningParenthesis { offset } => *offset..(*offset + 2),
-            Cst::ClosingParenthesis { offset } => *offset..(*offset + 2),
-            Cst::OpeningCurlyBrace { offset } => *offset..(*offset + 2),
-            Cst::ClosingCurlyBrace { offset } => *offset..(*offset + 2),
-            Cst::Arrow { offset } => *offset..(*offset + 3),
-            Cst::Int { offset, source, .. } => *offset..(*offset + source.len() + 1),
-            Cst::Text { offset, value } => *offset..(*offset + value.len() + 3),
-            Cst::Identifier { offset, value } => *offset..(*offset + value.len() + 1),
-            Cst::Symbol { offset, value } => *offset..(*offset + value.len() + 1),
+            Cst::EqualsSign { offset } => *offset..(*offset + 1),
+            Cst::OpeningParenthesis { offset } => *offset..(*offset + 1),
+            Cst::ClosingParenthesis { offset } => *offset..(*offset + 1),
+            Cst::OpeningCurlyBrace { offset } => *offset..(*offset + 1),
+            Cst::ClosingCurlyBrace { offset } => *offset..(*offset + 1),
+            Cst::Arrow { offset } => *offset..(*offset + 2),
+            Cst::Int { offset, source, .. } => *offset..(*offset + source.len()),
+            Cst::Text { offset, value } => *offset..(*offset + value.len() + 2),
+            Cst::Identifier { offset, value } => *offset..(*offset + value.len()),
+            Cst::Symbol { offset, value } => *offset..(*offset + value.len()),
             Cst::LeadingWhitespace { value, child } => {
                 let child_span = child.span();
                 (child_span.start - value.len())..child_span.end
@@ -224,7 +224,7 @@ impl Cst {
                 offset,
                 unparsable_input,
                 ..
-            } => *offset..(*offset + unparsable_input.len() + 1),
+            } => *offset..(*offset + unparsable_input.len()),
         }
     }
 
