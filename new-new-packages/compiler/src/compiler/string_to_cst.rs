@@ -470,7 +470,10 @@ fn lambda<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResu
             },
             opt(tuple((
                 |input| parameters(source, input, indentation),
-                map(|input| arrow(source, input), |it| Box::new(it)),
+                map(
+                    |input| trailing_whitespace_and_comment(input, |input| arrow(source, input)),
+                    |it| Box::new(it),
+                ),
             ))),
             alt((
                 |input| expressions1(source, input, indentation + 1),
@@ -1046,6 +1049,43 @@ fn test_lambda() {
                     })
                 }],
                 closing_curly_brace: Box::new(Cst::ClosingCurlyBrace { offset: 6 })
+            },
+        )
+    );
+    assert_eq!(
+        parse("{ n -> 5 }"),
+        (
+            "",
+            Cst::Lambda {
+                opening_curly_brace: Box::new(Cst::TrailingWhitespace {
+                    value: " ".to_owned(),
+                    child: Box::new(Cst::OpeningCurlyBrace { offset: 0 })
+                }),
+                parameters_and_arrow: Some((
+                    vec![Cst::Call {
+                        name: Box::new(Cst::TrailingWhitespace {
+                            value: " ".to_owned(),
+                            child: Box::new(Cst::Identifier {
+                                offset: 2,
+                                value: "n".to_owned()
+                            })
+                        }),
+                        arguments: vec![]
+                    }],
+                    Box::new(Cst::TrailingWhitespace {
+                        value: " ".to_owned(),
+                        child: Box::new(Cst::Arrow { offset: 4 })
+                    })
+                )),
+                body: vec![Cst::TrailingWhitespace {
+                    value: " ".to_owned(),
+                    child: Box::new(Cst::Int {
+                        offset: 7,
+                        value: 5,
+                        source: "5".to_owned()
+                    })
+                }],
+                closing_curly_brace: Box::new(Cst::ClosingCurlyBrace { offset: 9 })
             },
         )
     );
