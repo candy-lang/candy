@@ -9,6 +9,7 @@ use nom::{
     IResult, Offset, Parser,
 };
 use nom_supreme::{error::ErrorTree, final_parser::final_parser, ParserExt};
+use proptest::prelude::*;
 
 type ParserResult<'a, T> = IResult<&'a str, T, ErrorTree<&'a str>>;
 
@@ -230,6 +231,10 @@ where
     F: FnMut(&'a str) -> ParserResult<'a, Cst>,
 {
     (|input| {
+        if indentation == 0 {
+            return parser(input);
+        }
+
         let (input, indent) = recognize(count(tag("  "), indentation))(input)?;
         let (input, child) = &mut parser(input)?;
         Ok((
@@ -249,28 +254,30 @@ fn leading_whitespace_and_comment_and_empty_lines<'a>(
     input: &'a str,
     indentation: usize,
     min_newlines: usize,
-    mut parser: fn(&'a str, &'a str, usize) -> ParserResult<'a, Cst>,
+    parser: fn(&'a str, &'a str, usize) -> ParserResult<'a, Cst>,
 ) -> ParserResult<'a, Cst> {
     let parser: Box<dyn FnMut(&'a str) -> ParserResult<Cst>> = if min_newlines > 0 {
-        Box::new(move |input| with_newlines(source, input, indentation, min_newlines, parser))
+        Box::new(move |input| {
+            with_leading_newlines(source, input, indentation, min_newlines, parser)
+        })
     } else {
-        Box::new(
-            |input| match with_newlines(source, input, indentation, min_newlines, parser) {
+        Box::new(|input| {
+            match with_leading_newlines(source, input, indentation, min_newlines, parser) {
                 Ok(it) => Ok(it),
                 Err(_) => parser(source, input, indentation),
-            },
-        )
+            }
+        })
     };
     parser
         .context("leading_whitespace_and_comment_and_empty_lines")
         .parse(input)
 }
-fn with_newlines<'a>(
+fn with_leading_newlines<'a>(
     source: &'a str,
     input: &'a str,
     indentation: usize,
     min_newlines: usize,
-    mut parser: fn(&'a str, &'a str, usize) -> ParserResult<'a, Cst>,
+    parser: fn(&'a str, &'a str, usize) -> ParserResult<'a, Cst>,
 ) -> ParserResult<'a, Cst> {
     leading_whitespace(input, |input| {
         leading_comment(
@@ -281,7 +288,11 @@ fn with_newlines<'a>(
                         source,
                         input,
                         indentation,
-                        min_newlines - 1,
+                        if min_newlines > 0 {
+                            min_newlines - 1
+                        } else {
+                            0
+                        },
                         parser,
                     )
                 })),
@@ -304,7 +315,7 @@ where
                 let (input, child) = parser(input)?;
                 (
                     input,
-                    Cst::TrailingWhitespace {
+                    Cst::LeadingWhitespace {
                         value: space.to_owned(),
                         child: Box::new(child),
                     },
@@ -322,7 +333,12 @@ where
     F: FnMut(&'a str) -> ParserResult<'a, Cst>,
 {
     (|input| {
-        let (input, (_, comment)) = tuple((tag("#"), not_line_ending))(input)?;
+        let comment_result: IResult<_, _> = tuple((tag("#"), not_line_ending))(input);
+        let (input, comment) = match comment_result {
+            Ok((input, (_, comment))) => (input, comment),
+            Err(_) => return parser(input),
+        };
+
         let (input, child) = parser(input)?;
         let result = Cst::LeadingComment {
             value: comment.to_owned(),
@@ -454,14 +470,7 @@ fn lambda<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResu
             },
             opt(tuple((
                 |input| parameters(source, input, indentation),
-                map(
-                    |input| {
-                        trailing_whitespace_and_comment_and_empty_lines(input, |input| {
-                            arrow(source, input)
-                        })
-                    },
-                    |it| Box::new(it),
-                ),
+                map(|input| arrow(source, input), |it| Box::new(it)),
             ))),
             alt((
                 |input| expressions1(source, input, indentation + 1),
@@ -481,7 +490,7 @@ fn lambda<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResu
                     input,
                     indentation,
                     0,
-                    |source, input, indentation| {
+                    |source, input, _indentation| {
                         trailing_whitespace_and_comment(input, |input| {
                             closing_curly_brace(source, input)
                         })
@@ -514,7 +523,7 @@ fn parameters<'a>(
                 |input| parenthesized(source, input, indentation),
                 // TODO: only allow single-line lambdas
                 |input| lambda(source, input, indentation),
-                |input| call_without_arguments(input, source),
+                |input| call_without_arguments(source, input),
                 // TODO: catch-all
             )),
         )
@@ -566,7 +575,7 @@ fn arguments<'a>(
                 |input| parenthesized(source, input, indentation),
                 // TODO: only allow single-line lambdas
                 |input| lambda(source, input, indentation),
-                |input| call_without_arguments(input, source),
+                |input| call_without_arguments(source, input),
                 // TODO: catch-all
             )),
         )
@@ -626,186 +635,518 @@ where
     .parse(input)
 }
 
-// proptest! {
-//     #[test]
-//     fn test_int(value in 0u64..) {
-//         let string = value.to_string();
-//         prop_assert_eq!(int(&string).unwrap(), ("", Cst::Int(Int(value))));
-//     }
-//     #[test]
-//     fn test_text(value in "[\\w\\d\\s]*") {
-//         let stringified_text = format!("\"{}\"", value);
-//         prop_assert_eq!(text(&stringified_text).unwrap(), ("", Cst::Text(Text(value))));
-//     }
-//     #[test]
-//     fn test_symbol(value in "[A-Z][A-Za-z0-9]*") {
-//         prop_assert_eq!(symbol(&value).unwrap(), ("", Cst::Symbol(Symbol(value.clone()))));
-//     }
-//     #[test]
-//     fn test_identifier(value in "[a-z][A-Za-z0-9]*") {
-//         prop_assert_eq!(identifier(&value).unwrap(), ("", value.clone()));
-//     }
-// }
+proptest! {
+    #[test]
+    fn test_int(value in 0u64..) {
+        let string = value.to_string();
+        prop_assert_eq!(int(&string, &string).unwrap(), ("", Cst::Int{offset: 0, value: value, source: string.clone()}));
+    }
+    #[test]
+    fn test_text(value in "[\\w\\d\\s]*") {
+        let stringified_text = format!("\"{}\"", value);
+        prop_assert_eq!(text(&stringified_text, &stringified_text).unwrap(), ("", Cst::Text{offset: 0, value: value.clone()}));
+    }
+    #[test]
+    fn test_symbol(value in "[A-Z][A-Za-z0-9]*") {
+        prop_assert_eq!(symbol(&value, &value).unwrap(), ("", Cst::Symbol{ offset: 0, value: value.clone()}));
+    }
+    #[test]
+    fn test_identifier(value in "[a-z][A-Za-z0-9]*") {
+        prop_assert_eq!(identifier(&value, &value).unwrap(), ("", Cst::Identifier{ offset: 0, value: value.clone()}));
+    }
+}
 
-// #[test]
-// fn test_indented() {
-//     assert_eq!(indented("", 0).unwrap(), ("", ()));
-//     assert_eq!(indented("  ", 0).unwrap(), ("  ", ()));
-//     assert_eq!(indented("  ", 1).unwrap(), ("", ()));
-//     assert_eq!(indented("    ", 1).unwrap(), ("  ", ()));
-// }
-// #[test]
-// fn test_expressions0() {
-//     assert_eq!(expressions0("", 0).unwrap(), ("", vec![]));
-//     assert_eq!(expressions0("\n", 0).unwrap(), ("", vec![]));
-//     assert_eq!(expressions0("\n#abc\n", 0).unwrap(), ("", vec![]));
-//     assert_eq!(
-//         expressions0("\nprint", 0).unwrap(),
-//         (
-//             "",
-//             vec![Cst::Call(Call {
-//                 name: "print".to_owned(),
-//                 arguments: vec![]
-//             })]
-//         )
-//     );
-//     assert_eq!(
-//         expressions0("\nfoo = bar\n", 0).unwrap(),
-//         (
-//             "",
-//             vec![Cst::Assignment(Assignment {
-//                 name: "foo".to_owned(),
-//                 parameters: vec![],
-//                 body: vec![Cst::Call(Call {
-//                     name: "bar".to_owned(),
-//                     arguments: vec![]
-//                 })]
-//             })]
-//         )
-//     );
-//     assert_eq!(
-//         expressions0("\nfoo\nbar", 0).unwrap(),
-//         (
-//             "",
-//             vec![
-//                 Cst::Call(Call {
-//                     name: "foo".to_owned(),
-//                     arguments: vec![],
-//                 }),
-//                 Cst::Call(Call {
-//                     name: "bar".to_owned(),
-//                     arguments: vec![],
-//                 })
-//             ]
-//         )
-//     );
-//     assert_eq!(
-//         expressions0("\nadd 1 2", 0).unwrap(),
-//         (
-//             "",
-//             vec![Cst::Call(Call {
-//                 name: "add".to_owned(),
-//                 arguments: vec![Cst::Int(Int(1)), Cst::Int(Int(2))],
-//             })]
-//         )
-//     );
-//     assert_eq!(
-//         expressions0("\nfoo = bar\nadd\n  1\n  2", 0).unwrap(),
-//         (
-//             "",
-//             vec![
-//                 Cst::Assignment(Assignment {
-//                     name: "foo".to_owned(),
-//                     parameters: vec![],
-//                     body: vec![Cst::Call(Call {
-//                         name: "bar".to_owned(),
-//                         arguments: vec![]
-//                     })]
-//                 }),
-//                 Cst::Call(Call {
-//                     name: "add".to_owned(),
-//                     arguments: vec![Cst::Int(Int(1)), Cst::Int(Int(2))],
-//                 })
-//             ]
-//         )
-//     );
-//     assert_eq!(
-//         expressions0("\nadd\n  2\nmyIterable", 0).unwrap(),
-//         (
-//             "",
-//             vec![
-//                 Cst::Call(Call {
-//                     name: "add".to_owned(),
-//                     arguments: vec![Cst::Int(Int(2))],
-//                 }),
-//                 Cst::Call(Call {
-//                     name: "myIterable".to_owned(),
-//                     arguments: vec![],
-//                 })
-//             ]
-//         )
-//     );
-// }
-// #[test]
-// fn test_call() {
-//     assert_eq!(
-//         call("print", 0).unwrap(),
-//         (
-//             "",
-//             Cst::Call(Call {
-//                 name: "print".to_owned(),
-//                 arguments: vec![]
-//             })
-//         )
-//     );
-//     assert_eq!(
-//         call("print 123 \"foo\" Bar", 0).unwrap(),
-//         (
-//             "",
-//             Cst::Call(Call {
-//                 name: "print".to_owned(),
-//                 arguments: vec![
-//                     Cst::Int(Int(123)),
-//                     Cst::Text(Text("foo".to_owned())),
-//                     Cst::Symbol(Symbol("Bar".to_owned()))
-//                 ]
-//             })
-//         )
-//     );
-//     assert_eq!(
-//         call("add\n  7\nmyIterable", 0).unwrap(),
-//         (
-//             "myIterable",
-//             Cst::Call(Call {
-//                 name: "add".to_owned(),
-//                 arguments: vec![Cst::Int(Int(7)),]
-//             })
-//         )
-//     );
-// }
-// #[test]
-// fn test_lambda() {
-//     assert_eq!(
-//         lambda("{ 123 }", 0).unwrap(),
-//         (
-//             "",
-//             Cst::Lambda(Lambda {
-//                 parameters: vec![],
-//                 body: vec![Cst::Int(Int(123))],
-//             }),
-//         )
-//     );
-//     assert_eq!(
-//         lambda("{\n  123\n}", 0).unwrap(),
-//         (
-//             "",
-//             Cst::Lambda(Lambda {
-//                 parameters: vec![],
-//                 body: vec![Cst::Int(Int(123))],
-//             }),
-//         )
-//     );
-// }
+#[test]
+fn test_indented() {
+    fn parse(source: &str, indentation: usize) -> (&str, Cst) {
+        leading_indentation(source, indentation, |input| int(source, input)).unwrap()
+    }
+    assert_eq!(
+        parse("123", 0),
+        (
+            "",
+            Cst::LeadingWhitespace {
+                value: "".to_owned(),
+                child: Box::new(Cst::Int {
+                    offset: 0,
+                    value: 123,
+                    source: "123".to_owned()
+                }),
+            }
+        )
+    );
+    // assert_eq!(
+    //     parse("  123", 0),
+    //     (
+    //         "  ",
+    //         Cst::LeadingWhitespace {
+    //             value: "".to_owned(),
+    //             child: Box::new(Cst::Int { value: 123 })
+    //         }
+    //     )
+    // );
+    assert_eq!(
+        parse("  123", 1),
+        (
+            "",
+            Cst::LeadingWhitespace {
+                value: "  ".to_owned(),
+                child: Box::new(Cst::Int {
+                    offset: 2,
+                    value: 123,
+                    source: "123".to_owned()
+                })
+            }
+        )
+    );
+    // assert_eq!(
+    //     parse("    123", 1),
+    //     (
+    //         "  ",
+    //         Cst::LeadingWhitespace {
+    //             value: "".to_owned(),
+    //             child: Box::new(Cst::Int { value: 123 })
+    //         }
+    //     )
+    // );
+}
+#[test]
+fn test_expressions0() {
+    fn parse(source: &str) -> (&str, Vec<Cst>) {
+        expressions0(source, source, 0).unwrap()
+    }
+    assert_eq!(parse(""), ("", vec![]));
+    assert_eq!(parse("\n"), ("\n", vec![]));
+    assert_eq!(parse("\n#abc\n"), ("\n#abc\n", vec![]));
+    assert_eq!(
+        parse("\n123"),
+        (
+            "",
+            vec![Cst::LeadingWhitespace {
+                value: "\n".to_owned(),
+                child: Box::new(Cst::Int {
+                    offset: 1,
+                    value: 123,
+                    source: "123".to_owned()
+                })
+            }]
+        )
+    );
+    assert_eq!(
+        parse("\nprint"),
+        (
+            "",
+            vec![Cst::LeadingWhitespace {
+                value: "\n".to_owned(),
+                child: Box::new(Cst::Call {
+                    name: Box::new(Cst::Identifier {
+                        offset: 1,
+                        value: "print".to_owned()
+                    }),
+                    arguments: vec![]
+                })
+            }]
+        )
+    );
+    assert_eq!(
+        parse("\nfoo = bar\n"),
+        (
+            "\n",
+            vec![Cst::LeadingWhitespace {
+                value: "\n".to_owned(),
+                child: Box::new(Cst::Assignment {
+                    name: Box::new(Cst::TrailingWhitespace {
+                        value: " ".to_owned(),
+                        child: Box::new(Cst::Identifier {
+                            offset: 1,
+                            value: "foo".to_owned()
+                        })
+                    }),
+                    parameters: vec![],
+                    equals_sign: Box::new(Cst::TrailingWhitespace {
+                        value: " ".to_owned(),
+                        child: Box::new(Cst::EqualsSign { offset: 5 })
+                    }),
+                    body: vec![Cst::Call {
+                        name: Box::new(Cst::Identifier {
+                            offset: 7,
+                            value: "bar".to_owned()
+                        }),
+                        arguments: vec![]
+                    }]
+                })
+            }]
+        )
+    );
+    assert_eq!(
+        parse("\nfoo\nbar"),
+        (
+            "",
+            vec![
+                Cst::LeadingWhitespace {
+                    value: "\n".to_owned(),
+                    child: Box::new(Cst::Call {
+                        name: Box::new(Cst::Identifier {
+                            offset: 1,
+                            value: "foo".to_owned()
+                        }),
+                        arguments: vec![],
+                    })
+                },
+                Cst::LeadingWhitespace {
+                    value: "\n".to_owned(),
+                    child: Box::new(Cst::Call {
+                        name: Box::new(Cst::Identifier {
+                            offset: 5,
+                            value: "bar".to_owned()
+                        }),
+                        arguments: vec![],
+                    })
+                },
+            ]
+        )
+    );
+    assert_eq!(
+        parse("\nadd 1 2"),
+        (
+            "",
+            vec![Cst::LeadingWhitespace {
+                value: "\n".to_owned(),
+                child: Box::new(Cst::Call {
+                    name: Box::new(Cst::TrailingWhitespace {
+                        value: " ".to_owned(),
+                        child: Box::new(Cst::Identifier {
+                            offset: 1,
+                            value: "add".to_owned()
+                        }),
+                    }),
+                    arguments: vec![
+                        Cst::TrailingWhitespace {
+                            value: " ".to_owned(),
+                            child: Box::new(Cst::Int {
+                                offset: 5,
+                                value: 1,
+                                source: "1".to_owned()
+                            })
+                        },
+                        Cst::Int {
+                            offset: 7,
+                            value: 2,
+                            source: "2".to_owned()
+                        }
+                    ],
+                })
+            }]
+        )
+    );
+    assert_eq!(
+        parse("\nfoo = bar\nadd\n  1\n  2"),
+        (
+            "",
+            vec![
+                Cst::LeadingWhitespace {
+                    value: "\n".to_owned(),
+                    child: Box::new(Cst::Assignment {
+                        name: Box::new(Cst::TrailingWhitespace {
+                            value: " ".to_owned(),
+                            child: Box::new(Cst::Identifier {
+                                offset: 1,
+                                value: "foo".to_owned()
+                            }),
+                        }),
+                        parameters: vec![],
+                        equals_sign: Box::new(Cst::TrailingWhitespace {
+                            value: " ".to_owned(),
+                            child: Box::new(Cst::EqualsSign { offset: 5 })
+                        }),
+                        body: vec![Cst::Call {
+                            name: Box::new(Cst::Identifier {
+                                offset: 7,
+                                value: "bar".to_owned()
+                            }),
+                            arguments: vec![]
+                        }]
+                    })
+                },
+                Cst::LeadingWhitespace {
+                    value: "\n".to_owned(),
+                    child: Box::new(Cst::Call {
+                        name: Box::new(Cst::Identifier {
+                            offset: 11,
+                            value: "add".to_owned()
+                        }),
+                        arguments: vec![
+                            Cst::LeadingWhitespace {
+                                value: "\n".to_owned(),
+                                child: Box::new(Cst::LeadingWhitespace {
+                                    value: "  ".to_owned(),
+                                    child: Box::new(Cst::Int {
+                                        offset: 17,
+                                        value: 1,
+                                        source: "1".to_owned()
+                                    })
+                                })
+                            },
+                            Cst::LeadingWhitespace {
+                                value: "\n".to_owned(),
+                                child: Box::new(Cst::LeadingWhitespace {
+                                    value: "  ".to_owned(),
+                                    child: Box::new(Cst::Int {
+                                        offset: 21,
+                                        value: 2,
+                                        source: "2".to_owned()
+                                    })
+                                })
+                            },
+                        ],
+                    })
+                }
+            ]
+        )
+    );
+    assert_eq!(
+        parse("\nadd\n  2\nmyIterable"),
+        (
+            "",
+            vec![
+                Cst::LeadingWhitespace {
+                    value: "\n".to_owned(),
+                    child: Box::new(Cst::Call {
+                        name: Box::new(Cst::Identifier {
+                            offset: 1,
+                            value: "add".to_owned()
+                        }),
+                        arguments: vec![Cst::LeadingWhitespace {
+                            value: "\n".to_owned(),
+                            child: Box::new(Cst::LeadingWhitespace {
+                                value: "  ".to_owned(),
+                                child: Box::new(Cst::Int {
+                                    offset: 7,
+                                    value: 2,
+                                    source: "2".to_owned()
+                                })
+                            })
+                        },],
+                    })
+                },
+                Cst::LeadingWhitespace {
+                    value: "\n".to_owned(),
+                    child: Box::new(Cst::Call {
+                        name: Box::new(Cst::Identifier {
+                            offset: 9,
+                            value: "myIterable".to_owned()
+                        }),
+                        arguments: vec![],
+                    })
+                }
+            ]
+        )
+    );
+}
+#[test]
+fn test_call() {
+    fn parse(source: &str) -> (&str, Cst) {
+        call(source, source, 0).unwrap()
+    }
+    assert_eq!(
+        parse("print"),
+        (
+            "",
+            Cst::Call {
+                name: Box::new(Cst::Identifier {
+                    offset: 0,
+                    value: "print".to_owned()
+                }),
+                arguments: vec![]
+            }
+        )
+    );
+    assert_eq!(
+        parse("print 123 \"foo\" Bar"),
+        (
+            "",
+            Cst::Call {
+                name: Box::new(Cst::TrailingWhitespace {
+                    value: " ".to_owned(),
+                    child: Box::new(Cst::Identifier {
+                        offset: 0,
+                        value: "print".to_owned()
+                    })
+                }),
+                arguments: vec![
+                    Cst::TrailingWhitespace {
+                        value: " ".to_owned(),
+                        child: Box::new(Cst::Int {
+                            offset: 6,
+                            value: 123,
+                            source: "123".to_owned()
+                        })
+                    },
+                    Cst::TrailingWhitespace {
+                        value: " ".to_owned(),
+                        child: Box::new(Cst::Text {
+                            offset: 10,
+                            value: "foo".to_owned()
+                        })
+                    },
+                    Cst::Symbol {
+                        offset: 16,
+                        value: "Bar".to_owned()
+                    }
+                ]
+            }
+        )
+    );
+    assert_eq!(
+        parse("add\n  7\nmyIterable"),
+        (
+            "\nmyIterable",
+            Cst::Call {
+                name: Box::new(Cst::Identifier {
+                    offset: 0,
+                    value: "add".to_owned()
+                }),
+                arguments: vec![Cst::LeadingWhitespace {
+                    value: "\n".to_owned(),
+                    child: Box::new(Cst::LeadingWhitespace {
+                        value: "  ".to_owned(),
+                        child: Box::new(Cst::Int {
+                            offset: 6,
+                            value: 7,
+                            source: "7".to_owned()
+                        })
+                    })
+                }]
+            }
+        )
+    );
+}
+#[test]
+fn test_lambda() {
+    fn parse(source: &str) -> (&str, Cst) {
+        lambda(source, source, 0).unwrap()
+    }
+
+    assert_eq!(
+        parse("{ 123 }"),
+        (
+            "",
+            Cst::Lambda {
+                opening_curly_brace: Box::new(Cst::TrailingWhitespace {
+                    value: " ".to_owned(),
+                    child: Box::new(Cst::OpeningCurlyBrace { offset: 0 })
+                }),
+                parameters_and_arrow: None,
+                body: vec![Cst::TrailingWhitespace {
+                    value: " ".to_owned(),
+                    child: Box::new(Cst::Int {
+                        offset: 2,
+                        value: 123,
+                        source: "123".to_owned()
+                    })
+                }],
+                closing_curly_brace: Box::new(Cst::ClosingCurlyBrace { offset: 6 })
+            },
+        )
+    );
+    assert_eq!(
+        parse("{ a ->\n  123\n}"),
+        (
+            "",
+            Cst::Lambda {
+                opening_curly_brace: Box::new(Cst::TrailingWhitespace {
+                    value: " ".to_owned(),
+                    child: Box::new(Cst::OpeningCurlyBrace { offset: 0 }),
+                }),
+                parameters_and_arrow: Some((
+                    vec![Cst::Call {
+                        name: Box::new(Cst::TrailingWhitespace {
+                            value: " ".to_owned(),
+                            child: Box::new(Cst::Identifier {
+                                offset: 2,
+                                value: "a".to_owned()
+                            })
+                        }),
+                        arguments: vec![]
+                    }],
+                    Box::new(Cst::Arrow { offset: 4 })
+                )),
+                body: vec![Cst::LeadingWhitespace {
+                    value: "\n".to_owned(),
+                    child: Box::new(Cst::LeadingWhitespace {
+                        value: "  ".to_owned(),
+                        child: Box::new(Cst::Int {
+                            offset: 9,
+                            value: 123,
+                            source: "123".to_owned()
+                        })
+                    })
+                }],
+                closing_curly_brace: Box::new(Cst::LeadingWhitespace {
+                    value: "\n".to_owned(),
+                    child: Box::new(Cst::ClosingCurlyBrace { offset: 13 })
+                })
+            },
+        )
+    );
+}
+#[test]
+fn test_leading_stuff() {
+    let source = "123";
+    assert_eq!(
+        leading_whitespace(source, |input| int(source, input)).unwrap(),
+        (
+            "",
+            Cst::Int {
+                offset: 0,
+                value: 123,
+                source: "123".to_owned()
+            }
+        )
+    );
+
+    let source = " 123";
+    assert_eq!(
+        leading_whitespace(source, |input| int(source, input)).unwrap(),
+        (
+            "",
+            Cst::LeadingWhitespace {
+                value: " ".to_owned(),
+                child: Box::new(Cst::Int {
+                    offset: 1,
+                    value: 123,
+                    source: "123".to_owned()
+                })
+            },
+        )
+    );
+
+    fn parse(source: &str) -> (&str, Cst) {
+        leading_whitespace_and_comment_and_empty_lines(
+            source,
+            source,
+            0,
+            1,
+            |source, input, _indentation| int(source, input),
+        )
+        .unwrap()
+    }
+
+    assert_eq!(
+        parse("\n123"),
+        (
+            "",
+            Cst::LeadingWhitespace {
+                value: "\n".to_owned(),
+                child: Box::new(Cst::Int {
+                    offset: 1,
+                    value: 123,
+                    source: "123".to_owned()
+                }),
+            },
+        )
+    );
+}
 // #[test]
 // fn test_trailing_whitespace_and_comment() {
 //     assert_eq!(trailing_whitespace_and_comment("").unwrap(), ("", ()));
