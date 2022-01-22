@@ -5,7 +5,7 @@ use lsp_types::{
     TextDocumentRegistrationOptions,
 };
 use lspower::{jsonrpc, Client, LanguageServer};
-use tokio::sync::Mutex;
+use tokio::{fs, io, sync::Mutex};
 
 use self::open_file_manager::OpenFileManager;
 
@@ -108,5 +108,17 @@ impl LanguageServer for CandyLanguageServer {
 
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         self.open_file_manager.lock().await.did_close(params).await;
+    }
+}
+
+impl CandyLanguageServer {
+    async fn get_file_content(&self, uri: Url) -> io::Result<String> {
+        match self.open_file_manager.lock().await.get(&uri) {
+            Some(text) => Ok(text.to_owned()),
+            None => {
+                let file_path = uri.to_file_path().unwrap();
+                fs::read_to_string(&file_path).await
+            }
+        }
     }
 }

@@ -15,6 +15,11 @@ impl OpenFileManager {
             open_files: Default::default(),
         }
     }
+
+    pub fn get(&self, uri: &Url) -> Option<&str> {
+        self.open_files.get(uri).map(|it| it.as_str())
+    }
+
     pub async fn did_open(&mut self, params: DidOpenTextDocumentParams) {
         match params.text_document.language_id.as_str() {
             "candy" => {
