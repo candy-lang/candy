@@ -20,7 +20,10 @@ impl StringToCst for str {
     fn parse_cst(&self) -> Vec<Cst> {
         // TODO: handle trailing whitespace and comments properly
         let source = format!("\n{}", self);
-        let parser = |input| expressions0(&source, input, 0);
+        let parser = map(
+            tuple((|input| expressions0(&source, input, 0), many0(line_ending))),
+            |(csts, _)| csts,
+        );
         let result: Result<_, ErrorTree<&str>> = final_parser(parser)(&source);
         match result {
             Ok(parsed) => fix_offsets_csts(parsed),
