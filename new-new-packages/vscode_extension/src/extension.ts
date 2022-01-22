@@ -67,7 +67,8 @@ function safeSpawn(): SpawnedProcess {
   }
 
   return child_process.spawn(command[0], command[1], {
-    env: process.env,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    env: { ...process.env, RUST_BACKTRACE: '1' },
     shell: true,
   }) as SpawnedProcess;
 }
