@@ -52,9 +52,10 @@ async fn main() {
 
 fn run(options: CandyRunOptions) {
     init_logger(TerminalMode::Mixed);
-    log::debug!("Running test.candy.\n");
+    log::debug!("Running `{}`.\n", options.file.to_string_lossy());
 
-    let test_code = std::fs::read_to_string(options.file).expect("File test.candy not found.");
+    let test_code = std::fs::read_to_string(options.file.clone())
+        .unwrap_or_else(|_| panic!("File `{}` not found.", options.file.to_string_lossy()));
 
     log::info!("Parsing string to CST…");
     let cst = test_code.parse_cst();
