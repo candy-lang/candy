@@ -54,3 +54,47 @@ impl PositionToUtf8ByteOffset for Position {
         line_offset + char_offset
     }
 }
+
+pub trait RangeToLsp {
+    fn to_lsp(&self, text: &str) -> lsp_types::Range;
+}
+impl RangeToLsp for Range<usize> {
+    fn to_lsp(&self, text: &str) -> lsp_types::Range {
+        let start = self.start.utf8_byte_offset_to_lsp(text);
+        let end = self.end.utf8_byte_offset_to_lsp(text);
+        lsp_types::Range { start, end }
+    }
+}
+
+pub trait Utf8ByteOffsetToLsp {
+    fn utf8_byte_offset_to_lsp(&self, text: &str) -> Position;
+}
+impl Utf8ByteOffsetToLsp for usize {
+    fn utf8_byte_offset_to_lsp(&self, text: &str) -> Position {
+        let mut index = 0;
+        let mut line_index = 0;
+        let mut line_start = 0;
+        let mut character_byte_offset = 0;
+        while &index < self {
+            match text.bytes().nth(index).unwrap() {
+                b'\n' => {
+                    line_index += 1;
+                    line_start = index;
+                    character_byte_offset = 0;
+                }
+                _ => {
+                    character_byte_offset += 1;
+                }
+            }
+            index += 1;
+        }
+
+        let utf16_offset = text[line_start..line_start + character_byte_offset]
+            .encode_utf16()
+            .count();
+        Position {
+            line: line_index,
+            character: utf16_offset as u32,
+        }
+    }
+}
