@@ -5,7 +5,7 @@ use lsp_types::{
     TextDocumentChangeRegistrationOptions, TextDocumentRegistrationOptions, Url,
 };
 use lspower::{jsonrpc, Client, LanguageServer};
-use tokio::{fs, io, sync::Mutex};
+use tokio::{fs, sync::Mutex};
 
 use self::{folding_range::compute_folding_ranges, open_file_manager::OpenFileManager};
 
