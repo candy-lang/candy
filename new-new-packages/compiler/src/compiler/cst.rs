@@ -6,7 +6,16 @@ use std::{
 use itertools::Itertools;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum Cst {
+pub struct CstId(pub usize);
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct Cst {
+    pub id: CstId,
+    pub kind: CstKind,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum CstKind {
     // Simple characters.
     EqualsSign {
         offset: usize,
@@ -97,27 +106,27 @@ pub enum Cst {
 
 impl Display for Cst {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Cst::EqualsSign { .. } => write!(f, "="),
-            Cst::OpeningParenthesis { .. } => write!(f, "("),
-            Cst::ClosingParenthesis { .. } => write!(f, ")"),
-            Cst::OpeningCurlyBrace { .. } => write!(f, "{{"),
-            Cst::ClosingCurlyBrace { .. } => write!(f, "}}"),
-            Cst::Arrow { .. } => write!(f, "->"),
-            Cst::Int { source, .. } => write!(f, "{}", source),
-            Cst::Text { value, .. } => write!(f, "\"{}\"", value),
-            Cst::Identifier { value, .. } => write!(f, "{}", value),
-            Cst::Symbol { value, .. } => write!(f, "{}", value),
-            Cst::LeadingWhitespace { value, child } => write!(f, "{}{}", value, child),
-            Cst::LeadingComment { value, child } => write!(f, "{}{}", value, child),
-            Cst::TrailingWhitespace { child, value } => write!(f, "{}{}", child, value),
-            Cst::TrailingComment { child, value } => write!(f, "{}#{}", child, value),
-            Cst::Parenthesized {
+        match &self.kind {
+            CstKind::EqualsSign { .. } => write!(f, "="),
+            CstKind::OpeningParenthesis { .. } => write!(f, "("),
+            CstKind::ClosingParenthesis { .. } => write!(f, ")"),
+            CstKind::OpeningCurlyBrace { .. } => write!(f, "{{"),
+            CstKind::ClosingCurlyBrace { .. } => write!(f, "}}"),
+            CstKind::Arrow { .. } => write!(f, "->"),
+            CstKind::Int { source, .. } => write!(f, "{}", source),
+            CstKind::Text { value, .. } => write!(f, "\"{}\"", value),
+            CstKind::Identifier { value, .. } => write!(f, "{}", value),
+            CstKind::Symbol { value, .. } => write!(f, "{}", value),
+            CstKind::LeadingWhitespace { value, child } => write!(f, "{}{}", value, child),
+            CstKind::LeadingComment { value, child } => write!(f, "{}{}", value, child),
+            CstKind::TrailingWhitespace { child, value } => write!(f, "{}{}", child, value),
+            CstKind::TrailingComment { child, value } => write!(f, "{}#{}", child, value),
+            CstKind::Parenthesized {
                 opening_parenthesis,
                 inner,
                 closing_parenthesis,
             } => write!(f, "{}{}{}", opening_parenthesis, inner, closing_parenthesis),
-            Cst::Lambda {
+            CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,
@@ -137,7 +146,7 @@ impl Display for Cst {
                 body.iter().map(|it| format!("{}", it)).join(""),
                 closing_curly_brace,
             ),
-            Cst::Call { name, arguments } => {
+            CstKind::Call { name, arguments } => {
                 write!(
                     f,
                     "{}{}",
@@ -145,7 +154,7 @@ impl Display for Cst {
                     arguments.iter().map(|it| format!("{}", it)).join("")
                 )
             }
-            Cst::Assignment {
+            CstKind::Assignment {
                 name,
                 parameters,
                 equals_sign,
@@ -158,7 +167,7 @@ impl Display for Cst {
                 equals_sign,
                 body.iter().map(|it| format!("{}", it)).join(""),
             ),
-            Cst::Error {
+            CstKind::Error {
                 unparsable_input, ..
             } => write!(f, "{}", unparsable_input),
         }
@@ -167,60 +176,60 @@ impl Display for Cst {
 
 impl Cst {
     pub fn span(&self) -> Range<usize> {
-        match self {
-            Cst::EqualsSign { offset } => *offset..(*offset + 1),
-            Cst::OpeningParenthesis { offset } => *offset..(*offset + 1),
-            Cst::ClosingParenthesis { offset } => *offset..(*offset + 1),
-            Cst::OpeningCurlyBrace { offset } => *offset..(*offset + 1),
-            Cst::ClosingCurlyBrace { offset } => *offset..(*offset + 1),
-            Cst::Arrow { offset } => *offset..(*offset + 2),
-            Cst::Int { offset, source, .. } => *offset..(*offset + source.len()),
-            Cst::Text { offset, value } => *offset..(*offset + value.len() + 2),
-            Cst::Identifier { offset, value } => *offset..(*offset + value.len()),
-            Cst::Symbol { offset, value } => *offset..(*offset + value.len()),
-            Cst::LeadingWhitespace { value, child } => {
+        match &self.kind {
+            CstKind::EqualsSign { offset } => *offset..(*offset + 1),
+            CstKind::OpeningParenthesis { offset } => *offset..(*offset + 1),
+            CstKind::ClosingParenthesis { offset } => *offset..(*offset + 1),
+            CstKind::OpeningCurlyBrace { offset } => *offset..(*offset + 1),
+            CstKind::ClosingCurlyBrace { offset } => *offset..(*offset + 1),
+            CstKind::Arrow { offset } => *offset..(*offset + 2),
+            CstKind::Int { offset, source, .. } => *offset..(*offset + source.len()),
+            CstKind::Text { offset, value } => *offset..(*offset + value.len() + 2),
+            CstKind::Identifier { offset, value } => *offset..(*offset + value.len()),
+            CstKind::Symbol { offset, value } => *offset..(*offset + value.len()),
+            CstKind::LeadingWhitespace { value, child } => {
                 let child_span = child.span();
                 (child_span.start - value.len())..child_span.end
             }
-            Cst::LeadingComment { value, child } => {
+            CstKind::LeadingComment { value, child } => {
                 let child_span = child.span();
                 (child_span.start - value.len() - 1)..child_span.end
             }
-            Cst::TrailingWhitespace { child, value } => {
+            CstKind::TrailingWhitespace { child, value } => {
                 let child_span = child.span();
                 child_span.start..(child_span.end + value.len())
             }
-            Cst::TrailingComment { child, value } => {
+            CstKind::TrailingComment { child, value } => {
                 let child_span = child.span();
                 child_span.start..(child_span.end + value.len() + 1)
             }
-            Cst::Parenthesized {
+            CstKind::Parenthesized {
                 opening_parenthesis,
                 closing_parenthesis,
                 ..
             } => opening_parenthesis.span().start..closing_parenthesis.span().end,
-            Cst::Lambda {
+            CstKind::Lambda {
                 opening_curly_brace,
                 closing_curly_brace,
                 ..
             } => opening_curly_brace.span().start..closing_curly_brace.span().end,
-            Cst::Call { name, arguments } => {
+            CstKind::Call { name, arguments } => {
                 if arguments.is_empty() {
                     name.span()
                 } else {
                     name.span().start..arguments.last().unwrap().span().end
                 }
             }
-            Cst::Assignment {
+            CstKind::Assignment {
                 name,
                 equals_sign,
                 body,
                 ..
             } => {
-                let last_cst = body.last().unwrap_or(equals_sign);
+                let last_cst = body.last().unwrap_or(&*equals_sign);
                 name.span().start..last_cst.span().end
             }
-            Cst::Error {
+            CstKind::Error {
                 offset,
                 unparsable_input,
                 ..
@@ -229,12 +238,12 @@ impl Cst {
     }
 
     pub fn unwrap_whitespace_and_comment(&self) -> &Self {
-        match self {
-            Cst::LeadingWhitespace { child, .. } => child.unwrap_whitespace_and_comment(),
-            Cst::LeadingComment { child, .. } => child.unwrap_whitespace_and_comment(),
-            Cst::TrailingWhitespace { child, .. } => child.unwrap_whitespace_and_comment(),
-            Cst::TrailingComment { child, .. } => child.unwrap_whitespace_and_comment(),
-            it => it,
+        match &self.kind {
+            CstKind::LeadingWhitespace { child, .. } => child.unwrap_whitespace_and_comment(),
+            CstKind::LeadingComment { child, .. } => child.unwrap_whitespace_and_comment(),
+            CstKind::TrailingWhitespace { child, .. } => child.unwrap_whitespace_and_comment(),
+            CstKind::TrailingComment { child, .. } => child.unwrap_whitespace_and_comment(),
+            _ => self,
         }
     }
 }

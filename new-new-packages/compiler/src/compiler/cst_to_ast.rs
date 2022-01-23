@@ -1,5 +1,5 @@
 use super::ast::{self, Ast, Call, Int, Lambda, Symbol, Text};
-use super::cst::Cst;
+use super::cst::{Cst, CstKind};
 
 pub trait LowerCstToAst {
     fn into_ast(self) -> (Vec<Ast>, Vec<String>);
@@ -21,41 +21,44 @@ fn lower_csts(csts: Vec<Cst>) -> (Vec<Ast>, Vec<String>) {
     (asts, errors)
 }
 fn lower_cst(cst: Cst) -> (Ast, Vec<String>) {
-    match cst {
-        Cst::EqualsSign { .. } => (Ast::Error, vec![]),
-        Cst::OpeningParenthesis { .. } => (Ast::Error, vec![]),
-        Cst::ClosingParenthesis { .. } => (Ast::Error, vec![]),
-        Cst::OpeningCurlyBrace { .. } => (Ast::Error, vec![]),
-        Cst::ClosingCurlyBrace { .. } => (Ast::Error, vec![]),
-        Cst::Arrow { .. } => (Ast::Error, vec![]),
-        Cst::Int { value, .. } => (Ast::Int(Int(value)), vec![]),
-        Cst::Text { value, .. } => (Ast::Text(Text(value)), vec![]),
-        Cst::Identifier { .. } => {
+    match cst.kind {
+        CstKind::EqualsSign { .. } => (Ast::Error, vec![]),
+        CstKind::OpeningParenthesis { .. } => (Ast::Error, vec![]),
+        CstKind::ClosingParenthesis { .. } => (Ast::Error, vec![]),
+        CstKind::OpeningCurlyBrace { .. } => (Ast::Error, vec![]),
+        CstKind::ClosingCurlyBrace { .. } => (Ast::Error, vec![]),
+        CstKind::Arrow { .. } => (Ast::Error, vec![]),
+        CstKind::Int { value, .. } => (Ast::Int(Int(value)), vec![]),
+        CstKind::Text { value, .. } => (Ast::Text(Text(value)), vec![]),
+        CstKind::Identifier { .. } => {
             panic!("Tried to lower an identifier from CST to AST.")
         }
-        Cst::Symbol { value, .. } => (Ast::Symbol(Symbol(value)), vec![]),
-        Cst::LeadingWhitespace { child, .. } => lower_cst(*child),
-        Cst::LeadingComment { child, .. } => lower_cst(*child),
-        Cst::TrailingWhitespace { child, .. } => lower_cst(*child),
-        Cst::TrailingComment { child, .. } => lower_cst(*child),
-        Cst::Parenthesized {
+        CstKind::Symbol { value, .. } => (Ast::Symbol(Symbol(value)), vec![]),
+        CstKind::LeadingWhitespace { child, .. } => lower_cst(*child),
+        CstKind::LeadingComment { child, .. } => lower_cst(*child),
+        CstKind::TrailingWhitespace { child, .. } => lower_cst(*child),
+        CstKind::TrailingComment { child, .. } => lower_cst(*child),
+        CstKind::Parenthesized {
             opening_parenthesis,
             inner,
             closing_parenthesis,
         } => {
             assert!(
-                matches!(*opening_parenthesis, Cst::OpeningParenthesis { .. }),
+                matches!(opening_parenthesis.unwrap_whitespace_and_comment().kind, CstKind::OpeningParenthesis { .. }),
                 "Expected an opening parenthesis to start a parenthesized expression, but found `{}`.",
                 *opening_parenthesis
             );
             assert!(
-                matches!(*closing_parenthesis, Cst::ClosingParenthesis { .. }),
+                matches!(
+                    closing_parenthesis.unwrap_whitespace_and_comment().kind,
+                    CstKind::ClosingParenthesis { .. }
+                ),
                 "Expected a closing parenthesis to end a parenthesized expression, but found `{}`.",
                 *closing_parenthesis
             );
             lower_cst(*inner)
         }
-        Cst::Lambda {
+        CstKind::Lambda {
             opening_curly_brace,
             parameters_and_arrow,
             body,
@@ -64,8 +67,8 @@ fn lower_cst(cst: Cst) -> (Ast, Vec<String>) {
             let mut errors = vec![];
             assert!(
                 matches!(
-                    opening_curly_brace.unwrap_whitespace_and_comment(),
-                    Cst::OpeningCurlyBrace { .. }
+                    opening_curly_brace.unwrap_whitespace_and_comment().kind,
+                    CstKind::OpeningCurlyBrace { .. }
                 ),
                 "Expected an opening curly brace at the beginning of a lambda, but found {}.",
                 opening_curly_brace,
@@ -75,7 +78,10 @@ fn lower_cst(cst: Cst) -> (Ast, Vec<String>) {
                 errors.append(&mut parameters_errors);
 
                 assert!(
-                    matches!(*arrow, Cst::Arrow { .. }),
+                    matches!(
+                        arrow.unwrap_whitespace_and_comment().kind,
+                        CstKind::Arrow { .. }
+                    ),
                     "Expected an arrow after the parameters in a lambda, but found `{}`.",
                     arrow
                 );
@@ -90,8 +96,8 @@ fn lower_cst(cst: Cst) -> (Ast, Vec<String>) {
 
             assert!(
                 matches!(
-                    closing_curly_brace.unwrap_whitespace_and_comment(),
-                    Cst::ClosingCurlyBrace { .. }
+                    closing_curly_brace.unwrap_whitespace_and_comment().kind,
+                    CstKind::ClosingCurlyBrace { .. }
                 ),
                 "Expected a closing curly brace at the end of a lambda, but found {}.",
                 closing_curly_brace
@@ -99,9 +105,10 @@ fn lower_cst(cst: Cst) -> (Ast, Vec<String>) {
 
             (Ast::Lambda(Lambda { parameters, body }), errors)
         }
-        Cst::Call { name, arguments } => {
-            let name = match *name {
-                Cst::Identifier { value, .. } => value,
+        CstKind::Call { name, arguments } => {
+            let name = name.unwrap_whitespace_and_comment();
+            let name = match &name.kind {
+                CstKind::Identifier { value, .. } => value.to_owned(),
                 _ => {
                     panic!(
                         "Expected a symbol for the name of a call, but found `{}`.",
@@ -113,7 +120,7 @@ fn lower_cst(cst: Cst) -> (Ast, Vec<String>) {
             let (arguments, errors) = lower_csts(arguments);
             (Ast::Call(Call { name, arguments }), errors)
         }
-        Cst::Assignment {
+        CstKind::Assignment {
             name,
             parameters,
             equals_sign,
@@ -124,8 +131,8 @@ fn lower_cst(cst: Cst) -> (Ast, Vec<String>) {
             errors.append(&mut parameters_errors);
             assert!(
                 matches!(
-                    equals_sign.unwrap_whitespace_and_comment(),
-                    Cst::EqualsSign { .. }
+                    equals_sign.unwrap_whitespace_and_comment().kind,
+                    CstKind::EqualsSign { .. }
                 ),
                 "Expected an equals sign for the assignment."
             );
@@ -140,7 +147,7 @@ fn lower_cst(cst: Cst) -> (Ast, Vec<String>) {
                 errors,
             )
         }
-        Cst::Error { message, .. } => (Ast::Error, vec![message]),
+        CstKind::Error { message, .. } => (Ast::Error, vec![message]),
     }
 }
 
@@ -157,8 +164,9 @@ fn lower_parameters(csts: Vec<Cst>) -> (Vec<String>, Vec<String>) {
     (parameters, errors)
 }
 fn lower_parameter(cst: Cst) -> (Option<String>, Vec<String>) {
-    match cst.clone() {
-        Cst::Call { name, arguments } => {
+    let cst = cst.unwrap_whitespace_and_comment();
+    match cst.kind.clone() {
+        CstKind::Call { name, arguments } => {
             let name = lower_identifier(*name);
 
             if !arguments.is_empty() {
@@ -177,8 +185,9 @@ fn lower_parameter(cst: Cst) -> (Option<String>, Vec<String>) {
     }
 }
 fn lower_identifier(cst: Cst) -> String {
-    match cst {
-        Cst::Identifier { value, .. } => value,
+    let cst = cst.unwrap_whitespace_and_comment();
+    match &cst.kind {
+        CstKind::Identifier { value, .. } => value.clone(),
         _ => {
             panic!("Expected an identifier, but found `{}`.", cst);
         }
