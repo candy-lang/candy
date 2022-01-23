@@ -64,7 +64,7 @@ fn run(options: CandyRunOptions) {
     }
 
     log::info!("Lowering CST to AST…");
-    let (asts, errors) = cst.into_ast();
+    let (asts, _, errors) = cst.into_ast();
     if options.print_ast {
         log::info!("AST: {:#?}", asts);
     }

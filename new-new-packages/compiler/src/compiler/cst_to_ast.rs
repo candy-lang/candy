@@ -1,54 +1,71 @@
-use super::ast::{self, Ast, Call, Int, Lambda, Symbol, Text};
-use super::cst::{Cst, CstKind};
+use im::HashMap;
+
+use super::ast::{self, Ast, AstId, AstKind, AstString, Call, Int, Lambda, Symbol, Text};
+use super::cst::{Cst, CstId, CstKind};
+use super::error::CompilerError;
 
 pub trait LowerCstToAst {
-    fn into_ast(self) -> (Vec<Ast>, Vec<String>);
+    fn into_ast(self) -> (Vec<Ast>, HashMap<AstId, CstId>, Vec<CompilerError>);
 }
 impl LowerCstToAst for Vec<Cst> {
-    fn into_ast(self) -> (Vec<Ast>, Vec<String>) {
-        lower_csts(self)
+    fn into_ast(self) -> (Vec<Ast>, HashMap<AstId, CstId>, Vec<CompilerError>) {
+        let mut context = LoweringContext::new();
+        let asts = (&mut context).lower_csts(self);
+        (asts, context.id_mapping, context.errors)
     }
 }
 
-fn lower_csts(csts: Vec<Cst>) -> (Vec<Ast>, Vec<String>) {
-    let mut asts = vec![];
-    let mut errors = vec![];
-    for cst in csts {
-        let (ast, mut new_errors) = lower_cst(cst);
-        asts.push(ast);
-        errors.append(&mut new_errors);
-    }
-    (asts, errors)
+struct LoweringContext {
+    next_id: usize,
+    id_mapping: HashMap<AstId, CstId>,
+    errors: Vec<CompilerError>,
 }
-fn lower_cst(cst: Cst) -> (Ast, Vec<String>) {
-    match cst.kind {
-        CstKind::EqualsSign { .. } => (Ast::Error, vec![]),
-        CstKind::OpeningParenthesis { .. } => (Ast::Error, vec![]),
-        CstKind::ClosingParenthesis { .. } => (Ast::Error, vec![]),
-        CstKind::OpeningCurlyBrace { .. } => (Ast::Error, vec![]),
-        CstKind::ClosingCurlyBrace { .. } => (Ast::Error, vec![]),
-        CstKind::Arrow { .. } => (Ast::Error, vec![]),
-        CstKind::Int { value, .. } => (Ast::Int(Int(value)), vec![]),
-        CstKind::Text { value, .. } => (Ast::Text(Text(value)), vec![]),
-        CstKind::Identifier { .. } => {
-            panic!("Tried to lower an identifier from CST to AST.")
+impl LoweringContext {
+    fn new() -> LoweringContext {
+        LoweringContext {
+            next_id: 0,
+            id_mapping: HashMap::new(),
+            errors: vec![],
         }
-        CstKind::Symbol { value, .. } => (Ast::Symbol(Symbol(value)), vec![]),
-        CstKind::LeadingWhitespace { child, .. } => lower_cst(*child),
-        CstKind::LeadingComment { child, .. } => lower_cst(*child),
-        CstKind::TrailingWhitespace { child, .. } => lower_cst(*child),
-        CstKind::TrailingComment { child, .. } => lower_cst(*child),
-        CstKind::Parenthesized {
-            opening_parenthesis,
-            inner,
-            closing_parenthesis,
-        } => {
-            assert!(
+    }
+    fn lower_csts(&mut self, csts: Vec<Cst>) -> Vec<Ast> {
+        csts.into_iter().map(|it| self.lower_cst(it)).collect()
+    }
+    fn lower_cst(&mut self, cst: Cst) -> Ast {
+        match cst.kind {
+            CstKind::EqualsSign { .. } => self.create_ast(cst.id, AstKind::Error),
+            CstKind::OpeningParenthesis { .. } => self.create_ast(cst.id, AstKind::Error),
+            CstKind::ClosingParenthesis { .. } => self.create_ast(cst.id, AstKind::Error),
+            CstKind::OpeningCurlyBrace { .. } => self.create_ast(cst.id, AstKind::Error),
+            CstKind::ClosingCurlyBrace { .. } => self.create_ast(cst.id, AstKind::Error),
+            CstKind::Arrow { .. } => self.create_ast(cst.id, AstKind::Error),
+            CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(value))),
+            CstKind::Text { value, .. } => {
+                let string = self.create_string(cst.id, value);
+                self.create_ast(cst.id, AstKind::Text(Text(string)))
+            }
+            CstKind::Identifier { .. } => {
+                panic!("Tried to lower an identifier from CST to AST.")
+            }
+            CstKind::Symbol { value, .. } => {
+                let string = self.create_string(cst.id, value);
+                self.create_ast(cst.id, AstKind::Symbol(Symbol(string)))
+            }
+            CstKind::LeadingWhitespace { child, .. } => self.lower_cst(*child),
+            CstKind::LeadingComment { child, .. } => self.lower_cst(*child),
+            CstKind::TrailingWhitespace { child, .. } => self.lower_cst(*child),
+            CstKind::TrailingComment { child, .. } => self.lower_cst(*child),
+            CstKind::Parenthesized {
+                opening_parenthesis,
+                inner,
+                closing_parenthesis,
+            } => {
+                assert!(
                 matches!(opening_parenthesis.unwrap_whitespace_and_comment().kind, CstKind::OpeningParenthesis { .. }),
                 "Expected an opening parenthesis to start a parenthesized expression, but found `{}`.",
                 *opening_parenthesis
             );
-            assert!(
+                assert!(
                 matches!(
                     closing_parenthesis.unwrap_whitespace_and_comment().kind,
                     CstKind::ClosingParenthesis { .. }
@@ -56,140 +73,165 @@ fn lower_cst(cst: Cst) -> (Ast, Vec<String>) {
                 "Expected a closing parenthesis to end a parenthesized expression, but found `{}`.",
                 *closing_parenthesis
             );
-            lower_cst(*inner)
-        }
-        CstKind::Lambda {
-            opening_curly_brace,
-            parameters_and_arrow,
-            body,
-            closing_curly_brace,
-        } => {
-            let mut errors = vec![];
-            assert!(
-                matches!(
-                    opening_curly_brace.unwrap_whitespace_and_comment().kind,
-                    CstKind::OpeningCurlyBrace { .. }
-                ),
-                "Expected an opening curly brace at the beginning of a lambda, but found {}.",
+                self.lower_cst(*inner)
+            }
+            CstKind::Lambda {
                 opening_curly_brace,
-            );
-            let parameters = if let Some((parameters, arrow)) = parameters_and_arrow {
-                let (parameters, mut parameters_errors) = lower_parameters(parameters);
-                errors.append(&mut parameters_errors);
+                parameters_and_arrow,
+                body,
+                closing_curly_brace,
+            } => {
+                assert!(
+                    matches!(
+                        opening_curly_brace.unwrap_whitespace_and_comment().kind,
+                        CstKind::OpeningCurlyBrace { .. }
+                    ),
+                    "Expected an opening curly brace at the beginning of a lambda, but found {}.",
+                    opening_curly_brace,
+                );
+                let parameters = if let Some((parameters, arrow)) = parameters_and_arrow {
+                    let parameters = self.lower_parameters(parameters);
+
+                    assert!(
+                        matches!(
+                            arrow.unwrap_whitespace_and_comment().kind,
+                            CstKind::Arrow { .. }
+                        ),
+                        "Expected an arrow after the parameters in a lambda, but found `{}`.",
+                        arrow
+                    );
+
+                    parameters
+                } else {
+                    vec![]
+                };
+
+                let body = self.lower_csts(body);
 
                 assert!(
                     matches!(
-                        arrow.unwrap_whitespace_and_comment().kind,
-                        CstKind::Arrow { .. }
+                        closing_curly_brace.unwrap_whitespace_and_comment().kind,
+                        CstKind::ClosingCurlyBrace { .. }
                     ),
-                    "Expected an arrow after the parameters in a lambda, but found `{}`.",
-                    arrow
+                    "Expected a closing curly brace at the end of a lambda, but found {}.",
+                    closing_curly_brace
                 );
 
-                parameters
-            } else {
-                vec![]
-            };
+                self.create_ast(cst.id, AstKind::Lambda(Lambda { parameters, body }))
+            }
+            CstKind::Call { name, arguments } => {
+                let name = name.unwrap_whitespace_and_comment();
+                let name = match name {
+                    Cst {
+                        id,
+                        kind: CstKind::Identifier { value, .. },
+                    } => self.create_string(id.to_owned(), value.to_owned()),
+                    _ => {
+                        panic!(
+                            "Expected a symbol for the name of a call, but found `{}`.",
+                            name
+                        );
+                    }
+                };
 
-            let (body, mut body_errors) = lower_csts(body);
-            errors.append(&mut body_errors);
+                let arguments = self.lower_csts(arguments);
+                self.create_ast(cst.id, AstKind::Call(Call { name, arguments }))
+            }
+            CstKind::Assignment {
+                name,
+                parameters,
+                equals_sign,
+                body,
+            } => {
+                let name = self.lower_identifier(*name);
 
-            assert!(
-                matches!(
-                    closing_curly_brace.unwrap_whitespace_and_comment().kind,
-                    CstKind::ClosingCurlyBrace { .. }
-                ),
-                "Expected a closing curly brace at the end of a lambda, but found {}.",
-                closing_curly_brace
-            );
+                let parameters = self.lower_parameters(parameters);
+                assert!(
+                    matches!(
+                        equals_sign.unwrap_whitespace_and_comment().kind,
+                        CstKind::EqualsSign { .. }
+                    ),
+                    "Expected an equals sign for the assignment."
+                );
 
-            (Ast::Lambda(Lambda { parameters, body }), errors)
-        }
-        CstKind::Call { name, arguments } => {
-            let name = name.unwrap_whitespace_and_comment();
-            let name = match &name.kind {
-                CstKind::Identifier { value, .. } => value.to_owned(),
-                _ => {
-                    panic!(
-                        "Expected a symbol for the name of a call, but found `{}`.",
-                        name
-                    );
-                }
-            };
+                let body = self.lower_csts(body);
 
-            let (arguments, errors) = lower_csts(arguments);
-            (Ast::Call(Call { name, arguments }), errors)
-        }
-        CstKind::Assignment {
-            name,
-            parameters,
-            equals_sign,
-            body,
-        } => {
-            let mut errors = vec![];
-            let (parameters, mut parameters_errors) = lower_parameters(parameters);
-            errors.append(&mut parameters_errors);
-            assert!(
-                matches!(
-                    equals_sign.unwrap_whitespace_and_comment().kind,
-                    CstKind::EqualsSign { .. }
-                ),
-                "Expected an equals sign for the assignment."
-            );
-            let (body, mut body_errors) = lower_csts(body);
-            errors.append(&mut body_errors);
-            (
-                Ast::Assignment(ast::Assignment {
-                    name: lower_identifier(*name),
-                    parameters,
-                    body,
-                }),
-                errors,
-            )
-        }
-        CstKind::Error { message, .. } => (Ast::Error, vec![message]),
-    }
-}
-
-fn lower_parameters(csts: Vec<Cst>) -> (Vec<String>, Vec<String>) {
-    let mut parameters = vec![];
-    let mut errors = vec![];
-    for cst in csts {
-        let (parameter, mut new_errors) = lower_parameter(cst);
-        if let Some(parameter) = parameter {
-            parameters.push(parameter);
-        }
-        errors.append(&mut new_errors);
-    }
-    (parameters, errors)
-}
-fn lower_parameter(cst: Cst) -> (Option<String>, Vec<String>) {
-    let cst = cst.unwrap_whitespace_and_comment();
-    match cst.kind.clone() {
-        CstKind::Call { name, arguments } => {
-            let name = lower_identifier(*name);
-
-            if !arguments.is_empty() {
-                (
-                    Some(name.clone()),
-                    vec![format!(
-                        "Parameters can't have parameters themselves, but this one does: `{}`",
-                        cst
-                    )],
+                self.create_ast(
+                    cst.id,
+                    AstKind::Assignment(ast::Assignment {
+                        name,
+                        parameters,
+                        body,
+                    }),
                 )
-            } else {
-                (Some(name), vec![])
+            }
+            CstKind::Error { message, .. } => {
+                self.errors.push(CompilerError {
+                    span: todo!(),
+                    message: message.to_owned(),
+                });
+                self.create_ast(cst.id, AstKind::Error)
             }
         }
-        _ => (None, vec![format!("Expected parameter, found `{}`.", cst)]),
     }
-}
-fn lower_identifier(cst: Cst) -> String {
-    let cst = cst.unwrap_whitespace_and_comment();
-    match &cst.kind {
-        CstKind::Identifier { value, .. } => value.clone(),
-        _ => {
-            panic!("Expected an identifier, but found `{}`.", cst);
+
+    fn lower_parameters(&mut self, csts: Vec<Cst>) -> Vec<AstString> {
+        csts.into_iter()
+            .filter_map(|it| self.lower_parameter(it))
+            .collect()
+    }
+    fn lower_parameter(&mut self, cst: Cst) -> Option<AstString> {
+        let cst = cst.unwrap_whitespace_and_comment();
+        match cst.kind.clone() {
+            CstKind::Call { name, arguments } => {
+                let name = self.lower_identifier(*name);
+
+                if !arguments.is_empty() {
+                    self.errors.push(CompilerError {
+                        span: cst.span(),
+                        message: "Parameters can't have parameters themselves.".to_owned(),
+                    });
+                }
+                Some(name)
+            }
+            _ => {
+                self.errors.push(CompilerError {
+                    span: cst.span(),
+                    message: format!("Expected parameter, found `{}`.", cst),
+                });
+                None
+            }
         }
+    }
+    fn lower_identifier(&mut self, cst: Cst) -> AstString {
+        let cst = cst.unwrap_whitespace_and_comment();
+        match cst {
+            Cst {
+                id,
+                kind: CstKind::Identifier { value, .. },
+            } => self.create_string(id.to_owned(), value.clone()),
+            _ => {
+                panic!("Expected an identifier, but found `{}`.", cst);
+            }
+        }
+    }
+
+    fn create_ast(&mut self, cst_id: CstId, kind: AstKind) -> Ast {
+        Ast {
+            id: self.create_next_id(cst_id),
+            kind,
+        }
+    }
+    fn create_string(&mut self, cst_id: CstId, value: String) -> AstString {
+        AstString {
+            id: self.create_next_id(cst_id),
+            value,
+        }
+    }
+    fn create_next_id(&mut self, cst_id: CstId) -> AstId {
+        let id = AstId(self.next_id);
+        assert!(matches!(self.id_mapping.insert(id, cst_id), None));
+        self.next_id += 1;
+        id
     }
 }

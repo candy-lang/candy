@@ -1,4 +1,4 @@
-use super::ast::{self, Assignment, Ast, Int, Symbol, Text};
+use super::ast::{self, Assignment, Ast, AstKind, Int, Symbol, Text};
 use super::hir::{Expression, Id, Lambda};
 use crate::builtin_functions;
 use im::HashMap;
@@ -46,11 +46,11 @@ impl Compiler {
         }
     }
     fn compile_single(&mut self, ast: Ast) -> Id {
-        match ast {
-            Ast::Int(Int(int)) => self.push(Expression::Int(int)),
-            Ast::Text(Text(string)) => self.push(Expression::Text(string)),
-            Ast::Symbol(Symbol(symbol)) => self.push(Expression::Symbol(symbol)),
-            Ast::Lambda(ast::Lambda { parameters, body }) => {
+        match ast.kind {
+            AstKind::Int(Int(int)) => self.push(Expression::Int(int)),
+            AstKind::Text(Text(string)) => self.push(Expression::Text(string.value)),
+            AstKind::Symbol(Symbol(symbol)) => self.push(Expression::Symbol(symbol.value)),
+            AstKind::Lambda(ast::Lambda { parameters, body }) => {
                 let mut inner = Compiler {
                     lambda: Lambda::new(self.lambda.next_id(), parameters.len()),
                     identifiers: self.identifiers.clone(),
@@ -59,13 +59,13 @@ impl Compiler {
                     inner
                         .lambda
                         .identifiers
-                        .insert(inner.lambda.first_id + index, parameter.to_owned());
+                        .insert(inner.lambda.first_id + index, parameter.value.to_owned());
                 }
 
                 inner.compile(body);
                 self.push(Expression::Lambda(inner.lambda))
             }
-            Ast::Call(ast::Call { name, arguments }) => {
+            AstKind::Call(ast::Call { name, arguments }) => {
                 let argument_ids = arguments
                     .iter()
                     .map(|argument| self.compile_single(argument.to_owned()))
@@ -73,12 +73,12 @@ impl Compiler {
                 self.push(Expression::Call {
                     function: *self
                         .identifiers
-                        .get(&name)
-                        .expect(&format!("Name `{}` not found.", name)),
+                        .get(&*name)
+                        .expect(&format!("Name `{}` not found.", *name)),
                     arguments: argument_ids,
                 })
             }
-            Ast::Assignment(Assignment {
+            AstKind::Assignment(Assignment {
                 name,
                 parameters,
                 body,
@@ -90,16 +90,16 @@ impl Compiler {
                 for (index, parameter) in parameters.iter().enumerate() {
                     inner
                         .identifiers
-                        .insert(parameter.to_owned(), inner.lambda.first_id + index);
+                        .insert(parameter.value.to_owned(), inner.lambda.first_id + index);
                 }
                 inner.compile(body);
                 let id = self.push(Expression::Lambda(inner.lambda));
-                self.identifiers.insert(name.clone(), id);
-                self.lambda.identifiers.insert(id, name);
+                self.identifiers.insert(name.value.clone(), id);
+                self.lambda.identifiers.insert(id, name.value);
                 id
             }
             // TODO
-            Ast::Error => panic!("Error in AST"),
+            AstKind::Error => panic!("Error in AST"),
         }
     }
 }

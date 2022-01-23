@@ -5,7 +5,7 @@ use std::{
 
 use itertools::Itertools;
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct CstId(pub usize);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
