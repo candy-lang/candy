@@ -167,7 +167,7 @@ impl LoweringContext {
             }
             CstKind::Error { message, .. } => {
                 self.errors.push(CompilerError {
-                    span: todo!(),
+                    span: cst.span(),
                     message: message.to_owned(),
                 });
                 self.create_ast(cst.id, AstKind::Error)
