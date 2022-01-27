@@ -1,14 +1,14 @@
 use im::HashMap;
 
-use super::ast::{self, Ast, AstId, AstKind, AstString, Call, Int, Lambda, Symbol, Text};
-use super::cst::{Cst, CstId, CstKind};
+use super::ast::{self, Ast, AstKind, AstString, Int, Lambda, Symbol, Text};
+use super::cst::{self, Cst, CstKind};
 use super::error::CompilerError;
 
 pub trait LowerCstToAst {
-    fn into_ast(self) -> (Vec<Ast>, HashMap<AstId, CstId>, Vec<CompilerError>);
+    fn compile_into_ast(self) -> (Vec<Ast>, HashMap<ast::Id, cst::Id>, Vec<CompilerError>);
 }
 impl LowerCstToAst for Vec<Cst> {
-    fn into_ast(self) -> (Vec<Ast>, HashMap<AstId, CstId>, Vec<CompilerError>) {
+    fn compile_into_ast(self) -> (Vec<Ast>, HashMap<ast::Id, cst::Id>, Vec<CompilerError>) {
         let mut context = LoweringContext::new();
         let asts = (&mut context).lower_csts(self);
         (asts, context.id_mapping, context.errors)
@@ -17,7 +17,7 @@ impl LowerCstToAst for Vec<Cst> {
 
 struct LoweringContext {
     next_id: usize,
-    id_mapping: HashMap<AstId, CstId>,
+    id_mapping: HashMap<ast::Id, cst::Id>,
     errors: Vec<CompilerError>,
 }
 impl LoweringContext {
@@ -135,7 +135,7 @@ impl LoweringContext {
                 };
 
                 let arguments = self.lower_csts(arguments);
-                self.create_ast(cst.id, AstKind::Call(Call { name, arguments }))
+                self.create_ast(cst.id, AstKind::Call(ast::Call { name, arguments }))
             }
             CstKind::Assignment {
                 name,
@@ -216,20 +216,20 @@ impl LoweringContext {
         }
     }
 
-    fn create_ast(&mut self, cst_id: CstId, kind: AstKind) -> Ast {
+    fn create_ast(&mut self, cst_id: cst::Id, kind: AstKind) -> Ast {
         Ast {
             id: self.create_next_id(cst_id),
             kind,
         }
     }
-    fn create_string(&mut self, cst_id: CstId, value: String) -> AstString {
+    fn create_string(&mut self, cst_id: cst::Id, value: String) -> AstString {
         AstString {
             id: self.create_next_id(cst_id),
             value,
         }
     }
-    fn create_next_id(&mut self, cst_id: CstId) -> AstId {
-        let id = AstId(self.next_id);
+    fn create_next_id(&mut self, cst_id: cst::Id) -> ast::Id {
+        let id = ast::Id(self.next_id);
         assert!(matches!(self.id_mapping.insert(id, cst_id), None));
         self.next_id += 1;
         id

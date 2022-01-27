@@ -1,11 +1,11 @@
 use std::ops::Deref;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct AstId(pub usize);
+pub struct Id(pub usize);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Ast {
-    pub id: AstId,
+    pub id: Id,
     pub kind: AstKind,
 }
 
@@ -50,7 +50,7 @@ pub struct Assignment {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct AstString {
-    pub id: AstId,
+    pub id: Id,
     pub value: String,
 }
 impl Deref for AstString {
