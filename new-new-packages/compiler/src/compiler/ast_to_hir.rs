@@ -1,31 +1,31 @@
 use std::ops::Range;
 
-use super::ast::{self, Assignment, Ast, AstId, AstKind, Int, Symbol, Text};
-use super::cst::{Cst, CstId, CstVecExtension};
+use super::ast::{self, Assignment, Ast, AstKind, Int, Symbol, Text};
+use super::cst::{self, Cst, CstVecExtension};
 use super::error::CompilerError;
-use super::hir::{self, Expression, Id, Lambda};
+use super::hir::{self, Expression, Lambda};
 use crate::builtin_functions;
 use im::HashMap;
 
 pub trait CompileVecAstsToHir {
-    fn compile_to_hir(
+    fn compile_into_hir(
         self,
         cst: Vec<Cst>,
-        ast_cst_id_mapping: HashMap<AstId, CstId>,
-    ) -> (Lambda, HashMap<Id, AstId>, Vec<CompilerError>);
+        ast_cst_id_mapping: HashMap<ast::Id, cst::Id>,
+    ) -> (Lambda, HashMap<hir::Id, ast::Id>, Vec<CompilerError>);
 }
 impl CompileVecAstsToHir for Vec<Ast> {
-    fn compile_to_hir(
+    fn compile_into_hir(
         self,
         cst: Vec<Cst>,
-        ast_cst_id_mapping: HashMap<AstId, CstId>,
-    ) -> (Lambda, HashMap<Id, AstId>, Vec<CompilerError>) {
+        ast_cst_id_mapping: HashMap<ast::Id, cst::Id>,
+    ) -> (Lambda, HashMap<hir::Id, ast::Id>, Vec<CompilerError>) {
         let builtin_identifiers = builtin_functions::VALUES
             .iter()
             .enumerate()
             .map(|(index, builtin_function)| {
                 let string = format!("builtin{:?}", builtin_function);
-                (string, Id(index))
+                (string, hir::Id(index))
             })
             .collect::<HashMap<_, _>>();
         let mut compiler = Compiler::new(cst, ast_cst_id_mapping, builtin_identifiers);
@@ -41,51 +41,49 @@ impl CompileVecAstsToHir for Vec<Ast> {
 #[derive(Default)]
 struct CompilerContext {
     cst: Vec<Cst>,
-    ast_cst_id_mapping: HashMap<AstId, CstId>,
-    id_mapping: HashMap<Id, AstId>,
+    ast_cst_id_mapping: HashMap<ast::Id, cst::Id>,
+    id_mapping: HashMap<hir::Id, ast::Id>,
+    next_id: usize,
     errors: Vec<CompilerError>,
 }
 struct Compiler {
     context: CompilerContext,
     lambda: Lambda,
-    identifiers: HashMap<String, Id>,
+    identifiers: HashMap<String, hir::Id>,
 }
 impl Compiler {
     fn new(
         cst: Vec<Cst>,
-        ast_cst_id_mapping: HashMap<AstId, CstId>,
-        builtin_identifiers: HashMap<String, Id>,
+        ast_cst_id_mapping: HashMap<ast::Id, cst::Id>,
+        builtin_identifiers: HashMap<String, hir::Id>,
     ) -> Self {
         Compiler {
             context: CompilerContext {
                 cst,
                 ast_cst_id_mapping,
                 id_mapping: HashMap::new(),
+                next_id: 0,
                 errors: vec![],
             },
-            lambda: Lambda::new(Id(builtin_identifiers.len()), 0),
+            lambda: Lambda::new(hir::Id(builtin_identifiers.len()), 0),
             identifiers: builtin_identifiers,
         }
     }
 
-    fn push(&mut self, action: Expression) -> Id {
-        self.lambda.push(action)
-    }
-
     fn compile(&mut self, asts: Vec<Ast>) {
         if asts.is_empty() {
-            self.lambda.out = self.push(Expression::nothing());
+            self.lambda.out = self.push_without_ast_mapping(Expression::nothing());
         } else {
             for ast in asts.into_iter() {
                 self.lambda.out = self.compile_single(ast);
             }
         }
     }
-    fn compile_single(&mut self, ast: Ast) -> Id {
+    fn compile_single(&mut self, ast: Ast) -> hir::Id {
         match ast.kind {
-            AstKind::Int(Int(int)) => self.push(Expression::Int(int)),
-            AstKind::Text(Text(string)) => self.push(Expression::Text(string.value)),
-            AstKind::Symbol(Symbol(symbol)) => self.push(Expression::Symbol(symbol.value)),
+            AstKind::Int(Int(int)) => self.push(ast.id, Expression::Int(int)),
+            AstKind::Text(Text(string)) => self.push(ast.id, Expression::Text(string.value)),
+            AstKind::Symbol(Symbol(symbol)) => self.push(ast.id, Expression::Symbol(symbol.value)),
             AstKind::Lambda(ast::Lambda { parameters, body }) => {
                 let context = std::mem::take(&mut self.context);
                 let mut inner = Compiler {
@@ -95,14 +93,14 @@ impl Compiler {
                 };
                 for (index, parameter) in parameters.iter().enumerate() {
                     inner.lambda.identifiers.insert(
-                        Id(inner.lambda.first_id.0 + index),
+                        hir::Id(inner.lambda.first_id.0 + index),
                         parameter.value.to_owned(),
                     );
                 }
 
                 inner.compile(body);
                 self.context = inner.context;
-                self.push(Expression::Lambda(inner.lambda))
+                self.push(ast.id, Expression::Lambda(inner.lambda))
             }
             AstKind::Call(ast::Call { name, arguments }) => {
                 let argument_ids = arguments
@@ -116,13 +114,16 @@ impl Compiler {
                             message: format!("Unknown function: {}", *name),
                             span: self.ast_id_to_span(&name.id),
                         });
-                        return self.push(Expression::Error);
+                        return self.push(name.id, Expression::Error);
                     }
                 };
-                self.push(Expression::Call {
-                    function,
-                    arguments: argument_ids,
-                })
+                self.push(
+                    ast.id,
+                    Expression::Call {
+                        function,
+                        arguments: argument_ids,
+                    },
+                )
             }
             AstKind::Assignment(Assignment {
                 name,
@@ -143,16 +144,31 @@ impl Compiler {
                 }
                 inner.compile(body);
                 self.context = inner.context;
-                let id = self.push(Expression::Lambda(inner.lambda));
+                let id = self.push(ast.id, Expression::Lambda(inner.lambda));
                 self.identifiers.insert(name.value.clone(), id);
                 self.lambda.identifiers.insert(id, name.value);
                 id
             }
-            AstKind::Error => self.push(Expression::Error),
+            AstKind::Error => self.push(ast.id, Expression::Error),
         }
     }
 
-    fn ast_id_to_span(&self, id: &AstId) -> Range<usize> {
+    fn push(&mut self, ast_id: ast::Id, expression: Expression) -> hir::Id {
+        let hir_id = self.push_without_ast_mapping(expression);
+        self.context.id_mapping.insert(hir_id, ast_id);
+        hir_id
+    }
+    fn push_without_ast_mapping(&mut self, expression: Expression) -> hir::Id {
+        self.lambda.push(expression)
+    }
+    fn create_next_id(&mut self, ast_id: ast::Id) -> hir::Id {
+        let id = hir::Id(self.context.next_id);
+        assert!(matches!(self.context.id_mapping.insert(id, ast_id), None));
+        self.context.next_id += 1;
+        id
+    }
+
+    fn ast_id_to_span(&self, id: &ast::Id) -> Range<usize> {
         self.context
             .cst
             .find(self.context.ast_cst_id_mapping.get(id).unwrap())

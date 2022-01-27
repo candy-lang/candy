@@ -6,11 +6,11 @@ use std::{
 use itertools::Itertools;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
-pub struct CstId(pub usize);
+pub struct Id(pub usize);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Cst {
-    pub id: CstId,
+    pub id: Id,
     pub kind: CstKind,
 }
 
@@ -237,7 +237,7 @@ impl Cst {
         }
     }
 
-    pub fn find(&self, id: &CstId) -> Option<&Cst> {
+    pub fn find(&self, id: &Id) -> Option<&Cst> {
         if id == &self.id {
             return Some(self);
         };
@@ -286,10 +286,10 @@ impl Cst {
 }
 
 pub trait CstVecExtension {
-    fn find(&self, id: &CstId) -> Option<&Cst>;
+    fn find(&self, id: &Id) -> Option<&Cst>;
 }
 impl CstVecExtension for Vec<Cst> {
-    fn find(&self, id: &CstId) -> Option<&Cst> {
+    fn find(&self, id: &Id) -> Option<&Cst> {
         let child_index = self
             .binary_search_by_key(id, |it| it.id)
             .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })

@@ -48,7 +48,7 @@ fn fix_offsets_csts(next_id: &mut usize, csts: &mut Vec<Cst>) {
     }
 }
 fn fix_offsets_cst(next_id: &mut usize, cst: &mut Cst) {
-    cst.id = CstId(next_id.to_owned());
+    cst.id = Id(next_id.to_owned());
     *next_id += 1;
     match &mut cst.kind {
         CstKind::EqualsSign { offset } => *offset -= 1,
@@ -738,7 +738,7 @@ where
 }
 
 fn create_cst(kind: CstKind) -> Cst {
-    Cst { id: CstId(0), kind }
+    Cst { id: Id(0), kind }
 }
 
 proptest! {

@@ -1,8 +1,12 @@
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DocumentFilter, FoldingRange, FoldingRangeParams, InitializeParams,
-    InitializeResult, InitializedParams, MessageType, Registration, ServerCapabilities, ServerInfo,
+    InitializeResult, InitializedParams, MessageType, Registration, SemanticTokens,
+    SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
+    SemanticTokensRegistrationOptions, SemanticTokensResult, SemanticTokensServerCapabilities,
+    ServerCapabilities, ServerInfo, StaticRegistrationOptions,
     TextDocumentChangeRegistrationOptions, TextDocumentRegistrationOptions, Url,
+    WorkDoneProgressOptions,
 };
 use lspower::{jsonrpc, Client, LanguageServer};
 use tokio::{fs, sync::Mutex};
@@ -12,11 +16,13 @@ use crate::compiler::{
 };
 
 use self::{
-    folding_range::compute_folding_ranges, open_file_manager::OpenFileManager, utils::RangeToLsp,
+    folding_range::compute_folding_ranges, open_file_manager::OpenFileManager,
+    semantic_tokens::compute_semantic_tokens, utils::RangeToLsp,
 };
 
 mod folding_range;
 mod open_file_manager;
+mod semantic_tokens;
 mod utils;
 
 #[derive(Debug)]
@@ -91,7 +97,32 @@ impl LanguageServer for CandyLanguageServer {
                     id: "3".to_owned(),
                     method: "textDocument/foldingRange".to_owned(),
                     register_options: Some(
-                        serde_json::to_value(text_document_registration_options).unwrap(),
+                        serde_json::to_value(text_document_registration_options.clone()).unwrap(),
+                    ),
+                },
+                Registration {
+                    id: "4".to_owned(),
+                    method: "textDocument/semanticTokens".to_owned(),
+                    register_options: Some(
+                        serde_json::to_value(
+                            SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(
+                                SemanticTokensRegistrationOptions {
+                                    text_document_registration_options,
+                                    semantic_tokens_options: SemanticTokensOptions {
+                                        work_done_progress_options: WorkDoneProgressOptions {
+                                            work_done_progress: None,
+                                        },
+                                        legend: semantic_tokens::LEGEND.clone(),
+                                        range: Some(false),
+                                        full: Some(SemanticTokensFullOptions::Bool(true)),
+                                    },
+                                    static_registration_options: StaticRegistrationOptions {
+                                        id: None,
+                                    },
+                                },
+                            ),
+                        )
+                        .unwrap(),
                     ),
                 },
             ])
@@ -133,6 +164,17 @@ impl LanguageServer for CandyLanguageServer {
         let source = self.get_file_content(params.text_document.uri).await?;
         Ok(Some(compute_folding_ranges(&source)))
     }
+
+    async fn semantic_tokens_full(
+        &self,
+        params: SemanticTokensParams,
+    ) -> jsonrpc::Result<Option<SemanticTokensResult>> {
+        let source = self.get_file_content(params.text_document.uri).await?;
+        Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
+            result_id: None,
+            data: compute_semantic_tokens(&source),
+        })))
+    }
 }
 
 impl CandyLanguageServer {
@@ -145,8 +187,8 @@ impl CandyLanguageServer {
             }
         };
         let cst = source.parse_cst();
-        let (ast, ast_cst_id_mapping, ast_errors) = cst.clone().into_ast();
-        let (_, _, hir_errors) = ast.compile_to_hir(cst, ast_cst_id_mapping);
+        let (ast, ast_cst_id_mapping, ast_errors) = cst.clone().compile_into_ast();
+        let (_, _, hir_errors) = ast.compile_into_hir(cst, ast_cst_id_mapping);
 
         let diagnostics = ast_errors
             .into_iter()

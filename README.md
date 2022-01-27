@@ -160,9 +160,10 @@ Our TODO list:
   * [ ] selectionRange
   * [ ] prepareCallHierarchy
   * [ ] callHierarchy incoming, callHierarchy outgoing
-  * [ ] semantic tokens
+  * [x] semantic tokens
   * [ ] linkedEditingRange
   * [ ] moniker
+* [ ] incremental compilation
 * [ ] lists
 * [ ] maps
 * [ ] sets
