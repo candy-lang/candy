@@ -165,7 +165,7 @@ impl LoweringContext {
                     }),
                 )
             }
-            CstKind::Error { message, .. } => {
+            CstKind::Error { ref message, .. } => {
                 self.errors.push(CompilerError {
                     span: cst.span(),
                     message: message.to_owned(),

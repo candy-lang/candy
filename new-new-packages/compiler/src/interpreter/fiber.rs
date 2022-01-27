@@ -50,7 +50,7 @@ pub struct Lambda {
 
 impl Fiber {
     pub fn new(hir: hir::Lambda) -> Self {
-        assert_eq!(builtin_functions::VALUES.len(), hir.first_id);
+        assert_eq!(builtin_functions::VALUES.len(), hir.first_id.0);
         let environment = Environment::new(HashMap::new());
         Self {
             runner: LambdaRunner::new(
@@ -96,7 +96,9 @@ impl LambdaRunner {
     }
 
     fn current_id(&self) -> Id {
-        self.lambda.hir.first_id + self.lambda.hir.parameter_count + self.instruction_pointer
+        hir::Id(
+            self.lambda.hir.first_id.0 + self.lambda.hir.parameter_count + self.instruction_pointer,
+        )
     }
     pub fn run(&mut self) -> Result<Value, Value> {
         assert!(!self.lambda.hir.expressions.is_empty());
@@ -107,7 +109,7 @@ impl LambdaRunner {
             self.environment.store(self.current_id(), value);
             self.instruction_pointer += 1;
         }
-        Ok(self.environment.get(self.current_id() - 1))
+        Ok(self.environment.get(hir::Id(self.current_id().0 - 1)))
     }
     fn run_expression(&mut self, expression: Expression) -> Result<Value, Value> {
         match expression {
@@ -127,7 +129,7 @@ impl LambdaRunner {
                     .map(|it| self.environment.get(it))
                     .collect();
 
-                if let Some(builtin_function) = builtin_functions::VALUES.get(function) {
+                if let Some(builtin_function) = builtin_functions::VALUES.get(function.0) {
                     return builtin_function.call(arguments, |lambda, arguments| {
                         LambdaRunner::new(lambda, arguments).run()
                     });
@@ -154,6 +156,7 @@ impl LambdaRunner {
                 // log::trace!("Lambda returned {:?}", value);
                 value
             }
+            Expression::Error => panic!("We shouldn't evaluate code that has an error."),
         }
     }
 }
@@ -194,7 +197,7 @@ impl Environment {
         values
             .into_iter()
             .enumerate()
-            .map(|(index, it)| (first_id + index, it))
+            .map(|(index, it)| (hir::Id(first_id.0 + index), it))
             .collect()
     }
 }

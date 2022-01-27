@@ -7,7 +7,9 @@ use lsp_types::{
 use lspower::{jsonrpc, Client, LanguageServer};
 use tokio::{fs, sync::Mutex};
 
-use crate::compiler::{cst_to_ast::LowerCstToAst, string_to_cst::StringToCst};
+use crate::compiler::{
+    ast_to_hir::CompileVecAstsToHir, cst_to_ast::LowerCstToAst, string_to_cst::StringToCst,
+};
 
 use self::{
     folding_range::compute_folding_ranges, open_file_manager::OpenFileManager, utils::RangeToLsp,
@@ -142,10 +144,13 @@ impl CandyLanguageServer {
                 return;
             }
         };
-        let (_, _, errors) = source.parse_cst().into_ast();
+        let cst = source.parse_cst();
+        let (ast, ast_cst_id_mapping, ast_errors) = cst.clone().into_ast();
+        let (_, _, hir_errors) = ast.compile_to_hir(cst, ast_cst_id_mapping);
 
-        let diagnostics = errors
+        let diagnostics = ast_errors
             .into_iter()
+            .chain(hir_errors.into_iter())
             .map(|it| Diagnostic {
                 range: it.span.to_lsp(&source),
                 severity: Some(DiagnosticSeverity::ERROR),

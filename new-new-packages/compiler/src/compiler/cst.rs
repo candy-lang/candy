@@ -5,7 +5,7 @@ use std::{
 
 use itertools::Itertools;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct CstId(pub usize);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -237,6 +237,43 @@ impl Cst {
         }
     }
 
+    pub fn find(&self, id: &CstId) -> Option<&Cst> {
+        if id == &self.id {
+            return Some(self);
+        };
+
+        match &self.kind {
+            CstKind::EqualsSign { .. } => None,
+            CstKind::OpeningParenthesis { .. } => None,
+            CstKind::ClosingParenthesis { .. } => None,
+            CstKind::OpeningCurlyBrace { .. } => None,
+            CstKind::ClosingCurlyBrace { .. } => None,
+            CstKind::Arrow { .. } => None,
+            CstKind::Int { .. } => None,
+            CstKind::Text { .. } => None,
+            CstKind::Identifier { .. } => None,
+            CstKind::Symbol { .. } => None,
+            CstKind::LeadingWhitespace { child, .. } => child.find(id),
+            CstKind::LeadingComment { child, .. } => child.find(id),
+            CstKind::TrailingWhitespace { child, .. } => child.find(id),
+            CstKind::TrailingComment { child, .. } => child.find(id),
+            CstKind::Parenthesized { inner, .. } => inner.find(id),
+            CstKind::Lambda { body, .. } => body.find(id),
+            CstKind::Call { name, arguments } => name.find(id).or_else(|| arguments.find(id)),
+            CstKind::Assignment {
+                name,
+                parameters,
+                equals_sign,
+                body,
+            } => name
+                .find(id)
+                .or_else(|| parameters.find(id))
+                .or_else(|| equals_sign.find(id))
+                .or_else(|| body.find(id)),
+            CstKind::Error { .. } => None,
+        }
+    }
+
     pub fn unwrap_whitespace_and_comment(&self) -> &Self {
         match &self.kind {
             CstKind::LeadingWhitespace { child, .. } => child.unwrap_whitespace_and_comment(),
@@ -245,5 +282,18 @@ impl Cst {
             CstKind::TrailingComment { child, .. } => child.unwrap_whitespace_and_comment(),
             _ => self,
         }
+    }
+}
+
+pub trait CstVecExtension {
+    fn find(&self, id: &CstId) -> Option<&Cst>;
+}
+impl CstVecExtension for Vec<Cst> {
+    fn find(&self, id: &CstId) -> Option<&Cst> {
+        let child_index = self
+            .binary_search_by_key(id, |it| it.id)
+            .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
+            .ok()?;
+        self[child_index].find(id)
     }
 }

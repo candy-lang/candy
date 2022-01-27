@@ -64,7 +64,7 @@ fn run(options: CandyRunOptions) {
     }
 
     log::info!("Lowering CST to AST…");
-    let (asts, _, errors) = cst.into_ast();
+    let (asts, ast_cst_id_mapping, errors) = cst.clone().into_ast();
     if options.print_ast {
         log::info!("AST: {:#?}", asts);
     }
@@ -74,9 +74,13 @@ fn run(options: CandyRunOptions) {
     }
 
     log::info!("Compiling AST to HIR…");
-    let lambda = asts.compile_to_hir();
+    let (lambda, _, errors) = asts.compile_to_hir(cst, ast_cst_id_mapping);
     if options.print_hir {
         log::info!("HIR: {:#?}", lambda);
+    }
+    if !errors.is_empty() {
+        log::error!("Errors occurred while lowering AST to HIR:\n{:#?}", errors);
+        return;
     }
 
     if !options.no_run {
