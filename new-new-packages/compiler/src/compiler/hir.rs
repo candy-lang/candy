@@ -1,9 +1,15 @@
-use std::fmt;
+use std::fmt::{self, Display, Formatter};
 
 use im::HashMap;
 use itertools::Itertools;
 
-pub type Id = usize;
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub struct Id(pub usize);
+impl Display for Id {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "HirId({})", self.0)
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Expression {
@@ -12,13 +18,11 @@ pub enum Expression {
     Symbol(String),
     Lambda(Lambda),
     Call { function: Id, arguments: Vec<Id> },
+    Error,
 }
 impl Expression {
     pub fn nothing() -> Self {
         Expression::Symbol("Nothing".to_owned())
-    }
-    pub fn error() -> Self {
-        Expression::Symbol("Error".to_owned())
     }
 }
 
@@ -42,7 +46,7 @@ impl Lambda {
         }
     }
     pub fn next_id(&self) -> Id {
-        self.first_id + self.parameter_count + self.expressions.len()
+        Id(self.first_id.0 + self.parameter_count + self.expressions.len())
     }
     pub fn push(&mut self, expression: Expression) -> Id {
         let id = self.next_id();
@@ -51,7 +55,7 @@ impl Lambda {
     }
     pub fn get(&self, id: Id) -> Option<&Expression> {
         // TODO: use a different type when supporting more expressions than 2^127
-        let index = id as i128 - self.first_id as i128 - self.parameter_count as i128;
+        let index = id.0 as i128 - self.first_id.0 as i128 - self.parameter_count as i128;
         if index < 0 {
             None
         } else {
@@ -60,7 +64,7 @@ impl Lambda {
     }
     pub fn get_mut(&mut self, id: Id) -> Option<&mut Expression> {
         // TODO: use a different type when supporting more expressions than 2^127
-        let index = id as i128 - self.first_id as i128 - self.parameter_count as i128;
+        let index = id.0 as i128 - self.first_id.0 as i128 - self.parameter_count as i128;
         if index < 0 {
             None
         } else {
@@ -96,6 +100,7 @@ impl fmt::Display for Expression {
                     write!(f, "call {} with {}", function, arguments.iter().join(" "))
                 }
             }
+            Expression::Error => write!(f, "<error>"),
         }
     }
 }
@@ -103,7 +108,7 @@ impl fmt::Display for Lambda {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} parameters\n", self.parameter_count)?;
         for (index, action) in self.expressions.iter().enumerate() {
-            let id = self.first_id + self.parameter_count + index;
+            let id = self.first_id.0 + self.parameter_count + index;
             write!(f, "{} = {}\n", id, action)?;
         }
         write!(f, "out: {}\n", self.out)?;

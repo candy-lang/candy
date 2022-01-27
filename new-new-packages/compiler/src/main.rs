@@ -60,23 +60,27 @@ fn run(options: CandyRunOptions) {
     log::info!("Parsing string to CST…");
     let cst = test_code.parse_cst();
     if options.print_cst {
-        log::info!("CST: {:?}", cst);
+        log::info!("CST: {:#?}", cst);
     }
 
     log::info!("Lowering CST to AST…");
-    let (asts, errors) = cst.into_ast();
+    let (asts, ast_cst_id_mapping, errors) = cst.clone().into_ast();
     if options.print_ast {
-        log::info!("AST: {:?}", asts);
+        log::info!("AST: {:#?}", asts);
     }
     if !errors.is_empty() {
-        log::error!("Errors occurred while lowering CST to AST:\n{:?}", errors);
+        log::error!("Errors occurred while lowering CST to AST:\n{:#?}", errors);
         return;
     }
 
     log::info!("Compiling AST to HIR…");
-    let lambda = asts.compile_to_hir();
+    let (lambda, _, errors) = asts.compile_to_hir(cst, ast_cst_id_mapping);
     if options.print_hir {
-        log::info!("HIR: {:?}", lambda);
+        log::info!("HIR: {:#?}", lambda);
+    }
+    if !errors.is_empty() {
+        log::error!("Errors occurred while lowering AST to HIR:\n{:#?}", errors);
+        return;
     }
 
     if !options.no_run {
@@ -85,8 +89,8 @@ fn run(options: CandyRunOptions) {
         fiber.run();
         match fiber.status() {
             FiberStatus::Running => log::info!("Fiber is still running."),
-            FiberStatus::Done(value) => log::info!("Fiber is done: {:?}", value),
-            FiberStatus::Panicked(value) => log::error!("Fiber panicked: {:?}", value),
+            FiberStatus::Done(value) => log::info!("Fiber is done: {:#?}", value),
+            FiberStatus::Panicked(value) => log::error!("Fiber panicked: {:#?}", value),
         }
     }
 }

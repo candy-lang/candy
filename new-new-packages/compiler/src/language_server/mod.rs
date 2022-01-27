@@ -1,13 +1,19 @@
 use lsp_types::{
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentFilter, FoldingRange, FoldingRangeParams, InitializeParams, InitializeResult,
-    InitializedParams, MessageType, Registration, ServerCapabilities, ServerInfo,
+    Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DocumentFilter, FoldingRange, FoldingRangeParams, InitializeParams,
+    InitializeResult, InitializedParams, MessageType, Registration, ServerCapabilities, ServerInfo,
     TextDocumentChangeRegistrationOptions, TextDocumentRegistrationOptions, Url,
 };
 use lspower::{jsonrpc, Client, LanguageServer};
-use tokio::{fs, io, sync::Mutex};
+use tokio::{fs, sync::Mutex};
 
-use self::{folding_range::compute_folding_ranges, open_file_manager::OpenFileManager};
+use crate::compiler::{
+    ast_to_hir::CompileVecAstsToHir, cst_to_ast::LowerCstToAst, string_to_cst::StringToCst,
+};
+
+use self::{
+    folding_range::compute_folding_ranges, open_file_manager::OpenFileManager, utils::RangeToLsp,
+};
 
 mod folding_range;
 mod open_file_manager;
@@ -101,10 +107,20 @@ impl LanguageServer for CandyLanguageServer {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        self.open_file_manager.lock().await.did_open(params).await;
+        self.open_file_manager
+            .lock()
+            .await
+            .did_open(params.clone())
+            .await;
+        self.analyze_file(params.text_document.uri).await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        self.open_file_manager.lock().await.did_change(params).await;
+        self.open_file_manager
+            .lock()
+            .await
+            .did_change(params.clone())
+            .await;
+        self.analyze_file(params.text_document.uri).await;
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         self.open_file_manager.lock().await.did_close(params).await;
@@ -120,6 +136,37 @@ impl LanguageServer for CandyLanguageServer {
 }
 
 impl CandyLanguageServer {
+    async fn analyze_file(&self, uri: Url) {
+        let source = match self.get_file_content(uri.clone()).await {
+            Ok(source) => source,
+            Err(error) => {
+                log::error!("{:?}", error);
+                return;
+            }
+        };
+        let cst = source.parse_cst();
+        let (ast, ast_cst_id_mapping, ast_errors) = cst.clone().into_ast();
+        let (_, _, hir_errors) = ast.compile_to_hir(cst, ast_cst_id_mapping);
+
+        let diagnostics = ast_errors
+            .into_iter()
+            .chain(hir_errors.into_iter())
+            .map(|it| Diagnostic {
+                range: it.span.to_lsp(&source),
+                severity: Some(DiagnosticSeverity::ERROR),
+                code: None,
+                code_description: None,
+                source: Some("🍭 Candy".to_owned()),
+                message: it.message,
+                related_information: None,
+                tags: None,
+                data: None,
+            })
+            .collect();
+        self.client
+            .publish_diagnostics(uri, diagnostics, None)
+            .await;
+    }
     async fn get_file_content(&self, uri: Url) -> jsonrpc::Result<String> {
         match self.open_file_manager.lock().await.get(&uri) {
             Some(text) => Ok(text.to_owned()),
