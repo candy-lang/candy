@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::input::{Input, InputReference};
 
 use super::{cst::*, error::CompilerError};
@@ -17,17 +19,20 @@ type ParserResult<'a, T> = IResult<&'a str, T, ErrorTree<&'a str>>;
 
 #[salsa::query_group(StringToCstStorage)]
 pub trait StringToCst: Input {
-    fn cst(&self, input_reference: InputReference) -> Option<Vec<Cst>>;
-    fn cst_raw(&self, input_reference: InputReference) -> Option<(Vec<Cst>, Vec<CompilerError>)>;
+    fn cst(&self, input_reference: InputReference) -> Option<Arc<Vec<Cst>>>;
+    fn cst_raw(
+        &self,
+        input_reference: InputReference,
+    ) -> Option<(Arc<Vec<Cst>>, Vec<CompilerError>)>;
 }
 
-fn cst(db: &dyn StringToCst, input_reference: InputReference) -> Option<Vec<Cst>> {
+fn cst(db: &dyn StringToCst, input_reference: InputReference) -> Option<Arc<Vec<Cst>>> {
     db.cst_raw(input_reference).map(|(cst, _)| cst)
 }
 fn cst_raw(
     db: &dyn StringToCst,
     input_reference: InputReference,
-) -> Option<(Vec<Cst>, Vec<CompilerError>)> {
+) -> Option<(Arc<Vec<Cst>>, Vec<CompilerError>)> {
     let raw_source = db.get_input(input_reference)?;
 
     // TODO: handle trailing whitespace and comments properly
@@ -42,10 +47,10 @@ fn cst_raw(
             // TODO: remove the leading newline we inserted above
             fix_offsets_csts(&mut 0, &mut csts);
             let errors = extract_errors_csts(&csts);
-            (csts, errors)
+            (Arc::new(csts), errors)
         }
         Err(err) => (
-            vec![],
+            Arc::new(vec![]),
             vec![CompilerError {
                 span: 0..raw_source.len(),
                 message: format!("An error occurred while parsing: {:?}", err),

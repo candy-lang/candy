@@ -18,7 +18,7 @@ pub trait FoldingRangeDb: StringToCst {
 fn folding_ranges(db: &dyn FoldingRangeDb, input_reference: InputReference) -> Vec<FoldingRange> {
     let source = db.get_input(input_reference.clone()).unwrap();
     let mut context = Context::new(&source);
-    context.visit_csts(db.cst(input_reference).unwrap());
+    context.visit_csts(&db.cst(input_reference).unwrap());
     context.ranges
 }
 
@@ -34,13 +34,13 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn visit_csts(&mut self, csts: Vec<Cst>) {
+    fn visit_csts(&mut self, csts: &[Cst]) {
         for cst in csts {
             self.visit_cst(cst);
         }
     }
-    fn visit_cst(&mut self, cst: Cst) {
-        match cst.kind {
+    fn visit_cst(&mut self, cst: &Cst) {
+        match &cst.kind {
             CstKind::EqualsSign { .. } => {}
             CstKind::OpeningParenthesis { .. } => {}
             CstKind::ClosingParenthesis { .. } => {}
@@ -51,12 +51,12 @@ impl<'a> Context<'a> {
             CstKind::Text { .. } => {}
             CstKind::Identifier { .. } => {}
             CstKind::Symbol { .. } => {}
-            CstKind::LeadingWhitespace { child, .. } => self.visit_cst(*child),
+            CstKind::LeadingWhitespace { child, .. } => self.visit_cst(child),
             // TODO: support folding ranges for comments
-            CstKind::LeadingComment { child, .. } => self.visit_cst(*child),
-            CstKind::TrailingWhitespace { child, .. } => self.visit_cst(*child),
-            CstKind::TrailingComment { child, .. } => self.visit_cst(*child),
-            CstKind::Parenthesized { inner, .. } => self.visit_cst(*inner),
+            CstKind::LeadingComment { child, .. } => self.visit_cst(child),
+            CstKind::TrailingWhitespace { child, .. } => self.visit_cst(child),
+            CstKind::TrailingComment { child, .. } => self.visit_cst(child),
+            CstKind::Parenthesized { inner, .. } => self.visit_cst(inner),
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -81,9 +81,9 @@ impl<'a> Context<'a> {
                     FoldingRangeKind::Region,
                 );
                 if let Some((parameters, _)) = parameters_and_arrow {
-                    self.visit_csts(parameters);
+                    self.visit_csts(&parameters);
                 }
-                self.visit_csts(body);
+                self.visit_csts(&body);
             }
             CstKind::Call { name, arguments } => {
                 if !arguments.is_empty() {
@@ -99,8 +99,8 @@ impl<'a> Context<'a> {
                     );
                 }
 
-                self.visit_cst(*name);
-                self.visit_csts(arguments);
+                self.visit_cst(name);
+                self.visit_csts(&arguments);
             }
             CstKind::Assignment {
                 name,
@@ -121,9 +121,9 @@ impl<'a> Context<'a> {
                     );
                 }
 
-                self.visit_cst(*name);
-                self.visit_csts(parameters);
-                self.visit_csts(body);
+                self.visit_cst(name);
+                self.visit_csts(&parameters);
+                self.visit_csts(&body);
             }
             CstKind::Error { .. } => {}
         }

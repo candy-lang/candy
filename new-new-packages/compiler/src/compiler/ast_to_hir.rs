@@ -46,7 +46,7 @@ fn hir_raw(
             (string, hir::Id(index))
         })
         .collect::<HashMap<_, _>>();
-    let mut compiler = Compiler::new(cst, ast_cst_id_mapping, builtin_identifiers);
+    let mut compiler = Compiler::new(&cst, ast_cst_id_mapping, builtin_identifiers);
     compiler.compile(&ast);
     Some((
         Arc::new(compiler.lambda),
@@ -56,25 +56,25 @@ fn hir_raw(
 }
 
 #[derive(Default)]
-struct CompilerContext {
-    cst: Vec<Cst>,
+struct Context<'a> {
+    cst: &'a [Cst],
     ast_cst_id_mapping: HashMap<ast::Id, cst::Id>,
     id_mapping: HashMap<hir::Id, ast::Id>,
     errors: Vec<CompilerError>,
 }
-struct Compiler {
-    context: CompilerContext,
+struct Compiler<'a> {
+    context: Context<'a>,
     lambda: Lambda,
     identifiers: HashMap<String, hir::Id>,
 }
-impl Compiler {
+impl<'a> Compiler<'a> {
     fn new(
-        cst: Vec<Cst>,
+        cst: &'a [Cst],
         ast_cst_id_mapping: HashMap<ast::Id, cst::Id>,
         builtin_identifiers: HashMap<String, hir::Id>,
     ) -> Self {
         Compiler {
-            context: CompilerContext {
+            context: Context {
                 cst,
                 ast_cst_id_mapping,
                 id_mapping: HashMap::new(),
@@ -117,7 +117,7 @@ impl Compiler {
                     );
                 }
 
-                inner.compile(&body[..]);
+                inner.compile(&body);
                 self.context = inner.context;
                 self.push(ast.id, Expression::Lambda(inner.lambda))
             }
@@ -161,7 +161,7 @@ impl Compiler {
                         hir::Id(inner.lambda.first_id.0 + index),
                     );
                 }
-                inner.compile(&body[..]);
+                inner.compile(&body);
                 self.context = inner.context;
                 let id = self.push(ast.id, Expression::Lambda(inner.lambda));
                 self.identifiers.insert(name.value.clone(), id);

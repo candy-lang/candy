@@ -33,7 +33,7 @@ fn ast_raw(
 ) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>, Vec<CompilerError>)> {
     let cst = db.cst(input_reference)?;
     let mut context = LoweringContext::new();
-    let asts = (&mut context).lower_csts(cst);
+    let asts = (&mut context).lower_csts(&cst);
     Some((Arc::new(asts), context.id_mapping, context.errors))
 }
 
@@ -50,33 +50,35 @@ impl LoweringContext {
             errors: vec![],
         }
     }
-    fn lower_csts(&mut self, csts: Vec<Cst>) -> Vec<Ast> {
-        csts.into_iter().map(|it| self.lower_cst(it)).collect()
+    fn lower_csts(&mut self, csts: &[Cst]) -> Vec<Ast> {
+        csts.iter().map(|it| self.lower_cst(it)).collect()
     }
-    fn lower_cst(&mut self, cst: Cst) -> Ast {
-        match cst.kind {
+    fn lower_cst(&mut self, cst: &Cst) -> Ast {
+        match &cst.kind {
             CstKind::EqualsSign { .. } => self.create_ast(cst.id, AstKind::Error),
             CstKind::OpeningParenthesis { .. } => self.create_ast(cst.id, AstKind::Error),
             CstKind::ClosingParenthesis { .. } => self.create_ast(cst.id, AstKind::Error),
             CstKind::OpeningCurlyBrace { .. } => self.create_ast(cst.id, AstKind::Error),
             CstKind::ClosingCurlyBrace { .. } => self.create_ast(cst.id, AstKind::Error),
             CstKind::Arrow { .. } => self.create_ast(cst.id, AstKind::Error),
-            CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(value))),
+            CstKind::Int { value, .. } => {
+                self.create_ast(cst.id, AstKind::Int(Int(value.to_owned())))
+            }
             CstKind::Text { value, .. } => {
-                let string = self.create_string(cst.id, value);
+                let string = self.create_string(cst.id, value.to_owned());
                 self.create_ast(cst.id, AstKind::Text(Text(string)))
             }
             CstKind::Identifier { .. } => {
                 panic!("Tried to lower an identifier from CST to AST.")
             }
             CstKind::Symbol { value, .. } => {
-                let string = self.create_string(cst.id, value);
+                let string = self.create_string(cst.id, value.to_owned());
                 self.create_ast(cst.id, AstKind::Symbol(Symbol(string)))
             }
-            CstKind::LeadingWhitespace { child, .. } => self.lower_cst(*child),
-            CstKind::LeadingComment { child, .. } => self.lower_cst(*child),
-            CstKind::TrailingWhitespace { child, .. } => self.lower_cst(*child),
-            CstKind::TrailingComment { child, .. } => self.lower_cst(*child),
+            CstKind::LeadingWhitespace { child, .. } => self.lower_cst(child),
+            CstKind::LeadingComment { child, .. } => self.lower_cst(child),
+            CstKind::TrailingWhitespace { child, .. } => self.lower_cst(child),
+            CstKind::TrailingComment { child, .. } => self.lower_cst(child),
             CstKind::Parenthesized {
                 opening_parenthesis,
                 inner,
@@ -95,7 +97,7 @@ impl LoweringContext {
                 "Expected a closing parenthesis to end a parenthesized expression, but found `{}`.",
                 *closing_parenthesis
             );
-                self.lower_cst(*inner)
+                self.lower_cst(inner)
             }
             CstKind::Lambda {
                 opening_curly_brace,
@@ -165,7 +167,7 @@ impl LoweringContext {
                 equals_sign,
                 body,
             } => {
-                let name = self.lower_identifier(*name);
+                let name = self.lower_identifier(name);
 
                 let parameters = self.lower_parameters(parameters);
                 assert!(
@@ -197,16 +199,16 @@ impl LoweringContext {
         }
     }
 
-    fn lower_parameters(&mut self, csts: Vec<Cst>) -> Vec<AstString> {
+    fn lower_parameters(&mut self, csts: &[Cst]) -> Vec<AstString> {
         csts.into_iter()
             .filter_map(|it| self.lower_parameter(it))
             .collect()
     }
-    fn lower_parameter(&mut self, cst: Cst) -> Option<AstString> {
+    fn lower_parameter(&mut self, cst: &Cst) -> Option<AstString> {
         let cst = cst.unwrap_whitespace_and_comment();
-        match cst.kind.clone() {
+        match &cst.kind {
             CstKind::Call { name, arguments } => {
-                let name = self.lower_identifier(*name);
+                let name = self.lower_identifier(name);
 
                 if !arguments.is_empty() {
                     self.errors.push(CompilerError {
@@ -225,7 +227,7 @@ impl LoweringContext {
             }
         }
     }
-    fn lower_identifier(&mut self, cst: Cst) -> AstString {
+    fn lower_identifier(&mut self, cst: &Cst) -> AstString {
         let cst = cst.unwrap_whitespace_and_comment();
         match cst {
             Cst {

@@ -288,12 +288,16 @@ impl Cst {
 pub trait CstVecExtension {
     fn find(&self, id: &Id) -> Option<&Cst>;
 }
-impl CstVecExtension for Vec<Cst> {
+impl<T> CstVecExtension for T
+where
+    T: AsRef<[Cst]>,
+{
     fn find(&self, id: &Id) -> Option<&Cst> {
-        let child_index = self
+        let slice = self.as_ref();
+        let child_index = slice
             .binary_search_by_key(id, |it| it.id)
             .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
             .ok()?;
-        self[child_index].find(id)
+        slice[child_index].find(id)
     }
 }
