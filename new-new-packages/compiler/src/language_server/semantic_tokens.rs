@@ -8,12 +8,28 @@ use crate::{
         cst::{Cst, CstKind},
         string_to_cst::StringToCst,
     },
+    input::InputReference,
     language_server::utils::Utf8ByteOffsetToLsp,
 };
 use lazy_static::lazy_static;
 use lsp_types;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
+
+#[salsa::query_group(SemanticTokenDbStorage)]
+pub trait SemanticTokenDb: StringToCst {
+    fn semantic_tokens(&self, input_reference: InputReference) -> Vec<SemanticToken>;
+}
+
+fn semantic_tokens(
+    db: &dyn SemanticTokenDb,
+    input_reference: InputReference,
+) -> Vec<SemanticToken> {
+    let source = db.get_input(input_reference.clone()).unwrap();
+    let mut context = Context::new(&source);
+    context.visit_csts(&db.cst(input_reference).unwrap(), None);
+    context.tokens
+}
 
 lazy_static! {
     pub static ref LEGEND: SemanticTokensLegend = SemanticTokensLegend {
@@ -56,13 +72,6 @@ impl SemanticTokenType {
             SemanticTokenType::Operator => lsp_types::SemanticTokenType::OPERATOR,
         }
     }
-}
-
-pub fn compute_semantic_tokens(source: &str) -> Vec<SemanticToken> {
-    let cst = source.parse_cst();
-    let mut context = Context::new(source);
-    context.visit_csts(&cst, None);
-    context.tokens
 }
 
 struct Context<'a> {

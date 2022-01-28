@@ -1,18 +1,40 @@
+use std::sync::Arc;
+
 use im::HashMap;
 
 use super::ast::{self, Ast, AstKind, AstString, Int, Lambda, Symbol, Text};
 use super::cst::{self, Cst, CstKind};
 use super::error::CompilerError;
+use super::string_to_cst::StringToCst;
+use crate::input::InputReference;
 
-pub trait LowerCstToAst {
-    fn compile_into_ast(self) -> (Vec<Ast>, HashMap<ast::Id, cst::Id>, Vec<CompilerError>);
+#[salsa::query_group(CstToAstStorage)]
+pub trait CstToAst: StringToCst {
+    fn ast(
+        &self,
+        input_reference: InputReference,
+    ) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)>;
+    fn ast_raw(
+        &self,
+        input_reference: InputReference,
+    ) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>, Vec<CompilerError>)>;
 }
-impl LowerCstToAst for Vec<Cst> {
-    fn compile_into_ast(self) -> (Vec<Ast>, HashMap<ast::Id, cst::Id>, Vec<CompilerError>) {
-        let mut context = LoweringContext::new();
-        let asts = (&mut context).lower_csts(self);
-        (asts, context.id_mapping, context.errors)
-    }
+
+fn ast(
+    db: &dyn CstToAst,
+    input_reference: InputReference,
+) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)> {
+    db.ast_raw(input_reference)
+        .map(|(ast, id_mapping, _)| (ast, id_mapping))
+}
+fn ast_raw(
+    db: &dyn CstToAst,
+    input_reference: InputReference,
+) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>, Vec<CompilerError>)> {
+    let cst = db.cst(input_reference)?;
+    let mut context = LoweringContext::new();
+    let asts = (&mut context).lower_csts(cst);
+    Some((Arc::new(asts), context.id_mapping, context.errors))
 }
 
 struct LoweringContext {

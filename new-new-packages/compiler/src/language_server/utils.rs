@@ -1,6 +1,45 @@
 use std::ops::Range;
 
-use lsp_types::Position;
+use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
+
+use crate::{compiler::error::CompilerError, input::InputReference};
+
+impl CompilerError {
+    pub fn to_diagnostic(self, source: &str) -> Diagnostic {
+        Diagnostic {
+            range: self.span.to_lsp(&source),
+            severity: Some(DiagnosticSeverity::ERROR),
+            code: None,
+            code_description: None,
+            source: Some("🍭 Candy".to_owned()),
+            message: self.message,
+            related_information: None,
+            tags: None,
+            data: None,
+        }
+    }
+}
+
+impl From<Url> for InputReference {
+    fn from(uri: Url) -> InputReference {
+        match uri.scheme() {
+            "file" => InputReference::File(uri.to_file_path().unwrap()),
+            "untitled" => InputReference::Untitled(uri.to_string()["untitled:".len()..].to_owned()),
+            _ => panic!("Unsupported URI scheme: {}", uri.scheme()),
+        }
+    }
+}
+
+impl From<InputReference> for Url {
+    fn from(input_reference: InputReference) -> Url {
+        match input_reference {
+            InputReference::File(path) => Url::from_file_path(path).unwrap(),
+            InputReference::Untitled(id) => Url::parse(&format!("untitled:{}", id)).unwrap(),
+        }
+    }
+}
+
+// UTF-8 Byte Offset ↔ LSP Position/Range
 
 pub trait RangeToUtf8ByteOffset {
     fn to_utf8_byte_offset(&self, text: &str) -> Range<usize>;

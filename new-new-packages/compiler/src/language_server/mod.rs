@@ -1,40 +1,38 @@
 use lsp_types::{
-    Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DocumentFilter, FoldingRange, FoldingRangeParams, InitializeParams,
-    InitializeResult, InitializedParams, MessageType, Registration, SemanticTokens,
-    SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
-    SemanticTokensRegistrationOptions, SemanticTokensResult, SemanticTokensServerCapabilities,
-    ServerCapabilities, ServerInfo, StaticRegistrationOptions,
-    TextDocumentChangeRegistrationOptions, TextDocumentRegistrationOptions, Url,
-    WorkDoneProgressOptions,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DocumentFilter, FoldingRange, FoldingRangeParams, InitializeParams, InitializeResult,
+    InitializedParams, MessageType, Registration, SemanticTokens, SemanticTokensFullOptions,
+    SemanticTokensOptions, SemanticTokensParams, SemanticTokensRegistrationOptions,
+    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
+    StaticRegistrationOptions, TextDocumentChangeRegistrationOptions,
+    TextDocumentContentChangeEvent, TextDocumentRegistrationOptions, WorkDoneProgressOptions,
 };
 use lspower::{jsonrpc, Client, LanguageServer};
-use tokio::{fs, sync::Mutex};
+use tokio::sync::Mutex;
 
-use crate::compiler::{
-    ast_to_hir::CompileVecAstsToHir, cst_to_ast::LowerCstToAst, string_to_cst::StringToCst,
+use crate::{
+    compiler::{ast_to_hir::AstToHir, cst_to_ast::CstToAst, string_to_cst::StringToCst},
+    input::{Input, InputReference},
+    Database,
 };
 
 use self::{
-    folding_range::compute_folding_ranges, open_file_manager::OpenFileManager,
-    semantic_tokens::compute_semantic_tokens, utils::RangeToLsp,
+    folding_range::FoldingRangeDb, semantic_tokens::SemanticTokenDb, utils::RangeToUtf8ByteOffset,
 };
 
-mod folding_range;
-mod open_file_manager;
-mod semantic_tokens;
+pub mod folding_range;
+pub mod semantic_tokens;
 mod utils;
 
-#[derive(Debug)]
 pub struct CandyLanguageServer {
     pub client: Client,
-    pub open_file_manager: Mutex<OpenFileManager>,
+    pub db: Mutex<Database>,
 }
 impl CandyLanguageServer {
     pub fn from_client(client: Client) -> Self {
         Self {
             client,
-            open_file_manager: Mutex::new(OpenFileManager::new()),
+            db: Mutex::new(Database::default()),
         }
     }
 }
@@ -138,90 +136,93 @@ impl LanguageServer for CandyLanguageServer {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        self.open_file_manager
+        let input_reference = params.text_document.uri.into();
+        self.db
             .lock()
             .await
-            .did_open(params.clone())
-            .await;
-        self.analyze_file(params.text_document.uri).await;
+            .did_open_input(&input_reference, params.text_document.text);
+        self.analyze_file(input_reference).await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        self.open_file_manager
+        let input_reference = params.text_document.uri.into();
+        let changes = params.content_changes;
+        self.db
             .lock()
             .await
-            .did_change(params.clone())
-            .await;
-        self.analyze_file(params.text_document.uri).await;
+            .did_change_input(&input_reference, move |text| {
+                *text = apply_text_changes(text.to_owned(), changes);
+            });
+        self.analyze_file(input_reference).await;
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
-        self.open_file_manager.lock().await.did_close(params).await;
+        let input_reference = params.text_document.uri.into();
+        self.db.lock().await.did_close_input(&input_reference);
     }
 
     async fn folding_range(
         &self,
         params: FoldingRangeParams,
     ) -> jsonrpc::Result<Option<Vec<FoldingRange>>> {
-        let source = self.get_file_content(params.text_document.uri).await?;
-        Ok(Some(compute_folding_ranges(&source)))
+        let ranges = self
+            .db
+            .lock()
+            .await
+            .folding_ranges(params.text_document.uri.into());
+        Ok(Some(ranges))
     }
 
     async fn semantic_tokens_full(
         &self,
         params: SemanticTokensParams,
     ) -> jsonrpc::Result<Option<SemanticTokensResult>> {
-        let source = self.get_file_content(params.text_document.uri).await?;
+        let tokens = self
+            .db
+            .lock()
+            .await
+            .semantic_tokens(params.text_document.uri.into());
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
-            data: compute_semantic_tokens(&source),
+            data: tokens,
         })))
     }
 }
 
 impl CandyLanguageServer {
-    async fn analyze_file(&self, uri: Url) {
-        let source = match self.get_file_content(uri.clone()).await {
-            Ok(source) => source,
-            Err(error) => {
-                log::error!("{:?}", error);
-                return;
-            }
-        };
-        let cst = source.parse_cst();
-        let (ast, ast_cst_id_mapping, ast_errors) = cst.clone().compile_into_ast();
-        let (_, _, hir_errors) = ast.compile_into_hir(cst, ast_cst_id_mapping);
+    async fn analyze_file(&self, input_reference: InputReference) {
+        let db = self.db.lock().await;
 
-        let diagnostics = ast_errors
+        let source = db.get_input(input_reference.clone()).unwrap();
+        let (_, cst_errors) = db.cst_raw(input_reference.clone()).unwrap();
+        let (_, _, ast_errors) = db.ast_raw(input_reference.clone()).unwrap();
+        let (_, _, hir_errors) = db.hir_raw(input_reference.clone()).unwrap();
+
+        let diagnostics = cst_errors
             .into_iter()
+            .chain(ast_errors.into_iter())
             .chain(hir_errors.into_iter())
-            .map(|it| Diagnostic {
-                range: it.span.to_lsp(&source),
-                severity: Some(DiagnosticSeverity::ERROR),
-                code: None,
-                code_description: None,
-                source: Some("🍭 Candy".to_owned()),
-                message: it.message,
-                related_information: None,
-                tags: None,
-                data: None,
-            })
+            .map(|it| it.to_diagnostic(&source))
             .collect();
         self.client
-            .publish_diagnostics(uri, diagnostics, None)
+            .publish_diagnostics(input_reference.into(), diagnostics, None)
             .await;
     }
-    async fn get_file_content(&self, uri: Url) -> jsonrpc::Result<String> {
-        match self.open_file_manager.lock().await.get(&uri) {
-            Some(text) => Ok(text.to_owned()),
-            None => {
-                let file_path = uri.to_file_path().unwrap();
-                fs::read_to_string(&file_path)
-                    .await
-                    .map_err(|it| jsonrpc::Error {
-                        code: jsonrpc::ErrorCode::InternalError,
-                        message: it.to_string(),
-                        data: None,
-                    })
+}
+
+fn apply_text_changes(text: String, changes: Vec<TextDocumentContentChangeEvent>) -> String {
+    let mut text = text;
+    for change in changes {
+        match change.range {
+            Some(range) => {
+                let range = range.to_utf8_byte_offset(&text);
+                text = format!(
+                    "{}{}{}",
+                    &text[..range.start],
+                    &change.text,
+                    &text[range.end..]
+                );
             }
+            None => text = change.text,
         }
     }
+    text
 }

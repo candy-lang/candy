@@ -1,4 +1,6 @@
-use super::cst::*;
+use crate::input::{Input, InputReference};
+
+use super::{cst::*, error::CompilerError};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while, take_while_m_n},
@@ -13,31 +15,43 @@ use proptest::prelude::*;
 
 type ParserResult<'a, T> = IResult<&'a str, T, ErrorTree<&'a str>>;
 
-pub trait StringToCst {
-    fn parse_cst(&self) -> Vec<Cst>;
+#[salsa::query_group(StringToCstStorage)]
+pub trait StringToCst: Input {
+    fn cst(&self, input_reference: InputReference) -> Option<Vec<Cst>>;
+    fn cst_raw(&self, input_reference: InputReference) -> Option<(Vec<Cst>, Vec<CompilerError>)>;
 }
-impl StringToCst for str {
-    fn parse_cst(&self) -> Vec<Cst> {
-        // TODO: handle trailing whitespace and comments properly
-        let source = format!("\n{}", self);
-        let parser = map(
-            tuple((|input| expressions0(&source, input, 0), many0(line_ending))),
-            |(csts, _)| csts,
-        );
-        let result: Result<_, ErrorTree<&str>> = final_parser(parser)(&source);
-        match result {
-            Ok(mut csts) => {
-                // TODO: remove the leading newline we inserted above
-                fix_offsets_csts(&mut 0, &mut csts);
-                csts
-            }
-            Err(err) => vec![create_cst(CstKind::Error {
-                offset: 0,
-                unparsable_input: self.to_owned(),
-                message: format!("An error occurred while parsing: {:?}", err),
-            })],
+
+fn cst(db: &dyn StringToCst, input_reference: InputReference) -> Option<Vec<Cst>> {
+    db.cst_raw(input_reference).map(|(cst, _)| cst)
+}
+fn cst_raw(
+    db: &dyn StringToCst,
+    input_reference: InputReference,
+) -> Option<(Vec<Cst>, Vec<CompilerError>)> {
+    let raw_source = db.get_input(input_reference)?;
+
+    // TODO: handle trailing whitespace and comments properly
+    let source = format!("\n{}", raw_source);
+    let parser = map(
+        tuple((|input| expressions0(&source, input, 0), many0(line_ending))),
+        |(csts, _)| csts,
+    );
+    let result: Result<_, ErrorTree<&str>> = final_parser(parser)(&source);
+    Some(match result {
+        Ok(mut csts) => {
+            // TODO: remove the leading newline we inserted above
+            fix_offsets_csts(&mut 0, &mut csts);
+            let errors = extract_errors_csts(&csts);
+            (csts, errors)
         }
-    }
+        Err(err) => (
+            vec![],
+            vec![CompilerError {
+                span: 0..raw_source.len(),
+                message: format!("An error occurred while parsing: {:?}", err),
+            }],
+        ),
+    })
 }
 
 /// Because we don't parse the input directly, but prepend a newline to it, we
@@ -108,6 +122,83 @@ fn fix_offsets_cst(next_id: &mut usize, cst: &mut Cst) {
         }
         CstKind::Error { offset, .. } => *offset -= 1,
     };
+}
+
+fn extract_errors_csts(csts: &[Cst]) -> Vec<CompilerError> {
+    csts.iter()
+        .flat_map(|cst| extract_errors_cst(cst))
+        .collect()
+}
+fn extract_errors_cst(cst: &Cst) -> Vec<CompilerError> {
+    match &cst.kind {
+        CstKind::EqualsSign { .. } => vec![],
+        CstKind::OpeningParenthesis { .. } => vec![],
+        CstKind::ClosingParenthesis { .. } => vec![],
+        CstKind::OpeningCurlyBrace { .. } => vec![],
+        CstKind::ClosingCurlyBrace { .. } => vec![],
+        CstKind::Arrow { .. } => vec![],
+        CstKind::Int { .. } => vec![],
+        CstKind::Text { .. } => vec![],
+        CstKind::Identifier { .. } => vec![],
+        CstKind::Symbol { .. } => vec![],
+        CstKind::LeadingWhitespace { child, .. } => extract_errors_cst(child),
+        CstKind::LeadingComment { child, .. } => extract_errors_cst(child),
+        CstKind::TrailingWhitespace { child, .. } => extract_errors_cst(child),
+        CstKind::TrailingComment { child, .. } => extract_errors_cst(child),
+        CstKind::Parenthesized {
+            opening_parenthesis,
+            inner,
+            closing_parenthesis,
+        } => {
+            let mut errors = vec![];
+            errors.append(&mut extract_errors_cst(opening_parenthesis));
+            errors.append(&mut extract_errors_cst(inner));
+            errors.append(&mut extract_errors_cst(closing_parenthesis));
+            errors
+        }
+        CstKind::Lambda {
+            opening_curly_brace,
+            parameters_and_arrow,
+            body,
+            closing_curly_brace,
+        } => {
+            let mut errors = vec![];
+            errors.append(&mut extract_errors_cst(opening_curly_brace));
+            match parameters_and_arrow {
+                Some((arguments, arrow)) => {
+                    errors.append(&mut extract_errors_csts(arguments));
+                    errors.append(&mut extract_errors_cst(arrow));
+                }
+                None => {}
+            };
+            errors.append(&mut extract_errors_csts(body));
+            errors.append(&mut extract_errors_cst(closing_curly_brace));
+            errors
+        }
+        CstKind::Call { name, arguments } => {
+            let mut errors = vec![];
+            errors.append(&mut extract_errors_cst(name));
+            errors.append(&mut extract_errors_csts(arguments));
+            errors
+        }
+        CstKind::Assignment {
+            name,
+            parameters,
+            equals_sign,
+            body,
+        } => {
+            let mut errors = vec![];
+            errors.append(&mut extract_errors_cst(name));
+            errors.append(&mut extract_errors_csts(parameters));
+            errors.append(&mut extract_errors_cst(equals_sign));
+            errors.append(&mut extract_errors_csts(body));
+            errors
+        }
+        CstKind::Error { message, .. } => vec![CompilerError {
+            span: cst.span(),
+            message: message.to_owned(),
+        }],
+    }
 }
 
 fn expressions1<'a>(
