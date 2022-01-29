@@ -7,6 +7,7 @@ use crate::{
     input::{GetOpenInputQuery, InputReference, InputStorage, InputWatcher},
     language_server::{
         folding_range::FoldingRangeDbStorage, semantic_tokens::SemanticTokenDbStorage,
+        utils::LspPositionConversionStorage,
     },
 };
 
@@ -15,6 +16,7 @@ use crate::{
     CstToAstStorage,
     FoldingRangeDbStorage,
     InputStorage,
+    LspPositionConversionStorage,
     SemanticTokenDbStorage,
     StringToCstStorage
 )]
@@ -33,13 +35,10 @@ impl Database {
             .in_db_mut(self)
             .invalidate(input_reference);
     }
-    pub fn did_change_input<F>(&mut self, input_reference: &InputReference, mapper: F)
-    where
-        F: FnOnce(&mut String),
-    {
+    pub fn did_change_input(&mut self, input_reference: &InputReference, content: String) {
         self.open_inputs
             .entry(input_reference.to_owned())
-            .and_modify(mapper)
+            .and_modify(|it| *it = content)
             .or_insert_with(|| panic!("Received a change for an input that was not opened."));
         GetOpenInputQuery
             .in_db_mut(self)

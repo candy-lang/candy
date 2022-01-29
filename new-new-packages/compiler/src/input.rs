@@ -90,9 +90,7 @@ mod test {
             }],
         );
 
-        db.did_change_input(&input_reference, |content| {
-            *content = "456".to_owned();
-        });
+        db.did_change_input(&input_reference, "456".to_owned());
         assert_eq!(
             db.get_input(input_reference.clone())
                 .unwrap()

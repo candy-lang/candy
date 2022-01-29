@@ -8,28 +8,29 @@ use crate::{
     input::InputReference,
 };
 
-use super::utils::Utf8ByteOffsetToLsp;
+use super::utils::{LspPositionConversion, TupleToPosition};
 
 #[salsa::query_group(FoldingRangeDbStorage)]
-pub trait FoldingRangeDb: StringToCst {
+pub trait FoldingRangeDb: LspPositionConversion + StringToCst {
     fn folding_ranges(&self, input_reference: InputReference) -> Vec<FoldingRange>;
 }
 
 fn folding_ranges(db: &dyn FoldingRangeDb, input_reference: InputReference) -> Vec<FoldingRange> {
-    let source = db.get_input(input_reference.clone()).unwrap();
-    let mut context = Context::new(&source);
+    let mut context = Context::new(db, input_reference.clone());
     context.visit_csts(&db.cst(input_reference).unwrap());
     context.ranges
 }
 
 struct Context<'a> {
-    source: &'a str,
+    db: &'a dyn FoldingRangeDb,
+    input_reference: InputReference,
     ranges: Vec<FoldingRange>,
 }
 impl<'a> Context<'a> {
-    fn new(source: &'a str) -> Self {
+    fn new(db: &'a dyn FoldingRangeDb, input_reference: InputReference) -> Self {
         Context {
-            source,
+            db,
+            input_reference,
             ranges: vec![],
         }
     }
@@ -130,8 +131,14 @@ impl<'a> Context<'a> {
     }
 
     fn push(&mut self, start: usize, end: usize, kind: FoldingRangeKind) {
-        let start = start.utf8_byte_offset_to_lsp(self.source);
-        let end = end.utf8_byte_offset_to_lsp(self.source);
+        let start = self
+            .db
+            .utf8_byte_offset_to_lsp(start, self.input_reference.clone())
+            .to_position();
+        let end = self
+            .db
+            .utf8_byte_offset_to_lsp(end, self.input_reference.clone())
+            .to_position();
 
         self.ranges.push(FoldingRange {
             start_line: start.line,

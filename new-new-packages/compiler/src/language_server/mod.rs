@@ -17,12 +17,12 @@ use crate::{
 };
 
 use self::{
-    folding_range::FoldingRangeDb, semantic_tokens::SemanticTokenDb, utils::RangeToUtf8ByteOffset,
+    folding_range::FoldingRangeDb, semantic_tokens::SemanticTokenDb, utils::LspPositionConversion,
 };
 
 pub mod folding_range;
 pub mod semantic_tokens;
-mod utils;
+pub mod utils;
 
 pub struct CandyLanguageServer {
     pub client: Client,
@@ -144,14 +144,10 @@ impl LanguageServer for CandyLanguageServer {
         self.analyze_file(input_reference).await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        let input_reference = params.text_document.uri.into();
-        let changes = params.content_changes;
-        self.db
-            .lock()
-            .await
-            .did_change_input(&input_reference, move |text| {
-                *text = apply_text_changes(text.to_owned(), changes);
-            });
+        let input_reference: InputReference = params.text_document.uri.into();
+        let mut db = self.db.lock().await;
+        let text = apply_text_changes(&db, input_reference.clone(), params.content_changes);
+        db.did_change_input(&input_reference, text);
         self.analyze_file(input_reference).await;
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
@@ -191,7 +187,6 @@ impl CandyLanguageServer {
     async fn analyze_file(&self, input_reference: InputReference) {
         let db = self.db.lock().await;
 
-        let source = db.get_input(input_reference.clone()).unwrap();
         let (_, cst_errors) = db.cst_raw(input_reference.clone()).unwrap();
         let (_, _, ast_errors) = db.ast_raw(input_reference.clone()).unwrap();
         let (_, _, hir_errors) = db.hir_raw(input_reference.clone()).unwrap();
@@ -200,7 +195,7 @@ impl CandyLanguageServer {
             .into_iter()
             .chain(ast_errors.into_iter())
             .chain(hir_errors.into_iter())
-            .map(|it| it.to_diagnostic(&source))
+            .map(|it| it.to_diagnostic(&db, input_reference.clone()))
             .collect();
         self.client
             .publish_diagnostics(input_reference.into(), diagnostics, None)
@@ -208,18 +203,30 @@ impl CandyLanguageServer {
     }
 }
 
-fn apply_text_changes(text: String, changes: Vec<TextDocumentContentChangeEvent>) -> String {
-    let mut text = text;
+fn apply_text_changes(
+    db: &Database,
+    input_reference: InputReference,
+    changes: Vec<TextDocumentContentChangeEvent>,
+) -> String {
+    let mut text = db
+        .get_input(input_reference.clone())
+        .unwrap()
+        .as_ref()
+        .to_owned();
     for change in changes {
         match change.range {
             Some(range) => {
-                let range = range.to_utf8_byte_offset(&text);
-                text = format!(
-                    "{}{}{}",
-                    &text[..range.start],
-                    &change.text,
-                    &text[range.end..]
+                let start = db.position_to_utf8_byte_offset(
+                    range.start.line,
+                    range.start.character,
+                    input_reference.clone(),
                 );
+                let end = db.position_to_utf8_byte_offset(
+                    range.end.line,
+                    range.end.character,
+                    input_reference.clone(),
+                );
+                text = format!("{}{}{}", &text[..start], &change.text, &text[end..]);
             }
             None => text = change.text,
         }
