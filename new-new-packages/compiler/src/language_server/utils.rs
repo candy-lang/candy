@@ -109,7 +109,7 @@ fn utf8_byte_offset_to_lsp(
 
     let line = line_start_offsets
         .binary_search(&offset)
-        .unwrap_or_else(|i| i);
+        .unwrap_or_else(|i| i - 1);
 
     let line_start = line_start_offsets[line];
     let character_utf16_offset = text[line_start..offset.to_owned()].encode_utf16().count();
