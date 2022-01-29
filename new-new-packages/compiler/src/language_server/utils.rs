@@ -52,14 +52,20 @@ impl From<InputReference> for Url {
 
 #[salsa::query_group(LspPositionConversionStorage)]
 pub trait LspPositionConversion: Input {
-    // `lsp_types::Range` and `::Position` don't implement `Hash`, so they can't be
-    // used as query keys directly.
+    // `lsp_types::Range` and `::Position` don't implement `Hash`, so they can't
+    // be used as query keys directly.
+    //
+    // As its unlikely that a conversion is called multiple times with the same
+    // key, we shouldn't loose much performance by not caching the individual
+    // results.
+    #[salsa::transparent]
     fn position_to_utf8_byte_offset(
         &self,
         line: u32,
         character: u32,
         input_reference: InputReference,
     ) -> usize;
+    #[salsa::transparent]
     fn utf8_byte_offset_to_lsp(
         &self,
         position: usize,
