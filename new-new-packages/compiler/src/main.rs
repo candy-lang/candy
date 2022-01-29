@@ -1,13 +1,17 @@
 mod builtin_functions;
 mod compiler;
+mod database;
+mod incremental;
+mod input;
 mod interpreter;
 mod language_server;
 
-use crate::compiler::ast_to_hir::CompileVecAstsToHir;
-use crate::compiler::cst_to_ast::LowerCstToAst;
+use crate::compiler::ast_to_hir::AstToHir;
+use crate::compiler::cst_to_ast::CstToAst;
 use crate::compiler::string_to_cst::StringToCst;
 use crate::interpreter::fiber::FiberStatus;
 use crate::interpreter::*;
+use crate::{database::Database, input::InputReference};
 use language_server::CandyLanguageServer;
 use log;
 use lspower::{LspService, Server};
@@ -52,19 +56,31 @@ async fn main() {
 
 fn run(options: CandyRunOptions) {
     init_logger(TerminalMode::Mixed);
-    log::debug!("Running `{}`.\n", options.file.to_string_lossy());
+    let path_string = options.file.to_string_lossy();
+    log::debug!("Running `{}`.\n", path_string);
 
-    let test_code = std::fs::read_to_string(options.file.clone())
-        .unwrap_or_else(|_| panic!("File `{}` not found.", options.file.to_string_lossy()));
+    let input_reference = InputReference::File(options.file.to_owned());
+    let db = Database::default();
 
     log::info!("Parsing string to CST…");
-    let cst = test_code.parse_cst();
+    let (cst, errors) = db
+        .cst_raw(input_reference.clone())
+        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if options.print_cst {
         log::info!("CST: {:#?}", cst);
     }
+    if !errors.is_empty() {
+        log::error!(
+            "Errors occurred while parsing string to CST…:\n{:#?}",
+            errors
+        );
+        return;
+    }
 
     log::info!("Lowering CST to AST…");
-    let (asts, ast_cst_id_mapping, errors) = cst.clone().compile_into_ast();
+    let (asts, _, errors) = db
+        .ast_raw(input_reference.clone())
+        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if options.print_ast {
         log::info!("AST: {:#?}", asts);
     }
@@ -74,7 +90,9 @@ fn run(options: CandyRunOptions) {
     }
 
     log::info!("Compiling AST to HIR…");
-    let (lambda, _, errors) = asts.compile_into_hir(cst, ast_cst_id_mapping);
+    let (lambda, _, errors) = db
+        .hir_raw(input_reference.clone())
+        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if options.print_hir {
         log::info!("HIR: {:#?}", lambda);
     }
@@ -85,7 +103,7 @@ fn run(options: CandyRunOptions) {
 
     if !options.no_run {
         log::info!("Executing code…");
-        let mut fiber = fiber::Fiber::new(lambda);
+        let mut fiber = fiber::Fiber::new(lambda.as_ref().clone());
         fiber.run();
         match fiber.status() {
             FiberStatus::Running => log::info!("Fiber is still running."),

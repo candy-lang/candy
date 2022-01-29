@@ -1,100 +1,152 @@
-use std::ops::Range;
+use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
 
-use lsp_types::Position;
+use crate::{
+    compiler::error::CompilerError,
+    database::Database,
+    input::{Input, InputReference},
+};
 
-pub trait RangeToUtf8ByteOffset {
-    fn to_utf8_byte_offset(&self, text: &str) -> Range<usize>;
-}
-impl RangeToUtf8ByteOffset for lsp_types::Range {
-    fn to_utf8_byte_offset(&self, text: &str) -> Range<usize> {
-        let start = self.start.to_utf8_byte_offset(text);
-        let end = self.end.to_utf8_byte_offset(text);
-        start..end
+impl CompilerError {
+    pub fn to_diagnostic(self, db: &Database, input_reference: InputReference) -> Diagnostic {
+        Diagnostic {
+            range: lsp_types::Range {
+                start: db
+                    .utf8_byte_offset_to_lsp(self.span.start, input_reference.clone())
+                    .to_position(),
+                end: db
+                    .utf8_byte_offset_to_lsp(self.span.end, input_reference)
+                    .to_position(),
+            },
+            severity: Some(DiagnosticSeverity::ERROR),
+            code: None,
+            code_description: None,
+            source: Some("🍭 Candy".to_owned()),
+            message: self.message,
+            related_information: None,
+            tags: None,
+            data: None,
+        }
     }
 }
 
-pub trait PositionToUtf8ByteOffset {
-    fn to_utf8_byte_offset(&self, text: &str) -> usize;
-}
-impl PositionToUtf8ByteOffset for Position {
-    fn to_utf8_byte_offset(&self, text: &str) -> usize {
-        let mut line_index = 0;
-        let mut line_offset = 0;
-        while line_index < self.line {
-            match text.bytes().nth(line_offset).unwrap() {
-                b'\n' => {
-                    line_index += 1;
-                    line_offset += 1;
-                }
-                _ => {
-                    line_offset += 1;
-                }
-            }
+impl From<Url> for InputReference {
+    fn from(uri: Url) -> InputReference {
+        match uri.scheme() {
+            "file" => InputReference::File(uri.to_file_path().unwrap()),
+            "untitled" => InputReference::Untitled(uri.to_string()["untitled:".len()..].to_owned()),
+            _ => panic!("Unsupported URI scheme: {}", uri.scheme()),
         }
-
-        let mut line_length_bytes = 0;
-        loop {
-            match text.bytes().nth(line_offset + line_length_bytes) {
-                Some(b'\r' | b'\n') | None => break,
-                Some(_) => line_length_bytes += 1,
-            }
-        }
-
-        let line = &text[line_offset..line_offset + line_length_bytes];
-
-        let words = line.encode_utf16().collect::<Vec<_>>();
-        let char_offset = if self.character as usize >= words.len() {
-            line_length_bytes
-        } else {
-            String::from_utf16(&words[0..self.character as usize])
-                .unwrap()
-                .len()
-        };
-
-        line_offset + char_offset
     }
 }
 
-pub trait RangeToLsp {
-    fn to_lsp(&self, text: &str) -> lsp_types::Range;
-}
-impl RangeToLsp for Range<usize> {
-    fn to_lsp(&self, text: &str) -> lsp_types::Range {
-        let start = self.start.utf8_byte_offset_to_lsp(text);
-        let end = self.end.utf8_byte_offset_to_lsp(text);
-        lsp_types::Range { start, end }
+impl From<InputReference> for Url {
+    fn from(input_reference: InputReference) -> Url {
+        match input_reference {
+            InputReference::File(path) => Url::from_file_path(path).unwrap(),
+            InputReference::Untitled(id) => Url::parse(&format!("untitled:{}", id)).unwrap(),
+        }
     }
 }
 
-pub trait Utf8ByteOffsetToLsp {
-    fn utf8_byte_offset_to_lsp(&self, text: &str) -> Position;
-}
-impl Utf8ByteOffsetToLsp for usize {
-    fn utf8_byte_offset_to_lsp(&self, text: &str) -> Position {
-        let mut index = 0;
-        let mut line_index = 0;
-        let mut line_start = 0;
-        let mut character_byte_offset = 0;
-        while &index < self {
-            match text.bytes().nth(index).unwrap() {
-                b'\n' => {
-                    line_index += 1;
-                    line_start = index;
-                    character_byte_offset = 0;
-                }
-                _ => {
-                    character_byte_offset += 1;
-                }
-            }
-            index += 1;
-        }
+// UTF-8 Byte Offset ↔ LSP Position/Range
 
-        let utf16_offset = text[line_start..line_start + character_byte_offset]
-            .encode_utf16()
-            .count();
+#[salsa::query_group(LspPositionConversionStorage)]
+pub trait LspPositionConversion: Input {
+    // `lsp_types::Range` and `::Position` don't implement `Hash`, so they can't
+    // be used as query keys directly.
+    //
+    // As its unlikely that a conversion is called multiple times with the same
+    // key, we shouldn't loose much performance by not caching the individual
+    // results.
+    #[salsa::transparent]
+    fn position_to_utf8_byte_offset(
+        &self,
+        line: u32,
+        character: u32,
+        input_reference: InputReference,
+    ) -> usize;
+    #[salsa::transparent]
+    fn utf8_byte_offset_to_lsp(
+        &self,
+        position: usize,
+        input_reference: InputReference,
+    ) -> (u32, u32);
+
+    fn line_start_utf8_byte_offsets(&self, input_reference: InputReference) -> Vec<usize>;
+}
+
+fn position_to_utf8_byte_offset(
+    db: &dyn LspPositionConversion,
+    line: u32,
+    character: u32,
+    input_reference: InputReference,
+) -> usize {
+    let text = db.get_input(input_reference.clone()).unwrap();
+    let line_start_offsets = db.line_start_utf8_byte_offsets(input_reference);
+
+    let line_offset = line_start_offsets[line as usize];
+    let line_length = if line as usize == line_start_offsets.len() - 1 {
+        text.len()
+    } else {
+        line_start_offsets[(line + 1) as usize] - line_offset
+    };
+
+    let line = &text[line_offset..line_offset + line_length];
+
+    let words = line.encode_utf16().collect::<Vec<_>>();
+    let char_offset = if character as usize >= words.len() {
+        line_length
+    } else {
+        String::from_utf16(&words[0..character as usize])
+            .unwrap()
+            .len()
+    };
+
+    line_offset + char_offset
+}
+
+fn utf8_byte_offset_to_lsp(
+    db: &dyn LspPositionConversion,
+    offset: usize,
+    input_reference: InputReference,
+) -> (u32, u32) {
+    let text = db.get_input(input_reference.clone()).unwrap();
+    let line_start_offsets = db.line_start_utf8_byte_offsets(input_reference);
+
+    let line = line_start_offsets
+        .binary_search(&offset)
+        .unwrap_or_else(|i| i - 1);
+
+    let line_start = line_start_offsets[line];
+    let character_utf16_offset = text[line_start..offset.to_owned()].encode_utf16().count();
+    (line as u32, character_utf16_offset as u32)
+}
+
+pub trait TupleToPosition {
+    fn to_position(&self) -> Position;
+}
+impl TupleToPosition for (u32, u32) {
+    fn to_position(&self) -> Position {
         Position {
-            line: line_index,
-            character: utf16_offset as u32,
+            line: self.0,
+            character: self.1,
         }
     }
+}
+
+fn line_start_utf8_byte_offsets(
+    db: &dyn LspPositionConversion,
+    input_reference: InputReference,
+) -> Vec<usize> {
+    let text = db.get_input(input_reference).unwrap();
+    let mut offsets = vec![0];
+    offsets.append(
+        &mut text
+            .bytes()
+            .enumerate()
+            .filter(|(_, it)| it == &b'\n')
+            .map(|(index, _)| index + 1)
+            .collect(),
+    );
+    offsets
 }

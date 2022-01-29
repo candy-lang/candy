@@ -8,12 +8,29 @@ use crate::{
         cst::{Cst, CstKind},
         string_to_cst::StringToCst,
     },
-    language_server::utils::Utf8ByteOffsetToLsp,
+    input::InputReference,
+    language_server::utils::TupleToPosition,
 };
 use lazy_static::lazy_static;
 use lsp_types;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
+
+use super::utils::LspPositionConversion;
+
+#[salsa::query_group(SemanticTokenDbStorage)]
+pub trait SemanticTokenDb: LspPositionConversion + StringToCst {
+    fn semantic_tokens(&self, input_reference: InputReference) -> Vec<SemanticToken>;
+}
+
+fn semantic_tokens(
+    db: &dyn SemanticTokenDb,
+    input_reference: InputReference,
+) -> Vec<SemanticToken> {
+    let mut context = Context::new(db, input_reference.clone());
+    context.visit_csts(&db.cst(input_reference).unwrap(), None);
+    context.tokens
+}
 
 lazy_static! {
     pub static ref LEGEND: SemanticTokensLegend = SemanticTokensLegend {
@@ -58,46 +75,55 @@ impl SemanticTokenType {
     }
 }
 
-pub fn compute_semantic_tokens(source: &str) -> Vec<SemanticToken> {
-    let cst = source.parse_cst();
-    let mut context = Context::new(source);
-    context.visit_csts(&cst, None);
-    context.tokens
-}
-
 struct Context<'a> {
-    source: &'a str,
+    db: &'a dyn SemanticTokenDb,
+    input_reference: InputReference,
     tokens: Vec<SemanticToken>,
     cursor: Position,
 }
 impl<'a> Context<'a> {
-    fn new(source: &str) -> Context {
+    fn new(db: &'a dyn SemanticTokenDb, input_reference: InputReference) -> Context {
         Context {
-            source,
+            db,
+            input_reference,
             tokens: vec![],
             cursor: Position::new(0, 0),
         }
     }
     fn add_token(&mut self, range: Range<usize>, type_: SemanticTokenType) {
         // Reduce the token to multiple single-line tokens.
-        let mut cursor = range.start;
-        let mut line_start = cursor;
-        let mut source = &self.source[range.start..];
-        while cursor < range.end {
-            let next_char = source.chars().next().unwrap_or('\0');
-            match next_char {
-                '\n' => {
-                    self.add_single_line_token(line_start..cursor, type_);
-                    line_start = cursor + 1;
-                }
-                c => cursor += c.len_utf8(),
+
+        let mut start = self
+            .db
+            .utf8_byte_offset_to_lsp(range.start, self.input_reference.clone())
+            .to_position();
+        let end = self
+            .db
+            .utf8_byte_offset_to_lsp(range.end, self.input_reference.clone())
+            .to_position();
+
+        if start.line != end.line {
+            let line_start_offsets = self
+                .db
+                .line_start_utf8_byte_offsets(self.input_reference.clone());
+            while start.line != end.line {
+                assert!(start.line < end.line);
+
+                let line_length = line_start_offsets[(start.line as usize) + 1]
+                    - line_start_offsets[start.line as usize]
+                    - 1;
+                self.add_single_line_token(start, line_length as u32, type_);
+                start = Position {
+                    line: start.line + 1,
+                    character: 0,
+                };
             }
-            source = &source[next_char.len_utf8()..];
         }
-        self.add_single_line_token(line_start..range.end, type_);
+        assert_eq!(start.line, end.line);
+
+        self.add_single_line_token(start, end.character - start.character, type_);
     }
-    fn add_single_line_token(&mut self, range: Range<usize>, type_: SemanticTokenType) {
-        let start = range.start.utf8_byte_offset_to_lsp(self.source);
+    fn add_single_line_token(&mut self, start: Position, length: u32, type_: SemanticTokenType) {
         assert!(
             start >= self.cursor,
             "Tokens must be added with increasing positions. The cursor was as {:?}, but the new token starts at {:?}.",
@@ -118,7 +144,7 @@ impl<'a> Context<'a> {
             } else {
                 start.character
             },
-            length: range.len() as u32,
+            length,
             token_type: TOKEN_TYPE_MAPPING[&type_],
             token_modifiers_bitset: definition_modifier | readonly_modifier,
         });
