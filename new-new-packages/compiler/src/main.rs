@@ -1,3 +1,4 @@
+mod analyzer;
 mod builtin_functions;
 mod compiler;
 mod database;
@@ -15,10 +16,8 @@ use crate::{database::Database, input::InputReference};
 use language_server::CandyLanguageServer;
 use log;
 use lspower::{LspService, Server};
-use simplelog::{
-    ColorChoice, CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode, WriteLogger,
-};
-use std::{fs::File, path::PathBuf};
+use simplelog::{ColorChoice, Config, LevelFilter, TermLogger, TerminalMode};
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -100,6 +99,11 @@ fn run(options: CandyRunOptions) {
         log::error!("Errors occurred while lowering AST to HIR:\n{:#?}", errors);
         return;
     }
+
+    // let reports = analyze((*lambda).clone());
+    // for report in reports {
+    //     log::error!("Report: {:?}", report);
+    // }
 
     if !options.no_run {
         log::info!("Executing code…");

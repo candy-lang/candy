@@ -17,10 +17,14 @@ use crate::{
 };
 
 use self::{
-    folding_range::FoldingRangeDb, semantic_tokens::SemanticTokenDb, utils::LspPositionConversion,
+    folding_range::FoldingRangeDb,
+    hints::{HintsDb, HintsNotification},
+    semantic_tokens::SemanticTokenDb,
+    utils::LspPositionConversion,
 };
 
 pub mod folding_range;
+pub mod hints;
 pub mod semantic_tokens;
 pub mod utils;
 
@@ -198,7 +202,19 @@ impl CandyLanguageServer {
             .map(|it| it.to_diagnostic(&db, input_reference.clone()))
             .collect();
         self.client
-            .publish_diagnostics(input_reference.into(), diagnostics, None)
+            .publish_diagnostics(input_reference.clone().into(), diagnostics, None)
+            .await;
+        let hints = db.hints(input_reference.clone());
+        self.client
+            .send_custom_notification::<HintsNotification>(HintsNotification {
+                uri: match input_reference {
+                    InputReference::File(path) => {
+                        path.into_os_string().to_string_lossy().to_string()
+                    }
+                    InputReference::Untitled(string) => string,
+                },
+                hints,
+            })
             .await;
     }
 }

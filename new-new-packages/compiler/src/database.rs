@@ -6,11 +6,12 @@ use crate::{
     },
     input::{GetOpenInputQuery, InputReference, InputStorage, InputWatcher},
     language_server::{
-        folding_range::FoldingRangeDbStorage, semantic_tokens::SemanticTokenDbStorage,
-        utils::LspPositionConversionStorage,
+        folding_range::FoldingRangeDbStorage, hints::HintsDbStorage,
+        semantic_tokens::SemanticTokenDbStorage, utils::LspPositionConversionStorage,
     },
 };
 
+// HintsDbStorage
 #[salsa::database(
     AstToHirStorage,
     CstToAstStorage,
@@ -18,7 +19,8 @@ use crate::{
     InputStorage,
     LspPositionConversionStorage,
     SemanticTokenDbStorage,
-    StringToCstStorage
+    StringToCstStorage,
+    HintsDbStorage
 )]
 #[derive(Default)]
 pub struct Database {

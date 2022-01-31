@@ -1,0 +1,15 @@
+import { NotificationType, Range } from 'vscode-languageclient';
+
+export class PublishHintsNotification {
+  public static type = new NotificationType<HintsParams>(
+    'candy/textDocument/publishHints'
+  );
+}
+export interface HintsParams {
+  readonly uri: string;
+  readonly hints: Hint[];
+}
+export interface Hint {
+  readonly text: string;
+  readonly range: Range;
+}
