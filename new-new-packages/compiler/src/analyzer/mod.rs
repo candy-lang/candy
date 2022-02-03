@@ -1,6 +1,6 @@
 use crate::{
     compiler::hir::{self, Lambda},
-    interpreter::fiber::Value,
+    discover::fiber::Value,
 };
 use std::sync::Arc;
 

@@ -2,6 +2,7 @@ mod analyzer;
 mod builtin_functions;
 mod compiler;
 mod database;
+mod discover;
 mod incremental;
 mod input;
 mod interpreter;
@@ -89,11 +90,11 @@ fn run(options: CandyRunOptions) {
     }
 
     log::info!("Compiling AST to HIR…");
-    let (lambda, _, errors) = db
+    let (hir, _, errors) = db
         .hir_raw(input_reference.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if options.print_hir {
-        log::info!("HIR: {:#?}", lambda);
+        log::info!("HIR: {:#?}", hir);
     }
     if !errors.is_empty() {
         log::error!("Errors occurred while lowering AST to HIR:\n{:#?}", errors);
@@ -107,7 +108,7 @@ fn run(options: CandyRunOptions) {
 
     if !options.no_run {
         log::info!("Executing code…");
-        let mut fiber = fiber::Fiber::new(lambda.as_ref().clone());
+        let mut fiber = fiber::Fiber::new(hir.as_ref().clone());
         fiber.run();
         match fiber.status() {
             FiberStatus::Running => log::info!("Fiber is still running."),

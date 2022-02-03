@@ -178,16 +178,14 @@ impl LoweringContext {
                     "Expected an equals sign for the assignment."
                 );
 
-                let body = self.lower_csts(body);
+                let mut body = self.lower_csts(body);
 
-                self.create_ast(
-                    cst.id,
-                    AstKind::Assignment(ast::Assignment {
-                        name,
-                        parameters,
-                        body,
-                    }),
-                )
+                if !parameters.is_empty() {
+                    body =
+                        vec![self.create_ast(cst.id, AstKind::Lambda(Lambda { parameters, body }))];
+                }
+
+                self.create_ast(cst.id, AstKind::Assignment(ast::Assignment { name, body }))
             }
             CstKind::Error { ref message, .. } => {
                 self.errors.push(CompilerError {
@@ -201,7 +199,11 @@ impl LoweringContext {
 
     fn lower_parameters(&mut self, csts: &[Cst]) -> Vec<AstString> {
         csts.into_iter()
-            .filter_map(|it| self.lower_parameter(it))
+            .enumerate()
+            .map(|(index, it)| {
+                self.lower_parameter(it)
+                    .unwrap_or_else(|| self.create_string(it.id, format!("<invalid#{}", index)))
+            })
             .collect()
     }
     fn lower_parameter(&mut self, cst: &Cst) -> Option<AstString> {

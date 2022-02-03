@@ -8,7 +8,7 @@ use nom::{
     bytes::complete::{tag, take_while, take_while_m_n},
     character::complete::{alphanumeric0, anychar, line_ending, not_line_ending, space1},
     combinator::{map, opt, recognize, success, verify},
-    multi::{count, many0},
+    multi::{count, many0, many1},
     sequence::{delimited, tuple},
     IResult, Offset, Parser,
 };
@@ -714,7 +714,7 @@ fn parameters<'a>(
                 |input| parenthesized(source, input, indentation),
                 // TODO: only allow single-line lambdas
                 |input| lambda(source, input, indentation),
-                |input| call_without_arguments(source, input),
+                |input| identifier(source, input),
                 // TODO: catch-all
             )),
         )
@@ -742,25 +742,12 @@ fn call<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResult
     .context("call")
     .parse(input)
 }
-fn call_without_arguments<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
-    map(
-        |input| trailing_whitespace_and_comment(input, |input| identifier(source, input)),
-        |name| {
-            create_cst(CstKind::Call {
-                name: Box::new(name),
-                arguments: vec![],
-            })
-        },
-    )
-    .context("call_without_arguments")
-    .parse(input)
-}
 fn arguments<'a>(
     source: &'a str,
     input: &'a str,
     indentation: usize,
 ) -> ParserResult<'a, Vec<Cst>> {
-    many0(|input| {
+    many1(|input| {
         trailing_whitespace_and_comment(
             input,
             alt((
@@ -770,7 +757,7 @@ fn arguments<'a>(
                 |input| parenthesized(source, input, indentation),
                 // TODO: only allow single-line lambdas
                 |input| lambda(source, input, indentation),
-                |input| call_without_arguments(source, input),
+                |input| identifier(source, input),
                 // TODO: catch-all
             )),
         )

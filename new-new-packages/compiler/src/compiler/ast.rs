@@ -44,7 +44,6 @@ pub struct Call {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Assignment {
     pub name: AstString,
-    pub parameters: Vec<AstString>,
     pub body: Vec<Ast>,
 }
 

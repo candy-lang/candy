@@ -1,6 +1,6 @@
 use crate::builtin_functions::BuiltinFunction;
 
-use super::fiber::{Lambda, Value};
+use super::value::{Lambda, Value};
 
 macro_rules! destructure {
     ($arguments:expr, $enum:pat, $body:block) => {{
@@ -67,7 +67,7 @@ impl BuiltinFunction {
     fn get_argument_count(arguments: Vec<Value>) -> Value {
         destructure!(arguments, [Value::Lambda(function)], {
             // TODO: support parameter counts > 2^64 on 128-bit systems and better
-            (function.hir.parameter_count as u64).into()
+            (function.hir.parameters.len() as u64).into()
         })
     }
 
