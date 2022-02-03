@@ -19,6 +19,8 @@ export class HintsDecorations implements vs.Disposable {
     // tslint:disable-next-line: no-floating-promises
     analyzer.onReady().then(() => {
       this.analyzer.onNotification(PublishHintsNotification.type, (n) => {
+        console.log('Received hints!');
+
         this.hints[n.uri] = n.hints;
         // Fire an update if it was for the active document.
         if (
@@ -68,7 +70,7 @@ export class HintsDecorations implements vs.Disposable {
 
       decorations.push({
         range: hintRange,
-        renderOptions: { after: { contentText: `: ${r.text}` } },
+        renderOptions: { after: { contentText: r.text } },
       });
     }
 

@@ -6,6 +6,7 @@ import {
   LanguageClientOptions,
   StreamInfo,
 } from 'vscode-languageclient/node';
+import { HintsDecorations } from './hints';
 
 let client: LanguageClient;
 
@@ -23,6 +24,8 @@ export async function activate(context: vs.ExtensionContext) {
     clientOptions
   );
   client.start();
+
+  context.subscriptions.push(new HintsDecorations(client));
 }
 
 export function deactivate(): Thenable<void> | undefined {

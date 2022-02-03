@@ -23,6 +23,17 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "colors": [
+      {
+        "id": "candy.hints",
+        "description": "The color of hints shown. If not supplied, the color for `tab.inactiveForeground` will be used.",
+        "defaults": {
+          "dark": "tab.inactiveForeground",
+          "light": "tab.inactiveForeground",
+          "highContrast": "tab.inactiveForeground"
+        }
+      }
+    ],
     "configuration": {
       "title": "🍭 Candy",
       "properties": {

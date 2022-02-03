@@ -11,7 +11,6 @@ use crate::{
     },
 };
 
-// HintsDbStorage
 #[salsa::database(
     AstToHirStorage,
     CstToAstStorage,

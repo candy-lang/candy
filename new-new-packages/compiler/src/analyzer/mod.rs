@@ -9,7 +9,7 @@ pub fn analyze(hir: Arc<Lambda>) -> Vec<AnalyzerReport> {
     for id in hir.first_id.0..(hir.first_id.0 + hir.expressions.len()) {
         let id = hir::Id(id);
         match evaluate(&hir, id) {
-            Ok(value) => reports.push(AnalyzerReport::ValueOfExpression { id, value: value }),
+            Ok(value) => reports.push(AnalyzerReport::ValueOfExpression { id, value }),
             Err(error) => match error {
                 EvaluationError::HirContainsError => {}
                 EvaluationError::Panic(message) => {

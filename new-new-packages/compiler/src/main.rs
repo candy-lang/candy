@@ -129,7 +129,7 @@ async fn lsp() {
 
 fn init_logger(terminal_mode: TerminalMode) {
     TermLogger::init(
-        LevelFilter::Trace,
+        LevelFilter::Error,
         Config::default(),
         terminal_mode,
         ColorChoice::Auto,
