@@ -46,8 +46,8 @@ fn hints(db: &dyn HintsDb, input_reference: InputReference) -> Vec<Hint> {
         .into_iter()
         .filter_map(|report| {
             let (id, message) = match report {
-                AnalyzerReport::ValueOfExpression { id, value } => (id, format!("{:?}", value)),
-                AnalyzerReport::ExpressionPanics { id, value } => (id, format!("{:?}", value)),
+                AnalyzerReport::ValueOfExpression { id, value } => (id, format!("{}", value)),
+                AnalyzerReport::ExpressionPanics { id, value } => (id, format!("{}", value)),
                 AnalyzerReport::FunctionHasError { function, .. } => {
                     (function, "A function has an error.".into())
                 }
