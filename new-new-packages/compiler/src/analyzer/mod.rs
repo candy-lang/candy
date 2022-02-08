@@ -1,5 +1,5 @@
 use crate::{
-    compiler::hir::{self, Body, Expression, HirDb, Lambda},
+    compiler::hir::{self, Expression, HirDb, Lambda},
     discover::{run::Discover, value::Value},
     input::InputReference,
     language_server::utils::LspPositionConversion,
@@ -11,8 +11,13 @@ pub trait Analyze: Discover + HirDb + LspPositionConversion {
 }
 
 fn analyze(db: &dyn Analyze, input_reference: InputReference) -> Vec<AnalyzerReport> {
-    hir_ids_for_value_hints(db, input_reference.clone())
-        .into_iter()
+    let (hir, _) = db.hir(input_reference.clone()).unwrap();
+    let ids = collect_hir_ids_for_value_hints_list(
+        db,
+        input_reference.clone(),
+        hir.expressions.keys().cloned().collect(),
+    );
+    ids.into_iter()
         .map(move |id| (id.clone(), db.run(input_reference.clone(), id)))
         .into_iter()
         .filter_map(move |(id, value)| match value {
@@ -29,52 +34,46 @@ fn analyze(db: &dyn Analyze, input_reference: InputReference) -> Vec<AnalyzerRep
         .collect()
 }
 
-fn hir_ids_for_value_hints(db: &dyn Analyze, input_reference: InputReference) -> Vec<hir::Id> {
-    let (hir, _) = db.hir(input_reference).unwrap();
-    let mut ids = vec![];
-    hir.collect_hir_ids_for_value_hints(&mut ids);
-    ids
+fn collect_hir_ids_for_value_hints_list(
+    db: &dyn Analyze,
+    input_reference: InputReference,
+    ids: Vec<hir::Id>,
+) -> Vec<hir::Id> {
+    ids.into_iter()
+        .flat_map(|id| collect_hir_ids_for_value_hints(db, input_reference.clone(), id))
+        .collect()
 }
-
-impl Expression {
-    fn collect_hir_ids_for_value_hints(&self, ids: &mut Vec<hir::Id>) {
-        match self {
-            Expression::Int(_) => {}
-            Expression::Text(_) => {}
-            Expression::Reference(_) => {}
-            Expression::Symbol(_) => {}
-            Expression::Lambda(Lambda { body, .. }) => {
-                body.collect_hir_ids_for_value_hints(ids);
-            }
-            Expression::Body(body) => body.collect_hir_ids_for_value_hints(ids),
-            Expression::Call { arguments, .. } => {
-                ids.extend(arguments.iter().cloned());
-            }
-            Expression::Error => {}
+fn collect_hir_ids_for_value_hints(
+    db: &dyn Analyze,
+    input_reference: InputReference,
+    id: hir::Id,
+) -> Vec<hir::Id> {
+    match db
+        .find_expression(input_reference.clone(), id.clone())
+        .unwrap()
+    {
+        Expression::Int(_) => vec![],
+        Expression::Text(_) => vec![],
+        Expression::Reference(_) => {
+            vec![id]
         }
-    }
-}
-impl Body {
-    fn collect_hir_ids_for_value_hints(&self, ids: &mut Vec<hir::Id>) {
-        for (id, expression) in &self.expressions {
-            // We don't show the value if it's literally right there.
-            let should_show_hints = match expression {
-                Expression::Int(_) => false,
-                Expression::Text(_) => false,
-                Expression::Reference(_) => true,
-                Expression::Symbol(_) => false,
-                Expression::Lambda(_) => false,
-                Expression::Body(_) => true,
-                Expression::Call { .. } => true,
-                Expression::Error => true,
-            };
-            if !should_show_hints {
-                return;
-            }
-
+        Expression::Symbol(_) => vec![],
+        Expression::Lambda(Lambda { body, .. }) => collect_hir_ids_for_value_hints_list(
+            db,
+            input_reference,
+            body.expressions.keys().cloned().collect(),
+        ),
+        Expression::Body(body) => collect_hir_ids_for_value_hints_list(
+            db,
+            input_reference,
+            body.expressions.keys().cloned().collect(),
+        ),
+        Expression::Call { arguments, .. } => {
+            let mut ids = collect_hir_ids_for_value_hints_list(db, input_reference, arguments);
             ids.push(id.to_owned());
-            expression.collect_hir_ids_for_value_hints(ids);
+            ids
         }
+        Expression::Error => vec![],
     }
 }
 
