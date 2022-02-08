@@ -6,8 +6,80 @@ use std::{
 use im::HashMap;
 use itertools::Itertools;
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+use crate::input::InputReference;
+
+use super::ast_to_hir::AstToHir;
+
+#[salsa::query_group(HirDbStorage)]
+pub trait HirDb: AstToHir {
+    fn find_expression(&self, input_reference: InputReference, id: Id) -> Option<Expression>;
+    fn all_hir_ids(&self, input_reference: InputReference) -> Option<Vec<Id>>;
+}
+
+fn find_expression(db: &dyn HirDb, input_reference: InputReference, id: Id) -> Option<Expression> {
+    let (hir, _) = db.hir(input_reference).unwrap();
+    hir.find(&id).map(|it| it.to_owned())
+}
+fn all_hir_ids(db: &dyn HirDb, input_reference: InputReference) -> Option<Vec<Id>> {
+    let (hir, _) = db.hir(input_reference)?;
+    let mut ids = vec![];
+    hir.collect_all_ids(&mut ids);
+    log::info!("all HIR IDs: {:?}", ids);
+    Some(ids)
+}
+
+impl Expression {
+    fn collect_all_ids(&self, ids: &mut Vec<Id>) {
+        match self {
+            Expression::Int(_) => {}
+            Expression::Text(_) => {}
+            Expression::Reference(_) => {}
+            Expression::Symbol(_) => {}
+            Expression::Lambda(Lambda { body, .. }) => {
+                // TODO: list parameter IDs?
+                // for (index, _) in parameters.iter().enumerate() {
+                //     ids.push(first_id.to_owned() + index);
+                // }
+                body.collect_all_ids(ids);
+            }
+            Expression::Body(body) => body.collect_all_ids(ids),
+            Expression::Call { arguments, .. } => {
+                ids.extend(arguments.iter().cloned());
+            }
+            Expression::Error => {}
+        }
+    }
+}
+impl Body {
+    fn collect_all_ids(&self, ids: &mut Vec<Id>) {
+        ids.extend(self.expressions.keys().into_iter().cloned());
+        for expression in self.expressions.values() {
+            expression.collect_all_ids(ids);
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub struct Id(pub Vec<usize>);
+impl Id {
+    pub fn parent(&self) -> Option<Id> {
+        match self.0.len() {
+            0 => panic!("HIR ID is empty."),
+            1 => None,
+            _ => Some(Id(self.0[..self.0.len() - 1].to_vec())),
+        }
+    }
+}
+impl Add<usize> for Id {
+    type Output = Self;
+
+    fn add(self, rhs: usize) -> Self::Output {
+        assert!(!self.0.is_empty());
+        let mut vec = self.0[..self.0.len() - 1].to_vec();
+        vec.push(self.0.last().unwrap() + rhs);
+        Id(vec)
+    }
+}
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "HirId({:?})", self.0)
@@ -18,6 +90,7 @@ impl Display for Id {
 pub enum Expression {
     Int(u64),
     Text(String),
+    Reference(Id),
     Symbol(String),
     Lambda(Lambda),
     Body(Body),
@@ -44,23 +117,6 @@ pub struct Body {
     pub out: Option<Id>,
 }
 
-impl Add<usize> for Id {
-    type Output = Self;
-
-    fn add(self, rhs: usize) -> Self::Output {
-        assert!(!self.0.is_empty());
-    }
-}
-
-impl Lambda {
-    pub fn new(first_id: Id, parameters: Vec<String>) -> Self {
-        Self {
-            first_id,
-            parameters,
-            body: Body::new(),
-        }
-    }
-}
 impl Body {
     pub fn new() -> Self {
         Self {
@@ -70,16 +126,10 @@ impl Body {
         }
     }
     pub fn push(&mut self, id: Id, expression: Expression, identifier: Option<String>) {
-        self.expressions.insert(id, expression);
+        self.expressions.insert(id.to_owned(), expression);
         if let Some(identifier) = identifier {
             self.identifiers.insert(id, identifier);
         }
-    }
-    pub fn get(&self, id: &Id) -> Option<&Expression> {
-        self.expressions.get(id)
-    }
-    pub fn get_mut(&mut self, id: &Id) -> Option<&mut Expression> {
-        self.expressions.get_mut(id)
     }
 }
 
@@ -88,6 +138,7 @@ impl fmt::Display for Expression {
         match self {
             Expression::Int(int) => write!(f, "int {}", int),
             Expression::Text(text) => write!(f, "text {:?}", text),
+            Expression::Reference(reference) => write!(f, "reference {}", reference),
             Expression::Symbol(symbol) => write!(f, "symbol {}", symbol),
             Expression::Lambda(lambda) => {
                 write!(
@@ -139,31 +190,28 @@ impl fmt::Display for Body {
 }
 
 impl Expression {
-    fn find(&self, id: &Id) -> &Self {
+    fn find(&self, id: &Id) -> Option<&Self> {
         match self {
-            Expression::Int { .. } => panic!("Couldn't find ID {}.", id),
-            Expression::Text { .. } => panic!("Couldn't find ID {}.", id),
-            Expression::Symbol { .. } => panic!("Couldn't find ID {}.", id),
+            Expression::Int { .. } => None,
+            Expression::Text { .. } => None,
+            Expression::Reference { .. } => None,
+            Expression::Symbol { .. } => None,
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
             Expression::Body(body) => body.find(id),
-            Expression::Call {
-                function,
-                arguments,
-            } => panic!("Couldn't find ID {}.", id),
-            Expression::Error { .. } => panic!("Couldn't find ID {}.", id),
+            Expression::Call { .. } => None,
+            Expression::Error { .. } => None,
         }
     }
 }
 impl Body {
-    pub fn find(&self, id: &Id) -> &Expression {
+    fn find(&self, id: &Id) -> Option<&Expression> {
         if let Some(expression) = self.expressions.get(id) {
-            expression
+            Some(expression)
         } else {
             self.expressions
                 .iter()
-                .filter(|(key, _)| key.0 <= id.0)
-                .max_by_key(|(key, _)| key.0)
-                .unwrap()
+                .filter(|(key, _)| key <= &id)
+                .max_by_key(|(key, _)| key.0.to_owned())?
                 .1
                 .find(id)
         }

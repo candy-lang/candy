@@ -2,7 +2,7 @@ use lazy_static::lazy_static;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-#[derive(Debug, EnumIter)]
+#[derive(Debug, EnumIter, PartialEq, Eq, Clone, Hash)]
 pub enum BuiltinFunction {
     Add,
     Call0,

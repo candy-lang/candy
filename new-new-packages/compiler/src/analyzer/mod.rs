@@ -1,50 +1,33 @@
 use crate::{
-    compiler::hir::{self, Lambda},
-    discover::fiber::Value,
+    compiler::hir::{self, HirDb},
+    discover::{run::Discover, value::Value},
+    input::InputReference,
+    language_server::utils::LspPositionConversion,
 };
-use std::sync::Arc;
 
-pub fn analyze(hir: Arc<Lambda>) -> Vec<AnalyzerReport> {
-    let mut reports = vec![];
-    for id in hir.first_id.0..(hir.first_id.0 + hir.expressions.len()) {
-        let id = hir::Id(id);
-        match evaluate(&hir, id) {
-            Ok(value) => reports.push(AnalyzerReport::ValueOfExpression { id, value }),
-            Err(error) => match error {
-                EvaluationError::HirContainsError => {}
-                EvaluationError::Panic(message) => {
-                    reports.push(AnalyzerReport::ExpressionPanics { id, message })
-                }
-            },
-        }
-    }
-    reports
+#[salsa::query_group(AnalyzeStorage)]
+pub trait Analyze: Discover + HirDb + LspPositionConversion {
+    fn analyze(&self, input_reference: InputReference) -> Vec<AnalyzerReport>;
 }
 
-fn evaluate(hir: &Lambda, id: hir::Id) -> Result<Value, EvaluationError> {
-    let expression = hir.get(id).expect(&format!("The id {} doesn't exist.", id));
-    match expression {
-        hir::Expression::Int(int) => Ok(Value::Int(*int)),
-        hir::Expression::Text(text) => Ok(Value::Text(text.clone())),
-        hir::Expression::Symbol(symbol) => Ok(Value::Symbol(symbol.clone())),
-        hir::Expression::Lambda(lambda) => Err(EvaluationError::HirContainsError),
-        hir::Expression::Call {
-            function,
-            arguments,
-        } => {
-            let function = evaluate(hir, *function);
-            Err(EvaluationError::HirContainsError)
-        }
-        hir::Expression::Error => Err(EvaluationError::HirContainsError),
-    }
+fn analyze(db: &dyn Analyze, input_reference: InputReference) -> Vec<AnalyzerReport> {
+    db.run_all(input_reference.to_owned())
+        .into_iter()
+        .filter_map(move |(id, value)| match value {
+            Some(Ok(value)) => Some(AnalyzerReport::ValueOfExpression {
+                id: id.to_owned(),
+                value,
+            }),
+            Some(Err(value)) => Some(AnalyzerReport::ExpressionPanics {
+                id: id.to_owned(),
+                value,
+            }),
+            None => None,
+        })
+        .collect()
 }
 
-enum EvaluationError {
-    HirContainsError,
-    Panic(String),
-}
-
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum AnalyzerReport {
     ValueOfExpression {
         id: hir::Id,
@@ -52,7 +35,7 @@ pub enum AnalyzerReport {
     },
     ExpressionPanics {
         id: hir::Id,
-        message: String,
+        value: Value,
     },
     FunctionHasError {
         function: hir::Id,

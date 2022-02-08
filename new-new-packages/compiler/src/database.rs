@@ -1,9 +1,12 @@
 use im::HashMap;
 
 use crate::{
+    analyzer::AnalyzeStorage,
     compiler::{
-        ast_to_hir::AstToHirStorage, cst_to_ast::CstToAstStorage, string_to_cst::StringToCstStorage,
+        ast_to_hir::AstToHirStorage, cst_to_ast::CstToAstStorage, hir::HirDbStorage,
+        string_to_cst::StringToCstStorage,
     },
+    discover::run::DiscoverStorage,
     input::{GetOpenInputQuery, InputReference, InputStorage, InputWatcher},
     language_server::{
         folding_range::FoldingRangeDbStorage, hints::HintsDbStorage,
@@ -12,14 +15,17 @@ use crate::{
 };
 
 #[salsa::database(
+    AnalyzeStorage,
     AstToHirStorage,
     CstToAstStorage,
+    DiscoverStorage,
     FoldingRangeDbStorage,
+    HintsDbStorage,
+    HirDbStorage,
     InputStorage,
     LspPositionConversionStorage,
     SemanticTokenDbStorage,
-    StringToCstStorage,
-    HintsDbStorage
+    StringToCstStorage
 )]
 #[derive(Default)]
 pub struct Database {
@@ -31,7 +37,7 @@ impl<'a> salsa::Database for Database {}
 impl Database {
     pub fn did_open_input(&mut self, input_reference: &InputReference, content: String) {
         let current_value = self.open_inputs.insert(input_reference.clone(), content);
-        assert!(current_value.is_none());
+        // assert!(current_value.is_none());
         GetOpenInputQuery
             .in_db_mut(self)
             .invalidate(input_reference);

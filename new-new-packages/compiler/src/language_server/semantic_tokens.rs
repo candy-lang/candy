@@ -166,12 +166,10 @@ impl<'a> Context<'a> {
             CstKind::Arrow { .. } => {}
             CstKind::Int { .. } => self.add_token(cst.span(), SemanticTokenType::Number),
             CstKind::Text { .. } => self.add_token(cst.span(), SemanticTokenType::String),
-            CstKind::Identifier { .. } => match token_type_for_identifier {
-                Some(type_) => self.add_token(cst.span(), type_),
-                None => {
-                    panic!("We encountered and identifier, but don't know which type to assign.");
-                }
-            },
+            CstKind::Identifier { .. } => self.add_token(
+                cst.span(),
+                token_type_for_identifier.unwrap_or(SemanticTokenType::Function),
+            ),
             CstKind::Symbol { .. } => self.add_token(cst.span(), SemanticTokenType::Symbol),
             CstKind::LeadingWhitespace { child, .. } => {
                 self.visit_cst(child, token_type_for_identifier)

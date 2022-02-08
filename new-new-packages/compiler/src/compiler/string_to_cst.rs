@@ -251,6 +251,7 @@ fn expression<'a>(source: &'a str, input: &'a str, indentation: usize) -> Parser
         |input| lambda(source, input, indentation),
         |input| assignment(source, input, indentation),
         |input| call(source, input, indentation),
+        |input| identifier(source, input),
         // TODO: catch-all
     ))
     .context("expression")
@@ -767,14 +768,22 @@ fn arguments<'a>(
 }
 fn assignment<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResult<'a, Cst> {
     (|input| {
-        let (input, left) =
-            trailing_whitespace_and_comment(input, |input| call(source, input, indentation))?;
-        let (name, parameters) = match left {
-            Cst {
-                kind: CstKind::Call { name, arguments },
-                ..
-            } => (name, arguments),
-            _ => panic!("`call` did not return a `CstKind::Call`."),
+        let (input, name, parameters) = match trailing_whitespace_and_comment(input, |input| {
+            call(source, input, indentation)
+        }) {
+            Ok((
+                input,
+                Cst {
+                    kind: CstKind::Call { name, arguments },
+                    ..
+                },
+            )) => (input, name, arguments),
+            Ok(_) => panic!("`call` did not return a `CstKind::Call`."),
+            Err(_) => {
+                let (input, name) =
+                    trailing_whitespace_and_comment(input, |input| identifier(source, input))?;
+                (input, Box::new(name), vec![])
+            }
         };
         let (input, equals_sign) =
             trailing_whitespace_and_comment(input, |input| equals_sign(source, input))?;

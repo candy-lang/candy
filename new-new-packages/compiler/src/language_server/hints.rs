@@ -1,6 +1,6 @@
 use super::utils::LspPositionConversion;
 use crate::{
-    analyzer::{analyze, AnalyzerReport},
+    analyzer::{Analyze, AnalyzerReport},
     compiler::{ast_to_hir::AstToHir, cst::CstVecExtension},
     input::InputReference,
     language_server::utils::TupleToPosition,
@@ -26,7 +26,7 @@ impl Notification for HintsNotification {
 }
 
 #[salsa::query_group(HintsDbStorage)]
-pub trait HintsDb: LspPositionConversion + AstToHir {
+pub trait HintsDb: Analyze + AstToHir + LspPositionConversion {
     fn hints(&self, input_reference: InputReference) -> Vec<Hint>;
 }
 
@@ -35,29 +35,40 @@ fn hints(db: &dyn HintsDb, input_reference: InputReference) -> Vec<Hint> {
 
     let (cst, _) = db.cst_raw(input_reference.clone()).unwrap();
     let (_, ast_to_cst_id_mapping, _) = db.ast_raw(input_reference.clone()).unwrap();
-    let (hir, hir_to_ast_id_mapping, _) = db.hir_raw(input_reference.clone()).unwrap();
+    let (.., hir_to_ast_id_mapping, _) = db.hir_raw(input_reference.clone()).unwrap();
 
-    let reports = analyze(hir.clone());
+    let reports = db.analyze(input_reference.clone());
     for report in &reports {
         log::error!("Report: {:?}", report);
     }
 
     reports
         .into_iter()
-        .map(|report| {
+        .filter_map(|report| {
             let (id, message) = match report {
                 AnalyzerReport::ValueOfExpression { id, value } => (id, format!("{:?}", value)),
-                AnalyzerReport::ExpressionPanics { id, message } => (id, message),
-                AnalyzerReport::FunctionHasError {
-                    function,
-                    error_inducing_inputs,
-                } => (function, "A function has an error.".into()),
+                AnalyzerReport::ExpressionPanics { id, value } => (id, format!("{:?}", value)),
+                AnalyzerReport::FunctionHasError { function, .. } => {
+                    (function, "A function has an error.".into())
+                }
             };
-            let id = hir_to_ast_id_mapping.get(&id).unwrap();
-            let id = ast_to_cst_id_mapping.get(&id).unwrap();
+            let id = match hir_to_ast_id_mapping.get(&id) {
+                Some(id) => id,
+                None => {
+                    log::info!("Couldn't find ID {}.", id);
+                    return None;
+                }
+            };
+            let id = match ast_to_cst_id_mapping.get(&id) {
+                Some(id) => id,
+                None => {
+                    log::info!("Couldn't find ID {:?}.", id);
+                    return None;
+                }
+            };
             let span = cst.find(&id).unwrap().span();
 
-            Hint {
+            Some(Hint {
                 text: format!(" # {}", message),
                 range: Range {
                     start: db
@@ -67,7 +78,7 @@ fn hints(db: &dyn HintsDb, input_reference: InputReference) -> Vec<Hint> {
                         .utf8_byte_offset_to_lsp(span.end, input_reference.clone())
                         .to_position(),
                 },
-            }
+            })
         })
         .collect()
 }

@@ -1,6 +1,6 @@
 use im::HashMap;
 
-use crate::compiler::hir::{self, Id};
+use crate::compiler::hir::Id;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Value {
@@ -18,7 +18,7 @@ pub struct Environment {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Lambda {
-    captured_environment: Environment,
+    pub captured_environment: Environment,
     pub id: Id,
 }
 
@@ -80,27 +80,10 @@ impl Environment {
         );
         assert!(self.bindings.insert(id, value).is_none())
     }
-    pub fn get(&self, id: &Id) -> Value {
+    pub fn get(&self, id: &Id) -> Option<Value> {
         self.bindings
             .get(id)
             .map(|it| it.clone())
-            .unwrap_or_else(move || {
-                self.parent
-                    .as_ref()
-                    .expect(&format!(
-                        "Couldn't find value for ID {} in the environment: {:?}",
-                        id,
-                        self.clone()
-                    ))
-                    .get(id)
-            })
-    }
-
-    pub fn bindings_from_vec(first_id: Id, values: Vec<Value>) -> HashMap<Id, Value> {
-        values
-            .into_iter()
-            .enumerate()
-            .map(|(index, it)| (hir::Id(first_id.0 + index), it))
-            .collect()
+            .or_else(|| self.parent.as_ref()?.get(id))
     }
 }

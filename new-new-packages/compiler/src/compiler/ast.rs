@@ -13,6 +13,7 @@ pub struct Ast {
 pub enum AstKind {
     Int(Int),
     Text(Text),
+    Identifier(Identifier),
     Symbol(Symbol),
     Lambda(Lambda),
     Call(Call),
@@ -25,6 +26,9 @@ pub struct Int(pub u64);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Text(pub AstString);
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct Identifier(pub AstString);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Symbol(pub AstString);

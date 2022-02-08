@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use im::HashMap;
 
-use super::ast::{self, Ast, AstKind, AstString, Int, Lambda, Symbol, Text};
+use super::ast::{self, Ast, AstKind, AstString, Identifier, Int, Lambda, Symbol, Text};
 use super::cst::{self, Cst, CstKind};
 use super::error::CompilerError;
 use super::string_to_cst::StringToCst;
@@ -68,8 +68,9 @@ impl LoweringContext {
                 let string = self.create_string(cst.id, value.to_owned());
                 self.create_ast(cst.id, AstKind::Text(Text(string)))
             }
-            CstKind::Identifier { .. } => {
-                panic!("Tried to lower an identifier from CST to AST.")
+            CstKind::Identifier { value, .. } => {
+                let string = self.create_string(cst.id, value.to_owned());
+                self.create_ast(cst.id, AstKind::Identifier(Identifier(string)))
             }
             CstKind::Symbol { value, .. } => {
                 let string = self.create_string(cst.id, value.to_owned());
@@ -209,16 +210,8 @@ impl LoweringContext {
     fn lower_parameter(&mut self, cst: &Cst) -> Option<AstString> {
         let cst = cst.unwrap_whitespace_and_comment();
         match &cst.kind {
-            CstKind::Call { name, arguments } => {
-                let name = self.lower_identifier(name);
-
-                if !arguments.is_empty() {
-                    self.errors.push(CompilerError {
-                        span: cst.span(),
-                        message: "Parameters can't have parameters themselves.".to_owned(),
-                    });
-                }
-                Some(name)
+            CstKind::Identifier { value, .. } => {
+                Some(self.create_string(cst.id.to_owned(), value.clone()))
             }
             _ => {
                 self.errors.push(CompilerError {

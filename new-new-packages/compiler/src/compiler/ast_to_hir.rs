@@ -1,7 +1,7 @@
 use std::ops::Range;
 use std::sync::Arc;
 
-use super::ast::{self, Assignment, Ast, AstKind, Int, Symbol, Text};
+use super::ast::{self, Assignment, Ast, AstKind, Identifier, Int, Symbol, Text};
 use super::cst::{self, Cst, CstVecExtension};
 use super::cst_to_ast::CstToAst;
 use super::error::CompilerError;
@@ -104,6 +104,19 @@ impl<'a> Compiler<'a> {
             AstKind::Text(Text(string)) => {
                 self.push(ast.id, Expression::Text(string.value.to_owned()), None)
             }
+            AstKind::Identifier(Identifier(symbol)) => {
+                let reference = match self.identifiers.get(&symbol.value) {
+                    Some(reference) => reference.to_owned(),
+                    None => {
+                        self.context.errors.push(CompilerError {
+                            message: format!("Unknown reference: {}", symbol.value),
+                            span: self.ast_id_to_span(&symbol.id),
+                        });
+                        return self.push(symbol.id, Expression::Error, None);
+                    }
+                };
+                self.push(ast.id, Expression::Reference(reference.to_owned()), None)
+            }
             AstKind::Symbol(Symbol(symbol)) => {
                 self.push(ast.id, Expression::Symbol(symbol.value.to_owned()), None)
             }
@@ -118,13 +131,14 @@ impl<'a> Compiler<'a> {
 
                 for (parameter_index, parameter) in parameters.iter().enumerate() {
                     let id = hir::Id(add_ids(&lambda_id, parameter_index));
-                    body.identifiers.insert(id, parameter.value.to_owned());
-                    identifiers.insert(parameter.value, id);
+                    body.identifiers
+                        .insert(id.to_owned(), parameter.value.to_owned());
+                    identifiers.insert(parameter.value.to_owned(), id);
                 }
                 let mut inner = Compiler {
                     context,
                     body,
-                    parent_ids: lambda_id,
+                    parent_ids: lambda_id.to_owned(),
                     next_id: parameters.len(),
                     identifiers,
                 };
@@ -134,8 +148,8 @@ impl<'a> Compiler<'a> {
                 self.push(
                     ast.id,
                     Expression::Lambda(Lambda {
-                        first_id: hir::Id(lambda_id),
-                        parameters: parameters.iter().map(|it| it.value).collect(),
+                        first_id: hir::Id(add_ids(&lambda_id[..], 0)),
+                        parameters: parameters.iter().map(|it| it.value.to_owned()).collect(),
                         body: inner.body,
                     }),
                     None,
@@ -147,7 +161,7 @@ impl<'a> Compiler<'a> {
                     .map(|argument| self.compile_single(argument))
                     .collect();
                 let function = match self.identifiers.get(&name.value) {
-                    Some(function) => *function,
+                    Some(function) => function.to_owned(),
                     None => {
                         self.context.errors.push(CompilerError {
                             message: format!("Unknown function: {}", name.value),
@@ -193,16 +207,16 @@ impl<'a> Compiler<'a> {
         identifier: Option<String>,
     ) -> hir::Id {
         let id = self.create_next_id(ast_id);
-        self.body.push(id, expression, identifier);
-        self.context.id_mapping.insert(id, ast_id);
+        self.body.push(id.clone(), expression, identifier.clone());
+        self.context.id_mapping.insert(id.clone(), ast_id);
         if let Some(identifier) = identifier {
-            self.identifiers.insert(identifier, id);
+            self.identifiers.insert(identifier, id.clone());
         }
         id
     }
     fn push_without_ast_mapping(&mut self, expression: Expression) -> hir::Id {
         let id = self.create_next_id_without_ast_mapping();
-        self.body.push(id, expression, None);
+        self.body.push(id.to_owned(), expression, None);
         id
     }
 
@@ -216,7 +230,10 @@ impl<'a> Compiler<'a> {
 
     fn create_next_id(&mut self, ast_id: ast::Id) -> hir::Id {
         let id = self.create_next_id_without_ast_mapping();
-        assert!(matches!(self.context.id_mapping.insert(id, ast_id), None));
+        assert!(matches!(
+            self.context.id_mapping.insert(id.to_owned(), ast_id),
+            None
+        ));
         id
     }
     fn create_next_id_without_ast_mapping(&mut self) -> hir::Id {
