@@ -34,12 +34,12 @@ pub fn run_builtin_function(
         Err(error) => return Some(Err(error)),
     };
     match builtin_function {
-        BuiltinFunction::Add => Some(Ok(add(arguments))),
-        BuiltinFunction::Equals => Some(Ok(equals(arguments))),
+        BuiltinFunction::Add => add(arguments),
+        BuiltinFunction::Equals => equals(arguments),
         BuiltinFunction::GetArgumentCount => get_argument_count(db, input_reference, arguments),
         BuiltinFunction::Panic => panic(arguments),
-        BuiltinFunction::Print => Some(Ok(print(arguments))),
-        BuiltinFunction::TypeOf => Some(Ok(type_of(arguments))),
+        BuiltinFunction::Print => print(arguments),
+        BuiltinFunction::TypeOf => type_of(arguments),
         _ => panic!("Unhandled builtin function: {:?}", builtin_function),
     }
 }
@@ -49,19 +49,19 @@ macro_rules! destructure {
         if let $enum = &$arguments[..] {
             $body
         } else {
-            panic!()
+            Some(Err(Value::Text(format!("Invalid arguments").to_owned())))
         }
     }};
 }
 
-fn add(arguments: Vec<Value>) -> Value {
+fn add(arguments: Vec<Value>) -> DiscoverResult {
     destructure!(arguments, [Value::Int(a), Value::Int(b)], {
-        Value::Int(a + b)
+        Some(Ok(Value::Int(a + b)))
     })
 }
 
-fn equals(arguments: Vec<Value>) -> Value {
-    destructure!(arguments, [a, b], { (a == b).into() })
+fn equals(arguments: Vec<Value>) -> DiscoverResult {
+    destructure!(arguments, [a, b], { Some(Ok((a == b).into())) })
 }
 
 fn get_argument_count(
@@ -85,6 +85,7 @@ fn if_else(
     arguments: Vec<hir::Id>,
     environment: Environment,
 ) -> DiscoverResult {
+    log::error!("{:?}", arguments);
     if let [condition, then, else_] = &arguments[..] {
         let body_id = match db.run_with_environment(
             input_reference.clone(),
@@ -99,7 +100,14 @@ fn if_else(
 
         db.run_call(input_reference, body_id.to_owned(), vec![], environment)
     } else {
-        panic!()
+        Some(Err(Value::Text(
+            format!(
+                "Builtin if/else called with wrong number of arguments: {}, expected: {}",
+                arguments.len(),
+                3
+            )
+            .into(),
+        )))
     }
 }
 
@@ -107,41 +115,20 @@ fn panic(arguments: Vec<Value>) -> DiscoverResult {
     destructure!(arguments, [value], { Some(Err(value.clone())) })
 }
 
-fn print(arguments: Vec<Value>) -> Value {
+fn print(arguments: Vec<Value>) -> DiscoverResult {
     destructure!(arguments, [value], {
         println!("{:?}", value);
-        Value::nothing()
+        Some(Ok(Value::nothing()))
     })
 }
 
-fn type_of(arguments: Vec<Value>) -> Value {
+fn type_of(arguments: Vec<Value>) -> DiscoverResult {
     destructure!(arguments, [value], {
         match value {
-            Value::Int(_) => Value::Symbol("Int".to_owned()),
-            Value::Text(_) => Value::Symbol("Text".to_owned()),
-            Value::Symbol(_) => Value::Symbol("Symbol".to_owned()),
-            Value::Lambda(_) => Value::Symbol("Function".to_owned()),
+            Value::Int(_) => Some(Ok(Value::Symbol("Int".to_owned()))),
+            Value::Text(_) => Some(Ok(Value::Symbol("Text".to_owned()))),
+            Value::Symbol(_) => Some(Ok(Value::Symbol("Symbol".to_owned()))),
+            Value::Lambda(_) => Some(Ok(Value::Symbol("Function".to_owned()))),
         }
     })
-}
-
-pub trait DestructureTuple<T> {
-    fn tuple2(self, function_name: &str) -> Result<(T, T), Value>;
-}
-impl<T> DestructureTuple<T> for Vec<T> {
-    fn tuple2(self, function_name: &str) -> Result<(T, T), Value> {
-        if self.len() != 2 {
-            Err(Value::argument_count_mismatch_text(
-                function_name,
-                self.len(),
-                2,
-            ))
-        } else {
-            let mut iter = self.into_iter();
-            let first = iter.next().unwrap();
-            let second = iter.next().unwrap();
-            assert!(matches!(iter.next(), None));
-            Ok((first, second))
-        }
-    }
 }
