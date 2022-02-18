@@ -99,7 +99,7 @@ impl<'a> Compiler<'a> {
                 errors: vec![],
             },
             parent_ids: vec![],
-            next_id: 0,
+            next_id: builtin_identifiers.len(),
             body: Body::new(),
             identifiers: builtin_identifiers,
         }
