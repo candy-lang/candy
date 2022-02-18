@@ -20,16 +20,16 @@ fn analyze(db: &dyn Analyze, input_reference: InputReference) -> Vec<AnalyzerRep
     ids.into_iter()
         .map(move |id| (id.clone(), db.run(input_reference.clone(), id)))
         .into_iter()
-        .filter_map(move |(id, value)| match value {
-            Some(Ok(value)) => Some(AnalyzerReport::ValueOfExpression {
+        .filter_map(|(id, value)| value.map(|it| (id, it)))
+        .map(move |(id, value)| match value {
+            Ok(value) => AnalyzerReport::ValueOfExpression {
                 id: id.to_owned(),
                 value,
-            }),
-            Some(Err(value)) => Some(AnalyzerReport::ExpressionPanics {
+            },
+            Err(value) => AnalyzerReport::ExpressionPanics {
                 id: id.to_owned(),
                 value,
-            }),
-            None => None,
+            },
         })
         .collect()
 }
