@@ -21,7 +21,7 @@ pub fn run_builtin_function(
         builtin_function,
         arguments.len()
     );
-    // Handle builtin functions that don't need to resolve the
+    // Handle builtin functions that don't need to resolve the arguments.
     match builtin_function {
         BuiltinFunction::IfElse => return if_else(db, input, arguments, environment),
         _ => {}
