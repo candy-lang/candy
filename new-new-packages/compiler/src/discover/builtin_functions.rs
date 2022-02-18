@@ -23,12 +23,6 @@ pub fn run_builtin_function(
     );
     // Handle builtin functions that don't need to resolve the
     match builtin_function {
-        BuiltinFunction::Call0 => return call0(db, input_reference, arguments, environment),
-        BuiltinFunction::Call1 => return call1(db, input_reference, arguments, environment),
-        BuiltinFunction::Call2 => return call2(db, input_reference, arguments, environment),
-        BuiltinFunction::Call3 => return call3(db, input_reference, arguments, environment),
-        BuiltinFunction::Call4 => return call4(db, input_reference, arguments, environment),
-        BuiltinFunction::Call5 => return call5(db, input_reference, arguments, environment),
         BuiltinFunction::IfElse => return if_else(db, input_reference, arguments, environment),
         _ => {}
     }
@@ -60,31 +54,11 @@ macro_rules! destructure {
     }};
 }
 
-macro_rules! generate_call {
-    ($function_name:ident $(, $argument_names:ident)*) => {
-        fn $function_name(
-    db: &dyn Discover,
-    input_reference: InputReference,arguments: Vec<hir::Id>, environment: Environment) -> DiscoverResult
-        {
-            destructure!(arguments, [function, $($argument_names),*], {
-                db.run_call(input_reference, function.to_owned(), vec![$($argument_names.clone()),*], environment)
-            })
-      }
-    };
-}
-
 fn add(arguments: Vec<Value>) -> Value {
     destructure!(arguments, [Value::Int(a), Value::Int(b)], {
         Value::Int(a + b)
     })
 }
-
-generate_call!(call0);
-generate_call!(call1, argument0);
-generate_call!(call2, argument0, argument1);
-generate_call!(call3, argument0, argument1, argument2);
-generate_call!(call4, argument0, argument1, argument2, argument3);
-generate_call!(call5, argument0, argument1, argument2, argument3, argument4);
 
 fn equals(arguments: Vec<Value>) -> Value {
     destructure!(arguments, [a, b], { (a == b).into() })
