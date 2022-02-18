@@ -36,6 +36,12 @@ impl Expression {
             Expression::Text(_) => {}
             Expression::Reference(_) => {}
             Expression::Symbol(_) => {}
+            Expression::Struct(entries) => {
+                for (key_id, value_id) in entries.iter() {
+                    ids.push(key_id.to_owned());
+                    ids.push(value_id.to_owned());
+                }
+            }
             Expression::Lambda(Lambda { body, .. }) => {
                 // TODO: list parameter IDs?
                 // for (index, _) in parameters.iter().enumerate() {
@@ -93,6 +99,7 @@ pub enum Expression {
     Text(String),
     Reference(Id),
     Symbol(String),
+    Struct(HashMap<Id, Id>),
     Lambda(Lambda),
     Body(Body),
     Call { function: Id, arguments: Vec<Id> },
@@ -141,6 +148,16 @@ impl fmt::Display for Expression {
             Expression::Text(text) => write!(f, "text {:?}", text),
             Expression::Reference(reference) => write!(f, "reference {}", reference),
             Expression::Symbol(symbol) => write!(f, "symbol {}", symbol),
+            Expression::Struct(entries) => {
+                write!(
+                    f,
+                    "struct [\n{}\n]",
+                    entries
+                        .iter()
+                        .map(|(id, value)| format!("  {}: {}", id, value))
+                        .join(",\n"),
+                )
+            }
             Expression::Lambda(lambda) => {
                 write!(
                     f,
@@ -197,6 +214,7 @@ impl Expression {
             Expression::Text { .. } => None,
             Expression::Reference { .. } => None,
             Expression::Symbol { .. } => None,
+            Expression::Struct(_) => None,
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
             Expression::Body(body) => body.find(id),
             Expression::Call { .. } => None,

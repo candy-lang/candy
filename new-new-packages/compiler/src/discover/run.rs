@@ -4,6 +4,7 @@ use crate::{
     input::Input,
 };
 use im::HashMap;
+use itertools::Itertools;
 use log;
 
 use super::{
@@ -80,6 +81,35 @@ fn run_with_environment(
         Expression::Text(string) => Some(Ok(string.to_owned().into())),
         Expression::Reference(reference) => db.run_with_environment(input, reference, environment),
         Expression::Symbol(symbol) => Some(Ok(Value::Symbol(symbol.to_owned()))),
+        Expression::Struct(entries) => {
+            let entries = entries
+                .into_iter()
+                .map(|(key, value)| {
+                    let key = db.run_with_environment(input.clone(), key, environment.clone())?;
+                    let key = match key {
+                        Ok(Value::Symbol(symbol)) => symbol,
+                        Ok(_) => {
+                            return Some(Err(Value::Symbol(
+                                "Symbol expected as a struct key".to_owned(),
+                            )))
+                        }
+                        Err(error) => return Some(Err(error)),
+                    };
+
+                    let value =
+                        db.run_with_environment(input.clone(), value, environment.clone())?;
+                    let value = match value {
+                        Ok(value) => value,
+                        Err(error) => return Some(Err(error)),
+                    };
+                    Some(Ok((key, value)))
+                })
+                .collect::<Option<Result<HashMap<String, Value>, Value>>>()?;
+            match entries {
+                Ok(entries) => Some(Ok(Value::Struct(entries))),
+                Err(error) => Some(Err(error)),
+            }
+        }
         Expression::Lambda(_) => Some(Ok(Value::Lambda(Lambda {
             captured_environment: environment.to_owned(),
             id,
@@ -175,6 +205,17 @@ fn value_to_display_string(db: &dyn Discover, input: Input, value: Value) -> Str
         Value::Int(value) => format!("{}", value),
         Value::Text(value) => format!("\"{}\"", value),
         Value::Symbol(value) => format!("{}", value),
+        Value::Struct(entries) => format!(
+            "[{}]",
+            entries
+                .into_iter()
+                .map(|(key, value)| format!(
+                    "{}: {}",
+                    key,
+                    value_to_display_string(db, input.clone(), value)
+                ))
+                .join(", ")
+        ),
         Value::Lambda(Lambda { id, .. }) => {
             let lambda = db.find_expression(input, id.clone()).unwrap();
             if let Expression::Lambda(hir::Lambda { parameters, .. }) = lambda {

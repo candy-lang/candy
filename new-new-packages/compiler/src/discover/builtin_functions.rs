@@ -123,6 +123,7 @@ fn type_of(arguments: Vec<Value>) -> DiscoverResult {
             Value::Int(_) => Some(Ok(Value::Symbol("Int".to_owned()))),
             Value::Text(_) => Some(Ok(Value::Symbol("Text".to_owned()))),
             Value::Symbol(_) => Some(Ok(Value::Symbol("Symbol".to_owned()))),
+            Value::Struct(_) => Some(Ok(Value::Symbol("Struct".to_owned()))),
             Value::Lambda(_) => Some(Ok(Value::Symbol("Function".to_owned()))),
         }
     })

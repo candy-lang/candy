@@ -65,8 +65,12 @@ fn fix_offsets_cst(next_id: &mut usize, cst: &mut Cst) {
     *next_id += 1;
     match &mut cst.kind {
         CstKind::EqualsSign { offset } => *offset -= 1,
+        CstKind::Colon { offset } => *offset -= 1,
+        CstKind::Comma { offset } => *offset -= 1,
         CstKind::OpeningParenthesis { offset } => *offset -= 1,
         CstKind::ClosingParenthesis { offset } => *offset -= 1,
+        CstKind::OpeningBracket { offset } => *offset -= 1,
+        CstKind::ClosingBracket { offset } => *offset -= 1,
         CstKind::OpeningCurlyBrace { offset } => *offset -= 1,
         CstKind::ClosingCurlyBrace { offset } => *offset -= 1,
         CstKind::Arrow { offset } => *offset -= 1,
@@ -86,6 +90,36 @@ fn fix_offsets_cst(next_id: &mut usize, cst: &mut Cst) {
             fix_offsets_cst(next_id, &mut *opening_parenthesis);
             fix_offsets_cst(next_id, &mut *inner);
             fix_offsets_cst(next_id, &mut *closing_parenthesis);
+        }
+        CstKind::Struct {
+            opening_bracket,
+            entries,
+            closing_bracket,
+        } => {
+            fix_offsets_cst(next_id, &mut *opening_bracket);
+            fix_offsets_csts(next_id, &mut *entries);
+            if let Some(closing_bracket) = closing_bracket {
+                fix_offsets_cst(next_id, &mut *closing_bracket);
+            }
+        }
+        CstKind::StructEntry {
+            key,
+            colon,
+            value,
+            comma,
+        } => {
+            if let Some(key) = key {
+                fix_offsets_cst(next_id, &mut *key);
+            }
+            if let Some(colon) = colon {
+                fix_offsets_cst(next_id, &mut *colon);
+            }
+            if let Some(value) = value {
+                fix_offsets_cst(next_id, &mut *value);
+            }
+            if let Some(comma) = comma {
+                fix_offsets_cst(next_id, &mut *comma);
+            }
         }
         CstKind::Lambda {
             opening_curly_brace,
@@ -131,8 +165,12 @@ fn extract_errors_csts(csts: &[Cst]) -> Vec<CompilerError> {
 fn extract_errors_cst(cst: &Cst) -> Vec<CompilerError> {
     match &cst.kind {
         CstKind::EqualsSign { .. } => vec![],
+        CstKind::Colon { .. } => vec![],
+        CstKind::Comma { .. } => vec![],
         CstKind::OpeningParenthesis { .. } => vec![],
         CstKind::ClosingParenthesis { .. } => vec![],
+        CstKind::OpeningBracket { .. } => vec![],
+        CstKind::ClosingBracket { .. } => vec![],
         CstKind::OpeningCurlyBrace { .. } => vec![],
         CstKind::ClosingCurlyBrace { .. } => vec![],
         CstKind::Arrow { .. } => vec![],
@@ -153,6 +191,40 @@ fn extract_errors_cst(cst: &Cst) -> Vec<CompilerError> {
             errors.append(&mut extract_errors_cst(opening_parenthesis));
             errors.append(&mut extract_errors_cst(inner));
             errors.append(&mut extract_errors_cst(closing_parenthesis));
+            errors
+        }
+        CstKind::Struct {
+            opening_bracket,
+            entries,
+            closing_bracket,
+        } => {
+            let mut errors = vec![];
+            errors.append(&mut extract_errors_cst(opening_bracket));
+            errors.append(&mut extract_errors_csts(entries));
+            if let Some(closing_bracket) = closing_bracket {
+                errors.append(&mut extract_errors_cst(closing_bracket));
+            }
+            errors
+        }
+        CstKind::StructEntry {
+            key,
+            colon,
+            value,
+            comma,
+        } => {
+            let mut errors = vec![];
+            if let Some(key) = key {
+                errors.append(&mut extract_errors_cst(&key));
+            }
+            if let Some(colon) = colon {
+                errors.append(&mut extract_errors_cst(&colon));
+            }
+            if let Some(value) = value {
+                errors.append(&mut extract_errors_cst(&value));
+            }
+            if let Some(comma) = comma {
+                errors.append(&mut extract_errors_cst(&comma));
+            }
             errors
         }
         CstKind::Lambda {
@@ -260,15 +332,37 @@ fn equals_sign<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
     })
 }
 
+fn colon<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
+    parse_symbol(source, input, "colon", ":", |offset| CstKind::EqualsSign {
+        offset,
+    })
+}
+
+fn comma<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
+    parse_symbol(source, input, "comma", ",", |offset| CstKind::EqualsSign {
+        offset,
+    })
+}
+
 fn opening_parenthesis<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
     parse_symbol(source, input, "opening_parenthesis", "(", |offset| {
         CstKind::OpeningParenthesis { offset }
     })
 }
-
 fn closing_parenthesis<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
     parse_symbol(source, input, "closing_parenthesis", ")", |offset| {
         CstKind::ClosingParenthesis { offset }
+    })
+}
+
+fn opening_bracket<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
+    parse_symbol(source, input, "opening_bracket", "[", |offset| {
+        CstKind::OpeningCurlyBrace { offset }
+    })
+}
+fn closing_bracket<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
+    parse_symbol(source, input, "closing_bracket", "]", |offset| {
+        CstKind::ClosingCurlyBrace { offset }
     })
 }
 
@@ -277,12 +371,12 @@ fn opening_curly_brace<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, 
         CstKind::OpeningCurlyBrace { offset }
     })
 }
-
 fn closing_curly_brace<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
     parse_symbol(source, input, "closing_curly_brace", "}", |offset| {
         CstKind::ClosingCurlyBrace { offset }
     })
 }
+
 fn arrow<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
     parse_symbol(source, input, "arrow", "->", |offset| CstKind::Arrow {
         offset,
@@ -638,6 +732,103 @@ fn parenthesized<'a>(source: &'a str, input: &'a str, indentation: usize) -> Par
         },
     )
     .context("parenthesized")
+    .parse(input)
+}
+
+fn struct_<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResult<'a, Cst> {
+    map(
+        tuple((
+            |input| {
+                trailing_whitespace_and_comment_and_empty_lines(input, |input| {
+                    opening_bracket(source, input)
+                })
+            },
+            alt((
+                map(
+                    |input| struct_entry(source, input, indentation),
+                    |it| vec![it],
+                ),
+                many0(|input| {
+                    leading_whitespace_and_comment_and_empty_lines(
+                        source,
+                        input,
+                        indentation + 1,
+                        1,
+                        |source, input, indentation| {
+                            trailing_whitespace_and_comment(input, |input| {
+                                leading_indentation(input, indentation, |input| {
+                                    struct_entry(source, input, indentation)
+                                })
+                            })
+                        },
+                    )
+                }),
+            )),
+            opt(|input| {
+                leading_whitespace_and_comment_and_empty_lines(
+                    source,
+                    input,
+                    indentation,
+                    0,
+                    |source, input, _indentation| {
+                        trailing_whitespace_and_comment(input, |input| {
+                            closing_bracket(source, input)
+                        })
+                    },
+                )
+            }),
+        )),
+        |(opening_bracket, entries, closing_bracket)| {
+            create_cst(CstKind::Struct {
+                opening_bracket: Box::new(opening_bracket),
+                entries,
+                closing_bracket: closing_bracket.map(|it| Box::new(it)),
+            })
+        },
+    )
+    .context("struct_")
+    .parse(input)
+}
+
+fn struct_entry<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResult<'a, Cst> {
+    map(
+        verify(
+            tuple((
+                opt(|input| {
+                    trailing_whitespace_and_comment_and_empty_lines(input, |input| {
+                        expression(source, input, indentation)
+                    })
+                }),
+                opt(|input| {
+                    trailing_whitespace_and_comment_and_empty_lines(input, |input| {
+                        colon(source, input)
+                    })
+                }),
+                opt(|input| {
+                    trailing_whitespace_and_comment_and_empty_lines(input, |input| {
+                        expression(source, input, indentation)
+                    })
+                }),
+                opt(|input| {
+                    trailing_whitespace_and_comment_and_empty_lines(input, |input| {
+                        comma(source, input)
+                    })
+                }),
+            )),
+            |(key, colon, value, comma)| {
+                key.is_some() || colon.is_some() || value.is_some() || comma.is_some()
+            },
+        ),
+        |(key, colon, value, comma)| {
+            create_cst(CstKind::StructEntry {
+                key: key.map(|it| Box::new(it)),
+                colon: colon.map(|it| Box::new(it)),
+                value: value.map(|it| Box::new(it)),
+                comma: comma.map(|it| Box::new(it)),
+            })
+        },
+    )
+    .context("struct_entry")
     .parse(input)
 }
 
