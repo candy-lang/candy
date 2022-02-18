@@ -5,32 +5,32 @@ use crate::{
         cst::{Cst, CstKind},
         string_to_cst::StringToCst,
     },
-    input::InputReference,
+    input::Input,
 };
 
 use super::utils::{LspPositionConversion, TupleToPosition};
 
 #[salsa::query_group(FoldingRangeDbStorage)]
 pub trait FoldingRangeDb: LspPositionConversion + StringToCst {
-    fn folding_ranges(&self, input_reference: InputReference) -> Vec<FoldingRange>;
+    fn folding_ranges(&self, input: Input) -> Vec<FoldingRange>;
 }
 
-fn folding_ranges(db: &dyn FoldingRangeDb, input_reference: InputReference) -> Vec<FoldingRange> {
-    let mut context = Context::new(db, input_reference.clone());
-    context.visit_csts(&db.cst(input_reference).unwrap());
+fn folding_ranges(db: &dyn FoldingRangeDb, input: Input) -> Vec<FoldingRange> {
+    let mut context = Context::new(db, input.clone());
+    context.visit_csts(&db.cst(input).unwrap());
     context.ranges
 }
 
 struct Context<'a> {
     db: &'a dyn FoldingRangeDb,
-    input_reference: InputReference,
+    input: Input,
     ranges: Vec<FoldingRange>,
 }
 impl<'a> Context<'a> {
-    fn new(db: &'a dyn FoldingRangeDb, input_reference: InputReference) -> Self {
+    fn new(db: &'a dyn FoldingRangeDb, input: Input) -> Self {
         Context {
             db,
-            input_reference,
+            input,
             ranges: vec![],
         }
     }
@@ -133,11 +133,11 @@ impl<'a> Context<'a> {
     fn push(&mut self, start: usize, end: usize, kind: FoldingRangeKind) {
         let start = self
             .db
-            .utf8_byte_offset_to_lsp(start, self.input_reference.clone())
+            .utf8_byte_offset_to_lsp(start, self.input.clone())
             .to_position();
         let end = self
             .db
-            .utf8_byte_offset_to_lsp(end, self.input_reference.clone())
+            .utf8_byte_offset_to_lsp(end, self.input.clone())
             .to_position();
 
         self.ranges.push(FoldingRange {

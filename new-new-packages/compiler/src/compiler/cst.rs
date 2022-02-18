@@ -5,6 +5,19 @@ use std::{
 
 use itertools::Itertools;
 
+use crate::input::Input;
+
+use super::string_to_cst::StringToCst;
+
+#[salsa::query_group(CstDbStorage)]
+pub trait CstDb: StringToCst {
+    fn find_cst(&self, input: Input, id: Id) -> Option<Cst>;
+}
+
+fn find_cst(db: &dyn CstDb, input: Input, id: Id) -> Option<Cst> {
+    db.cst(input).unwrap().find(&id).map(|it| it.to_owned())
+}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct Id(pub usize);
 
@@ -237,7 +250,23 @@ impl Cst {
         }
     }
 
-    pub fn find(&self, id: &Id) -> Option<&Cst> {
+    /// Returns a span that makes sense to display in the editor.
+    ///
+    /// For example, if a call contains errors, we want to only underline the
+    /// name of the called function itself, not everything including arguments.
+    pub fn display_span(&self) -> Range<usize> {
+        match &self.kind {
+            CstKind::LeadingWhitespace { child, .. } => child.display_span(),
+            CstKind::LeadingComment { child, .. } => child.display_span(),
+            CstKind::TrailingWhitespace { child, .. } => child.display_span(),
+            CstKind::TrailingComment { child, .. } => child.display_span(),
+            CstKind::Call { name, .. } => name.display_span(),
+            CstKind::Assignment { name, .. } => name.display_span(),
+            _ => self.span(),
+        }
+    }
+
+    fn find(&self, id: &Id) -> Option<&Cst> {
         if id == &self.id {
             return Some(self);
         };

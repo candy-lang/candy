@@ -1,7 +1,7 @@
 use crate::{
     builtin_functions::BuiltinFunction,
     compiler::hir::{self, Expression},
-    input::InputReference,
+    input::Input,
 };
 
 use super::{
@@ -11,7 +11,7 @@ use super::{
 
 pub fn run_builtin_function(
     db: &dyn Discover,
-    input_reference: InputReference,
+    input: Input,
     builtin_function: BuiltinFunction,
     arguments: Vec<hir::Id>,
     environment: Environment,
@@ -23,12 +23,11 @@ pub fn run_builtin_function(
     );
     // Handle builtin functions that don't need to resolve the
     match builtin_function {
-        BuiltinFunction::IfElse => return if_else(db, input_reference, arguments, environment),
+        BuiltinFunction::IfElse => return if_else(db, input, arguments, environment),
         _ => {}
     }
 
-    let arguments =
-        db.run_multiple_with_environment(input_reference.to_owned(), arguments, environment)?;
+    let arguments = db.run_multiple_with_environment(input.to_owned(), arguments, environment)?;
     let arguments = match arguments {
         Ok(arguments) => arguments,
         Err(error) => return Some(Err(error)),
@@ -36,7 +35,7 @@ pub fn run_builtin_function(
     match builtin_function {
         BuiltinFunction::Add => add(arguments),
         BuiltinFunction::Equals => equals(arguments),
-        BuiltinFunction::GetArgumentCount => get_argument_count(db, input_reference, arguments),
+        BuiltinFunction::GetArgumentCount => get_argument_count(db, input, arguments),
         BuiltinFunction::Panic => panic(arguments),
         BuiltinFunction::Print => print(arguments),
         BuiltinFunction::TypeOf => type_of(arguments),
@@ -64,14 +63,10 @@ fn equals(arguments: Vec<Value>) -> DiscoverResult {
     destructure!(arguments, [a, b], { Some(Ok((a == b).into())) })
 }
 
-fn get_argument_count(
-    db: &dyn Discover,
-    input_reference: InputReference,
-    arguments: Vec<Value>,
-) -> DiscoverResult {
+fn get_argument_count(db: &dyn Discover, input: Input, arguments: Vec<Value>) -> DiscoverResult {
     destructure!(arguments, [Value::Lambda(function)], {
         // TODO: support parameter counts > 2^64 on 128-bit systems and better
-        let expression = match db.find_expression(input_reference, function.id.to_owned())? {
+        let expression = match db.find_expression(input, function.id.to_owned())? {
             Expression::Lambda(lambda) => lambda,
             _ => return None,
         };
@@ -81,14 +76,14 @@ fn get_argument_count(
 
 fn if_else(
     db: &dyn Discover,
-    input_reference: InputReference,
+    input: Input,
     arguments: Vec<hir::Id>,
     environment: Environment,
 ) -> DiscoverResult {
     log::error!("{:?}", arguments);
     if let [condition, then, else_] = &arguments[..] {
         let body_id = match db.run_with_environment(
-            input_reference.clone(),
+            input.clone(),
             condition.to_owned(),
             environment.to_owned(),
         )? {
@@ -98,7 +93,7 @@ fn if_else(
             Err(error) => return Some(Err(error)),
         };
 
-        db.run_call(input_reference, body_id.to_owned(), vec![], environment)
+        db.run_call(input, body_id.to_owned(), vec![], environment)
     } else {
         Some(Err(Value::Text(
             format!(

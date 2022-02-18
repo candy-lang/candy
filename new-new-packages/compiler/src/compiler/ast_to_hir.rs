@@ -2,40 +2,56 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use super::ast::{self, Assignment, Ast, AstKind, Identifier, Int, Symbol, Text};
-use super::cst::{self, Cst, CstVecExtension};
+use super::cst::{self, Cst, CstDb, CstVecExtension};
 use super::cst_to_ast::CstToAst;
 use super::error::CompilerError;
 use super::hir::{self, Body, Expression, Lambda};
 use crate::builtin_functions;
-use crate::input::InputReference;
+use crate::input::Input;
 use im::HashMap;
 
 #[salsa::query_group(AstToHirStorage)]
-pub trait AstToHir: CstToAst {
-    fn hir(
-        &self,
-        input_reference: InputReference,
-    ) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)>;
+pub trait AstToHir: CstDb + CstToAst {
+    fn hir_to_ast_id(&self, input: Input, id: hir::Id) -> Option<ast::Id>;
+    fn hir_to_cst_id(&self, input: Input, id: hir::Id) -> Option<cst::Id>;
+    fn hir_to_span(&self, input: Input, id: hir::Id) -> Option<Range<usize>>;
+    fn hir_to_display_span(&self, input: Input, id: hir::Id) -> Option<Range<usize>>;
+
+    fn hir(&self, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)>;
     fn hir_raw(
         &self,
-        input_reference: InputReference,
+        input: Input,
     ) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>, Vec<CompilerError>)>;
 }
 
-fn hir(
-    db: &dyn AstToHir,
-    input_reference: InputReference,
-) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)> {
-    db.hir_raw(input_reference)
+fn hir_to_ast_id(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<ast::Id> {
+    let (_, hir_to_ast_id_mapping) = db.hir(input).unwrap();
+    hir_to_ast_id_mapping.get(&id).cloned()
+}
+fn hir_to_cst_id(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<cst::Id> {
+    let id = db.hir_to_ast_id(input.clone(), id)?;
+    db.ast_to_cst_id(input, id)
+}
+fn hir_to_span(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<Range<usize>> {
+    let id = db.hir_to_cst_id(input.clone(), id)?;
+    Some(db.find_cst(input, id)?.span())
+}
+fn hir_to_display_span(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<Range<usize>> {
+    let id = db.hir_to_cst_id(input.clone(), id)?;
+    Some(db.find_cst(input, id)?.display_span())
+}
+
+fn hir(db: &dyn AstToHir, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)> {
+    db.hir_raw(input)
         .map(|(hir, id_mapping, _)| (hir, id_mapping))
 }
 fn hir_raw(
     db: &dyn AstToHir,
-    input_reference: InputReference,
+    input: Input,
 ) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>, Vec<CompilerError>)> {
-    let cst = db.cst(input_reference.clone())?;
+    let cst = db.cst(input.clone())?;
     let (ast, ast_cst_id_mapping) = db
-        .ast(input_reference)
+        .ast(input)
         .expect("AST must exist if the CST exists for the same input.");
 
     let builtin_identifiers = builtin_functions::VALUES

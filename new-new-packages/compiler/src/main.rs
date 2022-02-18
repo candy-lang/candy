@@ -1,4 +1,3 @@
-mod analyzer;
 mod builtin_functions;
 mod compiler;
 mod database;
@@ -10,7 +9,7 @@ mod language_server;
 use crate::compiler::ast_to_hir::AstToHir;
 use crate::compiler::cst_to_ast::CstToAst;
 use crate::compiler::string_to_cst::StringToCst;
-use crate::{database::Database, input::InputReference};
+use crate::{database::Database, input::Input};
 use language_server::CandyLanguageServer;
 use log;
 use lspower::{LspService, Server};
@@ -56,12 +55,12 @@ fn run(options: CandyRunOptions) {
     let path_string = options.file.to_string_lossy();
     log::debug!("Running `{}`.\n", path_string);
 
-    let input_reference = InputReference::File(options.file.to_owned());
+    let input = Input::File(options.file.to_owned());
     let db = Database::default();
 
     log::info!("Parsing string to CST…");
     let (cst, errors) = db
-        .cst_raw(input_reference.clone())
+        .cst_raw(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if options.print_cst {
         log::info!("CST: {:#?}", cst);
@@ -76,7 +75,7 @@ fn run(options: CandyRunOptions) {
 
     log::info!("Lowering CST to AST…");
     let (asts, _, errors) = db
-        .ast_raw(input_reference.clone())
+        .ast_raw(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if options.print_ast {
         log::info!("AST: {:#?}", asts);
@@ -88,7 +87,7 @@ fn run(options: CandyRunOptions) {
 
     log::info!("Compiling AST to HIR…");
     let (hir, _, errors) = db
-        .hir_raw(input_reference.clone())
+        .hir_raw(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if options.print_hir {
         log::info!("HIR: {:?}", hir);

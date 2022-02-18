@@ -86,21 +86,22 @@ export class HintsDecorations implements vs.Disposable {
     };
     const decorations: Map<HintKind, Item[]> = new Map();
     for (const hint of hints) {
-      const range = this.analyzer.protocol2CodeConverter.asRange(hint.range);
+      const position = this.analyzer.protocol2CodeConverter.asPosition(
+        hint.position
+      );
 
-      // Ensure the hint we got looks like a sensible range, otherwise the type info
+      // Ensure the hint we got looks like a sensible position, otherwise the type info
       // might be stale (eg. we sent two updates, and the type from in between them just
       // arrived). In this case, we'll just bail and do nothing, assuming a future update will
       // have the correct info.
       // TODO(later, JonasWanke): do we really need this check?
-      const finalCharacterPosition = range.end;
-      if (finalCharacterPosition.character < 1) {
+      if (position.character < 1) {
         return;
       }
 
       const existing = decorations.get(hint.kind) || [];
       existing.push({
-        range,
+        range: new vs.Range(position, position),
         renderOptions: { after: { contentText: hint.text } },
       });
       decorations.set(hint.kind, existing);
