@@ -6,8 +6,8 @@ import { Hint, PublishHintsNotification } from './lsp_custom_protocol';
 
 export class HintsDecorations implements vs.Disposable {
   private subscriptions: vs.Disposable[] = [];
-  private hints: { [key: string]: Hint[] } = {};
-  private editors: { [key: string]: vs.TextEditor } = {};
+  private hints: Map<String, Hint[]> = new Map();
+  private editors: Map<String, vs.TextEditor> = new Map();
   private updateTimeout?: NodeJS.Timer;
 
   private readonly decorationType = vs.window.createTextEditorDecorationType({
@@ -21,15 +21,20 @@ export class HintsDecorations implements vs.Disposable {
       this.analyzer.onNotification(PublishHintsNotification.type, (n) => {
         console.log('Received hints!');
 
-        this.hints[n.uri] = n.hints;
+        // We parse the URI so that it gets normalized.
+        const uri = vs.Uri.parse(n.uri).toString();
+
+        this.hints.set(uri, n.hints);
         // Fire an update if it was for the active document.
         if (
           vs.window.activeTextEditor &&
           vs.window.activeTextEditor.document &&
-          n.uri === this.uriToString(vs.window.activeTextEditor.document.uri)
+          uri === vs.window.activeTextEditor.document.uri.toString()
         ) {
           // Delay this so if we're getting lots of updates, we don't flicker.
-          if (this.updateTimeout) clearTimeout(this.updateTimeout);
+          if (this.updateTimeout) {
+            clearTimeout(this.updateTimeout);
+          }
           this.updateTimeout = setTimeout(() => this.update(), 500);
         }
       });
@@ -39,25 +44,31 @@ export class HintsDecorations implements vs.Disposable {
       vs.window.onDidChangeActiveTextEditor(() => this.update())
     );
     this.subscriptions.push(
-      vs.workspace.onDidCloseTextDocument((td) => {
-        delete this.hints[this.uriToString(td.uri)];
+      vs.workspace.onDidCloseTextDocument((document) => {
+        this.hints.delete(document.uri.toString());
       })
     );
-    if (vs.window.activeTextEditor) this.update();
+    if (vs.window.activeTextEditor) {
+      this.update();
+    }
   }
 
   private update() {
     const editor = vs.window.activeTextEditor;
-    if (!editor || !editor.document) return;
+    if (!editor || !editor.document) {
+      return;
+    }
 
-    const uri = this.uriToString(editor.document.uri);
-    if (!this.hints[uri]) return;
+    const hints = this.hints.get(editor.document.uri.toString());
+    if (hints === undefined) {
+      return;
+    }
 
     type Item = vs.DecorationOptions & {
       renderOptions: { after: { contentText: string } };
     };
     const decorations: Item[] = [];
-    for (const r of this.hints[uri]) {
+    for (const r of hints) {
       const hintRange = this.analyzer.protocol2CodeConverter.asRange(r.range);
 
       // Ensure the hint we got looks like a sensible range, otherwise the type info
@@ -66,7 +77,9 @@ export class HintsDecorations implements vs.Disposable {
       // have the correct info.
       // TODO(later, JonasWanke): do we really need this check?
       const finalCharacterPosition = hintRange.end;
-      if (finalCharacterPosition.character < 1) return;
+      if (finalCharacterPosition.character < 1) {
+        return;
+      }
 
       decorations.push({
         range: hintRange,
@@ -74,15 +87,12 @@ export class HintsDecorations implements vs.Disposable {
       });
     }
 
-    this.editors[uri] = editor;
+    this.editors.set(editor.document.uri.toString(), editor);
     editor.setDecorations(this.decorationType, decorations);
-  }
-  private uriToString(uri: vs.Uri): string {
-    return uri.toString().replace('%3A', ':');
   }
 
   public dispose() {
-    for (const editor of Object.values(this.editors)) {
+    for (const editor of this.editors.values()) {
       try {
         editor.setDecorations(this.decorationType, []);
       } catch {
