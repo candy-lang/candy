@@ -1,13 +1,88 @@
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    ops::Add,
+};
 
 use im::HashMap;
 use itertools::Itertools;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct Id(pub usize);
+use crate::input::InputReference;
+
+use super::ast_to_hir::AstToHir;
+
+#[salsa::query_group(HirDbStorage)]
+pub trait HirDb: AstToHir {
+    fn find_expression(&self, input_reference: InputReference, id: Id) -> Option<Expression>;
+    fn all_hir_ids(&self, input_reference: InputReference) -> Option<Vec<Id>>;
+}
+
+fn find_expression(db: &dyn HirDb, input_reference: InputReference, id: Id) -> Option<Expression> {
+    let (hir, _) = db.hir(input_reference).unwrap();
+    hir.find(&id).map(|it| it.to_owned())
+}
+fn all_hir_ids(db: &dyn HirDb, input_reference: InputReference) -> Option<Vec<Id>> {
+    let (hir, _) = db.hir(input_reference)?;
+    let mut ids = vec![];
+    hir.collect_all_ids(&mut ids);
+    log::info!("all HIR IDs: {:?}", ids);
+    Some(ids)
+}
+
+impl Expression {
+    fn collect_all_ids(&self, ids: &mut Vec<Id>) {
+        match self {
+            Expression::Int(_) => {}
+            Expression::Text(_) => {}
+            Expression::Reference(_) => {}
+            Expression::Symbol(_) => {}
+            Expression::Lambda(Lambda { body, .. }) => {
+                // TODO: list parameter IDs?
+                // for (index, _) in parameters.iter().enumerate() {
+                //     ids.push(first_id.to_owned() + index);
+                // }
+                body.collect_all_ids(ids);
+            }
+            Expression::Body(body) => body.collect_all_ids(ids),
+            Expression::Call { arguments, .. } => {
+                ids.extend(arguments.iter().cloned());
+            }
+            Expression::Error => {}
+        }
+    }
+}
+impl Body {
+    fn collect_all_ids(&self, ids: &mut Vec<Id>) {
+        ids.extend(self.expressions.keys().into_iter().cloned());
+        for expression in self.expressions.values() {
+            expression.collect_all_ids(ids);
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
+pub struct Id(pub Vec<usize>);
+impl Id {
+    pub fn parent(&self) -> Option<Id> {
+        match self.0.len() {
+            0 => panic!("HIR ID is empty."),
+            1 => None,
+            _ => Some(Id(self.0[..self.0.len() - 1].to_vec())),
+        }
+    }
+}
+impl Add<usize> for Id {
+    type Output = Self;
+
+    fn add(self, rhs: usize) -> Self::Output {
+        assert!(!self.0.is_empty());
+        let mut vec = self.0[..self.0.len() - 1].to_vec();
+        vec.push(self.0.last().unwrap() + rhs);
+        Id(vec)
+    }
+}
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "HirId({})", self.0)
+        write!(f, "HirId({:?})", self.0)
     }
 }
 
@@ -15,8 +90,10 @@ impl Display for Id {
 pub enum Expression {
     Int(u64),
     Text(String),
+    Reference(Id),
     Symbol(String),
     Lambda(Lambda),
+    Body(Body),
     Call { function: Id, arguments: Vec<Id> },
     Error,
 }
@@ -29,46 +106,29 @@ impl Expression {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Lambda {
     pub first_id: Id,
-    pub parameter_count: usize,
-    pub out: Id,
-    pub expressions: Vec<Expression>,
-    pub identifiers: HashMap<Id, String>,
+    pub parameters: Vec<String>,
+    pub body: Body,
 }
 
-impl Lambda {
-    pub fn new(first_id: Id, parameter_count: usize) -> Self {
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Body {
+    pub expressions: HashMap<Id, Expression>,
+    pub identifiers: HashMap<Id, String>,
+    pub out: Option<Id>,
+}
+
+impl Body {
+    pub fn new() -> Self {
         Self {
-            first_id,
-            parameter_count,
-            out: first_id,
-            expressions: vec![],
+            expressions: HashMap::new(),
             identifiers: HashMap::new(),
+            out: None,
         }
     }
-    pub fn next_id(&self) -> Id {
-        Id(self.first_id.0 + self.parameter_count + self.expressions.len())
-    }
-    pub fn push(&mut self, expression: Expression) -> Id {
-        let id = self.next_id();
-        self.expressions.push(expression);
-        id
-    }
-    pub fn get(&self, id: Id) -> Option<&Expression> {
-        // TODO: use a different type when supporting more expressions than 2^127
-        let index = id.0 as i128 - self.first_id.0 as i128 - self.parameter_count as i128;
-        if index < 0 {
-            None
-        } else {
-            self.expressions.get(index as usize)
-        }
-    }
-    pub fn get_mut(&mut self, id: Id) -> Option<&mut Expression> {
-        // TODO: use a different type when supporting more expressions than 2^127
-        let index = id.0 as i128 - self.first_id.0 as i128 - self.parameter_count as i128;
-        if index < 0 {
-            None
-        } else {
-            self.expressions.get_mut(index as usize)
+    pub fn push(&mut self, id: Id, expression: Expression, identifier: Option<String>) {
+        self.expressions.insert(id.to_owned(), expression);
+        if let Some(identifier) = identifier {
+            self.identifiers.insert(id, identifier);
         }
     }
 }
@@ -78,6 +138,7 @@ impl fmt::Display for Expression {
         match self {
             Expression::Int(int) => write!(f, "int {}", int),
             Expression::Text(text) => write!(f, "text {:?}", text),
+            Expression::Reference(reference) => write!(f, "reference {}", reference),
             Expression::Symbol(symbol) => write!(f, "symbol {}", symbol),
             Expression::Lambda(lambda) => {
                 write!(
@@ -90,15 +151,22 @@ impl fmt::Display for Expression {
                         .join("\n"),
                 )
             }
+            Expression::Body(body) => {
+                write!(
+                    f,
+                    "body [\n{}\n]",
+                    body.to_string()
+                        .lines()
+                        .map(|line| format!("  {}", line))
+                        .join("\n"),
+                )
+            }
             Expression::Call {
                 function,
                 arguments,
             } => {
-                if arguments.is_empty() {
-                    write!(f, "call {}", function)
-                } else {
-                    write!(f, "call {} with {}", function, arguments.iter().join(" "))
-                }
+                assert!(arguments.len() > 0, "A call needs to have arguments.");
+                write!(f, "call {} with {}", function, arguments.iter().join(" "))
             }
             Expression::Error => write!(f, "<error>"),
         }
@@ -106,12 +174,46 @@ impl fmt::Display for Expression {
 }
 impl fmt::Display for Lambda {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} parameters\n", self.parameter_count)?;
-        for (index, action) in self.expressions.iter().enumerate() {
-            let id = self.first_id.0 + self.parameter_count + index;
-            write!(f, "{} = {}\n", id, action)?;
-        }
-        write!(f, "out: {}\n", self.out)?;
+        write!(f, "{} parameters\n", self.parameters.len())?;
+        write!(f, "{}", self.body)?;
         Ok(())
+    }
+}
+impl fmt::Display for Body {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (id, expression) in self.expressions.iter() {
+            write!(f, "{} = {}\n", id, expression)?;
+        }
+        write!(f, "out: {:?}\n", self.out)?;
+        Ok(())
+    }
+}
+
+impl Expression {
+    fn find(&self, id: &Id) -> Option<&Self> {
+        match self {
+            Expression::Int { .. } => None,
+            Expression::Text { .. } => None,
+            Expression::Reference { .. } => None,
+            Expression::Symbol { .. } => None,
+            Expression::Lambda(Lambda { body, .. }) => body.find(id),
+            Expression::Body(body) => body.find(id),
+            Expression::Call { .. } => None,
+            Expression::Error { .. } => None,
+        }
+    }
+}
+impl Body {
+    fn find(&self, id: &Id) -> Option<&Expression> {
+        if let Some(expression) = self.expressions.get(id) {
+            Some(expression)
+        } else {
+            self.expressions
+                .iter()
+                .filter(|(key, _)| key <= &id)
+                .max_by_key(|(key, _)| key.0.to_owned())?
+                .1
+                .find(id)
+        }
     }
 }

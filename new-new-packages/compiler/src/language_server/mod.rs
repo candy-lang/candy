@@ -13,13 +13,12 @@ use tokio::sync::Mutex;
 use crate::{
     compiler::{ast_to_hir::AstToHir, cst_to_ast::CstToAst, string_to_cst::StringToCst},
     input::{Input, InputReference},
+    language_server::hints::HintsDb,
     Database,
 };
 
 use self::{
-    folding_range::FoldingRangeDb,
-    hints::{HintsDb, HintsNotification},
-    semantic_tokens::SemanticTokenDb,
+    folding_range::FoldingRangeDb, hints::HintsNotification, semantic_tokens::SemanticTokenDb,
     utils::LspPositionConversion,
 };
 

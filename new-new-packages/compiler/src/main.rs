@@ -2,22 +2,20 @@ mod analyzer;
 mod builtin_functions;
 mod compiler;
 mod database;
+mod discover;
 mod incremental;
 mod input;
-mod interpreter;
 mod language_server;
 
 use crate::compiler::ast_to_hir::AstToHir;
 use crate::compiler::cst_to_ast::CstToAst;
 use crate::compiler::string_to_cst::StringToCst;
-use crate::interpreter::fiber::FiberStatus;
-use crate::interpreter::*;
 use crate::{database::Database, input::InputReference};
 use language_server::CandyLanguageServer;
 use log;
 use lspower::{LspService, Server};
 use simplelog::{ColorChoice, Config, LevelFilter, TermLogger, TerminalMode};
-use std::path::PathBuf;
+use std::{fs::File, path::PathBuf};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -89,11 +87,11 @@ fn run(options: CandyRunOptions) {
     }
 
     log::info!("Compiling AST to HIR…");
-    let (lambda, _, errors) = db
+    let (hir, _, errors) = db
         .hir_raw(input_reference.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if options.print_hir {
-        log::info!("HIR: {:#?}", lambda);
+        log::info!("HIR: {:?}", hir);
     }
     if !errors.is_empty() {
         log::error!("Errors occurred while lowering AST to HIR:\n{:#?}", errors);
@@ -105,16 +103,16 @@ fn run(options: CandyRunOptions) {
     //     log::error!("Report: {:?}", report);
     // }
 
-    if !options.no_run {
-        log::info!("Executing code…");
-        let mut fiber = fiber::Fiber::new(lambda.as_ref().clone());
-        fiber.run();
-        match fiber.status() {
-            FiberStatus::Running => log::info!("Fiber is still running."),
-            FiberStatus::Done(value) => log::info!("Fiber is done: {:#?}", value),
-            FiberStatus::Panicked(value) => log::error!("Fiber panicked: {:#?}", value),
-        }
-    }
+    // if !options.no_run {
+    //     log::info!("Executing code…");
+    //     let mut fiber = fiber::Fiber::new(hir.as_ref().clone());
+    //     fiber.run();
+    //     match fiber.status() {
+    //         FiberStatus::Running => log::info!("Fiber is still running."),
+    //         FiberStatus::Done(value) => log::info!("Fiber is done: {:#?}", value),
+    //         FiberStatus::Panicked(value) => log::error!("Fiber panicked: {:#?}", value),
+    //     }
+    // }
 }
 
 async fn lsp() {
