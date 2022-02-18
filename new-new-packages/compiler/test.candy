@@ -16,7 +16,7 @@ isBool value =
   builtinIfElse isTrue { True } { isFalse }
 
 needs condition =
-  builtinIfElse (isBool condition) {} { panic "needs was called with the wrong arguments." }
+  builtinIfElse (isBool condition) {} { panic "`needs` was called with the wrong arguments." }
   builtinIfElse
     condition
     {}
