@@ -69,7 +69,7 @@ impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Int(value) => write!(f, "{}", value),
-            Value::Text(value) => write!(f, "{}", value),
+            Value::Text(value) => write!(f, "\"{}\"", value),
             Value::Symbol(value) => write!(f, "{}", value),
             Value::Lambda(_) => write!(f, "{{ … }}"),
         }
