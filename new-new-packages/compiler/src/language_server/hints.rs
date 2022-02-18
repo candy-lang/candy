@@ -37,12 +37,7 @@ fn hints(db: &dyn HintsDb, input_reference: InputReference) -> Vec<Hint> {
     let (_, ast_to_cst_id_mapping, _) = db.ast_raw(input_reference.clone()).unwrap();
     let (.., hir_to_ast_id_mapping, _) = db.hir_raw(input_reference.clone()).unwrap();
 
-    let reports = db.analyze(input_reference.clone());
-    for report in &reports {
-        log::error!("Report: {:?}", report);
-    }
-
-    reports
+    db.analyze(input_reference.clone())
         .into_iter()
         .filter_map(|report| {
             let (id, message) = match report {
