@@ -50,6 +50,8 @@ pub trait Discover: HirDb {
         arguments: Vec<hir::Id>,
         environment: Environment,
     ) -> DiscoverResult;
+
+    fn value_to_display_string(&self, input: Input, value: Value) -> String;
 }
 
 fn run_all(db: &dyn Discover, input: Input) -> HashMap<hir::Id, DiscoverResult> {
@@ -166,4 +168,24 @@ fn run_call(
     }
 
     db.run_with_environment(input, lambda_hir.body.out.unwrap(), inner_environment)
+}
+
+fn value_to_display_string(db: &dyn Discover, input: Input, value: Value) -> String {
+    match value {
+        Value::Int(value) => format!("{}", value),
+        Value::Text(value) => format!("\"{}\"", value),
+        Value::Symbol(value) => format!("{}", value),
+        Value::Lambda(Lambda { id, .. }) => {
+            let lambda = db.find_expression(input, id.clone()).unwrap();
+            if let Expression::Lambda(hir::Lambda { parameters, .. }) = lambda {
+                if parameters.is_empty() {
+                    "{ … }".to_owned()
+                } else {
+                    format!("{{ {} -> … }}", parameters.join(" "))
+                }
+            } else {
+                panic!("HIR of lambda {} is not a lambda.", id);
+            }
+        }
+    }
 }

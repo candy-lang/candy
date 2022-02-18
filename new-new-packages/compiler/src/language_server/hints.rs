@@ -80,7 +80,7 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
 
             Some(Hint {
                 kind,
-                text: format!(" # {}", value),
+                text: format!(" # {}", db.value_to_display_string(input.clone(), value)),
                 position,
             })
         })
