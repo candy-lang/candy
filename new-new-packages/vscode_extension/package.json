@@ -41,7 +41,7 @@
           "type": "string",
           "default": "",
           "markdownDescription": "Command to start the 🍭 Candy language server. If empty, we'll attempt to find the 🍭 Candy executable in the `PATH` environment variable.",
-          "scope": "machine-overridable"
+          "scope": "machine"
         }
       }
     },
