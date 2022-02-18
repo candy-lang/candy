@@ -13,8 +13,7 @@ use crate::{database::Database, input::Input};
 use language_server::CandyLanguageServer;
 use log;
 use lspower::{LspService, Server};
-use simplelog::{ColorChoice, Config, LevelFilter, TermLogger, TerminalMode};
-use std::{fs::File, path::PathBuf};
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -44,6 +43,7 @@ struct CandyRunOptions {
 
 #[tokio::main]
 async fn main() {
+    init_logger();
     match CandyOptions::from_args() {
         CandyOptions::Run(options) => run(options),
         CandyOptions::Lsp => lsp().await,
@@ -51,7 +51,6 @@ async fn main() {
 }
 
 fn run(options: CandyRunOptions) {
-    init_logger(TerminalMode::Mixed);
     let path_string = options.file.to_string_lossy();
     log::debug!("Running `{}`.\n", path_string);
 
@@ -115,7 +114,6 @@ fn run(options: CandyRunOptions) {
 }
 
 async fn lsp() {
-    init_logger(TerminalMode::Stderr);
     log::info!("Starting language server…");
     let (service, messages) = LspService::new(|client| CandyLanguageServer::from_client(client));
     Server::new(tokio::io::stdin(), tokio::io::stdout())
@@ -124,12 +122,21 @@ async fn lsp() {
         .await;
 }
 
-fn init_logger(terminal_mode: TerminalMode) {
-    TermLogger::init(
-        LevelFilter::Error,
-        Config::default(),
-        terminal_mode,
-        ColorChoice::Auto,
-    )
-    .unwrap();
+fn init_logger() {
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{} [{:>5}] {} {}",
+                chrono::Local::now().format("%H:%M:%S"),
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        .level_for("salsa", log::LevelFilter::Error)
+        .level_for("tokio_util", log::LevelFilter::Error)
+        .level_for("lspower::transport", log::LevelFilter::Error)
+        .chain(std::io::stderr())
+        .apply()
+        .unwrap();
 }

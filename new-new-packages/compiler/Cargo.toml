@@ -9,7 +9,9 @@ debug = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+chrono = "0.4.19"
 colored = "2.0.0"
+fern = "0.6.0"
 im = "15.0.0"
 itertools = { version = "0.10.0" }
 lazy_static = "1.4.0"
@@ -24,7 +26,6 @@ tokio-util = "0.6.0"
 salsa = "0.16.1"
 serde = { version = "1.0.83", features = ["derive"] }
 serde_json = "1.0.34"
-simplelog = "0.10.0"
 structopt = "0.3.25"
 strum = "0.23.0"
 strum_macros = "0.23"
