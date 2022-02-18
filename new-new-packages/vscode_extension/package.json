@@ -25,12 +25,21 @@
   "contributes": {
     "colors": [
       {
-        "id": "candy.hints",
-        "description": "The color of hints shown. If not supplied, the color for `tab.inactiveForeground` will be used.",
+        "id": "candy.hints.valueColor",
+        "description": "The color of hints indicating the value of an expression. If not supplied, the color for `tab.inactiveForeground` will be used.",
         "defaults": {
           "dark": "tab.inactiveForeground",
           "light": "tab.inactiveForeground",
           "highContrast": "tab.inactiveForeground"
+        }
+      },
+      {
+        "id": "candy.hints.panicColor",
+        "description": "The text color of hints indicating that the code panics. If not supplied, the color for `editorError.foreground` will be used.",
+        "defaults": {
+          "dark": "editorError.foreground",
+          "light": "editorError.foreground",
+          "highContrast": "editorError.foreground"
         }
       }
     ],

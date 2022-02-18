@@ -10,8 +10,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Hint {
+    kind: HintKind,
     text: String,
     range: Range,
+}
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HintKind {
+    Value,
+    Panic,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -40,11 +47,15 @@ fn hints(db: &dyn HintsDb, input_reference: InputReference) -> Vec<Hint> {
     db.analyze(input_reference.clone())
         .into_iter()
         .filter_map(|report| {
-            let (id, message) = match report {
-                AnalyzerReport::ValueOfExpression { id, value } => (id, format!("{}", value)),
-                AnalyzerReport::ExpressionPanics { id, value } => (id, format!("{}", value)),
+            let (id, kind, message) = match report {
+                AnalyzerReport::ValueOfExpression { id, value } => {
+                    (id, HintKind::Value, format!("{}", value))
+                }
+                AnalyzerReport::ExpressionPanics { id, value } => {
+                    (id, HintKind::Panic, format!("{}", value))
+                }
                 AnalyzerReport::FunctionHasError { function, .. } => {
-                    (function, "A function has an error.".into())
+                    (function, HintKind::Panic, "A function has an error.".into())
                 }
             };
             let id = match hir_to_ast_id_mapping.get(&id) {
@@ -64,6 +75,7 @@ fn hints(db: &dyn HintsDb, input_reference: InputReference) -> Vec<Hint> {
             let span = cst.find(&id).unwrap().span();
 
             Some(Hint {
+                kind,
                 text: format!(" # {}", message),
                 range: Range {
                     start: db

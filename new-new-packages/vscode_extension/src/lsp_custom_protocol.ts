@@ -10,6 +10,8 @@ export interface HintsParams {
   readonly hints: Hint[];
 }
 export interface Hint {
+  readonly kind: HintKind;
   readonly text: string;
   readonly range: Range;
 }
+export type HintKind = 'value' | 'panic';
