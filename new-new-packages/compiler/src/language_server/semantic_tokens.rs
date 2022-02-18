@@ -8,7 +8,7 @@ use crate::{
         cst::{Cst, CstKind},
         string_to_cst::StringToCst,
     },
-    input::InputReference,
+    input::Input,
     language_server::utils::TupleToPosition,
 };
 use lazy_static::lazy_static;
@@ -20,15 +20,12 @@ use super::utils::LspPositionConversion;
 
 #[salsa::query_group(SemanticTokenDbStorage)]
 pub trait SemanticTokenDb: LspPositionConversion + StringToCst {
-    fn semantic_tokens(&self, input_reference: InputReference) -> Vec<SemanticToken>;
+    fn semantic_tokens(&self, input: Input) -> Vec<SemanticToken>;
 }
 
-fn semantic_tokens(
-    db: &dyn SemanticTokenDb,
-    input_reference: InputReference,
-) -> Vec<SemanticToken> {
-    let mut context = Context::new(db, input_reference.clone());
-    context.visit_csts(&db.cst(input_reference).unwrap(), None);
+fn semantic_tokens(db: &dyn SemanticTokenDb, input: Input) -> Vec<SemanticToken> {
+    let mut context = Context::new(db, input.clone());
+    context.visit_csts(&db.cst(input).unwrap(), None);
     context.tokens
 }
 
@@ -77,15 +74,15 @@ impl SemanticTokenType {
 
 struct Context<'a> {
     db: &'a dyn SemanticTokenDb,
-    input_reference: InputReference,
+    input: Input,
     tokens: Vec<SemanticToken>,
     cursor: Position,
 }
 impl<'a> Context<'a> {
-    fn new(db: &'a dyn SemanticTokenDb, input_reference: InputReference) -> Context {
+    fn new(db: &'a dyn SemanticTokenDb, input: Input) -> Context {
         Context {
             db,
-            input_reference,
+            input,
             tokens: vec![],
             cursor: Position::new(0, 0),
         }
@@ -95,17 +92,15 @@ impl<'a> Context<'a> {
 
         let mut start = self
             .db
-            .utf8_byte_offset_to_lsp(range.start, self.input_reference.clone())
+            .utf8_byte_offset_to_lsp(range.start, self.input.clone())
             .to_position();
         let end = self
             .db
-            .utf8_byte_offset_to_lsp(range.end, self.input_reference.clone())
+            .utf8_byte_offset_to_lsp(range.end, self.input.clone())
             .to_position();
 
         if start.line != end.line {
-            let line_start_offsets = self
-                .db
-                .line_start_utf8_byte_offsets(self.input_reference.clone());
+            let line_start_offsets = self.db.line_start_utf8_byte_offsets(self.input.clone());
             while start.line != end.line {
                 assert!(start.line < end.line);
 

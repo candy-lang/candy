@@ -6,32 +6,31 @@ use super::ast::{self, Ast, AstKind, AstString, Identifier, Int, Lambda, Symbol,
 use super::cst::{self, Cst, CstKind};
 use super::error::CompilerError;
 use super::string_to_cst::StringToCst;
-use crate::input::InputReference;
+use crate::input::Input;
 
 #[salsa::query_group(CstToAstStorage)]
 pub trait CstToAst: StringToCst {
-    fn ast(
-        &self,
-        input_reference: InputReference,
-    ) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)>;
+    fn ast_to_cst_id(&self, input: Input, id: ast::Id) -> Option<cst::Id>;
+    fn ast(&self, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)>;
     fn ast_raw(
         &self,
-        input_reference: InputReference,
+        input: Input,
     ) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>, Vec<CompilerError>)>;
 }
 
-fn ast(
-    db: &dyn CstToAst,
-    input_reference: InputReference,
-) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)> {
-    db.ast_raw(input_reference)
+fn ast_to_cst_id(db: &dyn CstToAst, input: Input, id: ast::Id) -> Option<cst::Id> {
+    let (_, ast_to_cst_id_mapping) = db.ast(input).unwrap();
+    ast_to_cst_id_mapping.get(&id).cloned()
+}
+fn ast(db: &dyn CstToAst, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)> {
+    db.ast_raw(input)
         .map(|(ast, id_mapping, _)| (ast, id_mapping))
 }
 fn ast_raw(
     db: &dyn CstToAst,
-    input_reference: InputReference,
+    input: Input,
 ) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>, Vec<CompilerError>)> {
-    let cst = db.cst(input_reference)?;
+    let cst = db.cst(input)?;
     let mut context = LoweringContext::new();
     let asts = (&mut context).lower_csts(&cst);
     Some((Arc::new(asts), context.id_mapping, context.errors))

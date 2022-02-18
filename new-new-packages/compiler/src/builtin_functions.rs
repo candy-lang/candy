@@ -5,12 +5,6 @@ use strum_macros::EnumIter;
 #[derive(Debug, EnumIter, PartialEq, Eq, Clone, Hash)]
 pub enum BuiltinFunction {
     Add,
-    Call0,
-    Call1,
-    Call2,
-    Call3,
-    Call4,
-    Call5,
     Equals,
     GetArgumentCount,
     IfElse,

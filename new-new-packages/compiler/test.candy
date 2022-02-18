@@ -16,7 +16,7 @@ isBool value =
   builtinIfElse isTrue { True } { isFalse }
 
 needs condition =
-  builtinIfElse (isBool condition) {} { panic "needs was called with the wrong arguments." }
+  builtinIfElse (isBool condition) {} { panic "`needs` was called with the wrong arguments." }
   builtinIfElse
     condition
     {}
@@ -61,25 +61,6 @@ if condition then =
   needs (isBool condition)
   needs (isFunction0 then)
   ifElse condition then {}
-
-call0 function =
-  needs (isFunction0 function)
-  builtinCall0 function
-call1 function argument =
-  needs (isFunction1 function)
-  builtinCall1 function argument
-call2 function argument0 argument1 =
-  needs (isFunction2 function)
-  builtinCall2 function argument0 argument1
-call3 function argument0 argument1 argument2 =
-  needs (isFunction3 function)
-  builtinCall3 function argument0 argument1 argument2
-call4 function argument0 argument1 argument2 argument3 =
-  needs (isFunction4 function)
-  builtinCall4 function argument0 argument1 argument2 argument3
-call5 function argument0 argument1 argument2 argument3 argument4 =
-  needs (isFunction5 function)
-  builtinCall5 function argument0 argument1 argument2 argument3 argument4
 
 add a b =
   aIsInt = isInt a
@@ -130,7 +111,7 @@ fibonacci n = foo
 fibonacci = { n ->
   blub
 }
-
+bar
 
 lambda =
   foo = 1

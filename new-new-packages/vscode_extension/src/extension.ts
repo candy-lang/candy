@@ -61,10 +61,7 @@ function safeSpawn(): SpawnedProcess {
   const languageServerCommand = configuration.get<string>(
     'languageServerCommand'
   );
-  if (
-    languageServerCommand != null &&
-    languageServerCommand.trim().length !== 0
-  ) {
+  if (languageServerCommand && languageServerCommand.trim().length !== 0) {
     const parts = languageServerCommand.split(' ');
     command = [parts[0], parts.slice(1)];
   }

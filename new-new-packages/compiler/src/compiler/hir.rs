@@ -5,23 +5,24 @@ use std::{
 
 use im::HashMap;
 use itertools::Itertools;
+use linked_hash_map::LinkedHashMap;
 
-use crate::input::InputReference;
+use crate::input::Input;
 
 use super::ast_to_hir::AstToHir;
 
 #[salsa::query_group(HirDbStorage)]
 pub trait HirDb: AstToHir {
-    fn find_expression(&self, input_reference: InputReference, id: Id) -> Option<Expression>;
-    fn all_hir_ids(&self, input_reference: InputReference) -> Option<Vec<Id>>;
+    fn find_expression(&self, input: Input, id: Id) -> Option<Expression>;
+    fn all_hir_ids(&self, input: Input) -> Option<Vec<Id>>;
 }
 
-fn find_expression(db: &dyn HirDb, input_reference: InputReference, id: Id) -> Option<Expression> {
-    let (hir, _) = db.hir(input_reference).unwrap();
+fn find_expression(db: &dyn HirDb, input: Input, id: Id) -> Option<Expression> {
+    let (hir, _) = db.hir(input).unwrap();
     hir.find(&id).map(|it| it.to_owned())
 }
-fn all_hir_ids(db: &dyn HirDb, input_reference: InputReference) -> Option<Vec<Id>> {
-    let (hir, _) = db.hir(input_reference)?;
+fn all_hir_ids(db: &dyn HirDb, input: Input) -> Option<Vec<Id>> {
+    let (hir, _) = db.hir(input)?;
     let mut ids = vec![];
     hir.collect_all_ids(&mut ids);
     log::info!("all HIR IDs: {:?}", ids);
@@ -112,7 +113,7 @@ pub struct Lambda {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Body {
-    pub expressions: HashMap<Id, Expression>,
+    pub expressions: LinkedHashMap<Id, Expression>,
     pub identifiers: HashMap<Id, String>,
     pub out: Option<Id>,
 }
@@ -120,7 +121,7 @@ pub struct Body {
 impl Body {
     pub fn new() -> Self {
         Self {
-            expressions: HashMap::new(),
+            expressions: LinkedHashMap::new(),
             identifiers: HashMap::new(),
             out: None,
         }

@@ -1,7 +1,7 @@
 use crate::{
     builtin_functions::{self, BuiltinFunction},
     compiler::hir::{self, Body, Expression, HirDb},
-    input::InputReference,
+    input::Input,
 };
 use im::HashMap;
 use log;
@@ -22,49 +22,51 @@ pub type DiscoverResult = Option<EvaluationResult>;
 
 #[salsa::query_group(DiscoverStorage)]
 pub trait Discover: HirDb {
-    fn run_all(&self, input_reference: InputReference) -> HashMap<hir::Id, DiscoverResult>;
-    fn run(&self, input_reference: InputReference, id: hir::Id) -> DiscoverResult;
+    fn run_all(&self, input: Input) -> HashMap<hir::Id, DiscoverResult>;
+    fn run(&self, input: Input, id: hir::Id) -> DiscoverResult;
     fn run_with_environment(
         &self,
-        input_reference: InputReference,
+        input: Input,
         id: hir::Id,
         environment: Environment,
     ) -> DiscoverResult;
     fn run_multiple_with_environment(
         &self,
-        input_reference: InputReference,
+        input: Input,
         ids: Vec<hir::Id>,
         environment: Environment,
     ) -> Option<Result<Vec<Value>, Value>>;
     fn run_call(
         &self,
-        input_reference: InputReference,
+        input: Input,
         function_id: hir::Id,
         arguments: Vec<hir::Id>,
         environment: Environment,
     ) -> DiscoverResult;
     fn run_builtin_function(
         &self,
-        input_reference: InputReference,
+        input: Input,
         builtin_function: BuiltinFunction,
         arguments: Vec<hir::Id>,
         environment: Environment,
     ) -> DiscoverResult;
+
+    fn value_to_display_string(&self, input: Input, value: Value) -> String;
 }
 
-fn run_all(db: &dyn Discover, input_reference: InputReference) -> HashMap<hir::Id, DiscoverResult> {
-    db.all_hir_ids(input_reference.to_owned())
+fn run_all(db: &dyn Discover, input: Input) -> HashMap<hir::Id, DiscoverResult> {
+    db.all_hir_ids(input.to_owned())
         .unwrap()
         .into_iter()
-        .map(move |id| (id.to_owned(), db.run(input_reference.to_owned(), id)))
+        .map(move |id| (id.to_owned(), db.run(input.to_owned(), id)))
         .collect()
 }
-fn run(db: &dyn Discover, input_reference: InputReference, id: hir::Id) -> DiscoverResult {
-    db.run_with_environment(input_reference, id, Environment::new(HashMap::new()))
+fn run(db: &dyn Discover, input: Input, id: hir::Id) -> DiscoverResult {
+    db.run_with_environment(input, id, Environment::new(HashMap::new()))
 }
 fn run_with_environment(
     db: &dyn Discover,
-    input_reference: InputReference,
+    input: Input,
     id: hir::Id,
     environment: Environment,
 ) -> DiscoverResult {
@@ -72,48 +74,39 @@ fn run_with_environment(
         return Some(Ok(value));
     }
 
-    let expression = db.find_expression(input_reference.to_owned(), id.to_owned())?;
+    let expression = db.find_expression(input.to_owned(), id.to_owned())?;
     match expression {
         Expression::Int(int) => Some(Ok(int.to_owned().into())),
         Expression::Text(string) => Some(Ok(string.to_owned().into())),
-        Expression::Reference(reference) => {
-            db.run_with_environment(input_reference, reference, environment)
-        }
+        Expression::Reference(reference) => db.run_with_environment(input, reference, environment),
         Expression::Symbol(symbol) => Some(Ok(Value::Symbol(symbol.to_owned()))),
         Expression::Lambda(_) => Some(Ok(Value::Lambda(Lambda {
             captured_environment: environment.to_owned(),
             id,
         }))),
         Expression::Body(Body { out, .. }) => {
-            db.run_with_environment(input_reference, out.unwrap(), environment)
+            db.run_with_environment(input, out.unwrap(), environment)
         }
         Expression::Call {
             function,
             arguments,
-        } => db.run_call(input_reference, function, arguments, environment),
+        } => db.run_call(input, function, arguments, environment),
         Expression::Error => None,
     }
 }
 fn run_multiple_with_environment(
     db: &dyn Discover,
-    input_reference: InputReference,
+    input: Input,
     ids: Vec<hir::Id>,
     environment: Environment,
 ) -> Option<Result<Vec<Value>, Value>> {
     ids.into_iter()
-        .map(|it| {
-            run_with_environment(
-                db,
-                input_reference.to_owned(),
-                it.to_owned(),
-                environment.to_owned(),
-            )
-        })
+        .map(|it| run_with_environment(db, input.to_owned(), it.to_owned(), environment.to_owned()))
         .collect::<Option<Result<Vec<Value>, Value>>>()
 }
 fn run_call(
     db: &dyn Discover,
-    input_reference: InputReference,
+    input: Input,
     function: hir::Id,
     arguments: Vec<hir::Id>,
     environment: Environment,
@@ -121,7 +114,7 @@ fn run_call(
     if let &[builtin_function_index] = &function.0[..] {
         if let Some(builtin_function) = builtin_functions::VALUES.get(builtin_function_index) {
             return db.run_builtin_function(
-                input_reference,
+                input,
                 builtin_function.to_owned(),
                 arguments.to_owned(),
                 environment,
@@ -130,7 +123,7 @@ fn run_call(
     }
 
     let lambda = match db.run_with_environment(
-        input_reference.to_owned(),
+        input.to_owned(),
         function.to_owned(),
         environment.to_owned(),
     )? {
@@ -138,7 +131,7 @@ fn run_call(
         Ok(_) => return None,
         Err(error) => return Some(Err(error)),
     };
-    let lambda_hir = match db.find_expression(input_reference.to_owned(), lambda.id)? {
+    let lambda_hir = match db.find_expression(input.to_owned(), lambda.id)? {
         Expression::Lambda(lambda) => lambda,
         hir => panic!(
             "Discover lambda is not backed by a HIR lambda, but `{}`.",
@@ -147,12 +140,12 @@ fn run_call(
     };
 
     let lambda_parent = if let Some(lambda_parent_id) = function.parent() {
-        match db.find_expression(input_reference.to_owned(), lambda_parent_id)? {
+        match db.find_expression(input.to_owned(), lambda_parent_id)? {
             Expression::Body(body) => body,
             hir => panic!("A called lambda's parent isn't a body, but `{}`", hir),
         }
     } else {
-        let (hir, _) = db.hir(input_reference.to_owned()).unwrap();
+        let (hir, _) = db.hir(input.to_owned()).unwrap();
         hir.as_ref().to_owned()
     };
     let function_name = lambda_parent.identifiers.get(&function).unwrap();
@@ -162,11 +155,8 @@ fn run_call(
         return None;
     }
 
-    let arguments = db.run_multiple_with_environment(
-        input_reference.to_owned(),
-        arguments,
-        environment.to_owned(),
-    )?;
+    let arguments =
+        db.run_multiple_with_environment(input.to_owned(), arguments, environment.to_owned())?;
     let arguments = match arguments {
         Ok(arguments) => arguments,
         Err(error) => return Some(Err(error)),
@@ -177,9 +167,25 @@ fn run_call(
         inner_environment.store(lambda_hir.first_id.clone() + index, argument);
     }
 
-    db.run_with_environment(
-        input_reference,
-        lambda_hir.body.out.unwrap(),
-        inner_environment,
-    )
+    db.run_with_environment(input, lambda_hir.body.out.unwrap(), inner_environment)
+}
+
+fn value_to_display_string(db: &dyn Discover, input: Input, value: Value) -> String {
+    match value {
+        Value::Int(value) => format!("{}", value),
+        Value::Text(value) => format!("\"{}\"", value),
+        Value::Symbol(value) => format!("{}", value),
+        Value::Lambda(Lambda { id, .. }) => {
+            let lambda = db.find_expression(input, id.clone()).unwrap();
+            if let Expression::Lambda(hir::Lambda { parameters, .. }) = lambda {
+                if parameters.is_empty() {
+                    "{ … }".to_owned()
+                } else {
+                    format!("{{ {} -> … }}", parameters.join(" "))
+                }
+            } else {
+                panic!("HIR of lambda {} is not a lambda.", id);
+            }
+        }
+    }
 }

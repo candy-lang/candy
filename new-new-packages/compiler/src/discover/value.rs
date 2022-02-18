@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use im::HashMap;
 
 use crate::compiler::hir::Id;
@@ -34,17 +32,6 @@ impl Value {
     pub fn bool_false() -> Self {
         Value::Symbol("False".to_owned())
     }
-    pub fn argument_count_mismatch_text(
-        function_name: &str,
-        parameter_count: usize,
-        argument_count: usize,
-    ) -> Value {
-        format!(
-            "Function `{}` expects {} arguments, but {} were given.",
-            function_name, parameter_count, argument_count
-        )
-        .into()
-    }
 }
 impl From<u64> for Value {
     fn from(value: u64) -> Self {
@@ -62,16 +49,6 @@ impl From<bool> for Value {
             Value::bool_true()
         } else {
             Value::bool_false()
-        }
-    }
-}
-impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Value::Int(value) => write!(f, "{}", value),
-            Value::Text(value) => write!(f, "{}", value),
-            Value::Symbol(value) => write!(f, "{}", value),
-            Value::Lambda(_) => write!(f, "{{ … }}"),
         }
     }
 }

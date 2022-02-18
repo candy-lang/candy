@@ -1,17 +1,28 @@
 use super::utils::LspPositionConversion;
 use crate::{
-    analyzer::{Analyze, AnalyzerReport},
-    compiler::{ast_to_hir::AstToHir, cst::CstVecExtension},
-    input::InputReference,
+    compiler::{
+        ast_to_hir::AstToHir,
+        hir::{self, Expression, HirDb, Lambda},
+    },
+    discover::{run::Discover, value::Value},
+    input::{Input, InputDb},
     language_server::utils::TupleToPosition,
 };
-use lsp_types::{notification::Notification, Range};
+use itertools::Itertools;
+use lsp_types::{notification::Notification, Position};
 use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Hint {
+    kind: HintKind,
     text: String,
-    range: Range,
+    position: Position,
+}
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HintKind {
+    Value,
+    Panic,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -26,59 +37,95 @@ impl Notification for HintsNotification {
 }
 
 #[salsa::query_group(HintsDbStorage)]
-pub trait HintsDb: Analyze + AstToHir + LspPositionConversion {
-    fn hints(&self, input_reference: InputReference) -> Vec<Hint>;
+pub trait HintsDb: AstToHir + Discover + HirDb + InputDb + LspPositionConversion {
+    fn hints(&self, input: Input) -> Vec<Hint>;
 }
 
-fn hints(db: &dyn HintsDb, input_reference: InputReference) -> Vec<Hint> {
+fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
     log::debug!("Calculating hints!");
 
-    let (cst, _) = db.cst_raw(input_reference.clone()).unwrap();
-    let (_, ast_to_cst_id_mapping, _) = db.ast_raw(input_reference.clone()).unwrap();
-    let (.., hir_to_ast_id_mapping, _) = db.hir_raw(input_reference.clone()).unwrap();
+    let (hir, _) = db.hir(input.clone()).unwrap();
 
-    let reports = db.analyze(input_reference.clone());
-    for report in &reports {
-        log::error!("Report: {:?}", report);
-    }
-
-    reports
+    collect_hir_ids_for_hints_list(db, input.clone(), hir.expressions.keys().cloned().collect())
         .into_iter()
-        .filter_map(|report| {
-            let (id, message) = match report {
-                AnalyzerReport::ValueOfExpression { id, value } => (id, format!("{}", value)),
-                AnalyzerReport::ExpressionPanics { id, value } => (id, format!("{}", value)),
-                AnalyzerReport::FunctionHasError { function, .. } => {
-                    (function, "A function has an error.".into())
-                }
+        .filter_map(|id| {
+            let value = db.run(input.clone(), id.clone());
+            value.map(|it| (id, it))
+        })
+        .filter_map(|(id, value)| {
+            if value == Ok(Value::nothing()) {
+                return None;
             };
-            let id = match hir_to_ast_id_mapping.get(&id) {
-                Some(id) => id,
-                None => {
-                    log::info!("Couldn't find ID {}.", id);
-                    return None;
-                }
+
+            let (kind, value) = match value {
+                Ok(value) => (HintKind::Value, value),
+                Err(value) => (HintKind::Panic, value),
             };
-            let id = match ast_to_cst_id_mapping.get(&id) {
-                Some(id) => id,
-                None => {
-                    log::info!("Couldn't find ID {:?}.", id);
-                    return None;
-                }
+
+            let span = db.hir_to_display_span(input.clone(), id.clone()).unwrap();
+
+            let line = db
+                .utf8_byte_offset_to_lsp(span.start, input.clone())
+                .to_position()
+                .line;
+            let line_start_offsets = db.line_start_utf8_byte_offsets(input.clone());
+            let last_characer_of_line = if line as usize == line_start_offsets.len() - 1 {
+                db.get_input(input.clone()).unwrap().len()
+            } else {
+                line_start_offsets[(line + 1) as usize] - 1
             };
-            let span = cst.find(&id).unwrap().span();
+            let position = db
+                .utf8_byte_offset_to_lsp(last_characer_of_line, input.clone())
+                .to_position();
 
             Some(Hint {
-                text: format!(" # {}", message),
-                range: Range {
-                    start: db
-                        .utf8_byte_offset_to_lsp(span.start, input_reference.clone())
-                        .to_position(),
-                    end: db
-                        .utf8_byte_offset_to_lsp(span.end, input_reference.clone())
-                        .to_position(),
-                },
+                kind,
+                text: format!(" # {}", db.value_to_display_string(input.clone(), value)),
+                position,
             })
         })
+        // If multiple hints are on the same line, only show the first one.
+        .group_by(|hint| hint.position.line)
+        .into_iter()
+        .map(|(_, hints)| hints.into_iter().nth(0).unwrap())
         .collect()
+}
+
+fn collect_hir_ids_for_hints_list(
+    db: &dyn HintsDb,
+    input: Input,
+    ids: Vec<hir::Id>,
+) -> Vec<hir::Id> {
+    ids.into_iter()
+        .flat_map(|id| collect_hir_ids_for_hints(db, input.clone(), id))
+        .collect()
+}
+fn collect_hir_ids_for_hints(db: &dyn HintsDb, input: Input, id: hir::Id) -> Vec<hir::Id> {
+    match db.find_expression(input.clone(), id.clone()).unwrap() {
+        Expression::Int(_) => vec![],
+        Expression::Text(_) => vec![],
+        Expression::Reference(_) => vec![id],
+        Expression::Symbol(_) => vec![],
+        Expression::Lambda(Lambda { body, .. }) => {
+            collect_hir_ids_for_hints_list(db, input, body.expressions.keys().cloned().collect())
+        }
+        Expression::Body(body) => {
+            collect_hir_ids_for_hints_list(db, input, body.expressions.keys().cloned().collect())
+        }
+        Expression::Call { arguments, .. } => {
+            let mut ids = vec![id.to_owned()];
+            for argument_id in arguments {
+                let argument = db
+                    .find_expression(input.clone(), argument_id.clone())
+                    .unwrap();
+                if let Expression::Reference(_) = argument {
+                    continue;
+                }
+
+                ids.extend(collect_hir_ids_for_hints(db, input.clone(), argument_id));
+            }
+            ids
+        }
+        Expression::Error => vec![],
+    }
 }

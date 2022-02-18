@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     compiler::{ast_to_hir::AstToHir, cst_to_ast::CstToAst, string_to_cst::StringToCst},
-    input::{Input, InputReference},
+    input::{Input, InputDb},
     language_server::hints::HintsDb,
     Database,
 };
@@ -139,26 +139,26 @@ impl LanguageServer for CandyLanguageServer {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let input_reference = params.text_document.uri.into();
+        let input = params.text_document.uri.into();
         {
             let mut db = self.db.lock().await;
-            db.did_open_input(&input_reference, params.text_document.text);
+            db.did_open_input(&input, params.text_document.text);
         }
-        self.analyze_file(input_reference).await;
+        self.analyze_file(input).await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        let input_reference: InputReference = params.text_document.uri.into();
+        let input: Input = params.text_document.uri.into();
         {
             let mut db = self.db.lock().await;
-            let text = apply_text_changes(&db, input_reference.clone(), params.content_changes);
-            db.did_change_input(&input_reference, text);
+            let text = apply_text_changes(&db, input.clone(), params.content_changes);
+            db.did_change_input(&input, text);
         }
-        self.analyze_file(input_reference).await;
+        self.analyze_file(input).await;
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
-        let input_reference = params.text_document.uri.into();
+        let input = params.text_document.uri.into();
         let mut db = self.db.lock().await;
-        db.did_close_input(&input_reference);
+        db.did_close_input(&input);
     }
 
     async fn folding_range(
@@ -184,31 +184,31 @@ impl LanguageServer for CandyLanguageServer {
 }
 
 impl CandyLanguageServer {
-    async fn analyze_file(&self, input_reference: InputReference) {
+    async fn analyze_file(&self, input: Input) {
         log::debug!("Analyzing file. Locking guard.");
         let db = self.db.lock().await;
         log::debug!("Locked.");
 
-        let (_, cst_errors) = db.cst_raw(input_reference.clone()).unwrap();
-        let (_, _, ast_errors) = db.ast_raw(input_reference.clone()).unwrap();
-        let (_, _, hir_errors) = db.hir_raw(input_reference.clone()).unwrap();
+        let (_, cst_errors) = db.cst_raw(input.clone()).unwrap();
+        let (_, _, ast_errors) = db.ast_raw(input.clone()).unwrap();
+        let (_, _, hir_errors) = db.hir_raw(input.clone()).unwrap();
 
         log::debug!("Mapping errors to diagnostics.");
         let diagnostics = cst_errors
             .into_iter()
             .chain(ast_errors.into_iter())
             .chain(hir_errors.into_iter())
-            .map(|it| it.to_diagnostic(&db, input_reference.clone()))
+            .map(|it| it.to_diagnostic(&db, input.clone()))
             .collect();
         log::debug!("Publishing diagnostics.");
         self.client
-            .publish_diagnostics(input_reference.clone().into(), diagnostics, None)
+            .publish_diagnostics(input.clone().into(), diagnostics, None)
             .await;
         log::debug!("Published.");
-        let hints = db.hints(input_reference.clone());
+        let hints = db.hints(input.clone());
         self.client
             .send_custom_notification::<HintsNotification>(HintsNotification {
-                uri: Url::from(input_reference).to_string(),
+                uri: Url::from(input).to_string(),
                 hints,
             })
             .await;
@@ -217,26 +217,22 @@ impl CandyLanguageServer {
 
 fn apply_text_changes(
     db: &Database,
-    input_reference: InputReference,
+    input: Input,
     changes: Vec<TextDocumentContentChangeEvent>,
 ) -> String {
-    let mut text = db
-        .get_input(input_reference.clone())
-        .unwrap()
-        .as_ref()
-        .to_owned();
+    let mut text = db.get_input(input.clone()).unwrap().as_ref().to_owned();
     for change in changes {
         match change.range {
             Some(range) => {
                 let start = db.position_to_utf8_byte_offset(
                     range.start.line,
                     range.start.character,
-                    input_reference.clone(),
+                    input.clone(),
                 );
                 let end = db.position_to_utf8_byte_offset(
                     range.end.line,
                     range.end.character,
-                    input_reference.clone(),
+                    input.clone(),
                 );
                 text = format!("{}{}{}", &text[..start], &change.text, &text[end..]);
             }
