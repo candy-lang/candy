@@ -111,7 +111,7 @@ fibonacci n = foo
 fibonacci = { n ->
   blub
 }
-
+bar
 
 lambda =
   foo = 1
