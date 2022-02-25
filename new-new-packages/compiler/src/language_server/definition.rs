@@ -20,26 +20,20 @@ pub fn find_definition(
     let input: Input = params.text_document.uri.clone().into();
     let position = params.position;
     let offset = db.position_to_utf8_byte_offset(position.line, position.character, input.clone());
-    log::info!("find_definition: 0");
 
     let origin_cst = db.find_cst_by_offset(input.clone(), offset);
     match origin_cst.kind {
         CstKind::Identifier { .. } => {}
         _ => return None,
     }
-    log::info!("find_definition: 1");
 
     let origin_hir_id = db.cst_to_hir_id(input.clone(), origin_cst.id)?;
-    log::info!("find_definition: 2");
     let origin_expression = db.find_expression(input.clone(), origin_hir_id)?;
-    log::info!("find_definition: 3");
     let target_hir_id = match origin_expression {
         Expression::Reference(id) => id,
         _ => return None,
     };
-    log::info!("find_definition: 4");
     let target_cst_id = db.hir_to_cst_id(input.clone(), target_hir_id)?;
-    log::info!("find_definition: 5");
     let target_cst = db.find_cst(input.clone(), target_cst_id);
 
     let result = GotoDefinitionResponse::Link(vec![LocationLink {
