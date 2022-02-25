@@ -1,5 +1,8 @@
 use im::HashSet;
-use lsp_types::{DocumentHighlight, DocumentHighlightKind, Location, ReferenceParams};
+use lsp_types::{
+    DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Location, ReferenceParams,
+    TextDocumentPositionParams,
+};
 
 use crate::{
     compiler::{
@@ -14,13 +17,31 @@ use crate::{
 use super::utils::{LspPositionConversion, TupleToPosition};
 
 pub fn find_references(db: &Database, params: ReferenceParams) -> Option<Vec<Location>> {
-    let input: Input = params
-        .text_document_position
-        .text_document
-        .uri
-        .clone()
-        .into();
-    let position = params.text_document_position.position;
+    let position = params.text_document_position;
+    let references = find(db, position.clone(), params.context.include_declaration)?
+        .into_iter()
+        .map(|it| Location {
+            uri: position.text_document.uri.clone(),
+            range: it.range,
+        })
+        .collect();
+    Some(references)
+}
+
+pub fn find_document_highlights(
+    db: &Database,
+    params: DocumentHighlightParams,
+) -> Option<Vec<DocumentHighlight>> {
+    find(db, params.text_document_position_params, true)
+}
+
+fn find(
+    db: &Database,
+    params: TextDocumentPositionParams,
+    include_declaration: bool,
+) -> Option<Vec<DocumentHighlight>> {
+    let input: Input = params.text_document.uri.clone().into();
+    let position = params.position;
     let offset = db.offset_from_lsp(input.clone(), position.line, position.character);
 
     let origin_cst = db.find_cst_by_offset(input.clone(), offset);
@@ -30,15 +51,7 @@ pub fn find_references(db: &Database, params: ReferenceParams) -> Option<Vec<Loc
     }
 
     let origin_hir_id = db.cst_to_hir_id(input.clone(), origin_cst.id)?;
-    let references = db
-        .references(input, origin_hir_id, params.context.include_declaration)
-        .into_iter()
-        .map(|it| Location {
-            uri: params.text_document_position.text_document.uri.clone(),
-            range: it.range,
-        })
-        .collect();
-    Some(references)
+    Some(db.references(input, origin_hir_id, include_declaration))
 }
 
 #[salsa::query_group(ReferencesDbStorage)]

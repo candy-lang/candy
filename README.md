@@ -71,7 +71,7 @@ Our TODO list:
   * [x] ~~declaration~~, definition, ~~typeDefinition~~
   * [ ] implementation
   * [x] references
-  * [ ] documentHighlight
+  * [x] documentHighlight
   * [ ] documentSymbol
   * [ ] codeAction, codeAction resolve
   * [ ] codeLens, codeLens resolve, codeLens refresh
