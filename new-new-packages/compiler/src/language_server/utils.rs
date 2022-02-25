@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
 
 use crate::{
@@ -49,6 +51,17 @@ impl From<Input> for Url {
 }
 
 // UTF-8 Byte Offset ↔ LSP Position/Range
+
+impl Database {
+    pub fn range_to_lsp(&self, input: Input, range: Range<usize>) -> lsp_types::Range {
+        lsp_types::Range {
+            start: self
+                .utf8_byte_offset_to_lsp(range.start, input.clone())
+                .to_position(),
+            end: self.utf8_byte_offset_to_lsp(range.end, input).to_position(),
+        }
+    }
+}
 
 #[salsa::query_group(LspPositionConversionStorage)]
 pub trait LspPositionConversion: InputDb {
