@@ -87,15 +87,15 @@ impl LoweringContext {
                 self.create_ast(cst.id, AstKind::Int(Int(value.to_owned())))
             }
             CstKind::Text { value, .. } => {
-                let string = self.create_string(cst.id, value.to_owned());
+                let string = self.create_string_without_id_mapping(value.to_owned());
                 self.create_ast(cst.id, AstKind::Text(Text(string)))
             }
             CstKind::Identifier { value, .. } => {
-                let string = self.create_string(cst.id, value.to_owned());
+                let string = self.create_string_without_id_mapping(value.to_owned());
                 self.create_ast(cst.id, AstKind::Identifier(Identifier(string)))
             }
             CstKind::Symbol { value, .. } => {
-                let string = self.create_string(cst.id, value.to_owned());
+                let string = self.create_string_without_id_mapping(value.to_owned());
                 self.create_ast(cst.id, AstKind::Symbol(Symbol(string)))
             }
             CstKind::LeadingWhitespace { child, .. } => self.lower_cst(child),
@@ -329,9 +329,19 @@ impl LoweringContext {
             value,
         }
     }
+    fn create_string_without_id_mapping(&mut self, value: String) -> AstString {
+        AstString {
+            id: self.create_next_id_without_mapping(),
+            value,
+        }
+    }
     fn create_next_id(&mut self, cst_id: cst::Id) -> ast::Id {
-        let id = ast::Id(self.next_id);
+        let id = self.create_next_id_without_mapping();
         assert!(matches!(self.id_mapping.insert(id, cst_id), None));
+        id
+    }
+    fn create_next_id_without_mapping(&mut self) -> ast::Id {
+        let id = ast::Id(self.next_id);
         self.next_id += 1;
         id
     }
