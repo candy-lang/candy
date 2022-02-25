@@ -11,11 +11,11 @@ use super::string_to_cst::StringToCst;
 
 #[salsa::query_group(CstDbStorage)]
 pub trait CstDb: StringToCst {
-    fn find_cst(&self, input: Input, id: Id) -> Option<Cst>;
+    fn find_cst(&self, input: Input, id: Id) -> Cst;
 }
 
-fn find_cst(db: &dyn CstDb, input: Input, id: Id) -> Option<Cst> {
-    db.cst(input).unwrap().find(&id).map(|it| it.to_owned())
+fn find_cst(db: &dyn CstDb, input: Input, id: Id) -> Cst {
+    db.cst(input).unwrap().find(&id).unwrap().to_owned()
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]

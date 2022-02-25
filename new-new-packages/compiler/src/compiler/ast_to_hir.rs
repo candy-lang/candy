@@ -38,7 +38,7 @@ fn hir_id_to_span(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<Range<
 }
 fn hir_id_to_display_span(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<Range<usize>> {
     let id = db.hir_to_cst_id(input.clone(), id)?;
-    Some(db.find_cst(input, id)?.display_span())
+    Some(db.find_cst(input, id).display_span())
 }
 
 fn hir(db: &dyn AstToHir, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)> {

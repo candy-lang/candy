@@ -28,7 +28,7 @@ fn ast_to_cst_id(db: &dyn CstToAst, input: Input, id: ast::Id) -> Option<cst::Id
 }
 fn ast_id_to_span(db: &dyn CstToAst, input: Input, id: ast::Id) -> Option<Range<usize>> {
     let id = db.ast_to_cst_id(input.clone(), id)?;
-    Some(db.find_cst(input, id)?.span())
+    Some(db.find_cst(input, id).span())
 }
 
 fn ast(db: &dyn CstToAst, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)> {
