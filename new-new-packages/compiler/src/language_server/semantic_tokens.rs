@@ -154,8 +154,12 @@ impl<'a> Context<'a> {
     fn visit_cst(&mut self, cst: &Cst, token_type_for_identifier: Option<SemanticTokenType>) {
         match &cst.kind {
             CstKind::EqualsSign { .. } => self.add_token(cst.span(), SemanticTokenType::Operator),
+            CstKind::Colon { .. } => {}
+            CstKind::Comma { .. } => {}
             CstKind::OpeningParenthesis { .. } => {}
             CstKind::ClosingParenthesis { .. } => {}
+            CstKind::OpeningBracket { .. } => {}
+            CstKind::ClosingBracket { .. } => {}
             CstKind::OpeningCurlyBrace { .. } => {}
             CstKind::ClosingCurlyBrace { .. } => {}
             CstKind::Arrow { .. } => {}
@@ -193,6 +197,36 @@ impl<'a> Context<'a> {
                 self.visit_cst(opening_parenthesis, None);
                 self.visit_cst(inner, None);
                 self.visit_cst(closing_parenthesis, None);
+            }
+            CstKind::Struct {
+                opening_bracket,
+                entries,
+                closing_bracket,
+            } => {
+                self.visit_cst(opening_bracket, None);
+                self.visit_csts(entries, None);
+                if let Some(closing_bracket) = closing_bracket {
+                    self.visit_cst(closing_bracket, None);
+                }
+            }
+            CstKind::StructEntry {
+                key,
+                colon,
+                value,
+                comma,
+            } => {
+                if let Some(key) = key {
+                    self.visit_cst(key, None);
+                }
+                if let Some(colon) = colon {
+                    self.visit_cst(colon, None);
+                }
+                if let Some(value) = value {
+                    self.visit_cst(value, None);
+                }
+                if let Some(comma) = comma {
+                    self.visit_cst(comma, None);
+                }
             }
             CstKind::Lambda {
                 opening_curly_brace,

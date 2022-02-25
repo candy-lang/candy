@@ -43,8 +43,12 @@ impl<'a> Context<'a> {
     fn visit_cst(&mut self, cst: &Cst) {
         match &cst.kind {
             CstKind::EqualsSign { .. } => {}
+            CstKind::Colon { .. } => {}
+            CstKind::Comma { .. } => {}
             CstKind::OpeningParenthesis { .. } => {}
             CstKind::ClosingParenthesis { .. } => {}
+            CstKind::OpeningBracket { .. } => {}
+            CstKind::ClosingBracket { .. } => {}
             CstKind::OpeningCurlyBrace { .. } => {}
             CstKind::ClosingCurlyBrace { .. } => {}
             CstKind::Arrow { .. } => {}
@@ -58,6 +62,15 @@ impl<'a> Context<'a> {
             CstKind::TrailingWhitespace { child, .. } => self.visit_cst(child),
             CstKind::TrailingComment { child, .. } => self.visit_cst(child),
             CstKind::Parenthesized { inner, .. } => self.visit_cst(inner),
+            CstKind::Struct { entries, .. } => self.visit_csts(entries),
+            CstKind::StructEntry { key, value, .. } => {
+                if let Some(key) = key {
+                    self.visit_cst(key);
+                }
+                if let Some(value) = value {
+                    self.visit_cst(value);
+                }
+            }
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
