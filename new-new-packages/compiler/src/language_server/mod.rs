@@ -67,13 +67,20 @@ impl LanguageServer for CandyLanguageServer {
 
     async fn initialized(&self, _: InitializedParams) {
         log::info!("LSP: initialized");
-        let candy_files = DocumentFilter {
-            language: Some("candy".to_owned()),
-            scheme: Some("file".to_owned()),
-            pattern: None,
-        };
+        let candy_files = vec![
+            DocumentFilter {
+                language: Some("candy".to_owned()),
+                scheme: Some("file".to_owned()),
+                pattern: None,
+            },
+            DocumentFilter {
+                language: Some("candy".to_owned()),
+                scheme: Some("untitled".to_owned()),
+                pattern: None,
+            },
+        ];
         let text_document_registration_options = TextDocumentRegistrationOptions {
-            document_selector: Some(vec![candy_files.clone()]),
+            document_selector: Some(candy_files.clone()),
         };
         self.client
             .register_capability(vec![
@@ -96,7 +103,7 @@ impl LanguageServer for CandyLanguageServer {
                     method: "textDocument/didChange".to_owned(),
                     register_options: Some(
                         serde_json::to_value(TextDocumentChangeRegistrationOptions {
-                            document_selector: Some(vec![candy_files]),
+                            document_selector: Some(candy_files),
                             sync_kind: 2, // incremental
                         })
                         .unwrap(),
