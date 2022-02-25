@@ -68,8 +68,7 @@ Our TODO list:
   * [ ] completion, completion resolve
   * [ ] hover
   * [ ] signatureHelp
-  * [ ] declaration, definition
-  * [ ] typeDefinition
+  * [x] ~~declaration~~, definition, ~~typeDefinition~~
   * [ ] implementation
   * [ ] references
   * [ ] documentHighlight
@@ -77,8 +76,7 @@ Our TODO list:
   * [ ] codeAction, codeAction resolve
   * [ ] codeLens, codeLens resolve, codeLens refresh
   * [ ] documentLink, documentLink resolve
-  * [ ] documentColor
-  * [ ] colorPresentation
+  * [ ] ~~documentColor, colorPresentation~~
   * [ ] formatting
   * [ ] rangeFormatting
   * [ ] onTypeFormatting
