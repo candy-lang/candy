@@ -1,5 +1,7 @@
 use std::ops::Deref;
 
+use linked_hash_map::LinkedHashMap;
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct Id(pub usize);
 
@@ -15,6 +17,7 @@ pub enum AstKind {
     Text(Text),
     Identifier(Identifier),
     Symbol(Symbol),
+    Struct(Struct),
     Lambda(Lambda),
     Call(Call),
     Assignment(Assignment),
@@ -32,6 +35,11 @@ pub struct Identifier(pub AstString);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Symbol(pub AstString);
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct Struct {
+    pub entries: LinkedHashMap<Ast, Ast>,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Lambda {

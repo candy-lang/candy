@@ -11,6 +11,7 @@ pub enum BuiltinFunction {
     Panic,
     Print,
     TypeOf,
+    // TODO: add some way of getting keys and values from a struct
 }
 lazy_static! {
     pub static ref VALUES: Vec<BuiltinFunction> = BuiltinFunction::iter().collect();

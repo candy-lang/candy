@@ -62,7 +62,9 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
                 Err(value) => (HintKind::Panic, value),
             };
 
-            let span = db.hir_to_display_span(input.clone(), id.clone()).unwrap();
+            let span = db
+                .hir_id_to_display_span(input.clone(), id.clone())
+                .unwrap();
 
             let line = db
                 .utf8_byte_offset_to_lsp(span.start, input.clone())
@@ -106,6 +108,7 @@ fn collect_hir_ids_for_hints(db: &dyn HintsDb, input: Input, id: hir::Id) -> Vec
         Expression::Text(_) => vec![],
         Expression::Reference(_) => vec![id],
         Expression::Symbol(_) => vec![],
+        Expression::Struct(_) => vec![], // Handled separately // TODO
         Expression::Lambda(Lambda { body, .. }) => {
             collect_hir_ids_for_hints_list(db, input, body.expressions.keys().cloned().collect())
         }

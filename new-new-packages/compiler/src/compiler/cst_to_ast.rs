@@ -1,16 +1,20 @@
+use std::ops::Range;
 use std::sync::Arc;
 
 use im::HashMap;
 
 use super::ast::{self, Ast, AstKind, AstString, Identifier, Int, Lambda, Symbol, Text};
-use super::cst::{self, Cst, CstKind};
+use super::cst::{self, Cst, CstDb, CstKind};
 use super::error::CompilerError;
 use super::string_to_cst::StringToCst;
+use crate::compiler::ast::Struct;
 use crate::input::Input;
 
 #[salsa::query_group(CstToAstStorage)]
-pub trait CstToAst: StringToCst {
+pub trait CstToAst: CstDb + StringToCst {
     fn ast_to_cst_id(&self, input: Input, id: ast::Id) -> Option<cst::Id>;
+    fn ast_id_to_span(&self, input: Input, id: ast::Id) -> Option<Range<usize>>;
+
     fn ast(&self, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)>;
     fn ast_raw(
         &self,
@@ -22,6 +26,11 @@ fn ast_to_cst_id(db: &dyn CstToAst, input: Input, id: ast::Id) -> Option<cst::Id
     let (_, ast_to_cst_id_mapping) = db.ast(input).unwrap();
     ast_to_cst_id_mapping.get(&id).cloned()
 }
+fn ast_id_to_span(db: &dyn CstToAst, input: Input, id: ast::Id) -> Option<Range<usize>> {
+    let id = db.ast_to_cst_id(input.clone(), id)?;
+    Some(db.find_cst(input, id)?.span())
+}
+
 fn ast(db: &dyn CstToAst, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)> {
     db.ast_raw(input)
         .map(|(ast, id_mapping, _)| (ast, id_mapping))
@@ -55,8 +64,12 @@ impl LoweringContext {
     fn lower_cst(&mut self, cst: &Cst) -> Ast {
         match &cst.kind {
             CstKind::EqualsSign { .. } => self.create_ast(cst.id, AstKind::Error),
+            CstKind::Colon { .. } => self.create_ast(cst.id, AstKind::Error),
+            CstKind::Comma { .. } => self.create_ast(cst.id, AstKind::Error),
             CstKind::OpeningParenthesis { .. } => self.create_ast(cst.id, AstKind::Error),
             CstKind::ClosingParenthesis { .. } => self.create_ast(cst.id, AstKind::Error),
+            CstKind::OpeningBracket { .. } => self.create_ast(cst.id, AstKind::Error),
+            CstKind::ClosingBracket { .. } => self.create_ast(cst.id, AstKind::Error),
             CstKind::OpeningCurlyBrace { .. } => self.create_ast(cst.id, AstKind::Error),
             CstKind::ClosingCurlyBrace { .. } => self.create_ast(cst.id, AstKind::Error),
             CstKind::Arrow { .. } => self.create_ast(cst.id, AstKind::Error),
@@ -99,6 +112,66 @@ impl LoweringContext {
             );
                 self.lower_cst(inner)
             }
+            CstKind::Struct {
+                opening_bracket,
+                entries,
+                closing_bracket: _,
+            } => {
+                assert!(
+                    matches!(
+                        opening_bracket.unwrap_whitespace_and_comment().kind,
+                        CstKind::OpeningBracket { .. }
+                    ),
+                    "Expected an opening bracket to start a struct, but found `{}`.",
+                    *opening_bracket
+                );
+                let entries = entries
+                    .into_iter()
+                    .map(|entry| {
+                        let entry = entry.unwrap_whitespace_and_comment();
+                        if let CstKind::StructEntry {
+                            key,
+                            colon: _,
+                            value,
+                            comma: _,
+                        } = &entry.kind
+                        {
+                            if key.is_none() {
+                                self.errors.push(CompilerError {
+                                    span: cst.span(),
+                                    message: format!("Expected key, found `{}`.", cst),
+                                });
+                                return (
+                                    self.create_ast(cst.id, AstKind::Error),
+                                    self.create_ast(cst.id, AstKind::Error),
+                                );
+                            }
+
+                            if value.is_none() {
+                                self.errors.push(CompilerError {
+                                    span: cst.span(),
+                                    message: format!("Expected value, found `{}`.", cst),
+                                });
+                                return (
+                                    self.create_ast(cst.id, AstKind::Error),
+                                    self.create_ast(cst.id, AstKind::Error),
+                                );
+                            }
+                            let key = self.lower_cst(&key.clone().unwrap());
+                            let value = self.lower_cst(&value.clone().unwrap());
+                            (key, value)
+                        } else {
+                            // TODO: Register error.
+                            return (
+                                self.create_ast(cst.id, AstKind::Error),
+                                self.create_ast(cst.id, AstKind::Error),
+                            );
+                        }
+                    })
+                    .collect();
+                self.create_ast(cst.id, AstKind::Struct(Struct { entries }))
+            }
+            CstKind::StructEntry { .. } => self.create_ast(cst.id, AstKind::Error),
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,

@@ -10,9 +10,9 @@ use nom::{
     combinator::{map, opt, recognize, success, verify},
     multi::{count, many0, many1},
     sequence::{delimited, tuple},
-    IResult, Offset, Parser,
+    Finish, IResult, Offset, Parser,
 };
-use nom_supreme::{error::ErrorTree, final_parser::final_parser, ParserExt};
+use nom_supreme::{error::ErrorTree, ParserExt};
 use proptest::prelude::*;
 
 type ParserResult<'a, T> = IResult<&'a str, T, ErrorTree<&'a str>>;
@@ -31,23 +31,27 @@ fn cst_raw(db: &dyn StringToCst, input: Input) -> Option<(Arc<Vec<Cst>>, Vec<Com
 
     // TODO: handle trailing whitespace and comments properly
     let source = format!("\n{}", raw_source);
-    let parser = map(
+    let mut parser = map(
         tuple((|input| expressions0(&source, input, 0), many0(line_ending))),
         |(csts, _)| csts,
-    );
-    let result: Result<_, ErrorTree<&str>> = final_parser(parser)(&source);
+    )
+    .complete()
+    .all_consuming();
+    // let result: Result<_, ErrorTree<&str>> = final_parser(parser)(&source);
+    let result: IResult<&str, Vec<Cst>, ErrorTree<&str>> = parser.parse(&source);
+    let result = result.finish();
     Some(match result {
-        Ok(mut csts) => {
+        Ok((_, mut csts)) => {
             // TODO: remove the leading newline we inserted above
             fix_offsets_csts(&mut 0, &mut csts);
             let errors = extract_errors_csts(&csts);
             (Arc::new(csts), errors)
         }
-        Err(err) => (
+        Err(error) => (
             Arc::new(vec![]),
             vec![CompilerError {
                 span: 0..raw_source.len(),
-                message: format!("An error occurred while parsing: {:?}", err),
+                message: format!("An error occurred while parsing: {}", error),
             }],
         ),
     })
@@ -65,8 +69,12 @@ fn fix_offsets_cst(next_id: &mut usize, cst: &mut Cst) {
     *next_id += 1;
     match &mut cst.kind {
         CstKind::EqualsSign { offset } => *offset -= 1,
+        CstKind::Colon { offset } => *offset -= 1,
+        CstKind::Comma { offset } => *offset -= 1,
         CstKind::OpeningParenthesis { offset } => *offset -= 1,
         CstKind::ClosingParenthesis { offset } => *offset -= 1,
+        CstKind::OpeningBracket { offset } => *offset -= 1,
+        CstKind::ClosingBracket { offset } => *offset -= 1,
         CstKind::OpeningCurlyBrace { offset } => *offset -= 1,
         CstKind::ClosingCurlyBrace { offset } => *offset -= 1,
         CstKind::Arrow { offset } => *offset -= 1,
@@ -86,6 +94,36 @@ fn fix_offsets_cst(next_id: &mut usize, cst: &mut Cst) {
             fix_offsets_cst(next_id, &mut *opening_parenthesis);
             fix_offsets_cst(next_id, &mut *inner);
             fix_offsets_cst(next_id, &mut *closing_parenthesis);
+        }
+        CstKind::Struct {
+            opening_bracket,
+            entries,
+            closing_bracket,
+        } => {
+            fix_offsets_cst(next_id, &mut *opening_bracket);
+            fix_offsets_csts(next_id, &mut *entries);
+            if let Some(closing_bracket) = closing_bracket {
+                fix_offsets_cst(next_id, &mut *closing_bracket);
+            }
+        }
+        CstKind::StructEntry {
+            key,
+            colon,
+            value,
+            comma,
+        } => {
+            if let Some(key) = key {
+                fix_offsets_cst(next_id, &mut *key);
+            }
+            if let Some(colon) = colon {
+                fix_offsets_cst(next_id, &mut *colon);
+            }
+            if let Some(value) = value {
+                fix_offsets_cst(next_id, &mut *value);
+            }
+            if let Some(comma) = comma {
+                fix_offsets_cst(next_id, &mut *comma);
+            }
         }
         CstKind::Lambda {
             opening_curly_brace,
@@ -131,8 +169,12 @@ fn extract_errors_csts(csts: &[Cst]) -> Vec<CompilerError> {
 fn extract_errors_cst(cst: &Cst) -> Vec<CompilerError> {
     match &cst.kind {
         CstKind::EqualsSign { .. } => vec![],
+        CstKind::Colon { .. } => vec![],
+        CstKind::Comma { .. } => vec![],
         CstKind::OpeningParenthesis { .. } => vec![],
         CstKind::ClosingParenthesis { .. } => vec![],
+        CstKind::OpeningBracket { .. } => vec![],
+        CstKind::ClosingBracket { .. } => vec![],
         CstKind::OpeningCurlyBrace { .. } => vec![],
         CstKind::ClosingCurlyBrace { .. } => vec![],
         CstKind::Arrow { .. } => vec![],
@@ -153,6 +195,40 @@ fn extract_errors_cst(cst: &Cst) -> Vec<CompilerError> {
             errors.append(&mut extract_errors_cst(opening_parenthesis));
             errors.append(&mut extract_errors_cst(inner));
             errors.append(&mut extract_errors_cst(closing_parenthesis));
+            errors
+        }
+        CstKind::Struct {
+            opening_bracket,
+            entries,
+            closing_bracket,
+        } => {
+            let mut errors = vec![];
+            errors.append(&mut extract_errors_cst(opening_bracket));
+            errors.append(&mut extract_errors_csts(entries));
+            if let Some(closing_bracket) = closing_bracket {
+                errors.append(&mut extract_errors_cst(closing_bracket));
+            }
+            errors
+        }
+        CstKind::StructEntry {
+            key,
+            colon,
+            value,
+            comma,
+        } => {
+            let mut errors = vec![];
+            if let Some(key) = key {
+                errors.append(&mut extract_errors_cst(&key));
+            }
+            if let Some(colon) = colon {
+                errors.append(&mut extract_errors_cst(&colon));
+            }
+            if let Some(value) = value {
+                errors.append(&mut extract_errors_cst(&value));
+            }
+            if let Some(comma) = comma {
+                errors.append(&mut extract_errors_cst(&comma));
+            }
             errors
         }
         CstKind::Lambda {
@@ -242,6 +318,7 @@ fn expression<'a>(source: &'a str, input: &'a str, indentation: usize) -> Parser
         |input| text(source, input),
         |input| symbol(source, input),
         |input| parenthesized(source, input, indentation),
+        |input| struct_(source, input, indentation),
         |input| lambda(source, input, indentation),
         |input| assignment(source, input, indentation),
         |input| call(source, input, indentation),
@@ -260,15 +337,37 @@ fn equals_sign<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
     })
 }
 
+fn colon<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
+    parse_symbol(source, input, "colon", ":", |offset| CstKind::Colon {
+        offset,
+    })
+}
+
+fn comma<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
+    parse_symbol(source, input, "comma", ",", |offset| CstKind::Comma {
+        offset,
+    })
+}
+
 fn opening_parenthesis<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
     parse_symbol(source, input, "opening_parenthesis", "(", |offset| {
         CstKind::OpeningParenthesis { offset }
     })
 }
-
 fn closing_parenthesis<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
     parse_symbol(source, input, "closing_parenthesis", ")", |offset| {
         CstKind::ClosingParenthesis { offset }
+    })
+}
+
+fn opening_bracket<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
+    parse_symbol(source, input, "opening_bracket", "[", |offset| {
+        CstKind::OpeningBracket { offset }
+    })
+}
+fn closing_bracket<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
+    parse_symbol(source, input, "closing_bracket", "]", |offset| {
+        CstKind::ClosingBracket { offset }
     })
 }
 
@@ -277,12 +376,12 @@ fn opening_curly_brace<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, 
         CstKind::OpeningCurlyBrace { offset }
     })
 }
-
 fn closing_curly_brace<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
     parse_symbol(source, input, "closing_curly_brace", "}", |offset| {
         CstKind::ClosingCurlyBrace { offset }
     })
 }
+
 fn arrow<'a>(source: &'a str, input: &'a str) -> ParserResult<'a, Cst> {
     parse_symbol(source, input, "arrow", "->", |offset| CstKind::Arrow {
         offset,
@@ -641,6 +740,103 @@ fn parenthesized<'a>(source: &'a str, input: &'a str, indentation: usize) -> Par
     .parse(input)
 }
 
+fn struct_<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResult<'a, Cst> {
+    map(
+        tuple((
+            |input| {
+                trailing_whitespace_and_comment_and_empty_lines(input, |input| {
+                    opening_bracket(source, input)
+                })
+            },
+            alt((
+                map(
+                    |input| struct_entry(source, input, indentation),
+                    |it| vec![it],
+                ),
+                many0(|input| {
+                    leading_whitespace_and_comment_and_empty_lines(
+                        source,
+                        input,
+                        indentation + 1,
+                        1,
+                        |source, input, indentation| {
+                            trailing_whitespace_and_comment(input, |input| {
+                                leading_indentation(input, indentation, |input| {
+                                    struct_entry(source, input, indentation)
+                                })
+                            })
+                        },
+                    )
+                }),
+            )),
+            opt(|input| {
+                leading_whitespace_and_comment_and_empty_lines(
+                    source,
+                    input,
+                    indentation,
+                    0,
+                    |source, input, _indentation| {
+                        trailing_whitespace_and_comment(input, |input| {
+                            closing_bracket(source, input)
+                        })
+                    },
+                )
+            }),
+        )),
+        |(opening_bracket, entries, closing_bracket)| {
+            create_cst(CstKind::Struct {
+                opening_bracket: Box::new(opening_bracket),
+                entries,
+                closing_bracket: closing_bracket.map(|it| Box::new(it)),
+            })
+        },
+    )
+    .context("struct_")
+    .parse(input)
+}
+
+fn struct_entry<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResult<'a, Cst> {
+    map(
+        verify(
+            tuple((
+                opt(|input| {
+                    trailing_whitespace_and_comment_and_empty_lines(input, |input| {
+                        expression(source, input, indentation)
+                    })
+                }),
+                opt(|input| {
+                    trailing_whitespace_and_comment_and_empty_lines(input, |input| {
+                        colon(source, input)
+                    })
+                }),
+                opt(|input| {
+                    trailing_whitespace_and_comment_and_empty_lines(input, |input| {
+                        expression(source, input, indentation)
+                    })
+                }),
+                opt(|input| {
+                    trailing_whitespace_and_comment_and_empty_lines(input, |input| {
+                        comma(source, input)
+                    })
+                }),
+            )),
+            |(key, colon, value, comma)| {
+                key.is_some() || colon.is_some() || value.is_some() || comma.is_some()
+            },
+        ),
+        |(key, colon, value, comma)| {
+            create_cst(CstKind::StructEntry {
+                key: key.map(|it| Box::new(it)),
+                colon: colon.map(|it| Box::new(it)),
+                value: value.map(|it| Box::new(it)),
+                comma: comma.map(|it| Box::new(it)),
+            })
+        },
+    )
+    .context("struct_entry")
+    .parse(input)
+}
+
 fn lambda<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResult<'a, Cst> {
     map(
         tuple((
@@ -707,6 +903,7 @@ fn parameters<'a>(
                 |input| text(source, input),
                 |input| symbol(source, input),
                 |input| parenthesized(source, input, indentation),
+                |input| struct_(source, input, indentation),
                 // TODO: only allow single-line lambdas
                 |input| lambda(source, input, indentation),
                 |input| identifier(source, input),
@@ -750,6 +947,7 @@ fn arguments<'a>(
                 |input| text(source, input),
                 |input| symbol(source, input),
                 |input| parenthesized(source, input, indentation),
+                |input| struct_(source, input, indentation),
                 // TODO: only allow single-line lambdas
                 |input| lambda(source, input, indentation),
                 |input| identifier(source, input),
@@ -1132,6 +1330,160 @@ fn test_expressions0() {
                     }))
                 })
             ]
+        )
+    );
+}
+#[test]
+fn test_struct() {
+    fn parse(source: &str) -> (&str, Cst) {
+        struct_(source, source, 0).unwrap()
+    }
+    assert_eq!(
+        parse("[A: B]"),
+        (
+            "",
+            create_cst(CstKind::Struct {
+                opening_bracket: Box::new(create_cst(CstKind::OpeningBracket { offset: 0 })),
+                entries: vec![create_cst(CstKind::StructEntry {
+                    key: Some(Box::new(create_cst(CstKind::Symbol {
+                        offset: 1,
+                        value: "A".to_owned()
+                    }))),
+                    colon: Some(Box::new(create_cst(CstKind::TrailingWhitespace {
+                        value: " ".to_owned(),
+                        child: Box::new(create_cst(CstKind::Colon { offset: 2 }))
+                    }))),
+                    value: Some(Box::new(create_cst(CstKind::Symbol {
+                        offset: 4,
+                        value: "B".to_owned()
+                    }))),
+                    comma: None
+                })],
+                closing_bracket: Some(Box::new(create_cst(CstKind::ClosingBracket { offset: 5 }))),
+            })
+        )
+    );
+    assert_eq!(
+        parse("[Age: multiply 64 2]"),
+        (
+            "",
+            create_cst(CstKind::Struct {
+                opening_bracket: Box::new(create_cst(CstKind::OpeningBracket { offset: 0 })),
+                entries: vec![create_cst(CstKind::StructEntry {
+                    key: Some(Box::new(create_cst(CstKind::Symbol {
+                        offset: 1,
+                        value: "Age".to_owned()
+                    }))),
+                    colon: Some(Box::new(create_cst(CstKind::TrailingWhitespace {
+                        value: " ".to_owned(),
+                        child: Box::new(create_cst(CstKind::Colon { offset: 4 }))
+                    }))),
+                    value: Some(Box::new(create_cst(CstKind::Call {
+                        name: Box::new(create_cst(CstKind::TrailingWhitespace {
+                            value: " ".to_owned(),
+                            child: Box::new(create_cst(CstKind::Identifier {
+                                offset: 6,
+                                value: "multiply".to_owned()
+                            }))
+                        })),
+                        arguments: vec![
+                            create_cst(CstKind::TrailingWhitespace {
+                                value: " ".to_owned(),
+                                child: Box::new(create_cst(CstKind::Int {
+                                    offset: 15,
+                                    value: 64,
+                                    source: "64".to_owned()
+                                })),
+                            }),
+                            create_cst(CstKind::Int {
+                                offset: 18,
+                                value: 2,
+                                source: "2".to_owned()
+                            })
+                        ],
+                    }))),
+                    comma: None
+                })],
+                closing_bracket: Some(Box::new(create_cst(CstKind::ClosingBracket { offset: 19 }))),
+            })
+        )
+    );
+}
+#[test]
+fn test_struct_entry() {
+    fn parse(source: &str) -> (&str, Cst) {
+        struct_entry(source, source, 0).unwrap()
+    }
+    assert_eq!(
+        parse("A: B"),
+        (
+            "",
+            create_cst(CstKind::StructEntry {
+                key: Some(Box::new(create_cst(CstKind::Symbol {
+                    offset: 0,
+                    value: "A".to_owned()
+                }))),
+                colon: Some(Box::new(create_cst(CstKind::TrailingWhitespace {
+                    value: " ".to_owned(),
+                    child: Box::new(create_cst(CstKind::Colon { offset: 1 }))
+                }))),
+                value: Some(Box::new(create_cst(CstKind::Symbol {
+                    offset: 3,
+                    value: "B".to_owned()
+                }))),
+                comma: None
+            })
+        )
+    );
+    assert_eq!(
+        parse("A: B,"),
+        (
+            "",
+            create_cst(CstKind::StructEntry {
+                key: Some(Box::new(create_cst(CstKind::Symbol {
+                    offset: 0,
+                    value: "A".to_owned()
+                }))),
+                colon: Some(Box::new(create_cst(CstKind::TrailingWhitespace {
+                    value: " ".to_owned(),
+                    child: Box::new(create_cst(CstKind::Colon { offset: 1 }))
+                }))),
+                value: Some(Box::new(create_cst(CstKind::Symbol {
+                    offset: 3,
+                    value: "B".to_owned()
+                }))),
+                comma: Some(Box::new(create_cst(CstKind::Comma { offset: 4 })))
+            })
+        )
+    );
+    assert_eq!(
+        parse("A: foo bar"),
+        (
+            "",
+            create_cst(CstKind::StructEntry {
+                key: Some(Box::new(create_cst(CstKind::Symbol {
+                    offset: 0,
+                    value: "A".to_owned()
+                }))),
+                colon: Some(Box::new(create_cst(CstKind::TrailingWhitespace {
+                    value: " ".to_owned(),
+                    child: Box::new(create_cst(CstKind::Colon { offset: 1 }))
+                }))),
+                value: Some(Box::new(create_cst(CstKind::Call {
+                    name: Box::new(create_cst(CstKind::TrailingWhitespace {
+                        value: " ".to_owned(),
+                        child: Box::new(create_cst(CstKind::Identifier {
+                            offset: 3,
+                            value: "foo".to_owned()
+                        }))
+                    })),
+                    arguments: vec![create_cst(CstKind::Identifier {
+                        offset: 7,
+                        value: "bar".to_owned()
+                    })],
+                }))),
+                comma: None
+            })
         )
     );
 }

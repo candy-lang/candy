@@ -33,10 +33,22 @@ pub enum CstKind {
     EqualsSign {
         offset: usize,
     },
+    Colon {
+        offset: usize,
+    },
+    Comma {
+        offset: usize,
+    },
     OpeningParenthesis {
         offset: usize,
     },
     ClosingParenthesis {
+        offset: usize,
+    },
+    OpeningBracket {
+        offset: usize,
+    },
+    ClosingBracket {
         offset: usize,
     },
     OpeningCurlyBrace {
@@ -92,6 +104,17 @@ pub enum CstKind {
         inner: Box<Cst>,
         closing_parenthesis: Box<Cst>,
     },
+    Struct {
+        opening_bracket: Box<Cst>,
+        entries: Vec<Cst>,
+        closing_bracket: Option<Box<Cst>>,
+    },
+    StructEntry {
+        key: Option<Box<Cst>>,
+        colon: Option<Box<Cst>>,
+        value: Option<Box<Cst>>,
+        comma: Option<Box<Cst>>,
+    },
     Lambda {
         opening_curly_brace: Box<Cst>,
         parameters_and_arrow: Option<(Vec<Cst>, Box<Cst>)>,
@@ -121,8 +144,12 @@ impl Display for Cst {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.kind {
             CstKind::EqualsSign { .. } => write!(f, "="),
+            CstKind::Colon { .. } => write!(f, ":"),
+            CstKind::Comma { .. } => write!(f, ","),
             CstKind::OpeningParenthesis { .. } => write!(f, "("),
             CstKind::ClosingParenthesis { .. } => write!(f, ")"),
+            CstKind::OpeningBracket { .. } => write!(f, "["),
+            CstKind::ClosingBracket { .. } => write!(f, "]"),
             CstKind::OpeningCurlyBrace { .. } => write!(f, "{{"),
             CstKind::ClosingCurlyBrace { .. } => write!(f, "}}"),
             CstKind::Arrow { .. } => write!(f, "->"),
@@ -139,6 +166,40 @@ impl Display for Cst {
                 inner,
                 closing_parenthesis,
             } => write!(f, "{}{}{}", opening_parenthesis, inner, closing_parenthesis),
+            CstKind::Struct {
+                opening_bracket,
+                entries,
+                closing_bracket,
+            } => {
+                write!(f, "{}", opening_bracket)?;
+                for entry in entries {
+                    write!(f, "{}", entry)?;
+                }
+                if let Some(bracket) = closing_bracket {
+                    write!(f, "{}", bracket)?;
+                }
+                Ok(())
+            }
+            CstKind::StructEntry {
+                key,
+                colon,
+                value,
+                comma,
+            } => {
+                if let Some(key) = key {
+                    write!(f, "{}", key)?;
+                }
+                if let Some(colon) = colon {
+                    write!(f, "{}", colon)?;
+                }
+                if let Some(value) = value {
+                    write!(f, "{}", value)?;
+                }
+                if let Some(comma) = comma {
+                    write!(f, "{}", comma)?;
+                }
+                Ok(())
+            }
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -191,8 +252,12 @@ impl Cst {
     pub fn span(&self) -> Range<usize> {
         match &self.kind {
             CstKind::EqualsSign { offset } => *offset..(*offset + 1),
+            CstKind::Colon { offset } => *offset..(*offset + 1),
+            CstKind::Comma { offset } => *offset..(*offset + 1),
             CstKind::OpeningParenthesis { offset } => *offset..(*offset + 1),
             CstKind::ClosingParenthesis { offset } => *offset..(*offset + 1),
+            CstKind::OpeningBracket { offset } => *offset..(*offset + 1),
+            CstKind::ClosingBracket { offset } => *offset..(*offset + 1),
             CstKind::OpeningCurlyBrace { offset } => *offset..(*offset + 1),
             CstKind::ClosingCurlyBrace { offset } => *offset..(*offset + 1),
             CstKind::Arrow { offset } => *offset..(*offset + 2),
@@ -221,6 +286,45 @@ impl Cst {
                 closing_parenthesis,
                 ..
             } => opening_parenthesis.span().start..closing_parenthesis.span().end,
+            CstKind::Struct {
+                opening_bracket,
+                entries,
+                closing_bracket,
+            } => {
+                let start = opening_bracket.span().start;
+                let end = closing_bracket
+                    .clone()
+                    .map(|it| *it)
+                    .or_else(|| entries.last().cloned())
+                    .unwrap_or(*opening_bracket.clone())
+                    .span()
+                    .end;
+                start..end
+            }
+            CstKind::StructEntry {
+                key,
+                colon,
+                value,
+                comma,
+            } => {
+                let start = key
+                    .to_owned()
+                    .or(colon.to_owned())
+                    .or(value.to_owned())
+                    .or(comma.to_owned())
+                    .unwrap()
+                    .span()
+                    .start;
+                let end = comma
+                    .to_owned()
+                    .or(value.to_owned())
+                    .or(colon.to_owned())
+                    .or(key.to_owned())
+                    .unwrap()
+                    .span()
+                    .end;
+                start..end
+            }
             CstKind::Lambda {
                 opening_curly_brace,
                 closing_curly_brace,
@@ -266,6 +370,25 @@ impl Cst {
         }
     }
 
+    pub fn unwrap_whitespace_and_comment(&self) -> &Self {
+        match &self.kind {
+            CstKind::LeadingWhitespace { child, .. } => child.unwrap_whitespace_and_comment(),
+            CstKind::LeadingComment { child, .. } => child.unwrap_whitespace_and_comment(),
+            CstKind::TrailingWhitespace { child, .. } => child.unwrap_whitespace_and_comment(),
+            CstKind::TrailingComment { child, .. } => child.unwrap_whitespace_and_comment(),
+            _ => self,
+        }
+    }
+}
+
+trait TreeWithIds {
+    fn first_id(&self) -> Option<Id>;
+    fn find(&self, id: &Id) -> Option<&Cst>;
+}
+impl TreeWithIds for Cst {
+    fn first_id(&self) -> Option<Id> {
+        Some(self.id)
+    }
     fn find(&self, id: &Id) -> Option<&Cst> {
         if id == &self.id {
             return Some(self);
@@ -273,8 +396,12 @@ impl Cst {
 
         match &self.kind {
             CstKind::EqualsSign { .. } => None,
+            CstKind::Colon { .. } => None,
+            CstKind::Comma { .. } => None,
             CstKind::OpeningParenthesis { .. } => None,
             CstKind::ClosingParenthesis { .. } => None,
+            CstKind::OpeningBracket { .. } => None,
+            CstKind::ClosingBracket { .. } => None,
             CstKind::OpeningCurlyBrace { .. } => None,
             CstKind::ClosingCurlyBrace { .. } => None,
             CstKind::Arrow { .. } => None,
@@ -287,6 +414,24 @@ impl Cst {
             CstKind::TrailingWhitespace { child, .. } => child.find(id),
             CstKind::TrailingComment { child, .. } => child.find(id),
             CstKind::Parenthesized { inner, .. } => inner.find(id),
+            CstKind::Struct {
+                opening_bracket,
+                entries,
+                closing_bracket,
+            } => opening_bracket
+                .find(id)
+                .or_else(|| entries.find(id))
+                .or_else(|| closing_bracket.find(id)),
+            CstKind::StructEntry {
+                key,
+                colon,
+                value,
+                comma,
+            } => key
+                .find(id)
+                .or_else(|| colon.find(id))
+                .or_else(|| value.find(id))
+                .or_else(|| comma.find(id)),
             CstKind::Lambda { body, .. } => body.find(id),
             CstKind::Call { name, arguments } => name.find(id).or_else(|| arguments.find(id)),
             CstKind::Assignment {
@@ -302,29 +447,35 @@ impl Cst {
             CstKind::Error { .. } => None,
         }
     }
-
-    pub fn unwrap_whitespace_and_comment(&self) -> &Self {
-        match &self.kind {
-            CstKind::LeadingWhitespace { child, .. } => child.unwrap_whitespace_and_comment(),
-            CstKind::LeadingComment { child, .. } => child.unwrap_whitespace_and_comment(),
-            CstKind::TrailingWhitespace { child, .. } => child.unwrap_whitespace_and_comment(),
-            CstKind::TrailingComment { child, .. } => child.unwrap_whitespace_and_comment(),
-            _ => self,
-        }
+}
+impl<T: TreeWithIds> TreeWithIds for Option<T> {
+    fn first_id(&self) -> Option<Id> {
+        self.as_ref().and_then(|it| it.first_id())
+    }
+    fn find(&self, id: &Id) -> Option<&Cst> {
+        self.as_ref().and_then(|it| it.find(id))
     }
 }
-
-pub trait CstVecExtension {
-    fn find(&self, id: &Id) -> Option<&Cst>;
+impl<T: TreeWithIds> TreeWithIds for Box<T> {
+    fn first_id(&self) -> Option<Id> {
+        self.as_ref().first_id()
+    }
+    fn find(&self, id: &Id) -> Option<&Cst> {
+        self.as_ref().find(id)
+    }
 }
-impl<T> CstVecExtension for T
-where
-    T: AsRef<[Cst]>,
-{
+impl<T: TreeWithIds> TreeWithIds for [T] {
+    fn first_id(&self) -> Option<Id> {
+        self.iter()
+            .map(|it| it.first_id())
+            .filter_map(Some)
+            .nth(0)
+            .flatten()
+    }
     fn find(&self, id: &Id) -> Option<&Cst> {
         let slice = self.as_ref();
         let child_index = slice
-            .binary_search_by_key(id, |it| it.id)
+            .binary_search_by_key(id, |it| it.first_id().unwrap())
             .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
             .ok()?;
         slice[child_index].find(id)

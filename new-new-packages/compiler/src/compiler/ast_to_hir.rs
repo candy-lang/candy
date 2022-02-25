@@ -1,8 +1,8 @@
 use std::ops::Range;
 use std::sync::Arc;
 
-use super::ast::{self, Assignment, Ast, AstKind, Identifier, Int, Symbol, Text};
-use super::cst::{self, Cst, CstDb, CstVecExtension};
+use super::ast::{self, Assignment, Ast, AstKind, Identifier, Int, Struct, Symbol, Text};
+use super::cst::{self, CstDb};
 use super::cst_to_ast::CstToAst;
 use super::error::CompilerError;
 use super::hir::{self, Body, Expression, Lambda};
@@ -14,8 +14,8 @@ use im::HashMap;
 pub trait AstToHir: CstDb + CstToAst {
     fn hir_to_ast_id(&self, input: Input, id: hir::Id) -> Option<ast::Id>;
     fn hir_to_cst_id(&self, input: Input, id: hir::Id) -> Option<cst::Id>;
-    fn hir_to_span(&self, input: Input, id: hir::Id) -> Option<Range<usize>>;
-    fn hir_to_display_span(&self, input: Input, id: hir::Id) -> Option<Range<usize>>;
+    fn hir_id_to_span(&self, input: Input, id: hir::Id) -> Option<Range<usize>>;
+    fn hir_id_to_display_span(&self, input: Input, id: hir::Id) -> Option<Range<usize>>;
 
     fn hir(&self, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)>;
     fn hir_raw(
@@ -32,11 +32,11 @@ fn hir_to_cst_id(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<cst::Id
     let id = db.hir_to_ast_id(input.clone(), id)?;
     db.ast_to_cst_id(input, id)
 }
-fn hir_to_span(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<Range<usize>> {
-    let id = db.hir_to_cst_id(input.clone(), id)?;
-    Some(db.find_cst(input, id)?.span())
+fn hir_id_to_span(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<Range<usize>> {
+    let id = db.hir_to_ast_id(input.clone(), id)?;
+    db.ast_id_to_span(input, id)
 }
-fn hir_to_display_span(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<Range<usize>> {
+fn hir_id_to_display_span(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<Range<usize>> {
     let id = db.hir_to_cst_id(input.clone(), id)?;
     Some(db.find_cst(input, id)?.display_span())
 }
@@ -49,52 +49,54 @@ fn hir_raw(
     db: &dyn AstToHir,
     input: Input,
 ) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>, Vec<CompilerError>)> {
-    let cst = db.cst(input.clone())?;
-    let (ast, ast_cst_id_mapping) = db
-        .ast(input)
-        .expect("AST must exist if the CST exists for the same input.");
+    let (ast, _) = db.ast(input.clone())?;
 
-    let builtin_identifiers = builtin_functions::VALUES
-        .iter()
-        .enumerate()
-        .map(|(index, builtin_function)| {
-            let string = format!("builtin{:?}", builtin_function);
-            (string, hir::Id(vec![index]))
-        })
-        .collect::<HashMap<_, _>>();
-    let mut compiler = Compiler::new(&cst, ast_cst_id_mapping, builtin_identifiers);
+    let mut context = Context {
+        db,
+        input: input.clone(),
+    };
+    let mut compiler = Compiler::new(&mut context);
     compiler.compile(&ast);
     Some((
         Arc::new(compiler.body),
-        compiler.context.id_mapping,
-        compiler.context.errors,
+        compiler.output.id_mapping,
+        compiler.output.errors,
     ))
 }
 
-#[derive(Default)]
-struct Context<'a> {
-    cst: &'a [Cst],
-    ast_cst_id_mapping: HashMap<ast::Id, cst::Id>,
+struct Context<'c> {
+    db: &'c dyn AstToHir,
+    input: Input,
+}
+
+#[derive(Clone)]
+struct Output {
     id_mapping: HashMap<hir::Id, ast::Id>,
     errors: Vec<CompilerError>,
 }
-struct Compiler<'a> {
-    context: Context<'a>,
+
+struct Compiler<'c> {
+    context: &'c Context<'c>,
+    output: Output,
     body: Body,
     parent_ids: Vec<usize>,
     next_id: usize,
     identifiers: HashMap<String, hir::Id>,
 }
-impl<'a> Compiler<'a> {
-    fn new(
-        cst: &'a [Cst],
-        ast_cst_id_mapping: HashMap<ast::Id, cst::Id>,
-        builtin_identifiers: HashMap<String, hir::Id>,
-    ) -> Self {
+impl<'c> Compiler<'c> {
+    fn new(context: &'c Context<'c>) -> Self {
+        let builtin_identifiers = builtin_functions::VALUES
+            .iter()
+            .enumerate()
+            .map(|(index, builtin_function)| {
+                let string = format!("builtin{:?}", builtin_function);
+                (string, hir::Id(vec![index]))
+            })
+            .collect::<HashMap<_, _>>();
+
         Compiler {
-            context: Context {
-                cst,
-                ast_cst_id_mapping,
+            context,
+            output: Output {
                 id_mapping: HashMap::new(),
                 errors: vec![],
             },
@@ -124,9 +126,13 @@ impl<'a> Compiler<'a> {
                 let reference = match self.identifiers.get(&symbol.value) {
                     Some(reference) => reference.to_owned(),
                     None => {
-                        self.context.errors.push(CompilerError {
+                        self.output.errors.push(CompilerError {
                             message: format!("Unknown reference: {}", symbol.value),
-                            span: self.ast_id_to_span(&symbol.id),
+                            span: self
+                                .context
+                                .db
+                                .ast_id_to_span(self.context.input.clone(), symbol.id)
+                                .unwrap(),
                         });
                         return self.push(symbol.id, Expression::Error, None);
                     }
@@ -136,11 +142,17 @@ impl<'a> Compiler<'a> {
             AstKind::Symbol(Symbol(symbol)) => {
                 self.push(ast.id, Expression::Symbol(symbol.value.to_owned()), None)
             }
+            AstKind::Struct(Struct { entries }) => {
+                let entries = entries
+                    .iter()
+                    .map(|(key, value)| (self.compile_single(key), self.compile_single(value)))
+                    .collect();
+                self.push(ast.id, Expression::Struct(entries), None)
+            }
             AstKind::Lambda(ast::Lambda {
                 parameters,
                 body: body_asts,
             }) => {
-                let context = std::mem::take(&mut self.context);
                 let mut body = Body::new();
                 let lambda_id = add_ids(&self.parent_ids, self.next_id);
                 let mut identifiers = self.identifiers.clone();
@@ -151,8 +163,9 @@ impl<'a> Compiler<'a> {
                         .insert(id.to_owned(), parameter.value.to_owned());
                     identifiers.insert(parameter.value.to_owned(), id);
                 }
-                let mut inner = Compiler {
-                    context,
+                let mut inner = Compiler::<'c> {
+                    context: &mut self.context,
+                    output: self.output.clone(),
                     body,
                     parent_ids: lambda_id.to_owned(),
                     next_id: parameters.len(),
@@ -160,7 +173,7 @@ impl<'a> Compiler<'a> {
                 };
 
                 inner.compile(&body_asts);
-                self.context = inner.context;
+                self.output = inner.output;
                 self.push(
                     ast.id,
                     Expression::Lambda(Lambda {
@@ -172,16 +185,21 @@ impl<'a> Compiler<'a> {
                 )
             }
             AstKind::Call(ast::Call { name, arguments }) => {
-                let argument_ids = arguments
+                let arguments = arguments
                     .iter()
                     .map(|argument| self.compile_single(argument))
                     .collect();
+
                 let function = match self.identifiers.get(&name.value) {
                     Some(function) => function.to_owned(),
                     None => {
-                        self.context.errors.push(CompilerError {
+                        self.output.errors.push(CompilerError {
                             message: format!("Unknown function: {}", name.value),
-                            span: self.ast_id_to_span(&name.id),
+                            span: self
+                                .context
+                                .db
+                                .ast_id_to_span(self.context.input.clone(), name.id)
+                                .unwrap(),
                         });
                         return self.push(name.id, Expression::Error, None);
                     }
@@ -190,22 +208,22 @@ impl<'a> Compiler<'a> {
                     ast.id,
                     Expression::Call {
                         function,
-                        arguments: argument_ids,
+                        arguments,
                     },
                     None,
                 )
             }
             AstKind::Assignment(Assignment { name, body }) => {
-                let context = std::mem::take(&mut self.context);
-                let mut inner = Compiler {
-                    context,
+                let mut inner = Compiler::<'c> {
+                    context: &mut self.context,
+                    output: self.output.clone(),
                     body: Body::new(),
                     parent_ids: add_ids(&self.parent_ids, self.next_id),
                     next_id: 0,
                     identifiers: self.identifiers.clone(),
                 };
                 inner.compile(&body);
-                self.context = inner.context;
+                self.output = inner.output;
                 self.push(
                     ast.id,
                     Expression::Body(inner.body),
@@ -224,7 +242,7 @@ impl<'a> Compiler<'a> {
     ) -> hir::Id {
         let id = self.create_next_id(ast_id);
         self.body.push(id.clone(), expression, identifier.clone());
-        self.context.id_mapping.insert(id.clone(), ast_id);
+        self.output.id_mapping.insert(id.clone(), ast_id);
         if let Some(identifier) = identifier {
             self.identifiers.insert(identifier, id.clone());
         }
@@ -236,18 +254,10 @@ impl<'a> Compiler<'a> {
         id
     }
 
-    fn ast_id_to_span(&self, id: &ast::Id) -> Range<usize> {
-        self.context
-            .cst
-            .find(self.context.ast_cst_id_mapping.get(id).unwrap())
-            .expect("AST has no corresponding CST")
-            .span()
-    }
-
     fn create_next_id(&mut self, ast_id: ast::Id) -> hir::Id {
         let id = self.create_next_id_without_ast_mapping();
         assert!(matches!(
-            self.context.id_mapping.insert(id.to_owned(), ast_id),
+            self.output.id_mapping.insert(id.to_owned(), ast_id),
             None
         ));
         id
