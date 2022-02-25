@@ -241,16 +241,9 @@ fn apply_text_changes(
     for change in changes {
         match change.range {
             Some(range) => {
-                let start = db.position_to_utf8_byte_offset(
-                    range.start.line,
-                    range.start.character,
-                    input.clone(),
-                );
-                let end = db.position_to_utf8_byte_offset(
-                    range.end.line,
-                    range.end.character,
-                    input.clone(),
-                );
+                let start =
+                    db.offset_from_lsp(input.clone(), range.start.line, range.start.character);
+                let end = db.offset_from_lsp(input.clone(), range.end.line, range.end.character);
                 text = format!("{}{}{}", &text[..start], &change.text, &text[end..]);
             }
             None => text = change.text,

@@ -67,7 +67,7 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
                 .unwrap();
 
             let line = db
-                .utf8_byte_offset_to_lsp(span.start, input.clone())
+                .offset_to_lsp(input.clone(), span.start)
                 .to_position()
                 .line;
             let line_start_offsets = db.line_start_utf8_byte_offsets(input.clone());
@@ -77,7 +77,7 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
                 line_start_offsets[(line + 1) as usize] - 1
             };
             let position = db
-                .utf8_byte_offset_to_lsp(last_characer_of_line, input.clone())
+                .offset_to_lsp(input.clone(), last_characer_of_line)
                 .to_position();
 
             Some(Hint {
