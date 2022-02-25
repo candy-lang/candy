@@ -1,7 +1,7 @@
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFilter, FoldingRange, FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse,
-    InitializeParams, InitializeResult, InitializedParams, LocationLink, MessageType, Registration,
+    InitializeParams, InitializeResult, InitializedParams, MessageType, Registration,
     SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
     SemanticTokensRegistrationOptions, SemanticTokensResult, SemanticTokensServerCapabilities,
     ServerCapabilities, ServerInfo, StaticRegistrationOptions,
