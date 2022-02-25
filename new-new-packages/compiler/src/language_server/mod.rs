@@ -1,10 +1,10 @@
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFilter, FoldingRange, FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse,
-    InitializeParams, InitializeResult, InitializedParams, MessageType, Registration,
-    SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
-    SemanticTokensRegistrationOptions, SemanticTokensResult, SemanticTokensServerCapabilities,
-    ServerCapabilities, ServerInfo, StaticRegistrationOptions,
+    InitializeParams, InitializeResult, InitializedParams, Location, MessageType, ReferenceParams,
+    Registration, SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions,
+    SemanticTokensParams, SemanticTokensRegistrationOptions, SemanticTokensResult,
+    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, StaticRegistrationOptions,
     TextDocumentChangeRegistrationOptions, TextDocumentContentChangeEvent,
     TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
 };
@@ -20,12 +20,13 @@ use crate::{
 
 use self::{
     definition::find_definition, folding_range::FoldingRangeDb, hints::HintsNotification,
-    semantic_tokens::SemanticTokenDb, utils::LspPositionConversion,
+    references::find_references, semantic_tokens::SemanticTokenDb, utils::LspPositionConversion,
 };
 
 pub mod definition;
 pub mod folding_range;
 pub mod hints;
+pub mod references;
 pub mod semantic_tokens;
 pub mod utils;
 
@@ -105,13 +106,20 @@ impl LanguageServer for CandyLanguageServer {
                 },
                 Registration {
                     id: "4".to_owned(),
-                    method: "textDocument/foldingRange".to_owned(),
+                    method: "textDocument/references".to_owned(),
                     register_options: Some(
                         serde_json::to_value(text_document_registration_options.clone()).unwrap(),
                     ),
                 },
                 Registration {
                     id: "5".to_owned(),
+                    method: "textDocument/foldingRange".to_owned(),
+                    register_options: Some(
+                        serde_json::to_value(text_document_registration_options.clone()).unwrap(),
+                    ),
+                },
+                Registration {
+                    id: "6".to_owned(),
                     method: "textDocument/semanticTokens".to_owned(),
                     register_options: Some(
                         serde_json::to_value(
@@ -176,6 +184,11 @@ impl LanguageServer for CandyLanguageServer {
     ) -> jsonrpc::Result<Option<GotoDefinitionResponse>> {
         let db = self.db.lock().await;
         Ok(find_definition(&db, params))
+    }
+
+    async fn references(&self, params: ReferenceParams) -> jsonrpc::Result<Option<Vec<Location>>> {
+        let db = self.db.lock().await;
+        Ok(find_references(&db, params))
     }
 
     async fn folding_range(

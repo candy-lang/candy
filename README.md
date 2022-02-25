@@ -70,7 +70,7 @@ Our TODO list:
   * [ ] signatureHelp
   * [x] ~~declaration~~, definition, ~~typeDefinition~~
   * [ ] implementation
-  * [ ] references
+  * [x] references
   * [ ] documentHighlight
   * [ ] documentSymbol
   * [ ] codeAction, codeAction resolve
