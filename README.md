@@ -76,7 +76,7 @@ Our TODO list:
   * [ ] codeAction, codeAction resolve
   * [ ] codeLens, codeLens resolve, codeLens refresh
   * [ ] documentLink, documentLink resolve
-  * [ ] ~~documentColor, colorPresentation~~
+  * [x] ~~documentColor, colorPresentation~~
   * [ ] formatting
   * [ ] rangeFormatting
   * [ ] onTypeFormatting
@@ -86,7 +86,7 @@ Our TODO list:
   * [ ] prepareCallHierarchy
   * [ ] callHierarchy incoming, callHierarchy outgoing
   * [x] semantic tokens
-  * [ ] linkedEditingRange
+  * [x] ~~linkedEditingRange~~
   * [ ] moniker
 * [x] incremental compilation
 * [ ] lists
