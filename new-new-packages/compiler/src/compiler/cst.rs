@@ -275,6 +275,10 @@ impl Cst {
             CstKind::Symbol { offset, value } => *offset..(*offset + value.len()),
             CstKind::LeadingWhitespace { value, child } => {
                 let child_span = child.span();
+                if child_span.start < value.len() {
+                    // TODO: Remove this when our parser no longer adds a leading newline before parsing.
+                    return 0..child_span.end;
+                }
                 (child_span.start - value.len())..child_span.end
             }
             CstKind::LeadingComment { value, child } => {
