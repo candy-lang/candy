@@ -90,7 +90,7 @@ Our TODO list:
   * [x] semantic tokens
   * [ ] linkedEditingRange
   * [ ] moniker
-* [ ] incremental compilation
+* [x] incremental compilation
 * [ ] lists
 * [ ] maps
 * [ ] sets
