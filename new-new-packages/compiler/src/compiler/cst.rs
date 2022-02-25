@@ -12,10 +12,18 @@ use super::string_to_cst::StringToCst;
 #[salsa::query_group(CstDbStorage)]
 pub trait CstDb: StringToCst {
     fn find_cst(&self, input: Input, id: Id) -> Cst;
+    fn find_cst_by_offset(&self, input: Input, offset: usize) -> Cst;
 }
 
 fn find_cst(db: &dyn CstDb, input: Input, id: Id) -> Cst {
     db.cst(input).unwrap().find(&id).unwrap().to_owned()
+}
+fn find_cst_by_offset(db: &dyn CstDb, input: Input, offset: usize) -> Cst {
+    db.cst(input)
+        .unwrap()
+        .find_by_offset(&offset)
+        .unwrap()
+        .to_owned()
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
@@ -384,6 +392,9 @@ impl Cst {
 trait TreeWithIds {
     fn first_id(&self) -> Option<Id>;
     fn find(&self, id: &Id) -> Option<&Cst>;
+
+    fn first_offset(&self) -> Option<usize>;
+    fn find_by_offset(&self, offset: &usize) -> Option<&Cst>;
 }
 impl TreeWithIds for Cst {
     fn first_id(&self) -> Option<Id> {
@@ -447,6 +458,74 @@ impl TreeWithIds for Cst {
             CstKind::Error { .. } => None,
         }
     }
+
+    fn first_offset(&self) -> Option<usize> {
+        Some(self.span().start)
+    }
+    fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
+        let inner = match &self.kind {
+            CstKind::EqualsSign { .. } => None,
+            CstKind::Colon { .. } => None,
+            CstKind::Comma { .. } => None,
+            CstKind::OpeningParenthesis { .. } => None,
+            CstKind::ClosingParenthesis { .. } => None,
+            CstKind::OpeningBracket { .. } => None,
+            CstKind::ClosingBracket { .. } => None,
+            CstKind::OpeningCurlyBrace { .. } => None,
+            CstKind::ClosingCurlyBrace { .. } => None,
+            CstKind::Arrow { .. } => None,
+            CstKind::Int { .. } => None,
+            CstKind::Text { .. } => None,
+            CstKind::Identifier { .. } => None,
+            CstKind::Symbol { .. } => None,
+            CstKind::LeadingWhitespace { child, .. } => child.find_by_offset(offset),
+            CstKind::LeadingComment { child, .. } => child.find_by_offset(offset),
+            CstKind::TrailingWhitespace { child, .. } => child.find_by_offset(offset),
+            CstKind::TrailingComment { child, .. } => child.find_by_offset(offset),
+            CstKind::Parenthesized { inner, .. } => inner.find_by_offset(offset),
+            CstKind::Struct {
+                opening_bracket,
+                entries,
+                closing_bracket,
+            } => opening_bracket
+                .find_by_offset(offset)
+                .or_else(|| entries.find_by_offset(offset))
+                .or_else(|| closing_bracket.find_by_offset(offset)),
+            CstKind::StructEntry {
+                key,
+                colon,
+                value,
+                comma,
+            } => key
+                .find_by_offset(offset)
+                .or_else(|| colon.find_by_offset(offset))
+                .or_else(|| value.find_by_offset(offset))
+                .or_else(|| comma.find_by_offset(offset)),
+            CstKind::Lambda { body, .. } => body.find_by_offset(offset),
+            CstKind::Call { name, arguments } => name
+                .find_by_offset(offset)
+                .or_else(|| arguments.find_by_offset(offset)),
+            CstKind::Assignment {
+                name,
+                parameters,
+                equals_sign,
+                body,
+            } => name
+                .find_by_offset(offset)
+                .or_else(|| parameters.find_by_offset(offset))
+                .or_else(|| equals_sign.find_by_offset(offset))
+                .or_else(|| body.find_by_offset(offset)),
+            CstKind::Error { .. } => None,
+        };
+
+        inner.or_else(|| {
+            if self.span().contains(offset) {
+                return Some(self);
+            } else {
+                None
+            }
+        })
+    }
 }
 impl<T: TreeWithIds> TreeWithIds for Option<T> {
     fn first_id(&self) -> Option<Id> {
@@ -455,6 +534,13 @@ impl<T: TreeWithIds> TreeWithIds for Option<T> {
     fn find(&self, id: &Id) -> Option<&Cst> {
         self.as_ref().and_then(|it| it.find(id))
     }
+
+    fn first_offset(&self) -> Option<usize> {
+        self.as_ref().and_then(|it| it.first_offset())
+    }
+    fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
+        self.as_ref().and_then(|it| it.find_by_offset(offset))
+    }
 }
 impl<T: TreeWithIds> TreeWithIds for Box<T> {
     fn first_id(&self) -> Option<Id> {
@@ -462,6 +548,13 @@ impl<T: TreeWithIds> TreeWithIds for Box<T> {
     }
     fn find(&self, id: &Id) -> Option<&Cst> {
         self.as_ref().find(id)
+    }
+
+    fn first_offset(&self) -> Option<usize> {
+        self.as_ref().first_offset()
+    }
+    fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
+        self.as_ref().find_by_offset(offset)
     }
 }
 impl<T: TreeWithIds> TreeWithIds for [T] {
@@ -479,5 +572,21 @@ impl<T: TreeWithIds> TreeWithIds for [T] {
             .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
             .ok()?;
         slice[child_index].find(id)
+    }
+
+    fn first_offset(&self) -> Option<usize> {
+        self.iter()
+            .map(|it| it.first_offset())
+            .filter_map(Some)
+            .nth(0)
+            .flatten()
+    }
+    fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
+        let slice = self.as_ref();
+        let child_index = slice
+            .binary_search_by_key(offset, |it| it.first_offset().unwrap())
+            .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
+            .ok()?;
+        slice[child_index].find_by_offset(offset)
     }
 }
