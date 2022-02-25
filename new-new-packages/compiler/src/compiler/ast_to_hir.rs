@@ -174,6 +174,7 @@ impl<'c> Compiler<'c> {
 
                 for (parameter_index, parameter) in parameters.iter().enumerate() {
                     let id = hir::Id(add_ids(&lambda_id, parameter_index));
+                    self.output.id_mapping.insert(id.clone(), parameter.id);
                     body.identifiers
                         .insert(id.to_owned(), parameter.value.to_owned());
                     identifiers.insert(parameter.value.to_owned(), id);
