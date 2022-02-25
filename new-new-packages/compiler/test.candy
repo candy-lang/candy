@@ -98,14 +98,14 @@ main = {
 
 }
 
-user = [Age: 64 * 2]  # [Age: 128]
-user = [
-  Name: "Jonas",
-  Age: 42 / 2,    # 21
-  foo: 21,        # Foo: 21
-  foo: bar,       # Foo: 21
-]
-[]
+# user = [Age: 64 * 2]  # [Age: 128]
+# user = [
+#   Name: "Jonas",
+#   Age: 42 / 2,    # 21
+#   foo: 21,        # Foo: 21
+#   foo: bar,       # Foo: 21
+# ]
+# []
 
 
 
