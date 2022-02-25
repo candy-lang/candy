@@ -15,6 +15,8 @@ pub trait CstToAst: CstDb + StringToCst {
     fn ast_to_cst_id(&self, input: Input, id: ast::Id) -> Option<cst::Id>;
     fn ast_id_to_span(&self, input: Input, id: ast::Id) -> Option<Range<usize>>;
 
+    fn cst_to_ast_id(&self, input: Input, id: cst::Id) -> Option<ast::Id>;
+
     fn ast(&self, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)>;
     fn ast_raw(
         &self,
@@ -29,6 +31,14 @@ fn ast_to_cst_id(db: &dyn CstToAst, input: Input, id: ast::Id) -> Option<cst::Id
 fn ast_id_to_span(db: &dyn CstToAst, input: Input, id: ast::Id) -> Option<Range<usize>> {
     let id = db.ast_to_cst_id(input.clone(), id)?;
     Some(db.find_cst(input, id).span())
+}
+
+fn cst_to_ast_id(db: &dyn CstToAst, input: Input, id: cst::Id) -> Option<ast::Id> {
+    let (_, ast_to_cst_id_mapping) = db.ast(input).unwrap();
+    ast_to_cst_id_mapping
+        .iter()
+        .find_map(|(key, &value)| if value == id { Some(key) } else { None })
+        .cloned()
 }
 
 fn ast(db: &dyn CstToAst, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)> {
