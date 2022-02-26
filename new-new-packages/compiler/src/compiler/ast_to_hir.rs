@@ -17,6 +17,9 @@ pub trait AstToHir: CstDb + CstToAst {
     fn hir_id_to_span(&self, input: Input, id: hir::Id) -> Option<Range<usize>>;
     fn hir_id_to_display_span(&self, input: Input, id: hir::Id) -> Option<Range<usize>>;
 
+    fn ast_to_hir_id(&self, input: Input, id: ast::Id) -> Option<hir::Id>;
+    fn cst_to_hir_id(&self, input: Input, id: cst::Id) -> Option<hir::Id>;
+
     fn hir(&self, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)>;
     fn hir_raw(
         &self,
@@ -38,7 +41,19 @@ fn hir_id_to_span(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<Range<
 }
 fn hir_id_to_display_span(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<Range<usize>> {
     let id = db.hir_to_cst_id(input.clone(), id)?;
-    Some(db.find_cst(input, id)?.display_span())
+    Some(db.find_cst(input, id).display_span())
+}
+
+fn ast_to_hir_id(db: &dyn AstToHir, input: Input, id: ast::Id) -> Option<hir::Id> {
+    let (_, hir_to_ast_id_mapping) = db.hir(input).unwrap();
+    hir_to_ast_id_mapping
+        .iter()
+        .find_map(|(key, &value)| if value == id { Some(key) } else { None })
+        .cloned()
+}
+fn cst_to_hir_id(db: &dyn AstToHir, input: Input, id: cst::Id) -> Option<hir::Id> {
+    let id = db.cst_to_ast_id(input.clone(), id)?;
+    db.ast_to_hir_id(input, id)
 }
 
 fn hir(db: &dyn AstToHir, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)> {
@@ -159,6 +174,7 @@ impl<'c> Compiler<'c> {
 
                 for (parameter_index, parameter) in parameters.iter().enumerate() {
                     let id = hir::Id(add_ids(&lambda_id, parameter_index));
+                    self.output.id_mapping.insert(id.clone(), parameter.id);
                     body.identifiers
                         .insert(id.to_owned(), parameter.value.to_owned());
                     identifiers.insert(parameter.value.to_owned(), id);
