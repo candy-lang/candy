@@ -105,7 +105,7 @@ impl<'a> Context<'a> {
             self.visit_expression(id.to_owned(), expression);
         }
     }
-    fn visit_expressions(&mut self, ids: &[hir::Id]) {
+    fn visit_ids(&mut self, ids: &[hir::Id]) {
         for id in ids {
             self.visit_id(id.to_owned());
         }
@@ -149,7 +149,7 @@ impl<'a> Context<'a> {
                 if function == &self.id {
                     self.add_reference(id, DocumentHighlightKind::READ);
                 }
-                self.visit_expressions(arguments);
+                self.visit_ids(arguments);
             }
             Expression::Error => {}
         }
