@@ -192,6 +192,7 @@ mod parse {
     static MEANINGFUL_PUNCTUATION: &'static str = "=>(){}[],:";
 
     fn literal<'a>(input: &'a str, literal: &'static str) -> Option<&'a str> {
+        println!("literal({:?}, {:?})", input, literal);
         if input.starts_with(literal) {
             Some(&input[literal.len()..])
         } else {
@@ -229,11 +230,13 @@ mod parse {
     //     Some((input, Cst::Arrow))
     // }
     fn double_quote(input: &str) -> Option<(&str, Cst)> {
+        println!("double_quote({:?})", input);
         let input = literal(input, "\"")?;
         Some((input, Cst::DoubleQuote))
     }
 
     fn word(mut input: &str) -> Option<(&str, String)> {
+        println!("word({:?})", input);
         let mut chars = vec![];
         while let Some(c) = input.chars().next() {
             if c.is_whitespace() || MEANINGFUL_PUNCTUATION.contains(c) {
@@ -260,6 +263,7 @@ mod parse {
     }
 
     fn identifier(input: &str) -> Option<(&str, Cst)> {
+        println!("identifier({:?})", input);
         let (input, w) = word(input)?;
         if w.chars().next().unwrap().is_lowercase() {
             if w.chars().all(|c| c.is_ascii_alphanumeric()) {
@@ -298,6 +302,7 @@ mod parse {
     }
 
     fn symbol(input: &str) -> Option<(&str, Cst)> {
+        println!("symbol({:?})", input);
         let (input, w) = word(input)?;
         if w.chars().next().unwrap().is_uppercase() {
             if w.chars().all(|c| c.is_ascii_alphanumeric()) {
@@ -336,6 +341,7 @@ mod parse {
     }
 
     fn int(input: &str) -> Option<(&str, Cst)> {
+        println!("int({:?})", input);
         let (input, w) = word(input)?;
         if w.chars().next().unwrap().is_ascii_digit() {
             if w.chars().all(|c| c.is_ascii_digit()) {
@@ -372,6 +378,7 @@ mod parse {
     }
 
     fn single_line_whitespace(mut input: &str) -> (&str, Cst) {
+        println!("single_line_whitespace({:?})", input);
         let mut chars = vec![];
         let mut has_error = false;
         while let Some(c) = input.chars().next() {
@@ -403,6 +410,7 @@ mod parse {
     }
 
     fn comment(input: &str) -> Option<(&str, Cst)> {
+        println!("comment({:?})", input);
         if !matches!(input.chars().next(), Some('#')) {
             return None;
         }
@@ -424,6 +432,7 @@ mod parse {
     }
 
     fn leading_indentation(mut input: &str, indentation: usize) -> Option<(&str, Cst)> {
+        println!("leading_indentation({:?}, {:?})", input, indentation);
         let mut chars = vec![];
         let mut has_error = false;
         for i in 0..(2 * indentation) {
@@ -437,7 +446,7 @@ mod parse {
                     has_error = true;
                     input = &input[c.len_utf8()..];
                 }
-                c => return None,
+                _ => return None,
             }
         }
         let whitespace = chars.into_iter().join("");
@@ -453,6 +462,18 @@ mod parse {
             (input, Cst::Whitespace(whitespace))
         })
     }
+    #[test]
+    fn test_leading_indentation() {
+        assert_eq!(
+            leading_indentation("foo", 0),
+            Some(("foo", Cst::Whitespace("".to_string())))
+        );
+        assert_eq!(
+            leading_indentation("  foo", 1),
+            Some(("foo", Cst::Whitespace("  ".to_string())))
+        );
+        assert_eq!(leading_indentation("  foo", 2), None);
+    }
 
     /// Consumes all leading whitespace (including newlines) and comments that
     /// are still within the given indentation. Won't consume newlines before a
@@ -462,6 +483,10 @@ mod parse {
         indentation: usize,
         also_comments: bool,
     ) -> (&str, Vec<Cst>) {
+        println!(
+            "whitespaces_and_newlines({:?}, {:?}, {:?})",
+            input, indentation, also_comments
+        );
         let mut parts = vec![];
         let (input, whitespace) = single_line_whitespace(input);
         parts.push(whitespace);
@@ -491,7 +516,10 @@ mod parse {
                     parts.append(&mut new_parts);
                     input = new_input;
                 }
-                None => break,
+                None => {
+                    println!("Was None.");
+                    break;
+                }
             }
         }
         let parts = parts
@@ -549,6 +577,7 @@ mod parse {
     }
 
     fn text(input: &str, indentation: usize) -> Option<(&str, Cst)> {
+        println!("text({:?}, {:?})", input, indentation);
         let (mut input, opening_quote) = double_quote(input)?;
         let mut line = vec![];
         let mut parts = vec![];
@@ -659,7 +688,8 @@ mod parse {
     }
 
     fn expression(input: &str, indentation: usize) -> Option<(&str, Cst)> {
-        todo![]
+        println!("expression({:?}, {:?})", input, indentation);
+        int(input).or_else(|| identifier(input))
         // let expression = int(input)
         //     .or_else(|| text(input, indentation))
         //     .or_else(|| symbol(input))
@@ -674,36 +704,47 @@ mod parse {
         // // TODO: Implement fallback
         // None
     }
+    #[test]
+    fn test_expression() {
+        assert_eq!(
+            text("foo", 0),
+            Some(("", Cst::Identifier("foo".to_string())))
+        );
+    }
 
     fn call(input: &str, indentation: usize) -> Option<(&str, Cst)> {
-        todo!()
-        // let (mut input, name) = expression(input, indentation)?;
-        // let arguments = vec![];
-        // loop {
-        //     let (i, whitespace) = leading_whitespace(input, indentation + 1);
-        //     let (i, argument) = expression(i, indentation + 1);
-        //     arguments.push(argument);
-        //     input = i;
-        // }
-        // Some((
-        //     input,
-        //     Cst::Call {
-        //         name: Box::new(name),
-        //         arguments,
-        //     },
-        // ))
+        println!("call({:?}, {:?})", input, indentation);
+        let (mut input, name) = expression(input, indentation)?;
+        let mut arguments = vec![];
+        loop {
+            let (i, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+            let (i, argument) = match expression(i, indentation + 1) {
+                Some(it) => it,
+                None => break,
+            };
+            arguments.push(argument);
+            input = i;
+        }
+        Some((
+            input,
+            Cst::Call {
+                name: Box::new(name),
+                arguments,
+            },
+        ))
     }
     #[test]
     fn test_call() {
-        assert_eq!(call("Foo", 0), None);
-        assert_eq!(call("foo", 0), None);
-        // assert_eq!(
-        //     call("foo bar", 0),
-        //     Some(Cst::Call {
-        //         name: Box::new(Cst::Identifier("foo".to_string())),
-        //         arguments: vec![Cst::Identifier("bar".to_string())]
-        //     })
-        // );
+        assert_eq!(
+            call("foo bar", 0),
+            Some((
+                "",
+                Cst::Call {
+                    name: Box::new(Cst::Identifier("foo".to_string())),
+                    arguments: vec![Cst::Identifier("bar".to_string())]
+                }
+            ))
+        );
         // assert_eq!(
         //     call("Foo 4 bar", 0),
         //     Some(Cst::Call {
@@ -733,7 +774,7 @@ mod parse {
         //   4
         // bar
         assert_eq!(
-            call("foo 1 2\n  3\n  4\nbar", 1),
+            call("foo 1 2\n  3\n  4\nbar", 0),
             Some((
                 "\nbar",
                 Cst::Call {
@@ -797,229 +838,6 @@ mod parse {
 //         // TODO: catch-all
 //     ))
 //     .context("expression")
-//     .parse(input)
-// }
-
-// // Decorators.
-
-// fn leading_indentation<'a, F>(
-//     input: &'a str,
-//     indentation: usize,
-//     mut parser: F,
-// ) -> ParserResult<'a, Cst>
-// where
-//     F: FnMut(&'a str) -> ParserResult<'a, Cst>,
-// {
-//     (|input| {
-//         if indentation == 0 {
-//             return parser(input);
-//         }
-
-//         let (input, indent) = recognize(count(tag("  "), indentation))(input)?;
-//         let (input, child) = &mut parser(input)?;
-//         Ok((
-//             *input,
-//             create_cst(CstKind::LeadingWhitespace {
-//                 value: indent.to_string(),
-//                 child: Box::new(child.clone()),
-//             }),
-//         ))
-//     })
-//     .context("leading_indentation")
-//     .parse(input)
-// }
-
-// fn leading_whitespace_and_comment_and_empty_lines<'a>(
-//     source: &'a str,
-//     input: &'a str,
-//     indentation: usize,
-//     min_newlines: usize,
-//     parser: fn(&'a str, &'a str, usize) -> ParserResult<'a, Cst>,
-// ) -> ParserResult<'a, Cst> {
-//     let parser: Box<dyn FnMut(&'a str) -> ParserResult<Cst>> = if min_newlines > 0 {
-//         Box::new(move |input| {
-//             with_leading_newlines(source, input, indentation, min_newlines, parser)
-//         })
-//     } else {
-//         Box::new(|input| {
-//             match with_leading_newlines(source, input, indentation, min_newlines, parser) {
-//                 Ok(it) => Ok(it),
-//                 Err(_) => parser(source, input, indentation),
-//             }
-//         })
-//     };
-//     parser
-//         .context("leading_whitespace_and_comment_and_empty_lines")
-//         .parse(input)
-// }
-// fn with_leading_newlines<'a>(
-//     source: &'a str,
-//     input: &'a str,
-//     indentation: usize,
-//     min_newlines: usize,
-//     parser: fn(&'a str, &'a str, usize) -> ParserResult<'a, Cst>,
-// ) -> ParserResult<'a, Cst> {
-//     leading_whitespace(input, |input| {
-//         leading_comment(
-//             input,
-//             map(
-//                 tuple((line_ending, |input| {
-//                     leading_whitespace_and_comment_and_empty_lines(
-//                         source,
-//                         input,
-//                         indentation,
-//                         if min_newlines > 0 {
-//                             min_newlines - 1
-//                         } else {
-//                             0
-//                         },
-//                         parser,
-//                     )
-//                 })),
-//                 |(line_break, child)| {
-//                     create_cst(CstKind::LeadingWhitespace {
-//                         value: line_break.to_string(),
-//                         child: Box::new(child),
-//                     })
-//                 },
-//             ),
-//         )
-//     })
-// }
-// fn leading_whitespace<'a, F>(input: &'a str, mut parser: F) -> ParserResult<'a, Cst>
-// where
-//     F: FnMut(&'a str) -> ParserResult<'a, Cst>,
-// {
-//     (|input| {
-//         let space_result: IResult<_, _, ErrorTree<&'a str>> = space1(input);
-//         let (input, result) = match space_result {
-//             Ok((input, space)) => {
-//                 let (input, child) = parser(input)?;
-//                 (
-//                     input,
-//                     create_cst(CstKind::LeadingWhitespace {
-//                         value: space.to_string(),
-//                         child: Box::new(child),
-//                     }),
-//                 )
-//             }
-//             Err(_) => parser(input)?,
-//         };
-//         Ok((input, result))
-//     })
-//     .context("leading_whitespace")
-//     .parse(input)
-// }
-// fn leading_comment<'a, F>(input: &'a str, mut parser: F) -> ParserResult<'a, Cst>
-// where
-//     F: FnMut(&'a str) -> ParserResult<'a, Cst>,
-// {
-//     (|input| {
-//         let comment_result: IResult<_, _> = tuple((tag("#"), not_line_ending))(input);
-//         let (input, comment) = match comment_result {
-//             Ok((input, (_, comment))) => (input, comment),
-//             Err(_) => return parser(input),
-//         };
-
-//         let (input, child) = parser(input)?;
-//         let result = create_cst(CstKind::LeadingComment {
-//             value: comment.to_string(),
-//             child: Box::new(child),
-//         });
-//         Ok((input, result))
-//     })
-//     .context("leading_comment")
-//     .parse(input)
-// }
-
-// fn trailing_whitespace_and_comment_and_empty_lines<'a, F>(
-//     input: &'a str,
-//     mut parser: F,
-// ) -> ParserResult<'a, Cst>
-// where
-//     F: FnMut(&'a str) -> ParserResult<'a, Cst>,
-// {
-//     (|input| {
-//         let (mut input, mut child) = trailing_whitespace_and_comment(input, &mut parser)?;
-
-//         loop {
-//             let result = trailing_whitespace_and_comment(input, |input| {
-//                 let (input, line_break) = line_ending(input)?;
-
-//                 Ok((
-//                     input,
-//                     create_cst(CstKind::TrailingWhitespace {
-//                         child: Box::new(child.clone()),
-//                         value: line_break.to_string(),
-//                     }),
-//                 ))
-//             });
-//             match result {
-//                 Ok((remaining_input, inner_child)) => {
-//                     input = remaining_input;
-//                     child = inner_child;
-//                 }
-//                 Err(_) => break,
-//             }
-//         }
-//         Ok((input, child))
-//     })
-//     .context("trailing_whitespace_and_comment_and_empty_lines")
-//     .parse(input)
-// }
-// fn trailing_whitespace_and_comment<'a, F>(input: &'a str, mut parser: F) -> ParserResult<'a, Cst>
-// where
-//     F: FnMut(&'a str) -> ParserResult<'a, Cst>,
-// {
-//     (|input| trailing_comment(input, |input| trailing_whitespace(input, &mut parser)))
-//         .context("trailing_whitespace_and_comment")
-//         .parse(input)
-// }
-// fn trailing_whitespace<'a, F>(input: &'a str, mut parser: F) -> ParserResult<'a, Cst>
-// where
-//     F: FnMut(&'a str) -> ParserResult<'a, Cst>,
-// {
-//     (|input| {
-//         let (input, child) = parser(input)?;
-
-//         let space_result: IResult<_, _, ErrorTree<&'a str>> = space1(input);
-//         let (input, result) = match space_result {
-//             Ok((remaining, space)) => (
-//                 remaining,
-//                 create_cst(CstKind::TrailingWhitespace {
-//                     child: Box::new(child),
-//                     value: space.to_string(),
-//                 }),
-//             ),
-//             Err(_) => (input, child),
-//         };
-//         Ok((input, result))
-//     })
-//     .context("trailing_whitespace")
-//     .parse(input)
-// }
-// fn trailing_comment<'a, F>(input: &'a str, mut parser: F) -> ParserResult<'a, Cst>
-// where
-//     F: FnMut(&'a str) -> ParserResult<'a, Cst>,
-// {
-//     (|input| {
-//         let (input, child) = parser(input)?;
-
-//         let comment_result: IResult<_, _, ErrorTree<&'a str>> =
-//             tuple((tag("#"), not_line_ending))(input);
-//         let (input, result) = match comment_result {
-//             Ok((remaining, (_, comment))) => (
-//                 remaining,
-//                 create_cst(CstKind::TrailingComment {
-//                     child: Box::new(child),
-//                     value: comment.to_string(),
-//                 }),
-//             ),
-//             Err(_) => (input, child),
-//         };
-//         Ok((input, result))
-//     })
-//     .context("trailing_comment")
 //     .parse(input)
 // }
 
@@ -1121,25 +939,6 @@ mod parse {
 //     .parse(input)
 // }
 
-// fn call<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResult<'a, Cst> {
-//     map(
-//         tuple((
-//             |input| trailing_whitespace_and_comment(input, |input| identifier(source, input)),
-//             alt((
-//                 |input| expressions1(source, input, indentation + 1),
-//                 |input| arguments(source, input, indentation),
-//             )),
-//         )),
-//         |(name, arguments)| {
-//             create_cst(CstKind::Call {
-//                 name: Box::new(name),
-//                 arguments,
-//             })
-//         },
-//     )
-//     .context("call")
-//     .parse(input)
-// }
 // fn arguments<'a>(
 //     source: &'a str,
 //     input: &'a str,
