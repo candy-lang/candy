@@ -54,8 +54,8 @@ use super::error::CompilerError;
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Cst {
     // EqualsSign,
-    // OpeningParenthesis,
-    // ClosingParenthesis,
+    OpeningParenthesis,
+    ClosingParenthesis,
     // OpeningCurlyBrace,
     // ClosingCurlyBrace,
     // Arrow,
@@ -76,6 +76,11 @@ pub enum Cst {
     Whitespace(String),
     Newline, // TODO: Support different kinds of newlines.
     Comment(String),
+    Parenthesized {
+        opening_parenthesis: Box<Cst>,
+        inner: Box<Cst>,
+        closing_parenthesis: Box<Cst>,
+    },
 
     // Decorators.
     // LeadingWhitespace {
@@ -96,20 +101,11 @@ pub enum Cst {
     // },
 
     // Compound expressions.
-    // Parenthesized {
-    //     opening_parenthesis: Box<Cst>,
-    //     inner: Box<Cst>,
-    //     closing_parenthesis: Box<Cst>,
-    // },
     // Lambda {
     //     opening_curly_brace: Box<Cst>,
     //     parameters_and_arrow: Option<(Vec<Cst>, Box<Cst>)>,
     //     body: Vec<Cst>,
     //     closing_curly_brace: Box<Cst>,
-    // },
-    // Call {
-    //     name: Box<Cst>,
-    //     arguments: Vec<Cst>,
     // },
     // Assignment {
     //     name: Box<Cst>,
@@ -117,7 +113,6 @@ pub enum Cst {
     //     equals_sign: Box<Cst>,
     //     body: Vec<Cst>,
     // },
-    /// Indicates a parsing of some subtree did not succeed.
     Error {
         unparsable_input: String,
         error: CstError,
@@ -133,14 +128,15 @@ enum CstError {
     TextNotSufficientlyIndented,
     WeirdWhitespace,
     WeirdWhitespaceInIndentation,
+    ParenthesisNotClosed,
 }
 
 impl Display for Cst {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             // Cst::EqualsSign => "=".fmt(f),
-            // Cst::OpeningParenthesis => "(".fmt(f),
-            // Cst::ClosingParenthesis => ")".fmt(f),
+            Cst::OpeningParenthesis => "(".fmt(f),
+            Cst::ClosingParenthesis => ")".fmt(f),
             // Cst::OpeningCurlyBrace => "{".fmt(f),
             // Cst::ClosingCurlyBrace => "}".fmt(f),
             // Cst::Arrow => "=>".fmt(f),
@@ -166,6 +162,15 @@ impl Display for Cst {
             Cst::Comment(comment) => {
                 '#'.fmt(f)?;
                 comment.fmt(f)
+            }
+            Cst::Parenthesized {
+                opening_parenthesis,
+                inner,
+                closing_parenthesis,
+            } => {
+                opening_parenthesis.fmt(f)?;
+                inner.fmt(f)?;
+                closing_parenthesis.fmt(f)
             }
             Cst::Error {
                 unparsable_input,
@@ -209,14 +214,14 @@ mod parse {
     //     let input = literal(input, "=")?;
     //     Some((input, Cst::EqualsSign))
     // }
-    // fn opening_parenthesis(input: &str) -> Option<(&str, Cst)> {
-    //     let input = literal(input, "(")?;
-    //     Some((input, Cst::OpeningParenthesis))
-    // }
-    // fn closing_parenthesis(input: &str) -> Option<(&str, Cst)> {
-    //     let input = literal(input, ")")?;
-    //     Some((input, Cst::ClosingParenthesis))
-    // }
+    fn opening_parenthesis(input: &str) -> Option<(&str, Cst)> {
+        let input = literal(input, "(")?;
+        Some((input, Cst::OpeningParenthesis))
+    }
+    fn closing_parenthesis(input: &str) -> Option<(&str, Cst)> {
+        let input = literal(input, ")")?;
+        Some((input, Cst::ClosingParenthesis))
+    }
     // fn opening_curly_brace(input: &str) -> Option<(&str, Cst)> {
     //     let input = literal(input, "{")?;
     //     Some((input, Cst::OpeningCurlyBrace))
@@ -780,6 +785,61 @@ mod parse {
                 Cst::Call {
                     name: Box::new(Cst::Identifier("foo".to_string())),
                     arguments: vec![Cst::Int(1), Cst::Int(2), Cst::Int(3), Cst::Int(4)],
+                }
+            ))
+        );
+    }
+
+    fn parenthesized(input: &str, indentation: usize) -> Option<(&str, Cst)> {
+        let (input, opening_parenthesis) = opening_parenthesis(input)?;
+        let (input, inner) = expression(input, indentation).unwrap_or((
+            input,
+            Cst::Error {
+                unparsable_input: "".to_string(),
+                error: CstError::ParenthesisNotClosed,
+            },
+        ));
+        let (input, closing_parenthesis) = closing_parenthesis(input).unwrap_or((
+            input,
+            Cst::Error {
+                unparsable_input: "".to_string(),
+                error: CstError::ParenthesisNotClosed,
+            },
+        ));
+        Some((
+            input,
+            Cst::Parenthesized {
+                opening_parenthesis: Box::new(opening_parenthesis),
+                inner: Box::new(inner),
+                closing_parenthesis: Box::new(closing_parenthesis),
+            },
+        ))
+    }
+    #[test]
+    fn test_parenthesized() {
+        assert_eq!(
+            parenthesized("(foo)", 0),
+            Some((
+                "",
+                Cst::Parenthesized {
+                    opening_parenthesis: Box::new(Cst::OpeningParenthesis),
+                    inner: Box::new(Cst::Identifier("foo".to_string())),
+                    closing_parenthesis: Box::new(Cst::ClosingParenthesis),
+                }
+            ))
+        );
+        assert_eq!(parenthesized("foo", 0), None);
+        assert_eq!(
+            parenthesized("(foo", 0),
+            Some((
+                "",
+                Cst::Parenthesized {
+                    opening_parenthesis: Box::new(Cst::OpeningParenthesis),
+                    inner: Box::new(Cst::Identifier("foo".to_string())),
+                    closing_parenthesis: Box::new(Cst::Error {
+                        unparsable_input: "".to_string(),
+                        error: CstError::ParenthesisNotClosed
+                    }),
                 }
             ))
         );
