@@ -92,11 +92,11 @@ impl<'a> Context<'a> {
 
         let mut start = self
             .db
-            .utf8_byte_offset_to_lsp(range.start, self.input.clone())
+            .offset_to_lsp(self.input.clone(), range.start)
             .to_position();
         let end = self
             .db
-            .utf8_byte_offset_to_lsp(range.end, self.input.clone())
+            .offset_to_lsp(self.input.clone(), range.end)
             .to_position();
 
         if start.line != end.line {

@@ -146,12 +146,9 @@ impl<'a> Context<'a> {
     fn push(&mut self, start: usize, end: usize, kind: FoldingRangeKind) {
         let start = self
             .db
-            .utf8_byte_offset_to_lsp(start, self.input.clone())
+            .offset_to_lsp(self.input.clone(), start)
             .to_position();
-        let end = self
-            .db
-            .utf8_byte_offset_to_lsp(end, self.input.clone())
-            .to_position();
+        let end = self.db.offset_to_lsp(self.input.clone(), end).to_position();
 
         self.ranges.push(FoldingRange {
             start_line: start.line,

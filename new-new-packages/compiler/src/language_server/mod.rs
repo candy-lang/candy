@@ -1,8 +1,9 @@
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentFilter, FoldingRange, FoldingRangeParams, GotoDefinitionParams, GotoDefinitionResponse,
-    InitializeParams, InitializeResult, InitializedParams, MessageType, Registration,
-    SemanticTokens, SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
+    DocumentFilter, DocumentHighlight, DocumentHighlightParams, FoldingRange, FoldingRangeParams,
+    GotoDefinitionParams, GotoDefinitionResponse, InitializeParams, InitializeResult,
+    InitializedParams, Location, MessageType, ReferenceParams, Registration, SemanticTokens,
+    SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
     SemanticTokensRegistrationOptions, SemanticTokensResult, SemanticTokensServerCapabilities,
     ServerCapabilities, ServerInfo, StaticRegistrationOptions,
     TextDocumentChangeRegistrationOptions, TextDocumentContentChangeEvent,
@@ -19,13 +20,18 @@ use crate::{
 };
 
 use self::{
-    definition::find_definition, folding_range::FoldingRangeDb, hints::HintsNotification,
-    semantic_tokens::SemanticTokenDb, utils::LspPositionConversion,
+    definition::find_definition,
+    folding_range::FoldingRangeDb,
+    hints::HintsNotification,
+    references::{find_document_highlights, find_references},
+    semantic_tokens::SemanticTokenDb,
+    utils::LspPositionConversion,
 };
 
 pub mod definition;
 pub mod folding_range;
 pub mod hints;
+pub mod references;
 pub mod semantic_tokens;
 pub mod utils;
 
@@ -61,13 +67,20 @@ impl LanguageServer for CandyLanguageServer {
 
     async fn initialized(&self, _: InitializedParams) {
         log::info!("LSP: initialized");
-        let candy_files = DocumentFilter {
-            language: Some("candy".to_owned()),
-            scheme: Some("file".to_owned()),
-            pattern: None,
-        };
+        let candy_files = vec![
+            DocumentFilter {
+                language: Some("candy".to_owned()),
+                scheme: Some("file".to_owned()),
+                pattern: None,
+            },
+            DocumentFilter {
+                language: Some("candy".to_owned()),
+                scheme: Some("untitled".to_owned()),
+                pattern: None,
+            },
+        ];
         let text_document_registration_options = TextDocumentRegistrationOptions {
-            document_selector: Some(vec![candy_files.clone()]),
+            document_selector: Some(candy_files.clone()),
         };
         self.client
             .register_capability(vec![
@@ -90,7 +103,7 @@ impl LanguageServer for CandyLanguageServer {
                     method: "textDocument/didChange".to_owned(),
                     register_options: Some(
                         serde_json::to_value(TextDocumentChangeRegistrationOptions {
-                            document_selector: Some(vec![candy_files]),
+                            document_selector: Some(candy_files),
                             sync_kind: 2, // incremental
                         })
                         .unwrap(),
@@ -105,13 +118,27 @@ impl LanguageServer for CandyLanguageServer {
                 },
                 Registration {
                     id: "4".to_owned(),
-                    method: "textDocument/foldingRange".to_owned(),
+                    method: "textDocument/references".to_owned(),
                     register_options: Some(
                         serde_json::to_value(text_document_registration_options.clone()).unwrap(),
                     ),
                 },
                 Registration {
                     id: "5".to_owned(),
+                    method: "textDocument/documentHighlight".to_owned(),
+                    register_options: Some(
+                        serde_json::to_value(text_document_registration_options.clone()).unwrap(),
+                    ),
+                },
+                Registration {
+                    id: "6".to_owned(),
+                    method: "textDocument/foldingRange".to_owned(),
+                    register_options: Some(
+                        serde_json::to_value(text_document_registration_options.clone()).unwrap(),
+                    ),
+                },
+                Registration {
+                    id: "7".to_owned(),
                     method: "textDocument/semanticTokens".to_owned(),
                     register_options: Some(
                         serde_json::to_value(
@@ -178,6 +205,18 @@ impl LanguageServer for CandyLanguageServer {
         Ok(find_definition(&db, params))
     }
 
+    async fn references(&self, params: ReferenceParams) -> jsonrpc::Result<Option<Vec<Location>>> {
+        let db = self.db.lock().await;
+        Ok(find_references(&db, params))
+    }
+    async fn document_highlight(
+        &self,
+        params: DocumentHighlightParams,
+    ) -> jsonrpc::Result<Option<Vec<DocumentHighlight>>> {
+        let db = self.db.lock().await;
+        Ok(find_document_highlights(&db, params))
+    }
+
     async fn folding_range(
         &self,
         params: FoldingRangeParams,
@@ -241,16 +280,9 @@ fn apply_text_changes(
     for change in changes {
         match change.range {
             Some(range) => {
-                let start = db.position_to_utf8_byte_offset(
-                    range.start.line,
-                    range.start.character,
-                    input.clone(),
-                );
-                let end = db.position_to_utf8_byte_offset(
-                    range.end.line,
-                    range.end.character,
-                    input.clone(),
-                );
+                let start =
+                    db.offset_from_lsp(input.clone(), range.start.line, range.start.character);
+                let end = db.offset_from_lsp(input.clone(), range.end.line, range.end.character);
                 text = format!("{}{}{}", &text[..start], &change.text, &text[end..]);
             }
             None => text = change.text,

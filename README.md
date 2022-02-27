@@ -70,8 +70,8 @@ Our TODO list:
   * [ ] signatureHelp
   * [x] ~~declaration~~, definition, ~~typeDefinition~~
   * [ ] implementation
-  * [ ] references
-  * [ ] documentHighlight
+  * [x] references
+  * [x] documentHighlight
   * [ ] documentSymbol
   * [ ] codeAction, codeAction resolve
   * [ ] codeLens, codeLens resolve, codeLens refresh

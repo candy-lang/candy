@@ -19,7 +19,7 @@ pub fn find_definition(
     let params = params.text_document_position_params;
     let input: Input = params.text_document.uri.clone().into();
     let position = params.position;
-    let offset = db.position_to_utf8_byte_offset(position.line, position.character, input.clone());
+    let offset = db.offset_from_lsp(input.clone(), position.line, position.character);
 
     let origin_cst = db.find_cst_by_offset(input.clone(), offset);
     match origin_cst.kind {

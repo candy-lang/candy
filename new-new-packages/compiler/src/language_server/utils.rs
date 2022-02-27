@@ -13,11 +13,9 @@ impl CompilerError {
         Diagnostic {
             range: lsp_types::Range {
                 start: db
-                    .utf8_byte_offset_to_lsp(self.span.start, input.clone())
+                    .offset_to_lsp(input.clone(), self.span.start)
                     .to_position(),
-                end: db
-                    .utf8_byte_offset_to_lsp(self.span.end, input)
-                    .to_position(),
+                end: db.offset_to_lsp(input, self.span.end).to_position(),
             },
             severity: Some(DiagnosticSeverity::ERROR),
             code: None,
@@ -55,10 +53,8 @@ impl From<Input> for Url {
 impl Database {
     pub fn range_to_lsp(&self, input: Input, range: Range<usize>) -> lsp_types::Range {
         lsp_types::Range {
-            start: self
-                .utf8_byte_offset_to_lsp(range.start, input.clone())
-                .to_position(),
-            end: self.utf8_byte_offset_to_lsp(range.end, input).to_position(),
+            start: self.offset_to_lsp(input.clone(), range.start).to_position(),
+            end: self.offset_to_lsp(input, range.end).to_position(),
         }
     }
 }
@@ -72,18 +68,18 @@ pub trait LspPositionConversion: InputDb {
     // key, we shouldn't loose much performance by not caching the individual
     // results.
     #[salsa::transparent]
-    fn position_to_utf8_byte_offset(&self, line: u32, character: u32, input: Input) -> usize;
+    fn offset_from_lsp(&self, input: Input, line: u32, character: u32) -> usize;
     #[salsa::transparent]
-    fn utf8_byte_offset_to_lsp(&self, position: usize, input: Input) -> (u32, u32);
+    fn offset_to_lsp(&self, input: Input, position: usize) -> (u32, u32);
 
     fn line_start_utf8_byte_offsets(&self, input: Input) -> Vec<usize>;
 }
 
-fn position_to_utf8_byte_offset(
+fn offset_from_lsp(
     db: &dyn LspPositionConversion,
+    input: Input,
     line: u32,
     character: u32,
-    input: Input,
 ) -> usize {
     let text = db.get_input(input.clone()).unwrap();
     let line_start_offsets = db.line_start_utf8_byte_offsets(input);
@@ -109,11 +105,7 @@ fn position_to_utf8_byte_offset(
     line_offset + char_offset
 }
 
-fn utf8_byte_offset_to_lsp(
-    db: &dyn LspPositionConversion,
-    offset: usize,
-    input: Input,
-) -> (u32, u32) {
+fn offset_to_lsp(db: &dyn LspPositionConversion, input: Input, offset: usize) -> (u32, u32) {
     let text = db.get_input(input.clone()).unwrap();
     let line_start_offsets = db.line_start_utf8_byte_offsets(input);
 

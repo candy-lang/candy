@@ -9,7 +9,8 @@ use crate::{
     input::{GetOpenInputQuery, Input, InputDbStorage, InputWatcher},
     language_server::{
         folding_range::FoldingRangeDbStorage, hints::HintsDbStorage,
-        semantic_tokens::SemanticTokenDbStorage, utils::LspPositionConversionStorage,
+        references::ReferencesDbStorage, semantic_tokens::SemanticTokenDbStorage,
+        utils::LspPositionConversionStorage,
     },
 };
 
@@ -23,6 +24,7 @@ use crate::{
     HirDbStorage,
     InputDbStorage,
     LspPositionConversionStorage,
+    ReferencesDbStorage,
     SemanticTokenDbStorage,
     StringToCstStorage
 )]
