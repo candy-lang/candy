@@ -692,22 +692,25 @@ mod parse {
         );
     }
 
-    fn expression(input: &str, indentation: usize) -> Option<(&str, Cst)> {
-        println!("expression({:?}, {:?})", input, indentation);
-        int(input).or_else(|| identifier(input))
-        // let expression = int(input)
-        //     .or_else(|| text(input, indentation))
-        //     .or_else(|| symbol(input))
-        //     // .or_else(|| parenthesized(input))
-        //     // .or_else(|| lambda(input))
-        //     // .or_else(|| assignment(input))
-        //     .or_else(|| call(input, indentation))
-        //     .or_else(|| identifier(input));
-        // if let Some(result) = expression {
-        //     return Some(result);
-        // }
-        // // TODO: Implement fallback
-        // None
+    fn expression(input: &str, indentation: usize, allow_call: bool) -> Option<(&str, Cst)> {
+        println!(
+            "expression({:?}, {:?}, {:?})",
+            input, indentation, allow_call
+        );
+        int(input)
+            .or_else(|| text(input, indentation))
+            .or_else(|| symbol(input))
+            .or_else(|| parenthesized(input, indentation))
+            .or_else(|| {
+                if allow_call {
+                    call(input, indentation)
+                } else {
+                    None
+                }
+            })
+            .or_else(|| identifier(input))
+        // .or_else(|| lambda(input))
+        // .or_else(|| assignment(input))
     }
     #[test]
     fn test_expression() {
@@ -719,27 +722,32 @@ mod parse {
 
     fn call(input: &str, indentation: usize) -> Option<(&str, Cst)> {
         println!("call({:?}, {:?})", input, indentation);
-        let (mut input, name) = expression(input, indentation)?;
+        let (mut input, name) = expression(input, indentation, false)?;
         let mut arguments = vec![];
         loop {
             let (i, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
-            let (i, argument) = match expression(i, indentation + 1) {
+            let (i, argument) = match expression(i, indentation + 1, false) {
                 Some(it) => it,
                 None => break,
             };
             arguments.push(argument);
             input = i;
         }
-        Some((
-            input,
-            Cst::Call {
-                name: Box::new(name),
-                arguments,
-            },
-        ))
+        if arguments.len() == 0 {
+            None
+        } else {
+            Some((
+                input,
+                Cst::Call {
+                    name: Box::new(name),
+                    arguments,
+                },
+            ))
+        }
     }
     #[test]
     fn test_call() {
+        assert_eq!(call("print", 0), None);
         assert_eq!(
             call("foo bar", 0),
             Some((
@@ -750,13 +758,16 @@ mod parse {
                 }
             ))
         );
-        // assert_eq!(
-        //     call("Foo 4 bar", 0),
-        //     Some(Cst::Call {
-        //         name: Box::new(Cst::Symbol("Foo".to_string())),
-        //         arguments: vec![Cst::Int(4), Cst::Identifier("bar".to_string())]
-        //     })
-        // );
+        assert_eq!(
+            call("Foo 4 bar", 0),
+            Some((
+                "",
+                Cst::Call {
+                    name: Box::new(Cst::Symbol("Foo".to_string())),
+                    arguments: vec![Cst::Int(4), Cst::Identifier("bar".to_string())]
+                }
+            ))
+        );
         // foo
         //   bar
         //   baz
@@ -791,8 +802,9 @@ mod parse {
     }
 
     fn parenthesized(input: &str, indentation: usize) -> Option<(&str, Cst)> {
+        println!("parenthesized({:?}, {:?})", input, indentation);
         let (input, opening_parenthesis) = opening_parenthesis(input)?;
-        let (input, inner) = expression(input, indentation).unwrap_or((
+        let (input, inner) = expression(input, indentation, true).unwrap_or((
             input,
             Cst::Error {
                 unparsable_input: "".to_string(),
@@ -902,25 +914,6 @@ mod parse {
 // }
 
 // // Compound expressions.
-
-// fn parenthesized<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResult<'a, Cst> {
-//     map(
-//         tuple((
-//             |input| opening_parenthesis(source, input),
-//             |input| expression(source, input, indentation),
-//             |input| closing_parenthesis(source, input),
-//         )),
-//         |(opening_parenthesis, inner, closing_parenthesis)| {
-//             create_cst(CstKind::Parenthesized {
-//                 opening_parenthesis: Box::new(opening_parenthesis),
-//                 inner: Box::new(inner),
-//                 closing_parenthesis: Box::new(closing_parenthesis),
-//             })
-//         },
-//     )
-//     .context("parenthesized")
-//     .parse(input)
-// }
 
 // fn lambda<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResult<'a, Cst> {
 //     map(
@@ -1087,60 +1080,6 @@ mod parse {
 //     }
 // }
 
-// #[test]
-// fn test_indented() {
-//     fn parse(source: &str, indentation: usize) -> (&str, Cst) {
-//         leading_indentation(source, indentation, |input| int(source, input)).unwrap()
-//     }
-//     assert_eq!(
-//         parse("123", 0),
-//         (
-//             "",
-//             create_cst(CstKind::LeadingWhitespace {
-//                 value: "".to_string(),
-//                 child: Box::new(create_cst(CstKind::Int {
-//                     offset: 0,
-//                     value: 123,
-//                     source: "123".to_string()
-//                 })),
-//             })
-//         )
-//     );
-//     // assert_eq!(
-//     //     parse("  123", 0),
-//     //     (
-//     //         "  ",
-//     //         CstKind::LeadingWhitespace {
-//     //             value: "".to_string(),
-//     //             child: Box::new(CstKind::Int { value: 123 })
-//     //         }
-//     //     )
-//     // );
-//     assert_eq!(
-//         parse("  123", 1),
-//         (
-//             "",
-//             create_cst(CstKind::LeadingWhitespace {
-//                 value: "  ".to_string(),
-//                 child: Box::new(create_cst(CstKind::Int {
-//                     offset: 2,
-//                     value: 123,
-//                     source: "123".to_string()
-//                 }))
-//             })
-//         )
-//     );
-//     // assert_eq!(
-//     //     parse("    123", 1),
-//     //     (
-//     //         "  ",
-//     //         CstKind::LeadingWhitespace {
-//     //             value: "".to_string(),
-//     //             child: Box::new(CstKind::Int { value: 123 })
-//     //         }
-//     //     )
-//     // );
-// }
 // #[test]
 // fn test_expressions0() {
 //     fn parse(source: &str) -> (&str, Vec<Cst>) {
@@ -1375,84 +1314,6 @@ mod parse {
 //     );
 // }
 // #[test]
-// fn test_call() {
-//     fn parse(source: &str) -> (&str, Cst) {
-//         call(source, source, 0).unwrap()
-//     }
-//     assert_eq!(
-//         parse("print"),
-//         (
-//             "",
-//             create_cst(CstKind::Call {
-//                 name: Box::new(create_cst(CstKind::Identifier {
-//                     offset: 0,
-//                     value: "print".to_string()
-//                 })),
-//                 arguments: vec![]
-//             })
-//         )
-//     );
-//     assert_eq!(
-//         parse("print 123 \"foo\" Bar"),
-//         (
-//             "",
-//             create_cst(CstKind::Call {
-//                 name: Box::new(create_cst(CstKind::TrailingWhitespace {
-//                     value: " ".to_string(),
-//                     child: Box::new(create_cst(CstKind::Identifier {
-//                         offset: 0,
-//                         value: "print".to_string()
-//                     }))
-//                 })),
-//                 arguments: vec![
-//                     create_cst(CstKind::TrailingWhitespace {
-//                         value: " ".to_string(),
-//                         child: Box::new(create_cst(CstKind::Int {
-//                             offset: 6,
-//                             value: 123,
-//                             source: "123".to_string()
-//                         }))
-//                     }),
-//                     create_cst(CstKind::TrailingWhitespace {
-//                         value: " ".to_string(),
-//                         child: Box::new(create_cst(CstKind::Text {
-//                             offset: 10,
-//                             value: "foo".to_string()
-//                         }))
-//                     }),
-//                     create_cst(CstKind::Symbol {
-//                         offset: 16,
-//                         value: "Bar".to_string()
-//                     })
-//                 ]
-//             })
-//         )
-//     );
-//     assert_eq!(
-//         parse("add\n  7\nmyIterable"),
-//         (
-//             "\nmyIterable",
-//             create_cst(CstKind::Call {
-//                 name: Box::new(create_cst(CstKind::Identifier {
-//                     offset: 0,
-//                     value: "add".to_string()
-//                 })),
-//                 arguments: vec![create_cst(CstKind::LeadingWhitespace {
-//                     value: "\n".to_string(),
-//                     child: Box::new(create_cst(CstKind::LeadingWhitespace {
-//                         value: "  ".to_string(),
-//                         child: Box::new(create_cst(CstKind::Int {
-//                             offset: 6,
-//                             value: 7,
-//                             source: "7".to_string()
-//                         }))
-//                     }))
-//                 })]
-//             })
-//         )
-//     );
-// }
-// #[test]
 // fn test_lambda() {
 //     fn parse(source: &str) -> (&str, Cst) {
 //         lambda(source, source, 0).unwrap()
@@ -1628,11 +1489,6 @@ mod parse {
 //         trailing_whitespace_and_comment(" \t# abc").unwrap(),
 //         ("", ())
 //     );
-// }
-// #[test]
-// fn test_comment() {
-//     assert_eq!(comment("#").unwrap(), ("", ()));
-//     assert_eq!(comment("# abc").unwrap(), ("", ()));
 // }
 
 // trait ParserCandyExt<'a, O> {
