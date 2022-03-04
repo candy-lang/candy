@@ -1,3 +1,5 @@
+use im::HashMap;
+
 use crate::{
     builtin_functions::BuiltinFunction,
     compiler::hir::{self, Expression},
@@ -35,6 +37,9 @@ pub fn run_builtin_function(
         BuiltinFunction::GetArgumentCount => get_argument_count(db, input, arguments),
         BuiltinFunction::Panic => panic(arguments),
         BuiltinFunction::Print => print(arguments),
+        BuiltinFunction::StructGet => struct_get(arguments),
+        BuiltinFunction::StructGetKeys => struct_get_keys(arguments),
+        BuiltinFunction::StructHasKey => struct_has_key(arguments),
         BuiltinFunction::TypeOf => type_of(arguments),
         _ => panic!("Unhandled builtin function: {:?}", builtin_function),
     }
@@ -113,6 +118,44 @@ fn print(arguments: Vec<Value>) -> DiscoverResult {
         println!("{:?}", value);
         Value::nothing().into()
     })
+}
+
+fn struct_get(arguments: Vec<Value>) -> DiscoverResult {
+    destructure!(arguments, [struct_, key], {
+        let struct_ = expect_struct("builtinStructGet".to_owned(), struct_)?;
+        struct_
+            .get(key)
+            .map(|value| value.clone().into())
+            .unwrap_or_else(|| {
+                DiscoverResult::Panic(Value::Text(format!(
+                    "Struct does not contain key {:?}",
+                    key
+                )))
+            })
+    })
+}
+fn struct_get_keys(arguments: Vec<Value>) -> DiscoverResult {
+    destructure!(arguments, [struct_], {
+        let struct_ = expect_struct("builtinStructGetKeys".to_owned(), struct_)?;
+        Value::list(struct_.keys().cloned().collect()).into()
+    })
+}
+fn struct_has_key(arguments: Vec<Value>) -> DiscoverResult {
+    destructure!(arguments, [struct_, key], {
+        let struct_ = expect_struct("builtinStructHasKey".to_owned(), struct_)?;
+        Value::bool(struct_.contains_key(key)).into()
+    })
+}
+fn expect_struct(function_name: String, value: &Value) -> DiscoverResult<&HashMap<Value, Value>> {
+    match value {
+        Value::Struct(struct_) => struct_.into(),
+        _ => {
+            return DiscoverResult::Panic(Value::Text(format!(
+                "`{}` expected a struct as its first parameter, but received: {:?}",
+                function_name, value
+            )))
+        }
+    }
 }
 
 fn type_of(arguments: Vec<Value>) -> DiscoverResult {

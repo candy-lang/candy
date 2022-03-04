@@ -69,6 +69,39 @@ add a b =
   needs bIsInt
   builtinAdd a b
 
+some value = [Type: Some, Value: value]
+none = [Type: None]
+
+isStruct value = equals (typeOf value) Struct
+structHasKey struct key =
+  needs (isStruct struct)
+  builtinStructHasKey struct key
+structGetUnwrap struct key =
+  needs (isStruct struct)
+  needs (structHasKey struct key)
+  builtinStructGet struct key
+structGet struct key =
+  needs (isStruct struct)
+  ifElse
+    structHasKey struct key
+    { some (structGetUnwrap struct key) }
+    { none }
+structGetKeys struct =
+  needs (isStruct struct)
+  builtinStructGetKeys struct
+
+isMaybe value =
+  ifElse
+    isStruct value
+    {
+      type = structGet value Type
+      ifElse
+        equals type (some Some)
+        { structHasKey Value }
+        { equals type (some None) }
+    }  
+    { False }
+
 bar = add 2 2
 
 print text =
