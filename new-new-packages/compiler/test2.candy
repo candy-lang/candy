@@ -1,0 +1,8 @@
+a = 1
+b = builtinAdd 1 2
+c = builtinPanic "Foo"
+d = { a ->
+  builtinEquals 1 2
+  builtinEquals 1 a
+  True
+}
