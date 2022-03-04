@@ -7,7 +7,7 @@ pub enum Value {
     Int(u64),
     Text(String),
     Symbol(String),
-    Struct(HashMap<String, Value>),
+    Struct(HashMap<Value, Value>),
     Lambda(Lambda),
 }
 

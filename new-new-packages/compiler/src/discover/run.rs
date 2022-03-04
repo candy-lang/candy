@@ -87,12 +87,7 @@ fn run_with_environment(
                 .map(|(key, value)| {
                     let key = db.run_with_environment(input.clone(), key, environment.clone())?;
                     let key = match key {
-                        Ok(Value::Symbol(symbol)) => symbol,
-                        Ok(_) => {
-                            return Some(Err(Value::Symbol(
-                                "Symbol expected as a struct key".to_owned(),
-                            )))
-                        }
+                        Ok(key) => key,
                         Err(error) => return Some(Err(error)),
                     };
 
@@ -104,7 +99,7 @@ fn run_with_environment(
                     };
                     Some(Ok((key, value)))
                 })
-                .collect::<Option<Result<HashMap<String, Value>, Value>>>()?;
+                .collect::<Option<Result<HashMap<Value, Value>, Value>>>()?;
             match entries {
                 Ok(entries) => Some(Ok(Value::Struct(entries))),
                 Err(error) => Some(Err(error)),
@@ -211,7 +206,7 @@ fn value_to_display_string(db: &dyn Discover, input: Input, value: Value) -> Str
                 .into_iter()
                 .map(|(key, value)| format!(
                     "{}: {}",
-                    key,
+                    value_to_display_string(db, input.clone(), key),
                     value_to_display_string(db, input.clone(), value)
                 ))
                 .join(", ")
