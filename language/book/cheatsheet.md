@@ -1,3 +1,5 @@
+> **Warning:** This document is not up-to-date.
+
 This is not the whole book, but only a short cheatsheet for people coming from other languages.
 
 # Literals
