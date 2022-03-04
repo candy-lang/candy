@@ -61,7 +61,7 @@ Our TODO list:
 * [x] lower AST to HIR
 * [x] build a basic interpreter
 * [x] add CLI arguments for printing the CST, AST, or HIR
-* [ ] make functions independent of their order in source where possible
+* [ ] make functions independent of their order in top-level scope
 * [ ] support importing other files
 * [ ] namespaces/modules including visibility modifiers
 * [ ] IDE support:
