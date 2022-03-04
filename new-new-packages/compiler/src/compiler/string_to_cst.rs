@@ -56,9 +56,9 @@ pub enum Cst {
     // EqualsSign,
     OpeningParenthesis,
     ClosingParenthesis,
-    // OpeningCurlyBrace,
-    // ClosingCurlyBrace,
-    // Arrow,
+    OpeningCurlyBrace,
+    ClosingCurlyBrace,
+    Arrow,
     DoubleQuote,
     Identifier(String),
     Symbol(String),
@@ -81,6 +81,12 @@ pub enum Cst {
         inner: Box<Cst>,
         closing_parenthesis: Box<Cst>,
     },
+    Lambda {
+        opening_curly_brace: Box<Cst>,
+        parameters_and_arrow: Option<(Vec<Cst>, Box<Cst>)>,
+        body: Vec<Cst>,
+        closing_curly_brace: Box<Cst>,
+    },
 
     // Decorators.
     // LeadingWhitespace {
@@ -101,12 +107,6 @@ pub enum Cst {
     // },
 
     // Compound expressions.
-    // Lambda {
-    //     opening_curly_brace: Box<Cst>,
-    //     parameters_and_arrow: Option<(Vec<Cst>, Box<Cst>)>,
-    //     body: Vec<Cst>,
-    //     closing_curly_brace: Box<Cst>,
-    // },
     // Assignment {
     //     name: Box<Cst>,
     //     parameters: Vec<Cst>,
@@ -129,6 +129,8 @@ enum CstError {
     WeirdWhitespace,
     WeirdWhitespaceInIndentation,
     ParenthesisNotClosed,
+    TooMuchWhitespace,
+    CurlyBraceNotClosed,
 }
 
 impl Display for Cst {
@@ -137,9 +139,9 @@ impl Display for Cst {
             // Cst::EqualsSign => "=".fmt(f),
             Cst::OpeningParenthesis => "(".fmt(f),
             Cst::ClosingParenthesis => ")".fmt(f),
-            // Cst::OpeningCurlyBrace => "{".fmt(f),
-            // Cst::ClosingCurlyBrace => "}".fmt(f),
-            // Cst::Arrow => "=>".fmt(f),
+            Cst::OpeningCurlyBrace => "{".fmt(f),
+            Cst::ClosingCurlyBrace => "}".fmt(f),
+            Cst::Arrow => "->".fmt(f),
             Cst::DoubleQuote => '"'.fmt(f),
             Cst::Identifier(identifier) => identifier.fmt(f),
             Cst::Symbol(symbol) => symbol.fmt(f),
@@ -172,6 +174,24 @@ impl Display for Cst {
                 inner.fmt(f)?;
                 closing_parenthesis.fmt(f)
             }
+            Cst::Lambda {
+                opening_curly_brace,
+                parameters_and_arrow,
+                body,
+                closing_curly_brace,
+            } => {
+                opening_curly_brace.fmt(f)?;
+                if let Some((parameters, arrow)) = parameters_and_arrow {
+                    for parameter in parameters {
+                        parameter.fmt(f)?;
+                    }
+                    arrow.fmt(f)?;
+                }
+                for expression in body {
+                    expression.fmt(f)?;
+                }
+                closing_curly_brace.fmt(f)
+            }
             Cst::Error {
                 unparsable_input,
                 error,
@@ -194,7 +214,7 @@ mod parse {
     use super::{Cst, CstError};
     use itertools::Itertools;
 
-    static MEANINGFUL_PUNCTUATION: &'static str = "=>(){}[],:";
+    static MEANINGFUL_PUNCTUATION: &'static str = "=->(){}[],:";
 
     fn literal<'a>(input: &'a str, literal: &'static str) -> Option<&'a str> {
         println!("literal({:?}, {:?})", input, literal);
@@ -222,18 +242,18 @@ mod parse {
         let input = literal(input, ")")?;
         Some((input, Cst::ClosingParenthesis))
     }
-    // fn opening_curly_brace(input: &str) -> Option<(&str, Cst)> {
-    //     let input = literal(input, "{")?;
-    //     Some((input, Cst::OpeningCurlyBrace))
-    // }
-    // fn closing_curly_brace(input: &str) -> Option<(&str, Cst)> {
-    //     let input = literal(input, "}")?;
-    //     Some((input, Cst::ClosingCurlyBrace))
-    // }
-    // fn arrow(input: &str) -> Option<(&str, Cst)> {
-    //     let input = literal(input, "=>")?;
-    //     Some((input, Cst::Arrow))
-    // }
+    fn opening_curly_brace(input: &str) -> Option<(&str, Cst)> {
+        let input = literal(input, "{")?;
+        Some((input, Cst::OpeningCurlyBrace))
+    }
+    fn closing_curly_brace(input: &str) -> Option<(&str, Cst)> {
+        let input = literal(input, "}")?;
+        Some((input, Cst::ClosingCurlyBrace))
+    }
+    fn arrow(input: &str) -> Option<(&str, Cst)> {
+        let input = literal(input, "->")?;
+        Some((input, Cst::Arrow))
+    }
     fn double_quote(input: &str) -> Option<(&str, Cst)> {
         println!("double_quote({:?})", input);
         let input = literal(input, "\"")?;
@@ -555,6 +575,13 @@ mod parse {
             ("  foo", vec![Cst::Newline])
         );
         assert_eq!(
+            whitespaces_and_newlines(" \n  foo", 0, true),
+            (
+                "  foo",
+                vec![Cst::Whitespace(" ".to_string()), Cst::Newline]
+            )
+        );
+        assert_eq!(
             whitespaces_and_newlines("\n  foo", 2, true),
             ("\n  foo", vec![])
         );
@@ -857,140 +884,140 @@ mod parse {
         );
     }
 
+    fn body(mut input: &str, indentation: usize) -> (&str, Vec<Cst>) {
+        println!("body({:?}, {:?})", input, indentation);
+        let mut expressions = vec![];
+        loop {
+            let (i, _) = whitespaces_and_newlines(input, indentation, true);
+            let (i, ws) = single_line_whitespace(input);
+            match expression(i, indentation, true) {
+                Some((i, expression)) => {
+                    input = i;
+                    if let Cst::Whitespace(ws) = ws {
+                        if !ws.is_empty() {
+                            expressions.push(Cst::Error {
+                                unparsable_input: ws,
+                                error: CstError::TooMuchWhitespace,
+                            });
+                        }
+                    }
+                    expressions.push(expression);
+                }
+                None => break (input, expressions),
+            };
+        }
+    }
+
+    fn lambda(input: &str, indentation: usize) -> Option<(&str, Cst)> {
+        println!("lambda({:?}, {:?})", input, indentation);
+        let (input, opening_curly_brace) = opening_curly_brace(input)?;
+        let (mut input, parameters_and_arrow) = {
+            let input_without_params = input;
+            let mut input = input;
+            let mut parameters = vec![];
+            loop {
+                let (i, _) = whitespaces_and_newlines(input, indentation + 1, true);
+                input = i;
+                match expression(input, indentation + 1, false) {
+                    Some((i, parameter)) => {
+                        input = i;
+                        parameters.push(parameter);
+                    }
+                    None => break,
+                };
+            }
+            match arrow(input) {
+                Some((input, arrow)) => (input, Some((parameters, arrow))),
+                None => (input_without_params, None),
+            }
+        };
+
+        let (i, _) = whitespaces_and_newlines(input, indentation + 1, true);
+        let (i, body) = body(i, indentation + 1);
+        if !body.is_empty() {
+            input = i;
+        }
+
+        let (i, _) = whitespaces_and_newlines(i, indentation, true);
+        let closing_curly_brace = match closing_curly_brace(i) {
+            Some((i, closing_curly_brace)) => {
+                input = i;
+                closing_curly_brace
+            }
+            None => Cst::Error {
+                unparsable_input: "".to_string(),
+                error: CstError::CurlyBraceNotClosed,
+            },
+        };
+
+        Some((
+            input,
+            Cst::Lambda {
+                opening_curly_brace: Box::new(opening_curly_brace),
+                parameters_and_arrow: parameters_and_arrow
+                    .map(|(parameters, arrow)| (parameters, Box::new(arrow))),
+                body,
+                closing_curly_brace: Box::new(closing_curly_brace),
+            },
+        ))
+    }
+    #[test]
+    fn test_lambda() {
+        assert_eq!(lambda("2", 0), None);
+        assert_eq!(
+            lambda("{ 2 }", 0),
+            Some((
+                "",
+                Cst::Lambda {
+                    opening_curly_brace: Box::new(Cst::OpeningCurlyBrace),
+                    parameters_and_arrow: None,
+                    body: vec![Cst::Int(2)],
+                    closing_curly_brace: Box::new(Cst::ClosingCurlyBrace),
+                }
+            ))
+        );
+        // { a ->
+        //   foo
+        // }
+        assert_eq!(
+            lambda("{ a ->\n  foo\n}", 0),
+            Some((
+                "",
+                Cst::Lambda {
+                    opening_curly_brace: Box::new(Cst::OpeningCurlyBrace),
+                    parameters_and_arrow: Some((
+                        vec![Cst::Identifier("a".to_string())],
+                        Box::new(Cst::Arrow)
+                    )),
+                    body: vec![Cst::Identifier("foo".to_string())],
+                    closing_curly_brace: Box::new(Cst::ClosingCurlyBrace),
+                }
+            ))
+        );
+        // {
+        // foo
+        assert_eq!(
+            lambda("{\nfoo", 0),
+            Some((
+                "\nfoo",
+                Cst::Lambda {
+                    opening_curly_brace: Box::new(Cst::OpeningCurlyBrace),
+                    parameters_and_arrow: None,
+                    body: vec![],
+                    closing_curly_brace: Box::new(Cst::Error {
+                        unparsable_input: "".to_string(),
+                        error: CstError::CurlyBraceNotClosed
+                    }),
+                }
+            ))
+        );
+    }
+
     // fn csts(input: &str, indentation: usize) -> Cst {}
     // fn cst(input: &str, indentation: usize) -> Cst {}
 }
 
-// fn expressions1<'a>(
-//     source: &'a str,
-//     input: &'a str,
-//     indentation: usize,
-// ) -> ParserResult<'a, Vec<Cst>> {
-//     verify(
-//         |input| expressions0(source, input, indentation),
-//         |csts: &Vec<Cst>| !csts.is_empty(),
-//     )
-//     .context("expressions1")
-//     .parse(input)
-// }
-// fn expressions0<'a>(
-//     source: &'a str,
-//     input: &'a str,
-//     indentation: usize,
-// ) -> ParserResult<'a, Vec<Cst>> {
-//     many0(|input| {
-//         leading_whitespace_and_comment_and_empty_lines(
-//             source,
-//             input,
-//             indentation,
-//             1,
-//             |source, input, indentation| {
-//                 trailing_whitespace_and_comment(input, |input| {
-//                     leading_indentation(input, indentation, |input| {
-//                         expression(source, input, indentation)
-//                     })
-//                 })
-//             },
-//         )
-//     })
-//     .context("expressions0")
-//     .parse(input)
-// }
-
-// fn expression<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResult<'a, Cst> {
-//     alt((
-//         |input| int(source, input),
-//         |input| text(source, input),
-//         |input| symbol(source, input),
-//         |input| parenthesized(source, input, indentation),
-//         |input| lambda(source, input, indentation),
-//         |input| assignment(source, input, indentation),
-//         |input| call(source, input, indentation),
-//         |input| identifier(source, input),
-//         // TODO: catch-all
-//     ))
-//     .context("expression")
-//     .parse(input)
-// }
-
 // // Compound expressions.
-
-// fn lambda<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResult<'a, Cst> {
-//     map(
-//         tuple((
-//             |input| {
-//                 trailing_whitespace_and_comment_and_empty_lines(input, |input| {
-//                     opening_curly_brace(source, input)
-//                 })
-//             },
-//             opt(tuple((
-//                 |input| parameters(source, input, indentation),
-//                 map(
-//                     |input| trailing_whitespace_and_comment(input, |input| arrow(source, input)),
-//                     |it| Box::new(it),
-//                 ),
-//             ))),
-//             alt((
-//                 |input| expressions1(source, input, indentation + 1),
-//                 map(
-//                     |input| {
-//                         trailing_whitespace_and_comment_and_empty_lines(input, |input| {
-//                             expression(source, input, indentation)
-//                         })
-//                     },
-//                     |cst| vec![cst],
-//                 ),
-//                 success(vec![]),
-//             )),
-//             |input| {
-//                 leading_whitespace_and_comment_and_empty_lines(
-//                     source,
-//                     input,
-//                     indentation,
-//                     0,
-//                     |source, input, _indentation| {
-//                         trailing_whitespace_and_comment(input, |input| {
-//                             closing_curly_brace(source, input)
-//                         })
-//                     },
-//                 )
-//             },
-//         )),
-//         |(opening_curly_brace, parameters_and_arrow, body, closing_curly_brace)| {
-//             create_cst(CstKind::Lambda {
-//                 opening_curly_brace: Box::new(opening_curly_brace),
-//                 parameters_and_arrow,
-//                 body,
-//                 closing_curly_brace: Box::new(closing_curly_brace),
-//             })
-//         },
-//     )
-//     .context("lambda")
-//     .parse(input)
-// }
-// fn parameters<'a>(
-//     source: &'a str,
-//     input: &'a str,
-//     indentation: usize,
-// ) -> ParserResult<'a, Vec<Cst>> {
-//     many0(|input| {
-//         trailing_whitespace_and_comment_and_empty_lines(
-//             input,
-//             alt((
-//                 |input| int(source, input),
-//                 |input| text(source, input),
-//                 |input| symbol(source, input),
-//                 |input| parenthesized(source, input, indentation),
-//                 // TODO: only allow single-line lambdas
-//                 |input| lambda(source, input, indentation),
-//                 |input| identifier(source, input),
-//                 // TODO: catch-all
-//             )),
-//         )
-//     })
-//     .context("arguments")
-//     .parse(input)
-// }
 
 // fn arguments<'a>(
 //     source: &'a str,
@@ -1312,198 +1339,4 @@ mod parse {
 //             ]
 //         )
 //     );
-// }
-// #[test]
-// fn test_lambda() {
-//     fn parse(source: &str) -> (&str, Cst) {
-//         lambda(source, source, 0).unwrap()
-//     }
-
-//     assert_eq!(
-//         parse("{ 123 }"),
-//         (
-//             "",
-//             create_cst(CstKind::Lambda {
-//                 opening_curly_brace: Box::new(create_cst(CstKind::TrailingWhitespace {
-//                     value: " ".to_string(),
-//                     child: Box::new(create_cst(CstKind::OpeningCurlyBrace { offset: 0 }))
-//                 })),
-//                 parameters_and_arrow: None,
-//                 body: vec![create_cst(CstKind::TrailingWhitespace {
-//                     value: " ".to_string(),
-//                     child: Box::new(create_cst(CstKind::Int {
-//                         offset: 2,
-//                         value: 123,
-//                         source: "123".to_string()
-//                     }))
-//                 })],
-//                 closing_curly_brace: Box::new(create_cst(CstKind::ClosingCurlyBrace { offset: 6 }))
-//             }),
-//         )
-//     );
-//     assert_eq!(
-//         parse("{ n -> 5 }"),
-//         (
-//             "",
-//             create_cst(CstKind::Lambda {
-//                 opening_curly_brace: Box::new(create_cst(CstKind::TrailingWhitespace {
-//                     value: " ".to_string(),
-//                     child: Box::new(create_cst(CstKind::OpeningCurlyBrace { offset: 0 }))
-//                 })),
-//                 parameters_and_arrow: Some((
-//                     vec![create_cst(CstKind::Call {
-//                         name: Box::new(create_cst(CstKind::TrailingWhitespace {
-//                             value: " ".to_string(),
-//                             child: Box::new(create_cst(CstKind::Identifier {
-//                                 offset: 2,
-//                                 value: "n".to_string()
-//                             }))
-//                         })),
-//                         arguments: vec![]
-//                     })],
-//                     Box::new(create_cst(CstKind::TrailingWhitespace {
-//                         value: " ".to_string(),
-//                         child: Box::new(create_cst(CstKind::Arrow { offset: 4 }))
-//                     }))
-//                 )),
-//                 body: vec![create_cst(CstKind::TrailingWhitespace {
-//                     value: " ".to_string(),
-//                     child: Box::new(create_cst(CstKind::Int {
-//                         offset: 7,
-//                         value: 5,
-//                         source: "5".to_string()
-//                     }))
-//                 })],
-//                 closing_curly_brace: Box::new(create_cst(CstKind::ClosingCurlyBrace { offset: 9 }))
-//             }),
-//         )
-//     );
-//     assert_eq!(
-//         parse("{ a ->\n  123\n}"),
-//         (
-//             "",
-//             create_cst(CstKind::Lambda {
-//                 opening_curly_brace: Box::new(create_cst(CstKind::TrailingWhitespace {
-//                     value: " ".to_string(),
-//                     child: Box::new(create_cst(CstKind::OpeningCurlyBrace { offset: 0 })),
-//                 })),
-//                 parameters_and_arrow: Some((
-//                     vec![create_cst(CstKind::Call {
-//                         name: Box::new(create_cst(CstKind::TrailingWhitespace {
-//                             value: " ".to_string(),
-//                             child: Box::new(create_cst(CstKind::Identifier {
-//                                 offset: 2,
-//                                 value: "a".to_string()
-//                             }))
-//                         })),
-//                         arguments: vec![]
-//                     })],
-//                     Box::new(create_cst(CstKind::Arrow { offset: 4 }))
-//                 )),
-//                 body: vec![create_cst(CstKind::LeadingWhitespace {
-//                     value: "\n".to_string(),
-//                     child: Box::new(create_cst(CstKind::LeadingWhitespace {
-//                         value: "  ".to_string(),
-//                         child: Box::new(create_cst(CstKind::Int {
-//                             offset: 9,
-//                             value: 123,
-//                             source: "123".to_string()
-//                         }))
-//                     }))
-//                 })],
-//                 closing_curly_brace: Box::new(create_cst(CstKind::LeadingWhitespace {
-//                     value: "\n".to_string(),
-//                     child: Box::new(create_cst(CstKind::ClosingCurlyBrace { offset: 13 }))
-//                 }))
-//             }),
-//         )
-//     );
-// }
-// #[test]
-// fn test_leading_stuff() {
-//     let source = "123";
-//     assert_eq!(
-//         leading_whitespace(source, |input| int(source, input)).unwrap(),
-//         (
-//             "",
-//             create_cst(CstKind::Int {
-//                 offset: 0,
-//                 value: 123,
-//                 source: "123".to_string()
-//             })
-//         )
-//     );
-
-//     let source = " 123";
-//     assert_eq!(
-//         leading_whitespace(source, |input| int(source, input)).unwrap(),
-//         (
-//             "",
-//             create_cst(CstKind::LeadingWhitespace {
-//                 value: " ".to_string(),
-//                 child: Box::new(create_cst(CstKind::Int {
-//                     offset: 1,
-//                     value: 123,
-//                     source: "123".to_string()
-//                 }))
-//             }),
-//         )
-//     );
-
-//     fn parse(source: &str) -> (&str, Cst) {
-//         leading_whitespace_and_comment_and_empty_lines(
-//             source,
-//             source,
-//             0,
-//             1,
-//             |source, input, _indentation| int(source, input),
-//         )
-//         .unwrap()
-//     }
-
-//     assert_eq!(
-//         parse("\n123"),
-//         (
-//             "",
-//             create_cst(CstKind::LeadingWhitespace {
-//                 value: "\n".to_string(),
-//                 child: Box::new(create_cst(CstKind::Int {
-//                     offset: 1,
-//                     value: 123,
-//                     source: "123".to_string()
-//                 }),)
-//             }),
-//         )
-//     );
-// }
-// #[test]
-// fn test_trailing_whitespace_and_comment() {
-//     assert_eq!(trailing_whitespace_and_comment("").unwrap(), ("", ()));
-//     assert_eq!(trailing_whitespace_and_comment(" \t").unwrap(), ("", ()));
-//     assert_eq!(
-//         trailing_whitespace_and_comment(" print").unwrap(),
-//         ("print", ())
-//     );
-//     assert_eq!(trailing_whitespace_and_comment("# abc").unwrap(), ("", ()));
-//     assert_eq!(
-//         trailing_whitespace_and_comment(" \t# abc").unwrap(),
-//         ("", ())
-//     );
-// }
-
-// trait ParserCandyExt<'a, O> {
-//     fn map<R, F, G>(&mut self, f: F) -> Box<dyn FnMut(&'a str) -> ParserResult<'a, R>>
-//     where
-//         F: FnMut(O) -> R;
-// }
-// impl<'a, P, O> ParserCandyExt<'a, O> for P
-// where
-//     P: Parser<&'a str, O, ErrorTree<&'a str>>,
-// {
-//     fn map<R, F, G>(&mut self, f: F) -> impl FnMut(&'a str) -> ParserResult<'a, R>
-//     where
-//         F: FnMut(O) -> R,
-//     {
-//         todo!()
-//     }
 // }
