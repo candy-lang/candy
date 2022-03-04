@@ -9,17 +9,9 @@ use log;
 
 use super::{
     builtin_functions::run_builtin_function,
+    result::DiscoverResult,
     value::{Environment, Lambda, Value},
 };
-
-/// The result of a successful evaluation. Either a concrete value that could be
-/// used instead of the expression, or an Error indicating that the code will
-/// panic with a value.
-pub type EvaluationResult = Result<Value, Value>;
-
-/// The result of an attempted evaluation. May be None if the code still
-/// contains errors or is impure or too complicated.
-pub type DiscoverResult = Option<EvaluationResult>;
 
 #[salsa::query_group(DiscoverStorage)]
 pub trait Discover: HirDb {
@@ -36,7 +28,7 @@ pub trait Discover: HirDb {
         input: Input,
         ids: Vec<hir::Id>,
         environment: Environment,
-    ) -> Option<Result<Vec<Value>, Value>>;
+    ) -> DiscoverResult<Vec<Value>>;
     fn run_call(
         &self,
         input: Input,
@@ -72,43 +64,31 @@ fn run_with_environment(
     environment: Environment,
 ) -> DiscoverResult {
     if let Some(value) = environment.get(&id) {
-        return Some(Ok(value));
+        return value.into();
     }
 
-    let expression = db.find_expression(input.to_owned(), id.to_owned())?;
-    match expression {
-        Expression::Int(int) => Some(Ok(int.to_owned().into())),
-        Expression::Text(string) => Some(Ok(string.to_owned().into())),
+    match db.find_expression(input.to_owned(), id.to_owned())? {
+        Expression::Int(int) => Value::Int(int.to_owned()).into(),
+        Expression::Text(string) => Value::Text(string.to_owned()).into(),
         Expression::Reference(reference) => db.run_with_environment(input, reference, environment),
-        Expression::Symbol(symbol) => Some(Ok(Value::Symbol(symbol.to_owned()))),
+        Expression::Symbol(symbol) => Value::Symbol(symbol.to_owned()).into(),
         Expression::Struct(entries) => {
-            let entries = entries
+            let struct_ = entries
                 .into_iter()
                 .map(|(key, value)| {
                     let key = db.run_with_environment(input.clone(), key, environment.clone())?;
-                    let key = match key {
-                        Ok(key) => key,
-                        Err(error) => return Some(Err(error)),
-                    };
-
                     let value =
                         db.run_with_environment(input.clone(), value, environment.clone())?;
-                    let value = match value {
-                        Ok(value) => value,
-                        Err(error) => return Some(Err(error)),
-                    };
-                    Some(Ok((key, value)))
+                    (key, value).into()
                 })
-                .collect::<Option<Result<HashMap<Value, Value>, Value>>>()?;
-            match entries {
-                Ok(entries) => Some(Ok(Value::Struct(entries))),
-                Err(error) => Some(Err(error)),
-            }
+                .collect::<DiscoverResult<HashMap<Value, Value>>>()?;
+            Value::Struct(struct_).into()
         }
-        Expression::Lambda(_) => Some(Ok(Value::Lambda(Lambda {
+        Expression::Lambda(_) => Value::Lambda(Lambda {
             captured_environment: environment.to_owned(),
             id,
-        }))),
+        })
+        .into(),
         Expression::Body(Body { out, .. }) => {
             db.run_with_environment(input, out.unwrap(), environment)
         }
@@ -116,7 +96,7 @@ fn run_with_environment(
             function,
             arguments,
         } => db.run_call(input, function, arguments, environment),
-        Expression::Error => None,
+        Expression::Error => DiscoverResult::ErrorInHir,
     }
 }
 fn run_multiple_with_environment(
@@ -124,10 +104,10 @@ fn run_multiple_with_environment(
     input: Input,
     ids: Vec<hir::Id>,
     environment: Environment,
-) -> Option<Result<Vec<Value>, Value>> {
+) -> DiscoverResult<Vec<Value>> {
     ids.into_iter()
         .map(|it| run_with_environment(db, input.to_owned(), it.to_owned(), environment.to_owned()))
-        .collect::<Option<Result<Vec<Value>, Value>>>()
+        .collect()
 }
 fn run_call(
     db: &dyn Discover,
@@ -152,9 +132,8 @@ fn run_call(
         function.to_owned(),
         environment.to_owned(),
     )? {
-        Ok(Value::Lambda(lambda)) => lambda,
-        Ok(_) => return None,
-        Err(error) => return Some(Err(error)),
+        Value::Lambda(lambda) => lambda,
+        it => panic!("Tried to call something that wasn't a lambda: {:?}", it),
     };
     let lambda_hir = match db.find_expression(input.to_owned(), lambda.id)? {
         Expression::Lambda(lambda) => lambda,
@@ -177,15 +156,14 @@ fn run_call(
     log::trace!("Calling function `{}`", &function_name);
 
     if lambda_hir.parameters.len() != arguments.len() {
-        return None;
+        return DiscoverResult::Panic(Value::Text(format!(
+            "Lambda parameter and argument counts don't match: {:?}.",
+            lambda_hir
+        )));
     }
 
     let arguments =
         db.run_multiple_with_environment(input.to_owned(), arguments, environment.to_owned())?;
-    let arguments = match arguments {
-        Ok(arguments) => arguments,
-        Err(error) => return Some(Err(error)),
-    };
 
     let mut inner_environment = environment.to_owned();
     for (index, argument) in arguments.into_iter().enumerate() {

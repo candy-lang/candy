@@ -1,3 +1,5 @@
+#![feature(try_trait_v2)]
+
 mod builtin_functions;
 mod compiler;
 mod database;
