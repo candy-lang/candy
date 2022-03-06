@@ -7,7 +7,7 @@ pub enum Value {
     Int(u64),
     Text(String),
     Symbol(String),
-    Struct(HashMap<String, Value>),
+    Struct(HashMap<Value, Value>),
     Lambda(Lambda),
 }
 
@@ -27,11 +27,21 @@ impl Value {
     pub fn nothing() -> Self {
         Value::Symbol("Nothing".to_owned())
     }
-    pub fn bool_true() -> Self {
-        Value::Symbol("True".to_owned())
+    pub fn bool(value: bool) -> Self {
+        Value::Symbol(if value {
+            "True".to_owned()
+        } else {
+            "False".to_owned()
+        })
     }
-    pub fn bool_false() -> Self {
-        Value::Symbol("False".to_owned())
+
+    pub fn list(items: Vec<Value>) -> Self {
+        let items = items
+            .into_iter()
+            .enumerate()
+            .map(|(index, it)| (Value::Int(index as u64), it))
+            .collect();
+        Value::Struct(items)
     }
 }
 impl From<u64> for Value {
@@ -46,11 +56,7 @@ impl From<String> for Value {
 }
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
-        if value {
-            Value::bool_true()
-        } else {
-            Value::bool_false()
-        }
+        Value::bool(value)
     }
 }
 

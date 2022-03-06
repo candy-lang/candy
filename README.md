@@ -61,7 +61,7 @@ Our TODO list:
 * [x] lower AST to HIR
 * [x] build a basic interpreter
 * [x] add CLI arguments for printing the CST, AST, or HIR
-* [ ] make functions independent of their order in source where possible
+* [ ] make functions independent of their order in top-level scope
 * [ ] support importing other files
 * [ ] namespaces/modules including visibility modifiers
 * [ ] IDE support:
@@ -111,6 +111,6 @@ Our TODO list:
 1. Install Rust.
 2. Clone this repo.
 3. Open the workspace in VS Code.
-4. Run the launch config “Run Extension (Rust-Compiler: vscode_extension)”.
-5. When you are prompted to select the build task, choose “npm: watch (1) Rust-Compiler: vscode_extension” (should be the first entry).
+4. In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/new-new-packages/compiler/Cargo.toml -- lsp",`.
+5. Run the launch config “Run Extension (VS Code Extension)”.
 6. In the new VS Code window that opens, you can enjoy 🍭 Candy :)

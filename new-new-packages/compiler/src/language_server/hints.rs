@@ -4,7 +4,7 @@ use crate::{
         ast_to_hir::AstToHir,
         hir::{self, Expression, HirDb, Lambda},
     },
-    discover::{run::Discover, value::Value},
+    discover::{result::DiscoverResult, run::Discover, value::Value},
     input::{Input, InputDb},
     language_server::utils::TupleToPosition,
 };
@@ -48,18 +48,14 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
 
     collect_hir_ids_for_hints_list(db, input.clone(), hir.expressions.keys().cloned().collect())
         .into_iter()
-        .filter_map(|id| {
-            let value = db.run(input.clone(), id.clone());
-            value.map(|it| (id, it))
-        })
+        .map(|id| (id.clone(), db.run(input.clone(), id)))
         .filter_map(|(id, value)| {
-            if value == Ok(Value::nothing()) {
-                return None;
-            };
-
             let (kind, value) = match value {
-                Ok(value) => (HintKind::Value, value),
-                Err(value) => (HintKind::Panic, value),
+                DiscoverResult::Value(value) if value != Value::nothing() => {
+                    (HintKind::Value, value)
+                }
+                DiscoverResult::Panic(value) => (HintKind::Panic, value),
+                _ => return None,
             };
 
             let span = db
