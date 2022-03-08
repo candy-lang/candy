@@ -849,27 +849,37 @@ mod parse {
         );
     }
 
-    pub fn expression(input: &str, indentation: usize, allow_call: bool) -> Option<(&str, Cst)> {
+    pub fn expression(
+        input: &str,
+        indentation: usize,
+        allow_call_and_assignment: bool,
+    ) -> Option<(&str, Cst)> {
         log::info!(
             "expression({:?}, {:?}, {:?})",
             input,
             indentation,
-            allow_call
+            allow_call_and_assignment
         );
         int(input)
             .or_else(|| text(input, indentation))
             .or_else(|| symbol(input))
             .or_else(|| parenthesized(input, indentation))
+            // .or_else(|| lambda(input, indentation))
             .or_else(|| {
-                if allow_call {
+                if allow_call_and_assignment {
+                    assignment(input, indentation)
+                } else {
+                    None
+                }
+            })
+            .or_else(|| {
+                if allow_call_and_assignment {
                     call(input, indentation)
                 } else {
                     None
                 }
             })
             .or_else(|| identifier(input))
-        // .or_else(|| lambda(input))
-        // .or_else(|| assignment(input))
     }
     #[test]
     fn test_expression() {
@@ -1045,26 +1055,24 @@ mod parse {
     }
 
     fn body(mut input: &str, indentation: usize) -> (&str, Vec<Cst>) {
-        log::info!("body({:?}, {:?})", input, indentation);
+        log::warn!("body({:?}, {:?})", input, indentation);
+        let mut is_first = true;
         let mut expressions = vec![];
         loop {
-            let (i, _) = whitespaces_and_newlines(input, indentation, true);
-            let (i, ws) = single_line_whitespace(input);
-            match expression(i, indentation, true) {
-                Some((i, expression)) => {
-                    input = i;
-                    if let Cst::Whitespace(ws) = ws {
-                        if !ws.is_empty() {
-                            expressions.push(Cst::Error {
-                                unparsable_input: ws,
-                                error: CstError::TooMuchWhitespace,
-                            });
-                        }
-                    }
+            let mut new_input = input;
+            if !is_first {
+                let (new_new_input, _) = whitespaces_and_newlines(input, indentation, true);
+                new_input = new_new_input;
+            }
+            is_first = false;
+
+            match expression(new_input, indentation, true) {
+                Some((new_input, expression)) => {
+                    input = new_input;
                     expressions.push(expression);
                 }
                 None => break (input, expressions),
-            };
+            }
         }
     }
 
@@ -1184,13 +1192,25 @@ mod parse {
         let name = signature.into_iter().next().unwrap();
 
         log::info!("Removing whitespace before = on {:?}.", input);
-        let (input, _) = whitespaces_and_newlines(input, indentation + 1, true);
+        let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
         log::info!("Trying to parse equals on {:?}.", input);
         let (input, equals_sign) = equals_sign(input)?;
+        let (mut new_input, more_whitespace) = whitespaces_and_newlines(input, indentation, true);
+
+        let indentation = if name.is_multiline()
+            || parameters.is_multiline()
+            || whitespace.is_multiline()
+            || more_whitespace.is_multiline()
+        {
+            let (i, whitespace) = leading_indentation(new_input, 1)?;
+            new_input = i;
+            indentation + 1
+        } else {
+            indentation
+        };
 
         let mut input = input;
-        let (i, _) = whitespaces_and_newlines(input, indentation + 1, true);
-        let (i, body) = body(i, indentation + 1);
+        let (i, body) = body(new_input, indentation);
         if !body.is_empty() {
             input = i;
         }
