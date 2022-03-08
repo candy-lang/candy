@@ -53,7 +53,7 @@ use super::error::CompilerError;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Cst {
-    // EqualsSign,
+    EqualsSign,
     OpeningParenthesis,
     ClosingParenthesis,
     OpeningCurlyBrace,
@@ -87,6 +87,12 @@ pub enum Cst {
         body: Vec<Cst>,
         closing_curly_brace: Box<Cst>,
     },
+    Assignment {
+        name: Box<Cst>,
+        parameters: Vec<Cst>,
+        equals_sign: Box<Cst>,
+        body: Vec<Cst>,
+    },
 
     // Decorators.
     // LeadingWhitespace {
@@ -104,14 +110,6 @@ pub enum Cst {
     // TrailingComment {
     //     child: Box<Cst>,
     //     value: String, // without #
-    // },
-
-    // Compound expressions.
-    // Assignment {
-    //     name: Box<Cst>,
-    //     parameters: Vec<Cst>,
-    //     equals_sign: Box<Cst>,
-    //     body: Vec<Cst>,
     // },
     Error {
         unparsable_input: String,
@@ -136,7 +134,7 @@ enum CstError {
 impl Display for Cst {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            // Cst::EqualsSign => "=".fmt(f),
+            Cst::EqualsSign => "=".fmt(f),
             Cst::OpeningParenthesis => "(".fmt(f),
             Cst::ClosingParenthesis => ")".fmt(f),
             Cst::OpeningCurlyBrace => "{".fmt(f),
@@ -192,6 +190,22 @@ impl Display for Cst {
                 }
                 closing_curly_brace.fmt(f)
             }
+            Cst::Assignment {
+                name,
+                parameters,
+                equals_sign,
+                body,
+            } => {
+                name.fmt(f)?;
+                for parameter in parameters {
+                    parameter.fmt(f)?;
+                }
+                equals_sign.fmt(f)?;
+                for expression in body {
+                    expression.fmt(f)?;
+                }
+                Ok(())
+            }
             Cst::Error {
                 unparsable_input,
                 error,
@@ -230,10 +244,10 @@ mod parse {
         assert_eq!(literal("hello, world", "hi"), None);
     }
 
-    // fn equals_sign(input: &str) -> Option<(&str, Cst)> {
-    //     let input = literal(input, "=")?;
-    //     Some((input, Cst::EqualsSign))
-    // }
+    fn equals_sign(input: &str) -> Option<(&str, Cst)> {
+        let input = literal(input, "=")?;
+        Some((input, Cst::EqualsSign))
+    }
     fn opening_parenthesis(input: &str) -> Option<(&str, Cst)> {
         let input = literal(input, "(")?;
         Some((input, Cst::OpeningParenthesis))
@@ -747,6 +761,26 @@ mod parse {
         );
     }
 
+    /// Multiple expressions that are occurring one after another without a line
+    /// break in between.
+    fn run_of_expressions(input: &str, indentation: usize) -> Option<(&str, Vec<Cst>)> {
+        println!("run_of_expressions({:?}, {:?})", input, indentation);
+        let mut expressions = vec![];
+        let (mut input, expr) = expression(input, indentation, false)?;
+        expressions.push(expr);
+
+        loop {
+            let (i, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+            let (i, expr) = match expression(i, indentation + 1, false) {
+                Some(it) => it,
+                None => break,
+            };
+            expressions.push(expr);
+            input = i;
+        }
+        Some((input, expressions))
+    }
+
     fn call(input: &str, indentation: usize) -> Option<(&str, Cst)> {
         println!("call({:?}, {:?})", input, indentation);
         let (mut input, name) = expression(input, indentation, false)?;
@@ -1013,8 +1047,86 @@ mod parse {
         );
     }
 
-    // fn csts(input: &str, indentation: usize) -> Cst {}
-    // fn cst(input: &str, indentation: usize) -> Cst {}
+    fn assignment(input: &str, indentation: usize) -> Option<(&str, Cst)> {
+        println!("assignment({:?}, {:?})", input, indentation);
+        let (input, call) = call(input, indentation)?;
+        println!("Call is parsed.");
+        let (name, parameters) = match call {
+            Cst::Call { name, arguments } => (name, arguments),
+            _ => panic!(
+                "The call parser parsed something other than a call: {}",
+                call
+            ),
+        };
+
+        println!("Removing whitespace before = on {:?}.", input);
+        let (input, _) = whitespaces_and_newlines(input, indentation + 1, true);
+        println!("Trying to parse equals on {:?}.", input);
+        let (input, equals_sign) = equals_sign(input)?;
+
+        let mut input = input;
+        let (i, _) = whitespaces_and_newlines(input, indentation + 1, true);
+        let (i, body) = body(i, indentation + 1);
+        if !body.is_empty() {
+            input = i;
+        }
+
+        Some((
+            input,
+            Cst::Assignment {
+                name,
+                parameters,
+                equals_sign: Box::new(equals_sign),
+                body,
+            },
+        ))
+    }
+    #[test]
+    fn test_assignment() {
+        assert_eq!(
+            assignment("foo = 42", 0),
+            Some((
+                "",
+                Cst::Assignment {
+                    name: Box::new(Cst::Identifier("foo".to_string())),
+                    parameters: vec![],
+                    equals_sign: Box::new(Cst::EqualsSign),
+                    body: vec![Cst::Int(2)],
+                }
+            ))
+        );
+        assert_eq!(assignment("foo 42", 0), None);
+        // foo bar =
+        //   3
+        // 2
+        assert_eq!(
+            assignment("foo bar =\n  3\n2", 0),
+            Some((
+                "\n2",
+                Cst::Assignment {
+                    name: Box::new(Cst::Identifier("foo".to_string())),
+                    parameters: vec![Cst::Identifier("bar".to_string())],
+                    equals_sign: Box::new(Cst::EqualsSign),
+                    body: vec![Cst::Int(3)],
+                }
+            ))
+        );
+        // foo
+        //   bar
+        //   = 3
+        assert_eq!(
+            assignment("foo bar\n  = 3", 0),
+            Some((
+                "",
+                Cst::Assignment {
+                    name: Box::new(Cst::Identifier("foo".to_string())),
+                    parameters: vec![Cst::Identifier("bar".to_string())],
+                    equals_sign: Box::new(Cst::EqualsSign),
+                    body: vec![Cst::Int(3)],
+                }
+            ))
+        );
+    }
 }
 
 // // Compound expressions.
