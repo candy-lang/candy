@@ -761,8 +761,7 @@ mod parse {
         );
     }
 
-    /// Multiple expressions that are occurring one after another without a line
-    /// break in between.
+    /// Multiple expressions that are occurring one after another.
     fn run_of_expressions(input: &str, indentation: usize) -> Option<(&str, Vec<Cst>)> {
         println!("run_of_expressions({:?}, {:?})", input, indentation);
         let mut expressions = vec![];
@@ -783,28 +782,19 @@ mod parse {
 
     fn call(input: &str, indentation: usize) -> Option<(&str, Cst)> {
         println!("call({:?}, {:?})", input, indentation);
-        let (mut input, name) = expression(input, indentation, false)?;
-        let mut arguments = vec![];
-        loop {
-            let (i, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
-            let (i, argument) = match expression(i, indentation + 1, false) {
-                Some(it) => it,
-                None => break,
-            };
-            arguments.push(argument);
-            input = i;
+        let (input, mut expressions) = run_of_expressions(input, indentation)?;
+        if expressions.len() < 2 {
+            return None;
         }
-        if arguments.len() == 0 {
-            None
-        } else {
-            Some((
-                input,
-                Cst::Call {
-                    name: Box::new(name),
-                    arguments,
-                },
-            ))
-        }
+        let arguments = expressions.split_off(1);
+        let name = expressions.into_iter().next().unwrap();
+        Some((
+            input,
+            Cst::Call {
+                name: Box::new(name),
+                arguments,
+            },
+        ))
     }
     #[test]
     fn test_call() {
@@ -1049,15 +1039,13 @@ mod parse {
 
     fn assignment(input: &str, indentation: usize) -> Option<(&str, Cst)> {
         println!("assignment({:?}, {:?})", input, indentation);
-        let (input, call) = call(input, indentation)?;
-        println!("Call is parsed.");
-        let (name, parameters) = match call {
-            Cst::Call { name, arguments } => (name, arguments),
-            _ => panic!(
-                "The call parser parsed something other than a call: {}",
-                call
-            ),
-        };
+        let (input, mut signature) = run_of_expressions(input, indentation)?;
+        println!("Signature is parsed.");
+        if signature.is_empty() {
+            return None;
+        }
+        let parameters = signature.split_off(1);
+        let name = signature.into_iter().next().unwrap();
 
         println!("Removing whitespace before = on {:?}.", input);
         let (input, _) = whitespaces_and_newlines(input, indentation + 1, true);
@@ -1074,7 +1062,7 @@ mod parse {
         Some((
             input,
             Cst::Assignment {
-                name,
+                name: Box::new(name),
                 parameters,
                 equals_sign: Box::new(equals_sign),
                 body,
@@ -1091,7 +1079,7 @@ mod parse {
                     name: Box::new(Cst::Identifier("foo".to_string())),
                     parameters: vec![],
                     equals_sign: Box::new(Cst::EqualsSign),
-                    body: vec![Cst::Int(2)],
+                    body: vec![Cst::Int(42)],
                 }
             ))
         );
