@@ -49,7 +49,15 @@ use super::error::CompilerError;
 //     //     })
 // }
 
-// fn parse_cst(input: &str) -> Cst {}
+pub fn parse_cst(input: &str) -> Cst {
+    match parse::expression(input, 0, true) {
+        Some((rest, cst)) => cst,
+        None => Cst::Error {
+            unparsable_input: input.to_string(),
+            error: CstError::CurlyBraceNotClosed,
+        },
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Cst {
@@ -733,7 +741,7 @@ mod parse {
         );
     }
 
-    fn expression(input: &str, indentation: usize, allow_call: bool) -> Option<(&str, Cst)> {
+    pub fn expression(input: &str, indentation: usize, allow_call: bool) -> Option<(&str, Cst)> {
         println!(
             "expression({:?}, {:?}, {:?})",
             input, indentation, allow_call
