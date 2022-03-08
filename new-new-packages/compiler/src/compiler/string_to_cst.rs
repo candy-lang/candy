@@ -134,6 +134,7 @@ enum CstError {
     TextNotSufficientlyIndented,
     WeirdWhitespace,
     WeirdWhitespaceInIndentation,
+    ExpressionExpectedAfterOpeningParenthesis,
     ParenthesisNotClosed,
     TooMuchWhitespace,
     CurlyBraceNotClosed,
@@ -222,6 +223,107 @@ impl Display for Cst {
     }
 }
 
+trait IsMultiline {
+    fn is_multiline(&self) -> bool;
+}
+
+impl IsMultiline for Cst {
+    fn is_multiline(&self) -> bool {
+        match self {
+            Cst::EqualsSign => false,
+            Cst::OpeningParenthesis => false,
+            Cst::ClosingParenthesis => false,
+            Cst::OpeningCurlyBrace => false,
+            Cst::ClosingCurlyBrace => false,
+            Cst::Arrow => false,
+            Cst::DoubleQuote => false,
+            Cst::Identifier(_) => false,
+            Cst::Symbol(_) => false,
+            Cst::Int(_) => false,
+            Cst::Text {
+                opening_quote,
+                parts,
+                closing_quote,
+            } => {
+                opening_quote.is_multiline() || parts.is_multiline() || closing_quote.is_multiline()
+            }
+            Cst::TextPart(_) => false,
+            Cst::Call { name, arguments } => name.is_multiline() || arguments.is_multiline(),
+            Cst::Whitespace(whitespace) => whitespace.is_multiline(),
+            Cst::Newline => true,
+            Cst::Comment(_) => false,
+            Cst::Parenthesized {
+                opening_parenthesis,
+                inner,
+                closing_parenthesis,
+            } => {
+                opening_parenthesis.is_multiline()
+                    || inner.is_multiline()
+                    || closing_parenthesis.is_multiline()
+            }
+            Cst::Lambda {
+                opening_curly_brace,
+                parameters_and_arrow,
+                body,
+                closing_curly_brace,
+            } => {
+                opening_curly_brace.is_multiline()
+                    || parameters_and_arrow.is_multiline()
+                    || body.is_multiline()
+                    || closing_curly_brace.is_multiline()
+            }
+            Cst::Assignment {
+                name,
+                parameters,
+                equals_sign,
+                body,
+            } => {
+                name.is_multiline()
+                    || parameters.is_multiline()
+                    || equals_sign.is_multiline()
+                    || body.is_multiline()
+            }
+            Cst::Error {
+                unparsable_input,
+                error,
+            } => unparsable_input.is_multiline(),
+        }
+    }
+}
+
+impl IsMultiline for str {
+    fn is_multiline(&self) -> bool {
+        self.contains('\n')
+    }
+}
+
+impl IsMultiline for Vec<Cst> {
+    fn is_multiline(&self) -> bool {
+        self.iter().any(|cst| cst.is_multiline())
+    }
+}
+
+impl<T: IsMultiline> IsMultiline for Box<T> {
+    fn is_multiline(&self) -> bool {
+        self.is_multiline()
+    }
+}
+
+impl<T: IsMultiline> IsMultiline for Option<T> {
+    fn is_multiline(&self) -> bool {
+        match self {
+            Some(it) => it.is_multiline(),
+            None => false,
+        }
+    }
+}
+
+impl<A: IsMultiline, B: IsMultiline> IsMultiline for (A, B) {
+    fn is_multiline(&self) -> bool {
+        self.0.is_multiline() || self.1.is_multiline()
+    }
+}
+
 mod parse {
     // All parsers take an input and return an input that may have advanced a
     // little.
@@ -233,13 +335,15 @@ mod parse {
     //   Words may be invalid because they contain non-ascii or non-alphanumeric
     //   characters – for example, the word `Magic✨` is invalid.
 
+    use crate::compiler::string_to_cst::IsMultiline;
+
     use super::{Cst, CstError};
     use itertools::Itertools;
 
     static MEANINGFUL_PUNCTUATION: &'static str = "=->(){}[],:";
 
     fn literal<'a>(input: &'a str, literal: &'static str) -> Option<&'a str> {
-        println!("literal({:?}, {:?})", input, literal);
+        log::info!("literal({:?}, {:?})", input, literal);
         if input.starts_with(literal) {
             Some(&input[literal.len()..])
         } else {
@@ -277,13 +381,13 @@ mod parse {
         Some((input, Cst::Arrow))
     }
     fn double_quote(input: &str) -> Option<(&str, Cst)> {
-        println!("double_quote({:?})", input);
+        log::info!("double_quote({:?})", input);
         let input = literal(input, "\"")?;
         Some((input, Cst::DoubleQuote))
     }
 
     fn word(mut input: &str) -> Option<(&str, String)> {
-        println!("word({:?})", input);
+        log::info!("word({:?})", input);
         let mut chars = vec![];
         while let Some(c) = input.chars().next() {
             if c.is_whitespace() || MEANINGFUL_PUNCTUATION.contains(c) {
@@ -310,7 +414,7 @@ mod parse {
     }
 
     fn identifier(input: &str) -> Option<(&str, Cst)> {
-        println!("identifier({:?})", input);
+        log::info!("identifier({:?})", input);
         let (input, w) = word(input)?;
         if w.chars().next().unwrap().is_lowercase() {
             if w.chars().all(|c| c.is_ascii_alphanumeric()) {
@@ -349,7 +453,7 @@ mod parse {
     }
 
     fn symbol(input: &str) -> Option<(&str, Cst)> {
-        println!("symbol({:?})", input);
+        log::info!("symbol({:?})", input);
         let (input, w) = word(input)?;
         if w.chars().next().unwrap().is_uppercase() {
             if w.chars().all(|c| c.is_ascii_alphanumeric()) {
@@ -388,7 +492,7 @@ mod parse {
     }
 
     fn int(input: &str) -> Option<(&str, Cst)> {
-        println!("int({:?})", input);
+        log::info!("int({:?})", input);
         let (input, w) = word(input)?;
         if w.chars().next().unwrap().is_ascii_digit() {
             if w.chars().all(|c| c.is_ascii_digit()) {
@@ -425,7 +529,7 @@ mod parse {
     }
 
     fn single_line_whitespace(mut input: &str) -> (&str, Cst) {
-        println!("single_line_whitespace({:?})", input);
+        log::info!("single_line_whitespace({:?})", input);
         let mut chars = vec![];
         let mut has_error = false;
         while let Some(c) = input.chars().next() {
@@ -457,7 +561,7 @@ mod parse {
     }
 
     fn comment(input: &str) -> Option<(&str, Cst)> {
-        println!("comment({:?})", input);
+        log::info!("comment({:?})", input);
         if !matches!(input.chars().next(), Some('#')) {
             return None;
         }
@@ -479,7 +583,7 @@ mod parse {
     }
 
     fn leading_indentation(mut input: &str, indentation: usize) -> Option<(&str, Cst)> {
-        println!("leading_indentation({:?}, {:?})", input, indentation);
+        log::info!("leading_indentation({:?}, {:?})", input, indentation);
         let mut chars = vec![];
         let mut has_error = false;
         for i in 0..(2 * indentation) {
@@ -524,15 +628,17 @@ mod parse {
 
     /// Consumes all leading whitespace (including newlines) and comments that
     /// are still within the given indentation. Won't consume newlines before a
-    /// lower indentation.
+    /// lower or higher indentation.
     fn whitespaces_and_newlines(
         input: &str,
         indentation: usize,
         also_comments: bool,
     ) -> (&str, Vec<Cst>) {
-        println!(
+        log::info!(
             "whitespaces_and_newlines({:?}, {:?}, {:?})",
-            input, indentation, also_comments
+            input,
+            indentation,
+            also_comments
         );
         let mut parts = vec![];
         let (input, whitespace) = single_line_whitespace(input);
@@ -547,7 +653,8 @@ mod parse {
                 }
             }
 
-            // We only consume newlines if there is indentation coming after.
+            // We only consume newlines if there is sufficient indentation
+            // coming after.
             let mut new_input = input;
             let mut new_parts = vec![];
             while let Some('\n') = new_input.chars().next() {
@@ -557,6 +664,7 @@ mod parse {
             if new_input == input {
                 break; // No newlines.
             }
+            log::warn!("Indentation: {} Input: {:?}", indentation, input);
             match leading_indentation(new_input, indentation) {
                 Some((new_input, whitespace)) => {
                     new_parts.push(Cst::Whitespace(whitespace.to_string()));
@@ -564,7 +672,7 @@ mod parse {
                     input = new_input;
                 }
                 None => {
-                    println!("Was None.");
+                    log::info!("Was None.");
                     break;
                 }
             }
@@ -631,7 +739,7 @@ mod parse {
     }
 
     fn text(input: &str, indentation: usize) -> Option<(&str, Cst)> {
-        println!("text({:?}, {:?})", input, indentation);
+        log::info!("text({:?}, {:?})", input, indentation);
         let (mut input, opening_quote) = double_quote(input)?;
         let mut line = vec![];
         let mut parts = vec![];
@@ -742,9 +850,11 @@ mod parse {
     }
 
     pub fn expression(input: &str, indentation: usize, allow_call: bool) -> Option<(&str, Cst)> {
-        println!(
+        log::info!(
             "expression({:?}, {:?}, {:?})",
-            input, indentation, allow_call
+            input,
+            indentation,
+            allow_call
         );
         int(input)
             .or_else(|| text(input, indentation))
@@ -771,14 +881,21 @@ mod parse {
 
     /// Multiple expressions that are occurring one after another.
     fn run_of_expressions(input: &str, indentation: usize) -> Option<(&str, Vec<Cst>)> {
-        println!("run_of_expressions({:?}, {:?})", input, indentation);
+        log::info!("run_of_expressions({:?}, {:?})", input, indentation);
         let mut expressions = vec![];
         let (mut input, expr) = expression(input, indentation, false)?;
         expressions.push(expr);
 
+        let mut has_multiline_whitespace = false;
         loop {
             let (i, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
-            let (i, expr) = match expression(i, indentation + 1, false) {
+            has_multiline_whitespace |= whitespace.is_multiline();
+            let indentation = if has_multiline_whitespace {
+                indentation + 1
+            } else {
+                indentation
+            };
+            let (i, expr) = match expression(i, indentation, false) {
                 Some(it) => it,
                 None => break,
             };
@@ -789,7 +906,7 @@ mod parse {
     }
 
     fn call(input: &str, indentation: usize) -> Option<(&str, Cst)> {
-        println!("call({:?}, {:?})", input, indentation);
+        log::info!("call({:?}, {:?})", input, indentation);
         let (input, mut expressions) = run_of_expressions(input, indentation)?;
         if expressions.len() < 2 {
             return None;
@@ -861,15 +978,26 @@ mod parse {
     }
 
     fn parenthesized(input: &str, indentation: usize) -> Option<(&str, Cst)> {
-        println!("parenthesized({:?}, {:?})", input, indentation);
+        log::info!("parenthesized({:?}, {:?})", input, indentation);
         let (input, opening_parenthesis) = opening_parenthesis(input)?;
-        let (input, inner) = expression(input, indentation, true).unwrap_or((
+        let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+        let inner_indentation = if whitespace.is_multiline() {
+            indentation + 1
+        } else {
+            indentation
+        };
+        log::info!(
+            "Indentation for parenthesized inners is: {}",
+            inner_indentation
+        );
+        let (input, inner) = expression(input, inner_indentation, true).unwrap_or((
             input,
             Cst::Error {
                 unparsable_input: "".to_string(),
-                error: CstError::ParenthesisNotClosed,
+                error: CstError::ExpressionExpectedAfterOpeningParenthesis,
             },
         ));
+        let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
         let (input, closing_parenthesis) = closing_parenthesis(input).unwrap_or((
             input,
             Cst::Error {
@@ -917,7 +1045,7 @@ mod parse {
     }
 
     fn body(mut input: &str, indentation: usize) -> (&str, Vec<Cst>) {
-        println!("body({:?}, {:?})", input, indentation);
+        log::info!("body({:?}, {:?})", input, indentation);
         let mut expressions = vec![];
         loop {
             let (i, _) = whitespaces_and_newlines(input, indentation, true);
@@ -941,7 +1069,7 @@ mod parse {
     }
 
     fn lambda(input: &str, indentation: usize) -> Option<(&str, Cst)> {
-        println!("lambda({:?}, {:?})", input, indentation);
+        log::info!("lambda({:?}, {:?})", input, indentation);
         let (input, opening_curly_brace) = opening_curly_brace(input)?;
         let (mut input, parameters_and_arrow) = {
             let input_without_params = input;
@@ -1046,18 +1174,18 @@ mod parse {
     }
 
     fn assignment(input: &str, indentation: usize) -> Option<(&str, Cst)> {
-        println!("assignment({:?}, {:?})", input, indentation);
+        log::info!("assignment({:?}, {:?})", input, indentation);
         let (input, mut signature) = run_of_expressions(input, indentation)?;
-        println!("Signature is parsed.");
+        log::info!("Signature is parsed.");
         if signature.is_empty() {
             return None;
         }
         let parameters = signature.split_off(1);
         let name = signature.into_iter().next().unwrap();
 
-        println!("Removing whitespace before = on {:?}.", input);
+        log::info!("Removing whitespace before = on {:?}.", input);
         let (input, _) = whitespaces_and_newlines(input, indentation + 1, true);
-        println!("Trying to parse equals on {:?}.", input);
+        log::info!("Trying to parse equals on {:?}.", input);
         let (input, equals_sign) = equals_sign(input)?;
 
         let mut input = input;
