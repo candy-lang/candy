@@ -46,7 +46,7 @@ struct CandyRunOptions {
 
 #[tokio::main]
 async fn main() {
-    // init_logger();
+    init_logger();
     // match CandyOptions::from_args() {
     //     CandyOptions::Run(options) => run(options),
     //     CandyOptions::Lsp => lsp().await,
@@ -58,19 +58,24 @@ async fn main() {
         .watch("parser.candy", RecursiveMode::Recursive)
         .unwrap();
 
+    test_parser();
     loop {
         match rx.recv() {
             Ok(event) => {
-                println!("Parsing.");
-                let input = std::fs::read_to_string("parser.candy").unwrap();
-                std::fs::write(
-                    "parsed.txt",
-                    format!("{:#?}", compiler::string_to_cst::parse_cst(&input)),
-                );
+                test_parser();
             }
             Err(e) => println!("watch error: {:#?}", e),
         }
     }
+}
+
+fn test_parser() {
+    println!("Parsing.");
+    let input = std::fs::read_to_string("parser.candy").unwrap();
+    std::fs::write(
+        "parsed.txt",
+        format!("{:#?}", compiler::string_to_cst::parse_cst(&input)),
+    );
 }
 
 fn run(options: CandyRunOptions) {
