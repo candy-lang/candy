@@ -1119,73 +1119,6 @@ mod parse {
 
 // // Compound expressions.
 
-// fn arguments<'a>(
-//     source: &'a str,
-//     input: &'a str,
-//     indentation: usize,
-// ) -> ParserResult<'a, Vec<Cst>> {
-//     many1(|input| {
-//         trailing_whitespace_and_comment(
-//             input,
-//             alt((
-//                 |input| int(source, input),
-//                 |input| text(source, input),
-//                 |input| symbol(source, input),
-//                 |input| parenthesized(source, input, indentation),
-//                 // TODO: only allow single-line lambdas
-//                 |input| lambda(source, input, indentation),
-//                 |input| identifier(source, input),
-//                 // TODO: catch-all
-//             )),
-//         )
-//     })
-//     .context("arguments")
-//     .parse(input)
-// }
-// fn assignment<'a>(source: &'a str, input: &'a str, indentation: usize) -> ParserResult<'a, Cst> {
-//     (|input| {
-//         let (input, name, parameters) = match trailing_whitespace_and_comment(input, |input| {
-//             call(source, input, indentation)
-//         }) {
-//             Ok((
-//                 input,
-//                 Cst {
-//                     kind: CstKind::Call { name, arguments },
-//                     ..
-//                 },
-//             )) => (input, name, arguments),
-//             Ok(_) => panic!("`call` did not return a `CstKind::Call`."),
-//             Err(_) => {
-//                 let (input, name) =
-//                     trailing_whitespace_and_comment(input, |input| identifier(source, input))?;
-//                 (input, Box::new(name), vec![])
-//             }
-//         };
-//         let (input, equals_sign) =
-//             trailing_whitespace_and_comment(input, |input| equals_sign(source, input))?;
-
-//         let (input, body) = alt((
-//             |input| expressions1(source, input, indentation + 1),
-//             map(
-//                 |input| expression(source, input, indentation),
-//                 |cst| vec![cst],
-//             ),
-//             success(vec![]),
-//         ))(input)?;
-//         Ok((
-//             input,
-//             create_cst(CstKind::Assignment {
-//                 name,
-//                 parameters,
-//                 equals_sign: Box::new(equals_sign),
-//                 body,
-//             }),
-//         ))
-//     })
-//     .context("assignment")
-//     .parse(input)
-// }
-
 // proptest! {
 //     #[test]
 //     fn test_int(value in 0u64..) {
@@ -1209,12 +1142,6 @@ mod parse {
 
 // #[test]
 // fn test_expressions0() {
-//     fn parse(source: &str) -> (&str, Vec<Cst>) {
-//         expressions0(source, source, 0).unwrap()
-//     }
-//     assert_eq!(parse(""), ("", vec![]));
-//     assert_eq!(parse("\n"), ("\n", vec![]));
-//     assert_eq!(parse("\n#abc\n"), ("\n#abc\n", vec![]));
 //     assert_eq!(
 //         parse("\n123"),
 //         (
@@ -1225,22 +1152,6 @@ mod parse {
 //                     offset: 1,
 //                     value: 123,
 //                     source: "123".to_string()
-//                 }))
-//             })]
-//         )
-//     );
-//     assert_eq!(
-//         parse("\nprint"),
-//         (
-//             "",
-//             vec![create_cst(CstKind::LeadingWhitespace {
-//                 value: "\n".to_string(),
-//                 child: Box::new(create_cst(CstKind::Call {
-//                     name: Box::new(create_cst(CstKind::Identifier {
-//                         offset: 1,
-//                         value: "print".to_string()
-//                     })),
-//                     arguments: vec![]
 //                 }))
 //             })]
 //         )
