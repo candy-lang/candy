@@ -50,13 +50,36 @@ use super::error::CompilerError;
 // }
 
 pub fn parse_cst(input: &str) -> Vec<Cst> {
-    let (rest, mut expressions) = parse::body(input, 0);
-    if !rest.is_empty() {
-        expressions.push(Cst::Error {
-            unparsable_input: rest.to_string(),
-            error: CstError::UnparsedRest,
-        });
+    let mut expressions = vec![];
+    let mut outer_input = input;
+
+    while !outer_input.is_empty() {
+        let (input, mut body) = parse::body(outer_input, 0);
+        expressions.append(&mut body);
+
+        let (mut input, mut whitespace) = parse::whitespaces_and_newlines(input, 0, true);
+        expressions.append(&mut whitespace);
+
+        if let Some((new_input, unexpected_punctuation)) = parse::equals_sign(input)
+            .or_else(|| parse::closing_parenthesis(input))
+            .or_else(|| parse::closing_curly_brace(input))
+            .or_else(|| parse::arrow(input))
+        {
+            input = new_input;
+            expressions.push(unexpected_punctuation);
+        }
+
+        if input.len() < outer_input.len() {
+            outer_input = input;
+        } else {
+            expressions.push(Cst::Error {
+                unparsable_input: input.to_string(),
+                error: CstError::UnparsedRest,
+            });
+            break;
+        }
     }
+
     expressions
 }
 
@@ -140,6 +163,7 @@ enum CstError {
     TooMuchWhitespace,
     CurlyBraceNotClosed,
     UnparsedRest,
+    UnexpectedPunctuation,
 }
 
 impl Display for Cst {
@@ -358,7 +382,7 @@ mod parse {
         assert_eq!(literal("hello, world", "hi"), None);
     }
 
-    fn equals_sign(input: &str) -> Option<(&str, Cst)> {
+    pub fn equals_sign(input: &str) -> Option<(&str, Cst)> {
         let input = literal(input, "=")?;
         Some((input, Cst::EqualsSign))
     }
@@ -366,7 +390,7 @@ mod parse {
         let input = literal(input, "(")?;
         Some((input, Cst::OpeningParenthesis))
     }
-    fn closing_parenthesis(input: &str) -> Option<(&str, Cst)> {
+    pub fn closing_parenthesis(input: &str) -> Option<(&str, Cst)> {
         let input = literal(input, ")")?;
         Some((input, Cst::ClosingParenthesis))
     }
@@ -374,11 +398,11 @@ mod parse {
         let input = literal(input, "{")?;
         Some((input, Cst::OpeningCurlyBrace))
     }
-    fn closing_curly_brace(input: &str) -> Option<(&str, Cst)> {
+    pub fn closing_curly_brace(input: &str) -> Option<(&str, Cst)> {
         let input = literal(input, "}")?;
         Some((input, Cst::ClosingCurlyBrace))
     }
-    fn arrow(input: &str) -> Option<(&str, Cst)> {
+    pub fn arrow(input: &str) -> Option<(&str, Cst)> {
         let input = literal(input, "->")?;
         Some((input, Cst::Arrow))
     }
@@ -587,23 +611,24 @@ mod parse {
     fn leading_indentation(mut input: &str, indentation: usize) -> Option<(&str, Cst)> {
         log::info!("leading_indentation({:?}, {:?})", input, indentation);
         let mut chars = vec![];
-        let mut has_error = false;
-        for i in 0..(2 * indentation) {
-            match input.chars().next()? {
-                ' ' => {
-                    chars.push(' ');
-                    input = &input[1..];
-                }
-                c if c.is_whitespace() && c != '\n' => {
-                    chars.push(c);
-                    has_error = true;
-                    input = &input[c.len_utf8()..];
-                }
+        let mut has_weird_whitespace = false;
+        let mut indent_in_spaces = 0;
+
+        while indent_in_spaces < 2 * indentation {
+            let c = input.chars().next()?;
+            let (is_weird, indent_bonus) = match c {
+                ' ' => (false, 1),
+                '\t' => (true, 2),
+                c if c.is_whitespace() => (true, 1),
                 _ => return None,
-            }
+            };
+            chars.push(c);
+            has_weird_whitespace |= is_weird;
+            indent_in_spaces += indent_bonus;
+            input = &input[c.len_utf8()..];
         }
         let whitespace = chars.into_iter().join("");
-        Some(if has_error {
+        Some(if has_weird_whitespace {
             (
                 input,
                 Cst::Error {
@@ -631,7 +656,7 @@ mod parse {
     /// Consumes all leading whitespace (including newlines) and comments that
     /// are still within the given indentation. Won't consume newlines before a
     /// lower or higher indentation.
-    fn whitespaces_and_newlines(
+    pub fn whitespaces_and_newlines(
         input: &str,
         indentation: usize,
         also_comments: bool,
@@ -882,6 +907,17 @@ mod parse {
                 }
             })
             .or_else(|| identifier(input))
+            .or_else(|| {
+                word(input).map(|(input, word)| {
+                    (
+                        input,
+                        Cst::Error {
+                            unparsable_input: word,
+                            error: CstError::UnexpectedPunctuation,
+                        },
+                    )
+                })
+            })
     }
     #[test]
     fn test_expression() {
@@ -1071,8 +1107,10 @@ mod parse {
             is_first = false;
 
             let (mut new_input, unexpected_whitespace) = single_line_whitespace(new_input);
+            let mut indentation = indentation;
             if let Cst::Whitespace(whitespace) = &unexpected_whitespace {
                 if !whitespace.is_empty() {
+                    indentation += whitespace.len() / 2;
                     new_expressions.push(Cst::Error {
                         unparsable_input: whitespace.to_string(),
                         error: CstError::TooMuchWhitespace,
@@ -1187,6 +1225,23 @@ mod parse {
                 Cst::Lambda {
                     opening_curly_brace: Box::new(Cst::OpeningCurlyBrace),
                     parameters_and_arrow: None,
+                    body: vec![],
+                    closing_curly_brace: Box::new(Cst::Error {
+                        unparsable_input: "".to_string(),
+                        error: CstError::CurlyBraceNotClosed
+                    }),
+                }
+            ))
+        );
+        // {->
+        // }
+        assert_eq!(
+            lambda("{->\n}", 1),
+            Some((
+                "\n}",
+                Cst::Lambda {
+                    opening_curly_brace: Box::new(Cst::OpeningCurlyBrace),
+                    parameters_and_arrow: Some((vec![], Box::new(Cst::Arrow))),
                     body: vec![],
                     closing_curly_brace: Box::new(Cst::Error {
                         unparsable_input: "".to_string(),
