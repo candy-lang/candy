@@ -49,14 +49,15 @@ use super::error::CompilerError;
 //     //     })
 // }
 
-pub fn parse_cst(input: &str) -> Cst {
-    match parse::expression(input, 0, true) {
-        Some((rest, cst)) => cst,
-        None => Cst::Error {
-            unparsable_input: input.to_string(),
-            error: CstError::CurlyBraceNotClosed,
-        },
+pub fn parse_cst(input: &str) -> Vec<Cst> {
+    let (rest, mut expressions) = parse::body(input, 0);
+    if !rest.is_empty() {
+        expressions.push(Cst::Error {
+            unparsable_input: rest.to_string(),
+            error: CstError::UnparsedRest,
+        });
     }
+    expressions
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -138,6 +139,7 @@ enum CstError {
     ParenthesisNotClosed,
     TooMuchWhitespace,
     CurlyBraceNotClosed,
+    UnparsedRest,
 }
 
 impl Display for Cst {
@@ -849,7 +851,7 @@ mod parse {
         );
     }
 
-    pub fn expression(
+    fn expression(
         input: &str,
         indentation: usize,
         allow_call_and_assignment: bool,
@@ -864,7 +866,7 @@ mod parse {
             .or_else(|| text(input, indentation))
             .or_else(|| symbol(input))
             .or_else(|| parenthesized(input, indentation))
-            // .or_else(|| lambda(input, indentation))
+            .or_else(|| lambda(input, indentation))
             .or_else(|| {
                 if allow_call_and_assignment {
                     assignment(input, indentation)
@@ -1054,25 +1056,39 @@ mod parse {
         );
     }
 
-    fn body(mut input: &str, indentation: usize) -> (&str, Vec<Cst>) {
+    pub fn body(mut input: &str, indentation: usize) -> (&str, Vec<Cst>) {
         log::warn!("body({:?}, {:?})", input, indentation);
         let mut is_first = true;
         let mut expressions = vec![];
         loop {
+            let mut new_expressions = vec![];
             let mut new_input = input;
+
             if !is_first {
-                let (new_new_input, _) = whitespaces_and_newlines(input, indentation, true);
+                let (new_new_input, _) = whitespaces_and_newlines(new_input, indentation, true);
                 new_input = new_new_input;
             }
             is_first = false;
 
+            let (mut new_input, unexpected_whitespace) = single_line_whitespace(new_input);
+            if let Cst::Whitespace(whitespace) = &unexpected_whitespace {
+                if !whitespace.is_empty() {
+                    new_expressions.push(Cst::Error {
+                        unparsable_input: whitespace.to_string(),
+                        error: CstError::TooMuchWhitespace,
+                    });
+                }
+            }
+
             match expression(new_input, indentation, true) {
-                Some((new_input, expression)) => {
-                    input = new_input;
-                    expressions.push(expression);
+                Some((new_new_input, expression)) => {
+                    new_input = new_new_input;
+                    new_expressions.push(expression);
                 }
                 None => break (input, expressions),
             }
+            input = new_input;
+            expressions.append(&mut new_expressions);
         }
     }
 
@@ -1195,25 +1211,27 @@ mod parse {
         let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
         log::info!("Trying to parse equals on {:?}.", input);
         let (input, equals_sign) = equals_sign(input)?;
-        let (mut new_input, more_whitespace) = whitespaces_and_newlines(input, indentation, true);
+        let input_after_equals_sign = input;
+        let (input, more_whitespace) = whitespaces_and_newlines(input, indentation, true);
 
-        let indentation = if name.is_multiline()
+        let is_multiline = name.is_multiline()
             || parameters.is_multiline()
             || whitespace.is_multiline()
-            || more_whitespace.is_multiline()
-        {
-            let (i, whitespace) = leading_indentation(new_input, 1)?;
-            new_input = i;
-            indentation + 1
+            || more_whitespace.is_multiline();
+        let (input, body) = if is_multiline {
+            let (input, whitespace) = leading_indentation(input, 1)?;
+            let (input, body) = body(input, indentation + 1);
+            if body.is_empty() {
+                (input_after_equals_sign, body)
+            } else {
+                (input, body)
+            }
         } else {
-            indentation
+            match expression(input, indentation, true) {
+                Some((input, expression)) => (input, vec![expression]),
+                None => (input_after_equals_sign, vec![]),
+            }
         };
-
-        let mut input = input;
-        let (i, body) = body(new_input, indentation);
-        if !body.is_empty() {
-            input = i;
-        }
 
         Some((
             input,
