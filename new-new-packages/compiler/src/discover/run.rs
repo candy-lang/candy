@@ -1,6 +1,6 @@
 use crate::{
     builtin_functions::{self, BuiltinFunction},
-    compiler::hir::{self, Body, Expression, HirDb},
+    compiler::hir::{self, Expression, HirDb},
     input::Input,
 };
 use im::HashMap;
@@ -89,8 +89,8 @@ fn run_with_environment(
             id,
         })
         .into(),
-        Expression::Body(Body { out, .. }) => {
-            db.run_with_environment(input, out.unwrap(), environment)
+        Expression::Body(body) => {
+            db.run_with_environment(input, body.out_id().to_owned(), environment)
         }
         Expression::Call {
             function,
@@ -170,7 +170,11 @@ fn run_call(
         inner_environment.store(lambda_hir.first_id.clone() + index, argument);
     }
 
-    db.run_with_environment(input, lambda_hir.body.out.unwrap(), inner_environment)
+    db.run_with_environment(
+        input,
+        lambda_hir.body.out_id().to_owned(),
+        inner_environment,
+    )
 }
 
 fn value_to_display_string(db: &dyn Discover, input: Input, value: Value) -> String {

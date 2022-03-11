@@ -124,10 +124,10 @@ impl<'c> Compiler<'c> {
 
     fn compile(&mut self, asts: &[Ast]) {
         if asts.is_empty() {
-            self.body.out = Some(self.push_without_ast_mapping(Expression::nothing()));
+            self.push_without_ast_mapping(Expression::nothing());
         } else {
             for ast in asts.into_iter() {
-                self.body.out = Some(self.compile_single(ast));
+                self.compile_single(ast);
             }
         }
     }

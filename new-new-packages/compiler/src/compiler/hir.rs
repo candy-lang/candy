@@ -122,7 +122,6 @@ pub struct Lambda {
 pub struct Body {
     pub expressions: LinkedHashMap<Id, Expression>,
     pub identifiers: HashMap<Id, String>,
-    pub out: Option<Id>,
 }
 
 impl Body {
@@ -130,7 +129,6 @@ impl Body {
         Self {
             expressions: LinkedHashMap::new(),
             identifiers: HashMap::new(),
-            out: None,
         }
     }
     pub fn push(&mut self, id: Id, expression: Expression, identifier: Option<String>) {
@@ -138,6 +136,9 @@ impl Body {
         if let Some(identifier) = identifier {
             self.identifiers.insert(id, identifier);
         }
+    }
+    pub fn out_id(&self) -> &Id {
+        self.expressions.keys().last().unwrap()
     }
 }
 
@@ -202,7 +203,6 @@ impl fmt::Display for Body {
         for (id, expression) in self.expressions.iter() {
             write!(f, "{} = {}\n", id, expression)?;
         }
-        write!(f, "out: {:?}\n", self.out)?;
         Ok(())
     }
 }
