@@ -943,9 +943,19 @@ mod parse {
             } else {
                 indentation
             };
-            let (i, expr) = match expression(i, indentation, false) {
+            log::info!("whitespace");
+            let (i, expr) = match expression(i, indentation, has_multiline_whitespace) {
                 Some(it) => it,
-                None => break,
+                None => {
+                    let fallback = closing_parenthesis(i)
+                        .or_else(|| closing_curly_brace(i))
+                        .or_else(|| arrow(i));
+                    if let Some((i, cst)) = fallback {
+                        (i, cst)
+                    } else {
+                        break;
+                    }
+                }
             };
             expressions.push(expr);
             input = i;
