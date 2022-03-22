@@ -134,10 +134,10 @@ pub(super) fn run_call(
     log::trace!("Calling function `{}`", &function_name);
 
     if lambda_hir.parameters.len() != arguments.len() {
-        return DiscoverResult::Panic(Value::Text(format!(
+        return DiscoverResult::panic(format!(
             "Lambda parameter and argument counts don't match: {:?}.",
             lambda_hir
-        )));
+        ));
     }
 
     let mut inner_environment = lambda.captured_environment.to_owned();

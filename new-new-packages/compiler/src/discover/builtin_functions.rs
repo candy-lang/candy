@@ -54,7 +54,7 @@ macro_rules! destructure {
         if let $enum = &$arguments[..] {
             $body
         } else {
-            DiscoverResult::Panic(Value::Text(format!("Invalid arguments").to_owned()))
+            DiscoverResult::panic(format!("Invalid arguments").to_owned())
         }
     }};
 }
@@ -91,20 +91,20 @@ fn if_else(
             value if value == Value::bool(true) => then,
             value if value == Value::bool(false) => else_,
             value => {
-                return DiscoverResult::Panic(Value::Text(format!(
+                return DiscoverResult::panic(format!(
                     "Condition must be a boolean, but was {:?}.",
                     value
-                )))
+                ));
             }
         };
 
         run_call(db, input, body_id.to_owned(), vec![], environment)
     } else {
-        DiscoverResult::Panic(Value::Text(format!(
+        DiscoverResult::panic(format!(
             "Builtin if/else called with wrong number of arguments: {}, expected: {}",
             arguments.len(),
             3
-        )))
+        ))
     }
 }
 
@@ -126,10 +126,7 @@ fn struct_get(arguments: Vec<Value>) -> DiscoverResult {
             .get(key)
             .map(|value| value.clone().into())
             .unwrap_or_else(|| {
-                DiscoverResult::Panic(Value::Text(format!(
-                    "Struct does not contain key {:?}",
-                    key
-                )))
+                DiscoverResult::panic(format!("Struct does not contain key {:?}", key))
             })
     })
 }
@@ -149,10 +146,10 @@ fn expect_struct(function_name: String, value: &Value) -> DiscoverResult<&HashMa
     match value {
         Value::Struct(struct_) => struct_.into(),
         _ => {
-            return DiscoverResult::Panic(Value::Text(format!(
+            return DiscoverResult::panic(format!(
                 "`{}` expected a struct as its first parameter, but received: {:?}",
                 function_name, value
-            )))
+            ))
         }
     }
 }
@@ -167,4 +164,9 @@ fn type_of(arguments: Vec<Value>) -> DiscoverResult {
             Value::Lambda(_) => Value::Symbol("Function".to_owned()).into(),
         }
     })
+}
+        })
+    }
+
+    fn resolve(&self, current_path: &Path) -> Vec<PathBuf> {}
 }
