@@ -42,25 +42,23 @@ pub trait HintsDb: AstToHir + Discover + HirDb + InputDb + LspPositionConversion
 }
 
 fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
-    log::debug!("Calculating hints!");
+    log::debug!("Calculating hints for {:?}", input);
 
     let (hir, _) = db.hir(input.clone()).unwrap();
+    let discover_results = db.run_all(input.clone());
 
     collect_hir_ids_for_hints_list(db, input.clone(), hir.expressions.keys().cloned().collect())
         .into_iter()
-        .map(|id| (id.clone(), db.run(input.clone(), id)))
-        .filter_map(|(id, value)| {
-            let (kind, value) = match value {
-                DiscoverResult::Value(value) if value != Value::nothing() => {
+        .filter_map(|id| {
+            let (kind, value) = match discover_results.get(&id).unwrap() {
+                DiscoverResult::Value(value) if value != &Value::nothing() => {
                     (HintKind::Value, value)
                 }
                 DiscoverResult::Panic(value) => (HintKind::Panic, value),
                 _ => return None,
             };
 
-            let span = db
-                .hir_id_to_display_span(input.clone(), id.clone())
-                .unwrap();
+            let span = db.hir_id_to_display_span(input.clone(), id).unwrap();
 
             let line = db
                 .offset_to_lsp(input.clone(), span.start)
@@ -78,7 +76,10 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
 
             Some(Hint {
                 kind,
-                text: format!(" # {}", db.value_to_display_string(input.clone(), value)),
+                text: format!(
+                    " # {}",
+                    db.value_to_display_string(input.clone(), value.to_owned())
+                ),
                 position,
             })
         })

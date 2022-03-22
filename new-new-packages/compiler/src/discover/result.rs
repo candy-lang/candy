@@ -11,7 +11,25 @@ pub enum DiscoverResult<T = Value> {
     Value(T),
     Panic(Value),
     DependsOnParameter,
+    PreviousExpressionPanics,
     ErrorInHir,
+}
+impl<T> DiscoverResult<T> {
+    pub fn map<U, F: FnOnce(T) -> U>(self, op: F) -> DiscoverResult<U> {
+        match self {
+            DiscoverResult::Value(value) => DiscoverResult::Value(op(value)),
+            DiscoverResult::Panic(value) => DiscoverResult::Panic(value),
+            DiscoverResult::DependsOnParameter => DiscoverResult::DependsOnParameter,
+            DiscoverResult::PreviousExpressionPanics => DiscoverResult::PreviousExpressionPanics,
+            DiscoverResult::ErrorInHir => DiscoverResult::ErrorInHir,
+        }
+    }
+    pub fn transitive(self) -> Self {
+        match self {
+            DiscoverResult::Panic(_) => DiscoverResult::PreviousExpressionPanics,
+            it => it,
+        }
+    }
 }
 impl<T> Try for DiscoverResult<T> {
     type Output = T;
@@ -27,6 +45,9 @@ impl<T> Try for DiscoverResult<T> {
             DiscoverResult::DependsOnParameter => {
                 ControlFlow::Break(DiscoverResult::DependsOnParameter)
             }
+            DiscoverResult::PreviousExpressionPanics => {
+                ControlFlow::Break(DiscoverResult::PreviousExpressionPanics)
+            }
             DiscoverResult::ErrorInHir => ControlFlow::Break(DiscoverResult::ErrorInHir),
         }
     }
@@ -37,6 +58,7 @@ impl<T> FromResidual for DiscoverResult<T> {
             DiscoverResult::Value(_) => unreachable!(),
             DiscoverResult::Panic(panic) => DiscoverResult::Panic(panic),
             DiscoverResult::DependsOnParameter => DiscoverResult::DependsOnParameter,
+            DiscoverResult::PreviousExpressionPanics => DiscoverResult::PreviousExpressionPanics,
             DiscoverResult::ErrorInHir => DiscoverResult::ErrorInHir,
         }
     }
@@ -69,6 +91,9 @@ impl<A, V: FromIterator<A>> FromIterator<DiscoverResult<A>> for DiscoverResult<V
             Err(DiscoverResult::Value(_)) => unreachable!(),
             Err(DiscoverResult::Panic(panic)) => DiscoverResult::Panic(panic),
             Err(DiscoverResult::DependsOnParameter) => DiscoverResult::DependsOnParameter,
+            Err(DiscoverResult::PreviousExpressionPanics) => {
+                DiscoverResult::PreviousExpressionPanics
+            }
             Err(DiscoverResult::ErrorInHir) => DiscoverResult::ErrorInHir,
         }
     }
