@@ -16,9 +16,12 @@ pub trait HirDb: AstToHir {
     fn find_expression(&self, input: Input, id: Id) -> Option<Expression>;
     fn all_hir_ids(&self, input: Input) -> Option<Vec<Id>>;
 }
-
 fn find_expression(db: &dyn HirDb, input: Input, id: Id) -> Option<Expression> {
     let (hir, _) = db.hir(input).unwrap();
+    if id == Id::root() {
+        return Some(Expression::Body(hir.as_ref().to_owned()));
+    }
+
     hir.find(&id).map(|it| it.to_owned())
 }
 fn all_hir_ids(db: &dyn HirDb, input: Input) -> Option<Vec<Id>> {
@@ -69,10 +72,12 @@ impl Body {
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub struct Id(pub Vec<usize>);
 impl Id {
+    pub fn root() -> Self {
+        Id(vec![])
+    }
     pub fn parent(&self) -> Option<Id> {
         match self.0.len() {
-            0 => panic!("HIR ID is empty."),
-            1 => None,
+            0 => None,
             _ => Some(Id(self.0[..self.0.len() - 1].to_vec())),
         }
     }
@@ -81,7 +86,6 @@ impl Add<usize> for Id {
     type Output = Self;
 
     fn add(self, rhs: usize) -> Self::Output {
-        assert!(!self.0.is_empty());
         let mut vec = self.0[..self.0.len() - 1].to_vec();
         vec.push(self.0.last().unwrap() + rhs);
         Id(vec)
