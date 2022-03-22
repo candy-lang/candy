@@ -11,7 +11,7 @@ mod language_server;
 use crate::compiler::ast_to_hir::AstToHir;
 use crate::compiler::cst_to_ast::CstToAst;
 use crate::compiler::string_to_cst::StringToCst;
-use crate::database::project_directory;
+use crate::database::PROJECT_DIRECTORY;
 use crate::{database::Database, input::Input};
 use language_server::CandyLanguageServer;
 use log;
@@ -55,7 +55,7 @@ async fn main() {
 }
 
 fn run(options: CandyRunOptions) {
-    *project_directory.lock().unwrap() = Some(current_dir().unwrap());
+    *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
 
     let path_string = options.file.to_string_lossy();
     log::debug!("Running `{}`.\n", path_string);

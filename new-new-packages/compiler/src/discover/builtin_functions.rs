@@ -6,7 +6,7 @@ use itertools::Itertools;
 use crate::{
     builtin_functions::BuiltinFunction,
     compiler::hir::{self, Expression},
-    database::project_directory,
+    database::PROJECT_DIRECTORY,
     discover::run::run_call,
     input::Input,
 };
@@ -207,7 +207,7 @@ fn use_(db: &dyn Discover, arguments: Vec<Value>) -> DiscoverResult {
             return DiscoverResult::panic("Too many parent navigations.".to_owned());
         }
 
-        let project_dir = project_directory.lock().unwrap().clone().unwrap();
+        let project_dir = PROJECT_DIRECTORY.lock().unwrap().clone().unwrap();
         let target_paths = target.resolve(&current_path);
         let target = match target_paths
             .iter()

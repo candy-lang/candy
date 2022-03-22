@@ -14,7 +14,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     compiler::{ast_to_hir::AstToHir, cst_to_ast::CstToAst, string_to_cst::StringToCst},
-    database::project_directory,
+    database::PROJECT_DIRECTORY,
     input::{Input, InputDb},
     language_server::hints::HintsDb,
     Database,
@@ -64,7 +64,7 @@ impl LanguageServer for CandyLanguageServer {
             .unwrap()
             .uri
             .clone();
-        *project_directory.lock().unwrap() = match first_workspace_folder.into() {
+        *PROJECT_DIRECTORY.lock().unwrap() = match first_workspace_folder.into() {
             Input::File(path) => Some(path),
             _ => panic!("Workspace folder must be a file URI."),
         };
@@ -198,11 +198,13 @@ impl LanguageServer for CandyLanguageServer {
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let input: Input = params.text_document.uri.into();
+        let mut open_inputs = 
         {
             let mut db = self.db.lock().await;
             let text = apply_text_changes(&db, input.clone(), params.content_changes);
             db.did_change_input(&input, text);
         }
+        for file in db.
         self.analyze_file(input).await;
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {

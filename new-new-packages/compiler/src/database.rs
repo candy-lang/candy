@@ -70,5 +70,5 @@ impl InputWatcher for Database {
 }
 
 lazy_static! {
-    pub static ref project_directory: Mutex<Option<PathBuf>> = Mutex::new(None);
+    pub static ref PROJECT_DIRECTORY: Mutex<Option<PathBuf>> = Mutex::new(None);
 }
