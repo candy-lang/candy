@@ -230,16 +230,18 @@ fn use_(db: &dyn Discover, arguments: Vec<Value>) -> DiscoverResult {
         let (hir, _) = db.hir(input.clone()).unwrap();
         let discover_result = db.run_all(input);
 
-        let module = hir
-            .identifiers
+        hir.identifiers
             .iter()
-            .filter_map(|(id, key)| {
+            .map(|(id, key)| {
                 let key = Value::Text(key.to_owned());
-                let value = discover_result.get(id)?.to_owned().value()?;
-                Some((key, value))
+                let value = match discover_result.get(id) {
+                    Some(value) => value.to_owned()?,
+                    None => return DiscoverResult::ErrorInHir,
+                };
+                DiscoverResult::Value((key, value))
             })
-            .collect::<HashMap<Value, Value>>();
-        DiscoverResult::Value(Value::Struct(module))
+            .collect::<DiscoverResult<HashMap<Value, Value>>>()
+            .map(|it| Value::Struct(it))
     })
 }
 struct UseTarget {
