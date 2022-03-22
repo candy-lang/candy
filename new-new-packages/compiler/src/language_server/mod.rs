@@ -14,6 +14,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     compiler::{ast_to_hir::AstToHir, cst_to_ast::CstToAst, string_to_cst::StringToCst},
+    database::project_directory,
     input::{Input, InputDb},
     language_server::hints::HintsDb,
     Database,
@@ -50,11 +51,24 @@ impl CandyLanguageServer {
 
 #[lspower::async_trait]
 impl LanguageServer for CandyLanguageServer {
-    async fn initialize(&self, _: InitializeParams) -> jsonrpc::Result<InitializeResult> {
+    async fn initialize(&self, params: InitializeParams) -> jsonrpc::Result<InitializeResult> {
         log::info!("LSP: initialize");
         self.client
             .log_message(MessageType::INFO, "Initializing!")
             .await;
+
+        let first_workspace_folder = params
+            .workspace_folders
+            .unwrap()
+            .first()
+            .unwrap()
+            .uri
+            .clone();
+        *project_directory.lock().unwrap() = match first_workspace_folder.into() {
+            Input::File(path) => Some(path),
+            _ => panic!("Workspace folder must be a file URI."),
+        };
+
         Ok(InitializeResult {
             // We only support dynamic registration for now.
             capabilities: ServerCapabilities::default(),

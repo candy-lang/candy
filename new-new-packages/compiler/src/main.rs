@@ -11,10 +11,12 @@ mod language_server;
 use crate::compiler::ast_to_hir::AstToHir;
 use crate::compiler::cst_to_ast::CstToAst;
 use crate::compiler::string_to_cst::StringToCst;
+use crate::database::project_directory;
 use crate::{database::Database, input::Input};
 use language_server::CandyLanguageServer;
 use log;
 use lspower::{LspService, Server};
+use std::env::current_dir;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -53,6 +55,8 @@ async fn main() {
 }
 
 fn run(options: CandyRunOptions) {
+    *project_directory.lock().unwrap() = Some(current_dir().unwrap());
+
     let path_string = options.file.to_string_lossy();
     log::debug!("Running `{}`.\n", path_string);
 

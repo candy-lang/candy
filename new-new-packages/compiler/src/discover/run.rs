@@ -170,7 +170,11 @@ fn value_to_display_string(db: &dyn Discover, input: Input, value: Value) -> Str
                 .join(", ")
         ),
         Value::Lambda(Lambda { id, .. }) => {
-            let lambda = db.find_expression(input, id.clone()).unwrap();
+            // TODO(JonasWanke): remove this when we store the input inside each ID
+            let lambda = match db.find_expression(input, id.clone()) {
+                Some(lambda) => lambda,
+                None => return "<lambda>".to_owned(),
+            };
             if let Expression::Lambda(hir::Lambda { parameters, .. }) = lambda {
                 if parameters.is_empty() {
                     "{ … }".to_owned()

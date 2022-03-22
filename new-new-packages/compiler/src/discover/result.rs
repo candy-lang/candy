@@ -19,6 +19,12 @@ impl<T> DiscoverResult<T> {
         DiscoverResult::Panic(Value::Text(message))
     }
 
+    pub fn value(self) -> Option<T> {
+        match self {
+            DiscoverResult::Value(value) => Some(value),
+            _ => None,
+        }
+    }
     pub fn map<U, F: FnOnce(T) -> U>(self, op: F) -> DiscoverResult<U> {
         match self {
             DiscoverResult::Value(value) => DiscoverResult::Value(op(value)),
