@@ -417,13 +417,6 @@ impl IsMultiline for Vec<Cst> {
     }
 }
 
-// impl<T: IsMultiline> IsMultiline for Box<T> {
-//     fn is_multiline(&self) -> bool {
-//         log::info!("Checking if box is multiline.");
-//         (*self).is_multiline()
-//     }
-// }
-
 impl<T: IsMultiline> IsMultiline for Option<T> {
     fn is_multiline(&self) -> bool {
         match self {
@@ -465,12 +458,10 @@ mod parse {
     // All parsers take an input and return an input that may have advanced a
     // little.
     //
-    // Terminology:
-    //
-    // - Word: A number of characters that are not separated by whitespace or
-    //   significant punctuation. Identifiers, symbols, and ints are words.
-    //   Words may be invalid because they contain non-ascii or non-alphanumeric
-    //   characters – for example, the word `Magic✨` is invalid.
+    // Note: The parser is indentation-first. Indentation is more important than
+    // parentheses, brackets, etc. If some part of a definition can't be parsed,
+    // all the surrounding code still has a chance to be properly parsed – even
+    // mid-writing after putting the opening bracket of a struct.
 
     use crate::compiler::string_to_cst::IsMultiline;
 
@@ -539,6 +530,11 @@ mod parse {
         Some((input, Cst::DoubleQuote))
     }
 
+    /// "Word" refers to a number of characters that are not separated by
+    /// whitespace or significant punctuation. Identifiers, symbols, and ints
+    /// are words. Words may be invalid because they contain non-ascii or
+    /// non-alphanumeric characters – for example, the word `Magic✨` is an
+    /// invalid identifier or symbol.
     fn word(mut input: &str) -> Option<(&str, String)> {
         log::info!("word({:?})", input);
         let mut chars = vec![];
@@ -1191,7 +1187,6 @@ mod parse {
             }
 
             // The key itself.
-            println!("Key");
             let (input, key, has_key) = match expression(input, fields_indentation, true) {
                 Some((input, key)) => (input, key, true),
                 None => (
@@ -1205,7 +1200,6 @@ mod parse {
             };
 
             // Whitespace between key and colon.
-            println!("WS");
             let (input, whitespace) = whitespaces_and_newlines(input, fields_indentation + 1, true);
             if whitespace.is_multiline() {
                 fields_indentation = indentation + 1;
@@ -1213,7 +1207,6 @@ mod parse {
             let key = key.wrap_in_whitespace(whitespace);
 
             // Colon.
-            println!("Colon");
             let (input, colon, has_colon) = match colon(input) {
                 Some((input, colon)) => (input, colon, true),
                 None => (
@@ -1227,7 +1220,6 @@ mod parse {
             };
 
             // Whitespace between colon and value.
-            println!("WS");
             let (input, whitespace) = whitespaces_and_newlines(input, fields_indentation + 1, true);
             if whitespace.is_multiline() {
                 fields_indentation = indentation + 1;
@@ -1235,7 +1227,6 @@ mod parse {
             let colon = colon.wrap_in_whitespace(whitespace);
 
             // Value.
-            println!("Value");
             let (input, value, has_value) = match expression(input, fields_indentation + 1, true) {
                 Some((input, value)) => (input, value, true),
                 None => (
@@ -1265,7 +1256,6 @@ mod parse {
                 break;
             }
 
-            println!("Parsed a field. Remaining input: {}", input);
             outer_input = input;
             fields.push(Cst::StructField {
                 key: Box::new(key),
@@ -1276,7 +1266,6 @@ mod parse {
         }
         let input = outer_input;
 
-        println!("Done parsing fields. Remaining input: {}", input);
         let (new_input, whitespace) = whitespaces_and_newlines(input, indentation, true);
 
         let (input, closing_bracket) = match closing_bracket(new_input) {
@@ -1753,238 +1742,3 @@ mod parse {
         );
     }
 }
-
-// // Compound expressions.
-
-// proptest! {
-//     #[test]
-//     fn test_int(value in 0u64..) {
-//         let string = value.to_string();
-//         prop_assert_eq!(int(&string, &string).unwrap(), ("", create_cst(CstKind::Int{offset: 0, value: value, source: string.clone()})));
-//     }
-//     #[test]
-//     fn test_text(value in "[\\w\\d\\s]*") {
-//         let stringified_text = format!("\"{}\"", value);
-//         prop_assert_eq!(text(&stringified_text, &stringified_text).unwrap(), ("", create_cst(CstKind::Text{offset: 0, value: value.clone()})));
-//     }
-//     #[test]
-//     fn test_symbol(value in "[A-Z][A-Za-z0-9]*") {
-//         prop_assert_eq!(symbol(&value, &value).unwrap(), ("", create_cst(CstKind::Symbol{ offset: 0, value: value.clone()})));
-//     }
-//     #[test]
-//     fn test_identifier(value in "[a-z][A-Za-z0-9]*") {
-//         prop_assert_eq!(identifier(&value, &value).unwrap(), ("", create_cst(CstKind::Identifier{ offset: 0, value: value.clone()})));
-//     }
-// }
-
-// #[test]
-// fn test_expressions0() {
-//     assert_eq!(
-//         parse("\n123"),
-//         (
-//             "",
-//             vec![create_cst(CstKind::LeadingWhitespace {
-//                 value: "\n".to_string(),
-//                 child: Box::new(create_cst(CstKind::Int {
-//                     offset: 1,
-//                     value: 123,
-//                     source: "123".to_string()
-//                 }))
-//             })]
-//         )
-//     );
-//     assert_eq!(
-//         parse("\nfoo = bar\n"),
-//         (
-//             "\n",
-//             vec![create_cst(CstKind::LeadingWhitespace {
-//                 value: "\n".to_string(),
-//                 child: Box::new(create_cst(CstKind::Assignment {
-//                     name: Box::new(create_cst(CstKind::TrailingWhitespace {
-//                         value: " ".to_string(),
-//                         child: Box::new(create_cst(CstKind::Identifier {
-//                             offset: 1,
-//                             value: "foo".to_string()
-//                         }))
-//                     })),
-//                     parameters: vec![],
-//                     equals_sign: Box::new(create_cst(CstKind::TrailingWhitespace {
-//                         value: " ".to_string(),
-//                         child: Box::new(create_cst(CstKind::EqualsSign { offset: 5 }))
-//                     })),
-//                     body: vec![create_cst(CstKind::Call {
-//                         name: Box::new(create_cst(CstKind::Identifier {
-//                             offset: 7,
-//                             value: "bar".to_string()
-//                         })),
-//                         arguments: vec![]
-//                     })]
-//                 }))
-//             })]
-//         )
-//     );
-//     assert_eq!(
-//         parse("\nfoo\nbar"),
-//         (
-//             "",
-//             vec![
-//                 create_cst(CstKind::LeadingWhitespace {
-//                     value: "\n".to_string(),
-//                     child: Box::new(create_cst(CstKind::Call {
-//                         name: Box::new(create_cst(CstKind::Identifier {
-//                             offset: 1,
-//                             value: "foo".to_string()
-//                         })),
-//                         arguments: vec![],
-//                     }))
-//                 }),
-//                 create_cst(CstKind::LeadingWhitespace {
-//                     value: "\n".to_string(),
-//                     child: Box::new(create_cst(CstKind::Call {
-//                         name: Box::new(create_cst(CstKind::Identifier {
-//                             offset: 5,
-//                             value: "bar".to_string()
-//                         })),
-//                         arguments: vec![],
-//                     }))
-//                 }),
-//             ]
-//         )
-//     );
-//     assert_eq!(
-//         parse("\nadd 1 2"),
-//         (
-//             "",
-//             vec![create_cst(CstKind::LeadingWhitespace {
-//                 value: "\n".to_string(),
-//                 child: Box::new(create_cst(CstKind::Call {
-//                     name: Box::new(create_cst(CstKind::TrailingWhitespace {
-//                         value: " ".to_string(),
-//                         child: Box::new(create_cst(CstKind::Identifier {
-//                             offset: 1,
-//                             value: "add".to_string()
-//                         })),
-//                     })),
-//                     arguments: vec![
-//                         create_cst(CstKind::TrailingWhitespace {
-//                             value: " ".to_string(),
-//                             child: Box::new(create_cst(CstKind::Int {
-//                                 offset: 5,
-//                                 value: 1,
-//                                 source: "1".to_string()
-//                             }))
-//                         }),
-//                         create_cst(CstKind::Int {
-//                             offset: 7,
-//                             value: 2,
-//                             source: "2".to_string()
-//                         })
-//                     ],
-//                 }))
-//             })]
-//         )
-//     );
-//     assert_eq!(
-//         parse("\nfoo = bar\nadd\n  1\n  2"),
-//         (
-//             "",
-//             vec![
-//                 create_cst(CstKind::LeadingWhitespace {
-//                     value: "\n".to_string(),
-//                     child: Box::new(create_cst(CstKind::Assignment {
-//                         name: Box::new(create_cst(CstKind::TrailingWhitespace {
-//                             value: " ".to_string(),
-//                             child: Box::new(create_cst(CstKind::Identifier {
-//                                 offset: 1,
-//                                 value: "foo".to_string()
-//                             })),
-//                         })),
-//                         parameters: vec![],
-//                         equals_sign: Box::new(create_cst(CstKind::TrailingWhitespace {
-//                             value: " ".to_string(),
-//                             child: Box::new(create_cst(CstKind::EqualsSign { offset: 5 }))
-//                         })),
-//                         body: vec![create_cst(CstKind::Call {
-//                             name: Box::new(create_cst(CstKind::Identifier {
-//                                 offset: 7,
-//                                 value: "bar".to_string()
-//                             })),
-//                             arguments: vec![]
-//                         })]
-//                     }))
-//                 }),
-//                 create_cst(CstKind::LeadingWhitespace {
-//                     value: "\n".to_string(),
-//                     child: Box::new(create_cst(CstKind::Call {
-//                         name: Box::new(create_cst(CstKind::Identifier {
-//                             offset: 11,
-//                             value: "add".to_string()
-//                         })),
-//                         arguments: vec![
-//                             create_cst(CstKind::LeadingWhitespace {
-//                                 value: "\n".to_string(),
-//                                 child: Box::new(create_cst(CstKind::LeadingWhitespace {
-//                                     value: "  ".to_string(),
-//                                     child: Box::new(create_cst(CstKind::Int {
-//                                         offset: 17,
-//                                         value: 1,
-//                                         source: "1".to_string()
-//                                     }))
-//                                 }))
-//                             }),
-//                             create_cst(CstKind::LeadingWhitespace {
-//                                 value: "\n".to_string(),
-//                                 child: Box::new(create_cst(CstKind::LeadingWhitespace {
-//                                     value: "  ".to_string(),
-//                                     child: Box::new(create_cst(CstKind::Int {
-//                                         offset: 21,
-//                                         value: 2,
-//                                         source: "2".to_string()
-//                                     }))
-//                                 }))
-//                             }),
-//                         ],
-//                     }))
-//                 })
-//             ]
-//         )
-//     );
-//     assert_eq!(
-//         parse("\nadd\n  2\nmyIterable"),
-//         (
-//             "",
-//             vec![
-//                 create_cst(CstKind::LeadingWhitespace {
-//                     value: "\n".to_string(),
-//                     child: Box::new(create_cst(CstKind::Call {
-//                         name: Box::new(create_cst(CstKind::Identifier {
-//                             offset: 1,
-//                             value: "add".to_string()
-//                         })),
-//                         arguments: vec![create_cst(CstKind::LeadingWhitespace {
-//                             value: "\n".to_string(),
-//                             child: Box::new(create_cst(CstKind::LeadingWhitespace {
-//                                 value: "  ".to_string(),
-//                                 child: Box::new(create_cst(CstKind::Int {
-//                                     offset: 7,
-//                                     value: 2,
-//                                     source: "2".to_string()
-//                                 }))
-//                             }))
-//                         })],
-//                     }))
-//                 }),
-//                 create_cst(CstKind::LeadingWhitespace {
-//                     value: "\n".to_string(),
-//                     child: Box::new(create_cst(CstKind::Call {
-//                         name: Box::new(create_cst(CstKind::Identifier {
-//                             offset: 9,
-//                             value: "myIterable".to_string()
-//                         })),
-//                         arguments: vec![],
-//                     }))
-//                 })
-//             ]
-//         )
-//     );
-// }
