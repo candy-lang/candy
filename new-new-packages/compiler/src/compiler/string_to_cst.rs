@@ -302,6 +302,7 @@ trait IsMultiline {
 
 impl IsMultiline for Cst {
     fn is_multiline(&self) -> bool {
+        log::info!("Is {:?} multiline?", self);
         match self {
             Cst::EqualsSign => false,
             Cst::Comma => false,
@@ -368,7 +369,12 @@ impl IsMultiline for Cst {
                 closing_curly_brace,
             } => {
                 opening_curly_brace.is_multiline()
-                    || parameters_and_arrow.is_multiline()
+                    || parameters_and_arrow
+                        .as_ref()
+                        .map(|(parameters, arrow)| {
+                            parameters.is_multiline() || arrow.is_multiline()
+                        })
+                        .unwrap_or(false)
                     || body.is_multiline()
                     || closing_curly_brace.is_multiline()
             }
@@ -384,7 +390,12 @@ impl IsMultiline for Cst {
                     || body.is_multiline()
             }
             Cst::TrailingWhitespace { child, whitespace } => {
-                child.is_multiline() || whitespace.is_multiline()
+                log::info!("Is child multiline?");
+                let c = child.is_multiline();
+                log::info!("Is whitespace multiline?");
+                let w = whitespace.is_multiline();
+                log::info!("Combining");
+                c || w
             }
             Cst::Error {
                 unparsable_input,
@@ -406,11 +417,12 @@ impl IsMultiline for Vec<Cst> {
     }
 }
 
-impl<T: IsMultiline> IsMultiline for Box<T> {
-    fn is_multiline(&self) -> bool {
-        self.is_multiline()
-    }
-}
+// impl<T: IsMultiline> IsMultiline for Box<T> {
+//     fn is_multiline(&self) -> bool {
+//         log::info!("Checking if box is multiline.");
+//         (*self).is_multiline()
+//     }
+// }
 
 impl<T: IsMultiline> IsMultiline for Option<T> {
     fn is_multiline(&self) -> bool {
@@ -428,11 +440,20 @@ impl<A: IsMultiline, B: IsMultiline> IsMultiline for (A, B) {
 }
 
 impl Cst {
-    fn wrap_in_whitespace(self, whitespace: Vec<Cst>) -> Self {
+    fn wrap_in_whitespace(mut self, mut whitespace: Vec<Cst>) -> Self {
         if !whitespace.is_empty() {
-            Cst::TrailingWhitespace {
-                child: Box::new(self),
-                whitespace,
+            if let Cst::TrailingWhitespace {
+                child,
+                whitespace: self_whitespace,
+            } = &mut self
+            {
+                self_whitespace.append(&mut whitespace);
+                self
+            } else {
+                Cst::TrailingWhitespace {
+                    child: Box::new(self),
+                    whitespace,
+                }
             }
         } else {
             self
@@ -456,7 +477,7 @@ mod parse {
     use super::{Cst, CstError};
     use itertools::Itertools;
 
-    static MEANINGFUL_PUNCTUATION: &'static str = "=->(){}[],:";
+    static MEANINGFUL_PUNCTUATION: &'static str = "=:,(){}[]->";
 
     fn literal<'a>(input: &'a str, literal: &'static str) -> Option<&'a str> {
         log::info!("literal({:?}, {:?})", input, literal);
@@ -1055,6 +1076,7 @@ mod parse {
                 Some(it) => it,
                 None => {
                     let fallback = closing_parenthesis(i)
+                        .or_else(|| closing_bracket(i))
                         .or_else(|| closing_curly_brace(i))
                         .or_else(|| arrow(i));
                     if let Some((i, cst)) = fallback {
@@ -1184,7 +1206,7 @@ mod parse {
 
             // Whitespace between key and colon.
             println!("WS");
-            let (input, whitespace) = whitespaces_and_newlines(input, fields_indentation, true);
+            let (input, whitespace) = whitespaces_and_newlines(input, fields_indentation + 1, true);
             if whitespace.is_multiline() {
                 fields_indentation = indentation + 1;
             }
@@ -1206,7 +1228,7 @@ mod parse {
 
             // Whitespace between colon and value.
             println!("WS");
-            let (input, whitespace) = whitespaces_and_newlines(input, fields_indentation, true);
+            let (input, whitespace) = whitespaces_and_newlines(input, fields_indentation + 1, true);
             if whitespace.is_multiline() {
                 fields_indentation = indentation + 1;
             }
@@ -1214,7 +1236,7 @@ mod parse {
 
             // Value.
             println!("Value");
-            let (input, value, has_value) = match expression(input, fields_indentation, true) {
+            let (input, value, has_value) = match expression(input, fields_indentation + 1, true) {
                 Some((input, value)) => (input, value, true),
                 None => (
                     input,
@@ -1227,7 +1249,7 @@ mod parse {
             };
 
             // Whitespace between value and comma.
-            let (input, whitespace) = whitespaces_and_newlines(input, fields_indentation, true);
+            let (input, whitespace) = whitespaces_and_newlines(input, fields_indentation + 1, true);
             if whitespace.is_multiline() {
                 fields_indentation = indentation + 1;
             }
@@ -1255,21 +1277,26 @@ mod parse {
         let input = outer_input;
 
         println!("Done parsing fields. Remaining input: {}", input);
-        let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
-        if fields.is_empty() {
-            opening_bracket = opening_bracket.wrap_in_whitespace(whitespace);
-        } else {
-            let last = fields.pop().unwrap();
-            fields.push(last.wrap_in_whitespace(whitespace));
-        }
+        let (new_input, whitespace) = whitespaces_and_newlines(input, indentation, true);
 
-        let (input, closing_bracket) = closing_bracket(input).unwrap_or((
-            input,
-            Cst::Error {
-                unparsable_input: "".to_string(),
-                error: CstError::StructNotClosed,
-            },
-        ));
+        let (input, closing_bracket) = match closing_bracket(new_input) {
+            Some((input, closing_bracket)) => {
+                if fields.is_empty() {
+                    opening_bracket = opening_bracket.wrap_in_whitespace(whitespace);
+                } else {
+                    let last = fields.pop().unwrap();
+                    fields.push(last.wrap_in_whitespace(whitespace));
+                }
+                (input, closing_bracket)
+            }
+            None => (
+                input,
+                Cst::Error {
+                    unparsable_input: "".to_string(),
+                    error: CstError::StructNotClosed,
+                },
+            ),
+        };
 
         Some((
             input,
@@ -1462,7 +1489,20 @@ mod parse {
                     new_input = new_new_input;
                     new_expressions.push(expression);
                 }
-                None => break (input, expressions),
+                None => {
+                    let fallback = colon(new_input)
+                        .or_else(|| comma(new_input))
+                        .or_else(|| closing_parenthesis(new_input))
+                        .or_else(|| closing_bracket(new_input))
+                        .or_else(|| closing_curly_brace(new_input))
+                        .or_else(|| arrow(new_input));
+                    if let Some((i, cst)) = fallback {
+                        new_input = i;
+                        new_expressions.push(cst);
+                    } else {
+                        break (input, expressions);
+                    }
+                }
             }
             input = new_input;
             expressions.append(&mut new_expressions);
@@ -1633,10 +1673,12 @@ mod parse {
         let (input, more_whitespace) = whitespaces_and_newlines(input, indentation, true);
         equals_sign = equals_sign.wrap_in_whitespace(more_whitespace.clone());
 
+        log::info!("Checking if it's multiline");
         let is_multiline = name.is_multiline()
             || parameters.is_multiline()
             || whitespace.is_multiline()
             || more_whitespace.is_multiline();
+        log::info!("Is it multiline? {} Now, parsing body", is_multiline);
         let (input, body) = if is_multiline {
             let (input, whitespace) = leading_indentation(input, 1)?;
             equals_sign = equals_sign.wrap_in_whitespace(vec![whitespace]);
