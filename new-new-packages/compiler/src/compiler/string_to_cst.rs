@@ -85,13 +85,17 @@ pub fn parse_cst(input: &str) -> Vec<Cst> {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Cst {
-    EqualsSign,
-    OpeningParenthesis,
-    ClosingParenthesis,
-    OpeningCurlyBrace,
-    ClosingCurlyBrace,
-    Arrow,
-    DoubleQuote,
+    EqualsSign,         // =
+    Comma,              // ,
+    Colon,              // :
+    OpeningParenthesis, // (
+    ClosingParenthesis, // )
+    OpeningBracket,     // [
+    ClosingBracket,     // ]
+    OpeningCurlyBrace,  // {
+    ClosingCurlyBrace,  // }
+    Arrow,              // ->
+    DoubleQuote,        // "
     Identifier(String),
     Symbol(String),
     Int(u64),
@@ -104,6 +108,17 @@ pub enum Cst {
     Call {
         name: Box<Cst>,
         arguments: Vec<Cst>,
+    },
+    Struct {
+        opening_bracket: Box<Cst>,
+        fields: Vec<Cst>,
+        closing_bracket: Box<Cst>,
+    },
+    StructField {
+        key: Box<Cst>,
+        colon: Box<Cst>,
+        value: Box<Cst>,
+        comma: Option<Box<Cst>>,
     },
     Whitespace(String),
     Newline, // TODO: Support different kinds of newlines.
@@ -142,6 +157,10 @@ enum CstError {
     IntContainsNonDigits,
     TextDoesNotEndUntilInputEnds,
     TextNotSufficientlyIndented,
+    StructFieldMissesKey,
+    StructFieldMissesColon,
+    StructFieldMissesValue,
+    StructNotClosed,
     WeirdWhitespace,
     WeirdWhitespaceInIndentation,
     ExpressionExpectedAfterOpeningParenthesis,
@@ -156,8 +175,12 @@ impl Display for Cst {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Cst::EqualsSign => "=".fmt(f),
+            Cst::Comma => ",".fmt(f),
+            Cst::Colon => ":".fmt(f),
             Cst::OpeningParenthesis => "(".fmt(f),
             Cst::ClosingParenthesis => ")".fmt(f),
+            Cst::OpeningBracket => "[".fmt(f),
+            Cst::ClosingBracket => "]".fmt(f),
             Cst::OpeningCurlyBrace => "{".fmt(f),
             Cst::ClosingCurlyBrace => "}".fmt(f),
             Cst::Arrow => "->".fmt(f),
@@ -181,6 +204,31 @@ impl Display for Cst {
                 name.fmt(f)?;
                 for argument in arguments {
                     argument.fmt(f)?;
+                }
+                Ok(())
+            }
+            Cst::Struct {
+                opening_bracket,
+                fields,
+                closing_bracket,
+            } => {
+                opening_bracket.fmt(f)?;
+                for field in fields {
+                    field.fmt(f)?;
+                }
+                closing_bracket.fmt(f)
+            }
+            Cst::StructField {
+                key,
+                colon,
+                value,
+                comma,
+            } => {
+                key.fmt(f)?;
+                colon.fmt(f)?;
+                value.fmt(f)?;
+                if let Some(comma) = comma {
+                    comma.fmt(f)?;
                 }
                 Ok(())
             }
@@ -256,8 +304,12 @@ impl IsMultiline for Cst {
     fn is_multiline(&self) -> bool {
         match self {
             Cst::EqualsSign => false,
+            Cst::Comma => false,
+            Cst::Colon => false,
             Cst::OpeningParenthesis => false,
             Cst::ClosingParenthesis => false,
+            Cst::OpeningBracket => false,
+            Cst::ClosingBracket => false,
             Cst::OpeningCurlyBrace => false,
             Cst::ClosingCurlyBrace => false,
             Cst::Arrow => false,
@@ -274,6 +326,29 @@ impl IsMultiline for Cst {
             }
             Cst::TextPart(_) => false,
             Cst::Call { name, arguments } => name.is_multiline() || arguments.is_multiline(),
+            Cst::Struct {
+                opening_bracket,
+                fields,
+                closing_bracket,
+            } => {
+                opening_bracket.is_multiline()
+                    || fields.iter().any(|field| field.is_multiline())
+                    || closing_bracket.is_multiline()
+            }
+            Cst::StructField {
+                key,
+                colon,
+                value,
+                comma,
+            } => {
+                key.is_multiline()
+                    || colon.is_multiline()
+                    || value.is_multiline()
+                    || comma
+                        .as_ref()
+                        .map(|comma| comma.is_multiline())
+                        .unwrap_or(false)
+            }
             Cst::Whitespace(whitespace) => whitespace.is_multiline(),
             Cst::Newline => true,
             Cst::Comment(_) => false,
@@ -400,6 +475,22 @@ mod parse {
     pub fn equals_sign(input: &str) -> Option<(&str, Cst)> {
         let input = literal(input, "=")?;
         Some((input, Cst::EqualsSign))
+    }
+    pub fn comma(input: &str) -> Option<(&str, Cst)> {
+        let input = literal(input, ",")?;
+        Some((input, Cst::Comma))
+    }
+    pub fn colon(input: &str) -> Option<(&str, Cst)> {
+        let input = literal(input, ":")?;
+        Some((input, Cst::Colon))
+    }
+    fn opening_bracket(input: &str) -> Option<(&str, Cst)> {
+        let input = literal(input, "[")?;
+        Some((input, Cst::OpeningBracket))
+    }
+    pub fn closing_bracket(input: &str) -> Option<(&str, Cst)> {
+        let input = literal(input, "]")?;
+        Some((input, Cst::ClosingBracket))
     }
     fn opening_parenthesis(input: &str) -> Option<(&str, Cst)> {
         let input = literal(input, "(")?;
@@ -905,6 +996,7 @@ mod parse {
         int(input)
             .or_else(|| text(input, indentation))
             .or_else(|| symbol(input))
+            .or_else(|| struct_(input, indentation))
             .or_else(|| parenthesized(input, indentation))
             .or_else(|| lambda(input, indentation))
             .or_else(|| {
@@ -1054,6 +1146,219 @@ mod parse {
         );
     }
 
+    fn struct_(input: &str, indentation: usize) -> Option<(&str, Cst)> {
+        log::info!("struct({:?}, {:?})", input, indentation);
+
+        let (mut outer_input, mut opening_bracket) = opening_bracket(input)?;
+
+        let mut fields: Vec<Cst> = vec![];
+        let mut fields_indentation = indentation;
+        loop {
+            let input = outer_input;
+
+            // Whitespace before key.
+            let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+            if whitespace.is_multiline() {
+                fields_indentation = indentation + 1;
+            }
+            if fields.is_empty() {
+                opening_bracket = opening_bracket.wrap_in_whitespace(whitespace);
+            } else {
+                let last = fields.pop().unwrap();
+                fields.push(last.wrap_in_whitespace(whitespace));
+            }
+
+            // The key itself.
+            println!("Key");
+            let (input, key, has_key) = match expression(input, fields_indentation, true) {
+                Some((input, key)) => (input, key, true),
+                None => (
+                    input,
+                    Cst::Error {
+                        unparsable_input: "".to_string(),
+                        error: CstError::StructFieldMissesKey,
+                    },
+                    false,
+                ),
+            };
+
+            // Whitespace between key and colon.
+            println!("WS");
+            let (input, whitespace) = whitespaces_and_newlines(input, fields_indentation, true);
+            if whitespace.is_multiline() {
+                fields_indentation = indentation + 1;
+            }
+            let key = key.wrap_in_whitespace(whitespace);
+
+            // Colon.
+            println!("Colon");
+            let (input, colon, has_colon) = match colon(input) {
+                Some((input, colon)) => (input, colon, true),
+                None => (
+                    input,
+                    Cst::Error {
+                        unparsable_input: "".to_string(),
+                        error: CstError::StructFieldMissesColon,
+                    },
+                    false,
+                ),
+            };
+
+            // Whitespace between colon and value.
+            println!("WS");
+            let (input, whitespace) = whitespaces_and_newlines(input, fields_indentation, true);
+            if whitespace.is_multiline() {
+                fields_indentation = indentation + 1;
+            }
+            let colon = colon.wrap_in_whitespace(whitespace);
+
+            // Value.
+            println!("Value");
+            let (input, value, has_value) = match expression(input, fields_indentation, true) {
+                Some((input, value)) => (input, value, true),
+                None => (
+                    input,
+                    Cst::Error {
+                        unparsable_input: "".to_string(),
+                        error: CstError::StructFieldMissesValue,
+                    },
+                    false,
+                ),
+            };
+
+            // Whitespace between value and comma.
+            let (input, whitespace) = whitespaces_and_newlines(input, fields_indentation, true);
+            if whitespace.is_multiline() {
+                fields_indentation = indentation + 1;
+            }
+            let value = value.wrap_in_whitespace(whitespace);
+
+            // Comma.
+            let (input, comma) = match comma(input) {
+                Some((input, comma)) => (input, Some(comma)),
+                None => (input, None),
+            };
+
+            if !has_key && !has_colon && !has_value && comma.is_none() {
+                break;
+            }
+
+            println!("Parsed a field. Remaining input: {}", input);
+            outer_input = input;
+            fields.push(Cst::StructField {
+                key: Box::new(key),
+                colon: Box::new(colon),
+                value: Box::new(value),
+                comma: comma.map(|it| Box::new(it)),
+            });
+        }
+        let input = outer_input;
+
+        println!("Done parsing fields. Remaining input: {}", input);
+        let (input, whitespace) = whitespaces_and_newlines(input, indentation, true);
+        if fields.is_empty() {
+            opening_bracket = opening_bracket.wrap_in_whitespace(whitespace);
+        } else {
+            let last = fields.pop().unwrap();
+            fields.push(last.wrap_in_whitespace(whitespace));
+        }
+
+        let (input, closing_bracket) = closing_bracket(input).unwrap_or((
+            input,
+            Cst::Error {
+                unparsable_input: "".to_string(),
+                error: CstError::StructNotClosed,
+            },
+        ));
+
+        Some((
+            input,
+            Cst::Struct {
+                opening_bracket: Box::new(opening_bracket),
+                fields,
+                closing_bracket: Box::new(closing_bracket),
+            },
+        ))
+    }
+    #[test]
+    fn test_struct() {
+        assert_eq!(struct_("hello", 0), None);
+        assert_eq!(
+            struct_("[]", 0),
+            Some((
+                "",
+                Cst::Struct {
+                    opening_bracket: Box::new(Cst::OpeningBracket),
+                    fields: vec![],
+                    closing_bracket: Box::new(Cst::ClosingBracket),
+                }
+            ))
+        );
+        assert_eq!(
+            struct_("[foo:bar]", 0),
+            Some((
+                "",
+                Cst::Struct {
+                    opening_bracket: Box::new(Cst::OpeningBracket),
+                    fields: vec![Cst::StructField {
+                        key: Box::new(Cst::Identifier("foo".to_string())),
+                        colon: Box::new(Cst::Colon),
+                        value: Box::new(Cst::Identifier("bar".to_string())),
+                        comma: None,
+                    },],
+                    closing_bracket: Box::new(Cst::ClosingBracket),
+                }
+            ))
+        );
+        // [
+        //   foo: bar,
+        //   4: "Hi",
+        // ]
+        assert_eq!(
+            struct_("[\n  foo: bar,\n  4: \"Hi\",\n]", 0),
+            Some((
+                "",
+                Cst::Struct {
+                    opening_bracket: Box::new(Cst::TrailingWhitespace {
+                        child: Box::new(Cst::OpeningBracket),
+                        whitespace: vec![Cst::Newline, Cst::Whitespace("  ".to_string())],
+                    }),
+                    fields: vec![
+                        Cst::TrailingWhitespace {
+                            child: Box::new(Cst::StructField {
+                                key: Box::new(Cst::Identifier("foo".to_string())),
+                                colon: Box::new(Cst::TrailingWhitespace {
+                                    child: Box::new(Cst::Colon),
+                                    whitespace: vec![Cst::Whitespace(" ".to_string())],
+                                }),
+                                value: Box::new(Cst::Identifier("bar".to_string())),
+                                comma: Some(Box::new(Cst::Comma)),
+                            }),
+                            whitespace: vec![Cst::Newline, Cst::Whitespace("  ".to_string())]
+                        },
+                        Cst::TrailingWhitespace {
+                            child: Box::new(Cst::StructField {
+                                key: Box::new(Cst::Int(4)),
+                                colon: Box::new(Cst::TrailingWhitespace {
+                                    child: Box::new(Cst::Colon),
+                                    whitespace: vec![Cst::Whitespace(" ".to_string())],
+                                }),
+                                value: Box::new(Cst::Text {
+                                    opening_quote: Box::new(Cst::DoubleQuote),
+                                    parts: vec![Cst::TextPart("Hi".to_string())],
+                                    closing_quote: Box::new(Cst::DoubleQuote),
+                                }),
+                                comma: Some(Box::new(Cst::Comma))
+                            }),
+                            whitespace: vec![Cst::Newline]
+                        }
+                    ],
+                    closing_bracket: Box::new(Cst::ClosingBracket),
+                }
+            ))
+        );
+    }
+
     fn parenthesized(input: &str, indentation: usize) -> Option<(&str, Cst)> {
         log::info!("parenthesized({:?}, {:?})", input, indentation);
 
@@ -1066,11 +1371,8 @@ mod parse {
             indentation
         };
         let opening_parenthesis = opening_parenthesis.wrap_in_whitespace(whitespace);
-        log::info!(
-            "Indentation for parenthesized inners is: {}",
-            inner_indentation
-        );
 
+        log::info!("Parenthesized inners indented by {}", inner_indentation);
         let (input, inner) = expression(input, inner_indentation, true).unwrap_or((
             input,
             Cst::Error {
