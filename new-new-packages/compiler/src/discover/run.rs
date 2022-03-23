@@ -1,5 +1,5 @@
 use crate::{
-    builtin_functions::{self, BuiltinFunction},
+    builtin_functions,
     compiler::hir::{self, Body, Expression, HirDb},
     input::Input,
 };
@@ -16,100 +16,81 @@ use super::{
 #[salsa::query_group(DiscoverStorage)]
 pub trait Discover: HirDb {
     fn run_all(&self, input: Input) -> HashMap<hir::Id, DiscoverResult>;
-    fn run(&self, input: Input, id: hir::Id) -> DiscoverResult;
-    fn run_with_environment(
-        &self,
-        input: Input,
-        id: hir::Id,
-        environment: Environment,
-    ) -> DiscoverResult;
-    fn run_multiple_with_environment(
-        &self,
-        input: Input,
-        ids: Vec<hir::Id>,
-        environment: Environment,
-    ) -> DiscoverResult<Vec<Value>>;
-    fn run_call(
-        &self,
-        input: Input,
-        function_id: hir::Id,
-        arguments: Vec<hir::Id>,
-        environment: Environment,
-    ) -> DiscoverResult;
-    fn run_builtin_function(
-        &self,
-        input: Input,
-        builtin_function: BuiltinFunction,
-        arguments: Vec<hir::Id>,
-        environment: Environment,
-    ) -> DiscoverResult;
 
     fn value_to_display_string(&self, input: Input, value: Value) -> String;
 }
 
 fn run_all(db: &dyn Discover, input: Input) -> HashMap<hir::Id, DiscoverResult> {
-    db.all_hir_ids(input.to_owned())
-        .unwrap()
-        .into_iter()
-        .map(move |id| (id.to_owned(), db.run(input.to_owned(), id)))
-        .collect()
+    let (hir, _) = db.hir(input.clone()).unwrap();
+    run_body(db, input, hir.as_ref(), Environment::new()).flatten()
 }
-fn run(db: &dyn Discover, input: Input, id: hir::Id) -> DiscoverResult {
-    db.run_with_environment(input, id, Environment::new(HashMap::new()))
-}
-fn run_with_environment(
-    db: &dyn Discover,
-    input: Input,
-    id: hir::Id,
-    environment: Environment,
-) -> DiscoverResult {
-    if let Some(value) = environment.get(&id) {
-        return value.into();
+fn run_body(db: &dyn Discover, input: Input, body: &Body, environment: Environment) -> Environment {
+    let mut environment = environment.new_child();
+    for (id, _) in &body.expressions {
+        environment = run(db, input.clone(), id.to_owned(), environment);
     }
-
-    match db.find_expression(input.to_owned(), id.to_owned())? {
+    environment
+}
+fn run(db: &dyn Discover, input: Input, id: hir::Id, environment: Environment) -> Environment {
+    let mut environment = environment;
+    let result = match db.find_expression(input.clone(), id.clone()).unwrap() {
         Expression::Int(int) => Value::Int(int.to_owned()).into(),
         Expression::Text(string) => Value::Text(string.to_owned()).into(),
-        Expression::Reference(reference) => db.run_with_environment(input, reference, environment),
-        Expression::Symbol(symbol) => Value::Symbol(symbol.to_owned()).into(),
-        Expression::Struct(entries) => {
-            let struct_ = entries
-                .into_iter()
-                .map(|(key, value)| {
-                    let key = db.run_with_environment(input.clone(), key, environment.clone())?;
-                    let value =
-                        db.run_with_environment(input.clone(), value, environment.clone())?;
-                    (key, value).into()
-                })
-                .collect::<DiscoverResult<HashMap<Value, Value>>>()?;
-            Value::Struct(struct_).into()
+        Expression::Reference(reference) => {
+            if let &[builtin_function_index] = &reference.0[..] {
+                if let Some(_) = builtin_functions::VALUES.get(builtin_function_index) {
+                    panic!("References to built-in functions are not supported. Erroneous expression: {}", id)
+                }
+            }
+            match db.find_expression(input.clone(), reference.to_owned()) {
+                None => DiscoverResult::DependsOnParameter,
+                Some(_) => environment
+                    .get(&reference)
+                    .expect("Value behind reference must already be in environment")
+                    .transitive(),
+            }
         }
-        Expression::Lambda(_) => Value::Lambda(Lambda {
-            captured_environment: environment.to_owned(),
-            id,
-        })
-        .into(),
-        Expression::Body(Body { out, .. }) => {
-            db.run_with_environment(input, out.unwrap(), environment)
+        Expression::Symbol(symbol) => Value::Symbol(symbol.to_owned()).into(),
+        Expression::Struct(entries) => 'outer: loop {
+            let mut struct_ = HashMap::new();
+            for (key, value) in entries {
+                environment = run(db, input.clone(), key.clone(), environment);
+                environment = run(db, input.clone(), value.clone(), environment);
+                let key = match environment.get(&key).unwrap().transitive() {
+                    DiscoverResult::Value(value) => value,
+                    it => break 'outer it,
+                };
+                let value = match environment.get(&value).unwrap().transitive() {
+                    DiscoverResult::Value(value) => value,
+                    it => break 'outer it,
+                };
+                struct_.insert(key, value);
+            }
+            break Value::Struct(struct_).into();
+        },
+        Expression::Lambda(hir::Lambda { body, .. }) => {
+            let result = Value::Lambda(Lambda {
+                captured_environment: environment.to_owned(),
+                id: id.clone(),
+            })
+            .into();
+            environment = run_body(db, input.clone(), &body, environment);
+            result
+        }
+        Expression::Body(body) => {
+            environment = run_body(db, input, &body, environment);
+            environment.get(body.out_id()).unwrap().transitive()
         }
         Expression::Call {
             function,
             arguments,
-        } => db.run_call(input, function, arguments, environment),
+        } => run_call(db, input, function, arguments, environment.clone()),
         Expression::Error => DiscoverResult::ErrorInHir,
-    }
+    };
+    environment.store(id, result);
+    environment
 }
-fn run_multiple_with_environment(
-    db: &dyn Discover,
-    input: Input,
-    ids: Vec<hir::Id>,
-    environment: Environment,
-) -> DiscoverResult<Vec<Value>> {
-    ids.into_iter()
-        .map(|it| run_with_environment(db, input.to_owned(), it.to_owned(), environment.to_owned()))
-        .collect()
-}
-fn run_call(
+pub(super) fn run_call(
     db: &dyn Discover,
     input: Input,
     function: hir::Id,
@@ -118,7 +99,8 @@ fn run_call(
 ) -> DiscoverResult {
     if let &[builtin_function_index] = &function.0[..] {
         if let Some(builtin_function) = builtin_functions::VALUES.get(builtin_function_index) {
-            return db.run_builtin_function(
+            return run_builtin_function(
+                db,
                 input,
                 builtin_function.to_owned(),
                 arguments.to_owned(),
@@ -127,11 +109,7 @@ fn run_call(
         }
     }
 
-    let lambda = match db.run_with_environment(
-        input.to_owned(),
-        function.to_owned(),
-        environment.to_owned(),
-    )? {
+    let lambda = match environment.get(&function).unwrap().transitive()? {
         Value::Lambda(lambda) => lambda,
         it => panic!("Tried to call something that wasn't a lambda: {:?}", it),
     };
@@ -162,15 +140,17 @@ fn run_call(
         )));
     }
 
-    let arguments =
-        db.run_multiple_with_environment(input.to_owned(), arguments, environment.to_owned())?;
-
-    let mut inner_environment = environment.to_owned();
-    for (index, argument) in arguments.into_iter().enumerate() {
-        inner_environment.store(lambda_hir.first_id.clone() + index, argument);
+    let mut inner_environment = lambda.captured_environment.to_owned();
+    for (index, argument) in arguments.iter().enumerate() {
+        inner_environment.store(
+            lambda_hir.first_id.clone() + index,
+            environment.get(argument).unwrap(),
+        );
     }
 
-    db.run_with_environment(input, lambda_hir.body.out.unwrap(), inner_environment)
+    run_body(db, input, &lambda_hir.body, inner_environment)
+        .get(lambda_hir.body.out_id())
+        .unwrap()
 }
 
 fn value_to_display_string(db: &dyn Discover, input: Input, value: Value) -> String {

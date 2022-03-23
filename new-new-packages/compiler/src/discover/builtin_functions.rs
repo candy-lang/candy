@@ -3,6 +3,7 @@ use im::HashMap;
 use crate::{
     builtin_functions::BuiltinFunction,
     compiler::hir::{self, Expression},
+    discover::run::run_call,
     input::Input,
 };
 
@@ -30,7 +31,10 @@ pub fn run_builtin_function(
         _ => {}
     }
 
-    let arguments = db.run_multiple_with_environment(input.to_owned(), arguments, environment)?;
+    let arguments = arguments
+        .iter()
+        .map(|it| environment.get(it).unwrap())
+        .collect::<DiscoverResult<_>>()?;
     match builtin_function {
         BuiltinFunction::Add => add(arguments),
         BuiltinFunction::Equals => equals(arguments),
@@ -82,13 +86,8 @@ fn if_else(
     arguments: Vec<hir::Id>,
     environment: Environment,
 ) -> DiscoverResult {
-    log::error!("{:?}", arguments);
     if let [condition, then, else_] = &arguments[..] {
-        let body_id = match db.run_with_environment(
-            input.clone(),
-            condition.to_owned(),
-            environment.to_owned(),
-        )? {
+        let body_id = match environment.get(condition).unwrap()? {
             value if value == Value::bool(true) => then,
             value if value == Value::bool(false) => else_,
             value => {
@@ -99,7 +98,7 @@ fn if_else(
             }
         };
 
-        db.run_call(input, body_id.to_owned(), vec![], environment)
+        run_call(db, input, body_id.to_owned(), vec![], environment)
     } else {
         DiscoverResult::Panic(Value::Text(format!(
             "Builtin if/else called with wrong number of arguments: {}, expected: {}",

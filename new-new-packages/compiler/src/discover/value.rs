@@ -2,6 +2,8 @@ use im::HashMap;
 
 use crate::compiler::hir::Id;
 
+use super::result::DiscoverResult;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Value {
     Int(u64),
@@ -14,7 +16,7 @@ pub enum Value {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Environment {
     parent: Option<Box<Environment>>,
-    bindings: HashMap<Id, Value>,
+    bindings: HashMap<Id, DiscoverResult>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -61,25 +63,42 @@ impl From<bool> for Value {
 }
 
 impl Environment {
-    pub fn new(bindings: HashMap<Id, Value>) -> Environment {
+    pub fn new() -> Environment {
         Self {
             parent: None,
-            bindings,
+            bindings: HashMap::new(),
         }
     }
-    pub fn store(&mut self, id: Id, value: Value) {
+    pub fn new_child(self) -> Environment {
+        Self {
+            parent: Some(Box::new(self)),
+            bindings: HashMap::new(),
+        }
+    }
+    pub fn store(&mut self, id: Id, value: DiscoverResult) {
         assert!(
             !self.bindings.contains_key(&id),
-            "Tried to overwrite a value at ID {}: {:?}",
+            "Tried to overwrite a value at ID {} with {:?} (old value: {:?})",
             &id,
-            &value
+            &value,
+            &self.bindings.get(&id).unwrap(),
         );
         assert!(self.bindings.insert(id, value).is_none())
     }
-    pub fn get(&self, id: &Id) -> Option<Value> {
+    pub fn get(&self, id: &Id) -> Option<DiscoverResult> {
         self.bindings
             .get(id)
             .map(|it| it.clone())
             .or_else(|| self.parent.as_ref()?.get(id))
+    }
+
+    pub fn flatten(self) -> HashMap<Id, DiscoverResult> {
+        let mut bindings = HashMap::new();
+        let mut environment = Some(self);
+        while let Some(env) = environment {
+            bindings.extend(env.bindings.into_iter());
+            environment = env.parent.map(|it| *it);
+        }
+        bindings
     }
 }
