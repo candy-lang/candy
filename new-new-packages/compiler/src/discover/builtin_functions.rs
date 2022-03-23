@@ -233,11 +233,15 @@ fn use_(db: &dyn Discover, arguments: Vec<Value>) -> DiscoverResult {
         hir.identifiers
             .iter()
             .map(|(id, key)| {
-                let key = Value::Text(key.to_owned());
+                let mut key = key.to_owned();
+                key.get_mut(0..1).unwrap().make_ascii_uppercase();
+                let key = Value::Symbol(key.to_owned());
+
                 let value = match discover_result.get(id) {
                     Some(value) => value.to_owned()?,
                     None => return DiscoverResult::ErrorInHir,
                 };
+
                 DiscoverResult::Value((key, value))
             })
             .collect::<DiscoverResult<HashMap<Value, Value>>>()
