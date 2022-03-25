@@ -2,8 +2,18 @@ use std::ops::Deref;
 
 use linked_hash_map::LinkedHashMap;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct Id(pub usize);
+use crate::input::Input;
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct Id {
+    pub input: Input,
+    pub local: usize,
+}
+impl Id {
+    pub fn new(input: Input, local: usize) -> Self {
+        Self { input, local }
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Ast {

@@ -12,8 +12,8 @@ use crate::input::Input;
 
 #[salsa::query_group(CstToAstStorage)]
 pub trait CstToAst: CstDb + StringToCst {
-    fn ast_to_cst_id(&self, input: Input, id: ast::Id) -> Option<cst::Id>;
-    fn ast_id_to_span(&self, input: Input, id: ast::Id) -> Option<Range<usize>>;
+    fn ast_to_cst_id(&self, id: ast::Id) -> Option<cst::Id>;
+    fn ast_id_to_span(&self, id: ast::Id) -> Option<Range<usize>>;
 
     fn cst_to_ast_id(&self, input: Input, id: cst::Id) -> Option<ast::Id>;
 
@@ -24,13 +24,13 @@ pub trait CstToAst: CstDb + StringToCst {
     ) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>, Vec<CompilerError>)>;
 }
 
-fn ast_to_cst_id(db: &dyn CstToAst, input: Input, id: ast::Id) -> Option<cst::Id> {
-    let (_, ast_to_cst_id_mapping) = db.ast(input).unwrap();
+fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
+    let (_, ast_to_cst_id_mapping) = db.ast(id.input.clone()).unwrap();
     ast_to_cst_id_mapping.get(&id).cloned()
 }
-fn ast_id_to_span(db: &dyn CstToAst, input: Input, id: ast::Id) -> Option<Range<usize>> {
-    let id = db.ast_to_cst_id(input.clone(), id)?;
-    Some(db.find_cst(input, id).span())
+fn ast_id_to_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<usize>> {
+    let cst_id = db.ast_to_cst_id(id.clone())?;
+    Some(db.find_cst(id.input, cst_id).span())
 }
 
 fn cst_to_ast_id(db: &dyn CstToAst, input: Input, id: cst::Id) -> Option<ast::Id> {
@@ -49,20 +49,22 @@ fn ast_raw(
     db: &dyn CstToAst,
     input: Input,
 ) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>, Vec<CompilerError>)> {
-    let cst = db.cst(input)?;
-    let mut context = LoweringContext::new();
+    let cst = db.cst(input.clone())?;
+    let mut context = LoweringContext::new(input);
     let asts = (&mut context).lower_csts(&cst);
     Some((Arc::new(asts), context.id_mapping, context.errors))
 }
 
 struct LoweringContext {
+    input: Input,
     next_id: usize,
     id_mapping: HashMap<ast::Id, cst::Id>,
     errors: Vec<CompilerError>,
 }
 impl LoweringContext {
-    fn new() -> LoweringContext {
+    fn new(input: Input) -> LoweringContext {
         LoweringContext {
+            input,
             next_id: 0,
             id_mapping: HashMap::new(),
             errors: vec![],
@@ -337,11 +339,11 @@ impl LoweringContext {
     }
     fn create_next_id(&mut self, cst_id: cst::Id) -> ast::Id {
         let id = self.create_next_id_without_mapping();
-        assert!(matches!(self.id_mapping.insert(id, cst_id), None));
+        assert!(matches!(self.id_mapping.insert(id.clone(), cst_id), None));
         id
     }
     fn create_next_id_without_mapping(&mut self) -> ast::Id {
-        let id = ast::Id(self.next_id);
+        let id = ast::Id::new(self.input.clone(), self.next_id);
         self.next_id += 1;
         id
     }

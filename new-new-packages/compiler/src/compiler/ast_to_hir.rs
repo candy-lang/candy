@@ -17,7 +17,7 @@ pub trait AstToHir: CstDb + CstToAst {
     fn hir_id_to_span(&self, id: hir::Id) -> Option<Range<usize>>;
     fn hir_id_to_display_span(&self, id: hir::Id) -> Option<Range<usize>>;
 
-    fn ast_to_hir_id(&self, input: Input, id: ast::Id) -> Option<hir::Id>;
+    fn ast_to_hir_id(&self, id: ast::Id) -> Option<hir::Id>;
     fn cst_to_hir_id(&self, input: Input, id: cst::Id) -> Option<hir::Id>;
 
     fn hir(&self, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)>;
@@ -32,28 +32,26 @@ fn hir_to_ast_id(db: &dyn AstToHir, id: hir::Id) -> Option<ast::Id> {
     hir_to_ast_id_mapping.get(&id).cloned()
 }
 fn hir_to_cst_id(db: &dyn AstToHir, id: hir::Id) -> Option<cst::Id> {
-    let ast_id = db.hir_to_ast_id(id.clone())?;
-    db.ast_to_cst_id(id.input, ast_id)
+    db.ast_to_cst_id(db.hir_to_ast_id(id.clone())?)
 }
 fn hir_id_to_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<usize>> {
-    let ast_id = db.hir_to_ast_id(id.clone())?;
-    db.ast_id_to_span(id.input, ast_id)
+    db.ast_id_to_span(db.hir_to_ast_id(id.clone())?)
 }
 fn hir_id_to_display_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<usize>> {
     let cst_id = db.hir_to_cst_id(id.clone())?;
     Some(db.find_cst(id.input, cst_id).display_span())
 }
 
-fn ast_to_hir_id(db: &dyn AstToHir, input: Input, id: ast::Id) -> Option<hir::Id> {
-    let (_, hir_to_ast_id_mapping) = db.hir(input).unwrap();
+fn ast_to_hir_id(db: &dyn AstToHir, id: ast::Id) -> Option<hir::Id> {
+    let (_, hir_to_ast_id_mapping) = db.hir(id.input.clone()).unwrap();
     hir_to_ast_id_mapping
         .iter()
-        .find_map(|(key, &value)| if value == id { Some(key) } else { None })
+        .find_map(|(key, value)| if value == &id { Some(key) } else { None })
         .cloned()
 }
 fn cst_to_hir_id(db: &dyn AstToHir, input: Input, id: cst::Id) -> Option<hir::Id> {
-    let id = db.cst_to_ast_id(input.clone(), id)?;
-    db.ast_to_hir_id(input, id)
+    let id = db.cst_to_ast_id(input, id)?;
+    db.ast_to_hir_id(id)
 }
 
 fn hir(db: &dyn AstToHir, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)> {
@@ -133,36 +131,42 @@ impl<'c> Compiler<'c> {
     }
     fn compile_single(&mut self, ast: &Ast) -> hir::Id {
         match &ast.kind {
-            AstKind::Int(Int(int)) => self.push(ast.id, Expression::Int(int.to_owned()), None),
-            AstKind::Text(Text(string)) => {
-                self.push(ast.id, Expression::Text(string.value.to_owned()), None)
+            AstKind::Int(Int(int)) => {
+                self.push(ast.id.clone(), Expression::Int(int.to_owned()), None)
             }
+            AstKind::Text(Text(string)) => self.push(
+                ast.id.clone(),
+                Expression::Text(string.value.to_owned()),
+                None,
+            ),
             AstKind::Identifier(Identifier(symbol)) => {
                 let reference = match self.identifiers.get(&symbol.value) {
                     Some(reference) => reference.to_owned(),
                     None => {
                         self.output.errors.push(CompilerError {
                             message: format!("Unknown reference: {}", symbol.value),
-                            span: self
-                                .context
-                                .db
-                                .ast_id_to_span(self.context.input.clone(), symbol.id)
-                                .unwrap(),
+                            span: self.context.db.ast_id_to_span(symbol.id.clone()).unwrap(),
                         });
-                        return self.push(symbol.id, Expression::Error, None);
+                        return self.push(symbol.id.clone(), Expression::Error, None);
                     }
                 };
-                self.push(ast.id, Expression::Reference(reference.to_owned()), None)
+                self.push(
+                    ast.id.clone(),
+                    Expression::Reference(reference.to_owned()),
+                    None,
+                )
             }
-            AstKind::Symbol(Symbol(symbol)) => {
-                self.push(ast.id, Expression::Symbol(symbol.value.to_owned()), None)
-            }
+            AstKind::Symbol(Symbol(symbol)) => self.push(
+                ast.id.clone(),
+                Expression::Symbol(symbol.value.to_owned()),
+                None,
+            ),
             AstKind::Struct(Struct { entries }) => {
                 let entries = entries
                     .iter()
                     .map(|(key, value)| (self.compile_single(key), self.compile_single(value)))
                     .collect();
-                self.push(ast.id, Expression::Struct(entries), None)
+                self.push(ast.id.clone(), Expression::Struct(entries), None)
             }
             AstKind::Lambda(ast::Lambda {
                 parameters,
@@ -177,7 +181,9 @@ impl<'c> Compiler<'c> {
                         self.context.input.clone(),
                         add_ids(&lambda_id, parameter_index),
                     );
-                    self.output.id_mapping.insert(id.clone(), parameter.id);
+                    self.output
+                        .id_mapping
+                        .insert(id.clone(), parameter.id.clone());
                     body.identifiers
                         .insert(id.to_owned(), parameter.value.to_owned());
                     identifiers.insert(parameter.value.to_owned(), id);
@@ -194,7 +200,7 @@ impl<'c> Compiler<'c> {
                 inner.compile(&body_asts);
                 self.output = inner.output;
                 self.push(
-                    ast.id,
+                    ast.id.clone(),
                     Expression::Lambda(Lambda {
                         first_id: hir::Id::new(
                             self.context.input.clone(),
@@ -217,17 +223,13 @@ impl<'c> Compiler<'c> {
                     None => {
                         self.output.errors.push(CompilerError {
                             message: format!("Unknown function: {}", name.value),
-                            span: self
-                                .context
-                                .db
-                                .ast_id_to_span(self.context.input.clone(), name.id)
-                                .unwrap(),
+                            span: self.context.db.ast_id_to_span(name.id.clone()).unwrap(),
                         });
-                        return self.push(name.id, Expression::Error, None);
+                        return self.push(name.id.clone(), Expression::Error, None);
                     }
                 };
                 self.push(
-                    ast.id,
+                    ast.id.clone(),
                     Expression::Call {
                         function,
                         arguments,
@@ -247,12 +249,12 @@ impl<'c> Compiler<'c> {
                 inner.compile(&body);
                 self.output = inner.output;
                 self.push(
-                    ast.id,
+                    ast.id.clone(),
                     Expression::Body(inner.body),
                     Some(name.value.to_owned()),
                 )
             }
-            AstKind::Error => self.push(ast.id, Expression::Error, None),
+            AstKind::Error => self.push(ast.id.clone(), Expression::Error, None),
         }
     }
 
@@ -264,7 +266,6 @@ impl<'c> Compiler<'c> {
     ) -> hir::Id {
         let id = self.create_next_id(ast_id);
         self.body.push(id.clone(), expression, identifier.clone());
-        self.output.id_mapping.insert(id.clone(), ast_id);
         if let Some(identifier) = identifier {
             self.identifiers.insert(identifier, id.clone());
         }
