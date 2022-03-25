@@ -33,7 +33,7 @@ use crate::{
 #[derive(Default)]
 pub struct Database {
     storage: salsa::Storage<Self>,
-    open_inputs: HashMap<Input, String>,
+    pub open_inputs: HashMap<Input, String>,
 }
 impl<'a> salsa::Database for Database {}
 
