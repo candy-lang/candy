@@ -161,11 +161,17 @@ fn value_to_display_string(db: &dyn Discover, input: Input, value: Value) -> Str
         Value::Struct(entries) => format!(
             "[{}]",
             entries
+                .keys()
                 .into_iter()
-                .map(|(key, value)| format!(
+                .map(|it| (
+                    it,
+                    value_to_display_string(db, input.clone(), it.to_owned())
+                ))
+                .sorted_by_key(|(_, it)| it.to_owned())
+                .map(|(key, key_string)| format!(
                     "{}: {}",
-                    value_to_display_string(db, input.clone(), key),
-                    value_to_display_string(db, input.clone(), value)
+                    key_string,
+                    value_to_display_string(db, input.clone(), entries[key].to_owned())
                 ))
                 .join(", ")
         ),
