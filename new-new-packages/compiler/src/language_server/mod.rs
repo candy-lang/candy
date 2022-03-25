@@ -64,8 +64,8 @@ impl LanguageServer for CandyLanguageServer {
             .unwrap()
             .uri
             .clone();
-        *PROJECT_DIRECTORY.lock().unwrap() = match first_workspace_folder.into() {
-            Input::File(path) => Some(path),
+        *PROJECT_DIRECTORY.lock().unwrap() = match first_workspace_folder.scheme() {
+            "file" => Some(first_workspace_folder.to_file_path().unwrap()),
             _ => panic!("Workspace folder must be a file URI."),
         };
 

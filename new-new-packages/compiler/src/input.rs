@@ -1,6 +1,13 @@
-use std::{fs::read_to_string, path::PathBuf, sync::Arc};
+use std::{
+    fmt::{self, Display, Formatter},
+    fs::{self, read_to_string},
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use salsa::query_group;
+
+use crate::database::PROJECT_DIRECTORY;
 
 #[query_group(InputDbStorage)]
 pub trait InputDb: InputWatcher {
@@ -14,11 +21,14 @@ fn get_input(db: &dyn InputDb, input: Input) -> Option<Arc<String>> {
     };
 
     match input {
-        Input::File(path) => match read_to_string(&path) {
-            Ok(content) => Some(Arc::new(content)),
-            Err(error) if matches!(error.kind(), std::io::ErrorKind::NotFound) => None,
-            _ => panic!("Unexpected error when reading file {:?}.", path),
-        },
+        Input::File(_) => {
+            let path = input.to_path().unwrap();
+            match read_to_string(path.clone()) {
+                Ok(content) => Some(Arc::new(content)),
+                Err(error) if matches!(error.kind(), std::io::ErrorKind::NotFound) => None,
+                _ => panic!("Unexpected error when reading file {:?}.", path),
+            }
+        }
         Input::Untitled(_) => None,
     }
 }
@@ -44,8 +54,74 @@ pub trait InputWatcher {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub enum Input {
-    File(PathBuf),
+    /// Contains the path components from [PROJECT_DIRECTORY] to the file.
+    ///
+    /// `.` and `..` are not allowed.
+    File(Vec<String>),
     Untitled(String),
+}
+
+impl Input {
+    pub fn file(path: &Path) -> Input {
+        log::debug!("Path: {:?}", path);
+        let path = if path.is_relative() {
+            path.to_owned()
+        } else {
+            let project_dir = PROJECT_DIRECTORY.lock().unwrap().clone().unwrap();
+            fs::canonicalize(path)
+                .expect("Path does not exist or is invalid.")
+                .strip_prefix(fs::canonicalize(project_dir).unwrap().clone())
+                .expect("File does not belong to the project directory.")
+                .to_owned()
+        };
+
+        let components = path
+            .components()
+            .into_iter()
+            .map(|it| match it {
+                std::path::Component::Prefix(_) => unreachable!(),
+                std::path::Component::RootDir => unreachable!(),
+                std::path::Component::CurDir => panic!("`.` is not allowed in an input path."),
+                std::path::Component::ParentDir => {
+                    panic!("`..` is not allowed in an input path.")
+                }
+                std::path::Component::Normal(it) => {
+                    it.to_str().expect("Invalid UTF-8 in path.").to_owned()
+                }
+            })
+            .collect();
+        Input::File(components)
+    }
+
+    pub fn to_path(&self) -> Option<PathBuf> {
+        match self {
+            Input::File(components) => {
+                let mut path = PROJECT_DIRECTORY.lock().unwrap().clone().unwrap().clone();
+                for component in components {
+                    path.push(component);
+                }
+                Some(path)
+            }
+            Input::Untitled(_) => None,
+        }
+    }
+}
+impl Display for Input {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Input::File(components) => {
+                write!(f, "project-file:")?;
+                if let Some(component) = components.first() {
+                    write!(f, "{}", component)?;
+                }
+                for component in &components[1..] {
+                    write!(f, "/{}", component)?;
+                }
+                Ok(())
+            }
+            Input::Untitled(name) => write!(f, "untitled:{}", name),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -62,7 +138,7 @@ mod test {
     #[test]
     fn on_demand_input_works() {
         let mut db = Database::default();
-        let input = Input::File(PathBuf::from("/foo.rs"));
+        let input = Input::file(&PathBuf::from("/foo.rs"));
 
         db.did_open_input(&input, "123".to_owned());
         assert_eq!(

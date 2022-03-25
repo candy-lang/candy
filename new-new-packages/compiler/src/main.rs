@@ -60,7 +60,7 @@ fn run(options: CandyRunOptions) {
     let path_string = options.file.to_string_lossy();
     log::debug!("Running `{}`.\n", path_string);
 
-    let input = Input::File(options.file.to_owned());
+    let input = Input::file(&options.file);
     let db = Database::default();
 
     log::info!("Parsing string to CST…");

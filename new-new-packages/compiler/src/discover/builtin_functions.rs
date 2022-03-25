@@ -1,12 +1,9 @@
-use std::path::{Path, PathBuf};
-
 use im::HashMap;
 use itertools::Itertools;
 
 use crate::{
     builtin_functions::BuiltinFunction,
     compiler::hir::{self, Expression},
-    database::PROJECT_DIRECTORY,
     discover::run::run_call,
     input::Input,
 };
@@ -167,20 +164,23 @@ fn type_of(arguments: Vec<Value>) -> DiscoverResult {
 
 fn use_(db: &dyn Discover, arguments: Vec<Value>) -> DiscoverResult {
     destructure!(arguments, [current_path, target], {
-        let current_path_string = match current_path {
-            Value::Text(value) => value,
-            it => {
-                return DiscoverResult::panic(format!(
-                    "`use` expected a text as its first parameter, but received: {:?}",
-                    it
-                ))
-            }
-        };
         // `current_path` is set by us and not users, hence we don't have to validate it that strictly.
-        let mut current_path = PathBuf::new();
-        current_path.push(".");
-        for segment in current_path_string.split('/') {
-            current_path.push(segment);
+        let current_path_struct = match current_path {
+            Value::Struct(value) => value,
+            _ => unreachable!(),
+        };
+        let mut current_path = vec![];
+        let mut index = 0;
+        loop {
+            if let Some(component) = current_path_struct.get(&Value::Int(index)) {
+                match component {
+                    Value::Text(component) => current_path.push(component.clone()),
+                    _ => unreachable!(),
+                }
+            } else {
+                break;
+            }
+            index += 1;
         }
 
         let target = match target {
@@ -197,32 +197,27 @@ fn use_(db: &dyn Discover, arguments: Vec<Value>) -> DiscoverResult {
             Err(error) => return DiscoverResult::panic(error),
         };
 
-        if target.parent_navigations > current_path.components().count() - 1 {
+        if target.parent_navigations > current_path.len() {
             return DiscoverResult::panic("Too many parent navigations.".to_owned());
         }
 
-        let project_dir = PROJECT_DIRECTORY.lock().unwrap().clone().unwrap();
-        let target_paths = target.resolve(&current_path);
-        let target = match target_paths
+        let inputs = target.resolve(&current_path[..]);
+        let input = match inputs
             .iter()
-            .filter(|it| project_dir.join(it).exists())
+            .filter(|&it| db.get_input(it.to_owned()).is_some())
             .next()
         {
             Some(target) => target,
             None => {
                 return DiscoverResult::panic(format!(
                     "Target doesn't exist. Checked the following path(s): {}",
-                    target_paths
-                        .iter()
-                        .map(|it| it.to_str().unwrap())
-                        .join(", ")
+                    inputs.iter().map(|it| format!("{}", it)).join(", ")
                 ));
             }
         };
 
-        let input = Input::File(project_dir.join(target).to_owned());
         let (hir, _) = db.hir(input.clone()).unwrap();
-        let discover_result = db.run_all(input);
+        let discover_result = db.run_all(input.to_owned());
 
         hir.identifiers
             .iter()
@@ -285,29 +280,30 @@ impl UseTarget {
         })
     }
 
-    fn resolve(&self, current_path: &Path) -> Vec<PathBuf> {
+    fn resolve(&self, current_path: &[String]) -> Vec<Input> {
         let mut path = current_path;
         for _ in 0..self.parent_navigations {
-            path = path.parent().unwrap();
+            if path.is_empty() {
+                return vec![];
+            }
+            path = &path[..path.len() - 1];
         }
 
-        let mut path = path.to_path_buf();
+        let mut path = path.to_owned();
         for part in &self.path {
-            path.push(part);
+            path.push(part.to_owned());
         }
 
         let mut result = vec![];
 
         let mut subdirectory = path.clone();
-        subdirectory.push(".candy");
-        result.push(subdirectory);
+        subdirectory.push(".candy".to_owned());
+        result.push(Input::File(subdirectory));
 
-        if path.components().count() > 1 {
-            path.set_file_name(format!(
-                "{}.candy",
-                path.file_name().unwrap().to_str().unwrap()
-            ));
-            result.push(path);
+        if path.len() > 1 {
+            let last = path.last_mut().unwrap();
+            *last = format!("{}.candy", last);
+            result.push(Input::File(path));
         }
         result
     }
