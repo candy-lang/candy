@@ -79,12 +79,6 @@ impl Id {
         Self { input, local }
     }
 
-    pub fn root(input: Input) -> Self {
-        Id {
-            input,
-            local: vec![],
-        }
-    }
     pub fn is_root(&self) -> bool {
         self.local.is_empty()
     }
