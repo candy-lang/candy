@@ -19,7 +19,6 @@ use super::{
 
 pub fn run_builtin_function(
     db: &dyn Discover,
-    input: Input,
     builtin_function: BuiltinFunction,
     arguments: Vec<hir::Id>,
     environment: Environment,
@@ -31,7 +30,7 @@ pub fn run_builtin_function(
     );
     // Handle builtin functions that don't need to resolve the arguments.
     match builtin_function {
-        BuiltinFunction::IfElse => return if_else(db, input, arguments, environment),
+        BuiltinFunction::IfElse => return if_else(db, arguments, environment),
         _ => {}
     }
 
@@ -42,7 +41,7 @@ pub fn run_builtin_function(
     match builtin_function {
         BuiltinFunction::Add => add(arguments),
         BuiltinFunction::Equals => equals(arguments),
-        BuiltinFunction::GetArgumentCount => get_argument_count(db, input, arguments),
+        BuiltinFunction::GetArgumentCount => get_argument_count(db, arguments),
         BuiltinFunction::Panic => panic(arguments),
         BuiltinFunction::Print => print(arguments),
         BuiltinFunction::StructGet => struct_get(arguments),
@@ -74,10 +73,10 @@ fn equals(arguments: Vec<Value>) -> DiscoverResult {
     destructure!(arguments, [a, b], { Value::bool(a == b).into() })
 }
 
-fn get_argument_count(db: &dyn Discover, input: Input, arguments: Vec<Value>) -> DiscoverResult {
+fn get_argument_count(db: &dyn Discover, arguments: Vec<Value>) -> DiscoverResult {
     destructure!(arguments, [Value::Lambda(function)], {
         // TODO: support parameter counts > 2^64 on 128-bit systems and better
-        let expression = match db.find_expression(input, function.id.to_owned()).unwrap() {
+        let expression = match db.find_expression(function.id.to_owned()).unwrap() {
             Expression::Lambda(lambda) => lambda,
             _ => panic!("Lambda's function"),
         };
@@ -85,12 +84,7 @@ fn get_argument_count(db: &dyn Discover, input: Input, arguments: Vec<Value>) ->
     })
 }
 
-fn if_else(
-    db: &dyn Discover,
-    input: Input,
-    arguments: Vec<hir::Id>,
-    environment: Environment,
-) -> DiscoverResult {
+fn if_else(db: &dyn Discover, arguments: Vec<hir::Id>, environment: Environment) -> DiscoverResult {
     if let [condition, then, else_] = &arguments[..] {
         let body_id = match environment.get(condition).unwrap()? {
             value if value == Value::bool(true) => then,
@@ -103,7 +97,7 @@ fn if_else(
             }
         };
 
-        run_call(db, input, body_id.to_owned(), vec![], environment)
+        run_call(db, body_id.to_owned(), vec![], environment)
     } else {
         DiscoverResult::panic(format!(
             "Builtin if/else called with wrong number of arguments: {}, expected: {}",

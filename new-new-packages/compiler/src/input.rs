@@ -42,7 +42,7 @@ pub trait InputWatcher {
     fn get_open_input_raw(&self, input: &Input) -> Option<String>;
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub enum Input {
     File(PathBuf),
     Untitled(String),

@@ -17,32 +17,32 @@ use super::{
 pub trait Discover: HirDb {
     fn run_all(&self, input: Input) -> HashMap<hir::Id, DiscoverResult>;
 
-    fn value_to_display_string(&self, input: Input, value: Value) -> String;
+    fn value_to_display_string(&self, value: Value) -> String;
 }
 
 fn run_all(db: &dyn Discover, input: Input) -> HashMap<hir::Id, DiscoverResult> {
     let (hir, _) = db.hir(input.clone()).unwrap();
-    run_body(db, input, hir.as_ref(), Environment::new()).flatten()
+    run_body(db, hir.as_ref(), Environment::new()).flatten()
 }
-fn run_body(db: &dyn Discover, input: Input, body: &Body, environment: Environment) -> Environment {
+fn run_body(db: &dyn Discover, body: &Body, environment: Environment) -> Environment {
     let mut environment = environment.new_child();
     for (id, _) in &body.expressions {
-        environment = run(db, input.clone(), id.to_owned(), environment);
+        environment = run(db, id.to_owned(), environment);
     }
     environment
 }
-fn run(db: &dyn Discover, input: Input, id: hir::Id, environment: Environment) -> Environment {
+fn run(db: &dyn Discover, id: hir::Id, environment: Environment) -> Environment {
     let mut environment = environment;
-    let result = match db.find_expression(input.clone(), id.clone()).unwrap() {
+    let result = match db.find_expression(id.clone()).unwrap() {
         Expression::Int(int) => Value::Int(int.to_owned()).into(),
         Expression::Text(string) => Value::Text(string.to_owned()).into(),
         Expression::Reference(reference) => {
-            if let &[builtin_function_index] = &reference.0[..] {
+            if let &[builtin_function_index] = &reference.local[..] {
                 if let Some(_) = builtin_functions::VALUES.get(builtin_function_index) {
                     panic!("References to built-in functions are not supported. Erroneous expression: {}", id)
                 }
             }
-            match db.find_expression(input.clone(), reference.to_owned()) {
+            match db.find_expression(reference.to_owned()) {
                 None => DiscoverResult::DependsOnParameter,
                 Some(_) => environment
                     .get(&reference)
@@ -54,8 +54,8 @@ fn run(db: &dyn Discover, input: Input, id: hir::Id, environment: Environment) -
         Expression::Struct(entries) => 'outer: loop {
             let mut struct_ = HashMap::new();
             for (key, value) in entries {
-                environment = run(db, input.clone(), key.clone(), environment);
-                environment = run(db, input.clone(), value.clone(), environment);
+                environment = run(db, key.clone(), environment);
+                environment = run(db, value.clone(), environment);
                 let key = match environment.get(&key).unwrap().transitive() {
                     DiscoverResult::Value(value) => value,
                     it => break 'outer it,
@@ -74,17 +74,17 @@ fn run(db: &dyn Discover, input: Input, id: hir::Id, environment: Environment) -
                 id: id.clone(),
             })
             .into();
-            environment = run_body(db, input.clone(), &body, environment);
+            environment = run_body(db, &body, environment);
             result
         }
         Expression::Body(body) => {
-            environment = run_body(db, input, &body, environment);
+            environment = run_body(db, &body, environment);
             environment.get(body.out_id()).unwrap().transitive()
         }
         Expression::Call {
             function,
             arguments,
-        } => run_call(db, input, function, arguments, environment.clone()),
+        } => run_call(db, function, arguments, environment.clone()),
         Expression::Error => DiscoverResult::ErrorInHir,
     };
     environment.store(id, result);
@@ -92,16 +92,14 @@ fn run(db: &dyn Discover, input: Input, id: hir::Id, environment: Environment) -
 }
 pub(super) fn run_call(
     db: &dyn Discover,
-    input: Input,
     function: hir::Id,
     arguments: Vec<hir::Id>,
     environment: Environment,
 ) -> DiscoverResult {
-    if let &[builtin_function_index] = &function.0[..] {
+    if let &[builtin_function_index] = &function.local[..] {
         if let Some(builtin_function) = builtin_functions::VALUES.get(builtin_function_index) {
             return run_builtin_function(
                 db,
-                input,
                 builtin_function.to_owned(),
                 arguments.to_owned(),
                 environment,
@@ -113,7 +111,7 @@ pub(super) fn run_call(
         Value::Lambda(lambda) => lambda,
         it => panic!("Tried to call something that wasn't a lambda: {:?}", it),
     };
-    let lambda_hir = match db.find_expression(input.to_owned(), lambda.id)? {
+    let lambda_hir = match db.find_expression(lambda.id)? {
         Expression::Lambda(lambda) => lambda,
         hir => panic!(
             "Discover lambda is not backed by a HIR lambda, but `{}`.",
@@ -122,12 +120,12 @@ pub(super) fn run_call(
     };
 
     let lambda_parent = if let Some(lambda_parent_id) = function.parent() {
-        match db.find_expression(input.to_owned(), lambda_parent_id)? {
+        match db.find_expression(lambda_parent_id)? {
             Expression::Body(body) => body,
             hir => panic!("A called lambda's parent isn't a body, but `{}`", hir),
         }
     } else {
-        let (hir, _) = db.hir(input.to_owned()).unwrap();
+        let (hir, _) = db.hir(function.input.to_owned()).unwrap();
         hir.as_ref().to_owned()
     };
     let function_name = lambda_parent.identifiers.get(&function).unwrap();
@@ -148,12 +146,12 @@ pub(super) fn run_call(
         );
     }
 
-    run_body(db, input, &lambda_hir.body, inner_environment)
+    run_body(db, &lambda_hir.body, inner_environment)
         .get(lambda_hir.body.out_id())
         .unwrap()
 }
 
-fn value_to_display_string(db: &dyn Discover, input: Input, value: Value) -> String {
+fn value_to_display_string(db: &dyn Discover, value: Value) -> String {
     match value {
         Value::Int(value) => format!("{}", value),
         Value::Text(value) => format!("\"{}\"", value),
@@ -163,24 +161,17 @@ fn value_to_display_string(db: &dyn Discover, input: Input, value: Value) -> Str
             entries
                 .keys()
                 .into_iter()
-                .map(|it| (
-                    it,
-                    value_to_display_string(db, input.clone(), it.to_owned())
-                ))
+                .map(|it| (it, value_to_display_string(db, it.to_owned())))
                 .sorted_by_key(|(_, it)| it.to_owned())
                 .map(|(key, key_string)| format!(
                     "{}: {}",
                     key_string,
-                    value_to_display_string(db, input.clone(), entries[key].to_owned())
+                    value_to_display_string(db, entries[key].to_owned())
                 ))
                 .join(", ")
         ),
         Value::Lambda(Lambda { id, .. }) => {
-            // TODO(JonasWanke): remove this when we store the input inside each ID
-            let lambda = match db.find_expression(input, id.clone()) {
-                Some(lambda) => lambda,
-                None => return "<lambda>".to_owned(),
-            };
+            let lambda = db.find_expression(id.clone()).unwrap();
             if let Expression::Lambda(hir::Lambda { parameters, .. }) = lambda {
                 if parameters.is_empty() {
                     "{ … }".to_owned()

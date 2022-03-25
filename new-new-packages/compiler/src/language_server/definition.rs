@@ -28,12 +28,12 @@ pub fn find_definition(
     }
 
     let origin_hir_id = db.cst_to_hir_id(input.clone(), origin_cst.id)?;
-    let origin_expression = db.find_expression(input.clone(), origin_hir_id)?;
+    let origin_expression = db.find_expression(origin_hir_id)?;
     let target_hir_id = match origin_expression {
         Expression::Reference(id) => id,
         _ => return None,
     };
-    let target_cst_id = db.hir_to_cst_id(input.clone(), target_hir_id)?;
+    let target_cst_id = db.hir_to_cst_id(target_hir_id)?;
     let target_cst = db.find_cst(input.clone(), target_cst_id);
 
     let result = GotoDefinitionResponse::Link(vec![LocationLink {

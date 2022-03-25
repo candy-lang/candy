@@ -12,10 +12,10 @@ use im::HashMap;
 
 #[salsa::query_group(AstToHirStorage)]
 pub trait AstToHir: CstDb + CstToAst {
-    fn hir_to_ast_id(&self, input: Input, id: hir::Id) -> Option<ast::Id>;
-    fn hir_to_cst_id(&self, input: Input, id: hir::Id) -> Option<cst::Id>;
-    fn hir_id_to_span(&self, input: Input, id: hir::Id) -> Option<Range<usize>>;
-    fn hir_id_to_display_span(&self, input: Input, id: hir::Id) -> Option<Range<usize>>;
+    fn hir_to_ast_id(&self, id: hir::Id) -> Option<ast::Id>;
+    fn hir_to_cst_id(&self, id: hir::Id) -> Option<cst::Id>;
+    fn hir_id_to_span(&self, id: hir::Id) -> Option<Range<usize>>;
+    fn hir_id_to_display_span(&self, id: hir::Id) -> Option<Range<usize>>;
 
     fn ast_to_hir_id(&self, input: Input, id: ast::Id) -> Option<hir::Id>;
     fn cst_to_hir_id(&self, input: Input, id: cst::Id) -> Option<hir::Id>;
@@ -27,21 +27,21 @@ pub trait AstToHir: CstDb + CstToAst {
     ) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>, Vec<CompilerError>)>;
 }
 
-fn hir_to_ast_id(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<ast::Id> {
-    let (_, hir_to_ast_id_mapping) = db.hir(input).unwrap();
+fn hir_to_ast_id(db: &dyn AstToHir, id: hir::Id) -> Option<ast::Id> {
+    let (_, hir_to_ast_id_mapping) = db.hir(id.input.clone()).unwrap();
     hir_to_ast_id_mapping.get(&id).cloned()
 }
-fn hir_to_cst_id(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<cst::Id> {
-    let id = db.hir_to_ast_id(input.clone(), id)?;
-    db.ast_to_cst_id(input, id)
+fn hir_to_cst_id(db: &dyn AstToHir, id: hir::Id) -> Option<cst::Id> {
+    let ast_id = db.hir_to_ast_id(id.clone())?;
+    db.ast_to_cst_id(id.input, ast_id)
 }
-fn hir_id_to_span(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<Range<usize>> {
-    let id = db.hir_to_ast_id(input.clone(), id)?;
-    db.ast_id_to_span(input, id)
+fn hir_id_to_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<usize>> {
+    let ast_id = db.hir_to_ast_id(id.clone())?;
+    db.ast_id_to_span(id.input, ast_id)
 }
-fn hir_id_to_display_span(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<Range<usize>> {
-    let id = db.hir_to_cst_id(input.clone(), id)?;
-    Some(db.find_cst(input, id).display_span())
+fn hir_id_to_display_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<usize>> {
+    let cst_id = db.hir_to_cst_id(id.clone())?;
+    Some(db.find_cst(id.input, cst_id).display_span())
 }
 
 fn ast_to_hir_id(db: &dyn AstToHir, input: Input, id: ast::Id) -> Option<hir::Id> {
@@ -105,7 +105,7 @@ impl<'c> Compiler<'c> {
             .enumerate()
             .map(|(index, builtin_function)| {
                 let string = format!("builtin{:?}", builtin_function);
-                (string, hir::Id(vec![index]))
+                (string, hir::Id::new(context.input.clone(), vec![index]))
             })
             .collect::<HashMap<_, _>>();
 
@@ -173,7 +173,10 @@ impl<'c> Compiler<'c> {
                 let mut identifiers = self.identifiers.clone();
 
                 for (parameter_index, parameter) in parameters.iter().enumerate() {
-                    let id = hir::Id(add_ids(&lambda_id, parameter_index));
+                    let id = hir::Id::new(
+                        self.context.input.clone(),
+                        add_ids(&lambda_id, parameter_index),
+                    );
                     self.output.id_mapping.insert(id.clone(), parameter.id);
                     body.identifiers
                         .insert(id.to_owned(), parameter.value.to_owned());
@@ -193,7 +196,10 @@ impl<'c> Compiler<'c> {
                 self.push(
                     ast.id,
                     Expression::Lambda(Lambda {
-                        first_id: hir::Id(add_ids(&lambda_id[..], 0)),
+                        first_id: hir::Id::new(
+                            self.context.input.clone(),
+                            add_ids(&lambda_id[..], 0),
+                        ),
                         parameters: parameters.iter().map(|it| it.value.to_owned()).collect(),
                         body: inner.body,
                     }),
@@ -279,7 +285,10 @@ impl<'c> Compiler<'c> {
         id
     }
     fn create_next_id_without_ast_mapping(&mut self) -> hir::Id {
-        let id = hir::Id(add_ids(&self.parent_ids, self.next_id));
+        let id = hir::Id::new(
+            self.context.input.clone(),
+            add_ids(&self.parent_ids, self.next_id),
+        );
         self.next_id += 1;
         id
     }

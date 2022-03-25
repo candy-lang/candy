@@ -13,12 +13,12 @@ use super::ast_to_hir::AstToHir;
 
 #[salsa::query_group(HirDbStorage)]
 pub trait HirDb: AstToHir {
-    fn find_expression(&self, input: Input, id: Id) -> Option<Expression>;
+    fn find_expression(&self, id: Id) -> Option<Expression>;
     fn all_hir_ids(&self, input: Input) -> Option<Vec<Id>>;
 }
-fn find_expression(db: &dyn HirDb, input: Input, id: Id) -> Option<Expression> {
-    let (hir, _) = db.hir(input).unwrap();
-    if id == Id::root() {
+fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
+    let (hir, _) = db.hir(id.input.clone()).unwrap();
+    if id.is_root() {
         return Some(Expression::Body(hir.as_ref().to_owned()));
     }
 
@@ -70,15 +70,32 @@ impl Body {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
-pub struct Id(pub Vec<usize>);
+pub struct Id {
+    pub input: Input,
+    pub local: Vec<usize>,
+}
 impl Id {
-    pub fn root() -> Self {
-        Id(vec![])
+    pub fn new(input: Input, local: Vec<usize>) -> Self {
+        Self { input, local }
     }
+
+    pub fn root(input: Input) -> Self {
+        Id {
+            input,
+            local: vec![],
+        }
+    }
+    pub fn is_root(&self) -> bool {
+        self.local.is_empty()
+    }
+
     pub fn parent(&self) -> Option<Id> {
-        match self.0.len() {
+        match self.local.len() {
             0 => None,
-            _ => Some(Id(self.0[..self.0.len() - 1].to_vec())),
+            _ => Some(Id {
+                input: self.input.clone(),
+                local: self.local[..self.local.len() - 1].to_vec(),
+            }),
         }
     }
 }
@@ -86,14 +103,17 @@ impl Add<usize> for Id {
     type Output = Self;
 
     fn add(self, rhs: usize) -> Self::Output {
-        let mut vec = self.0[..self.0.len() - 1].to_vec();
-        vec.push(self.0.last().unwrap() + rhs);
-        Id(vec)
+        let mut local = self.local[..self.local.len() - 1].to_vec();
+        local.push(self.local.last().unwrap() + rhs);
+        Id {
+            input: self.input,
+            local: local,
+        }
     }
 }
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "HirId({:?})", self.0)
+        write!(f, "HirId({:?}:{:?})", self.input, self.local)
     }
 }
 
@@ -234,7 +254,7 @@ impl Body {
             self.expressions
                 .iter()
                 .filter(|(key, _)| key <= &id)
-                .max_by_key(|(key, _)| key.0.to_owned())?
+                .max_by_key(|(key, _)| key.local.to_owned())?
                 .1
                 .find(id)
         }
