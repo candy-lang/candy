@@ -107,7 +107,7 @@ impl<'c> Compiler<'c> {
             })
             .collect::<HashMap<_, _>>();
 
-        Compiler {
+        let mut compiler = Compiler {
             context,
             output: Output {
                 id_mapping: HashMap::new(),
@@ -117,12 +117,111 @@ impl<'c> Compiler<'c> {
             next_id: builtin_identifiers.len(),
             body: Body::new(),
             identifiers: builtin_identifiers,
+        };
+        compiler.generate_use();
+        compiler
+    }
+
+    fn generate_use(&mut self) {
+        let mut assignment_inner = Compiler::<'c> {
+            context: &mut self.context,
+            output: self.output.clone(),
+            body: Body::new(),
+            parent_ids: add_ids(&self.parent_ids, self.next_id),
+            next_id: 0,
+            identifiers: self.identifiers.clone(),
+        };
+
+        let lambda_id = add_ids(&assignment_inner.parent_ids, assignment_inner.next_id);
+        let lambda_parameter_id = hir::Id::new(
+            assignment_inner.context.input.clone(),
+            add_ids(&lambda_id[..], 0),
+        );
+        let mut lambda_inner = Compiler::<'c> {
+            context: &mut assignment_inner.context,
+            output: assignment_inner.output.clone(),
+            body: Body::new(),
+            parent_ids: lambda_id.clone(),
+            next_id: 1, // one parameter
+            identifiers: assignment_inner.identifiers.clone(),
+        };
+
+        let panic_id = lambda_inner.identifiers["builtinPanic"].clone();
+        match &lambda_inner.context.input {
+            Input::File(path) => {
+                let current_path_content = path
+                    .iter()
+                    .enumerate()
+                    .map(|(index, it)| {
+                        (
+                            lambda_inner
+                                .push_without_ast_mapping(Expression::Int(index as u64), None),
+                            lambda_inner
+                                .push_without_ast_mapping(Expression::Text(it.to_owned()), None),
+                        )
+                    })
+                    .collect();
+                let current_path = lambda_inner
+                    .push_without_ast_mapping(Expression::Struct(current_path_content), None);
+                lambda_inner.push_without_ast_mapping(
+                    Expression::Call {
+                        function: lambda_inner.identifiers["builtinUse"].clone(),
+                        arguments: vec![current_path, lambda_parameter_id.clone()],
+                    },
+                    None,
+                );
+            }
+            Input::ExternalFile(_) => {
+                let message_id = lambda_inner.push_without_ast_mapping(
+                    Expression::Text(
+                        "File doesn't belong to the currently opened project.".to_owned(),
+                    ),
+                    None,
+                );
+                lambda_inner.push_without_ast_mapping(
+                    Expression::Call {
+                        function: panic_id,
+                        arguments: vec![message_id],
+                    },
+                    None,
+                );
+            }
+            Input::Untitled(_) => {
+                let message_id = lambda_inner.push_without_ast_mapping(
+                    Expression::Text("Untitled files can't call `use`.".to_owned()),
+                    None,
+                );
+                lambda_inner.push_without_ast_mapping(
+                    Expression::Call {
+                        function: panic_id,
+                        arguments: vec![message_id],
+                    },
+                    None,
+                );
+            }
         }
+
+        assignment_inner.output = lambda_inner.output;
+        assignment_inner.push_without_ast_mapping(
+            Expression::Lambda(Lambda {
+                first_id: lambda_parameter_id,
+                parameters: vec!["target".to_owned()],
+                body: lambda_inner.body,
+            }),
+            None,
+        );
+
+        self.output = assignment_inner.output;
+
+        self.push_without_ast_mapping(
+            Expression::Body(assignment_inner.body),
+            Some("use".to_owned()),
+        );
     }
 
     fn compile(&mut self, asts: &[Ast]) {
         if asts.is_empty() {
-            self.push_without_ast_mapping(Expression::nothing());
+            self.push_without_ast_mapping(Expression::nothing(), None);
         } else {
             for ast in asts.into_iter() {
                 self.compile_single(ast);
@@ -271,9 +370,16 @@ impl<'c> Compiler<'c> {
         }
         id
     }
-    fn push_without_ast_mapping(&mut self, expression: Expression) -> hir::Id {
+    fn push_without_ast_mapping(
+        &mut self,
+        expression: Expression,
+        identifier: Option<String>,
+    ) -> hir::Id {
         let id = self.create_next_id_without_ast_mapping();
         self.body.push(id.to_owned(), expression, None);
+        if let Some(identifier) = identifier {
+            self.identifiers.insert(identifier, id.clone());
+        }
         id
     }
 

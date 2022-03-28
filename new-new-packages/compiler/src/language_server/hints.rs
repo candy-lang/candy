@@ -58,7 +58,7 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
                 _ => return None,
             };
 
-            let span = db.hir_id_to_display_span(id).unwrap();
+            let span = db.hir_id_to_display_span(id)?;
 
             let line = db
                 .offset_to_lsp(input.clone(), span.start)
@@ -108,7 +108,10 @@ fn collect_hir_ids_for_hints(db: &dyn HintsDb, id: hir::Id) -> Vec<hir::Id> {
         Expression::Call { arguments, .. } => {
             let mut ids = vec![id.to_owned()];
             for argument_id in arguments {
-                let argument = db.find_expression(argument_id.clone()).unwrap();
+                let argument = match db.find_expression(argument_id.clone()) {
+                    Some(argument) => argument,
+                    None => continue, // Generated code
+                };
                 if let Expression::Reference(_) = argument {
                     continue;
                 }

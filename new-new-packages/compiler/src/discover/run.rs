@@ -130,8 +130,11 @@ pub(super) fn run_call(
         let (hir, _) = db.hir(function.input.to_owned()).unwrap();
         hir.as_ref().to_owned()
     };
-    let function_name = lambda_parent.identifiers.get(&function).unwrap();
-    log::trace!("Calling function `{}`", &function_name);
+    match lambda_parent.identifiers.get(&function) {
+        Some(function_name) => log::trace!("Calling function `{}`", &function_name),
+        // TODO: Inline lambdas don't have names, but for some other lambdas the name is not found.
+        None => log::trace!("Calling function {}", function),
+    };
 
     if lambda_hir.parameters.len() != arguments.len() {
         return DiscoverResult::panic(format!(
