@@ -121,20 +121,20 @@ pub(super) fn run_call(
         ),
     };
 
-    let lambda_parent = if let Some(lambda_parent_id) = function.parent() {
-        match db.find_expression(lambda_parent_id)? {
-            Expression::Body(body) => body,
-            hir => panic!("A called lambda's parent isn't a body, but `{}`", hir),
-        }
-    } else {
-        let (hir, _) = db.hir(function.input.to_owned()).unwrap();
-        hir.as_ref().to_owned()
-    };
-    match lambda_parent.identifiers.get(&function) {
-        Some(function_name) => log::trace!("Calling function `{}`", &function_name),
-        // TODO: Inline lambdas don't have names, but for some other lambdas the name is not found.
-        None => log::trace!("Calling function {}", function),
-    };
+    // let lambda_parent = if let Some(lambda_parent_id) = function.parent() {
+    //     match db.find_expression(lambda_parent_id)? {
+    //         Expression::Body(body) => body,
+    //         hir => panic!("A called lambda's parent isn't a body, but `{}`", hir),
+    //     }
+    // } else {
+    //     let (hir, _) = db.hir(function.input.to_owned()).unwrap();
+    //     hir.as_ref().to_owned()
+    // };
+    // match lambda_parent.identifiers.get(&function) {
+    //     Some(function_name) => log::trace!("Calling function `{}`", &function_name),
+    //     // TODO: Inline lambdas don't have names, but for some other lambdas the name is not found.
+    //     None => log::trace!("Calling function {}", function),
+    // };
 
     if lambda_hir.parameters.len() != arguments.len() {
         return DiscoverResult::panic(format!(
