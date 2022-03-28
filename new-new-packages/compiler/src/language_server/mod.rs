@@ -26,7 +26,7 @@ use self::{
     hints::HintsNotification,
     references::{find_document_highlights, find_references},
     semantic_tokens::SemanticTokenDb,
-    utils::LspPositionConversion,
+    utils::{line_start_utf8_byte_offsets_raw, offset_from_lsp_raw},
 };
 
 pub mod definition;
@@ -294,9 +294,9 @@ fn apply_text_changes(
     for change in changes {
         match change.range {
             Some(range) => {
-                let start =
-                    db.offset_from_lsp(input.clone(), range.start.line, range.start.character);
-                let end = db.offset_from_lsp(input.clone(), range.end.line, range.end.character);
+                let line_start_offsets = line_start_utf8_byte_offsets_raw(&text);
+                let start = offset_from_lsp_raw(&text, &line_start_offsets[..], range.start);
+                let end = offset_from_lsp_raw(&text, &line_start_offsets[..], range.end);
                 text = format!("{}{}{}", &text[..start], &change.text, &text[end..]);
             }
             None => text = change.text,
