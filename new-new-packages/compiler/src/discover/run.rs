@@ -44,21 +44,18 @@ fn run(db: &dyn Discover, id: hir::Id, environment: Environment) -> Environment 
             }
             match db.find_expression(reference.to_owned()) {
                 None => DiscoverResult::DependsOnParameter,
-                Some(_) => environment
-                    .get(&reference)
-                    .expect("Value behind reference must already be in environment")
-                    .transitive(),
+                Some(_) => environment.get(&reference).transitive(),
             }
         }
         Expression::Symbol(symbol) => Value::Symbol(symbol.to_owned()).into(),
         Expression::Struct(entries) => 'outer: loop {
             let mut struct_ = HashMap::new();
             for (key, value) in entries {
-                let key = match environment.get(&key).unwrap().transitive() {
+                let key = match environment.get(&key).transitive() {
                     DiscoverResult::Value(value) => value,
                     it => break 'outer it,
                 };
-                let value = match environment.get(&value).unwrap().transitive() {
+                let value = match environment.get(&value).transitive() {
                     DiscoverResult::Value(value) => value,
                     it => break 'outer it,
                 };
@@ -66,18 +63,25 @@ fn run(db: &dyn Discover, id: hir::Id, environment: Environment) -> Environment 
             }
             break Value::Struct(struct_).into();
         },
-        Expression::Lambda(hir::Lambda { body, .. }) => {
-            let result = Value::Lambda(Lambda {
-                captured_environment: environment.to_owned(),
+        Expression::Lambda(hir::Lambda {
+            first_id,
+            parameters,
+            body,
+        }) => {
+            let lambda = Lambda {
+                captured_environment: environment.clone(),
                 id: id.clone(),
-            })
-            .into();
+            };
+
+            for (index, _) in parameters.iter().enumerate() {
+                environment.store(first_id.clone() + index, DiscoverResult::DependsOnParameter);
+            }
             environment = run_body(db, &body, environment);
-            result
+            Value::Lambda(lambda).into()
         }
         Expression::Body(body) => {
             environment = run_body(db, &body, environment);
-            environment.get(body.out_id()).unwrap().transitive()
+            environment.get(body.out_id()).transitive()
         }
         Expression::Call {
             function,
@@ -105,7 +109,7 @@ pub(super) fn run_call(
         }
     }
 
-    let lambda = match environment.get(&function).unwrap().transitive()? {
+    let lambda = match environment.get(&function).transitive()? {
         Value::Lambda(lambda) => lambda,
         it => panic!("Tried to call something that wasn't a lambda: {:?}", it),
     };
@@ -140,13 +144,11 @@ pub(super) fn run_call(
     for (index, argument) in arguments.iter().enumerate() {
         inner_environment.store(
             lambda_hir.first_id.clone() + index,
-            environment.get(argument).unwrap(),
+            environment.get(argument),
         );
     }
 
-    run_body(db, &lambda_hir.body, inner_environment)
-        .get(lambda_hir.body.out_id())
-        .unwrap()
+    run_body(db, &lambda_hir.body, inner_environment).get(lambda_hir.body.out_id())
 }
 
 fn value_to_display_string(db: &dyn Discover, value: Value) -> String {

@@ -33,7 +33,7 @@ pub fn run_builtin_function(
 
     let arguments = arguments
         .iter()
-        .map(|it| environment.get(it).unwrap())
+        .map(|it| environment.get(it).transitive())
         .collect::<DiscoverResult<_>>()?;
     match builtin_function {
         BuiltinFunction::Add => add(arguments),
@@ -83,7 +83,7 @@ fn get_argument_count(db: &dyn Discover, arguments: Vec<Value>) -> DiscoverResul
 
 fn if_else(db: &dyn Discover, arguments: Vec<hir::Id>, environment: Environment) -> DiscoverResult {
     if let [condition, then, else_] = &arguments[..] {
-        let body_id = match environment.get(condition).unwrap()? {
+        let body_id = match environment.get(condition)? {
             value if value == Value::bool(true) => then,
             value if value == Value::bool(false) => else_,
             value => {
