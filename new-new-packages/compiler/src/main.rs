@@ -13,6 +13,7 @@ use crate::compiler::cst_to_ast::CstToAst;
 use crate::compiler::string_to_cst::StringToCst;
 use crate::database::PROJECT_DIRECTORY;
 use crate::{database::Database, input::Input};
+use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use log;
 use lspower::{LspService, Server};
@@ -34,6 +35,8 @@ struct CandyRunOptions {
 
     #[structopt(long)]
     print_ast: bool,
+    #[structopt(long)]
+    print_ast_cst_id_map: bool,
 
     #[structopt(long)]
     print_hir: bool,
@@ -78,11 +81,22 @@ fn run(options: CandyRunOptions) {
     }
 
     log::info!("Lowering CST to AST…");
-    let (asts, _, errors) = db
+    let (asts, ast_cst_id_map, errors) = db
         .ast_raw(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", options.file.display()));
     if options.print_ast {
         log::info!("AST: {:#?}", asts);
+    }
+    if options.print_ast_cst_id_map {
+        log::info!(
+            "AST → CST Id map: {}",
+            ast_cst_id_map
+                .keys()
+                .into_iter()
+                .sorted_by_key(|it| it.local)
+                .map(|key| format!("{}: {}", key.local, ast_cst_id_map[key].0))
+                .join(", ")
+        );
     }
     if !errors.is_empty() {
         log::error!("Errors occurred while lowering CST to AST:\n{:#?}", errors);
