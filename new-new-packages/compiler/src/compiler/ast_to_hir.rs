@@ -244,7 +244,7 @@ impl<'c> Compiler<'c> {
                     None => {
                         self.output.errors.push(CompilerError {
                             message: format!("Unknown reference: {}", symbol.value),
-                            span: self.context.db.ast_id_to_span(symbol.id.clone()).unwrap(),
+                            span: self.context.db.ast_id_to_span(ast.id.clone()).unwrap(),
                         });
                         return self.push(symbol.id.clone(), Expression::Error, None);
                     }
