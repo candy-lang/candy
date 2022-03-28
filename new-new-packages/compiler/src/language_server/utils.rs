@@ -30,9 +30,9 @@ impl CompilerError {
 }
 
 impl From<Url> for Input {
-    fn from(uri: Url) -> Input {
+    fn from(uri: Url) -> Self {
         match uri.scheme() {
-            "file" => Input::file(&uri.to_file_path().unwrap()),
+            "file" => uri.to_file_path().unwrap().into(),
             "untitled" => Input::Untitled(uri.to_string()["untitled:".len()..].to_owned()),
             _ => panic!("Unsupported URI scheme: {}", uri.scheme()),
         }
@@ -42,7 +42,9 @@ impl From<Url> for Input {
 impl From<Input> for Url {
     fn from(input: Input) -> Url {
         match input {
-            Input::File(_) => Url::from_file_path(input.to_path().unwrap()).unwrap(),
+            Input::File(_) | Input::ExternalFile(_) => {
+                Url::from_file_path(input.to_path().unwrap()).unwrap()
+            }
             Input::Untitled(id) => Url::parse(&format!("untitled:{}", id)).unwrap(),
         }
     }

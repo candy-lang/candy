@@ -21,7 +21,7 @@ fn get_input(db: &dyn InputDb, input: Input) -> Option<Arc<String>> {
     };
 
     match input {
-        Input::File(_) => {
+        Input::File(_) | Input::ExternalFile(_) => {
             let path = input.to_path().unwrap();
             match read_to_string(path.clone()) {
                 Ok(content) => Some(Arc::new(content)),
@@ -58,21 +58,22 @@ pub enum Input {
     ///
     /// `.` and `..` are not allowed.
     File(Vec<String>),
+    /// A file not belonging to the current project.
+    ///
+    /// This is temporary and should become obsolete when we support packages.
+    ExternalFile(PathBuf),
     Untitled(String),
 }
 
-impl Input {
-    pub fn file(path: &Path) -> Input {
-        log::debug!("Path: {:?}", path);
-        let path = if path.is_relative() {
-            path.to_owned()
-        } else {
-            let project_dir = PROJECT_DIRECTORY.lock().unwrap().clone().unwrap();
-            fs::canonicalize(path)
-                .expect("Path does not exist or is invalid.")
-                .strip_prefix(fs::canonicalize(project_dir).unwrap().clone())
-                .expect("File does not belong to the project directory.")
-                .to_owned()
+impl From<PathBuf> for Input {
+    fn from(path: PathBuf) -> Self {
+        let project_dir = PROJECT_DIRECTORY.lock().unwrap().clone().unwrap();
+        let path = match fs::canonicalize(&path)
+            .expect("Path does not exist or is invalid.")
+            .strip_prefix(fs::canonicalize(project_dir).unwrap().clone())
+        {
+            Ok(path) => path.to_owned(),
+            Err(_) => return Input::ExternalFile(path),
         };
 
         let components = path
@@ -92,7 +93,8 @@ impl Input {
             .collect();
         Input::File(components)
     }
-
+}
+impl Input {
     pub fn to_path(&self) -> Option<PathBuf> {
         match self {
             Input::File(components) => {
@@ -102,6 +104,7 @@ impl Input {
                 }
                 Some(path)
             }
+            Input::ExternalFile(path) => Some(path.clone()),
             Input::Untitled(_) => None,
         }
     }
@@ -119,6 +122,7 @@ impl Display for Input {
                 }
                 Ok(())
             }
+            Input::ExternalFile(path) => write!(f, "external-file:{}", path.display()),
             Input::Untitled(name) => write!(f, "untitled:{}", name),
         }
     }
@@ -138,7 +142,7 @@ mod test {
     #[test]
     fn on_demand_input_works() {
         let mut db = Database::default();
-        let input = Input::file(&PathBuf::from("/foo.rs"));
+        let input: Input = PathBuf::from("/foo.rs").into();
 
         db.did_open_input(&input, "123".to_owned());
         assert_eq!(

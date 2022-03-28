@@ -57,16 +57,15 @@ async fn main() {
 fn run(options: CandyRunOptions) {
     *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
 
-    let path_string = options.file.to_string_lossy();
-    log::debug!("Running `{}`.\n", path_string);
+    log::debug!("Running `{}`.\n", options.file.display());
 
-    let input = Input::file(&options.file);
+    let input: Input = options.file.clone().into();
     let db = Database::default();
 
     log::info!("Parsing string to CST…");
     let (cst, errors) = db
         .cst_raw(input.clone())
-        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+        .unwrap_or_else(|| panic!("File `{}` not found.", options.file.display()));
     if options.print_cst {
         log::info!("CST: {:#?}", cst);
     }
@@ -81,7 +80,7 @@ fn run(options: CandyRunOptions) {
     log::info!("Lowering CST to AST…");
     let (asts, _, errors) = db
         .ast_raw(input.clone())
-        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+        .unwrap_or_else(|| panic!("File `{}` not found.", options.file.display()));
     if options.print_ast {
         log::info!("AST: {:#?}", asts);
     }
@@ -93,7 +92,7 @@ fn run(options: CandyRunOptions) {
     log::info!("Compiling AST to HIR…");
     let (hir, _, errors) = db
         .hir_raw(input.clone())
-        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+        .unwrap_or_else(|| panic!("File `{}` not found.", options.file.display()));
     if options.print_hir {
         log::info!("HIR: {:?}", hir);
     }
