@@ -54,8 +54,6 @@ fn run(db: &dyn Discover, id: hir::Id, environment: Environment) -> Environment 
         Expression::Struct(entries) => 'outer: loop {
             let mut struct_ = HashMap::new();
             for (key, value) in entries {
-                environment = run(db, key.clone(), environment);
-                environment = run(db, value.clone(), environment);
                 let key = match environment.get(&key).unwrap().transitive() {
                     DiscoverResult::Value(value) => value,
                     it => break 'outer it,
