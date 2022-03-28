@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFilter, DocumentHighlight, DocumentHighlightParams, FoldingRange, FoldingRangeParams,
@@ -257,7 +258,7 @@ impl LanguageServer for CandyLanguageServer {
 
 impl CandyLanguageServer {
     async fn analyze_files(&self, inputs: Vec<Input>) {
-        log::debug!("Analyzing file(s) {:?}", inputs);
+        log::debug!("Analyzing file(s) {}", inputs.iter().join(", "));
         let db = self.db.lock().await;
 
         for input in inputs {
