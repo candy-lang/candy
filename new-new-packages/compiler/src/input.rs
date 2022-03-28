@@ -1,7 +1,7 @@
 use std::{
     fmt::{self, Display, Formatter},
     fs::{self, read_to_string},
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::Arc,
 };
 
