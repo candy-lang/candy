@@ -20,7 +20,7 @@ pub fn run_builtin_function(
     arguments: Vec<hir::Id>,
     environment: Environment,
 ) -> DiscoverResult {
-    log::info!(
+    log::trace!(
         "run_builtin_function: builtin{:?} {:?}",
         builtin_function,
         arguments
