@@ -74,45 +74,46 @@ export class HintsDecorations implements vs.Disposable {
   }
 
   private update() {
-    const editor = vs.window.activeTextEditor;
-    if (!editor || !editor.document) {
-      return;
+    const activeEditor = vs.window.activeTextEditor;
+    if (activeEditor && activeEditor.document) {
+      this.editors.set(activeEditor.document.uri.toString(), activeEditor);
     }
 
-    const hints = this.hints.get(editor.document.uri.toString());
-    if (hints === undefined) {
-      return;
-    }
-
-    type Item = vs.DecorationOptions & {
-      renderOptions: { after: { contentText: string } };
-    };
-    const decorations = new Map<HintKind, Item[]>();
-    for (const hint of hints) {
-      const position = this.analyzer.protocol2CodeConverter.asPosition(
-        hint.position
-      );
-
-      // Ensure the hint we got looks like a sensible position, otherwise the type info
-      // might be stale (e.g., we sent two updates, and the type from in between them just
-      // arrived). In this case, we'll just bail and do nothing, assuming a future update will
-      // have the correct info.
-      // TODO(later, JonasWanke): do we really need this check?
-      if (position.character < 1) {
+    for (const [uri, editor] of this.editors.entries()) {
+      const hints = this.hints.get(uri);
+      if (hints === undefined) {
         return;
       }
 
-      const existing = decorations.get(hint.kind) || [];
-      existing.push({
-        range: new vs.Range(position, position),
-        renderOptions: { after: { contentText: hint.text } },
-      });
-      decorations.set(hint.kind, existing);
-    }
+      type Item = vs.DecorationOptions & {
+        renderOptions: { after: { contentText: string } };
+      };
+      const decorations = new Map<HintKind, Item[]>();
+      for (const hint of hints) {
+        const position = this.analyzer.protocol2CodeConverter.asPosition(
+          hint.position
+        );
 
-    this.editors.set(editor.document.uri.toString(), editor);
-    for (const entry of this.decorationTypes.entries()) {
-      editor.setDecorations(entry[1], decorations.get(entry[0]) || []);
+        // Ensure the hint we got looks like a sensible position, otherwise the type info
+        // might be stale (e.g., we sent two updates, and the type from in between them just
+        // arrived). In this case, we'll just bail and do nothing, assuming a future update will
+        // have the correct info.
+        // TODO(later, JonasWanke): do we really need this check?
+        if (position.character < 1) {
+          return;
+        }
+
+        const existing = decorations.get(hint.kind) || [];
+        existing.push({
+          range: new vs.Range(position, position),
+          renderOptions: { after: { contentText: hint.text } },
+        });
+        decorations.set(hint.kind, existing);
+      }
+
+      for (const [hintKind, decorationType] of this.decorationTypes.entries()) {
+        editor.setDecorations(decorationType, decorations.get(hintKind) || []);
+      }
     }
   }
 
