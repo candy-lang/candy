@@ -107,7 +107,7 @@ impl Add<usize> for Id {
 }
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "HirId({:?}:{:?})", self.input, self.local)
+        write!(f, "HirId({}:{:?})", self.input, self.local)
     }
 }
 
