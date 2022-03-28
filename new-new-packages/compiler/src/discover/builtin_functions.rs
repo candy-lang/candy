@@ -281,15 +281,27 @@ impl UseTarget {
     }
 
     fn resolve(&self, current_path: &[String]) -> Vec<Input> {
-        let mut path = current_path;
-        for _ in 0..self.parent_navigations {
-            if path.is_empty() {
-                return vec![];
+        let mut path = current_path.to_owned();
+        if self.parent_navigations == 0 {
+            assert!(!path.is_empty());
+            let last = path.last_mut().unwrap();
+            if last == ".candy" {
+                path.pop();
+            } else {
+                *last = last
+                    .strip_suffix(".candy")
+                    .expect("File name must end with `.candy`.")
+                    .to_owned();
             }
-            path = &path[..path.len() - 1];
+        } else {
+            for _ in 0..self.parent_navigations {
+                if path.is_empty() {
+                    return vec![];
+                }
+                path.pop();
+            }
         }
 
-        let mut path = path.to_owned();
         for part in &self.path {
             path.push(part.to_owned());
         }
@@ -300,7 +312,7 @@ impl UseTarget {
         subdirectory.push(".candy".to_owned());
         result.push(Input::File(subdirectory));
 
-        if path.len() > 1 {
+        if path.len() >= 1 {
             let last = path.last_mut().unwrap();
             *last = format!("{}.candy", last);
             result.push(Input::File(path));
