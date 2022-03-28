@@ -21,9 +21,9 @@ pub fn run_builtin_function(
     environment: Environment,
 ) -> DiscoverResult {
     log::info!(
-        "run_builtin_function: {:?} {}",
+        "run_builtin_function: builtin{:?} {:?}",
         builtin_function,
-        arguments.len()
+        arguments
     );
     // Handle builtin functions that don't need to resolve the arguments.
     match builtin_function {
