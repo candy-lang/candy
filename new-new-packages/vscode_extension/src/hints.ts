@@ -14,7 +14,10 @@ export class HintsDecorations implements vs.Disposable {
   private editors = new Map<String, vs.TextEditor>();
   private updateTimeout?: NodeJS.Timer;
 
-  private readonly decorationTypes = new Map([
+  private readonly decorationTypes = new Map<
+    HintKind,
+    vs.TextEditorDecorationType
+  >([
     [
       'value',
       vs.window.createTextEditorDecorationType({
@@ -108,8 +111,8 @@ export class HintsDecorations implements vs.Disposable {
     }
 
     this.editors.set(editor.document.uri.toString(), editor);
-    for (const entry of decorations.entries()) {
-      editor.setDecorations(this.decorationTypes.get(entry[0])!, entry[1]);
+    for (const entry of this.decorationTypes.entries()) {
+      editor.setDecorations(entry[1], decorations.get(entry[0]) || []);
     }
   }
 
