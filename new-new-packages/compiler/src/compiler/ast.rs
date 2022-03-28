@@ -1,4 +1,7 @@
-use std::ops::Deref;
+use std::{
+    fmt::{self, Display, Formatter},
+    ops::Deref,
+};
 
 use linked_hash_map::LinkedHashMap;
 
@@ -12,6 +15,11 @@ pub struct Id {
 impl Id {
     pub fn new(input: Input, local: usize) -> Self {
         Self { input, local }
+    }
+}
+impl Display for Id {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "AstId({}:{:?})", self.input, self.local)
     }
 }
 
