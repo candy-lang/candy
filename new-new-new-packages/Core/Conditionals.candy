@@ -1,0 +1,14 @@
+needs = builtinStructGet (use ".Needs") Needs
+isBool = builtinStructGet (use ".Bool") Is
+isFunction0 = builtinStructGet (use ".Function") Is0
+
+ifElse condition then else =
+  needs (isBool condition)
+  needs (isFunction0 then)
+  needs (isFunction0 else)
+  builtinIfElse condition then else
+
+if condition then =
+  needs (isBool condition)
+  needs (isFunction0 then)
+  ifElse condition then {}

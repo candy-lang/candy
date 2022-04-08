@@ -11,8 +11,9 @@
 'P: Compiler/Utils':
   - packages/compiler_utils/**/*
 'P: Core':
-  - packages/core/**/*
+  - new-new-new-packages/Core/**/*
   - new-packages/Core/**/*
+  - packages/core/**/*
 'P: LspServer':
   - packages/lsp_server/**/*
 'P: PetitParser':
