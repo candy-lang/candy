@@ -3,7 +3,7 @@ use lsp_types::{FoldingRange, FoldingRangeKind};
 use crate::{
     compiler::{
         cst::{Cst, CstKind},
-        string_to_cst::StringToCst,
+        rcst_to_cst::RcstToCst,
     },
     input::Input,
 };
@@ -11,13 +11,14 @@ use crate::{
 use super::utils::{LspPositionConversion, TupleToPosition};
 
 #[salsa::query_group(FoldingRangeDbStorage)]
-pub trait FoldingRangeDb: LspPositionConversion + StringToCst {
+pub trait FoldingRangeDb: LspPositionConversion + RcstToCst {
     fn folding_ranges(&self, input: Input) -> Vec<FoldingRange>;
 }
 
 fn folding_ranges(db: &dyn FoldingRangeDb, input: Input) -> Vec<FoldingRange> {
     let mut context = Context::new(db, input.clone());
-    context.visit_csts(&db.cst(input).unwrap());
+    let cst = db.cst(input).unwrap();
+    context.visit_csts(&cst);
     context.ranges
 }
 
@@ -42,22 +43,49 @@ impl<'a> Context<'a> {
     }
     fn visit_cst(&mut self, cst: &Cst) {
         match &cst.kind {
-            CstKind::EqualsSign { .. } => {}
-            CstKind::OpeningParenthesis { .. } => {}
-            CstKind::ClosingParenthesis { .. } => {}
-            CstKind::OpeningCurlyBrace { .. } => {}
-            CstKind::ClosingCurlyBrace { .. } => {}
-            CstKind::Arrow { .. } => {}
-            CstKind::Int { .. } => {}
-            CstKind::Text { .. } => {}
-            CstKind::Identifier { .. } => {}
-            CstKind::Symbol { .. } => {}
-            CstKind::LeadingWhitespace { child, .. } => self.visit_cst(child),
+            CstKind::EqualsSign => {}
+            CstKind::Comma => {}
+            CstKind::Colon => {}
+            CstKind::OpeningParenthesis => {}
+            CstKind::ClosingParenthesis => {}
+            CstKind::OpeningBracket => {}
+            CstKind::ClosingBracket => {}
+            CstKind::OpeningCurlyBrace => {}
+            CstKind::ClosingCurlyBrace => {}
+            CstKind::Arrow => {}
+            CstKind::DoubleQuote => {}
+            CstKind::Octothorpe => {}
+            CstKind::Whitespace(_) => {}
+            CstKind::Newline => {}
             // TODO: support folding ranges for comments
-            CstKind::LeadingComment { child, .. } => self.visit_cst(child),
+            CstKind::Comment { .. } => {}
             CstKind::TrailingWhitespace { child, .. } => self.visit_cst(child),
-            CstKind::TrailingComment { child, .. } => self.visit_cst(child),
+            CstKind::Identifier(_) => {}
+            CstKind::Symbol(_) => {}
+            CstKind::Int(_) => {}
+            CstKind::Text { .. } => {}
+            CstKind::TextPart(_) => {}
             CstKind::Parenthesized { inner, .. } => self.visit_cst(inner),
+            CstKind::Call { name, arguments } => {
+                if !arguments.is_empty() {
+                    let name = name.unwrap_whitespace_and_comment();
+                    assert!(matches!(name.kind, CstKind::Identifier { .. }));
+
+                    let last_argument = arguments.last().unwrap().unwrap_whitespace_and_comment();
+
+                    self.push(
+                        name.span.end,
+                        last_argument.span.end,
+                        FoldingRangeKind::Region,
+                    );
+                }
+
+                self.visit_cst(name);
+                self.visit_csts(&arguments);
+            }
+            // TODO: support folding ranges for structs
+            CstKind::Struct { .. } => {}
+            CstKind::StructField { .. } => {}
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -77,31 +105,14 @@ impl<'a> Context<'a> {
                 ));
 
                 self.push(
-                    opening_curly_brace.span().end,
-                    closing_curly_brace.span().start,
+                    opening_curly_brace.span.end,
+                    closing_curly_brace.span.start,
                     FoldingRangeKind::Region,
                 );
                 if let Some((parameters, _)) = parameters_and_arrow {
                     self.visit_csts(&parameters);
                 }
                 self.visit_csts(&body);
-            }
-            CstKind::Call { name, arguments } => {
-                if !arguments.is_empty() {
-                    let name = name.unwrap_whitespace_and_comment();
-                    assert!(matches!(name.kind, CstKind::Identifier { .. }));
-
-                    let last_argument = arguments.last().unwrap().unwrap_whitespace_and_comment();
-
-                    self.push(
-                        name.span().end,
-                        last_argument.span().end,
-                        FoldingRangeKind::Region,
-                    );
-                }
-
-                self.visit_cst(name);
-                self.visit_csts(&arguments);
             }
             CstKind::Assignment {
                 name,
@@ -116,8 +127,8 @@ impl<'a> Context<'a> {
                     let last_expression = body.last().unwrap().unwrap_whitespace_and_comment();
 
                     self.push(
-                        equals_sign.span().end,
-                        last_expression.span().end,
+                        equals_sign.span.end,
+                        last_expression.span.end,
                         FoldingRangeKind::Region,
                     );
                 }

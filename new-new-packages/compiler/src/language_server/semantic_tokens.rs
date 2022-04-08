@@ -6,7 +6,7 @@ use lsp_types::{Position, SemanticToken, SemanticTokensLegend};
 use crate::{
     compiler::{
         cst::{Cst, CstKind},
-        string_to_cst::StringToCst,
+        rcst_to_cst::RcstToCst,
     },
     input::Input,
     language_server::utils::TupleToPosition,
@@ -19,13 +19,14 @@ use strum_macros::EnumIter;
 use super::utils::LspPositionConversion;
 
 #[salsa::query_group(SemanticTokenDbStorage)]
-pub trait SemanticTokenDb: LspPositionConversion + StringToCst {
+pub trait SemanticTokenDb: LspPositionConversion + RcstToCst {
     fn semantic_tokens(&self, input: Input) -> Vec<SemanticToken>;
 }
 
 fn semantic_tokens(db: &dyn SemanticTokenDb, input: Input) -> Vec<SemanticToken> {
     let mut context = Context::new(db, input.clone());
-    context.visit_csts(&db.cst(input).unwrap(), None);
+    let cst = db.cst(input).unwrap();
+    context.visit_csts(&cst, None);
     context.tokens
 }
 
@@ -153,38 +154,35 @@ impl<'a> Context<'a> {
     }
     fn visit_cst(&mut self, cst: &Cst, token_type_for_identifier: Option<SemanticTokenType>) {
         match &cst.kind {
-            CstKind::EqualsSign { .. } => self.add_token(cst.span(), SemanticTokenType::Operator),
-            CstKind::OpeningParenthesis { .. } => {}
-            CstKind::ClosingParenthesis { .. } => {}
-            CstKind::OpeningCurlyBrace { .. } => {}
-            CstKind::ClosingCurlyBrace { .. } => {}
-            CstKind::Arrow { .. } => {}
-            CstKind::Int { .. } => self.add_token(cst.span(), SemanticTokenType::Number),
-            CstKind::Text { .. } => self.add_token(cst.span(), SemanticTokenType::String),
-            CstKind::Identifier { .. } => self.add_token(
-                cst.span(),
-                token_type_for_identifier.unwrap_or(SemanticTokenType::Function),
-            ),
-            CstKind::Symbol { .. } => self.add_token(cst.span(), SemanticTokenType::Symbol),
-            CstKind::LeadingWhitespace { child, .. } => {
-                self.visit_cst(child, token_type_for_identifier)
-            }
-            CstKind::LeadingComment { value, child } => {
-                let span = cst.span();
-                self.add_token(
-                    span.start..span.start + value.len(),
-                    SemanticTokenType::Comment,
-                );
-                self.visit_cst(child, token_type_for_identifier);
+            CstKind::EqualsSign => self.add_token(cst.span.clone(), SemanticTokenType::Operator),
+            CstKind::Comma => {}
+            CstKind::Colon => {}
+            CstKind::OpeningParenthesis => {}
+            CstKind::ClosingParenthesis => {}
+            CstKind::OpeningBracket => {}
+            CstKind::ClosingBracket => {}
+            CstKind::OpeningCurlyBrace => {}
+            CstKind::ClosingCurlyBrace => {}
+            CstKind::Arrow => self.add_token(cst.span.clone(), SemanticTokenType::Operator),
+            CstKind::DoubleQuote => {} // handled by parent
+            CstKind::Octothorpe => {}  // handled by parent
+            CstKind::Whitespace(_) => {}
+            CstKind::Newline => {}
+            CstKind::Comment { octothorpe, .. } => {
+                self.visit_cst(octothorpe, None);
+                self.add_token(cst.span.clone(), SemanticTokenType::Comment);
             }
             CstKind::TrailingWhitespace { child, .. } => {
-                self.visit_cst(child, token_type_for_identifier);
+                self.visit_cst(child, token_type_for_identifier)
             }
-            CstKind::TrailingComment { child, value } => {
-                let span = cst.span();
-                self.visit_cst(child, token_type_for_identifier);
-                self.add_token(span.end - value.len()..span.end, SemanticTokenType::Comment);
-            }
+            CstKind::Identifier { .. } => self.add_token(
+                cst.span.clone(),
+                token_type_for_identifier.unwrap_or(SemanticTokenType::Function),
+            ),
+            CstKind::Symbol { .. } => self.add_token(cst.span.clone(), SemanticTokenType::Symbol),
+            CstKind::Int { .. } => self.add_token(cst.span.clone(), SemanticTokenType::Number),
+            CstKind::Text { .. } => self.add_token(cst.span.clone(), SemanticTokenType::String),
+            CstKind::TextPart(_) => {} // handled by parent
             CstKind::Parenthesized {
                 opening_parenthesis,
                 inner,
@@ -194,6 +192,32 @@ impl<'a> Context<'a> {
                 self.visit_cst(inner, None);
                 self.visit_cst(closing_parenthesis, None);
             }
+            CstKind::Call { name, arguments } => {
+                self.visit_cst(name, Some(SemanticTokenType::Function));
+                self.visit_csts(arguments, None);
+            }
+            CstKind::Struct {
+                opening_bracket,
+                fields,
+                closing_bracket,
+            } => {
+                self.visit_cst(opening_bracket, None);
+                self.visit_csts(fields, None);
+                self.visit_cst(closing_bracket, None);
+            }
+            CstKind::StructField {
+                key,
+                colon,
+                value,
+                comma,
+            } => {
+                self.visit_cst(key, None);
+                self.visit_cst(colon, None);
+                self.visit_cst(value, None);
+                if let Some(comma) = comma {
+                    self.visit_cst(comma, None);
+                }
+            }
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -201,15 +225,12 @@ impl<'a> Context<'a> {
                 closing_curly_brace,
             } => {
                 self.visit_cst(opening_curly_brace, None);
-                if let Some((parameters, _)) = parameters_and_arrow {
+                if let Some((parameters, arrow)) = parameters_and_arrow {
                     self.visit_csts(parameters, Some(SemanticTokenType::Parameter));
+                    self.visit_cst(arrow, None);
                 }
                 self.visit_csts(body, None);
                 self.visit_cst(closing_curly_brace, None);
-            }
-            CstKind::Call { name, arguments } => {
-                self.visit_cst(name, Some(SemanticTokenType::Function));
-                self.visit_csts(arguments, None);
             }
             CstKind::Assignment {
                 name,

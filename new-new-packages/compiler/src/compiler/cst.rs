@@ -1,16 +1,12 @@
+use super::{rcst::RcstError, rcst_to_cst::RcstToCst};
+use crate::input::Input;
 use std::{
     fmt::{self, Display, Formatter},
     ops::Range,
 };
 
-use itertools::Itertools;
-
-use crate::input::Input;
-
-use super::string_to_cst::StringToCst;
-
 #[salsa::query_group(CstDbStorage)]
-pub trait CstDb: StringToCst {
+pub trait CstDb: RcstToCst {
     fn find_cst(&self, input: Input, id: Id) -> Option<Cst>;
 }
 
@@ -24,73 +20,62 @@ pub struct Id(pub usize);
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Cst {
     pub id: Id,
+    pub span: Range<usize>,
     pub kind: CstKind,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum CstKind {
-    // Simple characters.
-    EqualsSign {
-        offset: usize,
-    },
-    OpeningParenthesis {
-        offset: usize,
-    },
-    ClosingParenthesis {
-        offset: usize,
-    },
-    OpeningCurlyBrace {
-        offset: usize,
-    },
-    ClosingCurlyBrace {
-        offset: usize,
-    },
-    Arrow {
-        offset: usize,
-    },
-
-    // Self-contained atoms of the language.
-    Int {
-        offset: usize,
-        value: u64,
-        source: String,
-    },
-    Text {
-        offset: usize,
-        value: String,
-    },
-    Identifier {
-        offset: usize,
-        value: String,
-    },
-    Symbol {
-        offset: usize,
-        value: String,
-    },
-
-    // Decorators.
-    LeadingWhitespace {
-        value: String,
-        child: Box<Cst>,
-    },
-    LeadingComment {
-        value: String, // without #
-        child: Box<Cst>,
+    EqualsSign,         // =
+    Comma,              // ,
+    Colon,              // :
+    OpeningParenthesis, // (
+    ClosingParenthesis, // )
+    OpeningBracket,     // [
+    ClosingBracket,     // ]
+    OpeningCurlyBrace,  // {
+    ClosingCurlyBrace,  // }
+    Arrow,              // ->
+    DoubleQuote,        // "
+    Octothorpe,         // #
+    Whitespace(String),
+    Newline, // TODO: Support different kinds of newlines.
+    Comment {
+        octothorpe: Box<Cst>,
+        comment: String,
     },
     TrailingWhitespace {
         child: Box<Cst>,
-        value: String,
+        whitespace: Vec<Cst>,
     },
-    TrailingComment {
-        child: Box<Cst>,
-        value: String, // without #
+    Identifier(String),
+    Symbol(String),
+    Int(u64),
+    Text {
+        opening_quote: Box<Cst>,
+        parts: Vec<Cst>,
+        closing_quote: Box<Cst>,
     },
-
-    // Compound expressions.
+    TextPart(String),
     Parenthesized {
         opening_parenthesis: Box<Cst>,
         inner: Box<Cst>,
         closing_parenthesis: Box<Cst>,
+    },
+    Call {
+        name: Box<Cst>,
+        arguments: Vec<Cst>,
+    },
+    Struct {
+        opening_bracket: Box<Cst>,
+        fields: Vec<Cst>,
+        closing_bracket: Box<Cst>,
+    },
+    StructField {
+        key: Box<Cst>,
+        colon: Box<Cst>,
+        value: Box<Cst>,
+        comma: Option<Box<Cst>>,
     },
     Lambda {
         opening_curly_brace: Box<Cst>,
@@ -98,171 +83,157 @@ pub enum CstKind {
         body: Vec<Cst>,
         closing_curly_brace: Box<Cst>,
     },
-    Call {
-        name: Box<Cst>,
-        arguments: Vec<Cst>,
-    },
     Assignment {
         name: Box<Cst>,
         parameters: Vec<Cst>,
         equals_sign: Box<Cst>,
         body: Vec<Cst>,
     },
-
-    /// Indicates a parsing of some subtree did not succeed.
     Error {
-        offset: usize,
         unparsable_input: String,
-        message: String,
+        error: RcstError,
     },
 }
 
 impl Display for Cst {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.kind {
-            CstKind::EqualsSign { .. } => write!(f, "="),
-            CstKind::OpeningParenthesis { .. } => write!(f, "("),
-            CstKind::ClosingParenthesis { .. } => write!(f, ")"),
-            CstKind::OpeningCurlyBrace { .. } => write!(f, "{{"),
-            CstKind::ClosingCurlyBrace { .. } => write!(f, "}}"),
-            CstKind::Arrow { .. } => write!(f, "->"),
-            CstKind::Int { source, .. } => write!(f, "{}", source),
-            CstKind::Text { value, .. } => write!(f, "\"{}\"", value),
-            CstKind::Identifier { value, .. } => write!(f, "{}", value),
-            CstKind::Symbol { value, .. } => write!(f, "{}", value),
-            CstKind::LeadingWhitespace { value, child } => write!(f, "{}{}", value, child),
-            CstKind::LeadingComment { value, child } => write!(f, "{}{}", value, child),
-            CstKind::TrailingWhitespace { child, value } => write!(f, "{}{}", child, value),
-            CstKind::TrailingComment { child, value } => write!(f, "{}#{}", child, value),
+            CstKind::EqualsSign => "=".fmt(f),
+            CstKind::Comma => ",".fmt(f),
+            CstKind::Colon => ":".fmt(f),
+            CstKind::OpeningParenthesis => "(".fmt(f),
+            CstKind::ClosingParenthesis => ")".fmt(f),
+            CstKind::OpeningBracket => "[".fmt(f),
+            CstKind::ClosingBracket => "]".fmt(f),
+            CstKind::OpeningCurlyBrace => "{".fmt(f),
+            CstKind::ClosingCurlyBrace => "}".fmt(f),
+            CstKind::Arrow => "->".fmt(f),
+            CstKind::DoubleQuote => '"'.fmt(f),
+            CstKind::Octothorpe => '#'.fmt(f),
+            CstKind::Whitespace(whitespace) => whitespace.fmt(f),
+            CstKind::Newline => '\n'.fmt(f),
+            CstKind::Comment {
+                octothorpe,
+                comment,
+            } => {
+                octothorpe.fmt(f)?;
+                comment.fmt(f)
+            }
+            CstKind::TrailingWhitespace { child, whitespace } => {
+                child.fmt(f)?;
+                for w in whitespace {
+                    w.fmt(f)?;
+                }
+                Ok(())
+            }
+            CstKind::Identifier(identifier) => identifier.fmt(f),
+            CstKind::Symbol(symbol) => symbol.fmt(f),
+            CstKind::Int(int) => int.fmt(f),
+            CstKind::Text {
+                opening_quote,
+                parts,
+                closing_quote,
+            } => {
+                opening_quote.fmt(f)?;
+                for part in parts {
+                    part.fmt(f)?;
+                }
+                closing_quote.fmt(f)
+            }
+            CstKind::TextPart(literal) => literal.fmt(f),
             CstKind::Parenthesized {
                 opening_parenthesis,
                 inner,
                 closing_parenthesis,
-            } => write!(f, "{}{}{}", opening_parenthesis, inner, closing_parenthesis),
+            } => {
+                opening_parenthesis.fmt(f)?;
+                inner.fmt(f)?;
+                closing_parenthesis.fmt(f)
+            }
+            CstKind::Call { name, arguments } => {
+                name.fmt(f)?;
+                for argument in arguments {
+                    argument.fmt(f)?;
+                }
+                Ok(())
+            }
+            CstKind::Struct {
+                opening_bracket,
+                fields,
+                closing_bracket,
+            } => {
+                opening_bracket.fmt(f)?;
+                for field in fields {
+                    field.fmt(f)?;
+                }
+                closing_bracket.fmt(f)
+            }
+            CstKind::StructField {
+                key,
+                colon,
+                value,
+                comma,
+            } => {
+                key.fmt(f)?;
+                colon.fmt(f)?;
+                value.fmt(f)?;
+                if let Some(comma) = comma {
+                    comma.fmt(f)?;
+                }
+                Ok(())
+            }
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
                 body,
                 closing_curly_brace,
-            } => write!(
-                f,
-                "{}{}{}{}",
-                opening_curly_brace,
-                parameters_and_arrow
-                    .as_ref()
-                    .map(|(parameters, arrow)| format!(
-                        "{}{}",
-                        parameters.iter().map(|it| format!("{}", it)).join(""),
-                        arrow
-                    ))
-                    .unwrap_or("".into()),
-                body.iter().map(|it| format!("{}", it)).join(""),
-                closing_curly_brace,
-            ),
-            CstKind::Call { name, arguments } => {
-                write!(
-                    f,
-                    "{}{}",
-                    name,
-                    arguments.iter().map(|it| format!("{}", it)).join("")
-                )
+            } => {
+                opening_curly_brace.fmt(f)?;
+                if let Some((parameters, arrow)) = parameters_and_arrow {
+                    for parameter in parameters {
+                        parameter.fmt(f)?;
+                    }
+                    arrow.fmt(f)?;
+                }
+                for expression in body {
+                    expression.fmt(f)?;
+                }
+                closing_curly_brace.fmt(f)
             }
             CstKind::Assignment {
                 name,
                 parameters,
                 equals_sign,
                 body,
-            } => write!(
-                f,
-                "{}{}{}{}",
-                name,
-                parameters.iter().map(|it| format!("{}", it)).join(""),
-                equals_sign,
-                body.iter().map(|it| format!("{}", it)).join(""),
-            ),
+            } => {
+                name.fmt(f)?;
+                for parameter in parameters {
+                    parameter.fmt(f)?;
+                }
+                equals_sign.fmt(f)?;
+                for expression in body {
+                    expression.fmt(f)?;
+                }
+                Ok(())
+            }
             CstKind::Error {
                 unparsable_input, ..
-            } => write!(f, "{}", unparsable_input),
+            } => unparsable_input.fmt(f),
         }
     }
 }
 
 impl Cst {
-    pub fn span(&self) -> Range<usize> {
-        match &self.kind {
-            CstKind::EqualsSign { offset } => *offset..(*offset + 1),
-            CstKind::OpeningParenthesis { offset } => *offset..(*offset + 1),
-            CstKind::ClosingParenthesis { offset } => *offset..(*offset + 1),
-            CstKind::OpeningCurlyBrace { offset } => *offset..(*offset + 1),
-            CstKind::ClosingCurlyBrace { offset } => *offset..(*offset + 1),
-            CstKind::Arrow { offset } => *offset..(*offset + 2),
-            CstKind::Int { offset, source, .. } => *offset..(*offset + source.len()),
-            CstKind::Text { offset, value } => *offset..(*offset + value.len() + 2),
-            CstKind::Identifier { offset, value } => *offset..(*offset + value.len()),
-            CstKind::Symbol { offset, value } => *offset..(*offset + value.len()),
-            CstKind::LeadingWhitespace { value, child } => {
-                let child_span = child.span();
-                (child_span.start - value.len())..child_span.end
-            }
-            CstKind::LeadingComment { value, child } => {
-                let child_span = child.span();
-                (child_span.start - value.len() - 1)..child_span.end
-            }
-            CstKind::TrailingWhitespace { child, value } => {
-                let child_span = child.span();
-                child_span.start..(child_span.end + value.len())
-            }
-            CstKind::TrailingComment { child, value } => {
-                let child_span = child.span();
-                child_span.start..(child_span.end + value.len() + 1)
-            }
-            CstKind::Parenthesized {
-                opening_parenthesis,
-                closing_parenthesis,
-                ..
-            } => opening_parenthesis.span().start..closing_parenthesis.span().end,
-            CstKind::Lambda {
-                opening_curly_brace,
-                closing_curly_brace,
-                ..
-            } => opening_curly_brace.span().start..closing_curly_brace.span().end,
-            CstKind::Call { name, arguments } => {
-                if arguments.is_empty() {
-                    name.span()
-                } else {
-                    name.span().start..arguments.last().unwrap().span().end
-                }
-            }
-            CstKind::Assignment {
-                name,
-                equals_sign,
-                body,
-                ..
-            } => {
-                let last_cst = body.last().unwrap_or(&*equals_sign);
-                name.span().start..last_cst.span().end
-            }
-            CstKind::Error {
-                offset,
-                unparsable_input,
-                ..
-            } => *offset..(*offset + unparsable_input.len()),
-        }
-    }
-
     /// Returns a span that makes sense to display in the editor.
     ///
     /// For example, if a call contains errors, we want to only underline the
     /// name of the called function itself, not everything including arguments.
     pub fn display_span(&self) -> Range<usize> {
         match &self.kind {
-            CstKind::LeadingWhitespace { child, .. } => child.display_span(),
-            CstKind::LeadingComment { child, .. } => child.display_span(),
             CstKind::TrailingWhitespace { child, .. } => child.display_span(),
-            CstKind::TrailingComment { child, .. } => child.display_span(),
             CstKind::Call { name, .. } => name.display_span(),
             CstKind::Assignment { name, .. } => name.display_span(),
-            _ => self.span(),
+            _ => self.span.clone(),
         }
     }
 
@@ -272,23 +243,79 @@ impl Cst {
         };
 
         match &self.kind {
-            CstKind::EqualsSign { .. } => None,
-            CstKind::OpeningParenthesis { .. } => None,
-            CstKind::ClosingParenthesis { .. } => None,
-            CstKind::OpeningCurlyBrace { .. } => None,
-            CstKind::ClosingCurlyBrace { .. } => None,
-            CstKind::Arrow { .. } => None,
-            CstKind::Int { .. } => None,
-            CstKind::Text { .. } => None,
-            CstKind::Identifier { .. } => None,
-            CstKind::Symbol { .. } => None,
-            CstKind::LeadingWhitespace { child, .. } => child.find(id),
-            CstKind::LeadingComment { child, .. } => child.find(id),
-            CstKind::TrailingWhitespace { child, .. } => child.find(id),
-            CstKind::TrailingComment { child, .. } => child.find(id),
-            CstKind::Parenthesized { inner, .. } => inner.find(id),
-            CstKind::Lambda { body, .. } => body.find(id),
+            CstKind::EqualsSign => None,
+            CstKind::Comma => None,
+            CstKind::Colon => None,
+            CstKind::OpeningParenthesis => None,
+            CstKind::ClosingParenthesis => None,
+            CstKind::OpeningBracket => None,
+            CstKind::ClosingBracket => None,
+            CstKind::OpeningCurlyBrace => None,
+            CstKind::ClosingCurlyBrace => None,
+            CstKind::Arrow => None,
+            CstKind::DoubleQuote => None,
+            CstKind::Octothorpe => None,
+            CstKind::Whitespace(_) => None,
+            CstKind::Newline => None,
+            CstKind::Comment { octothorpe, .. } => octothorpe.find(id),
+            CstKind::TrailingWhitespace { child, whitespace } => {
+                child.find(id).or_else(|| whitespace.find(id))
+            }
+            CstKind::Identifier(_) => None,
+            CstKind::Symbol(_) => None,
+            CstKind::Int(_) => None,
+            CstKind::Text {
+                opening_quote,
+                parts,
+                closing_quote,
+            } => opening_quote
+                .find(id)
+                .or_else(|| parts.find(id))
+                .or_else(|| closing_quote.find(id)),
+            CstKind::TextPart(_) => None,
+            CstKind::Parenthesized {
+                opening_parenthesis,
+                inner,
+                closing_parenthesis,
+            } => opening_parenthesis
+                .find(id)
+                .or_else(|| inner.find(id))
+                .or_else(|| closing_parenthesis.find(id)),
             CstKind::Call { name, arguments } => name.find(id).or_else(|| arguments.find(id)),
+            CstKind::Struct {
+                opening_bracket,
+                fields,
+                closing_bracket,
+            } => opening_bracket
+                .find(id)
+                .or_else(|| fields.find(id))
+                .or_else(|| closing_bracket.find(id)),
+            CstKind::StructField {
+                key,
+                colon,
+                value,
+                comma,
+            } => key
+                .find(id)
+                .or_else(|| colon.find(id))
+                .or_else(|| value.find(id))
+                .or_else(|| comma.as_ref().and_then(|comma| comma.find(id))),
+            CstKind::Lambda {
+                opening_curly_brace,
+                parameters_and_arrow,
+                body,
+                closing_curly_brace,
+            } => opening_curly_brace
+                .find(id)
+                .or_else(|| {
+                    parameters_and_arrow
+                        .as_ref()
+                        .and_then(|(parameters, arrow)| {
+                            parameters.find(id).or_else(|| arrow.find(id))
+                        })
+                })
+                .or_else(|| body.find(id))
+                .or_else(|| closing_curly_brace.find(id)),
             CstKind::Assignment {
                 name,
                 parameters,
@@ -305,10 +332,7 @@ impl Cst {
 
     pub fn unwrap_whitespace_and_comment(&self) -> &Self {
         match &self.kind {
-            CstKind::LeadingWhitespace { child, .. } => child.unwrap_whitespace_and_comment(),
-            CstKind::LeadingComment { child, .. } => child.unwrap_whitespace_and_comment(),
             CstKind::TrailingWhitespace { child, .. } => child.unwrap_whitespace_and_comment(),
-            CstKind::TrailingComment { child, .. } => child.unwrap_whitespace_and_comment(),
             _ => self,
         }
     }

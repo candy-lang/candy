@@ -1,45 +1,50 @@
-// mod builtin_functions;
+mod builtin_functions;
 mod compiler;
-// mod database;
-// mod discover;
-// mod incremental;
-// mod input;
-// mod language_server;
+mod database;
+mod discover;
+mod incremental;
+mod input;
+mod language_server;
 
-// use crate::compiler::ast_to_hir::AstToHir;
-// use crate::compiler::cst_to_ast::CstToAst;
-// use crate::compiler::string_to_cst::StringToCst;
-// use crate::{database::Database, input::Input};
-// use language_server::CandyLanguageServer;
+use crate::compiler::ast_to_hir::AstToHir;
+use crate::compiler::cst_to_ast::CstToAst;
+use crate::compiler::hir;
+use crate::compiler::rcst_to_cst::RcstToCst;
+use crate::compiler::string_to_rcst::StringToRcst;
+use crate::{database::Database, input::Input};
+use itertools::Itertools;
+use language_server::CandyLanguageServer;
 use log;
 use lspower::{LspService, Server};
 use notify::{watcher, RecursiveMode, Watcher};
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
+use std::sync::Arc;
 use std::time::Duration;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "candy", about = "The 🍭 Candy CLI.")]
 enum CandyOptions {
+    Build(CandyBuildOptions),
     Run(CandyRunOptions),
     Lsp,
 }
 
 #[derive(StructOpt, Debug)]
+struct CandyBuildOptions {
+    #[structopt(long)]
+    debug: bool,
+
+    #[structopt(long)]
+    watch: bool,
+
+    #[structopt(parse(from_os_str))]
+    file: PathBuf,
+}
+
+#[derive(StructOpt, Debug)]
 struct CandyRunOptions {
-    #[structopt(long)]
-    print_cst: bool,
-
-    #[structopt(long)]
-    print_ast: bool,
-
-    #[structopt(long)]
-    print_hir: bool,
-
-    #[structopt(long)]
-    no_run: bool,
-
     #[structopt(parse(from_os_str))]
     file: PathBuf,
 }
@@ -47,107 +52,118 @@ struct CandyRunOptions {
 #[tokio::main]
 async fn main() {
     init_logger();
-    // match CandyOptions::from_args() {
-    //     CandyOptions::Run(options) => run(options),
-    //     CandyOptions::Lsp => lsp().await,
-    // }
-
-    let (tx, rx) = channel();
-    let mut watcher = watcher(tx, Duration::from_secs(1)).unwrap();
-    watcher
-        .watch("parser.candy", RecursiveMode::Recursive)
-        .unwrap();
-
-    test_parser();
-    loop {
-        match rx.recv() {
-            Ok(event) => {
-                test_parser();
-            }
-            Err(e) => println!("watch error: {:#?}", e),
-        }
+    match CandyOptions::from_args() {
+        CandyOptions::Build(options) => build(options),
+        CandyOptions::Run(options) => run(options),
+        CandyOptions::Lsp => lsp().await,
     }
 }
 
-fn test_parser() {
-    println!("Parsing.");
-    let input = std::fs::read_to_string("parser.candy").unwrap();
-    std::fs::write(
-        "parsed.txt",
-        format!("{:#?}", compiler::string_to_cst::parse_cst(&input)),
-    );
+fn build(options: CandyBuildOptions) {
+    raw_build(&options.file, options.debug);
+
+    if options.watch {
+        let (tx, rx) = channel();
+        let mut watcher = watcher(tx, Duration::from_secs(1)).unwrap();
+        watcher
+            .watch(&options.file, RecursiveMode::Recursive)
+            .unwrap();
+        loop {
+            match rx.recv() {
+                Ok(_) => {
+                    raw_build(&options.file, options.debug);
+                }
+                Err(e) => println!("watch error: {:#?}", e),
+            }
+        }
+    }
 }
+fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
+    let path_string = file.to_string_lossy();
+    log::debug!("Building `{}`.", path_string);
 
-fn run(options: CandyRunOptions) {
-    // let path_string = options.file.to_string_lossy();
-    // log::debug!("Running `{}`.\n", path_string);
+    let input = Input::File(file.to_owned());
+    let db = Database::default();
 
-    // let input = Input::File(options.file.to_owned());
-    // let db = Database::default();
+    log::info!("Parsing string to RCST…");
+    let rcst = db
+        .rcst(input.clone())
+        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+    if debug {
+        let mut file = file.clone();
+        assert!(file.set_extension("candy.rcst"));
+        std::fs::write(file, format!("{:#?}\n", rcst.clone())).unwrap();
+    }
 
-    // log::info!("Parsing string to CST…");
-    // let (cst, errors) = db
-    //     .cst_raw(input.clone())
-    //     .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
-    // if options.print_cst {
-    //     log::info!("CST: {:#?}", cst);
-    // }
-    // if !errors.is_empty() {
-    //     log::error!(
-    //         "Errors occurred while parsing string to CST…:\n{:#?}",
-    //         errors
-    //     );
-    //     return;
-    // }
+    log::info!("Parsing RCST to CST…");
+    let cst = db
+        .cst(input.clone())
+        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+    if debug {
+        let mut file = file.clone();
+        assert!(file.set_extension("candy.cst"));
+        std::fs::write(file, format!("{:#?}\n", cst.clone())).unwrap();
+    }
 
-    // log::info!("Lowering CST to AST…");
-    // let (asts, _, errors) = db
-    //     .ast_raw(input.clone())
-    //     .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
-    // if options.print_ast {
-    //     log::info!("AST: {:#?}", asts);
-    // }
-    // if !errors.is_empty() {
-    //     log::error!("Errors occurred while lowering CST to AST:\n{:#?}", errors);
-    //     return;
-    // }
+    log::info!("Lowering CST to AST…");
+    let (asts, _, errors) = db
+        .ast_raw(input.clone())
+        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+    if debug {
+        let mut file = file.clone();
+        assert!(file.set_extension("candy.ast"));
+        std::fs::write(file, format!("{:#?}\n", asts.clone())).unwrap();
+    }
+    if !errors.is_empty() {
+        log::error!("Errors occurred while lowering CST to AST:\n{:#?}", errors);
+        return None;
+    }
 
-    // log::info!("Compiling AST to HIR…");
-    // let (hir, _, errors) = db
-    //     .hir_raw(input.clone())
-    //     .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
-    // if options.print_hir {
-    //     log::info!("HIR: {:?}", hir);
-    // }
-    // if !errors.is_empty() {
-    //     log::error!("Errors occurred while lowering AST to HIR:\n{:#?}", errors);
-    //     return;
-    // }
+    log::info!("Compiling AST to HIR…");
+    let (hir, _, errors) = db
+        .hir_raw(input.clone())
+        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+    if debug {
+        let mut file = file.clone();
+        assert!(file.set_extension("candy.hir"));
+        std::fs::write(file, format!("{:#?}\n", hir.clone())).unwrap();
+    }
+    if !errors.is_empty() {
+        log::error!("Errors occurred while lowering AST to HIR:\n{:#?}", errors);
+        return None;
+    }
 
     // let reports = analyze((*lambda).clone());
     // for report in reports {
     //     log::error!("Report: {:?}", report);
     // }
 
-    // if !options.no_run {
-    //     log::info!("Executing code…");
-    //     let mut fiber = fiber::Fiber::new(hir.as_ref().clone());
-    //     fiber.run();
-    //     match fiber.status() {
-    //         FiberStatus::Running => log::info!("Fiber is still running."),
-    //         FiberStatus::Done(value) => log::info!("Fiber is done: {:#?}", value),
-    //         FiberStatus::Panicked(value) => log::error!("Fiber panicked: {:#?}", value),
-    //     }
+    Some(hir)
+}
+
+fn run(options: CandyRunOptions) {
+    let _hir = raw_build(&options.file, false);
+
+    let path_string = options.file.to_string_lossy();
+    log::debug!("Running `{}`.", path_string);
+
+    // log::info!("Executing code…");
+    // let mut fiber = fiber::Fiber::new(hir.as_ref().clone());
+    // fiber.run();
+    // match fiber.status() {
+    //     FiberStatus::Running => log::info!("Fiber is still running."),
+    //     FiberStatus::Done(value) => log::info!("Fiber is done: {:#?}", value),
+    //     FiberStatus::Panicked(value) => log::error!("Fiber panicked: {:#?}", value),
     // }
 }
 
 async fn lsp() {
-    // log::info!("Starting language server…");
-    // let (service, messages) = LspService::new(|client| CandyLanguageServer::from_client(client));
-    // Server::new(tokio::io::stdin(), tokio::io::stdout())
-    //     .interleave(messages)
-    //     .serve(service)
-    //     .await;
+    log::info!("Starting language server…");
+    let (service, messages) = LspService::new(|client| CandyLanguageServer::from_client(client));
+    Server::new(tokio::io::stdin(), tokio::io::stdout())
+        .interleave(messages)
+        .serve(service)
+        .await;
 }
 
 fn init_logger() {

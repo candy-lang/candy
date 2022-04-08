@@ -1,6 +1,5 @@
-use std::{fs::read_to_string, path::PathBuf, sync::Arc};
-
 use salsa::query_group;
+use std::{fs::read_to_string, path::PathBuf, sync::Arc};
 
 #[query_group(InputDbStorage)]
 pub trait InputDb: InputWatcher {
@@ -54,7 +53,8 @@ mod test {
     use crate::{
         compiler::{
             cst::{self, Cst, CstKind},
-            string_to_cst::StringToCst,
+            rcst::Rcst,
+            string_to_rcst::StringToCst,
         },
         database::Database,
     };
@@ -70,20 +70,10 @@ mod test {
             "123"
         );
         assert_eq!(
-            db.cst(input.clone()).unwrap().as_ref().to_owned(),
-            vec![Cst {
-                id: cst::Id(0),
-                kind: CstKind::LeadingWhitespace {
-                    value: "\n".to_owned(),
-                    child: Box::new(Cst {
-                        id: cst::Id(1),
-                        kind: CstKind::Int {
-                            offset: 0,
-                            value: 123,
-                            source: "123".to_owned(),
-                        }
-                    })
-                }
+            db.rcst(input.clone()).unwrap().as_ref().to_owned(),
+            vec![Rcst::LeadingWhitespace {
+                value: "\n".to_owned(),
+                child: Box::new(::Int(123))
             }],
         );
 
@@ -93,20 +83,10 @@ mod test {
             "456"
         );
         assert_eq!(
-            db.cst(input.clone()).unwrap().as_ref().to_owned(),
-            vec![Cst {
-                id: cst::Id(0),
-                kind: CstKind::LeadingWhitespace {
-                    value: "\n".to_owned(),
-                    child: Box::new(Cst {
-                        id: cst::Id(1),
-                        kind: CstKind::Int {
-                            offset: 0,
-                            value: 456,
-                            source: "456".to_owned(),
-                        }
-                    })
-                }
+            db.rcst(input.clone()).unwrap().as_ref().to_owned(),
+            vec![Rcst::LeadingWhitespace {
+                value: "\n".to_owned(),
+                child: Box::new(Rcst::Int(456))
             }],
         );
 

@@ -11,7 +11,10 @@ use lspower::{jsonrpc, Client, LanguageServer};
 use tokio::sync::Mutex;
 
 use crate::{
-    compiler::{ast_to_hir::AstToHir, cst_to_ast::CstToAst, string_to_cst::StringToCst},
+    compiler::{
+        ast_to_hir::AstToHir, cst_to_ast::CstToAst, rcst_to_cst::RcstToCst,
+        string_to_rcst::StringToRcst,
+    },
     input::{Input, InputDb},
     language_server::hints::HintsDb,
     Database,
@@ -189,14 +192,14 @@ impl CandyLanguageServer {
         let db = self.db.lock().await;
         log::debug!("Locked.");
 
-        let (_, cst_errors) = db.cst_raw(input.clone()).unwrap();
+        let _ = db.cst(input.clone()).unwrap();
         let (_, _, ast_errors) = db.ast_raw(input.clone()).unwrap();
         let (_, _, hir_errors) = db.hir_raw(input.clone()).unwrap();
 
         log::debug!("Mapping errors to diagnostics.");
-        let diagnostics = cst_errors
+        // TODO(MarcelGarus): Report CST errors.
+        let diagnostics = ast_errors
             .into_iter()
-            .chain(ast_errors.into_iter())
             .chain(hir_errors.into_iter())
             .map(|it| it.to_diagnostic(&db, input.clone()))
             .collect();

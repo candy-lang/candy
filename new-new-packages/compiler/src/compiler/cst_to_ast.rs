@@ -1,15 +1,16 @@
 use std::sync::Arc;
 
 use im::HashMap;
+use itertools::Itertools;
 
 use super::ast::{self, Ast, AstKind, AstString, Identifier, Int, Lambda, Symbol, Text};
 use super::cst::{self, Cst, CstKind};
 use super::error::CompilerError;
-use super::string_to_cst::StringToCst;
+use super::rcst_to_cst::RcstToCst;
 use crate::input::Input;
 
 #[salsa::query_group(CstToAstStorage)]
-pub trait CstToAst: StringToCst {
+pub trait CstToAst: RcstToCst {
     fn ast_to_cst_id(&self, input: Input, id: ast::Id) -> Option<cst::Id>;
     fn ast(&self, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)>;
     fn ast_raw(
@@ -54,31 +55,46 @@ impl LoweringContext {
     }
     fn lower_cst(&mut self, cst: &Cst) -> Ast {
         match &cst.kind {
-            CstKind::EqualsSign { .. } => self.create_ast(cst.id, AstKind::Error),
-            CstKind::OpeningParenthesis { .. } => self.create_ast(cst.id, AstKind::Error),
-            CstKind::ClosingParenthesis { .. } => self.create_ast(cst.id, AstKind::Error),
-            CstKind::OpeningCurlyBrace { .. } => self.create_ast(cst.id, AstKind::Error),
-            CstKind::ClosingCurlyBrace { .. } => self.create_ast(cst.id, AstKind::Error),
-            CstKind::Arrow { .. } => self.create_ast(cst.id, AstKind::Error),
-            CstKind::Int { value, .. } => {
-                self.create_ast(cst.id, AstKind::Int(Int(value.to_owned())))
-            }
-            CstKind::Text { value, .. } => {
-                let string = self.create_string(cst.id, value.to_owned());
-                self.create_ast(cst.id, AstKind::Text(Text(string)))
-            }
-            CstKind::Identifier { value, .. } => {
-                let string = self.create_string(cst.id, value.to_owned());
+            CstKind::EqualsSign => self.create_ast(cst.id, AstKind::Error),
+            CstKind::Comma => self.create_ast(cst.id, AstKind::Error),
+            CstKind::Colon => self.create_ast(cst.id, AstKind::Error),
+            CstKind::OpeningParenthesis => self.create_ast(cst.id, AstKind::Error),
+            CstKind::ClosingParenthesis => self.create_ast(cst.id, AstKind::Error),
+            CstKind::OpeningBracket => self.create_ast(cst.id, AstKind::Error),
+            CstKind::ClosingBracket => self.create_ast(cst.id, AstKind::Error),
+            CstKind::OpeningCurlyBrace => self.create_ast(cst.id, AstKind::Error),
+            CstKind::ClosingCurlyBrace => self.create_ast(cst.id, AstKind::Error),
+            CstKind::Arrow => self.create_ast(cst.id, AstKind::Error),
+            CstKind::DoubleQuote => self.create_ast(cst.id, AstKind::Error),
+            CstKind::Octothorpe => self.create_ast(cst.id, AstKind::Error),
+            CstKind::Whitespace(_) => self.create_ast(cst.id, AstKind::Error),
+            CstKind::Newline => self.create_ast(cst.id, AstKind::Error),
+            CstKind::Comment { .. } => self.create_ast(cst.id, AstKind::Error),
+            CstKind::TrailingWhitespace { child, .. } => self.lower_cst(child),
+            CstKind::Identifier(identifier) => {
+                let string = self.create_string(cst.id, identifier.to_owned());
                 self.create_ast(cst.id, AstKind::Identifier(Identifier(string)))
             }
-            CstKind::Symbol { value, .. } => {
-                let string = self.create_string(cst.id, value.to_owned());
+            CstKind::Symbol(symbol) => {
+                let string = self.create_string(cst.id, symbol.to_owned());
                 self.create_ast(cst.id, AstKind::Symbol(Symbol(string)))
             }
-            CstKind::LeadingWhitespace { child, .. } => self.lower_cst(child),
-            CstKind::LeadingComment { child, .. } => self.lower_cst(child),
-            CstKind::TrailingWhitespace { child, .. } => self.lower_cst(child),
-            CstKind::TrailingComment { child, .. } => self.lower_cst(child),
+            CstKind::Int(value) => self.create_ast(cst.id, AstKind::Int(Int(value.to_owned()))),
+            CstKind::Text { parts, .. } => {
+                let text = parts
+                    .into_iter()
+                    .filter_map(|it| match it {
+                        Cst {
+                            kind: CstKind::TextPart(text),
+                            ..
+                        } => Some(text),
+                        _ => None,
+                    })
+                    .join("");
+                let string = self.create_string(cst.id, text);
+                self.create_ast(cst.id, AstKind::Text(Text(string)))
+            }
+            CstKind::TextPart(_) => self.create_ast(cst.id, AstKind::Error),
             CstKind::Parenthesized {
                 opening_parenthesis,
                 inner,
@@ -99,6 +115,36 @@ impl LoweringContext {
             );
                 self.lower_cst(inner)
             }
+            CstKind::Call { name, arguments } => {
+                let name = name.unwrap_whitespace_and_comment();
+                let name = match name {
+                    Cst {
+                        id,
+                        kind: CstKind::Identifier(identifier),
+                        ..
+                    } => self.create_string(id.to_owned(), identifier.to_owned()),
+                    _ => {
+                        panic!(
+                            "Expected a symbol for the name of a call, but found `{}`.",
+                            name
+                        );
+                    }
+                };
+
+                let arguments = self.lower_csts(arguments);
+                self.create_ast(cst.id, AstKind::Call(ast::Call { name, arguments }))
+            }
+            CstKind::Struct {
+                opening_bracket,
+                fields,
+                closing_bracket,
+            } => todo!(),
+            CstKind::StructField {
+                key,
+                colon,
+                value,
+                comma,
+            } => todo!(),
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -143,24 +189,6 @@ impl LoweringContext {
 
                 self.create_ast(cst.id, AstKind::Lambda(Lambda { parameters, body }))
             }
-            CstKind::Call { name, arguments } => {
-                let name = name.unwrap_whitespace_and_comment();
-                let name = match name {
-                    Cst {
-                        id,
-                        kind: CstKind::Identifier { value, .. },
-                    } => self.create_string(id.to_owned(), value.to_owned()),
-                    _ => {
-                        panic!(
-                            "Expected a symbol for the name of a call, but found `{}`.",
-                            name
-                        );
-                    }
-                };
-
-                let arguments = self.lower_csts(arguments);
-                self.create_ast(cst.id, AstKind::Call(ast::Call { name, arguments }))
-            }
             CstKind::Assignment {
                 name,
                 parameters,
@@ -187,10 +215,11 @@ impl LoweringContext {
 
                 self.create_ast(cst.id, AstKind::Assignment(ast::Assignment { name, body }))
             }
-            CstKind::Error { ref message, .. } => {
+            CstKind::Error { error, .. } => {
                 self.errors.push(CompilerError {
-                    span: cst.span(),
-                    message: message.to_owned(),
+                    span: cst.span.clone(),
+                    // TODO: make this beautiful
+                    message: format!("{:?}", error),
                 });
                 self.create_ast(cst.id, AstKind::Error)
             }
@@ -209,12 +238,12 @@ impl LoweringContext {
     fn lower_parameter(&mut self, cst: &Cst) -> Option<AstString> {
         let cst = cst.unwrap_whitespace_and_comment();
         match &cst.kind {
-            CstKind::Identifier { value, .. } => {
-                Some(self.create_string(cst.id.to_owned(), value.clone()))
+            CstKind::Identifier(identifier) => {
+                Some(self.create_string(cst.id.to_owned(), identifier.clone()))
             }
             _ => {
                 self.errors.push(CompilerError {
-                    span: cst.span(),
+                    span: cst.span.clone(),
                     message: format!("Expected parameter, found `{}`.", cst),
                 });
                 None
@@ -226,8 +255,9 @@ impl LoweringContext {
         match cst {
             Cst {
                 id,
-                kind: CstKind::Identifier { value, .. },
-            } => self.create_string(id.to_owned(), value.clone()),
+                kind: CstKind::Identifier(identifier),
+                ..
+            } => self.create_string(id.to_owned(), identifier.clone()),
             _ => {
                 panic!("Expected an identifier, but found `{}`.", cst);
             }

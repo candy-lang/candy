@@ -34,7 +34,7 @@ fn hir_to_cst_id(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<cst::Id
 }
 fn hir_to_span(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<Range<usize>> {
     let id = db.hir_to_cst_id(input.clone(), id)?;
-    Some(db.find_cst(input, id)?.span())
+    Some(db.find_cst(input, id)?.span)
 }
 fn hir_to_display_span(db: &dyn AstToHir, input: Input, id: hir::Id) -> Option<Range<usize>> {
     let id = db.hir_to_cst_id(input.clone(), id)?;
@@ -241,7 +241,8 @@ impl<'a> Compiler<'a> {
             .cst
             .find(self.context.ast_cst_id_mapping.get(id).unwrap())
             .expect("AST has no corresponding CST")
-            .span()
+            .span
+            .clone()
     }
 
     fn create_next_id(&mut self, ast_id: ast::Id) -> hir::Id {
