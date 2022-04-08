@@ -14,17 +14,22 @@ use super::{
     value::{Environment, Value},
 };
 
+const TRACE_BUILTIN_FUNCTION_CALLS: bool = false;
+
 pub fn run_builtin_function(
     db: &dyn Discover,
     builtin_function: BuiltinFunction,
     arguments: Vec<hir::Id>,
     environment: Environment,
 ) -> DiscoverResult {
-    log::trace!(
-        "run_builtin_function: builtin{:?} {}",
-        builtin_function,
-        arguments.iter().join(" ")
-    );
+    if TRACE_BUILTIN_FUNCTION_CALLS {
+        log::trace!(
+            "run_builtin_function: builtin{:?} {}",
+            builtin_function,
+            arguments.iter().join(" ")
+        );
+    }
+
     // Handle builtin functions that don't need to resolve the arguments.
     match builtin_function {
         BuiltinFunction::IfElse => return if_else(db, arguments, environment),
