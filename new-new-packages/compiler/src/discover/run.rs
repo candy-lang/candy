@@ -5,7 +5,6 @@ use crate::{
 };
 use im::HashMap;
 use itertools::Itertools;
-use log;
 
 use super::{
     builtin_functions::run_builtin_function,
@@ -17,6 +16,7 @@ use super::{
 pub trait Discover: HirDb {
     fn run_all(&self, input: Input) -> HashMap<hir::Id, DiscoverResult>;
 
+    #[salsa::transparent]
     fn value_to_display_string(&self, value: Value) -> String;
 }
 
