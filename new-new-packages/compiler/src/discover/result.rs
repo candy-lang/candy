@@ -4,6 +4,8 @@ use std::{
     ops::{ControlFlow, FromResidual, Try},
 };
 
+use crate::input::Input;
+
 use super::value::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -13,6 +15,7 @@ pub enum DiscoverResult<T = Value> {
     DependsOnParameter,
     PreviousExpressionPanics,
     ErrorInHir,
+    CircularImport(Vec<Input>),
 }
 impl<T> DiscoverResult<T> {
     pub fn panic(message: String) -> Self {
@@ -32,6 +35,9 @@ impl<T> DiscoverResult<T> {
             DiscoverResult::DependsOnParameter => DiscoverResult::DependsOnParameter,
             DiscoverResult::PreviousExpressionPanics => DiscoverResult::PreviousExpressionPanics,
             DiscoverResult::ErrorInHir => DiscoverResult::ErrorInHir,
+            DiscoverResult::CircularImport(import_chain) => {
+                DiscoverResult::CircularImport(import_chain)
+            }
         }
     }
     pub fn transitive(self) -> Self {
@@ -59,18 +65,15 @@ impl<T> Try for DiscoverResult<T> {
                 ControlFlow::Break(DiscoverResult::PreviousExpressionPanics)
             }
             DiscoverResult::ErrorInHir => ControlFlow::Break(DiscoverResult::ErrorInHir),
+            DiscoverResult::CircularImport(import_chain) => {
+                ControlFlow::Break(DiscoverResult::CircularImport(import_chain))
+            }
         }
     }
 }
 impl<T> FromResidual for DiscoverResult<T> {
     fn from_residual(residual: DiscoverResult<Infallible>) -> Self {
-        match residual {
-            DiscoverResult::Value(_) => unreachable!(),
-            DiscoverResult::Panic(panic) => DiscoverResult::Panic(panic),
-            DiscoverResult::DependsOnParameter => DiscoverResult::DependsOnParameter,
-            DiscoverResult::PreviousExpressionPanics => DiscoverResult::PreviousExpressionPanics,
-            DiscoverResult::ErrorInHir => DiscoverResult::ErrorInHir,
-        }
+        residual.map(|_| unreachable!())
     }
 }
 
@@ -91,20 +94,14 @@ impl<A, V: FromIterator<A>> FromIterator<DiscoverResult<A>> for DiscoverResult<V
     fn from_iter<I: IntoIterator<Item = DiscoverResult<A>>>(iter: I) -> DiscoverResult<V> {
         let result = iter
             .into_iter()
-            .map(|x| match x {
+            .map::<Result<A, DiscoverResult<Infallible>>, _>(|x| match x {
                 DiscoverResult::Value(value) => Ok(value),
-                it => Err(it),
+                it => Err(it.map(|_| unreachable!())),
             })
             .collect::<Result<_, _>>();
         match result {
             Ok(value) => DiscoverResult::Value(value),
-            Err(DiscoverResult::Value(_)) => unreachable!(),
-            Err(DiscoverResult::Panic(panic)) => DiscoverResult::Panic(panic),
-            Err(DiscoverResult::DependsOnParameter) => DiscoverResult::DependsOnParameter,
-            Err(DiscoverResult::PreviousExpressionPanics) => {
-                DiscoverResult::PreviousExpressionPanics
-            }
-            Err(DiscoverResult::ErrorInHir) => DiscoverResult::ErrorInHir,
+            Err(error) => DiscoverResult::from_residual(error),
         }
     }
 }
