@@ -94,7 +94,7 @@ fn offset_from_lsp(
 pub fn offset_from_lsp_raw(text: &str, line_start_offsets: &[usize], position: Position) -> usize {
     let line_offset = line_start_offsets[position.line as usize];
     let line_length = if position.line as usize == line_start_offsets.len() - 1 {
-        text.len()
+        text.len() - line_offset
     } else {
         line_start_offsets[(position.line + 1) as usize] - line_offset
     };
