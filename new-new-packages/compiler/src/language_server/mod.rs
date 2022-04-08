@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFilter, DocumentHighlight, DocumentHighlightParams, FoldingRange, FoldingRangeParams,
@@ -14,6 +15,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     compiler::{ast_to_hir::AstToHir, cst_to_ast::CstToAst, string_to_cst::StringToCst},
+    database::PROJECT_DIRECTORY,
     input::{Input, InputDb},
     language_server::hints::HintsDb,
     Database,
@@ -25,7 +27,7 @@ use self::{
     hints::HintsNotification,
     references::{find_document_highlights, find_references},
     semantic_tokens::SemanticTokenDb,
-    utils::LspPositionConversion,
+    utils::{line_start_utf8_byte_offsets_raw, offset_from_lsp_raw},
 };
 
 pub mod definition;
@@ -50,11 +52,24 @@ impl CandyLanguageServer {
 
 #[lspower::async_trait]
 impl LanguageServer for CandyLanguageServer {
-    async fn initialize(&self, _: InitializeParams) -> jsonrpc::Result<InitializeResult> {
+    async fn initialize(&self, params: InitializeParams) -> jsonrpc::Result<InitializeResult> {
         log::info!("LSP: initialize");
         self.client
             .log_message(MessageType::INFO, "Initializing!")
             .await;
+
+        let first_workspace_folder = params
+            .workspace_folders
+            .unwrap()
+            .first()
+            .unwrap()
+            .uri
+            .clone();
+        *PROJECT_DIRECTORY.lock().unwrap() = match first_workspace_folder.scheme() {
+            "file" => Some(first_workspace_folder.to_file_path().unwrap()),
+            _ => panic!("Workspace folder must be a file URI."),
+        };
+
         Ok(InitializeResult {
             // We only support dynamic registration for now.
             capabilities: ServerCapabilities::default(),
@@ -180,16 +195,18 @@ impl LanguageServer for CandyLanguageServer {
             let mut db = self.db.lock().await;
             db.did_open_input(&input, params.text_document.text);
         }
-        self.analyze_file(input).await;
+        self.analyze_files(vec![input]).await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let input: Input = params.text_document.uri.into();
+        let mut open_inputs = Vec::<Input>::new();
         {
             let mut db = self.db.lock().await;
             let text = apply_text_changes(&db, input.clone(), params.content_changes);
             db.did_change_input(&input, text);
+            open_inputs.extend(db.open_inputs.keys().cloned());
         }
-        self.analyze_file(input).await;
+        self.analyze_files(open_inputs).await;
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         let input = params.text_document.uri.into();
@@ -240,34 +257,32 @@ impl LanguageServer for CandyLanguageServer {
 }
 
 impl CandyLanguageServer {
-    async fn analyze_file(&self, input: Input) {
-        log::debug!("Analyzing file. Locking guard.");
+    async fn analyze_files(&self, inputs: Vec<Input>) {
+        log::debug!("Analyzing file(s) {}", inputs.iter().join(", "));
         let db = self.db.lock().await;
-        log::debug!("Locked.");
 
-        let (_, cst_errors) = db.cst_raw(input.clone()).unwrap();
-        let (_, _, ast_errors) = db.ast_raw(input.clone()).unwrap();
-        let (_, _, hir_errors) = db.hir_raw(input.clone()).unwrap();
+        for input in inputs {
+            let (_, cst_errors) = db.cst_raw(input.clone()).unwrap();
+            let (_, _, ast_errors) = db.ast_raw(input.clone()).unwrap();
+            let (_, _, hir_errors) = db.hir_raw(input.clone()).unwrap();
 
-        log::debug!("Mapping errors to diagnostics.");
-        let diagnostics = cst_errors
-            .into_iter()
-            .chain(ast_errors.into_iter())
-            .chain(hir_errors.into_iter())
-            .map(|it| it.to_diagnostic(&db, input.clone()))
-            .collect();
-        log::debug!("Publishing diagnostics.");
-        self.client
-            .publish_diagnostics(input.clone().into(), diagnostics, None)
-            .await;
-        log::debug!("Published.");
-        let hints = db.hints(input.clone());
-        self.client
-            .send_custom_notification::<HintsNotification>(HintsNotification {
-                uri: Url::from(input).to_string(),
-                hints,
-            })
-            .await;
+            let diagnostics = cst_errors
+                .into_iter()
+                .chain(ast_errors.into_iter())
+                .chain(hir_errors.into_iter())
+                .map(|it| it.to_diagnostic(&db, input.clone()))
+                .collect();
+            self.client
+                .publish_diagnostics(input.clone().into(), diagnostics, None)
+                .await;
+            let hints = db.hints(input.clone());
+            self.client
+                .send_custom_notification::<HintsNotification>(HintsNotification {
+                    uri: Url::from(input).to_string(),
+                    hints,
+                })
+                .await;
+        }
     }
 }
 
@@ -280,9 +295,9 @@ fn apply_text_changes(
     for change in changes {
         match change.range {
             Some(range) => {
-                let start =
-                    db.offset_from_lsp(input.clone(), range.start.line, range.start.character);
-                let end = db.offset_from_lsp(input.clone(), range.end.line, range.end.character);
+                let line_start_offsets = line_start_utf8_byte_offsets_raw(&text);
+                let start = offset_from_lsp_raw(&text, &line_start_offsets[..], range.start);
+                let end = offset_from_lsp_raw(&text, &line_start_offsets[..], range.end);
                 text = format!("{}{}{}", &text[..start], &change.text, &text[end..]);
             }
             None => text = change.text,

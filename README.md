@@ -62,7 +62,7 @@ Our TODO list:
 * [x] build a basic interpreter
 * [x] add CLI arguments for printing the CST, AST, or HIR
 * [ ] make functions independent of their order in top-level scope
-* [ ] support importing other files
+* [x] support importing other files (`use`)
 * [ ] namespaces/modules including visibility modifiers
 * [ ] IDE support:
   * [ ] completion, completion resolve

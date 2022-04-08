@@ -14,7 +14,7 @@ pub enum BuiltinFunction {
     StructGetKeys, // struct.getKeys struct -> listOfKeys
     StructHasKey,  // struct.hasKey struct key -> bool
     TypeOf,
-    // TODO: add some way of getting keys and values from a struct
+    Use, // use currentPath target -> targetAsStruct
 }
 lazy_static! {
     pub static ref VALUES: Vec<BuiltinFunction> = BuiltinFunction::iter().collect();

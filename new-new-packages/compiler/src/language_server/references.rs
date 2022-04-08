@@ -50,46 +50,38 @@ fn find(
         _ => return None,
     }
 
-    let origin_hir_id = db.cst_to_hir_id(input.clone(), origin_cst.id)?;
-    Some(db.references(input, origin_hir_id, include_declaration))
+    let origin_hir_id = db.cst_to_hir_id(input, origin_cst.id)?;
+    Some(db.references(origin_hir_id, include_declaration))
 }
 
 #[salsa::query_group(ReferencesDbStorage)]
 pub trait ReferencesDb: HirDb + LspPositionConversion {
-    fn references(
-        &self,
-        input: Input,
-        id: hir::Id,
-        include_declaration: bool,
-    ) -> Vec<DocumentHighlight>;
+    fn references(&self, id: hir::Id, include_declaration: bool) -> Vec<DocumentHighlight>;
 }
 
 fn references(
     db: &dyn ReferencesDb,
-    input: Input,
     id: hir::Id,
     include_declaration: bool,
 ) -> Vec<DocumentHighlight> {
-    let (hir, _) = db.hir(input.clone()).unwrap();
+    let (hir, _) = db.hir(id.input.clone()).unwrap();
 
-    let mut context = Context::new(db, input, id, include_declaration);
+    let mut context = Context::new(db, id, include_declaration);
     context.visit_body(hir.as_ref());
     context.references
 }
 
 struct Context<'a> {
     db: &'a dyn ReferencesDb,
-    input: Input,
     id: hir::Id,
     include_declaration: bool,
     discovered_references: HashSet<hir::Id>,
     references: Vec<DocumentHighlight>,
 }
 impl<'a> Context<'a> {
-    fn new(db: &'a dyn ReferencesDb, input: Input, id: hir::Id, include_declaration: bool) -> Self {
+    fn new(db: &'a dyn ReferencesDb, id: hir::Id, include_declaration: bool) -> Self {
         Self {
             db,
-            input,
             id,
             include_declaration,
             discovered_references: HashSet::new(),
@@ -111,10 +103,7 @@ impl<'a> Context<'a> {
         }
     }
     fn visit_id(&mut self, id: hir::Id) {
-        let expression = self
-            .db
-            .find_expression(self.input.clone(), id.to_owned())
-            .unwrap();
+        let expression = self.db.find_expression(id.to_owned()).unwrap();
         self.visit_expression(id, &expression);
     }
     fn visit_expression(&mut self, id: hir::Id, expression: &Expression) {
@@ -165,17 +154,14 @@ impl<'a> Context<'a> {
         }
         self.discovered_references.insert(id.clone());
 
-        let span = self.db.hir_id_to_span(self.input.clone(), id).unwrap();
+        let span = self.db.hir_id_to_span(id.clone()).unwrap();
         self.references.push(DocumentHighlight {
             range: lsp_types::Range {
                 start: self
                     .db
-                    .offset_to_lsp(self.input.clone(), span.start)
+                    .offset_to_lsp(id.input.clone(), span.start)
                     .to_position(),
-                end: self
-                    .db
-                    .offset_to_lsp(self.input.clone(), span.end)
-                    .to_position(),
+                end: self.db.offset_to_lsp(id.input, span.end).to_position(),
             },
             kind: Some(kind),
         });

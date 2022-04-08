@@ -1,4 +1,6 @@
 use im::HashMap;
+use lazy_static::lazy_static;
+use std::{path::PathBuf, sync::Mutex};
 
 use crate::{
     compiler::{
@@ -31,7 +33,7 @@ use crate::{
 #[derive(Default)]
 pub struct Database {
     storage: salsa::Storage<Self>,
-    open_inputs: HashMap<Input, String>,
+    pub open_inputs: HashMap<Input, String>,
 }
 impl<'a> salsa::Database for Database {}
 
@@ -65,4 +67,8 @@ impl InputWatcher for Database {
     fn get_open_input_raw(&self, input: &Input) -> Option<String> {
         self.open_inputs.get(input).cloned()
     }
+}
+
+lazy_static! {
+    pub static ref PROJECT_DIRECTORY: Mutex<Option<PathBuf>> = Mutex::new(None);
 }

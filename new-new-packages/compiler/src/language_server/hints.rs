@@ -47,7 +47,7 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
     let (hir, _) = db.hir(input.clone()).unwrap();
     let discover_results = db.run_all(input.clone());
 
-    collect_hir_ids_for_hints_list(db, input.clone(), hir.expressions.keys().cloned().collect())
+    collect_hir_ids_for_hints_list(db, hir.expressions.keys().cloned().collect())
         .into_iter()
         .filter_map(|id| {
             let (kind, value) = match discover_results.get(&id).unwrap() {
@@ -58,7 +58,7 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
                 _ => return None,
             };
 
-            let span = db.hir_id_to_display_span(input.clone(), id).unwrap();
+            let span = db.hir_id_to_display_span(id)?;
 
             let line = db
                 .offset_to_lsp(input.clone(), span.start)
@@ -76,10 +76,7 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
 
             Some(Hint {
                 kind,
-                text: format!(
-                    " # {}",
-                    db.value_to_display_string(input.clone(), value.to_owned())
-                ),
+                text: format!(" # {}", db.value_to_display_string(value.to_owned())),
                 position,
             })
         })
@@ -90,39 +87,36 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
         .collect()
 }
 
-fn collect_hir_ids_for_hints_list(
-    db: &dyn HintsDb,
-    input: Input,
-    ids: Vec<hir::Id>,
-) -> Vec<hir::Id> {
+fn collect_hir_ids_for_hints_list(db: &dyn HintsDb, ids: Vec<hir::Id>) -> Vec<hir::Id> {
     ids.into_iter()
-        .flat_map(|id| collect_hir_ids_for_hints(db, input.clone(), id))
+        .flat_map(|id| collect_hir_ids_for_hints(db, id))
         .collect()
 }
-fn collect_hir_ids_for_hints(db: &dyn HintsDb, input: Input, id: hir::Id) -> Vec<hir::Id> {
-    match db.find_expression(input.clone(), id.clone()).unwrap() {
+fn collect_hir_ids_for_hints(db: &dyn HintsDb, id: hir::Id) -> Vec<hir::Id> {
+    match db.find_expression(id.clone()).unwrap() {
         Expression::Int(_) => vec![],
         Expression::Text(_) => vec![],
         Expression::Reference(_) => vec![id],
         Expression::Symbol(_) => vec![],
         Expression::Struct(_) => vec![], // Handled separately // TODO
         Expression::Lambda(Lambda { body, .. }) => {
-            collect_hir_ids_for_hints_list(db, input, body.expressions.keys().cloned().collect())
+            collect_hir_ids_for_hints_list(db, body.expressions.keys().cloned().collect())
         }
         Expression::Body(body) => {
-            collect_hir_ids_for_hints_list(db, input, body.expressions.keys().cloned().collect())
+            collect_hir_ids_for_hints_list(db, body.expressions.keys().cloned().collect())
         }
         Expression::Call { arguments, .. } => {
             let mut ids = vec![id.to_owned()];
             for argument_id in arguments {
-                let argument = db
-                    .find_expression(input.clone(), argument_id.clone())
-                    .unwrap();
+                let argument = match db.find_expression(argument_id.clone()) {
+                    Some(argument) => argument,
+                    None => continue, // Generated code
+                };
                 if let Expression::Reference(_) = argument {
                     continue;
                 }
 
-                ids.extend(collect_hir_ids_for_hints(db, input.clone(), argument_id));
+                ids.extend(collect_hir_ids_for_hints(db, argument_id));
             }
             ids
         }

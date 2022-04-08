@@ -11,10 +11,13 @@ mod language_server;
 use crate::compiler::ast_to_hir::AstToHir;
 use crate::compiler::cst_to_ast::CstToAst;
 use crate::compiler::string_to_cst::StringToCst;
+use crate::database::PROJECT_DIRECTORY;
 use crate::{database::Database, input::Input};
+use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use log;
 use lspower::{LspService, Server};
+use std::env::current_dir;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -32,6 +35,8 @@ struct CandyRunOptions {
 
     #[structopt(long)]
     print_ast: bool,
+    #[structopt(long)]
+    print_ast_cst_id_map: bool,
 
     #[structopt(long)]
     print_hir: bool,
@@ -53,16 +58,17 @@ async fn main() {
 }
 
 fn run(options: CandyRunOptions) {
-    let path_string = options.file.to_string_lossy();
-    log::debug!("Running `{}`.\n", path_string);
+    *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
 
-    let input = Input::File(options.file.to_owned());
+    log::debug!("Running `{}`.\n", options.file.display());
+
+    let input: Input = options.file.clone().into();
     let db = Database::default();
 
     log::info!("Parsing string to CST…");
     let (cst, errors) = db
         .cst_raw(input.clone())
-        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+        .unwrap_or_else(|| panic!("File `{}` not found.", options.file.display()));
     if options.print_cst {
         log::info!("CST: {:#?}", cst);
     }
@@ -75,11 +81,22 @@ fn run(options: CandyRunOptions) {
     }
 
     log::info!("Lowering CST to AST…");
-    let (asts, _, errors) = db
+    let (asts, ast_cst_id_map, errors) = db
         .ast_raw(input.clone())
-        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+        .unwrap_or_else(|| panic!("File `{}` not found.", options.file.display()));
     if options.print_ast {
         log::info!("AST: {:#?}", asts);
+    }
+    if options.print_ast_cst_id_map {
+        log::info!(
+            "AST → CST Id map: {}",
+            ast_cst_id_map
+                .keys()
+                .into_iter()
+                .sorted_by_key(|it| it.local)
+                .map(|key| format!("{}: {}", key.local, ast_cst_id_map[key].0))
+                .join(", ")
+        );
     }
     if !errors.is_empty() {
         log::error!("Errors occurred while lowering CST to AST:\n{:#?}", errors);
@@ -89,7 +106,7 @@ fn run(options: CandyRunOptions) {
     log::info!("Compiling AST to HIR…");
     let (hir, _, errors) = db
         .hir_raw(input.clone())
-        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+        .unwrap_or_else(|| panic!("File `{}` not found.", options.file.display()));
     if options.print_hir {
         log::info!("HIR: {:?}", hir);
     }

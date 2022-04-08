@@ -76,20 +76,26 @@ impl Environment {
         }
     }
     pub fn store(&mut self, id: Id, value: DiscoverResult) {
-        assert!(
-            !self.bindings.contains_key(&id),
-            "Tried to overwrite a value at ID {} with {:?} (old value: {:?})",
-            &id,
-            &value,
-            &self.bindings.get(&id).unwrap(),
-        );
+        if let Some(old_value) = self.bindings.get(&id) {
+            if !matches!(old_value, DiscoverResult::DependsOnParameter) {
+                panic!(
+                    "Tried to overwrite a value at ID {} with {:?} (old value: {:?})",
+                    &id,
+                    &value,
+                    &self.bindings.get(&id).unwrap(),
+                );
+            }
+        }
         assert!(self.bindings.insert(id, value).is_none())
     }
-    pub fn get(&self, id: &Id) -> Option<DiscoverResult> {
-        self.bindings
-            .get(id)
-            .map(|it| it.clone())
-            .or_else(|| self.parent.as_ref()?.get(id))
+    pub fn get(&self, id: &Id) -> DiscoverResult {
+        match self.bindings.get(id).map(|it| it.clone()) {
+            Some(value) => value,
+            None => match self.parent.as_ref() {
+                Some(parent) => parent.get(id),
+                None => panic!("Couldn't find a value for ID {}", id),
+            },
+        }
     }
 
     pub fn flatten(self) -> HashMap<Id, DiscoverResult> {
