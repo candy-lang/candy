@@ -42,7 +42,7 @@ pub trait HintsDb: AstToHir + Discover + HirDb + InputDb + LspPositionConversion
 }
 
 fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
-    log::debug!("Calculating hints for {:?}", input);
+    log::debug!("Calculating hints for {}", input);
 
     let (hir, _) = db.hir(input.clone()).unwrap();
     let discover_results = db.run_all(input.clone());
@@ -80,10 +80,10 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
                 position,
             })
         })
-        // If multiple hints are on the same line, only show the first one.
+        // If multiple hints are on the same line, only show the last one.
         .group_by(|hint| hint.position.line)
         .into_iter()
-        .map(|(_, hints)| hints.into_iter().nth(0).unwrap())
+        .map(|(_, hints)| hints.into_iter().last().unwrap())
         .collect()
 }
 
