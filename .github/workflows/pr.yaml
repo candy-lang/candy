@@ -6,9 +6,10 @@ jobs:
   add-labels:
     runs-on: ubuntu-latest
     steps:
-      - uses: srvaroa/labeler@v0.7
-        env:
-          GITHUB_TOKEN: '${{ secrets.BOT_TOKEN }}'
+      - uses: actions/labeler@v2
+        with:
+          configuration-path: .github/labels.yaml
+          repo-token: '${{ secrets.BOT_TOKEN }}'
 
   assign-author:
     if: github.event.action == 'opened'
