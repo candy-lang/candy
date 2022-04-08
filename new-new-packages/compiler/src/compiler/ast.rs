@@ -1,7 +1,27 @@
-use std::ops::Deref;
+use std::{
+    fmt::{self, Display, Formatter},
+    ops::Deref,
+};
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct Id(pub usize);
+use linked_hash_map::LinkedHashMap;
+
+use crate::input::Input;
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct Id {
+    pub input: Input,
+    pub local: usize,
+}
+impl Id {
+    pub fn new(input: Input, local: usize) -> Self {
+        Self { input, local }
+    }
+}
+impl Display for Id {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "AstId({}:{:?})", self.input, self.local)
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Ast {
@@ -15,6 +35,7 @@ pub enum AstKind {
     Text(Text),
     Identifier(Identifier),
     Symbol(Symbol),
+    Struct(Struct),
     Lambda(Lambda),
     Call(Call),
     Assignment(Assignment),
@@ -32,6 +53,11 @@ pub struct Identifier(pub AstString);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Symbol(pub AstString);
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct Struct {
+    pub fields: LinkedHashMap<Ast, Ast>,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Lambda {

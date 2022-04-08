@@ -75,7 +75,7 @@ function safeSpawn(): SpawnedProcess {
 class LoggingTransform extends stream.Transform {
   constructor(
     private readonly prefix: string,
-    private readonly onlyShowJson: boolean = false,
+    private readonly onlyShowJson: boolean = true,
     opts?: stream.TransformOptions
   ) {
     super(opts);

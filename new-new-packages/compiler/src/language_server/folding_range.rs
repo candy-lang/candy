@@ -2,7 +2,7 @@ use lsp_types::{FoldingRange, FoldingRangeKind};
 
 use crate::{
     compiler::{
-        cst::{Cst, CstKind},
+        cst::{Cst, CstKind, UnwrapWhitespaceAndComment},
         rcst_to_cst::RcstToCst,
     },
     input::Input,
@@ -83,9 +83,11 @@ impl<'a> Context<'a> {
                 self.visit_cst(name);
                 self.visit_csts(&arguments);
             }
-            // TODO: support folding ranges for structs
-            CstKind::Struct { .. } => {}
-            CstKind::StructField { .. } => {}
+            CstKind::Struct { fields, .. } => self.visit_csts(fields),
+            CstKind::StructField { key, value, .. } => {
+                self.visit_cst(key);
+                self.visit_cst(value);
+            }
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -144,12 +146,9 @@ impl<'a> Context<'a> {
     fn push(&mut self, start: usize, end: usize, kind: FoldingRangeKind) {
         let start = self
             .db
-            .utf8_byte_offset_to_lsp(start, self.input.clone())
+            .offset_to_lsp(self.input.clone(), start)
             .to_position();
-        let end = self
-            .db
-            .utf8_byte_offset_to_lsp(end, self.input.clone())
-            .to_position();
+        let end = self.db.offset_to_lsp(self.input.clone(), end).to_position();
 
         self.ranges.push(FoldingRange {
             start_line: start.line,

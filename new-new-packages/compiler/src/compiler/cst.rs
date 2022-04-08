@@ -7,11 +7,19 @@ use std::{
 
 #[salsa::query_group(CstDbStorage)]
 pub trait CstDb: RcstToCst {
-    fn find_cst(&self, input: Input, id: Id) -> Option<Cst>;
+    fn find_cst(&self, input: Input, id: Id) -> Cst;
+    fn find_cst_by_offset(&self, input: Input, offset: usize) -> Cst;
 }
 
-fn find_cst(db: &dyn CstDb, input: Input, id: Id) -> Option<Cst> {
-    db.cst(input).unwrap().find(&id).map(|it| it.to_owned())
+fn find_cst(db: &dyn CstDb, input: Input, id: Id) -> Cst {
+    db.cst(input).unwrap().find(&id).unwrap().to_owned()
+}
+fn find_cst_by_offset(db: &dyn CstDb, input: Input, offset: usize) -> Cst {
+    db.cst(input)
+        .unwrap()
+        .find_by_offset(&offset)
+        .unwrap()
+        .to_owned()
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
@@ -98,15 +106,15 @@ pub enum CstKind {
 impl Display for Cst {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.kind {
-            CstKind::EqualsSign => "=".fmt(f),
-            CstKind::Comma => ",".fmt(f),
-            CstKind::Colon => ":".fmt(f),
-            CstKind::OpeningParenthesis => "(".fmt(f),
-            CstKind::ClosingParenthesis => ")".fmt(f),
-            CstKind::OpeningBracket => "[".fmt(f),
-            CstKind::ClosingBracket => "]".fmt(f),
-            CstKind::OpeningCurlyBrace => "{".fmt(f),
-            CstKind::ClosingCurlyBrace => "}".fmt(f),
+            CstKind::EqualsSign => '='.fmt(f),
+            CstKind::Comma => ','.fmt(f),
+            CstKind::Colon => ':'.fmt(f),
+            CstKind::OpeningParenthesis => '('.fmt(f),
+            CstKind::ClosingParenthesis => ')'.fmt(f),
+            CstKind::OpeningBracket => '['.fmt(f),
+            CstKind::ClosingBracket => ']'.fmt(f),
+            CstKind::OpeningCurlyBrace => '{'.fmt(f),
+            CstKind::ClosingCurlyBrace => '}'.fmt(f),
             CstKind::Arrow => "->".fmt(f),
             CstKind::DoubleQuote => '"'.fmt(f),
             CstKind::Octothorpe => '#'.fmt(f),
@@ -145,11 +153,7 @@ impl Display for Cst {
                 opening_parenthesis,
                 inner,
                 closing_parenthesis,
-            } => {
-                opening_parenthesis.fmt(f)?;
-                inner.fmt(f)?;
-                closing_parenthesis.fmt(f)
-            }
+            } => write!(f, "{}{}{}", opening_parenthesis, inner, closing_parenthesis),
             CstKind::Call { name, arguments } => {
                 name.fmt(f)?;
                 for argument in arguments {
@@ -237,6 +241,124 @@ impl Cst {
         }
     }
 
+    fn is_whitespace(&self) -> bool {
+        match &self.kind {
+            CstKind::Whitespace(_) | CstKind::Newline | CstKind::Comment { .. } => true,
+            CstKind::TrailingWhitespace { child, .. } => child.is_whitespace(),
+            _ => false,
+        }
+    }
+}
+
+pub trait UnwrapWhitespaceAndComment {
+    fn unwrap_whitespace_and_comment(&self) -> Self;
+}
+impl UnwrapWhitespaceAndComment for Cst {
+    fn unwrap_whitespace_and_comment(&self) -> Self {
+        let kind = match &self.kind {
+            CstKind::TrailingWhitespace { child, .. } => {
+                return child.unwrap_whitespace_and_comment()
+            }
+            CstKind::Text {
+                opening_quote,
+                parts,
+                closing_quote,
+            } => CstKind::Text {
+                opening_quote: Box::new(opening_quote.unwrap_whitespace_and_comment()),
+                parts: parts.unwrap_whitespace_and_comment(),
+                closing_quote: Box::new(closing_quote.unwrap_whitespace_and_comment()),
+            },
+            CstKind::Parenthesized {
+                opening_parenthesis,
+                inner,
+                closing_parenthesis,
+            } => CstKind::Parenthesized {
+                opening_parenthesis: Box::new(opening_parenthesis.unwrap_whitespace_and_comment()),
+                inner: Box::new(inner.unwrap_whitespace_and_comment()),
+                closing_parenthesis: Box::new(closing_parenthesis.unwrap_whitespace_and_comment()),
+            },
+            CstKind::Call { name, arguments } => CstKind::Call {
+                name: Box::new(name.unwrap_whitespace_and_comment()),
+                arguments: arguments.unwrap_whitespace_and_comment(),
+            },
+            CstKind::Struct {
+                opening_bracket,
+                fields,
+                closing_bracket,
+            } => CstKind::Struct {
+                opening_bracket: Box::new(opening_bracket.unwrap_whitespace_and_comment()),
+                fields: fields.unwrap_whitespace_and_comment(),
+                closing_bracket: Box::new(closing_bracket.unwrap_whitespace_and_comment()),
+            },
+            CstKind::StructField {
+                key,
+                colon,
+                value,
+                comma,
+            } => CstKind::StructField {
+                key: Box::new(key.unwrap_whitespace_and_comment()),
+                colon: Box::new(colon.unwrap_whitespace_and_comment()),
+                value: Box::new(value.unwrap_whitespace_and_comment()),
+                comma: comma
+                    .as_ref()
+                    .map(|comma| Box::new(comma.unwrap_whitespace_and_comment())),
+            },
+            CstKind::Lambda {
+                opening_curly_brace,
+                parameters_and_arrow,
+                body,
+                closing_curly_brace,
+            } => CstKind::Lambda {
+                opening_curly_brace: Box::new(opening_curly_brace.unwrap_whitespace_and_comment()),
+                parameters_and_arrow: parameters_and_arrow.as_ref().map(|(parameters, arrow)| {
+                    (
+                        parameters.unwrap_whitespace_and_comment(),
+                        Box::new(arrow.unwrap_whitespace_and_comment()),
+                    )
+                }),
+                body: body.unwrap_whitespace_and_comment(),
+                closing_curly_brace: Box::new(closing_curly_brace.unwrap_whitespace_and_comment()),
+            },
+            CstKind::Assignment {
+                name,
+                parameters,
+                equals_sign,
+                body,
+            } => CstKind::Assignment {
+                name: Box::new(name.unwrap_whitespace_and_comment()),
+                parameters: parameters.unwrap_whitespace_and_comment(),
+                equals_sign: Box::new(equals_sign.unwrap_whitespace_and_comment()),
+                body: body.unwrap_whitespace_and_comment(),
+            },
+            other_kind => other_kind.clone(),
+        };
+        Cst {
+            id: self.id,
+            span: self.span.clone(),
+            kind,
+        }
+    }
+}
+impl UnwrapWhitespaceAndComment for Vec<Cst> {
+    fn unwrap_whitespace_and_comment(&self) -> Self {
+        self.iter()
+            .filter(|it| !it.is_whitespace())
+            .map(|it| it.unwrap_whitespace_and_comment())
+            .collect()
+    }
+}
+
+trait TreeWithIds {
+    fn first_id(&self) -> Option<Id>;
+    fn find(&self, id: &Id) -> Option<&Cst>;
+
+    fn first_offset(&self) -> Option<usize>;
+    fn find_by_offset(&self, offset: &usize) -> Option<&Cst>;
+}
+impl TreeWithIds for Cst {
+    fn first_id(&self) -> Option<Id> {
+        Some(self.id)
+    }
     fn find(&self, id: &Id) -> Option<&Cst> {
         if id == &self.id {
             return Some(self);
@@ -330,27 +452,140 @@ impl Cst {
         }
     }
 
-    pub fn unwrap_whitespace_and_comment(&self) -> &Self {
-        match &self.kind {
-            CstKind::TrailingWhitespace { child, .. } => child.unwrap_whitespace_and_comment(),
-            _ => self,
-        }
+    fn first_offset(&self) -> Option<usize> {
+        Some(self.span.start)
+    }
+    fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
+        let inner = match &self.kind {
+            CstKind::EqualsSign { .. } => None,
+            CstKind::Colon { .. } => None,
+            CstKind::Comma { .. } => None,
+            CstKind::OpeningParenthesis { .. } => None,
+            CstKind::ClosingParenthesis { .. } => None,
+            CstKind::OpeningBracket { .. } => None,
+            CstKind::ClosingBracket { .. } => None,
+            CstKind::OpeningCurlyBrace { .. } => None,
+            CstKind::ClosingCurlyBrace { .. } => None,
+            CstKind::Arrow { .. } => None,
+            CstKind::DoubleQuote => todo!(),
+            CstKind::Octothorpe => todo!(),
+            CstKind::Whitespace(_) => todo!(),
+            CstKind::Newline => todo!(),
+            CstKind::Comment {
+                octothorpe,
+                comment,
+            } => todo!(),
+            CstKind::TrailingWhitespace { child, .. } => child.find_by_offset(offset),
+            CstKind::Identifier { .. } => None,
+            CstKind::Symbol { .. } => None,
+            CstKind::Int { .. } => None,
+            CstKind::Text { .. } => None,
+            CstKind::TextPart(_) => todo!(),
+            CstKind::Parenthesized { inner, .. } => inner.find_by_offset(offset),
+            CstKind::Call { name, arguments } => name
+                .find_by_offset(offset)
+                .or_else(|| arguments.find_by_offset(offset)),
+            CstKind::Struct {
+                opening_bracket,
+                fields,
+                closing_bracket,
+            } => opening_bracket
+                .find_by_offset(offset)
+                .or_else(|| fields.find_by_offset(offset))
+                .or_else(|| closing_bracket.find_by_offset(offset)),
+            CstKind::StructField {
+                key,
+                colon,
+                value,
+                comma,
+            } => key
+                .find_by_offset(offset)
+                .or_else(|| colon.find_by_offset(offset))
+                .or_else(|| value.find_by_offset(offset))
+                .or_else(|| comma.find_by_offset(offset)),
+            CstKind::Lambda { body, .. } => body.find_by_offset(offset),
+            CstKind::Assignment {
+                name,
+                parameters,
+                equals_sign,
+                body,
+            } => name
+                .find_by_offset(offset)
+                .or_else(|| parameters.find_by_offset(offset))
+                .or_else(|| equals_sign.find_by_offset(offset))
+                .or_else(|| body.find_by_offset(offset)),
+            CstKind::Error { .. } => None,
+        };
+
+        inner.or_else(|| {
+            if self.span.contains(offset) {
+                return Some(self);
+            } else {
+                None
+            }
+        })
     }
 }
+impl<T: TreeWithIds> TreeWithIds for Option<T> {
+    fn first_id(&self) -> Option<Id> {
+        self.as_ref().and_then(|it| it.first_id())
+    }
+    fn find(&self, id: &Id) -> Option<&Cst> {
+        self.as_ref().and_then(|it| it.find(id))
+    }
 
-pub trait CstVecExtension {
-    fn find(&self, id: &Id) -> Option<&Cst>;
+    fn first_offset(&self) -> Option<usize> {
+        self.as_ref().and_then(|it| it.first_offset())
+    }
+    fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
+        self.as_ref().and_then(|it| it.find_by_offset(offset))
+    }
 }
-impl<T> CstVecExtension for T
-where
-    T: AsRef<[Cst]>,
-{
+impl<T: TreeWithIds> TreeWithIds for Box<T> {
+    fn first_id(&self) -> Option<Id> {
+        self.as_ref().first_id()
+    }
+    fn find(&self, id: &Id) -> Option<&Cst> {
+        self.as_ref().find(id)
+    }
+
+    fn first_offset(&self) -> Option<usize> {
+        self.as_ref().first_offset()
+    }
+    fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
+        self.as_ref().find_by_offset(offset)
+    }
+}
+impl<T: TreeWithIds> TreeWithIds for [T] {
+    fn first_id(&self) -> Option<Id> {
+        self.iter()
+            .map(|it| it.first_id())
+            .filter_map(Some)
+            .nth(0)
+            .flatten()
+    }
     fn find(&self, id: &Id) -> Option<&Cst> {
         let slice = self.as_ref();
         let child_index = slice
-            .binary_search_by_key(id, |it| it.id)
+            .binary_search_by_key(id, |it| it.first_id().unwrap())
             .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
             .ok()?;
         slice[child_index].find(id)
+    }
+
+    fn first_offset(&self) -> Option<usize> {
+        self.iter()
+            .map(|it| it.first_offset())
+            .filter_map(Some)
+            .nth(0)
+            .flatten()
+    }
+    fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
+        let slice = self.as_ref();
+        let child_index = slice
+            .binary_search_by_key(offset, |it| it.first_offset().unwrap())
+            .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
+            .ok()?;
+        slice[child_index].find_by_offset(offset)
     }
 }

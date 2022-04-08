@@ -1,3 +1,5 @@
+#![feature(try_trait_v2)]
+
 mod builtin_functions;
 mod compiler;
 mod database;
@@ -11,12 +13,15 @@ use crate::compiler::cst_to_ast::CstToAst;
 use crate::compiler::hir;
 use crate::compiler::rcst_to_cst::RcstToCst;
 use crate::compiler::string_to_rcst::StringToRcst;
+use crate::database::PROJECT_DIRECTORY;
 use crate::{database::Database, input::Input};
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use log;
 use lspower::{LspService, Server};
 use notify::{watcher, RecursiveMode, Watcher};
+use std::env::current_dir;
+use std::fs;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
@@ -60,6 +65,8 @@ async fn main() {
 }
 
 fn build(options: CandyBuildOptions) {
+    *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
+
     raw_build(&options.file, options.debug);
 
     if options.watch {
@@ -82,7 +89,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
     let path_string = file.to_string_lossy();
     log::debug!("Building `{}`.", path_string);
 
-    let input = Input::File(file.to_owned());
+    let input: Input = file.clone().into();
     let db = Database::default();
 
     log::info!("Parsing string to RCST…");
@@ -90,9 +97,8 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
         .rcst(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if debug {
-        let mut file = file.clone();
-        assert!(file.set_extension("candy.rcst"));
-        std::fs::write(file, format!("{:#?}\n", rcst.clone())).unwrap();
+        let hir_file = file.clone_with_extension("candy.rcst");
+        fs::write(hir_file, format!("{:#?}\n", rcst.clone())).unwrap();
     }
 
     log::info!("Parsing RCST to CST…");
@@ -100,23 +106,29 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
         .cst(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if debug {
-        let mut file = file.clone();
-        assert!(file.set_extension("candy.cst"));
-        std::fs::write(file, format!("{:#?}\n", cst.clone())).unwrap();
+        let cst_file = file.clone_with_extension("candy.cst");
+        fs::write(cst_file, format!("{:#?}\n", cst.clone())).unwrap();
     }
 
     log::info!("Lowering CST to AST…");
-    let (asts, _, errors) = db
+    let (asts, ast_cst_id_map, errors) = db
         .ast_raw(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if debug {
-        let mut file = file.clone();
-        assert!(file.set_extension("candy.ast"));
-        std::fs::write(file, format!("{:#?}\n", asts.clone())).unwrap();
-    }
-    if !errors.is_empty() {
-        log::error!("Errors occurred while lowering CST to AST:\n{:#?}", errors);
-        return None;
+        let ast_file = file.clone_with_extension("candy.ast");
+        fs::write(ast_file, format!("{:#?}\n", asts.clone())).unwrap();
+
+        let ast_to_cst_ids_file = file.clone_with_extension("candy.cst_to_ast_ids");
+        fs::write(
+            ast_to_cst_ids_file,
+            ast_cst_id_map
+                .keys()
+                .into_iter()
+                .sorted_by_key(|it| it.local)
+                .map(|key| format!("{}: {}", key.local, ast_cst_id_map[key].0))
+                .join("\n"),
+        )
+        .unwrap();
     }
 
     log::info!("Compiling AST to HIR…");
@@ -124,13 +136,8 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
         .hir_raw(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if debug {
-        let mut file = file.clone();
-        assert!(file.set_extension("candy.hir"));
-        std::fs::write(file, format!("{:#?}\n", hir.clone())).unwrap();
-    }
-    if !errors.is_empty() {
-        log::error!("Errors occurred while lowering AST to HIR:\n{:#?}", errors);
-        return None;
+        let hir_file = file.clone_with_extension("candy.hir");
+        fs::write(hir_file, format!("{:#?}\n", hir.clone())).unwrap();
     }
 
     // let reports = analyze((*lambda).clone());
@@ -142,6 +149,13 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
 }
 
 fn run(options: CandyRunOptions) {
+    *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
+
+    log::debug!("Running `{}`.\n", options.file.display());
+
+    let input: Input = options.file.clone().into();
+    let db = Database::default();
+
     let _hir = raw_build(&options.file, false);
 
     let path_string = options.file.to_string_lossy();
@@ -183,4 +197,15 @@ fn init_logger() {
         .chain(std::io::stderr())
         .apply()
         .unwrap();
+}
+
+trait CloneWithExtension {
+    fn clone_with_extension(&self, extension: &'static str) -> Self;
+}
+impl CloneWithExtension for PathBuf {
+    fn clone_with_extension(&self, extension: &'static str) -> Self {
+        let mut path = self.clone();
+        assert!(path.set_extension(extension));
+        path
+    }
 }

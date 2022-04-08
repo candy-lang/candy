@@ -4,7 +4,7 @@ use crate::{
         ast_to_hir::AstToHir,
         hir::{self, Expression, HirDb, Lambda},
     },
-    discover::{run::Discover, value::Value},
+    discover::{result::DiscoverResult, run::Discover, value::Value},
     input::{Input, InputDb},
     language_server::utils::TupleToPosition,
 };
@@ -42,30 +42,26 @@ pub trait HintsDb: AstToHir + Discover + HirDb + InputDb + LspPositionConversion
 }
 
 fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
-    log::debug!("Calculating hints!");
+    log::debug!("Calculating hints for {:?}", input);
 
     let (hir, _) = db.hir(input.clone()).unwrap();
+    let discover_results = db.run_all(input.clone());
 
-    collect_hir_ids_for_hints_list(db, input.clone(), hir.expressions.keys().cloned().collect())
+    collect_hir_ids_for_hints_list(db, hir.expressions.keys().cloned().collect())
         .into_iter()
         .filter_map(|id| {
-            let value = db.run(input.clone(), id.clone());
-            value.map(|it| (id, it))
-        })
-        .filter_map(|(id, value)| {
-            if value == Ok(Value::nothing()) {
-                return None;
+            let (kind, value) = match discover_results.get(&id).unwrap() {
+                DiscoverResult::Value(value) if value != &Value::nothing() => {
+                    (HintKind::Value, value)
+                }
+                DiscoverResult::Panic(value) => (HintKind::Panic, value),
+                _ => return None,
             };
 
-            let (kind, value) = match value {
-                Ok(value) => (HintKind::Value, value),
-                Err(value) => (HintKind::Panic, value),
-            };
-
-            let span = db.hir_to_display_span(input.clone(), id.clone()).unwrap();
+            let span = db.hir_id_to_display_span(id)?;
 
             let line = db
-                .utf8_byte_offset_to_lsp(span.start, input.clone())
+                .offset_to_lsp(input.clone(), span.start)
                 .to_position()
                 .line;
             let line_start_offsets = db.line_start_utf8_byte_offsets(input.clone());
@@ -75,12 +71,12 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
                 line_start_offsets[(line + 1) as usize] - 1
             };
             let position = db
-                .utf8_byte_offset_to_lsp(last_characer_of_line, input.clone())
+                .offset_to_lsp(input.clone(), last_characer_of_line)
                 .to_position();
 
             Some(Hint {
                 kind,
-                text: format!(" # {}", db.value_to_display_string(input.clone(), value)),
+                text: format!(" # {}", db.value_to_display_string(value.to_owned())),
                 position,
             })
         })
@@ -91,38 +87,36 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
         .collect()
 }
 
-fn collect_hir_ids_for_hints_list(
-    db: &dyn HintsDb,
-    input: Input,
-    ids: Vec<hir::Id>,
-) -> Vec<hir::Id> {
+fn collect_hir_ids_for_hints_list(db: &dyn HintsDb, ids: Vec<hir::Id>) -> Vec<hir::Id> {
     ids.into_iter()
-        .flat_map(|id| collect_hir_ids_for_hints(db, input.clone(), id))
+        .flat_map(|id| collect_hir_ids_for_hints(db, id))
         .collect()
 }
-fn collect_hir_ids_for_hints(db: &dyn HintsDb, input: Input, id: hir::Id) -> Vec<hir::Id> {
-    match db.find_expression(input.clone(), id.clone()).unwrap() {
+fn collect_hir_ids_for_hints(db: &dyn HintsDb, id: hir::Id) -> Vec<hir::Id> {
+    match db.find_expression(id.clone()).unwrap() {
         Expression::Int(_) => vec![],
         Expression::Text(_) => vec![],
         Expression::Reference(_) => vec![id],
         Expression::Symbol(_) => vec![],
+        Expression::Struct(_) => vec![], // Handled separately // TODO
         Expression::Lambda(Lambda { body, .. }) => {
-            collect_hir_ids_for_hints_list(db, input, body.expressions.keys().cloned().collect())
+            collect_hir_ids_for_hints_list(db, body.expressions.keys().cloned().collect())
         }
         Expression::Body(body) => {
-            collect_hir_ids_for_hints_list(db, input, body.expressions.keys().cloned().collect())
+            collect_hir_ids_for_hints_list(db, body.expressions.keys().cloned().collect())
         }
         Expression::Call { arguments, .. } => {
             let mut ids = vec![id.to_owned()];
             for argument_id in arguments {
-                let argument = db
-                    .find_expression(input.clone(), argument_id.clone())
-                    .unwrap();
+                let argument = match db.find_expression(argument_id.clone()) {
+                    Some(argument) => argument,
+                    None => continue, // Generated code
+                };
                 if let Expression::Reference(_) = argument {
                     continue;
                 }
 
-                ids.extend(collect_hir_ids_for_hints(db, input.clone(), argument_id));
+                ids.extend(collect_hir_ids_for_hints(db, argument_id));
             }
             ids
         }

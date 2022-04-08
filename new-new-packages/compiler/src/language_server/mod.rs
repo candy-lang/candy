@@ -1,11 +1,14 @@
+use itertools::Itertools;
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentFilter, FoldingRange, FoldingRangeParams, InitializeParams, InitializeResult,
-    InitializedParams, MessageType, Registration, SemanticTokens, SemanticTokensFullOptions,
-    SemanticTokensOptions, SemanticTokensParams, SemanticTokensRegistrationOptions,
-    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
-    StaticRegistrationOptions, TextDocumentChangeRegistrationOptions,
-    TextDocumentContentChangeEvent, TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
+    DocumentFilter, DocumentHighlight, DocumentHighlightParams, FoldingRange, FoldingRangeParams,
+    GotoDefinitionParams, GotoDefinitionResponse, InitializeParams, InitializeResult,
+    InitializedParams, Location, MessageType, ReferenceParams, Registration, SemanticTokens,
+    SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
+    SemanticTokensRegistrationOptions, SemanticTokensResult, SemanticTokensServerCapabilities,
+    ServerCapabilities, ServerInfo, StaticRegistrationOptions,
+    TextDocumentChangeRegistrationOptions, TextDocumentContentChangeEvent,
+    TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
 };
 use lspower::{jsonrpc, Client, LanguageServer};
 use tokio::sync::Mutex;
@@ -15,18 +18,25 @@ use crate::{
         ast_to_hir::AstToHir, cst_to_ast::CstToAst, rcst_to_cst::RcstToCst,
         string_to_rcst::StringToRcst,
     },
+    database::PROJECT_DIRECTORY,
     input::{Input, InputDb},
     language_server::hints::HintsDb,
     Database,
 };
 
 use self::{
-    folding_range::FoldingRangeDb, hints::HintsNotification, semantic_tokens::SemanticTokenDb,
-    utils::LspPositionConversion,
+    definition::find_definition,
+    folding_range::FoldingRangeDb,
+    hints::HintsNotification,
+    references::{find_document_highlights, find_references},
+    semantic_tokens::SemanticTokenDb,
+    utils::{line_start_utf8_byte_offsets_raw, offset_from_lsp_raw},
 };
 
+pub mod definition;
 pub mod folding_range;
 pub mod hints;
+pub mod references;
 pub mod semantic_tokens;
 pub mod utils;
 
@@ -45,11 +55,24 @@ impl CandyLanguageServer {
 
 #[lspower::async_trait]
 impl LanguageServer for CandyLanguageServer {
-    async fn initialize(&self, _: InitializeParams) -> jsonrpc::Result<InitializeResult> {
+    async fn initialize(&self, params: InitializeParams) -> jsonrpc::Result<InitializeResult> {
         log::info!("LSP: initialize");
         self.client
             .log_message(MessageType::INFO, "Initializing!")
             .await;
+
+        let first_workspace_folder = params
+            .workspace_folders
+            .unwrap()
+            .first()
+            .unwrap()
+            .uri
+            .clone();
+        *PROJECT_DIRECTORY.lock().unwrap() = match first_workspace_folder.scheme() {
+            "file" => Some(first_workspace_folder.to_file_path().unwrap()),
+            _ => panic!("Workspace folder must be a file URI."),
+        };
+
         Ok(InitializeResult {
             // We only support dynamic registration for now.
             capabilities: ServerCapabilities::default(),
@@ -62,13 +85,20 @@ impl LanguageServer for CandyLanguageServer {
 
     async fn initialized(&self, _: InitializedParams) {
         log::info!("LSP: initialized");
-        let candy_files = DocumentFilter {
-            language: Some("candy".to_owned()),
-            scheme: Some("file".to_owned()),
-            pattern: None,
-        };
+        let candy_files = vec![
+            DocumentFilter {
+                language: Some("candy".to_owned()),
+                scheme: Some("file".to_owned()),
+                pattern: None,
+            },
+            DocumentFilter {
+                language: Some("candy".to_owned()),
+                scheme: Some("untitled".to_owned()),
+                pattern: None,
+            },
+        ];
         let text_document_registration_options = TextDocumentRegistrationOptions {
-            document_selector: Some(vec![candy_files.clone()]),
+            document_selector: Some(candy_files.clone()),
         };
         self.client
             .register_capability(vec![
@@ -91,7 +121,7 @@ impl LanguageServer for CandyLanguageServer {
                     method: "textDocument/didChange".to_owned(),
                     register_options: Some(
                         serde_json::to_value(TextDocumentChangeRegistrationOptions {
-                            document_selector: Some(vec![candy_files]),
+                            document_selector: Some(candy_files),
                             sync_kind: 2, // incremental
                         })
                         .unwrap(),
@@ -99,13 +129,34 @@ impl LanguageServer for CandyLanguageServer {
                 },
                 Registration {
                     id: "3".to_owned(),
-                    method: "textDocument/foldingRange".to_owned(),
+                    method: "textDocument/definition".to_owned(),
                     register_options: Some(
                         serde_json::to_value(text_document_registration_options.clone()).unwrap(),
                     ),
                 },
                 Registration {
                     id: "4".to_owned(),
+                    method: "textDocument/references".to_owned(),
+                    register_options: Some(
+                        serde_json::to_value(text_document_registration_options.clone()).unwrap(),
+                    ),
+                },
+                Registration {
+                    id: "5".to_owned(),
+                    method: "textDocument/documentHighlight".to_owned(),
+                    register_options: Some(
+                        serde_json::to_value(text_document_registration_options.clone()).unwrap(),
+                    ),
+                },
+                Registration {
+                    id: "6".to_owned(),
+                    method: "textDocument/foldingRange".to_owned(),
+                    register_options: Some(
+                        serde_json::to_value(text_document_registration_options.clone()).unwrap(),
+                    ),
+                },
+                Registration {
+                    id: "7".to_owned(),
                     method: "textDocument/semanticTokens".to_owned(),
                     register_options: Some(
                         serde_json::to_value(
@@ -147,21 +198,43 @@ impl LanguageServer for CandyLanguageServer {
             let mut db = self.db.lock().await;
             db.did_open_input(&input, params.text_document.text);
         }
-        self.analyze_file(input).await;
+        self.analyze_files(vec![input]).await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let input: Input = params.text_document.uri.into();
+        let mut open_inputs = Vec::<Input>::new();
         {
             let mut db = self.db.lock().await;
             let text = apply_text_changes(&db, input.clone(), params.content_changes);
             db.did_change_input(&input, text);
+            open_inputs.extend(db.open_inputs.keys().cloned());
         }
-        self.analyze_file(input).await;
+        self.analyze_files(open_inputs).await;
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         let input = params.text_document.uri.into();
         let mut db = self.db.lock().await;
         db.did_close_input(&input);
+    }
+
+    async fn goto_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> jsonrpc::Result<Option<GotoDefinitionResponse>> {
+        let db = self.db.lock().await;
+        Ok(find_definition(&db, params))
+    }
+
+    async fn references(&self, params: ReferenceParams) -> jsonrpc::Result<Option<Vec<Location>>> {
+        let db = self.db.lock().await;
+        Ok(find_references(&db, params))
+    }
+    async fn document_highlight(
+        &self,
+        params: DocumentHighlightParams,
+    ) -> jsonrpc::Result<Option<Vec<DocumentHighlight>>> {
+        let db = self.db.lock().await;
+        Ok(find_document_highlights(&db, params))
     }
 
     async fn folding_range(
@@ -187,34 +260,33 @@ impl LanguageServer for CandyLanguageServer {
 }
 
 impl CandyLanguageServer {
-    async fn analyze_file(&self, input: Input) {
-        log::debug!("Analyzing file. Locking guard.");
+    async fn analyze_files(&self, inputs: Vec<Input>) {
+        log::debug!("Analyzing file(s) {}", inputs.iter().join(", "));
         let db = self.db.lock().await;
         log::debug!("Locked.");
 
-        let _ = db.cst(input.clone()).unwrap();
-        let (_, _, ast_errors) = db.ast_raw(input.clone()).unwrap();
-        let (_, _, hir_errors) = db.hir_raw(input.clone()).unwrap();
+        for input in inputs {
+            let _ = db.cst(input.clone()).unwrap();
+            let (_, _, ast_errors) = db.ast_raw(input.clone()).unwrap();
+            let (_, _, hir_errors) = db.hir_raw(input.clone()).unwrap();
 
-        log::debug!("Mapping errors to diagnostics.");
-        // TODO(MarcelGarus): Report CST errors.
-        let diagnostics = ast_errors
-            .into_iter()
-            .chain(hir_errors.into_iter())
-            .map(|it| it.to_diagnostic(&db, input.clone()))
-            .collect();
-        log::debug!("Publishing diagnostics.");
-        self.client
-            .publish_diagnostics(input.clone().into(), diagnostics, None)
-            .await;
-        log::debug!("Published.");
-        let hints = db.hints(input.clone());
-        self.client
-            .send_custom_notification::<HintsNotification>(HintsNotification {
-                uri: Url::from(input).to_string(),
-                hints,
-            })
-            .await;
+            // TODO(MarcelGarus): Report CST errors.
+            let diagnostics = ast_errors
+                .into_iter()
+                .chain(hir_errors.into_iter())
+                .map(|it| it.to_diagnostic(&db, input.clone()))
+                .collect();
+            self.client
+                .publish_diagnostics(input.clone().into(), diagnostics, None)
+                .await;
+            let hints = db.hints(input.clone());
+            self.client
+                .send_custom_notification::<HintsNotification>(HintsNotification {
+                    uri: Url::from(input).to_string(),
+                    hints,
+                })
+                .await;
+        }
     }
 }
 
@@ -227,16 +299,9 @@ fn apply_text_changes(
     for change in changes {
         match change.range {
             Some(range) => {
-                let start = db.position_to_utf8_byte_offset(
-                    range.start.line,
-                    range.start.character,
-                    input.clone(),
-                );
-                let end = db.position_to_utf8_byte_offset(
-                    range.end.line,
-                    range.end.character,
-                    input.clone(),
-                );
+                let line_start_offsets = line_start_utf8_byte_offsets_raw(&text);
+                let start = offset_from_lsp_raw(&text, &line_start_offsets[..], range.start);
+                let end = offset_from_lsp_raw(&text, &line_start_offsets[..], range.end);
                 text = format!("{}{}{}", &text[..start], &change.text, &text[end..]);
             }
             None => text = change.text,

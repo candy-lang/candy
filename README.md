@@ -61,24 +61,22 @@ Our TODO list:
 * [x] lower AST to HIR
 * [x] build a basic interpreter
 * [x] add CLI arguments for printing the CST, AST, or HIR
-* [ ] make functions independent of their order in source where possible
-* [ ] support importing other files
+* [ ] make functions independent of their order in top-level scope
+* [x] support importing other files (`use`)
 * [ ] namespaces/modules including visibility modifiers
 * [ ] IDE support:
   * [ ] completion, completion resolve
   * [ ] hover
   * [ ] signatureHelp
-  * [ ] declaration, definition
-  * [ ] typeDefinition
+  * [x] ~~declaration~~, definition, ~~typeDefinition~~
   * [ ] implementation
-  * [ ] references
-  * [ ] documentHighlight
+  * [x] references
+  * [x] documentHighlight
   * [ ] documentSymbol
   * [ ] codeAction, codeAction resolve
   * [ ] codeLens, codeLens resolve, codeLens refresh
   * [ ] documentLink, documentLink resolve
-  * [ ] documentColor
-  * [ ] colorPresentation
+  * [x] ~~documentColor, colorPresentation~~
   * [ ] formatting
   * [ ] rangeFormatting
   * [ ] onTypeFormatting
@@ -88,9 +86,9 @@ Our TODO list:
   * [ ] prepareCallHierarchy
   * [ ] callHierarchy incoming, callHierarchy outgoing
   * [x] semantic tokens
-  * [ ] linkedEditingRange
+  * [x] ~~linkedEditingRange~~
   * [ ] moniker
-* [ ] incremental compilation
+* [x] incremental compilation
 * [ ] lists
 * [ ] maps
 * [ ] sets
@@ -112,5 +110,7 @@ Our TODO list:
 
 1. Install Rust.
 2. Clone this repo.
-3. Open the workspace in VSCode.
-4. Run the Rust VSCode extension.
+3. Open the workspace in VS Code.
+4. In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/new-new-packages/compiler/Cargo.toml -- lsp",`.
+5. Run the launch config “Run Extension (VS Code Extension)”.
+6. In the new VS Code window that opens, you can enjoy 🍭 Candy :)

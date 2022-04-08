@@ -1,3 +1,5 @@
+use std::{ops::Range, sync::Arc};
+
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
 
 use crate::{
@@ -11,11 +13,9 @@ impl CompilerError {
         Diagnostic {
             range: lsp_types::Range {
                 start: db
-                    .utf8_byte_offset_to_lsp(self.span.start, input.clone())
+                    .offset_to_lsp(input.clone(), self.span.start)
                     .to_position(),
-                end: db
-                    .utf8_byte_offset_to_lsp(self.span.end, input)
-                    .to_position(),
+                end: db.offset_to_lsp(input, self.span.end).to_position(),
             },
             severity: Some(DiagnosticSeverity::ERROR),
             code: None,
@@ -30,9 +30,9 @@ impl CompilerError {
 }
 
 impl From<Url> for Input {
-    fn from(uri: Url) -> Input {
+    fn from(uri: Url) -> Self {
         match uri.scheme() {
-            "file" => Input::File(uri.to_file_path().unwrap()),
+            "file" => uri.to_file_path().unwrap().into(),
             "untitled" => Input::Untitled(uri.to_string()["untitled:".len()..].to_owned()),
             _ => panic!("Unsupported URI scheme: {}", uri.scheme()),
         }
@@ -42,13 +42,24 @@ impl From<Url> for Input {
 impl From<Input> for Url {
     fn from(input: Input) -> Url {
         match input {
-            Input::File(path) => Url::from_file_path(path).unwrap(),
+            Input::File(_) | Input::ExternalFile(_) => {
+                Url::from_file_path(input.to_path().unwrap()).unwrap()
+            }
             Input::Untitled(id) => Url::parse(&format!("untitled:{}", id)).unwrap(),
         }
     }
 }
 
 // UTF-8 Byte Offset ↔ LSP Position/Range
+
+impl Database {
+    pub fn range_to_lsp(&self, input: Input, range: Range<usize>) -> lsp_types::Range {
+        lsp_types::Range {
+            start: self.offset_to_lsp(input.clone(), range.start).to_position(),
+            end: self.offset_to_lsp(input, range.end).to_position(),
+        }
+    }
+}
 
 #[salsa::query_group(LspPositionConversionStorage)]
 pub trait LspPositionConversion: InputDb {
@@ -59,36 +70,42 @@ pub trait LspPositionConversion: InputDb {
     // key, we shouldn't loose much performance by not caching the individual
     // results.
     #[salsa::transparent]
-    fn position_to_utf8_byte_offset(&self, line: u32, character: u32, input: Input) -> usize;
+    fn offset_from_lsp(&self, input: Input, line: u32, character: u32) -> usize;
     #[salsa::transparent]
-    fn utf8_byte_offset_to_lsp(&self, position: usize, input: Input) -> (u32, u32);
+    fn offset_to_lsp(&self, input: Input, position: usize) -> (u32, u32);
 
-    fn line_start_utf8_byte_offsets(&self, input: Input) -> Vec<usize>;
+    fn line_start_utf8_byte_offsets(&self, input: Input) -> Arc<Vec<usize>>;
 }
 
-fn position_to_utf8_byte_offset(
+fn offset_from_lsp(
     db: &dyn LspPositionConversion,
+    input: Input,
     line: u32,
     character: u32,
-    input: Input,
 ) -> usize {
     let text = db.get_input(input.clone()).unwrap();
     let line_start_offsets = db.line_start_utf8_byte_offsets(input);
-
-    let line_offset = line_start_offsets[line as usize];
-    let line_length = if line as usize == line_start_offsets.len() - 1 {
+    offset_from_lsp_raw(
+        text.as_ref(),
+        line_start_offsets.as_ref(),
+        Position { line, character },
+    )
+}
+pub fn offset_from_lsp_raw(text: &str, line_start_offsets: &[usize], position: Position) -> usize {
+    let line_offset = line_start_offsets[position.line as usize];
+    let line_length = if position.line as usize == line_start_offsets.len() - 1 {
         text.len()
     } else {
-        line_start_offsets[(line + 1) as usize] - line_offset
+        line_start_offsets[(position.line + 1) as usize] - line_offset
     };
 
     let line = &text[line_offset..line_offset + line_length];
 
     let words = line.encode_utf16().collect::<Vec<_>>();
-    let char_offset = if character as usize >= words.len() {
+    let char_offset = if position.character as usize >= words.len() {
         line_length
     } else {
-        String::from_utf16(&words[0..character as usize])
+        String::from_utf16(&words[0..position.character as usize])
             .unwrap()
             .len()
     };
@@ -96,11 +113,7 @@ fn position_to_utf8_byte_offset(
     line_offset + char_offset
 }
 
-fn utf8_byte_offset_to_lsp(
-    db: &dyn LspPositionConversion,
-    offset: usize,
-    input: Input,
-) -> (u32, u32) {
+fn offset_to_lsp(db: &dyn LspPositionConversion, input: Input, offset: usize) -> (u32, u32) {
     let text = db.get_input(input.clone()).unwrap();
     let line_start_offsets = db.line_start_utf8_byte_offsets(input);
 
@@ -125,8 +138,12 @@ impl TupleToPosition for (u32, u32) {
     }
 }
 
-fn line_start_utf8_byte_offsets(db: &dyn LspPositionConversion, input: Input) -> Vec<usize> {
-    let text = db.get_input(input).unwrap();
+fn line_start_utf8_byte_offsets(db: &dyn LspPositionConversion, input: Input) -> Arc<Vec<usize>> {
+    Arc::new(line_start_utf8_byte_offsets_raw(
+        db.get_input(input).unwrap().as_ref(),
+    ))
+}
+pub fn line_start_utf8_byte_offsets_raw(text: &str) -> Vec<usize> {
     let mut offsets = vec![0];
     offsets.append(
         &mut text

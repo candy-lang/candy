@@ -1,0 +1,14 @@
+- StructField vs StructEntry
+  -> field
+- opinions on debugging using --debug and --watch?
+  -> nice!
+- errors
+  - currently, only some text
+    - all the natural language stuff scattered through the compiler, makes revising harder and obfuscates the actual compiler code
+    - multiple modalities may require different formatting: IDE vs console vs runtime
+  - proposal: CompilerError contains raw errors from compiler stages
+  - don't abort if errors are contained; rather handle them during execution
+    - vision: syntax error in some part -> can still compile to executable that crashes when it reaches that point
+  -> put errors in the tree
+
+- 

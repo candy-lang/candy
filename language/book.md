@@ -1,6 +1,6 @@
 # The Candy Book
 
-> Note: This document is not up-to-date.
+> **Warning:** This document is not up-to-date.
 
 ## Foreword
 

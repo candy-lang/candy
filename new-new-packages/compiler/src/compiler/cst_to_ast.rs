@@ -1,17 +1,24 @@
+use std::ops::Range;
 use std::sync::Arc;
 
 use im::HashMap;
 use itertools::Itertools;
 
 use super::ast::{self, Ast, AstKind, AstString, Identifier, Int, Lambda, Symbol, Text};
-use super::cst::{self, Cst, CstKind};
+use super::cst::{self, Cst, CstDb, CstKind};
 use super::error::CompilerError;
 use super::rcst_to_cst::RcstToCst;
+use crate::compiler::ast::Struct;
+use crate::compiler::cst::UnwrapWhitespaceAndComment;
 use crate::input::Input;
 
 #[salsa::query_group(CstToAstStorage)]
-pub trait CstToAst: RcstToCst {
-    fn ast_to_cst_id(&self, input: Input, id: ast::Id) -> Option<cst::Id>;
+pub trait CstToAst: CstDb + RcstToCst {
+    fn ast_to_cst_id(&self, id: ast::Id) -> Option<cst::Id>;
+    fn ast_id_to_span(&self, id: ast::Id) -> Option<Range<usize>>;
+
+    fn cst_to_ast_id(&self, input: Input, id: cst::Id) -> Option<ast::Id>;
+
     fn ast(&self, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)>;
     fn ast_raw(
         &self,
@@ -19,10 +26,23 @@ pub trait CstToAst: RcstToCst {
     ) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>, Vec<CompilerError>)>;
 }
 
-fn ast_to_cst_id(db: &dyn CstToAst, input: Input, id: ast::Id) -> Option<cst::Id> {
-    let (_, ast_to_cst_id_mapping) = db.ast(input).unwrap();
+fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
+    let (_, ast_to_cst_id_mapping) = db.ast(id.input.clone()).unwrap();
     ast_to_cst_id_mapping.get(&id).cloned()
 }
+fn ast_id_to_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<usize>> {
+    let cst_id = db.ast_to_cst_id(id.clone())?;
+    Some(db.find_cst(id.input, cst_id).span)
+}
+
+fn cst_to_ast_id(db: &dyn CstToAst, input: Input, id: cst::Id) -> Option<ast::Id> {
+    let (_, ast_to_cst_id_mapping) = db.ast(input).unwrap();
+    ast_to_cst_id_mapping
+        .iter()
+        .find_map(|(key, &value)| if value == id { Some(key) } else { None })
+        .cloned()
+}
+
 fn ast(db: &dyn CstToAst, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)> {
     db.ast_raw(input)
         .map(|(ast, id_mapping, _)| (ast, id_mapping))
@@ -31,20 +51,23 @@ fn ast_raw(
     db: &dyn CstToAst,
     input: Input,
 ) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>, Vec<CompilerError>)> {
-    let cst = db.cst(input)?;
-    let mut context = LoweringContext::new();
+    let cst = db.cst(input.clone())?;
+    let cst = cst.unwrap_whitespace_and_comment();
+    let mut context = LoweringContext::new(input);
     let asts = (&mut context).lower_csts(&cst);
     Some((Arc::new(asts), context.id_mapping, context.errors))
 }
 
 struct LoweringContext {
+    input: Input,
     next_id: usize,
     id_mapping: HashMap<ast::Id, cst::Id>,
     errors: Vec<CompilerError>,
 }
 impl LoweringContext {
-    fn new() -> LoweringContext {
+    fn new(input: Input) -> LoweringContext {
         LoweringContext {
+            input,
             next_id: 0,
             id_mapping: HashMap::new(),
             errors: vec![],
@@ -72,14 +95,14 @@ impl LoweringContext {
             CstKind::Comment { .. } => self.create_ast(cst.id, AstKind::Error),
             CstKind::TrailingWhitespace { child, .. } => self.lower_cst(child),
             CstKind::Identifier(identifier) => {
-                let string = self.create_string(cst.id, identifier.to_owned());
+                let string = self.create_string_without_id_mapping(identifier.to_string());
                 self.create_ast(cst.id, AstKind::Identifier(Identifier(string)))
             }
             CstKind::Symbol(symbol) => {
-                let string = self.create_string(cst.id, symbol.to_owned());
+                let string = self.create_string_without_id_mapping(symbol.to_string());
                 self.create_ast(cst.id, AstKind::Symbol(Symbol(string)))
             }
-            CstKind::Int(value) => self.create_ast(cst.id, AstKind::Int(Int(value.to_owned()))),
+            CstKind::Int(value) => self.create_ast(cst.id, AstKind::Int(Int(*value))),
             CstKind::Text { parts, .. } => {
                 let text = parts
                     .into_iter()
@@ -91,7 +114,7 @@ impl LoweringContext {
                         _ => None,
                     })
                     .join("");
-                let string = self.create_string(cst.id, text);
+                let string = self.create_string_without_id_mapping(text);
                 self.create_ast(cst.id, AstKind::Text(Text(string)))
             }
             CstKind::TextPart(_) => self.create_ast(cst.id, AstKind::Error),
@@ -137,14 +160,42 @@ impl LoweringContext {
             CstKind::Struct {
                 opening_bracket,
                 fields,
-                closing_bracket,
-            } => todo!(),
-            CstKind::StructField {
-                key,
-                colon,
-                value,
-                comma,
-            } => todo!(),
+                closing_bracket: _,
+            } => {
+                assert!(
+                    matches!(
+                        opening_bracket.unwrap_whitespace_and_comment().kind,
+                        CstKind::OpeningBracket { .. }
+                    ),
+                    "Expected an opening bracket to start a struct, but found `{}`.",
+                    *opening_bracket
+                );
+                let fields = fields
+                    .into_iter()
+                    .map(|field| {
+                        let field = field.unwrap_whitespace_and_comment();
+                        if let CstKind::StructField {
+                            key,
+                            colon: _,
+                            value,
+                            comma: _,
+                        } = &field.kind
+                        {
+                            let key = self.lower_cst(&key.clone());
+                            let value = self.lower_cst(&value.clone());
+                            (key, value)
+                        } else {
+                            // TODO: Register error.
+                            return (
+                                self.create_ast(cst.id, AstKind::Error),
+                                self.create_ast(cst.id, AstKind::Error),
+                            );
+                        }
+                    })
+                    .collect();
+                self.create_ast(cst.id, AstKind::Struct(Struct { fields }))
+            }
+            CstKind::StructField { .. } => self.create_ast(cst.id, AstKind::Error),
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -276,9 +327,19 @@ impl LoweringContext {
             value,
         }
     }
+    fn create_string_without_id_mapping(&mut self, value: String) -> AstString {
+        AstString {
+            id: self.create_next_id_without_mapping(),
+            value,
+        }
+    }
     fn create_next_id(&mut self, cst_id: cst::Id) -> ast::Id {
-        let id = ast::Id(self.next_id);
-        assert!(matches!(self.id_mapping.insert(id, cst_id), None));
+        let id = self.create_next_id_without_mapping();
+        assert!(matches!(self.id_mapping.insert(id.clone(), cst_id), None));
+        id
+    }
+    fn create_next_id_without_mapping(&mut self) -> ast::Id {
+        let id = ast::Id::new(self.input.clone(), self.next_id);
         self.next_id += 1;
         id
     }
