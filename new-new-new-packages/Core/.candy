@@ -1,6 +1,6 @@
 bool = use ".Bool"
 conditionals = use ".Conditionals"
-equality = builtinStructGet (use ".Equality") Equals
+equals = builtinStructGet (use ".Equality") Equals
 function = use ".Function"
 int = use ".Int"
 check = builtinStructGet (use ".Needs") Check
