@@ -135,7 +135,7 @@ mod test {
         compiler::{
             cst::{self, Cst, CstKind},
             rcst::Rcst,
-            string_to_rcst::StringToCst,
+            string_to_rcst::StringToRcst,
         },
         database::Database,
     };
@@ -152,10 +152,7 @@ mod test {
         );
         assert_eq!(
             db.rcst(input.clone()).unwrap().as_ref().to_owned(),
-            vec![Rcst::LeadingWhitespace {
-                value: "\n".to_owned(),
-                child: Box::new(::Int(123))
-            }],
+            vec![Rcst::Int(123),],
         );
 
         db.did_change_input(&input, "456".to_owned());
@@ -165,10 +162,7 @@ mod test {
         );
         assert_eq!(
             db.rcst(input.clone()).unwrap().as_ref().to_owned(),
-            vec![Rcst::LeadingWhitespace {
-                value: "\n".to_owned(),
-                child: Box::new(Rcst::Int(456))
-            }],
+            vec![Rcst::Int(456)],
         );
 
         db.did_close_input(&input);
