@@ -107,7 +107,12 @@ impl Add<usize> for Id {
 }
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "HirId({}:{:?})", self.input, self.local)
+        write!(
+            f,
+            "HirId({}:{})",
+            self.input,
+            self.local.iter().map(|id| format!("{}", id)).join(":")
+        )
     }
 }
 
@@ -182,17 +187,17 @@ impl fmt::Display for Expression {
             Expression::Struct(entries) => {
                 write!(
                     f,
-                    "struct [\n{}\n]",
+                    "struct [{}]",
                     entries
                         .iter()
-                        .map(|(id, value)| format!("  {}: {}", id, value))
-                        .join(",\n"),
+                        .map(|(key, value)| format!("{}: {}", key, value))
+                        .join(", "),
                 )
             }
             Expression::Lambda(lambda) => {
                 write!(
                     f,
-                    "lambda [\n{}\n]",
+                    "lambda {{{}\n}}",
                     lambda
                         .to_string()
                         .lines()
@@ -203,7 +208,7 @@ impl fmt::Display for Expression {
             Expression::Body(body) => {
                 write!(
                     f,
-                    "body [\n{}\n]",
+                    "body {{\n{}\n}}",
                     body.to_string()
                         .lines()
                         .map(|line| format!("  {}", line))
@@ -215,9 +220,20 @@ impl fmt::Display for Expression {
                 arguments,
             } => {
                 assert!(arguments.len() > 0, "A call needs to have arguments.");
-                write!(f, "call {} with {}", function, arguments.iter().join(" "))
+                write!(
+                    f,
+                    "call {} with arguments {}",
+                    function,
+                    arguments.iter().join(", ")
+                )
             }
-            Expression::Error { .. } => write!(f, "<error>"),
+            Expression::Error { child, errors } => {
+                write!(f, "Error {:?}", errors)?;
+                if let Some(child) = child {
+                    write!(f, "\nfallback: {}", child)?;
+                }
+                Ok(())
+            }
         }
     }
 }

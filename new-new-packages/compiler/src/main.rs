@@ -141,7 +141,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if debug {
         let hir_file = file.clone_with_extension("candy.hir");
-        fs::write(hir_file, format!("{:#?}\n", hir.clone())).unwrap();
+        fs::write(hir_file, format!("{}", hir.clone())).unwrap();
 
         let hir_ast_id_file = file.clone_with_extension("candy.hir_to_ast_ids");
         fs::write(
