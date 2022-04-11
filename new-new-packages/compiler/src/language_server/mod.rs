@@ -15,7 +15,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     compiler::{
-        ast_to_hir::AstToHir, cst_to_ast::CstToAst, rcst_to_cst::RcstToCst,
+        ast_to_hir::AstToHir, cst_to_ast::CstToAst, hir::CollectErrors, rcst_to_cst::RcstToCst,
         string_to_rcst::StringToRcst,
     },
     database::PROJECT_DIRECTORY,
@@ -266,16 +266,16 @@ impl CandyLanguageServer {
         log::debug!("Locked.");
 
         for input in inputs {
-            let _ = db.cst(input.clone()).unwrap();
-            let (_, _, ast_errors) = db.ast_raw(input.clone()).unwrap();
-            let (_, _, hir_errors) = db.hir_raw(input.clone()).unwrap();
+            let (hir, mapping) = db.hir_raw(input.clone()).unwrap();
 
-            // TODO(MarcelGarus): Report CST errors.
-            let diagnostics = ast_errors
-                .into_iter()
-                .chain(hir_errors.into_iter())
-                .map(|it| it.to_diagnostic(&db, input.clone()))
-                .collect();
+            let diagnostics = {
+                let mut errors = vec![];
+                hir.collect_errors(&mut errors);
+                errors
+                    .into_iter()
+                    .map(|it| it.to_diagnostic(&db, input.clone()))
+                    .collect()
+            };
             self.client
                 .publish_diagnostics(input.clone().into(), diagnostics, None)
                 .await;

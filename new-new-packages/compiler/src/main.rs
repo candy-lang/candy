@@ -111,14 +111,18 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
     }
 
     log::info!("Lowering CST to AST…");
-    let (asts, ast_cst_id_map, errors) = db
+    let (asts, ast_cst_id_map) = db
         .ast_raw(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if debug {
         let ast_file = file.clone_with_extension("candy.ast");
-        fs::write(ast_file, format!("{:#?}\n", asts.clone())).unwrap();
+        fs::write(
+            ast_file,
+            format!("{}\n", asts.iter().map(|ast| format!("{}", ast)).join("\n")),
+        )
+        .unwrap();
 
-        let ast_to_cst_ids_file = file.clone_with_extension("candy.cst_to_ast_ids");
+        let ast_to_cst_ids_file = file.clone_with_extension("candy.ast_to_cst_ids");
         fs::write(
             ast_to_cst_ids_file,
             ast_cst_id_map
@@ -132,12 +136,23 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
     }
 
     log::info!("Compiling AST to HIR…");
-    let (hir, _, errors) = db
+    let (hir, hir_ast_id_map) = db
         .hir_raw(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if debug {
         let hir_file = file.clone_with_extension("candy.hir");
         fs::write(hir_file, format!("{:#?}\n", hir.clone())).unwrap();
+
+        let hir_ast_id_file = file.clone_with_extension("candy.hir_to_ast_ids");
+        fs::write(
+            hir_ast_id_file,
+            hir_ast_id_map
+                .keys()
+                .into_iter()
+                .map(|key| format!("{:?}: {}", key, hir_ast_id_map[key].local))
+                .join("\n"),
+        )
+        .unwrap();
     }
 
     // let reports = analyze((*lambda).clone());

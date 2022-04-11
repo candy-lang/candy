@@ -87,7 +87,7 @@ fn run(db: &dyn Discover, id: hir::Id, environment: Environment) -> Environment 
             function,
             arguments,
         } => run_call(db, function, arguments, environment.clone()),
-        Expression::Error => DiscoverResult::ErrorInHir,
+        Expression::Error { .. } => DiscoverResult::ErrorInHir,
     };
     environment.store(id, result);
     environment

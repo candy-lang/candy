@@ -120,6 +120,6 @@ fn collect_hir_ids_for_hints(db: &dyn HintsDb, id: hir::Id) -> Vec<hir::Id> {
             }
             ids
         }
-        Expression::Error => vec![],
+        Expression::Error { .. } => vec![],
     }
 }

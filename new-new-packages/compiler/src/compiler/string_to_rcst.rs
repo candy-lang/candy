@@ -469,7 +469,10 @@ mod parse {
             (
                 "foo",
                 vec![
-                    Rcst::Comment(" hey".to_string()),
+                    Rcst::Comment {
+                        octothorpe: Box::new(Rcst::Octothorpe),
+                        comment: " hey".to_string()
+                    },
                     Rcst::Newline,
                     Rcst::Whitespace("  ".to_string()),
                 ],

@@ -9,7 +9,7 @@ use linked_hash_map::LinkedHashMap;
 
 use crate::input::Input;
 
-use super::ast_to_hir::AstToHir;
+use super::{ast_to_hir::AstToHir, error::CompilerError};
 
 #[salsa::query_group(HirDbStorage)]
 pub trait HirDb: AstToHir {
@@ -56,7 +56,7 @@ impl Expression {
             Expression::Call { arguments, .. } => {
                 ids.extend(arguments.iter().cloned());
             }
-            Expression::Error => {}
+            Expression::Error { .. } => {}
         }
     }
 }
@@ -120,8 +120,14 @@ pub enum Expression {
     Struct(HashMap<Id, Id>),
     Lambda(Lambda),
     Body(Body),
-    Call { function: Id, arguments: Vec<Id> },
-    Error,
+    Call {
+        function: Id,
+        arguments: Vec<Id>,
+    },
+    Error {
+        child: Option<Id>,
+        errors: Vec<CompilerError>,
+    },
 }
 impl Expression {
     pub fn nothing() -> Self {
@@ -140,6 +146,12 @@ pub struct Lambda {
 pub struct Body {
     pub expressions: LinkedHashMap<Id, Expression>,
     pub identifiers: HashMap<Id, String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum HirError {
+    UnknownReference { symbol: String },
+    UnknownFunction { name: String },
 }
 
 impl Body {
@@ -205,7 +217,7 @@ impl fmt::Display for Expression {
                 assert!(arguments.len() > 0, "A call needs to have arguments.");
                 write!(f, "call {} with {}", function, arguments.iter().join(" "))
             }
-            Expression::Error => write!(f, "<error>"),
+            Expression::Error { .. } => write!(f, "<error>"),
         }
     }
 }
@@ -251,6 +263,36 @@ impl Body {
                 .max_by_key(|(key, _)| key.local.to_owned())?
                 .1
                 .find(id)
+        }
+    }
+}
+
+pub trait CollectErrors {
+    fn collect_errors(&self, errors: &mut Vec<CompilerError>);
+}
+impl CollectErrors for Expression {
+    fn collect_errors(&self, errors: &mut Vec<CompilerError>) {
+        match self {
+            Expression::Int(_)
+            | Expression::Text(_)
+            | Expression::Reference(_)
+            | Expression::Symbol(_)
+            | Expression::Struct(_)
+            | Expression::Call { .. } => {}
+            Expression::Lambda(lambda) => lambda.body.collect_errors(errors),
+            Expression::Body(body) => body.collect_errors(errors),
+            Expression::Error {
+                errors: the_errors, ..
+            } => {
+                errors.append(&mut the_errors.clone());
+            }
+        }
+    }
+}
+impl CollectErrors for Body {
+    fn collect_errors(&self, errors: &mut Vec<CompilerError>) {
+        for (_id, ast) in &self.expressions {
+            ast.collect_errors(errors);
         }
     }
 }
