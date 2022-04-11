@@ -1,0 +1,42 @@
+equals = builtinStructGet (use ".Equality") Equals
+needs = builtinStructGet (use ".Needs") Needs
+type = use ".Type"
+
+is value =
+  isOfType = builtinStructGet type Is
+  isOfType value Function
+
+getArgumentCount function =
+  needs (is function)
+  builtinGetArgumentCount function
+
+is0 value =
+  builtinIfElse
+    (is value)
+    { False }
+    { equals (getArgumentCount value) 0 }
+is1 value =
+  builtinIfElse
+    (is value)
+    { False }
+    { equals (getArgumentCount value) 1 }
+is2 value =
+  builtinIfElse
+    (is value)
+    { False }
+    { equals (getArgumentCount value) 2 }
+is3 value =
+  builtinIfElse
+    (is value)
+    { False }
+    { equals (getArgumentCount value) 3 }
+is4 value =
+  builtinIfElse
+    (is value)
+    { False }
+    { equals (getArgumentCount value) 4 }
+is5 value =
+  builtinIfElse
+    (is value)
+    { False }
+    { equals (getArgumentCount value) 5 }

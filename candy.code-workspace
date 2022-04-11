@@ -5,6 +5,10 @@
       "path": "."
     },
     {
+      "name": "Core",
+      "path": "new-new-new-packages/Core"
+    },
+    {
       "name": "Compiler",
       "path": "new-new-packages/compiler"
     },

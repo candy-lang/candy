@@ -14,20 +14,26 @@ use super::{
     value::{Environment, Value},
 };
 
+const TRACE_BUILTIN_FUNCTION_CALLS: bool = false;
+
 pub fn run_builtin_function(
     db: &dyn Discover,
+    import_chain: &[Input],
     builtin_function: BuiltinFunction,
     arguments: Vec<hir::Id>,
     environment: Environment,
 ) -> DiscoverResult {
-    log::trace!(
-        "run_builtin_function: builtin{:?} {}",
-        builtin_function,
-        arguments.iter().join(" ")
-    );
+    if TRACE_BUILTIN_FUNCTION_CALLS {
+        log::trace!(
+            "run_builtin_function: builtin{:?} {}",
+            builtin_function,
+            arguments.iter().join(" ")
+        );
+    }
+
     // Handle builtin functions that don't need to resolve the arguments.
     match builtin_function {
-        BuiltinFunction::IfElse => return if_else(db, arguments, environment),
+        BuiltinFunction::IfElse => return if_else(db, import_chain, arguments, environment),
         _ => {}
     }
 
@@ -45,7 +51,7 @@ pub fn run_builtin_function(
         BuiltinFunction::StructGetKeys => struct_get_keys(arguments),
         BuiltinFunction::StructHasKey => struct_has_key(arguments),
         BuiltinFunction::TypeOf => type_of(arguments),
-        BuiltinFunction::Use => use_(db, arguments),
+        BuiltinFunction::Use => use_(db, import_chain, arguments),
         _ => panic!("Unhandled builtin function: {:?}", builtin_function),
     }
 }
@@ -81,7 +87,12 @@ fn get_argument_count(db: &dyn Discover, arguments: Vec<Value>) -> DiscoverResul
     })
 }
 
-fn if_else(db: &dyn Discover, arguments: Vec<hir::Id>, environment: Environment) -> DiscoverResult {
+fn if_else(
+    db: &dyn Discover,
+    import_chain: &[Input],
+    arguments: Vec<hir::Id>,
+    environment: Environment,
+) -> DiscoverResult {
     if let [condition, then, else_] = &arguments[..] {
         let body_id = match environment.get(condition)? {
             value if value == Value::bool(true) => then,
@@ -94,7 +105,7 @@ fn if_else(db: &dyn Discover, arguments: Vec<hir::Id>, environment: Environment)
             }
         };
 
-        run_call(db, body_id.to_owned(), vec![], environment)
+        run_call(db, import_chain, body_id.to_owned(), vec![], environment)
     } else {
         DiscoverResult::panic(format!(
             "Builtin if/else called with wrong number of arguments: {}, expected: {}",
@@ -162,7 +173,7 @@ fn type_of(arguments: Vec<Value>) -> DiscoverResult {
     })
 }
 
-fn use_(db: &dyn Discover, arguments: Vec<Value>) -> DiscoverResult {
+fn use_(db: &dyn Discover, import_chain: &[Input], arguments: Vec<Value>) -> DiscoverResult {
     destructure!(arguments, [current_path, target], {
         // `current_path` is set by us and not users, hence we don't have to validate it that strictly.
         let current_path_struct = match current_path {
@@ -216,8 +227,12 @@ fn use_(db: &dyn Discover, arguments: Vec<Value>) -> DiscoverResult {
             }
         };
 
+        if import_chain.contains(input) {
+            return DiscoverResult::CircularImport(import_chain.to_owned());
+        }
+
         let (hir, _) = db.hir(input.clone()).unwrap();
-        let discover_result = db.run_all(input.to_owned());
+        let discover_result = db.run_all(input.to_owned(), import_chain.to_owned());
 
         hir.identifiers
             .iter()

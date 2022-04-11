@@ -1,0 +1,21 @@
+needs = builtinStructGet (use ".Needs") Needs
+type = use ".Type"
+
+is value =
+  isOfType = builtinStructGet type Is
+  isOfType
+    value
+    Struct
+
+hasKey struct key =
+  needs (is struct)
+  builtinStructHasKey struct key
+
+structGetUnwrap struct key =
+  needs (is struct)
+  needs (hasKey struct key)
+  builtinStructGet struct key
+
+structGetKeys struct =
+  needs (is struct)
+  builtinStructGetKeys struct

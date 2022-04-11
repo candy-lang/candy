@@ -5,7 +5,6 @@ use crate::{
 };
 use im::HashMap;
 use itertools::Itertools;
-use log;
 
 use super::{
     builtin_functions::run_builtin_function,
@@ -15,23 +14,46 @@ use super::{
 
 #[salsa::query_group(DiscoverStorage)]
 pub trait Discover: HirDb {
-    fn run_all(&self, input: Input) -> HashMap<hir::Id, DiscoverResult>;
+    fn run_all(&self, input: Input, import_chain: Vec<Input>) -> HashMap<hir::Id, DiscoverResult>;
 
+    #[salsa::transparent]
     fn value_to_display_string(&self, value: Value) -> String;
 }
 
-fn run_all(db: &dyn Discover, input: Input) -> HashMap<hir::Id, DiscoverResult> {
+fn run_all(
+    db: &dyn Discover,
+    input: Input,
+    mut import_chain: Vec<Input>,
+) -> HashMap<hir::Id, DiscoverResult> {
+    if import_chain.contains(&input) {
+        panic!(
+            "Unhandled circular import detected: {:?}",
+            import_chain.iter().map(|it| format!("{}", it)).join(" -> ")
+        );
+    }
+
     let (hir, _) = db.hir(input.clone()).unwrap();
-    run_body(db, hir.as_ref(), Environment::new()).flatten()
+    import_chain.push(input);
+    run_body(db, &import_chain[..], hir.as_ref(), Environment::new()).flatten()
 }
-fn run_body(db: &dyn Discover, body: &Body, environment: Environment) -> Environment {
+fn run_body(
+    db: &dyn Discover,
+    import_chain: &[Input],
+    body: &Body,
+    environment: Environment,
+) -> Environment {
     let mut environment = environment.new_child();
     for (id, _) in &body.expressions {
-        environment = run(db, id.to_owned(), environment);
+        environment = run(db, import_chain, id.to_owned(), environment);
     }
     environment
 }
-fn run(db: &dyn Discover, id: hir::Id, environment: Environment) -> Environment {
+fn run(
+    db: &dyn Discover,
+    import_chain: &[Input],
+    id: hir::Id,
+    environment: Environment,
+) -> Environment {
     let mut environment = environment;
     let result = match db.find_expression(id.clone()).unwrap() {
         Expression::Int(int) => Value::Int(int.to_owned()).into(),
@@ -76,17 +98,17 @@ fn run(db: &dyn Discover, id: hir::Id, environment: Environment) -> Environment 
             for (index, _) in parameters.iter().enumerate() {
                 environment.store(first_id.clone() + index, DiscoverResult::DependsOnParameter);
             }
-            environment = run_body(db, &body, environment);
+            environment = run_body(db, import_chain, &body, environment);
             Value::Lambda(lambda).into()
         }
         Expression::Body(body) => {
-            environment = run_body(db, &body, environment);
+            environment = run_body(db, import_chain, &body, environment);
             environment.get(body.out_id()).transitive()
         }
         Expression::Call {
             function,
             arguments,
-        } => run_call(db, function, arguments, environment.clone()),
+        } => run_call(db, import_chain, function, arguments, environment.clone()),
         Expression::Error => DiscoverResult::ErrorInHir,
     };
     environment.store(id, result);
@@ -94,6 +116,7 @@ fn run(db: &dyn Discover, id: hir::Id, environment: Environment) -> Environment 
 }
 pub(super) fn run_call(
     db: &dyn Discover,
+    import_chain: &[Input],
     function: hir::Id,
     arguments: Vec<hir::Id>,
     environment: Environment,
@@ -102,6 +125,7 @@ pub(super) fn run_call(
         if let Some(builtin_function) = builtin_functions::VALUES.get(builtin_function_index) {
             return run_builtin_function(
                 db,
+                import_chain,
                 builtin_function.to_owned(),
                 arguments.to_owned(),
                 environment,
@@ -136,7 +160,7 @@ pub(super) fn run_call(
         );
     }
 
-    run_body(db, &lambda_hir.body, inner_environment).get(lambda_hir.body.out_id())
+    run_body(db, import_chain, &lambda_hir.body, inner_environment).get(lambda_hir.body.out_id())
 }
 
 fn value_to_display_string(db: &dyn Discover, value: Value) -> String {
