@@ -471,10 +471,7 @@ impl TreeWithIds for Cst {
             CstKind::Octothorpe => todo!(),
             CstKind::Whitespace(_) => todo!(),
             CstKind::Newline(_) => todo!(),
-            CstKind::Comment {
-                octothorpe,
-                comment,
-            } => todo!(),
+            CstKind::Comment { .. } => todo!(),
             CstKind::TrailingWhitespace { child, .. } => child.find_by_offset(offset),
             CstKind::Identifier { .. } => None,
             CstKind::Symbol { .. } => None,

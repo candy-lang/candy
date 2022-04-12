@@ -14,10 +14,7 @@ use lspower::{jsonrpc, Client, LanguageServer};
 use tokio::sync::Mutex;
 
 use crate::{
-    compiler::{
-        ast_to_hir::AstToHir, cst_to_ast::CstToAst, hir::CollectErrors, rcst_to_cst::RcstToCst,
-        string_to_rcst::StringToRcst,
-    },
+    compiler::{ast_to_hir::AstToHir, hir::CollectErrors},
     database::PROJECT_DIRECTORY,
     input::{Input, InputDb},
     language_server::hints::HintsDb,
@@ -266,7 +263,7 @@ impl CandyLanguageServer {
         log::debug!("Locked.");
 
         for input in inputs {
-            let (hir, mapping) = db.hir_raw(input.clone()).unwrap();
+            let (hir, _mapping) = db.hir_raw(input.clone()).unwrap();
 
             let diagnostics = {
                 let mut errors = vec![];

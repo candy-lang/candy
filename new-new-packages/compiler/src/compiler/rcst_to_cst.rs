@@ -1,6 +1,5 @@
 use super::{
     cst::{self, Cst, CstKind},
-    error::CompilerError,
     rcst::Rcst,
     string_to_rcst::StringToRcst,
 };

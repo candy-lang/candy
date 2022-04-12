@@ -132,11 +132,7 @@ impl Display for Input {
 mod test {
     use super::*;
     use crate::{
-        compiler::{
-            cst::{self, Cst, CstKind},
-            rcst::Rcst,
-            string_to_rcst::StringToRcst,
-        },
+        compiler::{rcst::Rcst, string_to_rcst::StringToRcst},
         database::Database,
     };
 

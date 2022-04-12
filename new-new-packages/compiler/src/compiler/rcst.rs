@@ -240,7 +240,7 @@ impl IsMultiline for Rcst {
             Rcst::Arrow => false,
             Rcst::DoubleQuote => false,
             Rcst::Octothorpe => false,
-            Rcst::Whitespace(whitespace) => false,
+            Rcst::Whitespace(_) => false,
             Rcst::Newline(_) => true,
             Rcst::Comment { .. } => false,
             Rcst::TrailingWhitespace { child, whitespace } => {

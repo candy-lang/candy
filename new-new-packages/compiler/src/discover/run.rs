@@ -5,7 +5,6 @@ use crate::{
 };
 use im::HashMap;
 use itertools::Itertools;
-use log;
 
 use super::{
     builtin_functions::run_builtin_function,
