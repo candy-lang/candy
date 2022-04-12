@@ -150,74 +150,82 @@ impl CollectErrors for Vec<Ast> {
 
 impl Display for Ast {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.fmt_with_indentation(f, "");
-        Ok(())
-    }
-}
-impl Ast {
-    fn fmt_with_indentation(&self, f: &mut Formatter<'_>, indentation: &str) -> fmt::Result {
-        self.id.fmt(f)?;
-        ' '.fmt(f)?;
-        let more_indentation = format!("  {}", indentation);
+        write!(f, "{}: ", self.id)?;
         match &self.kind {
-            AstKind::Int(int) => write!(f, "{}", int.0),
-            AstKind::Text(text) => write!(f, "\"{}\"", text.0),
-            AstKind::Identifier(identifier) => write!(f, "{}", identifier.0),
-            AstKind::Symbol(symbol) => write!(f, "{}", symbol.0),
+            AstKind::Int(int) => write!(f, "int {}", int.0),
+            AstKind::Text(text) => write!(f, "text \"{}\"", text.0),
+            AstKind::Identifier(identifier) => write!(f, "identifier {}", identifier.0),
+            AstKind::Symbol(symbol) => write!(f, "symbol {}", symbol.0),
             AstKind::Struct(struct_) => {
-                " [".fmt(f)?;
-                for (key, value) in &struct_.fields {
-                    more_indentation.fmt(f)?;
-                    key.fmt_with_indentation(f, &more_indentation)?;
-                    ": ".fmt(f)?;
-                    value.fmt_with_indentation(f, &more_indentation)?;
-                    ",\n".fmt(f)?;
-                }
-                indentation.fmt(f)?;
-                ']'.fmt(f)?;
-                Ok(())
+                write!(
+                    f,
+                    "struct [\n{}\n]",
+                    struct_
+                        .fields
+                        .iter()
+                        .map(|(key, value)| format!("{}: {},", key, value))
+                        .join("\n")
+                        .lines()
+                        .map(|line| format!("  {}", line))
+                        .join("\n")
+                )
             }
             AstKind::Lambda(lambda) => {
-                " {".fmt(f)?;
-                lambda
-                    .parameters
-                    .iter()
-                    .map(|it| format!("{}", it))
-                    .join(", ")
-                    .fmt(f)?;
-                " -> ".fmt(f)?;
-                for ast in &lambda.body {
-                    more_indentation.fmt(f)?;
-                    ast.fmt(f)?;
-                    '\n'.fmt(f)?;
-                }
-                "}".fmt(f)?;
-                Ok(())
+                write!(
+                    f,
+                    "lambda {{ {} ->\n{}\n}}",
+                    lambda
+                        .parameters
+                        .iter()
+                        .map(|it| format!("{}", it))
+                        .join(" "),
+                    lambda
+                        .body
+                        .iter()
+                        .map(|it| format!("{}", it))
+                        .join("\n")
+                        .lines()
+                        .map(|line| format!("  {}", line))
+                        .join("\n")
+                )
             }
             AstKind::Call(call) => {
-                call.name.fmt(f)?;
-                '\n'.fmt(f)?;
-                for argument in &call.arguments {
-                    more_indentation.fmt(f)?;
-                    argument.fmt_with_indentation(f, indentation);
-                }
-                Ok(())
+                write!(
+                    f,
+                    "call {} with these arguments: {}",
+                    call.name,
+                    call.arguments
+                        .iter()
+                        .map(|argument| format!("{}", argument))
+                        .join("\n")
+                )
             }
             AstKind::Assignment(assignment) => {
-                assignment.name.fmt(f)?;
-                " =\n".fmt(f)?;
-                for ast in &assignment.body {
-                    more_indentation.fmt(f)?;
-                    ast.fmt_with_indentation(f, &more_indentation);
-                    '\n'.fmt(f)?;
-                }
-                Ok(())
+                write!(
+                    f,
+                    "assignment: {} =\n{}",
+                    assignment.name,
+                    assignment
+                        .body
+                        .iter()
+                        .map(|it| format!("{}", it))
+                        .join("\n")
+                        .lines()
+                        .map(|line| format!("  {}", line))
+                        .join("\n")
+                )
             }
             AstKind::Error { child, errors } => {
-                write!(f, "!! errors: {:?}", errors);
+                write!(
+                    f,
+                    "error:\n{}",
+                    errors
+                        .iter()
+                        .map(|error| format!("  {:?}", error))
+                        .join("\n")
+                )?;
                 if let Some(child) = child {
-                    write!(f, "\n{}", indentation);
-                    child.fmt_with_indentation(f, &more_indentation);
+                    write!(f, "\n  fallback: {}", child)?;
                 }
                 Ok(())
             }

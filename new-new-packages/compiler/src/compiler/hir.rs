@@ -187,21 +187,22 @@ impl fmt::Display for Expression {
             Expression::Struct(entries) => {
                 write!(
                     f,
-                    "struct [{}]",
+                    "struct [\n{}\n]",
                     entries
                         .iter()
-                        .map(|(key, value)| format!("{}: {}", key, value))
-                        .join(", "),
+                        .map(|(key, value)| format!("  {}: {},", key, value))
+                        .join("\n"),
                 )
             }
             Expression::Lambda(lambda) => {
                 write!(
                     f,
-                    "lambda {{{}\n}}",
+                    "lambda {{ {}\n}}",
                     lambda
                         .to_string()
                         .lines()
-                        .map(|line| format!("  {}", line))
+                        .enumerate()
+                        .map(|(i, line)| format!("{}{}", if i == 0 { "" } else { "  " }, line))
                         .join("\n"),
                 )
             }
@@ -222,15 +223,21 @@ impl fmt::Display for Expression {
                 assert!(arguments.len() > 0, "A call needs to have arguments.");
                 write!(
                     f,
-                    "call {} with arguments {}",
+                    "call {} with these arguments:\n{}",
                     function,
-                    arguments.iter().join(", ")
+                    arguments
+                        .iter()
+                        .map(|argument| format!("  {}", argument))
+                        .join("\n")
                 )
             }
             Expression::Error { child, errors } => {
-                write!(f, "Error {:?}", errors)?;
+                write!(f, "error")?;
+                for error in errors {
+                    write!(f, "\n  {:?}", error)?;
+                }
                 if let Some(child) = child {
-                    write!(f, "\nfallback: {}", child)?;
+                    write!(f, "\n  fallback: {}", child)?;
                 }
                 Ok(())
             }
@@ -239,7 +246,16 @@ impl fmt::Display for Expression {
 }
 impl fmt::Display for Lambda {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} parameters\n", self.parameters.len())?;
+        write!(
+            f,
+            "{} {} ->\n",
+            self.parameters.len(),
+            if self.parameters.len() == 1 {
+                "parameter"
+            } else {
+                "parameters"
+            }
+        )?;
         write!(f, "{}", self.body)?;
         Ok(())
     }
