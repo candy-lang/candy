@@ -278,7 +278,7 @@ mod parse {
         );
     }
 
-    fn single_line_whitespace(mut input: &str) -> (&str, Rcst) {
+    fn single_line_whitespace(mut input: &str) -> Option<(&str, Rcst)> {
         log::trace!("single_line_whitespace({:?})", input);
         let mut chars = vec![];
         let mut has_error = false;
@@ -298,16 +298,25 @@ mod parse {
         }
         let whitespace = chars.into_iter().join("");
         if has_error {
-            (
+            Some((
                 input,
                 Rcst::Error {
                     unparsable_input: whitespace,
                     error: RcstError::WeirdWhitespace,
                 },
-            )
+            ))
+        } else if !whitespace.is_empty() {
+            Some((input, Rcst::Whitespace(whitespace)))
         } else {
-            (input, Rcst::Whitespace(whitespace))
+            None
         }
+    }
+    #[test]
+    fn test_single_line_whitespace() {
+        assert_eq!(
+            single_line_whitespace("  \nfoo"),
+            Some(("\nfoo", Rcst::Whitespace("  ".to_string())))
+        );
     }
 
     fn comment(input: &str) -> Option<(&str, Rcst)> {
@@ -381,9 +390,9 @@ mod parse {
 
     /// Consumes all leading whitespace (including newlines) and comments that
     /// are still within the given indentation. Won't consume newlines before a
-    /// lower or higher indentation.
+    /// lower.
     pub fn whitespaces_and_newlines(
-        input: &str,
+        mut input: &str,
         indentation: usize,
         also_comments: bool,
     ) -> (&str, Vec<Rcst>) {
@@ -394,8 +403,10 @@ mod parse {
             also_comments
         );
         let mut parts = vec![];
-        let (input, whitespace) = single_line_whitespace(input);
-        parts.push(whitespace);
+        if let Some((new_input, whitespace)) = single_line_whitespace(input) {
+            input = new_input;
+            parts.push(whitespace);
+        }
 
         let mut input = input;
         loop {
@@ -672,6 +683,9 @@ mod parse {
             } else {
                 indentation
             };
+            log::debug!("Got whitespace: {:?}", whitespace);
+            let last = expressions.pop().unwrap();
+            expressions.push(last.wrap_in_whitespace(whitespace));
 
             let (i, expr) = match expression(i, indentation, has_multiline_whitespace) {
                 Some(it) => it,
@@ -683,18 +697,32 @@ mod parse {
                     if let Some((i, cst)) = fallback {
                         (i, cst)
                     } else {
+                        input = i;
                         break;
                     }
                 }
             };
 
-            let last = expressions.pop().unwrap();
-            expressions.push(last.wrap_in_whitespace(whitespace));
-
             expressions.push(expr);
             input = i;
         }
         Some((input, expressions))
+    }
+    #[test]
+    fn test_run_of_expressions() {
+        assert_eq!(run_of_expressions("print", 0), None);
+        // foo
+        // .. # this is indentation
+        assert_eq!(
+            call("foo\n  ", 0),
+            Some((
+                "",
+                Rcst::Call {
+                    name: Box::new(Rcst::Identifier("foo".to_string())),
+                    arguments: vec![],
+                },
+            ))
+        );
     }
 
     fn call(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
@@ -1055,32 +1083,34 @@ mod parse {
         log::trace!("body({:?}, {:?})", input, indentation);
         let mut expressions = vec![];
         loop {
-            let mut new_expressions = vec![];
-            let mut new_input = input;
+            let (new_input, mut whitespace) = whitespaces_and_newlines(input, indentation, true);
+            input = new_input;
+            expressions.append(&mut whitespace);
 
-            let (new_new_input, mut whitespace) =
-                whitespaces_and_newlines(new_input, indentation, true);
-            new_expressions.append(&mut whitespace);
-            new_input = new_new_input;
-
-            let (mut new_input, unexpected_whitespace) = single_line_whitespace(new_input);
             let mut indentation = indentation;
-            if let Rcst::Whitespace(whitespace) = &unexpected_whitespace {
-                if !whitespace.is_empty() {
-                    indentation += whitespace_indentation_score(whitespace) / 2;
-                    new_expressions.push(Rcst::Error {
-                        unparsable_input: whitespace.to_string(),
-                        error: RcstError::TooMuchWhitespace,
-                    });
-                }
-            } else {
-                new_expressions.push(unexpected_whitespace);
+            if let Some((new_input, unexpected_whitespace)) = single_line_whitespace(input) {
+                input = new_input;
+                indentation += match &unexpected_whitespace {
+                    Rcst::Whitespace(whitespace)
+                    | Rcst::Error {
+                        unparsable_input: whitespace,
+                        error: RcstError::WeirdWhitespace,
+                    } => whitespace_indentation_score(whitespace) / 2,
+                    _ => panic!(
+                        "single_line_whitespace returned something other than Whitespace or Error."
+                    ),
+                };
+                expressions.push(Rcst::Error {
+                    unparsable_input: unexpected_whitespace.to_string(),
+                    error: RcstError::TooMuchWhitespace,
+                });
+                continue;
             }
 
-            match expression(new_input, indentation, true) {
-                Some((new_new_input, expression)) => {
-                    new_input = new_new_input;
-                    new_expressions.push(expression);
+            match expression(input, indentation, true) {
+                Some((new_input, expression)) => {
+                    input = new_input;
+                    expressions.push(expression);
                 }
                 None => {
                     let fallback = colon(new_input)
@@ -1089,16 +1119,14 @@ mod parse {
                         .or_else(|| closing_bracket(new_input))
                         .or_else(|| closing_curly_brace(new_input))
                         .or_else(|| arrow(new_input));
-                    if let Some((i, cst)) = fallback {
-                        new_input = i;
-                        new_expressions.push(cst);
+                    if let Some((new_input, cst)) = fallback {
+                        input = new_input;
+                        expressions.push(cst);
                     } else {
                         break (input, expressions);
                     }
                 }
             }
-            input = new_input;
-            expressions.append(&mut new_expressions);
         }
     }
 
