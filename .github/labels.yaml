@@ -1,0 +1,24 @@
+'P: Compiler':
+  - new-new-packages/compiler/**/*
+'P: Compiler/Ast':
+  - packages/ast/**/*
+'P: Compiler/CodeGeneratorDart':
+  - packages/code_generator_dart/**/*
+'P: Compiler/Cst':
+  - packages/cst/**/*
+'P: Compiler/Hir':
+  - packages/hir/**/*
+'P: Compiler/Utils':
+  - packages/compiler_utils/**/*
+'P: Core':
+  - new-new-new-packages/Core/**/*
+  - new-packages/Core/**/*
+  - packages/core/**/*
+'P: LspServer':
+  - packages/lsp_server/**/*
+'P: PetitParser':
+  - packages/petit_parser/**/*
+'P: ShoppingList':
+  - new-packages/ShoppingList/**/*
+'P: VS Code Extension':
+  - new-new-packages/vscode_extension/**/*

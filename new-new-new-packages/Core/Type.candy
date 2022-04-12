@@ -1,0 +1,6 @@
+equals = builtinStructGet (use ".Equality") Equals
+
+typeOf value = builtinTypeOf value
+
+is value type =
+  equals (typeOf value) type

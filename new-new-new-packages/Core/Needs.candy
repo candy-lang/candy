@@ -1,0 +1,17 @@
+type = use ".Type"
+panic = builtinStructGet (use ".Panic") Panic
+isOfType = builtinStructGet type Is
+
+needs condition =
+  builtinIfElse (isOfType condition Bool) {} { panic "`needs` was called with the wrong arguments." }
+  builtinIfElse
+    condition
+    {}
+    { panic "A function was called with the wrong arguments." }
+
+check condition =
+  needs (isOfType condition Bool)
+  builtinIfElse
+    condition
+    {}
+    { panic "A check didn't succeed" }

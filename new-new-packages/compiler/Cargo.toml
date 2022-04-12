@@ -19,19 +19,17 @@ linked-hash-map = "0.5.4"
 log = "0.4.14"
 lsp-types = "0.91.1"
 lspower = "1.5.0"
-nom = "7.1.0"
-nom-supreme = "0.6.0"
 notify = "4.0.17"
 proptest = "1.0.0"
 regex = "1.5.5"
 salsa = "0.16.1"
 serde = { version = "1.0.83", features = ["derive"] }
-serde_json = "1.0.34"
+serde_json = "1.0.79"
 structopt = "0.3.25"
-strum = "0.23.0"
-strum_macros = "0.23"
-tokio = { version = "1.9.0", features = ["full"] }
-tokio-util = "0.6.0"
+strum = "0.24.0"
+strum_macros = "0.24"
+tokio = { version = "1.17.0", features = ["full"] }
+tokio-util = "0.7.1"
 
 [target.x86_64-unknown-linux-gnu]
 linker = "/usr/bin/clang"

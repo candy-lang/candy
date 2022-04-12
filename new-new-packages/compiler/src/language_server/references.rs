@@ -103,7 +103,10 @@ impl<'a> Context<'a> {
         }
     }
     fn visit_id(&mut self, id: hir::Id) {
-        let expression = self.db.find_expression(id.to_owned()).unwrap();
+        let expression = match self.db.find_expression(id.to_owned()) {
+            Some(expression) => expression,
+            None => return, // Generated code
+        };
         self.visit_expression(id, &expression);
     }
     fn visit_expression(&mut self, id: hir::Id, expression: &Expression) {

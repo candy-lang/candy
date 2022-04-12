@@ -112,5 +112,6 @@ Our TODO list:
 2. Clone this repo.
 3. Open the workspace in VS Code.
 4. In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/new-new-packages/compiler/Cargo.toml -- lsp",`.
-5. Run the launch config “Run Extension (VS Code Extension)”.
-6. In the new VS Code window that opens, you can enjoy 🍭 Candy :)
+5. Run `npm install` inside `new-new-packages/vscode_extension/`.
+6. Run the launch config “Run Extension (VS Code Extension)”.
+7. In the new VS Code window that opens, you can enjoy 🍭 Candy :)
