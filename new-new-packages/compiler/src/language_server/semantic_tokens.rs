@@ -167,7 +167,7 @@ impl<'a> Context<'a> {
             CstKind::DoubleQuote => {} // handled by parent
             CstKind::Octothorpe => {}  // handled by parent
             CstKind::Whitespace(_) => {}
-            CstKind::Newline => {}
+            CstKind::Newline(_) => {}
             CstKind::Comment { octothorpe, .. } => {
                 self.visit_cst(octothorpe, None);
                 self.add_token(cst.span.clone(), SemanticTokenType::Comment);

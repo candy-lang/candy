@@ -100,9 +100,9 @@ impl RcstToCstExt for Rcst {
                 state.offset += whitespace.len();
                 CstKind::Whitespace(whitespace)
             }
-            Rcst::Newline => {
-                state.offset += 1;
-                CstKind::Newline
+            Rcst::Newline(newline) => {
+                state.offset += newline.len();
+                CstKind::Newline(newline)
             }
             Rcst::Comment {
                 octothorpe,

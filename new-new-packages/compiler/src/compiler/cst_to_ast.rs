@@ -93,7 +93,7 @@ impl LoweringContext {
                 },
             ),
             CstKind::Whitespace(_)
-            | CstKind::Newline
+            | CstKind::Newline(_)
             | CstKind::Comment { .. }
             | CstKind::TrailingWhitespace { .. } => {
                 panic!("Whitespace should have been removed before lowering to AST.")

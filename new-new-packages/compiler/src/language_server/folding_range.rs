@@ -56,7 +56,7 @@ impl<'a> Context<'a> {
             CstKind::DoubleQuote => {}
             CstKind::Octothorpe => {}
             CstKind::Whitespace(_) => {}
-            CstKind::Newline => {}
+            CstKind::Newline(_) => {}
             // TODO: support folding ranges for comments
             CstKind::Comment { .. } => {}
             CstKind::TrailingWhitespace { child, .. } => self.visit_cst(child),

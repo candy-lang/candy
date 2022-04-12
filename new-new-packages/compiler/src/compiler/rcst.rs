@@ -14,8 +14,8 @@ pub enum Rcst {
     Arrow,              // ->
     DoubleQuote,        // "
     Octothorpe,         // #
-    Whitespace(String),
-    Newline, // TODO: Support different kinds of newlines.
+    Whitespace(String), // contains only non-multiline whitespace
+    Newline(String), // the associated `String` because some systems (such as Windows) have weird newlines
     Comment {
         octothorpe: Box<Rcst>,
         comment: String,
@@ -108,7 +108,7 @@ impl Display for Rcst {
             Rcst::DoubleQuote => '"'.fmt(f),
             Rcst::Octothorpe => "#".fmt(f),
             Rcst::Whitespace(whitespace) => whitespace.fmt(f),
-            Rcst::Newline => '\n'.fmt(f),
+            Rcst::Newline(newline) => newline.fmt(f),
             Rcst::Comment {
                 octothorpe,
                 comment,
@@ -240,8 +240,8 @@ impl IsMultiline for Rcst {
             Rcst::Arrow => false,
             Rcst::DoubleQuote => false,
             Rcst::Octothorpe => false,
-            Rcst::Whitespace(whitespace) => whitespace.is_multiline(),
-            Rcst::Newline => true,
+            Rcst::Whitespace(whitespace) => false,
+            Rcst::Newline(_) => true,
             Rcst::Comment { .. } => false,
             Rcst::TrailingWhitespace { child, whitespace } => {
                 log::info!("Is child multiline?");

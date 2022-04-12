@@ -47,7 +47,7 @@ pub enum CstKind {
     DoubleQuote,        // "
     Octothorpe,         // #
     Whitespace(String),
-    Newline, // TODO: Support different kinds of newlines.
+    Newline(String),
     Comment {
         octothorpe: Box<Cst>,
         comment: String,
@@ -119,7 +119,7 @@ impl Display for Cst {
             CstKind::DoubleQuote => '"'.fmt(f),
             CstKind::Octothorpe => '#'.fmt(f),
             CstKind::Whitespace(whitespace) => whitespace.fmt(f),
-            CstKind::Newline => '\n'.fmt(f),
+            CstKind::Newline(newline) => newline.fmt(f),
             CstKind::Comment {
                 octothorpe,
                 comment,
@@ -243,7 +243,7 @@ impl Cst {
 
     fn is_whitespace(&self) -> bool {
         match &self.kind {
-            CstKind::Whitespace(_) | CstKind::Newline | CstKind::Comment { .. } => true,
+            CstKind::Whitespace(_) | CstKind::Newline(_) | CstKind::Comment { .. } => true,
             CstKind::TrailingWhitespace { child, .. } => child.is_whitespace(),
             _ => false,
         }
@@ -378,7 +378,7 @@ impl TreeWithIds for Cst {
             CstKind::DoubleQuote => None,
             CstKind::Octothorpe => None,
             CstKind::Whitespace(_) => None,
-            CstKind::Newline => None,
+            CstKind::Newline(_) => None,
             CstKind::Comment { octothorpe, .. } => octothorpe.find(id),
             CstKind::TrailingWhitespace { child, whitespace } => {
                 child.find(id).or_else(|| whitespace.find(id))
@@ -470,7 +470,7 @@ impl TreeWithIds for Cst {
             CstKind::DoubleQuote => todo!(),
             CstKind::Octothorpe => todo!(),
             CstKind::Whitespace(_) => todo!(),
-            CstKind::Newline => todo!(),
+            CstKind::Newline(_) => todo!(),
             CstKind::Comment {
                 octothorpe,
                 comment,

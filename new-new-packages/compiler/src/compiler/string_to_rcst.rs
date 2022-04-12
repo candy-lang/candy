@@ -130,6 +130,15 @@ mod parse {
         let input = literal(input, "#")?;
         Some((input, Rcst::Octothorpe))
     }
+    fn newline(input: &str) -> Option<(&str, Rcst)> {
+        let newlines = vec!["\n", "\r\n"];
+        for newline in newlines {
+            if let Some(input) = literal(input, newline) {
+                return Some((input, Rcst::Newline(newline.to_string())));
+            }
+        }
+        None
+    }
 
     /// "Word" refers to a number of characters that are not separated by
     /// whitespace or significant punctuation. Identifiers, symbols, and ints
@@ -288,7 +297,7 @@ mod parse {
                     chars.push(' ');
                     input = &input[1..];
                 }
-                c if c.is_whitespace() && c != '\n' => {
+                c if c.is_whitespace() && c != '\n' && c != '\r' => {
                     chars.push(c);
                     has_error = true;
                     input = &input[c.len_utf8()..];
@@ -421,9 +430,9 @@ mod parse {
             // coming after.
             let mut new_input = input;
             let mut new_parts = vec![];
-            while let Some('\n') = new_input.chars().next() {
-                new_parts.push(Rcst::Newline);
-                new_input = &new_input[1..];
+            while let Some((new_new_input, newline)) = newline(new_input) {
+                new_parts.push(newline);
+                new_input = new_new_input;
             }
             if new_input == input {
                 break; // No newlines.
@@ -454,24 +463,30 @@ mod parse {
         assert_eq!(whitespaces_and_newlines("foo", 0, true), ("foo", vec![]));
         assert_eq!(
             whitespaces_and_newlines("\nfoo", 0, true),
-            ("foo", vec![Rcst::Newline])
+            ("foo", vec![Rcst::Newline("\n".to_string())])
         );
         assert_eq!(
             whitespaces_and_newlines("\n  foo", 1, true),
             (
                 "foo",
-                vec![Rcst::Newline, Rcst::Whitespace("  ".to_string())]
+                vec![
+                    Rcst::Newline("\n".to_string()),
+                    Rcst::Whitespace("  ".to_string())
+                ]
             )
         );
         assert_eq!(
             whitespaces_and_newlines("\n  foo", 0, true),
-            ("  foo", vec![Rcst::Newline])
+            ("  foo", vec![Rcst::Newline("\n".to_string())])
         );
         assert_eq!(
             whitespaces_and_newlines(" \n  foo", 0, true),
             (
                 "  foo",
-                vec![Rcst::Whitespace(" ".to_string()), Rcst::Newline]
+                vec![
+                    Rcst::Whitespace(" ".to_string()),
+                    Rcst::Newline("\n".to_string())
+                ]
             )
         );
         assert_eq!(
@@ -497,7 +512,7 @@ mod parse {
                         octothorpe: Box::new(Rcst::Octothorpe),
                         comment: " hey".to_string()
                     },
-                    Rcst::Newline,
+                    Rcst::Newline("\n".to_string()),
                     Rcst::Whitespace("  ".to_string()),
                 ],
             )
@@ -575,7 +590,7 @@ mod parse {
                     opening_quote: Box::new(Rcst::DoubleQuote),
                     parts: vec![
                         Rcst::TextPart("foo".to_string()),
-                        Rcst::Newline,
+                        Rcst::Newline("\n".to_string()),
                         Rcst::Whitespace("  ".to_string()),
                         Rcst::TextPart("bar".to_string())
                     ],
@@ -970,7 +985,10 @@ mod parse {
                 Rcst::Struct {
                     opening_bracket: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::OpeningBracket),
-                        whitespace: vec![Rcst::Newline, Rcst::Whitespace("  ".to_string())],
+                        whitespace: vec![
+                            Rcst::Newline("\n".to_string()),
+                            Rcst::Whitespace("  ".to_string())
+                        ],
                     }),
                     fields: vec![
                         Rcst::TrailingWhitespace {
@@ -983,7 +1001,10 @@ mod parse {
                                 value: Box::new(Rcst::Identifier("bar".to_string())),
                                 comma: Some(Box::new(Rcst::Comma)),
                             }),
-                            whitespace: vec![Rcst::Newline, Rcst::Whitespace("  ".to_string())]
+                            whitespace: vec![
+                                Rcst::Newline("\n".to_string()),
+                                Rcst::Whitespace("  ".to_string())
+                            ]
                         },
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::StructField {
@@ -999,7 +1020,7 @@ mod parse {
                                 }),
                                 comma: Some(Box::new(Rcst::Comma))
                             }),
-                            whitespace: vec![Rcst::Newline]
+                            whitespace: vec![Rcst::Newline("\n".to_string())]
                         }
                     ],
                     closing_bracket: Box::new(Rcst::ClosingBracket),
