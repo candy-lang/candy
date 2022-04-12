@@ -129,8 +129,8 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
                 .keys()
                 .into_iter()
                 .sorted_by_key(|it| it.local)
-                .map(|key| format!("{}: {}", key.local, ast_cst_id_map[key].0))
-                .join("\n"),
+                .map(|key| format!("{} -> {}\n", key, ast_cst_id_map[key].0))
+                .join(""),
         )
         .unwrap();
     }
@@ -149,8 +149,8 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
             hir_ast_id_map
                 .keys()
                 .into_iter()
-                .map(|key| format!("{:?}: {}", key, hir_ast_id_map[key].local))
-                .join("\n"),
+                .map(|key| format!("{} -> {}\n", key, hir_ast_id_map[key]))
+                .join(""),
         )
         .unwrap();
     }
