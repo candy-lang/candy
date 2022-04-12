@@ -1103,7 +1103,11 @@ mod parse {
     pub fn body(mut input: &str, indentation: usize) -> (&str, Vec<Rcst>) {
         log::trace!("body({:?}, {:?})", input, indentation);
         let mut expressions = vec![];
-        loop {
+
+        let mut number_of_expressions_in_last_iteration = -1i64;
+        while number_of_expressions_in_last_iteration < expressions.len() as i64 {
+            number_of_expressions_in_last_iteration = expressions.len() as i64;
+
             let (new_input, mut whitespace) = whitespaces_and_newlines(input, indentation, true);
             input = new_input;
             expressions.append(&mut whitespace);
@@ -1125,7 +1129,6 @@ mod parse {
                     unparsable_input: unexpected_whitespace.to_string(),
                     error: RcstError::TooMuchWhitespace,
                 });
-                continue;
             }
 
             match expression(input, indentation, true) {
@@ -1143,12 +1146,11 @@ mod parse {
                     if let Some((new_input, cst)) = fallback {
                         input = new_input;
                         expressions.push(cst);
-                    } else {
-                        break (input, expressions);
                     }
                 }
             }
         }
+        (input, expressions)
     }
 
     fn lambda(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
