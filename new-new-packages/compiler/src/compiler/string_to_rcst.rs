@@ -41,6 +41,17 @@ impl Rcst {
     }
 }
 
+fn whitespace_indentation_score(whitespace: &str) -> usize {
+    whitespace
+        .chars()
+        .map(|c| match c {
+            '\t' => 2,
+            c if c.is_whitespace() => 1,
+            _ => panic!("whitespace_indentation_score called with something non-whitespace"),
+        })
+        .sum()
+}
+
 mod parse {
     // All parsers take an input and return an input that may have advanced a
     // little.
@@ -49,6 +60,8 @@ mod parse {
     // parentheses, brackets, etc. If some part of a definition can't be parsed,
     // all the surrounding code still has a chance to be properly parsed – even
     // mid-writing after putting the opening bracket of a struct.
+
+    use crate::compiler::string_to_rcst::whitespace_indentation_score;
 
     use super::super::rcst::{IsMultiline, Rcst, RcstError};
     use itertools::Itertools;
@@ -1054,7 +1067,7 @@ mod parse {
             let mut indentation = indentation;
             if let Rcst::Whitespace(whitespace) = &unexpected_whitespace {
                 if !whitespace.is_empty() {
-                    indentation += whitespace.len() / 2; // TODO
+                    indentation += whitespace_indentation_score(whitespace) / 2;
                     new_expressions.push(Rcst::Error {
                         unparsable_input: whitespace.to_string(),
                         error: RcstError::TooMuchWhitespace,
