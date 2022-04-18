@@ -11,7 +11,7 @@ debug = true
 [dependencies]
 chrono = "0.4.19"
 colored = "2.0.0"
-fern = "0.6.0"
+fern = "0.6.1"
 im = "15.0.0"
 itertools = { version = "0.10.0" }
 lazy_static = "1.4.0"
