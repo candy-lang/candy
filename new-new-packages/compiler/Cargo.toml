@@ -16,7 +16,7 @@ im = "15.0.0"
 itertools = { version = "0.10.0" }
 lazy_static = "1.4.0"
 linked-hash-map = "0.5.4"
-log = "0.4.14"
+log = "0.4.16"
 lsp-types = "0.91.1"
 lspower = "1.5.0"
 nom = "7.1.0"
