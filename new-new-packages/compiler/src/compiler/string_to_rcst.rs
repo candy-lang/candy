@@ -422,9 +422,10 @@ mod parse {
         assert_eq!(leading_indentation("  foo", 2), None);
     }
 
-    /// Consumes all leading whitespace (including newlines) and comments that
-    /// are still within the given indentation. Won't consume whitespace with
-    /// a lower indentation followed by non-whitespace stuff.
+    /// Consumes all leading whitespace (including newlines) and optionally
+    /// comments that are still within the given indentation. Won't consume a
+    /// newline followed by less-indented whitespace followed by non-whitespace
+    /// stuff like an expression.
     pub fn whitespaces_and_newlines(
         mut input: &str,
         indentation: usize,
@@ -551,6 +552,28 @@ mod parse {
                     Rcst::Whitespace("  ".to_string()),
                 ],
             )
+        );
+        assert_eq!(
+            whitespaces_and_newlines("# foo\n\n  #bar\n", 1, true),
+            (
+                "\n",
+                vec![
+                    Rcst::Comment {
+                        octothorpe: Box::new(Rcst::Octothorpe),
+                        comment: " foo".to_string()
+                    },
+                    Rcst::Newline("\n".to_string()),
+                    Rcst::Error {
+                        unparsable_input: "\n ".to_string(),
+                        error: RcstError::WeirdWhitespaceInIndentation
+                    },
+                    Rcst::Whitespace(" ".to_string()),
+                    Rcst::Comment {
+                        octothorpe: Box::new(Rcst::Octothorpe),
+                        comment: "bar".to_string()
+                    }
+                ]
+            ),
         );
     }
 

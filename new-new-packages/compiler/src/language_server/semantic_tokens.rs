@@ -188,7 +188,7 @@ impl<'a> Context<'a> {
             } => {
                 self.add_token(opening_quote.span.clone(), SemanticTokenType::String);
                 for part in parts {
-                    if let Cst::TextPart(_) = part {
+                    if let CstKind::TextPart(_) = part.kind {
                         self.add_token(part.span.clone(), SemanticTokenType::String)
                     }
                 }
