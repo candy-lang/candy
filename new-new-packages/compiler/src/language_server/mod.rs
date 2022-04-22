@@ -263,7 +263,7 @@ impl CandyLanguageServer {
         log::debug!("Locked.");
 
         for input in inputs {
-            let (hir, _mapping) = db.hir_raw(input.clone()).unwrap();
+            let (hir, _mapping) = db.hir(input.clone()).unwrap();
 
             let diagnostics = {
                 let mut errors = vec![];

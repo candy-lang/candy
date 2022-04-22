@@ -22,7 +22,6 @@ pub trait CstToAst: CstDb + RcstToCst {
     fn cst_to_ast_id(&self, input: Input, id: cst::Id) -> Option<ast::Id>;
 
     fn ast(&self, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)>;
-    fn ast_raw(&self, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)>;
 }
 
 fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
@@ -43,9 +42,6 @@ fn cst_to_ast_id(db: &dyn CstToAst, input: Input, id: cst::Id) -> Option<ast::Id
 }
 
 fn ast(db: &dyn CstToAst, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)> {
-    db.ast_raw(input).map(|(ast, id_mapping)| (ast, id_mapping))
-}
-fn ast_raw(db: &dyn CstToAst, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)> {
     let cst = db.cst(input.clone())?;
     let cst = cst.unwrap_whitespace_and_comment();
     let mut context = LoweringContext::new(input);
@@ -87,6 +83,7 @@ impl LoweringContext {
                 AstKind::Error {
                     child: None,
                     errors: vec![CompilerError {
+                        input: self.input.clone(),
                         span: cst.span.clone(),
                         payload: CompilerErrorPayload::Ast(AstError::UnexpectedPunctuation),
                     }],
@@ -106,7 +103,7 @@ impl LoweringContext {
                 let string = self.create_string_without_id_mapping(symbol.to_string());
                 self.create_ast(cst.id, AstKind::Symbol(Symbol(string)))
             }
-            CstKind::Int(value) => self.create_ast(cst.id, AstKind::Int(Int(*value))),
+            CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(*value))),
             CstKind::Text {
                 opening_quote,
                 parts,
@@ -137,6 +134,7 @@ impl LoweringContext {
                         AstKind::Error {
                             child: None,
                             errors: vec![CompilerError {
+                                input: self.input.clone(),
                                 span: closing_quote.span.clone(),
                                 payload: CompilerErrorPayload::Ast(
                                     AstError::TextWithoutClosingQuote,
@@ -167,6 +165,7 @@ impl LoweringContext {
                         AstKind::Error {
                             child: None,
                             errors: vec![CompilerError {
+                                input: self.input.clone(),
                                 span: closing_parenthesis.span.clone(),
                                 payload: CompilerErrorPayload::Ast(
                                     AstError::ParenthesizedWithoutClosingParenthesis,
@@ -191,6 +190,7 @@ impl LoweringContext {
                 } else {
                     let mut errors = vec![];
                     errors.push(CompilerError {
+                        input: self.input.clone(),
                         span: name.span.clone(),
                         payload: CompilerErrorPayload::Ast(AstError::CallOfANonIdentifier),
                     });
@@ -236,9 +236,10 @@ impl LoweringContext {
                                     AstKind::Error {
                                         child: None,
                                         errors: vec![CompilerError {
+                                            input: self.input.clone(),
                                             span: colon.span.clone(),
                                             payload: CompilerErrorPayload::Ast(
-                                                AstError::ColonMissingAfterStructKey,
+                                                AstError::StructKeyWithoutColon,
                                             ),
                                         }],
                                     },
@@ -251,9 +252,10 @@ impl LoweringContext {
                                         AstKind::Error {
                                             child: None,
                                             errors: vec![CompilerError {
+                                                input: self.input.clone(),
                                                 span: comma.span.clone(),
                                                 payload: CompilerErrorPayload::Ast(
-                                                    AstError::NonCommaAfterStructValue,
+                                                    AstError::StructValueWithoutComma,
                                                 ),
                                             }],
                                         },
@@ -264,6 +266,7 @@ impl LoweringContext {
                             Some((key, value))
                         } else {
                             errors.push(CompilerError {
+                                input: self.input.clone(),
                                 span: cst.span.clone(),
                                 payload: CompilerErrorPayload::Ast(
                                     AstError::StructWithNonStructField,
@@ -276,6 +279,7 @@ impl LoweringContext {
 
                 if !matches!(closing_bracket.kind, CstKind::ClosingBracket) {
                     errors.push(CompilerError {
+                        input: self.input.clone(),
                         span: closing_bracket.span.clone(),
                         payload: CompilerErrorPayload::Ast(AstError::StructWithoutClosingBrace),
                     });
@@ -323,6 +327,7 @@ impl LoweringContext {
 
                 if !matches!(closing_curly_brace.kind, CstKind::ClosingCurlyBrace) {
                     errors.push(CompilerError {
+                        input: self.input.clone(),
                         span: closing_curly_brace.span.clone(),
                         payload: CompilerErrorPayload::Ast(
                             AstError::LambdaWithoutClosingCurlyBrace,
@@ -382,6 +387,7 @@ impl LoweringContext {
                 AstKind::Error {
                     child: None,
                     errors: vec![CompilerError {
+                        input: self.input.clone(),
                         span: cst.span.clone(),
                         payload: CompilerErrorPayload::Rcst(error.clone()),
                     }],
@@ -399,7 +405,7 @@ impl LoweringContext {
                 Ok(parameter) => parameter,
                 Err(error) => {
                     errors.push(error);
-                    self.create_string(it.id, format!("<invalid#{}", index))
+                    self.create_string(it.id, format!("<invalid#{}>", index))
                 }
             })
             .collect();
@@ -410,6 +416,7 @@ impl LoweringContext {
             Ok(self.create_string(cst.id.to_owned(), identifier.clone()))
         } else {
             Err(CompilerError {
+                input: self.input.clone(),
                 span: cst.span.clone(),
                 payload: CompilerErrorPayload::Ast(AstError::ExpectedParameter),
             })
@@ -452,7 +459,7 @@ impl LoweringContext {
         id
     }
     fn create_next_id_without_mapping(&mut self) -> ast::Id {
-        let id = ast::Id::new(self.input.clone(), self.next_id);
+        let id = ast::Id::new(self.input.clone().clone(), self.next_id);
         self.next_id += 1;
         id
     }

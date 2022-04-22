@@ -126,10 +126,9 @@ impl RcstToCstExt for Rcst {
                 state.offset += symbol.len();
                 CstKind::Symbol(symbol)
             }
-            Rcst::Int(int) => {
-                let int_str = format!("{}", int);
-                state.offset += int_str.len();
-                CstKind::Int(int)
+            Rcst::Int { value, string } => {
+                state.offset += string.len();
+                CstKind::Int { value, string }
             }
             Rcst::Text {
                 opening_quote,

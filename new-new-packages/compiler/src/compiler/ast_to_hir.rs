@@ -21,7 +21,6 @@ pub trait AstToHir: CstDb + CstToAst {
     fn cst_to_hir_id(&self, input: Input, id: cst::Id) -> Option<hir::Id>;
 
     fn hir(&self, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)>;
-    fn hir_raw(&self, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)>;
 }
 
 fn hir_to_ast_id(db: &dyn AstToHir, id: hir::Id) -> Option<ast::Id> {
@@ -52,9 +51,6 @@ fn cst_to_hir_id(db: &dyn AstToHir, input: Input, id: cst::Id) -> Option<hir::Id
 }
 
 fn hir(db: &dyn AstToHir, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)> {
-    db.hir_raw(input).map(|(hir, id_mapping)| (hir, id_mapping))
-}
-fn hir_raw(db: &dyn AstToHir, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)> {
     let (ast, _) = db.ast(input.clone())?;
 
     let mut context = Context {
@@ -227,6 +223,7 @@ impl<'c> Compiler<'c> {
                             Expression::Error {
                                 child: None,
                                 errors: vec![CompilerError {
+                                    input: ast.id.input.clone(),
                                     span: self.context.db.ast_id_to_span(ast.id.clone()).unwrap(),
                                     payload: CompilerErrorPayload::Hir(
                                         HirError::UnknownReference {
@@ -313,6 +310,7 @@ impl<'c> Compiler<'c> {
                             Expression::Error {
                                 child: None,
                                 errors: vec![CompilerError {
+                                    input: name.id.input.clone(),
                                     span: self.context.db.ast_id_to_span(name.id.clone()).unwrap(),
                                     payload: CompilerErrorPayload::Hir(HirError::UnknownFunction {
                                         name: name.value.clone(),
@@ -391,17 +389,6 @@ impl<'c> Compiler<'c> {
             self.identifiers.insert(identifier, id.clone());
         }
         id
-    }
-
-    fn ast_id_to_span(&self, id: &ast::Id) -> Range<usize> {
-        self.context
-            .db
-            .find_cst(
-                id.input.clone(),
-                self.context.db.ast_to_cst_id(id.clone()).unwrap(),
-            )
-            .span
-            .clone()
     }
 
     fn create_next_id(&mut self, ast_id: ast::Id) -> hir::Id {

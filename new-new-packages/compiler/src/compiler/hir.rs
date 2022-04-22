@@ -246,16 +246,7 @@ impl fmt::Display for Expression {
 }
 impl fmt::Display for Lambda {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} {} ->\n",
-            self.parameters.len(),
-            if self.parameters.len() == 1 {
-                "parameter"
-            } else {
-                "parameters"
-            }
-        )?;
+        write!(f, "{} ->\n", self.parameters.join(" "),)?;
         write!(f, "{}", self.body)?;
         Ok(())
     }

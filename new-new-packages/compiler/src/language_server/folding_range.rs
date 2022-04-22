@@ -62,7 +62,8 @@ impl<'a> Context<'a> {
             CstKind::TrailingWhitespace { child, .. } => self.visit_cst(child),
             CstKind::Identifier(_) => {}
             CstKind::Symbol(_) => {}
-            CstKind::Int(_) => {}
+            CstKind::Int { .. } => {}
+            // TODO: support folding ranges for multiline texts
             CstKind::Text { .. } => {}
             CstKind::TextPart(_) => {}
             CstKind::Parenthesized { inner, .. } => self.visit_cst(inner),
@@ -83,6 +84,7 @@ impl<'a> Context<'a> {
                 self.visit_cst(name);
                 self.visit_csts(&arguments);
             }
+            // TODO: support folding ranges for structs
             CstKind::Struct { fields, .. } => self.visit_csts(fields),
             CstKind::StructField { key, value, .. } => {
                 self.visit_cst(key);

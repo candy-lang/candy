@@ -105,8 +105,8 @@ pub enum AstError {
     CallOfANonIdentifier,
     StructWithNonStructField,
     StructWithoutClosingBrace,
-    ColonMissingAfterStructKey,
-    NonCommaAfterStructValue,
+    StructKeyWithoutColon,
+    StructValueWithoutComma,
     ExpectedParameter,
     LambdaWithoutClosingCurlyBrace,
 }
@@ -132,9 +132,9 @@ impl CollectErrors for Ast {
             AstKind::Assignment(assignment) => assignment.body.collect_errors(errors),
             AstKind::Error {
                 child,
-                errors: recovered_errors,
+                errors: mut recovered_errors,
             } => {
-                errors.append(&mut recovered_errors.clone());
+                errors.append(&mut recovered_errors);
                 child.map(|child| child.collect_errors(errors));
             }
         }
@@ -192,11 +192,11 @@ impl Display for Ast {
             AstKind::Call(call) => {
                 write!(
                     f,
-                    "call {} with these arguments: {}",
+                    "call {} with these arguments:\n{}",
                     call.name,
                     call.arguments
                         .iter()
-                        .map(|argument| format!("{}", argument))
+                        .map(|argument| format!("  {}", argument))
                         .join("\n")
                 )
             }
@@ -234,6 +234,6 @@ impl Display for Ast {
 }
 impl Display for AstString {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}@{}", self.id, self.value)
+        write!(f, "{}@\"{}\"", self.id, self.value)
     }
 }

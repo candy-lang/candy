@@ -26,10 +26,10 @@ use crate::{
     HirDbStorage,
     InputDbStorage,
     LspPositionConversionStorage,
+    RcstToCstStorage,
     ReferencesDbStorage,
     SemanticTokenDbStorage,
-    StringToRcstStorage,
-    RcstToCstStorage
+    StringToRcstStorage
 )]
 #[derive(Default)]
 pub struct Database {

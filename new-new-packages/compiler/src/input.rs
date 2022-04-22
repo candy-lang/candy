@@ -148,7 +148,10 @@ mod test {
         );
         assert_eq!(
             db.rcst(input.clone()).unwrap().as_ref().to_owned(),
-            vec![Rcst::Int(123),],
+            vec![Rcst::Int {
+                value: 123,
+                string: "123".to_string()
+            },],
         );
 
         db.did_change_input(&input, "456".to_owned());
@@ -158,7 +161,10 @@ mod test {
         );
         assert_eq!(
             db.rcst(input.clone()).unwrap().as_ref().to_owned(),
-            vec![Rcst::Int(456)],
+            vec![Rcst::Int {
+                value: 456,
+                string: "456".to_string()
+            }],
         );
 
         db.did_close_input(&input);

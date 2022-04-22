@@ -1,4 +1,5 @@
 #![feature(try_trait_v2)]
+#![feature(let_chains)]
 
 mod builtin_functions;
 mod compiler;
@@ -80,7 +81,7 @@ fn build(options: CandyBuildOptions) {
                 Ok(_) => {
                     raw_build(&options.file, options.debug);
                 }
-                Err(e) => println!("watch error: {:#?}", e),
+                Err(e) => log::error!("watch error: {:#?}", e),
             }
         }
     }
@@ -112,7 +113,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
 
     log::info!("Lowering CST to AST…");
     let (asts, ast_cst_id_map) = db
-        .ast_raw(input.clone())
+        .ast(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if debug {
         let ast_file = file.clone_with_extension("candy.ast");
@@ -137,7 +138,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
 
     log::info!("Compiling AST to HIR…");
     let (hir, hir_ast_id_map) = db
-        .hir_raw(input.clone())
+        .hir(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if debug {
         let hir_file = file.clone_with_extension("candy.hir");
@@ -168,8 +169,8 @@ fn run(options: CandyRunOptions) {
 
     log::debug!("Running `{}`.\n", options.file.display());
 
-    let input: Input = options.file.clone().into();
-    let db = Database::default();
+    let _input: Input = options.file.clone().into();
+    let _db = Database::default();
 
     let _hir = raw_build(&options.file, false);
 
@@ -209,6 +210,7 @@ fn init_logger() {
         .level_for("salsa", log::LevelFilter::Error)
         .level_for("tokio_util", log::LevelFilter::Error)
         .level_for("lspower::transport", log::LevelFilter::Error)
+        .level_for("candy::compiler::string_to_rcst", log::LevelFilter::Debug)
         .chain(std::io::stderr())
         .apply()
         .unwrap();

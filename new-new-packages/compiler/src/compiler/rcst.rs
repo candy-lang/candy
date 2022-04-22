@@ -26,7 +26,10 @@ pub enum Rcst {
     },
     Identifier(String),
     Symbol(String),
-    Int(u64),
+    Int {
+        value: u64,
+        string: String,
+    },
     Text {
         opening_quote: Box<Rcst>,
         parts: Vec<Rcst>,
@@ -76,7 +79,7 @@ pub enum RcstError {
     IdentifierContainsNonAlphanumericAscii,
     SymbolContainsNonAlphanumericAscii,
     IntContainsNonDigits,
-    TextDoesNotEndUntilInputEnds,
+    TextNotClosed,
     TextNotSufficientlyIndented,
     StructFieldMissesKey,
     StructFieldMissesColon,
@@ -84,12 +87,12 @@ pub enum RcstError {
     StructNotClosed,
     WeirdWhitespace,
     WeirdWhitespaceInIndentation,
-    ExpressionExpectedAfterOpeningParenthesis,
+    OpeningParenthesisWithoutExpression,
     ParenthesisNotClosed,
     TooMuchWhitespace,
     CurlyBraceNotClosed,
     UnparsedRest,
-    UnexpectedPunctuation,
+    UnexpectedCharacters,
 }
 
 impl Display for Rcst {
@@ -125,7 +128,7 @@ impl Display for Rcst {
             }
             Rcst::Identifier(identifier) => identifier.fmt(f),
             Rcst::Symbol(symbol) => symbol.fmt(f),
-            Rcst::Int(int) => int.fmt(f),
+            Rcst::Int { string, .. } => string.fmt(f),
             Rcst::Text {
                 opening_quote,
                 parts,
@@ -226,7 +229,6 @@ pub trait IsMultiline {
 
 impl IsMultiline for Rcst {
     fn is_multiline(&self) -> bool {
-        log::info!("Is {:?} multiline?", self);
         match self {
             Rcst::EqualsSign => false,
             Rcst::Comma => false,
@@ -244,16 +246,11 @@ impl IsMultiline for Rcst {
             Rcst::Newline(_) => true,
             Rcst::Comment { .. } => false,
             Rcst::TrailingWhitespace { child, whitespace } => {
-                log::info!("Is child multiline?");
-                let c = child.is_multiline();
-                log::info!("Is whitespace multiline?");
-                let w = whitespace.is_multiline();
-                log::info!("Combining");
-                c || w
+                child.is_multiline() || whitespace.is_multiline()
             }
             Rcst::Identifier(_) => false,
             Rcst::Symbol(_) => false,
-            Rcst::Int(_) => false,
+            Rcst::Int { .. } => false,
             Rcst::Text {
                 opening_quote,
                 parts,
@@ -278,7 +275,7 @@ impl IsMultiline for Rcst {
                 closing_bracket,
             } => {
                 opening_bracket.is_multiline()
-                    || fields.iter().any(|field| field.is_multiline())
+                    || fields.is_multiline()
                     || closing_bracket.is_multiline()
             }
             Rcst::StructField {

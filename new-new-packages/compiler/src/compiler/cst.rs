@@ -58,7 +58,10 @@ pub enum CstKind {
     },
     Identifier(String),
     Symbol(String),
-    Int(u64),
+    Int {
+        value: u64,
+        string: String,
+    },
     Text {
         opening_quote: Box<Cst>,
         parts: Vec<Cst>,
@@ -136,7 +139,7 @@ impl Display for Cst {
             }
             CstKind::Identifier(identifier) => identifier.fmt(f),
             CstKind::Symbol(symbol) => symbol.fmt(f),
-            CstKind::Int(int) => int.fmt(f),
+            CstKind::Int { string, .. } => string.fmt(f),
             CstKind::Text {
                 opening_quote,
                 parts,
@@ -385,7 +388,7 @@ impl TreeWithIds for Cst {
             }
             CstKind::Identifier(_) => None,
             CstKind::Symbol(_) => None,
-            CstKind::Int(_) => None,
+            CstKind::Int { .. } => None,
             CstKind::Text {
                 opening_quote,
                 parts,
@@ -467,17 +470,17 @@ impl TreeWithIds for Cst {
             CstKind::OpeningCurlyBrace { .. } => None,
             CstKind::ClosingCurlyBrace { .. } => None,
             CstKind::Arrow { .. } => None,
-            CstKind::DoubleQuote => todo!(),
-            CstKind::Octothorpe => todo!(),
-            CstKind::Whitespace(_) => todo!(),
-            CstKind::Newline(_) => todo!(),
-            CstKind::Comment { .. } => todo!(),
+            CstKind::DoubleQuote => None,
+            CstKind::Octothorpe => None,
+            CstKind::Whitespace(_) => None,
+            CstKind::Newline(_) => None,
+            CstKind::Comment { octothorpe, .. } => octothorpe.find_by_offset(offset),
             CstKind::TrailingWhitespace { child, .. } => child.find_by_offset(offset),
             CstKind::Identifier { .. } => None,
             CstKind::Symbol { .. } => None,
             CstKind::Int { .. } => None,
             CstKind::Text { .. } => None,
-            CstKind::TextPart(_) => todo!(),
+            CstKind::TextPart(_) => None,
             CstKind::Parenthesized { inner, .. } => inner.find_by_offset(offset),
             CstKind::Call { name, arguments } => name
                 .find_by_offset(offset)
