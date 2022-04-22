@@ -459,7 +459,7 @@ impl LoweringContext {
         id
     }
     fn create_next_id_without_mapping(&mut self) -> ast::Id {
-        let id = ast::Id::new(self.input.clone().clone(), self.next_id);
+        let id = ast::Id::new(self.input.clone(), self.next_id);
         self.next_id += 1;
         id
     }
