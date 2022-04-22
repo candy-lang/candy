@@ -1338,13 +1338,13 @@ mod parse {
             if let Some((i, curly_brace)) = closing_curly_brace(i) {
                 (i, body_expression, whitespace, curly_brace)
             } else {
-                // There is not a closing brace after a single expression. Try a
-                // body of multiple expressions. We didn't try this first
-                // because then the body would also have consumed any trailing
-                // closing curly brace in the same line.
+                // There is no closing brace after a single expression. Thus,
+                // we now try to parse a body of multiple expressions. We didn't
+                // try this first because then the body would also have consumed
+                // any trailing closing curly brace in the same line.
                 // For example, for the lambda `{ 2 }`, the body parser would
                 // have already consumed the `}`. The body parser works great
-                // for multiline bodies though.
+                // for multiline bodies, though.
                 let (i, body) = body(input_before_parsing_expression, indentation + 1);
                 let (i, whitespace) = whitespaces_and_newlines(i, indentation, true);
                 let (i, curly_brace) = match closing_curly_brace(i) {
