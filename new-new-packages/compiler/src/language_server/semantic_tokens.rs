@@ -181,7 +181,19 @@ impl<'a> Context<'a> {
             ),
             CstKind::Symbol { .. } => self.add_token(cst.span.clone(), SemanticTokenType::Symbol),
             CstKind::Int { .. } => self.add_token(cst.span.clone(), SemanticTokenType::Number),
-            CstKind::Text { .. } => self.add_token(cst.span.clone(), SemanticTokenType::String),
+            CstKind::Text {
+                opening_quote,
+                parts,
+                closing_quote,
+            } => {
+                self.add_token(opening_quote.span.clone(), SemanticTokenType::String);
+                for part in parts {
+                    if let Cst::TextPart(_) = part {
+                        self.add_token(part.span.clone(), SemanticTokenType::String)
+                    }
+                }
+                self.add_token(closing_quote.span.clone(), SemanticTokenType::String);
+            }
             CstKind::TextPart(_) => {} // handled by parent
             CstKind::Parenthesized {
                 opening_parenthesis,

@@ -132,7 +132,7 @@ impl LoweringContext {
                     text = self.create_ast(
                         closing_quote.id,
                         AstKind::Error {
-                            child: None,
+                            child: Some(Box::new(text)),
                             errors: vec![CompilerError {
                                 input: self.input.clone(),
                                 span: closing_quote.span.clone(),
@@ -163,7 +163,7 @@ impl LoweringContext {
                     ast = self.create_ast(
                         closing_parenthesis.id,
                         AstKind::Error {
-                            child: None,
+                            child: Some(Box::new(ast)),
                             errors: vec![CompilerError {
                                 input: self.input.clone(),
                                 span: closing_parenthesis.span.clone(),
@@ -179,7 +179,7 @@ impl LoweringContext {
             }
             CstKind::Call { name, arguments } => {
                 let name_string = if let CstKind::Identifier(identifier) = &name.kind {
-                    Some(self.create_string(cst.id.to_owned(), identifier.to_owned()))
+                    Some(self.create_string(name.id.to_owned(), identifier.to_owned()))
                 } else {
                     None
                 };
@@ -234,7 +234,7 @@ impl LoweringContext {
                                 key = self.create_ast(
                                     colon.id,
                                     AstKind::Error {
-                                        child: None,
+                                        child: Some(Box::new(key)),
                                         errors: vec![CompilerError {
                                             input: self.input.clone(),
                                             span: colon.span.clone(),
@@ -250,7 +250,7 @@ impl LoweringContext {
                                     value = self.create_ast(
                                         comma.id,
                                         AstKind::Error {
-                                            child: None,
+                                            child: Some(Box::new(value)),
                                             errors: vec![CompilerError {
                                                 input: self.input.clone(),
                                                 span: comma.span.clone(),
