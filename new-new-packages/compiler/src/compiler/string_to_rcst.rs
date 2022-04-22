@@ -794,11 +794,11 @@ mod parse {
                 "",
                 Rcst::Call {
                     name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string()))
                         whitespace: vec![
                             Rcst::Newline("\n".to_string()),
                             Rcst::Whitespace("  ".to_string())
                         ],
-                        child: Box::new(Rcst::Identifier("foo".to_string()))
                     }),
                     arguments: vec![Rcst::Identifier("bar".to_string())],
                 },
@@ -831,8 +831,8 @@ mod parse {
                 "",
                 Rcst::Call {
                     name: Box::new(Rcst::TrailingWhitespace {
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                         child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
                     arguments: vec![Rcst::Identifier("bar".to_string())]
                 }
@@ -844,16 +844,16 @@ mod parse {
                 "",
                 Rcst::Call {
                     name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Symbol("Foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        child: Box::new(Rcst::Symbol("Foo".to_string()))
                     }),
                     arguments: vec![
                         Rcst::TrailingWhitespace {
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
                             child: Box::new(Rcst::Int {
                                 value: 4,
                                 string: "4".to_string()
                             }),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
                         },
                         Rcst::Identifier("bar".to_string())
                     ]
@@ -870,19 +870,19 @@ mod parse {
                 "\n2",
                 Rcst::Call {
                     name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![
                             Rcst::Newline("\n".to_string()),
                             Rcst::Whitespace("  ".to_string())
                         ],
-                        child: Box::new(Rcst::Identifier("foo".to_string())),
                     }),
                     arguments: vec![
                         Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Identifier("bar".to_string())),
                             whitespace: vec![
                                 Rcst::Newline("\n".to_string()),
                                 Rcst::Whitespace("  ".to_string())
                             ],
-                            child: Box::new(Rcst::Identifier("bar".to_string())),
                         },
                         Rcst::Identifier("baz".to_string())
                     ],
@@ -899,36 +899,36 @@ mod parse {
                 "\nbar",
                 Rcst::Call {
                     name: Box::new(Rcst::TrailingWhitespace {
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                         child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
                     arguments: vec![
                         Rcst::TrailingWhitespace {
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
                             child: Box::new(Rcst::Int {
                                 value: 1,
                                 string: "1".to_string()
                             }),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
                         },
                         Rcst::TrailingWhitespace {
-                            whitespace: vec![
-                                Rcst::Newline("\n".to_string()),
-                                Rcst::Whitespace("  ".to_string())
-                            ],
                             child: Box::new(Rcst::Int {
                                 value: 2,
                                 string: "2".to_string()
                             }),
-                        },
-                        Rcst::TrailingWhitespace {
                             whitespace: vec![
                                 Rcst::Newline("\n".to_string()),
                                 Rcst::Whitespace("  ".to_string())
                             ],
+                        },
+                        Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::Int {
                                 value: 3,
                                 string: "3".to_string()
-                            })
+                            }),
+                            whitespace: vec![
+                                Rcst::Newline("\n".to_string()),
+                                Rcst::Whitespace("  ".to_string())
+                            ],
                         },
                         Rcst::Int {
                             value: 4,
@@ -1395,16 +1395,16 @@ mod parse {
                 "",
                 Rcst::Lambda {
                     opening_curly_brace: Box::new(Rcst::TrailingWhitespace {
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                         child: Box::new(Rcst::OpeningCurlyBrace),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
                     parameters_and_arrow: None,
                     body: vec![Rcst::TrailingWhitespace {
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                         child: Box::new(Rcst::Int {
                             value: 2,
                             string: "2".to_string()
-                        })
+                        }),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }],
                     closing_curly_brace: Box::new(Rcst::ClosingCurlyBrace),
                 }
@@ -1419,25 +1419,25 @@ mod parse {
                 "",
                 Rcst::Lambda {
                     opening_curly_brace: Box::new(Rcst::TrailingWhitespace {
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                         child: Box::new(Rcst::OpeningCurlyBrace),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
                     parameters_and_arrow: Some((
                         vec![Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Identifier("a".to_string())),
                             whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                            child: Box::new(Rcst::Identifier("a".to_string()))
                         },],
                         Box::new(Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Arrow),
                             whitespace: vec![
                                 Rcst::Newline("\n".to_string()),
                                 Rcst::Whitespace("  ".to_string())
                             ],
-                            child: Box::new(Rcst::Arrow)
                         }),
                     )),
                     body: vec![Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Newline("\n".to_string())],
-                        child: Box::new(Rcst::Identifier("foo".to_string()))
                     }],
                     closing_curly_brace: Box::new(Rcst::ClosingCurlyBrace),
                 }
@@ -1451,8 +1451,8 @@ mod parse {
                 "foo",
                 Rcst::Lambda {
                     opening_curly_brace: Box::new(Rcst::TrailingWhitespace {
-                        whitespace: vec![Rcst::Newline("\n".to_string())],
                         child: Box::new(Rcst::OpeningCurlyBrace),
+                        whitespace: vec![Rcst::Newline("\n".to_string())],
                     }),
                     parameters_and_arrow: None,
                     body: vec![],
@@ -1489,8 +1489,8 @@ mod parse {
                 "",
                 Rcst::Lambda {
                     opening_curly_brace: Box::new(Rcst::TrailingWhitespace {
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                         child: Box::new(Rcst::OpeningCurlyBrace),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
                     parameters_and_arrow: None,
                     body: vec![
@@ -1564,13 +1564,13 @@ mod parse {
                 "",
                 Rcst::Assignment {
                     name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        child: Box::new(Rcst::Identifier("foo".to_string()))
                     }),
                     parameters: vec![],
                     equals_sign: Box::new(Rcst::TrailingWhitespace {
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                         child: Box::new(Rcst::EqualsSign),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
                     body: vec![Rcst::Int {
                         value: 42,
@@ -1589,19 +1589,19 @@ mod parse {
                 "\n2",
                 Rcst::Assignment {
                     name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        child: Box::new(Rcst::Identifier("foo".to_string()))
                     }),
                     parameters: vec![Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("bar".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                        child: Box::new(Rcst::Identifier("bar".to_string()))
                     }],
                     equals_sign: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![
                             Rcst::Newline("\n".to_string()),
                             Rcst::Whitespace("  ".to_string())
                         ],
-                        child: Box::new(Rcst::EqualsSign)
                     }),
                     body: vec![Rcst::Int {
                         value: 3,
@@ -1619,22 +1619,22 @@ mod parse {
                 "",
                 Rcst::Assignment {
                     name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![
                             Rcst::Newline("\n".to_string()),
                             Rcst::Whitespace("  ".to_string())
                         ],
-                        child: Box::new(Rcst::Identifier("foo".to_string()))
                     }),
                     parameters: vec![Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("bar".to_string())),
                         whitespace: vec![
                             Rcst::Newline("\n".to_string()),
                             Rcst::Whitespace("  ".to_string())
                         ],
-                        child: Box::new(Rcst::Identifier("bar".to_string()))
                     }],
                     equals_sign: Box::new(Rcst::TrailingWhitespace {
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                         child: Box::new(Rcst::EqualsSign),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
                     body: vec![Rcst::Int {
                         value: 3,
