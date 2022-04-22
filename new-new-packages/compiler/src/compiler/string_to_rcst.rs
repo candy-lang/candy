@@ -1480,6 +1480,32 @@ mod parse {
                 }
             ))
         );
+        // { foo
+        //   bar
+        // }
+        assert_eq!(
+            lambda("{ foo\n  bar\n}", 0),
+            Some((
+                "",
+                Rcst::Lambda {
+                    opening_curly_brace: Box::new(Rcst::TrailingWhitespace {
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                        child: Box::new(Rcst::OpeningCurlyBrace),
+                    }),
+                    parameters_and_arrow: None,
+                    body: vec![
+                        Rcst::Identifier("foo".to_string()),
+                        Rcst::Newline("\n".to_string()),
+                        Rcst::Whitespace("  ".to_string()),
+                        Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Identifier("bar".to_string())),
+                            whitespace: vec![Rcst::Newline("\n".to_string())],
+                        }
+                    ],
+                    closing_curly_brace: Box::new(Rcst::ClosingCurlyBrace)
+                }
+            ))
+        );
     }
 
     fn assignment(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
