@@ -14,7 +14,7 @@ use lspower::{jsonrpc, Client, LanguageServer};
 use tokio::sync::Mutex;
 
 use crate::{
-    compiler::{ast_to_hir::AstToHir, cst_to_ast::CstToAst, string_to_cst::StringToCst},
+    compiler::{ast_to_hir::AstToHir, hir::CollectErrors},
     database::PROJECT_DIRECTORY,
     input::{Input, InputDb},
     language_server::hints::HintsDb,
@@ -260,18 +260,19 @@ impl CandyLanguageServer {
     async fn analyze_files(&self, inputs: Vec<Input>) {
         log::debug!("Analyzing file(s) {}", inputs.iter().join(", "));
         let db = self.db.lock().await;
+        log::debug!("Locked.");
 
         for input in inputs {
-            let (_, cst_errors) = db.cst_raw(input.clone()).unwrap();
-            let (_, _, ast_errors) = db.ast_raw(input.clone()).unwrap();
-            let (_, _, hir_errors) = db.hir_raw(input.clone()).unwrap();
+            let (hir, _mapping) = db.hir(input.clone()).unwrap();
 
-            let diagnostics = cst_errors
-                .into_iter()
-                .chain(ast_errors.into_iter())
-                .chain(hir_errors.into_iter())
-                .map(|it| it.to_diagnostic(&db, input.clone()))
-                .collect();
+            let diagnostics = {
+                let mut errors = vec![];
+                hir.collect_errors(&mut errors);
+                errors
+                    .into_iter()
+                    .map(|it| it.to_diagnostic(&db, input.clone()))
+                    .collect()
+            };
             self.client
                 .publish_diagnostics(input.clone().into(), diagnostics, None)
                 .await;

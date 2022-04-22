@@ -5,7 +5,7 @@ use std::{path::PathBuf, sync::Mutex};
 use crate::{
     compiler::{
         ast_to_hir::AstToHirStorage, cst::CstDbStorage, cst_to_ast::CstToAstStorage,
-        hir::HirDbStorage, string_to_cst::StringToCstStorage,
+        hir::HirDbStorage, rcst_to_cst::RcstToCstStorage, string_to_rcst::StringToRcstStorage,
     },
     discover::run::DiscoverStorage,
     input::{GetOpenInputQuery, Input, InputDbStorage, InputWatcher},
@@ -26,9 +26,10 @@ use crate::{
     HirDbStorage,
     InputDbStorage,
     LspPositionConversionStorage,
+    RcstToCstStorage,
     ReferencesDbStorage,
     SemanticTokenDbStorage,
-    StringToCstStorage
+    StringToRcstStorage
 )]
 #[derive(Default)]
 pub struct Database {

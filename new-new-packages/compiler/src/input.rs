@@ -132,10 +132,7 @@ impl Display for Input {
 mod test {
     use super::*;
     use crate::{
-        compiler::{
-            cst::{self, Cst, CstKind},
-            string_to_cst::StringToCst,
-        },
+        compiler::{rcst::Rcst, string_to_rcst::StringToRcst},
         database::Database,
     };
 
@@ -150,21 +147,11 @@ mod test {
             "123"
         );
         assert_eq!(
-            db.cst(input.clone()).unwrap().as_ref().to_owned(),
-            vec![Cst {
-                id: cst::Id(0),
-                kind: CstKind::LeadingWhitespace {
-                    value: "\n".to_owned(),
-                    child: Box::new(Cst {
-                        id: cst::Id(1),
-                        kind: CstKind::Int {
-                            offset: 0,
-                            value: 123,
-                            source: "123".to_owned(),
-                        }
-                    })
-                }
-            }],
+            db.rcst(input.clone()).unwrap().as_ref().to_owned(),
+            vec![Rcst::Int {
+                value: 123,
+                string: "123".to_string()
+            },],
         );
 
         db.did_change_input(&input, "456".to_owned());
@@ -173,20 +160,10 @@ mod test {
             "456"
         );
         assert_eq!(
-            db.cst(input.clone()).unwrap().as_ref().to_owned(),
-            vec![Cst {
-                id: cst::Id(0),
-                kind: CstKind::LeadingWhitespace {
-                    value: "\n".to_owned(),
-                    child: Box::new(Cst {
-                        id: cst::Id(1),
-                        kind: CstKind::Int {
-                            offset: 0,
-                            value: 456,
-                            source: "456".to_owned(),
-                        }
-                    })
-                }
+            db.rcst(input.clone()).unwrap().as_ref().to_owned(),
+            vec![Rcst::Int {
+                value: 456,
+                string: "456".to_string()
             }],
         );
 

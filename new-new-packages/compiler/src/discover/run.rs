@@ -109,7 +109,7 @@ fn run(
             function,
             arguments,
         } => run_call(db, import_chain, function, arguments, environment.clone()),
-        Expression::Error => DiscoverResult::ErrorInHir,
+        Expression::Error { .. } => DiscoverResult::ErrorInHir,
     };
     environment.store(id, result);
     environment

@@ -3,7 +3,7 @@ use std::{ops::Range, sync::Arc};
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
 
 use crate::{
-    compiler::error::CompilerError,
+    compiler::error::{CompilerError, CompilerErrorPayload},
     database::Database,
     input::{Input, InputDb},
 };
@@ -21,7 +21,11 @@ impl CompilerError {
             code: None,
             code_description: None,
             source: Some("🍭 Candy".to_owned()),
-            message: self.message,
+            message: match self.payload {
+                CompilerErrorPayload::Rcst(rcst) => format!("RCST: {:?}", rcst),
+                CompilerErrorPayload::Ast(ast) => format!("AST: {:?}", ast),
+                CompilerErrorPayload::Hir(hir) => format!("HIR: {:?}", hir),
+            },
             related_information: None,
             tags: None,
             data: None,

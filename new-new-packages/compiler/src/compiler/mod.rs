@@ -4,4 +4,6 @@ pub mod cst;
 pub mod cst_to_ast;
 pub mod error;
 pub mod hir;
-pub mod string_to_cst;
+pub mod rcst;
+pub mod rcst_to_cst;
+pub mod string_to_rcst;
