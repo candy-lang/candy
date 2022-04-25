@@ -12,6 +12,7 @@ mod language_server;
 use crate::compiler::ast_to_hir::AstToHir;
 use crate::compiler::cst_to_ast::CstToAst;
 use crate::compiler::hir;
+use crate::compiler::hir_to_lir::HirToLir;
 use crate::compiler::rcst_to_cst::RcstToCst;
 use crate::compiler::string_to_rcst::StringToRcst;
 use crate::database::PROJECT_DIRECTORY;
@@ -154,6 +155,15 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
                 .join(""),
         )
         .unwrap();
+    }
+
+    log::info!("Compiling HIR to LIR…");
+    let lir = db
+        .lir(input.clone())
+        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+    if debug {
+        let lir_file = file.clone_with_extension("candy.lir");
+        fs::write(lir_file, format!("{}", lir)).unwrap();
     }
 
     // let reports = analyze((*lambda).clone());

@@ -5,7 +5,8 @@ use std::{path::PathBuf, sync::Mutex};
 use crate::{
     compiler::{
         ast_to_hir::AstToHirStorage, cst::CstDbStorage, cst_to_ast::CstToAstStorage,
-        hir::HirDbStorage, rcst_to_cst::RcstToCstStorage, string_to_rcst::StringToRcstStorage,
+        hir::HirDbStorage, hir_to_lir::HirToLirStorage, rcst_to_cst::RcstToCstStorage,
+        string_to_rcst::StringToRcstStorage,
     },
     discover::run::DiscoverStorage,
     input::{GetOpenInputQuery, Input, InputDbStorage, InputWatcher},
@@ -24,6 +25,7 @@ use crate::{
     FoldingRangeDbStorage,
     HintsDbStorage,
     HirDbStorage,
+    HirToLirStorage,
     InputDbStorage,
     LspPositionConversionStorage,
     RcstToCstStorage,
