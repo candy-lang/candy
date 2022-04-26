@@ -1,12 +1,15 @@
 use super::{
     ast_to_hir::AstToHir,
     cst::CstDb,
-    cst_to_ast::CstToAst,
     hir::{self, Body, Expression},
     lir::{Chunk, ChunkIndex, Instruction, Lir, StackOffset},
 };
-use crate::input::Input;
-use std::{collections::HashMap, sync::Arc};
+use crate::{builtin_functions::BuiltinFunction, input::Input};
+use itertools::Itertools;
+use std::{
+    mem::{self, swap},
+    sync::Arc,
+};
 
 #[salsa::query_group(HirToLirStorage)]
 pub trait HirToLir: CstDb + AstToHir {
@@ -15,29 +18,42 @@ pub trait HirToLir: CstDb + AstToHir {
 
 fn lir(db: &dyn HirToLir, input: Input) -> Option<Arc<Lir>> {
     let (hir, _) = db.hir(input.clone())?;
-    let mut context = LoweringContext::new();
+
+    let mut context = LoweringContext::default();
     context.compile_body(&hir);
-    assert_eq!(context.stack_size, 0); // TODO
-    assert!(context.ids.values().all(|it| it.is_empty())); // TODO
-    Some(Arc::new(context.lir))
+    let lir = context.finalize();
+
+    Some(Arc::new(lir))
 }
 
+#[derive(Default)]
+struct ChunkRegistry {
+    chunks: Vec<Chunk>,
+}
+impl ChunkRegistry {
+    fn register_chunk(&mut self, chunk: Chunk) -> ChunkIndex {
+        let index = self.chunks.len();
+        self.chunks.push(chunk);
+        index
+    }
+}
+
+#[derive(Default)]
 struct LoweringContext {
-    stack_size: usize,
-    /// Maps ids to stack indices where it appears.
-    ids: HashMap<hir::Id, Vec<usize>>,
-    lir: Lir,
-    current_chunk_index: ChunkIndex,
+    registry: ChunkRegistry,
+    stack: Vec<hir::Id>,
+    instructions: Vec<Instruction>,
 }
 impl LoweringContext {
-    fn new() -> LoweringContext {
-        LoweringContext {
-            stack_size: 0,
-            ids: HashMap::new(),
-            lir: Lir {
-                chunks: vec![Chunk::new()],
-            },
-            current_chunk_index: 0,
+    fn finalize(mut self) -> Lir {
+        self.stack.pop().unwrap(); // Top-level has no return value.
+        assert!(dbg!(self.stack).is_empty());
+
+        self.registry.register_chunk(Chunk {
+            instructions: self.instructions,
+        });
+        Lir {
+            chunks: self.registry.chunks,
         }
     }
 
@@ -45,112 +61,160 @@ impl LoweringContext {
         for (id, expression) in &body.expressions {
             self.compile_expression(id, expression);
         }
-
-        self.add(Instruction::PopMultipleBelowTop(body.expressions.len() - 1));
-        for (id, expression) in &body.expressions {
-            self.notify_stack_entry_removed(id);
-        }
+        self.emit_pop_multiple_below_top(body.expressions.len() - 1);
     }
     fn compile_expression(&mut self, id: &hir::Id, expression: &Expression) {
         match expression {
-            Expression::Int(int) => self.add(Instruction::CreateInt(*int)),
-            Expression::Text(text) => self.add(Instruction::CreateText(text.clone())),
-            Expression::Reference(id) => self.push_from_stack(id),
-            Expression::Symbol(symbol) => self.add(Instruction::CreateSymbol(symbol.clone())),
+            Expression::Int(int) => self.emit_create_int(id.clone(), *int),
+            Expression::Text(text) => self.emit_create_text(id.clone(), text.clone()),
+            Expression::Reference(reference) => {
+                self.emit_push_from_stack(reference.clone());
+                self.stack.replace_top_id(id.clone());
+            }
+            Expression::Symbol(symbol) => self.emit_create_symbol(id.clone(), symbol.clone()),
             Expression::Struct(entries) => {
                 for (key, value) in entries {
-                    self.push_from_stack(key);
-                    self.push_from_stack(value);
+                    self.emit_push_from_stack(key.clone());
+                    self.emit_push_from_stack(value.clone());
                 }
-                self.add(Instruction::CreateStruct {
-                    num_entries: entries.len(),
-                });
-                for (key, value) in entries {
-                    self.notify_stack_entry_removed(key);
-                    self.notify_stack_entry_removed(value);
-                }
+                self.emit_create_struct(id.clone(), entries.len());
             }
             Expression::Lambda(lambda) => {
-                let old_chunk_index = self.current_chunk_index;
-                self.lir.chunks.push(Chunk::new());
-                self.current_chunk_index = self.lir.chunks.len() - 1;
-                let chunk_index = self.current_chunk_index;
-
+                let mut registry = ChunkRegistry::default();
+                swap(&mut self.registry, &mut registry);
+                let mut lambda_context = LoweringContext {
+                    registry,
+                    stack: self.stack.clone(),
+                    instructions: vec![],
+                };
                 for (i, argument) in lambda.parameters.iter().enumerate() {
-                    self.notify_new_stack_entry(&(lambda.first_id.clone() + i));
+                    lambda_context.stack.push(lambda.first_id.clone() + i);
                 }
+                lambda_context.compile_body(&lambda.body);
+                lambda_context.emit_pop_multiple_below_top(lambda.parameters.len());
+                lambda_context.emit_return();
+                swap(&mut self.registry, &mut lambda_context.registry);
 
-                self.compile_body(&lambda.body);
-
-                self.add(Instruction::PopMultipleBelowTop(lambda.parameters.len()));
-                for (i, argument) in lambda.parameters.iter().enumerate() {
-                    self.notify_stack_entry_removed(&(lambda.first_id.clone() + i));
-                }
-
-                self.add(Instruction::Return);
-
-                self.current_chunk_index = old_chunk_index;
-
-                self.add(Instruction::CreateClosure(chunk_index))
+                let lambda_chunk = Chunk {
+                    instructions: lambda_context.instructions,
+                };
+                let chunk_index = self.registry.register_chunk(lambda_chunk);
+                self.emit_create_closure(id.clone(), chunk_index);
             }
-            Expression::Body(body) => self.compile_body(body),
+            Expression::Body(body) => {
+                self.compile_body(body);
+                self.stack.replace_top_id(id.clone());
+            }
             Expression::Call {
                 function,
                 arguments,
             } => {
                 let builtin_function = if let &[builtin_function_index] = &function.local[..] {
-                    if let Some(builtin_function) =
-                        crate::builtin_functions::VALUES.get(builtin_function_index)
-                    {
-                        Some(*builtin_function)
-                    } else {
-                        None
-                    }
+                    crate::builtin_functions::VALUES
+                        .get(builtin_function_index)
+                        .map(|it| *it)
                 } else {
                     None
                 };
 
                 for argument in arguments {
-                    self.push_from_stack(argument);
+                    self.emit_push_from_stack(argument.clone());
                 }
 
                 if let Some(builtin_function) = builtin_function {
-                    self.add(Instruction::Builtin(builtin_function));
+                    self.emit_builtin(id.clone(), builtin_function, arguments.len());
                 } else {
-                    self.push_from_stack(function);
-                    self.add(Instruction::Call);
-                }
-                for argument in arguments {
-                    self.notify_stack_entry_removed(argument);
+                    self.emit_push_from_stack(function.clone());
+                    self.emit_call(id.clone(), arguments.len());
                 }
             }
-            Expression::Error { child, errors } => self.add(Instruction::Error(id.to_owned())),
+            Expression::Error { child, errors } => self.emit_error(id.to_owned()),
         };
-        self.notify_new_stack_entry(id);
-        self.add(Instruction::DebugValueEvaluated(id.clone()));
+        self.emit_debug_value_evaluated(id.clone());
     }
 
-    fn push_from_stack(&mut self, id: &hir::Id) {
-        self.add(Instruction::PushFromStack(self.find_in_stack(id)));
-        self.notify_new_stack_entry(id);
+    fn emit_create_int(&mut self, id: hir::Id, int: u64) {
+        self.emit(Instruction::CreateInt(int));
+        self.stack.push(id);
     }
-    fn notify_new_stack_entry(&mut self, id: &hir::Id) {
-        self.ids
-            .entry(id.to_owned())
-            .or_insert_with(|| vec![])
-            .push(self.stack_size);
-        self.stack_size += 1;
+    fn emit_create_text(&mut self, id: hir::Id, text: String) {
+        self.emit(Instruction::CreateText(text));
+        self.stack.push(id);
     }
-    fn notify_stack_entry_removed(&mut self, id: &hir::Id) {
-        self.ids.get_mut(id).unwrap().pop().unwrap();
-        self.stack_size -= 1;
+    fn emit_create_symbol(&mut self, id: hir::Id, symbol: String) {
+        self.emit(Instruction::CreateSymbol(symbol));
+        self.stack.push(id);
     }
-    fn find_in_stack(&self, id: &hir::Id) -> StackOffset {
-        dbg!(self.stack_size - 1) - dbg!(self.ids[id].last().unwrap())
+    fn emit_create_struct(&mut self, id: hir::Id, num_entries: usize) {
+        self.emit(Instruction::CreateStruct { num_entries });
+        self.stack.pop_multiple(2 * num_entries);
+        self.stack.push(id);
+    }
+    fn emit_create_closure(&mut self, id: hir::Id, chunk: usize) {
+        self.emit(Instruction::CreateClosure(chunk));
+        self.stack.push(id);
+    }
+    fn emit_pop(&mut self) {
+        self.emit(Instruction::Pop);
+        self.stack.pop();
+    }
+    fn emit_pop_multiple_below_top(&mut self, n: usize) {
+        self.emit(Instruction::PopMultipleBelowTop(n));
+        let top = self.stack.pop().unwrap();
+        self.stack.pop_multiple(n);
+        self.stack.push(top);
+    }
+    fn emit_push_from_stack(&mut self, id: hir::Id) {
+        let offset = self.stack.find_id(&id);
+        self.emit(Instruction::PushFromStack(offset));
+        self.stack.push(id);
+    }
+    fn emit_call(&mut self, id: hir::Id, num_args: usize) {
+        self.emit(Instruction::Call);
+        self.stack.pop(); // closure
+        self.stack.pop_multiple(num_args);
+        self.stack.push(id);
+    }
+    fn emit_return(&mut self) {
+        self.emit(Instruction::Return);
+    }
+    fn emit_builtin(&mut self, id: hir::Id, builtin: BuiltinFunction, num_args: usize) {
+        self.emit(Instruction::Builtin(builtin));
+        self.stack.pop_multiple(num_args);
+        self.stack.push(id);
+    }
+    fn emit_debug_value_evaluated(&mut self, id: hir::Id) {
+        self.emit(Instruction::DebugValueEvaluated(id));
+    }
+    fn emit_error(&mut self, id: hir::Id) {
+        self.emit(Instruction::Error(id));
     }
 
-    fn add(&mut self, instruction: Instruction) {
-        let mut chunk = self.lir.chunks.get_mut(self.current_chunk_index).unwrap();
-        chunk.instructions.push(instruction);
+    fn emit(&mut self, instruction: Instruction) {
+        self.instructions.push(instruction);
+    }
+}
+
+trait StackExt {
+    fn pop_multiple(&mut self, n: usize);
+    fn find_id(&self, id: &hir::Id) -> StackOffset;
+    fn replace_top_id(&mut self, id: hir::Id);
+}
+impl StackExt for Vec<hir::Id> {
+    fn pop_multiple(&mut self, n: usize) {
+        for _ in 0..n {
+            self.pop();
+        }
+    }
+    fn find_id(&self, id: &hir::Id) -> StackOffset {
+        self.iter().rev().position(|it| it == id).expect(&format!(
+            "Id {} not found in stack: {}",
+            id,
+            self.iter().join(" ")
+        ))
+    }
+    fn replace_top_id(&mut self, id: hir::Id) {
+        self.pop().unwrap();
+        self.push(id);
     }
 }
