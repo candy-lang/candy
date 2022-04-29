@@ -6,10 +6,7 @@ use super::{
 };
 use crate::{builtin_functions::BuiltinFunction, input::Input};
 use itertools::Itertools;
-use std::{
-    mem::{self, swap},
-    sync::Arc,
-};
+use std::{mem::swap, sync::Arc};
 
 #[salsa::query_group(HirToLirStorage)]
 pub trait HirToLir: CstDb + AstToHir {
@@ -50,6 +47,7 @@ impl LoweringContext {
         assert!(dbg!(self.stack).is_empty());
 
         self.registry.register_chunk(Chunk {
+            num_args: 0,
             instructions: self.instructions,
         });
         Lir {
@@ -96,6 +94,7 @@ impl LoweringContext {
                 swap(&mut self.registry, &mut lambda_context.registry);
 
                 let lambda_chunk = Chunk {
+                    num_args: lambda.parameters.len(),
                     instructions: lambda_context.instructions,
                 };
                 let chunk_index = self.registry.register_chunk(lambda_chunk);

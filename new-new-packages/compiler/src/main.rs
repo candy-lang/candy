@@ -8,6 +8,7 @@ mod discover;
 mod incremental;
 mod input;
 mod language_server;
+mod vm;
 
 use crate::compiler::ast_to_hir::AstToHir;
 use crate::compiler::cst_to_ast::CstToAst;
@@ -16,7 +17,9 @@ use crate::compiler::hir_to_lir::HirToLir;
 use crate::compiler::rcst_to_cst::RcstToCst;
 use crate::compiler::string_to_rcst::StringToRcst;
 use crate::database::PROJECT_DIRECTORY;
+use crate::vm::{Status, Vm};
 use crate::{database::Database, input::Input};
+use compiler::lir::Lir;
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use log;
@@ -87,7 +90,7 @@ fn build(options: CandyBuildOptions) {
         }
     }
 }
-fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
+fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
     let path_string = file.to_string_lossy();
     log::debug!("Building `{}`.", path_string);
 
@@ -171,7 +174,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<hir::Body>> {
     //     log::error!("Report: {:?}", report);
     // }
 
-    Some(hir)
+    Some(lir)
 }
 
 fn run(options: CandyRunOptions) {
@@ -182,19 +185,24 @@ fn run(options: CandyRunOptions) {
     let _input: Input = options.file.clone().into();
     let _db = Database::default();
 
-    let _hir = raw_build(&options.file, false);
+    let lir = match raw_build(&options.file, false) {
+        Some(lir) => lir,
+        None => {
+            println!("Build failed.");
+            return;
+        }
+    };
 
     let path_string = options.file.to_string_lossy();
     log::debug!("Running `{}`.", path_string);
 
-    // log::info!("Executing code…");
-    // let mut fiber = fiber::Fiber::new(hir.as_ref().clone());
-    // fiber.run();
-    // match fiber.status() {
-    //     FiberStatus::Running => log::info!("Fiber is still running."),
-    //     FiberStatus::Done(value) => log::info!("Fiber is done: {:#?}", value),
-    //     FiberStatus::Panicked(value) => log::error!("Fiber panicked: {:#?}", value),
-    // }
+    let mut vm = Vm::new(lir.chunks.clone());
+    vm.run(1000);
+    match vm.status() {
+        Status::Running => log::info!("VM is still running."),
+        Status::Done(value) => log::info!("VM is done: {:#?}", value),
+        Status::Panicked(value) => log::error!("VM panicked: {:#?}", value),
+    }
 }
 
 async fn lsp() {

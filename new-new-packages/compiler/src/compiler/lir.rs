@@ -1,18 +1,19 @@
 use crate::{builtin_functions::BuiltinFunction, hir};
 use std::{collections::HashMap, fmt::Display};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lir {
     pub chunks: Vec<Chunk>,
 }
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Chunk {
+    pub num_args: usize,
     pub instructions: Vec<Instruction>,
 }
 pub type ChunkIndex = usize;
 pub type StackOffset = usize; // 0 is the last item, 1 the one before that, etc.
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Instruction {
     /// Pushes an int.
     CreateInt(u64),
@@ -70,18 +71,10 @@ pub enum Instruction {
     Error(hir::Id),
 }
 
-impl Chunk {
-    pub fn new() -> Self {
-        Chunk {
-            instructions: vec![],
-        }
-    }
-}
-
 impl Display for Lir {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, chunk) in self.chunks.iter().enumerate() {
-            writeln!(f, "Chunk {}", i)?;
+            writeln!(f, "Chunk {} ({} args)", i, chunk.num_args)?;
             for instruction in &chunk.instructions {
                 write!(f, "  ")?; // indent actual instructions
                 match instruction {
