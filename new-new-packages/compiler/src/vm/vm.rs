@@ -266,9 +266,14 @@ impl Vm {
                 todo!("Implement builtins")
             }
             Instruction::DebugValueEvaluated(_) => {}
-            Instruction::Error(_) => {
-                // TODO: Fail gracefully.
-                panic!("The VM crashed because there was an error in previous compilation stages.")
+            Instruction::Error(hir_id) => {
+                self.status = Status::Panicked(Object {
+                    reference_count: 0,
+                    data: ObjectData::Text(
+                        "The VM crashed because there was an error in previous compilation stages."
+                            .to_string(),
+                    ),
+                });
             }
         }
     }
