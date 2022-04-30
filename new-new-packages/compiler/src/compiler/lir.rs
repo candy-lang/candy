@@ -36,9 +36,6 @@ pub enum Instruction {
     /// a -> a, pointer to closure
     CreateClosure(ChunkIndex),
 
-    /// Pops a stack item.
-    Pop,
-
     /// Leaves the top stack item untouched, but removes n below.
     PopMultipleBelowTop(usize),
 
@@ -87,7 +84,6 @@ impl Display for Lir {
                     Instruction::CreateClosure(chunk) => {
                         writeln!(f, "createClosure, chunk {}", chunk)
                     }
-                    Instruction::Pop => writeln!(f, "pop"),
                     Instruction::PopMultipleBelowTop(count) => {
                         writeln!(f, "popMultipleBelowTop {}", count)
                     }

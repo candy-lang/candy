@@ -153,10 +153,6 @@ impl LoweringContext {
         self.emit(Instruction::CreateClosure(chunk));
         self.stack.push(id);
     }
-    fn emit_pop(&mut self) {
-        self.emit(Instruction::Pop);
-        self.stack.pop();
-    }
     fn emit_pop_multiple_below_top(&mut self, n: usize) {
         self.emit(Instruction::PopMultipleBelowTop(n));
         let top = self.stack.pop().unwrap();

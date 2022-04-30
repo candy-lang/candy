@@ -199,11 +199,6 @@ impl Vm {
                 });
                 self.stack.push(StackEntry::Object(address));
             }
-            Instruction::Pop => {
-                if let StackEntry::Object(address) = self.stack.pop().unwrap() {
-                    self.drop(address);
-                }
-            }
             Instruction::PopMultipleBelowTop(n) => {
                 let top = self.stack.pop().unwrap();
                 for _ in 0..n {
