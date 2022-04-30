@@ -36,12 +36,13 @@ pub struct ByteCodePointer {
     chunk: ChunkIndex,
     instruction: usize,
 }
-type ObjectPointer = u64;
+type ObjectPointer = usize;
 
 // TODO: Later add a reference counter. For now, we're just leaking memory
 // because objects are never freed.
 #[derive(Debug, Clone)] // TODO: rm Clone
 pub struct Object {
+    reference_count: usize,
     data: ObjectData,
 }
 #[derive(Clone, Debug)] // TODO: rm Clone
@@ -86,12 +87,48 @@ impl Vm {
 
     fn create_object(&mut self, object: ObjectData) -> ObjectPointer {
         let address = self.next_heap_address;
-        self.heap.insert(address, Object { data: object });
+        self.heap.insert(
+            address,
+            Object {
+                reference_count: 1,
+                data: object,
+            },
+        );
         self.next_heap_address += 1;
         address
     }
     fn free_object(&mut self, address: ObjectPointer) {
-        self.heap.remove(&address);
+        let object = self.heap.remove(&address).unwrap();
+        assert_eq!(object.reference_count, 0);
+        match object.data {
+            ObjectData::Int(_) => {}
+            ObjectData::Text(_) => {}
+            ObjectData::Symbol(_) => {}
+            ObjectData::Struct(entries) => {
+                for (key, value) in entries {
+                    self.drop(key);
+                    self.drop(value);
+                }
+            }
+            ObjectData::Closure { captured, body } => {
+                for entry in captured {
+                    if let StackEntry::Object(address) = entry {
+                        self.drop(address);
+                    }
+                }
+            }
+        }
+    }
+
+    fn dup(&mut self, address: ObjectPointer) {
+        self.get_from_heap(address).reference_count += 1;
+    }
+    fn drop(&mut self, address: ObjectPointer) {
+        let object = self.get_from_heap(address);
+        object.reference_count -= 1;
+        if object.reference_count == 0 {
+            self.free_object(address);
+        }
     }
 
     pub fn run(&mut self, mut num_instructions: u16) {
@@ -108,6 +145,7 @@ impl Vm {
 
             if self.ip.instruction >= self.chunks[self.ip.chunk].instructions.len() {
                 self.status = Status::Done(Object {
+                    reference_count: 0,
                     data: ObjectData::Symbol("Nothing".to_string()),
                 });
             }
@@ -146,25 +184,41 @@ impl Vm {
                 self.stack.push(StackEntry::Object(address));
             }
             Instruction::CreateClosure(chunk_index) => {
+                let stack = self.stack.clone();
+                for entry in &stack {
+                    match entry {
+                        StackEntry::ByteCode(_) => {}
+                        StackEntry::Object(address) => {
+                            self.dup(*address);
+                        }
+                    }
+                }
                 let address = self.create_object(ObjectData::Closure {
-                    captured: self.stack.clone(),
+                    captured: stack,
                     body: chunk_index,
                 });
                 self.stack.push(StackEntry::Object(address));
             }
             Instruction::Pop => {
-                self.stack.pop().unwrap();
+                if let StackEntry::Object(address) = self.stack.pop().unwrap() {
+                    self.drop(address);
+                }
             }
             Instruction::PopMultipleBelowTop(n) => {
                 let top = self.stack.pop().unwrap();
                 for _ in 0..n {
-                    self.stack.pop().unwrap();
+                    if let StackEntry::Object(address) = self.stack.pop().unwrap() {
+                        self.drop(address);
+                    }
                 }
                 self.stack.push(top);
             }
             Instruction::PushFromStack(offset) => {
                 let entry = self.get_from_stack(offset);
-                self.stack.push(entry)
+                if let StackEntry::Object(address) = &entry {
+                    self.dup(*address);
+                }
+                self.stack.push(entry);
             }
             Instruction::Call => {
                 let closure_address = match self.stack.pop().unwrap() {
@@ -191,6 +245,7 @@ impl Vm {
                 for arg in args {
                     self.stack.push(StackEntry::Object(arg));
                 }
+                self.drop(closure_address);
                 self.ip = ByteCodePointer {
                     chunk: body,
                     instruction: 0,
