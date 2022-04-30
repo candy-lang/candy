@@ -1,14 +1,11 @@
+use super::error::CompilerError;
+use crate::input::Input;
+use itertools::Itertools;
+use linked_hash_map::LinkedHashMap;
 use std::{
     fmt::{self, Display, Formatter},
     ops::Deref,
 };
-
-use itertools::Itertools;
-use linked_hash_map::LinkedHashMap;
-
-use crate::input::Input;
-
-use super::error::CompilerError;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Id {

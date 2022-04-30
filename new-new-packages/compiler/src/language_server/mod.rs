@@ -1,3 +1,18 @@
+use self::{
+    definition::find_definition,
+    folding_range::FoldingRangeDb,
+    hints::HintsNotification,
+    references::{find_document_highlights, find_references},
+    semantic_tokens::SemanticTokenDb,
+    utils::{line_start_utf8_byte_offsets_raw, offset_from_lsp_raw},
+};
+use crate::{
+    compiler::{ast_to_hir::AstToHir, hir::CollectErrors},
+    database::PROJECT_DIRECTORY,
+    input::{Input, InputDb},
+    language_server::hints::HintsDb,
+    Database,
+};
 use itertools::Itertools;
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
@@ -12,23 +27,6 @@ use lsp_types::{
 };
 use lspower::{jsonrpc, Client, LanguageServer};
 use tokio::sync::Mutex;
-
-use crate::{
-    compiler::{ast_to_hir::AstToHir, hir::CollectErrors},
-    database::PROJECT_DIRECTORY,
-    input::{Input, InputDb},
-    language_server::hints::HintsDb,
-    Database,
-};
-
-use self::{
-    definition::find_definition,
-    folding_range::FoldingRangeDb,
-    hints::HintsNotification,
-    references::{find_document_highlights, find_references},
-    semantic_tokens::SemanticTokenDb,
-    utils::{line_start_utf8_byte_offsets_raw, offset_from_lsp_raw},
-};
 
 pub mod definition;
 pub mod folding_range;

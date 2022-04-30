@@ -1,15 +1,12 @@
+use super::{ast_to_hir::AstToHir, error::CompilerError};
+use crate::input::Input;
+use im::HashMap;
+use itertools::Itertools;
+use linked_hash_map::LinkedHashMap;
 use std::{
     fmt::{self, Display, Formatter},
     ops::Add,
 };
-
-use im::HashMap;
-use itertools::Itertools;
-use linked_hash_map::LinkedHashMap;
-
-use crate::input::Input;
-
-use super::{ast_to_hir::AstToHir, error::CompilerError};
 
 #[salsa::query_group(HirDbStorage)]
 pub trait HirDb: AstToHir {

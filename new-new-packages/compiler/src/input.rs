@@ -1,13 +1,11 @@
+use crate::database::PROJECT_DIRECTORY;
+use salsa::query_group;
 use std::{
     fmt::{self, Display, Formatter},
     fs::{self, read_to_string},
     path::PathBuf,
     sync::Arc,
 };
-
-use salsa::query_group;
-
-use crate::database::PROJECT_DIRECTORY;
 
 #[query_group(InputDbStorage)]
 pub trait InputDb: InputWatcher {

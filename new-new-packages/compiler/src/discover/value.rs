@@ -1,8 +1,6 @@
-use im::HashMap;
-
-use crate::compiler::hir::Id;
-
 use super::result::DiscoverResult;
+use crate::compiler::hir::Id;
+use im::HashMap;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Value {

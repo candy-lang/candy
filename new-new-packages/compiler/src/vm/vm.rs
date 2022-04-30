@@ -1,7 +1,4 @@
-use crate::{
-    builtin_functions::BuiltinFunction,
-    compiler::lir::{Chunk, ChunkIndex, Instruction},
-};
+use crate::compiler::lir::{Chunk, ChunkIndex, Instruction};
 use itertools::Itertools;
 use log::debug;
 use std::collections::HashMap;
@@ -11,7 +8,7 @@ use std::collections::HashMap;
 pub struct Vm {
     chunks: Vec<Chunk>,
     status: Status,
-    ip: ByteCodePointer, // instruction pointer
+    next_instruction: ByteCodePointer,
     stack: Vec<StackEntry>,
     heap: HashMap<ObjectPointer, Object>,
     next_heap_address: ObjectPointer,
@@ -24,8 +21,7 @@ pub enum Status {
     Panicked(Object),
 }
 
-// TODO: Stack entries point either to instructions or to objects. In the
-// future, we should unify both cases.
+/// Stack entries point either to instructions or to objects.
 #[derive(Debug, Clone, Copy)]
 pub enum StackEntry {
     ByteCode(ByteCodePointer),
@@ -38,14 +34,12 @@ pub struct ByteCodePointer {
 }
 type ObjectPointer = usize;
 
-// TODO: Later add a reference counter. For now, we're just leaking memory
-// because objects are never freed.
-#[derive(Debug, Clone)] // TODO: rm Clone
+#[derive(Debug, Clone)] // TODO: remove Clone once it's no longer needed
 pub struct Object {
     reference_count: usize,
     data: ObjectData,
 }
-#[derive(Clone, Debug)] // TODO: rm Clone
+#[derive(Clone, Debug)] // TODO: remove Clone once it's no longer needed
 pub enum ObjectData {
     Int(u64),
     Text(String),
@@ -64,7 +58,7 @@ impl Vm {
         Self {
             chunks: chunks.clone(),
             status: Status::Running,
-            ip: ByteCodePointer {
+            next_instruction: ByteCodePointer {
                 chunk: chunks.len() - 1,
                 instruction: 0,
             },
@@ -110,7 +104,7 @@ impl Vm {
                     self.drop(value);
                 }
             }
-            ObjectData::Closure { captured, body } => {
+            ObjectData::Closure { captured, .. } => {
                 for entry in captured {
                     if let StackEntry::Object(address) = entry {
                         self.drop(address);
@@ -138,12 +132,16 @@ impl Vm {
         );
         while matches!(self.status, Status::Running) && num_instructions > 0 {
             num_instructions -= 1;
-            let instruction = self.chunks[self.ip.chunk].instructions[self.ip.instruction].clone();
+            let instruction = self.chunks[self.next_instruction.chunk].instructions
+                [self.next_instruction.instruction]
+                .clone();
             debug!("Executing instruction: {:?}", &instruction);
-            self.ip.instruction += 1;
+            self.next_instruction.instruction += 1;
             self.run_instruction(instruction);
 
-            if self.ip.instruction >= self.chunks[self.ip.chunk].instructions.len() {
+            if self.next_instruction.instruction
+                >= self.chunks[self.next_instruction.chunk].instructions.len()
+            {
                 self.status = Status::Done(Object {
                     reference_count: 0,
                     data: ObjectData::Symbol("Nothing".to_string()),
@@ -235,24 +233,23 @@ impl Vm {
                     };
                     args.push(address);
                 }
-                self.stack.push(StackEntry::ByteCode(self.ip));
+                self.stack.push(StackEntry::ByteCode(self.next_instruction));
                 self.stack.append(&mut captured.clone());
                 for arg in args {
                     self.stack.push(StackEntry::Object(arg));
                 }
                 self.drop(closure_address);
-                self.ip = ByteCodePointer {
+                self.next_instruction = ByteCodePointer {
                     chunk: body,
                     instruction: 0,
                 };
             }
             Instruction::Return => {
                 let return_value = self.stack.pop().unwrap();
-                // TODO: The closure should take care of removing all captured
-                // variables from the stack. That's only possible once we
-                // analyze what variables are closed over in the first place.
-                // For now, we simply pop until we find a byte code address,
-                // which is the address we pushed to remember the caller.
+                // TODO: Important: The closure should take care of removing all
+                // captured variables from the stack. That's only possible once
+                // we statically determine how many variables were captured in
+                // the first place.
                 let caller = loop {
                     match self.stack.pop().unwrap() {
                         StackEntry::ByteCode(address) => break address,
@@ -260,13 +257,13 @@ impl Vm {
                     }
                 };
                 self.stack.push(return_value);
-                self.ip = caller;
+                self.next_instruction = caller;
             }
-            Instruction::Builtin(builtin) => {
-                todo!("Implement builtins")
+            Instruction::Builtin(_) => {
+                todo!("Implement builtin")
             }
             Instruction::DebugValueEvaluated(_) => {}
-            Instruction::Error(hir_id) => {
+            Instruction::Error(_) => {
                 self.status = Status::Panicked(Object {
                     reference_count: 0,
                     data: ObjectData::Text(

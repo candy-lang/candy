@@ -1,5 +1,5 @@
 use crate::{builtin_functions::BuiltinFunction, hir};
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lir {

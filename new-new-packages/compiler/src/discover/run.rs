@@ -1,3 +1,8 @@
+use super::{
+    builtin_functions::run_builtin_function,
+    result::DiscoverResult,
+    value::{Environment, Lambda, Value},
+};
 use crate::{
     builtin_functions,
     compiler::hir::{self, Body, Expression, HirDb},
@@ -5,12 +10,6 @@ use crate::{
 };
 use im::HashMap;
 use itertools::Itertools;
-
-use super::{
-    builtin_functions::run_builtin_function,
-    result::DiscoverResult,
-    value::{Environment, Lambda, Value},
-};
 
 #[salsa::query_group(DiscoverStorage)]
 pub trait Discover: HirDb {

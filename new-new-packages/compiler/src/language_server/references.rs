@@ -1,9 +1,4 @@
-use im::HashSet;
-use lsp_types::{
-    DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Location, ReferenceParams,
-    TextDocumentPositionParams,
-};
-
+use super::utils::{LspPositionConversion, TupleToPosition};
 use crate::{
     compiler::{
         ast_to_hir::AstToHir,
@@ -13,8 +8,11 @@ use crate::{
     database::Database,
     input::Input,
 };
-
-use super::utils::{LspPositionConversion, TupleToPosition};
+use im::HashSet;
+use lsp_types::{
+    DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Location, ReferenceParams,
+    TextDocumentPositionParams,
+};
 
 pub fn find_references(db: &Database, params: ReferenceParams) -> Option<Vec<Location>> {
     let position = params.text_document_position;

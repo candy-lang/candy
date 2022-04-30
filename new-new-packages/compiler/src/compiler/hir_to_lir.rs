@@ -44,7 +44,7 @@ struct LoweringContext {
 impl LoweringContext {
     fn finalize(mut self) -> Lir {
         self.stack.pop().unwrap(); // Top-level has no return value.
-        assert!(dbg!(self.stack).is_empty());
+        assert!(self.stack.is_empty());
 
         self.registry.register_chunk(Chunk {
             num_args: 0,
@@ -85,7 +85,7 @@ impl LoweringContext {
                     stack: self.stack.clone(),
                     instructions: vec![],
                 };
-                for (i, argument) in lambda.parameters.iter().enumerate() {
+                for i in 0..lambda.parameters.len() {
                     lambda_context.stack.push(lambda.first_id.clone() + i);
                 }
                 lambda_context.compile_body(&lambda.body);
@@ -127,7 +127,7 @@ impl LoweringContext {
                     self.emit_call(id.clone(), arguments.len());
                 }
             }
-            Expression::Error { child, errors } => self.emit_error(id.to_owned()),
+            Expression::Error { .. } => self.emit_error(id.to_owned()),
         };
         self.emit_debug_value_evaluated(id.clone());
     }

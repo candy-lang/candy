@@ -1,14 +1,13 @@
-use std::ops::Range;
-use std::sync::Arc;
-
-use super::ast::{self, Assignment, Ast, AstKind, Identifier, Int, Struct, Symbol, Text};
-use super::cst::{self, CstDb};
-use super::cst_to_ast::CstToAst;
-use super::error::{CompilerError, CompilerErrorPayload};
-use super::hir::{self, Body, Expression, HirError, Lambda};
-use crate::builtin_functions;
-use crate::input::Input;
+use super::{
+    ast::{self, Assignment, Ast, AstKind, Identifier, Int, Struct, Symbol, Text},
+    cst::{self, CstDb},
+    cst_to_ast::CstToAst,
+    error::{CompilerError, CompilerErrorPayload},
+    hir::{self, Body, Expression, HirError, Lambda},
+};
+use crate::{builtin_functions, input::Input};
 use im::HashMap;
+use std::{ops::Range, sync::Arc};
 
 #[salsa::query_group(AstToHirStorage)]
 pub trait AstToHir: CstDb + CstToAst {

@@ -1,8 +1,4 @@
-use std::ops::Range;
-
-use im::HashMap;
-use lsp_types::{Position, SemanticToken, SemanticTokensLegend};
-
+use super::utils::LspPositionConversion;
 use crate::{
     compiler::{
         cst::{Cst, CstKind},
@@ -11,12 +7,12 @@ use crate::{
     input::Input,
     language_server::utils::TupleToPosition,
 };
+use im::HashMap;
 use lazy_static::lazy_static;
-use lsp_types;
+use lsp_types::{self, Position, SemanticToken, SemanticTokensLegend};
+use std::ops::Range;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
-
-use super::utils::LspPositionConversion;
 
 #[salsa::query_group(SemanticTokenDbStorage)]
 pub trait SemanticTokenDb: LspPositionConversion + RcstToCst {

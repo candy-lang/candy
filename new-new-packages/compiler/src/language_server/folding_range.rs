@@ -1,5 +1,4 @@
-use lsp_types::{FoldingRange, FoldingRangeKind};
-
+use super::utils::{LspPositionConversion, TupleToPosition};
 use crate::{
     compiler::{
         cst::{Cst, CstKind, UnwrapWhitespaceAndComment},
@@ -7,8 +6,7 @@ use crate::{
     },
     input::Input,
 };
-
-use super::utils::{LspPositionConversion, TupleToPosition};
+use lsp_types::{FoldingRange, FoldingRangeKind};
 
 #[salsa::query_group(FoldingRangeDbStorage)]
 pub trait FoldingRangeDb: LspPositionConversion + RcstToCst {

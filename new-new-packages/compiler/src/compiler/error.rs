@@ -1,7 +1,6 @@
-use std::ops::Range;
-
 use super::{ast::AstError, hir::HirError, rcst::RcstError};
 use crate::input::Input;
+use std::ops::Range;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct CompilerError {

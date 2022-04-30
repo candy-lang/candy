@@ -1,12 +1,10 @@
+use super::value::Value;
+use crate::input::Input;
 use std::{
     convert::Infallible,
     iter::FromIterator,
     ops::{ControlFlow, FromResidual, Try},
 };
-
-use crate::input::Input;
-
-use super::value::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DiscoverResult<T = Value> {

@@ -1,5 +1,4 @@
-use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, LocationLink};
-
+use super::utils::LspPositionConversion;
 use crate::{
     compiler::{
         ast_to_hir::AstToHir,
@@ -9,8 +8,7 @@ use crate::{
     database::Database,
     input::Input,
 };
-
-use super::utils::LspPositionConversion;
+use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, LocationLink};
 
 pub fn find_definition(
     db: &Database,

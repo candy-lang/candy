@@ -1,7 +1,3 @@
-use im::HashMap;
-use lazy_static::lazy_static;
-use std::{path::PathBuf, sync::Mutex};
-
 use crate::{
     compiler::{
         ast_to_hir::AstToHirStorage, cst::CstDbStorage, cst_to_ast::CstToAstStorage,
@@ -16,6 +12,9 @@ use crate::{
         utils::LspPositionConversionStorage,
     },
 };
+use im::HashMap;
+use lazy_static::lazy_static;
+use std::{path::PathBuf, sync::Mutex};
 
 #[salsa::database(
     AstToHirStorage,

@@ -1,18 +1,16 @@
-use im::HashMap;
-use itertools::Itertools;
-
+use super::{
+    result::DiscoverResult,
+    run::Discover,
+    value::{Environment, Value},
+};
 use crate::{
     builtin_functions::BuiltinFunction,
     compiler::hir::{self, Expression},
     discover::run::run_call,
     input::Input,
 };
-
-use super::{
-    result::DiscoverResult,
-    run::Discover,
-    value::{Environment, Value},
-};
+use im::HashMap;
+use itertools::Itertools;
 
 const TRACE_BUILTIN_FUNCTION_CALLS: bool = false;
 

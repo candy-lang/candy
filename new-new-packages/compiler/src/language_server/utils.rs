@@ -1,12 +1,10 @@
-use std::{ops::Range, sync::Arc};
-
-use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
-
 use crate::{
     compiler::error::{CompilerError, CompilerErrorPayload},
     database::Database,
     input::{Input, InputDb},
 };
+use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
+use std::{ops::Range, sync::Arc};
 
 impl CompilerError {
     pub fn to_diagnostic(self, db: &Database, input: Input) -> Diagnostic {

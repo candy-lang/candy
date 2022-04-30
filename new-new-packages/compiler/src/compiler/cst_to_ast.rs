@@ -1,18 +1,19 @@
-use std::ops::Range;
-use std::sync::Arc;
-
+use super::{
+    ast::{
+        self, Ast, AstError, AstKind, AstString, CollectErrors, Identifier, Int, Lambda, Symbol,
+        Text,
+    },
+    cst::{self, Cst, CstDb, CstKind},
+    error::{CompilerError, CompilerErrorPayload},
+    rcst_to_cst::RcstToCst,
+};
+use crate::{
+    compiler::{ast::Struct, cst::UnwrapWhitespaceAndComment},
+    input::Input,
+};
 use im::HashMap;
 use itertools::Itertools;
-
-use super::ast::{
-    self, Ast, AstError, AstKind, AstString, CollectErrors, Identifier, Int, Lambda, Symbol, Text,
-};
-use super::cst::{self, Cst, CstDb, CstKind};
-use super::error::{CompilerError, CompilerErrorPayload};
-use super::rcst_to_cst::RcstToCst;
-use crate::compiler::ast::Struct;
-use crate::compiler::cst::UnwrapWhitespaceAndComment;
-use crate::input::Input;
+use std::{ops::Range, sync::Arc};
 
 #[salsa::query_group(CstToAstStorage)]
 pub trait CstToAst: CstDb + RcstToCst {

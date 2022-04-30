@@ -10,27 +10,28 @@ mod input;
 mod language_server;
 mod vm;
 
-use crate::compiler::ast_to_hir::AstToHir;
-use crate::compiler::cst_to_ast::CstToAst;
-use crate::compiler::hir;
-use crate::compiler::hir_to_lir::HirToLir;
-use crate::compiler::rcst_to_cst::RcstToCst;
-use crate::compiler::string_to_rcst::StringToRcst;
-use crate::database::PROJECT_DIRECTORY;
-use crate::vm::{Status, Vm};
-use crate::{database::Database, input::Input};
+use crate::{
+    compiler::{
+        ast_to_hir::AstToHir, cst_to_ast::CstToAst, hir, hir_to_lir::HirToLir,
+        rcst_to_cst::RcstToCst, string_to_rcst::StringToRcst,
+    },
+    database::{Database, PROJECT_DIRECTORY},
+    input::Input,
+    vm::{Status, Vm},
+};
 use compiler::lir::Lir;
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use log;
 use lspower::{LspService, Server};
 use notify::{watcher, RecursiveMode, Watcher};
-use std::env::current_dir;
-use std::fs;
-use std::path::PathBuf;
-use std::sync::mpsc::channel;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    env::current_dir,
+    fs,
+    path::PathBuf,
+    sync::{mpsc::channel, Arc},
+    time::Duration,
+};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
