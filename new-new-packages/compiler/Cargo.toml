@@ -12,7 +12,7 @@ debug = true
 chrono = "0.4.19"
 colored = "2.0.0"
 fern = "0.6.1"
-im = "15.0.0"
+im = "15.1.0"
 itertools = { version = "0.10.0" }
 lazy_static = "1.4.0"
 linked-hash-map = "0.5.4"
