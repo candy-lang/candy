@@ -1,20 +1,22 @@
 # 🍭 Candy
 
-A sweet programming language that is minimalistic and still expressive and fun to work with.
+A sweet programming language that is robst, minimalistic, and expressive.
 
-[Join our Discord server.](https://discord.gg/5Vr4eAJ7gU)
+Candy aims to blurs the line between dynamically-typed and statically-typed languages.
+Like dynamic languages, it is permissive during compilation, allowing you to quickly prototype new ideas.
+You can freely compose data without having to specify its structure before.
+Like static languages, the tooling highlights potential errors before they happen.
 
 ## Quick introduction
 
 * **Values are at the center of your computations.**
-  Only some predefined types of immutable values exist.
+  Only some predefined types of immutable values exist: ints, texts, symbols, and structs.
   ```
-  3    # Int
-  "Hi" # String
-  Blub # Symbol
-  # TODO: List
-  # TODO: Map
-  # TODO: Set
+  {
+    Name: "Candy",
+    Number: 3,
+    Color: Green,
+  }
   ```
 * **Minimalistic syntax.**
   Defining variables and functions all works without braces cluttering up your code.
@@ -48,6 +50,10 @@ A sweet programming language that is minimalistic and still expressive and fun t
     needs (isInt a)
     logarithm a  # fails for a = 0
   ```
+
+## Discussion
+
+[Join our Discord server.](https://discord.gg/5Vr4eAJ7gU)
 
 ## The current state
 
@@ -111,7 +117,7 @@ Our TODO list:
 1. Install Rust.
 2. Clone this repo.
 3. Open the workspace in VS Code.
-4. In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/new-new-packages/compiler/Cargo.toml -- lsp",`.
-5. Run `npm install` inside `new-new-packages/vscode_extension/`.
+4. In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/compiler/Cargo.toml -- lsp",`.
+5. Run `npm install` inside `vscode_extension/`.
 6. Run the launch config “Run Extension (VS Code Extension)”.
 7. In the new VS Code window that opens, you can enjoy 🍭 Candy :)
