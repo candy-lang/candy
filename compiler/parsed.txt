@@ -1,0 +1,18 @@
+Assignment {
+    name: Identifier(
+        "blub",
+    ),
+    parameters: [],
+    equals_sign: EqualsSign,
+    body: [
+        Identifier(
+            "foo",
+        ),
+        Identifier(
+            "bar",
+        ),
+        Identifier(
+            "baz",
+        ),
+    ],
+}

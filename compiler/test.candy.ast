@@ -1,0 +1,347 @@
+AstId(project-file:test.candy:7): assignment: AstId(project-file:test.candy:0)@"typeOf" =
+  AstId(project-file:test.candy:6): lambda { AstId(project-file:test.candy:1)@"value" ->
+    AstId(project-file:test.candy:5): call AstId(project-file:test.candy:2)@"builtinTypeOf" with these arguments:
+      AstId(project-file:test.candy:4): identifier AstId(project-file:test.candy:3)@"value"
+  }
+AstId(project-file:test.candy:18): assignment: AstId(project-file:test.candy:8)@"equals" =
+  AstId(project-file:test.candy:17): lambda { AstId(project-file:test.candy:9)@"a" AstId(project-file:test.candy:10)@"b" ->
+    AstId(project-file:test.candy:16): call AstId(project-file:test.candy:11)@"builtinEquals" with these arguments:
+      AstId(project-file:test.candy:13): identifier AstId(project-file:test.candy:12)@"a"
+      AstId(project-file:test.candy:15): identifier AstId(project-file:test.candy:14)@"b"
+  }
+AstId(project-file:test.candy:26): assignment: AstId(project-file:test.candy:19)@"panic" =
+  AstId(project-file:test.candy:25): lambda { AstId(project-file:test.candy:20)@"message" ->
+    AstId(project-file:test.candy:24): call AstId(project-file:test.candy:21)@"builtinPanic" with these arguments:
+      AstId(project-file:test.candy:23): identifier AstId(project-file:test.candy:22)@"message"
+  }
+AstId(project-file:test.candy:38): assignment: AstId(project-file:test.candy:27)@"isInt" =
+  AstId(project-file:test.candy:37): lambda { AstId(project-file:test.candy:28)@"value" ->
+    AstId(project-file:test.candy:36): call AstId(project-file:test.candy:29)@"equals" with these arguments:
+      AstId(project-file:test.candy:33): call AstId(project-file:test.candy:30)@"typeOf" with these arguments:
+      AstId(project-file:test.candy:32): identifier AstId(project-file:test.candy:31)@"value"
+      AstId(project-file:test.candy:35): symbol AstId(project-file:test.candy:34)@"Int"
+  }
+AstId(project-file:test.candy:50): assignment: AstId(project-file:test.candy:39)@"isText" =
+  AstId(project-file:test.candy:49): lambda { AstId(project-file:test.candy:40)@"value" ->
+    AstId(project-file:test.candy:48): call AstId(project-file:test.candy:41)@"equals" with these arguments:
+      AstId(project-file:test.candy:45): call AstId(project-file:test.candy:42)@"typeOf" with these arguments:
+      AstId(project-file:test.candy:44): identifier AstId(project-file:test.candy:43)@"value"
+      AstId(project-file:test.candy:47): symbol AstId(project-file:test.candy:46)@"Text"
+  }
+AstId(project-file:test.candy:62): assignment: AstId(project-file:test.candy:51)@"isSymbol" =
+  AstId(project-file:test.candy:61): lambda { AstId(project-file:test.candy:52)@"value" ->
+    AstId(project-file:test.candy:60): call AstId(project-file:test.candy:53)@"equals" with these arguments:
+      AstId(project-file:test.candy:57): call AstId(project-file:test.candy:54)@"typeOf" with these arguments:
+      AstId(project-file:test.candy:56): identifier AstId(project-file:test.candy:55)@"value"
+      AstId(project-file:test.candy:59): symbol AstId(project-file:test.candy:58)@"Symbol"
+  }
+AstId(project-file:test.candy:92): assignment: AstId(project-file:test.candy:63)@"isBool" =
+  AstId(project-file:test.candy:91): lambda { AstId(project-file:test.candy:64)@"value" ->
+    AstId(project-file:test.candy:72): assignment: AstId(project-file:test.candy:65)@"isTrue" =
+      AstId(project-file:test.candy:71): call AstId(project-file:test.candy:66)@"equals" with these arguments:
+        AstId(project-file:test.candy:68): identifier AstId(project-file:test.candy:67)@"value"
+        AstId(project-file:test.candy:70): symbol AstId(project-file:test.candy:69)@"True"
+    AstId(project-file:test.candy:80): assignment: AstId(project-file:test.candy:73)@"isFalse" =
+      AstId(project-file:test.candy:79): call AstId(project-file:test.candy:74)@"equals" with these arguments:
+        AstId(project-file:test.candy:76): identifier AstId(project-file:test.candy:75)@"value"
+        AstId(project-file:test.candy:78): symbol AstId(project-file:test.candy:77)@"False"
+    AstId(project-file:test.candy:90): call AstId(project-file:test.candy:81)@"builtinIfElse" with these arguments:
+      AstId(project-file:test.candy:83): identifier AstId(project-file:test.candy:82)@"isTrue"
+      AstId(project-file:test.candy:86): lambda {  ->
+      AstId(project-file:test.candy:85): symbol AstId(project-file:test.candy:84)@"True"
+    }
+      AstId(project-file:test.candy:89): lambda {  ->
+      AstId(project-file:test.candy:88): identifier AstId(project-file:test.candy:87)@"isFalse"
+    }
+  }
+AstId(project-file:test.candy:118): assignment: AstId(project-file:test.candy:93)@"needs" =
+  AstId(project-file:test.candy:117): lambda { AstId(project-file:test.candy:94)@"condition" ->
+    AstId(project-file:test.candy:106): call AstId(project-file:test.candy:95)@"builtinIfElse" with these arguments:
+      AstId(project-file:test.candy:99): call AstId(project-file:test.candy:96)@"isBool" with these arguments:
+      AstId(project-file:test.candy:98): identifier AstId(project-file:test.candy:97)@"condition"
+      AstId(project-file:test.candy:100): lambda {  ->
+    
+    }
+      AstId(project-file:test.candy:105): lambda {  ->
+      AstId(project-file:test.candy:104): call AstId(project-file:test.candy:101)@"panic" with these arguments:
+        AstId(project-file:test.candy:103): text "AstId(project-file:test.candy:102)@"`needs` was called with the wrong arguments.""
+    }
+    AstId(project-file:test.candy:116): call AstId(project-file:test.candy:107)@"builtinIfElse" with these arguments:
+      AstId(project-file:test.candy:109): identifier AstId(project-file:test.candy:108)@"condition"
+      AstId(project-file:test.candy:110): lambda {  ->
+    
+    }
+      AstId(project-file:test.candy:115): lambda {  ->
+      AstId(project-file:test.candy:114): call AstId(project-file:test.candy:111)@"panic" with these arguments:
+        AstId(project-file:test.candy:113): text "AstId(project-file:test.candy:112)@"A function was called with the wrong arguments.""
+    }
+  }
+AstId(project-file:test.candy:138): assignment: AstId(project-file:test.candy:119)@"not" =
+  AstId(project-file:test.candy:137): lambda { AstId(project-file:test.candy:120)@"a" ->
+    AstId(project-file:test.candy:126): call AstId(project-file:test.candy:121)@"needs" with these arguments:
+      AstId(project-file:test.candy:125): call AstId(project-file:test.candy:122)@"isBool" with these arguments:
+      AstId(project-file:test.candy:124): identifier AstId(project-file:test.candy:123)@"a"
+    AstId(project-file:test.candy:136): call AstId(project-file:test.candy:127)@"builtinIfElse" with these arguments:
+      AstId(project-file:test.candy:129): identifier AstId(project-file:test.candy:128)@"a"
+      AstId(project-file:test.candy:132): lambda {  ->
+      AstId(project-file:test.candy:131): symbol AstId(project-file:test.candy:130)@"False"
+    }
+      AstId(project-file:test.candy:135): lambda {  ->
+      AstId(project-file:test.candy:134): symbol AstId(project-file:test.candy:133)@"True"
+    }
+  }
+AstId(project-file:test.candy:165): assignment: AstId(project-file:test.candy:139)@"and" =
+  AstId(project-file:test.candy:164): lambda { AstId(project-file:test.candy:140)@"a" AstId(project-file:test.candy:141)@"b" ->
+    AstId(project-file:test.candy:147): call AstId(project-file:test.candy:142)@"needs" with these arguments:
+      AstId(project-file:test.candy:146): call AstId(project-file:test.candy:143)@"isBool" with these arguments:
+      AstId(project-file:test.candy:145): identifier AstId(project-file:test.candy:144)@"a"
+    AstId(project-file:test.candy:153): call AstId(project-file:test.candy:148)@"needs" with these arguments:
+      AstId(project-file:test.candy:152): call AstId(project-file:test.candy:149)@"isBool" with these arguments:
+      AstId(project-file:test.candy:151): identifier AstId(project-file:test.candy:150)@"b"
+    AstId(project-file:test.candy:163): call AstId(project-file:test.candy:154)@"builtinIfElse" with these arguments:
+      AstId(project-file:test.candy:156): identifier AstId(project-file:test.candy:155)@"a"
+      AstId(project-file:test.candy:159): lambda {  ->
+      AstId(project-file:test.candy:158): identifier AstId(project-file:test.candy:157)@"b"
+    }
+      AstId(project-file:test.candy:162): lambda {  ->
+      AstId(project-file:test.candy:161): symbol AstId(project-file:test.candy:160)@"False"
+    }
+  }
+AstId(project-file:test.candy:192): assignment: AstId(project-file:test.candy:166)@"or" =
+  AstId(project-file:test.candy:191): lambda { AstId(project-file:test.candy:167)@"a" AstId(project-file:test.candy:168)@"b" ->
+    AstId(project-file:test.candy:174): call AstId(project-file:test.candy:169)@"needs" with these arguments:
+      AstId(project-file:test.candy:173): call AstId(project-file:test.candy:170)@"isBool" with these arguments:
+      AstId(project-file:test.candy:172): identifier AstId(project-file:test.candy:171)@"a"
+    AstId(project-file:test.candy:180): call AstId(project-file:test.candy:175)@"needs" with these arguments:
+      AstId(project-file:test.candy:179): call AstId(project-file:test.candy:176)@"isBool" with these arguments:
+      AstId(project-file:test.candy:178): identifier AstId(project-file:test.candy:177)@"b"
+    AstId(project-file:test.candy:190): call AstId(project-file:test.candy:181)@"builtinIfElse" with these arguments:
+      AstId(project-file:test.candy:183): identifier AstId(project-file:test.candy:182)@"a"
+      AstId(project-file:test.candy:186): lambda {  ->
+      AstId(project-file:test.candy:185): symbol AstId(project-file:test.candy:184)@"True"
+    }
+      AstId(project-file:test.candy:189): lambda {  ->
+      AstId(project-file:test.candy:188): identifier AstId(project-file:test.candy:187)@"b"
+    }
+  }
+AstId(project-file:test.candy:212): assignment: AstId(project-file:test.candy:193)@"check" =
+  AstId(project-file:test.candy:211): lambda { AstId(project-file:test.candy:194)@"condition" ->
+    AstId(project-file:test.candy:200): call AstId(project-file:test.candy:195)@"needs" with these arguments:
+      AstId(project-file:test.candy:199): call AstId(project-file:test.candy:196)@"isBool" with these arguments:
+      AstId(project-file:test.candy:198): identifier AstId(project-file:test.candy:197)@"condition"
+    AstId(project-file:test.candy:210): call AstId(project-file:test.candy:201)@"builtinIfElse" with these arguments:
+      AstId(project-file:test.candy:203): identifier AstId(project-file:test.candy:202)@"condition"
+      AstId(project-file:test.candy:204): lambda {  ->
+    
+    }
+      AstId(project-file:test.candy:209): lambda {  ->
+      AstId(project-file:test.candy:208): call AstId(project-file:test.candy:205)@"panic" with these arguments:
+        AstId(project-file:test.candy:207): text "AstId(project-file:test.candy:206)@"A check didn't succeed""
+    }
+  }
+AstId(project-file:test.candy:224): assignment: AstId(project-file:test.candy:213)@"isFunction" =
+  AstId(project-file:test.candy:223): lambda { AstId(project-file:test.candy:214)@"value" ->
+    AstId(project-file:test.candy:222): call AstId(project-file:test.candy:215)@"equals" with these arguments:
+      AstId(project-file:test.candy:219): call AstId(project-file:test.candy:216)@"typeOf" with these arguments:
+      AstId(project-file:test.candy:218): identifier AstId(project-file:test.candy:217)@"value"
+      AstId(project-file:test.candy:221): symbol AstId(project-file:test.candy:220)@"Function"
+  }
+AstId(project-file:test.candy:238): assignment: AstId(project-file:test.candy:225)@"getArgumentCount" =
+  AstId(project-file:test.candy:237): lambda { AstId(project-file:test.candy:226)@"function" ->
+    AstId(project-file:test.candy:232): call AstId(project-file:test.candy:227)@"needs" with these arguments:
+      AstId(project-file:test.candy:231): call AstId(project-file:test.candy:228)@"isFunction" with these arguments:
+      AstId(project-file:test.candy:230): identifier AstId(project-file:test.candy:229)@"function"
+    AstId(project-file:test.candy:236): call AstId(project-file:test.candy:233)@"builtinGetArgumentCount" with these arguments:
+      AstId(project-file:test.candy:235): identifier AstId(project-file:test.candy:234)@"function"
+  }
+AstId(project-file:test.candy:255): assignment: AstId(project-file:test.candy:239)@"isFunction0" =
+  AstId(project-file:test.candy:254): lambda { AstId(project-file:test.candy:240)@"value" ->
+    AstId(project-file:test.candy:253): call AstId(project-file:test.candy:241)@"and" with these arguments:
+      AstId(project-file:test.candy:245): call AstId(project-file:test.candy:242)@"isFunction" with these arguments:
+      AstId(project-file:test.candy:244): identifier AstId(project-file:test.candy:243)@"value"
+      AstId(project-file:test.candy:252): call AstId(project-file:test.candy:246)@"equals" with these arguments:
+      AstId(project-file:test.candy:250): call AstId(project-file:test.candy:247)@"getArgumentCount" with these arguments:
+      AstId(project-file:test.candy:249): identifier AstId(project-file:test.candy:248)@"value"
+      AstId(project-file:test.candy:251): int 0
+  }
+AstId(project-file:test.candy:272): assignment: AstId(project-file:test.candy:256)@"isFunction1" =
+  AstId(project-file:test.candy:271): lambda { AstId(project-file:test.candy:257)@"value" ->
+    AstId(project-file:test.candy:270): call AstId(project-file:test.candy:258)@"and" with these arguments:
+      AstId(project-file:test.candy:262): call AstId(project-file:test.candy:259)@"isFunction" with these arguments:
+      AstId(project-file:test.candy:261): identifier AstId(project-file:test.candy:260)@"value"
+      AstId(project-file:test.candy:269): call AstId(project-file:test.candy:263)@"equals" with these arguments:
+      AstId(project-file:test.candy:267): call AstId(project-file:test.candy:264)@"getArgumentCount" with these arguments:
+      AstId(project-file:test.candy:266): identifier AstId(project-file:test.candy:265)@"value"
+      AstId(project-file:test.candy:268): int 1
+  }
+AstId(project-file:test.candy:289): assignment: AstId(project-file:test.candy:273)@"isFunction2" =
+  AstId(project-file:test.candy:288): lambda { AstId(project-file:test.candy:274)@"value" ->
+    AstId(project-file:test.candy:287): call AstId(project-file:test.candy:275)@"and" with these arguments:
+      AstId(project-file:test.candy:279): call AstId(project-file:test.candy:276)@"isFunction" with these arguments:
+      AstId(project-file:test.candy:278): identifier AstId(project-file:test.candy:277)@"value"
+      AstId(project-file:test.candy:286): call AstId(project-file:test.candy:280)@"equals" with these arguments:
+      AstId(project-file:test.candy:284): call AstId(project-file:test.candy:281)@"getArgumentCount" with these arguments:
+      AstId(project-file:test.candy:283): identifier AstId(project-file:test.candy:282)@"value"
+      AstId(project-file:test.candy:285): int 2
+  }
+AstId(project-file:test.candy:306): assignment: AstId(project-file:test.candy:290)@"isFunction3" =
+  AstId(project-file:test.candy:305): lambda { AstId(project-file:test.candy:291)@"value" ->
+    AstId(project-file:test.candy:304): call AstId(project-file:test.candy:292)@"and" with these arguments:
+      AstId(project-file:test.candy:296): call AstId(project-file:test.candy:293)@"isFunction" with these arguments:
+      AstId(project-file:test.candy:295): identifier AstId(project-file:test.candy:294)@"value"
+      AstId(project-file:test.candy:303): call AstId(project-file:test.candy:297)@"equals" with these arguments:
+      AstId(project-file:test.candy:301): call AstId(project-file:test.candy:298)@"getArgumentCount" with these arguments:
+      AstId(project-file:test.candy:300): identifier AstId(project-file:test.candy:299)@"value"
+      AstId(project-file:test.candy:302): int 3
+  }
+AstId(project-file:test.candy:323): assignment: AstId(project-file:test.candy:307)@"isFunction4" =
+  AstId(project-file:test.candy:322): lambda { AstId(project-file:test.candy:308)@"value" ->
+    AstId(project-file:test.candy:321): call AstId(project-file:test.candy:309)@"and" with these arguments:
+      AstId(project-file:test.candy:313): call AstId(project-file:test.candy:310)@"isFunction" with these arguments:
+      AstId(project-file:test.candy:312): identifier AstId(project-file:test.candy:311)@"value"
+      AstId(project-file:test.candy:320): call AstId(project-file:test.candy:314)@"equals" with these arguments:
+      AstId(project-file:test.candy:318): call AstId(project-file:test.candy:315)@"getArgumentCount" with these arguments:
+      AstId(project-file:test.candy:317): identifier AstId(project-file:test.candy:316)@"value"
+      AstId(project-file:test.candy:319): int 4
+  }
+AstId(project-file:test.candy:340): assignment: AstId(project-file:test.candy:324)@"isFunction5" =
+  AstId(project-file:test.candy:339): lambda { AstId(project-file:test.candy:325)@"value" ->
+    AstId(project-file:test.candy:338): call AstId(project-file:test.candy:326)@"and" with these arguments:
+      AstId(project-file:test.candy:330): call AstId(project-file:test.candy:327)@"isFunction" with these arguments:
+      AstId(project-file:test.candy:329): identifier AstId(project-file:test.candy:328)@"value"
+      AstId(project-file:test.candy:337): call AstId(project-file:test.candy:331)@"equals" with these arguments:
+      AstId(project-file:test.candy:335): call AstId(project-file:test.candy:332)@"getArgumentCount" with these arguments:
+      AstId(project-file:test.candy:334): identifier AstId(project-file:test.candy:333)@"value"
+      AstId(project-file:test.candy:336): int 5
+  }
+AstId(project-file:test.candy:372): assignment: AstId(project-file:test.candy:341)@"ifElse" =
+  AstId(project-file:test.candy:371): lambda { AstId(project-file:test.candy:342)@"condition" AstId(project-file:test.candy:343)@"then" AstId(project-file:test.candy:344)@"else" ->
+    AstId(project-file:test.candy:350): call AstId(project-file:test.candy:345)@"needs" with these arguments:
+      AstId(project-file:test.candy:349): call AstId(project-file:test.candy:346)@"isBool" with these arguments:
+      AstId(project-file:test.candy:348): identifier AstId(project-file:test.candy:347)@"condition"
+    AstId(project-file:test.candy:356): call AstId(project-file:test.candy:351)@"needs" with these arguments:
+      AstId(project-file:test.candy:355): call AstId(project-file:test.candy:352)@"isFunction0" with these arguments:
+      AstId(project-file:test.candy:354): identifier AstId(project-file:test.candy:353)@"then"
+    AstId(project-file:test.candy:362): call AstId(project-file:test.candy:357)@"needs" with these arguments:
+      AstId(project-file:test.candy:361): call AstId(project-file:test.candy:358)@"isFunction0" with these arguments:
+      AstId(project-file:test.candy:360): identifier AstId(project-file:test.candy:359)@"else"
+    AstId(project-file:test.candy:370): call AstId(project-file:test.candy:363)@"builtinIfElse" with these arguments:
+      AstId(project-file:test.candy:365): identifier AstId(project-file:test.candy:364)@"condition"
+      AstId(project-file:test.candy:367): identifier AstId(project-file:test.candy:366)@"then"
+      AstId(project-file:test.candy:369): identifier AstId(project-file:test.candy:368)@"else"
+  }
+AstId(project-file:test.candy:396): assignment: AstId(project-file:test.candy:373)@"if" =
+  AstId(project-file:test.candy:395): lambda { AstId(project-file:test.candy:374)@"condition" AstId(project-file:test.candy:375)@"then" ->
+    AstId(project-file:test.candy:381): call AstId(project-file:test.candy:376)@"needs" with these arguments:
+      AstId(project-file:test.candy:380): call AstId(project-file:test.candy:377)@"isBool" with these arguments:
+      AstId(project-file:test.candy:379): identifier AstId(project-file:test.candy:378)@"condition"
+    AstId(project-file:test.candy:387): call AstId(project-file:test.candy:382)@"needs" with these arguments:
+      AstId(project-file:test.candy:386): call AstId(project-file:test.candy:383)@"isFunction0" with these arguments:
+      AstId(project-file:test.candy:385): identifier AstId(project-file:test.candy:384)@"then"
+    AstId(project-file:test.candy:394): call AstId(project-file:test.candy:388)@"ifElse" with these arguments:
+      AstId(project-file:test.candy:390): identifier AstId(project-file:test.candy:389)@"condition"
+      AstId(project-file:test.candy:392): identifier AstId(project-file:test.candy:391)@"then"
+      AstId(project-file:test.candy:393): lambda {  ->
+    
+    }
+  }
+AstId(project-file:test.candy:427): assignment: AstId(project-file:test.candy:397)@"add" =
+  AstId(project-file:test.candy:426): lambda { AstId(project-file:test.candy:398)@"a" AstId(project-file:test.candy:399)@"b" ->
+    AstId(project-file:test.candy:405): assignment: AstId(project-file:test.candy:400)@"aIsInt" =
+      AstId(project-file:test.candy:404): call AstId(project-file:test.candy:401)@"isInt" with these arguments:
+        AstId(project-file:test.candy:403): identifier AstId(project-file:test.candy:402)@"a"
+    AstId(project-file:test.candy:409): call AstId(project-file:test.candy:406)@"needs" with these arguments:
+      AstId(project-file:test.candy:408): identifier AstId(project-file:test.candy:407)@"aIsInt"
+    AstId(project-file:test.candy:415): assignment: AstId(project-file:test.candy:410)@"bIsInt" =
+      AstId(project-file:test.candy:414): call AstId(project-file:test.candy:411)@"isInt" with these arguments:
+        AstId(project-file:test.candy:413): identifier AstId(project-file:test.candy:412)@"b"
+    AstId(project-file:test.candy:419): call AstId(project-file:test.candy:416)@"needs" with these arguments:
+      AstId(project-file:test.candy:418): identifier AstId(project-file:test.candy:417)@"bIsInt"
+    AstId(project-file:test.candy:425): call AstId(project-file:test.candy:420)@"builtinAdd" with these arguments:
+      AstId(project-file:test.candy:422): identifier AstId(project-file:test.candy:421)@"a"
+      AstId(project-file:test.candy:424): identifier AstId(project-file:test.candy:423)@"b"
+  }
+AstId(project-file:test.candy:433): assignment: AstId(project-file:test.candy:428)@"bar" =
+  AstId(project-file:test.candy:432): call AstId(project-file:test.candy:429)@"add" with these arguments:
+    AstId(project-file:test.candy:430): int 2
+    AstId(project-file:test.candy:431): int 2
+AstId(project-file:test.candy:437): assignment: AstId(project-file:test.candy:434)@"print" =
+  AstId(project-file:test.candy:436): lambda { AstId(project-file:test.candy:435)@"text" ->
+  
+  }
+AstId(project-file:test.candy:439): assignment: AstId(project-file:test.candy:438)@"readLine" =
+
+AstId(project-file:test.candy:444): assignment: AstId(project-file:test.candy:440)@"add" =
+  AstId(project-file:test.candy:443): lambda { AstId(project-file:test.candy:441)@"a" AstId(project-file:test.candy:442)@"b" ->
+  
+  }
+AstId(project-file:test.candy:449): assignment: AstId(project-file:test.candy:445)@"map" =
+  AstId(project-file:test.candy:448): lambda { AstId(project-file:test.candy:446)@"iterable" AstId(project-file:test.candy:447)@"mapper" ->
+  
+  }
+AstId(project-file:test.candy:451): assignment: AstId(project-file:test.candy:450)@"myIterable" =
+
+AstId(project-file:test.candy:455): assignment: AstId(project-file:test.candy:452)@"blub" =
+  AstId(project-file:test.candy:454): symbol AstId(project-file:test.candy:453)@"Blub"
+AstId(project-file:test.candy:459): assignment: AstId(project-file:test.candy:456)@"call" =
+  AstId(project-file:test.candy:458): lambda { AstId(project-file:test.candy:457)@"lambda" ->
+  
+  }
+AstId(project-file:test.candy:481): assignment: AstId(project-file:test.candy:460)@"main" =
+  AstId(project-file:test.candy:463): assignment: AstId(project-file:test.candy:461)@"foo" =
+    AstId(project-file:test.candy:462): int 3
+  AstId(project-file:test.candy:468): assignment: AstId(project-file:test.candy:464)@"bar" =
+    AstId(project-file:test.candy:467): lambda { AstId(project-file:test.candy:465)@"n" ->
+      AstId(project-file:test.candy:466): int 5
+    }
+  AstId(project-file:test.candy:475): assignment: AstId(project-file:test.candy:469)@"baz" =
+    AstId(project-file:test.candy:473): call AstId(project-file:test.candy:470)@"print" with these arguments:
+      AstId(project-file:test.candy:472): text "AstId(project-file:test.candy:471)@"abc""
+    AstId(project-file:test.candy:474): int 123
+  AstId(project-file:test.candy:478): call AstId(project-file:test.candy:476)@"bar" with these arguments:
+    AstId(project-file:test.candy:477): int 5
+  AstId(project-file:test.candy:480): identifier AstId(project-file:test.candy:479)@"foo"
+AstId(project-file:test.candy:497): assignment: AstId(project-file:test.candy:482)@"main" =
+  AstId(project-file:test.candy:485): assignment: AstId(project-file:test.candy:483)@"foo" =
+    AstId(project-file:test.candy:484): int 1
+  AstId(project-file:test.candy:490): assignment: AstId(project-file:test.candy:486)@"bar" =
+    AstId(project-file:test.candy:489): lambda { AstId(project-file:test.candy:487)@"n" ->
+      AstId(project-file:test.candy:488): int 5
+    }
+  AstId(project-file:test.candy:494): assignment: AstId(project-file:test.candy:491)@"a" =
+    AstId(project-file:test.candy:493): identifier AstId(project-file:test.candy:492)@"readLine"
+  AstId(project-file:test.candy:496): identifier AstId(project-file:test.candy:495)@"a"
+AstId(project-file:test.candy:500): assignment: AstId(project-file:test.candy:498)@"main" =
+  AstId(project-file:test.candy:499): lambda {  ->
+  
+  }
+AstId(project-file:test.candy:504): assignment: AstId(project-file:test.candy:501)@"foo" =
+  AstId(project-file:test.candy:503): identifier AstId(project-file:test.candy:502)@"add"
+AstId(project-file:test.candy:509): call AstId(project-file:test.candy:505)@"add" with these arguments:
+  AstId(project-file:test.candy:506): int 8646461
+  AstId(project-file:test.candy:508): text "AstId(project-file:test.candy:507)@"Hi""
+AstId(project-file:test.candy:520): call AstId(project-file:test.candy:510)@"map" with these arguments:
+  AstId(project-file:test.candy:512): identifier AstId(project-file:test.candy:511)@"myIterable"
+  AstId(project-file:test.candy:519): lambda { AstId(project-file:test.candy:513)@"a" AstId(project-file:test.candy:514)@"b" ->
+  AstId(project-file:test.candy:518): call AstId(project-file:test.candy:515)@"print" with these arguments:
+    AstId(project-file:test.candy:517): text "AstId(project-file:test.candy:516)@"the item on io""
+}
+AstId(project-file:test.candy:526): assignment: AstId(project-file:test.candy:521)@"fibonacci" =
+  AstId(project-file:test.candy:525): lambda { AstId(project-file:test.candy:522)@"n" ->
+    AstId(project-file:test.candy:524): identifier AstId(project-file:test.candy:523)@"foo"
+  }
+AstId(project-file:test.candy:532): assignment: AstId(project-file:test.candy:527)@"fibonacci" =
+  AstId(project-file:test.candy:531): lambda { AstId(project-file:test.candy:528)@"n" ->
+    AstId(project-file:test.candy:530): identifier AstId(project-file:test.candy:529)@"blub"
+  }
+AstId(project-file:test.candy:534): identifier AstId(project-file:test.candy:533)@"bar"
+AstId(project-file:test.candy:544): assignment: AstId(project-file:test.candy:535)@"lambda" =
+  AstId(project-file:test.candy:538): assignment: AstId(project-file:test.candy:536)@"foo" =
+    AstId(project-file:test.candy:537): int 1
+  AstId(project-file:test.candy:543): assignment: AstId(project-file:test.candy:539)@"bar" =
+    AstId(project-file:test.candy:542): lambda {  ->
+      AstId(project-file:test.candy:541): identifier AstId(project-file:test.candy:540)@"foo"
+    }
+AstId(project-file:test.candy:548): call AstId(project-file:test.candy:545)@"call" with these arguments:
+  AstId(project-file:test.candy:547): identifier AstId(project-file:test.candy:546)@"lambda"
+AstId(project-file:test.candy:550): symbol AstId(project-file:test.candy:549)@"True"

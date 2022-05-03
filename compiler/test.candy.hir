@@ -1,0 +1,537 @@
+HirId(project-file:test.candy:11) = body {
+  HirId(project-file:test.candy:11:0) = lambda { target ->
+    HirId(project-file:test.candy:11:0:1) = int 0
+    HirId(project-file:test.candy:11:0:2) = text "test.candy"
+    HirId(project-file:test.candy:11:0:3) = struct [
+      HirId(project-file:test.candy:11:0:1): HirId(project-file:test.candy:11:0:2),
+    ]
+    HirId(project-file:test.candy:11:0:4) = call HirId(project-file:test.candy:10) with these arguments:
+      HirId(project-file:test.candy:11:0:3)
+      HirId(project-file:test.candy:11:0:0)
+  }
+}
+HirId(project-file:test.candy:12) = body {
+  HirId(project-file:test.candy:12:0) = lambda { value ->
+    HirId(project-file:test.candy:12:0:1) = reference HirId(project-file:test.candy:12:0:0)
+    HirId(project-file:test.candy:12:0:2) = call HirId(project-file:test.candy:9) with these arguments:
+      HirId(project-file:test.candy:12:0:1)
+  }
+}
+HirId(project-file:test.candy:13) = body {
+  HirId(project-file:test.candy:13:0) = lambda { a b ->
+    HirId(project-file:test.candy:13:0:2) = reference HirId(project-file:test.candy:13:0:0)
+    HirId(project-file:test.candy:13:0:3) = reference HirId(project-file:test.candy:13:0:1)
+    HirId(project-file:test.candy:13:0:4) = call HirId(project-file:test.candy:1) with these arguments:
+      HirId(project-file:test.candy:13:0:2)
+      HirId(project-file:test.candy:13:0:3)
+  }
+}
+HirId(project-file:test.candy:14) = body {
+  HirId(project-file:test.candy:14:0) = lambda { message ->
+    HirId(project-file:test.candy:14:0:1) = reference HirId(project-file:test.candy:14:0:0)
+    HirId(project-file:test.candy:14:0:2) = call HirId(project-file:test.candy:4) with these arguments:
+      HirId(project-file:test.candy:14:0:1)
+  }
+}
+HirId(project-file:test.candy:15) = body {
+  HirId(project-file:test.candy:15:0) = lambda { value ->
+    HirId(project-file:test.candy:15:0:1) = reference HirId(project-file:test.candy:15:0:0)
+    HirId(project-file:test.candy:15:0:2) = call HirId(project-file:test.candy:12) with these arguments:
+      HirId(project-file:test.candy:15:0:1)
+    HirId(project-file:test.candy:15:0:3) = symbol Int
+    HirId(project-file:test.candy:15:0:4) = call HirId(project-file:test.candy:13) with these arguments:
+      HirId(project-file:test.candy:15:0:2)
+      HirId(project-file:test.candy:15:0:3)
+  }
+}
+HirId(project-file:test.candy:16) = body {
+  HirId(project-file:test.candy:16:0) = lambda { value ->
+    HirId(project-file:test.candy:16:0:1) = reference HirId(project-file:test.candy:16:0:0)
+    HirId(project-file:test.candy:16:0:2) = call HirId(project-file:test.candy:12) with these arguments:
+      HirId(project-file:test.candy:16:0:1)
+    HirId(project-file:test.candy:16:0:3) = symbol Text
+    HirId(project-file:test.candy:16:0:4) = call HirId(project-file:test.candy:13) with these arguments:
+      HirId(project-file:test.candy:16:0:2)
+      HirId(project-file:test.candy:16:0:3)
+  }
+}
+HirId(project-file:test.candy:17) = body {
+  HirId(project-file:test.candy:17:0) = lambda { value ->
+    HirId(project-file:test.candy:17:0:1) = reference HirId(project-file:test.candy:17:0:0)
+    HirId(project-file:test.candy:17:0:2) = call HirId(project-file:test.candy:12) with these arguments:
+      HirId(project-file:test.candy:17:0:1)
+    HirId(project-file:test.candy:17:0:3) = symbol Symbol
+    HirId(project-file:test.candy:17:0:4) = call HirId(project-file:test.candy:13) with these arguments:
+      HirId(project-file:test.candy:17:0:2)
+      HirId(project-file:test.candy:17:0:3)
+  }
+}
+HirId(project-file:test.candy:18) = body {
+  HirId(project-file:test.candy:18:0) = lambda { value ->
+    HirId(project-file:test.candy:18:0:1) = body {
+      HirId(project-file:test.candy:18:0:1:0) = reference HirId(project-file:test.candy:18:0:0)
+      HirId(project-file:test.candy:18:0:1:1) = symbol True
+      HirId(project-file:test.candy:18:0:1:2) = call HirId(project-file:test.candy:13) with these arguments:
+        HirId(project-file:test.candy:18:0:1:0)
+        HirId(project-file:test.candy:18:0:1:1)
+    }
+    HirId(project-file:test.candy:18:0:2) = body {
+      HirId(project-file:test.candy:18:0:2:0) = reference HirId(project-file:test.candy:18:0:0)
+      HirId(project-file:test.candy:18:0:2:1) = symbol False
+      HirId(project-file:test.candy:18:0:2:2) = call HirId(project-file:test.candy:13) with these arguments:
+        HirId(project-file:test.candy:18:0:2:0)
+        HirId(project-file:test.candy:18:0:2:1)
+    }
+    HirId(project-file:test.candy:18:0:3) = reference HirId(project-file:test.candy:18:0:1)
+    HirId(project-file:test.candy:18:0:4) = lambda {  ->
+      HirId(project-file:test.candy:18:0:4:0) = symbol True
+    }
+    HirId(project-file:test.candy:18:0:5) = lambda {  ->
+      HirId(project-file:test.candy:18:0:5:0) = reference HirId(project-file:test.candy:18:0:2)
+    }
+    HirId(project-file:test.candy:18:0:6) = call HirId(project-file:test.candy:3) with these arguments:
+      HirId(project-file:test.candy:18:0:3)
+      HirId(project-file:test.candy:18:0:4)
+      HirId(project-file:test.candy:18:0:5)
+  }
+}
+HirId(project-file:test.candy:19) = body {
+  HirId(project-file:test.candy:19:0) = lambda { condition ->
+    HirId(project-file:test.candy:19:0:1) = reference HirId(project-file:test.candy:19:0:0)
+    HirId(project-file:test.candy:19:0:2) = call HirId(project-file:test.candy:18) with these arguments:
+      HirId(project-file:test.candy:19:0:1)
+    HirId(project-file:test.candy:19:0:3) = lambda {  ->
+      HirId(project-file:test.candy:19:0:3:0) = symbol Nothing
+    }
+    HirId(project-file:test.candy:19:0:4) = lambda {  ->
+      HirId(project-file:test.candy:19:0:4:0) = text "`needs` was called with the wrong arguments."
+      HirId(project-file:test.candy:19:0:4:1) = call HirId(project-file:test.candy:14) with these arguments:
+        HirId(project-file:test.candy:19:0:4:0)
+    }
+    HirId(project-file:test.candy:19:0:5) = call HirId(project-file:test.candy:3) with these arguments:
+      HirId(project-file:test.candy:19:0:2)
+      HirId(project-file:test.candy:19:0:3)
+      HirId(project-file:test.candy:19:0:4)
+    HirId(project-file:test.candy:19:0:6) = reference HirId(project-file:test.candy:19:0:0)
+    HirId(project-file:test.candy:19:0:7) = lambda {  ->
+      HirId(project-file:test.candy:19:0:7:0) = symbol Nothing
+    }
+    HirId(project-file:test.candy:19:0:8) = lambda {  ->
+      HirId(project-file:test.candy:19:0:8:0) = text "A function was called with the wrong arguments."
+      HirId(project-file:test.candy:19:0:8:1) = call HirId(project-file:test.candy:14) with these arguments:
+        HirId(project-file:test.candy:19:0:8:0)
+    }
+    HirId(project-file:test.candy:19:0:9) = call HirId(project-file:test.candy:3) with these arguments:
+      HirId(project-file:test.candy:19:0:6)
+      HirId(project-file:test.candy:19:0:7)
+      HirId(project-file:test.candy:19:0:8)
+  }
+}
+HirId(project-file:test.candy:20) = body {
+  HirId(project-file:test.candy:20:0) = lambda { a ->
+    HirId(project-file:test.candy:20:0:1) = reference HirId(project-file:test.candy:20:0:0)
+    HirId(project-file:test.candy:20:0:2) = call HirId(project-file:test.candy:18) with these arguments:
+      HirId(project-file:test.candy:20:0:1)
+    HirId(project-file:test.candy:20:0:3) = call HirId(project-file:test.candy:19) with these arguments:
+      HirId(project-file:test.candy:20:0:2)
+    HirId(project-file:test.candy:20:0:4) = reference HirId(project-file:test.candy:20:0:0)
+    HirId(project-file:test.candy:20:0:5) = lambda {  ->
+      HirId(project-file:test.candy:20:0:5:0) = symbol False
+    }
+    HirId(project-file:test.candy:20:0:6) = lambda {  ->
+      HirId(project-file:test.candy:20:0:6:0) = symbol True
+    }
+    HirId(project-file:test.candy:20:0:7) = call HirId(project-file:test.candy:3) with these arguments:
+      HirId(project-file:test.candy:20:0:4)
+      HirId(project-file:test.candy:20:0:5)
+      HirId(project-file:test.candy:20:0:6)
+  }
+}
+HirId(project-file:test.candy:21) = body {
+  HirId(project-file:test.candy:21:0) = lambda { a b ->
+    HirId(project-file:test.candy:21:0:2) = reference HirId(project-file:test.candy:21:0:0)
+    HirId(project-file:test.candy:21:0:3) = call HirId(project-file:test.candy:18) with these arguments:
+      HirId(project-file:test.candy:21:0:2)
+    HirId(project-file:test.candy:21:0:4) = call HirId(project-file:test.candy:19) with these arguments:
+      HirId(project-file:test.candy:21:0:3)
+    HirId(project-file:test.candy:21:0:5) = reference HirId(project-file:test.candy:21:0:1)
+    HirId(project-file:test.candy:21:0:6) = call HirId(project-file:test.candy:18) with these arguments:
+      HirId(project-file:test.candy:21:0:5)
+    HirId(project-file:test.candy:21:0:7) = call HirId(project-file:test.candy:19) with these arguments:
+      HirId(project-file:test.candy:21:0:6)
+    HirId(project-file:test.candy:21:0:8) = reference HirId(project-file:test.candy:21:0:0)
+    HirId(project-file:test.candy:21:0:9) = lambda {  ->
+      HirId(project-file:test.candy:21:0:9:0) = reference HirId(project-file:test.candy:21:0:1)
+    }
+    HirId(project-file:test.candy:21:0:10) = lambda {  ->
+      HirId(project-file:test.candy:21:0:10:0) = symbol False
+    }
+    HirId(project-file:test.candy:21:0:11) = call HirId(project-file:test.candy:3) with these arguments:
+      HirId(project-file:test.candy:21:0:8)
+      HirId(project-file:test.candy:21:0:9)
+      HirId(project-file:test.candy:21:0:10)
+  }
+}
+HirId(project-file:test.candy:22) = body {
+  HirId(project-file:test.candy:22:0) = lambda { a b ->
+    HirId(project-file:test.candy:22:0:2) = reference HirId(project-file:test.candy:22:0:0)
+    HirId(project-file:test.candy:22:0:3) = call HirId(project-file:test.candy:18) with these arguments:
+      HirId(project-file:test.candy:22:0:2)
+    HirId(project-file:test.candy:22:0:4) = call HirId(project-file:test.candy:19) with these arguments:
+      HirId(project-file:test.candy:22:0:3)
+    HirId(project-file:test.candy:22:0:5) = reference HirId(project-file:test.candy:22:0:1)
+    HirId(project-file:test.candy:22:0:6) = call HirId(project-file:test.candy:18) with these arguments:
+      HirId(project-file:test.candy:22:0:5)
+    HirId(project-file:test.candy:22:0:7) = call HirId(project-file:test.candy:19) with these arguments:
+      HirId(project-file:test.candy:22:0:6)
+    HirId(project-file:test.candy:22:0:8) = reference HirId(project-file:test.candy:22:0:0)
+    HirId(project-file:test.candy:22:0:9) = lambda {  ->
+      HirId(project-file:test.candy:22:0:9:0) = symbol True
+    }
+    HirId(project-file:test.candy:22:0:10) = lambda {  ->
+      HirId(project-file:test.candy:22:0:10:0) = reference HirId(project-file:test.candy:22:0:1)
+    }
+    HirId(project-file:test.candy:22:0:11) = call HirId(project-file:test.candy:3) with these arguments:
+      HirId(project-file:test.candy:22:0:8)
+      HirId(project-file:test.candy:22:0:9)
+      HirId(project-file:test.candy:22:0:10)
+  }
+}
+HirId(project-file:test.candy:23) = body {
+  HirId(project-file:test.candy:23:0) = lambda { condition ->
+    HirId(project-file:test.candy:23:0:1) = reference HirId(project-file:test.candy:23:0:0)
+    HirId(project-file:test.candy:23:0:2) = call HirId(project-file:test.candy:18) with these arguments:
+      HirId(project-file:test.candy:23:0:1)
+    HirId(project-file:test.candy:23:0:3) = call HirId(project-file:test.candy:19) with these arguments:
+      HirId(project-file:test.candy:23:0:2)
+    HirId(project-file:test.candy:23:0:4) = reference HirId(project-file:test.candy:23:0:0)
+    HirId(project-file:test.candy:23:0:5) = lambda {  ->
+      HirId(project-file:test.candy:23:0:5:0) = symbol Nothing
+    }
+    HirId(project-file:test.candy:23:0:6) = lambda {  ->
+      HirId(project-file:test.candy:23:0:6:0) = text "A check didn't succeed"
+      HirId(project-file:test.candy:23:0:6:1) = call HirId(project-file:test.candy:14) with these arguments:
+        HirId(project-file:test.candy:23:0:6:0)
+    }
+    HirId(project-file:test.candy:23:0:7) = call HirId(project-file:test.candy:3) with these arguments:
+      HirId(project-file:test.candy:23:0:4)
+      HirId(project-file:test.candy:23:0:5)
+      HirId(project-file:test.candy:23:0:6)
+  }
+}
+HirId(project-file:test.candy:24) = body {
+  HirId(project-file:test.candy:24:0) = lambda { value ->
+    HirId(project-file:test.candy:24:0:1) = reference HirId(project-file:test.candy:24:0:0)
+    HirId(project-file:test.candy:24:0:2) = call HirId(project-file:test.candy:12) with these arguments:
+      HirId(project-file:test.candy:24:0:1)
+    HirId(project-file:test.candy:24:0:3) = symbol Function
+    HirId(project-file:test.candy:24:0:4) = call HirId(project-file:test.candy:13) with these arguments:
+      HirId(project-file:test.candy:24:0:2)
+      HirId(project-file:test.candy:24:0:3)
+  }
+}
+HirId(project-file:test.candy:25) = body {
+  HirId(project-file:test.candy:25:0) = lambda { function ->
+    HirId(project-file:test.candy:25:0:1) = reference HirId(project-file:test.candy:25:0:0)
+    HirId(project-file:test.candy:25:0:2) = call HirId(project-file:test.candy:24) with these arguments:
+      HirId(project-file:test.candy:25:0:1)
+    HirId(project-file:test.candy:25:0:3) = call HirId(project-file:test.candy:19) with these arguments:
+      HirId(project-file:test.candy:25:0:2)
+    HirId(project-file:test.candy:25:0:4) = reference HirId(project-file:test.candy:25:0:0)
+    HirId(project-file:test.candy:25:0:5) = call HirId(project-file:test.candy:2) with these arguments:
+      HirId(project-file:test.candy:25:0:4)
+  }
+}
+HirId(project-file:test.candy:26) = body {
+  HirId(project-file:test.candy:26:0) = lambda { value ->
+    HirId(project-file:test.candy:26:0:1) = reference HirId(project-file:test.candy:26:0:0)
+    HirId(project-file:test.candy:26:0:2) = call HirId(project-file:test.candy:24) with these arguments:
+      HirId(project-file:test.candy:26:0:1)
+    HirId(project-file:test.candy:26:0:3) = reference HirId(project-file:test.candy:26:0:0)
+    HirId(project-file:test.candy:26:0:4) = call HirId(project-file:test.candy:25) with these arguments:
+      HirId(project-file:test.candy:26:0:3)
+    HirId(project-file:test.candy:26:0:5) = int 0
+    HirId(project-file:test.candy:26:0:6) = call HirId(project-file:test.candy:13) with these arguments:
+      HirId(project-file:test.candy:26:0:4)
+      HirId(project-file:test.candy:26:0:5)
+    HirId(project-file:test.candy:26:0:7) = call HirId(project-file:test.candy:21) with these arguments:
+      HirId(project-file:test.candy:26:0:2)
+      HirId(project-file:test.candy:26:0:6)
+  }
+}
+HirId(project-file:test.candy:27) = body {
+  HirId(project-file:test.candy:27:0) = lambda { value ->
+    HirId(project-file:test.candy:27:0:1) = reference HirId(project-file:test.candy:27:0:0)
+    HirId(project-file:test.candy:27:0:2) = call HirId(project-file:test.candy:24) with these arguments:
+      HirId(project-file:test.candy:27:0:1)
+    HirId(project-file:test.candy:27:0:3) = reference HirId(project-file:test.candy:27:0:0)
+    HirId(project-file:test.candy:27:0:4) = call HirId(project-file:test.candy:25) with these arguments:
+      HirId(project-file:test.candy:27:0:3)
+    HirId(project-file:test.candy:27:0:5) = int 1
+    HirId(project-file:test.candy:27:0:6) = call HirId(project-file:test.candy:13) with these arguments:
+      HirId(project-file:test.candy:27:0:4)
+      HirId(project-file:test.candy:27:0:5)
+    HirId(project-file:test.candy:27:0:7) = call HirId(project-file:test.candy:21) with these arguments:
+      HirId(project-file:test.candy:27:0:2)
+      HirId(project-file:test.candy:27:0:6)
+  }
+}
+HirId(project-file:test.candy:28) = body {
+  HirId(project-file:test.candy:28:0) = lambda { value ->
+    HirId(project-file:test.candy:28:0:1) = reference HirId(project-file:test.candy:28:0:0)
+    HirId(project-file:test.candy:28:0:2) = call HirId(project-file:test.candy:24) with these arguments:
+      HirId(project-file:test.candy:28:0:1)
+    HirId(project-file:test.candy:28:0:3) = reference HirId(project-file:test.candy:28:0:0)
+    HirId(project-file:test.candy:28:0:4) = call HirId(project-file:test.candy:25) with these arguments:
+      HirId(project-file:test.candy:28:0:3)
+    HirId(project-file:test.candy:28:0:5) = int 2
+    HirId(project-file:test.candy:28:0:6) = call HirId(project-file:test.candy:13) with these arguments:
+      HirId(project-file:test.candy:28:0:4)
+      HirId(project-file:test.candy:28:0:5)
+    HirId(project-file:test.candy:28:0:7) = call HirId(project-file:test.candy:21) with these arguments:
+      HirId(project-file:test.candy:28:0:2)
+      HirId(project-file:test.candy:28:0:6)
+  }
+}
+HirId(project-file:test.candy:29) = body {
+  HirId(project-file:test.candy:29:0) = lambda { value ->
+    HirId(project-file:test.candy:29:0:1) = reference HirId(project-file:test.candy:29:0:0)
+    HirId(project-file:test.candy:29:0:2) = call HirId(project-file:test.candy:24) with these arguments:
+      HirId(project-file:test.candy:29:0:1)
+    HirId(project-file:test.candy:29:0:3) = reference HirId(project-file:test.candy:29:0:0)
+    HirId(project-file:test.candy:29:0:4) = call HirId(project-file:test.candy:25) with these arguments:
+      HirId(project-file:test.candy:29:0:3)
+    HirId(project-file:test.candy:29:0:5) = int 3
+    HirId(project-file:test.candy:29:0:6) = call HirId(project-file:test.candy:13) with these arguments:
+      HirId(project-file:test.candy:29:0:4)
+      HirId(project-file:test.candy:29:0:5)
+    HirId(project-file:test.candy:29:0:7) = call HirId(project-file:test.candy:21) with these arguments:
+      HirId(project-file:test.candy:29:0:2)
+      HirId(project-file:test.candy:29:0:6)
+  }
+}
+HirId(project-file:test.candy:30) = body {
+  HirId(project-file:test.candy:30:0) = lambda { value ->
+    HirId(project-file:test.candy:30:0:1) = reference HirId(project-file:test.candy:30:0:0)
+    HirId(project-file:test.candy:30:0:2) = call HirId(project-file:test.candy:24) with these arguments:
+      HirId(project-file:test.candy:30:0:1)
+    HirId(project-file:test.candy:30:0:3) = reference HirId(project-file:test.candy:30:0:0)
+    HirId(project-file:test.candy:30:0:4) = call HirId(project-file:test.candy:25) with these arguments:
+      HirId(project-file:test.candy:30:0:3)
+    HirId(project-file:test.candy:30:0:5) = int 4
+    HirId(project-file:test.candy:30:0:6) = call HirId(project-file:test.candy:13) with these arguments:
+      HirId(project-file:test.candy:30:0:4)
+      HirId(project-file:test.candy:30:0:5)
+    HirId(project-file:test.candy:30:0:7) = call HirId(project-file:test.candy:21) with these arguments:
+      HirId(project-file:test.candy:30:0:2)
+      HirId(project-file:test.candy:30:0:6)
+  }
+}
+HirId(project-file:test.candy:31) = body {
+  HirId(project-file:test.candy:31:0) = lambda { value ->
+    HirId(project-file:test.candy:31:0:1) = reference HirId(project-file:test.candy:31:0:0)
+    HirId(project-file:test.candy:31:0:2) = call HirId(project-file:test.candy:24) with these arguments:
+      HirId(project-file:test.candy:31:0:1)
+    HirId(project-file:test.candy:31:0:3) = reference HirId(project-file:test.candy:31:0:0)
+    HirId(project-file:test.candy:31:0:4) = call HirId(project-file:test.candy:25) with these arguments:
+      HirId(project-file:test.candy:31:0:3)
+    HirId(project-file:test.candy:31:0:5) = int 5
+    HirId(project-file:test.candy:31:0:6) = call HirId(project-file:test.candy:13) with these arguments:
+      HirId(project-file:test.candy:31:0:4)
+      HirId(project-file:test.candy:31:0:5)
+    HirId(project-file:test.candy:31:0:7) = call HirId(project-file:test.candy:21) with these arguments:
+      HirId(project-file:test.candy:31:0:2)
+      HirId(project-file:test.candy:31:0:6)
+  }
+}
+HirId(project-file:test.candy:32) = body {
+  HirId(project-file:test.candy:32:0) = lambda { condition then else ->
+    HirId(project-file:test.candy:32:0:3) = reference HirId(project-file:test.candy:32:0:0)
+    HirId(project-file:test.candy:32:0:4) = call HirId(project-file:test.candy:18) with these arguments:
+      HirId(project-file:test.candy:32:0:3)
+    HirId(project-file:test.candy:32:0:5) = call HirId(project-file:test.candy:19) with these arguments:
+      HirId(project-file:test.candy:32:0:4)
+    HirId(project-file:test.candy:32:0:6) = reference HirId(project-file:test.candy:32:0:1)
+    HirId(project-file:test.candy:32:0:7) = call HirId(project-file:test.candy:26) with these arguments:
+      HirId(project-file:test.candy:32:0:6)
+    HirId(project-file:test.candy:32:0:8) = call HirId(project-file:test.candy:19) with these arguments:
+      HirId(project-file:test.candy:32:0:7)
+    HirId(project-file:test.candy:32:0:9) = reference HirId(project-file:test.candy:32:0:2)
+    HirId(project-file:test.candy:32:0:10) = call HirId(project-file:test.candy:26) with these arguments:
+      HirId(project-file:test.candy:32:0:9)
+    HirId(project-file:test.candy:32:0:11) = call HirId(project-file:test.candy:19) with these arguments:
+      HirId(project-file:test.candy:32:0:10)
+    HirId(project-file:test.candy:32:0:12) = reference HirId(project-file:test.candy:32:0:0)
+    HirId(project-file:test.candy:32:0:13) = reference HirId(project-file:test.candy:32:0:1)
+    HirId(project-file:test.candy:32:0:14) = reference HirId(project-file:test.candy:32:0:2)
+    HirId(project-file:test.candy:32:0:15) = call HirId(project-file:test.candy:3) with these arguments:
+      HirId(project-file:test.candy:32:0:12)
+      HirId(project-file:test.candy:32:0:13)
+      HirId(project-file:test.candy:32:0:14)
+  }
+}
+HirId(project-file:test.candy:33) = body {
+  HirId(project-file:test.candy:33:0) = lambda { condition then ->
+    HirId(project-file:test.candy:33:0:2) = reference HirId(project-file:test.candy:33:0:0)
+    HirId(project-file:test.candy:33:0:3) = call HirId(project-file:test.candy:18) with these arguments:
+      HirId(project-file:test.candy:33:0:2)
+    HirId(project-file:test.candy:33:0:4) = call HirId(project-file:test.candy:19) with these arguments:
+      HirId(project-file:test.candy:33:0:3)
+    HirId(project-file:test.candy:33:0:5) = reference HirId(project-file:test.candy:33:0:1)
+    HirId(project-file:test.candy:33:0:6) = call HirId(project-file:test.candy:26) with these arguments:
+      HirId(project-file:test.candy:33:0:5)
+    HirId(project-file:test.candy:33:0:7) = call HirId(project-file:test.candy:19) with these arguments:
+      HirId(project-file:test.candy:33:0:6)
+    HirId(project-file:test.candy:33:0:8) = reference HirId(project-file:test.candy:33:0:0)
+    HirId(project-file:test.candy:33:0:9) = reference HirId(project-file:test.candy:33:0:1)
+    HirId(project-file:test.candy:33:0:10) = lambda {  ->
+      HirId(project-file:test.candy:33:0:10:0) = symbol Nothing
+    }
+    HirId(project-file:test.candy:33:0:11) = call HirId(project-file:test.candy:32) with these arguments:
+      HirId(project-file:test.candy:33:0:8)
+      HirId(project-file:test.candy:33:0:9)
+      HirId(project-file:test.candy:33:0:10)
+  }
+}
+HirId(project-file:test.candy:34) = body {
+  HirId(project-file:test.candy:34:0) = lambda { a b ->
+    HirId(project-file:test.candy:34:0:2) = body {
+      HirId(project-file:test.candy:34:0:2:0) = reference HirId(project-file:test.candy:34:0:0)
+      HirId(project-file:test.candy:34:0:2:1) = call HirId(project-file:test.candy:15) with these arguments:
+        HirId(project-file:test.candy:34:0:2:0)
+    }
+    HirId(project-file:test.candy:34:0:3) = reference HirId(project-file:test.candy:34:0:2)
+    HirId(project-file:test.candy:34:0:4) = call HirId(project-file:test.candy:19) with these arguments:
+      HirId(project-file:test.candy:34:0:3)
+    HirId(project-file:test.candy:34:0:5) = body {
+      HirId(project-file:test.candy:34:0:5:0) = reference HirId(project-file:test.candy:34:0:1)
+      HirId(project-file:test.candy:34:0:5:1) = call HirId(project-file:test.candy:15) with these arguments:
+        HirId(project-file:test.candy:34:0:5:0)
+    }
+    HirId(project-file:test.candy:34:0:6) = reference HirId(project-file:test.candy:34:0:5)
+    HirId(project-file:test.candy:34:0:7) = call HirId(project-file:test.candy:19) with these arguments:
+      HirId(project-file:test.candy:34:0:6)
+    HirId(project-file:test.candy:34:0:8) = reference HirId(project-file:test.candy:34:0:0)
+    HirId(project-file:test.candy:34:0:9) = reference HirId(project-file:test.candy:34:0:1)
+    HirId(project-file:test.candy:34:0:10) = call HirId(project-file:test.candy:0) with these arguments:
+      HirId(project-file:test.candy:34:0:8)
+      HirId(project-file:test.candy:34:0:9)
+  }
+}
+HirId(project-file:test.candy:35) = body {
+  HirId(project-file:test.candy:35:0) = int 2
+  HirId(project-file:test.candy:35:1) = int 2
+  HirId(project-file:test.candy:35:2) = call HirId(project-file:test.candy:34) with these arguments:
+    HirId(project-file:test.candy:35:0)
+    HirId(project-file:test.candy:35:1)
+}
+HirId(project-file:test.candy:36) = body {
+  HirId(project-file:test.candy:36:0) = lambda { text ->
+    HirId(project-file:test.candy:36:0:1) = symbol Nothing
+  }
+}
+HirId(project-file:test.candy:37) = body {
+  HirId(project-file:test.candy:37:0) = symbol Nothing
+}
+HirId(project-file:test.candy:38) = body {
+  HirId(project-file:test.candy:38:0) = lambda { a b ->
+    HirId(project-file:test.candy:38:0:2) = symbol Nothing
+  }
+}
+HirId(project-file:test.candy:39) = body {
+  HirId(project-file:test.candy:39:0) = lambda { iterable mapper ->
+    HirId(project-file:test.candy:39:0:2) = symbol Nothing
+  }
+}
+HirId(project-file:test.candy:40) = body {
+  HirId(project-file:test.candy:40:0) = symbol Nothing
+}
+HirId(project-file:test.candy:41) = body {
+  HirId(project-file:test.candy:41:0) = symbol Blub
+}
+HirId(project-file:test.candy:42) = body {
+  HirId(project-file:test.candy:42:0) = lambda { lambda ->
+    HirId(project-file:test.candy:42:0:1) = symbol Nothing
+  }
+}
+HirId(project-file:test.candy:43) = body {
+  HirId(project-file:test.candy:43:0) = body {
+    HirId(project-file:test.candy:43:0:0) = int 3
+  }
+  HirId(project-file:test.candy:43:1) = body {
+    HirId(project-file:test.candy:43:1:0) = lambda { n ->
+      HirId(project-file:test.candy:43:1:0:1) = int 5
+    }
+  }
+  HirId(project-file:test.candy:43:2) = body {
+    HirId(project-file:test.candy:43:2:0) = text "abc"
+    HirId(project-file:test.candy:43:2:1) = call HirId(project-file:test.candy:36) with these arguments:
+      HirId(project-file:test.candy:43:2:0)
+    HirId(project-file:test.candy:43:2:2) = int 123
+  }
+  HirId(project-file:test.candy:43:3) = int 5
+  HirId(project-file:test.candy:43:4) = call HirId(project-file:test.candy:43:1) with these arguments:
+    HirId(project-file:test.candy:43:3)
+  HirId(project-file:test.candy:43:5) = reference HirId(project-file:test.candy:43:0)
+}
+HirId(project-file:test.candy:44) = body {
+  HirId(project-file:test.candy:44:0) = body {
+    HirId(project-file:test.candy:44:0:0) = int 1
+  }
+  HirId(project-file:test.candy:44:1) = body {
+    HirId(project-file:test.candy:44:1:0) = lambda { n ->
+      HirId(project-file:test.candy:44:1:0:1) = int 5
+    }
+  }
+  HirId(project-file:test.candy:44:2) = body {
+    HirId(project-file:test.candy:44:2:0) = reference HirId(project-file:test.candy:37)
+  }
+  HirId(project-file:test.candy:44:3) = reference HirId(project-file:test.candy:44:2)
+}
+HirId(project-file:test.candy:45) = body {
+  HirId(project-file:test.candy:45:0) = lambda {  ->
+    HirId(project-file:test.candy:45:0:0) = symbol Nothing
+  }
+}
+HirId(project-file:test.candy:46) = body {
+  HirId(project-file:test.candy:46:0) = reference HirId(project-file:test.candy:38)
+}
+HirId(project-file:test.candy:47) = int 8646461
+HirId(project-file:test.candy:48) = text "Hi"
+HirId(project-file:test.candy:49) = call HirId(project-file:test.candy:38) with these arguments:
+  HirId(project-file:test.candy:47)
+  HirId(project-file:test.candy:48)
+HirId(project-file:test.candy:50) = reference HirId(project-file:test.candy:40)
+HirId(project-file:test.candy:51) = lambda { a b ->
+  HirId(project-file:test.candy:51:2) = text "the item on io"
+  HirId(project-file:test.candy:51:3) = call HirId(project-file:test.candy:36) with these arguments:
+    HirId(project-file:test.candy:51:2)
+}
+HirId(project-file:test.candy:52) = call HirId(project-file:test.candy:39) with these arguments:
+  HirId(project-file:test.candy:50)
+  HirId(project-file:test.candy:51)
+HirId(project-file:test.candy:53) = body {
+  HirId(project-file:test.candy:53:0) = lambda { n ->
+    HirId(project-file:test.candy:53:0:1) = reference HirId(project-file:test.candy:46)
+  }
+}
+HirId(project-file:test.candy:54) = body {
+  HirId(project-file:test.candy:54:0) = lambda { n ->
+    HirId(project-file:test.candy:54:0:1) = reference HirId(project-file:test.candy:41)
+  }
+}
+HirId(project-file:test.candy:55) = reference HirId(project-file:test.candy:35)
+HirId(project-file:test.candy:56) = body {
+  HirId(project-file:test.candy:56:0) = body {
+    HirId(project-file:test.candy:56:0:0) = int 1
+  }
+  HirId(project-file:test.candy:56:1) = body {
+    HirId(project-file:test.candy:56:1:0) = lambda {  ->
+      HirId(project-file:test.candy:56:1:0:0) = reference HirId(project-file:test.candy:56:0)
+    }
+  }
+}
+HirId(project-file:test.candy:57) = reference HirId(project-file:test.candy:56)
+HirId(project-file:test.candy:58) = call HirId(project-file:test.candy:42) with these arguments:
+  HirId(project-file:test.candy:57)
+HirId(project-file:test.candy:59) = symbol True

@@ -1,6 +1,0 @@
-public use .and
-public use .choice
-public use .not
-public use .optional
-public use .sequence
-public use .settable

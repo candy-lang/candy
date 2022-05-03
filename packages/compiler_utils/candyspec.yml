@@ -1,7 +1,0 @@
-name: compiler_utils
-
-dependencies:
-  incremental:
-    path: ../incremental
-  petit_parser:
-    path: ../petit_parser
