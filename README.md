@@ -2,7 +2,7 @@
 
 A sweet programming language that is robst, minimalistic, and expressive.
 
-Candy aims to blurs the line between dynamically-typed and statically-typed languages.
+Candy aims to blur the line between dynamically-typed and statically-typed languages.
 Like dynamic languages, it is permissive during compilation, allowing you to quickly prototype new ideas.
 You can freely compose data without having to specify its structure before.
 Like static languages, the tooling highlights potential errors before they happen.
@@ -12,11 +12,10 @@ Like static languages, the tooling highlights potential errors before they happe
 * **Values are at the center of your computations.**
   Only some predefined types of immutable values exist: ints, texts, symbols, and structs.
   ```
-  {
-    Name: "Candy",
-    Number: 3,
-    Color: Green,
-  }
+  3
+  "Candy"
+  Green
+  { Name: "Candy" }
   ```
 * **Minimalistic syntax.**
   Defining variables and functions all works without braces cluttering up your code.
@@ -29,14 +28,14 @@ Like static languages, the tooling highlights potential errors before they happe
   println "Hello, world!"
   ```
 * **Extensive compile-time evaluation.**
-  Loads of values can already be computed at compile-time.
+  Many values can already be computed at compile-time.
   In your editor, you'll see the results on the right side as you type:
   ```
   foo = double 2  # foo = 4
   ```
 * **Something better than traditional types.**
   The days of runtime errors like "logarithm only accepts positive numbers" or "first only works on non-empty lists" are over.
-  In Candy, functions have to specify their needs exactly.
+  In Candy, functions have to specify their needs *exactly.*
   ```
   efficientTextReverse text =
     needs (isText text)
@@ -44,12 +43,13 @@ Like static languages, the tooling highlights potential errors before they happe
     text
   ```
 * **Permanent fuzzing.**
-  While editing your code, it's automatically tested with loads of inputs to see if one breaks the code.
+  While editing your code, the tooling automatically tests it with many input to see if one breaks the code.
   You'll be immediately notified of any unhandled inputs.
+  This is how the tooling could look like:
   ```
-  foo a =
+  foo a =            # If you pass a = 0, ...
     needs (isInt a)
-    logarithm a  # fails for a = 0
+    logarithm a      # ... then this fails because logarithm only works on positive numbers.
   ```
 
 ## Discussion
