@@ -38,13 +38,14 @@ Like static languages, the tooling highlights potential errors before they happe
   The days of runtime errors like "logarithm only accepts positive numbers" or "first only works on non-empty lists" are over.
   In Candy, functions have to specify their needs exactly.
   ```
-  efficientStringReverse string =
-    needs (isString string)
-    needs (isPalindrome string)
-    string
+  efficientTextReverse text =
+    needs (isText text)
+    needs (isPalindrome text)
+    text
   ```
 * **Permanent fuzzing.**
-  While editing your code, it's automatically tested with loads of inputs to see if one breaks the code. You'll be immediately notified of any unhandled inputs.
+  While editing your code, it's automatically tested with loads of inputs to see if one breaks the code.
+  You'll be immediately notified of any unhandled inputs.
   ```
   foo a =
     needs (isInt a)
@@ -98,7 +99,7 @@ Our TODO list:
 * [ ] lists
 * [ ] maps
 * [ ] sets
-* [ ] string interpolation
+* [ ] text interpolation
 * [ ] constant evaluation
 * [ ] fibers
 * [ ] channels
