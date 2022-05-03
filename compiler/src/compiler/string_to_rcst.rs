@@ -794,7 +794,7 @@ mod parse {
                 "",
                 Rcst::Call {
                     name: Box::new(Rcst::TrailingWhitespace {
-                        child: Box::new(Rcst::Identifier("foo".to_string()))
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![
                             Rcst::Newline("\n".to_string()),
                             Rcst::Whitespace("  ".to_string())
