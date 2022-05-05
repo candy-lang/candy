@@ -6,66 +6,15 @@
     },
     {
       "name": "Core",
-      "path": "new-new-new-packages/Core"
+      "path": "packages/Core"
     },
     {
       "name": "Compiler",
-      "path": "new-new-packages/compiler"
+      "path": "compiler"
     },
     {
       "name": "VS Code Extension",
-      "path": "new-new-packages/vscode_extension"
-    },
-    {
-      "name": "Old 📖 Language",
-      "path": "language"
-    },
-    {
-      "name": "Old 🧸 Playground (new)",
-      "path": "new-packages/Playground"
-    },
-    {
-      "name": "Old Core (new)",
-      "path": "new-packages/Core"
-    },
-    {
-      "name": "Old 🛒 Shopping List (example)",
-      "path": "new-packages/ShoppingList"
-    },
-    {
-      "name": "Old (Old) 🧸 Playground",
-      "path": "playground"
-    },
-    {
-      "name": "Old Old Core",
-      "path": "packages/core"
-    },
-    {
-      "name": "Old Old Dart Code",
-      "path": "packages/dart_code"
-    },
-    {
-      "name": "Old Old Compiler: CST",
-      "path": "packages/cst"
-    },
-    {
-      "name": "Old Old Compiler: AST",
-      "path": "packages/ast"
-    },
-    {
-      "name": "Old Old Compiler: HIR",
-      "path": "packages/hir"
-    },
-    {
-      "name": "Old Old Compiler: Code Generator Dart",
-      "path": "packages/code_generator_dart"
-    },
-    {
-      "name": "Old Old Compiler: Utils",
-      "path": "packages/compiler_utils"
-    },
-    {
-      "path": "packages/name_checker"
+      "path": "vscode_extension"
     }
   ]
 }
