@@ -80,9 +80,10 @@ impl LoweringContext {
             Expression::Lambda(lambda) => {
                 let mut registry = ChunkRegistry::default();
                 swap(&mut self.registry, &mut registry);
+                let captured_stack = self.stack.clone();
                 let mut lambda_context = LoweringContext {
                     registry,
-                    stack: self.stack.clone(),
+                    stack: captured_stack.clone(),
                     instructions: vec![],
                 };
                 for i in 0..lambda.parameters.len() {
@@ -90,6 +91,7 @@ impl LoweringContext {
                 }
                 lambda_context.compile_body(&lambda.body);
                 lambda_context.emit_pop_multiple_below_top(lambda.parameters.len());
+                lambda_context.emit_pop_multiple_below_top(captured_stack.len());
                 lambda_context.emit_return();
                 swap(&mut self.registry, &mut lambda_context.registry);
 

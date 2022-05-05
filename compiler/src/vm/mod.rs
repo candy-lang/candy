@@ -1,3 +1,4 @@
+mod builtin_functions;
 pub mod value;
 mod vm;
 

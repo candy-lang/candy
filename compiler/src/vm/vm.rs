@@ -3,36 +3,38 @@ use itertools::Itertools;
 use log::debug;
 use std::collections::HashMap;
 
+use super::value::Value;
+
 /// A VM can execute some byte code.
 #[derive(Debug)]
 pub struct Vm {
-    chunks: Vec<Chunk>,
-    status: Status,
+    pub(super) chunks: Vec<Chunk>,
+    pub(super) status: Status,
     next_instruction: ByteCodePointer,
-    stack: Vec<StackEntry>,
+    pub(super) stack: Vec<StackEntry>,
     heap: HashMap<ObjectPointer, Object>,
     next_heap_address: ObjectPointer,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Status {
     Running,
-    Done(Object),
-    Panicked(Object),
+    Done(Value),
+    Panicked(Value),
 }
 
 /// Stack entries point either to instructions or to objects.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StackEntry {
     ByteCode(ByteCodePointer),
     Object(ObjectPointer),
 }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ByteCodePointer {
     chunk: ChunkIndex,
     instruction: usize,
 }
-type ObjectPointer = usize;
+pub type ObjectPointer = usize;
 
 #[derive(Debug, Clone)] // TODO: remove Clone once it's no longer needed
 pub struct Object {
@@ -79,7 +81,7 @@ impl Vm {
         self.heap.get_mut(&address).unwrap()
     }
 
-    fn create_object(&mut self, object: ObjectData) -> ObjectPointer {
+    pub fn create_object(&mut self, object: ObjectData) -> ObjectPointer {
         let address = self.next_heap_address;
         self.heap.insert(
             address,
@@ -91,7 +93,7 @@ impl Vm {
         self.next_heap_address += 1;
         address
     }
-    fn free_object(&mut self, address: ObjectPointer) {
+    pub fn free_object(&mut self, address: ObjectPointer) {
         let object = self.heap.remove(&address).unwrap();
         assert_eq!(object.reference_count, 0);
         match object.data {
@@ -125,6 +127,45 @@ impl Vm {
         }
     }
 
+    pub(super) fn import(&mut self, value: Value) -> ObjectPointer {
+        self.create_object(match value {
+            Value::Int(int) => ObjectData::Int(int),
+            Value::Text(text) => ObjectData::Text(text),
+            Value::Symbol(symbol) => ObjectData::Symbol(symbol),
+            Value::Struct(struct_) => {
+                let entries = HashMap::new();
+                for (key, value) in struct_ {
+                    entries.insert(self.import(key), self.import(value));
+                }
+                ObjectData::Struct(entries)
+            }
+            Value::Closure { captured, body } => ObjectData::Closure { captured, body },
+        })
+    }
+    pub(super) fn export(&mut self, address: ObjectPointer) -> Value {
+        let value = self.export_helper(address);
+        self.drop(address);
+        value
+    }
+    fn export_helper(&mut self, address: ObjectPointer) -> Value {
+        match self.get_from_heap(address).data {
+            ObjectData::Int(int) => Value::Int(int),
+            ObjectData::Text(text) => Value::Text(text),
+            ObjectData::Symbol(symbol) => Value::Symbol(symbol),
+            ObjectData::Struct(struct_) => {
+                let entries = im::HashMap::new();
+                for (key, value) in struct_ {
+                    entries.insert(self.export_helper(key), self.export_helper(value));
+                }
+                Value::Struct(entries)
+            }
+            ObjectData::Closure { captured, body } => Value::Closure {
+                captured: captured.clone(),
+                body,
+            },
+        }
+    }
+
     pub fn run(&mut self, mut num_instructions: u16) {
         assert!(
             matches!(self.status, Status::Running),
@@ -142,10 +183,7 @@ impl Vm {
             if self.next_instruction.instruction
                 >= self.chunks[self.next_instruction.chunk].instructions.len()
             {
-                self.status = Status::Done(Object {
-                    reference_count: 0,
-                    data: ObjectData::Symbol("Nothing".to_string()),
-                });
+                self.status = Status::Done(Value::nothing());
             }
         }
     }
@@ -246,31 +284,22 @@ impl Vm {
             }
             Instruction::Return => {
                 let return_value = self.stack.pop().unwrap();
-                // TODO: Important: The closure should take care of removing all
-                // captured variables from the stack. That's only possible once
-                // we statically determine how many variables were captured in
-                // the first place.
-                let caller = loop {
-                    match self.stack.pop().unwrap() {
-                        StackEntry::ByteCode(address) => break address,
-                        StackEntry::Object(_) => {}
-                    }
+                let caller = match self.stack.pop().unwrap() {
+                    StackEntry::ByteCode(address) => address,
+                    StackEntry::Object(_) => panic!("Return with no caller on stack"),
                 };
                 self.stack.push(return_value);
                 self.next_instruction = caller;
             }
-            Instruction::Builtin(_) => {
-                todo!("Implement builtin")
+            Instruction::Builtin(builtin_function) => {
+                self.run_builtin_function(builtin_function);
             }
             Instruction::DebugValueEvaluated(_) => {}
             Instruction::Error(_) => {
-                self.status = Status::Panicked(Object {
-                    reference_count: 0,
-                    data: ObjectData::Text(
-                        "The VM crashed because there was an error in previous compilation stages."
-                            .to_string(),
-                    ),
-                });
+                self.status = Status::Panicked(Value::Text(
+                    "The VM crashed because there was an error in previous compilation stages."
+                        .to_string(),
+                ));
             }
         }
     }
