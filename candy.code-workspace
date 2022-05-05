@@ -5,16 +5,20 @@
       "path": "."
     },
     {
-      "name": "Core",
-      "path": "packages/Core"
-    },
-    {
       "name": "Compiler",
       "path": "compiler"
     },
     {
       "name": "VS Code Extension",
       "path": "vscode_extension"
+    },
+    {
+      "name": "Packages",
+      "path": "packages"
+    },
+    {
+      "name": "Old Packages",
+      "path": "old-packages"
     }
   ]
 }
