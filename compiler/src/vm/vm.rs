@@ -79,7 +79,10 @@ impl Vm {
     fn get_from_stack(&self, offset: usize) -> StackEntry {
         self.stack[self.stack.len() - 1 - offset as usize].clone()
     }
-    fn get_from_heap(&mut self, address: ObjectPointer) -> &mut Object {
+    fn get_from_heap(&self, address: ObjectPointer) -> &Object {
+        self.heap.get(&address).unwrap()
+    }
+    fn get_mut_from_heap(&mut self, address: ObjectPointer) -> &mut Object {
         self.heap.get_mut(&address).unwrap()
     }
 
@@ -119,10 +122,10 @@ impl Vm {
     }
 
     fn dup(&mut self, address: ObjectPointer) {
-        self.get_from_heap(address).reference_count += 1;
+        self.get_mut_from_heap(address).reference_count += 1;
     }
     fn drop(&mut self, address: ObjectPointer) {
-        let object = self.get_from_heap(address);
+        let object = self.get_mut_from_heap(address);
         object.reference_count -= 1;
         if object.reference_count == 0 {
             self.free_object(address);
