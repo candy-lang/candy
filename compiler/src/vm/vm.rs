@@ -197,9 +197,9 @@ impl Vm {
                     .iter()
                     .map(|entry| match entry {
                         StackEntry::ByteCode(byte_code) => {
-                            format!("->{}:{}", byte_code.chunk, byte_code.instruction)
+                            format!("here#{}:{}", byte_code.chunk, byte_code.instruction)
                         }
-                        StackEntry::Object(address) => format!("{}", address),
+                        StackEntry::Object(address) => format!("{}", self.export_helper(*address)),
                     })
                     .join(", ")
             );
