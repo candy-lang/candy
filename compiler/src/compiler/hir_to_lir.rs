@@ -89,9 +89,11 @@ impl LoweringContext {
                 for i in 0..lambda.parameters.len() {
                     lambda_context.stack.push(lambda.first_id.clone() + i);
                 }
+                lambda_context.emit_debug_closure_entered(id.clone());
                 lambda_context.compile_body(&lambda.body);
                 lambda_context.emit_pop_multiple_below_top(lambda.parameters.len());
                 lambda_context.emit_pop_multiple_below_top(captured_stack.len());
+                lambda_context.emit_debug_closure_exited();
                 lambda_context.emit_return();
                 swap(&mut self.registry, &mut lambda_context.registry);
 
@@ -182,6 +184,12 @@ impl LoweringContext {
     }
     fn emit_debug_value_evaluated(&mut self, id: hir::Id) {
         self.emit(Instruction::DebugValueEvaluated(id));
+    }
+    fn emit_debug_closure_entered(&mut self, id: hir::Id) {
+        self.emit(Instruction::DebugClosureEntered(id));
+    }
+    fn emit_debug_closure_exited(&mut self) {
+        self.emit(Instruction::DebugClosureExited);
     }
     fn emit_error(&mut self, id: hir::Id) {
         self.emit(Instruction::Error(id));

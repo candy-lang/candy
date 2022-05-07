@@ -65,6 +65,9 @@ pub enum Instruction {
     /// of the stack.
     DebugValueEvaluated(hir::Id),
 
+    DebugClosureEntered(hir::Id),
+    DebugClosureExited,
+
     Error(hir::Id),
 }
 
@@ -96,6 +99,10 @@ impl Display for Lir {
                     Instruction::DebugValueEvaluated(hir_id) => {
                         writeln!(f, "debugValueEvaluated {}", hir_id)
                     }
+                    Instruction::DebugClosureEntered(hir_id) => {
+                        writeln!(f, "debugClosureEntered {}", hir_id)
+                    }
+                    Instruction::DebugClosureExited => writeln!(f, "debugClosureExited"),
                     Instruction::Error(hir_id) => writeln!(f, "error {}", hir_id),
                 }?;
             }
