@@ -155,23 +155,23 @@ impl Vm {
         self.drop(address);
         value
     }
-    fn export_helper(&mut self, address: ObjectPointer) -> Value {
-        match self.get_from_heap(address).data.clone() {
-            ObjectData::Int(int) => Value::Int(int),
-            ObjectData::Text(text) => Value::Text(text),
-            ObjectData::Symbol(symbol) => Value::Symbol(symbol),
+    fn export_helper(&self, address: ObjectPointer) -> Value {
+        match &self.get_from_heap(address).data {
+            ObjectData::Int(int) => Value::Int(*int),
+            ObjectData::Text(text) => Value::Text(text.clone()),
+            ObjectData::Symbol(symbol) => Value::Symbol(symbol.clone()),
             ObjectData::Struct(struct_) => {
                 let mut entries = im::HashMap::new();
                 for (key, value) in struct_ {
-                    let key = self.export_helper(key);
-                    let value = self.export_helper(value);
+                    let key = self.export_helper(*key);
+                    let value = self.export_helper(*value);
                     entries.insert(key, value);
                 }
                 Value::Struct(entries)
             }
             ObjectData::Closure { captured, body } => Value::Closure {
                 captured: captured.clone(),
-                body,
+                body: *body,
             },
         }
     }
