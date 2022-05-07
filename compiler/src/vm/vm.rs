@@ -1,10 +1,10 @@
-use crate::compiler::lir::{Chunk, ChunkIndex, Instruction};
+use crate::compiler::{
+    hir,
+    lir::{Chunk, ChunkIndex, Instruction},
+};
 use itertools::Itertools;
 use log::debug;
-use std::{
-    collections::HashMap,
-    fmt::{self, Display},
-};
+use std::collections::HashMap;
 
 use super::value::Value;
 
@@ -16,6 +16,7 @@ pub struct Vm {
     pub(super) stack: Vec<StackEntry>,
     heap: HashMap<ObjectPointer, Object>,
     next_heap_address: ObjectPointer,
+    stack_trace: Vec<hir::Id>,
 }
 
 #[derive(Clone)]
@@ -69,6 +70,7 @@ impl Vm {
             stack: vec![],
             heap: HashMap::new(),
             next_heap_address: 0,
+            stack_trace: vec![],
         }
     }
 
@@ -317,6 +319,10 @@ impl Vm {
                 self.run_builtin_function(builtin_function);
             }
             Instruction::DebugValueEvaluated(_) => {}
+            Instruction::DebugClosureEntered(hir_id) => self.stack_trace.push(hir_id),
+            Instruction::DebugClosureExited => {
+                self.stack_trace.pop().unwrap();
+            }
             Instruction::Error(_) => {
                 self.panic(
                     "The VM crashed because there was an error in previous compilation stages."
@@ -329,5 +335,9 @@ impl Vm {
     pub fn panic(&mut self, message: String) -> Value {
         self.status = Status::Panicked(Value::Text(message));
         Value::Symbol("Never".to_string())
+    }
+
+    pub fn current_stack_trace(&self) -> Vec<hir::Id> {
+        self.stack_trace.clone()
     }
 }
