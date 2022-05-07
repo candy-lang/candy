@@ -1,6 +1,9 @@
+use std::fmt::{self, Display, Formatter};
+
 use super::vm::StackEntry;
 use crate::compiler::lir::ChunkIndex;
 use im::HashMap;
+use itertools::Itertools;
 
 /// A self-contained value. Unlike objects, these are not tied to a running VM,
 /// which makes them useful for being sent through channels between multiple
@@ -63,6 +66,27 @@ impl Value {
         match self {
             Value::Closure { captured, body } => Some((captured, body)),
             _ => None,
+        }
+    }
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Int(int) => write!(f, "{}", int),
+            Value::Text(text) => write!(f, "{:?}", text),
+            Value::Symbol(symbol) => write!(f, "{}", symbol),
+            Value::Struct(entries) => write!(
+                f,
+                "{{ {} }}",
+                entries
+                    .iter()
+                    .map(|(key, value)| format!("{}: {}", key, value))
+                    .join(", ")
+            ),
+            Value::Closure { captured, body } => {
+                write!(f, "closure@{}", body)
+            }
         }
     }
 }
