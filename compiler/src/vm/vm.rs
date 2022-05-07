@@ -1,12 +1,14 @@
 use crate::compiler::lir::{Chunk, ChunkIndex, Instruction};
 use itertools::Itertools;
 use log::debug;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fmt::{self, Display},
+};
 
 use super::value::Value;
 
 /// A VM can execute some byte code.
-#[derive(Debug)]
 pub struct Vm {
     pub(super) chunks: Vec<Chunk>,
     pub(super) status: Status,
@@ -66,7 +68,7 @@ impl Vm {
             },
             stack: vec![],
             heap: HashMap::new(),
-            next_heap_address: 1000000,
+            next_heap_address: 0,
         }
     }
 
@@ -128,19 +130,22 @@ impl Vm {
     }
 
     pub(super) fn import(&mut self, value: Value) -> ObjectPointer {
-        self.create_object(match value {
+        let value = match value {
             Value::Int(int) => ObjectData::Int(int),
             Value::Text(text) => ObjectData::Text(text),
             Value::Symbol(symbol) => ObjectData::Symbol(symbol),
             Value::Struct(struct_) => {
-                let entries = HashMap::new();
+                let mut entries = HashMap::new();
                 for (key, value) in struct_ {
-                    entries.insert(self.import(key), self.import(value));
+                    let key = self.import(key);
+                    let value = self.import(value);
+                    entries.insert(key, value);
                 }
                 ObjectData::Struct(entries)
             }
             Value::Closure { captured, body } => ObjectData::Closure { captured, body },
-        })
+        };
+        self.create_object(value)
     }
     pub(super) fn export(&mut self, address: ObjectPointer) -> Value {
         let value = self.export_helper(address);
@@ -148,14 +153,16 @@ impl Vm {
         value
     }
     fn export_helper(&mut self, address: ObjectPointer) -> Value {
-        match self.get_from_heap(address).data {
+        match self.get_from_heap(address).data.clone() {
             ObjectData::Int(int) => Value::Int(int),
             ObjectData::Text(text) => Value::Text(text),
             ObjectData::Symbol(symbol) => Value::Symbol(symbol),
             ObjectData::Struct(struct_) => {
-                let entries = im::HashMap::new();
+                let mut entries = im::HashMap::new();
                 for (key, value) in struct_ {
-                    entries.insert(self.export_helper(key), self.export_helper(value));
+                    let key = self.export_helper(key);
+                    let value = self.export_helper(value);
+                    entries.insert(key, value);
                 }
                 Value::Struct(entries)
             }
@@ -179,6 +186,18 @@ impl Vm {
             debug!("Executing instruction: {:?}", &instruction);
             self.next_instruction.instruction += 1;
             self.run_instruction(instruction);
+            debug!(
+                "Stack: {}",
+                self.stack
+                    .iter()
+                    .map(|entry| match entry {
+                        StackEntry::ByteCode(byte_code) => {
+                            format!("->{}:{}", byte_code.chunk, byte_code.instruction)
+                        }
+                        StackEntry::Object(address) => format!("{}", address),
+                    })
+                    .join(", ")
+            );
 
             if self.next_instruction.instruction
                 >= self.chunks[self.next_instruction.chunk].instructions.len()
@@ -187,7 +206,7 @@ impl Vm {
             }
         }
     }
-    fn run_instruction(&mut self, instruction: Instruction) {
+    pub fn run_instruction(&mut self, instruction: Instruction) {
         match instruction {
             Instruction::CreateInt(int) => {
                 let address = self.create_object(ObjectData::Int(int));
@@ -296,11 +315,16 @@ impl Vm {
             }
             Instruction::DebugValueEvaluated(_) => {}
             Instruction::Error(_) => {
-                self.status = Status::Panicked(Value::Text(
+                self.panic(
                     "The VM crashed because there was an error in previous compilation stages."
                         .to_string(),
-                ));
+                );
             }
         }
+    }
+
+    pub fn panic(&mut self, message: String) -> Value {
+        self.status = Status::Panicked(Value::Text(message));
+        Value::Symbol("Never".to_string())
     }
 }

@@ -1,7 +1,12 @@
 use crate::{
     builtin_functions::BuiltinFunction,
-    compiler::hir::{self, Expression},
-    input::Input,
+    compiler::{
+        hir::{self, Expression},
+        hir_to_lir::HirToLir,
+        lir::Instruction,
+    },
+    database::Database,
+    input::{Input, InputDb},
 };
 use im::HashMap;
 use itertools::Itertools;
@@ -35,7 +40,7 @@ impl Vm {
             BuiltinFunction::Equals => self.equals(),
             BuiltinFunction::GetArgumentCount => self.get_argument_count(),
             BuiltinFunction::IfElse => self.if_else(),
-            BuiltinFunction::Panic => self.panic(),
+            BuiltinFunction::Panic => self.panic_builtin(),
             BuiltinFunction::Print => self.print(),
             BuiltinFunction::StructGet => self.struct_get(),
             BuiltinFunction::StructGetKeys => self.struct_get_keys(),
@@ -44,8 +49,8 @@ impl Vm {
             BuiltinFunction::Use => self.use_(),
             _ => panic!("Unhandled builtin function: {:?}", builtin_function),
         };
-        self.stack
-            .push(StackEntry::Object(self.import(return_value)));
+        let return_object = self.import(return_value);
+        self.stack.push(StackEntry::Object(return_object));
     }
 
     fn add(&mut self) -> Value {
@@ -55,53 +60,41 @@ impl Vm {
     }
 
     fn equals(&mut self) -> Value {
-        let b = self.pop_value().unwrap().into_int().unwrap();
-        let a = self.pop_value().unwrap().into_int().unwrap();
+        let b = self.pop_value().unwrap();
+        let a = self.pop_value().unwrap();
         (a == b).into()
     }
 
     fn get_argument_count(&mut self) -> Value {
         let function = self.pop_value().unwrap().into_closure().unwrap();
-        let chunk = self.chunks[function.1];
-        Value::Int(chunk.num_args as u64)
+        let num_args = self.chunks[function.1].num_args;
+        Value::Int(num_args as u64)
     }
 
     fn if_else(&mut self) -> Value {
-        let else_ = self.pop_value().unwrap().into_closure().unwrap();
-        let then = self.pop_value().unwrap().into_closure().unwrap();
+        let else_ = self.pop_value().unwrap();
+        let then = self.pop_value().unwrap();
         let condition = self.pop_value().unwrap().into_symbol().unwrap();
 
-        match &condition {
-            "True" => {}
-            "False" => {}
+        let condition = match condition.as_str() {
+            "True" => true,
+            "False" => false,
+            _ => {
+                return self.panic(format!(
+                    "builtinIfElse expected True or False as a condition, but got {}",
+                    condition
+                ))
+            }
         };
-
-        if let [condition, then, else_] = &arguments[..] {
-            let body_id = match environment.get(condition)? {
-                value if value == Value::bool(true) => then,
-                value if value == Value::bool(false) => else_,
-                value => {
-                    return DiscoverResult::panic(format!(
-                        "Condition must be a boolean, but was {:?}.",
-                        value
-                    ));
-                }
-            };
-
-            run_call(db, import_chain, body_id.to_owned(), vec![], environment)
-        } else {
-            DiscoverResult::panic(format!(
-                "Builtin if/else called with wrong number of arguments: {}, expected: {}",
-                arguments.len(),
-                3
-            ))
-        }
+        let closure_object = self.import(if condition { then } else { else_ });
+        self.stack.push(StackEntry::Object(closure_object));
+        self.run_instruction(Instruction::Call);
+        self.pop_value().unwrap()
     }
 
-    fn panic(&mut self) -> Value {
-        let message = self.pop_value().unwrap();
-        self.status = Status::Panicked(message);
-        Value::nothing()
+    fn panic_builtin(&mut self) -> Value {
+        let message = self.pop_value().unwrap().into_text().unwrap();
+        self.panic(message)
     }
 
     fn print(&mut self) -> Value {
@@ -131,7 +124,7 @@ impl Vm {
     fn struct_has_key(&mut self) -> Value {
         let key = self.pop_value().unwrap();
         let struct_ = self.pop_value().unwrap().into_struct().unwrap();
-        (struct_.contains_key(key)).into()
+        (struct_.contains_key(&key)).into()
     }
 
     fn type_of(&mut self) -> Value {
@@ -141,88 +134,69 @@ impl Vm {
             Value::Text(_) => Value::Symbol("Text".to_owned()).into(),
             Value::Symbol(_) => Value::Symbol("Symbol".to_owned()).into(),
             Value::Struct(_) => Value::Symbol("Struct".to_owned()).into(),
-            Value::Lambda(_) => Value::Symbol("Function".to_owned()).into(),
+            Value::Closure { .. } => Value::Symbol("Function".to_owned()).into(),
         }
     }
 
     fn use_(&mut self) -> Value {
-        destructure!(arguments, [current_path, target], {
-            // `current_path` is set by us and not users, hence we don't have to validate it that strictly.
-            let current_path_struct = match current_path {
-                Value::Struct(value) => value,
-                _ => unreachable!(),
-            };
-            let mut current_path = vec![];
-            let mut index = 0;
-            loop {
-                if let Some(component) = current_path_struct.get(&Value::Int(index)) {
-                    match component {
-                        Value::Text(component) => current_path.push(component.clone()),
-                        _ => unreachable!(),
-                    }
-                } else {
-                    break;
-                }
-                index += 1;
-            }
+        let target = self.pop_value().unwrap().into_text().unwrap();
+        let current_path_struct = self.pop_value().unwrap().into_struct().unwrap();
 
-            let target = match target {
-                Value::Text(value) => value,
-                it => {
-                    return DiscoverResult::panic(format!(
-                        "`use` expected a text as its second parameter, but received: {:?}",
-                        it
-                    ))
-                }
-            };
-            let target = match UseTarget::parse(target) {
-                Ok(target) => target,
-                Err(error) => return DiscoverResult::panic(error),
-            };
+        let mut current_path = vec![];
+        let mut index = 0;
+        while let Some(component) = current_path_struct.get(&Value::Int(index)) {
+            current_path.push(component.clone().into_text().unwrap());
+            index += 1;
+        }
 
-            if target.parent_navigations > current_path.len() {
-                return DiscoverResult::panic("Too many parent navigations.".to_owned());
-            }
+        let target = match UseTarget::parse(&target) {
+            Ok(target) => target,
+            Err(error) => return self.panic(error),
+        };
 
-            let inputs = target.resolve(&current_path[..]);
-            let input = match inputs
-                .iter()
-                .filter(|&it| db.get_input(it.to_owned()).is_some())
-                .next()
-            {
-                Some(target) => target,
-                None => {
-                    return DiscoverResult::panic(format!(
-                        "Target doesn't exist. Checked the following path(s): {}",
-                        inputs.iter().map(|it| format!("{}", it)).join(", ")
-                    ));
-                }
-            };
+        if target.parent_navigations > current_path.len() {
+            return self.panic("Too many parent navigations.".to_string());
+        }
 
-            if import_chain.contains(input) {
-                return DiscoverResult::CircularImport(import_chain.to_owned());
-            }
+        // let inputs = target.resolve(&current_path[..]);
+        // let input = match inputs
+        //     .iter()
+        //     .filter(|&it| db.get_input(it.to_owned()).is_some())
+        //     .next()
+        // {
+        //     Some(target) => target,
+        //     None => {
+        //         return self.panic(format!(
+        //             "Target doesn't exist. Checked the following path(s): {}",
+        //             inputs.iter().map(|it| format!("{}", it)).join(", ")
+        //         ));
+        //     }
+        // };
 
-            let (hir, _) = db.hir(input.clone()).unwrap();
-            let discover_result = db.run_all(input.to_owned(), import_chain.to_owned());
+        Value::Symbol("Used".to_string())
 
-            hir.identifiers
-                .iter()
-                .map(|(id, key)| {
-                    let mut key = key.to_owned();
-                    key.get_mut(0..1).unwrap().make_ascii_uppercase();
-                    let key = Value::Symbol(key.to_owned());
+        // TODO: Continue implementing use.
+        // let (lir, _) = db.lir(input.clone()).unwrap();
+        // TODO: Run LIR.
+        // let discover_result = db.run_all(input.to_owned(), import_chain.to_owned());
 
-                    let value = match discover_result.get(id) {
-                        Some(value) => value.to_owned()?,
-                        None => return DiscoverResult::ErrorInHir,
-                    };
+        // TODO: Put public identifiers into map.
+        // hir.identifiers
+        //     .iter()
+        //     .map(|(id, key)| {
+        //         let mut key = key.to_owned();
+        //         key.get_mut(0..1).unwrap().make_ascii_uppercase();
+        //         let key = Value::Symbol(key.to_owned());
 
-                    DiscoverResult::Value((key, value))
-                })
-                .collect::<DiscoverResult<HashMap<Value, Value>>>()
-                .map(|it| Value::Struct(it))
-        })
+        //         let value = match discover_result.get(id) {
+        //             Some(value) => value.to_owned()?,
+        //             None => return DiscoverResult::ErrorInHir,
+        //         };
+
+        //         DiscoverResult::Value((key, value))
+        //     })
+        //     .collect::<DiscoverResult<HashMap<Value, Value>>>()
+        //     .map(|it| Value::Struct(it))
     }
 }
 struct UseTarget {
@@ -320,6 +294,7 @@ impl StackEntry {
 
 impl Vm {
     fn pop_value(&mut self) -> Option<Value> {
-        Some(self.export(self.stack.pop()?.into_object()?))
+        let address = self.stack.pop()?.into_object()?;
+        Some(self.export(address))
     }
 }
