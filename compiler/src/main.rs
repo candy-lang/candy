@@ -22,7 +22,7 @@ use crate::{
 use compiler::lir::Lir;
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
-use log;
+use log::{debug, error, info, LevelFilter};
 use lspower::{LspService, Server};
 use notify::{watcher, RecursiveMode, Watcher};
 use std::{
@@ -86,19 +86,19 @@ fn build(options: CandyBuildOptions) {
                 Ok(_) => {
                     raw_build(&options.file, options.debug);
                 }
-                Err(e) => log::error!("watch error: {:#?}", e),
+                Err(e) => error!("watch error: {:#?}", e),
             }
         }
     }
 }
 fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
     let path_string = file.to_string_lossy();
-    log::debug!("Building `{}`.", path_string);
+    debug!("Building `{}`.", path_string);
 
     let input: Input = file.clone().into();
     let db = Database::default();
 
-    log::info!("Parsing string to RCST…");
+    info!("Parsing string to RCST…");
     let rcst = db
         .rcst(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
@@ -107,7 +107,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         fs::write(hir_file, format!("{:#?}\n", rcst.clone())).unwrap();
     }
 
-    log::info!("Parsing RCST to CST…");
+    info!("Parsing RCST to CST…");
     let cst = db
         .cst(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
@@ -116,7 +116,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         fs::write(cst_file, format!("{:#?}\n", cst.clone())).unwrap();
     }
 
-    log::info!("Lowering CST to AST…");
+    info!("Lowering CST to AST…");
     let (asts, ast_cst_id_map) = db
         .ast(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
@@ -141,7 +141,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         .unwrap();
     }
 
-    log::info!("Compiling AST to HIR…");
+    info!("Compiling AST to HIR…");
     let (hir, hir_ast_id_map) = db
         .hir(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
@@ -161,7 +161,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         .unwrap();
     }
 
-    log::info!("Compiling HIR to LIR…");
+    info!("Compiling HIR to LIR…");
     let lir = db
         .lir(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
@@ -170,18 +170,13 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         fs::write(lir_file, format!("{}", lir)).unwrap();
     }
 
-    // let reports = analyze((*lambda).clone());
-    // for report in reports {
-    //     log::error!("Report: {:?}", report);
-    // }
-
     Some(lir)
 }
 
 fn run(options: CandyRunOptions) {
     *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
 
-    log::debug!("Running `{}`.\n", options.file.display());
+    debug!("Running `{}`.\n", options.file.display());
 
     let _input: Input = options.file.clone().into();
     let _db = Database::default();
@@ -195,19 +190,21 @@ fn run(options: CandyRunOptions) {
     };
 
     let path_string = options.file.to_string_lossy();
-    log::debug!("Running `{}`.", path_string);
+    debug!("Running `{}`.", path_string);
 
     let mut vm = Vm::new(lir.chunks.clone());
     vm.run(1000);
     match vm.status() {
-        Status::Running => log::info!("VM is still running."),
-        Status::Done(value) => log::info!("VM is done: {:#?}", value),
-        Status::Panicked(value) => log::error!("VM panicked: {:#?}", value),
+        Status::Running => info!("VM is still running."),
+        Status::Done(value) => info!("VM is done: {:#?}", value),
+        Status::Panicked(value) => {
+            error!("VM panicked: {:#?}", value);
+        }
     }
 }
 
 async fn lsp() {
-    log::info!("Starting language server…");
+    info!("Starting language server…");
     let (service, messages) = LspService::new(|client| CandyLanguageServer::from_client(client));
     Server::new(tokio::io::stdin(), tokio::io::stdout())
         .interleave(messages)
@@ -226,10 +223,10 @@ fn init_logger() {
                 message
             ))
         })
-        .level_for("salsa", log::LevelFilter::Error)
-        .level_for("tokio_util", log::LevelFilter::Error)
-        .level_for("lspower::transport", log::LevelFilter::Error)
-        .level_for("candy::compiler::string_to_rcst", log::LevelFilter::Debug)
+        .level_for("salsa", LevelFilter::Error)
+        .level_for("tokio_util", LevelFilter::Error)
+        .level_for("lspower::transport", LevelFilter::Error)
+        .level_for("candy::compiler::string_to_rcst", LevelFilter::Debug)
         .chain(std::io::stderr())
         .apply()
         .unwrap();
