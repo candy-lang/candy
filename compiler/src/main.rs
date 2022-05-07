@@ -12,11 +12,12 @@ mod vm;
 
 use crate::{
     compiler::{
-        ast_to_hir::AstToHir, cst_to_ast::CstToAst, hir, hir_to_lir::HirToLir,
+        ast_to_hir::AstToHir, cst::CstDb, cst_to_ast::CstToAst, hir, hir_to_lir::HirToLir,
         rcst_to_cst::RcstToCst, string_to_rcst::StringToRcst,
     },
     database::{Database, PROJECT_DIRECTORY},
     input::Input,
+    language_server::utils::LspPositionConversion,
     vm::{Status, Vm},
 };
 use compiler::lir::Lir;
@@ -178,8 +179,8 @@ fn run(options: CandyRunOptions) {
 
     debug!("Running `{}`.\n", options.file.display());
 
-    let _input: Input = options.file.clone().into();
-    let _db = Database::default();
+    let input: Input = options.file.clone().into();
+    let db = Database::default();
 
     let lir = match raw_build(&options.file, false) {
         Some(lir) => lir,
@@ -199,6 +200,21 @@ fn run(options: CandyRunOptions) {
         Status::Done(value) => info!("VM is done: {:#?}", value),
         Status::Panicked(value) => {
             error!("VM panicked: {:#?}", value);
+
+            error!("Stack trace:");
+            let (_, hir_to_ast_ids) = db.hir(input.clone()).unwrap();
+            let (_, ast_to_cst_ids) = db.ast(input.clone()).unwrap();
+            for hir_id in vm.current_stack_trace().into_iter().rev() {
+                let ast_id = hir_to_ast_ids[&hir_id].clone();
+                let cst_id = ast_to_cst_ids[&ast_id];
+                let cst = db.find_cst(input.clone(), cst_id);
+                let start = db.offset_to_lsp(input.clone(), cst.span.start);
+                let end = db.offset_to_lsp(input.clone(), cst.span.end);
+                error!(
+                    "{}, {}, {:?}, {}:{} – {}:{}",
+                    hir_id, ast_id, cst_id, start.0, start.1, end.0, end.1
+                );
+            }
         }
     }
 }
