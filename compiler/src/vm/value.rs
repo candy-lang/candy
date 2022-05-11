@@ -1,9 +1,8 @@
-use std::fmt::{self, Display, Formatter};
-
 use super::vm::StackEntry;
 use crate::compiler::lir::ChunkIndex;
 use im::HashMap;
 use itertools::Itertools;
+use std::fmt::{self, Display, Formatter};
 
 /// A self-contained value. Unlike objects, these are not tied to a running VM,
 /// which makes them useful for being sent through channels between multiple

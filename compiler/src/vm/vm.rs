@@ -1,3 +1,7 @@
+use super::{
+    heap::{Heap, ObjectData, ObjectPointer},
+    value::Value,
+};
 use crate::compiler::{
     hir,
     lir::{Chunk, ChunkIndex, Instruction},
@@ -6,17 +10,14 @@ use itertools::Itertools;
 use log::debug;
 use std::collections::HashMap;
 
-use super::value::Value;
-
 /// A VM can execute some byte code.
 pub struct Vm {
     pub(super) chunks: Vec<Chunk>,
     pub(super) status: Status,
     next_instruction: ByteCodePointer,
     pub(super) stack: Vec<StackEntry>,
-    heap: HashMap<ObjectPointer, Object>,
-    next_heap_address: ObjectPointer,
     stack_trace: Vec<hir::Id>,
+    pub(super) heap: Heap,
 }
 
 #[derive(Clone)]
@@ -37,26 +38,6 @@ pub struct ByteCodePointer {
     chunk: ChunkIndex,
     instruction: usize,
 }
-pub type ObjectPointer = usize;
-
-#[derive(Debug, Clone)] // TODO: remove Clone once it's no longer needed
-pub struct Object {
-    reference_count: usize,
-    data: ObjectData,
-}
-#[derive(Clone, Debug)] // TODO: remove Clone once it's no longer needed
-pub enum ObjectData {
-    Int(u64),
-    Text(String),
-    Symbol(String),
-    Struct(HashMap<ObjectPointer, ObjectPointer>),
-    Closure {
-        // TODO: This could later be just a vector of object pointers, but for
-        // now we capture the whole stack.
-        captured: Vec<StackEntry>,
-        body: ChunkIndex,
-    },
-}
 
 impl Vm {
     pub fn new(chunks: Vec<Chunk>) -> Self {
@@ -68,9 +49,8 @@ impl Vm {
                 instruction: 0,
             },
             stack: vec![],
-            heap: HashMap::new(),
-            next_heap_address: 0,
             stack_trace: vec![],
+            heap: Heap::new(),
         }
     }
 
@@ -80,102 +60,6 @@ impl Vm {
 
     fn get_from_stack(&self, offset: usize) -> StackEntry {
         self.stack[self.stack.len() - 1 - offset as usize].clone()
-    }
-    fn get_from_heap(&self, address: ObjectPointer) -> &Object {
-        self.heap.get(&address).unwrap()
-    }
-    fn get_mut_from_heap(&mut self, address: ObjectPointer) -> &mut Object {
-        self.heap.get_mut(&address).unwrap()
-    }
-
-    pub fn create_object(&mut self, object: ObjectData) -> ObjectPointer {
-        let address = self.next_heap_address;
-        self.heap.insert(
-            address,
-            Object {
-                reference_count: 1,
-                data: object,
-            },
-        );
-        self.next_heap_address += 1;
-        address
-    }
-    pub fn free_object(&mut self, address: ObjectPointer) {
-        let object = self.heap.remove(&address).unwrap();
-        assert_eq!(object.reference_count, 0);
-        match object.data {
-            ObjectData::Int(_) => {}
-            ObjectData::Text(_) => {}
-            ObjectData::Symbol(_) => {}
-            ObjectData::Struct(entries) => {
-                for (key, value) in entries {
-                    self.drop(key);
-                    self.drop(value);
-                }
-            }
-            ObjectData::Closure { captured, .. } => {
-                for entry in captured {
-                    if let StackEntry::Object(address) = entry {
-                        self.drop(address);
-                    }
-                }
-            }
-        }
-    }
-
-    fn dup(&mut self, address: ObjectPointer) {
-        self.get_mut_from_heap(address).reference_count += 1;
-    }
-    fn drop(&mut self, address: ObjectPointer) {
-        let object = self.get_mut_from_heap(address);
-        object.reference_count -= 1;
-        if object.reference_count == 0 {
-            self.free_object(address);
-        }
-    }
-
-    pub(super) fn import(&mut self, value: Value) -> ObjectPointer {
-        let value = match value {
-            Value::Int(int) => ObjectData::Int(int),
-            Value::Text(text) => ObjectData::Text(text),
-            Value::Symbol(symbol) => ObjectData::Symbol(symbol),
-            Value::Struct(struct_) => {
-                let mut entries = HashMap::new();
-                for (key, value) in struct_ {
-                    let key = self.import(key);
-                    let value = self.import(value);
-                    entries.insert(key, value);
-                }
-                ObjectData::Struct(entries)
-            }
-            Value::Closure { captured, body } => ObjectData::Closure { captured, body },
-        };
-        self.create_object(value)
-    }
-    pub(super) fn export(&mut self, address: ObjectPointer) -> Value {
-        let value = self.export_helper(address);
-        self.drop(address);
-        value
-    }
-    fn export_helper(&self, address: ObjectPointer) -> Value {
-        match &self.get_from_heap(address).data {
-            ObjectData::Int(int) => Value::Int(*int),
-            ObjectData::Text(text) => Value::Text(text.clone()),
-            ObjectData::Symbol(symbol) => Value::Symbol(symbol.clone()),
-            ObjectData::Struct(struct_) => {
-                let mut entries = im::HashMap::new();
-                for (key, value) in struct_ {
-                    let key = self.export_helper(*key);
-                    let value = self.export_helper(*value);
-                    entries.insert(key, value);
-                }
-                Value::Struct(entries)
-            }
-            ObjectData::Closure { captured, body } => Value::Closure {
-                captured: captured.clone(),
-                body: *body,
-            },
-        }
     }
 
     pub fn run(&mut self, mut num_instructions: u16) {
@@ -191,18 +75,31 @@ impl Vm {
             debug!("Executing instruction: {:?}", &instruction);
             self.next_instruction.instruction += 1;
             self.run_instruction(instruction);
-            debug!(
-                "Stack: {}",
-                self.stack
+
+            {
+                let function_stack = self.stack_trace.clone();
+                let local_data_stack = self
+                    .stack
                     .iter()
-                    .map(|entry| match entry {
-                        StackEntry::ByteCode(byte_code) => {
-                            format!("here#{}:{}", byte_code.chunk, byte_code.instruction)
-                        }
-                        StackEntry::Object(address) => format!("{}", self.export_helper(*address)),
-                    })
-                    .join(", ")
-            );
+                    .rev()
+                    .take_while(|entry| matches!(entry, StackEntry::Object(_)))
+                    .collect_vec()
+                    .into_iter()
+                    .rev()
+                    .collect_vec();
+                debug!(
+                    "Stack: {}{}",
+                    function_stack.into_iter().join("..., "),
+                    local_data_stack
+                        .into_iter()
+                        .map(|entry| match entry {
+                            StackEntry::ByteCode(_) => unreachable!(),
+                            StackEntry::Object(address) =>
+                                format!(", {}", self.heap.export_without_dropping(*address)),
+                        })
+                        .join("")
+                );
+            }
 
             if self.next_instruction.instruction
                 >= self.chunks[self.next_instruction.chunk].instructions.len()
@@ -214,15 +111,15 @@ impl Vm {
     pub fn run_instruction(&mut self, instruction: Instruction) {
         match instruction {
             Instruction::CreateInt(int) => {
-                let address = self.create_object(ObjectData::Int(int));
+                let address = self.heap.create(ObjectData::Int(int));
                 self.stack.push(StackEntry::Object(address));
             }
             Instruction::CreateText(text) => {
-                let address = self.create_object(ObjectData::Text(text));
+                let address = self.heap.create(ObjectData::Text(text));
                 self.stack.push(StackEntry::Object(address));
             }
             Instruction::CreateSymbol(symbol) => {
-                let address = self.create_object(ObjectData::Symbol(symbol));
+                let address = self.heap.create(ObjectData::Symbol(symbol));
                 self.stack.push(StackEntry::Object(address));
             }
             Instruction::CreateStruct { num_entries } => {
@@ -240,7 +137,7 @@ impl Vm {
                     assert_eq!(key_and_value.next(), None);
                     entries.insert(key, value);
                 }
-                let address = self.create_object(ObjectData::Struct(entries));
+                let address = self.heap.create(ObjectData::Struct(entries));
                 self.stack.push(StackEntry::Object(address));
             }
             Instruction::CreateClosure(chunk_index) => {
@@ -249,11 +146,11 @@ impl Vm {
                     match entry {
                         StackEntry::ByteCode(_) => {}
                         StackEntry::Object(address) => {
-                            self.dup(*address);
+                            self.heap.dup(*address);
                         }
                     }
                 }
-                let address = self.create_object(ObjectData::Closure {
+                let address = self.heap.create(ObjectData::Closure {
                     captured: stack,
                     body: chunk_index,
                 });
@@ -263,7 +160,7 @@ impl Vm {
                 let top = self.stack.pop().unwrap();
                 for _ in 0..n {
                     if let StackEntry::Object(address) = self.stack.pop().unwrap() {
-                        self.drop(address);
+                        self.heap.drop(address);
                     }
                 }
                 self.stack.push(top);
@@ -271,7 +168,7 @@ impl Vm {
             Instruction::PushFromStack(offset) => {
                 let entry = self.get_from_stack(offset);
                 if let StackEntry::Object(address) = &entry {
-                    self.dup(*address);
+                    self.heap.dup(*address);
                 }
                 self.stack.push(entry);
             }
@@ -280,7 +177,7 @@ impl Vm {
                     StackEntry::ByteCode(_) => panic!(),
                     StackEntry::Object(address) => address,
                 };
-                let (captured, body) = match &self.get_from_heap(closure_address).data {
+                let (captured, body) = match &self.heap.get(closure_address).data {
                     ObjectData::Closure { captured, body } => (captured.clone(), *body),
                     _ => panic!("Can't call non-closure."),
                 };
@@ -300,7 +197,7 @@ impl Vm {
                 for arg in args {
                     self.stack.push(StackEntry::Object(arg));
                 }
-                self.drop(closure_address);
+                self.heap.drop(closure_address);
                 self.next_instruction = ByteCodePointer {
                     chunk: body,
                     instruction: 0,

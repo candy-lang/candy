@@ -1,3 +1,9 @@
+use super::{
+    heap::{Object, ObjectData, ObjectPointer},
+    value::Value,
+    vm::StackEntry,
+    Status, Vm,
+};
 use crate::{
     builtin_functions::BuiltinFunction,
     compiler::{
@@ -10,12 +16,6 @@ use crate::{
 };
 use im::HashMap;
 use itertools::Itertools;
-
-use super::{
-    value::Value,
-    vm::{Object, ObjectData, ObjectPointer, StackEntry},
-    Status, Vm,
-};
 
 const TRACE_BUILTIN_FUNCTION_CALLS: bool = false;
 
@@ -49,7 +49,7 @@ impl Vm {
             BuiltinFunction::Use => self.use_(),
             _ => panic!("Unhandled builtin function: {:?}", builtin_function),
         };
-        let return_object = self.import(return_value);
+        let return_object = self.heap.import(return_value);
         self.stack.push(StackEntry::Object(return_object));
     }
 
@@ -86,7 +86,7 @@ impl Vm {
                 ))
             }
         };
-        let closure_object = self.import(if condition { then } else { else_ });
+        let closure_object = self.heap.import(if condition { then } else { else_ });
         self.stack.push(StackEntry::Object(closure_object));
         self.run_instruction(Instruction::Call);
         self.pop_value().unwrap()
@@ -295,6 +295,6 @@ impl StackEntry {
 impl Vm {
     fn pop_value(&mut self) -> Option<Value> {
         let address = self.stack.pop()?.into_object()?;
-        Some(self.export(address))
+        Some(self.heap.export(address))
     }
 }
