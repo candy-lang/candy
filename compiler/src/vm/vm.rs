@@ -15,9 +15,10 @@ pub struct Vm {
     pub(super) chunks: Vec<Chunk>,
     pub(super) status: Status,
     next_instruction: ByteCodePointer,
-    pub(super) stack: Vec<StackEntry>,
-    stack_trace: Vec<hir::Id>,
     pub(super) heap: Heap,
+    pub(super) data_stack: Vec<ObjectPointer>,
+    pub(super) function_stack: Vec<ByteCodePointer>,
+    pub(super) debug_stack: Vec<hir::Id>,
 }
 
 #[derive(Clone)]
@@ -27,12 +28,6 @@ pub enum Status {
     Panicked(Value),
 }
 
-/// Stack entries point either to instructions or to objects.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum StackEntry {
-    ByteCode(ByteCodePointer),
-    Object(ObjectPointer),
-}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ByteCodePointer {
     chunk: ChunkIndex,
@@ -48,9 +43,10 @@ impl Vm {
                 chunk: chunks.len() - 1,
                 instruction: 0,
             },
-            stack: vec![],
-            stack_trace: vec![],
             heap: Heap::new(),
+            data_stack: vec![],
+            function_stack: vec![],
+            debug_stack: vec![],
         }
     }
 
@@ -58,8 +54,8 @@ impl Vm {
         self.status.clone()
     }
 
-    fn get_from_stack(&self, offset: usize) -> StackEntry {
-        self.stack[self.stack.len() - 1 - offset as usize].clone()
+    fn get_from_data_stack(&self, offset: usize) -> ObjectPointer {
+        self.data_stack[self.data_stack.len() - 1 - offset as usize].clone()
     }
 
     pub fn run(&mut self, mut num_instructions: u16) {
@@ -76,30 +72,14 @@ impl Vm {
             self.next_instruction.instruction += 1;
             self.run_instruction(instruction);
 
-            {
-                let function_stack = self.stack_trace.clone();
-                let local_data_stack = self
-                    .stack
+            debug!(
+                "Stack: {}{}",
+                self.debug_stack.iter().join("..., "),
+                self.data_stack
                     .iter()
-                    .rev()
-                    .take_while(|entry| matches!(entry, StackEntry::Object(_)))
-                    .collect_vec()
-                    .into_iter()
-                    .rev()
-                    .collect_vec();
-                debug!(
-                    "Stack: {}{}",
-                    function_stack.into_iter().join("..., "),
-                    local_data_stack
-                        .into_iter()
-                        .map(|entry| match entry {
-                            StackEntry::ByteCode(_) => unreachable!(),
-                            StackEntry::Object(address) =>
-                                format!(", {}", self.heap.export_without_dropping(*address)),
-                        })
-                        .join("")
-                );
-            }
+                    .map(|address| format!(", {}", self.heap.export_without_dropping(*address)))
+                    .join("")
+            );
 
             if self.next_instruction.instruction
                 >= self.chunks[self.next_instruction.chunk].instructions.len()
@@ -112,23 +92,20 @@ impl Vm {
         match instruction {
             Instruction::CreateInt(int) => {
                 let address = self.heap.create(ObjectData::Int(int));
-                self.stack.push(StackEntry::Object(address));
+                self.data_stack.push(address);
             }
             Instruction::CreateText(text) => {
                 let address = self.heap.create(ObjectData::Text(text));
-                self.stack.push(StackEntry::Object(address));
+                self.data_stack.push(address);
             }
             Instruction::CreateSymbol(symbol) => {
                 let address = self.heap.create(ObjectData::Symbol(symbol));
-                self.stack.push(StackEntry::Object(address));
+                self.data_stack.push(address);
             }
             Instruction::CreateStruct { num_entries } => {
                 let mut key_value_addresses = vec![];
                 for _ in 0..(2 * num_entries) {
-                    match self.stack.pop().unwrap() {
-                        StackEntry::ByteCode(_) => panic!("Struct can only contain objects."),
-                        StackEntry::Object(address) => key_value_addresses.push(address),
-                    }
+                    key_value_addresses.push(self.data_stack.pop().unwrap());
                 }
                 let mut entries = HashMap::new();
                 for mut key_and_value in &key_value_addresses.into_iter().rev().chunks(2) {
@@ -138,45 +115,34 @@ impl Vm {
                     entries.insert(key, value);
                 }
                 let address = self.heap.create(ObjectData::Struct(entries));
-                self.stack.push(StackEntry::Object(address));
+                self.data_stack.push(address);
             }
             Instruction::CreateClosure(chunk_index) => {
-                let stack = self.stack.clone();
-                for entry in &stack {
-                    match entry {
-                        StackEntry::ByteCode(_) => {}
-                        StackEntry::Object(address) => {
-                            self.heap.dup(*address);
-                        }
-                    }
+                let stack = self.data_stack.clone();
+                for address in &stack {
+                    self.heap.dup(*address);
                 }
                 let address = self.heap.create(ObjectData::Closure {
                     captured: stack,
                     body: chunk_index,
                 });
-                self.stack.push(StackEntry::Object(address));
+                self.data_stack.push(address);
             }
             Instruction::PopMultipleBelowTop(n) => {
-                let top = self.stack.pop().unwrap();
+                let top = self.data_stack.pop().unwrap();
                 for _ in 0..n {
-                    if let StackEntry::Object(address) = self.stack.pop().unwrap() {
-                        self.heap.drop(address);
-                    }
+                    let address = self.data_stack.pop().unwrap();
+                    self.heap.drop(address);
                 }
-                self.stack.push(top);
+                self.data_stack.push(top);
             }
             Instruction::PushFromStack(offset) => {
-                let entry = self.get_from_stack(offset);
-                if let StackEntry::Object(address) = &entry {
-                    self.heap.dup(*address);
-                }
-                self.stack.push(entry);
+                let address = self.get_from_data_stack(offset);
+                self.heap.dup(address);
+                self.data_stack.push(address);
             }
             Instruction::Call => {
-                let closure_address = match self.stack.pop().unwrap() {
-                    StackEntry::ByteCode(_) => panic!(),
-                    StackEntry::Object(address) => address,
-                };
+                let closure_address = self.data_stack.pop().unwrap();
                 let (captured, body) = match &self.heap.get(closure_address).data {
                     ObjectData::Closure { captured, body } => (captured.clone(), *body),
                     _ => panic!("Can't call non-closure."),
@@ -184,19 +150,11 @@ impl Vm {
                 let num_args = self.chunks[body].num_args;
                 let mut args = vec![];
                 for _ in 0..num_args {
-                    let address = match self.stack.pop().unwrap() {
-                        StackEntry::ByteCode(_) => {
-                            panic!("You can only pass objects as arguments.")
-                        }
-                        StackEntry::Object(address) => address,
-                    };
-                    args.push(address);
+                    args.push(self.data_stack.pop().unwrap());
                 }
-                self.stack.push(StackEntry::ByteCode(self.next_instruction));
-                self.stack.append(&mut captured.clone());
-                for arg in args {
-                    self.stack.push(StackEntry::Object(arg));
-                }
+                self.function_stack.push(self.next_instruction);
+                self.data_stack.append(&mut captured.clone());
+                self.data_stack.append(&mut args);
                 self.heap.drop(closure_address);
                 self.next_instruction = ByteCodePointer {
                     chunk: body,
@@ -204,21 +162,16 @@ impl Vm {
                 };
             }
             Instruction::Return => {
-                let return_value = self.stack.pop().unwrap();
-                let caller = match self.stack.pop().unwrap() {
-                    StackEntry::ByteCode(address) => address,
-                    StackEntry::Object(_) => panic!("Return with no caller on stack"),
-                };
-                self.stack.push(return_value);
+                let caller = self.function_stack.pop().unwrap();
                 self.next_instruction = caller;
             }
             Instruction::Builtin(builtin_function) => {
                 self.run_builtin_function(builtin_function);
             }
             Instruction::DebugValueEvaluated(_) => {}
-            Instruction::DebugClosureEntered(hir_id) => self.stack_trace.push(hir_id),
+            Instruction::DebugClosureEntered(hir_id) => self.debug_stack.push(hir_id),
             Instruction::DebugClosureExited => {
-                self.stack_trace.pop().unwrap();
+                self.debug_stack.pop().unwrap();
             }
             Instruction::Error(_) => {
                 self.panic(
@@ -235,6 +188,6 @@ impl Vm {
     }
 
     pub fn current_stack_trace(&self) -> Vec<hir::Id> {
-        self.stack_trace.clone()
+        self.debug_stack.clone()
     }
 }

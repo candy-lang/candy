@@ -1,4 +1,4 @@
-use super::vm::StackEntry;
+use super::heap::ObjectPointer;
 use crate::compiler::lir::ChunkIndex;
 use im::HashMap;
 use itertools::Itertools;
@@ -19,7 +19,7 @@ pub enum Value {
     Symbol(String),
     Struct(HashMap<Value, Value>),
     Closure {
-        captured: Vec<StackEntry>,
+        captured: Vec<ObjectPointer>,
         body: ChunkIndex,
     },
 }
@@ -61,7 +61,7 @@ impl Value {
             _ => None,
         }
     }
-    pub fn into_closure(self) -> Option<(Vec<StackEntry>, ChunkIndex)> {
+    pub fn into_closure(self) -> Option<(Vec<ObjectPointer>, ChunkIndex)> {
         match self {
             Value::Closure { captured, body } => Some((captured, body)),
             _ => None,

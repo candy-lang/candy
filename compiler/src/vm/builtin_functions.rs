@@ -1,7 +1,6 @@
 use super::{
     heap::{Object, ObjectData, ObjectPointer},
     value::Value,
-    vm::StackEntry,
     Status, Vm,
 };
 use crate::{
@@ -50,7 +49,7 @@ impl Vm {
             _ => panic!("Unhandled builtin function: {:?}", builtin_function),
         };
         let return_object = self.heap.import(return_value);
-        self.stack.push(StackEntry::Object(return_object));
+        self.data_stack.push(return_object);
     }
 
     fn add(&mut self) -> Value {
@@ -87,7 +86,7 @@ impl Vm {
             }
         };
         let closure_object = self.heap.import(if condition { then } else { else_ });
-        self.stack.push(StackEntry::Object(closure_object));
+        self.data_stack.push(closure_object);
         self.run_instruction(Instruction::Call);
         self.pop_value().unwrap()
     }
@@ -283,18 +282,9 @@ impl UseTarget {
     }
 }
 
-impl StackEntry {
-    fn into_object(self) -> Option<ObjectPointer> {
-        match self {
-            StackEntry::Object(it) => Some(it),
-            StackEntry::ByteCode(_) => None,
-        }
-    }
-}
-
 impl Vm {
     fn pop_value(&mut self) -> Option<Value> {
-        let address = self.stack.pop()?.into_object()?;
+        let address = self.data_stack.pop()?;
         Some(self.heap.export(address))
     }
 }

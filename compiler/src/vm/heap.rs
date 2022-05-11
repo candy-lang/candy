@@ -1,4 +1,4 @@
-use super::{value::Value, vm::StackEntry};
+use super::value::Value;
 use crate::compiler::lir::ChunkIndex;
 use std::collections::HashMap;
 
@@ -23,7 +23,7 @@ pub enum ObjectData {
     Closure {
         // TODO: This could later be just a vector of object pointers, but for
         // now we capture the whole stack.
-        captured: Vec<StackEntry>,
+        captured: Vec<ObjectPointer>,
         body: ChunkIndex,
     },
 }
@@ -80,10 +80,8 @@ impl Heap {
                 }
             }
             ObjectData::Closure { captured, .. } => {
-                for entry in captured {
-                    if let StackEntry::Object(address) = entry {
-                        self.drop(address);
-                    }
+                for object in captured {
+                    self.drop(object);
                 }
             }
         }
@@ -103,7 +101,10 @@ impl Heap {
                 }
                 ObjectData::Struct(entries)
             }
-            Value::Closure { captured, body } => ObjectData::Closure { captured, body },
+            Value::Closure { captured, body } => {
+                let mut captured = vec![];
+                ObjectData::Closure { captured, body }
+            }
         };
         self.create(value)
     }
