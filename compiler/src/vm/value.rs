@@ -84,8 +84,8 @@ impl Display for Value {
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
             ),
-            Value::Closure { captured, body } => {
-                write!(f, "closure@{}", body)
+            Value::Closure { body, .. } => {
+                write!(f, "{{{}}}", body)
             }
         }
     }
