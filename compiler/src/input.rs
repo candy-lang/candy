@@ -111,7 +111,7 @@ impl Display for Input {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             Input::File(components) => {
-                write!(f, "project-file:")?;
+                write!(f, "~:")?;
                 if let Some(component) = components.first() {
                     write!(f, "{}", component)?;
                 }

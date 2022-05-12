@@ -6,7 +6,7 @@ use super::{
 use crate::{
     builtin_functions::BuiltinFunction,
     compiler::hir::{self, Expression},
-    discover::run::run_call,
+    // discover::run::run_call,
     input::Input,
 };
 use im::HashMap;
@@ -103,7 +103,8 @@ fn if_else(
             }
         };
 
-        run_call(db, import_chain, body_id.to_owned(), vec![], environment)
+        todo!()
+        // run_call(db, import_chain, body_id.to_owned(), vec![], environment)
     } else {
         DiscoverResult::panic(format!(
             "Builtin if/else called with wrong number of arguments: {}, expected: {}",
@@ -230,7 +231,7 @@ fn use_(db: &dyn Discover, import_chain: &[Input], arguments: Vec<Value>) -> Dis
         }
 
         let (hir, _) = db.hir(input.clone()).unwrap();
-        let discover_result = db.run_all(input.to_owned(), import_chain.to_owned());
+        let discover_result: HashMap<hir::Id, DiscoverResult> = todo!(); // db.run_all(input.to_owned(), import_chain.to_owned());
 
         hir.identifiers
             .iter()

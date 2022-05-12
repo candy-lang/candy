@@ -3,10 +3,7 @@ use crate::input::Input;
 use im::HashMap;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
-use std::{
-    fmt::{self, Display, Formatter},
-    ops::Add,
-};
+use std::fmt::{self, Display, Formatter};
 
 #[salsa::query_group(HirDbStorage)]
 pub trait HirDb: AstToHir {
@@ -69,47 +66,30 @@ impl Body {
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub struct Id {
     pub input: Input,
-    pub local: Vec<usize>,
+    pub keys: Vec<String>,
 }
 impl Id {
-    pub fn new(input: Input, local: Vec<usize>) -> Self {
-        Self { input, local }
+    pub fn new(input: Input, keys: Vec<String>) -> Self {
+        Self { input, keys }
     }
 
     pub fn is_root(&self) -> bool {
-        self.local.is_empty()
+        self.keys.is_empty()
     }
 
     pub fn parent(&self) -> Option<Id> {
-        match self.local.len() {
+        match self.keys.len() {
             0 => None,
             _ => Some(Id {
                 input: self.input.clone(),
-                local: self.local[..self.local.len() - 1].to_vec(),
+                keys: self.keys[..self.keys.len() - 1].to_vec(),
             }),
-        }
-    }
-}
-impl Add<usize> for Id {
-    type Output = Self;
-
-    fn add(self, rhs: usize) -> Self::Output {
-        let mut local = self.local[..self.local.len() - 1].to_vec();
-        local.push(self.local.last().unwrap() + rhs);
-        Id {
-            input: self.input,
-            local: local,
         }
     }
 }
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
-            f,
-            "HirId({}:{})",
-            self.input,
-            self.local.iter().map(|id| format!("{}", id)).join(":")
-        )
+        write!(f, "HirId({}:{})", self.input, self.keys.iter().join(":"))
     }
 }
 
@@ -133,14 +113,13 @@ pub enum Expression {
 }
 impl Expression {
     pub fn nothing() -> Self {
-        Expression::Symbol("Nothing".to_owned())
+        Expression::Symbol("Nothing".to_string())
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Lambda {
-    pub first_id: Id,
-    pub parameters: Vec<String>,
+    pub parameters: Vec<Id>,
     pub body: Body,
 }
 
@@ -243,7 +222,14 @@ impl fmt::Display for Expression {
 }
 impl fmt::Display for Lambda {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} ->\n", self.parameters.join(" "),)?;
+        write!(
+            f,
+            "{} ->\n",
+            self.parameters
+                .iter()
+                .map(|parameter| format!("{}", parameter))
+                .join(" "),
+        )?;
         write!(f, "{}", self.body)?;
         Ok(())
     }
@@ -279,8 +265,8 @@ impl Body {
         } else {
             self.expressions
                 .iter()
-                .filter(|(key, _)| key <= &id)
-                .max_by_key(|(key, _)| key.local.to_owned())?
+                .filter(|(it, _)| it <= &id)
+                .max_by_key(|(id, _)| id.keys.to_owned())?
                 .1
                 .find(id)
         }

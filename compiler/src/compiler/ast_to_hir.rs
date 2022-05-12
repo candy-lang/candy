@@ -70,26 +70,26 @@ struct Compiler<'c> {
     context: &'c Context<'c>,
     id_mapping: HashMap<hir::Id, ast::Id>,
     body: Body,
-    parent_ids: Vec<usize>,
-    next_id: usize,
+    parent_keys: Vec<String>,
     identifiers: HashMap<String, hir::Id>,
 }
 impl<'c> Compiler<'c> {
     fn new(context: &'c Context<'c>) -> Self {
         let builtin_identifiers = builtin_functions::VALUES
             .iter()
-            .enumerate()
-            .map(|(index, builtin_function)| {
+            .map(|builtin_function| {
                 let string = format!("builtin{:?}", builtin_function);
-                (string, hir::Id::new(context.input.clone(), vec![index]))
+                (
+                    string.clone(),
+                    hir::Id::new(context.input.clone(), vec![string]),
+                )
             })
             .collect::<HashMap<_, _>>();
 
         let mut compiler = Compiler {
             context,
             id_mapping: HashMap::new(),
-            parent_ids: vec![],
-            next_id: builtin_identifiers.len(),
+            parent_keys: vec![],
             body: Body::new(),
             identifiers: builtin_identifiers,
         };
@@ -102,22 +102,20 @@ impl<'c> Compiler<'c> {
             context: &mut self.context,
             id_mapping: self.id_mapping.clone(),
             body: Body::new(),
-            parent_ids: add_ids(&self.parent_ids, self.next_id),
-            next_id: 0,
+            parent_keys: add_keys(&self.parent_keys, "use".to_string()),
             identifiers: self.identifiers.clone(),
         };
 
-        let lambda_id = add_ids(&assignment_inner.parent_ids, assignment_inner.next_id);
+        let lambda_keys = add_keys(&assignment_inner.parent_keys, "0".to_string());
         let lambda_parameter_id = hir::Id::new(
             assignment_inner.context.input.clone(),
-            add_ids(&lambda_id[..], 0),
+            add_keys(&lambda_keys[..], "target".to_string()),
         );
         let mut lambda_inner = Compiler::<'c> {
             context: &mut assignment_inner.context,
             id_mapping: assignment_inner.id_mapping.clone(),
             body: Body::new(),
-            parent_ids: lambda_id.clone(),
-            next_id: 1, // one parameter
+            parent_keys: lambda_keys.clone(),
             identifiers: assignment_inner.identifiers.clone(),
         };
 
@@ -149,7 +147,7 @@ impl<'c> Compiler<'c> {
             Input::ExternalFile(_) => {
                 let message_id = lambda_inner.push_without_ast_mapping(
                     Expression::Text(
-                        "File doesn't belong to the currently opened project.".to_owned(),
+                        "File doesn't belong to the currently opened project.".to_string(),
                     ),
                     None,
                 );
@@ -163,7 +161,7 @@ impl<'c> Compiler<'c> {
             }
             Input::Untitled(_) => {
                 let message_id = lambda_inner.push_without_ast_mapping(
-                    Expression::Text("Untitled files can't call `use`.".to_owned()),
+                    Expression::Text("Untitled files can't call `use`.".to_string()),
                     None,
                 );
                 lambda_inner.push_without_ast_mapping(
@@ -179,8 +177,10 @@ impl<'c> Compiler<'c> {
         assignment_inner.id_mapping = lambda_inner.id_mapping;
         assignment_inner.push_without_ast_mapping(
             Expression::Lambda(Lambda {
-                first_id: lambda_parameter_id,
-                parameters: vec!["target".to_owned()],
+                parameters: vec![hir::Id::new(
+                    self.context.input.clone(),
+                    vec!["use".to_string(), "0".to_string(), "target".to_string()],
+                )],
                 body: lambda_inner.body,
             }),
             None,
@@ -190,7 +190,7 @@ impl<'c> Compiler<'c> {
 
         self.push_without_ast_mapping(
             Expression::Body(assignment_inner.body),
-            Some("use".to_owned()),
+            Some("use".to_string()),
         );
     }
 
@@ -258,38 +258,41 @@ impl<'c> Compiler<'c> {
                 body: body_asts,
             }) => {
                 let mut body = Body::new();
-                let lambda_id = add_ids(&self.parent_ids, self.next_id);
+                let lambda_id = self.create_next_id(ast.id.clone(), None);
                 let mut identifiers = self.identifiers.clone();
 
-                for (parameter_index, parameter) in parameters.iter().enumerate() {
+                for parameter in parameters.iter() {
+                    let name = parameter.value.to_string();
                     let id = hir::Id::new(
                         self.context.input.clone(),
-                        add_ids(&lambda_id, parameter_index),
+                        add_keys(&lambda_id.keys, name.clone()),
                     );
                     self.id_mapping.insert(id.clone(), parameter.id.clone());
-                    body.identifiers
-                        .insert(id.to_owned(), parameter.value.to_owned());
-                    identifiers.insert(parameter.value.to_owned(), id);
+                    body.identifiers.insert(id.clone(), name.clone());
+                    identifiers.insert(name, id);
                 }
                 let mut inner = Compiler::<'c> {
                     context: &mut self.context,
                     id_mapping: self.id_mapping.clone(),
                     body,
-                    parent_ids: lambda_id.to_owned(),
-                    next_id: parameters.len(),
+                    parent_keys: lambda_id.keys.clone(),
                     identifiers,
                 };
 
                 inner.compile(&body_asts);
                 self.id_mapping = inner.id_mapping;
-                self.push(
-                    ast.id.clone(),
+                self.push_with_existing_id(
+                    lambda_id.clone(),
                     Expression::Lambda(Lambda {
-                        first_id: hir::Id::new(
-                            self.context.input.clone(),
-                            add_ids(&lambda_id[..], 0),
-                        ),
-                        parameters: parameters.iter().map(|it| it.value.to_owned()).collect(),
+                        parameters: parameters
+                            .iter()
+                            .map(|parameter| {
+                                hir::Id::new(
+                                    self.context.input.clone(),
+                                    add_keys(&lambda_id.keys[..], parameter.value.to_string()),
+                                )
+                            })
+                            .collect(),
                         body: inner.body,
                     }),
                     None,
@@ -330,21 +333,17 @@ impl<'c> Compiler<'c> {
                 )
             }
             AstKind::Assignment(Assignment { name, body }) => {
+                let name = name.value.to_owned();
                 let mut inner = Compiler::<'c> {
                     context: &mut self.context,
                     id_mapping: self.id_mapping.clone(),
                     body: Body::new(),
-                    parent_ids: add_ids(&self.parent_ids, self.next_id),
-                    next_id: 0,
+                    parent_keys: add_keys(&self.parent_keys, name.clone()),
                     identifiers: self.identifiers.clone(),
                 };
                 inner.compile(&body);
                 self.id_mapping = inner.id_mapping;
-                self.push(
-                    ast.id.clone(),
-                    Expression::Body(inner.body),
-                    Some(name.value.to_owned()),
-                )
+                self.push(ast.id.clone(), Expression::Body(inner.body), Some(name))
             }
             AstKind::Error { child, errors } => {
                 let child = if let Some(child) = child {
@@ -370,19 +369,23 @@ impl<'c> Compiler<'c> {
         expression: Expression,
         identifier: Option<String>,
     ) -> hir::Id {
-        let id = self.create_next_id(ast_id);
-        self.body.push(id.clone(), expression, identifier.clone());
-        if let Some(identifier) = identifier {
-            self.identifiers.insert(identifier, id.clone());
-        }
-        id
+        let id = self.create_next_id(ast_id, identifier.clone());
+        self.push_with_existing_id(id, expression, identifier)
     }
     fn push_without_ast_mapping(
         &mut self,
         expression: Expression,
         identifier: Option<String>,
     ) -> hir::Id {
-        let id = self.create_next_id_without_ast_mapping();
+        let id = self.create_next_id_without_ast_mapping(identifier.clone());
+        self.push_with_existing_id(id, expression, identifier)
+    }
+    fn push_with_existing_id(
+        &mut self,
+        id: hir::Id,
+        expression: Expression,
+        identifier: Option<String>,
+    ) -> hir::Id {
         self.body.push(id.to_owned(), expression, None);
         if let Some(identifier) = identifier {
             self.identifiers.insert(identifier, id.clone());
@@ -390,21 +393,39 @@ impl<'c> Compiler<'c> {
         id
     }
 
-    fn create_next_id(&mut self, ast_id: ast::Id) -> hir::Id {
-        let id = self.create_next_id_without_ast_mapping();
+    fn create_next_id(&mut self, ast_id: ast::Id, key: Option<String>) -> hir::Id {
+        let id = self.create_next_id_without_ast_mapping(key);
         assert!(self.id_mapping.insert(id.to_owned(), ast_id).is_none());
         id
     }
-    fn create_next_id_without_ast_mapping(&mut self) -> hir::Id {
-        let id = hir::Id::new(
-            self.context.input.clone(),
-            add_ids(&self.parent_ids, self.next_id),
-        );
-        self.next_id += 1;
-        id
+    fn create_next_id_without_ast_mapping(&mut self, key: Option<String>) -> hir::Id {
+        for disambiguator in 0.. {
+            let last_part = if let Some(key) = &key {
+                let disambiguator = if disambiguator == 0 {
+                    "".to_string()
+                } else {
+                    format!("${}", disambiguator - 1)
+                };
+                format!("{}{}", key, disambiguator)
+            } else {
+                format!("{}", disambiguator)
+            };
+            let id = hir::Id::new(
+                self.context.input.clone(),
+                add_keys(&self.parent_keys, last_part),
+            );
+            if !self.id_mapping.contains_key(&id) {
+                return id;
+            }
+        }
+        unreachable!()
     }
 }
 
-fn add_ids(parents: &[usize], id: usize) -> Vec<usize> {
-    parents.iter().map(|it| *it).chain(vec![id]).collect()
+fn add_keys(parents: &[String], id: String) -> Vec<String> {
+    parents
+        .iter()
+        .map(|it| it.to_string())
+        .chain(vec![id])
+        .collect()
 }

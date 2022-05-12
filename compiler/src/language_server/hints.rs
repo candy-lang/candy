@@ -11,6 +11,7 @@ use crate::{
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Hint {
@@ -45,7 +46,7 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
     log::debug!("Calculating hints for {}", input);
 
     let (hir, _) = db.hir(input.clone()).unwrap();
-    let discover_results = db.run_all(input.clone(), vec![]);
+    let discover_results: HashMap<hir::Id, DiscoverResult> = HashMap::new(); // db.run_all(input.clone(), vec![]);
 
     collect_hir_ids_for_hints_list(db, hir.expressions.keys().cloned().collect())
         .into_iter()
@@ -81,11 +82,13 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
                 .offset_to_lsp(input.clone(), last_characer_of_line)
                 .to_position();
 
-            Some(Hint {
-                kind,
-                text: format!(" # {}", db.value_to_display_string(value.to_owned())),
-                position,
-            })
+            None as Option<Hint>
+            // TODO: Include more hints
+            // Some(Hint {
+            //     kind,
+            //     text: format!(" # {}", db.value_to_display_string(value.to_owned())),
+            //     position,
+            // })
         })
         // If multiple hints are on the same line, only show the last one.
         .group_by(|hint| hint.position.line)

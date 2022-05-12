@@ -86,8 +86,8 @@ impl LoweringContext {
                     stack: captured_stack.clone(),
                     instructions: vec![],
                 };
-                for i in 0..lambda.parameters.len() {
-                    lambda_context.stack.push(lambda.first_id.clone() + i);
+                for parameter in &lambda.parameters {
+                    lambda_context.stack.push(parameter.clone());
                 }
                 lambda_context.emit_debug_closure_entered(id.clone());
                 lambda_context.compile_body(&lambda.body);
@@ -112,10 +112,12 @@ impl LoweringContext {
                 function,
                 arguments,
             } => {
-                let builtin_function = if let &[builtin_function_index] = &function.local[..] {
+                let builtin_function = if let [name] = &function.keys[..] {
                     crate::builtin_functions::VALUES
-                        .get(builtin_function_index)
+                        .iter()
+                        .filter(|it| format!("builtin{:?}", it) == *name)
                         .map(|it| *it)
+                        .next()
                 } else {
                     None
                 };
