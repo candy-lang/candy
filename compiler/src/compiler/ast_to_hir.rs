@@ -98,6 +98,18 @@ impl<'c> Compiler<'c> {
     }
 
     fn generate_use(&mut self) {
+        // HirId(project-file:test.candy:11) = body {
+        //   HirId(project-file:test.candy:11:0) = lambda { target ->
+        //     HirId(project-file:test.candy:11:0:1) = int 0
+        //     HirId(project-file:test.candy:11:0:2) = text "test.candy"
+        //     HirId(project-file:test.candy:11:0:3) = struct [
+        //       HirId(project-file:test.candy:11:0:1): HirId(project-file:test.candy:11:0:2),
+        //     ]
+        //     HirId(project-file:test.candy:11:0:4) = call HirId(project-file:test.candy:10) with these arguments:
+        //       HirId(project-file:test.candy:11:0:3)
+        //       HirId(project-file:test.candy:11:0:0)
+        //   }
+        // }
         let mut assignment_inner = Compiler::<'c> {
             context: &mut self.context,
             id_mapping: self.id_mapping.clone(),
@@ -127,21 +139,27 @@ impl<'c> Compiler<'c> {
                     .enumerate()
                     .map(|(index, it)| {
                         (
-                            lambda_inner
-                                .push_without_ast_mapping(Expression::Int(index as u64), None),
-                            lambda_inner
-                                .push_without_ast_mapping(Expression::Text(it.to_owned()), None),
+                            lambda_inner.push_without_ast_mapping(
+                                Expression::Int(index as u64),
+                                Some("key".to_string()),
+                            ),
+                            lambda_inner.push_without_ast_mapping(
+                                Expression::Text(it.to_owned()),
+                                Some("value".to_string()),
+                            ),
                         )
                     })
                     .collect();
-                let current_path = lambda_inner
-                    .push_without_ast_mapping(Expression::Struct(current_path_content), None);
+                let current_path = lambda_inner.push_without_ast_mapping(
+                    Expression::Struct(current_path_content),
+                    Some("currentPath".to_string()),
+                );
                 lambda_inner.push_without_ast_mapping(
                     Expression::Call {
                         function: lambda_inner.identifiers["builtinUse"].clone(),
                         arguments: vec![current_path, lambda_parameter_id.clone()],
                     },
-                    None,
+                    Some("module".to_string()),
                 );
             }
             Input::ExternalFile(_) => {
@@ -149,27 +167,27 @@ impl<'c> Compiler<'c> {
                     Expression::Text(
                         "File doesn't belong to the currently opened project.".to_string(),
                     ),
-                    None,
+                    Some("message".to_string()),
                 );
                 lambda_inner.push_without_ast_mapping(
                     Expression::Call {
                         function: panic_id,
                         arguments: vec![message_id],
                     },
-                    None,
+                    Some("panicked".to_string()),
                 );
             }
             Input::Untitled(_) => {
                 let message_id = lambda_inner.push_without_ast_mapping(
                     Expression::Text("Untitled files can't call `use`.".to_string()),
-                    None,
+                    Some("message".to_string()),
                 );
                 lambda_inner.push_without_ast_mapping(
                     Expression::Call {
                         function: panic_id,
                         arguments: vec![message_id],
                     },
-                    None,
+                    Some("panicked".to_string()),
                 );
             }
         }
@@ -177,10 +195,7 @@ impl<'c> Compiler<'c> {
         assignment_inner.id_mapping = lambda_inner.id_mapping;
         assignment_inner.push_without_ast_mapping(
             Expression::Lambda(Lambda {
-                parameters: vec![hir::Id::new(
-                    self.context.input.clone(),
-                    vec!["use".to_string(), "0".to_string(), "target".to_string()],
-                )],
+                parameters: vec![lambda_parameter_id],
                 body: lambda_inner.body,
             }),
             None,
@@ -386,7 +401,8 @@ impl<'c> Compiler<'c> {
         expression: Expression,
         identifier: Option<String>,
     ) -> hir::Id {
-        self.body.push(id.to_owned(), expression, None);
+        self.body
+            .push(id.to_owned(), expression, identifier.clone());
         if let Some(identifier) = identifier {
             self.identifiers.insert(identifier, id.clone());
         }
