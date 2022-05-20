@@ -185,7 +185,7 @@ fn run(options: CandyRunOptions) {
     let lir = match raw_build(&options.file, false) {
         Some(lir) => lir,
         None => {
-            println!("Build failed.");
+            log::info!("Build failed.");
             return;
         }
     };
