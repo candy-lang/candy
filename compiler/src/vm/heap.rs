@@ -2,6 +2,7 @@ use super::value::Value;
 use crate::compiler::lir::ChunkIndex;
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct Heap {
     objects: HashMap<ObjectPointer, Object>,
     next_address: ObjectPointer,
@@ -37,10 +38,14 @@ impl Heap {
     }
 
     pub fn get(&self, address: ObjectPointer) -> &Object {
-        self.objects.get(&address).unwrap()
+        self.objects
+            .get(&address)
+            .expect(&format!("Couldn't get object {}.", address))
     }
     pub fn get_mut(&mut self, address: ObjectPointer) -> &mut Object {
-        self.objects.get_mut(&address).unwrap()
+        self.objects
+            .get_mut(&address)
+            .expect(&format!("Couldn't get object {}.", address))
     }
 
     pub fn dup(&mut self, address: ObjectPointer) {
