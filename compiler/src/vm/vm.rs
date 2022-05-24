@@ -73,12 +73,11 @@ impl Vm {
             self.run_instruction(instruction);
 
             debug!(
-                "Stack: {}{}",
-                self.debug_stack.iter().join("..., "),
+                "Stack: {}",
                 self.data_stack
                     .iter()
-                    .map(|address| format!(", {}", self.heap.export_without_dropping(*address)))
-                    .join("")
+                    .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
+                    .join(", ")
             );
 
             if self.next_instruction.instruction
@@ -154,6 +153,9 @@ impl Vm {
                 }
                 self.function_stack.push(self.next_instruction);
                 self.data_stack.append(&mut captured.clone());
+                for captured in captured {
+                    self.heap.dup(captured);
+                }
                 self.data_stack.append(&mut args);
                 self.heap.drop(closure_address);
                 self.next_instruction = ByteCodePointer {
