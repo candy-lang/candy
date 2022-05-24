@@ -58,7 +58,18 @@ fn hir(db: &dyn AstToHir, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, a
     };
     let mut compiler = Compiler::new(&mut context);
     compiler.compile(&ast);
-    Some((Arc::new(compiler.body), compiler.id_mapping))
+    let id_mapping_of_existing_ids = compiler
+        .id_mapping
+        .into_iter()
+        .filter_map(|(key, value)| {
+            if let Some(value) = value {
+                Some((key, value))
+            } else {
+                None
+            }
+        })
+        .collect();
+    Some((Arc::new(compiler.body), id_mapping_of_existing_ids))
 }
 
 struct Context<'c> {
@@ -68,7 +79,7 @@ struct Context<'c> {
 
 struct Compiler<'c> {
     context: &'c Context<'c>,
-    id_mapping: HashMap<hir::Id, ast::Id>,
+    id_mapping: HashMap<hir::Id, Option<ast::Id>>,
     body: Body,
     parent_keys: Vec<String>,
     identifiers: HashMap<String, hir::Id>,
@@ -127,16 +138,28 @@ impl<'c> Compiler<'c> {
                     .enumerate()
                     .map(|(index, it)| {
                         (
-                            lambda_inner
-                                .push_without_ast_mapping(Expression::Int(index as u64), None),
-                            lambda_inner
-                                .push_without_ast_mapping(Expression::Text(it.to_owned()), None),
+                            lambda_inner.push(
+                                None,
+                                Expression::Int(index as u64),
+                                // Some("key".to_string()),
+                                None,
+                            ),
+                            lambda_inner.push(
+                                None,
+                                Expression::Text(it.to_owned()),
+                                // Some("raw_path".to_string()),
+                                None,
+                            ),
                         )
                     })
                     .collect();
-                let current_path = lambda_inner
-                    .push_without_ast_mapping(Expression::Struct(current_path_content), None);
-                lambda_inner.push_without_ast_mapping(
+                let current_path = lambda_inner.push(
+                    None,
+                    Expression::Struct(current_path_content),
+                    Some("path".to_string()),
+                );
+                lambda_inner.push(
+                    None,
                     Expression::Call {
                         function: lambda_inner.identifiers["builtinUse"].clone(),
                         arguments: vec![current_path, lambda_parameter_id.clone()],
@@ -145,13 +168,15 @@ impl<'c> Compiler<'c> {
                 );
             }
             Input::ExternalFile(_) => {
-                let message_id = lambda_inner.push_without_ast_mapping(
+                let message_id = lambda_inner.push(
+                    None,
                     Expression::Text(
                         "File doesn't belong to the currently opened project.".to_string(),
                     ),
                     None,
                 );
-                lambda_inner.push_without_ast_mapping(
+                lambda_inner.push(
+                    None,
                     Expression::Call {
                         function: panic_id,
                         arguments: vec![message_id],
@@ -160,11 +185,13 @@ impl<'c> Compiler<'c> {
                 );
             }
             Input::Untitled(_) => {
-                let message_id = lambda_inner.push_without_ast_mapping(
+                let message_id = lambda_inner.push(
+                    None,
                     Expression::Text("Untitled files can't call `use`.".to_string()),
                     None,
                 );
-                lambda_inner.push_without_ast_mapping(
+                lambda_inner.push(
+                    None,
                     Expression::Call {
                         function: panic_id,
                         arguments: vec![message_id],
@@ -175,7 +202,8 @@ impl<'c> Compiler<'c> {
         }
 
         assignment_inner.id_mapping = lambda_inner.id_mapping;
-        assignment_inner.push_without_ast_mapping(
+        assignment_inner.push(
+            None,
             Expression::Lambda(Lambda {
                 parameters: vec![hir::Id::new(
                     self.context.input.clone(),
@@ -188,7 +216,8 @@ impl<'c> Compiler<'c> {
 
         self.id_mapping = assignment_inner.id_mapping;
 
-        self.push_without_ast_mapping(
+        self.push(
+            None,
             Expression::Body(assignment_inner.body),
             Some("use".to_string()),
         );
@@ -196,7 +225,7 @@ impl<'c> Compiler<'c> {
 
     fn compile(&mut self, asts: &[Ast]) {
         if asts.is_empty() {
-            self.push_without_ast_mapping(Expression::nothing(), None);
+            self.push(None, Expression::nothing(), None);
         } else {
             for ast in asts.into_iter() {
                 self.compile_single(ast);
@@ -206,10 +235,10 @@ impl<'c> Compiler<'c> {
     fn compile_single(&mut self, ast: &Ast) -> hir::Id {
         match &ast.kind {
             AstKind::Int(Int(int)) => {
-                self.push(ast.id.clone(), Expression::Int(int.to_owned()), None)
+                self.push(Some(ast.id.clone()), Expression::Int(int.to_owned()), None)
             }
             AstKind::Text(Text(string)) => self.push(
-                ast.id.clone(),
+                Some(ast.id.clone()),
                 Expression::Text(string.value.to_owned()),
                 None,
             ),
@@ -218,7 +247,7 @@ impl<'c> Compiler<'c> {
                     Some(reference) => reference.to_owned(),
                     None => {
                         return self.push(
-                            symbol.id.clone(),
+                            Some(symbol.id.clone()),
                             Expression::Error {
                                 child: None,
                                 errors: vec![CompilerError {
@@ -236,13 +265,13 @@ impl<'c> Compiler<'c> {
                     }
                 };
                 self.push(
-                    ast.id.clone(),
+                    Some(ast.id.clone()),
                     Expression::Reference(reference.to_owned()),
                     None,
                 )
             }
             AstKind::Symbol(Symbol(symbol)) => self.push(
-                ast.id.clone(),
+                Some(ast.id.clone()),
                 Expression::Symbol(symbol.value.to_owned()),
                 None,
             ),
@@ -251,14 +280,14 @@ impl<'c> Compiler<'c> {
                     .iter()
                     .map(|(key, value)| (self.compile_single(key), self.compile_single(value)))
                     .collect();
-                self.push(ast.id.clone(), Expression::Struct(fields), None)
+                self.push(Some(ast.id.clone()), Expression::Struct(fields), None)
             }
             AstKind::Lambda(ast::Lambda {
                 parameters,
                 body: body_asts,
             }) => {
                 let mut body = Body::new();
-                let lambda_id = self.create_next_id(ast.id.clone(), None);
+                let lambda_id = self.create_next_id(Some(ast.id.clone()), None);
                 let mut identifiers = self.identifiers.clone();
 
                 for parameter in parameters.iter() {
@@ -267,7 +296,8 @@ impl<'c> Compiler<'c> {
                         self.context.input.clone(),
                         add_keys(&lambda_id.keys, name.clone()),
                     );
-                    self.id_mapping.insert(id.clone(), parameter.id.clone());
+                    self.id_mapping
+                        .insert(id.clone(), Some(parameter.id.clone()));
                     body.identifiers.insert(id.clone(), name.clone());
                     identifiers.insert(name, id);
                 }
@@ -308,7 +338,7 @@ impl<'c> Compiler<'c> {
                     Some(function) => function.to_owned(),
                     None => {
                         return self.push(
-                            name.id.clone(),
+                            Some(name.id.clone()),
                             Expression::Error {
                                 child: None,
                                 errors: vec![CompilerError {
@@ -324,7 +354,7 @@ impl<'c> Compiler<'c> {
                     }
                 };
                 self.push(
-                    ast.id.clone(),
+                    Some(ast.id.clone()),
                     Expression::Call {
                         function,
                         arguments,
@@ -343,7 +373,11 @@ impl<'c> Compiler<'c> {
                 };
                 inner.compile(&body);
                 self.id_mapping = inner.id_mapping;
-                self.push(ast.id.clone(), Expression::Body(inner.body), Some(name))
+                self.push(
+                    Some(ast.id.clone()),
+                    Expression::Body(inner.body),
+                    Some(name),
+                )
             }
             AstKind::Error { child, errors } => {
                 let child = if let Some(child) = child {
@@ -352,7 +386,7 @@ impl<'c> Compiler<'c> {
                     None
                 };
                 self.push(
-                    ast.id.clone(),
+                    Some(ast.id.clone()),
                     Expression::Error {
                         child,
                         errors: errors.clone(),
@@ -365,19 +399,11 @@ impl<'c> Compiler<'c> {
 
     fn push(
         &mut self,
-        ast_id: ast::Id,
+        ast_id: Option<ast::Id>,
         expression: Expression,
         identifier: Option<String>,
     ) -> hir::Id {
         let id = self.create_next_id(ast_id, identifier.clone());
-        self.push_with_existing_id(id, expression, identifier)
-    }
-    fn push_without_ast_mapping(
-        &mut self,
-        expression: Expression,
-        identifier: Option<String>,
-    ) -> hir::Id {
-        let id = self.create_next_id_without_ast_mapping(identifier.clone());
         self.push_with_existing_id(id, expression, identifier)
     }
     fn push_with_existing_id(
@@ -386,27 +412,22 @@ impl<'c> Compiler<'c> {
         expression: Expression,
         identifier: Option<String>,
     ) -> hir::Id {
-        self.body.push(id.to_owned(), expression, None);
+        self.body
+            .push(id.to_owned(), expression, identifier.clone());
         if let Some(identifier) = identifier {
             self.identifiers.insert(identifier, id.clone());
         }
         id
     }
 
-    fn create_next_id(&mut self, ast_id: ast::Id, key: Option<String>) -> hir::Id {
-        let id = self.create_next_id_without_ast_mapping(key);
-        assert!(self.id_mapping.insert(id.to_owned(), ast_id).is_none());
-        id
-    }
-    fn create_next_id_without_ast_mapping(&mut self, key: Option<String>) -> hir::Id {
+    fn create_next_id(&mut self, ast_id: Option<ast::Id>, key: Option<String>) -> hir::Id {
         for disambiguator in 0.. {
             let last_part = if let Some(key) = &key {
-                let disambiguator = if disambiguator == 0 {
-                    "".to_string()
+                if disambiguator == 0 {
+                    key.to_string()
                 } else {
-                    format!("${}", disambiguator - 1)
-                };
-                format!("{}{}", key, disambiguator)
+                    format!("{}${}", key, disambiguator - 1)
+                }
             } else {
                 format!("{}", disambiguator)
             };
@@ -415,6 +436,7 @@ impl<'c> Compiler<'c> {
                 add_keys(&self.parent_keys, last_part),
             );
             if !self.id_mapping.contains_key(&id) {
+                self.id_mapping.insert(id.to_owned(), ast_id).is_none();
                 return id;
             }
         }
