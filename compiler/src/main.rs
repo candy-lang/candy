@@ -108,7 +108,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         fs::write(hir_file, format!("{:#?}\n", rcst.clone())).unwrap();
     }
 
-    info!("Parsing RCST to CST…");
+    info!("Turning RCST to CST…");
     let cst = db
         .cst(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
@@ -117,7 +117,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         fs::write(cst_file, format!("{:#?}\n", cst.clone())).unwrap();
     }
 
-    info!("Lowering CST to AST…");
+    info!("Abstracting CST to AST…");
     let (asts, ast_cst_id_map) = db
         .ast(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
@@ -142,7 +142,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         .unwrap();
     }
 
-    info!("Compiling AST to HIR…");
+    info!("Turning AST to HIR…");
     let (hir, hir_ast_id_map) = db
         .hir(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
@@ -162,7 +162,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         .unwrap();
     }
 
-    info!("Compiling HIR to LIR…");
+    info!("Lowering HIR to LIR…");
     let lir = db
         .lir(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
@@ -197,7 +197,7 @@ fn run(options: CandyRunOptions) {
     vm.run(1000);
     match vm.status() {
         Status::Running => info!("VM is still running."),
-        Status::Done(value) => info!("VM is done: {:#?}", value),
+        Status::Done(value) => info!("VM is done: {}", value),
         Status::Panicked(value) => {
             error!("VM panicked: {:#?}", value);
 
