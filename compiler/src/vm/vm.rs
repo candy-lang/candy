@@ -18,7 +18,7 @@ pub struct Vm {
     pub(super) heap: Heap,
     pub(super) data_stack: Vec<ObjectPointer>,
     pub(super) function_stack: Vec<ByteCodePointer>,
-    pub(super) debug_stack: Vec<hir::Id>,
+    pub(super) debug_stack: Vec<DebugEntry>,
 }
 
 #[derive(Clone)]
@@ -32,6 +32,12 @@ pub enum Status {
 pub struct ByteCodePointer {
     chunk: ChunkIndex,
     instruction: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct DebugEntry {
+    pub id: hir::Id,
+    pub stack: Vec<Value>,
 }
 
 impl Vm {
@@ -171,7 +177,14 @@ impl Vm {
                 self.run_builtin_function(builtin_function);
             }
             Instruction::DebugValueEvaluated(_) => {}
-            Instruction::DebugClosureEntered(hir_id) => self.debug_stack.push(hir_id),
+            Instruction::DebugClosureEntered(id) => {
+                let mut stack = vec![];
+                for entry in &self.data_stack {
+                    stack.push(self.heap.export_without_dropping(*entry));
+                }
+
+                self.debug_stack.push(DebugEntry { id, stack });
+            }
             Instruction::DebugClosureExited => {
                 self.debug_stack.pop().unwrap();
             }
@@ -189,7 +202,7 @@ impl Vm {
         Value::Symbol("Never".to_string())
     }
 
-    pub fn current_stack_trace(&self) -> Vec<hir::Id> {
+    pub fn current_stack_trace(&self) -> Vec<DebugEntry> {
         self.debug_stack.clone()
     }
 }

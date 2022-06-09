@@ -37,34 +37,34 @@ impl Value {
         Value::Struct(items)
     }
 
-    pub fn into_int(self) -> Option<u64> {
+    pub fn try_into_int(self) -> Result<u64, Value> {
         match self {
-            Value::Int(int) => Some(int),
-            _ => None,
+            Value::Int(int) => Ok(int),
+            it => Err(it),
         }
     }
-    pub fn into_text(self) -> Option<String> {
+    pub fn try_into_text(self) -> Result<String, Value> {
         match self {
-            Value::Text(text) => Some(text),
-            _ => None,
+            Value::Text(text) => Ok(text),
+            it => Err(it),
         }
     }
-    pub fn into_symbol(self) -> Option<String> {
+    pub fn try_into_symbol(self) -> Result<String, Value> {
         match self {
-            Value::Symbol(symbol) => Some(symbol),
-            _ => None,
+            Value::Symbol(symbol) => Ok(symbol),
+            it => Err(it),
         }
     }
-    pub fn into_struct(self) -> Option<HashMap<Value, Value>> {
+    pub fn try_into_struct(self) -> Result<HashMap<Value, Value>, Value> {
         match self {
-            Value::Struct(entries) => Some(entries),
-            _ => None,
+            Value::Struct(entries) => Ok(entries),
+            it => Err(it),
         }
     }
-    pub fn into_closure(self) -> Option<(Vec<ObjectPointer>, ChunkIndex)> {
+    pub fn try_into_closure(self) -> Result<(Vec<ObjectPointer>, ChunkIndex), Value> {
         match self {
-            Value::Closure { captured, body } => Some((captured, body)),
-            _ => None,
+            Value::Closure { captured, body } => Ok((captured, body)),
+            it => Err(it),
         }
     }
 }

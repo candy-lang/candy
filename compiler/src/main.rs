@@ -204,7 +204,8 @@ fn run(options: CandyRunOptions) {
             error!("Stack trace:");
             let (_, hir_to_ast_ids) = db.hir(input.clone()).unwrap();
             let (_, ast_to_cst_ids) = db.ast(input.clone()).unwrap();
-            for hir_id in vm.current_stack_trace().into_iter().rev() {
+            for entry in vm.current_stack_trace().into_iter().rev() {
+                let hir_id = entry.id;
                 let ast_id = hir_to_ast_ids[&hir_id].clone();
                 let cst_id = ast_to_cst_ids[&ast_id];
                 let cst = db.find_cst(input.clone(), cst_id);
