@@ -1,14 +1,11 @@
 use super::{value::Value, Vm};
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
 use itertools::Itertools;
-
-const TRACE_BUILTIN_FUNCTION_CALLS: bool = false;
+use log::{debug, trace};
 
 impl Vm {
     pub(super) fn run_builtin_function(&mut self, builtin_function: BuiltinFunction) {
-        if TRACE_BUILTIN_FUNCTION_CALLS {
-            log::trace!("run_builtin_function: builtin{:?}", builtin_function);
-        }
+        trace!("run_builtin_function: builtin{:?}", builtin_function);
 
         let return_value = match builtin_function {
             BuiltinFunction::Add => self.add(),
@@ -56,13 +53,13 @@ impl Vm {
     }
 
     fn get_argument_count(&mut self) -> Result<Value, String> {
-        let closure = self
+        let (_, chunk) = self
             .pop_value()
             .unwrap()
             .try_into_closure()
             .map_err(|it| format!("builtinAddArgumentCount expects a closure, got {}.", it))?;
 
-        let num_args = self.chunks[closure.1].num_args;
+        let num_args = self.chunks[chunk].num_args;
         Ok(Value::Int(num_args as u64))
     }
 

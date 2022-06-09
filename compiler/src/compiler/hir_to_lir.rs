@@ -61,7 +61,7 @@ impl LoweringContext {
             self.compile_expression(id, expression);
         }
         self.emit_pop_multiple_below_top(body.expressions.len() - 1);
-        assert_eq!(stack_size_before, self.stack.len() - 1); // extra return value
+        assert_eq!(self.stack.len(), stack_size_before + 1); // extra return value
     }
     fn compile_expression(&mut self, id: &hir::Id, expression: &Expression) {
         match expression {

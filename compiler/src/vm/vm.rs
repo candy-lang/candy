@@ -7,7 +7,7 @@ use crate::compiler::{
     lir::{Chunk, ChunkIndex, Instruction},
 };
 use itertools::Itertools;
-use log::debug;
+use log::{debug, trace};
 use std::collections::HashMap;
 
 /// A VM can execute some byte code.
@@ -37,7 +37,7 @@ pub struct ByteCodePointer {
 #[derive(Debug, Clone)]
 pub struct DebugEntry {
     pub id: hir::Id,
-    pub stack: Vec<Value>,
+    pub data_stack: Vec<Value>,
 }
 
 impl Vm {
@@ -74,17 +74,18 @@ impl Vm {
             let instruction = self.chunks[self.next_instruction.chunk].instructions
                 [self.next_instruction.instruction]
                 .clone();
-            debug!("Executing instruction: {:?}", &instruction);
+            trace!("Running instruction: {:?}", &instruction);
             self.next_instruction.instruction += 1;
             self.run_instruction(instruction);
 
-            debug!(
+            trace!(
                 "Stack: {}",
                 self.data_stack
                     .iter()
                     .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
                     .join(", ")
             );
+            trace!("Heap: {:?}", self.heap);
 
             if self.next_instruction.instruction
                 >= self.chunks[self.next_instruction.chunk].instructions.len()
@@ -122,14 +123,14 @@ impl Vm {
                 let address = self.heap.create(ObjectData::Struct(entries));
                 self.data_stack.push(address);
             }
-            Instruction::CreateClosure(chunk_index) => {
-                let stack = self.data_stack.clone();
-                for address in &stack {
+            Instruction::CreateClosure(chunk) => {
+                let captured = self.data_stack.clone();
+                for address in &captured {
                     self.heap.dup(*address);
                 }
                 let address = self.heap.create(ObjectData::Closure {
-                    captured: stack,
-                    body: chunk_index,
+                    captured,
+                    body: chunk,
                 });
                 self.data_stack.push(address);
             }
@@ -176,17 +177,40 @@ impl Vm {
             Instruction::Builtin(builtin_function) => {
                 self.run_builtin_function(builtin_function);
             }
-            Instruction::DebugValueEvaluated(_) => {}
+            Instruction::DebugValueEvaluated(id) => {
+                let address = *self.data_stack.last().unwrap();
+                let value = self.heap.export_without_dropping(address);
+                debug!("{} = {}", id, value);
+            }
             Instruction::DebugClosureEntered(id) => {
                 let mut stack = vec![];
                 for entry in &self.data_stack {
                     stack.push(self.heap.export_without_dropping(*entry));
                 }
 
-                self.debug_stack.push(DebugEntry { id, stack });
+                self.debug_stack.push(DebugEntry {
+                    id,
+                    data_stack: stack,
+                });
             }
             Instruction::DebugClosureExited => {
-                self.debug_stack.pop().unwrap();
+                let entry = self.debug_stack.pop().unwrap();
+                trace!("Exited closure {}.", entry.id);
+                trace!(
+                    "Stack before: {:?}",
+                    entry
+                        .data_stack
+                        .iter()
+                        .map(|value| format!("{}", value))
+                        .join(", ")
+                );
+                trace!(
+                    "Stack after:  {:?}",
+                    self.data_stack
+                        .iter()
+                        .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
+                        .join(", ")
+                );
             }
             Instruction::Error(_) => {
                 self.panic(

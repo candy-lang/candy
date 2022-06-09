@@ -1,3 +1,5 @@
+use log::trace;
+
 use super::value::Value;
 use crate::compiler::lir::ChunkIndex;
 use std::collections::HashMap;
@@ -22,8 +24,6 @@ pub enum ObjectData {
     Symbol(String),
     Struct(HashMap<ObjectPointer, ObjectPointer>),
     Closure {
-        // TODO: This could later be just a vector of object pointers, but for
-        // now we capture the whole stack.
         captured: Vec<ObjectPointer>,
         body: ChunkIndex,
     },
@@ -50,10 +50,22 @@ impl Heap {
 
     pub fn dup(&mut self, address: ObjectPointer) {
         self.get_mut(address).reference_count += 1;
+        trace!(
+            "RefCount of {} increased to {}. Value: {}",
+            address,
+            self.get(address).reference_count,
+            self.export_without_dropping(address),
+        );
     }
     pub fn drop(&mut self, address: ObjectPointer) {
         let object = self.get_mut(address);
         object.reference_count -= 1;
+        trace!(
+            "RefCount of {} reduced to {}. Value: {}",
+            address,
+            object.reference_count,
+            value,
+        );
         if object.reference_count == 0 {
             self.free(address);
         }
@@ -61,6 +73,7 @@ impl Heap {
 
     pub fn create(&mut self, object: ObjectData) -> ObjectPointer {
         let address = self.next_address;
+        trace!("Creating object {:?} at {}.", object, address);
         self.objects.insert(
             address,
             Object {
@@ -73,6 +86,7 @@ impl Heap {
     }
     pub fn free(&mut self, address: ObjectPointer) {
         let object = self.objects.remove(&address).unwrap();
+        trace!("Freeing object {:?} at {}.", object, address);
         assert_eq!(object.reference_count, 0);
         match object.data {
             ObjectData::Int(_) => {}
