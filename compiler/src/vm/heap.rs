@@ -58,6 +58,7 @@ impl Heap {
         );
     }
     pub fn drop(&mut self, address: ObjectPointer) {
+        let value = self.export_without_dropping(address); // TODO: Only for logging
         let object = self.get_mut(address);
         object.reference_count -= 1;
         trace!(
