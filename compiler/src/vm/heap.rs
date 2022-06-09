@@ -121,10 +121,7 @@ impl Heap {
                 }
                 ObjectData::Struct(entries)
             }
-            Value::Closure { captured, body } => {
-                let mut captured = vec![];
-                ObjectData::Closure { captured, body }
-            }
+            Value::Closure { captured, body } => ObjectData::Closure { captured, body },
         };
         self.create(value)
     }
