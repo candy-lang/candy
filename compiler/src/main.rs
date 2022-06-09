@@ -240,10 +240,13 @@ fn init_logger() {
                 message
             ))
         })
+        .level_for("candy::compiler::string_to_rcst", LevelFilter::Debug)
+        .level_for("candy::vm::builtin_functions", LevelFilter::Warn)
+        .level_for("candy::vm::heap", LevelFilter::Debug)
+        .level_for("candy::vm::vm", LevelFilter::Debug)
+        .level_for("lspower::transport", LevelFilter::Error)
         .level_for("salsa", LevelFilter::Error)
         .level_for("tokio_util", LevelFilter::Error)
-        .level_for("lspower::transport", LevelFilter::Error)
-        .level_for("candy::compiler::string_to_rcst", LevelFilter::Debug)
         .chain(std::io::stderr())
         .apply()
         .unwrap();
