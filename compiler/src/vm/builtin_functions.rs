@@ -7,11 +7,16 @@ impl Vm {
     pub(super) fn run_builtin_function(&mut self, builtin_function: BuiltinFunction) {
         trace!("run_builtin_function: builtin{:?}", builtin_function);
 
-        let return_value = match builtin_function {
+        let return_value_or_panic_message = match builtin_function {
             BuiltinFunction::Add => self.add(),
             BuiltinFunction::Equals => Ok(self.equals()),
             BuiltinFunction::GetArgumentCount => self.get_argument_count(),
-            BuiltinFunction::IfElse => self.if_else(),
+            BuiltinFunction::IfElse => match self.if_else() {
+                // If successful, builtinIfElse doesn't return a value, but
+                // diverges the control flow.
+                Ok(()) => return,
+                Err(message) => Err(message),
+            },
             BuiltinFunction::Panic => self.panic_builtin(),
             BuiltinFunction::Print => self.print(),
             BuiltinFunction::StructGet => self.struct_get(),
@@ -19,9 +24,8 @@ impl Vm {
             BuiltinFunction::StructHasKey => self.struct_has_key(),
             BuiltinFunction::TypeOf => Ok(self.type_of()),
             BuiltinFunction::Use => self.use_(),
-            _ => panic!("Unhandled builtin function: {:?}", builtin_function),
         };
-        let return_value = match return_value {
+        let return_value = match return_value_or_panic_message {
             Ok(value) => value,
             Err(panic_message) => self.panic(panic_message),
         };
@@ -63,7 +67,7 @@ impl Vm {
         Ok(Value::Int(num_args as u64))
     }
 
-    fn if_else(&mut self) -> Result<Value, String> {
+    fn if_else(&mut self) -> Result<(), String> {
         let else_ = self.pop_value().unwrap();
         let then = self.pop_value().unwrap();
         let condition = self.pop_value().unwrap().try_into_symbol().map_err(|it| {
@@ -110,9 +114,13 @@ impl Vm {
         };
 
         let closure_object = self.heap.import(if condition { then } else { else_ });
+        debug!(
+            "IfElse executing the closure: {:?}",
+            self.heap.export_without_dropping(closure_object)
+        );
         self.data_stack.push(closure_object);
         self.run_instruction(Instruction::Call);
-        Ok(self.pop_value().unwrap())
+        Ok(())
     }
 
     fn panic_builtin(&mut self) -> Result<Value, String> {
