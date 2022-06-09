@@ -72,18 +72,32 @@ impl Vm {
                 it
             )
         })?;
-        if then.clone().try_into_closure().is_err() {
-            return Err(format!(
-                "builtinIfElse expects a closure as the then, got {}.",
-                then
-            ));
-        }
-        if else_.clone().try_into_closure().is_err() {
-            return Err(format!(
-                "builtinIfElse expects a closure as the else, got {}.",
-                else_
-            ));
-        }
+        match then.clone() {
+            Value::Closure { body, .. } => {
+                if self.chunks[body].num_args > 0 {
+                    return Err(format!("builtinIfElse expects a closure without arguments as the then, got one with {} arguments.", self.chunks[body].num_args));
+                }
+            }
+            _ => {
+                return Err(format!(
+                    "builtinIfElse expects a closure as the then, got {}.",
+                    then
+                ))
+            }
+        };
+        match else_.clone() {
+            Value::Closure { body, .. } => {
+                if self.chunks[body].num_args > 0 {
+                    return Err(format!("builtinIfElse expects a closure without arguments as the else, got one with {} arguments.", self.chunks[body].num_args));
+                }
+            }
+            _ => {
+                return Err(format!(
+                    "builtinIfElse expects a closure as the else, got {}.",
+                    else_
+                ))
+            }
+        };
         let condition = match condition.as_str() {
             "True" => true,
             "False" => false,
