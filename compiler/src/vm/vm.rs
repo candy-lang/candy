@@ -158,6 +158,7 @@ impl Vm {
                 for _ in 0..num_args {
                     args.push(self.data_stack.pop().unwrap());
                 }
+                args.reverse();
                 self.function_stack.push(self.next_instruction);
                 self.data_stack.append(&mut captured.clone());
                 for captured in captured {
