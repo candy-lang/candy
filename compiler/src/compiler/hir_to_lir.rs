@@ -56,10 +56,12 @@ impl LoweringContext {
     }
 
     fn compile_body(&mut self, body: &Body) {
+        let stack_size_before = self.stack.len();
         for (id, expression) in &body.expressions {
             self.compile_expression(id, expression);
         }
         self.emit_pop_multiple_below_top(body.expressions.len() - 1);
+        assert_eq!(stack_size_before, self.stack.len() - 1); // extra return value
     }
     fn compile_expression(&mut self, id: &hir::Id, expression: &Expression) {
         match expression {
@@ -214,11 +216,10 @@ impl StackExt for Vec<hir::Id> {
         }
     }
     fn find_id(&self, id: &hir::Id) -> StackOffset {
-        self.iter().rev().position(|it| it == id).expect(&format!(
-            "Id {} not found in stack: {}",
-            id,
-            self.iter().join(" ")
-        ))
+        self.iter()
+            .rev()
+            .position(|it| it == id)
+            .unwrap_or_else(|| panic!("Id {} not found in stack: {}", id, self.iter().join(" ")))
     }
     fn replace_top_id(&mut self, id: hir::Id) {
         self.pop().unwrap();
