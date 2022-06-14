@@ -11,24 +11,24 @@ debug = true
 [dependencies]
 chrono = "0.4.19"
 colored = "2.0.0"
-fern = "0.6.0"
-im = "15.0.0"
+fern = "0.6.1"
+im = "15.1.0"
 itertools = { version = "0.10.0" }
 lazy_static = "1.4.0"
 linked-hash-map = "0.5.4"
-log = "0.4.14"
-lsp-types = "0.91.1"
+log = "0.4.16"
+lsp-types = "0.93.0"
 lspower = "1.5.0"
 notify = "4.0.17"
 proptest = "1.0.0"
 regex = "1.5.5"
 salsa = "0.16.1"
-serde = { version = "1.0.83", features = ["derive"] }
-serde_json = "1.0.79"
+serde = { version = "1.0.137", features = ["derive"] }
+serde_json = "1.0.80"
 structopt = "0.3.25"
 strum = "0.24.0"
 strum_macros = "0.24"
-tokio = { version = "1.17.0", features = ["full"] }
+tokio = { version = "1.18.0", features = ["full"] }
 tokio-util = "0.7.1"
 
 [target.x86_64-unknown-linux-gnu]
