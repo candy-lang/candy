@@ -1,10 +1,10 @@
 # This is the Candy core library.
 
-typeOf value = builtinTypeOf value
+typeOf value = ✨.typeOf value
 
-equals a b = builtinEquals a b
+equals a b = ✨.equals a b
 
-panic message = builtinPanic message
+panic message = ✨.panic message
 
 isInt value = equals (typeOf value) Int
 isText value = equals (typeOf value) Text
@@ -13,30 +13,23 @@ isSymbol value = equals (typeOf value) Symbol
 isBool value =
   isTrue = equals value True
   isFalse = equals value False
-  builtinIfElse isTrue { True } { isFalse }
-
-needs condition =
-  builtinIfElse (isBool condition) {} { panic "`needs` was called with the wrong arguments." }
-  builtinIfElse
-    condition
-    {}
-    { panic "A function was called with the wrong arguments." }
+  ✨.ifElse isTrue { True } { isFalse }
 
 not a =
   needs (isBool a)
-  builtinIfElse a { False } { True }
+  ✨.ifElse a { False } { True }
 and a b =
   needs (isBool a)
   needs (isBool b)
-  builtinIfElse a { b } { False }
+  ✨.ifElse a { b } { False }
 or a b =
   needs (isBool a)
   needs (isBool b)
-  builtinIfElse a { True } { b }
+  ✨.ifElse a { True } { b }
 
 check condition =
   needs (isBool condition)
-  builtinIfElse
+  ✨.ifElse
     condition
     {}
     { panic "A check didn't succeed" }
@@ -44,7 +37,7 @@ check condition =
 isFunction value = equals (typeOf value) Function
 getArgumentCount function =
   needs (isFunction function)
-  builtinGetArgumentCount function
+  ✨.getArgumentCount function
 isFunction0 value = and (isFunction value) (equals (getArgumentCount value) 0)
 isFunction1 value = and (isFunction value) (equals (getArgumentCount value) 1)
 isFunction2 value = and (isFunction value) (equals (getArgumentCount value) 2)
@@ -56,28 +49,18 @@ ifElse condition then else =
   needs (isBool condition)
   needs (isFunction0 then)
   needs (isFunction0 else)
-  builtinIfElse condition then else
+  ✨.ifElse condition then else
 if condition then =
   needs (isBool condition)
   needs (isFunction0 then)
   ifElse condition then {}
 
 add a b =
-  aIsInt = isInt a
-  needs aIsInt
-  bIsInt = isInt b
-  needs bIsInt
-  builtinAdd a b
+  needs (isInt a)
+  needs (isInt b)
+  ✨.add a b
 
-bar = add 2 2
-
-print text =
-readLine =
-add a b =
-map iterable mapper =
-myIterable =
-blub = Blub
-call lambda =
+print text = ✨.print text
 
 main =
   foo = 3
@@ -87,35 +70,3 @@ main =
     123
   bar 5
   foo
-
-main =
-  foo = 1
-  bar = { n -> 5 }
-  a = readLine
-  a
-
-main = {
-
-}
-
-foo = add
-add
-  8646461
-  "Hi"
-
-map
-  myIterable
-  { a b -> print "the item on io" }
-
-fibonacci n = foo
-fibonacci = { n ->
-  blub
-}
-bar
-
-lambda =
-  foo = 1
-  bar = { foo }
-call lambda
-
-True
