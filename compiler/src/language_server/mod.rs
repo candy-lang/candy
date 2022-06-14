@@ -17,16 +17,16 @@ use itertools::Itertools;
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFilter, DocumentHighlight, DocumentHighlightParams, FoldingRange, FoldingRangeParams,
-    GotoDefinitionParams, GotoDefinitionResponse, InitializeParams, InitializeResult,
-    InitializedParams, Location, MessageType, ReferenceParams, Registration, SemanticTokens,
+    GotoDefinitionParams, GotoDefinitionResponse, 
+    InitializedParams, Location, ReferenceParams, Registration, SemanticTokens,
     SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
     SemanticTokensRegistrationOptions, SemanticTokensResult, SemanticTokensServerCapabilities,
     ServerCapabilities, ServerInfo, StaticRegistrationOptions,
     TextDocumentChangeRegistrationOptions, TextDocumentContentChangeEvent,
-    TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
+    TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions, InitializeParams, InitializeResult, MessageType,
 };
-use lspower::{jsonrpc, Client, LanguageServer};
 use tokio::sync::Mutex;
+use tower_lsp::{Client, LanguageServer, LspService, Server, jsonrpc};
 
 pub mod definition;
 pub mod folding_range;
@@ -48,7 +48,7 @@ impl CandyLanguageServer {
     }
 }
 
-#[lspower::async_trait]
+#[tower_lsp::async_trait]
 impl LanguageServer for CandyLanguageServer {
     async fn initialize(&self, params: InitializeParams) -> jsonrpc::Result<InitializeResult> {
         log::info!("LSP: initialize");
@@ -276,7 +276,7 @@ impl CandyLanguageServer {
                 .await;
             let hints = db.hints(input.clone());
             self.client
-                .send_custom_notification::<HintsNotification>(HintsNotification {
+                .send_notification::<HintsNotification>(HintsNotification {
                     uri: Url::from(input).to_string(),
                     hints,
                 })
