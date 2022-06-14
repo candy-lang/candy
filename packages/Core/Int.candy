@@ -1,11 +1,9 @@
-needs = builtinStructGet (use ".Needs") Needs
+needs = (use ".Needs").needs
 type = use ".Type"
 
-is value =
-  isOfType = builtinStructGet type Is
-  isOfType value Int
+is value = type.is value Int
 
 add a b =
   needs (is a)
   needs (is b)
-  builtinAdd a b
+  ✨.add a b
