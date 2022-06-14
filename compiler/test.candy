@@ -60,13 +60,13 @@ add a b =
   needs (isInt b)
   ✨.add a b
 
-print text = ✨.print text
+print text = (✨.print) text
 
 main =
   foo = 3
   bar = { n -> 5 }
   baz =
-    print "abc"
+    (print) "abc"
     123
   bar 5
   foo
