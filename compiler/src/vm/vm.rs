@@ -224,10 +224,9 @@ impl Vm {
                         .join(", ")
                 );
             }
-            Instruction::Error(_) => {
+            Instruction::Error(error) => {
                 self.panic(
-                    "The VM crashed because there was an error in previous compilation stages."
-                        .to_string(),
+                    format!("The VM crashed because there was an error in previous compilation stages: {:?}", error),
                 );
             }
         }
