@@ -38,33 +38,9 @@ impl Value {
         Value::Struct(items)
     }
 
-    pub fn try_into_int(self) -> Result<u64, Value> {
-        match self {
-            Value::Int(int) => Ok(int),
-            it => Err(it),
-        }
-    }
     pub fn try_into_text(self) -> Result<String, Value> {
         match self {
             Value::Text(text) => Ok(text),
-            it => Err(it),
-        }
-    }
-    pub fn try_into_symbol(self) -> Result<String, Value> {
-        match self {
-            Value::Symbol(symbol) => Ok(symbol),
-            it => Err(it),
-        }
-    }
-    pub fn try_into_struct(self) -> Result<HashMap<Value, Value>, Value> {
-        match self {
-            Value::Struct(entries) => Ok(entries),
-            it => Err(it),
-        }
-    }
-    pub fn try_into_closure(self) -> Result<(Vec<ObjectPointer>, ChunkIndex), Value> {
-        match self {
-            Value::Closure { captured, body } => Ok((captured, body)),
             it => Err(it),
         }
     }
