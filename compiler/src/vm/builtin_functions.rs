@@ -1,29 +1,45 @@
-use super::{value::Value, Vm};
+use super::{heap::ObjectPointer, value::Value, Vm};
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
 use itertools::Itertools;
 use log::{debug, trace};
 
+macro_rules! destructure {
+    ($args:expr, $enum:pat, $body:block) => {{
+        if let $enum = &$args[..] {
+            $body
+        } else {
+            Err(format!("Invalid arguments."))
+        }
+    }};
+}
+
 impl Vm {
-    pub(super) fn run_builtin_function(&mut self, builtin_function: BuiltinFunction) {
+    pub(super) fn run_builtin_function(
+        &mut self,
+        builtin_function: &BuiltinFunction,
+        args: &[ObjectPointer],
+    ) {
         trace!("run_builtin_function: builtin{:?}", builtin_function);
 
-        let return_value_or_panic_message = match builtin_function {
-            BuiltinFunction::Add => self.add(),
-            BuiltinFunction::Equals => Ok(self.equals()),
-            BuiltinFunction::GetArgumentCount => self.get_argument_count(),
-            BuiltinFunction::IfElse => match self.if_else() {
+        let args = args.iter().map(|it| self.heap.export(*it)).collect_vec();
+
+        let return_value_or_panic_message = match &builtin_function {
+            BuiltinFunction::Add => self.add(args),
+            BuiltinFunction::Equals => self.equals(args),
+            BuiltinFunction::GetArgumentCount => self.get_argument_count(args),
+            BuiltinFunction::IfElse => match self.if_else(args) {
                 // If successful, builtinIfElse doesn't return a value, but
                 // diverges the control flow.
                 Ok(()) => return,
                 Err(message) => Err(message),
             },
-            BuiltinFunction::Panic => self.panic_builtin(),
-            BuiltinFunction::Print => self.print(),
-            BuiltinFunction::StructGet => self.struct_get(),
-            BuiltinFunction::StructGetKeys => self.struct_get_keys(),
-            BuiltinFunction::StructHasKey => self.struct_has_key(),
-            BuiltinFunction::TypeOf => Ok(self.type_of()),
-            BuiltinFunction::Use => self.use_(),
+            BuiltinFunction::Panic => self.panic_builtin(args).map(|_| panic!()),
+            BuiltinFunction::Print => self.print(args),
+            BuiltinFunction::StructGet => self.struct_get(args),
+            BuiltinFunction::StructGetKeys => self.struct_get_keys(args),
+            BuiltinFunction::StructHasKey => self.struct_has_key(args),
+            BuiltinFunction::TypeOf => self.type_of(args),
+            BuiltinFunction::Use => self.use_(args),
         };
         let return_value = match return_value_or_panic_message {
             Ok(value) => value,
@@ -34,186 +50,140 @@ impl Vm {
         self.data_stack.push(return_object);
     }
 
-    fn add(&mut self) -> Result<Value, String> {
-        let b = self
-            .pop_value()
-            .unwrap()
-            .try_into_int()
-            .map_err(|it| format!("builtinAdd expects numbers as arguments, got {}.", it))?;
-        let a = self
-            .pop_value()
-            .unwrap()
-            .try_into_int()
-            .map_err(|it| format!("builtinAdd expects numbers as arguments, got {}.", it))?;
-
-        Ok((a + b).into())
+    fn add(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(a), Value::Int(b)], { Ok((a + b).into()) })
     }
 
-    fn equals(&mut self) -> Value {
-        let b = self.pop_value().unwrap();
-        let a = self.pop_value().unwrap();
-
-        (a == b).into()
+    fn equals(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [a, b], { Ok((a == b).into()) })
     }
 
-    fn get_argument_count(&mut self) -> Result<Value, String> {
-        let (_, chunk) = self
-            .pop_value()
-            .unwrap()
-            .try_into_closure()
-            .map_err(|it| format!("builtinAddArgumentCount expects a closure, got {}.", it))?;
-
-        let num_args = self.chunks[chunk].num_args;
-        Ok(Value::Int(num_args as u64))
+    fn get_argument_count(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Closure { body, .. }], {
+            Ok((self.chunks[*body].num_args as u64).into())
+        })
     }
 
-    fn if_else(&mut self) -> Result<(), String> {
-        let else_ = self.pop_value().unwrap();
-        let then = self.pop_value().unwrap();
-        let condition = self.pop_value().unwrap().try_into_symbol().map_err(|it| {
-            format!(
-                "builtinIfElse expects a boolean symbol as the condition, got {}.",
-                it
-            )
-        })?;
-        match then.clone() {
-            Value::Closure { body, .. } => {
-                if self.chunks[body].num_args > 0 {
-                    return Err(format!("builtinIfElse expects a closure without arguments as the then, got one with {} arguments.", self.chunks[body].num_args));
+    fn if_else(&mut self, args: Vec<Value>) -> Result<(), String> {
+        destructure!(
+            args,
+            [
+                Value::Symbol(condition),
+                Value::Closure {
+                    captured: then_captured,
+                    body: then_body
+                },
+                Value::Closure {
+                    captured: else_captured,
+                    body: else_body
                 }
-            }
-            _ => {
-                return Err(format!(
-                    "builtinIfElse expects a closure as the then, got {}.",
-                    then
-                ))
-            }
-        };
-        match else_.clone() {
-            Value::Closure { body, .. } => {
-                if self.chunks[body].num_args > 0 {
-                    return Err(format!("builtinIfElse expects a closure without arguments as the else, got one with {} arguments.", self.chunks[body].num_args));
+            ],
+            {
+                if self.chunks[*then_body].num_args > 0 {
+                    return Err(format!("IfElse expects a closure without arguments as the then, got one with {} arguments.", self.chunks[*then_body].num_args));
                 }
+                if self.chunks[*else_body].num_args > 0 {
+                    return Err(format!("IfElse expects a closure without arguments as the else, got one with {} arguments.", self.chunks[*else_body].num_args));
+                }
+                let condition = match condition.as_str() {
+                    "True" => true,
+                    "False" => false,
+                    _ => {
+                        return Err(format!(
+                            "IfElse expected True or False as a condition, but got {}.",
+                            condition
+                        ));
+                    }
+                };
+
+                let closure_object = self.heap.import(if condition {
+                    Value::Closure {
+                        captured: then_captured.to_owned(),
+                        body: then_body.to_owned(),
+                    }
+                } else {
+                    Value::Closure {
+                        captured: else_captured.to_owned(),
+                        body: else_body.to_owned(),
+                    }
+                });
+                debug!(
+                    "IfElse executing the closure: {:?}",
+                    self.heap.export_without_dropping(closure_object)
+                );
+                self.data_stack.push(closure_object);
+                self.run_instruction(Instruction::Call { num_args: 0 });
+                Ok(())
             }
-            _ => {
-                return Err(format!(
-                    "builtinIfElse expects a closure as the else, got {}.",
-                    else_
-                ))
+        )
+    }
+
+    fn panic_builtin(&mut self, args: Vec<Value>) -> Result<!, String> {
+        destructure!(args, [Value::Text(message)], { Err(message.to_string()) })
+    }
+
+    fn print(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Text(message)], {
+            println!("{:?}", message);
+            Ok(Value::nothing())
+        })
+    }
+
+    fn struct_get(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Struct(struct_), key], {
+            match struct_.get(&key) {
+                Some(value) => Ok(value.clone().into()),
+                None => Err(format!("Struct does not contain key {:?}.", key)),
             }
-        };
-        let condition = match condition.as_str() {
-            "True" => true,
-            "False" => false,
-            _ => {
-                return Err(format!(
-                    "builtinIfElse expected True or False as a condition, but got {}",
-                    condition
-                ));
+        })
+    }
+
+    fn struct_get_keys(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Struct(struct_)], {
+            Ok(Value::list(struct_.keys().cloned().collect()))
+        })
+    }
+
+    fn struct_has_key(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Struct(struct_), key], {
+            Ok((struct_.contains_key(key)).into())
+        })
+    }
+
+    fn type_of(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [value], {
+            Ok(Value::Symbol(match &value {
+                Value::Int(_) => "Int",
+                Value::Text(_) => "Text",
+                Value::Symbol(_) => "Symbol",
+                Value::Struct(_) => "Struct",
+                Value::Closure { .. } => "Function",
+                Value::Builtin { .. } => "Builtin",
+            }.to_owned()))
+        })
+    }
+
+    fn use_(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(
+            args,
+            [Value::Struct(current_path_struct), Value::Text(target)],
+            {
+                let mut current_path = vec![];
+                let mut index = 0;
+                while let Some(component) = current_path_struct.get(&Value::Int(index)) {
+                    current_path.push(component.clone().try_into_text().map_err(|it| format!("builtinUse expects a struct as current path with only textual paths as values, but the map contains the value {} for key {}", it, index)));
+                    index += 1;
+                }
+
+                let target = UseTarget::parse(&target)?;
+
+                if target.parent_navigations > current_path.len() {
+                    return Err("Too many parent navigations.".to_string());
+                }
+
+                Ok(Value::Symbol("Used".to_string()))
             }
-        };
-
-        let closure_object = self.heap.import(if condition { then } else { else_ });
-        debug!(
-            "IfElse executing the closure: {:?}",
-            self.heap.export_without_dropping(closure_object)
-        );
-        self.data_stack.push(closure_object);
-        self.run_instruction(Instruction::Call);
-        Ok(())
-    }
-
-    fn panic_builtin(&mut self) -> Result<Value, String> {
-        let message = self
-            .pop_value()
-            .unwrap()
-            .try_into_text()
-            .map_err(|it| format!("builtinPanic expects a text as the message, got {}.", it))?;
-
-        Ok(self.panic(message))
-    }
-
-    fn print(&mut self) -> Result<Value, String> {
-        let message = self
-            .pop_value()
-            .unwrap()
-            .try_into_text()
-            .map_err(|it| format!("builtinPrint expects a text as the message, got {}.", it))?;
-
-        println!("{:?}", message);
-        Ok(Value::nothing())
-    }
-
-    fn struct_get(&mut self) -> Result<Value, String> {
-        let key = self.pop_value().unwrap();
-        let struct_ = self
-            .pop_value()
-            .unwrap()
-            .try_into_struct()
-            .map_err(|it| format!("builtinStructGet expects struct, got {}.", it))?;
-
-        match struct_.get(&key) {
-            Some(value) => Ok(value.clone().into()),
-            None => Err(format!("Struct does not contain key {:?}.", key)),
-        }
-    }
-
-    fn struct_get_keys(&mut self) -> Result<Value, String> {
-        let struct_ = self
-            .pop_value()
-            .unwrap()
-            .try_into_struct()
-            .map_err(|it| format!("builtinStructGetKeys expects struct, got {}.", it))?;
-
-        Ok(Value::list(struct_.keys().cloned().collect()))
-    }
-
-    fn struct_has_key(&mut self) -> Result<Value, String> {
-        let key = self.pop_value().unwrap();
-        let struct_ = self
-            .pop_value()
-            .unwrap()
-            .try_into_struct()
-            .map_err(|it| format!("builtinStructHasKey expects struct, got {}.", it))?;
-
-        Ok((struct_.contains_key(&key)).into())
-    }
-
-    fn type_of(&mut self) -> Value {
-        let value = self.pop_value().unwrap();
-        match value {
-            Value::Int(_) => Value::Symbol("Int".to_owned()).into(),
-            Value::Text(_) => Value::Symbol("Text".to_owned()).into(),
-            Value::Symbol(_) => Value::Symbol("Symbol".to_owned()).into(),
-            Value::Struct(_) => Value::Symbol("Struct".to_owned()).into(),
-            Value::Closure { .. } => Value::Symbol("Function".to_owned()).into(),
-        }
-    }
-
-    fn use_(&mut self) -> Result<Value, String> {
-        let target = self
-            .pop_value()
-            .unwrap()
-            .try_into_text()
-            .map_err(|it| format!("builtinUse expects text as target, got {}.", it))?;
-        let current_path_struct = self
-            .pop_value()
-            .unwrap()
-            .try_into_struct()
-            .map_err(|it| format!("builtinUse expects struct as current path, got {}.", it))?;
-
-        let mut current_path = vec![];
-        let mut index = 0;
-        while let Some(component) = current_path_struct.get(&Value::Int(index)) {
-            current_path.push(component.clone().try_into_text().map_err(|it| format!("builtinUse expects a struct as current path with only textual paths as values, but the map contains the value {} for key {}", it, index)));
-            index += 1;
-        }
-
-        let target = UseTarget::parse(&target)?;
-
-        if target.parent_navigations > current_path.len() {
-            return Err("Too many parent navigations.".to_string());
-        }
+        )
 
         // let inputs = target.resolve(&current_path[..]);
         // let input = match inputs
@@ -229,8 +199,6 @@ impl Vm {
         //         ));
         //     }
         // };
-
-        Ok(Value::Symbol("Used".to_string()))
 
         // TODO: Continue implementing use.
         // let (lir, _) = db.lir(input.clone()).unwrap();

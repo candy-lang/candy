@@ -134,6 +134,10 @@ impl Vm {
                 });
                 self.data_stack.push(address);
             }
+            Instruction::CreateBuiltin(builtin) => {
+                let address = self.heap.create(ObjectData::Builtin(builtin));
+                self.data_stack.push(address);
+            }
             Instruction::PopMultipleBelowTop(n) => {
                 let top = self.data_stack.pop().unwrap();
                 for _ in 0..n {
@@ -147,36 +151,43 @@ impl Vm {
                 self.heap.dup(address);
                 self.data_stack.push(address);
             }
-            Instruction::Call => {
+            Instruction::Call { num_args } => {
                 let closure_address = self.data_stack.pop().unwrap();
-                let (captured, body) = match &self.heap.get(closure_address).data {
-                    ObjectData::Closure { captured, body } => (captured.clone(), *body),
-                    _ => panic!("Can't call non-closure."),
-                };
-                let num_args = self.chunks[body].num_args;
                 let mut args = vec![];
                 for _ in 0..num_args {
                     args.push(self.data_stack.pop().unwrap());
                 }
                 args.reverse();
-                self.function_stack.push(self.next_instruction);
-                self.data_stack.append(&mut captured.clone());
-                for captured in captured {
-                    self.heap.dup(captured);
-                }
-                self.data_stack.append(&mut args);
-                self.heap.drop(closure_address);
-                self.next_instruction = ByteCodePointer {
-                    chunk: body,
-                    instruction: 0,
+
+                match self.heap.get(closure_address).data.clone() {
+                    ObjectData::Closure { captured, body } => {
+                        let expected_num_args = self.chunks[body].num_args;
+                        if num_args != expected_num_args {
+                            self.panic(format!("Closure expects {} parameters, but you called it with {} arguments.", expected_num_args, num_args));
+                            return;
+                        }
+
+                        self.function_stack.push(self.next_instruction);
+                        self.data_stack.append(&mut captured.clone());
+                        for captured in captured {
+                            self.heap.dup(captured);
+                        }
+                        self.data_stack.append(&mut args);
+                        self.heap.drop(closure_address);
+                        self.next_instruction = ByteCodePointer {
+                            chunk: body,
+                            instruction: 0,
+                        };
+                    }
+                    ObjectData::Builtin(builtin) => {
+                        self.run_builtin_function(&builtin, &args);
+                    }
+                    _ => panic!("Can only call closures and builtins."),
                 };
             }
             Instruction::Return => {
                 let caller = self.function_stack.pop().unwrap();
                 self.next_instruction = caller;
-            }
-            Instruction::Builtin(builtin_function) => {
-                self.run_builtin_function(builtin_function);
             }
             Instruction::DebugValueEvaluated(id) => {
                 let address = *self.data_stack.last().unwrap();

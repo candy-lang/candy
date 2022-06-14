@@ -1,11 +1,18 @@
 use super::{
-    ast::{self, Assignment, Ast, AstKind, Identifier, Int, Struct, Symbol, Text},
+    ast::{
+        self, Assignment, Ast, AstKind, CallReceiver, Identifier, Int, Struct, StructAccess,
+        Symbol, Text,
+    },
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
     error::{CompilerError, CompilerErrorPayload},
     hir::{self, Body, Expression, HirError, Lambda},
+    utils::AdjustCasingOfFirstLetter,
 };
-use crate::{builtin_functions, input::Input};
+use crate::{
+    builtin_functions::{self, BuiltinFunction},
+    input::Input,
+};
 use im::HashMap;
 use std::{ops::Range, sync::Arc};
 
@@ -86,39 +93,48 @@ struct Compiler<'c> {
 }
 impl<'c> Compiler<'c> {
     fn new(context: &'c Context<'c>) -> Self {
-        let builtin_identifiers = builtin_functions::VALUES
-            .iter()
-            .map(|builtin_function| {
-                let string = format!("builtin{:?}", builtin_function);
-                (
-                    string.clone(),
-                    hir::Id::new(context.input.clone(), vec![string]),
-                )
-            })
-            .collect::<HashMap<_, _>>();
-
         let mut compiler = Compiler {
             context,
             id_mapping: HashMap::new(),
             parent_keys: vec![],
             body: Body::new(),
-            identifiers: builtin_identifiers,
+            identifiers: HashMap::new(),
         };
+        compiler.generate_sparkles();
         compiler.generate_use();
         compiler
     }
 
+    fn generate_sparkles(&mut self) {
+        let mut sparkles_map = HashMap::new();
+
+        for builtin_function in builtin_functions::VALUES.iter() {
+            let symbol = self.push(
+                None,
+                Expression::Symbol(format!("{:?}", builtin_function)),
+                None,
+            );
+            let builtin = self.push(None, Expression::Builtin(*builtin_function), None);
+            sparkles_map.insert(symbol, builtin);
+        }
+
+        let sparkles_map = Expression::Struct(sparkles_map);
+        self.push(None, sparkles_map, Some("✨".to_string()));
+    }
+
     fn generate_use(&mut self) {
-        // HirId(project-file:test.candy:11) = body {
-        //   HirId(project-file:test.candy:11:0) = lambda { target ->
-        //     HirId(project-file:test.candy:11:0:1) = int 0
-        //     HirId(project-file:test.candy:11:0:2) = text "test.candy"
-        //     HirId(project-file:test.candy:11:0:3) = struct [
-        //       HirId(project-file:test.candy:11:0:1): HirId(project-file:test.candy:11:0:2),
+        // HirId(~:test.candy:use) = body {
+        //   HirId(~:test.candy:use:0) = lambda { HirId(~:test.candy:use:0:target) ->
+        //     HirId(~:test.candy:use:0:0) = builtinPanic
+        //     HirId(~:test.candy:use:0:1) = builtinUse
+        //     HirId(~:test.candy:use:0:2) = int 0
+        //     HirId(~:test.candy:use:0:3) = text "test.candy"
+        //     HirId(~:test.candy:use:0:path) = struct [
+        //       HirId(~:test.candy:use:0:2): HirId(~:test.candy:use:0:3),
         //     ]
-        //     HirId(project-file:test.candy:11:0:4) = call HirId(project-file:test.candy:10) with these arguments:
-        //       HirId(project-file:test.candy:11:0:3)
-        //       HirId(project-file:test.candy:11:0:0)
+        //     HirId(~:test.candy:use:0:module) = call HirId(~:test.candy:use:0:1) with these arguments:
+        //       HirId(~:test.candy:use:0:path)
+        //       HirId(~:test.candy:use:0:target)
         //   }
         // }
         let mut assignment_inner = Compiler::<'c> {
@@ -142,9 +158,11 @@ impl<'c> Compiler<'c> {
             identifiers: assignment_inner.identifiers.clone(),
         };
 
-        let panic_id = lambda_inner.identifiers["builtinPanic"].clone();
+        let panic_id = lambda_inner.push(None, Expression::Builtin(BuiltinFunction::Panic), None);
         match &lambda_inner.context.input {
             Input::File(path) => {
+                let use_id =
+                    lambda_inner.push(None, Expression::Builtin(BuiltinFunction::Use), None);
                 let current_path_content = path
                     .iter()
                     .enumerate()
@@ -173,7 +191,7 @@ impl<'c> Compiler<'c> {
                 lambda_inner.push(
                     None,
                     Expression::Call {
-                        function: lambda_inner.identifiers["builtinUse"].clone(),
+                        function: use_id,
                         arguments: vec![current_path, lambda_parameter_id.clone()],
                     },
                     Some("module".to_string()),
@@ -291,6 +309,9 @@ impl<'c> Compiler<'c> {
                     .collect();
                 self.push(Some(ast.id.clone()), Expression::Struct(fields), None)
             }
+            AstKind::StructAccess(struct_access) => {
+                self.lower_struct_access(Some(ast.id.clone()), struct_access)
+            }
             AstKind::Lambda(ast::Lambda {
                 parameters,
                 body: body_asts,
@@ -337,29 +358,43 @@ impl<'c> Compiler<'c> {
                     None,
                 )
             }
-            AstKind::Call(ast::Call { name, arguments }) => {
+            AstKind::Call(ast::Call {
+                receiver,
+                arguments,
+            }) => {
                 let arguments = arguments
                     .iter()
                     .map(|argument| self.compile_single(argument))
                     .collect();
 
-                let function = match self.identifiers.get(&name.value) {
-                    Some(function) => function.to_owned(),
-                    None => {
-                        return self.push(
-                            Some(name.id.clone()),
-                            Expression::Error {
-                                child: None,
-                                errors: vec![CompilerError {
-                                    input: name.id.input.clone(),
-                                    span: self.context.db.ast_id_to_span(name.id.clone()).unwrap(),
-                                    payload: CompilerErrorPayload::Hir(HirError::UnknownFunction {
-                                        name: name.value.clone(),
-                                    }),
-                                }],
-                            },
-                            None,
-                        );
+                let function = match receiver {
+                    CallReceiver::Identifier(name) => match self.identifiers.get(&name.value) {
+                        Some(function) => function.to_owned(),
+                        None => {
+                            return self.push(
+                                Some(name.id.clone()),
+                                Expression::Error {
+                                    child: None,
+                                    errors: vec![CompilerError {
+                                        input: name.id.input.clone(),
+                                        span: self
+                                            .context
+                                            .db
+                                            .ast_id_to_span(name.id.clone())
+                                            .unwrap(),
+                                        payload: CompilerErrorPayload::Hir(
+                                            HirError::UnknownFunction {
+                                                name: name.value.clone(),
+                                            },
+                                        ),
+                                    }],
+                                },
+                                None,
+                            );
+                        }
+                    },
+                    CallReceiver::StructAccess(struct_access) => {
+                        self.lower_struct_access(None, struct_access)
                     }
                 };
                 self.push(
@@ -404,6 +439,27 @@ impl<'c> Compiler<'c> {
                 )
             }
         }
+    }
+    fn lower_struct_access(
+        &mut self,
+        id: Option<ast::Id>,
+        struct_access: &StructAccess,
+    ) -> hir::Id {
+        let struct_ = self.compile_single(&*struct_access.struct_);
+        let key_id = self.push(
+            Some(struct_access.key.id.clone()),
+            Expression::Symbol(struct_access.key.value.uppercase_first_letter()),
+            None,
+        );
+        let struct_get_id = self.push(None, Expression::Builtin(BuiltinFunction::StructGet), None);
+        self.push(
+            id,
+            Expression::Call {
+                function: struct_get_id,
+                arguments: vec![struct_, key_id],
+            },
+            None,
+        )
     }
 
     fn push(

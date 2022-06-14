@@ -1,7 +1,7 @@
 use log::trace;
 
 use super::value::Value;
-use crate::compiler::lir::ChunkIndex;
+use crate::{compiler::lir::ChunkIndex, builtin_functions::BuiltinFunction};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -27,6 +27,7 @@ pub enum ObjectData {
         captured: Vec<ObjectPointer>,
         body: ChunkIndex,
     },
+    Builtin(BuiltinFunction),
 }
 
 impl Heap {
@@ -110,6 +111,7 @@ impl Heap {
                     self.drop(object);
                 }
             }
+            ObjectData::Builtin(_) => {}
         }
     }
 
@@ -128,6 +130,7 @@ impl Heap {
                 ObjectData::Struct(entries)
             }
             Value::Closure { captured, body } => ObjectData::Closure { captured, body },
+            Value::Builtin(builtin) => ObjectData::Builtin(builtin),
         };
         self.create(value)
     }
@@ -154,6 +157,7 @@ impl Heap {
                 captured: captured.clone(),
                 body: *body,
             },
+            ObjectData::Builtin(builtin) => Value::Builtin(*builtin)
         }
     }
 }

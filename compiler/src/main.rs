@@ -1,5 +1,6 @@
 #![feature(try_trait_v2)]
 #![feature(let_chains)]
+#![feature(never_type)]
 
 mod builtin_functions;
 mod compiler;
@@ -24,8 +25,8 @@ use compiler::lir::Lir;
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use log::{debug, error, info, LevelFilter};
-use lspower::{LspService, Server};
 use notify::{watcher, RecursiveMode, Watcher};
+use tower_lsp::{Server, LspService};
 use std::{
     env::current_dir,
     fs,
@@ -222,9 +223,8 @@ fn run(options: CandyRunOptions) {
 
 async fn lsp() {
     info!("Starting language server…");
-    let (service, messages) = LspService::new(|client| CandyLanguageServer::from_client(client));
-    Server::new(tokio::io::stdin(), tokio::io::stdout())
-        .interleave(messages)
+    let (service, socket) = LspService::new(|client| CandyLanguageServer::from_client(client));
+    Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
         .serve(service)
         .await;
 }
@@ -240,6 +240,7 @@ fn init_logger() {
                 message
             ))
         })
+        .level_for("candy::compiler::hir_to_lir", LevelFilter::Debug)
         .level_for("candy::compiler::string_to_rcst", LevelFilter::Debug)
         .level_for("candy::vm::builtin_functions", LevelFilter::Warn)
         .level_for("candy::vm::heap", LevelFilter::Debug)

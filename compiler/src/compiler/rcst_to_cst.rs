@@ -55,6 +55,10 @@ impl RcstToCstExt for Rcst {
                 state.offset += 1;
                 CstKind::Comma
             }
+            Rcst::Dot => {
+                state.offset += 1;
+                CstKind::Dot
+            }
             Rcst::Colon => {
                 state.offset += 1;
                 CstKind::Colon
@@ -166,6 +170,11 @@ impl RcstToCstExt for Rcst {
                 colon: Box::new(colon.to_cst(state)),
                 value: Box::new(value.to_cst(state)),
                 comma: comma.map(|comma| Box::new(comma.to_cst(state))),
+            },
+            Rcst::StructAccess { struct_, dot, key } => CstKind::StructAccess{
+                struct_: Box::new(struct_.to_cst(state)),
+                dot: Box::new(dot.to_cst(state)),
+                key: Box::new(key.to_cst(state)),
             },
             Rcst::Parenthesized {
                 opening_parenthesis,

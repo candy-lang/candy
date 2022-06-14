@@ -4,7 +4,7 @@ use super::{
     hir::{self, Body, Expression},
     lir::{Chunk, ChunkIndex, Instruction, Lir, StackOffset},
 };
-use crate::{builtin_functions::BuiltinFunction, input::Input};
+use crate::{input::Input, builtin_functions::BuiltinFunction};
 use itertools::Itertools;
 use std::{mem::swap, sync::Arc};
 
@@ -64,6 +64,9 @@ impl LoweringContext {
         assert_eq!(self.stack.len(), stack_size_before + 1); // extra return value
     }
     fn compile_expression(&mut self, id: &hir::Id, expression: &Expression) {
+        log::trace!("Stack: {:?}", self.stack);
+        log::trace!("Compiling expression {:?}", expression);
+
         match expression {
             Expression::Int(int) => self.emit_create_int(id.clone(), *int),
             Expression::Text(text) => self.emit_create_text(id.clone(), text.clone()),
@@ -114,26 +117,15 @@ impl LoweringContext {
                 function,
                 arguments,
             } => {
-                let builtin_function = if let [name] = &function.keys[..] {
-                    crate::builtin_functions::VALUES
-                        .iter()
-                        .filter(|it| format!("builtin{:?}", it) == *name)
-                        .map(|it| *it)
-                        .next()
-                } else {
-                    None
-                };
-
                 for argument in arguments {
                     self.emit_push_from_stack(argument.clone());
                 }
 
-                if let Some(builtin_function) = builtin_function {
-                    self.emit_builtin(id.clone(), builtin_function, arguments.len());
-                } else {
-                    self.emit_push_from_stack(function.clone());
-                    self.emit_call(id.clone(), arguments.len());
-                }
+                self.emit_push_from_stack(function.clone());
+                self.emit_call(id.clone(), arguments.len());
+            }
+            Expression::Builtin(builtin) => {
+                self.emit_create_builtin(id.clone(), *builtin);
             }
             Expression::Error { .. } => self.emit_error(id.to_owned()),
         };
@@ -161,6 +153,10 @@ impl LoweringContext {
         self.emit(Instruction::CreateClosure(chunk));
         self.stack.push(id);
     }
+    fn emit_create_builtin(&mut self, id: hir::Id, builtin: BuiltinFunction) {
+        self.emit(Instruction::CreateBuiltin(builtin));
+        self.stack.push(id);
+    }
     fn emit_pop_multiple_below_top(&mut self, n: usize) {
         self.emit(Instruction::PopMultipleBelowTop(n));
         let top = self.stack.pop().unwrap();
@@ -173,18 +169,13 @@ impl LoweringContext {
         self.stack.push(id);
     }
     fn emit_call(&mut self, id: hir::Id, num_args: usize) {
-        self.emit(Instruction::Call);
-        self.stack.pop(); // closure
+        self.emit(Instruction::Call {num_args});
+        self.stack.pop(); // closure/builtin
         self.stack.pop_multiple(num_args);
         self.stack.push(id);
     }
     fn emit_return(&mut self) {
         self.emit(Instruction::Return);
-    }
-    fn emit_builtin(&mut self, id: hir::Id, builtin: BuiltinFunction, num_args: usize) {
-        self.emit(Instruction::Builtin(builtin));
-        self.stack.pop_multiple(num_args);
-        self.stack.push(id);
     }
     fn emit_debug_value_evaluated(&mut self, id: hir::Id) {
         self.emit(Instruction::DebugValueEvaluated(id));
@@ -196,7 +187,8 @@ impl LoweringContext {
         self.emit(Instruction::DebugClosureExited);
     }
     fn emit_error(&mut self, id: hir::Id) {
-        self.emit(Instruction::Error(id));
+        self.emit(Instruction::Error(id.clone()));
+        self.stack.push(id);
     }
 
     fn emit(&mut self, instruction: Instruction) {

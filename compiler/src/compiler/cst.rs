@@ -36,6 +36,7 @@ pub struct Cst {
 pub enum CstKind {
     EqualsSign,         // =
     Comma,              // ,
+    Dot,                // .
     Colon,              // :
     OpeningParenthesis, // (
     ClosingParenthesis, // )
@@ -88,6 +89,11 @@ pub enum CstKind {
         value: Box<Cst>,
         comma: Option<Box<Cst>>,
     },
+    StructAccess {
+        struct_: Box<Cst>,
+        dot: Box<Cst>,
+        key: Box<Cst>,
+    },
     Lambda {
         opening_curly_brace: Box<Cst>,
         parameters_and_arrow: Option<(Vec<Cst>, Box<Cst>)>,
@@ -111,6 +117,7 @@ impl Display for Cst {
         match &self.kind {
             CstKind::EqualsSign => '='.fmt(f),
             CstKind::Comma => ','.fmt(f),
+            CstKind::Dot => '.'.fmt(f),
             CstKind::Colon => ':'.fmt(f),
             CstKind::OpeningParenthesis => '('.fmt(f),
             CstKind::ClosingParenthesis => ')'.fmt(f),
@@ -188,6 +195,11 @@ impl Display for Cst {
                     comma.fmt(f)?;
                 }
                 Ok(())
+            }
+            CstKind::StructAccess { struct_, dot, key } => {
+                struct_.fmt(f)?;
+                dot.fmt(f)?;
+                key.fmt(f)
             }
             CstKind::Lambda {
                 opening_curly_brace,
@@ -306,6 +318,11 @@ impl UnwrapWhitespaceAndComment for Cst {
                     .as_ref()
                     .map(|comma| Box::new(comma.unwrap_whitespace_and_comment())),
             },
+            CstKind::StructAccess { struct_, dot, key } => CstKind::StructAccess {
+                struct_: Box::new(struct_.unwrap_whitespace_and_comment()),
+                dot: Box::new(dot.unwrap_whitespace_and_comment()),
+                key: Box::new(key.unwrap_whitespace_and_comment()),
+            },
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -370,6 +387,7 @@ impl TreeWithIds for Cst {
         match &self.kind {
             CstKind::EqualsSign => None,
             CstKind::Comma => None,
+            CstKind::Dot => None,
             CstKind::Colon => None,
             CstKind::OpeningParenthesis => None,
             CstKind::ClosingParenthesis => None,
@@ -415,6 +433,10 @@ impl TreeWithIds for Cst {
                 .find(id)
                 .or_else(|| fields.find(id))
                 .or_else(|| closing_bracket.find(id)),
+            CstKind::StructAccess { struct_, dot, key } => struct_
+                .find(id)
+                .or_else(|| dot.find(id))
+                .or_else(|| key.find(id)),
             CstKind::StructField {
                 key,
                 colon,
@@ -461,8 +483,9 @@ impl TreeWithIds for Cst {
     fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
         let inner = match &self.kind {
             CstKind::EqualsSign { .. } => None,
-            CstKind::Colon { .. } => None,
             CstKind::Comma { .. } => None,
+            CstKind::Dot { .. } => None,
+            CstKind::Colon { .. } => None,
             CstKind::OpeningParenthesis { .. } => None,
             CstKind::ClosingParenthesis { .. } => None,
             CstKind::OpeningBracket { .. } => None,
@@ -503,6 +526,10 @@ impl TreeWithIds for Cst {
                 .or_else(|| colon.find_by_offset(offset))
                 .or_else(|| value.find_by_offset(offset))
                 .or_else(|| comma.find_by_offset(offset)),
+            CstKind::StructAccess { struct_, dot, key } => struct_
+                .find_by_offset(offset)
+                .or_else(|| dot.find_by_offset(offset))
+                .or_else(|| key.find_by_offset(offset)),
             CstKind::Lambda { body, .. } => body.find_by_offset(offset),
             CstKind::Assignment {
                 name,

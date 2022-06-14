@@ -141,6 +141,7 @@ impl<'a> Context<'a> {
                 }
                 self.visit_ids(arguments);
             }
+            Expression::Builtin(_) => {}
             Expression::Error { child, .. } => {
                 if let Some(child) = child {
                     self.visit_id(child.clone());

@@ -1,5 +1,5 @@
 use super::{ast_to_hir::AstToHir, error::CompilerError};
-use crate::input::Input;
+use crate::{input::Input, builtin_functions::BuiltinFunction};
 use im::HashMap;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
@@ -50,6 +50,7 @@ impl Expression {
             Expression::Call { arguments, .. } => {
                 ids.extend(arguments.iter().cloned());
             }
+            Expression::Builtin(builtin) => {}
             Expression::Error { .. } => {}
         }
     }
@@ -106,6 +107,7 @@ pub enum Expression {
         function: Id,
         arguments: Vec<Id>,
     },
+    Builtin(BuiltinFunction),
     Error {
         child: Option<Id>,
         errors: Vec<CompilerError>,
@@ -207,6 +209,13 @@ impl fmt::Display for Expression {
                         .join("\n")
                 )
             }
+            Expression::Builtin(builtin) => {
+                write!(
+                    f,
+                    "builtin{:?}",
+                    builtin
+                )
+            }
             Expression::Error { child, errors } => {
                 write!(f, "error")?;
                 for error in errors {
@@ -254,6 +263,7 @@ impl Expression {
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
             Expression::Body(body) => body.find(id),
             Expression::Call { .. } => None,
+            Expression::Builtin(_) => None,
             Expression::Error { .. } => None,
         }
     }
@@ -284,7 +294,8 @@ impl CollectErrors for Expression {
             | Expression::Reference(_)
             | Expression::Symbol(_)
             | Expression::Struct(_)
-            | Expression::Call { .. } => {}
+            | Expression::Call { .. }
+            | Expression::Builtin(_) => {}
             Expression::Lambda(lambda) => lambda.body.collect_errors(errors),
             Expression::Body(body) => body.collect_errors(errors),
             Expression::Error {
