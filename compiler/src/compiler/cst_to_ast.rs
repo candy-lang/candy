@@ -1,7 +1,7 @@
 use super::{
     ast::{
-        self, Ast, AstError, AstKind, AstString, CollectErrors, Identifier, Int, Lambda, Symbol,
-        Text, CallReceiver,
+        self, Ast, AstError, AstKind, AstString, CallReceiver, CollectErrors, Identifier, Int,
+        Lambda, Symbol, Text,
     },
     cst::{self, Cst, CstDb, CstKind},
     error::{CompilerError, CompilerErrorPayload},
@@ -181,13 +181,38 @@ impl LoweringContext {
                 ast
             }
             CstKind::Call { name, arguments } => {
+                let mut name_kind = &name.kind;
+                loop {
+                    name_kind = match name_kind {
+                        CstKind::Parenthesized {
+                            opening_parenthesis,
+                            inner,
+                            closing_parenthesis,
+                        } => {
+                            assert!(
+                                matches!(opening_parenthesis.kind, CstKind::OpeningParenthesis),
+                                "Parenthesized needs to start with opening parenthesis, but started with {}.",
+                                opening_parenthesis
+                            );
+                            assert!(
+                                matches!(
+                                    closing_parenthesis.kind,
+                                    CstKind::ClosingParenthesis
+                                ),
+                                "Parenthesized for a call receiver needs to end with closing parenthesis, but ended with {}.", closing_parenthesis
+                            );
+                            &inner.kind
+                        }
+                        _ => break,
+                    };
+                }
                 let receiver = match &name.kind {
-                    CstKind::Identifier(identifier) => {
-                        Some(CallReceiver::Identifier(self.create_string(name.id.to_owned(), identifier.to_owned())))
-                    }
-                    CstKind::StructAccess { struct_, dot, key } => {
-                        Some(CallReceiver::StructAccess(self.lower_struct_access(struct_, dot, key)))
-                    }
+                    CstKind::Identifier(identifier) => Some(CallReceiver::Identifier(
+                        self.create_string(name.id.to_owned(), identifier.to_owned()),
+                    )),
+                    CstKind::StructAccess { struct_, dot, key } => Some(
+                        CallReceiver::StructAccess(self.lower_struct_access(struct_, dot, key)),
+                    ),
                     _ => None,
                 };
                 let arguments = self.lower_csts(arguments);
@@ -314,10 +339,7 @@ impl LoweringContext {
             CstKind::StructField { .. } => panic!("StructField should only appear in Struct."),
             CstKind::StructAccess { struct_, dot, key } => {
                 let struct_access = self.lower_struct_access(struct_, dot, key);
-                self.create_ast(
-                    cst.id,
-                    AstKind::StructAccess(struct_access),
-                )
+                self.create_ast(cst.id, AstKind::StructAccess(struct_access))
             }
             CstKind::Lambda {
                 opening_curly_brace,

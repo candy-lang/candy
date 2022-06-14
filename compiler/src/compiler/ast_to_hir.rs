@@ -1,6 +1,6 @@
 use super::{
     ast::{
-        self, Assignment, Ast, AstKind, CallReceiver, Identifier, Int, Struct, StructAccess,
+        self, Assignment, Ast, AstKind, Call, CallReceiver, Identifier, Int, Struct, StructAccess,
         Symbol, Text,
     },
     cst::{self, CstDb},
@@ -358,54 +358,7 @@ impl<'c> Compiler<'c> {
                     None,
                 )
             }
-            AstKind::Call(ast::Call {
-                receiver,
-                arguments,
-            }) => {
-                let arguments = arguments
-                    .iter()
-                    .map(|argument| self.compile_single(argument))
-                    .collect();
-
-                let function = match receiver {
-                    CallReceiver::Identifier(name) => match self.identifiers.get(&name.value) {
-                        Some(function) => function.to_owned(),
-                        None => {
-                            return self.push(
-                                Some(name.id.clone()),
-                                Expression::Error {
-                                    child: None,
-                                    errors: vec![CompilerError {
-                                        input: name.id.input.clone(),
-                                        span: self
-                                            .context
-                                            .db
-                                            .ast_id_to_span(name.id.clone())
-                                            .unwrap(),
-                                        payload: CompilerErrorPayload::Hir(
-                                            HirError::UnknownFunction {
-                                                name: name.value.clone(),
-                                            },
-                                        ),
-                                    }],
-                                },
-                                None,
-                            );
-                        }
-                    },
-                    CallReceiver::StructAccess(struct_access) => {
-                        self.lower_struct_access(None, struct_access)
-                    }
-                };
-                self.push(
-                    Some(ast.id.clone()),
-                    Expression::Call {
-                        function,
-                        arguments,
-                    },
-                    None,
-                )
-            }
+            AstKind::Call(call) => self.lower_call(Some(ast.id.clone()), call),
             AstKind::Assignment(Assignment { name, body }) => {
                 let name = name.value.to_owned();
                 let mut inner = Compiler::<'c> {
@@ -457,6 +410,47 @@ impl<'c> Compiler<'c> {
             Expression::Call {
                 function: struct_get_id,
                 arguments: vec![struct_, key_id],
+            },
+            None,
+        )
+    }
+    fn lower_call(&mut self, id: Option<ast::Id>, call: &Call) -> hir::Id {
+        let arguments = call
+            .arguments
+            .iter()
+            .map(|argument| self.compile_single(argument))
+            .collect();
+
+        let function = match call.receiver.clone() {
+            CallReceiver::Identifier(name) => match self.identifiers.get(&name.value) {
+                Some(function) => function.to_owned(),
+                None => {
+                    return self.push(
+                        Some(name.id.clone()),
+                        Expression::Error {
+                            child: None,
+                            errors: vec![CompilerError {
+                                input: name.id.input.clone(),
+                                span: self.context.db.ast_id_to_span(name.id.clone()).unwrap(),
+                                payload: CompilerErrorPayload::Hir(HirError::UnknownFunction {
+                                    name: name.value.clone(),
+                                }),
+                            }],
+                        },
+                        None,
+                    );
+                }
+            },
+            CallReceiver::StructAccess(struct_access) => {
+                self.lower_struct_access(None, &struct_access)
+            }
+            CallReceiver::Call(call) => self.lower_call(None, &*call),
+        };
+        self.push(
+            id,
+            Expression::Call {
+                function,
+                arguments,
             },
             None,
         )

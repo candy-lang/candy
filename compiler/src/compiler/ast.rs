@@ -85,6 +85,7 @@ pub struct Call {
 pub enum CallReceiver {
     Identifier(AstString),
     StructAccess(StructAccess),
+    Call(Box<Call>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -201,17 +202,7 @@ impl Display for Ast {
                         .join("\n")
                 )
             }
-            AstKind::Call(call) => {
-                write!(
-                    f,
-                    "call {} with these arguments:\n{}",
-                    call.receiver,
-                    call.arguments
-                        .iter()
-                        .map(|argument| format!("  {}", argument))
-                        .join("\n")
-                )
-            }
+            AstKind::Call(call) => write!( f, "{}", call ) ,
             AstKind::Assignment(assignment) => {
                 write!(
                     f,
@@ -254,11 +245,25 @@ impl Display for StructAccess {
         )
     }
 }
+impl Display for Call {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+                    f,
+                    "call {} with these arguments:\n{}",
+                    self.receiver,
+                    self.arguments
+                        .iter()
+                        .map(|argument| format!("  {}", argument))
+                        .join("\n")
+                )
+    }
+}
 impl Display for CallReceiver {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             CallReceiver::Identifier(identifier) => write!(f, "{}", identifier),
             CallReceiver::StructAccess(struct_access) => write!(f, "{}", struct_access),
+            CallReceiver::Call(call) => write!(f, "{}", call),
         }
     }
 }
