@@ -152,14 +152,17 @@ impl Vm {
 
     fn type_of(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [value], {
-            Ok(Value::Symbol(match &value {
-                Value::Int(_) => "Int",
-                Value::Text(_) => "Text",
-                Value::Symbol(_) => "Symbol",
-                Value::Struct(_) => "Struct",
-                Value::Closure { .. } => "Function",
-                Value::Builtin { .. } => "Builtin",
-            }.to_owned()))
+            Ok(Value::Symbol(
+                match &value {
+                    Value::Int(_) => "Int",
+                    Value::Text(_) => "Text",
+                    Value::Symbol(_) => "Symbol",
+                    Value::Struct(_) => "Struct",
+                    Value::Closure { .. } => "Function",
+                    Value::Builtin { .. } => "Builtin",
+                }
+                .to_owned(),
+            ))
         })
     }
 
@@ -306,12 +309,5 @@ impl UseTarget {
             result.push(Input::File(path));
         }
         result
-    }
-}
-
-impl Vm {
-    fn pop_value(&mut self) -> Option<Value> {
-        let address = self.data_stack.pop()?;
-        Some(self.heap.export(address))
     }
 }

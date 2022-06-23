@@ -49,7 +49,7 @@ impl Expression {
             Expression::Call { arguments, .. } => {
                 ids.extend(arguments.iter().cloned());
             }
-            Expression::Builtin(builtin) => {}
+            Expression::Builtin(_) => {}
             Expression::Error { .. } => {}
         }
     }
@@ -147,9 +147,6 @@ impl Body {
         if let Some(identifier) = identifier {
             self.identifiers.insert(id, identifier);
         }
-    }
-    pub fn out_id(&self) -> &Id {
-        self.expressions.keys().last().unwrap()
     }
 }
 

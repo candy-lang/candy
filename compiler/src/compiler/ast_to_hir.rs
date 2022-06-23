@@ -485,7 +485,7 @@ impl<'c> Compiler<'c> {
                 add_keys(&self.parent_keys, last_part),
             );
             if !self.id_mapping.contains_key(&id) {
-                self.id_mapping.insert(id.to_owned(), ast_id).is_none();
+                assert!(self.id_mapping.insert(id.to_owned(), ast_id).is_none());
                 return id;
             }
         }
