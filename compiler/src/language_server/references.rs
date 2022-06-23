@@ -129,9 +129,6 @@ impl<'a> Context<'a> {
                 // way. Therfore, we already visit them in [visit_body].
                 self.visit_body(body);
             }
-            Expression::Body(body) => {
-                self.visit_body(body);
-            }
             Expression::Call {
                 function,
                 arguments,

@@ -232,31 +232,26 @@ impl<'c> Compiler<'c> {
         }
 
         assignment_inner.id_mapping = lambda_inner.id_mapping;
-        assignment_inner.push(
+        self.id_mapping = assignment_inner.id_mapping;
+        self.push(
             None,
             Expression::Lambda(Lambda {
                 parameters: vec![lambda_parameter_id],
                 body: lambda_inner.body,
             }),
-            None,
-        );
-
-        self.id_mapping = assignment_inner.id_mapping;
-
-        self.push(
-            None,
-            Expression::Body(assignment_inner.body),
             Some("use".to_string()),
         );
     }
 
-    fn compile(&mut self, asts: &[Ast]) {
+    fn compile(&mut self, asts: &[Ast]) -> hir::Id {
         if asts.is_empty() {
-            self.push(None, Expression::nothing(), None);
+            self.push(None, Expression::nothing(), None)
         } else {
+            let mut last_id = None;
             for ast in asts.into_iter() {
-                self.compile_single(ast);
+                last_id = Some(self.compile_single(ast));
             }
+            last_id.unwrap()
         }
     }
     fn compile_single(&mut self, ast: &Ast) -> hir::Id {
@@ -361,18 +356,10 @@ impl<'c> Compiler<'c> {
             AstKind::Call(call) => self.lower_call(Some(ast.id.clone()), call),
             AstKind::Assignment(Assignment { name, body }) => {
                 let name = name.value.to_owned();
-                let mut inner = Compiler::<'c> {
-                    context: &mut self.context,
-                    id_mapping: self.id_mapping.clone(),
-                    body: Body::new(),
-                    parent_keys: add_keys(&self.parent_keys, name.clone()),
-                    identifiers: self.identifiers.clone(),
-                };
-                inner.compile(&body);
-                self.id_mapping = inner.id_mapping;
+                let body = self.compile(body);
                 self.push(
                     Some(ast.id.clone()),
-                    Expression::Body(inner.body),
+                    Expression::Reference(body),
                     Some(name),
                 )
             }

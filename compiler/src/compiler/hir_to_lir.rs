@@ -4,7 +4,7 @@ use super::{
     hir::{self, Body, Expression},
     lir::{Chunk, ChunkIndex, Instruction, Lir, StackOffset},
 };
-use crate::{input::Input, builtin_functions::BuiltinFunction};
+use crate::{builtin_functions::BuiltinFunction, input::Input};
 use itertools::Itertools;
 use std::{mem::swap, sync::Arc};
 
@@ -109,10 +109,6 @@ impl LoweringContext {
                 let chunk_index = self.registry.register_chunk(lambda_chunk);
                 self.emit_create_closure(id.clone(), chunk_index);
             }
-            Expression::Body(body) => {
-                self.compile_body(body);
-                self.stack.replace_top_id(id.clone());
-            }
             Expression::Call {
                 function,
                 arguments,
@@ -169,7 +165,7 @@ impl LoweringContext {
         self.stack.push(id);
     }
     fn emit_call(&mut self, id: hir::Id, num_args: usize) {
-        self.emit(Instruction::Call {num_args});
+        self.emit(Instruction::Call { num_args });
         self.stack.pop(); // closure/builtin
         self.stack.pop_multiple(num_args);
         self.stack.push(id);

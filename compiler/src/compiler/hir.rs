@@ -1,5 +1,5 @@
 use super::{ast_to_hir::AstToHir, error::CompilerError};
-use crate::{input::Input, builtin_functions::BuiltinFunction};
+use crate::{builtin_functions::BuiltinFunction, input::Input};
 use im::HashMap;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
@@ -13,7 +13,7 @@ pub trait HirDb: AstToHir {
 fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
     let (hir, _) = db.hir(id.input.clone()).unwrap();
     if id.is_root() {
-        return Some(Expression::Body(hir.as_ref().to_owned()));
+        panic!("You can't get the root because that got lowered into multiple IDs.");
     }
 
     hir.find(&id).map(|it| it.to_owned())
@@ -46,7 +46,6 @@ impl Expression {
                 // }
                 body.collect_all_ids(ids);
             }
-            Expression::Body(body) => body.collect_all_ids(ids),
             Expression::Call { arguments, .. } => {
                 ids.extend(arguments.iter().cloned());
             }
@@ -102,7 +101,6 @@ pub enum Expression {
     Symbol(String),
     Struct(HashMap<Id, Id>),
     Lambda(Lambda),
-    Body(Body),
     Call {
         function: Id,
         arguments: Vec<Id>,
@@ -184,16 +182,7 @@ impl fmt::Display for Expression {
                         .join("\n"),
                 )
             }
-            Expression::Body(body) => {
-                write!(
-                    f,
-                    "body {{\n{}\n}}",
-                    body.to_string()
-                        .lines()
-                        .map(|line| format!("  {}", line))
-                        .join("\n"),
-                )
-            }
+
             Expression::Call {
                 function,
                 arguments,
@@ -210,11 +199,7 @@ impl fmt::Display for Expression {
                 )
             }
             Expression::Builtin(builtin) => {
-                write!(
-                    f,
-                    "builtin{:?}",
-                    builtin
-                )
+                write!(f, "builtin{:?}", builtin)
             }
             Expression::Error { child, errors } => {
                 write!(f, "error")?;
@@ -261,7 +246,6 @@ impl Expression {
             Expression::Symbol { .. } => None,
             Expression::Struct(_) => None,
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
-            Expression::Body(body) => body.find(id),
             Expression::Call { .. } => None,
             Expression::Builtin(_) => None,
             Expression::Error { .. } => None,
@@ -297,7 +281,6 @@ impl CollectErrors for Expression {
             | Expression::Call { .. }
             | Expression::Builtin(_) => {}
             Expression::Lambda(lambda) => lambda.body.collect_errors(errors),
-            Expression::Body(body) => body.collect_errors(errors),
             Expression::Error {
                 errors: the_errors, ..
             } => {
