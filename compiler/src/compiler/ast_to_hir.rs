@@ -123,19 +123,17 @@ impl<'c> Compiler<'c> {
     }
 
     fn generate_use(&mut self) {
-        // HirId(~:test.candy:use) = body {
-        //   HirId(~:test.candy:use:0) = lambda { HirId(~:test.candy:use:0:target) ->
-        //     HirId(~:test.candy:use:0:0) = builtinPanic
-        //     HirId(~:test.candy:use:0:1) = builtinUse
-        //     HirId(~:test.candy:use:0:2) = int 0
-        //     HirId(~:test.candy:use:0:3) = text "test.candy"
-        //     HirId(~:test.candy:use:0:path) = struct [
-        //       HirId(~:test.candy:use:0:2): HirId(~:test.candy:use:0:3),
-        //     ]
-        //     HirId(~:test.candy:use:0:module) = call HirId(~:test.candy:use:0:1) with these arguments:
-        //       HirId(~:test.candy:use:0:path)
-        //       HirId(~:test.candy:use:0:target)
-        //   }
+        // HirId(~:test.candy:use) = lambda { HirId(~:test.candy:use:target) ->
+        //   HirId(~:test.candy:use:panic) = builtinPanic
+        //   HirId(~:test.candy:use:use) = builtinUse
+        //   HirId(~:test.candy:use:key) = int 0
+        //   HirId(~:test.candy:use:raw_path) = text "test.candy"
+        //   HirId(~:test.candy:use:currentPath) = struct [
+        //     HirId(~:test.candy:use:key): HirId(~:test.candy:use:raw_path),
+        //   ]
+        //   HirId(~:test.candy:use:importedModule) = call HirId(~:test.candy:use:use) with these arguments:
+        //     HirId(~:test.candy:use:currentPath)
+        //     HirId(~:test.candy:use:target)
         // }
         let mut assignment_inner = Compiler::<'c> {
             context: &mut self.context,
@@ -145,7 +143,7 @@ impl<'c> Compiler<'c> {
             identifiers: self.identifiers.clone(),
         };
 
-        let lambda_keys = add_keys(&assignment_inner.parent_keys, "0".to_string());
+        let lambda_keys = assignment_inner.parent_keys;
         let lambda_parameter_id = hir::Id::new(
             assignment_inner.context.input.clone(),
             add_keys(&lambda_keys[..], "target".to_string()),
@@ -158,11 +156,18 @@ impl<'c> Compiler<'c> {
             identifiers: assignment_inner.identifiers.clone(),
         };
 
-        let panic_id = lambda_inner.push(None, Expression::Builtin(BuiltinFunction::Panic), None);
+        let panic_id = lambda_inner.push(
+            None,
+            Expression::Builtin(BuiltinFunction::Panic),
+            Some("panic".to_string()),
+        );
         match &lambda_inner.context.input {
             Input::File(path) => {
-                let use_id =
-                    lambda_inner.push(None, Expression::Builtin(BuiltinFunction::Use), None);
+                let use_id = lambda_inner.push(
+                    None,
+                    Expression::Builtin(BuiltinFunction::Use),
+                    Some("use".to_string()),
+                );
                 let current_path_content = path
                     .iter()
                     .enumerate()
@@ -171,14 +176,12 @@ impl<'c> Compiler<'c> {
                             lambda_inner.push(
                                 None,
                                 Expression::Int(index as u64),
-                                // Some("key".to_string()),
-                                None,
+                                Some("key".to_string()),
                             ),
                             lambda_inner.push(
                                 None,
                                 Expression::Text(it.to_owned()),
-                                // Some("raw_path".to_string()),
-                                None,
+                                Some("rawPath".to_string()),
                             ),
                         )
                     })
@@ -186,7 +189,7 @@ impl<'c> Compiler<'c> {
                 let current_path = lambda_inner.push(
                     None,
                     Expression::Struct(current_path_content),
-                    Some("path".to_string()),
+                    Some("currentPath".to_string()),
                 );
                 lambda_inner.push(
                     None,
@@ -194,7 +197,7 @@ impl<'c> Compiler<'c> {
                         function: use_id,
                         arguments: vec![current_path, lambda_parameter_id.clone()],
                     },
-                    Some("module".to_string()),
+                    Some("importedModule".to_string()),
                 );
             }
             Input::ExternalFile(_) => {
