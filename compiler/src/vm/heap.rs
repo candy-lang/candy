@@ -1,7 +1,7 @@
 use log::trace;
 
 use super::value::Value;
-use crate::{compiler::lir::ChunkIndex, builtin_functions::BuiltinFunction};
+use crate::{builtin_functions::BuiltinFunction, compiler::lir::ChunkIndex};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -115,7 +115,7 @@ impl Heap {
         }
     }
 
-    pub(super) fn import(&mut self, value: Value) -> ObjectPointer {
+    pub fn import(&mut self, value: Value) -> ObjectPointer {
         let value = match value {
             Value::Int(int) => ObjectData::Int(int),
             Value::Text(text) => ObjectData::Text(text),
@@ -134,7 +134,7 @@ impl Heap {
         };
         self.create(value)
     }
-    pub(super) fn export(&mut self, address: ObjectPointer) -> Value {
+    pub fn export(&mut self, address: ObjectPointer) -> Value {
         let value = self.export_without_dropping(address);
         self.drop(address);
         value
@@ -157,7 +157,7 @@ impl Heap {
                 captured: captured.clone(),
                 body: *body,
             },
-            ObjectData::Builtin(builtin) => Value::Builtin(*builtin)
+            ObjectData::Builtin(builtin) => Value::Builtin(*builtin),
         }
     }
 }

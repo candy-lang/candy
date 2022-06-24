@@ -2,23 +2,31 @@ use super::{
     heap::{Heap, ObjectData, ObjectPointer},
     value::Value,
 };
-use crate::compiler::{
-    hir,
-    lir::{Chunk, ChunkIndex, Instruction},
+use crate::{
+    compiler::{
+        ast_to_hir::AstToHir,
+        cst::CstDb,
+        cst_to_ast::CstToAst,
+        hir,
+        lir::{Chunk, ChunkIndex, Instruction},
+    },
+    database::Database,
+    input::Input,
+    language_server::utils::LspPositionConversion,
 };
 use itertools::Itertools;
-use log::{debug, trace};
+use log::{debug, error, trace};
 use std::collections::HashMap;
 
 /// A VM can execute some byte code.
 pub struct Vm {
-    pub(super) chunks: Vec<Chunk>,
-    pub(super) status: Status,
+    pub chunks: Vec<Chunk>,
+    pub status: Status,
     next_instruction: ByteCodePointer,
-    pub(super) heap: Heap,
-    pub(super) data_stack: Vec<ObjectPointer>,
-    pub(super) function_stack: Vec<ByteCodePointer>,
-    pub(super) debug_stack: Vec<DebugEntry>,
+    pub heap: Heap,
+    pub data_stack: Vec<ObjectPointer>,
+    pub function_stack: Vec<ByteCodePointer>,
+    pub debug_stack: Vec<DebugEntry>,
     pub fuzzable_closures: Vec<ObjectPointer>,
 }
 
@@ -245,5 +253,24 @@ impl Vm {
 
     pub fn current_stack_trace(&self) -> Vec<DebugEntry> {
         self.debug_stack.clone()
+    }
+}
+
+pub fn dump_panicked_vm(db: &Database, input: Input, vm: &Vm, value: Value) {
+    error!("VM panicked: {:#?}", value);
+    error!("Stack trace:");
+    let (_, hir_to_ast_ids) = db.hir(input.clone()).unwrap();
+    let (_, ast_to_cst_ids) = db.ast(input.clone()).unwrap();
+    for entry in vm.current_stack_trace().into_iter().rev() {
+        let hir_id = entry.id;
+        let ast_id = hir_to_ast_ids[&hir_id].clone();
+        let cst_id = ast_to_cst_ids[&ast_id];
+        let cst = db.find_cst(input.clone(), cst_id);
+        let start = db.offset_to_lsp(input.clone(), cst.span.start);
+        let end = db.offset_to_lsp(input.clone(), cst.span.end);
+        error!(
+            "{}, {}, {:?}, {}:{} – {}:{}",
+            hir_id, ast_id, cst_id, start.0, start.1, end.0, end.1
+        );
     }
 }

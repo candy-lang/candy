@@ -3,4 +3,4 @@ mod heap;
 pub mod value;
 mod vm;
 
-pub use vm::{Status, Vm};
+pub use vm::{dump_panicked_vm, Status, Vm};
