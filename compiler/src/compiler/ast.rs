@@ -74,6 +74,7 @@ pub struct StructAccess {
 pub struct Lambda {
     pub parameters: Vec<AstString>,
     pub body: Vec<Ast>,
+    pub fuzzable: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -183,18 +184,21 @@ impl Display for Ast {
                 )
             }
             AstKind::StructAccess(struct_access) => write!(f, "{}", struct_access),
-            AstKind::Lambda(lambda) => {
+            AstKind::Lambda(Lambda {
+                parameters,
+                body,
+                fuzzable,
+            }) => {
                 write!(
                     f,
-                    "lambda {{ {} ->\n{}\n}}",
-                    lambda
-                        .parameters
-                        .iter()
-                        .map(|it| format!("{}", it))
-                        .join(" "),
-                    lambda
-                        .body
-                        .iter()
+                    "lambda ({}) {{ {} ->\n{}\n}}",
+                    if *fuzzable {
+                        "fuzzable"
+                    } else {
+                        "non-fuzzable"
+                    },
+                    parameters.iter().map(|it| format!("{}", it)).join(" "),
+                    body.iter()
                         .map(|it| format!("{}", it))
                         .join("\n")
                         .lines()
@@ -202,7 +206,7 @@ impl Display for Ast {
                         .join("\n")
                 )
             }
-            AstKind::Call(call) => write!( f, "{}", call ) ,
+            AstKind::Call(call) => write!(f, "{}", call),
             AstKind::Assignment(assignment) => {
                 write!(
                     f,
@@ -248,14 +252,14 @@ impl Display for StructAccess {
 impl Display for Call {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
-                    f,
-                    "call {} with these arguments:\n{}",
-                    self.receiver,
-                    self.arguments
-                        .iter()
-                        .map(|argument| format!("  {}", argument))
-                        .join("\n")
-                )
+            f,
+            "call {} with these arguments:\n{}",
+            self.receiver,
+            self.arguments
+                .iter()
+                .map(|argument| format!("  {}", argument))
+                .join("\n")
+        )
     }
 }
 impl Display for CallReceiver {

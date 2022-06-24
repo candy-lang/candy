@@ -377,7 +377,14 @@ impl LoweringContext {
                     });
                 }
 
-                let mut ast = self.create_ast(cst.id, AstKind::Lambda(Lambda { parameters, body }));
+                let mut ast = self.create_ast(
+                    cst.id,
+                    AstKind::Lambda(Lambda {
+                        parameters,
+                        body,
+                        fuzzable: false,
+                    }),
+                );
                 if !errors.is_empty() {
                     ast = self.create_ast(
                         cst.id,
@@ -407,8 +414,14 @@ impl LoweringContext {
                 let mut body = self.lower_csts(body);
 
                 if !parameters.is_empty() {
-                    body =
-                        vec![self.create_ast(cst.id, AstKind::Lambda(Lambda { parameters, body }))];
+                    body = vec![self.create_ast(
+                        cst.id,
+                        AstKind::Lambda(Lambda {
+                            parameters,
+                            body,
+                            fuzzable: true,
+                        }),
+                    )];
                 }
 
                 let mut ast =

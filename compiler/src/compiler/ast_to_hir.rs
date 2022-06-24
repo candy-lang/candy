@@ -241,6 +241,7 @@ impl<'c> Compiler<'c> {
             Expression::Lambda(Lambda {
                 parameters: vec![lambda_parameter_id],
                 body: lambda_inner.body,
+                fuzzable: false,
             }),
             Some("use".to_string()),
         );
@@ -313,6 +314,7 @@ impl<'c> Compiler<'c> {
             AstKind::Lambda(ast::Lambda {
                 parameters,
                 body: body_asts,
+                fuzzable,
             }) => {
                 let mut body = Body::new();
                 let lambda_id = self.create_next_id(Some(ast.id.clone()), None);
@@ -352,6 +354,7 @@ impl<'c> Compiler<'c> {
                             })
                             .collect(),
                         body: inner.body,
+                        fuzzable: *fuzzable,
                     }),
                     None,
                 )
