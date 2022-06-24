@@ -65,6 +65,9 @@ pub enum Instruction {
     /// a, caller, return value -> a, return value
     Return,
 
+    /// Indicates that a fuzzable closure sits at the top of the stack.
+    RegisterFuzzableClosure(hir::Id),
+
     /// Indicates that a value for the given id was evaluated and is at the top
     /// of the stack.
     DebugValueEvaluated(hir::Id),
@@ -98,8 +101,13 @@ impl Display for Lir {
                         writeln!(f, "popMultipleBelowTop {}", count)
                     }
                     Instruction::PushFromStack(offset) => writeln!(f, "pushFromStack {}", offset),
-                    Instruction::Call { num_args } => writeln!(f, "call with {} arguments", num_args),
+                    Instruction::Call { num_args } => {
+                        writeln!(f, "call with {} arguments", num_args)
+                    }
                     Instruction::Return => writeln!(f, "return"),
+                    Instruction::RegisterFuzzableClosure(hir_id) => {
+                        writeln!(f, "registerFuzzableClosure {}", hir_id)
+                    }
                     Instruction::DebugValueEvaluated(hir_id) => {
                         writeln!(f, "debugValueEvaluated {}", hir_id)
                     }

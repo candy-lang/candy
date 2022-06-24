@@ -108,6 +108,9 @@ impl LoweringContext {
                 };
                 let chunk_index = self.registry.register_chunk(lambda_chunk);
                 self.emit_create_closure(id.clone(), chunk_index);
+                if lambda.fuzzable {
+                    self.emit_register_fuzzable_closure(id.clone());
+                }
             }
             Expression::Call {
                 function,
@@ -172,6 +175,9 @@ impl LoweringContext {
     }
     fn emit_return(&mut self) {
         self.emit(Instruction::Return);
+    }
+    fn emit_register_fuzzable_closure(&mut self, id: hir::Id) {
+        self.emit(Instruction::RegisterFuzzableClosure(id));
     }
     fn emit_debug_value_evaluated(&mut self, id: hir::Id) {
         self.emit(Instruction::DebugValueEvaluated(id));

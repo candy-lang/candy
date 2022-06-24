@@ -19,6 +19,7 @@ pub struct Vm {
     pub(super) data_stack: Vec<ObjectPointer>,
     pub(super) function_stack: Vec<ByteCodePointer>,
     pub(super) debug_stack: Vec<DebugEntry>,
+    pub fuzzable_closures: Vec<ObjectPointer>,
 }
 
 #[derive(Clone)]
@@ -53,6 +54,7 @@ impl Vm {
             data_stack: vec![],
             function_stack: vec![],
             debug_stack: vec![],
+            fuzzable_closures: vec![],
         }
     }
 
@@ -188,6 +190,10 @@ impl Vm {
             Instruction::Return => {
                 let caller = self.function_stack.pop().unwrap();
                 self.next_instruction = caller;
+            }
+            Instruction::RegisterFuzzableClosure(_) => {
+                let closure = self.data_stack.last().unwrap().clone();
+                self.fuzzable_closures.push(closure);
             }
             Instruction::DebugValueEvaluated(id) => {
                 let address = *self.data_stack.last().unwrap();
