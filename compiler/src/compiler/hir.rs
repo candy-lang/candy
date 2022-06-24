@@ -27,11 +27,13 @@ fn all_hir_ids(db: &dyn HirDb, input: Input) -> Option<Vec<Id>> {
 }
 
 impl Expression {
-    fn collect_all_ids(&self, ids: &mut Vec<Id>) {
+    pub fn collect_all_ids(&self, ids: &mut Vec<Id>) {
         match self {
             Expression::Int(_) => {}
             Expression::Text(_) => {}
-            Expression::Reference(_) => {}
+            Expression::Reference(id) => {
+                ids.push(id.clone());
+            }
             Expression::Symbol(_) => {}
             Expression::Struct(entries) => {
                 for (key_id, value_id) in entries.iter() {
@@ -39,14 +41,19 @@ impl Expression {
                     ids.push(value_id.to_owned());
                 }
             }
-            Expression::Lambda(Lambda { body, .. }) => {
-                // TODO: list parameter IDs?
-                // for (index, _) in parameters.iter().enumerate() {
-                //     ids.push(first_id.to_owned() + index);
-                // }
+            Expression::Lambda(Lambda {
+                parameters, body, ..
+            }) => {
+                for parameter in parameters {
+                    ids.push(parameter.clone());
+                }
                 body.collect_all_ids(ids);
             }
-            Expression::Call { arguments, .. } => {
+            Expression::Call {
+                function,
+                arguments,
+            } => {
+                ids.push(function.clone());
                 ids.extend(arguments.iter().cloned());
             }
             Expression::Builtin(_) => {}
@@ -121,12 +128,22 @@ impl Expression {
 pub struct Lambda {
     pub parameters: Vec<Id>,
     pub body: Body,
+    pub fuzzable: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Body {
     pub expressions: LinkedHashMap<Id, Expression>,
     pub identifiers: HashMap<Id, String>,
+}
+impl Body {
+    pub fn return_value(&self) -> Id {
+        self.expressions
+            .keys()
+            .last()
+            .expect("no expressions")
+            .clone()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -170,7 +187,12 @@ impl fmt::Display for Expression {
             Expression::Lambda(lambda) => {
                 write!(
                     f,
-                    "lambda {{ {}\n}}",
+                    "lambda ({}) {{ {}\n}}",
+                    if lambda.fuzzable {
+                        "fuzzable"
+                    } else {
+                        "non-fuzzable"
+                    },
                     lambda
                         .to_string()
                         .lines()

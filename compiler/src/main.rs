@@ -26,7 +26,6 @@ use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use log::{debug, error, info, LevelFilter};
 use notify::{watcher, RecursiveMode, Watcher};
-use tower_lsp::{Server, LspService};
 use std::{
     env::current_dir,
     fs,
@@ -35,6 +34,7 @@ use std::{
     time::Duration,
 };
 use structopt::StructOpt;
+use tower_lsp::{LspService, Server};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "candy", about = "The 🍭 Candy CLI.")]
@@ -105,8 +105,8 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         .rcst(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if debug {
-        let hir_file = file.clone_with_extension("candy.rcst");
-        fs::write(hir_file, format!("{:#?}\n", rcst.clone())).unwrap();
+        let rcst_file = file.clone_with_extension("candy.rcst");
+        fs::write(rcst_file, format!("{:#?}\n", rcst.clone())).unwrap();
     }
 
     info!("Turning RCST to CST…");
