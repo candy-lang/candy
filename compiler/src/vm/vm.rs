@@ -195,6 +195,25 @@ impl Vm {
                     _ => panic!("Can only call closures and builtins."),
                 };
             }
+            Instruction::Needs => {
+                let condition = self.data_stack.pop().unwrap();
+                match self.heap.get(condition).data.clone() {
+                    ObjectData::Symbol(symbol) => match symbol.as_str() {
+                        "True" => {
+                            self.data_stack.push(self.heap.import(Value::nothing()));
+                        }
+                        "False" => {
+                            self.panic("Need failed.".to_string());
+                        }
+                        _ => {
+                            self.panic(format!("Needs expects True or False as a symbol."));
+                        }
+                    },
+                    _ => {
+                        self.panic(format!("Needs expects a boolean symbol."));
+                    }
+                }
+            }
             Instruction::Return => {
                 let caller = self.function_stack.pop().unwrap();
                 self.next_instruction = caller;

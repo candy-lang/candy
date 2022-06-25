@@ -60,6 +60,11 @@ pub enum Instruction {
         num_args: usize,
     },
 
+    /// Pops a boolean. If it's true, pushes Nothing. If it's false, panics.
+    ///
+    /// a, condition -> a, Nothing
+    Needs,
+
     /// Returns from the current closure to the original caller.
     ///
     /// a, caller, return value -> a, return value
@@ -104,6 +109,7 @@ impl Display for Lir {
                     Instruction::Call { num_args } => {
                         writeln!(f, "call with {} arguments", num_args)
                     }
+                    Instruction::Needs => writeln!(f, "needs"),
                     Instruction::Return => writeln!(f, "return"),
                     Instruction::RegisterFuzzableClosure(hir_id) => {
                         writeln!(f, "registerFuzzableClosure {}", hir_id)

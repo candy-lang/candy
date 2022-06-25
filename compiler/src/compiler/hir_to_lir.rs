@@ -126,6 +126,10 @@ impl LoweringContext {
             Expression::Builtin(builtin) => {
                 self.emit_create_builtin(id.clone(), *builtin);
             }
+            Expression::Needs { condition } => {
+                self.emit_push_from_stack(*condition.clone());
+                self.emit_needs(id.clone());
+            }
             Expression::Error { .. } => self.emit_error(id.to_owned()),
         };
         self.emit_debug_value_evaluated(id.clone());
@@ -172,6 +176,9 @@ impl LoweringContext {
         self.stack.pop(); // closure/builtin
         self.stack.pop_multiple(num_args);
         self.stack.push(id);
+    }
+    fn emit_needs(&mut self, id: hir::Id) {
+        self.emit(Instruction::Needs);
     }
     fn emit_return(&mut self) {
         self.emit(Instruction::Return);

@@ -14,6 +14,7 @@ use crate::{
     input::Input,
 };
 use im::HashMap;
+use itertools::Itertools;
 use std::{ops::Range, sync::Arc};
 
 #[salsa::query_group(AstToHirStorage)]
@@ -412,28 +413,52 @@ impl<'c> Compiler<'c> {
             .arguments
             .iter()
             .map(|argument| self.compile_single(argument))
-            .collect();
+            .collect_vec();
 
         let function = match call.receiver.clone() {
-            CallReceiver::Identifier(name) => match self.identifiers.get(&name.value) {
-                Some(function) => function.to_owned(),
-                None => {
+            CallReceiver::Identifier(name) => {
+                if name.value == "needs" {
                     return self.push(
-                        Some(name.id.clone()),
-                        Expression::Error {
-                            child: None,
-                            errors: vec![CompilerError {
-                                input: name.id.input.clone(),
-                                span: self.context.db.ast_id_to_span(name.id.clone()).unwrap(),
-                                payload: CompilerErrorPayload::Hir(HirError::UnknownFunction {
-                                    name: name.value.clone(),
-                                }),
-                            }],
+                        id,
+                        if arguments.len() == 1 {
+                            Expression::Needs {
+                                condition: Box::new(arguments.first().unwrap().clone()),
+                            }
+                        } else {
+                            Expression::Error {
+                                child: None,
+                                errors: vec![CompilerError {
+                                    input: name.id.input.clone(),
+                                    span: self.context.db.ast_id_to_span(name.id.clone()).unwrap(),
+                                    payload: CompilerErrorPayload::Hir(
+                                        HirError::NeedsWithWrongNumberOfArguments,
+                                    ),
+                                }],
+                            }
                         },
                         None,
                     );
                 }
-            },
+                match self.identifiers.get(&name.value) {
+                    Some(function) => function.to_owned(),
+                    None => {
+                        return self.push(
+                            Some(name.id.clone()),
+                            Expression::Error {
+                                child: None,
+                                errors: vec![CompilerError {
+                                    input: name.id.input.clone(),
+                                    span: self.context.db.ast_id_to_span(name.id.clone()).unwrap(),
+                                    payload: CompilerErrorPayload::Hir(HirError::UnknownFunction {
+                                        name: name.value.clone(),
+                                    }),
+                                }],
+                            },
+                            None,
+                        );
+                    }
+                }
+            }
             CallReceiver::StructAccess(struct_access) => {
                 self.lower_struct_access(None, &struct_access)
             }

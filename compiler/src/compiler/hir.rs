@@ -57,6 +57,9 @@ impl Expression {
                 ids.extend(arguments.iter().cloned());
             }
             Expression::Builtin(_) => {}
+            Expression::Needs { condition } => {
+                ids.push(*condition.clone());
+            }
             Expression::Error { .. } => {}
         }
     }
@@ -113,6 +116,9 @@ pub enum Expression {
         arguments: Vec<Id>,
     },
     Builtin(BuiltinFunction),
+    Needs {
+        condition: Box<Id>,
+    },
     Error {
         child: Option<Id>,
         errors: Vec<CompilerError>,
@@ -150,6 +156,7 @@ impl Body {
 pub enum HirError {
     UnknownReference { symbol: String },
     UnknownFunction { name: String },
+    NeedsWithWrongNumberOfArguments,
 }
 
 impl Body {
@@ -220,6 +227,9 @@ impl fmt::Display for Expression {
             Expression::Builtin(builtin) => {
                 write!(f, "builtin{:?}", builtin)
             }
+            Expression::Needs { condition } => {
+                write!(f, "needs {}", condition)
+            }
             Expression::Error { child, errors } => {
                 write!(f, "error")?;
                 for error in errors {
@@ -267,6 +277,7 @@ impl Expression {
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
             Expression::Call { .. } => None,
             Expression::Builtin(_) => None,
+            Expression::Needs { .. } => None,
             Expression::Error { .. } => None,
         }
     }
@@ -298,7 +309,8 @@ impl CollectErrors for Expression {
             | Expression::Symbol(_)
             | Expression::Struct(_)
             | Expression::Call { .. }
-            | Expression::Builtin(_) => {}
+            | Expression::Builtin(_)
+            | Expression::Needs { .. } => {}
             Expression::Lambda(lambda) => lambda.body.collect_errors(errors),
             Expression::Error {
                 errors: the_errors, ..
