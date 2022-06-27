@@ -1,5 +1,6 @@
 use super::{
     heap::{Heap, ObjectData, ObjectPointer},
+    tracer::{TraceEntry, Tracer},
     value::Value,
 };
 use crate::{
@@ -7,7 +8,6 @@ use crate::{
         ast_to_hir::AstToHir,
         cst::CstDb,
         cst_to_ast::CstToAst,
-        hir,
         lir::{Chunk, ChunkIndex, Instruction},
     },
     database::Database,
@@ -25,8 +25,8 @@ pub struct Vm {
     next_instruction: ByteCodePointer,
     pub heap: Heap,
     pub data_stack: Vec<ObjectPointer>,
-    pub function_stack: Vec<ByteCodePointer>,
-    pub debug_stack: Vec<DebugEntry>,
+    pub call_stack: Vec<ByteCodePointer>,
+    pub tracer: Tracer,
     pub fuzzable_closures: Vec<ObjectPointer>,
 }
 
@@ -43,12 +43,6 @@ pub struct ByteCodePointer {
     instruction: usize,
 }
 
-#[derive(Debug, Clone)]
-pub struct DebugEntry {
-    pub id: hir::Id,
-    pub data_stack: Vec<Value>,
-}
-
 impl Vm {
     pub fn new(chunks: Vec<Chunk>) -> Self {
         Self {
@@ -60,8 +54,8 @@ impl Vm {
             },
             heap: Heap::new(),
             data_stack: vec![],
-            function_stack: vec![],
-            debug_stack: vec![],
+            call_stack: vec![],
+            tracer: Tracer::default(),
             fuzzable_closures: vec![],
         }
     }
@@ -177,7 +171,7 @@ impl Vm {
                             return;
                         }
 
-                        self.function_stack.push(self.next_instruction);
+                        self.call_stack.push(self.next_instruction);
                         self.data_stack.append(&mut captured.clone());
                         for captured in captured {
                             self.heap.dup(captured);
@@ -215,47 +209,39 @@ impl Vm {
                 }
             }
             Instruction::Return => {
-                let caller = self.function_stack.pop().unwrap();
+                let caller = self.call_stack.pop().unwrap();
                 self.next_instruction = caller;
             }
             Instruction::RegisterFuzzableClosure(_) => {
                 let closure = self.data_stack.last().unwrap().clone();
                 self.fuzzable_closures.push(closure);
             }
-            Instruction::DebugValueEvaluated(id) => {
+            Instruction::TraceValueEvaluated(id) => {
                 let address = *self.data_stack.last().unwrap();
                 let value = self.heap.export_without_dropping(address);
                 debug!("{} = {}", id, value);
             }
-            Instruction::DebugClosureEntered(id) => {
-                let mut stack = vec![];
-                for entry in &self.data_stack {
-                    stack.push(self.heap.export_without_dropping(*entry));
-                }
+            Instruction::TraceCallStarts { id, num_args } => {
+                let closure_address = self.data_stack.last().unwrap();
+                let closure = self.heap.export_without_dropping(*closure_address);
 
-                self.debug_stack.push(DebugEntry {
-                    id,
-                    data_stack: stack,
-                });
+                let mut args = vec![];
+                let stack_size = self.data_stack.len();
+                for i in 0..num_args {
+                    let address = self.data_stack[stack_size - i - 2];
+                    let argument = self.heap.export_without_dropping(address);
+                    args.push(argument);
+                }
+                args.reverse();
+
+                self.tracer
+                    .push(TraceEntry::CallStarted { id, closure, args });
             }
-            Instruction::DebugClosureExited => {
-                let entry = self.debug_stack.pop().unwrap();
-                trace!("Exited closure {}.", entry.id);
-                trace!(
-                    "Stack before: {:?}",
-                    entry
-                        .data_stack
-                        .iter()
-                        .map(|value| format!("{}", value))
-                        .join(", ")
-                );
-                trace!(
-                    "Stack after:  {:?}",
-                    self.data_stack
-                        .iter()
-                        .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
-                        .join(", ")
-                );
+            Instruction::TraceCallEnds => {
+                let return_value_address = self.data_stack.last().unwrap();
+                let return_value = self.heap.export_without_dropping(*return_value_address);
+
+                self.tracer.push(TraceEntry::CallEnded { return_value });
             }
             Instruction::Error(error) => {
                 self.panic(
@@ -270,26 +256,40 @@ impl Vm {
         Value::Symbol("Never".to_string())
     }
 
-    pub fn current_stack_trace(&self) -> Vec<DebugEntry> {
-        self.debug_stack.clone()
+    pub fn current_stack_trace(&self) -> Vec<ByteCodePointer> {
+        self.call_stack.clone()
+    }
+
+    pub fn run_closure(&mut self, closure_address: ObjectPointer, arguments: Vec<Value>) {
+        let num_args = arguments.len();
+        for arg in arguments {
+            let address = self.heap.import(arg);
+            self.data_stack.push(address);
+        }
+        self.data_stack.push(closure_address);
+        self.run_instruction(Instruction::Call { num_args });
+
+        self.status = Status::Running;
     }
 }
 
 pub fn dump_panicked_vm(db: &Database, input: Input, vm: &Vm, value: Value) {
     error!("VM panicked: {:#?}", value);
     error!("Stack trace:");
-    let (_, hir_to_ast_ids) = db.hir(input.clone()).unwrap();
-    let (_, ast_to_cst_ids) = db.ast(input.clone()).unwrap();
+    // let (_, hir_to_ast_ids) = db.hir(input.clone()).unwrap();
+    // let (_, ast_to_cst_ids) = db.ast(input.clone()).unwrap();
     for entry in vm.current_stack_trace().into_iter().rev() {
-        let hir_id = entry.id;
-        let ast_id = hir_to_ast_ids[&hir_id].clone();
-        let cst_id = ast_to_cst_ids[&ast_id];
-        let cst = db.find_cst(input.clone(), cst_id);
-        let start = db.offset_to_lsp(input.clone(), cst.span.start);
-        let end = db.offset_to_lsp(input.clone(), cst.span.end);
-        error!(
-            "{}, {}, {:?}, {}:{} – {}:{}",
-            hir_id, ast_id, cst_id, start.0, start.1, end.0, end.1
-        );
+        error!("{:?}", entry);
+
+        // let hir_id = entry.id;
+        // let ast_id = hir_to_ast_ids[&hir_id].clone();
+        // let cst_id = ast_to_cst_ids[&ast_id];
+        // let cst = db.find_cst(input.clone(), cst_id);
+        // let start = db.offset_to_lsp(input.clone(), cst.span.start);
+        // let end = db.offset_to_lsp(input.clone(), cst.span.end);
+        // error!(
+        //     "{}, {}, {:?}, {}:{} – {}:{}",
+        //     hir_id, ast_id, cst_id, start.0, start.1, end.0, end.1
+        // );
     }
 }

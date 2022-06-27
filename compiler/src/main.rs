@@ -60,6 +60,9 @@ struct CandyBuildOptions {
 
 #[derive(StructOpt, Debug)]
 struct CandyRunOptions {
+    #[structopt(long)]
+    debug: bool,
+
     #[structopt(parse(from_os_str))]
     file: PathBuf,
 }
@@ -211,6 +214,16 @@ fn run(options: CandyRunOptions) {
         Status::Panicked(value) => {
             dump_panicked_vm(&db, input, &vm, value);
         }
+    }
+
+    if options.debug {
+        let trace = vm.tracer.correlate_and_dump();
+        let trace_file = options.file.clone_with_extension("candy.trace");
+        fs::write(trace_file.clone(), trace).unwrap();
+        info!(
+            "Trace has been written to `{}`.",
+            trace_file.as_path().display()
+        );
     }
 }
 

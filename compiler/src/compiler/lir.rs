@@ -75,10 +75,13 @@ pub enum Instruction {
 
     /// Indicates that a value for the given id was evaluated and is at the top
     /// of the stack.
-    DebugValueEvaluated(hir::Id),
+    TraceValueEvaluated(hir::Id),
 
-    DebugClosureEntered(hir::Id),
-    DebugClosureExited,
+    TraceCallStarts {
+        id: hir::Id,
+        num_args: usize,
+    },
+    TraceCallEnds,
 
     Error(hir::Id),
 }
@@ -114,13 +117,13 @@ impl Display for Lir {
                     Instruction::RegisterFuzzableClosure(hir_id) => {
                         writeln!(f, "registerFuzzableClosure {}", hir_id)
                     }
-                    Instruction::DebugValueEvaluated(hir_id) => {
-                        writeln!(f, "debugValueEvaluated {}", hir_id)
+                    Instruction::TraceValueEvaluated(hir_id) => {
+                        writeln!(f, "traceValueEvaluated {}", hir_id)
                     }
-                    Instruction::DebugClosureEntered(hir_id) => {
-                        writeln!(f, "debugClosureEntered {}", hir_id)
+                    Instruction::TraceCallStarts { id, num_args } => {
+                        writeln!(f, "traceCallStarts {} ({} args)", id, num_args)
                     }
-                    Instruction::DebugClosureExited => writeln!(f, "debugClosureExited"),
+                    Instruction::TraceCallEnds => writeln!(f, "traceCallEnds"),
                     Instruction::Error(hir_id) => writeln!(f, "error {}", hir_id),
                 }?;
             }

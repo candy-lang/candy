@@ -1,3 +1,5 @@
+use std::fs;
+
 use crate::{
     compiler::{hir_to_lir::HirToLir, lir::Instruction},
     database::Database,
@@ -36,14 +38,9 @@ pub fn fuzz(db: &Database, input: Input) {
         };
         info!("Fuzzing closure {} with {} arguments.", closure, num_args);
 
-        for arg in generate_fuzzing_arguments(num_args) {
-            let address = vm.heap.import(arg);
-            vm.data_stack.push(address);
-        }
-        vm.data_stack.push(closure_address);
-        vm.run_instruction(Instruction::Call { num_args });
+        let arguments = generate_fuzzing_arguments(num_args);
+        vm.run_closure(closure_address, arguments);
 
-        vm.status = Status::Running;
         vm.run(1000);
         match vm.status() {
             Status::Running => {
@@ -53,7 +50,17 @@ pub fn fuzz(db: &Database, input: Input) {
             Status::Done(value) => info!("VM is done: {}", value),
             Status::Panicked(value) => {
                 error!("The VM panicked during fuzzing:");
-                dump_panicked_vm(&db, input, &vm, value);
+                dump_panicked_vm(&db, input.clone(), &vm, value);
+
+                let trace = vm.tracer.correlate_and_dump();
+                // PathBuff::new(input.to_path().unwrap())
+                let mut trace_file = input.to_path().unwrap();
+                trace_file.set_extension("candy.trace");
+                fs::write(trace_file.clone(), trace).unwrap();
+                info!(
+                    "Trace has been written to `{}`.",
+                    trace_file.as_path().display()
+                );
                 return;
             }
         }

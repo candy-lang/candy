@@ -94,11 +94,9 @@ impl LoweringContext {
                 for parameter in &lambda.parameters {
                     lambda_context.stack.push(parameter.clone());
                 }
-                lambda_context.emit_debug_closure_entered(id.clone());
                 lambda_context.compile_body(&lambda.body);
                 lambda_context.emit_pop_multiple_below_top(lambda.parameters.len());
                 lambda_context.emit_pop_multiple_below_top(captured_stack.len());
-                lambda_context.emit_debug_closure_exited();
                 lambda_context.emit_return();
                 swap(&mut self.registry, &mut lambda_context.registry);
 
@@ -121,18 +119,20 @@ impl LoweringContext {
                 }
 
                 self.emit_push_from_stack(function.clone());
+                self.emit_trace_call_starts(id.clone(), arguments.len());
                 self.emit_call(id.clone(), arguments.len());
+                self.emit_trace_call_ends();
             }
             Expression::Builtin(builtin) => {
                 self.emit_create_builtin(id.clone(), *builtin);
             }
             Expression::Needs { condition } => {
                 self.emit_push_from_stack(*condition.clone());
-                self.emit_needs(id.clone());
+                self.emit_needs();
             }
             Expression::Error { .. } => self.emit_error(id.to_owned()),
         };
-        self.emit_debug_value_evaluated(id.clone());
+        self.emit_trace_value_evaluated(id.clone());
     }
 
     fn emit_create_int(&mut self, id: hir::Id, int: u64) {
@@ -177,7 +177,7 @@ impl LoweringContext {
         self.stack.pop_multiple(num_args);
         self.stack.push(id);
     }
-    fn emit_needs(&mut self, id: hir::Id) {
+    fn emit_needs(&mut self) {
         self.emit(Instruction::Needs);
     }
     fn emit_return(&mut self) {
@@ -186,14 +186,14 @@ impl LoweringContext {
     fn emit_register_fuzzable_closure(&mut self, id: hir::Id) {
         self.emit(Instruction::RegisterFuzzableClosure(id));
     }
-    fn emit_debug_value_evaluated(&mut self, id: hir::Id) {
-        self.emit(Instruction::DebugValueEvaluated(id));
+    fn emit_trace_value_evaluated(&mut self, id: hir::Id) {
+        self.emit(Instruction::TraceValueEvaluated(id));
     }
-    fn emit_debug_closure_entered(&mut self, id: hir::Id) {
-        self.emit(Instruction::DebugClosureEntered(id));
+    fn emit_trace_call_starts(&mut self, id: hir::Id, num_args: usize) {
+        self.emit(Instruction::TraceCallStarts { id, num_args });
     }
-    fn emit_debug_closure_exited(&mut self) {
-        self.emit(Instruction::DebugClosureExited);
+    fn emit_trace_call_ends(&mut self) {
+        self.emit(Instruction::TraceCallEnds);
     }
     fn emit_error(&mut self, id: hir::Id) {
         self.emit(Instruction::Error(id.clone()));
