@@ -4,21 +4,16 @@ use super::{
     value::Value,
 };
 use crate::{
-    compiler::{
-        ast_to_hir::AstToHir,
-        cst::CstDb,
-        cst_to_ast::CstToAst,
-        lir::{Chunk, ChunkIndex, Instruction},
-    },
+    compiler::lir::{Chunk, ChunkIndex, Instruction},
     database::Database,
     input::Input,
-    language_server::utils::LspPositionConversion,
 };
 use itertools::Itertools;
 use log::{debug, error, trace};
 use std::collections::HashMap;
 
 /// A VM can execute some byte code.
+#[derive(Clone)]
 pub struct Vm {
     pub chunks: Vec<Chunk>,
     pub status: Status,

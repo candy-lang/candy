@@ -312,63 +312,23 @@ impl<'c> Compiler<'c> {
             AstKind::StructAccess(struct_access) => {
                 self.lower_struct_access(Some(ast.id.clone()), struct_access)
             }
-            AstKind::Lambda(ast::Lambda {
-                parameters,
-                body: body_asts,
-                fuzzable,
-            }) => {
-                let mut body = Body::new();
-                let lambda_id = self.create_next_id(Some(ast.id.clone()), None);
-                let mut identifiers = self.identifiers.clone();
-
-                for parameter in parameters.iter() {
-                    let name = parameter.value.to_string();
-                    let id = hir::Id::new(
-                        self.context.input.clone(),
-                        add_keys(&lambda_id.keys, name.clone()),
-                    );
-                    self.id_mapping
-                        .insert(id.clone(), Some(parameter.id.clone()));
-                    body.identifiers.insert(id.clone(), name.clone());
-                    identifiers.insert(name, id);
-                }
-                let mut inner = Compiler::<'c> {
-                    context: &mut self.context,
-                    id_mapping: self.id_mapping.clone(),
-                    body,
-                    parent_keys: lambda_id.keys.clone(),
-                    identifiers,
-                };
-
-                inner.compile(&body_asts);
-                self.id_mapping = inner.id_mapping;
-                self.push_with_existing_id(
-                    lambda_id.clone(),
-                    Expression::Lambda(Lambda {
-                        parameters: parameters
-                            .iter()
-                            .map(|parameter| {
-                                hir::Id::new(
-                                    self.context.input.clone(),
-                                    add_keys(&lambda_id.keys[..], parameter.value.to_string()),
-                                )
-                            })
-                            .collect(),
-                        body: inner.body,
-                        fuzzable: *fuzzable,
-                    }),
-                    None,
-                )
-            }
+            AstKind::Lambda(lambda) => self.compile_lambda(ast.id.clone(), lambda, None),
             AstKind::Call(call) => self.lower_call(Some(ast.id.clone()), call),
             AstKind::Assignment(Assignment { name, body }) => {
                 let name = name.value.to_owned();
-                let body = self.compile(body);
-                self.push(
-                    Some(ast.id.clone()),
-                    Expression::Reference(body),
-                    Some(name),
-                )
+                match body {
+                    ast::AssignmentBody::Lambda(lambda) => {
+                        self.compile_lambda(ast.id.clone(), lambda, Some(name))
+                    }
+                    ast::AssignmentBody::Body(body) => {
+                        let body = self.compile(body);
+                        self.push(
+                            Some(ast.id.clone()),
+                            Expression::Reference(body),
+                            Some(name),
+                        )
+                    }
+                }
             }
             AstKind::Error { child, errors } => {
                 let child = if let Some(child) = child {
@@ -386,6 +346,57 @@ impl<'c> Compiler<'c> {
                 )
             }
         }
+    }
+    fn compile_lambda(
+        &mut self,
+        id: ast::Id,
+        lambda: &ast::Lambda,
+        identifier: Option<String>,
+    ) -> hir::Id {
+        let mut body = Body::new();
+        let lambda_id = self.create_next_id(Some(id), identifier.clone());
+        let mut identifiers = self.identifiers.clone();
+
+        for parameter in lambda.parameters.iter() {
+            let name = parameter.value.to_string();
+            let id = hir::Id::new(
+                self.context.input.clone(),
+                add_keys(&lambda_id.keys, name.clone()),
+            );
+            self.id_mapping
+                .insert(id.clone(), Some(parameter.id.clone()));
+            body.identifiers.insert(id.clone(), name.clone());
+            identifiers.insert(name, id);
+        }
+        let mut inner = Compiler::<'c> {
+            context: &mut self.context,
+            id_mapping: self.id_mapping.clone(),
+            body,
+            parent_keys: lambda_id.keys.clone(),
+            identifiers,
+        };
+
+        inner.compile(&lambda.body);
+        self.id_mapping = inner.id_mapping;
+        log::info!("Compiling lambda with name {:?}", identifier);
+        self.push_with_existing_id(
+            lambda_id.clone(),
+            Expression::Lambda(Lambda {
+                parameters: lambda
+                    .parameters
+                    .iter()
+                    .map(|parameter| {
+                        hir::Id::new(
+                            self.context.input.clone(),
+                            add_keys(&lambda_id.keys[..], parameter.value.to_string()),
+                        )
+                    })
+                    .collect(),
+                body: inner.body,
+                fuzzable: lambda.fuzzable,
+            }),
+            identifier,
+        )
     }
     fn lower_struct_access(
         &mut self,

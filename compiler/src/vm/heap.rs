@@ -4,7 +4,7 @@ use super::value::Value;
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::ChunkIndex};
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Heap {
     objects: HashMap<ObjectPointer, Object>,
     next_address: ObjectPointer,

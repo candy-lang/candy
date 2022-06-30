@@ -1,10 +1,11 @@
 use super::value::Value;
 use crate::compiler::hir::Id;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Tracer {
     log: Vec<TraceEntry>,
 }
+#[derive(Clone)]
 pub enum TraceEntry {
     ValueEvaluated {
         id: Id,

@@ -9,7 +9,10 @@ use super::{
     utils::AdjustCasingOfFirstLetter,
 };
 use crate::{
-    compiler::{ast::Struct, cst::UnwrapWhitespaceAndComment},
+    compiler::{
+        ast::{AssignmentBody, Struct},
+        cst::UnwrapWhitespaceAndComment,
+    },
     input::Input,
 };
 use im::HashMap;
@@ -411,18 +414,16 @@ impl LoweringContext {
                     equals_sign,
                 );
 
-                let mut body = self.lower_csts(body);
-
-                if !parameters.is_empty() {
-                    body = vec![self.create_ast(
-                        cst.id,
-                        AstKind::Lambda(Lambda {
-                            parameters,
-                            body,
-                            fuzzable: true,
-                        }),
-                    )];
-                }
+                let body = self.lower_csts(body);
+                let body = if !parameters.is_empty() {
+                    AssignmentBody::Lambda(Lambda {
+                        parameters,
+                        body,
+                        fuzzable: true,
+                    })
+                } else {
+                    AssignmentBody::Body(body)
+                };
 
                 let mut ast =
                     self.create_ast(cst.id, AstKind::Assignment(ast::Assignment { name, body }));
