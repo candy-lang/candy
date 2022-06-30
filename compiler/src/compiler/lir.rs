@@ -47,22 +47,25 @@ pub enum Instruction {
     /// Pushes an item from back in the stack on the stack again.
     PushFromStack(StackOffset),
 
-    /// Pops a closure and the number of arguments it requires, pushes the
-    /// current instruction pointer, all captured variables, and arguments, and
-    /// then executes the closure.
+    /// Pops a closure and num_args arguments, pushes the current instruction
+    /// pointer, all captured variables, and arguments, and then changes the
+    /// instruction pointer to the first instruction of the closure.
     ///
     /// a, arg1, arg2, ..., argN, closure -> a, caller, captured vars, arg1, arg2, ..., argN
     ///
-    /// When the closure returns, the stack will contain the result:
+    /// Later, when the closure returns (perhaps many instructions after this
+    /// one), the stack will contain the result:
     ///
     /// a, arg1, arg2, ..., argN, closure -> a, return value from closure
     Call {
         num_args: usize,
     },
 
-    /// Pops a boolean. If it's true, pushes Nothing. If it's false, panics.
+    /// Pops a boolean condition and a message. If the condition is true, it
+    /// just pushes Nothing. If the condition is false, it panic with the
+    /// message.
     ///
-    /// a, condition -> a, Nothing
+    /// a, message, condition -> a, Nothing
     Needs,
 
     /// Returns from the current closure to the original caller.

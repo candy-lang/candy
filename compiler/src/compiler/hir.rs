@@ -57,8 +57,9 @@ impl Expression {
                 ids.extend(arguments.iter().cloned());
             }
             Expression::Builtin(_) => {}
-            Expression::Needs { condition } => {
+            Expression::Needs { condition, message } => {
                 ids.push(*condition.clone());
+                ids.push(*message.clone());
             }
             Expression::Error { .. } => {}
         }
@@ -118,6 +119,7 @@ pub enum Expression {
     Builtin(BuiltinFunction),
     Needs {
         condition: Box<Id>,
+        message: Box<Id>,
     },
     Error {
         child: Option<Id>,
@@ -227,8 +229,8 @@ impl fmt::Display for Expression {
             Expression::Builtin(builtin) => {
                 write!(f, "builtin{:?}", builtin)
             }
-            Expression::Needs { condition } => {
-                write!(f, "needs {}", condition)
+            Expression::Needs { condition, message } => {
+                write!(f, "needs {} with message {}", condition, message)
             }
             Expression::Error { child, errors } => {
                 write!(f, "error")?;

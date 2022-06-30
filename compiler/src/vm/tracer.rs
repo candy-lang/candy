@@ -21,7 +21,8 @@ pub enum TraceEntry {
     },
     NeedsStarted {
         id: Id,
-        arg: Value,
+        condition: Value,
+        message: Value,
     },
     NeedsEnded,
 }
@@ -54,13 +55,17 @@ impl Tracer {
                     calls[start].return_value = Some(return_value.clone());
                     indentation -= 1;
                 }
-                TraceEntry::NeedsStarted { id, arg } => {
+                TraceEntry::NeedsStarted {
+                    id,
+                    condition,
+                    message,
+                } => {
                     stack.push(calls.len());
                     calls.push(DumpableCall {
                         indentation,
                         id: id.clone(),
                         closure: Value::Symbol("Needs".to_string()),
-                        args: vec![arg.clone()],
+                        args: vec![condition.clone(), message.clone()],
                         return_value: None,
                     });
                     indentation += 1;

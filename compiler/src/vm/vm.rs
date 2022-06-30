@@ -189,13 +189,16 @@ impl Vm {
             }
             Instruction::Needs => {
                 let condition = self.data_stack.pop().unwrap();
+                let message = self.data_stack.pop().unwrap();
+
                 match self.heap.get(condition).data.clone() {
                     ObjectData::Symbol(symbol) => match symbol.as_str() {
                         "True" => {
                             self.data_stack.push(self.heap.import(Value::nothing()));
                         }
                         "False" => {
-                            self.panic("Need failed.".to_string());
+                            self.status =
+                                Status::Panicked(self.heap.export_without_dropping(message))
                         }
                         _ => {
                             self.panic(format!("Needs expects True or False as a symbol."));
@@ -242,9 +245,15 @@ impl Vm {
                 self.tracer.push(TraceEntry::CallEnded { return_value });
             }
             Instruction::TraceNeedsStarts { id } => {
-                let address = *self.data_stack.last().unwrap();
-                let arg = self.heap.export_without_dropping(address);
-                self.tracer.push(TraceEntry::NeedsStarted { id, arg });
+                let condition = self.data_stack[self.data_stack.len() - 1];
+                let message = self.data_stack[self.data_stack.len() - 2];
+                let condition = self.heap.export_without_dropping(condition);
+                let message = self.heap.export_without_dropping(message);
+                self.tracer.push(TraceEntry::NeedsStarted {
+                    id,
+                    condition,
+                    message,
+                });
             }
             Instruction::TraceNeedsEnds => self.tracer.push(TraceEntry::NeedsEnded),
             Instruction::Error(error) => {

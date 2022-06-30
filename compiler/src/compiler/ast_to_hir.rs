@@ -428,26 +428,31 @@ impl<'c> Compiler<'c> {
         let function = match call.receiver.clone() {
             CallReceiver::Identifier(name) => {
                 if name.value == "needs" {
-                    return self.push(
-                        id,
-                        if arguments.len() == 1 {
-                            Expression::Needs {
-                                condition: Box::new(arguments.first().unwrap().clone()),
-                            }
-                        } else {
-                            Expression::Error {
-                                child: None,
-                                errors: vec![CompilerError {
-                                    input: name.id.input.clone(),
-                                    span: self.context.db.ast_id_to_span(name.id.clone()).unwrap(),
-                                    payload: CompilerErrorPayload::Hir(
-                                        HirError::NeedsWithWrongNumberOfArguments,
-                                    ),
-                                }],
-                            }
+                    let expression = match arguments.len() {
+                        2 => Expression::Needs {
+                            condition: Box::new(arguments.first().unwrap().clone()),
+                            message: Box::new(arguments.last().unwrap().clone()),
                         },
-                        None,
-                    );
+                        1 => Expression::Needs {
+                            condition: Box::new(arguments.first().unwrap().clone()),
+                            message: Box::new(self.push(
+                                None,
+                                Expression::Text("needs not satisfied".to_string()),
+                                None,
+                            )),
+                        },
+                        _ => Expression::Error {
+                            child: None,
+                            errors: vec![CompilerError {
+                                input: name.id.input.clone(),
+                                span: self.context.db.ast_id_to_span(name.id.clone()).unwrap(),
+                                payload: CompilerErrorPayload::Hir(
+                                    HirError::NeedsWithWrongNumberOfArguments,
+                                ),
+                            }],
+                        },
+                    };
+                    return self.push(id, expression, None);
                 }
                 match self.identifiers.get(&name.value) {
                     Some(function) => function.to_owned(),
