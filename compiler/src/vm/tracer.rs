@@ -75,7 +75,7 @@ impl Tracer {
                         format!(
                             "{} {}",
                             closure,
-                            args.iter().map(|arg| format!("{}", arg)).join("\n")
+                            args.iter().map(|arg| format!("{}", arg)).join(" ")
                         ),
                         id,
                     ),

@@ -15,7 +15,7 @@ fn generate_value() -> Value {
 }
 fn generate_value_with_complexity(rng: &mut ThreadRng, mut complexity: f32) -> Value {
     match rng.gen_range(1..=5) {
-        1 => Value::Int(rng.gen()),
+        1 => Value::Int(rng.gen_range(0..1000)),
         2 => Value::Text("test".to_string()),
         3 => Value::Symbol("Test".to_string()),
         4 => {

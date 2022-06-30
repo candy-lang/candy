@@ -75,7 +75,10 @@ fn fuzz_vm(db: &Database, input: Input, vm: &Vm, num_fuzzable_closures_to_skip: 
                 TestResult::NoPanic => {}
                 TestResult::WrongInputs => {} // This is the fuzzer's fault.
                 TestResult::InternalPanic(message) => {
-                    log::error!("The fuzzer discovered an input that crashes the closure:");
+                    log::error!(
+                        "The fuzzer discovered an input that crashes {}:",
+                        closure_id
+                    );
                     log::error!(
                         "Calling `{} {}` doesn't work because {}.",
                         closure_id,
