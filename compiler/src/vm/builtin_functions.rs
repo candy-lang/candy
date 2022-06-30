@@ -8,7 +8,7 @@ macro_rules! destructure {
         if let $enum = &$args[..] {
             $body
         } else {
-            Err(format!("Invalid arguments."))
+            Err(format!("a builtin function received invalid arguments"))
         }
     }};
 }

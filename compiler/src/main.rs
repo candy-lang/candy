@@ -19,10 +19,10 @@ use crate::{
     },
     database::{Database, PROJECT_DIRECTORY},
     input::Input,
-    vm::{dump_panicked_vm, Status, Vm},
+    vm::{Status, Vm},
 };
 use compiler::lir::Lir;
-use fern::colors::{Color, ColoredLevelConfig, WithFgColor};
+use fern::colors::{Color, ColoredLevelConfig};
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use log::{debug, error, info, LevelFilter};
@@ -36,7 +36,6 @@ use std::{
 };
 use structopt::StructOpt;
 use tower_lsp::{LspService, Server};
-use vm::value::Value;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "candy", about = "The 🍭 Candy CLI.")]
@@ -213,12 +212,14 @@ fn run(options: CandyRunOptions) {
         Status::Running => info!("VM is still running."),
         Status::Done(value) => info!("VM is done: {}", value),
         Status::Panicked(value) => {
-            dump_panicked_vm(&db, input, &vm, value);
+            log::error!("VM panicked with value {}.", value);
+            log::error!("This is the stack trace:");
+            vm.tracer.dump_stack_trace(&db, input);
         }
     }
 
     if options.debug {
-        let trace = vm.tracer.correlate_and_dump();
+        let trace = vm.tracer.dump_call_tree();
         let trace_file = options.file.clone_with_extension("candy.trace");
         fs::write(trace_file.clone(), trace).unwrap();
         info!(

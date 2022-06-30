@@ -5,8 +5,9 @@ use crate::{
     },
     database::Database,
     input::Input,
-    vm::{dump_panicked_vm, tracer::TraceEntry, value::Value, Status, Vm},
+    vm::{tracer::TraceEntry, value::Value, Status, Vm},
 };
+use itertools::Itertools;
 use log;
 use std::fs;
 
@@ -22,7 +23,8 @@ pub fn fuzz(db: &Database, input: Input) {
         }
         Status::Done(value) => log::debug!("VM is done: {}", value),
         Status::Panicked(value) => {
-            dump_panicked_vm(&db, input, &vm, value);
+            log::error!("VM panicked with value {}.", value);
+            log::error!("{}", vm.tracer.format_stack_trace(db, input));
             return;
         }
     }
@@ -47,7 +49,7 @@ fn fuzz_vm(db: &Database, input: Input, vm: &Vm, num_fuzzable_closures_to_skip: 
         } else {
             panic!("The VM registered a fuzzable closure that's not a closure.");
         };
-        log::info!("Fuzzing {}.", closure_id,);
+        log::info!("Fuzzing {}.", closure_id);
 
         let fuzz_count = num_args * 20;
 
@@ -57,7 +59,13 @@ fn fuzz_vm(db: &Database, input: Input, vm: &Vm, num_fuzzable_closures_to_skip: 
             let mut vm = vm.clone();
             let arguments = generate_fuzzing_arguments(num_args);
 
-            match test_closure_with_args(db, closure_id, &mut vm, *closure_address, arguments) {
+            match test_closure_with_args(
+                db,
+                closure_id,
+                &mut vm,
+                *closure_address,
+                arguments.clone(),
+            ) {
                 TestResult::StillRunning => {
                     log::warn!("The fuzzer is giving up because the VM didn't finish running.")
                 }
@@ -65,9 +73,19 @@ fn fuzz_vm(db: &Database, input: Input, vm: &Vm, num_fuzzable_closures_to_skip: 
                 TestResult::WrongInputs => {} // This is the fuzzer's fault.
                 TestResult::InternalPanic(message) => {
                     log::error!("The fuzzer discovered an input that crashes the closure:");
-                    dump_panicked_vm(&db, input.clone(), &vm, message);
+                    log::error!(
+                        "Calling `{} {}` doesn't work because {}.",
+                        closure_id,
+                        arguments.iter().map(|it| format!("{}", it)).join(" "),
+                        match message {
+                            Value::Text(message) => message,
+                            other => format!("{}", other),
+                        },
+                    );
+                    log::error!("This was the stack trace:");
+                    vm.tracer.dump_stack_trace(db, input.clone());
 
-                    let trace = vm.tracer.correlate_and_dump();
+                    let trace = vm.tracer.dump_call_tree();
                     // PathBuff::new(input.to_path().unwrap())
                     let mut trace_file = input.to_path().unwrap();
                     trace_file.set_extension("candy.trace");
@@ -102,7 +120,7 @@ fn test_closure_with_args(
             // dissatisfied, then the panic is not the fault of the code
             // inside the code, but of the caller.
             let is_our_fault =
-                did_need_in_closure_cause_panic(db, &closure_id, vm.tracer.log.last().unwrap());
+                did_need_in_closure_cause_panic(db, &closure_id, vm.tracer.log().last().unwrap());
             if is_our_fault {
                 TestResult::WrongInputs
             } else {

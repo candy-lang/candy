@@ -3,16 +3,12 @@ use super::{
     tracer::{TraceEntry, Tracer},
     value::Value,
 };
-use crate::{
-    compiler::{
-        hir::Id,
-        lir::{Chunk, ChunkIndex, Instruction},
-    },
-    database::Database,
-    input::Input,
+use crate::compiler::{
+    hir::Id,
+    lir::{Chunk, ChunkIndex, Instruction},
 };
 use itertools::Itertools;
-use log::{debug, error, trace};
+use log::trace;
 use std::collections::HashMap;
 
 /// A VM can execute some byte code.
@@ -220,7 +216,7 @@ impl Vm {
             Instruction::TraceValueEvaluated(id) => {
                 let address = *self.data_stack.last().unwrap();
                 let value = self.heap.export_without_dropping(address);
-                debug!("{} = {}", id, value);
+                self.tracer.push(TraceEntry::ValueEvaluated { id, value });
             }
             Instruction::TraceCallStarts { id, num_args } => {
                 let closure_address = self.data_stack.last().unwrap();
@@ -269,10 +265,6 @@ impl Vm {
         Value::Symbol("Never".to_string())
     }
 
-    pub fn current_stack_trace(&self) -> Vec<ByteCodePointer> {
-        self.call_stack.clone()
-    }
-
     pub fn run_closure(&mut self, closure_address: ObjectPointer, arguments: Vec<Value>) {
         let num_args = arguments.len();
         for arg in arguments {
@@ -283,26 +275,5 @@ impl Vm {
         self.run_instruction(Instruction::Call { num_args });
 
         self.status = Status::Running;
-    }
-}
-
-pub fn dump_panicked_vm(db: &Database, input: Input, vm: &Vm, value: Value) {
-    error!("VM panicked: {:#?}", value);
-    error!("Stack trace:");
-    // let (_, hir_to_ast_ids) = db.hir(input.clone()).unwrap();
-    // let (_, ast_to_cst_ids) = db.ast(input.clone()).unwrap();
-    for entry in vm.current_stack_trace().into_iter().rev() {
-        error!("{:?}", entry);
-
-        // let hir_id = entry.id;
-        // let ast_id = hir_to_ast_ids[&hir_id].clone();
-        // let cst_id = ast_to_cst_ids[&ast_id];
-        // let cst = db.find_cst(input.clone(), cst_id);
-        // let start = db.offset_to_lsp(input.clone(), cst.span.start);
-        // let end = db.offset_to_lsp(input.clone(), cst.span.end);
-        // error!(
-        //     "{}, {}, {:?}, {}:{} – {}:{}",
-        //     hir_id, ast_id, cst_id, start.0, start.1, end.0, end.1
-        // );
     }
 }
