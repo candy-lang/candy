@@ -1,7 +1,7 @@
 use super::{heap::ObjectPointer, value::Value, Vm};
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
 use itertools::Itertools;
-use log::{debug, trace};
+use log;
 
 macro_rules! destructure {
     ($args:expr, $enum:pat, $body:block) => {{
@@ -19,7 +19,7 @@ impl Vm {
         builtin_function: &BuiltinFunction,
         args: &[ObjectPointer],
     ) {
-        trace!("run_builtin_function: builtin{:?}", builtin_function);
+        log::trace!("run_builtin_function: builtin{:?}", builtin_function);
 
         let args = args.iter().map(|it| self.heap.export(*it)).collect_vec();
 
@@ -107,7 +107,7 @@ impl Vm {
                         body: else_body.to_owned(),
                     }
                 });
-                debug!(
+                log::debug!(
                     "IfElse executing the closure: {:?}",
                     self.heap.export_without_dropping(closure_object)
                 );

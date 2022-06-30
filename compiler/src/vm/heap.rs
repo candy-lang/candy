@@ -1,7 +1,6 @@
-use log::trace;
-
 use super::value::Value;
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::ChunkIndex};
+use log;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -51,7 +50,7 @@ impl Heap {
 
     pub fn dup(&mut self, address: ObjectPointer) {
         self.get_mut(address).reference_count += 1;
-        trace!(
+        log::trace!(
             "RefCount of {} increased to {}. Value: {}",
             address,
             self.get(address).reference_count,
@@ -62,7 +61,7 @@ impl Heap {
         let value = self.export_without_dropping(address); // TODO: Only for logging
         let object = self.get_mut(address);
         object.reference_count -= 1;
-        trace!(
+        log::trace!(
             "RefCount of {} reduced to {}. Value: {}",
             address,
             object.reference_count,
@@ -75,7 +74,7 @@ impl Heap {
 
     pub fn create(&mut self, object: ObjectData) -> ObjectPointer {
         let address = self.next_address;
-        trace!("Creating object {:?} at {}.", object, address);
+        log::trace!("Creating object {:?} at {}.", object, address);
         // TODO: Remove this special case once closures are self-contained.
         if let ObjectData::Closure { captured, .. } = &object {
             for captured in captured {
@@ -94,7 +93,7 @@ impl Heap {
     }
     pub fn free(&mut self, address: ObjectPointer) {
         let object = self.objects.remove(&address).unwrap();
-        trace!("Freeing object {:?} at {}.", object, address);
+        log::trace!("Freeing object {:?} at {}.", object, address);
         assert_eq!(object.reference_count, 0);
         match object.data {
             ObjectData::Int(_) => {}

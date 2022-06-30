@@ -8,7 +8,7 @@ use crate::compiler::{
     lir::{Chunk, ChunkIndex, Instruction},
 };
 use itertools::Itertools;
-use log::trace;
+use log;
 use std::collections::HashMap;
 
 /// A VM can execute some byte code.
@@ -72,18 +72,18 @@ impl Vm {
             let instruction = self.chunks[self.next_instruction.chunk].instructions
                 [self.next_instruction.instruction]
                 .clone();
-            trace!("Running instruction: {:?}", &instruction);
+            log::trace!("Running instruction: {:?}", &instruction);
             self.next_instruction.instruction += 1;
             self.run_instruction(instruction);
 
-            trace!(
+            log::trace!(
                 "Stack: {}",
                 self.data_stack
                     .iter()
                     .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
                     .join(", ")
             );
-            trace!("Heap: {:?}", self.heap);
+            log::trace!("Heap: {:?}", self.heap);
 
             if self.next_instruction.instruction
                 >= self.chunks[self.next_instruction.chunk].instructions.len()
