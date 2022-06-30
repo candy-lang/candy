@@ -31,38 +31,41 @@ pub fn fuzz(db: &Database, input: Input) {
         "Now, the fuzzing begins. So far, we have {} closures to fuzz.",
         vm.fuzzable_closures.len()
     );
-    while let Some((closure_id, closure_address)) = vm.fuzzable_closures.pop() {
-        let closure = vm.heap.export_without_dropping(closure_address);
+
+    fuzz_vm(db, input, &vm, 0);
+}
+
+fn fuzz_vm(db: &Database, input: Input, vm: &Vm, num_fuzzable_closures_to_skip: usize) {
+    'test_different_closures: for (closure_id, closure_address) in vm
+        .fuzzable_closures
+        .iter()
+        .skip(num_fuzzable_closures_to_skip)
+    {
+        let closure = vm.heap.export_without_dropping(*closure_address);
         let num_args = if let Value::Closure { body, .. } = closure {
             vm.chunks[body].num_args
         } else {
             panic!("The VM registered a fuzzable closure that's not a closure.");
         };
-        log::info!(
-            "Fuzzing closure {} (id {}) with {} arguments.",
-            closure,
-            closure_id,
-            num_args
-        );
+        log::info!("Fuzzing {}.", closure_id,);
 
-        let arguments = generate_fuzzing_arguments(num_args);
-        vm.run_closure(closure_address, arguments);
+        let fuzz_count = num_args * 20;
 
-        vm.run(1000);
-        match vm.status() {
-            Status::Running => {
-                log::warn!("The fuzzer is giving up because the VM didn't finish running.");
-                return;
-            }
-            Status::Done(value) => log::debug!("VM is done: {}", value),
-            Status::Panicked(value) => {
-                let did_need_in_closure_cause_panic =
-                    did_need_in_closure_cause_panic(db, &closure_id, vm.tracer.log.last().unwrap());
-                if did_need_in_closure_cause_panic {
-                    log::debug!("The closure crashed for some input, but it's the fuzzer's fault.");
-                } else {
+        for _ in 0..fuzz_count {
+            // Snapshot a VM so we can run the fuzzing in the copy without modifying
+            // the original VM.
+            let mut vm = vm.clone();
+            let arguments = generate_fuzzing_arguments(num_args);
+
+            match test_closure_with_args(db, closure_id, &mut vm, *closure_address, arguments) {
+                TestResult::StillRunning => {
+                    log::warn!("The fuzzer is giving up because the VM didn't finish running.")
+                }
+                TestResult::NoPanic => {}
+                TestResult::WrongInputs => {} // This is the fuzzer's fault.
+                TestResult::InternalPanic(message) => {
                     log::error!("The fuzzer discovered an input that crashes the closure:");
-                    dump_panicked_vm(&db, input.clone(), &vm, value);
+                    dump_panicked_vm(&db, input.clone(), &vm, message);
 
                     let trace = vm.tracer.correlate_and_dump();
                     // PathBuff::new(input.to_path().unwrap())
@@ -73,12 +76,46 @@ pub fn fuzz(db: &Database, input: Input) {
                         "Trace has been written to `{}`.",
                         trace_file.as_path().display()
                     );
+                    continue 'test_different_closures;
                 }
+            }
+        }
+        log::debug!("Couldn't find any issues with this function.");
+    }
+}
 
-                return;
+fn test_closure_with_args(
+    db: &Database,
+    closure_id: &hir::Id,
+    vm: &mut Vm,
+    closure_address: usize,
+    arguments: Vec<Value>,
+) -> TestResult {
+    vm.run_closure(closure_address, arguments);
+
+    vm.run(1000);
+    match vm.status() {
+        Status::Running => TestResult::StillRunning,
+        Status::Done(_) => TestResult::NoPanic,
+        Status::Panicked(message) => {
+            // If a needs directly inside the tested closure was
+            // dissatisfied, then the panic is not the fault of the code
+            // inside the code, but of the caller.
+            let is_our_fault =
+                did_need_in_closure_cause_panic(db, &closure_id, vm.tracer.log.last().unwrap());
+            if is_our_fault {
+                TestResult::WrongInputs
+            } else {
+                TestResult::InternalPanic(message)
             }
         }
     }
+}
+enum TestResult {
+    StillRunning,
+    NoPanic,
+    WrongInputs,
+    InternalPanic(Value),
 }
 
 fn generate_fuzzing_arguments(num: usize) -> Vec<Value> {
