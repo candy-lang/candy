@@ -1,5 +1,3 @@
-use std::fs;
-
 use crate::{
     compiler::{
         hir::{self, Expression, HirDb, Lambda},
@@ -9,7 +7,8 @@ use crate::{
     input::Input,
     vm::{dump_panicked_vm, tracer::TraceEntry, value::Value, Status, Vm},
 };
-use log::{error, info};
+use log;
+use std::fs;
 
 pub fn fuzz(db: &Database, input: Input) {
     let lir = db.lir(input.clone()).unwrap();
@@ -18,17 +17,17 @@ pub fn fuzz(db: &Database, input: Input) {
     vm.run(1000);
     match vm.status() {
         Status::Running => {
-            info!("VM didn't finish running, so we're not fuzzing it.");
+            log::warn!("VM didn't finish running, so we're not fuzzing it.");
             return;
         }
-        Status::Done(value) => info!("VM is done: {}", value),
+        Status::Done(value) => log::debug!("VM is done: {}", value),
         Status::Panicked(value) => {
             dump_panicked_vm(&db, input, &vm, value);
             return;
         }
     }
 
-    info!(
+    log::info!(
         "Now, the fuzzing begins. So far, we have {} closures to fuzz.",
         vm.fuzzable_closures.len()
     );
@@ -39,9 +38,11 @@ pub fn fuzz(db: &Database, input: Input) {
         } else {
             panic!("The VM registered a fuzzable closure that's not a closure.");
         };
-        info!(
+        log::info!(
             "Fuzzing closure {} (id {}) with {} arguments.",
-            closure, closure_id, num_args
+            closure,
+            closure_id,
+            num_args
         );
 
         let arguments = generate_fuzzing_arguments(num_args);
@@ -50,17 +51,17 @@ pub fn fuzz(db: &Database, input: Input) {
         vm.run(1000);
         match vm.status() {
             Status::Running => {
-                info!("VM didn't finish running, so we're not fuzzing it.");
+                log::warn!("The fuzzer is giving up because the VM didn't finish running.");
                 return;
             }
-            Status::Done(value) => info!("VM is done: {}", value),
+            Status::Done(value) => log::debug!("VM is done: {}", value),
             Status::Panicked(value) => {
                 let did_need_in_closure_cause_panic =
                     did_need_in_closure_cause_panic(db, &closure_id, vm.tracer.log.last().unwrap());
                 if did_need_in_closure_cause_panic {
-                    error!("The closure crashed for some input, but it's the fuzzer's fault.");
+                    log::debug!("The closure crashed for some input, but it's the fuzzer's fault.");
                 } else {
-                    error!("The fuzzer discovered an input that crashes the closure:");
+                    log::error!("The fuzzer discovered an input that crashes the closure:");
                     dump_panicked_vm(&db, input.clone(), &vm, value);
 
                     let trace = vm.tracer.correlate_and_dump();
@@ -68,7 +69,7 @@ pub fn fuzz(db: &Database, input: Input) {
                     let mut trace_file = input.to_path().unwrap();
                     trace_file.set_extension("candy.trace");
                     fs::write(trace_file.clone(), trace).unwrap();
-                    info!(
+                    log::info!(
                         "Trace has been written to `{}`.",
                         trace_file.as_path().display()
                     );

@@ -378,7 +378,6 @@ impl<'c> Compiler<'c> {
 
         inner.compile(&lambda.body);
         self.id_mapping = inner.id_mapping;
-        log::info!("Compiling lambda with name {:?}", identifier);
         self.push_with_existing_id(
             lambda_id.clone(),
             Expression::Lambda(Lambda {

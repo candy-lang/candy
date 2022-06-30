@@ -22,6 +22,7 @@ use crate::{
     vm::{dump_panicked_vm, Status, Vm},
 };
 use compiler::lir::Lir;
+use fern::colors::{Color, ColoredLevelConfig, WithFgColor};
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use log::{debug, error, info, LevelFilter};
@@ -255,10 +256,13 @@ async fn lsp() {
 }
 
 fn init_logger() {
+    let colors = ColoredLevelConfig::new().debug(Color::BrightBlack);
     fern::Dispatch::new()
-        .format(|out, message, record| {
+        .format(move |out, message, record| {
+            let color = colors.get_color(&record.level());
             out.finish(format_args!(
-                "{} [{:>5}] {} {}",
+                "\x1B[{}m{} [{:>5}] {} {}\x1B[0m",
+                color.to_fg_str(),
                 chrono::Local::now().format("%H:%M:%S"),
                 record.level(),
                 record.target(),
@@ -269,7 +273,7 @@ fn init_logger() {
         .level_for("candy::compiler::string_to_rcst", LevelFilter::Debug)
         .level_for("candy::vm::builtin_functions", LevelFilter::Warn)
         .level_for("candy::vm::heap", LevelFilter::Debug)
-        .level_for("candy::vm::vm", LevelFilter::Debug)
+        .level_for("candy::vm::vm", LevelFilter::Info)
         .level_for("lspower::transport", LevelFilter::Error)
         .level_for("salsa", LevelFilter::Error)
         .level_for("tokio_util", LevelFilter::Error)
