@@ -36,6 +36,11 @@ pub enum Instruction {
     /// a -> a, pointer to closure
     CreateClosure(ChunkIndex),
 
+    /// Pushes a builtin function.
+    ///
+    /// a -> a, builtin
+    CreateBuiltin(BuiltinFunction),
+
     /// Leaves the top stack item untouched, but removes n below.
     PopMultipleBelowTop(usize),
 
@@ -51,22 +56,32 @@ pub enum Instruction {
     /// When the closure returns, the stack will contain the result:
     ///
     /// a, arg1, arg2, ..., argN, closure -> a, return value from closure
-    Call,
+    Call {
+        num_args: usize,
+    },
+
+    /// Pops a boolean. If it's true, pushes Nothing. If it's false, panics.
+    ///
+    /// a, condition -> a, Nothing
+    Needs,
 
     /// Returns from the current closure to the original caller.
     ///
     /// a, caller, return value -> a, return value
     Return,
 
-    /// Builtins. They all behave differently.
-    Builtin(BuiltinFunction),
+    /// Indicates that a fuzzable closure sits at the top of the stack.
+    RegisterFuzzableClosure(hir::Id),
 
     /// Indicates that a value for the given id was evaluated and is at the top
     /// of the stack.
-    DebugValueEvaluated(hir::Id),
+    TraceValueEvaluated(hir::Id),
 
-    DebugClosureEntered(hir::Id),
-    DebugClosureExited,
+    TraceCallStarts {
+        id: hir::Id,
+        num_args: usize,
+    },
+    TraceCallEnds,
 
     Error(hir::Id),
 }
@@ -87,22 +102,28 @@ impl Display for Lir {
                     Instruction::CreateClosure(chunk) => {
                         writeln!(f, "createClosure, chunk {}", chunk)
                     }
+                    Instruction::CreateBuiltin(builtin_function) => {
+                        writeln!(f, "createBuiltin {:?}", builtin_function)
+                    }
                     Instruction::PopMultipleBelowTop(count) => {
                         writeln!(f, "popMultipleBelowTop {}", count)
                     }
                     Instruction::PushFromStack(offset) => writeln!(f, "pushFromStack {}", offset),
-                    Instruction::Call => writeln!(f, "call"),
+                    Instruction::Call { num_args } => {
+                        writeln!(f, "call with {} arguments", num_args)
+                    }
+                    Instruction::Needs => writeln!(f, "needs"),
                     Instruction::Return => writeln!(f, "return"),
-                    Instruction::Builtin(builtin_function) => {
-                        writeln!(f, "builtin {:?}", builtin_function)
+                    Instruction::RegisterFuzzableClosure(hir_id) => {
+                        writeln!(f, "registerFuzzableClosure {}", hir_id)
                     }
-                    Instruction::DebugValueEvaluated(hir_id) => {
-                        writeln!(f, "debugValueEvaluated {}", hir_id)
+                    Instruction::TraceValueEvaluated(hir_id) => {
+                        writeln!(f, "traceValueEvaluated {}", hir_id)
                     }
-                    Instruction::DebugClosureEntered(hir_id) => {
-                        writeln!(f, "debugClosureEntered {}", hir_id)
+                    Instruction::TraceCallStarts { id, num_args } => {
+                        writeln!(f, "traceCallStarts {} ({} args)", id, num_args)
                     }
-                    Instruction::DebugClosureExited => writeln!(f, "debugClosureExited"),
+                    Instruction::TraceCallEnds => writeln!(f, "traceCallEnds"),
                     Instruction::Error(hir_id) => writeln!(f, "error {}", hir_id),
                 }?;
             }

@@ -1,4 +1,4 @@
-use super::error::CompilerError;
+use super::{error::CompilerError, utils::AdjustCasingOfFirstLetter};
 use crate::input::Input;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
@@ -36,6 +36,7 @@ pub enum AstKind {
     Identifier(Identifier),
     Symbol(Symbol),
     Struct(Struct),
+    StructAccess(StructAccess),
     Lambda(Lambda),
     Call(Call),
     Assignment(Assignment),
@@ -63,17 +64,29 @@ pub struct Symbol(pub AstString);
 pub struct Struct {
     pub fields: LinkedHashMap<Ast, Ast>,
 }
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct StructAccess {
+    pub struct_: Box<Ast>,
+    pub key: AstString,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Lambda {
     pub parameters: Vec<AstString>,
     pub body: Vec<Ast>,
+    pub fuzzable: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Call {
-    pub name: AstString,
+    pub receiver: CallReceiver,
     pub arguments: Vec<Ast>,
+}
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum CallReceiver {
+    Identifier(AstString),
+    StructAccess(StructAccess),
+    Call(Box<Call>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -124,6 +137,9 @@ impl CollectErrors for Ast {
                     value.collect_errors(errors);
                 }
             }
+            AstKind::StructAccess(struct_access) => {
+                struct_access.struct_.collect_errors(errors);
+            }
             AstKind::Lambda(lambda) => lambda.body.collect_errors(errors),
             AstKind::Call(call) => call.arguments.collect_errors(errors),
             AstKind::Assignment(assignment) => assignment.body.collect_errors(errors),
@@ -167,18 +183,22 @@ impl Display for Ast {
                         .join("\n")
                 )
             }
-            AstKind::Lambda(lambda) => {
+            AstKind::StructAccess(struct_access) => write!(f, "{}", struct_access),
+            AstKind::Lambda(Lambda {
+                parameters,
+                body,
+                fuzzable,
+            }) => {
                 write!(
                     f,
-                    "lambda {{ {} ->\n{}\n}}",
-                    lambda
-                        .parameters
-                        .iter()
-                        .map(|it| format!("{}", it))
-                        .join(" "),
-                    lambda
-                        .body
-                        .iter()
+                    "lambda ({}) {{ {} ->\n{}\n}}",
+                    if *fuzzable {
+                        "fuzzable"
+                    } else {
+                        "non-fuzzable"
+                    },
+                    parameters.iter().map(|it| format!("{}", it)).join(" "),
+                    body.iter()
                         .map(|it| format!("{}", it))
                         .join("\n")
                         .lines()
@@ -186,17 +206,7 @@ impl Display for Ast {
                         .join("\n")
                 )
             }
-            AstKind::Call(call) => {
-                write!(
-                    f,
-                    "call {} with these arguments:\n{}",
-                    call.name,
-                    call.arguments
-                        .iter()
-                        .map(|argument| format!("  {}", argument))
-                        .join("\n")
-                )
-            }
+            AstKind::Call(call) => write!(f, "{}", call),
             AstKind::Assignment(assignment) => {
                 write!(
                     f,
@@ -226,6 +236,38 @@ impl Display for Ast {
                 }
                 Ok(())
             }
+        }
+    }
+}
+impl Display for StructAccess {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "struct access {}.{}",
+            self.struct_,
+            self.key.lowercase_first_letter()
+        )
+    }
+}
+impl Display for Call {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "call {} with these arguments:\n{}",
+            self.receiver,
+            self.arguments
+                .iter()
+                .map(|argument| format!("  {}", argument))
+                .join("\n")
+        )
+    }
+}
+impl Display for CallReceiver {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            CallReceiver::Identifier(identifier) => write!(f, "{}", identifier),
+            CallReceiver::StructAccess(struct_access) => write!(f, "{}", struct_access),
+            CallReceiver::Call(call) => write!(f, "{}", call),
         }
     }
 }

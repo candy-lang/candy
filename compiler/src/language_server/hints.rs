@@ -112,9 +112,6 @@ fn collect_hir_ids_for_hints(db: &dyn HintsDb, id: hir::Id) -> Vec<hir::Id> {
         Expression::Lambda(Lambda { body, .. }) => {
             collect_hir_ids_for_hints_list(db, body.expressions.keys().cloned().collect())
         }
-        Expression::Body(body) => {
-            collect_hir_ids_for_hints_list(db, body.expressions.keys().cloned().collect())
-        }
         Expression::Call { arguments, .. } => {
             let mut ids = vec![id.to_owned()];
             for argument_id in arguments {
@@ -130,6 +127,8 @@ fn collect_hir_ids_for_hints(db: &dyn HintsDb, id: hir::Id) -> Vec<hir::Id> {
             }
             ids
         }
+        Expression::Builtin(_) => vec![],
+        Expression::Needs { .. } => vec![],
         Expression::Error { .. } => vec![],
     }
 }

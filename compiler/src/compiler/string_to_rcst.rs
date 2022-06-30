@@ -66,7 +66,7 @@ mod parse {
     use super::super::rcst::{IsMultiline, Rcst, RcstError};
     use itertools::Itertools;
 
-    static MEANINGFUL_PUNCTUATION: &'static str = "()[]:,{}->=";
+    static MEANINGFUL_PUNCTUATION: &'static str = "()[]:,{}->=.";
     static SUPPORTED_WHITESPACE: &'static str = " \r\n\t";
 
     fn literal<'a>(input: &'a str, literal: &'static str) -> Option<&'a str> {
@@ -90,6 +90,10 @@ mod parse {
     pub fn comma(input: &str) -> Option<(&str, Rcst)> {
         let input = literal(input, ",")?;
         Some((input, Rcst::Comma))
+    }
+    pub fn dot(input: &str) -> Option<(&str, Rcst)> {
+        let input = literal(input, ".")?;
+        Some((input, Rcst::Dot))
     }
     pub fn colon(input: &str) -> Option<(&str, Rcst)> {
         let input = literal(input, ":")?;
@@ -144,7 +148,7 @@ mod parse {
     /// "Word" refers to a bunch of characters that are not separated by
     /// whitespace or significant punctuation. Identifiers, symbols, and ints
     /// are words. Words may be invalid because they contain non-ascii or
-    /// non-alphanumeric characters – for example, the word `Magic✨` is an
+    /// non-alphanumeric characters – for example, the word `Magic🌵` is an
     /// invalid symbol.
     fn word(mut input: &str) -> Option<(&str, String)> {
         log::trace!("word({:?})", input);
@@ -176,6 +180,9 @@ mod parse {
     fn identifier(input: &str) -> Option<(&str, Rcst)> {
         log::trace!("identifier({:?})", input);
         let (input, w) = word(input)?;
+        if w == "✨" {
+            return Some((input, Rcst::Identifier(w)));
+        }
         if !w.chars().next().unwrap().is_lowercase() {
             return None;
         }
@@ -699,7 +706,7 @@ mod parse {
             indentation,
             allow_call_and_assignment
         );
-        int(input)
+        let (mut input, mut expression) = int(input)
             .or_else(|| text(input, indentation))
             .or_else(|| symbol(input))
             .or_else(|| struct_(input, indentation))
@@ -730,7 +737,24 @@ mod parse {
                         },
                     )
                 })
-            })
+            })?;
+
+        loop {
+            log::trace!("struct_access({:?}, {:?})", input, indentation);
+
+            let (new_input, dot) = match dot(input) {
+                Some(it) => it,
+                None => break,
+            };
+            let (new_input, key) = match identifier(new_input) {
+                Some(it) => it,
+                None => break,
+            };
+
+            input = new_input;
+            expression = Rcst::StructAccess { struct_: Box::new(expression), dot: Box::new(dot), key: Box::new(key) };
+        };
+        Some((input, expression))
     }
     #[test]
     fn test_expression() {

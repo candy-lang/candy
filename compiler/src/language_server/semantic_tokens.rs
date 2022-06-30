@@ -152,6 +152,7 @@ impl<'a> Context<'a> {
         match &cst.kind {
             CstKind::EqualsSign => self.add_token(cst.span.clone(), SemanticTokenType::Operator),
             CstKind::Comma => {}
+            CstKind::Dot => {}
             CstKind::Colon => {}
             CstKind::OpeningParenthesis => {}
             CstKind::ClosingParenthesis => {}
@@ -225,6 +226,11 @@ impl<'a> Context<'a> {
                 if let Some(comma) = comma {
                     self.visit_cst(comma, None);
                 }
+            }
+            CstKind::StructAccess { struct_, dot, key } => {
+                self.visit_cst(struct_, None);
+                self.visit_cst(dot, None);
+                self.visit_cst(key, Some(SemanticTokenType::Symbol));
             }
             CstKind::Lambda {
                 opening_curly_brace,

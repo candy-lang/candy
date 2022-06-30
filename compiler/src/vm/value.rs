@@ -1,5 +1,5 @@
 use super::heap::ObjectPointer;
-use crate::compiler::lir::ChunkIndex;
+use crate::{compiler::lir::ChunkIndex, builtin_functions::BuiltinFunction};
 use im::HashMap;
 use itertools::Itertools;
 use std::fmt::{self, Display, Formatter};
@@ -22,6 +22,7 @@ pub enum Value {
         captured: Vec<ObjectPointer>,
         body: ChunkIndex,
     },
+    Builtin(BuiltinFunction)
 }
 
 impl Value {
@@ -37,33 +38,9 @@ impl Value {
         Value::Struct(items)
     }
 
-    pub fn try_into_int(self) -> Result<u64, Value> {
-        match self {
-            Value::Int(int) => Ok(int),
-            it => Err(it),
-        }
-    }
     pub fn try_into_text(self) -> Result<String, Value> {
         match self {
             Value::Text(text) => Ok(text),
-            it => Err(it),
-        }
-    }
-    pub fn try_into_symbol(self) -> Result<String, Value> {
-        match self {
-            Value::Symbol(symbol) => Ok(symbol),
-            it => Err(it),
-        }
-    }
-    pub fn try_into_struct(self) -> Result<HashMap<Value, Value>, Value> {
-        match self {
-            Value::Struct(entries) => Ok(entries),
-            it => Err(it),
-        }
-    }
-    pub fn try_into_closure(self) -> Result<(Vec<ObjectPointer>, ChunkIndex), Value> {
-        match self {
-            Value::Closure { captured, body } => Ok((captured, body)),
             it => Err(it),
         }
     }
@@ -85,6 +62,9 @@ impl Display for Value {
             ),
             Value::Closure { body, .. } => {
                 write!(f, "{{{}}}", body)
+            }
+            Value::Builtin(builtin) => {
+                write!(f, "builtin{:?}", builtin)
             }
         }
     }

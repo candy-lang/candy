@@ -1,1 +1,1 @@
-equals a b = builtinEquals a b
+equals a b = ✨.equals a b

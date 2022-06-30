@@ -43,6 +43,7 @@ impl<'a> Context<'a> {
         match &cst.kind {
             CstKind::EqualsSign => {}
             CstKind::Comma => {}
+            CstKind::Dot => {}
             CstKind::Colon => {}
             CstKind::OpeningParenthesis => {}
             CstKind::ClosingParenthesis => {}
@@ -87,6 +88,11 @@ impl<'a> Context<'a> {
             CstKind::StructField { key, value, .. } => {
                 self.visit_cst(key);
                 self.visit_cst(value);
+            }
+            CstKind::StructAccess { struct_, dot, key } => {
+                self.visit_cst(struct_);
+                self.visit_cst(dot);
+                self.visit_cst(key);
             }
             CstKind::Lambda {
                 opening_curly_brace,

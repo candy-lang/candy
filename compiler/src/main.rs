@@ -1,10 +1,12 @@
 #![feature(try_trait_v2)]
 #![feature(let_chains)]
+#![feature(never_type)]
 
 mod builtin_functions;
 mod compiler;
 mod database;
 mod discover;
+mod fuzzer;
 mod incremental;
 mod input;
 mod language_server;
@@ -12,19 +14,17 @@ mod vm;
 
 use crate::{
     compiler::{
-        ast_to_hir::AstToHir, cst::CstDb, cst_to_ast::CstToAst, hir, hir_to_lir::HirToLir,
+        ast_to_hir::AstToHir, cst_to_ast::CstToAst, hir, hir_to_lir::HirToLir,
         rcst_to_cst::RcstToCst, string_to_rcst::StringToRcst,
     },
     database::{Database, PROJECT_DIRECTORY},
     input::Input,
-    language_server::utils::LspPositionConversion,
-    vm::{Status, Vm},
+    vm::{dump_panicked_vm, Status, Vm},
 };
 use compiler::lir::Lir;
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use log::{debug, error, info, LevelFilter};
-use lspower::{LspService, Server};
 use notify::{watcher, RecursiveMode, Watcher};
 use std::{
     env::current_dir,
@@ -34,12 +34,15 @@ use std::{
     time::Duration,
 };
 use structopt::StructOpt;
+use tower_lsp::{LspService, Server};
+use vm::value::Value;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "candy", about = "The 🍭 Candy CLI.")]
 enum CandyOptions {
     Build(CandyBuildOptions),
     Run(CandyRunOptions),
+    Fuzz(CandyFuzzOptions),
     Lsp,
 }
 
@@ -57,6 +60,15 @@ struct CandyBuildOptions {
 
 #[derive(StructOpt, Debug)]
 struct CandyRunOptions {
+    #[structopt(long)]
+    debug: bool,
+
+    #[structopt(parse(from_os_str))]
+    file: PathBuf,
+}
+
+#[derive(StructOpt, Debug)]
+struct CandyFuzzOptions {
     #[structopt(parse(from_os_str))]
     file: PathBuf,
 }
@@ -67,6 +79,7 @@ async fn main() {
     match CandyOptions::from_args() {
         CandyOptions::Build(options) => build(options),
         CandyOptions::Run(options) => run(options),
+        CandyOptions::Fuzz(options) => fuzz(options),
         CandyOptions::Lsp => lsp().await,
     }
 }
@@ -104,8 +117,8 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         .rcst(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if debug {
-        let hir_file = file.clone_with_extension("candy.rcst");
-        fs::write(hir_file, format!("{:#?}\n", rcst.clone())).unwrap();
+        let rcst_file = file.clone_with_extension("candy.rcst");
+        fs::write(rcst_file, format!("{:#?}\n", rcst.clone())).unwrap();
     }
 
     info!("Turning RCST to CST…");
@@ -177,7 +190,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
 fn run(options: CandyRunOptions) {
     *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
 
-    debug!("Running `{}`.\n", options.file.display());
+    debug!("Building `{}`.\n", options.file.display());
 
     let input: Input = options.file.clone().into();
     let db = Database::default();
@@ -199,32 +212,44 @@ fn run(options: CandyRunOptions) {
         Status::Running => info!("VM is still running."),
         Status::Done(value) => info!("VM is done: {}", value),
         Status::Panicked(value) => {
-            error!("VM panicked: {:#?}", value);
-
-            error!("Stack trace:");
-            let (_, hir_to_ast_ids) = db.hir(input.clone()).unwrap();
-            let (_, ast_to_cst_ids) = db.ast(input.clone()).unwrap();
-            for entry in vm.current_stack_trace().into_iter().rev() {
-                let hir_id = entry.id;
-                let ast_id = hir_to_ast_ids[&hir_id].clone();
-                let cst_id = ast_to_cst_ids[&ast_id];
-                let cst = db.find_cst(input.clone(), cst_id);
-                let start = db.offset_to_lsp(input.clone(), cst.span.start);
-                let end = db.offset_to_lsp(input.clone(), cst.span.end);
-                error!(
-                    "{}, {}, {:?}, {}:{} – {}:{}",
-                    hir_id, ast_id, cst_id, start.0, start.1, end.0, end.1
-                );
-            }
+            dump_panicked_vm(&db, input, &vm, value);
         }
     }
+
+    if options.debug {
+        let trace = vm.tracer.correlate_and_dump();
+        let trace_file = options.file.clone_with_extension("candy.trace");
+        fs::write(trace_file.clone(), trace).unwrap();
+        info!(
+            "Trace has been written to `{}`.",
+            trace_file.as_path().display()
+        );
+    }
+}
+
+fn fuzz(options: CandyFuzzOptions) {
+    *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
+
+    debug!("Building `{}`.\n", options.file.display());
+
+    let input: Input = options.file.clone().into();
+    let db = Database::default();
+
+    if raw_build(&options.file, false).is_none() {
+        log::info!("Build failed.");
+        return;
+    }
+
+    let path_string = options.file.to_string_lossy();
+    debug!("Fuzzing `{}`.", path_string);
+
+    fuzzer::fuzz(&db, input);
 }
 
 async fn lsp() {
     info!("Starting language server…");
-    let (service, messages) = LspService::new(|client| CandyLanguageServer::from_client(client));
-    Server::new(tokio::io::stdin(), tokio::io::stdout())
-        .interleave(messages)
+    let (service, socket) = LspService::new(|client| CandyLanguageServer::from_client(client));
+    Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
         .serve(service)
         .await;
 }
@@ -240,6 +265,7 @@ fn init_logger() {
                 message
             ))
         })
+        .level_for("candy::compiler::hir_to_lir", LevelFilter::Debug)
         .level_for("candy::compiler::string_to_rcst", LevelFilter::Debug)
         .level_for("candy::vm::builtin_functions", LevelFilter::Warn)
         .level_for("candy::vm::heap", LevelFilter::Debug)

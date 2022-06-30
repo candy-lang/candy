@@ -1,5 +1,3 @@
 type = use ".Type"
 
-is value =
-  isOfType = builtinStructGet type Is
-  isOfType value Text
+is value = type.is value Text

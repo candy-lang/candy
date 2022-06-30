@@ -1,5 +1,5 @@
 use super::{ast_to_hir::AstToHir, error::CompilerError};
-use crate::input::Input;
+use crate::{builtin_functions::BuiltinFunction, input::Input};
 use im::HashMap;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
@@ -13,7 +13,7 @@ pub trait HirDb: AstToHir {
 fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
     let (hir, _) = db.hir(id.input.clone()).unwrap();
     if id.is_root() {
-        return Some(Expression::Body(hir.as_ref().to_owned()));
+        panic!("You can't get the root because that got lowered into multiple IDs.");
     }
 
     hir.find(&id).map(|it| it.to_owned())
@@ -27,11 +27,13 @@ fn all_hir_ids(db: &dyn HirDb, input: Input) -> Option<Vec<Id>> {
 }
 
 impl Expression {
-    fn collect_all_ids(&self, ids: &mut Vec<Id>) {
+    pub fn collect_all_ids(&self, ids: &mut Vec<Id>) {
         match self {
             Expression::Int(_) => {}
             Expression::Text(_) => {}
-            Expression::Reference(_) => {}
+            Expression::Reference(id) => {
+                ids.push(id.clone());
+            }
             Expression::Symbol(_) => {}
             Expression::Struct(entries) => {
                 for (key_id, value_id) in entries.iter() {
@@ -39,16 +41,24 @@ impl Expression {
                     ids.push(value_id.to_owned());
                 }
             }
-            Expression::Lambda(Lambda { body, .. }) => {
-                // TODO: list parameter IDs?
-                // for (index, _) in parameters.iter().enumerate() {
-                //     ids.push(first_id.to_owned() + index);
-                // }
+            Expression::Lambda(Lambda {
+                parameters, body, ..
+            }) => {
+                for parameter in parameters {
+                    ids.push(parameter.clone());
+                }
                 body.collect_all_ids(ids);
             }
-            Expression::Body(body) => body.collect_all_ids(ids),
-            Expression::Call { arguments, .. } => {
+            Expression::Call {
+                function,
+                arguments,
+            } => {
+                ids.push(function.clone());
                 ids.extend(arguments.iter().cloned());
+            }
+            Expression::Builtin(_) => {}
+            Expression::Needs { condition } => {
+                ids.push(*condition.clone());
             }
             Expression::Error { .. } => {}
         }
@@ -101,10 +111,13 @@ pub enum Expression {
     Symbol(String),
     Struct(HashMap<Id, Id>),
     Lambda(Lambda),
-    Body(Body),
     Call {
         function: Id,
         arguments: Vec<Id>,
+    },
+    Builtin(BuiltinFunction),
+    Needs {
+        condition: Box<Id>,
     },
     Error {
         child: Option<Id>,
@@ -121,6 +134,7 @@ impl Expression {
 pub struct Lambda {
     pub parameters: Vec<Id>,
     pub body: Body,
+    pub fuzzable: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -128,11 +142,21 @@ pub struct Body {
     pub expressions: LinkedHashMap<Id, Expression>,
     pub identifiers: HashMap<Id, String>,
 }
+impl Body {
+    pub fn return_value(&self) -> Id {
+        self.expressions
+            .keys()
+            .last()
+            .expect("no expressions")
+            .clone()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum HirError {
     UnknownReference { symbol: String },
     UnknownFunction { name: String },
+    NeedsWithWrongNumberOfArguments,
 }
 
 impl Body {
@@ -147,9 +171,6 @@ impl Body {
         if let Some(identifier) = identifier {
             self.identifiers.insert(id, identifier);
         }
-    }
-    pub fn out_id(&self) -> &Id {
-        self.expressions.keys().last().unwrap()
     }
 }
 
@@ -173,7 +194,12 @@ impl fmt::Display for Expression {
             Expression::Lambda(lambda) => {
                 write!(
                     f,
-                    "lambda {{ {}\n}}",
+                    "lambda ({}) {{ {}\n}}",
+                    if lambda.fuzzable {
+                        "fuzzable"
+                    } else {
+                        "non-fuzzable"
+                    },
                     lambda
                         .to_string()
                         .lines()
@@ -182,16 +208,7 @@ impl fmt::Display for Expression {
                         .join("\n"),
                 )
             }
-            Expression::Body(body) => {
-                write!(
-                    f,
-                    "body {{\n{}\n}}",
-                    body.to_string()
-                        .lines()
-                        .map(|line| format!("  {}", line))
-                        .join("\n"),
-                )
-            }
+
             Expression::Call {
                 function,
                 arguments,
@@ -206,6 +223,12 @@ impl fmt::Display for Expression {
                         .map(|argument| format!("  {}", argument))
                         .join("\n")
                 )
+            }
+            Expression::Builtin(builtin) => {
+                write!(f, "builtin{:?}", builtin)
+            }
+            Expression::Needs { condition } => {
+                write!(f, "needs {}", condition)
             }
             Expression::Error { child, errors } => {
                 write!(f, "error")?;
@@ -252,8 +275,9 @@ impl Expression {
             Expression::Symbol { .. } => None,
             Expression::Struct(_) => None,
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
-            Expression::Body(body) => body.find(id),
             Expression::Call { .. } => None,
+            Expression::Builtin(_) => None,
+            Expression::Needs { .. } => None,
             Expression::Error { .. } => None,
         }
     }
@@ -284,9 +308,10 @@ impl CollectErrors for Expression {
             | Expression::Reference(_)
             | Expression::Symbol(_)
             | Expression::Struct(_)
-            | Expression::Call { .. } => {}
+            | Expression::Call { .. }
+            | Expression::Builtin(_)
+            | Expression::Needs { .. } => {}
             Expression::Lambda(lambda) => lambda.body.collect_errors(errors),
-            Expression::Body(body) => body.collect_errors(errors),
             Expression::Error {
                 errors: the_errors, ..
             } => {

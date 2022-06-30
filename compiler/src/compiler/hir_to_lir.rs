@@ -64,6 +64,9 @@ impl LoweringContext {
         assert_eq!(self.stack.len(), stack_size_before + 1); // extra return value
     }
     fn compile_expression(&mut self, id: &hir::Id, expression: &Expression) {
+        log::trace!("Stack: {:?}", self.stack);
+        log::trace!("Compiling expression {:?}", expression);
+
         match expression {
             Expression::Int(int) => self.emit_create_int(id.clone(), *int),
             Expression::Text(text) => self.emit_create_text(id.clone(), text.clone()),
@@ -91,11 +94,9 @@ impl LoweringContext {
                 for parameter in &lambda.parameters {
                     lambda_context.stack.push(parameter.clone());
                 }
-                lambda_context.emit_debug_closure_entered(id.clone());
                 lambda_context.compile_body(&lambda.body);
                 lambda_context.emit_pop_multiple_below_top(lambda.parameters.len());
                 lambda_context.emit_pop_multiple_below_top(captured_stack.len());
-                lambda_context.emit_debug_closure_exited();
                 lambda_context.emit_return();
                 swap(&mut self.registry, &mut lambda_context.registry);
 
@@ -105,39 +106,33 @@ impl LoweringContext {
                 };
                 let chunk_index = self.registry.register_chunk(lambda_chunk);
                 self.emit_create_closure(id.clone(), chunk_index);
-            }
-            Expression::Body(body) => {
-                self.compile_body(body);
-                self.stack.replace_top_id(id.clone());
+                if lambda.fuzzable {
+                    self.emit_register_fuzzable_closure(id.clone());
+                }
             }
             Expression::Call {
                 function,
                 arguments,
             } => {
-                let builtin_function = if let [name] = &function.keys[..] {
-                    crate::builtin_functions::VALUES
-                        .iter()
-                        .filter(|it| format!("builtin{:?}", it) == *name)
-                        .map(|it| *it)
-                        .next()
-                } else {
-                    None
-                };
-
                 for argument in arguments {
                     self.emit_push_from_stack(argument.clone());
                 }
 
-                if let Some(builtin_function) = builtin_function {
-                    self.emit_builtin(id.clone(), builtin_function, arguments.len());
-                } else {
-                    self.emit_push_from_stack(function.clone());
-                    self.emit_call(id.clone(), arguments.len());
-                }
+                self.emit_push_from_stack(function.clone());
+                self.emit_trace_call_starts(id.clone(), arguments.len());
+                self.emit_call(id.clone(), arguments.len());
+                self.emit_trace_call_ends();
+            }
+            Expression::Builtin(builtin) => {
+                self.emit_create_builtin(id.clone(), *builtin);
+            }
+            Expression::Needs { condition } => {
+                self.emit_push_from_stack(*condition.clone());
+                self.emit_needs();
             }
             Expression::Error { .. } => self.emit_error(id.to_owned()),
         };
-        self.emit_debug_value_evaluated(id.clone());
+        self.emit_trace_value_evaluated(id.clone());
     }
 
     fn emit_create_int(&mut self, id: hir::Id, int: u64) {
@@ -161,6 +156,10 @@ impl LoweringContext {
         self.emit(Instruction::CreateClosure(chunk));
         self.stack.push(id);
     }
+    fn emit_create_builtin(&mut self, id: hir::Id, builtin: BuiltinFunction) {
+        self.emit(Instruction::CreateBuiltin(builtin));
+        self.stack.push(id);
+    }
     fn emit_pop_multiple_below_top(&mut self, n: usize) {
         self.emit(Instruction::PopMultipleBelowTop(n));
         let top = self.stack.pop().unwrap();
@@ -173,30 +172,32 @@ impl LoweringContext {
         self.stack.push(id);
     }
     fn emit_call(&mut self, id: hir::Id, num_args: usize) {
-        self.emit(Instruction::Call);
-        self.stack.pop(); // closure
+        self.emit(Instruction::Call { num_args });
+        self.stack.pop(); // closure/builtin
         self.stack.pop_multiple(num_args);
         self.stack.push(id);
+    }
+    fn emit_needs(&mut self) {
+        self.emit(Instruction::Needs);
     }
     fn emit_return(&mut self) {
         self.emit(Instruction::Return);
     }
-    fn emit_builtin(&mut self, id: hir::Id, builtin: BuiltinFunction, num_args: usize) {
-        self.emit(Instruction::Builtin(builtin));
-        self.stack.pop_multiple(num_args);
-        self.stack.push(id);
+    fn emit_register_fuzzable_closure(&mut self, id: hir::Id) {
+        self.emit(Instruction::RegisterFuzzableClosure(id));
     }
-    fn emit_debug_value_evaluated(&mut self, id: hir::Id) {
-        self.emit(Instruction::DebugValueEvaluated(id));
+    fn emit_trace_value_evaluated(&mut self, id: hir::Id) {
+        self.emit(Instruction::TraceValueEvaluated(id));
     }
-    fn emit_debug_closure_entered(&mut self, id: hir::Id) {
-        self.emit(Instruction::DebugClosureEntered(id));
+    fn emit_trace_call_starts(&mut self, id: hir::Id, num_args: usize) {
+        self.emit(Instruction::TraceCallStarts { id, num_args });
     }
-    fn emit_debug_closure_exited(&mut self) {
-        self.emit(Instruction::DebugClosureExited);
+    fn emit_trace_call_ends(&mut self) {
+        self.emit(Instruction::TraceCallEnds);
     }
     fn emit_error(&mut self, id: hir::Id) {
-        self.emit(Instruction::Error(id));
+        self.emit(Instruction::Error(id.clone()));
+        self.stack.push(id);
     }
 
     fn emit(&mut self, instruction: Instruction) {

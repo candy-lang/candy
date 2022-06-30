@@ -1,12 +1,20 @@
 use super::{
-    ast::{self, Assignment, Ast, AstKind, Identifier, Int, Struct, Symbol, Text},
+    ast::{
+        self, Assignment, Ast, AstKind, Call, CallReceiver, Identifier, Int, Struct, StructAccess,
+        Symbol, Text,
+    },
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
     error::{CompilerError, CompilerErrorPayload},
     hir::{self, Body, Expression, HirError, Lambda},
+    utils::AdjustCasingOfFirstLetter,
 };
-use crate::{builtin_functions, input::Input};
+use crate::{
+    builtin_functions::{self, BuiltinFunction},
+    input::Input,
+};
 use im::HashMap;
+use itertools::Itertools;
 use std::{ops::Range, sync::Arc};
 
 #[salsa::query_group(AstToHirStorage)]
@@ -86,40 +94,47 @@ struct Compiler<'c> {
 }
 impl<'c> Compiler<'c> {
     fn new(context: &'c Context<'c>) -> Self {
-        let builtin_identifiers = builtin_functions::VALUES
-            .iter()
-            .map(|builtin_function| {
-                let string = format!("builtin{:?}", builtin_function);
-                (
-                    string.clone(),
-                    hir::Id::new(context.input.clone(), vec![string]),
-                )
-            })
-            .collect::<HashMap<_, _>>();
-
         let mut compiler = Compiler {
             context,
             id_mapping: HashMap::new(),
             parent_keys: vec![],
             body: Body::new(),
-            identifiers: builtin_identifiers,
+            identifiers: HashMap::new(),
         };
+        compiler.generate_sparkles();
         compiler.generate_use();
         compiler
     }
 
+    fn generate_sparkles(&mut self) {
+        let mut sparkles_map = HashMap::new();
+
+        for builtin_function in builtin_functions::VALUES.iter() {
+            let symbol = self.push(
+                None,
+                Expression::Symbol(format!("{:?}", builtin_function)),
+                None,
+            );
+            let builtin = self.push(None, Expression::Builtin(*builtin_function), None);
+            sparkles_map.insert(symbol, builtin);
+        }
+
+        let sparkles_map = Expression::Struct(sparkles_map);
+        self.push(None, sparkles_map, Some("✨".to_string()));
+    }
+
     fn generate_use(&mut self) {
-        // HirId(project-file:test.candy:11) = body {
-        //   HirId(project-file:test.candy:11:0) = lambda { target ->
-        //     HirId(project-file:test.candy:11:0:1) = int 0
-        //     HirId(project-file:test.candy:11:0:2) = text "test.candy"
-        //     HirId(project-file:test.candy:11:0:3) = struct [
-        //       HirId(project-file:test.candy:11:0:1): HirId(project-file:test.candy:11:0:2),
-        //     ]
-        //     HirId(project-file:test.candy:11:0:4) = call HirId(project-file:test.candy:10) with these arguments:
-        //       HirId(project-file:test.candy:11:0:3)
-        //       HirId(project-file:test.candy:11:0:0)
-        //   }
+        // HirId(~:test.candy:use) = lambda { HirId(~:test.candy:use:target) ->
+        //   HirId(~:test.candy:use:panic) = builtinPanic
+        //   HirId(~:test.candy:use:use) = builtinUse
+        //   HirId(~:test.candy:use:key) = int 0
+        //   HirId(~:test.candy:use:raw_path) = text "test.candy"
+        //   HirId(~:test.candy:use:currentPath) = struct [
+        //     HirId(~:test.candy:use:key): HirId(~:test.candy:use:raw_path),
+        //   ]
+        //   HirId(~:test.candy:use:importedModule) = call HirId(~:test.candy:use:use) with these arguments:
+        //     HirId(~:test.candy:use:currentPath)
+        //     HirId(~:test.candy:use:target)
         // }
         let mut assignment_inner = Compiler::<'c> {
             context: &mut self.context,
@@ -129,7 +144,7 @@ impl<'c> Compiler<'c> {
             identifiers: self.identifiers.clone(),
         };
 
-        let lambda_keys = add_keys(&assignment_inner.parent_keys, "0".to_string());
+        let lambda_keys = assignment_inner.parent_keys;
         let lambda_parameter_id = hir::Id::new(
             assignment_inner.context.input.clone(),
             add_keys(&lambda_keys[..], "target".to_string()),
@@ -142,9 +157,18 @@ impl<'c> Compiler<'c> {
             identifiers: assignment_inner.identifiers.clone(),
         };
 
-        let panic_id = lambda_inner.identifiers["builtinPanic"].clone();
+        let panic_id = lambda_inner.push(
+            None,
+            Expression::Builtin(BuiltinFunction::Panic),
+            Some("panic".to_string()),
+        );
         match &lambda_inner.context.input {
             Input::File(path) => {
+                let use_id = lambda_inner.push(
+                    None,
+                    Expression::Builtin(BuiltinFunction::Use),
+                    Some("use".to_string()),
+                );
                 let current_path_content = path
                     .iter()
                     .enumerate()
@@ -153,14 +177,12 @@ impl<'c> Compiler<'c> {
                             lambda_inner.push(
                                 None,
                                 Expression::Int(index as u64),
-                                // Some("key".to_string()),
-                                None,
+                                Some("key".to_string()),
                             ),
                             lambda_inner.push(
                                 None,
                                 Expression::Text(it.to_owned()),
-                                // Some("raw_path".to_string()),
-                                None,
+                                Some("rawPath".to_string()),
                             ),
                         )
                     })
@@ -168,15 +190,15 @@ impl<'c> Compiler<'c> {
                 let current_path = lambda_inner.push(
                     None,
                     Expression::Struct(current_path_content),
-                    Some("path".to_string()),
+                    Some("currentPath".to_string()),
                 );
                 lambda_inner.push(
                     None,
                     Expression::Call {
-                        function: lambda_inner.identifiers["builtinUse"].clone(),
+                        function: use_id,
                         arguments: vec![current_path, lambda_parameter_id.clone()],
                     },
-                    Some("module".to_string()),
+                    Some("importedModule".to_string()),
                 );
             }
             Input::ExternalFile(_) => {
@@ -214,31 +236,27 @@ impl<'c> Compiler<'c> {
         }
 
         assignment_inner.id_mapping = lambda_inner.id_mapping;
-        assignment_inner.push(
+        self.id_mapping = assignment_inner.id_mapping;
+        self.push(
             None,
             Expression::Lambda(Lambda {
                 parameters: vec![lambda_parameter_id],
                 body: lambda_inner.body,
+                fuzzable: false,
             }),
-            None,
-        );
-
-        self.id_mapping = assignment_inner.id_mapping;
-
-        self.push(
-            None,
-            Expression::Body(assignment_inner.body),
             Some("use".to_string()),
         );
     }
 
-    fn compile(&mut self, asts: &[Ast]) {
+    fn compile(&mut self, asts: &[Ast]) -> hir::Id {
         if asts.is_empty() {
-            self.push(None, Expression::nothing(), None);
+            self.push(None, Expression::nothing(), None)
         } else {
+            let mut last_id = None;
             for ast in asts.into_iter() {
-                self.compile_single(ast);
+                last_id = Some(self.compile_single(ast));
             }
+            last_id.unwrap()
         }
     }
     fn compile_single(&mut self, ast: &Ast) -> hir::Id {
@@ -291,9 +309,13 @@ impl<'c> Compiler<'c> {
                     .collect();
                 self.push(Some(ast.id.clone()), Expression::Struct(fields), None)
             }
+            AstKind::StructAccess(struct_access) => {
+                self.lower_struct_access(Some(ast.id.clone()), struct_access)
+            }
             AstKind::Lambda(ast::Lambda {
                 parameters,
                 body: body_asts,
+                fuzzable,
             }) => {
                 let mut body = Body::new();
                 let lambda_id = self.create_next_id(Some(ast.id.clone()), None);
@@ -333,58 +355,18 @@ impl<'c> Compiler<'c> {
                             })
                             .collect(),
                         body: inner.body,
+                        fuzzable: *fuzzable,
                     }),
                     None,
                 )
             }
-            AstKind::Call(ast::Call { name, arguments }) => {
-                let arguments = arguments
-                    .iter()
-                    .map(|argument| self.compile_single(argument))
-                    .collect();
-
-                let function = match self.identifiers.get(&name.value) {
-                    Some(function) => function.to_owned(),
-                    None => {
-                        return self.push(
-                            Some(name.id.clone()),
-                            Expression::Error {
-                                child: None,
-                                errors: vec![CompilerError {
-                                    input: name.id.input.clone(),
-                                    span: self.context.db.ast_id_to_span(name.id.clone()).unwrap(),
-                                    payload: CompilerErrorPayload::Hir(HirError::UnknownFunction {
-                                        name: name.value.clone(),
-                                    }),
-                                }],
-                            },
-                            None,
-                        );
-                    }
-                };
-                self.push(
-                    Some(ast.id.clone()),
-                    Expression::Call {
-                        function,
-                        arguments,
-                    },
-                    None,
-                )
-            }
+            AstKind::Call(call) => self.lower_call(Some(ast.id.clone()), call),
             AstKind::Assignment(Assignment { name, body }) => {
                 let name = name.value.to_owned();
-                let mut inner = Compiler::<'c> {
-                    context: &mut self.context,
-                    id_mapping: self.id_mapping.clone(),
-                    body: Body::new(),
-                    parent_keys: add_keys(&self.parent_keys, name.clone()),
-                    identifiers: self.identifiers.clone(),
-                };
-                inner.compile(&body);
-                self.id_mapping = inner.id_mapping;
+                let body = self.compile(body);
                 self.push(
                     Some(ast.id.clone()),
-                    Expression::Body(inner.body),
+                    Expression::Reference(body),
                     Some(name),
                 )
             }
@@ -404,6 +386,92 @@ impl<'c> Compiler<'c> {
                 )
             }
         }
+    }
+    fn lower_struct_access(
+        &mut self,
+        id: Option<ast::Id>,
+        struct_access: &StructAccess,
+    ) -> hir::Id {
+        let struct_ = self.compile_single(&*struct_access.struct_);
+        let key_id = self.push(
+            Some(struct_access.key.id.clone()),
+            Expression::Symbol(struct_access.key.value.uppercase_first_letter()),
+            None,
+        );
+        let struct_get_id = self.push(None, Expression::Builtin(BuiltinFunction::StructGet), None);
+        self.push(
+            id,
+            Expression::Call {
+                function: struct_get_id,
+                arguments: vec![struct_, key_id],
+            },
+            None,
+        )
+    }
+    fn lower_call(&mut self, id: Option<ast::Id>, call: &Call) -> hir::Id {
+        let arguments = call
+            .arguments
+            .iter()
+            .map(|argument| self.compile_single(argument))
+            .collect_vec();
+
+        let function = match call.receiver.clone() {
+            CallReceiver::Identifier(name) => {
+                if name.value == "needs" {
+                    return self.push(
+                        id,
+                        if arguments.len() == 1 {
+                            Expression::Needs {
+                                condition: Box::new(arguments.first().unwrap().clone()),
+                            }
+                        } else {
+                            Expression::Error {
+                                child: None,
+                                errors: vec![CompilerError {
+                                    input: name.id.input.clone(),
+                                    span: self.context.db.ast_id_to_span(name.id.clone()).unwrap(),
+                                    payload: CompilerErrorPayload::Hir(
+                                        HirError::NeedsWithWrongNumberOfArguments,
+                                    ),
+                                }],
+                            }
+                        },
+                        None,
+                    );
+                }
+                match self.identifiers.get(&name.value) {
+                    Some(function) => function.to_owned(),
+                    None => {
+                        return self.push(
+                            Some(name.id.clone()),
+                            Expression::Error {
+                                child: None,
+                                errors: vec![CompilerError {
+                                    input: name.id.input.clone(),
+                                    span: self.context.db.ast_id_to_span(name.id.clone()).unwrap(),
+                                    payload: CompilerErrorPayload::Hir(HirError::UnknownFunction {
+                                        name: name.value.clone(),
+                                    }),
+                                }],
+                            },
+                            None,
+                        );
+                    }
+                }
+            }
+            CallReceiver::StructAccess(struct_access) => {
+                self.lower_struct_access(None, &struct_access)
+            }
+            CallReceiver::Call(call) => self.lower_call(None, &*call),
+        };
+        self.push(
+            id,
+            Expression::Call {
+                function,
+                arguments,
+            },
+            None,
+        )
     }
 
     fn push(
@@ -445,7 +513,7 @@ impl<'c> Compiler<'c> {
                 add_keys(&self.parent_keys, last_part),
             );
             if !self.id_mapping.contains_key(&id) {
-                self.id_mapping.insert(id.to_owned(), ast_id).is_none();
+                assert!(self.id_mapping.insert(id.to_owned(), ast_id).is_none());
                 return id;
             }
         }

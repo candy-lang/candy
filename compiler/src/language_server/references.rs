@@ -129,9 +129,6 @@ impl<'a> Context<'a> {
                 // way. Therfore, we already visit them in [visit_body].
                 self.visit_body(body);
             }
-            Expression::Body(body) => {
-                self.visit_body(body);
-            }
             Expression::Call {
                 function,
                 arguments,
@@ -141,6 +138,8 @@ impl<'a> Context<'a> {
                 }
                 self.visit_ids(arguments);
             }
+            Expression::Builtin(_) => {}
+            Expression::Needs { .. } => {}
             Expression::Error { child, .. } => {
                 if let Some(child) = child {
                     self.visit_id(child.clone());

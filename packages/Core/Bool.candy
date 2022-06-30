@@ -1,18 +1,16 @@
-needs = builtinStructGet (use ".Needs") Needs
+needs = (use ".Needs").needs
 type = use ".Type"
 
-is value =
-  isOfType = builtinStructGet type Is
-  isOfType value Bool
+is value = type.is value Bool
 
 not a =
   needs (is a)
-  builtinIfElse a { False } { True }
+  ✨.ifElse a { False } { True }
 and a b =
   needs (is a)
   needs (is b)
-  builtinIfElse a { b } { False }
+  ✨.ifElse a { b } { False }
 or a b =
   needs (is a)
   needs (is b)
-  builtinIfElse a { True } { b }
+  ✨.ifElse a { True } { b }

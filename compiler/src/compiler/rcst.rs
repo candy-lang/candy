@@ -4,6 +4,7 @@ use std::fmt::{self, Display, Formatter};
 pub enum Rcst {
     EqualsSign,         // =
     Comma,              // ,
+    Dot,                // .
     Colon,              // :
     OpeningParenthesis, // (
     ClosingParenthesis, // )
@@ -56,6 +57,11 @@ pub enum Rcst {
         value: Box<Rcst>,
         comma: Option<Box<Rcst>>,
     },
+    StructAccess {
+        struct_: Box<Rcst>,
+        dot: Box<Rcst>,
+        key: Box<Rcst>,
+    },
     Lambda {
         opening_curly_brace: Box<Rcst>,
         parameters_and_arrow: Option<(Vec<Rcst>, Box<Rcst>)>,
@@ -100,6 +106,7 @@ impl Display for Rcst {
         match self {
             Rcst::EqualsSign => "=".fmt(f),
             Rcst::Comma => ",".fmt(f),
+            Rcst::Dot => ".".fmt(f),
             Rcst::Colon => ":".fmt(f),
             Rcst::OpeningParenthesis => "(".fmt(f),
             Rcst::ClosingParenthesis => ")".fmt(f),
@@ -182,6 +189,11 @@ impl Display for Rcst {
                 }
                 Ok(())
             }
+            Rcst::StructAccess { struct_, dot, key } => {
+                struct_.fmt(f)?;
+                dot.fmt(f)?;
+                key.fmt(f)
+            }
             Rcst::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -232,6 +244,7 @@ impl IsMultiline for Rcst {
         match self {
             Rcst::EqualsSign => false,
             Rcst::Comma => false,
+            Rcst::Dot => false,
             Rcst::Colon => false,
             Rcst::OpeningParenthesis => false,
             Rcst::ClosingParenthesis => false,
@@ -291,6 +304,9 @@ impl IsMultiline for Rcst {
                         .as_ref()
                         .map(|comma| comma.is_multiline())
                         .unwrap_or(false)
+            }
+            Rcst::StructAccess { struct_, dot, key } => {
+                struct_.is_multiline() || dot.is_multiline() || key.is_multiline()
             }
             Rcst::Lambda {
                 opening_curly_brace,

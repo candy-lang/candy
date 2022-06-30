@@ -1,11 +1,12 @@
 use super::{
     ast::{
-        self, Ast, AstError, AstKind, AstString, CollectErrors, Identifier, Int, Lambda, Symbol,
-        Text,
+        self, Ast, AstError, AstKind, AstString, CallReceiver, CollectErrors, Identifier, Int,
+        Lambda, Symbol, Text,
     },
     cst::{self, Cst, CstDb, CstKind},
     error::{CompilerError, CompilerErrorPayload},
     rcst_to_cst::RcstToCst,
+    utils::AdjustCasingOfFirstLetter,
 };
 use crate::{
     compiler::{ast::Struct, cst::UnwrapWhitespaceAndComment},
@@ -70,6 +71,7 @@ impl LoweringContext {
         match &cst.kind {
             CstKind::EqualsSign
             | CstKind::Comma
+            | CstKind::Dot
             | CstKind::Colon
             | CstKind::OpeningParenthesis
             | CstKind::ClosingParenthesis
@@ -179,15 +181,50 @@ impl LoweringContext {
                 ast
             }
             CstKind::Call { name, arguments } => {
-                let name_string = if let CstKind::Identifier(identifier) = &name.kind {
-                    Some(self.create_string(name.id.to_owned(), identifier.to_owned()))
-                } else {
-                    None
+                let mut name_kind = &name.kind;
+                loop {
+                    name_kind = match name_kind {
+                        CstKind::Parenthesized {
+                            opening_parenthesis,
+                            inner,
+                            closing_parenthesis,
+                        } => {
+                            assert!(
+                                matches!(opening_parenthesis.kind, CstKind::OpeningParenthesis),
+                                "Parenthesized needs to start with opening parenthesis, but started with {}.",
+                                opening_parenthesis
+                            );
+                            assert!(
+                                matches!(
+                                    closing_parenthesis.kind,
+                                    CstKind::ClosingParenthesis
+                                ),
+                                "Parenthesized for a call receiver needs to end with closing parenthesis, but ended with {}.", closing_parenthesis
+                            );
+                            &inner.kind
+                        }
+                        _ => break,
+                    };
+                }
+                let receiver = match &name.kind {
+                    CstKind::Identifier(identifier) => Some(CallReceiver::Identifier(
+                        self.create_string(name.id.to_owned(), identifier.to_owned()),
+                    )),
+                    CstKind::StructAccess { struct_, dot, key } => Some(
+                        CallReceiver::StructAccess(self.lower_struct_access(struct_, dot, key)),
+                    ),
+                    _ => None,
                 };
                 let arguments = self.lower_csts(arguments);
 
-                if let Some(name) = name_string {
-                    self.create_ast(cst.id, AstKind::Call(ast::Call { name, arguments }))
+                if let Some(receiver) = receiver {
+                    self.create_ast(
+                        cst.id,
+                        AstKind::Call(ast::Call {
+                            receiver,
+                            arguments,
+                        }),
+                    )
                 } else {
                     let mut errors = vec![];
                     errors.push(CompilerError {
@@ -300,6 +337,10 @@ impl LoweringContext {
                 }
             }
             CstKind::StructField { .. } => panic!("StructField should only appear in Struct."),
+            CstKind::StructAccess { struct_, dot, key } => {
+                let struct_access = self.lower_struct_access(struct_, dot, key);
+                self.create_ast(cst.id, AstKind::StructAccess(struct_access))
+            }
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -336,7 +377,14 @@ impl LoweringContext {
                     });
                 }
 
-                let mut ast = self.create_ast(cst.id, AstKind::Lambda(Lambda { parameters, body }));
+                let mut ast = self.create_ast(
+                    cst.id,
+                    AstKind::Lambda(Lambda {
+                        parameters,
+                        body,
+                        fuzzable: false,
+                    }),
+                );
                 if !errors.is_empty() {
                     ast = self.create_ast(
                         cst.id,
@@ -366,8 +414,14 @@ impl LoweringContext {
                 let mut body = self.lower_csts(body);
 
                 if !parameters.is_empty() {
-                    body =
-                        vec![self.create_ast(cst.id, AstKind::Lambda(Lambda { parameters, body }))];
+                    body = vec![self.create_ast(
+                        cst.id,
+                        AstKind::Lambda(Lambda {
+                            parameters,
+                            body,
+                            fuzzable: true,
+                        }),
+                    )];
                 }
 
                 let mut ast =
@@ -394,6 +448,31 @@ impl LoweringContext {
                     }],
                 },
             ),
+        }
+    }
+
+    fn lower_struct_access(&mut self, struct_: &Cst, dot: &Cst, key: &Cst) -> ast::StructAccess {
+        let struct_ = self.lower_cst(struct_);
+
+        assert!(
+            matches!(dot.kind, CstKind::Dot),
+            "Struct access should always have a dot, but instead had {}.",
+            dot
+        );
+
+        let key = match key.kind.clone() {
+            CstKind::Identifier(identifier) => {
+                self.create_string(key.id.to_owned(), identifier.uppercase_first_letter())
+            }
+            _ => panic!(
+                "Expected an identifier after the dot in a struct access, but found `{}`.",
+                key
+            ),
+        };
+
+        ast::StructAccess {
+            struct_: Box::new(struct_),
+            key,
         }
     }
 
