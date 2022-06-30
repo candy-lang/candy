@@ -1,6 +1,6 @@
 mod builtin_functions;
 mod heap;
-mod tracer;
+pub mod tracer;
 pub mod value;
 mod vm;
 

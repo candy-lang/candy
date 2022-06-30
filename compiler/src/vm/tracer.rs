@@ -3,7 +3,7 @@ use crate::compiler::hir::Id;
 
 #[derive(Default, Clone)]
 pub struct Tracer {
-    log: Vec<TraceEntry>,
+    pub log: Vec<TraceEntry>,
 }
 #[derive(Clone)]
 pub enum TraceEntry {

@@ -4,7 +4,10 @@ use super::{
     value::Value,
 };
 use crate::{
-    compiler::lir::{Chunk, ChunkIndex, Instruction},
+    compiler::{
+        hir::Id,
+        lir::{Chunk, ChunkIndex, Instruction},
+    },
     database::Database,
     input::Input,
 };
@@ -22,7 +25,7 @@ pub struct Vm {
     pub data_stack: Vec<ObjectPointer>,
     pub call_stack: Vec<ByteCodePointer>,
     pub tracer: Tracer,
-    pub fuzzable_closures: Vec<ObjectPointer>,
+    pub fuzzable_closures: Vec<(Id, ObjectPointer)>,
 }
 
 #[derive(Clone)]
@@ -207,9 +210,9 @@ impl Vm {
                 let caller = self.call_stack.pop().unwrap();
                 self.next_instruction = caller;
             }
-            Instruction::RegisterFuzzableClosure(_) => {
+            Instruction::RegisterFuzzableClosure(id) => {
                 let closure = self.data_stack.last().unwrap().clone();
-                self.fuzzable_closures.push(closure);
+                self.fuzzable_closures.push((id, closure));
             }
             Instruction::TraceValueEvaluated(id) => {
                 let address = *self.data_stack.last().unwrap();
