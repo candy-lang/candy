@@ -117,6 +117,7 @@ dependencies = [
  "lsp-types",
  "notify",
  "proptest",
+ "rand",
  "regex",
  "salsa",
  "serde",

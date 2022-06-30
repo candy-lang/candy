@@ -1,3 +1,6 @@
+mod generator;
+
+use self::generator::generate_n_values;
 use crate::{
     compiler::{
         hir::{self, Expression, HirDb, Lambda},
@@ -57,7 +60,7 @@ fn fuzz_vm(db: &Database, input: Input, vm: &Vm, num_fuzzable_closures_to_skip: 
             // Snapshot a VM so we can run the fuzzing in the copy without modifying
             // the original VM.
             let mut vm = vm.clone();
-            let arguments = generate_fuzzing_arguments(num_args);
+            let arguments = generate_n_values(num_args);
 
             match test_closure_with_args(
                 db,
@@ -134,14 +137,6 @@ enum TestResult {
     NoPanic,
     WrongInputs,
     InternalPanic(Value),
-}
-
-fn generate_fuzzing_arguments(num: usize) -> Vec<Value> {
-    let mut args = vec![];
-    for _ in 0..num {
-        args.push(Value::Int(0));
-    }
-    args
 }
 
 fn did_need_in_closure_cause_panic(
