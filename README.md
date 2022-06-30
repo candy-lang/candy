@@ -14,7 +14,7 @@ Candy blurs the line between those stages, for example, by replacing compile-tim
   3                   # int
   "Candy"             # text
   Green               # symbol
-  [ Name: "Candy" ]   # symbol
+  [ Name: "Candy" ]   # struct
   { it -> add it 2 }  # closure
   ```
 * **Minimalistic syntax.**
