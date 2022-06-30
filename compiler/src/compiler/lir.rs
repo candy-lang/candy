@@ -82,6 +82,10 @@ pub enum Instruction {
         num_args: usize,
     },
     TraceCallEnds,
+    TraceNeedsStarts {
+        id: hir::Id,
+    },
+    TraceNeedsEnds,
 
     Error(hir::Id),
 }
@@ -124,6 +128,10 @@ impl Display for Lir {
                         writeln!(f, "traceCallStarts {} ({} args)", id, num_args)
                     }
                     Instruction::TraceCallEnds => writeln!(f, "traceCallEnds"),
+                    Instruction::TraceNeedsStarts { id } => {
+                        writeln!(f, "traceNeedsStarts {}", id)
+                    }
+                    Instruction::TraceNeedsEnds => writeln!(f, "traceNeedsEnds"),
                     Instruction::Error(hir_id) => writeln!(f, "error {}", hir_id),
                 }?;
             }

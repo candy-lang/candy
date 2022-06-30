@@ -128,7 +128,9 @@ impl LoweringContext {
             }
             Expression::Needs { condition } => {
                 self.emit_push_from_stack(*condition.clone());
+                self.emit_trace_needs_starts(id.clone());
                 self.emit_needs();
+                self.emit_trace_needs_ends();
             }
             Expression::Error { .. } => self.emit_error(id.to_owned()),
         };
@@ -194,6 +196,12 @@ impl LoweringContext {
     }
     fn emit_trace_call_ends(&mut self) {
         self.emit(Instruction::TraceCallEnds);
+    }
+    fn emit_trace_needs_starts(&mut self, id: hir::Id) {
+        self.emit(Instruction::TraceNeedsStarts { id });
+    }
+    fn emit_trace_needs_ends(&mut self) {
+        self.emit(Instruction::TraceNeedsEnds);
     }
     fn emit_error(&mut self, id: hir::Id) {
         self.emit(Instruction::Error(id.clone()));

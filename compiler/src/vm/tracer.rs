@@ -19,6 +19,11 @@ pub enum TraceEntry {
     CallEnded {
         return_value: Value,
     },
+    NeedsStarted {
+        id: Id,
+        arg: Value,
+    },
+    NeedsEnded,
 }
 
 impl Tracer {
@@ -47,6 +52,22 @@ impl Tracer {
                 TraceEntry::CallEnded { return_value } => {
                     let start = stack.pop().unwrap();
                     calls[start].return_value = Some(return_value.clone());
+                    indentation -= 1;
+                }
+                TraceEntry::NeedsStarted { id, arg } => {
+                    stack.push(calls.len());
+                    calls.push(DumpableCall {
+                        indentation,
+                        id: id.clone(),
+                        closure: Value::Symbol("Needs".to_string()),
+                        args: vec![arg.clone()],
+                        return_value: None,
+                    });
+                    indentation += 1;
+                }
+                TraceEntry::NeedsEnded => {
+                    let start = stack.pop().unwrap();
+                    calls[start].return_value = Some(Value::nothing());
                     indentation -= 1;
                 }
             }

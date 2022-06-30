@@ -238,6 +238,12 @@ impl Vm {
 
                 self.tracer.push(TraceEntry::CallEnded { return_value });
             }
+            Instruction::TraceNeedsStarts { id } => {
+                let address = *self.data_stack.last().unwrap();
+                let arg = self.heap.export_without_dropping(address);
+                self.tracer.push(TraceEntry::NeedsStarted { id, arg });
+            }
+            Instruction::TraceNeedsEnds => self.tracer.push(TraceEntry::NeedsEnded),
             Instruction::Error(error) => {
                 self.panic(
                     format!("The VM crashed because there was an error in previous compilation stages: {:?}", error),
