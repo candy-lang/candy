@@ -188,14 +188,14 @@ impl Display for Ast {
                     struct_
                         .fields
                         .iter()
-                        .map(|(key, value)| format!("{}: {},", key, value))
+                        .map(|(key, value)| format!("{key}: {value},"))
                         .join("\n")
                         .lines()
-                        .map(|line| format!("  {}", line))
+                        .map(|line| format!("  {line}"))
                         .join("\n")
                 )
             }
-            AstKind::StructAccess(struct_access) => write!(f, "{}", struct_access),
+            AstKind::StructAccess(struct_access) => write!(f, "{struct_access}"),
             AstKind::Lambda(lambda) => write!(f, "{}", lambda),
             AstKind::Call(call) => write!(f, "{}", call),
             AstKind::Assignment(assignment) => {
@@ -205,7 +205,7 @@ impl Display for Ast {
                     assignment.name,
                     format!("{}", assignment.body)
                         .lines()
-                        .map(|line| format!("  {}", line))
+                        .map(|line| format!("  {line}"))
                         .join("\n"),
                 )
             }
@@ -213,13 +213,10 @@ impl Display for Ast {
                 write!(
                     f,
                     "error:\n{}",
-                    errors
-                        .iter()
-                        .map(|error| format!("  {:?}", error))
-                        .join("\n")
+                    errors.iter().map(|error| format!("  {error:?}")).join("\n")
                 )?;
                 if let Some(child) = child {
-                    write!(f, "\n  fallback: {}", child)?;
+                    write!(f, "\n  fallback: {child}")?;
                 }
                 Ok(())
             }
@@ -229,9 +226,9 @@ impl Display for Ast {
 impl Display for AssignmentBody {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            AssignmentBody::Lambda(lambda) => write!(f, "{}", lambda),
+            AssignmentBody::Lambda(lambda) => write!(f, "{lambda}"),
             AssignmentBody::Body(body) => {
-                write!(f, "{}", body.iter().map(|it| format!("{}", it)).join("\n"))
+                write!(f, "{}", body.iter().map(|it| format!("{it}")).join("\n"))
             }
         }
     }
@@ -246,13 +243,13 @@ impl Display for Lambda {
             } else {
                 "non-fuzzable"
             },
-            self.parameters.iter().map(|it| format!("{}", it)).join(" "),
+            self.parameters.iter().map(|it| format!("{it}")).join(" "),
             self.body
                 .iter()
-                .map(|it| format!("{}", it))
+                .map(|it| format!("{it}"))
                 .join("\n")
                 .lines()
-                .map(|line| format!("  {}", line))
+                .map(|line| format!("  {line}"))
                 .join("\n")
         )
     }
@@ -275,7 +272,7 @@ impl Display for Call {
             self.receiver,
             self.arguments
                 .iter()
-                .map(|argument| format!("  {}", argument))
+                .map(|argument| format!("  {argument}"))
                 .join("\n")
         )
     }

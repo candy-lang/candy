@@ -65,7 +65,7 @@ impl LoweringContext {
     }
     fn compile_expression(&mut self, id: &hir::Id, expression: &Expression) {
         log::trace!("Stack: {:?}", self.stack);
-        log::trace!("Compiling expression {:?}", expression);
+        log::trace!("Compiling expression {expression:?}");
 
         match expression {
             Expression::Int(int) => self.emit_create_int(id.clone(), *int),

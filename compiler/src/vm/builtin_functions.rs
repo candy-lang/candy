@@ -19,7 +19,7 @@ impl Vm {
         builtin_function: &BuiltinFunction,
         args: &[ObjectPointer],
     ) {
-        log::trace!("run_builtin_function: builtin{:?}", builtin_function);
+        log::trace!("run_builtin_function: builtin{builtin_function:?}");
 
         let args = args.iter().map(|it| self.heap.export(*it)).collect_vec();
 
@@ -90,8 +90,7 @@ impl Vm {
                     "False" => false,
                     _ => {
                         return Err(format!(
-                            "IfElse expected True or False as a condition, but got {}.",
-                            condition
+                            "IfElse expected True or False as a condition, but got {condition}.",
                         ));
                     }
                 };
@@ -133,7 +132,7 @@ impl Vm {
         destructure!(args, [Value::Struct(struct_), key], {
             match struct_.get(&key) {
                 Some(value) => Ok(value.clone().into()),
-                None => Err(format!("Struct does not contain key {:?}.", key)),
+                None => Err(format!("Struct does not contain key {key:?}.")),
             }
         })
     }
@@ -174,7 +173,7 @@ impl Vm {
                 let mut current_path = vec![];
                 let mut index = 0;
                 while let Some(component) = current_path_struct.get(&Value::Int(index)) {
-                    current_path.push(component.clone().try_into_text().map_err(|it| format!("builtinUse expects a struct as current path with only textual paths as values, but the map contains the value {} for key {}", it, index)));
+                    current_path.push(component.clone().try_into_text().map_err(|it| format!("builtinUse expects a struct as current path with only textual paths as values, but the map contains the value {it} for key {index}")));
                     index += 1;
                 }
 
@@ -305,7 +304,7 @@ impl UseTarget {
 
         if path.len() >= 1 {
             let last = path.last_mut().unwrap();
-            *last = format!("{}.candy", last);
+            *last = format!("{last}.candy");
             result.push(Input::File(path));
         }
         result

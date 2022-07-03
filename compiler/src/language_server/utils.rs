@@ -20,9 +20,9 @@ impl CompilerError {
             code_description: None,
             source: Some("🍭 Candy".to_owned()),
             message: match self.payload {
-                CompilerErrorPayload::Rcst(rcst) => format!("RCST: {:?}", rcst),
-                CompilerErrorPayload::Ast(ast) => format!("AST: {:?}", ast),
-                CompilerErrorPayload::Hir(hir) => format!("HIR: {:?}", hir),
+                CompilerErrorPayload::Rcst(rcst) => format!("RCST: {rcst:?}"),
+                CompilerErrorPayload::Ast(ast) => format!("AST: {ast:?}"),
+                CompilerErrorPayload::Hir(hir) => format!("HIR: {hir:?}"),
             },
             related_information: None,
             tags: None,
@@ -47,7 +47,7 @@ impl From<Input> for Url {
             Input::File(_) | Input::ExternalFile(_) => {
                 Url::from_file_path(input.to_path().unwrap()).unwrap()
             }
-            Input::Untitled(id) => Url::parse(&format!("untitled:{}", id)).unwrap(),
+            Input::Untitled(id) => Url::parse(&format!("untitled:{id}")).unwrap(),
         }
     }
 }

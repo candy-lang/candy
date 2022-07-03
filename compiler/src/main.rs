@@ -99,14 +99,14 @@ fn build(options: CandyBuildOptions) {
                 Ok(_) => {
                     raw_build(&options.file, options.debug);
                 }
-                Err(e) => log::error!("watch error: {:#?}", e),
+                Err(e) => log::error!("watch error: {e:#?}"),
             }
         }
     }
 }
 fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
     let path_string = file.to_string_lossy();
-    log::debug!("Building `{}`.", path_string);
+    log::debug!("Building `{path_string}`.");
 
     let input: Input = file.clone().into();
     let db = Database::default();
@@ -148,7 +148,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
                 .keys()
                 .into_iter()
                 .sorted_by_key(|it| it.local)
-                .map(|key| format!("{} -> {}\n", key, ast_cst_id_map[key].0))
+                .map(|key| format!("{key} -> {}\n", ast_cst_id_map[key].0))
                 .join(""),
         )
         .unwrap();
@@ -168,7 +168,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
             hir_ast_id_map
                 .keys()
                 .into_iter()
-                .map(|key| format!("{} -> {}\n", key, hir_ast_id_map[key]))
+                .map(|key| format!("{key} -> {}\n", hir_ast_id_map[key]))
                 .join(""),
         )
         .unwrap();
@@ -180,7 +180,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if debug {
         let lir_file = file.clone_with_extension("candy.lir");
-        fs::write(lir_file, format!("{}", lir)).unwrap();
+        fs::write(lir_file, format!("{lir}")).unwrap();
     }
 
     Some(lir)
@@ -203,15 +203,15 @@ fn run(options: CandyRunOptions) {
     };
 
     let path_string = options.file.to_string_lossy();
-    log::debug!("Running `{}`.", path_string);
+    log::debug!("Running `{path_string}`.");
 
     let mut vm = Vm::new(lir.chunks.clone());
     vm.run(1000);
     match vm.status() {
         Status::Running => log::info!("VM is still running."),
-        Status::Done(value) => log::info!("VM is done: {}", value),
+        Status::Done(value) => log::info!("VM is done: {value}"),
         Status::Panicked(value) => {
-            log::error!("VM panicked with value {}.", value);
+            log::error!("VM panicked with value {value}.");
             log::error!("This is the stack trace:");
             vm.tracer.dump_stack_trace(&db, input);
         }
@@ -242,7 +242,7 @@ fn fuzz(options: CandyFuzzOptions) {
     }
 
     let path_string = options.file.to_string_lossy();
-    log::debug!("Fuzzing `{}`.", path_string);
+    log::debug!("Fuzzing `{path_string}`.");
 
     fuzzer::fuzz(&db, input);
 }

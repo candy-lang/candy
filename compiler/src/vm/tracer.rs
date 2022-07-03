@@ -73,9 +73,8 @@ impl Tracer {
                 let (call_string, hir_id) = match entry {
                     TraceEntry::CallStarted { id, closure, args } => (
                         format!(
-                            "{} {}",
-                            closure,
-                            args.iter().map(|arg| format!("{}", arg)).join(" ")
+                            "{closure} {}",
+                            args.iter().map(|arg| format!("{arg}")).join(" ")
                         ),
                         id,
                     ),
@@ -83,7 +82,7 @@ impl Tracer {
                         id,
                         condition,
                         message,
-                    } => (format!("needs {} {}", condition, message), id),
+                    } => (format!("needs {condition} {message}"), id),
                     _ => unreachable!(),
                 };
                 let caller_location_string = {
@@ -93,11 +92,11 @@ impl Tracer {
                     let start = db.offset_to_lsp(input.clone(), cst.span.start);
                     let end = db.offset_to_lsp(input.clone(), cst.span.end);
                     format!(
-                        "{}, {}, {:?}, {}:{} – {}:{}",
-                        hir_id, ast_id, cst_id, start.0, start.1, end.0, end.1
+                        "{hir_id}, {ast_id}, {cst_id:?}, {}:{} – {}:{}",
+                        start.0, start.1, end.0, end.1
                     )
                 };
-                format!("{:90} {}", caller_location_string, call_string)
+                format!("{caller_location_string:90} {call_string}")
             })
             .join("\n")
     }
@@ -157,11 +156,11 @@ impl Tracer {
             dump.push_str(&format!("{}", call.closure));
             for arg in call.args {
                 dump.push(' ');
-                dump.push_str(&format!("{}", arg));
+                dump.push_str(&format!("{arg}"));
             }
             if let Some(value) = call.return_value {
                 dump.push_str(" = ");
-                dump.push_str(&format!("{}", value));
+                dump.push_str(&format!("{value}"));
             } else {
                 dump.push_str(" (panicked)");
             }

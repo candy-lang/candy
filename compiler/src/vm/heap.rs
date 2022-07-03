@@ -40,19 +40,18 @@ impl Heap {
     pub fn get(&self, address: ObjectPointer) -> &Object {
         self.objects
             .get(&address)
-            .expect(&format!("Couldn't get object {}.", address))
+            .expect(&format!("Couldn't get object {address}."))
     }
     pub fn get_mut(&mut self, address: ObjectPointer) -> &mut Object {
         self.objects
             .get_mut(&address)
-            .expect(&format!("Couldn't get object {}.", address))
+            .expect(&format!("Couldn't get object {address}."))
     }
 
     pub fn dup(&mut self, address: ObjectPointer) {
         self.get_mut(address).reference_count += 1;
         log::trace!(
-            "RefCount of {} increased to {}. Value: {}",
-            address,
+            "RefCount of {address} increased to {}. Value: {}",
             self.get(address).reference_count,
             self.export_without_dropping(address),
         );
@@ -62,10 +61,8 @@ impl Heap {
         let object = self.get_mut(address);
         object.reference_count -= 1;
         log::trace!(
-            "RefCount of {} reduced to {}. Value: {}",
-            address,
+            "RefCount of {address} reduced to {}. Value: {value}",
             object.reference_count,
-            value,
         );
         if object.reference_count == 0 {
             self.free(address);
@@ -74,7 +71,7 @@ impl Heap {
 
     pub fn create(&mut self, object: ObjectData) -> ObjectPointer {
         let address = self.next_address;
-        log::trace!("Creating object {:?} at {}.", object, address);
+        log::trace!("Creating object {object:?} at {address}.");
         // TODO: Remove this special case once closures are self-contained.
         if let ObjectData::Closure { captured, .. } = &object {
             for captured in captured {
@@ -93,7 +90,7 @@ impl Heap {
     }
     pub fn free(&mut self, address: ObjectPointer) {
         let object = self.objects.remove(&address).unwrap();
-        log::trace!("Freeing object {:?} at {}.", object, address);
+        log::trace!("Freeing object {object:?} at {address}.");
         assert_eq!(object.reference_count, 0);
         match object.data {
             ObjectData::Int(_) => {}

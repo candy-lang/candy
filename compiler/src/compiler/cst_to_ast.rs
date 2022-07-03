@@ -486,7 +486,7 @@ impl LoweringContext {
                 Ok(parameter) => parameter,
                 Err(error) => {
                     errors.push(error);
-                    self.create_string(it.id, format!("<invalid#{}>", index))
+                    self.create_string(it.id, format!("<invalid#{index}>"))
                 }
             })
             .collect();

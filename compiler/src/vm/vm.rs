@@ -72,7 +72,7 @@ impl Vm {
             let instruction = self.chunks[self.next_instruction.chunk].instructions
                 [self.next_instruction.instruction]
                 .clone();
-            log::trace!("Running instruction: {:?}", &instruction);
+            log::trace!("Running instruction: {instruction:?}");
             self.next_instruction.instruction += 1;
             self.run_instruction(instruction);
 
@@ -161,7 +161,7 @@ impl Vm {
                     ObjectData::Closure { captured, body } => {
                         let expected_num_args = self.chunks[body].num_args;
                         if num_args != expected_num_args {
-                            self.panic(format!("Closure expects {} parameters, but you called it with {} arguments.", expected_num_args, num_args));
+                            self.panic(format!("Closure expects {expected_num_args} parameters, but you called it with {num_args} arguments."));
                             return;
                         }
 
@@ -197,11 +197,11 @@ impl Vm {
                                 Status::Panicked(self.heap.export_without_dropping(message))
                         }
                         _ => {
-                            self.panic(format!("Needs expects True or False as a symbol."));
+                            self.panic("Needs expects True or False as a symbol.".to_string());
                         }
                     },
                     _ => {
-                        self.panic(format!("Needs expects a boolean symbol."));
+                        self.panic("Needs expects a boolean symbol.".to_string());
                     }
                 }
             }
@@ -254,7 +254,7 @@ impl Vm {
             Instruction::TraceNeedsEnds => self.tracer.push(TraceEntry::NeedsEnded),
             Instruction::Error(error) => {
                 self.panic(
-                    format!("The VM crashed because there was an error in previous compilation stages: {:?}", error),
+                    format!("The VM crashed because there was an error in previous compilation stages: {error:?}"),
                 );
             }
         }

@@ -24,9 +24,9 @@ pub fn fuzz(db: &Database, input: Input) {
             log::warn!("VM didn't finish running, so we're not fuzzing it.");
             return;
         }
-        Status::Done(value) => log::debug!("VM is done: {}", value),
+        Status::Done(value) => log::debug!("VM is done: {value}"),
         Status::Panicked(value) => {
-            log::error!("VM panicked with value {}.", value);
+            log::error!("VM panicked with value {value}.");
             log::error!("{}", vm.tracer.format_stack_trace(db, input));
             return;
         }
@@ -52,7 +52,7 @@ fn fuzz_vm(db: &Database, input: Input, vm: &Vm, num_fuzzable_closures_to_skip: 
         } else {
             panic!("The VM registered a fuzzable closure that's not a closure.");
         };
-        log::info!("Fuzzing {}.", closure_id);
+        log::info!("Fuzzing {closure_id}.");
 
         let fuzz_count = num_args * 20;
 
@@ -75,13 +75,9 @@ fn fuzz_vm(db: &Database, input: Input, vm: &Vm, num_fuzzable_closures_to_skip: 
                 TestResult::NoPanic => {}
                 TestResult::WrongInputs => {} // This is the fuzzer's fault.
                 TestResult::InternalPanic(message) => {
+                    log::error!("The fuzzer discovered an input that crashes {closure_id}:");
                     log::error!(
-                        "The fuzzer discovered an input that crashes {}:",
-                        closure_id
-                    );
-                    log::error!(
-                        "Calling `{} {}` doesn't work because {}.",
-                        closure_id,
+                        "Calling `{closure_id} {}` doesn't work because {}.",
                         arguments.iter().map(|it| format!("{}", it)).join(" "),
                         match message {
                             Value::Text(message) => message,

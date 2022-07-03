@@ -518,7 +518,7 @@ impl<'c> Compiler<'c> {
                 if disambiguator == 0 {
                     key.to_string()
                 } else {
-                    format!("{}${}", key, disambiguator - 1)
+                    format!("{key}${}", disambiguator - 1)
                 }
             } else {
                 format!("{}", disambiguator)
