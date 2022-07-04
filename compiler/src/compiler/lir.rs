@@ -1,19 +1,15 @@
 use crate::{builtin_functions::BuiltinFunction, hir};
+use itertools::Itertools;
 use std::fmt::Display;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lir {
-    pub chunks: Vec<Chunk>,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Chunk {
-    pub num_args: usize,
     pub instructions: Vec<Instruction>,
 }
-pub type ChunkIndex = usize;
+
 pub type StackOffset = usize; // 0 is the last item, 1 the one before that, etc.
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Instruction {
     /// Pushes an int.
     CreateInt(u64),
@@ -34,7 +30,10 @@ pub enum Instruction {
     /// Pushes a closure that captures the whole stack.
     ///
     /// a -> a, pointer to closure
-    CreateClosure(ChunkIndex),
+    CreateClosure {
+        num_args: usize,
+        body: Vec<Instruction>,
+    },
 
     /// Pushes a builtin function.
     ///
@@ -93,51 +92,71 @@ pub enum Instruction {
     Error(hir::Id),
 }
 
+impl Display for Instruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Instruction::CreateInt(int) => write!(f, "createInt {int}"),
+            Instruction::CreateText(text) => write!(f, "createText {text:?}"),
+            Instruction::CreateSymbol(symbol) => write!(f, "createSymbol {symbol}"),
+            Instruction::CreateStruct { num_entries } => {
+                write!(f, "createStruct {num_entries}")
+            }
+            Instruction::CreateClosure {
+                num_args,
+                body: instructions,
+            } => {
+                write!(
+                    f,
+                    "createClosure ({num_args} {})",
+                    if *num_args == 1 {
+                        "argument"
+                    } else {
+                        "arguments"
+                    }
+                )?;
+                for instruction in instructions {
+                    let indented = format!("{instruction}")
+                        .lines()
+                        .map(|line| format!("  {line}"))
+                        .join("\n");
+                    write!(f, "\n{indented}")?;
+                }
+                Ok(())
+            }
+            Instruction::CreateBuiltin(builtin_function) => {
+                write!(f, "createBuiltin {builtin_function:?}")
+            }
+            Instruction::PopMultipleBelowTop(count) => {
+                write!(f, "popMultipleBelowTop {count}")
+            }
+            Instruction::PushFromStack(offset) => write!(f, "pushFromStack {offset}"),
+            Instruction::Call { num_args } => {
+                write!(f, "call with {num_args} arguments")
+            }
+            Instruction::Needs => write!(f, "needs"),
+            Instruction::Return => write!(f, "return"),
+            Instruction::RegisterFuzzableClosure(hir_id) => {
+                write!(f, "registerFuzzableClosure {hir_id}")
+            }
+            Instruction::TraceValueEvaluated(hir_id) => {
+                write!(f, "traceValueEvaluated {hir_id}")
+            }
+            Instruction::TraceCallStarts { id, num_args } => {
+                write!(f, "traceCallStarts {id} ({num_args} args)")
+            }
+            Instruction::TraceCallEnds => write!(f, "traceCallEnds"),
+            Instruction::TraceNeedsStarts { id } => {
+                write!(f, "traceNeedsStarts {id}")
+            }
+            Instruction::TraceNeedsEnds => write!(f, "traceNeedsEnds"),
+            Instruction::Error(hir_id) => write!(f, "error {hir_id}"),
+        }
+    }
+}
 impl Display for Lir {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (i, chunk) in self.chunks.iter().enumerate() {
-            writeln!(f, "Chunk {i} ({} args)", chunk.num_args)?;
-            for instruction in &chunk.instructions {
-                write!(f, "  ")?; // indent actual instructions
-                match instruction {
-                    Instruction::CreateInt(int) => writeln!(f, "createInt {int}"),
-                    Instruction::CreateText(text) => writeln!(f, "createText {text:?}"),
-                    Instruction::CreateSymbol(symbol) => writeln!(f, "createSymbol {symbol}"),
-                    Instruction::CreateStruct { num_entries } => {
-                        writeln!(f, "createStruct {num_entries}")
-                    }
-                    Instruction::CreateClosure(chunk) => {
-                        writeln!(f, "createClosure, chunk {chunk}")
-                    }
-                    Instruction::CreateBuiltin(builtin_function) => {
-                        writeln!(f, "createBuiltin {builtin_function:?}")
-                    }
-                    Instruction::PopMultipleBelowTop(count) => {
-                        writeln!(f, "popMultipleBelowTop {count}")
-                    }
-                    Instruction::PushFromStack(offset) => writeln!(f, "pushFromStack {offset}"),
-                    Instruction::Call { num_args } => {
-                        writeln!(f, "call with {num_args} arguments")
-                    }
-                    Instruction::Needs => writeln!(f, "needs"),
-                    Instruction::Return => writeln!(f, "return"),
-                    Instruction::RegisterFuzzableClosure(hir_id) => {
-                        writeln!(f, "registerFuzzableClosure {hir_id}")
-                    }
-                    Instruction::TraceValueEvaluated(hir_id) => {
-                        writeln!(f, "traceValueEvaluated {hir_id}")
-                    }
-                    Instruction::TraceCallStarts { id, num_args } => {
-                        writeln!(f, "traceCallStarts {id} ({num_args} args)")
-                    }
-                    Instruction::TraceCallEnds => writeln!(f, "traceCallEnds"),
-                    Instruction::TraceNeedsStarts { id } => {
-                        writeln!(f, "traceNeedsStarts {id}")
-                    }
-                    Instruction::TraceNeedsEnds => writeln!(f, "traceNeedsEnds"),
-                    Instruction::Error(hir_id) => writeln!(f, "error {hir_id}"),
-                }?;
-            }
+        for instruction in &self.instructions {
+            writeln!(f, "{instruction}")?;
         }
         Ok(())
     }

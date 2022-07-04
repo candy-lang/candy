@@ -3,10 +3,7 @@ use super::{
     tracer::{TraceEntry, Tracer},
     value::Value,
 };
-use crate::compiler::{
-    hir::Id,
-    lir::{Chunk, ChunkIndex, Instruction},
-};
+use crate::compiler::{hir::Id, lir::Instruction};
 use itertools::Itertools;
 use log;
 use std::collections::HashMap;
@@ -14,7 +11,6 @@ use std::collections::HashMap;
 /// A VM can execute some byte code.
 #[derive(Clone)]
 pub struct Vm {
-    pub chunks: Vec<Chunk>,
     pub status: Status,
     next_instruction: ByteCodePointer,
     pub heap: Heap,
@@ -33,25 +29,65 @@ pub enum Status {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ByteCodePointer {
-    chunk: ChunkIndex,
+    /// Pointer to the closure object that is currently running code.
+    closure: ObjectPointer,
+
+    /// Index of the next instruction to run.
     instruction: usize,
+}
+impl ByteCodePointer {
+    fn null_pointer() -> Self {
+        Self {
+            closure: 0,
+            instruction: 0,
+        }
+    }
 }
 
 impl Vm {
-    pub fn new(chunks: Vec<Chunk>) -> Self {
+    pub fn new() -> Self {
         Self {
-            chunks: chunks.clone(),
-            status: Status::Running,
-            next_instruction: ByteCodePointer {
-                chunk: chunks.len() - 1,
-                instruction: 0,
-            },
+            status: Status::Done(Value::nothing()),
+            next_instruction: ByteCodePointer::null_pointer(),
             heap: Heap::new(),
             data_stack: vec![],
             call_stack: vec![],
             tracer: Tracer::default(),
             fuzzable_closures: vec![],
         }
+    }
+
+    /// Sets this VM up in a way that the closure will run.
+    pub fn start_closure(&mut self, closure: Value, arguments: Vec<Value>) {
+        let num_args = if let Value::Closure { num_args, .. } = closure.clone() {
+            num_args
+        } else {
+            panic!("Called start_closure with a non-closure.");
+        };
+
+        assert_eq!(num_args, arguments.len());
+
+        for arg in arguments {
+            let address = self.heap.import(arg);
+            self.data_stack.push(address);
+        }
+        let address = self.heap.import(closure);
+        self.data_stack.push(address);
+
+        self.next_instruction = ByteCodePointer {
+            closure: address,
+            instruction: 0,
+        };
+        self.run_instruction(Instruction::Call { num_args });
+        self.status = Status::Running;
+    }
+    pub fn start_module_closure(&mut self, closure: Value) {
+        if let Value::Closure { captured, .. } = closure.clone() {
+            assert_eq!(captured.len(), 0, "Called start_module_closure with a closure that is not a module closure (it captures stuff).");
+        } else {
+            panic!("Called start_module_closure with a non-closure.");
+        };
+        self.start_closure(closure, vec![])
     }
 
     pub fn status(&self) -> Status {
@@ -69,9 +105,16 @@ impl Vm {
         );
         while matches!(self.status, Status::Running) && num_instructions > 0 {
             num_instructions -= 1;
-            let instruction = self.chunks[self.next_instruction.chunk].instructions
-                [self.next_instruction.instruction]
-                .clone();
+
+            let current_closure = self.heap.get(self.next_instruction.closure);
+            let current_body = if let ObjectData::Closure { body, .. } = &current_closure.data {
+                body
+            } else {
+                panic!("The instruction poniter points to a non-closure.");
+            };
+            let body_len = current_body.len();
+            let instruction = current_body[self.next_instruction.instruction].clone();
+
             log::trace!("Running instruction: {instruction:?}");
             self.next_instruction.instruction += 1;
             self.run_instruction(instruction);
@@ -85,9 +128,7 @@ impl Vm {
             );
             log::trace!("Heap: {:?}", self.heap);
 
-            if self.next_instruction.instruction
-                >= self.chunks[self.next_instruction.chunk].instructions.len()
-            {
+            if self.next_instruction.instruction >= body_len {
                 self.status = Status::Done(Value::nothing());
             }
         }
@@ -121,14 +162,15 @@ impl Vm {
                 let address = self.heap.create(ObjectData::Struct(entries));
                 self.data_stack.push(address);
             }
-            Instruction::CreateClosure(chunk) => {
+            Instruction::CreateClosure { num_args, body } => {
                 let captured = self.data_stack.clone();
                 for address in &captured {
                     self.heap.dup(*address);
                 }
                 let address = self.heap.create(ObjectData::Closure {
                     captured,
-                    body: chunk,
+                    num_args,
+                    body,
                 });
                 self.data_stack.push(address);
             }
@@ -158,8 +200,11 @@ impl Vm {
                 args.reverse();
 
                 match self.heap.get(closure_address).data.clone() {
-                    ObjectData::Closure { captured, body } => {
-                        let expected_num_args = self.chunks[body].num_args;
+                    ObjectData::Closure {
+                        captured,
+                        num_args: expected_num_args,
+                        ..
+                    } => {
                         if num_args != expected_num_args {
                             self.panic(format!("Closure expects {expected_num_args} parameters, but you called it with {num_args} arguments."));
                             return;
@@ -171,9 +216,8 @@ impl Vm {
                             self.heap.dup(captured);
                         }
                         self.data_stack.append(&mut args);
-                        self.heap.drop(closure_address);
                         self.next_instruction = ByteCodePointer {
-                            chunk: body,
+                            closure: closure_address,
                             instruction: 0,
                         };
                     }
@@ -206,6 +250,7 @@ impl Vm {
                 }
             }
             Instruction::Return => {
+                self.heap.drop(self.next_instruction.closure);
                 let caller = self.call_stack.pop().unwrap();
                 self.next_instruction = caller;
             }
@@ -263,17 +308,5 @@ impl Vm {
     pub fn panic(&mut self, message: String) -> Value {
         self.status = Status::Panicked(Value::Text(message));
         Value::Symbol("Never".to_string())
-    }
-
-    pub fn run_closure(&mut self, closure_address: ObjectPointer, arguments: Vec<Value>) {
-        let num_args = arguments.len();
-        for arg in arguments {
-            let address = self.heap.import(arg);
-            self.data_stack.push(address);
-        }
-        self.data_stack.push(closure_address);
-        self.run_instruction(Instruction::Call { num_args });
-
-        self.status = Status::Running;
     }
 }

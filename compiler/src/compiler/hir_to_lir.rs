@@ -2,11 +2,11 @@ use super::{
     ast_to_hir::AstToHir,
     cst::CstDb,
     hir::{self, Body, Expression},
-    lir::{Chunk, ChunkIndex, Instruction, Lir, StackOffset},
+    lir::{Instruction, Lir, StackOffset},
 };
 use crate::{builtin_functions::BuiltinFunction, input::Input};
 use itertools::Itertools;
-use std::{mem::swap, sync::Arc};
+use std::sync::Arc;
 
 #[salsa::query_group(HirToLirStorage)]
 pub trait HirToLir: CstDb + AstToHir {
@@ -24,20 +24,7 @@ fn lir(db: &dyn HirToLir, input: Input) -> Option<Arc<Lir>> {
 }
 
 #[derive(Default)]
-struct ChunkRegistry {
-    chunks: Vec<Chunk>,
-}
-impl ChunkRegistry {
-    fn register_chunk(&mut self, chunk: Chunk) -> ChunkIndex {
-        let index = self.chunks.len();
-        self.chunks.push(chunk);
-        index
-    }
-}
-
-#[derive(Default)]
 struct LoweringContext {
-    registry: ChunkRegistry,
     stack: Vec<hir::Id>,
     instructions: Vec<Instruction>,
 }
@@ -46,12 +33,8 @@ impl LoweringContext {
         self.stack.pop().unwrap(); // Top-level has no return value.
         assert!(self.stack.is_empty());
 
-        self.registry.register_chunk(Chunk {
-            num_args: 0,
-            instructions: self.instructions,
-        });
         Lir {
-            chunks: self.registry.chunks,
+            instructions: self.instructions,
         }
     }
 
@@ -83,11 +66,8 @@ impl LoweringContext {
                 self.emit_create_struct(id.clone(), entries.len());
             }
             Expression::Lambda(lambda) => {
-                let mut registry = ChunkRegistry::default();
-                swap(&mut self.registry, &mut registry);
                 let captured_stack = self.stack.clone();
                 let mut lambda_context = LoweringContext {
-                    registry,
                     stack: captured_stack.clone(),
                     instructions: vec![],
                 };
@@ -98,14 +78,12 @@ impl LoweringContext {
                 lambda_context.emit_pop_multiple_below_top(lambda.parameters.len());
                 lambda_context.emit_pop_multiple_below_top(captured_stack.len());
                 lambda_context.emit_return();
-                swap(&mut self.registry, &mut lambda_context.registry);
 
-                let lambda_chunk = Chunk {
-                    num_args: lambda.parameters.len(),
-                    instructions: lambda_context.instructions,
-                };
-                let chunk_index = self.registry.register_chunk(lambda_chunk);
-                self.emit_create_closure(id.clone(), chunk_index);
+                self.emit_create_closure(
+                    id.clone(),
+                    lambda.parameters.len(),
+                    lambda_context.finalize().instructions,
+                );
                 if lambda.fuzzable {
                     self.emit_register_fuzzable_closure(id.clone());
                 }
@@ -155,8 +133,16 @@ impl LoweringContext {
         self.stack.pop_multiple(2 * num_entries);
         self.stack.push(id);
     }
-    fn emit_create_closure(&mut self, id: hir::Id, chunk: usize) {
-        self.emit(Instruction::CreateClosure(chunk));
+    fn emit_create_closure(
+        &mut self,
+        id: hir::Id,
+        num_args: usize,
+        instructions: Vec<Instruction>,
+    ) {
+        self.emit(Instruction::CreateClosure {
+            num_args,
+            body: instructions,
+        });
         self.stack.push(id);
     }
     fn emit_create_builtin(&mut self, id: hir::Id, builtin: BuiltinFunction) {

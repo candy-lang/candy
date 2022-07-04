@@ -59,8 +59,8 @@ impl Vm {
     }
 
     fn get_argument_count(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Closure { body, .. }], {
-            Ok((self.chunks[*body].num_args as u64).into())
+        destructure!(args, [Value::Closure { num_args, .. }], {
+            Ok((*num_args as u64).into())
         })
     }
 
@@ -71,19 +71,21 @@ impl Vm {
                 Value::Symbol(condition),
                 Value::Closure {
                     captured: then_captured,
+                    num_args: then_num_args,
                     body: then_body
                 },
                 Value::Closure {
                     captured: else_captured,
+                    num_args: else_num_args,
                     body: else_body
                 }
             ],
             {
-                if self.chunks[*then_body].num_args > 0 {
-                    return Err(format!("IfElse expects a closure without arguments as the then, got one with {} arguments.", self.chunks[*then_body].num_args));
+                if *then_num_args > 0 {
+                    return Err(format!("IfElse expects a closure without arguments as the then, got one with {then_num_args} arguments."));
                 }
-                if self.chunks[*else_body].num_args > 0 {
-                    return Err(format!("IfElse expects a closure without arguments as the else, got one with {} arguments.", self.chunks[*else_body].num_args));
+                if *else_num_args > 0 {
+                    return Err(format!("IfElse expects a closure without arguments as the else, got one with {else_num_args} arguments."));
                 }
                 let condition = match condition.as_str() {
                     "True" => true,
@@ -98,11 +100,13 @@ impl Vm {
                 let closure_object = self.heap.import(if condition {
                     Value::Closure {
                         captured: then_captured.to_owned(),
+                        num_args: *then_num_args,
                         body: then_body.to_owned(),
                     }
                 } else {
                     Value::Closure {
                         captured: else_captured.to_owned(),
+                        num_args: *else_num_args,
                         body: else_body.to_owned(),
                     }
                 });

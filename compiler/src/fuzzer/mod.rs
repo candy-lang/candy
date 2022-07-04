@@ -16,8 +16,10 @@ use std::fs;
 
 pub fn fuzz(db: &Database, input: Input) {
     let lir = db.lir(input.clone()).unwrap();
+    let module_closure = Value::module_closure_from_lir((*lir).clone());
 
-    let mut vm = Vm::new(lir.chunks.clone());
+    let mut vm = Vm::new();
+    vm.start_module_closure(module_closure);
     vm.run(1000);
     match vm.status() {
         Status::Running => {
@@ -47,8 +49,8 @@ fn fuzz_vm(db: &Database, input: Input, vm: &Vm, num_fuzzable_closures_to_skip: 
         .skip(num_fuzzable_closures_to_skip)
     {
         let closure = vm.heap.export_without_dropping(*closure_address);
-        let num_args = if let Value::Closure { body, .. } = closure {
-            vm.chunks[body].num_args
+        let num_args = if let Value::Closure { num_args, .. } = closure {
+            num_args
         } else {
             panic!("The VM registered a fuzzable closure that's not a closure.");
         };
@@ -111,7 +113,8 @@ fn test_closure_with_args(
     closure_address: usize,
     arguments: Vec<Value>,
 ) -> TestResult {
-    vm.run_closure(closure_address, arguments);
+    let closure = vm.heap.export_without_dropping(closure_address);
+    vm.start_closure(closure, arguments);
 
     vm.run(1000);
     match vm.status() {

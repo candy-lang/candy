@@ -18,7 +18,7 @@ use crate::{
     },
     database::{Database, PROJECT_DIRECTORY},
     input::Input,
-    vm::{Status, Vm},
+    vm::{value::Value, Status, Vm},
 };
 use compiler::lir::Lir;
 use fern::colors::{Color, ColoredLevelConfig};
@@ -201,11 +201,13 @@ fn run(options: CandyRunOptions) {
             return;
         }
     };
+    let module_closure = Value::module_closure_from_lir((*lir).clone());
 
     let path_string = options.file.to_string_lossy();
     log::debug!("Running `{path_string}`.");
 
-    let mut vm = Vm::new(lir.chunks.clone());
+    let mut vm = Vm::new();
+    vm.start_module_closure(module_closure);
     vm.run(1000);
     match vm.status() {
         Status::Running => log::info!("VM is still running."),

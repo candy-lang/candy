@@ -1,5 +1,8 @@
 use super::heap::ObjectPointer;
-use crate::{builtin_functions::BuiltinFunction, compiler::lir::ChunkIndex};
+use crate::{
+    builtin_functions::BuiltinFunction,
+    compiler::lir::{Instruction, Lir},
+};
 use im::HashMap;
 use itertools::Itertools;
 use std::fmt::{self, Display, Formatter};
@@ -20,15 +23,25 @@ pub enum Value {
     Struct(HashMap<Value, Value>),
     Closure {
         captured: Vec<ObjectPointer>,
-        body: ChunkIndex,
+        num_args: usize,
+        body: Vec<Instruction>,
     },
     Builtin(BuiltinFunction),
 }
 
 impl Value {
-    pub fn nothing() -> Value {
+    pub fn nothing() -> Self {
         Value::Symbol("Nothing".to_owned())
     }
+
+    pub fn module_closure_from_lir(lir: Lir) -> Self {
+        Value::Closure {
+            captured: vec![],
+            num_args: 0,
+            body: lir.instructions,
+        }
+    }
+
     pub fn list(items: Vec<Value>) -> Self {
         let items = items
             .into_iter()
@@ -54,14 +67,14 @@ impl Display for Value {
             Value::Symbol(symbol) => write!(f, "{}", symbol),
             Value::Struct(entries) => write!(
                 f,
-                "{{ {} }}",
+                "[ {} ]",
                 entries
                     .iter()
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
             ),
-            Value::Closure { body, .. } => {
-                write!(f, "{{{body}}}")
+            Value::Closure { .. } => {
+                write!(f, "{{...}}")
             }
             Value::Builtin(builtin) => {
                 write!(f, "builtin{builtin:?}")
