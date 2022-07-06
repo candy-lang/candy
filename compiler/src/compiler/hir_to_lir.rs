@@ -15,12 +15,31 @@ pub trait HirToLir: CstDb + AstToHir {
 
 fn lir(db: &dyn HirToLir, input: Input) -> Option<Arc<Lir>> {
     let (hir, _) = db.hir(input.clone())?;
+    let instructions = compile_lambda(&[], &[], &hir);
+    Some(Arc::new(Lir { instructions }))
+}
 
-    let mut context = LoweringContext::default();
-    context.compile_body(&hir);
-    let lir = context.finalize();
+fn compile_lambda(captured: &[hir::Id], parameters: &[hir::Id], body: &Body) -> Vec<Instruction> {
+    let mut context = LoweringContext {
+        stack: captured.iter().map(|it| it.clone()).collect_vec(),
+        instructions: vec![],
+    };
+    for parameter in parameters {
+        context.stack.push(parameter.clone());
+    }
 
-    Some(Arc::new(lir))
+    for (id, expression) in &body.expressions {
+        context.compile_expression(id, expression);
+    }
+
+    context.emit_pop_multiple_below_top(body.expressions.len() - 1);
+    context.emit_pop_multiple_below_top(parameters.len());
+    context.emit_pop_multiple_below_top(captured.len());
+    context.emit_return();
+
+    assert_eq!(context.stack.len(), 1); // The stack should only contain the return value.
+
+    context.instructions
 }
 
 #[derive(Default)]
@@ -29,23 +48,6 @@ struct LoweringContext {
     instructions: Vec<Instruction>,
 }
 impl LoweringContext {
-    fn finalize(mut self) -> Lir {
-        self.stack.pop().unwrap(); // Top-level has no return value.
-        assert!(self.stack.is_empty());
-
-        Lir {
-            instructions: self.instructions,
-        }
-    }
-
-    fn compile_body(&mut self, body: &Body) {
-        let stack_size_before = self.stack.len();
-        for (id, expression) in &body.expressions {
-            self.compile_expression(id, expression);
-        }
-        self.emit_pop_multiple_below_top(body.expressions.len() - 1);
-        assert_eq!(self.stack.len(), stack_size_before + 1); // extra return value
-    }
     fn compile_expression(&mut self, id: &hir::Id, expression: &Expression) {
         log::trace!("Stack: {:?}", self.stack);
         log::trace!("Compiling expression {expression:?}");
@@ -66,23 +68,17 @@ impl LoweringContext {
                 self.emit_create_struct(id.clone(), entries.len());
             }
             Expression::Lambda(lambda) => {
-                let captured_stack = self.stack.clone();
-                let mut lambda_context = LoweringContext {
-                    stack: captured_stack.clone(),
-                    instructions: vec![],
-                };
-                for parameter in &lambda.parameters {
-                    lambda_context.stack.push(parameter.clone());
-                }
-                lambda_context.compile_body(&lambda.body);
-                lambda_context.emit_pop_multiple_below_top(lambda.parameters.len());
-                lambda_context.emit_pop_multiple_below_top(captured_stack.len());
-                lambda_context.emit_return();
+                let captured = lambda.captured_ids(id);
+                let instructions = compile_lambda(&captured, &lambda.parameters, &lambda.body);
 
                 self.emit_create_closure(
                     id.clone(),
+                    captured
+                        .iter()
+                        .map(|id| self.stack.find_id(id))
+                        .collect_vec(),
                     lambda.parameters.len(),
-                    lambda_context.finalize().instructions,
+                    instructions,
                 );
                 if lambda.fuzzable {
                     self.emit_register_fuzzable_closure(id.clone());
@@ -136,10 +132,12 @@ impl LoweringContext {
     fn emit_create_closure(
         &mut self,
         id: hir::Id,
+        captured: Vec<StackOffset>,
         num_args: usize,
         instructions: Vec<Instruction>,
     ) {
         self.emit(Instruction::CreateClosure {
+            captured,
             num_args,
             body: instructions,
         });

@@ -12,10 +12,10 @@ use std::collections::HashMap;
 #[derive(Clone)]
 pub struct Vm {
     pub status: Status,
-    next_instruction: ByteCodePointer,
+    next_instruction: InstructionPointer,
     pub heap: Heap,
     pub data_stack: Vec<ObjectPointer>,
-    pub call_stack: Vec<ByteCodePointer>,
+    pub call_stack: Vec<InstructionPointer>,
     pub tracer: Tracer,
     pub fuzzable_closures: Vec<(Id, ObjectPointer)>,
 }
@@ -23,22 +23,28 @@ pub struct Vm {
 #[derive(Clone)]
 pub enum Status {
     Running,
-    Done(Value),
+    Done,
     Panicked(Value),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ByteCodePointer {
+pub struct InstructionPointer {
     /// Pointer to the closure object that is currently running code.
     closure: ObjectPointer,
 
     /// Index of the next instruction to run.
     instruction: usize,
 }
-impl ByteCodePointer {
+impl InstructionPointer {
     fn null_pointer() -> Self {
         Self {
             closure: 0,
+            instruction: 0,
+        }
+    }
+    fn start_of_closure(closure: ObjectPointer) -> Self {
+        Self {
+            closure,
             instruction: 0,
         }
     }
@@ -47,8 +53,8 @@ impl ByteCodePointer {
 impl Vm {
     pub fn new() -> Self {
         Self {
-            status: Status::Done(Value::nothing()),
-            next_instruction: ByteCodePointer::null_pointer(),
+            status: Status::Done,
+            next_instruction: InstructionPointer::null_pointer(),
             heap: Heap::new(),
             data_stack: vec![],
             call_stack: vec![],
@@ -58,7 +64,11 @@ impl Vm {
     }
 
     /// Sets this VM up in a way that the closure will run.
-    pub fn start_closure(&mut self, closure: Value, arguments: Vec<Value>) {
+    pub fn set_up_closure_execution(&mut self, closure: Value, arguments: Vec<Value>) {
+        assert!(matches!(self.status, Status::Done));
+        assert!(self.data_stack.is_empty());
+        assert!(self.call_stack.is_empty());
+
         let num_args = if let Value::Closure { num_args, .. } = closure.clone() {
             num_args
         } else {
@@ -74,20 +84,25 @@ impl Vm {
         let address = self.heap.import(closure);
         self.data_stack.push(address);
 
-        self.next_instruction = ByteCodePointer {
-            closure: address,
-            instruction: 0,
-        };
         self.run_instruction(Instruction::Call { num_args });
         self.status = Status::Running;
     }
-    pub fn start_module_closure(&mut self, closure: Value) {
-        if let Value::Closure { captured, .. } = closure.clone() {
+    pub fn set_up_module_closure_execution(&mut self, closure: Value) {
+        if let Value::Closure {
+            captured, num_args, ..
+        } = closure.clone()
+        {
             assert_eq!(captured.len(), 0, "Called start_module_closure with a closure that is not a module closure (it captures stuff).");
+            assert_eq!(num_args, 0, "Called start_module_closure with a closure that is not a module closure (it has arguments).");
         } else {
             panic!("Called start_module_closure with a non-closure.");
         };
-        self.start_closure(closure, vec![])
+        self.set_up_closure_execution(closure, vec![])
+    }
+    pub fn tear_down_closure_execution(&mut self) -> Value {
+        assert!(matches!(self.status, Status::Done));
+        let return_value = self.data_stack.pop().unwrap();
+        self.heap.export(return_value)
     }
 
     pub fn status(&self) -> Status {
@@ -112,24 +127,35 @@ impl Vm {
             } else {
                 panic!("The instruction poniter points to a non-closure.");
             };
-            let body_len = current_body.len();
             let instruction = current_body[self.next_instruction.instruction].clone();
 
-            log::trace!("Running instruction: {instruction:?}");
-            self.next_instruction.instruction += 1;
-            self.run_instruction(instruction);
-
             log::trace!(
-                "Stack: {}",
+                "Data stack: {}",
                 self.data_stack
                     .iter()
                     .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
                     .join(", ")
             );
+            log::trace!(
+                "Call stack: {}",
+                self.call_stack
+                    .iter()
+                    .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
+                    .join(", ")
+            );
+            log::trace!(
+                "Instruction pointer: {}:{}",
+                self.next_instruction.closure,
+                self.next_instruction.instruction
+            );
             log::trace!("Heap: {:?}", self.heap);
 
-            if self.next_instruction.instruction >= body_len {
-                self.status = Status::Done(Value::nothing());
+            log::trace!("Running instruction: {instruction:?}");
+            self.next_instruction.instruction += 1;
+            self.run_instruction(instruction);
+
+            if self.next_instruction == InstructionPointer::null_pointer() {
+                self.status = Status::Done;
             }
         }
     }
@@ -162,8 +188,15 @@ impl Vm {
                 let address = self.heap.create(ObjectData::Struct(entries));
                 self.data_stack.push(address);
             }
-            Instruction::CreateClosure { num_args, body } => {
-                let captured = self.data_stack.clone();
+            Instruction::CreateClosure {
+                num_args,
+                body,
+                captured,
+            } => {
+                let captured = captured
+                    .iter()
+                    .map(|offset| self.get_from_data_stack(*offset))
+                    .collect_vec();
                 for address in &captured {
                     self.heap.dup(*address);
                 }
@@ -216,12 +249,11 @@ impl Vm {
                             self.heap.dup(captured);
                         }
                         self.data_stack.append(&mut args);
-                        self.next_instruction = ByteCodePointer {
-                            closure: closure_address,
-                            instruction: 0,
-                        };
+                        self.next_instruction =
+                            InstructionPointer::start_of_closure(closure_address);
                     }
                     ObjectData::Builtin(builtin) => {
+                        self.heap.drop(closure_address);
                         self.run_builtin_function(&builtin, &args);
                     }
                     _ => panic!("Can only call closures and builtins."),
@@ -256,6 +288,7 @@ impl Vm {
             }
             Instruction::RegisterFuzzableClosure(id) => {
                 let closure = self.data_stack.last().unwrap().clone();
+                self.heap.dup(closure);
                 self.fuzzable_closures.push((id, closure));
             }
             Instruction::TraceValueEvaluated(id) => {
@@ -282,7 +315,6 @@ impl Vm {
             Instruction::TraceCallEnds => {
                 let return_value_address = self.data_stack.last().unwrap();
                 let return_value = self.heap.export_without_dropping(*return_value_address);
-
                 self.tracer.push(TraceEntry::CallEnded { return_value });
             }
             Instruction::TraceNeedsStarts { id } => {

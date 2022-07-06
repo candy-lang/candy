@@ -207,11 +207,14 @@ fn run(options: CandyRunOptions) {
     log::debug!("Running `{path_string}`.");
 
     let mut vm = Vm::new();
-    vm.start_module_closure(module_closure);
+    vm.set_up_module_closure_execution(module_closure);
     vm.run(1000);
     match vm.status() {
         Status::Running => log::info!("VM is still running."),
-        Status::Done(value) => log::info!("VM is done: {value}"),
+        Status::Done => {
+            let return_value = vm.tear_down_closure_execution();
+            log::info!("VM is done: {return_value}");
+        }
         Status::Panicked(value) => {
             log::error!("VM panicked with value {value}.");
             log::error!("This is the stack trace:");

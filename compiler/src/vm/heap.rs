@@ -1,9 +1,10 @@
 use super::value::Value;
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
+use itertools::Itertools;
 use log;
 use std::collections::HashMap;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Heap {
     objects: HashMap<ObjectPointer, Object>,
     next_address: ObjectPointer,
@@ -11,12 +12,12 @@ pub struct Heap {
 
 pub type ObjectPointer = usize;
 
-#[derive(Debug, Clone)] // TODO: remove Clone once it's no longer needed
+#[derive(Clone)]
 pub struct Object {
     reference_count: usize,
     pub data: ObjectData,
 }
-#[derive(Clone, Debug)] // TODO: remove Clone once it's no longer needed
+#[derive(Clone)]
 pub enum ObjectData {
     Int(u64),
     Text(String),
@@ -28,6 +29,24 @@ pub enum ObjectData {
         body: Vec<Instruction>,
     },
     Builtin(BuiltinFunction),
+}
+
+impl std::fmt::Debug for Heap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut objects = self.objects.clone().into_iter().collect_vec();
+        objects.sort_by_key(|(address, _)| *address);
+
+        writeln!(f, "{{")?;
+        for (address, object) in objects {
+            writeln!(
+                f,
+                "{address}: {} {}",
+                object.reference_count,
+                self.export_without_dropping(address)
+            )?;
+        }
+        write!(f, "}}")
+    }
 }
 
 impl Heap {
@@ -92,7 +111,7 @@ impl Heap {
     }
     pub fn free(&mut self, address: ObjectPointer) {
         let object = self.objects.remove(&address).unwrap();
-        log::trace!("Freeing object {object:?} at {address}.");
+        log::trace!("Freeing object at {address}.");
         assert_eq!(object.reference_count, 0);
         match object.data {
             ObjectData::Int(_) => {}

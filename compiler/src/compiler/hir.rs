@@ -3,7 +3,10 @@ use crate::{builtin_functions::BuiltinFunction, input::Input};
 use im::HashMap;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
-use std::fmt::{self, Display, Formatter};
+use std::{
+    collections::HashSet,
+    fmt::{self, Display, Formatter},
+};
 
 #[salsa::query_group(HirDbStorage)]
 pub trait HirDb: AstToHir {
@@ -97,6 +100,10 @@ impl Id {
             }),
         }
     }
+
+    pub fn is_parent_of(&self, other: &Self) -> bool {
+        self.keys.len() < other.keys.len() && self.keys.iter().zip(&other.keys).all(|(a, b)| a == b)
+    }
 }
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -137,6 +144,19 @@ pub struct Lambda {
     pub parameters: Vec<Id>,
     pub body: Body,
     pub fuzzable: bool,
+}
+impl Lambda {
+    pub fn captured_ids(&self, my_id: &Id) -> Vec<Id> {
+        let mut captured = vec![];
+        self.body.collect_all_ids(&mut captured);
+        let captured = captured
+            .into_iter()
+            .filter(|potentially_captured_id| !my_id.is_parent_of(potentially_captured_id))
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect_vec();
+        captured
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

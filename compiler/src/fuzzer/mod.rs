@@ -19,20 +19,21 @@ pub fn fuzz(db: &Database, input: Input) {
     let module_closure = Value::module_closure_from_lir((*lir).clone());
 
     let mut vm = Vm::new();
-    vm.start_module_closure(module_closure);
+    vm.set_up_module_closure_execution(module_closure);
     vm.run(1000);
     match vm.status() {
         Status::Running => {
             log::warn!("VM didn't finish running, so we're not fuzzing it.");
             return;
         }
-        Status::Done(value) => log::debug!("VM is done: {value}"),
+        Status::Done => log::debug!("VM is done."),
         Status::Panicked(value) => {
             log::error!("VM panicked with value {value}.");
             log::error!("{}", vm.tracer.format_stack_trace(db, input));
             return;
         }
     }
+    let _ = vm.tear_down_closure_execution();
 
     log::info!(
         "Now, the fuzzing begins. So far, we have {} closures to fuzz.",
@@ -114,12 +115,13 @@ fn test_closure_with_args(
     arguments: Vec<Value>,
 ) -> TestResult {
     let closure = vm.heap.export_without_dropping(closure_address);
-    vm.start_closure(closure, arguments);
+    println!("Starting closure {closure}.");
+    vm.set_up_closure_execution(closure, arguments);
 
     vm.run(1000);
     match vm.status() {
         Status::Running => TestResult::StillRunning,
-        Status::Done(_) => TestResult::NoPanic,
+        Status::Done => TestResult::NoPanic,
         Status::Panicked(message) => {
             // If a needs directly inside the tested closure was
             // dissatisfied, then the panic is not the fault of the code
