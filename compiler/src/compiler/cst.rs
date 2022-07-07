@@ -481,71 +481,83 @@ impl TreeWithIds for Cst {
         Some(self.span.start)
     }
     fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
-        let inner = match &self.kind {
-            CstKind::EqualsSign { .. } => None,
-            CstKind::Comma { .. } => None,
-            CstKind::Dot { .. } => None,
-            CstKind::Colon { .. } => None,
-            CstKind::OpeningParenthesis { .. } => None,
-            CstKind::ClosingParenthesis { .. } => None,
-            CstKind::OpeningBracket { .. } => None,
-            CstKind::ClosingBracket { .. } => None,
-            CstKind::OpeningCurlyBrace { .. } => None,
-            CstKind::ClosingCurlyBrace { .. } => None,
-            CstKind::Arrow { .. } => None,
-            CstKind::DoubleQuote => None,
-            CstKind::Octothorpe => None,
-            CstKind::Whitespace(_) => None,
-            CstKind::Newline(_) => None,
-            CstKind::Comment { octothorpe, .. } => octothorpe.find_by_offset(offset),
-            CstKind::TrailingWhitespace { child, .. } => child.find_by_offset(offset),
-            CstKind::Identifier { .. } => None,
-            CstKind::Symbol { .. } => None,
-            CstKind::Int { .. } => None,
-            CstKind::Text { .. } => None,
-            CstKind::TextPart(_) => None,
-            CstKind::Parenthesized { inner, .. } => inner.find_by_offset(offset),
-            CstKind::Call { name, arguments } => name
-                .find_by_offset(offset)
-                .or_else(|| arguments.find_by_offset(offset)),
+        let (inner, is_end_inclusive) = match &self.kind {
+            CstKind::EqualsSign { .. } => (None, false),
+            CstKind::Comma { .. } => (None, false),
+            CstKind::Dot { .. } => (None, false),
+            CstKind::Colon { .. } => (None, false),
+            CstKind::OpeningParenthesis { .. } => (None, false),
+            CstKind::ClosingParenthesis { .. } => (None, false),
+            CstKind::OpeningBracket { .. } => (None, false),
+            CstKind::ClosingBracket { .. } => (None, false),
+            CstKind::OpeningCurlyBrace { .. } => (None, false),
+            CstKind::ClosingCurlyBrace { .. } => (None, false),
+            CstKind::Arrow { .. } => (None, false),
+            CstKind::DoubleQuote => (None, false),
+            CstKind::Octothorpe => (None, false),
+            CstKind::Whitespace(_) => (None, false),
+            CstKind::Newline(_) => (None, false),
+            CstKind::Comment { octothorpe, .. } => (octothorpe.find_by_offset(offset), true),
+            CstKind::TrailingWhitespace { child, .. } => (child.find_by_offset(offset), false),
+            CstKind::Identifier { .. } => (None, true),
+            CstKind::Symbol { .. } => (None, true),
+            CstKind::Int { .. } => (None, true),
+            CstKind::Text { .. } => (None, false),
+            CstKind::TextPart(_) => (None, false),
+            CstKind::Parenthesized { inner, .. } => (inner.find_by_offset(offset), false),
+            CstKind::Call { name, arguments } => (
+                name.find_by_offset(offset)
+                    .or_else(|| arguments.find_by_offset(offset)),
+                false,
+            ),
             CstKind::Struct {
                 opening_bracket,
                 fields,
                 closing_bracket,
-            } => opening_bracket
-                .find_by_offset(offset)
-                .or_else(|| fields.find_by_offset(offset))
-                .or_else(|| closing_bracket.find_by_offset(offset)),
+            } => (
+                opening_bracket
+                    .find_by_offset(offset)
+                    .or_else(|| fields.find_by_offset(offset))
+                    .or_else(|| closing_bracket.find_by_offset(offset)),
+                false,
+            ),
             CstKind::StructField {
                 key,
                 colon,
                 value,
                 comma,
-            } => key
-                .find_by_offset(offset)
-                .or_else(|| colon.find_by_offset(offset))
-                .or_else(|| value.find_by_offset(offset))
-                .or_else(|| comma.find_by_offset(offset)),
-            CstKind::StructAccess { struct_, dot, key } => struct_
-                .find_by_offset(offset)
-                .or_else(|| dot.find_by_offset(offset))
-                .or_else(|| key.find_by_offset(offset)),
-            CstKind::Lambda { body, .. } => body.find_by_offset(offset),
+            } => (
+                key.find_by_offset(offset)
+                    .or_else(|| colon.find_by_offset(offset))
+                    .or_else(|| value.find_by_offset(offset))
+                    .or_else(|| comma.find_by_offset(offset)),
+                false,
+            ),
+            CstKind::StructAccess { struct_, dot, key } => (
+                struct_
+                    .find_by_offset(offset)
+                    .or_else(|| dot.find_by_offset(offset))
+                    .or_else(|| key.find_by_offset(offset)),
+                false,
+            ),
+            CstKind::Lambda { body, .. } => (body.find_by_offset(offset), false),
             CstKind::Assignment {
                 name,
                 parameters,
                 equals_sign,
                 body,
-            } => name
-                .find_by_offset(offset)
-                .or_else(|| parameters.find_by_offset(offset))
-                .or_else(|| equals_sign.find_by_offset(offset))
-                .or_else(|| body.find_by_offset(offset)),
-            CstKind::Error { .. } => None,
+            } => (
+                name.find_by_offset(offset)
+                    .or_else(|| parameters.find_by_offset(offset))
+                    .or_else(|| equals_sign.find_by_offset(offset))
+                    .or_else(|| body.find_by_offset(offset)),
+                false,
+            ),
+            CstKind::Error { .. } => (None, false),
         };
 
         inner.or_else(|| {
-            if self.span.contains(offset) {
+            if self.span.contains(offset) || (is_end_inclusive && &self.span.end == offset) {
                 return Some(self);
             } else {
                 None
