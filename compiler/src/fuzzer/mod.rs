@@ -19,8 +19,8 @@ pub fn fuzz(db: &Database, input: Input) {
     let module_closure = Value::module_closure_from_lir((*lir).clone());
 
     let mut vm = Vm::new();
-    vm.set_up_module_closure_execution(module_closure);
-    vm.run(1000);
+    vm.set_up_module_closure_execution(db, module_closure);
+    vm.run(db, 1000);
     match vm.status() {
         Status::Running => {
             log::warn!("VM didn't finish running, so we're not fuzzing it.");
@@ -116,9 +116,9 @@ fn test_closure_with_args(
 ) -> TestResult {
     let closure = vm.heap.export_without_dropping(closure_address);
     println!("Starting closure {closure}.");
-    vm.set_up_closure_execution(closure, arguments);
+    vm.set_up_closure_execution(db, closure, arguments);
 
-    vm.run(1000);
+    vm.run(db, 1000);
     match vm.status() {
         Status::Running => TestResult::StillRunning,
         Status::Done => TestResult::NoPanic,

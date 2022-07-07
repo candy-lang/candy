@@ -49,7 +49,7 @@ pub fn run_builtin_function(
         BuiltinFunction::StructGetKeys => struct_get_keys(arguments),
         BuiltinFunction::StructHasKey => struct_has_key(arguments),
         BuiltinFunction::TypeOf => type_of(arguments),
-        BuiltinFunction::Use => use_(db, import_chain, arguments),
+        BuiltinFunction::UseAsset => use_(db, import_chain, arguments),
         _ => panic!("Unhandled builtin function: {:?}", builtin_function),
     }
 }

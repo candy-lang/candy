@@ -24,7 +24,8 @@ fn get_input(db: &dyn InputDb, input: Input) -> Option<Arc<String>> {
             match read_to_string(path.clone()) {
                 Ok(content) => Some(Arc::new(content)),
                 Err(error) if matches!(error.kind(), std::io::ErrorKind::NotFound) => None,
-                _ => panic!("Unexpected error when reading file {:?}.", path),
+                // _ => panic!("Unexpected error when reading file {:?}.", path),
+                Err(_) => None,
             }
         }
         Input::Untitled(_) => None,

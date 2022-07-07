@@ -1,5 +1,5 @@
 use super::{heap::ObjectPointer, value::Value, Vm};
-use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
+use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::{Input, InputDb}};
 use itertools::Itertools;
 use log;
 
@@ -16,6 +16,7 @@ macro_rules! destructure {
 impl Vm {
     pub(super) fn run_builtin_function(
         &mut self,
+        db: &dyn InputDb,
         builtin_function: &BuiltinFunction,
         args: &[ObjectPointer],
     ) {
@@ -27,7 +28,7 @@ impl Vm {
             BuiltinFunction::Add => self.add(args),
             BuiltinFunction::Equals => self.equals(args),
             BuiltinFunction::GetArgumentCount => self.get_argument_count(args),
-            BuiltinFunction::IfElse => match self.if_else(args) {
+            BuiltinFunction::IfElse => match self.if_else(db, args) {
                 // If successful, builtinIfElse doesn't return a value, but
                 // diverges the control flow.
                 Ok(()) => return,
@@ -39,7 +40,7 @@ impl Vm {
             BuiltinFunction::StructGetKeys => self.struct_get_keys(args),
             BuiltinFunction::StructHasKey => self.struct_has_key(args),
             BuiltinFunction::TypeOf => self.type_of(args),
-            BuiltinFunction::Use => self.use_(args),
+            BuiltinFunction::UseAsset => self.use_asset(db, args),
         };
         let return_value = match return_value_or_panic_message {
             Ok(value) => value,
@@ -64,7 +65,7 @@ impl Vm {
         })
     }
 
-    fn if_else(&mut self, args: Vec<Value>) -> Result<(), String> {
+    fn if_else(&mut self, db: &dyn InputDb, args: Vec<Value>) -> Result<(), String> {
         destructure!(
             args,
             [
@@ -115,7 +116,7 @@ impl Vm {
                     self.heap.export_without_dropping(closure_object)
                 );
                 self.data_stack.push(closure_object);
-                self.run_instruction(Instruction::Call { num_args: 0 });
+                self.run_instruction(db, Instruction::Call { num_args: 0 });
                 Ok(())
             }
         )
@@ -169,27 +170,38 @@ impl Vm {
         })
     }
 
-    fn use_(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(
+    fn use_asset(&mut self, db: &dyn InputDb, args: Vec<Value>) -> Result<Value, String> {
+        let (current_path, target) = destructure!(
             args,
             [Value::Struct(current_path_struct), Value::Text(target)],
             {
+                // `current_path_struct` is set by us and not users, hence we don't have to validate it that strictly.
                 let mut current_path = vec![];
                 let mut index = 0;
                 while let Some(component) = current_path_struct.get(&Value::Int(index)) {
-                    current_path.push(component.clone().try_into_text().map_err(|it| format!("builtinUse expects a struct as current path with only textual paths as values, but the map contains the value {it} for key {index}")));
+                    current_path.push(component.clone().try_into_text().unwrap());
                     index += 1;
                 }
-
-                let target = UseTarget::parse(&target)?;
-
-                if target.parent_navigations > current_path.len() {
-                    return Err("Too many parent navigations.".to_string());
-                }
-
-                Ok(Value::Symbol("Used".to_string()))
+                Ok((current_path, target.to_string()))
             }
-        )
+        )?;
+
+        let target = UseAssetTarget::parse(&target)?;
+
+        let mut path = current_path.to_owned();
+        for _ in 0..target.parent_navigations {
+            if path.pop() == None {
+                return Err("too many parent navigations".to_string());
+            }
+        }
+        if path.last().map(|it| it.ends_with(".candy")).unwrap_or(false) {
+            return Err("importing child files (starting with a single dot) only works from `.candy` files".to_string());
+        }
+        path.push(target.path.to_string());
+
+        let input = Input::File(path.clone());
+        let content = db.get_input(input).ok_or_else(|| format!("Couldn't import file '{}'.", path.join("/")))?;
+        Ok(Value::Text((*content).clone()))
 
         // let inputs = target.resolve(&current_path[..]);
         // let input = match inputs
@@ -228,77 +240,43 @@ impl Vm {
         //     })
         //     .collect::<DiscoverResult<HashMap<Value, Value>>>()
         //     .map(|it| Value::Struct(it))
+
+        // Ok(Value::Symbol("Used".to_string()))
+
     }
 }
 
-struct UseTarget {
+struct UseAssetTarget {
     parent_navigations: usize,
-    path: Vec<String>,
+    path: String,
 }
-impl UseTarget {
+impl UseAssetTarget {
     const PARENT_NAVIGATION_CHAR: char = '.';
 
-    fn parse(target: &str) -> Result<Self, String> {
-        let mut parent_navigations = 0;
-        let mut target = target;
-        while target.chars().next() == Some(UseTarget::PARENT_NAVIGATION_CHAR) {
-            parent_navigations += 1;
-            target = &target[UseTarget::PARENT_NAVIGATION_CHAR.len_utf8()..];
-        }
-
-        let mut path = vec![];
-        loop {
-            let mut chars = vec![];
-            while let Some(c) = target.chars().next() {
-                if c == UseTarget::PARENT_NAVIGATION_CHAR {
-                    break;
-                }
-                chars.push(c);
-                target = &target[c.len_utf8()..];
+    fn parse(mut target: &str) -> Result<Self, String> {
+        let parent_navigations = {
+            let mut navigations = 0;
+            while target.chars().next() == Some(UseAssetTarget::PARENT_NAVIGATION_CHAR) {
+                navigations += 1;
+                target = &target[UseAssetTarget::PARENT_NAVIGATION_CHAR.len_utf8()..];
             }
-
-            if target.is_empty() {
-                path.push(chars.into_iter().join(""));
-                break;
+            match navigations {
+                0 => return Err("targets of useAsst must start with at least one dot".to_string()),
+                i => i - 1, // two dots means one parent navigation
             }
-
-            if chars.is_empty() {
-                return Err("Target contains consecutive dots (`.`) in the path.".to_owned());
-            }
-
-            path.push(chars.into_iter().join(""));
-        }
-        Ok(UseTarget {
-            parent_navigations,
-            path,
-        })
+        };
+        let path = target.to_string();
+        Ok(UseAssetTarget { parent_navigations, path })
     }
 
     fn resolve(&self, current_path: &[String]) -> Vec<Input> {
         let mut path = current_path.to_owned();
-        if self.parent_navigations == 0 {
-            assert!(!path.is_empty());
-            let last = path.last_mut().unwrap();
-            if last == ".candy" {
-                path.pop();
-            } else {
-                *last = last
-                    .strip_suffix(".candy")
-                    .expect("File name must end with `.candy`.")
-                    .to_owned();
-            }
-        } else {
-            for _ in 0..self.parent_navigations {
-                if path.is_empty() {
-                    return vec![];
-                }
-                path.pop();
+        for _ in 0..self.parent_navigations {
+            if path.pop() == None {
+                return vec![];
             }
         }
-
-        for part in &self.path {
-            path.push(part.to_owned());
-        }
+        path.push(self.path.to_string());
 
         let mut result = vec![];
 

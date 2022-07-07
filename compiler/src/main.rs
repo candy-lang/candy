@@ -207,8 +207,8 @@ fn run(options: CandyRunOptions) {
     log::debug!("Running `{path_string}`.");
 
     let mut vm = Vm::new();
-    vm.set_up_module_closure_execution(module_closure);
-    vm.run(1000);
+    vm.set_up_module_closure_execution(&db, module_closure);
+    vm.run(&db, 1000);
     match vm.status() {
         Status::Running => log::info!("VM is still running."),
         Status::Done => {

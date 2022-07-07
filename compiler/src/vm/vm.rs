@@ -3,7 +3,7 @@ use super::{
     tracer::{TraceEntry, Tracer},
     value::Value,
 };
-use crate::compiler::{hir::Id, lir::Instruction};
+use crate::{compiler::{hir::Id, lir::Instruction}, input::InputDb};
 use itertools::Itertools;
 use log;
 use std::collections::HashMap;
@@ -64,7 +64,7 @@ impl Vm {
     }
 
     /// Sets this VM up in a way that the closure will run.
-    pub fn set_up_closure_execution(&mut self, closure: Value, arguments: Vec<Value>) {
+    pub fn set_up_closure_execution(&mut self, db: &dyn InputDb, closure: Value, arguments: Vec<Value>) {
         assert!(matches!(self.status, Status::Done));
         assert!(self.data_stack.is_empty());
         assert!(self.call_stack.is_empty());
@@ -84,10 +84,10 @@ impl Vm {
         let address = self.heap.import(closure);
         self.data_stack.push(address);
 
-        self.run_instruction(Instruction::Call { num_args });
+        self.run_instruction(db, Instruction::Call { num_args });
         self.status = Status::Running;
     }
-    pub fn set_up_module_closure_execution(&mut self, closure: Value) {
+    pub fn set_up_module_closure_execution(&mut self, db: &dyn InputDb, closure: Value) {
         if let Value::Closure {
             captured, num_args, ..
         } = closure.clone()
@@ -97,7 +97,7 @@ impl Vm {
         } else {
             panic!("Called start_module_closure with a non-closure.");
         };
-        self.set_up_closure_execution(closure, vec![])
+        self.set_up_closure_execution(db, closure, vec![])
     }
     pub fn tear_down_closure_execution(&mut self) -> Value {
         assert!(matches!(self.status, Status::Done));
@@ -113,7 +113,7 @@ impl Vm {
         self.data_stack[self.data_stack.len() - 1 - offset as usize].clone()
     }
 
-    pub fn run(&mut self, mut num_instructions: u16) {
+    pub fn run(&mut self, db: &dyn InputDb, mut num_instructions: u16) {
         assert!(
             matches!(self.status, Status::Running),
             "Called Vm::run on a vm that is not ready to run."
@@ -125,7 +125,7 @@ impl Vm {
             let current_body = if let ObjectData::Closure { body, .. } = &current_closure.data {
                 body
             } else {
-                panic!("The instruction poniter points to a non-closure.");
+                panic!("The instruction pointer points to a non-closure.");
             };
             let instruction = current_body[self.next_instruction.instruction].clone();
 
@@ -152,14 +152,14 @@ impl Vm {
 
             log::trace!("Running instruction: {instruction:?}");
             self.next_instruction.instruction += 1;
-            self.run_instruction(instruction);
+            self.run_instruction(db, instruction);
 
             if self.next_instruction == InstructionPointer::null_pointer() {
                 self.status = Status::Done;
             }
         }
     }
-    pub fn run_instruction(&mut self, instruction: Instruction) {
+    pub fn run_instruction(&mut self, db: &dyn InputDb, instruction: Instruction) {
         match instruction {
             Instruction::CreateInt(int) => {
                 let address = self.heap.create(ObjectData::Int(int));
@@ -254,7 +254,7 @@ impl Vm {
                     }
                     ObjectData::Builtin(builtin) => {
                         self.heap.drop(closure_address);
-                        self.run_builtin_function(&builtin, &args);
+                        self.run_builtin_function(db, &builtin, &args);
                     }
                     _ => panic!("Can only call closures and builtins."),
                 };

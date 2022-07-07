@@ -102,7 +102,7 @@ impl<'c> Compiler<'c> {
             identifiers: HashMap::new(),
         };
         compiler.generate_sparkles();
-        compiler.generate_use();
+        compiler.generate_use_asset();
         compiler
     }
 
@@ -123,24 +123,24 @@ impl<'c> Compiler<'c> {
         self.push(None, sparkles_map, Some("✨".to_string()));
     }
 
-    fn generate_use(&mut self) {
-        // HirId(~:test.candy:use) = lambda { HirId(~:test.candy:use:target) ->
-        //   HirId(~:test.candy:use:panic) = builtinPanic
-        //   HirId(~:test.candy:use:use) = builtinUse
-        //   HirId(~:test.candy:use:key) = int 0
-        //   HirId(~:test.candy:use:raw_path) = text "test.candy"
-        //   HirId(~:test.candy:use:currentPath) = struct [
-        //     HirId(~:test.candy:use:key): HirId(~:test.candy:use:raw_path),
+    fn generate_use_asset(&mut self) {
+        // HirId(~:test.candy:use) = lambda { HirId(~:test.candy:useAsset:target) ->
+        //   HirId(~:test.candy:useAsset:panic) = builtinPanic
+        //   HirId(~:test.candy:useAsset:useAsset) = builtinUseAsset
+        //   HirId(~:test.candy:useAsset:key) = int 0
+        //   HirId(~:test.candy:useAsset:raw_path) = text "test.candy"
+        //   HirId(~:test.candy:useAsset:currentPath) = struct [
+        //     HirId(~:test.candy:useAsset:key): HirId(~:test.candy:useAsset:raw_path),
         //   ]
-        //   HirId(~:test.candy:use:importedModule) = call HirId(~:test.candy:use:use) with these arguments:
-        //     HirId(~:test.candy:use:currentPath)
-        //     HirId(~:test.candy:use:target)
+        //   HirId(~:test.candy:useAsset:importedFileContent) = call HirId(~:test.candy:useAsset:useAsset) with these arguments:
+        //     HirId(~:test.candy:useAsset:currentPath)
+        //     HirId(~:test.candy:useAsset:target)
         // }
         let mut assignment_inner = Compiler::<'c> {
             context: &mut self.context,
             id_mapping: self.id_mapping.clone(),
             body: Body::new(),
-            parent_keys: add_keys(&self.parent_keys, "use".to_string()),
+            parent_keys: add_keys(&self.parent_keys, "useAsset".to_string()),
             identifiers: self.identifiers.clone(),
         };
 
@@ -166,8 +166,8 @@ impl<'c> Compiler<'c> {
             Input::File(path) => {
                 let use_id = lambda_inner.push(
                     None,
-                    Expression::Builtin(BuiltinFunction::Use),
-                    Some("use".to_string()),
+                    Expression::Builtin(BuiltinFunction::UseAsset),
+                    Some("useAsset".to_string()),
                 );
                 let current_path_content = path
                     .iter()
@@ -198,7 +198,7 @@ impl<'c> Compiler<'c> {
                         function: use_id,
                         arguments: vec![current_path, lambda_parameter_id.clone()],
                     },
-                    Some("importedModule".to_string()),
+                    Some("importedFileContent".to_string()),
                 );
             }
             Input::ExternalFile(_) => {
@@ -221,7 +221,7 @@ impl<'c> Compiler<'c> {
             Input::Untitled(_) => {
                 let message_id = lambda_inner.push(
                     None,
-                    Expression::Text("Untitled files can't call `use`.".to_string()),
+                    Expression::Text("Untitled files can't call `useAsset`.".to_string()),
                     Some("message".to_string()),
                 );
                 lambda_inner.push(
@@ -244,7 +244,7 @@ impl<'c> Compiler<'c> {
                 body: lambda_inner.body,
                 fuzzable: false,
             }),
-            Some("use".to_string()),
+            Some("useAsset".to_string()),
         );
     }
 
