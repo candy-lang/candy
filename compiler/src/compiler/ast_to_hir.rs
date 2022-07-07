@@ -15,7 +15,7 @@ use crate::{
 };
 use im::HashMap;
 use itertools::Itertools;
-use std::{ops::Range, sync::Arc};
+use std::{mem, ops::Range, sync::Arc};
 
 #[salsa::query_group(AstToHirStorage)]
 pub trait AstToHir: CstDb + CstToAst {
@@ -68,24 +68,22 @@ fn compile_top_level(
     input: Input,
     ast: &[Ast],
 ) -> (Body, HashMap<hir::Id, ast::Id>) {
-    let mut context = GlobalContext {
+    let mut context = Context {
         input,
         id_mapping: HashMap::new(),
         db,
         public_identifiers: HashMap::new(),
-    };
-    let mut local_context = LocalContext {
         body: Body::new(),
         prefix_keys: vec![],
         identifiers: HashMap::new(),
         is_top_level: true,
     };
 
-    local_context.generate_sparkles(&mut context);
-    local_context.generate_use_asset(&mut context);
-    local_context.generate_use(&mut context);
-    local_context.compile(&mut context, &ast);
-    local_context.generate_exports_struct(&mut context);
+    context.generate_sparkles();
+    context.generate_use_asset();
+    context.generate_use();
+    context.compile(&mut &ast);
+    context.generate_exports_struct();
 
     let id_mapping = context
         .id_mapping
@@ -98,56 +96,72 @@ fn compile_top_level(
             }
         })
         .collect();
-    (local_context.body, id_mapping)
+    (context.body, id_mapping)
 }
 
-struct GlobalContext<'a> {
+struct Context<'a> {
     input: Input,
     id_mapping: HashMap<hir::Id, Option<ast::Id>>,
     db: &'a dyn AstToHir,
     public_identifiers: HashMap<String, hir::Id>,
-}
-
-struct LocalContext {
     body: Body,
     prefix_keys: Vec<String>,
     identifiers: HashMap<String, hir::Id>,
     is_top_level: bool,
 }
-impl LocalContext {
-    fn inner_for(parent: &LocalContext, child_key: Option<String>) -> Self {
-        LocalContext {
-            body: Body::new(),
-            prefix_keys: match child_key {
-                Some(child_key) => add_keys(&parent.prefix_keys, child_key.to_string()),
-                None => parent.prefix_keys.clone(),
-            },
-            identifiers: parent.identifiers.clone(),
-            is_top_level: false,
+
+impl<'a> Context<'a> {
+    fn start_non_top_level(&mut self) -> NonTopLevelResetState {
+        NonTopLevelResetState(mem::replace(&mut self.is_top_level, false))
+    }
+    fn end_non_top_level(&mut self, reset_state: NonTopLevelResetState) {
+        self.is_top_level = reset_state.0;
+    }
+}
+struct NonTopLevelResetState(bool);
+
+impl<'a> Context<'a> {
+    fn start_scope(&mut self) -> ScopeResetState {
+        ScopeResetState {
+            body: mem::replace(&mut self.body, Body::new()),
+            prefix_keys: self.prefix_keys.clone(),
+            identifiers: self.identifiers.clone(),
+            non_top_level_reset_state: self.start_non_top_level(),
         }
     }
+    fn end_scope(&mut self, reset_state: ScopeResetState) -> Body {
+        let inner_body = mem::replace(&mut self.body, reset_state.body);
+        self.prefix_keys = reset_state.prefix_keys;
+        self.identifiers = reset_state.identifiers;
+        self.end_non_top_level(reset_state.non_top_level_reset_state);
+        inner_body
+    }
+}
+struct ScopeResetState {
+    body: Body,
+    prefix_keys: Vec<String>,
+    identifiers: HashMap<String, hir::Id>,
+    non_top_level_reset_state: NonTopLevelResetState,
+}
 
-    fn compile(&mut self, context: &mut GlobalContext, asts: &[Ast]) -> hir::Id {
+impl<'a> Context<'a> {
+    fn compile(&mut self, asts: &[Ast]) -> hir::Id {
         if asts.is_empty() {
-            self.push(context, None, Expression::nothing(), None)
+            self.push(None, Expression::nothing(), None)
         } else {
             let mut last_id = None;
             for ast in asts.into_iter() {
-                last_id = Some(self.compile_single(context, ast));
+                last_id = Some(self.compile_single(ast));
             }
             last_id.unwrap()
         }
     }
-    fn compile_single(&mut self, context: &mut GlobalContext, ast: &Ast) -> hir::Id {
+    fn compile_single(&mut self, ast: &Ast) -> hir::Id {
         match &ast.kind {
-            AstKind::Int(Int(int)) => self.push(
-                context,
-                Some(ast.id.clone()),
-                Expression::Int(int.to_owned()),
-                None,
-            ),
+            AstKind::Int(Int(int)) => {
+                self.push(Some(ast.id.clone()), Expression::Int(int.to_owned()), None)
+            }
             AstKind::Text(Text(string)) => self.push(
-                context,
                 Some(ast.id.clone()),
                 Expression::Text(string.value.to_owned()),
                 None,
@@ -157,13 +171,12 @@ impl LocalContext {
                     Some(reference) => reference.to_owned(),
                     None => {
                         return self.push(
-                            context,
                             Some(symbol.id.clone()),
                             Expression::Error {
                                 child: None,
                                 errors: vec![CompilerError {
                                     input: ast.id.input.clone(),
-                                    span: context.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                                    span: self.db.ast_id_to_span(ast.id.clone()).unwrap(),
                                     payload: CompilerErrorPayload::Hir(
                                         HirError::UnknownReference {
                                             symbol: symbol.value.clone(),
@@ -176,14 +189,12 @@ impl LocalContext {
                     }
                 };
                 self.push(
-                    context,
                     Some(ast.id.clone()),
                     Expression::Reference(reference.to_owned()),
                     None,
                 )
             }
             AstKind::Symbol(Symbol(symbol)) => self.push(
-                context,
                 Some(ast.id.clone()),
                 Expression::Symbol(symbol.value.to_owned()),
                 None,
@@ -191,25 +202,15 @@ impl LocalContext {
             AstKind::Struct(Struct { fields }) => {
                 let fields = fields
                     .iter()
-                    .map(|(key, value)| {
-                        (
-                            self.compile_single(context, key),
-                            self.compile_single(context, value),
-                        )
-                    })
+                    .map(|(key, value)| (self.compile_single(key), self.compile_single(value)))
                     .collect();
-                self.push(
-                    context,
-                    Some(ast.id.clone()),
-                    Expression::Struct(fields),
-                    None,
-                )
+                self.push(Some(ast.id.clone()), Expression::Struct(fields), None)
             }
             AstKind::StructAccess(struct_access) => {
-                self.lower_struct_access(context, Some(ast.id.clone()), struct_access)
+                self.lower_struct_access(Some(ast.id.clone()), struct_access)
             }
-            AstKind::Lambda(lambda) => self.compile_lambda(context, ast.id.clone(), lambda, None),
-            AstKind::Call(call) => self.lower_call(context, Some(ast.id.clone()), call),
+            AstKind::Lambda(lambda) => self.compile_lambda(ast.id.clone(), lambda, None),
+            AstKind::Call(call) => self.lower_call(Some(ast.id.clone()), call),
             AstKind::Assignment(Assignment {
                 name,
                 is_public,
@@ -218,16 +219,14 @@ impl LocalContext {
                 let name = name.value.to_owned();
                 let id = match body {
                     ast::AssignmentBody::Lambda(lambda) => {
-                        self.compile_lambda(context, ast.id.clone(), lambda, Some(name.clone()))
+                        self.compile_lambda(ast.id.clone(), lambda, Some(name.clone()))
                     }
                     ast::AssignmentBody::Body(body) => {
-                        let was_top_level = self.is_top_level;
-                        self.is_top_level = false;
-                        let body = self.compile(context, body);
-                        self.is_top_level = was_top_level;
+                        let reset_state = self.start_non_top_level();
+                        let body = self.compile(body);
+                        self.end_non_top_level(reset_state);
 
                         self.push(
-                            context,
                             Some(ast.id.clone()),
                             Expression::Reference(body),
                             Some(name.clone()),
@@ -236,16 +235,15 @@ impl LocalContext {
                 };
                 if *is_public {
                     if self.is_top_level {
-                        context.public_identifiers.insert(name, id.clone());
+                        self.public_identifiers.insert(name, id.clone());
                     } else {
                         self.push(
-                            context,
                             None,
                             Expression::Error {
                                 child: None,
                                 errors: vec![CompilerError {
                                     input: ast.id.input.clone(),
-                                    span: context.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                                    span: self.db.ast_id_to_span(ast.id.clone()).unwrap(),
                                     payload: CompilerErrorPayload::Hir(
                                         HirError::PublicAssignmentInNotTopLevel,
                                     ),
@@ -259,12 +257,11 @@ impl LocalContext {
             }
             AstKind::Error { child, errors } => {
                 let child = if let Some(child) = child {
-                    Some(self.compile_single(context, &*child))
+                    Some(self.compile_single(&*child))
                 } else {
                     None
                 };
                 self.push(
-                    context,
                     Some(ast.id.clone()),
                     Expression::Error {
                         child,
@@ -277,30 +274,30 @@ impl LocalContext {
     }
     fn compile_lambda(
         &mut self,
-        context: &mut GlobalContext,
         id: ast::Id,
         lambda: &ast::Lambda,
         identifier: Option<String>,
     ) -> hir::Id {
-        let mut body = Body::new();
-        let lambda_id = self.create_next_id(context, Some(id), identifier.clone());
-        let mut identifiers = self.identifiers.clone();
+        let assignment_reset_state = self.start_scope();
+        let lambda_id = self.create_next_id(Some(id), identifier.clone());
 
         for parameter in lambda.parameters.iter() {
             let name = parameter.value.to_string();
-            let id = hir::Id::new(
-                context.input.clone(),
-                add_keys(&lambda_id.keys, name.clone()),
-            );
-            context
-                .id_mapping
+            let id = hir::Id::new(self.input.clone(), add_keys(&lambda_id.keys, name.clone()));
+            self.id_mapping
                 .insert(id.clone(), Some(parameter.id.clone()));
-            body.identifiers.insert(id.clone(), name.clone());
-            identifiers.insert(name, id);
+            self.body.identifiers.insert(id.clone(), name.clone());
+            self.identifiers.insert(name, id);
         }
-        let mut inner =
-            LocalContext::inner_for(&self, Some(lambda_id.keys.last().unwrap().clone()));
-        inner.compile(context, &lambda.body);
+
+        let lambda_reset_state = self.start_scope();
+        self.prefix_keys
+            .push(lambda_id.keys.last().unwrap().clone());
+
+        self.compile(&lambda.body);
+
+        let inner_body = self.end_scope(lambda_reset_state);
+        self.end_scope(assignment_reset_state);
 
         self.push_with_existing_id(
             lambda_id.clone(),
@@ -310,12 +307,12 @@ impl LocalContext {
                     .iter()
                     .map(|parameter| {
                         hir::Id::new(
-                            context.input.clone(),
+                            self.input.clone(),
                             add_keys(&lambda_id.keys[..], parameter.value.to_string()),
                         )
                     })
                     .collect(),
-                body: inner.body,
+                body: inner_body,
                 fuzzable: lambda.fuzzable,
             }),
             identifier,
@@ -323,25 +320,17 @@ impl LocalContext {
     }
     fn lower_struct_access(
         &mut self,
-        context: &mut GlobalContext,
         id: Option<ast::Id>,
         struct_access: &StructAccess,
     ) -> hir::Id {
-        let struct_ = self.compile_single(context, &*struct_access.struct_);
+        let struct_ = self.compile_single(&*struct_access.struct_);
         let key_id = self.push(
-            context,
             Some(struct_access.key.id.clone()),
             Expression::Symbol(struct_access.key.value.uppercase_first_letter()),
             None,
         );
-        let struct_get_id = self.push(
-            context,
-            None,
-            Expression::Builtin(BuiltinFunction::StructGet),
-            None,
-        );
+        let struct_get_id = self.push(None, Expression::Builtin(BuiltinFunction::StructGet), None);
         self.push(
-            context,
             id,
             Expression::Call {
                 function: struct_get_id,
@@ -350,16 +339,11 @@ impl LocalContext {
             None,
         )
     }
-    fn lower_call(
-        &mut self,
-        context: &mut GlobalContext,
-        id: Option<ast::Id>,
-        call: &Call,
-    ) -> hir::Id {
+    fn lower_call(&mut self, id: Option<ast::Id>, call: &Call) -> hir::Id {
         let arguments = call
             .arguments
             .iter()
-            .map(|argument| self.compile_single(context, argument))
+            .map(|argument| self.compile_single(argument))
             .collect_vec();
 
         let function = match call.receiver.clone() {
@@ -373,7 +357,6 @@ impl LocalContext {
                         1 => Expression::Needs {
                             condition: Box::new(arguments.first().unwrap().clone()),
                             message: Box::new(self.push(
-                                context,
                                 None,
                                 Expression::Text("needs not satisfied".to_string()),
                                 None,
@@ -383,26 +366,25 @@ impl LocalContext {
                             child: None,
                             errors: vec![CompilerError {
                                 input: name.id.input.clone(),
-                                span: context.db.ast_id_to_span(name.id.clone()).unwrap(),
+                                span: self.db.ast_id_to_span(name.id.clone()).unwrap(),
                                 payload: CompilerErrorPayload::Hir(
                                     HirError::NeedsWithWrongNumberOfArguments,
                                 ),
                             }],
                         },
                     };
-                    return self.push(context, id, expression, None);
+                    return self.push(id, expression, None);
                 }
                 match self.identifiers.get(&name.value) {
                     Some(function) => function.to_owned(),
                     None => {
                         return self.push(
-                            context,
                             Some(name.id.clone()),
                             Expression::Error {
                                 child: None,
                                 errors: vec![CompilerError {
                                     input: name.id.input.clone(),
-                                    span: context.db.ast_id_to_span(name.id.clone()).unwrap(),
+                                    span: self.db.ast_id_to_span(name.id.clone()).unwrap(),
                                     payload: CompilerErrorPayload::Hir(HirError::UnknownFunction {
                                         name: name.value.clone(),
                                     }),
@@ -414,12 +396,11 @@ impl LocalContext {
                 }
             }
             CallReceiver::StructAccess(struct_access) => {
-                self.lower_struct_access(context, None, &struct_access)
+                self.lower_struct_access(None, &struct_access)
             }
-            CallReceiver::Call(call) => self.lower_call(context, None, &*call),
+            CallReceiver::Call(call) => self.lower_call(None, &*call),
         };
         self.push(
-            context,
             id,
             Expression::Call {
                 function,
@@ -431,12 +412,11 @@ impl LocalContext {
 
     fn push(
         &mut self,
-        context: &mut GlobalContext,
         ast_id: Option<ast::Id>,
         expression: Expression,
         identifier: Option<String>,
     ) -> hir::Id {
-        let id = self.create_next_id(context, ast_id, identifier.clone());
+        let id = self.create_next_id(ast_id, identifier.clone());
         self.push_with_existing_id(id, expression, identifier)
     }
     fn push_with_existing_id(
@@ -454,12 +434,7 @@ impl LocalContext {
         id
     }
 
-    fn create_next_id(
-        &mut self,
-        context: &mut GlobalContext,
-        ast_id: Option<ast::Id>,
-        key: Option<String>,
-    ) -> hir::Id {
+    fn create_next_id(&mut self, ast_id: Option<ast::Id>, key: Option<String>) -> hir::Id {
         for disambiguator in 0.. {
             let last_part = if let Some(key) = &key {
                 if disambiguator == 0 {
@@ -470,12 +445,9 @@ impl LocalContext {
             } else {
                 format!("{}", disambiguator)
             };
-            let id = hir::Id::new(
-                context.input.clone(),
-                add_keys(&self.prefix_keys, last_part),
-            );
-            if !context.id_mapping.contains_key(&id) {
-                assert!(context.id_mapping.insert(id.to_owned(), ast_id).is_none());
+            let id = hir::Id::new(self.input.clone(), add_keys(&self.prefix_keys, last_part));
+            if !self.id_mapping.contains_key(&id) {
+                assert!(self.id_mapping.insert(id.to_owned(), ast_id).is_none());
                 return id;
             }
         }
@@ -483,41 +455,39 @@ impl LocalContext {
     }
 }
 
-impl LocalContext {
-    fn generate_sparkles(&mut self, context: &mut GlobalContext) {
+impl<'a> Context<'a> {
+    fn generate_sparkles(&mut self) {
         let mut sparkles_map = HashMap::new();
 
         for builtin_function in builtin_functions::VALUES.iter() {
             let symbol = self.push(
-                context,
                 None,
-                Expression::Symbol(format!("{:?}", builtin_function)),
+                Expression::Symbol(format!("{builtin_function:?}")),
                 None,
             );
-            let builtin = self.push(context, None, Expression::Builtin(*builtin_function), None);
+            let builtin = self.push(None, Expression::Builtin(*builtin_function), None);
             sparkles_map.insert(symbol, builtin);
         }
 
         let sparkles_map = Expression::Struct(sparkles_map);
-        self.push(context, None, sparkles_map, Some("✨".to_string()));
+        self.push(None, sparkles_map, Some("✨".to_string()));
     }
 
     // Generates a struct that contains the current path as a struct. Generates
     // panicking code if the current file is not on the file system and of the
     // current project.
-    fn generate_current_path_struct(&mut self, context: &mut GlobalContext) -> hir::Id {
+    fn generate_current_path_struct(&mut self) -> hir::Id {
         // HirId(~:test.candy:something:key) = int 0
         // HirId(~:test.candy:something:raw_path) = text "test.candy"
         // HirId(~:test.candy:something:currentPath) = struct [
         //   HirId(~:test.candy:something:key): HirId(~:test.candy:something:raw_path),
         // ]
         let panic_id = self.push(
-            context,
             None,
             Expression::Builtin(BuiltinFunction::Panic),
             Some("panic".to_string()),
         );
-        match context.input.clone() {
+        match self.input.clone() {
             Input::File(path) => {
                 let current_path_content = path
                     .into_iter()
@@ -525,14 +495,8 @@ impl LocalContext {
                     .enumerate()
                     .map(|(index, it)| {
                         (
+                            self.push(None, Expression::Int(index as u64), Some("key".to_string())),
                             self.push(
-                                context,
-                                None,
-                                Expression::Int(index as u64),
-                                Some("key".to_string()),
-                            ),
-                            self.push(
-                                context,
                                 None,
                                 Expression::Text(it.to_owned()),
                                 Some("rawPath".to_string()),
@@ -541,7 +505,6 @@ impl LocalContext {
                     })
                     .collect();
                 self.push(
-                    context,
                     None,
                     Expression::Struct(current_path_content),
                     Some("currentPath".to_string()),
@@ -549,7 +512,6 @@ impl LocalContext {
             }
             Input::ExternalFile(_) => {
                 let message_id = self.push(
-                    context,
                     None,
                     Expression::Text(
                         "File doesn't belong to the currently opened project.".to_string(),
@@ -557,7 +519,6 @@ impl LocalContext {
                     Some("message".to_string()),
                 );
                 self.push(
-                    context,
                     None,
                     Expression::Call {
                         function: panic_id,
@@ -568,13 +529,11 @@ impl LocalContext {
             }
             Input::Untitled(_) => {
                 let message_id = self.push(
-                    context,
                     None,
                     Expression::Text("Untitled files can't call `useAsset`.".to_string()),
                     Some("message".to_string()),
                 );
                 self.push(
-                    context,
                     None,
                     Expression::Call {
                         function: panic_id,
@@ -586,7 +545,7 @@ impl LocalContext {
         }
     }
 
-    fn generate_use_asset(&mut self, context: &mut GlobalContext) {
+    fn generate_use_asset(&mut self) {
         // HirId(~:test.candy:useAsset) = lambda { HirId(~:test.candy:useAsset:target) ->
         //   HirId(~:test.candy:useAsset:panic) = builtinPanic
         //   HirId(~:test.candy:useAsset:useAsset) = builtinUseAsset
@@ -600,22 +559,20 @@ impl LocalContext {
         //     HirId(~:test.candy:useAsset:target)
         // }
 
-        let assignment_context = LocalContext::inner_for(&self, Some("useAsset".to_string()));
-        let lambda_parameter_id = hir::Id::new(
-            context.input.clone(),
-            add_keys(&assignment_context.prefix_keys[..], "target".to_string()),
-        );
-        let mut lambda_context = LocalContext::inner_for(&assignment_context, None);
+        let reset_state = self.start_scope();
+        self.prefix_keys.push("useAsset".to_string());
 
-        let current_path = lambda_context.generate_current_path_struct(context);
-        let use_id = lambda_context.push(
-            context,
+        let lambda_parameter_id = hir::Id::new(
+            self.input.clone(),
+            add_keys(&self.prefix_keys[..], "target".to_string()),
+        );
+        let current_path = self.generate_current_path_struct();
+        let use_id = self.push(
             None,
             Expression::Builtin(BuiltinFunction::UseAsset),
             Some("useAsset".to_string()),
         );
-        lambda_context.push(
-            context,
+        self.push(
             None,
             Expression::Call {
                 function: use_id,
@@ -624,19 +581,20 @@ impl LocalContext {
             Some("importedFileContent".to_string()),
         );
 
+        let inner_body = self.end_scope(reset_state);
+
         self.push(
-            context,
             None,
             Expression::Lambda(Lambda {
                 parameters: vec![lambda_parameter_id],
-                body: lambda_context.body,
+                body: inner_body,
                 fuzzable: false,
             }),
             Some("useAsset".to_string()),
         );
     }
 
-    fn generate_use(&mut self, context: &mut GlobalContext) {
+    fn generate_use(&mut self) {
         // HirId(~:test.candy:use) = lambda { HirId(~:test.candy:use:target) ->
         //   HirId(~:test.candy:use:panic) = builtinPanic
         //   HirId(~:test.candy:use:key) = int 0
@@ -650,22 +608,20 @@ impl LocalContext {
         //     HirId(~:test.candy:use:target)
         //  }
 
-        let assignment_context = LocalContext::inner_for(self, Some("use".to_string()));
+        let reset_state = self.start_scope();
+        self.prefix_keys.push("use".to_string());
         let lambda_parameter_id = hir::Id::new(
-            context.input.clone(),
-            add_keys(&assignment_context.prefix_keys[..], "target".to_string()),
+            self.input.clone(),
+            add_keys(&self.prefix_keys[..], "target".to_string()),
         );
-        let mut lambda_inner = LocalContext::inner_for(&assignment_context, None);
 
-        let current_path = lambda_inner.generate_current_path_struct(context);
-        let use_id = lambda_inner.push(
-            context,
+        let current_path = self.generate_current_path_struct();
+        let use_id = self.push(
             None,
             Expression::Builtin(BuiltinFunction::UseLocalModule),
             Some("useLocalModule".to_string()),
         );
-        lambda_inner.push(
-            context,
+        self.push(
             None,
             Expression::Call {
                 function: use_id,
@@ -674,29 +630,29 @@ impl LocalContext {
             Some("importedModule".to_string()),
         );
 
+        let inner_body = self.end_scope(reset_state);
+
         self.push(
-            context,
             None,
             Expression::Lambda(Lambda {
                 parameters: vec![lambda_parameter_id],
-                body: lambda_inner.body,
+                body: inner_body,
                 fuzzable: false,
             }),
             Some("use".to_string()),
         );
     }
 
-    fn generate_exports_struct(&mut self, context: &mut GlobalContext) -> hir::Id {
+    fn generate_exports_struct(&mut self) -> hir::Id {
         // HirId(~:test.candy:100) = symbol Foo
         // HirId(~:test.candy:102) = struct [
         //   HirId(~:test.candy:100): HirId(~:test.candy:101),
         // ]
 
         let mut exports = HashMap::new();
-        for (name, id) in context.public_identifiers.clone() {
+        for (name, id) in self.public_identifiers.clone() {
             exports.insert(
                 self.push(
-                    context,
                     None,
                     Expression::Symbol(name.uppercase_first_letter()),
                     None,
@@ -704,7 +660,7 @@ impl LocalContext {
                 id,
             );
         }
-        self.push(context, None, Expression::Struct(exports), None)
+        self.push(None, Expression::Struct(exports), None)
     }
 }
 
