@@ -120,8 +120,6 @@ Major milestones:
 - mini-heaps
 - start fuzzing in language server
 - show fuzzing hints in the editor
-- implement `use` again, this time for both local files and packages from the packages folder
-- make closures more readable (maybe maintain a map from closure to name in the VM)
 - implement fibers and nurseries
 - implement channels
 - remove builtinPrint
