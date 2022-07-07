@@ -1,7 +1,9 @@
 use super::heap::ObjectPointer;
 use crate::{
     builtin_functions::BuiltinFunction,
-    compiler::lir::{Instruction, Lir},
+    compiler::{hir_to_lir::HirToLir, lir::Instruction},
+    database::Database,
+    input::Input,
 };
 use im::HashMap;
 use itertools::Itertools;
@@ -34,12 +36,23 @@ impl Value {
         Value::Symbol("Nothing".to_owned())
     }
 
-    pub fn module_closure_from_lir(lir: Lir) -> Self {
-        Value::Closure {
+    pub fn module_closure_of_input(db: &Database, input: Input) -> Option<Self> {
+        let lir = db.lir(input.clone())?;
+        Some(Value::Closure {
             captured: vec![],
             num_args: 0,
-            body: lir.instructions,
-        }
+            body: vec![
+                Instruction::TraceModuleStarts { input },
+                Instruction::CreateClosure {
+                    captured: vec![],
+                    num_args: 0,
+                    body: lir.instructions.clone(),
+                },
+                Instruction::Call { num_args: 0 },
+                Instruction::TraceModuleEnds,
+                Instruction::Return,
+            ],
+        })
     }
 
     pub fn list(items: Vec<Value>) -> Self {

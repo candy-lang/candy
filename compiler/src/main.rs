@@ -190,8 +190,6 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
 fn run(options: CandyRunOptions) {
     *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
 
-    log::debug!("Building `{}`.\n", options.file.display());
-
     let input: Input = options.file.clone().into();
     let db = Database::default();
 
@@ -202,7 +200,7 @@ fn run(options: CandyRunOptions) {
             return;
         }
     };
-    let module_closure = Value::module_closure_from_lir((*lir).clone());
+    let module_closure = Value::module_closure_of_input(&db, input.clone()).unwrap();
 
     let path_string = options.file.to_string_lossy();
     log::debug!("Running `{path_string}`.");

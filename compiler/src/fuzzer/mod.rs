@@ -2,10 +2,7 @@ mod generator;
 
 use self::generator::generate_n_values;
 use crate::{
-    compiler::{
-        hir::{self, Expression, HirDb, Lambda},
-        hir_to_lir::HirToLir,
-    },
+    compiler::hir::{self, Expression, HirDb, Lambda},
     database::Database,
     input::Input,
     vm::{tracer::TraceEntry, value::Value, Status, Vm},
@@ -15,8 +12,7 @@ use log;
 use std::fs;
 
 pub fn fuzz(db: &Database, input: Input) {
-    let lir = db.lir(input.clone()).unwrap();
-    let module_closure = Value::module_closure_from_lir((*lir).clone());
+    let module_closure = Value::module_closure_of_input(&db, input.clone()).unwrap();
 
     let mut vm = Vm::new();
     vm.set_up_module_closure_execution(db, input.clone(), module_closure);
