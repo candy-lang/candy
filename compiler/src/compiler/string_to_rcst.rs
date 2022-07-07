@@ -1644,8 +1644,8 @@ mod parse {
             }
         };
 
-        let (whitespace, (equals_sign, body)) =
-            (equals_sign, body).split_outer_trailing_whitespace();
+        let (whitespace, (assignment_sign, body)) =
+            (assignment_sign, body).split_outer_trailing_whitespace();
         Some((
             input,
             Rcst::Assignment {
