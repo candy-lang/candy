@@ -1,3 +1,4 @@
+use super::error::CompilerError;
 use crate::{builtin_functions::BuiltinFunction, hir};
 use itertools::Itertools;
 use std::fmt::Display;
@@ -90,7 +91,10 @@ pub enum Instruction {
     },
     TraceNeedsEnds,
 
-    Error(hir::Id),
+    Error {
+        id: hir::Id,
+        error: CompilerError,
+    },
 }
 
 impl Display for Instruction {
@@ -156,7 +160,7 @@ impl Display for Instruction {
                 write!(f, "traceNeedsStarts {id}")
             }
             Instruction::TraceNeedsEnds => write!(f, "traceNeedsEnds"),
-            Instruction::Error(hir_id) => write!(f, "error {hir_id}"),
+            Instruction::Error { id, error } => write!(f, "error at {id}: {error:?}"),
         }
     }
 }

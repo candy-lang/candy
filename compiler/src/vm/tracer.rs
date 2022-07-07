@@ -42,13 +42,13 @@ impl Tracer {
                 self.stack.push(entry);
             }
             TraceEntry::CallEnded { .. } => {
-                self.stack.pop();
+                self.stack.pop().unwrap();
             }
             TraceEntry::NeedsStarted { .. } => {
                 self.stack.push(entry);
             }
             TraceEntry::NeedsEnded => {
-                self.stack.pop();
+                self.stack.pop().unwrap();
             }
             _ => {}
         }
@@ -87,17 +87,32 @@ impl Tracer {
                 };
                 let caller_location_string = {
                     let ast_id = hir_to_ast_ids.get(&hir_id).map(|id| id.clone());
-                    let cst_id = ast_id.as_ref().and_then(|id| ast_to_cst_ids.get(&id)).map(|id| id.clone());
-                    let cst = cst_id.map(|id| db.find_cst(input.clone(), id)).map(|id| id.clone());
-                    let span = cst.map(|cst| (
-                        db.offset_to_lsp(input.clone(), cst.span.start),
-                        db.offset_to_lsp(input.clone(), cst.span.end),
-                    ));
+                    let cst_id = ast_id
+                        .as_ref()
+                        .and_then(|id| ast_to_cst_ids.get(&id))
+                        .map(|id| id.clone());
+                    let cst = cst_id
+                        .map(|id| db.find_cst(input.clone(), id))
+                        .map(|id| id.clone());
+                    let span = cst.map(|cst| {
+                        (
+                            db.offset_to_lsp(input.clone(), cst.span.start),
+                            db.offset_to_lsp(input.clone(), cst.span.end),
+                        )
+                    });
                     format!(
                         "{hir_id}, {}, {}, {}",
-                        ast_id.map(|id| format!("{id}")).unwrap_or("<no ast>".to_string()),
-                        cst_id.map(|id| format!("{id:?}")).unwrap_or("<no cst>".to_string()),
-                        span.map(|((start_line, start_col), (end_line, end_col))| format!("{}:{} – {}:{}", start_line, start_col, end_line, end_col)).unwrap_or("<no location>".to_string())
+                        ast_id
+                            .map(|id| format!("{id}"))
+                            .unwrap_or("<no ast>".to_string()),
+                        cst_id
+                            .map(|id| format!("{id:?}"))
+                            .unwrap_or("<no cst>".to_string()),
+                        span.map(|((start_line, start_col), (end_line, end_col))| format!(
+                            "{}:{} – {}:{}",
+                            start_line, start_col, end_line, end_col
+                        ))
+                        .unwrap_or("<no location>".to_string())
                     )
                 };
                 format!("{caller_location_string:90} {call_string}")

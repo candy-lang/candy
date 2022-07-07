@@ -1,6 +1,7 @@
 use super::{
     ast_to_hir::AstToHir,
     cst::CstDb,
+    error::CompilerError,
     hir::{self, Body, Expression},
     lir::{Instruction, Lir, StackOffset},
 };
@@ -107,7 +108,11 @@ impl LoweringContext {
                 self.emit_needs(id.clone());
                 self.emit_trace_needs_ends();
             }
-            Expression::Error { .. } => self.emit_error(id.to_owned()),
+            Expression::Error { errors, .. } => {
+                for error in errors {
+                    self.emit_error(id.clone(), error.clone());
+                }
+            }
         };
         self.emit_trace_value_evaluated(id.clone());
     }
@@ -191,8 +196,11 @@ impl LoweringContext {
     fn emit_trace_needs_ends(&mut self) {
         self.emit(Instruction::TraceNeedsEnds);
     }
-    fn emit_error(&mut self, id: hir::Id) {
-        self.emit(Instruction::Error(id.clone()));
+    fn emit_error(&mut self, id: hir::Id, error: CompilerError) {
+        self.emit(Instruction::Error {
+            id: id.clone(),
+            error,
+        });
         self.stack.push(id);
     }
 

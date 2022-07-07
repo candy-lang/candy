@@ -1,6 +1,7 @@
-#![feature(try_trait_v2)]
+#![feature(label_break_value)]
 #![feature(let_chains)]
 #![feature(never_type)]
+#![feature(try_trait_v2)]
 
 mod builtin_functions;
 mod compiler;

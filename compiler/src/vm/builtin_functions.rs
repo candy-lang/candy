@@ -1,5 +1,10 @@
 use super::{heap::ObjectPointer, value::Value, Vm};
-use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::{Input, InputDb}};
+use crate::{
+    builtin_functions::BuiltinFunction,
+    compiler::{hir_to_lir::HirToLir, lir::Instruction},
+    database::Database,
+    input::{Input, InputDb},
+};
 use itertools::Itertools;
 use log;
 
@@ -16,7 +21,7 @@ macro_rules! destructure {
 impl Vm {
     pub(super) fn run_builtin_function(
         &mut self,
-        db: &dyn InputDb,
+        db: &Database,
         builtin_function: &BuiltinFunction,
         args: &[ObjectPointer],
     ) {
@@ -29,8 +34,8 @@ impl Vm {
             BuiltinFunction::Equals => self.equals(args),
             BuiltinFunction::GetArgumentCount => self.get_argument_count(args),
             BuiltinFunction::IfElse => match self.if_else(db, args) {
-                // If successful, builtinIfElse doesn't return a value, but
-                // diverges the control flow.
+                // If successful, IfElse doesn't return a value, but diverges
+                // the control flow.
                 Ok(()) => return,
                 Err(message) => Err(message),
             },
@@ -41,6 +46,14 @@ impl Vm {
             BuiltinFunction::StructHasKey => self.struct_has_key(args),
             BuiltinFunction::TypeOf => self.type_of(args),
             BuiltinFunction::UseAsset => self.use_asset(db, args),
+            BuiltinFunction::UseLocalModule => {
+                // If successful, UseLocalModule doesn't return a value, but
+                // diverges the control flow.
+                match self.use_local_module(db, args) {
+                    Ok(()) => return,
+                    Err(message) => Err(message),
+                }
+            }
         };
         let return_value = match return_value_or_panic_message {
             Ok(value) => value,
@@ -65,7 +78,7 @@ impl Vm {
         })
     }
 
-    fn if_else(&mut self, db: &dyn InputDb, args: Vec<Value>) -> Result<(), String> {
+    fn if_else(&mut self, db: &Database, args: Vec<Value>) -> Result<(), String> {
         destructure!(
             args,
             [
@@ -170,8 +183,40 @@ impl Vm {
         })
     }
 
-    fn use_asset(&mut self, db: &dyn InputDb, args: Vec<Value>) -> Result<Value, String> {
-        let (current_path, target) = destructure!(
+    fn use_asset(&mut self, db: &Database, args: Vec<Value>) -> Result<Value, String> {
+        let (current_path, target) = Self::parse_current_path_and_target(args)?;
+        let target = UseAssetTarget::parse(&target)?;
+        let input = target.resolve_asset(&current_path)?;
+        let content = db
+            .get_input(input.clone())
+            .ok_or_else(|| format!("Couldn't import file '{}'.", input))?;
+        Ok(Value::Text((*content).clone()))
+    }
+
+    fn use_local_module(&mut self, db: &Database, args: Vec<Value>) -> Result<(), String> {
+        let (current_path, target) = Self::parse_current_path_and_target(args)?;
+        let target = UseAssetTarget::parse(&target)?;
+        let possible_inputs = target.resolve_local_module(&current_path)?;
+        let input = 'find_existing_input: {
+            for input in possible_inputs {
+                if db.get_input(input.clone()).is_some() {
+                    break 'find_existing_input input;
+                }
+            }
+            return Err("couldn't import module".to_string());
+        };
+        let lir = db
+            .lir(input)
+            .ok_or_else(|| "couldn't import module".to_string())?;
+        let module_closure = Value::module_closure_from_lir((*lir).clone());
+        let address = self.heap.import(module_closure);
+        self.data_stack.push(address);
+        self.run_instruction(db, Instruction::Call { num_args: 0 });
+        Ok(())
+    }
+
+    fn parse_current_path_and_target(args: Vec<Value>) -> Result<(Vec<String>, String), String> {
+        destructure!(
             args,
             [Value::Struct(current_path_struct), Value::Text(target)],
             {
@@ -184,65 +229,7 @@ impl Vm {
                 }
                 Ok((current_path, target.to_string()))
             }
-        )?;
-
-        let target = UseAssetTarget::parse(&target)?;
-
-        let mut path = current_path.to_owned();
-        for _ in 0..target.parent_navigations {
-            if path.pop() == None {
-                return Err("too many parent navigations".to_string());
-            }
-        }
-        if path.last().map(|it| it.ends_with(".candy")).unwrap_or(false) {
-            return Err("importing child files (starting with a single dot) only works from `.candy` files".to_string());
-        }
-        path.push(target.path.to_string());
-
-        let input = Input::File(path.clone());
-        let content = db.get_input(input).ok_or_else(|| format!("Couldn't import file '{}'.", path.join("/")))?;
-        Ok(Value::Text((*content).clone()))
-
-        // let inputs = target.resolve(&current_path[..]);
-        // let input = match inputs
-        //     .iter()
-        //     .filter(|&it| db.get_input(it.to_owned()).is_some())
-        //     .next()
-        // {
-        //     Some(target) => target,
-        //     None => {
-        //         return self.panic(format!(
-        //             "Target doesn't exist. Checked the following path(s): {}",
-        //             inputs.iter().map(|it| format!("{}", it)).join(", ")
-        //         ));
-        //     }
-        // };
-
-        // TODO: Continue implementing use.
-        // let (lir, _) = db.lir(input.clone()).unwrap();
-        // TODO: Run LIR.
-        // let discover_result = db.run_all(input.to_owned(), import_chain.to_owned());
-
-        // TODO: Put public identifiers into map.
-        // hir.identifiers
-        //     .iter()
-        //     .map(|(id, key)| {
-        //         let mut key = key.to_owned();
-        //         key.get_mut(0..1).unwrap().make_ascii_uppercase();
-        //         let key = Value::Symbol(key.to_owned());
-
-        //         let value = match discover_result.get(id) {
-        //             Some(value) => value.to_owned()?,
-        //             None => return DiscoverResult::ErrorInHir,
-        //         };
-
-        //         DiscoverResult::Value((key, value))
-        //     })
-        //     .collect::<DiscoverResult<HashMap<Value, Value>>>()
-        //     .map(|it| Value::Struct(it))
-
-        // Ok(Value::Symbol("Used".to_string()))
-
+        )
     }
 }
 
@@ -261,34 +248,70 @@ impl UseAssetTarget {
                 target = &target[UseAssetTarget::PARENT_NAVIGATION_CHAR.len_utf8()..];
             }
             match navigations {
-                0 => return Err("targets of useAsst must start with at least one dot".to_string()),
+                0 => return Err("the target must start with at least one dot".to_string()),
                 i => i - 1, // two dots means one parent navigation
             }
         };
-        let path = target.to_string();
-        Ok(UseAssetTarget { parent_navigations, path })
+        let path = {
+            if !target
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '.')
+            {
+                return Err("the target name can only contain letters".to_string());
+            }
+            target.to_string()
+        };
+        Ok(UseAssetTarget {
+            parent_navigations,
+            path,
+        })
     }
 
-    fn resolve(&self, current_path: &[String]) -> Vec<Input> {
+    fn resolve_asset(&self, current_path: &[String]) -> Result<Input, String> {
         let mut path = current_path.to_owned();
         for _ in 0..self.parent_navigations {
             if path.pop() == None {
-                return vec![];
+                return Err("too many parent navigations".to_string());
             }
         }
-        path.push(self.path.to_string());
-
-        let mut result = vec![];
-
-        let mut subdirectory = path.clone();
-        subdirectory.push(".candy".to_owned());
-        result.push(Input::File(subdirectory));
-
-        if path.len() >= 1 {
-            let last = path.last_mut().unwrap();
-            *last = format!("{last}.candy");
-            result.push(Input::File(path));
+        if path
+            .last()
+            .map(|it| it.ends_with(".candy"))
+            .unwrap_or(false)
+        {
+            return Err(
+                "importing child files (starting with a single dot) only works from `.candy` files"
+                    .to_string(),
+            );
         }
-        result
+        path.push(self.path.to_string());
+        Ok(Input::File(path.clone()))
+    }
+
+    fn resolve_local_module(&self, current_path: &[String]) -> Result<Vec<Input>, String> {
+        if self.path.contains('.') {
+            return Err("the target name contains a file ending".to_string());
+        }
+
+        let mut path = current_path.to_owned();
+        for _ in 0..self.parent_navigations {
+            if path.pop() == None {
+                return Err("too many parent navigations".to_string());
+            }
+        }
+        let possible_paths = vec![
+            path.clone()
+                .into_iter()
+                .chain([format!("{}.candy", self.path)])
+                .collect_vec(),
+            path.clone()
+                .into_iter()
+                .chain([self.path.to_string(), ".candy".to_string()])
+                .collect_vec(),
+        ];
+        Ok(possible_paths
+            .into_iter()
+            .map(|path| Input::File(path))
+            .collect_vec())
     }
 }

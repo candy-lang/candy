@@ -103,6 +103,7 @@ impl<'c> Compiler<'c> {
         };
         compiler.generate_sparkles();
         compiler.generate_use_asset();
+        compiler.generate_use();
         compiler
     }
 
@@ -123,8 +124,79 @@ impl<'c> Compiler<'c> {
         self.push(None, sparkles_map, Some("✨".to_string()));
     }
 
+    // Generates a struct that contains the current path as a struct. Generates
+    // panicking code if the current file is not on the file system and of the
+    // current project.
+    fn generate_current_path_struct(&mut self) -> hir::Id {
+        // HirId(~:test.candy:something:key) = int 0
+        // HirId(~:test.candy:something:raw_path) = text "test.candy"
+        // HirId(~:test.candy:something:currentPath) = struct [
+        //   HirId(~:test.candy:something:key): HirId(~:test.candy:something:raw_path),
+        // ]
+        let panic_id = self.push(
+            None,
+            Expression::Builtin(BuiltinFunction::Panic),
+            Some("panic".to_string()),
+        );
+        match &self.context.input {
+            Input::File(path) => {
+                let current_path_content = path
+                    .iter()
+                    .enumerate()
+                    .map(|(index, it)| {
+                        (
+                            self.push(None, Expression::Int(index as u64), Some("key".to_string())),
+                            self.push(
+                                None,
+                                Expression::Text(it.to_owned()),
+                                Some("rawPath".to_string()),
+                            ),
+                        )
+                    })
+                    .collect();
+                self.push(
+                    None,
+                    Expression::Struct(current_path_content),
+                    Some("currentPath".to_string()),
+                )
+            }
+            Input::ExternalFile(_) => {
+                let message_id = self.push(
+                    None,
+                    Expression::Text(
+                        "File doesn't belong to the currently opened project.".to_string(),
+                    ),
+                    Some("message".to_string()),
+                );
+                self.push(
+                    None,
+                    Expression::Call {
+                        function: panic_id,
+                        arguments: vec![message_id],
+                    },
+                    Some("panicked".to_string()),
+                )
+            }
+            Input::Untitled(_) => {
+                let message_id = self.push(
+                    None,
+                    Expression::Text("Untitled files can't call `useAsset`.".to_string()),
+                    Some("message".to_string()),
+                );
+                self.push(
+                    None,
+                    Expression::Call {
+                        function: panic_id,
+                        arguments: vec![message_id],
+                    },
+                    Some("panicked".to_string()),
+                )
+            }
+        }
+    }
+
     fn generate_use_asset(&mut self) {
-        // HirId(~:test.candy:use) = lambda { HirId(~:test.candy:useAsset:target) ->
+        // HirId(~:test.candy:useAsset) = lambda { HirId(~:test.candy:useAsset:target) ->
         //   HirId(~:test.candy:useAsset:panic) = builtinPanic
         //   HirId(~:test.candy:useAsset:useAsset) = builtinUseAsset
         //   HirId(~:test.candy:useAsset:key) = int 0
@@ -157,83 +229,20 @@ impl<'c> Compiler<'c> {
             identifiers: assignment_inner.identifiers.clone(),
         };
 
-        let panic_id = lambda_inner.push(
+        let current_path = lambda_inner.generate_current_path_struct();
+        let use_id = lambda_inner.push(
             None,
-            Expression::Builtin(BuiltinFunction::Panic),
-            Some("panic".to_string()),
+            Expression::Builtin(BuiltinFunction::UseAsset),
+            Some("useAsset".to_string()),
         );
-        match &lambda_inner.context.input {
-            Input::File(path) => {
-                let use_id = lambda_inner.push(
-                    None,
-                    Expression::Builtin(BuiltinFunction::UseAsset),
-                    Some("useAsset".to_string()),
-                );
-                let current_path_content = path
-                    .iter()
-                    .enumerate()
-                    .map(|(index, it)| {
-                        (
-                            lambda_inner.push(
-                                None,
-                                Expression::Int(index as u64),
-                                Some("key".to_string()),
-                            ),
-                            lambda_inner.push(
-                                None,
-                                Expression::Text(it.to_owned()),
-                                Some("rawPath".to_string()),
-                            ),
-                        )
-                    })
-                    .collect();
-                let current_path = lambda_inner.push(
-                    None,
-                    Expression::Struct(current_path_content),
-                    Some("currentPath".to_string()),
-                );
-                lambda_inner.push(
-                    None,
-                    Expression::Call {
-                        function: use_id,
-                        arguments: vec![current_path, lambda_parameter_id.clone()],
-                    },
-                    Some("importedFileContent".to_string()),
-                );
-            }
-            Input::ExternalFile(_) => {
-                let message_id = lambda_inner.push(
-                    None,
-                    Expression::Text(
-                        "File doesn't belong to the currently opened project.".to_string(),
-                    ),
-                    Some("message".to_string()),
-                );
-                lambda_inner.push(
-                    None,
-                    Expression::Call {
-                        function: panic_id,
-                        arguments: vec![message_id],
-                    },
-                    Some("panicked".to_string()),
-                );
-            }
-            Input::Untitled(_) => {
-                let message_id = lambda_inner.push(
-                    None,
-                    Expression::Text("Untitled files can't call `useAsset`.".to_string()),
-                    Some("message".to_string()),
-                );
-                lambda_inner.push(
-                    None,
-                    Expression::Call {
-                        function: panic_id,
-                        arguments: vec![message_id],
-                    },
-                    Some("panicked".to_string()),
-                );
-            }
-        }
+        lambda_inner.push(
+            None,
+            Expression::Call {
+                function: use_id,
+                arguments: vec![current_path, lambda_parameter_id.clone()],
+            },
+            Some("importedFileContent".to_string()),
+        );
 
         assignment_inner.id_mapping = lambda_inner.id_mapping;
         self.id_mapping = assignment_inner.id_mapping;
@@ -245,6 +254,68 @@ impl<'c> Compiler<'c> {
                 fuzzable: false,
             }),
             Some("useAsset".to_string()),
+        );
+    }
+
+    fn generate_use(&mut self) {
+        // HirId(~:test.candy:use) = lambda { HirId(~:test.candy:use:target) ->
+        //   HirId(~:test.candy:use:panic) = builtinPanic
+        //   HirId(~:test.candy:use:key) = int 0
+        //   HirId(~:test.candy:use:rawPath) = text "test.candy"
+        //   HirId(~:test.candy:use:currentPath) = struct [
+        //     HirId(~:test.candy:use:key): HirId(~:test.candy:use:rawPath),
+        //   ]
+        //   HirId(~:test.candy:use:useLocalModule) = builtinUseLocalModule
+        //   HirId(~:test.candy:use:importedModule) = call HirId(~:test.candy:use:useLocalModule) with these arguments:
+        //     HirId(~:test.candy:use:currentPath)
+        //     HirId(~:test.candy:use:target)
+        //  }
+        let mut assignment_inner = Compiler::<'c> {
+            context: &mut self.context,
+            id_mapping: self.id_mapping.clone(),
+            body: Body::new(),
+            parent_keys: add_keys(&self.parent_keys, "use".to_string()),
+            identifiers: self.identifiers.clone(),
+        };
+
+        let lambda_keys = assignment_inner.parent_keys;
+        let lambda_parameter_id = hir::Id::new(
+            assignment_inner.context.input.clone(),
+            add_keys(&lambda_keys[..], "target".to_string()),
+        );
+        let mut lambda_inner = Compiler::<'c> {
+            context: &mut assignment_inner.context,
+            id_mapping: assignment_inner.id_mapping.clone(),
+            body: Body::new(),
+            parent_keys: lambda_keys.clone(),
+            identifiers: assignment_inner.identifiers.clone(),
+        };
+
+        let current_path = lambda_inner.generate_current_path_struct();
+        let use_id = lambda_inner.push(
+            None,
+            Expression::Builtin(BuiltinFunction::UseLocalModule),
+            Some("useLocalModule".to_string()),
+        );
+        lambda_inner.push(
+            None,
+            Expression::Call {
+                function: use_id,
+                arguments: vec![current_path, lambda_parameter_id.clone()],
+            },
+            Some("importedModule".to_string()),
+        );
+
+        assignment_inner.id_mapping = lambda_inner.id_mapping;
+        self.id_mapping = assignment_inner.id_mapping;
+        self.push(
+            None,
+            Expression::Lambda(Lambda {
+                parameters: vec![lambda_parameter_id],
+                body: lambda_inner.body,
+                fuzzable: false,
+            }),
+            Some("use".to_string()),
         );
     }
 

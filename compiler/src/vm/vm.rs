@@ -3,7 +3,11 @@ use super::{
     tracer::{TraceEntry, Tracer},
     value::Value,
 };
-use crate::{compiler::{hir::Id, lir::Instruction}, input::InputDb};
+use crate::{
+    compiler::{hir::Id, lir::Instruction},
+    database::Database,
+    input::InputDb,
+};
 use itertools::Itertools;
 use log;
 use std::collections::HashMap;
@@ -64,7 +68,12 @@ impl Vm {
     }
 
     /// Sets this VM up in a way that the closure will run.
-    pub fn set_up_closure_execution(&mut self, db: &dyn InputDb, closure: Value, arguments: Vec<Value>) {
+    pub fn set_up_closure_execution(
+        &mut self,
+        db: &Database,
+        closure: Value,
+        arguments: Vec<Value>,
+    ) {
         assert!(matches!(self.status, Status::Done));
         assert!(self.data_stack.is_empty());
         assert!(self.call_stack.is_empty());
@@ -87,7 +96,7 @@ impl Vm {
         self.run_instruction(db, Instruction::Call { num_args });
         self.status = Status::Running;
     }
-    pub fn set_up_module_closure_execution(&mut self, db: &dyn InputDb, closure: Value) {
+    pub fn set_up_module_closure_execution(&mut self, db: &Database, closure: Value) {
         if let Value::Closure {
             captured, num_args, ..
         } = closure.clone()
@@ -113,7 +122,7 @@ impl Vm {
         self.data_stack[self.data_stack.len() - 1 - offset as usize].clone()
     }
 
-    pub fn run(&mut self, db: &dyn InputDb, mut num_instructions: u16) {
+    pub fn run(&mut self, db: &Database, mut num_instructions: u16) {
         assert!(
             matches!(self.status, Status::Running),
             "Called Vm::run on a vm that is not ready to run."
@@ -159,7 +168,7 @@ impl Vm {
             }
         }
     }
-    pub fn run_instruction(&mut self, db: &dyn InputDb, instruction: Instruction) {
+    pub fn run_instruction(&mut self, db: &Database, instruction: Instruction) {
         match instruction {
             Instruction::CreateInt(int) => {
                 let address = self.heap.create(ObjectData::Int(int));
@@ -329,10 +338,10 @@ impl Vm {
                 });
             }
             Instruction::TraceNeedsEnds => self.tracer.push(TraceEntry::NeedsEnded),
-            Instruction::Error(error) => {
-                self.panic(
-                    format!("The VM crashed because there was an error in previous compilation stages: {error:?}"),
-                );
+            Instruction::Error { id, error } => {
+                self.panic(format!(
+                    "The VM crashed because there was an error at {id}: {error:?}"
+                ));
             }
         }
     }
