@@ -145,6 +145,7 @@ impl<'c> Compiler<'c> {
             Input::File(path) => {
                 let current_path_content = path
                     .iter()
+                    .filter(|path| *path != ".candy")
                     .enumerate()
                     .map(|(index, it)| {
                         (
