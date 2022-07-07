@@ -123,6 +123,7 @@ Major milestones:
 - implement fibers and nurseries
 - implement channels
 - remove builtinPrint
+- parse calls with call as a receiver: `(foo Bar) Baz`
 
 ## How to use Candy
 

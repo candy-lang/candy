@@ -758,6 +758,23 @@ mod parse {
             expression("foo", 0, true),
             Some(("", Rcst::Identifier("foo".to_string())))
         );
+        assert_eq!(
+            expression("(foo Bar)", 0, false),
+            Some((
+                "",
+                Rcst::Parenthesized {
+                    opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                    inner: Box::new(Rcst::Call {
+                        name: Box::new(Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Identifier("foo".to_string())),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())]
+                        }),
+                        arguments: vec![Rcst::Symbol("Bar".to_string())]
+                    }),
+                    closing_parenthesis: Box::new(Rcst::ClosingParenthesis)
+                }
+            ))
+        );
     }
 
     /// Multiple expressions that are occurring one after another.
@@ -822,6 +839,29 @@ mod parse {
                     }),
                     arguments: vec![Rcst::Identifier("bar".to_string())],
                 },
+            ))
+        );
+        assert_eq!(
+            run_of_expressions("(foo Bar) Baz", 0),
+            Some((
+                "",
+                vec![
+                    Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Parenthesized {
+                            opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                            inner: Box::new(Rcst::Call {
+                                name: Box::new(Rcst::TrailingWhitespace {
+                                    child: Box::new(Rcst::Identifier("foo".to_string())),
+                                    whitespace: vec![Rcst::Whitespace(" ".to_string())]
+                                }),
+                                arguments: vec![Rcst::Symbol("Bar".to_string())]
+                            }),
+                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis)
+                        }),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())]
+                    },
+                    Rcst::Symbol("Baz".to_string())
+                ]
             ))
         );
     }
@@ -958,6 +998,29 @@ mod parse {
                             string: "4".to_string()
                         }
                     ],
+                }
+            ))
+        );
+        assert_eq!(
+            call("(foo Bar) Baz\n", 0),
+            Some((
+                "\n",
+                Rcst::Call {
+                    name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Parenthesized {
+                            opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                            inner: Box::new(Rcst::Call {
+                                name: Box::new(Rcst::TrailingWhitespace {
+                                    child: Box::new(Rcst::Identifier("foo".to_string())),
+                                    whitespace: vec![Rcst::Whitespace(" ".to_string())]
+                                }),
+                                arguments: vec![Rcst::Symbol("Bar".to_string())]
+                            }),
+                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis)
+                        }),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())]
+                    }),
+                    arguments: vec![Rcst::Symbol("Baz".to_string())]
                 }
             ))
         );
