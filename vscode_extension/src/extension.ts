@@ -43,7 +43,7 @@ async function spawnServer(): Promise<StreamInfo> {
   process.stderr.on('data', (data) => console.error(data.toString()));
 
   process.addListener('close', (exitCode) => {
-    if (exitCode == 101) {
+    if (exitCode === 101) {
       console.error('LSP server was closed with a panic.');
     } else {
       console.error(`LSP server was closed with code ${exitCode}.`);
@@ -56,7 +56,7 @@ async function spawnServer(): Promise<StreamInfo> {
     console.error(`LSP server had an error: ${event}`);
   });
   process.addListener('exit', (exitCode) => {
-    if (exitCode == 101) {
+    if (exitCode === 101) {
       console.error('LSP server panicked.');
     } else {
       console.error(`LSP server exited with exit code ${exitCode}.`);
