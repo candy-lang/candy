@@ -3,11 +3,15 @@ use crate::{builtin_functions::BuiltinFunction, input::Input};
 use im::HashMap;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    sync::Arc,
+};
 
 #[salsa::query_group(HirDbStorage)]
 pub trait HirDb: AstToHir {
     fn find_expression(&self, id: Id) -> Option<Expression>;
+    fn containing_body_of(&self, id: Id) -> Arc<Body>;
     fn all_hir_ids(&self, input: Input) -> Option<Vec<Id>>;
 }
 fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
@@ -17,6 +21,21 @@ fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
     }
 
     hir.find(&id).map(|it| it.to_owned())
+}
+fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
+    match id.parent() {
+        Some(lambda_id) => {
+            if lambda_id.is_root() {
+                db.hir(id.input.clone()).unwrap().0
+            } else {
+                match db.find_expression(lambda_id).unwrap() {
+                    Expression::Lambda(lambda) => Arc::new(lambda.body),
+                    _ => panic!("Parent of an expression must be a lambda (or root scope)."),
+                }
+            }
+        }
+        None => panic!("The root scope has no parent."),
+    }
 }
 fn all_hir_ids(db: &dyn HirDb, input: Input) -> Option<Vec<Id>> {
     let (hir, _) = db.hir(input)?;

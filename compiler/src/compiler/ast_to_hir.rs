@@ -450,7 +450,11 @@ impl<'c> Compiler<'c> {
                     return self.push(id, expression, None);
                 }
                 match self.identifiers.get(&name.value) {
-                    Some(function) => function.to_owned(),
+                    Some(function) => self.push(
+                        Some(name.id),
+                        Expression::Reference(function.to_owned()),
+                        None,
+                    ),
                     None => {
                         return self.push(
                             Some(name.id.clone()),

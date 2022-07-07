@@ -41,15 +41,38 @@ fn find(
     let input: Input = params.text_document.uri.clone().into();
     let position = params.position;
     let offset = db.offset_from_lsp(input.clone(), position.line, position.character);
-
-    let origin_cst = db.find_cst_by_offset(input.clone(), offset);
-    let query = match origin_cst.kind {
-        CstKind::Identifier { .. } => ReferenceQuery::Id(db.cst_to_hir_id(input, origin_cst.id)?),
-        CstKind::Symbol(symbol) => ReferenceQuery::Symbol(input, symbol),
-        _ => return None,
-    };
-
+    let query = query_for_offset(db, input, offset)?;
     Some(db.references(query, include_declaration))
+}
+
+fn query_for_offset(db: &Database, input: Input, offset: usize) -> Option<ReferenceQuery> {
+    let origin_cst = db.find_cst_by_offset(input.clone(), offset);
+    match origin_cst.kind {
+        CstKind::Identifier { .. } => {
+            let hir_id = db.cst_to_hir_id(input, origin_cst.id)?;
+            let target_id = if let Some(hir_expr) = db.find_expression(hir_id.clone()) {
+                log::info!("hir_expr: {hir_expr:?}");
+                let containing_body = db.containing_body_of(hir_id.clone());
+                if containing_body.identifiers.contains_key(&hir_id) {
+                    // A local variable was declared. Find references to that variable.
+                    hir_id
+                } else {
+                    // An intermediate reference. Find references to it's target.
+                    match hir_expr {
+                        Expression::Reference(target_id) => target_id,
+                        Expression::Symbol(_) => todo!("Handle struct access"),
+                        _ => panic!("Expected a reference, got {:?}", hir_expr),
+                    }
+                }
+            } else {
+                // Parameter
+                hir_id
+            };
+            Some(ReferenceQuery::Id(target_id))
+        }
+        CstKind::Symbol(symbol) => Some(ReferenceQuery::Symbol(input, symbol)),
+        _ => None,
+    }
 }
 
 #[salsa::query_group(ReferencesDbStorage)]
