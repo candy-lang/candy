@@ -40,14 +40,10 @@ async function spawnServer(): Promise<StreamInfo> {
   const process = safeSpawn();
   console.info(`PID: ${process.pid}`);
 
-  const reader = process.stdout.pipe(new LoggingTransform('<=='));
-  const writer = new LoggingTransform('==>');
-  writer.pipe(process.stdin);
-
   process.stderr.on('data', (data) => console.error(data.toString()));
 
   process.addListener('close', (exitCode) => {
-    if (exitCode == 101) {
+    if (exitCode === 101) {
       console.error('LSP server was closed with a panic.');
     } else {
       console.error(`LSP server was closed with code ${exitCode}.`);
@@ -60,7 +56,7 @@ async function spawnServer(): Promise<StreamInfo> {
     console.error(`LSP server had an error: ${event}`);
   });
   process.addListener('exit', (exitCode) => {
-    if (exitCode == 101) {
+    if (exitCode === 101) {
       console.error('LSP server panicked.');
     } else {
       console.error(`LSP server exited with exit code ${exitCode}.`);
@@ -70,7 +66,7 @@ async function spawnServer(): Promise<StreamInfo> {
     console.error('LSP server sent a message.');
   });
 
-  return { reader, writer };
+  return { reader: process.stdout, writer: process.stdin };
 }
 
 type SpawnedProcess = child_process.ChildProcess & {
@@ -95,39 +91,4 @@ function safeSpawn(): SpawnedProcess {
     env: { ...process.env, RUST_BACKTRACE: '1' },
     shell: true,
   }) as SpawnedProcess;
-}
-class LoggingTransform extends stream.Transform {
-  constructor(
-    private readonly prefix: string,
-    private readonly onlyShowJson: boolean = true,
-    opts?: stream.TransformOptions
-  ) {
-    super(opts);
-  }
-  public _transform(
-    chunk: any,
-    encoding: BufferEncoding,
-    callback: () => void
-  ): void {
-    const value = (chunk as Buffer).toString();
-    const toLog = this.onlyShowJson
-      ? value
-          .split('\r\n')
-          .filter(
-            (line) => line.trim().startsWith('{') || line.trim().startsWith('#')
-          )
-          .join('\r\n')
-      : value;
-    if (toLog.length > 0 || !this.onlyShowJson) {
-      console.info(`${this.prefix} ${toLog}`);
-    }
-
-    // TODO: This is a workaround because VSCode doesn't adhere to the LSP spec.
-    const fixedValue = value.replace(
-      '"prepareSupportDefaultBehavior":true',
-      '"prepareSupportDefaultBehavior":   1'
-    );
-    this.push(Buffer.from(fixedValue, 'utf8'), encoding);
-    callback();
-  }
 }

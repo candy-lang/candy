@@ -123,6 +123,7 @@ Major milestones:
 - implement channels
 - remove builtinPrint
 - new name?
+- parse calls with call as a receiver: `(foo Bar) Baz`
 
 ## How to use Candy
 

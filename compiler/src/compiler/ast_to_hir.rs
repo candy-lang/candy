@@ -318,7 +318,7 @@ impl<'a> Context<'a> {
                 body: inner_body,
                 fuzzable: lambda.fuzzable,
             }),
-            identifier,
+            None,
         )
     }
 
@@ -353,8 +353,8 @@ impl<'a> Context<'a> {
                             condition: Box::new(condition.clone()),
                             message: Box::new(message.clone()),
                         },
-                        [message] => Expression::Needs {
-                            condition: Box::new(message.clone()),
+                        [condition] => Expression::Needs {
+                            condition: Box::new(condition.clone()),
                             message: Box::new(self.push(
                                 None,
                                 Expression::Text("needs not satisfied".to_string()),

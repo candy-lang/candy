@@ -70,10 +70,7 @@ impl<'a> Context<'a> {
             CstKind::Call { name, arguments } => {
                 if !arguments.is_empty() {
                     let name = name.unwrap_whitespace_and_comment();
-                    assert!(matches!(name.kind, CstKind::Identifier { .. }));
-
                     let last_argument = arguments.last().unwrap().unwrap_whitespace_and_comment();
-
                     self.push(
                         name.span.end,
                         last_argument.span.end,

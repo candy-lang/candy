@@ -45,6 +45,9 @@ pub trait HintsDb: AstToHir + Discover + HirDb + InputDb + LspPositionConversion
 fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
     log::debug!("Calculating hints for {input}");
 
+    // TODO: migrate LSP hints to use VM
+    return vec![];
+
     let (hir, _) = db.hir(input.clone()).unwrap();
     let discover_results: HashMap<hir::Id, DiscoverResult> = HashMap::new(); // db.run_all(input.clone(), vec![]);
 

@@ -17,16 +17,16 @@ use itertools::Itertools;
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFilter, DocumentHighlight, DocumentHighlightParams, FoldingRange, FoldingRangeParams,
-    GotoDefinitionParams, GotoDefinitionResponse, 
-    InitializedParams, Location, ReferenceParams, Registration, SemanticTokens,
+    GotoDefinitionParams, GotoDefinitionResponse, InitializeParams, InitializeResult,
+    InitializedParams, Location, MessageType, ReferenceParams, Registration, SemanticTokens,
     SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensParams,
     SemanticTokensRegistrationOptions, SemanticTokensResult, SemanticTokensServerCapabilities,
     ServerCapabilities, ServerInfo, StaticRegistrationOptions,
     TextDocumentChangeRegistrationOptions, TextDocumentContentChangeEvent,
-    TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions, InitializeParams, InitializeResult, MessageType,
+    TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
 };
 use tokio::sync::Mutex;
-use tower_lsp::{Client, LanguageServer, LspService, Server, jsonrpc};
+use tower_lsp::{jsonrpc, Client, LanguageServer};
 
 pub mod definition;
 pub mod folding_range;
