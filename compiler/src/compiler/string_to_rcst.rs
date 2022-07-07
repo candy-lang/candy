@@ -61,7 +61,9 @@ mod parse {
     // all the surrounding code still has a chance to be properly parsed – even
     // mid-writing after putting the opening bracket of a struct.
 
-    use crate::compiler::string_to_rcst::whitespace_indentation_score;
+    use crate::compiler::{
+        rcst::SplitOuterTrailingWhitespace, string_to_rcst::whitespace_indentation_score,
+    };
 
     use super::super::rcst::{IsMultiline, Rcst, RcstError};
     use itertools::Itertools;
@@ -826,10 +828,12 @@ mod parse {
 
     fn call(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
         log::trace!("call({input:?}, {indentation:?})");
-        let (input, mut expressions) = run_of_expressions(input, indentation)?;
+        let (input, expressions) = run_of_expressions(input, indentation)?;
         if expressions.len() < 2 {
             return None;
         }
+
+        let (whitespace, mut expressions) = expressions.split_outer_trailing_whitespace();
         let arguments = expressions.split_off(1);
         let name = expressions.into_iter().next().unwrap();
         Some((
@@ -837,7 +841,8 @@ mod parse {
             Rcst::Call {
                 name: Box::new(name),
                 arguments,
-            },
+            }
+            .wrap_in_whitespace(whitespace),
         ))
     }
     #[test]
@@ -1283,7 +1288,12 @@ mod parse {
             match expression(input, indentation, true) {
                 Some((new_input, expression)) => {
                     input = new_input;
+
+                    let (whitespace, expression) = expression.split_outer_trailing_whitespace();
                     expressions.push(expression);
+                    for whitespace in whitespace {
+                        expressions.push(whitespace);
+                    }
                 }
                 None => {
                     let fallback = colon(new_input)
@@ -1564,6 +1574,8 @@ mod parse {
             }
         };
 
+        let (whitespace, (equals_sign, body)) =
+            (equals_sign, body).split_outer_trailing_whitespace();
         Some((
             input,
             Rcst::Assignment {
@@ -1571,7 +1583,8 @@ mod parse {
                 parameters,
                 equals_sign: Box::new(equals_sign),
                 body,
-            },
+            }
+            .wrap_in_whitespace(whitespace),
         ))
     }
     #[test]
