@@ -1,4 +1,3 @@
-needs = (use ".Needs").needs
 type = use ".Type"
 
 is value = type.is value Int

@@ -1,11 +1,10 @@
 bool = use ".Bool"
+check = (use ".Check").check
 conditionals = use ".Conditionals"
-equals = builtinStructGet (use ".Equality") Equals
+equals = (use ".Equality").equals
 function = use ".Function"
 int = use ".Int"
-check = builtinStructGet (use ".Needs") Check
-needs = builtinStructGet (use ".Needs") Needs
-panic = builtinStructGet (use ".Panic") Panic
+panic = (use ".Panic").panic
 struct = use ".Struct"
 text = use ".Text"
 type = use ".Type"
