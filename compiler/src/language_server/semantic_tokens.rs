@@ -153,6 +153,7 @@ impl<'a> Context<'a> {
             CstKind::Comma => {}
             CstKind::Dot => {}
             CstKind::Colon => {}
+            CstKind::ColonEqualsSign => {}
             CstKind::OpeningParenthesis => {}
             CstKind::ClosingParenthesis => {}
             CstKind::OpeningBracket => {}
@@ -248,12 +249,12 @@ impl<'a> Context<'a> {
             CstKind::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign,
                 body,
             } => {
                 self.visit_cst(name, Some(SemanticTokenType::Assignment));
                 self.visit_csts(&parameters[..], Some(SemanticTokenType::Parameter));
-                self.visit_cst(equals_sign, None);
+                self.visit_cst(assignment_sign, None);
                 self.visit_csts(body, None);
             }
             CstKind::Error { .. } => {}

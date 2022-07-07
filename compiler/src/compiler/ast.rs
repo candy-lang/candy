@@ -92,6 +92,7 @@ pub enum CallReceiver {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Assignment {
     pub name: AstString,
+    pub is_public: bool,
     pub body: AssignmentBody,
 }
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

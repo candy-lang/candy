@@ -63,6 +63,10 @@ impl RcstToCstExt for Rcst {
                 state.offset += 1;
                 CstKind::Colon
             }
+            Rcst::ColonEqualsSign => {
+                state.offset += 2;
+                CstKind::ColonEqualsSign
+            }
             Rcst::OpeningParenthesis => {
                 state.offset += 1;
                 CstKind::OpeningParenthesis
@@ -201,12 +205,12 @@ impl RcstToCstExt for Rcst {
             Rcst::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign,
                 body,
             } => CstKind::Assignment {
                 name: Box::new(name.to_cst(state)),
                 parameters: parameters.to_csts(state),
-                equals_sign: Box::new(equals_sign.to_cst(state)),
+                assignment_sign: Box::new(assignment_sign.to_cst(state)),
                 body: body.to_csts(state),
             },
             Rcst::Error {

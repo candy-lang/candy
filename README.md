@@ -116,6 +116,7 @@ Major milestones:
 ## Short-term TODOs
 
 - use BigInts
+- make using := in non-top level an error
 - mini-heaps
 - start fuzzing in language server
 - show fuzzing hints in the editor

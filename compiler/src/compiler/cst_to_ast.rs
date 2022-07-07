@@ -76,6 +76,7 @@ impl LoweringContext {
             | CstKind::Comma
             | CstKind::Dot
             | CstKind::Colon
+            | CstKind::ColonEqualsSign
             | CstKind::OpeningParenthesis
             | CstKind::ClosingParenthesis
             | CstKind::OpeningBracket
@@ -402,16 +403,16 @@ impl LoweringContext {
             CstKind::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign,
                 body,
             } => {
                 let name = self.lower_identifier(name);
                 let (parameters, errors) = self.lower_parameters(parameters);
 
                 assert!(
-                    matches!(equals_sign.kind, CstKind::EqualsSign),
-                    "Expected an equals sign for the assignment, but found {} instead.",
-                    equals_sign,
+                    matches!(assignment_sign.kind, CstKind::EqualsSign | CstKind::ColonEqualsSign),
+                    "Expected an equals sign or colon equals sign for the assignment, but found {} instead.",
+                    assignment_sign,
                 );
 
                 let body = self.lower_csts(body);
@@ -425,8 +426,14 @@ impl LoweringContext {
                     AssignmentBody::Body(body)
                 };
 
-                let mut ast =
-                    self.create_ast(cst.id, AstKind::Assignment(ast::Assignment { name, body }));
+                let mut ast = self.create_ast(
+                    cst.id,
+                    AstKind::Assignment(ast::Assignment {
+                        name,
+                        is_public: matches!(assignment_sign.kind, CstKind::ColonEqualsSign),
+                        body,
+                    }),
+                );
                 if !errors.is_empty() {
                     ast = self.create_ast(
                         cst.id,

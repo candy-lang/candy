@@ -6,6 +6,7 @@ pub enum Rcst {
     Comma,              // ,
     Dot,                // .
     Colon,              // :
+    ColonEqualsSign,    // :=
     OpeningParenthesis, // (
     ClosingParenthesis, // )
     OpeningBracket,     // [
@@ -71,7 +72,7 @@ pub enum Rcst {
     Assignment {
         name: Box<Rcst>,
         parameters: Vec<Rcst>,
-        equals_sign: Box<Rcst>,
+        assignment_sign: Box<Rcst>,
         body: Vec<Rcst>,
     },
     Error {
@@ -108,6 +109,7 @@ impl Display for Rcst {
             Rcst::Comma => ",".fmt(f),
             Rcst::Dot => ".".fmt(f),
             Rcst::Colon => ":".fmt(f),
+            Rcst::ColonEqualsSign => ":=".fmt(f),
             Rcst::OpeningParenthesis => "(".fmt(f),
             Rcst::ClosingParenthesis => ")".fmt(f),
             Rcst::OpeningBracket => "[".fmt(f),
@@ -215,7 +217,7 @@ impl Display for Rcst {
             Rcst::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign: equals_sign,
                 body,
             } => {
                 name.fmt(f)?;
@@ -246,6 +248,7 @@ impl IsMultiline for Rcst {
             Rcst::Comma => false,
             Rcst::Dot => false,
             Rcst::Colon => false,
+            Rcst::ColonEqualsSign => false,
             Rcst::OpeningParenthesis => false,
             Rcst::ClosingParenthesis => false,
             Rcst::OpeningBracket => false,
@@ -327,7 +330,7 @@ impl IsMultiline for Rcst {
             Rcst::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign: equals_sign,
                 body,
             } => {
                 name.is_multiline()

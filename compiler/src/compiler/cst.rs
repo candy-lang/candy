@@ -38,6 +38,7 @@ pub enum CstKind {
     Comma,              // ,
     Dot,                // .
     Colon,              // :
+    ColonEqualsSign,    // :=
     OpeningParenthesis, // (
     ClosingParenthesis, // )
     OpeningBracket,     // [
@@ -103,7 +104,7 @@ pub enum CstKind {
     Assignment {
         name: Box<Cst>,
         parameters: Vec<Cst>,
-        equals_sign: Box<Cst>,
+        assignment_sign: Box<Cst>,
         body: Vec<Cst>,
     },
     Error {
@@ -119,6 +120,7 @@ impl Display for Cst {
             CstKind::Comma => ','.fmt(f),
             CstKind::Dot => '.'.fmt(f),
             CstKind::Colon => ':'.fmt(f),
+            CstKind::ColonEqualsSign => ":=".fmt(f),
             CstKind::OpeningParenthesis => '('.fmt(f),
             CstKind::ClosingParenthesis => ')'.fmt(f),
             CstKind::OpeningBracket => '['.fmt(f),
@@ -222,7 +224,7 @@ impl Display for Cst {
             CstKind::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign: equals_sign,
                 body,
             } => {
                 name.fmt(f)?;
@@ -342,12 +344,12 @@ impl UnwrapWhitespaceAndComment for Cst {
             CstKind::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign: equals_sign,
                 body,
             } => CstKind::Assignment {
                 name: Box::new(name.unwrap_whitespace_and_comment()),
                 parameters: parameters.unwrap_whitespace_and_comment(),
-                equals_sign: Box::new(equals_sign.unwrap_whitespace_and_comment()),
+                assignment_sign: Box::new(equals_sign.unwrap_whitespace_and_comment()),
                 body: body.unwrap_whitespace_and_comment(),
             },
             other_kind => other_kind.clone(),
@@ -389,6 +391,7 @@ impl TreeWithIds for Cst {
             CstKind::Comma => None,
             CstKind::Dot => None,
             CstKind::Colon => None,
+            CstKind::ColonEqualsSign => None,
             CstKind::OpeningParenthesis => None,
             CstKind::ClosingParenthesis => None,
             CstKind::OpeningBracket => None,
@@ -466,7 +469,7 @@ impl TreeWithIds for Cst {
             CstKind::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign: equals_sign,
                 body,
             } => name
                 .find(id)
@@ -486,6 +489,7 @@ impl TreeWithIds for Cst {
             CstKind::Comma { .. } => None,
             CstKind::Dot { .. } => None,
             CstKind::Colon { .. } => None,
+            CstKind::ColonEqualsSign { .. } => None,
             CstKind::OpeningParenthesis { .. } => None,
             CstKind::ClosingParenthesis { .. } => None,
             CstKind::OpeningBracket { .. } => None,
@@ -534,7 +538,7 @@ impl TreeWithIds for Cst {
             CstKind::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign: equals_sign,
                 body,
             } => name
                 .find_by_offset(offset)

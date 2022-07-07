@@ -66,6 +66,7 @@ fn hir(db: &dyn AstToHir, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, a
     };
     let mut compiler = Compiler::new(&mut context);
     compiler.compile(&ast);
+    compiler.generate_exports_struct();
     let id_mapping_of_existing_ids = compiler
         .id_mapping
         .into_iter()
@@ -91,6 +92,7 @@ struct Compiler<'c> {
     body: Body,
     parent_keys: Vec<String>,
     identifiers: HashMap<String, hir::Id>,
+    public_identifiers: HashMap<String, hir::Id>,
 }
 impl<'c> Compiler<'c> {
     fn new(context: &'c Context<'c>) -> Self {
@@ -100,6 +102,7 @@ impl<'c> Compiler<'c> {
             parent_keys: vec![],
             body: Body::new(),
             identifiers: HashMap::new(),
+            public_identifiers: HashMap::new(),
         };
         compiler.generate_sparkles();
         compiler.generate_use_asset();
@@ -214,6 +217,7 @@ impl<'c> Compiler<'c> {
             body: Body::new(),
             parent_keys: add_keys(&self.parent_keys, "useAsset".to_string()),
             identifiers: self.identifiers.clone(),
+            public_identifiers: HashMap::new(),
         };
 
         let lambda_keys = assignment_inner.parent_keys;
@@ -227,6 +231,7 @@ impl<'c> Compiler<'c> {
             body: Body::new(),
             parent_keys: lambda_keys.clone(),
             identifiers: assignment_inner.identifiers.clone(),
+            public_identifiers: HashMap::new(),
         };
 
         let current_path = lambda_inner.generate_current_path_struct();
@@ -276,6 +281,7 @@ impl<'c> Compiler<'c> {
             body: Body::new(),
             parent_keys: add_keys(&self.parent_keys, "use".to_string()),
             identifiers: self.identifiers.clone(),
+            public_identifiers: HashMap::new(),
         };
 
         let lambda_keys = assignment_inner.parent_keys;
@@ -289,6 +295,7 @@ impl<'c> Compiler<'c> {
             body: Body::new(),
             parent_keys: lambda_keys.clone(),
             identifiers: assignment_inner.identifiers.clone(),
+            public_identifiers: HashMap::new(),
         };
 
         let current_path = lambda_inner.generate_current_path_struct();
@@ -317,6 +324,25 @@ impl<'c> Compiler<'c> {
             }),
             Some("use".to_string()),
         );
+    }
+
+    fn generate_exports_struct(&mut self) -> hir::Id {
+        // HirId(~:test.candy:100) = symbol Foo
+        // HirId(~:test.candy:102) = struct [
+        //   HirId(~:test.candy:100): HirId(~:test.candy:101),
+        // ]
+        let mut exports = HashMap::new();
+        for (name, id) in self.public_identifiers.clone() {
+            exports.insert(
+                self.push(
+                    None,
+                    Expression::Symbol(name.uppercase_first_letter()),
+                    None,
+                ),
+                id,
+            );
+        }
+        self.push(None, Expression::Struct(exports), None)
     }
 
     fn compile(&mut self, asts: &[Ast]) -> hir::Id {
@@ -385,21 +411,29 @@ impl<'c> Compiler<'c> {
             }
             AstKind::Lambda(lambda) => self.compile_lambda(ast.id.clone(), lambda, None),
             AstKind::Call(call) => self.lower_call(Some(ast.id.clone()), call),
-            AstKind::Assignment(Assignment { name, body }) => {
+            AstKind::Assignment(Assignment {
+                name,
+                is_public,
+                body,
+            }) => {
                 let name = name.value.to_owned();
-                match body {
+                let id = match body {
                     ast::AssignmentBody::Lambda(lambda) => {
-                        self.compile_lambda(ast.id.clone(), lambda, Some(name))
+                        self.compile_lambda(ast.id.clone(), lambda, Some(name.clone()))
                     }
                     ast::AssignmentBody::Body(body) => {
                         let body = self.compile(body);
                         self.push(
                             Some(ast.id.clone()),
                             Expression::Reference(body),
-                            Some(name),
+                            Some(name.clone()),
                         )
                     }
+                };
+                if *is_public {
+                    self.public_identifiers.insert(name, id.clone());
                 }
+                id
             }
             AstKind::Error { child, errors } => {
                 let child = if let Some(child) = child {
@@ -445,6 +479,7 @@ impl<'c> Compiler<'c> {
             body,
             parent_keys: lambda_id.keys.clone(),
             identifiers,
+            public_identifiers: HashMap::new(),
         };
 
         inner.compile(&lambda.body);

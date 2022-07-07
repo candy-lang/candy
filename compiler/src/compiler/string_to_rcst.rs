@@ -99,6 +99,10 @@ mod parse {
         let input = literal(input, ":")?;
         Some((input, Rcst::Colon))
     }
+    pub fn colon_equals_sign(input: &str) -> Option<(&str, Rcst)> {
+        let input = literal(input, ":=")?;
+        Some((input, Rcst::ColonEqualsSign))
+    }
     fn opening_bracket(input: &str) -> Option<(&str, Rcst)> {
         let input = literal(input, "[")?;
         Some((input, Rcst::OpeningBracket))
@@ -1540,11 +1544,14 @@ mod parse {
         let parameters = signature.split_off(1);
         let name = signature.into_iter().next().unwrap();
 
-        let (input, mut equals_sign) = equals_sign(input)?;
-        let input_after_equals_sign = input;
+        let (input, mut assignment_sign) = match colon_equals_sign(input) {
+            Some(it) => it,
+            None => equals_sign(input)?,
+        };
+        let input_after_assignment_sign = input;
 
         let (input, more_whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
-        equals_sign = equals_sign.wrap_in_whitespace(more_whitespace.clone());
+        assignment_sign = assignment_sign.wrap_in_whitespace(more_whitespace.clone());
 
         let is_multiline = name.is_multiline()
             || parameters.is_multiline()
@@ -1553,14 +1560,14 @@ mod parse {
         let (input, body) = if is_multiline {
             let (input, body) = body(input, indentation + 1);
             if body.is_empty() {
-                (input_after_equals_sign, body)
+                (input_after_assignment_sign, body)
             } else {
                 (input, body)
             }
         } else {
             match expression(input, indentation, true) {
                 Some((input, expression)) => (input, vec![expression]),
-                None => (input_after_equals_sign, vec![]),
+                None => (input_after_assignment_sign, vec![]),
             }
         };
 
@@ -1569,7 +1576,7 @@ mod parse {
             Rcst::Assignment {
                 name: Box::new(name),
                 parameters,
-                equals_sign: Box::new(equals_sign),
+                assignment_sign: Box::new(assignment_sign),
                 body,
             },
         ))
@@ -1586,7 +1593,7 @@ mod parse {
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
                     parameters: vec![],
-                    equals_sign: Box::new(Rcst::TrailingWhitespace {
+                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
@@ -1614,7 +1621,7 @@ mod parse {
                         child: Box::new(Rcst::Identifier("bar".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }],
-                    equals_sign: Box::new(Rcst::TrailingWhitespace {
+                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![
                             Rcst::Newline("\n".to_string()),
@@ -1650,7 +1657,7 @@ mod parse {
                             Rcst::Whitespace("  ".to_string())
                         ],
                     }],
-                    equals_sign: Box::new(Rcst::TrailingWhitespace {
+                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
