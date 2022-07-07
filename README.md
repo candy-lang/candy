@@ -116,6 +116,7 @@ Major milestones:
 ## Short-term TODOs
 
 - use BigInts
+- mini-heaps
 - start fuzzing in language server
 - show fuzzing hints in the editor
 - implement `use` again, this time for both local files and packages from the packages folder
@@ -123,6 +124,7 @@ Major milestones:
 - implement fibers and nurseries
 - implement channels
 - remove builtinPrint
+- new name?
 
 ## How to use Candy
 
