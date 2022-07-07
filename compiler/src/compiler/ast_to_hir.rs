@@ -156,6 +156,7 @@ impl<'a> Context<'a> {
             last_id.unwrap()
         }
     }
+
     fn compile_single(&mut self, ast: &Ast) -> hir::Id {
         match &ast.kind {
             AstKind::Int(Int(int)) => {
@@ -216,26 +217,27 @@ impl<'a> Context<'a> {
                 is_public,
                 body,
             }) => {
-                let name = name.value.to_owned();
-                let id = match body {
+                let name_string = name.value.to_owned();
+                let body = match body {
                     ast::AssignmentBody::Lambda(lambda) => {
-                        self.compile_lambda(ast.id.clone(), lambda, Some(name.clone()))
+                        self.compile_lambda(ast.id.clone(), lambda, Some(name_string.clone()))
                     }
                     ast::AssignmentBody::Body(body) => {
                         let reset_state = self.start_non_top_level();
                         let body = self.compile(body);
                         self.end_non_top_level(reset_state);
 
-                        self.push(
-                            Some(ast.id.clone()),
-                            Expression::Reference(body),
-                            Some(name.clone()),
-                        )
+                        self.push(Some(ast.id.clone()), Expression::Reference(body), None)
                     }
                 };
+                self.push(
+                    Some(name.id.clone()),
+                    Expression::Reference(body.clone()),
+                    Some(name_string.clone()),
+                );
                 if *is_public {
                     if self.is_top_level {
-                        self.public_identifiers.insert(name, id.clone());
+                        self.public_identifiers.insert(name_string, body.clone());
                     } else {
                         self.push(
                             None,
@@ -253,7 +255,7 @@ impl<'a> Context<'a> {
                         );
                     }
                 }
-                id
+                body
             }
             AstKind::Error { child, errors } => {
                 let child = if let Some(child) = child {
@@ -272,6 +274,7 @@ impl<'a> Context<'a> {
             }
         }
     }
+
     fn compile_lambda(
         &mut self,
         id: ast::Id,
@@ -318,6 +321,7 @@ impl<'a> Context<'a> {
             identifier,
         )
     }
+
     fn lower_struct_access(
         &mut self,
         id: Option<ast::Id>,
@@ -339,23 +343,18 @@ impl<'a> Context<'a> {
             None,
         )
     }
-    fn lower_call(&mut self, id: Option<ast::Id>, call: &Call) -> hir::Id {
-        let arguments = call
-            .arguments
-            .iter()
-            .map(|argument| self.compile_single(argument))
-            .collect_vec();
 
+    fn lower_call(&mut self, id: Option<ast::Id>, call: &Call) -> hir::Id {
         let function = match call.receiver.clone() {
             CallReceiver::Identifier(name) => {
                 if name.value == "needs" {
-                    let expression = match arguments.len() {
-                        2 => Expression::Needs {
-                            condition: Box::new(arguments.first().unwrap().clone()),
-                            message: Box::new(arguments.last().unwrap().clone()),
+                    let expression = match &self.lower_call_arguments(&call.arguments[..])[..] {
+                        [condition, message] => Expression::Needs {
+                            condition: Box::new(condition.clone()),
+                            message: Box::new(message.clone()),
                         },
-                        1 => Expression::Needs {
-                            condition: Box::new(arguments.first().unwrap().clone()),
+                        [message] => Expression::Needs {
+                            condition: Box::new(message.clone()),
                             message: Box::new(self.push(
                                 None,
                                 Expression::Text("needs not satisfied".to_string()),
@@ -375,8 +374,11 @@ impl<'a> Context<'a> {
                     };
                     return self.push(id, expression, None);
                 }
-                match self.identifiers.get(&name.value) {
-                    Some(function) => function.to_owned(),
+
+                match self.identifiers.get(&name.value).map(|id| id.clone()) {
+                    Some(function) => {
+                        self.push(Some(name.id), Expression::Reference(function), None)
+                    }
                     None => {
                         return self.push(
                             Some(name.id.clone()),
@@ -400,6 +402,7 @@ impl<'a> Context<'a> {
             }
             CallReceiver::Call(call) => self.lower_call(None, &*call),
         };
+        let arguments = self.lower_call_arguments(&call.arguments[..]);
         self.push(
             id,
             Expression::Call {
@@ -408,6 +411,12 @@ impl<'a> Context<'a> {
             },
             None,
         )
+    }
+    fn lower_call_arguments(&mut self, arguments: &[Ast]) -> Vec<hir::Id> {
+        arguments
+            .iter()
+            .map(|argument| self.compile_single(argument))
+            .collect_vec()
     }
 
     fn push(
