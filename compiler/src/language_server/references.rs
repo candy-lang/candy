@@ -63,7 +63,10 @@ fn query_for_offset(db: &Database, input: Input, offset: usize) -> Option<Refere
                     // An intermediate reference. Find references to it's target.
                     match hir_expr {
                         Expression::Reference(target_id) => target_id,
-                        Expression::Symbol(_) => todo!("Handle struct access"),
+                        Expression::Symbol(_) => {
+                            // TODO_ Handle struct access
+                            return None;
+                        }
                         _ => panic!("Expected a reference, got {:?}", hir_expr),
                     }
                 }
