@@ -54,7 +54,6 @@ fn query_for_offset(db: &Database, input: Input, offset: usize) -> Option<Refere
         CstKind::Identifier { .. } => {
             let hir_id = db.cst_to_hir_id(input, origin_cst.id)?;
             let target_id = if let Some(hir_expr) = db.find_expression(hir_id.clone()) {
-                log::info!("hir_expr: {hir_expr:?}");
                 let containing_body = db.containing_body_of(hir_id.clone());
                 if containing_body.identifiers.contains_key(&hir_id) {
                     // A local variable was declared. Find references to that variable.
@@ -64,7 +63,7 @@ fn query_for_offset(db: &Database, input: Input, offset: usize) -> Option<Refere
                     match hir_expr {
                         Expression::Reference(target_id) => target_id,
                         Expression::Symbol(_) => {
-                            // TODO_ Handle struct access
+                            // TODO: Handle struct access
                             return None;
                         }
                         _ => panic!("Expected a reference, got {:?}", hir_expr),
