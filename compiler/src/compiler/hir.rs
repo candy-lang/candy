@@ -178,6 +178,7 @@ impl Body {
 pub enum HirError {
     UnknownReference { symbol: String },
     UnknownFunction { name: String },
+    PublicAssignmentInNotTopLevel,
     NeedsWithWrongNumberOfArguments,
 }
 

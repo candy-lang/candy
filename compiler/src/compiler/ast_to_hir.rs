@@ -68,17 +68,17 @@ fn compile_top_level(
     input: Input,
     ast: &[Ast],
 ) -> (Body, HashMap<hir::Id, ast::Id>) {
-    let mut local_context = LocalContext {
-        body: Body::new(),
-        prefix_keys: vec![],
-        identifiers: HashMap::new(),
-        public_identifiers: HashMap::new(),
-        is_top_level: true,
-    };
     let mut context = GlobalContext {
         input,
         id_mapping: HashMap::new(),
         db,
+        public_identifiers: HashMap::new(),
+    };
+    let mut local_context = LocalContext {
+        body: Body::new(),
+        prefix_keys: vec![],
+        identifiers: HashMap::new(),
+        is_top_level: true,
     };
 
     local_context.generate_sparkles(&mut context);
@@ -105,13 +105,13 @@ struct GlobalContext<'a> {
     input: Input,
     id_mapping: HashMap<hir::Id, Option<ast::Id>>,
     db: &'a dyn AstToHir,
+    public_identifiers: HashMap<String, hir::Id>,
 }
 
 struct LocalContext {
     body: Body,
     prefix_keys: Vec<String>,
     identifiers: HashMap<String, hir::Id>,
-    public_identifiers: HashMap<String, hir::Id>,
     is_top_level: bool,
 }
 impl LocalContext {
@@ -123,7 +123,6 @@ impl LocalContext {
                 None => parent.prefix_keys.clone(),
             },
             identifiers: parent.identifiers.clone(),
-            public_identifiers: HashMap::new(),
             is_top_level: false,
         }
     }
@@ -222,7 +221,11 @@ impl LocalContext {
                         self.compile_lambda(context, ast.id.clone(), lambda, Some(name.clone()))
                     }
                     ast::AssignmentBody::Body(body) => {
+                        let was_top_level = self.is_top_level;
+                        self.is_top_level = false;
                         let body = self.compile(context, body);
+                        self.is_top_level = was_top_level;
+
                         self.push(
                             context,
                             Some(ast.id.clone()),
@@ -232,7 +235,25 @@ impl LocalContext {
                     }
                 };
                 if *is_public {
-                    self.public_identifiers.insert(name, id.clone());
+                    if self.is_top_level {
+                        context.public_identifiers.insert(name, id.clone());
+                    } else {
+                        self.push(
+                            context,
+                            None,
+                            Expression::Error {
+                                child: None,
+                                errors: vec![CompilerError {
+                                    input: ast.id.input.clone(),
+                                    span: context.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                                    payload: CompilerErrorPayload::Hir(
+                                        HirError::PublicAssignmentInNotTopLevel,
+                                    ),
+                                }],
+                            },
+                            None,
+                        );
+                    }
                 }
                 id
             }
@@ -672,7 +693,7 @@ impl LocalContext {
         // ]
 
         let mut exports = HashMap::new();
-        for (name, id) in self.public_identifiers.clone() {
+        for (name, id) in context.public_identifiers.clone() {
             exports.insert(
                 self.push(
                     context,
