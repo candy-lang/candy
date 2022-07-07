@@ -47,22 +47,25 @@ pub enum Instruction {
     /// Pushes an item from back in the stack on the stack again.
     PushFromStack(StackOffset),
 
-    /// Pops a closure and the number of arguments it requires, pushes the
-    /// current instruction pointer, all captured variables, and arguments, and
-    /// then executes the closure.
+    /// Pops a closure and num_args arguments, pushes the current instruction
+    /// pointer, all captured variables, and arguments, and then changes the
+    /// instruction pointer to the first instruction of the closure.
     ///
     /// a, arg1, arg2, ..., argN, closure -> a, caller, captured vars, arg1, arg2, ..., argN
     ///
-    /// When the closure returns, the stack will contain the result:
+    /// Later, when the closure returns (perhaps many instructions after this
+    /// one), the stack will contain the result:
     ///
     /// a, arg1, arg2, ..., argN, closure -> a, return value from closure
     Call {
         num_args: usize,
     },
 
-    /// Pops a boolean. If it's true, pushes Nothing. If it's false, panics.
+    /// Pops a boolean condition and a message. If the condition is true, it
+    /// just pushes Nothing. If the condition is false, it panic with the
+    /// message.
     ///
-    /// a, condition -> a, Nothing
+    /// a, message, condition -> a, Nothing
     Needs,
 
     /// Returns from the current closure to the original caller.
@@ -82,6 +85,10 @@ pub enum Instruction {
         num_args: usize,
     },
     TraceCallEnds,
+    TraceNeedsStarts {
+        id: hir::Id,
+    },
+    TraceNeedsEnds,
 
     Error(hir::Id),
 }
@@ -89,42 +96,46 @@ pub enum Instruction {
 impl Display for Lir {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, chunk) in self.chunks.iter().enumerate() {
-            writeln!(f, "Chunk {} ({} args)", i, chunk.num_args)?;
+            writeln!(f, "Chunk {i} ({} args)", chunk.num_args)?;
             for instruction in &chunk.instructions {
                 write!(f, "  ")?; // indent actual instructions
                 match instruction {
-                    Instruction::CreateInt(int) => writeln!(f, "createInt {}", int),
-                    Instruction::CreateText(text) => writeln!(f, "createText {:?}", text),
-                    Instruction::CreateSymbol(symbol) => writeln!(f, "createSymbol {}", symbol),
+                    Instruction::CreateInt(int) => writeln!(f, "createInt {int}"),
+                    Instruction::CreateText(text) => writeln!(f, "createText {text:?}"),
+                    Instruction::CreateSymbol(symbol) => writeln!(f, "createSymbol {symbol}"),
                     Instruction::CreateStruct { num_entries } => {
-                        writeln!(f, "createStruct {}", num_entries)
+                        writeln!(f, "createStruct {num_entries}")
                     }
                     Instruction::CreateClosure(chunk) => {
-                        writeln!(f, "createClosure, chunk {}", chunk)
+                        writeln!(f, "createClosure, chunk {chunk}")
                     }
                     Instruction::CreateBuiltin(builtin_function) => {
-                        writeln!(f, "createBuiltin {:?}", builtin_function)
+                        writeln!(f, "createBuiltin {builtin_function:?}")
                     }
                     Instruction::PopMultipleBelowTop(count) => {
-                        writeln!(f, "popMultipleBelowTop {}", count)
+                        writeln!(f, "popMultipleBelowTop {count}")
                     }
-                    Instruction::PushFromStack(offset) => writeln!(f, "pushFromStack {}", offset),
+                    Instruction::PushFromStack(offset) => writeln!(f, "pushFromStack {offset}"),
                     Instruction::Call { num_args } => {
-                        writeln!(f, "call with {} arguments", num_args)
+                        writeln!(f, "call with {num_args} arguments")
                     }
                     Instruction::Needs => writeln!(f, "needs"),
                     Instruction::Return => writeln!(f, "return"),
                     Instruction::RegisterFuzzableClosure(hir_id) => {
-                        writeln!(f, "registerFuzzableClosure {}", hir_id)
+                        writeln!(f, "registerFuzzableClosure {hir_id}")
                     }
                     Instruction::TraceValueEvaluated(hir_id) => {
-                        writeln!(f, "traceValueEvaluated {}", hir_id)
+                        writeln!(f, "traceValueEvaluated {hir_id}")
                     }
                     Instruction::TraceCallStarts { id, num_args } => {
-                        writeln!(f, "traceCallStarts {} ({} args)", id, num_args)
+                        writeln!(f, "traceCallStarts {id} ({num_args} args)")
                     }
                     Instruction::TraceCallEnds => writeln!(f, "traceCallEnds"),
-                    Instruction::Error(hir_id) => writeln!(f, "error {}", hir_id),
+                    Instruction::TraceNeedsStarts { id } => {
+                        writeln!(f, "traceNeedsStarts {id}")
+                    }
+                    Instruction::TraceNeedsEnds => writeln!(f, "traceNeedsEnds"),
+                    Instruction::Error(hir_id) => writeln!(f, "error {hir_id}"),
                 }?;
             }
         }

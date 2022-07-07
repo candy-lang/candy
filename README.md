@@ -1,27 +1,27 @@
 # 🍭 Candy
 
-A sweet programming language that is robst, minimalistic, and expressive.
+A sweet programming language that is robust, minimalistic, and expressive.
 
-Candy aims to blur the line between dynamically-typed and statically-typed languages.
-Like dynamic languages, it is permissive during compilation, allowing you to quickly prototype new ideas.
-You can freely compose data without having to specify its structure before.
-Like static languages, the tooling highlights potential errors before they happen.
+Candy aims to have excellent tooling – most language features are designed with tooling in mind.
+Many languages have a strict separation between compile-time and runtime.
+Candy blurs the line between those stages, for example, by replacing compile-time types with edit-time fuzzing.
 
 ## Quick introduction
 
 * **Values are at the center of your computations.**
-  Only some predefined types of immutable values exist: ints, texts, symbols, and structs.
+  Only a handful of predefined types of values exist:
   ```
-  3
-  "Candy"
-  Green
-  { Name: "Candy" }
+  3                   # int
+  "Candy"             # text
+  Green               # symbol
+  [ Name: "Candy" ]   # struct
+  { it -> add it 2 }  # closure
   ```
 * **Minimalistic syntax.**
-  Defining variables and functions all works without braces cluttering up your code.
+  Defining variables and functions works without braces or keywords cluttering up your code.
   The syntax is indentation-aware.
   ```
-  foo = a
+  foo = 42
   println message =
     print message
     print "\n"
@@ -29,27 +29,25 @@ Like static languages, the tooling highlights potential errors before they happe
   ```
 * **Extensive compile-time evaluation.**
   Many values can already be computed at compile-time.
-  In your editor, you'll see the results on the right side as you type:
+  In your editor, you'll see the results on the right side:
   ```
   foo = double 2  # foo = 4
   ```
-* **Something better than traditional types.**
-  The days of runtime errors like "logarithm only accepts positive numbers" or "first only works on non-empty lists" are over.
+* **Fuzzing instead of traditional types.**
   In Candy, functions have to specify their needs *exactly.*
+  As you type, the tooling automatically tests your code with many input to see if one breaks the code:
   ```
+  foo a =             # If you pass a = 0,
+    needs (isInt a)
+    math.logarithm a  # then this fails because logarithm only works on positive numbers.
+
   efficientTextReverse text =
     needs (isText text)
-    needs (isPalindrome text)
+    needs (isPalindrome text) "efficientTextReverse only works on palindromes"
     text
-  ```
-* **Permanent fuzzing.**
-  While editing your code, the tooling automatically tests it with many input to see if one breaks the code.
-  You'll be immediately notified of any unhandled inputs.
-  This is how the tooling could look like:
-  ```
-  foo a =            # If you pass a = 0, ...
-    needs (isInt a)
-    logarithm a      # ... then this fails because logarithm only works on positive numbers.
+
+  greetBackwards name =                   # If you pass name = "Test",
+    "Hello, {efficientTextReverse name}"  # then this fails because efficientTextReverse only works on palindromes.
   ```
 
 ## Discussion
@@ -61,7 +59,7 @@ Like static languages, the tooling highlights potential errors before they happe
 We are currently implementing a first version of Candy in Rust.
 We already have a language server that provides some tooling.
 
-Our TODO list:
+Major milestones:
 
 * [x] build a basic parser
 * [x] lower CST to AST
@@ -112,6 +110,19 @@ Our TODO list:
 * [ ] testing
 * [ ] fuzzing of the compiler itself
 * [ ] clean up repo (delete a bunch of stuff!)
+* [ ] package manager
+* [ ] online playground
+
+## Short-term TODOs
+
+- use BigInts
+- start fuzzing in language server
+- show fuzzing hints in the editor
+- implement `use` again, this time for both local files and packages from the packages folder
+- make closures more readable (maybe maintain a map from closure to name in the VM)
+- implement fibers and nurseries
+- implement channels
+- remove builtinPrint
 
 ## How to use Candy
 

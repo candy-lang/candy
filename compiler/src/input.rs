@@ -113,15 +113,15 @@ impl Display for Input {
             Input::File(components) => {
                 write!(f, "~:")?;
                 if let Some(component) = components.first() {
-                    write!(f, "{}", component)?;
+                    write!(f, "{component}")?;
                 }
                 for component in &components[1..] {
-                    write!(f, "/{}", component)?;
+                    write!(f, "/{component}")?;
                 }
                 Ok(())
             }
             Input::ExternalFile(path) => write!(f, "external-file:{}", path.display()),
-            Input::Untitled(name) => write!(f, "untitled:{}", name),
+            Input::Untitled(name) => write!(f, "untitled:{name}"),
         }
     }
 }

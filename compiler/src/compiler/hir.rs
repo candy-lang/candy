@@ -22,7 +22,7 @@ fn all_hir_ids(db: &dyn HirDb, input: Input) -> Option<Vec<Id>> {
     let (hir, _) = db.hir(input)?;
     let mut ids = vec![];
     hir.collect_all_ids(&mut ids);
-    log::info!("all HIR IDs: {:?}", ids);
+    log::info!("all HIR IDs: {ids:?}");
     Some(ids)
 }
 
@@ -57,8 +57,9 @@ impl Expression {
                 ids.extend(arguments.iter().cloned());
             }
             Expression::Builtin(_) => {}
-            Expression::Needs { condition } => {
+            Expression::Needs { condition, message } => {
                 ids.push(*condition.clone());
+                ids.push(*message.clone());
             }
             Expression::Error { .. } => {}
         }
@@ -118,6 +119,7 @@ pub enum Expression {
     Builtin(BuiltinFunction),
     Needs {
         condition: Box<Id>,
+        message: Box<Id>,
     },
     Error {
         child: Option<Id>,
@@ -177,17 +179,17 @@ impl Body {
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expression::Int(int) => write!(f, "int {}", int),
-            Expression::Text(text) => write!(f, "text {:?}", text),
-            Expression::Reference(reference) => write!(f, "reference {}", reference),
-            Expression::Symbol(symbol) => write!(f, "symbol {}", symbol),
+            Expression::Int(int) => write!(f, "int {int}"),
+            Expression::Text(text) => write!(f, "text {text:?}"),
+            Expression::Reference(reference) => write!(f, "reference {reference}"),
+            Expression::Symbol(symbol) => write!(f, "symbol {symbol}"),
             Expression::Struct(entries) => {
                 write!(
                     f,
                     "struct [\n{}\n]",
                     entries
                         .iter()
-                        .map(|(key, value)| format!("  {}: {},", key, value))
+                        .map(|(key, value)| format!("  {key}: {value},"))
                         .join("\n"),
                 )
             }
@@ -204,7 +206,7 @@ impl fmt::Display for Expression {
                         .to_string()
                         .lines()
                         .enumerate()
-                        .map(|(i, line)| format!("{}{}", if i == 0 { "" } else { "  " }, line))
+                        .map(|(i, line)| format!("{}{line}", if i == 0 { "" } else { "  " }))
                         .join("\n"),
                 )
             }
@@ -216,27 +218,26 @@ impl fmt::Display for Expression {
                 assert!(arguments.len() > 0, "A call needs to have arguments.");
                 write!(
                     f,
-                    "call {} with these arguments:\n{}",
-                    function,
+                    "call {function} with these arguments:\n{}",
                     arguments
                         .iter()
-                        .map(|argument| format!("  {}", argument))
+                        .map(|argument| format!("  {argument}"))
                         .join("\n")
                 )
             }
             Expression::Builtin(builtin) => {
-                write!(f, "builtin{:?}", builtin)
+                write!(f, "builtin{builtin:?}")
             }
-            Expression::Needs { condition } => {
-                write!(f, "needs {}", condition)
+            Expression::Needs { condition, message } => {
+                write!(f, "needs {condition} with message {message}")
             }
             Expression::Error { child, errors } => {
                 write!(f, "error")?;
                 for error in errors {
-                    write!(f, "\n  {:?}", error)?;
+                    write!(f, "\n  {error:?}")?;
                 }
                 if let Some(child) = child {
-                    write!(f, "\n  fallback: {}", child)?;
+                    write!(f, "\n  fallback: {child}")?;
                 }
                 Ok(())
             }
@@ -250,7 +251,7 @@ impl fmt::Display for Lambda {
             "{} ->\n",
             self.parameters
                 .iter()
-                .map(|parameter| format!("{}", parameter))
+                .map(|parameter| format!("{parameter}"))
                 .join(" "),
         )?;
         write!(f, "{}", self.body)?;
@@ -260,7 +261,7 @@ impl fmt::Display for Lambda {
 impl fmt::Display for Body {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (id, expression) in self.expressions.iter() {
-            write!(f, "{} = {}\n", id, expression)?;
+            write!(f, "{id} = {expression}\n")?;
         }
         Ok(())
     }

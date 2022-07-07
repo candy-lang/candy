@@ -1,5 +1,5 @@
 use super::heap::ObjectPointer;
-use crate::{compiler::lir::ChunkIndex, builtin_functions::BuiltinFunction};
+use crate::{builtin_functions::BuiltinFunction, compiler::lir::ChunkIndex};
 use im::HashMap;
 use itertools::Itertools;
 use std::fmt::{self, Display, Formatter};
@@ -22,7 +22,7 @@ pub enum Value {
         captured: Vec<ObjectPointer>,
         body: ChunkIndex,
     },
-    Builtin(BuiltinFunction)
+    Builtin(BuiltinFunction),
 }
 
 impl Value {
@@ -61,10 +61,10 @@ impl Display for Value {
                     .join(", ")
             ),
             Value::Closure { body, .. } => {
-                write!(f, "{{{}}}", body)
+                write!(f, "{{{body}}}")
             }
             Value::Builtin(builtin) => {
-                write!(f, "builtin{:?}", builtin)
+                write!(f, "builtin{builtin:?}")
             }
         }
     }

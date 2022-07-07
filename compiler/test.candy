@@ -4,8 +4,6 @@ typeOf value = ✨.typeOf value
 
 equals a b = ✨.equals a b
 
-panic message = ✨.panic message
-
 isInt value = equals (typeOf value) Int
 isText value = equals (typeOf value) Text
 isSymbol value = equals (typeOf value) Symbol
@@ -15,20 +13,24 @@ isBool value =
   isFalse = equals value False
   ✨.ifElse isTrue { True } { isFalse }
 
+panic message =
+  needs (isText message) "panic needs text as a message"
+  ✨.panic message
+
 not a =
-  needs (isBool a)
+  needs (isBool a) "not needs a bool"
   ✨.ifElse a { False } { True }
 and a b =
-  needs (isBool a)
-  needs (isBool b)
+  needs (isBool a) "and's first argument needs to be a bool"
+  needs (isBool b) "and's second argument needs to be a bool"
   ✨.ifElse a { b } { False }
 or a b =
-  needs (isBool a)
-  needs (isBool b)
+  needs (isBool a) "or's first argument needs to be a bool"
+  needs (isBool b) "or's second argument needs to be a bool"
   ✨.ifElse a { True } { b }
 
 check condition =
-  needs (isBool condition)
+  needs (isBool condition) "check needs a boolean condition"
   ✨.ifElse
     condition
     {}
@@ -36,37 +38,39 @@ check condition =
 
 isFunction value = equals (typeOf value) Function
 getArgumentCount function =
-  needs (isFunction function)
+  needs (isFunction function) "getArgumentCount needs a function"
   ✨.getArgumentCount function
-isFunction0 value = and (isFunction value) (equals (getArgumentCount value) 0)
-isFunction1 value = and (isFunction value) (equals (getArgumentCount value) 1)
-isFunction2 value = and (isFunction value) (equals (getArgumentCount value) 2)
-isFunction3 value = and (isFunction value) (equals (getArgumentCount value) 3)
-isFunction4 value = and (isFunction value) (equals (getArgumentCount value) 4)
-isFunction5 value = and (isFunction value) (equals (getArgumentCount value) 5)
+isFunction0 value = ✨.ifElse (isFunction value) { equals (getArgumentCount value) 0 } { False }
+isFunction1 value = ✨.ifElse (isFunction value) { equals (getArgumentCount value) 1 } { False }
+isFunction2 value = ✨.ifElse (isFunction value) { equals (getArgumentCount value) 2 } { False }
+isFunction3 value = ✨.ifElse (isFunction value) { equals (getArgumentCount value) 3 } { False }
+isFunction4 value = ✨.ifElse (isFunction value) { equals (getArgumentCount value) 4 } { False }
+isFunction5 value = ✨.ifElse (isFunction value) { equals (getArgumentCount value) 5 } { False }
 
 ifElse condition then else =
-  needs (isBool condition)
-  needs (isFunction0 then)
-  needs (isFunction0 else)
+  needs (isBool condition) "ifElse needs a boolean condition"
+  needs (isFunction0 then) "ifElse needs a lambda as the then clause"
+  needs (isFunction0 else) "ifElse needs a lambda as the else clause"
   ✨.ifElse condition then else
 if condition then =
-  needs (isBool condition)
-  needs (isFunction0 then)
+  needs (isBool condition) "ifElse needs a boolean condition"
+  needs (isFunction0 then) "ifElse needs a lambda as the then clause"
   ifElse condition then {}
 
 add a b =
-  needs (isInt a)
-  needs (isInt b)
+  needs (isInt a) "add's first argument needs to be an int"
+  needs (isInt b) "add's second argument needs to be an int"
   ✨.add a b
 
-print text = (✨.print) text
+print text =
+  needs (isText text)
+  ✨.print text
 
 main =
   foo = 3
   bar = { n -> 5 }
   baz =
-    (print) "abc"
+    print "abc"
     123
   bar 5
   foo

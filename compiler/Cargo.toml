@@ -11,7 +11,7 @@ debug = true
 [dependencies]
 chrono = "0.4.19"
 colored = "2.0.0"
-fern = "0.6.1"
+fern = { version = "0.6.1", features = ["colored"] }
 im = "15.1.0"
 itertools = { version = "0.10.0" }
 lazy_static = "1.4.0"
@@ -20,6 +20,7 @@ log = "0.4.16"
 lsp-types = "0.93.0"
 notify = "4.0.17"
 proptest = "1.0.0"
+rand = "0.8.5"
 regex = "1.5.5"
 salsa = "0.16.1"
 serde = { version = "1.0.137", features = ["derive"] }

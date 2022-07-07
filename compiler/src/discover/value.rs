@@ -77,9 +77,7 @@ impl Environment {
         if let Some(old_value) = self.bindings.get(&id) {
             if !matches!(old_value, DiscoverResult::DependsOnParameter) {
                 panic!(
-                    "Tried to overwrite a value at ID {} with {:?} (old value: {:?})",
-                    &id,
-                    &value,
+                    "Tried to overwrite a value at ID {id} with {value:?} (old value: {:?})",
                     &self.bindings.get(&id).unwrap(),
                 );
             }

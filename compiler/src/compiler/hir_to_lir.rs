@@ -65,7 +65,7 @@ impl LoweringContext {
     }
     fn compile_expression(&mut self, id: &hir::Id, expression: &Expression) {
         log::trace!("Stack: {:?}", self.stack);
-        log::trace!("Compiling expression {:?}", expression);
+        log::trace!("Compiling expression {expression:?}");
 
         match expression {
             Expression::Int(int) => self.emit_create_int(id.clone(), *int),
@@ -126,9 +126,12 @@ impl LoweringContext {
             Expression::Builtin(builtin) => {
                 self.emit_create_builtin(id.clone(), *builtin);
             }
-            Expression::Needs { condition } => {
+            Expression::Needs { condition, message } => {
+                self.emit_push_from_stack(*message.clone());
                 self.emit_push_from_stack(*condition.clone());
-                self.emit_needs();
+                self.emit_trace_needs_starts(id.clone());
+                self.emit_needs(id.clone());
+                self.emit_trace_needs_ends();
             }
             Expression::Error { .. } => self.emit_error(id.to_owned()),
         };
@@ -177,8 +180,11 @@ impl LoweringContext {
         self.stack.pop_multiple(num_args);
         self.stack.push(id);
     }
-    fn emit_needs(&mut self) {
+    fn emit_needs(&mut self, id: hir::Id) {
+        self.stack.pop(); // condition
+        self.stack.pop(); // message
         self.emit(Instruction::Needs);
+        self.stack.push(id); // Nothing
     }
     fn emit_return(&mut self) {
         self.emit(Instruction::Return);
@@ -194,6 +200,12 @@ impl LoweringContext {
     }
     fn emit_trace_call_ends(&mut self) {
         self.emit(Instruction::TraceCallEnds);
+    }
+    fn emit_trace_needs_starts(&mut self, id: hir::Id) {
+        self.emit(Instruction::TraceNeedsStarts { id });
+    }
+    fn emit_trace_needs_ends(&mut self) {
+        self.emit(Instruction::TraceNeedsEnds);
     }
     fn emit_error(&mut self, id: hir::Id) {
         self.emit(Instruction::Error(id.clone()));

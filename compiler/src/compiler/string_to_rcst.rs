@@ -70,7 +70,7 @@ mod parse {
     static SUPPORTED_WHITESPACE: &'static str = " \r\n\t";
 
     fn literal<'a>(input: &'a str, literal: &'static str) -> Option<&'a str> {
-        log::trace!("literal({:?}, {:?})", input, literal);
+        log::trace!("literal({input:?}, {literal:?})");
         if input.starts_with(literal) {
             Some(&input[literal.len()..])
         } else {
@@ -151,7 +151,7 @@ mod parse {
     /// non-alphanumeric characters – for example, the word `Magic🌵` is an
     /// invalid symbol.
     fn word(mut input: &str) -> Option<(&str, String)> {
-        log::trace!("word({:?})", input);
+        log::trace!("word({input:?})");
         let mut chars = vec![];
         while let Some(c) = input.chars().next() {
             if c.is_whitespace() || MEANINGFUL_PUNCTUATION.contains(c) {
@@ -178,7 +178,7 @@ mod parse {
     }
 
     fn identifier(input: &str) -> Option<(&str, Rcst)> {
-        log::trace!("identifier({:?})", input);
+        log::trace!("identifier({input:?})");
         let (input, w) = word(input)?;
         if w == "✨" {
             return Some((input, Rcst::Identifier(w)));
@@ -219,7 +219,7 @@ mod parse {
     }
 
     fn symbol(input: &str) -> Option<(&str, Rcst)> {
-        log::trace!("symbol({:?})", input);
+        log::trace!("symbol({input:?})");
         let (input, w) = word(input)?;
         if !w.chars().next().unwrap().is_uppercase() {
             return None;
@@ -257,7 +257,7 @@ mod parse {
     }
 
     fn int(input: &str) -> Option<(&str, Rcst)> {
-        log::trace!("int({:?})", input);
+        log::trace!("int({input:?})");
         let (input, w) = word(input)?;
         if !w.chars().next().unwrap().is_ascii_digit() {
             return None;
@@ -321,7 +321,7 @@ mod parse {
     }
 
     fn single_line_whitespace(mut input: &str) -> Option<(&str, Rcst)> {
-        log::trace!("single_line_whitespace({:?})", input);
+        log::trace!("single_line_whitespace({input:?})");
         let mut chars = vec![];
         let mut has_error = false;
         while let Some(c) = input.chars().next() {
@@ -362,7 +362,7 @@ mod parse {
     }
 
     fn comment(input: &str) -> Option<(&str, Rcst)> {
-        log::trace!("comment({:?})", input);
+        log::trace!("comment({input:?})");
         let (mut input, octothorpe) = octothorpe(input)?;
         let mut comment = vec![];
         loop {
@@ -386,7 +386,7 @@ mod parse {
     }
 
     fn leading_indentation(mut input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        log::trace!("leading_indentation({:?}, {:?})", input, indentation);
+        log::trace!("leading_indentation({input:?}, {indentation:?})");
         let mut chars = vec![];
         let mut has_weird_whitespace = false;
         let mut indent_in_spaces = 0;
@@ -400,7 +400,7 @@ mod parse {
             };
             chars.push(c);
             has_weird_whitespace |= is_weird;
-            indent_in_spaces += whitespace_indentation_score(&format!("{}", c));
+            indent_in_spaces += whitespace_indentation_score(&format!("{c}"));
             input = &input[c.len_utf8()..];
         }
         let whitespace = chars.into_iter().join("");
@@ -438,12 +438,7 @@ mod parse {
         indentation: usize,
         also_comments: bool,
     ) -> (&str, Vec<Rcst>) {
-        log::trace!(
-            "whitespaces_and_newlines({:?}, {:?}, {:?})",
-            input,
-            indentation,
-            also_comments
-        );
+        log::trace!("whitespaces_and_newlines({input:?}, {indentation:?}, {also_comments:?})");
         let mut parts = vec![];
         if let Some((new_input, whitespace)) = single_line_whitespace(input) {
             input = new_input;
@@ -585,7 +580,7 @@ mod parse {
     }
 
     fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        log::trace!("text({:?}, {:?})", input, indentation);
+        log::trace!("text({input:?}, {indentation:?})");
         let (mut input, opening_quote) = double_quote(input)?;
         let mut line = vec![];
         let mut parts = vec![];
@@ -700,12 +695,7 @@ mod parse {
         indentation: usize,
         allow_call_and_assignment: bool,
     ) -> Option<(&str, Rcst)> {
-        log::trace!(
-            "expression({:?}, {:?}, {:?})",
-            input,
-            indentation,
-            allow_call_and_assignment
-        );
+        log::trace!("expression({input:?}, {indentation:?}, {allow_call_and_assignment:?})");
         let (mut input, mut expression) = int(input)
             .or_else(|| text(input, indentation))
             .or_else(|| symbol(input))
@@ -740,7 +730,7 @@ mod parse {
             })?;
 
         loop {
-            log::trace!("struct_access({:?}, {:?})", input, indentation);
+            log::trace!("struct_access({input:?}, {indentation:?})");
 
             let (new_input, dot) = match dot(input) {
                 Some(it) => it,
@@ -752,8 +742,12 @@ mod parse {
             };
 
             input = new_input;
-            expression = Rcst::StructAccess { struct_: Box::new(expression), dot: Box::new(dot), key: Box::new(key) };
-        };
+            expression = Rcst::StructAccess {
+                struct_: Box::new(expression),
+                dot: Box::new(dot),
+                key: Box::new(key),
+            };
+        }
         Some((input, expression))
     }
     #[test]
@@ -766,7 +760,7 @@ mod parse {
 
     /// Multiple expressions that are occurring one after another.
     fn run_of_expressions(input: &str, indentation: usize) -> Option<(&str, Vec<Rcst>)> {
-        log::trace!("run_of_expressions({:?}, {:?})", input, indentation);
+        log::trace!("run_of_expressions({input:?}, {indentation:?})");
         let mut expressions = vec![];
         let (mut input, expr) = expression(input, indentation, false)?;
         expressions.push(expr);
@@ -831,7 +825,7 @@ mod parse {
     }
 
     fn call(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        log::trace!("call({:?}, {:?})", input, indentation);
+        log::trace!("call({input:?}, {indentation:?})");
         let (input, mut expressions) = run_of_expressions(input, indentation)?;
         if expressions.len() < 2 {
             return None;
@@ -965,7 +959,7 @@ mod parse {
     }
 
     fn struct_(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        log::trace!("struct({:?}, {:?})", input, indentation);
+        log::trace!("struct({input:?}, {indentation:?})");
 
         let (mut outer_input, mut opening_bracket) = opening_bracket(input)?;
 
@@ -1185,7 +1179,7 @@ mod parse {
     }
 
     fn parenthesized(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        log::trace!("parenthesized({:?}, {:?})", input, indentation);
+        log::trace!("parenthesized({input:?}, {indentation:?})");
 
         let (input, opening_parenthesis) = opening_parenthesis(input)?;
 
@@ -1256,7 +1250,7 @@ mod parse {
     }
 
     pub fn body(mut input: &str, indentation: usize) -> (&str, Vec<Rcst>) {
-        log::trace!("body({:?}, {:?})", input, indentation);
+        log::trace!("body({input:?}, {indentation:?})");
         let mut expressions = vec![];
 
         let mut number_of_expressions_in_last_iteration = -1i64;
@@ -1309,7 +1303,7 @@ mod parse {
     }
 
     fn lambda(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        log::trace!("lambda({:?}, {:?})", input, indentation);
+        log::trace!("lambda({input:?}, {indentation:?})");
         let (input, opening_curly_brace) = opening_curly_brace(input)?;
         let (input, mut opening_curly_brace, mut parameters_and_arrow) = {
             let input_without_params = input;
@@ -1533,7 +1527,7 @@ mod parse {
     }
 
     fn assignment(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        log::trace!("assignment({:?}, {:?})", input, indentation);
+        log::trace!("assignment({input:?}, {indentation:?})");
         let (input, mut signature) = run_of_expressions(input, indentation)?;
         if signature.is_empty() {
             return None;

@@ -43,7 +43,7 @@ pub trait HintsDb: AstToHir + Discover + HirDb + InputDb + LspPositionConversion
 }
 
 fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
-    log::debug!("Calculating hints for {}", input);
+    log::debug!("Calculating hints for {input}");
 
     let (hir, _) = db.hir(input.clone()).unwrap();
     let discover_results: HashMap<hir::Id, DiscoverResult> = HashMap::new(); // db.run_all(input.clone(), vec![]);
@@ -60,7 +60,7 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
                     HintKind::Panic,
                     Value::Text(format!(
                         "Circular import detected: {}",
-                        import_chain.iter().map(|it| format!("{}", it)).join(" → ")
+                        import_chain.iter().map(|it| format!("{it}")).join(" → ")
                     )),
                 ),
                 _ => return None,

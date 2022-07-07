@@ -92,7 +92,12 @@ pub enum CallReceiver {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Assignment {
     pub name: AstString,
-    pub body: Vec<Ast>,
+    pub body: AssignmentBody,
+}
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum AssignmentBody {
+    Lambda(Lambda),
+    Body(Vec<Ast>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -142,7 +147,14 @@ impl CollectErrors for Ast {
             }
             AstKind::Lambda(lambda) => lambda.body.collect_errors(errors),
             AstKind::Call(call) => call.arguments.collect_errors(errors),
-            AstKind::Assignment(assignment) => assignment.body.collect_errors(errors),
+            AstKind::Assignment(assignment) => match assignment.body {
+                AssignmentBody::Lambda(lambda) => lambda.body.collect_errors(errors),
+                AssignmentBody::Body(body) => {
+                    for ast in body {
+                        ast.collect_errors(errors)
+                    }
+                }
+            },
             AstKind::Error {
                 child,
                 errors: mut recovered_errors,
@@ -176,67 +188,70 @@ impl Display for Ast {
                     struct_
                         .fields
                         .iter()
-                        .map(|(key, value)| format!("{}: {},", key, value))
+                        .map(|(key, value)| format!("{key}: {value},"))
                         .join("\n")
                         .lines()
-                        .map(|line| format!("  {}", line))
+                        .map(|line| format!("  {line}"))
                         .join("\n")
                 )
             }
-            AstKind::StructAccess(struct_access) => write!(f, "{}", struct_access),
-            AstKind::Lambda(Lambda {
-                parameters,
-                body,
-                fuzzable,
-            }) => {
-                write!(
-                    f,
-                    "lambda ({}) {{ {} ->\n{}\n}}",
-                    if *fuzzable {
-                        "fuzzable"
-                    } else {
-                        "non-fuzzable"
-                    },
-                    parameters.iter().map(|it| format!("{}", it)).join(" "),
-                    body.iter()
-                        .map(|it| format!("{}", it))
-                        .join("\n")
-                        .lines()
-                        .map(|line| format!("  {}", line))
-                        .join("\n")
-                )
-            }
+            AstKind::StructAccess(struct_access) => write!(f, "{struct_access}"),
+            AstKind::Lambda(lambda) => write!(f, "{}", lambda),
             AstKind::Call(call) => write!(f, "{}", call),
             AstKind::Assignment(assignment) => {
                 write!(
                     f,
                     "assignment: {} =\n{}",
                     assignment.name,
-                    assignment
-                        .body
-                        .iter()
-                        .map(|it| format!("{}", it))
-                        .join("\n")
+                    format!("{}", assignment.body)
                         .lines()
-                        .map(|line| format!("  {}", line))
-                        .join("\n")
+                        .map(|line| format!("  {line}"))
+                        .join("\n"),
                 )
             }
             AstKind::Error { child, errors } => {
                 write!(
                     f,
                     "error:\n{}",
-                    errors
-                        .iter()
-                        .map(|error| format!("  {:?}", error))
-                        .join("\n")
+                    errors.iter().map(|error| format!("  {error:?}")).join("\n")
                 )?;
                 if let Some(child) = child {
-                    write!(f, "\n  fallback: {}", child)?;
+                    write!(f, "\n  fallback: {child}")?;
                 }
                 Ok(())
             }
         }
+    }
+}
+impl Display for AssignmentBody {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            AssignmentBody::Lambda(lambda) => write!(f, "{lambda}"),
+            AssignmentBody::Body(body) => {
+                write!(f, "{}", body.iter().map(|it| format!("{it}")).join("\n"))
+            }
+        }
+    }
+}
+impl Display for Lambda {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "lambda ({}) {{ {} ->\n{}\n}}",
+            if self.fuzzable {
+                "fuzzable"
+            } else {
+                "non-fuzzable"
+            },
+            self.parameters.iter().map(|it| format!("{it}")).join(" "),
+            self.body
+                .iter()
+                .map(|it| format!("{it}"))
+                .join("\n")
+                .lines()
+                .map(|line| format!("  {line}"))
+                .join("\n")
+        )
     }
 }
 impl Display for StructAccess {
@@ -257,7 +272,7 @@ impl Display for Call {
             self.receiver,
             self.arguments
                 .iter()
-                .map(|argument| format!("  {}", argument))
+                .map(|argument| format!("  {argument}"))
                 .join("\n")
         )
     }

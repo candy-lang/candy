@@ -118,9 +118,8 @@ impl<'a> Context<'a> {
     fn add_single_line_token(&mut self, start: Position, length: u32, type_: SemanticTokenType) {
         assert!(
             start >= self.cursor,
-            "Tokens must be added with increasing positions. The cursor was as {:?}, but the new token starts at {:?}.",
+            "Tokens must be added with increasing positions. The cursor was as {:?}, but the new token starts at {start:?}.",
             self.cursor,
-            start,
         );
 
         let definition_modifier = if type_ == SemanticTokenType::Assignment {
