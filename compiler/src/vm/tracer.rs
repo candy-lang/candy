@@ -86,14 +86,18 @@ impl Tracer {
                     _ => unreachable!(),
                 };
                 let caller_location_string = {
-                    let ast_id = hir_to_ast_ids[&hir_id].clone();
-                    let cst_id = ast_to_cst_ids[&ast_id];
-                    let cst = db.find_cst(input.clone(), cst_id);
-                    let start = db.offset_to_lsp(input.clone(), cst.span.start);
-                    let end = db.offset_to_lsp(input.clone(), cst.span.end);
+                    let ast_id = hir_to_ast_ids.get(&hir_id).map(|id| id.clone());
+                    let cst_id = ast_id.as_ref().and_then(|id| ast_to_cst_ids.get(&id)).map(|id| id.clone());
+                    let cst = cst_id.map(|id| db.find_cst(input.clone(), id)).map(|id| id.clone());
+                    let span = cst.map(|cst| (
+                        db.offset_to_lsp(input.clone(), cst.span.start),
+                        db.offset_to_lsp(input.clone(), cst.span.end),
+                    ));
                     format!(
-                        "{hir_id}, {ast_id}, {cst_id:?}, {}:{} – {}:{}",
-                        start.0, start.1, end.0, end.1
+                        "{hir_id}, {}, {}, {}",
+                        ast_id.map(|id| format!("{id}")).unwrap_or("<no ast>".to_string()),
+                        cst_id.map(|id| format!("{id:?}")).unwrap_or("<no cst>".to_string()),
+                        span.map(|((start_line, start_col), (end_line, end_col))| format!("{}:{} – {}:{}", start_line, start_col, end_line, end_col)).unwrap_or("<no location>".to_string())
                     )
                 };
                 format!("{caller_location_string:90} {call_string}")

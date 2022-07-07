@@ -27,7 +27,7 @@ pub enum Instruction {
         num_entries: usize,
     },
 
-    /// Pushes a closure that captures the whole stack.
+    /// Pushes a closure.
     ///
     /// a -> a, pointer to closure
     CreateClosure {

@@ -20,10 +20,10 @@ fn lir(db: &dyn HirToLir, input: Input) -> Option<Arc<Lir>> {
 }
 
 fn compile_lambda(captured: &[hir::Id], parameters: &[hir::Id], body: &Body) -> Vec<Instruction> {
-    let mut context = LoweringContext {
-        stack: captured.iter().map(|it| it.clone()).collect_vec(),
-        instructions: vec![],
-    };
+    let mut context = LoweringContext::default();
+    for captured in captured {
+        context.stack.push(captured.clone());
+    }
     for parameter in parameters {
         context.stack.push(parameter.clone());
     }
