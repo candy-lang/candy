@@ -48,6 +48,9 @@ fn find(
 fn query_for_offset(db: &Database, input: Input, offset: usize) -> Option<ReferenceQuery> {
     let origin_cst = db.find_cst_by_offset(input.clone(), offset);
     match origin_cst.kind {
+        CstKind::Identifier(identifier) if identifier == "needs" => {
+            Some(ReferenceQuery::Needs(input))
+        }
         CstKind::Identifier { .. } => {
             let hir_id = db.cst_to_hir_id(input, origin_cst.id)?;
             let target_id = if let Some(hir_expr) = db.find_expression(hir_id.clone()) {
@@ -93,6 +96,7 @@ fn references(
     let input = match &query {
         ReferenceQuery::Id(id) => id.input.clone(),
         ReferenceQuery::Symbol(input, _) => input.to_owned(),
+        ReferenceQuery::Needs(input) => input.to_owned(),
     };
     let (hir, _) = db.hir(input).unwrap();
 
@@ -112,6 +116,7 @@ struct Context<'a> {
 pub enum ReferenceQuery {
     Id(hir::Id),
     Symbol(Input, String),
+    Needs(Input),
 }
 impl<'a> Context<'a> {
     fn new(db: &'a dyn ReferencesDb, query: ReferenceQuery, include_declaration: bool) -> Self {
@@ -188,7 +193,11 @@ impl<'a> Context<'a> {
                 self.visit_ids(arguments);
             }
             Expression::Builtin(_) => {}
-            Expression::Needs { .. } => {}
+            Expression::Needs { .. } => {
+                if let ReferenceQuery::Needs(_) = &self.query {
+                    self.add_reference(id, DocumentHighlightKind::READ);
+                }
+            }
             Expression::Error { child, .. } => {
                 if let Some(child) = child {
                     self.visit_id(child.clone());
