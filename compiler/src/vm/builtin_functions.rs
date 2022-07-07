@@ -141,7 +141,7 @@ impl Vm {
 
     fn print(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Text(message)], {
-            println!("{:?}", message);
+            println!("{message:?}");
             Ok(Value::nothing())
         })
     }

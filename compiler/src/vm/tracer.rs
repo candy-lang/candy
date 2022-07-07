@@ -106,7 +106,7 @@ impl Tracer {
                             .map(|id| format!("{id}"))
                             .unwrap_or("<no ast>".to_string()),
                         cst_id
-                            .map(|id| format!("{id:?}"))
+                            .map(|id| format!("{id}"))
                             .unwrap_or("<no cst>".to_string()),
                         span.map(|((start_line, start_col), (end_line, end_col))| format!(
                             "{}:{} – {}:{}",

@@ -62,9 +62,9 @@ impl Value {
 impl Display for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Int(int) => write!(f, "{}", int),
-            Value::Text(text) => write!(f, "{:?}", text),
-            Value::Symbol(symbol) => write!(f, "{}", symbol),
+            Value::Int(int) => write!(f, "{int}"),
+            Value::Text(text) => write!(f, "{text:?}"),
+            Value::Symbol(symbol) => write!(f, "{symbol}"),
             Value::Struct(entries) => write!(
                 f,
                 "[ {} ]",

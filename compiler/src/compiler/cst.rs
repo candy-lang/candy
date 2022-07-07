@@ -24,6 +24,11 @@ fn find_cst_by_offset(db: &dyn CstDb, input: Input, offset: usize) -> Cst {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct Id(pub usize);
+impl Display for Id {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "CstId({})", self.0)
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Cst {

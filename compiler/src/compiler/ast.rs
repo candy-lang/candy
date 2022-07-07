@@ -19,7 +19,7 @@ impl Id {
 }
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "AstId({}:{:?})", self.input, self.local)
+        write!(f, "AstId({}:{})", self.input, self.local)
     }
 }
 
