@@ -19,7 +19,7 @@ pub fn fuzz(db: &Database, input: Input) {
     let module_closure = Value::module_closure_from_lir((*lir).clone());
 
     let mut vm = Vm::new();
-    vm.set_up_module_closure_execution(db, module_closure);
+    vm.set_up_module_closure_execution(db, input.clone(), module_closure);
     vm.run(db, 1000);
     match vm.status() {
         Status::Running => {
@@ -33,7 +33,7 @@ pub fn fuzz(db: &Database, input: Input) {
             return;
         }
     }
-    let _ = vm.tear_down_closure_execution();
+    let _ = vm.tear_down_module_closure_execution();
 
     log::info!(
         "Now, the fuzzing begins. So far, we have {} closures to fuzz.",

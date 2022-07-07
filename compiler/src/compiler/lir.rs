@@ -1,5 +1,5 @@
 use super::error::CompilerError;
-use crate::{builtin_functions::BuiltinFunction, hir};
+use crate::{builtin_functions::BuiltinFunction, hir, input::Input};
 use itertools::Itertools;
 use std::fmt::Display;
 
@@ -77,10 +77,7 @@ pub enum Instruction {
     /// Indicates that a fuzzable closure sits at the top of the stack.
     RegisterFuzzableClosure(hir::Id),
 
-    /// Indicates that a value for the given id was evaluated and is at the top
-    /// of the stack.
     TraceValueEvaluated(hir::Id),
-
     TraceCallStarts {
         id: hir::Id,
         num_args: usize,
@@ -90,6 +87,10 @@ pub enum Instruction {
         id: hir::Id,
     },
     TraceNeedsEnds,
+    TraceModuleStarts {
+        input: Input,
+    },
+    TraceModuleEnds,
 
     Error {
         id: hir::Id,
@@ -160,6 +161,8 @@ impl Display for Instruction {
                 write!(f, "traceNeedsStarts {id}")
             }
             Instruction::TraceNeedsEnds => write!(f, "traceNeedsEnds"),
+            Instruction::TraceModuleStarts { input } => write!(f, "traceModuleStarts {input}"),
+            Instruction::TraceModuleEnds => write!(f, "traceModuleEnds"),
             Instruction::Error { id, error } => write!(f, "error at {id}: {error:?}"),
         }
     }

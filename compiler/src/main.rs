@@ -208,13 +208,13 @@ fn run(options: CandyRunOptions) {
     log::debug!("Running `{path_string}`.");
 
     let mut vm = Vm::new();
-    vm.set_up_module_closure_execution(&db, module_closure);
+    vm.set_up_module_closure_execution(&db, input.clone(), module_closure);
     vm.run(&db, 1000);
     match vm.status() {
         Status::Running => log::info!("VM is still running."),
         Status::Done => {
-            let return_value = vm.tear_down_closure_execution();
-            log::info!("VM is done: {return_value}");
+            let return_value = vm.tear_down_module_closure_execution();
+            log::info!("VM is done. Export map: {return_value}");
         }
         Status::Panicked(value) => {
             log::error!("VM panicked with value {value}.");

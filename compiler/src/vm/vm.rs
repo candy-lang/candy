@@ -6,7 +6,7 @@ use super::{
 use crate::{
     compiler::{hir::Id, lir::Instruction},
     database::Database,
-    input::InputDb,
+    input::Input,
 };
 use itertools::Itertools;
 use log;
@@ -20,6 +20,7 @@ pub struct Vm {
     pub heap: Heap,
     pub data_stack: Vec<ObjectPointer>,
     pub call_stack: Vec<InstructionPointer>,
+    pub import_stack: Vec<Input>,
     pub tracer: Tracer,
     pub fuzzable_closures: Vec<(Id, ObjectPointer)>,
 }
@@ -62,12 +63,12 @@ impl Vm {
             heap: Heap::new(),
             data_stack: vec![],
             call_stack: vec![],
+            import_stack: vec![],
             tracer: Tracer::default(),
             fuzzable_closures: vec![],
         }
     }
 
-    /// Sets this VM up in a way that the closure will run.
     pub fn set_up_closure_execution(
         &mut self,
         db: &Database,
@@ -96,22 +97,31 @@ impl Vm {
         self.run_instruction(db, Instruction::Call { num_args });
         self.status = Status::Running;
     }
-    pub fn set_up_module_closure_execution(&mut self, db: &Database, closure: Value) {
-        if let Value::Closure {
-            captured, num_args, ..
-        } = closure.clone()
-        {
-            assert_eq!(captured.len(), 0, "Called start_module_closure with a closure that is not a module closure (it captures stuff).");
-            assert_eq!(num_args, 0, "Called start_module_closure with a closure that is not a module closure (it has arguments).");
-        } else {
-            panic!("Called start_module_closure with a non-closure.");
-        };
-        self.set_up_closure_execution(db, closure, vec![])
-    }
     pub fn tear_down_closure_execution(&mut self) -> Value {
         assert!(matches!(self.status, Status::Done));
         let return_value = self.data_stack.pop().unwrap();
         self.heap.export(return_value)
+    }
+
+    pub fn set_up_module_closure_execution(&mut self, db: &Database, input: Input, closure: Value) {
+        let mut instructions = if let Value::Closure {
+            captured,
+            num_args,
+            body,
+        } = closure.clone()
+        {
+            assert_eq!(captured.len(), 0, "Called start_module_closure with a closure that is not a module closure (it captures stuff).");
+            assert_eq!(num_args, 0, "Called start_module_closure with a closure that is not a module closure (it has arguments).");
+            body
+        } else {
+            panic!("Called start_module_closure with a non-closure.");
+        };
+        instructions.insert(0, Instruction::TraceModuleStarts { input });
+        instructions.push(Instruction::TraceModuleEnds);
+        self.set_up_closure_execution(db, closure, vec![])
+    }
+    pub fn tear_down_module_closure_execution(&mut self) -> Value {
+        self.tear_down_closure_execution()
     }
 
     pub fn status(&self) -> Status {
@@ -338,6 +348,36 @@ impl Vm {
                 });
             }
             Instruction::TraceNeedsEnds => self.tracer.push(TraceEntry::NeedsEnded),
+            Instruction::TraceModuleStarts { input } => {
+                println!(
+                    "Import stack: {}",
+                    self.import_stack
+                        .iter()
+                        .map(|it| format!("{it}"))
+                        .join(", ")
+                );
+                if self.import_stack.contains(&input) {
+                    self.panic(format!(
+                        "there's an import cycle ({})",
+                        self.import_stack
+                            .iter()
+                            .skip_while(|it| **it != input)
+                            .chain([&input])
+                            .map(|input| format!("{input}"))
+                            .join(" -> "),
+                    ));
+                }
+                self.import_stack.push(input.clone());
+                self.tracer.push(TraceEntry::ModuleStarted { input });
+            }
+            Instruction::TraceModuleEnds => {
+                self.import_stack.pop().unwrap();
+                self.tracer.push(TraceEntry::ModuleEnded {
+                    export_map: self
+                        .heap
+                        .export_without_dropping(*self.data_stack.last().unwrap()),
+                })
+            }
             Instruction::Error { id, error } => {
                 self.panic(format!(
                     "The VM crashed because there was an error at {id}: {error:?}"

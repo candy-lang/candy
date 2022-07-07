@@ -1,7 +1,10 @@
 use super::{heap::ObjectPointer, value::Value, Vm};
 use crate::{
     builtin_functions::BuiltinFunction,
-    compiler::{hir_to_lir::HirToLir, lir::Instruction},
+    compiler::{
+        hir_to_lir::HirToLir,
+        lir::{Instruction, Lir},
+    },
     database::Database,
     input::{Input, InputDb},
 };
@@ -205,10 +208,15 @@ impl Vm {
             }
             return Err("couldn't import module".to_string());
         };
+
         let lir = db
-            .lir(input)
+            .lir(input.clone())
             .ok_or_else(|| "couldn't import module".to_string())?;
-        let module_closure = Value::module_closure_from_lir((*lir).clone());
+        let mut instructions = lir.instructions.clone();
+        instructions.insert(0, Instruction::TraceModuleStarts { input });
+        instructions.push(Instruction::TraceModuleEnds);
+        let module_closure = Value::module_closure_from_lir(Lir { instructions });
+
         let address = self.heap.import(module_closure);
         self.data_stack.push(address);
         self.run_instruction(db, Instruction::Call { num_args: 0 });
