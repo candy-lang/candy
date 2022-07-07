@@ -349,13 +349,6 @@ impl Vm {
             }
             Instruction::TraceNeedsEnds => self.tracer.push(TraceEntry::NeedsEnded),
             Instruction::TraceModuleStarts { input } => {
-                println!(
-                    "Import stack: {}",
-                    self.import_stack
-                        .iter()
-                        .map(|it| format!("{it}"))
-                        .join(", ")
-                );
                 if self.import_stack.contains(&input) {
                     self.panic(format!(
                         "there's an import cycle ({})",

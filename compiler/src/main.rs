@@ -14,11 +14,17 @@ mod vm;
 
 use crate::{
     compiler::{
-        ast_to_hir::AstToHir, cst_to_ast::CstToAst, hir, hir_to_lir::HirToLir,
-        rcst_to_cst::RcstToCst, string_to_rcst::StringToRcst,
+        ast_to_hir::AstToHir,
+        cst_to_ast::CstToAst,
+        error::CompilerError,
+        hir::{self, CollectErrors},
+        hir_to_lir::HirToLir,
+        rcst_to_cst::RcstToCst,
+        string_to_rcst::StringToRcst,
     },
     database::{Database, PROJECT_DIRECTORY},
     input::Input,
+    language_server::utils::LspPositionConversion,
     vm::{value::Value, Status, Vm},
 };
 use compiler::lir::Lir;
@@ -107,12 +113,12 @@ fn build(options: CandyBuildOptions) {
 }
 fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
     let path_string = file.to_string_lossy();
-    log::debug!("Building `{path_string}`.");
+    log::info!("Building `{path_string}`.");
 
     let input: Input = file.clone().into();
     let db = Database::default();
 
-    log::info!("Parsing string to RCST…");
+    log::debug!("Parsing string to RCST…");
     let rcst = db
         .rcst(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
@@ -121,7 +127,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         fs::write(rcst_file, format!("{:#?}\n", rcst.clone())).unwrap();
     }
 
-    log::info!("Turning RCST to CST…");
+    log::debug!("Turning RCST to CST…");
     let cst = db
         .cst(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
@@ -130,7 +136,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         fs::write(cst_file, format!("{:#?}\n", cst.clone())).unwrap();
     }
 
-    log::info!("Abstracting CST to AST…");
+    log::debug!("Abstracting CST to AST…");
     let (asts, ast_cst_id_map) = db
         .ast(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
@@ -155,7 +161,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         .unwrap();
     }
 
-    log::info!("Turning AST to HIR…");
+    log::debug!("Turning AST to HIR…");
     let (hir, hir_ast_id_map) = db
         .hir(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
@@ -175,13 +181,21 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         .unwrap();
     }
 
-    log::info!("Lowering HIR to LIR…");
+    log::debug!("Lowering HIR to LIR…");
     let lir = db
         .lir(input.clone())
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if debug {
         let lir_file = file.clone_with_extension("candy.lir");
         fs::write(lir_file, format!("{lir}")).unwrap();
+    }
+
+    let mut errors = vec![];
+    hir.collect_errors(&mut errors);
+    for CompilerError { span, payload, .. } in errors {
+        let (start_line, start_col) = db.offset_to_lsp(input.clone(), span.start);
+        let (end_line, end_col) = db.offset_to_lsp(input.clone(), span.end);
+        log::warn!("{start_line}:{start_col} – {end_line}:{end_col}: {payload:?}");
     }
 
     Some(lir)
@@ -193,17 +207,14 @@ fn run(options: CandyRunOptions) {
     let input: Input = options.file.clone().into();
     let db = Database::default();
 
-    let lir = match raw_build(&options.file, false) {
-        Some(lir) => lir,
-        None => {
-            log::info!("Build failed.");
-            return;
-        }
+    if raw_build(&options.file, false).is_none() {
+        log::info!("Build failed.");
+        return;
     };
     let module_closure = Value::module_closure_of_input(&db, input.clone()).unwrap();
 
     let path_string = options.file.to_string_lossy();
-    log::debug!("Running `{path_string}`.");
+    log::info!("Running `{path_string}`.");
 
     let mut vm = Vm::new();
     vm.set_up_module_closure_execution(&db, input.clone(), module_closure);

@@ -192,8 +192,3 @@ enum Action {
     End(String),
     Stay(String),
 }
-struct TraceLine {
-    indentation: usize,
-    content: String,
-    result: Option<Value>,
-}
