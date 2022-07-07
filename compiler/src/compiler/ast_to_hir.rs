@@ -419,22 +419,16 @@ impl<'c> Compiler<'c> {
         )
     }
     fn lower_call(&mut self, id: Option<ast::Id>, call: &Call) -> hir::Id {
-        let arguments = call
-            .arguments
-            .iter()
-            .map(|argument| self.compile_single(argument))
-            .collect_vec();
-
         let function = match call.receiver.clone() {
             CallReceiver::Identifier(name) => {
                 if name.value == "needs" {
-                    let expression = match arguments.len() {
-                        2 => Expression::Needs {
-                            condition: Box::new(arguments.first().unwrap().clone()),
-                            message: Box::new(arguments.last().unwrap().clone()),
+                    let expression = match &self.lower_call_arguments(&call.arguments[..])[..] {
+                        [condition, message] => Expression::Needs {
+                            condition: Box::new(condition.clone()),
+                            message: Box::new(message.clone()),
                         },
-                        1 => Expression::Needs {
-                            condition: Box::new(arguments.first().unwrap().clone()),
+                        [condition] => Expression::Needs {
+                            condition: Box::new(condition.clone()),
                             message: Box::new(self.push(
                                 None,
                                 Expression::Text("needs not satisfied".to_string()),
@@ -479,6 +473,7 @@ impl<'c> Compiler<'c> {
             }
             CallReceiver::Call(call) => self.lower_call(None, &*call),
         };
+        let arguments = self.lower_call_arguments(&call.arguments[..]);
         self.push(
             id,
             Expression::Call {
@@ -487,6 +482,12 @@ impl<'c> Compiler<'c> {
             },
             None,
         )
+    }
+    fn lower_call_arguments(&mut self, arguments: &[Ast]) -> Vec<hir::Id> {
+        arguments
+            .iter()
+            .map(|argument| self.compile_single(argument))
+            .collect_vec()
     }
 
     fn push(
