@@ -315,20 +315,21 @@ impl<'c> Compiler<'c> {
             AstKind::Lambda(lambda) => self.compile_lambda(ast.id.clone(), lambda, None),
             AstKind::Call(call) => self.lower_call(Some(ast.id.clone()), call),
             AstKind::Assignment(Assignment { name, body }) => {
-                let name = name.value.to_owned();
-                match body {
+                let name_string = name.value.to_owned();
+                let body = match body {
                     ast::AssignmentBody::Lambda(lambda) => {
-                        self.compile_lambda(ast.id.clone(), lambda, Some(name))
+                        self.compile_lambda(ast.id.clone(), lambda, Some(name_string.clone()))
                     }
                     ast::AssignmentBody::Body(body) => {
                         let body = self.compile(body);
-                        self.push(
-                            Some(ast.id.clone()),
-                            Expression::Reference(body),
-                            Some(name),
-                        )
+                        self.push(Some(ast.id.clone()), Expression::Reference(body), None)
                     }
-                }
+                };
+                self.push(
+                    Some(name.id.clone()),
+                    Expression::Reference(body),
+                    Some(name_string),
+                )
             }
             AstKind::Error { child, errors } => {
                 let child = if let Some(child) = child {
@@ -394,7 +395,7 @@ impl<'c> Compiler<'c> {
                 body: inner.body,
                 fuzzable: lambda.fuzzable,
             }),
-            identifier,
+            None,
         )
     }
     fn lower_struct_access(
