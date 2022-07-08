@@ -1,8 +1,10 @@
 use super::heap::ObjectPointer;
 use crate::{
     builtin_functions::BuiltinFunction,
-    compiler::{hir_to_lir::HirToLir, lir::Instruction},
-    database::Database,
+    compiler::{
+        hir_to_lir::HirToLir,
+        lir::{Instruction, Lir},
+    },
     input::Input,
 };
 use im::HashMap;
@@ -36,9 +38,8 @@ impl Value {
         Value::Symbol("Nothing".to_owned())
     }
 
-    pub fn module_closure_of_input(db: &Database, input: Input) -> Option<Self> {
-        let lir = db.lir(input.clone())?;
-        Some(Value::Closure {
+    pub fn module_closure_of_lir(input: Input, lir: Lir) -> Self {
+        Value::Closure {
             captured: vec![],
             num_args: 0,
             body: vec![
@@ -52,7 +53,11 @@ impl Value {
                 Instruction::TraceModuleEnds,
                 Instruction::Return,
             ],
-        })
+        }
+    }
+    pub fn module_closure_of_input(db: &dyn HirToLir, input: Input) -> Option<Self> {
+        let lir = db.lir(input.clone())?;
+        Some(Self::module_closure_of_lir(input, (*lir).clone()))
     }
 
     pub fn list(items: Vec<Value>) -> Self {

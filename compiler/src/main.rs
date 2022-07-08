@@ -25,7 +25,7 @@ use crate::{
     database::{Database, PROJECT_DIRECTORY},
     input::Input,
     language_server::utils::LspPositionConversion,
-    vm::{value::Value, Status, Vm},
+    vm::{use_provider::DbUseProvider, value::Value, Status, Vm},
 };
 use compiler::lir::Lir;
 use fern::colors::{Color, ColoredLevelConfig};
@@ -215,8 +215,9 @@ fn run(options: CandyRunOptions) {
     log::info!("Running `{path_string}`.");
 
     let mut vm = Vm::new();
-    vm.set_up_module_closure_execution(&db, input.clone(), module_closure);
-    vm.run(&db, 1000);
+    let use_provider = DbUseProvider { db: &db };
+    vm.set_up_module_closure_execution(&use_provider, module_closure);
+    vm.run(&use_provider, 1000);
     match vm.status() {
         Status::Running => log::info!("VM is still running."),
         Status::Done => {

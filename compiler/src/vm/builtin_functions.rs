@@ -1,7 +1,7 @@
-use super::{heap::ObjectPointer, value::Value, Vm};
+use super::{heap::ObjectPointer, use_provider::UseProvider, value::Value, Vm};
 use crate::{
     builtin_functions::BuiltinFunction,
-    compiler::lir::Instruction,
+    compiler::{hir_to_lir::HirToLir, lir::Instruction},
     database::Database,
     input::{Input, InputDb},
 };
@@ -19,9 +19,9 @@ macro_rules! destructure {
 }
 
 impl Vm {
-    pub(super) fn run_builtin_function(
+    pub(super) fn run_builtin_function<U: UseProvider>(
         &mut self,
-        db: &Database,
+        use_provider: &U,
         builtin_function: &BuiltinFunction,
         args: &[ObjectPointer],
     ) {
@@ -33,7 +33,7 @@ impl Vm {
             BuiltinFunction::Add => self.add(args),
             BuiltinFunction::Equals => self.equals(args),
             BuiltinFunction::GetArgumentCount => self.get_argument_count(args),
-            BuiltinFunction::IfElse => match self.if_else(db, args) {
+            BuiltinFunction::IfElse => match self.if_else(use_provider, args) {
                 // If successful, IfElse doesn't return a value, but diverges
                 // the control flow.
                 Ok(()) => return,
@@ -45,11 +45,11 @@ impl Vm {
             BuiltinFunction::StructGetKeys => self.struct_get_keys(args),
             BuiltinFunction::StructHasKey => self.struct_has_key(args),
             BuiltinFunction::TypeOf => self.type_of(args),
-            BuiltinFunction::UseAsset => self.use_asset(db, args),
+            BuiltinFunction::UseAsset => self.use_asset(use_provider, args),
             BuiltinFunction::UseLocalModule => {
                 // If successful, UseLocalModule doesn't return a value, but
                 // diverges the control flow.
-                match self.use_local_module(db, args) {
+                match self.use_local_module(use_provider, args) {
                     Ok(()) => return,
                     Err(message) => Err(message),
                 }
@@ -78,7 +78,11 @@ impl Vm {
         })
     }
 
-    fn if_else(&mut self, db: &Database, args: Vec<Value>) -> Result<(), String> {
+    fn if_else<U: UseProvider>(
+        &mut self,
+        use_provider: &U,
+        args: Vec<Value>,
+    ) -> Result<(), String> {
         destructure!(
             args,
             [
@@ -129,7 +133,7 @@ impl Vm {
                     self.heap.export_without_dropping(closure_object)
                 );
                 self.data_stack.push(closure_object);
-                self.run_instruction(db, Instruction::Call { num_args: 0 });
+                self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
                 Ok(())
             }
         )
@@ -183,13 +187,15 @@ impl Vm {
         })
     }
 
-    fn use_asset(&mut self, db: &Database, args: Vec<Value>) -> Result<Value, String> {
+    fn use_asset<U: UseProvider>(
+        &mut self,
+        use_provider: &U,
+        args: Vec<Value>,
+    ) -> Result<Value, String> {
         let (current_path, target) = Self::parse_current_path_and_target(args)?;
         let target = UseAssetTarget::parse(&target)?;
         let input = target.resolve_asset(&current_path)?;
-        let content = db
-            .get_input(input.clone())
-            .ok_or_else(|| format!("Couldn't import file '{}'.", input))?;
+        let content = use_provider.use_asset(input)?;
         Ok(Value::list(
             content
                 .iter()
@@ -198,24 +204,27 @@ impl Vm {
         ))
     }
 
-    fn use_local_module(&mut self, db: &Database, args: Vec<Value>) -> Result<(), String> {
+    fn use_local_module<U: UseProvider>(
+        &mut self,
+        use_provider: &U,
+        args: Vec<Value>,
+    ) -> Result<(), String> {
         let (current_path, target) = Self::parse_current_path_and_target(args)?;
         let target = UseAssetTarget::parse(&target)?;
         let possible_inputs = target.resolve_local_module(&current_path)?;
-        let input = 'find_existing_input: {
+        let (input, lir) = 'find_existing_input: {
             for input in possible_inputs {
-                if db.get_input(input.clone()).is_some() {
-                    break 'find_existing_input input;
+                if let Some(lir) = use_provider.use_local_module(input.clone()) {
+                    break 'find_existing_input (input, lir);
                 }
             }
             return Err("couldn't import module".to_string());
         };
 
-        let module_closure = Value::module_closure_of_input(db, input.clone())
-            .ok_or_else(|| "couldn't import module".to_string())?;
+        let module_closure = Value::module_closure_of_lir(input.clone(), lir);
         let address = self.heap.import(module_closure);
         self.data_stack.push(address);
-        self.run_instruction(db, Instruction::Call { num_args: 0 });
+        self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
         Ok(())
     }
 

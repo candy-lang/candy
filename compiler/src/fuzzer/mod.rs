@@ -5,18 +5,19 @@ use crate::{
     compiler::hir::{self, Expression, HirDb, Lambda},
     database::Database,
     input::Input,
-    vm::{tracer::TraceEntry, value::Value, Status, Vm},
+    vm::{tracer::TraceEntry, use_provider::DbUseProvider, value::Value, Status, Vm},
 };
 use itertools::Itertools;
 use log;
 use std::fs;
 
 pub fn fuzz(db: &Database, input: Input) {
-    let module_closure = Value::module_closure_of_input(&db, input.clone()).unwrap();
+    let module_closure = Value::module_closure_of_input(db, input.clone()).unwrap();
 
     let mut vm = Vm::new();
-    vm.set_up_module_closure_execution(db, input.clone(), module_closure);
-    vm.run(db, 1000);
+    let use_provider = DbUseProvider { db };
+    vm.set_up_module_closure_execution(&use_provider, module_closure);
+    vm.run(&use_provider, 1000);
     match vm.status() {
         Status::Running => {
             log::warn!("VM didn't finish running, so we're not fuzzing it.");
@@ -111,10 +112,12 @@ fn test_closure_with_args(
     arguments: Vec<Value>,
 ) -> TestResult {
     let closure = vm.heap.export_without_dropping(closure_address);
-    println!("Starting closure {closure}.");
-    vm.set_up_closure_execution(db, closure, arguments);
 
-    vm.run(db, 1000);
+    println!("Starting closure {closure}.");
+    let use_provider = DbUseProvider { db };
+    vm.set_up_closure_execution(&use_provider, closure, arguments);
+
+    vm.run(&use_provider, 1000);
     match vm.status() {
         Status::Running => TestResult::StillRunning,
         Status::Done => TestResult::NoPanic,
