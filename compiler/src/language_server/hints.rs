@@ -2,16 +2,17 @@ use super::utils::LspPositionConversion;
 use crate::{
     compiler::{
         ast_to_hir::AstToHir,
-        hir::{self, Expression, HirDb, Lambda},
+        hir::{self, HirDb},
+        hir_to_lir::HirToLir,
     },
-    discover::{result::DiscoverResult, run::Discover, value::Value},
+    discover::run::Discover,
     input::{Input, InputDb},
     language_server::utils::TupleToPosition,
+    vm::{tracer::TraceEntry, use_provider::FunctionUseProvider, value::Value, Status, Vm},
 };
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Hint {
@@ -38,37 +39,71 @@ impl Notification for HintsNotification {
 }
 
 #[salsa::query_group(HintsDbStorage)]
-pub trait HintsDb: AstToHir + Discover + HirDb + InputDb + LspPositionConversion {
+pub trait HintsDb:
+    HirToLir + AstToHir + Discover + HirDb + InputDb + LspPositionConversion
+{
     fn hints(&self, input: Input) -> Vec<Hint>;
 }
 
 fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
     log::debug!("Calculating hints for {input}");
 
-    // TODO: migrate LSP hints to use VM
-    return vec![];
+    let lir = match db.lir(input.clone()) {
+        Some(lir) => (*lir).clone(),
+        None => return vec![],
+    };
+    let module_closure = Value::module_closure_of_lir(input.clone(), lir);
 
-    let (hir, _) = db.hir(input.clone()).unwrap();
-    let discover_results: HashMap<hir::Id, DiscoverResult> = HashMap::new(); // db.run_all(input.clone(), vec![]);
+    let mut vm = Vm::new();
+    let use_provider = FunctionUseProvider {
+        use_asset: &|input| {
+            db.get_input(input.clone())
+                .map(|bytes| (*bytes).clone())
+                .ok_or_else(|| format!("Couldn't import file '{}'.", input))
+        },
+        use_local_module: &|input| db.lir(input).map(|lir| (*lir).clone()),
+    };
 
-    collect_hir_ids_for_hints_list(db, hir.expressions.keys().cloned().collect())
-        .into_iter()
-        .filter_map(|id| {
-            let (kind, value) = match discover_results.get(&id).unwrap() {
-                DiscoverResult::Value(value) if value != &Value::nothing() => {
-                    (HintKind::Value, value.to_owned())
+    vm.set_up_module_closure_execution(&use_provider, module_closure);
+    vm.run(&use_provider, 1000);
+    let panicked = match vm.status() {
+        Status::Running => {
+            log::info!("VM is still running.");
+            None
+        }
+        Status::Done => {
+            let return_value = vm.tear_down_module_closure_execution();
+            log::info!("VM is done. Export map: {return_value}");
+            None
+        }
+        Status::Panicked(value) => {
+            log::error!("VM panicked with value {value}.");
+            // log::error!("This is the stack trace:");
+            // vm.tracer.dump_stack_trace(&db, input);
+            Some(value)
+        }
+    };
+
+    let id_of_this_module = hir::Id::new(input.clone(), vec![]);
+    let values = vm
+        .tracer
+        .log()
+        .iter()
+        .filter_map(|entry| match entry {
+            TraceEntry::ValueEvaluated { id, value } => {
+                if id_of_this_module.is_parent_of(id) {
+                    Some((id.clone(), value.clone()))
+                } else {
+                    None
                 }
-                DiscoverResult::Panic(value) => (HintKind::Panic, value.to_owned()),
-                DiscoverResult::CircularImport(import_chain) => (
-                    HintKind::Panic,
-                    Value::Text(format!(
-                        "Circular import detected: {}",
-                        import_chain.iter().map(|it| format!("{it}")).join(" → ")
-                    )),
-                ),
-                _ => return None,
-            };
+            }
+            _ => None,
+        })
+        .collect_vec();
 
+    let value_hints = values
+        .into_iter()
+        .filter_map(|(id, value)| {
             let span = db.hir_id_to_display_span(id)?;
 
             let line = db
@@ -85,53 +120,39 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
                 .offset_to_lsp(input.clone(), last_characer_of_line)
                 .to_position();
 
-            None as Option<Hint>
-            // TODO: Include more hints
-            // Some(Hint {
-            //     kind,
-            //     text: format!(" # {}", db.value_to_display_string(value.to_owned())),
-            //     position,
-            // })
+            Some(Hint {
+                kind: HintKind::Value,
+                text: format!(" # {value}"),
+                position,
+            })
         })
-        // If multiple hints are on the same line, only show the last one.
+        .collect_vec();
+
+    // If multiple hints are on the same line, only show the last one.
+    let mut hints = value_hints
+        .into_iter()
         .group_by(|hint| hint.position.line)
         .into_iter()
         .map(|(_, hints)| hints.into_iter().last().unwrap())
-        .collect()
-}
+        .collect_vec();
 
-fn collect_hir_ids_for_hints_list(db: &dyn HintsDb, ids: Vec<hir::Id>) -> Vec<hir::Id> {
-    ids.into_iter()
-        .flat_map(|id| collect_hir_ids_for_hints(db, id))
-        .collect()
-}
-fn collect_hir_ids_for_hints(db: &dyn HintsDb, id: hir::Id) -> Vec<hir::Id> {
-    match db.find_expression(id.clone()).unwrap() {
-        Expression::Int(_) => vec![],
-        Expression::Text(_) => vec![],
-        Expression::Reference(_) => vec![id],
-        Expression::Symbol(_) => vec![],
-        Expression::Struct(_) => vec![], // Handled separately // TODO
-        Expression::Lambda(Lambda { body, .. }) => {
-            collect_hir_ids_for_hints_list(db, body.expressions.keys().cloned().collect())
-        }
-        Expression::Call { arguments, .. } => {
-            let mut ids = vec![id.to_owned()];
-            for argument_id in arguments {
-                let argument = match db.find_expression(argument_id.clone()) {
-                    Some(argument) => argument,
-                    None => continue, // Generated code
-                };
-                if let Expression::Reference(_) = argument {
-                    continue;
+    if let Some(message) = panicked {
+        hints.push(Hint {
+            kind: HintKind::Panic,
+            text: format!(
+                " # The code in this module panicked because {}.",
+                if let Value::Text(message) = message {
+                    message
+                } else {
+                    format!("{message}")
                 }
-
-                ids.extend(collect_hir_ids_for_hints(db, argument_id));
-            }
-            ids
-        }
-        Expression::Builtin(_) => vec![],
-        Expression::Needs { .. } => vec![],
-        Expression::Error { .. } => vec![],
+            ),
+            position: Position {
+                line: 0,
+                character: 1,
+            },
+        });
     }
+
+    hints
 }
