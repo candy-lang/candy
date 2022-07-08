@@ -11,6 +11,7 @@ pub struct CompilerError {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum CompilerErrorPayload {
+    InvalidUtf8,
     Rcst(RcstError),
     Ast(AstError),
     Hir(HirError),

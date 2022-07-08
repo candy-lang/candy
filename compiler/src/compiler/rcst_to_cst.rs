@@ -1,17 +1,17 @@
 use super::{
     cst::{self, Cst, CstKind},
     rcst::Rcst,
-    string_to_rcst::StringToRcst,
+    string_to_rcst::{InvalidInputError, StringToRcst},
 };
 use crate::input::Input;
 use std::sync::Arc;
 
 #[salsa::query_group(RcstToCstStorage)]
 pub trait RcstToCst: StringToRcst {
-    fn cst(&self, input: Input) -> Option<Arc<Vec<Cst>>>;
+    fn cst(&self, input: Input) -> Result<Arc<Vec<Cst>>, InvalidInputError>;
 }
 
-fn cst(db: &dyn RcstToCst, input: Input) -> Option<Arc<Vec<Cst>>> {
+fn cst(db: &dyn RcstToCst, input: Input) -> Result<Arc<Vec<Cst>>, InvalidInputError> {
     let rcsts = db.rcst(input)?;
 
     let mut state = State {
@@ -20,7 +20,7 @@ fn cst(db: &dyn RcstToCst, input: Input) -> Option<Arc<Vec<Cst>>> {
     };
     let csts = (*rcsts).clone().to_csts(&mut state);
 
-    Some(Arc::new(csts))
+    Ok(Arc::new(csts))
 }
 
 struct State {

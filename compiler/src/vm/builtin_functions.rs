@@ -1,10 +1,7 @@
 use super::{heap::ObjectPointer, value::Value, Vm};
 use crate::{
     builtin_functions::BuiltinFunction,
-    compiler::{
-        hir_to_lir::HirToLir,
-        lir::{Instruction, Lir},
-    },
+    compiler::lir::Instruction,
     database::Database,
     input::{Input, InputDb},
 };
@@ -193,7 +190,12 @@ impl Vm {
         let content = db
             .get_input(input.clone())
             .ok_or_else(|| format!("Couldn't import file '{}'.", input))?;
-        Ok(Value::Text((*content).clone()))
+        Ok(Value::list(
+            content
+                .iter()
+                .map(|byte| Value::Int(*byte as u64))
+                .collect_vec(),
+        ))
     }
 
     fn use_local_module(&mut self, db: &Database, args: Vec<Value>) -> Result<(), String> {

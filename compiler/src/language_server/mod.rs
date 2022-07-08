@@ -191,7 +191,7 @@ impl LanguageServer for CandyLanguageServer {
         let input = params.text_document.uri.into();
         {
             let mut db = self.db.lock().await;
-            db.did_open_input(&input, params.text_document.text);
+            db.did_open_input(&input, params.text_document.text.into_bytes());
         }
         self.analyze_files(vec![input]).await;
     }
@@ -201,7 +201,7 @@ impl LanguageServer for CandyLanguageServer {
         {
             let mut db = self.db.lock().await;
             let text = apply_text_changes(&db, input.clone(), params.content_changes);
-            db.did_change_input(&input, text);
+            db.did_change_input(&input, text.into_bytes());
             open_inputs.extend(db.open_inputs.keys().cloned());
         }
         self.analyze_files(open_inputs).await;
@@ -290,7 +290,12 @@ fn apply_text_changes(
     input: Input,
     changes: Vec<TextDocumentContentChangeEvent>,
 ) -> String {
-    let mut text = db.get_input(input.clone()).unwrap().as_ref().to_owned();
+    let mut text = db
+        .get_string_input(input.clone())
+        .unwrap()
+        .as_ref()
+        .to_owned();
+    db.get_input(input).unwrap().as_ref();
     for change in changes {
         match change.range {
             Some(range) => {

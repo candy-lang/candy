@@ -4,11 +4,17 @@ use std::sync::Arc;
 
 #[salsa::query_group(StringToRcstStorage)]
 pub trait StringToRcst: InputDb {
-    fn rcst(&self, input: Input) -> Option<Arc<Vec<Rcst>>>;
+    fn rcst(&self, input: Input) -> Result<Arc<Vec<Rcst>>, InvalidInputError>;
 }
 
-fn rcst(db: &dyn StringToRcst, input: Input) -> Option<Arc<Vec<Rcst>>> {
-    let source = db.get_input(input)?;
+fn rcst(db: &dyn StringToRcst, input: Input) -> Result<Arc<Vec<Rcst>>, InvalidInputError> {
+    let source = db.get_input(input).ok_or(InvalidInputError::DoesNotExist)?;
+    let source = match String::from_utf8((*source).clone()) {
+        Ok(source) => source,
+        Err(_) => {
+            return Err(InvalidInputError::InvalidUtf8);
+        }
+    };
     let (rest, mut rcsts) = parse::body(&source, 0);
     if !rest.is_empty() {
         rcsts.push(Rcst::Error {
@@ -16,7 +22,13 @@ fn rcst(db: &dyn StringToRcst, input: Input) -> Option<Arc<Vec<Rcst>>> {
             error: RcstError::UnparsedRest,
         });
     }
-    Some(Arc::new(rcsts))
+    Ok(Arc::new(rcsts))
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub enum InvalidInputError {
+    DoesNotExist,
+    InvalidUtf8,
 }
 
 impl Rcst {

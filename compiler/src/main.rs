@@ -121,16 +121,14 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
     log::debug!("Parsing string to RCST…");
     let rcst = db
         .rcst(input.clone())
-        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+        .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", path_string, err));
     if debug {
         let rcst_file = file.clone_with_extension("candy.rcst");
         fs::write(rcst_file, format!("{:#?}\n", rcst.clone())).unwrap();
     }
 
     log::debug!("Turning RCST to CST…");
-    let cst = db
-        .cst(input.clone())
-        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+    let cst = db.cst(input.clone()).expect("RCST should have failed");
     if debug {
         let cst_file = file.clone_with_extension("candy.cst");
         fs::write(cst_file, format!("{:#?}\n", cst.clone())).unwrap();
