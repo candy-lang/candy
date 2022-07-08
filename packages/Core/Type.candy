@@ -1,4 +1,4 @@
-equals = (use ".Equality").equals
+equals = (use "..Equality").equals
 
 typeOf value := ✨.typeOf value
 

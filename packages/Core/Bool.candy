@@ -1,4 +1,4 @@
-type = use ".Type"
+type = use "..Type"
 
 is value := type.is value Bool
 
