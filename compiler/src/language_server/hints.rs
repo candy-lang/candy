@@ -1,6 +1,7 @@
 use super::utils::LspPositionConversion;
 use crate::{
     compiler::{
+        ast::{Ast, AstKind, FindAst},
         ast_to_hir::AstToHir,
         hir::{self, HirDb},
         hir_to_lir::HirToLir,
@@ -9,10 +10,12 @@ use crate::{
     input::{Input, InputDb},
     language_server::utils::TupleToPosition,
     vm::{tracer::TraceEntry, use_provider::FunctionUseProvider, value::Value, Status, Vm},
+    CloneWithExtension,
 };
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position};
 use serde::{Deserialize, Serialize};
+use std::fs;
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Hint {
@@ -66,7 +69,8 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
 
     vm.set_up_module_closure_execution(&use_provider, module_closure);
     vm.run(&use_provider, 1000);
-    let panicked = match vm.status() {
+
+    let panic_hint = match vm.status() {
         Status::Running => {
             log::info!("VM is still running.");
             None
@@ -78,20 +82,27 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
         }
         Status::Panicked(value) => {
             log::error!("VM panicked with value {value}.");
-            // log::error!("This is the stack trace:");
-            // vm.tracer.dump_stack_trace(&db, input);
-            Some(value)
+            if let Some(path) = input.to_path() {
+                let trace = vm.tracer.dump_call_tree();
+                let trace_file = path.clone_with_extension("candy.trace");
+                fs::write(trace_file.clone(), trace).unwrap();
+            }
+            panic_hint(db, input.clone(), &vm, value)
         }
     };
 
-    let id_of_this_module = hir::Id::new(input.clone(), vec![]);
-    let values = vm
+    let interesting_values = vm
         .tracer
         .log()
         .iter()
         .filter_map(|entry| match entry {
             TraceEntry::ValueEvaluated { id, value } => {
-                if id_of_this_module.is_parent_of(id) {
+                if id.input != input {
+                    return None;
+                }
+                let ast_id = db.hir_to_ast_id(id.clone())?;
+                let ast = (*db.ast(input.clone())?.0).clone();
+                if let AstKind::Assignment { .. } = ast.find(&ast_id)?.kind {
                     Some((id.clone(), value.clone()))
                 } else {
                     None
@@ -101,29 +112,13 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
         })
         .collect_vec();
 
-    let value_hints = values
+    let value_hints = interesting_values
         .into_iter()
         .filter_map(|(id, value)| {
-            let span = db.hir_id_to_display_span(id)?;
-
-            let line = db
-                .offset_to_lsp(input.clone(), span.start)
-                .to_position()
-                .line;
-            let line_start_offsets = db.line_start_utf8_byte_offsets(input.clone());
-            let last_characer_of_line = if line as usize == line_start_offsets.len() - 1 {
-                db.get_input(input.clone()).unwrap().len()
-            } else {
-                line_start_offsets[(line + 1) as usize] - 1
-            };
-            let position = db
-                .offset_to_lsp(input.clone(), last_characer_of_line)
-                .to_position();
-
             Some(Hint {
                 kind: HintKind::Value,
                 text: format!(" # {value}"),
-                position,
+                position: id_to_end_of_line(db, input.clone(), id)?,
             })
         })
         .collect_vec();
@@ -136,23 +131,78 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
         .map(|(_, hints)| hints.into_iter().last().unwrap())
         .collect_vec();
 
-    if let Some(message) = panicked {
-        hints.push(Hint {
-            kind: HintKind::Panic,
-            text: format!(
-                " # The code in this module panicked because {}.",
-                if let Value::Text(message) = message {
-                    message
-                } else {
-                    format!("{message}")
-                }
-            ),
-            position: Position {
-                line: 0,
-                character: 1,
-            },
-        });
+    if let Some(hint) = panic_hint {
+        hints.push(hint);
     }
 
     hints
+}
+
+fn panic_hint(db: &dyn HintsDb, input: Input, vm: &Vm, panic_message: Value) -> Option<Hint> {
+    // We want to show the hint at the last call site still inside the current
+    // module. If there is no call site in this module, then the panic results
+    // from a compiler error in a previous stage which is already reported.
+    let last_call_in_this_module = vm
+        .tracer
+        .stack()
+        .iter()
+        .rev()
+        .filter(|entry| {
+            let id = match entry {
+                TraceEntry::CallStarted { id, .. } => id,
+                TraceEntry::NeedsStarted { id, .. } => id,
+                _ => return false,
+            };
+            // Make sure the entry comes from the same file and is not generated code.
+            id.input == input && db.hir_to_cst_id(id.clone()).is_some()
+        })
+        .next()?;
+
+    let (id, call_info) = match last_call_in_this_module {
+        TraceEntry::CallStarted { id, closure, args } => (
+            id,
+            format!(
+                "{closure} {}",
+                args.iter().map(|arg| format!("{arg}")).join(" ")
+            ),
+        ),
+        TraceEntry::NeedsStarted {
+            id,
+            condition,
+            message,
+        } => (id, format!("needs {condition} {message}")),
+        _ => unreachable!(),
+    };
+
+    Some(Hint {
+        kind: HintKind::Panic,
+        text: format!(
+            " # Calling {call_info} panicked because {}.",
+            if let Value::Text(message) = panic_message {
+                message
+            } else {
+                format!("{panic_message}")
+            }
+        ),
+        position: id_to_end_of_line(db, input, id.clone())?,
+    })
+}
+
+fn id_to_end_of_line(db: &dyn HintsDb, input: Input, id: hir::Id) -> Option<Position> {
+    let span = db.hir_id_to_display_span(id.clone())?;
+
+    let line = db
+        .offset_to_lsp(input.clone(), span.start)
+        .to_position()
+        .line;
+    let line_start_offsets = db.line_start_utf8_byte_offsets(input.clone());
+    let last_characer_of_line = if line as usize == line_start_offsets.len() - 1 {
+        db.get_input(input.clone()).unwrap().len()
+    } else {
+        line_start_offsets[(line + 1) as usize] - 1
+    };
+    let position = db
+        .offset_to_lsp(input.clone(), last_characer_of_line)
+        .to_position();
+    Some(position)
 }

@@ -69,6 +69,9 @@ impl Tracer {
         &self.log
     }
 
+    pub fn stack(&self) -> &[TraceEntry] {
+        &self.stack
+    }
     pub fn dump_stack_trace(&self, db: &Database, input: Input) {
         for line in self.format_stack_trace(db, input).lines() {
             log::error!("{}", line);

@@ -118,8 +118,10 @@ impl Id {
         }
     }
 
-    pub fn is_parent_of(&self, other: &Self) -> bool {
-        self.keys.len() < other.keys.len() && self.keys.iter().zip(&other.keys).all(|(a, b)| a == b)
+    pub fn is_same_module_parent_of(&self, other: &Self) -> bool {
+        self.input == other.input
+            && self.keys.len() < other.keys.len()
+            && self.keys.iter().zip(&other.keys).all(|(a, b)| a == b)
     }
 }
 impl Display for Id {
@@ -168,7 +170,9 @@ impl Lambda {
         self.body.collect_all_ids(&mut captured);
         let captured = captured
             .into_iter()
-            .filter(|potentially_captured_id| !my_id.is_parent_of(potentially_captured_id))
+            .filter(|potentially_captured_id| {
+                !my_id.is_same_module_parent_of(potentially_captured_id)
+            })
             .collect::<HashSet<_>>()
             .into_iter()
             .collect_vec();
