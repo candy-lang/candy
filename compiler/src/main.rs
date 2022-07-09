@@ -217,17 +217,22 @@ fn run(options: CandyRunOptions) {
     let mut vm = Vm::new();
     let use_provider = DbUseProvider { db: &db };
     vm.set_up_module_closure_execution(&use_provider, module_closure);
-    vm.run(&use_provider, 1000);
-    match vm.status() {
-        Status::Running => log::info!("VM is still running."),
-        Status::Done => {
-            let return_value = vm.tear_down_module_closure_execution();
-            log::info!("VM is done. Export map: {return_value}");
-        }
-        Status::Panicked(value) => {
-            log::error!("VM panicked with value {value}.");
-            log::error!("This is the stack trace:");
-            vm.tracer.dump_stack_trace(&db, input);
+
+    loop {
+        vm.run(&use_provider, 10000);
+        match vm.status() {
+            Status::Running => log::info!("VM is still running."),
+            Status::Done => {
+                let return_value = vm.tear_down_module_closure_execution();
+                log::info!("VM is done. Export map: {return_value}");
+                break;
+            }
+            Status::Panicked(value) => {
+                log::error!("VM panicked with value {value}.");
+                log::error!("This is the stack trace:");
+                vm.tracer.dump_stack_trace(&db, input.clone());
+                break;
+            }
         }
     }
 
