@@ -5,7 +5,7 @@ use super::{
     value::Value,
 };
 use crate::{
-    compiler::{hir::Id, hir_to_lir::HirToLir, lir::Instruction},
+    compiler::{hir::Id, lir::Instruction},
     input::Input,
 };
 use itertools::Itertools;

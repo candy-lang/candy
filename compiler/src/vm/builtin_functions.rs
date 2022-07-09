@@ -1,10 +1,5 @@
 use super::{heap::ObjectPointer, use_provider::UseProvider, value::Value, Vm};
-use crate::{
-    builtin_functions::BuiltinFunction,
-    compiler::{hir_to_lir::HirToLir, lir::Instruction},
-    database::Database,
-    input::{Input, InputDb},
-};
+use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
 use itertools::Itertools;
 use log;
 
