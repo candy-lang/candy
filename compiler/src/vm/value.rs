@@ -1,4 +1,3 @@
-use super::heap::ObjectPointer;
 use crate::{
     builtin_functions::BuiltinFunction,
     compiler::{
@@ -26,7 +25,7 @@ pub enum Value {
     Symbol(String),
     Struct(HashMap<Value, Value>),
     Closure {
-        captured: Vec<ObjectPointer>,
+        captured: Vec<Value>,
         num_args: usize,
         body: Vec<Instruction>,
     },
