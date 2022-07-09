@@ -1,7 +1,7 @@
 use super::utils::LspPositionConversion;
 use crate::{
     compiler::{
-        ast::{Ast, AstKind, FindAst},
+        ast::{AstKind, FindAst},
         ast_to_hir::AstToHir,
         hir::{self, HirDb},
         hir_to_lir::HirToLir,
