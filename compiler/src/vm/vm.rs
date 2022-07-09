@@ -147,26 +147,26 @@ impl Vm {
             };
             let instruction = current_body[self.next_instruction.instruction].clone();
 
-            log::trace!(
-                "Data stack: {}",
-                self.data_stack
-                    .iter()
-                    .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
-                    .join(", ")
-            );
-            log::trace!(
-                "Call stack: {}",
-                self.call_stack
-                    .iter()
-                    .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
-                    .join(", ")
-            );
-            log::trace!(
-                "Instruction pointer: {}:{}",
-                self.next_instruction.closure,
-                self.next_instruction.instruction
-            );
-            log::trace!("Heap: {:?}", self.heap);
+            // log::trace!(
+            //     "Data stack: {}",
+            //     self.data_stack
+            //         .iter()
+            //         .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
+            //         .join(", ")
+            // );
+            // log::trace!(
+            //     "Call stack: {}",
+            //     self.call_stack
+            //         .iter()
+            //         .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
+            //         .join(", ")
+            // );
+            // log::trace!(
+            //     "Instruction pointer: {}:{}",
+            //     self.next_instruction.closure,
+            //     self.next_instruction.instruction
+            // );
+            // log::trace!("Heap: {:?}", self.heap);
 
             log::trace!("Running instruction: {instruction:?}");
             self.next_instruction.instruction += 1;
