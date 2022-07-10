@@ -1,21 +1,45 @@
+//! Unlike the usual language server features, hints are not generated on-demand
+//! with the usual request-response model. Instead, a hints server runs in the
+//! background all the time. That way, the hints can progressively get better.
+//! For example, when opening a long file, the hints may appear from top to
+//! bottom as more code is evaluated. Then, the individual closures could get
+//! fuzzed with ever-more-complex inputs, resulting in some error cases to be
+//! displayed over time.
+//! While doing all that, we can pause regularly between executing instructions
+//! so that we don't occupy a single CPU at 100%.
+
 use super::utils::LspPositionConversion;
 use crate::{
     compiler::{
         ast::{AstKind, FindAst},
         ast_to_hir::AstToHir,
-        hir::{self, HirDb},
+        cst_to_ast::CstToAst,
+        hir,
         hir_to_lir::HirToLir,
     },
-    discover::run::Discover,
+    database::Database,
     input::{Input, InputDb},
     language_server::utils::TupleToPosition,
-    vm::{tracer::TraceEntry, use_provider::FunctionUseProvider, value::Value, Status, Vm},
+    vm::{tracer::TraceEntry, use_provider::DbUseProvider, value::Value, Status, Vm},
     CloneWithExtension,
 };
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position};
+use rand::{prelude::SliceRandom, thread_rng};
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::{collections::HashMap, fs, sync::Arc, time::Duration};
+use tokio::{
+    sync::{
+        mpsc::{error::TryRecvError, Receiver, Sender},
+        Mutex,
+    },
+    time::sleep,
+};
+
+pub enum Event {
+    UpdateModule(Input),
+    CloseModule(Input),
+}
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Hint {
@@ -41,44 +65,84 @@ impl Notification for HintsNotification {
     type Params = Self;
 }
 
-#[salsa::query_group(HintsDbStorage)]
-pub trait HintsDb:
-    HirToLir + AstToHir + Discover + HirDb + InputDb + LspPositionConversion
-{
-    fn hints(&self, input: Input) -> Vec<Hint>;
+pub async fn run_server(
+    db: Arc<Mutex<Database>>,
+    mut incoming_events: Receiver<Event>,
+    outgoing_hints: Sender<(Input, Vec<Hint>)>,
+) {
+    let mut vms = HashMap::new();
+
+    'server_loop: loop {
+        loop {
+            match incoming_events.try_recv() {
+                Ok(event) => handle_event(db.clone(), &mut vms, event).await,
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => break 'server_loop,
+            }
+        }
+
+        let input_of_chosen_vm = vms
+            .iter()
+            .filter(|(input, vm)| match vm.status() {
+                Status::Running => true,
+                Status::Done => false,
+                Status::Panicked(_) => false,
+            })
+            .collect_vec()
+            .choose(&mut thread_rng())
+            .map(|(input, _)| (*input).clone());
+
+        if let Some(input) = input_of_chosen_vm {
+            let vm = vms.get_mut(&input).unwrap();
+            let use_provider = DbUseProvider { db: db.clone() };
+            vm.run(&use_provider, 500);
+            let hints = collect_hints(db.clone(), &input, vm);
+        }
+
+        sleep(Duration::from_millis(100)).await;
+    }
 }
 
-fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
-    log::debug!("Calculating hints for {input}");
+async fn handle_event(db: Arc<Mutex<Database>>, vms: &mut HashMap<Input, Vm>, event: Event) {
+    match event {
+        Event::UpdateModule(input) => match vm_for_input(db, input.clone()).await {
+            Some(vm) => {
+                vms.insert(input, vm);
+            }
+            None => {}
+        },
+        Event::CloseModule(input) => {
+            vms.remove(&input);
+        }
+    }
+}
 
-    let lir = match db.lir(input.clone()) {
-        Some(lir) => (*lir).clone(),
-        None => return vec![],
+async fn vm_for_input(db: Arc<Mutex<Database>>, input: Input) -> Option<Vm> {
+    let lir = {
+        let db = db.lock().await;
+        let lir = db.lir(input.clone())?;
+        (*lir).clone()
     };
     let module_closure = Value::module_closure_of_lir(input.clone(), lir);
 
     let mut vm = Vm::new();
-    let use_provider = FunctionUseProvider {
-        use_asset: &|input| {
-            db.get_input(input.clone())
-                .map(|bytes| (*bytes).clone())
-                .ok_or_else(|| format!("Couldn't import file '{}'.", input))
-        },
-        use_local_module: &|input| db.lir(input).map(|lir| (*lir).clone()),
-    };
 
+    let use_provider = DbUseProvider { db };
     vm.set_up_module_closure_execution(&use_provider, module_closure);
-    vm.run(&use_provider, 1000);
+    Some(vm)
+}
 
-    let panic_hint = match vm.status() {
+async fn collect_hints(db: Arc<Mutex<Database>>, input: &Input, vm: &mut Vm) -> Vec<Hint> {
+    log::debug!("Calculating hints for {input}");
+    let mut hints = vec![];
+
+    match vm.status() {
         Status::Running => {
             log::info!("VM is still running.");
-            None
         }
         Status::Done => {
             let return_value = vm.tear_down_module_closure_execution();
             log::info!("VM is done. Export map: {return_value}");
-            None
         }
         Status::Panicked(value) => {
             log::error!("VM panicked with value {value}.");
@@ -87,58 +151,64 @@ fn hints(db: &dyn HintsDb, input: Input) -> Vec<Hint> {
                 let trace_file = path.clone_with_extension("candy.trace");
                 fs::write(trace_file.clone(), trace).unwrap();
             }
-            panic_hint(db, input.clone(), &vm, value)
+            let db = db.lock().await;
+            match panic_hint(&db, input.clone(), &vm, value) {
+                Some(hint) => {
+                    hints.push(hint);
+                }
+                None => log::error!("Module panicked, but we are not displaying an error."),
+            }
         }
     };
 
-    let interesting_values = vm
-        .tracer
-        .log()
-        .iter()
-        .filter_map(|entry| match entry {
+    for entry in vm.tracer.log() {
+        let (id, value) = match entry {
             TraceEntry::ValueEvaluated { id, value } => {
-                if id.input != input {
-                    return None;
+                if &id.input != input {
+                    continue;
                 }
-                let ast_id = db.hir_to_ast_id(id.clone())?;
-                let ast = (*db.ast(input.clone())?.0).clone();
-                if let AstKind::Assignment { .. } = ast.find(&ast_id)?.kind {
-                    Some((id.clone(), value.clone()))
-                } else {
-                    None
+                let db = db.lock().await;
+                let ast_id = match db.hir_to_ast_id(id.clone()) {
+                    Some(ast_id) => ast_id,
+                    None => continue,
+                };
+                let ast = match db.ast(input.clone()) {
+                    Some((ast, _)) => (*ast).clone(),
+                    None => continue,
+                };
+                match ast.find(&ast_id) {
+                    None => continue,
+                    Some(ast) => match ast.kind {
+                        AstKind::Assignment { .. } => {}
+                        _ => continue,
+                    },
                 }
+                (id.clone(), value.clone())
             }
-            _ => None,
-        })
-        .collect_vec();
+            _ => continue,
+        };
 
-    let value_hints = interesting_values
-        .into_iter()
-        .filter_map(|(id, value)| {
-            Some(Hint {
-                kind: HintKind::Value,
-                text: format!(" # {value}"),
-                position: id_to_end_of_line(db, input.clone(), id)?,
-            })
-        })
-        .collect_vec();
+        let db = db.lock().await;
+        hints.push(Hint {
+            kind: HintKind::Value,
+            text: format!(" # {value}"),
+            position: id_to_end_of_line(&db, input.clone(), id).unwrap(),
+        });
+    }
 
     // If multiple hints are on the same line, only show the last one.
-    let mut hints = value_hints
+    // TODO: Give panic hints a higher priority.
+    let hints = hints
         .into_iter()
         .group_by(|hint| hint.position.line)
         .into_iter()
         .map(|(_, hints)| hints.into_iter().last().unwrap())
         .collect_vec();
 
-    if let Some(hint) = panic_hint {
-        hints.push(hint);
-    }
-
     hints
 }
 
-fn panic_hint(db: &dyn HintsDb, input: Input, vm: &Vm, panic_message: Value) -> Option<Hint> {
+fn panic_hint(db: &Database, input: Input, vm: &Vm, panic_message: Value) -> Option<Hint> {
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.
@@ -188,7 +258,7 @@ fn panic_hint(db: &dyn HintsDb, input: Input, vm: &Vm, panic_message: Value) -> 
     })
 }
 
-fn id_to_end_of_line(db: &dyn HintsDb, input: Input, id: hir::Id) -> Option<Position> {
+fn id_to_end_of_line(db: &Database, input: Input, id: hir::Id) -> Option<Position> {
     let span = db.hir_id_to_display_span(id.clone())?;
 
     let line = db

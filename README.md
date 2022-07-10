@@ -115,6 +115,7 @@ Major milestones:
 
 ## Short-term TODOs
 
+- extra closure value type
 - use BigInts
 - mini-heaps?
 - start fuzzing in language server

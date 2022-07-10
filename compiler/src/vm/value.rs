@@ -4,11 +4,16 @@ use crate::{
         hir_to_lir::HirToLir,
         lir::{Instruction, Lir},
     },
+    database::Database,
     input::Input,
 };
 use im::HashMap;
 use itertools::Itertools;
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    sync::Arc,
+};
+use tokio::sync::Mutex;
 
 /// A self-contained value. Unlike objects, these are not tied to a running VM,
 /// which makes them useful for being sent through channels between multiple
@@ -54,7 +59,8 @@ impl Value {
             ],
         }
     }
-    pub fn module_closure_of_input(db: &dyn HirToLir, input: Input) -> Option<Self> {
+    pub async fn module_closure_of_input(db: Arc<Mutex<Database>>, input: Input) -> Option<Self> {
+        let db = db.lock().await;
         let lir = db.lir(input.clone())?;
         Some(Self::module_closure_of_lir(input, (*lir).clone()))
     }

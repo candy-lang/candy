@@ -1,3 +1,10 @@
+pub mod definition;
+pub mod folding_range;
+pub mod hints;
+pub mod references;
+pub mod semantic_tokens;
+pub mod utils;
+
 use self::{
     definition::find_definition,
     folding_range::FoldingRangeDb,
@@ -10,7 +17,6 @@ use crate::{
     compiler::{ast_to_hir::AstToHir, hir::CollectErrors},
     database::PROJECT_DIRECTORY,
     input::{Input, InputDb},
-    language_server::hints::HintsDb,
     Database,
 };
 use itertools::Itertools;
@@ -25,25 +31,21 @@ use lsp_types::{
     TextDocumentChangeRegistrationOptions, TextDocumentContentChangeEvent,
     TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
 };
-use tokio::sync::Mutex;
+use std::sync::Arc;
+use tokio::sync::{mpsc::Sender, Mutex};
 use tower_lsp::{jsonrpc, Client, LanguageServer};
-
-pub mod definition;
-pub mod folding_range;
-pub mod hints;
-pub mod references;
-pub mod semantic_tokens;
-pub mod utils;
 
 pub struct CandyLanguageServer {
     pub client: Client,
-    pub db: Mutex<Database>,
+    pub db: Arc<Mutex<Database>>,
+    pub hints_server_sink: Arc<Mutex<Option<Sender<hints::Event>>>>,
 }
 impl CandyLanguageServer {
     pub fn from_client(client: Client) -> Self {
         Self {
             client,
-            db: Mutex::new(Database::default()),
+            db: Default::default(),
+            hints_server_sink: Default::default(),
         }
     }
 }
@@ -67,6 +69,27 @@ impl LanguageServer for CandyLanguageServer {
             "file" => Some(first_workspace_folder.to_file_path().unwrap()),
             _ => panic!("Workspace folder must be a file URI."),
         };
+
+        let (events_sender, events_receiver) = tokio::sync::mpsc::channel(16);
+        let (hints_sender, mut hints_receiver) = tokio::sync::mpsc::channel(8);
+        tokio::spawn(hints::run_server(
+            self.db.clone(),
+            events_receiver,
+            hints_sender,
+        ));
+        *self.hints_server_sink.lock().await = Some(events_sender);
+        let client = self.client.clone();
+        let hint_reporter = async move || {
+            while let Some((input, hints)) = hints_receiver.recv().await {
+                client
+                    .send_notification::<HintsNotification>(HintsNotification {
+                        uri: Url::from(input).to_string(),
+                        hints,
+                    })
+                    .await;
+            }
+        };
+        tokio::spawn(hint_reporter());
 
         Ok(InitializeResult {
             // We only support dynamic registration for now.
@@ -273,13 +296,6 @@ impl CandyLanguageServer {
             };
             self.client
                 .publish_diagnostics(input.clone().into(), diagnostics, None)
-                .await;
-            let hints = db.hints(input.clone());
-            self.client
-                .send_notification::<HintsNotification>(HintsNotification {
-                    uri: Url::from(input).to_string(),
-                    hints,
-                })
                 .await;
         }
     }

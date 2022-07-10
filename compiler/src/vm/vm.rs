@@ -69,7 +69,7 @@ impl Vm {
         }
     }
 
-    pub fn set_up_closure_execution<U: UseProvider>(
+    pub async fn set_up_closure_execution<U: UseProvider>(
         &mut self,
         use_provider: &U,
         closure: Value,
@@ -94,7 +94,8 @@ impl Vm {
         let address = self.heap.import(closure);
         self.data_stack.push(address);
 
-        self.run_instruction(use_provider, Instruction::Call { num_args });
+        self.run_instruction(use_provider, Instruction::Call { num_args })
+            .await;
         self.status = Status::Running;
     }
     pub fn tear_down_closure_execution(&mut self) -> Value {
@@ -103,7 +104,7 @@ impl Vm {
         self.heap.export(return_value)
     }
 
-    pub fn set_up_module_closure_execution<U: UseProvider>(
+    pub async fn set_up_module_closure_execution<U: UseProvider>(
         &mut self,
         use_provider: &U,
         closure: Value,
@@ -118,6 +119,7 @@ impl Vm {
             panic!("Called start_module_closure with a non-closure.");
         };
         self.set_up_closure_execution(use_provider, closure, vec![])
+            .await;
     }
     pub fn tear_down_module_closure_execution(&mut self) -> Value {
         self.tear_down_closure_execution()
@@ -131,7 +133,7 @@ impl Vm {
         self.data_stack[self.data_stack.len() - 1 - offset as usize].clone()
     }
 
-    pub fn run<U: UseProvider>(&mut self, use_provider: &U, mut num_instructions: u16) {
+    pub async fn run<U: UseProvider>(&mut self, use_provider: &U, mut num_instructions: u16) {
         assert!(
             matches!(self.status, Status::Running),
             "Called Vm::run on a vm that is not ready to run."
@@ -170,14 +172,18 @@ impl Vm {
 
             log::trace!("Running instruction: {instruction:?}");
             self.next_instruction.instruction += 1;
-            self.run_instruction(use_provider, instruction);
+            self.run_instruction(use_provider, instruction).await;
 
             if self.next_instruction == InstructionPointer::null_pointer() {
                 self.status = Status::Done;
             }
         }
     }
-    pub fn run_instruction<U: UseProvider>(&mut self, use_provider: &U, instruction: Instruction) {
+    pub async fn run_instruction<U: UseProvider>(
+        &mut self,
+        use_provider: &U,
+        instruction: Instruction,
+    ) {
         match instruction {
             Instruction::CreateInt(int) => {
                 let address = self.heap.create(ObjectData::Int(int));
@@ -272,7 +278,8 @@ impl Vm {
                     }
                     ObjectData::Builtin(builtin) => {
                         self.heap.drop(closure_address);
-                        self.run_builtin_function(use_provider, &builtin, &args);
+                        self.run_builtin_function(use_provider, &builtin, &args)
+                            .await;
                     }
                     _ => panic!("Can only call closures and builtins."),
                 };

@@ -14,7 +14,7 @@ macro_rules! destructure {
 }
 
 impl Vm {
-    pub(super) fn run_builtin_function<U: UseProvider>(
+    pub(super) async fn run_builtin_function<U: UseProvider>(
         &mut self,
         use_provider: &U,
         builtin_function: &BuiltinFunction,
@@ -40,11 +40,11 @@ impl Vm {
             BuiltinFunction::StructGetKeys => self.struct_get_keys(args),
             BuiltinFunction::StructHasKey => self.struct_has_key(args),
             BuiltinFunction::TypeOf => self.type_of(args),
-            BuiltinFunction::UseAsset => self.use_asset(use_provider, args),
+            BuiltinFunction::UseAsset => self.use_asset(use_provider, args).await,
             BuiltinFunction::UseLocalModule => {
                 // If successful, UseLocalModule doesn't return a value, but
                 // diverges the control flow.
-                match self.use_local_module(use_provider, args) {
+                match self.use_local_module(use_provider, args).await {
                     Ok(()) => return,
                     Err(message) => Err(message),
                 }
@@ -182,7 +182,7 @@ impl Vm {
         })
     }
 
-    fn use_asset<U: UseProvider>(
+    async fn use_asset<U: UseProvider>(
         &mut self,
         use_provider: &U,
         args: Vec<Value>,
@@ -190,7 +190,7 @@ impl Vm {
         let (current_path, target) = Self::parse_current_path_and_target(args)?;
         let target = UseAssetTarget::parse(&target)?;
         let input = target.resolve_asset(&current_path)?;
-        let content = use_provider.use_asset(input)?;
+        let content = use_provider.use_asset(input).await?;
         Ok(Value::list(
             content
                 .iter()
@@ -199,7 +199,7 @@ impl Vm {
         ))
     }
 
-    fn use_local_module<U: UseProvider>(
+    async fn use_local_module<U: UseProvider>(
         &mut self,
         use_provider: &U,
         args: Vec<Value>,
@@ -209,7 +209,7 @@ impl Vm {
         let possible_inputs = target.resolve_local_module(&current_path)?;
         let (input, lir) = 'find_existing_input: {
             for input in possible_inputs {
-                if let Some(lir) = use_provider.use_local_module(input.clone()) {
+                if let Some(lir) = use_provider.use_local_module(input.clone()).await {
                     break 'find_existing_input (input, lir);
                 }
             }
