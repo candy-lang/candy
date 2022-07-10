@@ -9,7 +9,6 @@ debug = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = "0.1.56"
 chrono = "0.4.19"
 colored = "2.0.0"
 fern = { version = "0.6.1", features = ["colored"] }

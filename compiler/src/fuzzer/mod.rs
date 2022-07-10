@@ -13,15 +13,16 @@ use std::{fs, sync::Arc};
 use tokio::sync::Mutex;
 
 pub async fn fuzz(db: Arc<Mutex<Database>>, input: Input) {
-    let module_closure = Value::module_closure_of_input(db.clone(), input.clone())
-        .await
-        .unwrap();
+    let mut vm = {
+        let mut vm = Vm::new();
+        let db = db.lock().await;
+        let module_closure = Value::module_closure_of_input(&db, input.clone()).unwrap();
+        let use_provider = DbUseProvider { db: &db };
+        vm.set_up_module_closure_execution(&use_provider, module_closure);
+        vm.run(&use_provider, 1000);
+        vm
+    };
 
-    let mut vm = Vm::new();
-    let use_provider = DbUseProvider { db: db.clone() };
-    vm.set_up_module_closure_execution(&use_provider, module_closure)
-        .await;
-    vm.run(&use_provider, 1000).await;
     match vm.status() {
         Status::Running => {
             log::warn!("VM didn't finish running, so we're not fuzzing it.");
@@ -42,7 +43,7 @@ pub async fn fuzz(db: Arc<Mutex<Database>>, input: Input) {
         vm.fuzzable_closures.len()
     );
 
-    fuzz_vm(db, input, &vm, 0);
+    fuzz_vm(db, input, &vm, 0).await;
 }
 
 async fn fuzz_vm(
@@ -126,11 +127,14 @@ async fn test_closure_with_args(
 ) -> TestResult {
     let closure = vm.heap.export_without_dropping(closure_address);
 
-    println!("Starting closure {closure}.");
-    let use_provider = DbUseProvider { db: db.clone() };
-    vm.set_up_closure_execution(&use_provider, closure, arguments);
+    {
+        let db = db.lock().await;
+        println!("Starting closure {closure}.");
+        let use_provider = DbUseProvider { db: &db };
+        vm.set_up_closure_execution(&use_provider, closure, arguments);
+        vm.run(&use_provider, 1000);
+    }
 
-    vm.run(&use_provider, 1000);
     match vm.status() {
         Status::Running => TestResult::StillRunning,
         Status::Done => TestResult::NoPanic,

@@ -15,7 +15,6 @@ use crate::{
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
         hir,
-        hir_to_lir::HirToLir,
     },
     database::Database,
     input::{Input, InputDb},
@@ -39,6 +38,7 @@ use tokio::{
 pub enum Event {
     UpdateModule(Input),
     CloseModule(Input),
+    Shutdown,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
@@ -75,7 +75,7 @@ pub async fn run_server(
     'server_loop: loop {
         loop {
             match incoming_events.try_recv() {
-                Ok(event) => handle_event(db.clone(), &mut vms, event).await,
+                Ok(event) => handle_event(db.clone(), &mut incoming_events, &mut vms, event).await,
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => break 'server_loop,
             }
@@ -83,7 +83,7 @@ pub async fn run_server(
 
         let input_of_chosen_vm = vms
             .iter()
-            .filter(|(input, vm)| match vm.status() {
+            .filter(|(_, vm)| match vm.status() {
                 Status::Running => true,
                 Status::Done => false,
                 Status::Panicked(_) => false,
@@ -93,17 +93,26 @@ pub async fn run_server(
             .map(|(input, _)| (*input).clone());
 
         if let Some(input) = input_of_chosen_vm {
-            let vm = vms.get_mut(&input).unwrap();
-            let use_provider = DbUseProvider { db: db.clone() };
-            vm.run(&use_provider, 500);
-            let hints = collect_hints(db.clone(), &input, vm);
+            let hints = {
+                let vm = vms.get_mut(&input).unwrap();
+                let db = db.lock().await;
+                let use_provider = DbUseProvider { db: &db };
+                vm.run(&use_provider, 5);
+                collect_hints(&db, &input, vm)
+            };
+            outgoing_hints.send((input, hints)).await.unwrap();
         }
 
         sleep(Duration::from_millis(100)).await;
     }
 }
 
-async fn handle_event(db: Arc<Mutex<Database>>, vms: &mut HashMap<Input, Vm>, event: Event) {
+async fn handle_event(
+    db: Arc<Mutex<Database>>,
+    incoming_events: &mut Receiver<Event>,
+    vms: &mut HashMap<Input, Vm>,
+    event: Event,
+) {
     match event {
         Event::UpdateModule(input) => match vm_for_input(db, input.clone()).await {
             Some(vm) => {
@@ -114,25 +123,22 @@ async fn handle_event(db: Arc<Mutex<Database>>, vms: &mut HashMap<Input, Vm>, ev
         Event::CloseModule(input) => {
             vms.remove(&input);
         }
+        Event::Shutdown => {
+            incoming_events.close();
+        }
     }
 }
 
 async fn vm_for_input(db: Arc<Mutex<Database>>, input: Input) -> Option<Vm> {
-    let lir = {
-        let db = db.lock().await;
-        let lir = db.lir(input.clone())?;
-        (*lir).clone()
-    };
-    let module_closure = Value::module_closure_of_lir(input.clone(), lir);
-
+    let db = db.lock().await;
+    let module_closure = Value::module_closure_of_input(&db, input.clone())?;
     let mut vm = Vm::new();
-
-    let use_provider = DbUseProvider { db };
+    let use_provider = DbUseProvider { db: &db };
     vm.set_up_module_closure_execution(&use_provider, module_closure);
     Some(vm)
 }
 
-async fn collect_hints(db: Arc<Mutex<Database>>, input: &Input, vm: &mut Vm) -> Vec<Hint> {
+fn collect_hints(db: &Database, input: &Input, vm: &mut Vm) -> Vec<Hint> {
     log::debug!("Calculating hints for {input}");
     let mut hints = vec![];
 
@@ -146,12 +152,6 @@ async fn collect_hints(db: Arc<Mutex<Database>>, input: &Input, vm: &mut Vm) -> 
         }
         Status::Panicked(value) => {
             log::error!("VM panicked with value {value}.");
-            if let Some(path) = input.to_path() {
-                let trace = vm.tracer.dump_call_tree();
-                let trace_file = path.clone_with_extension("candy.trace");
-                fs::write(trace_file.clone(), trace).unwrap();
-            }
-            let db = db.lock().await;
             match panic_hint(&db, input.clone(), &vm, value) {
                 Some(hint) => {
                     hints.push(hint);
@@ -160,6 +160,11 @@ async fn collect_hints(db: Arc<Mutex<Database>>, input: &Input, vm: &mut Vm) -> 
             }
         }
     };
+    if let Some(path) = input.to_path() {
+        let trace = vm.tracer.dump_call_tree();
+        let trace_file = path.clone_with_extension("candy.trace");
+        fs::write(trace_file.clone(), trace).unwrap();
+    }
 
     for entry in vm.tracer.log() {
         let (id, value) = match entry {
@@ -167,7 +172,6 @@ async fn collect_hints(db: Arc<Mutex<Database>>, input: &Input, vm: &mut Vm) -> 
                 if &id.input != input {
                     continue;
                 }
-                let db = db.lock().await;
                 let ast_id = match db.hir_to_ast_id(id.clone()) {
                     Some(ast_id) => ast_id,
                     None => continue,
@@ -188,7 +192,6 @@ async fn collect_hints(db: Arc<Mutex<Database>>, input: &Input, vm: &mut Vm) -> 
             _ => continue,
         };
 
-        let db = db.lock().await;
         hints.push(Hint {
             kind: HintKind::Value,
             text: format!(" # {value}"),

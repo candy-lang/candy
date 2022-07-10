@@ -106,7 +106,6 @@ checksum = "c4872d67bab6358e59559027aa3b9157c53d9358c51423c17554809a8858e0f8"
 name = "candy"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "chrono",
  "colored 2.0.0",
  "fern",

@@ -86,8 +86,8 @@ async fn main() {
     init_logger();
     match CandyOptions::from_args() {
         CandyOptions::Build(options) => build(options),
-        CandyOptions::Run(options) => run(options).await,
-        CandyOptions::Fuzz(options) => fuzz(options),
+        CandyOptions::Run(options) => run(options),
+        CandyOptions::Fuzz(options) => fuzz(options).await,
         CandyOptions::Lsp => lsp().await,
     }
 }
@@ -201,27 +201,24 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
     Some(lir)
 }
 
-async fn run(options: CandyRunOptions) {
+fn run(options: CandyRunOptions) {
     *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
 
     let input: Input = options.file.clone().into();
-    let db = Arc::new(Mutex::new(Database::default()));
+    let db = Database::default();
 
     if raw_build(&options.file, false).is_none() {
         log::info!("Build failed.");
         return;
     };
-    let module_closure = Value::module_closure_of_input(db.clone(), input.clone())
-        .await
-        .unwrap();
+    let module_closure = Value::module_closure_of_input(&db, input.clone()).unwrap();
 
     let path_string = options.file.to_string_lossy();
     log::info!("Running `{path_string}`.");
 
     let mut vm = Vm::new();
-    let use_provider = DbUseProvider { db: db.clone() };
-    vm.set_up_module_closure_execution(&use_provider, module_closure)
-        .await;
+    let use_provider = DbUseProvider { db: &db };
+    vm.set_up_module_closure_execution(&use_provider, module_closure);
 
     loop {
         vm.run(&use_provider, 10000);
@@ -235,7 +232,6 @@ async fn run(options: CandyRunOptions) {
             Status::Panicked(value) => {
                 log::error!("VM panicked with value {value}.");
                 log::error!("This is the stack trace:");
-                let db = db.lock().await;
                 vm.tracer.dump_stack_trace(&db, input.clone());
                 break;
             }
@@ -253,7 +249,7 @@ async fn run(options: CandyRunOptions) {
     }
 }
 
-fn fuzz(options: CandyFuzzOptions) {
+async fn fuzz(options: CandyFuzzOptions) {
     *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
 
     log::debug!("Building `{}`.\n", options.file.display());
@@ -269,7 +265,7 @@ fn fuzz(options: CandyFuzzOptions) {
     let path_string = options.file.to_string_lossy();
     log::debug!("Fuzzing `{path_string}`.");
 
-    fuzzer::fuzz(db, input);
+    fuzzer::fuzz(db, input).await;
 }
 
 async fn lsp() {

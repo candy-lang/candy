@@ -1,0 +1,5 @@
+Hint { kind: Value, text: " # [ 0: 110, 10: 97, 16: 50, 20: 111, 24: 44, 4: 44, 6: 103, 3: 101, 7: 101, 13: 101, 22: 97, 21: 110, 9: 77, 23: 115, 17: 50, 14: 108, 19: 74, 5: 97, 8: 10, 11: 114, 25: 50, 12: 99, 26: 50, 18: 10, 1: 97, 15: 44, 2: 109 ]", position: Position { line: 0, character: 28 } }
+Hint { kind: Value, text: " # 3", position: Position { line: 1, character: 7 } }
+Hint { kind: Value, text: " # {...}", position: Position { line: 2, character: 9 } }
+Hint { kind: Value, text: " # 5", position: Position { line: 3, character: 11 } }
+Hint { kind: Value, text: " # [  ]", position: Position { line: 4, character: 19 } }
