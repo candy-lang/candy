@@ -427,8 +427,13 @@ impl LoweringContext {
                 assignment_sign,
                 body,
             } => {
-                let name = self.lower_identifier(name);
-                let (parameters, errors) = self.lower_parameters(parameters);
+                let mut errors = vec![];
+                let (name, name_error) = self.lower_identifier(name);
+                if let Some(error) = name_error {
+                    errors.push(error);
+                }
+                let (parameters, mut parameter_errors) = self.lower_parameters(parameters);
+                errors.append(&mut parameter_errors);
 
                 assert!(
                     matches!(assignment_sign.kind, CstKind::EqualsSign | CstKind::ColonEqualsSign),
@@ -531,17 +536,19 @@ impl LoweringContext {
             })
         }
     }
-    fn lower_identifier(&mut self, cst: &Cst) -> AstString {
-        match cst {
-            Cst {
-                id,
-                kind: CstKind::Identifier(identifier),
-                ..
-            } => self.create_string(id.to_owned(), identifier.clone()),
-            _ => {
-                panic!("Expected an identifier, but found `{}`.", cst);
-            }
-        }
+    fn lower_identifier(&mut self, cst: &Cst) -> (AstString, Option<CompilerError>) {
+        let (identifier, error) = match &cst.kind {
+            CstKind::Identifier(identifier) => (identifier.clone(), None),
+            _ => (
+                "<invalid>".to_string(),
+                Some(CompilerError {
+                    input: self.input.clone(),
+                    span: cst.span.clone(),
+                    payload: CompilerErrorPayload::Ast(AstError::ExpectedIdentifier),
+                }),
+            ),
+        };
+        (self.create_string(cst.id.to_owned(), identifier), error)
     }
 
     fn create_ast(&mut self, cst_id: cst::Id, kind: AstKind) -> Ast {

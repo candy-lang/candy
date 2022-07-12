@@ -123,6 +123,7 @@ pub enum AstError {
     StructWithoutClosingBrace,
     StructKeyWithoutColon,
     StructValueWithoutComma,
+    ExpectedIdentifier,
     ExpectedParameter,
     LambdaWithoutClosingCurlyBrace,
 }
