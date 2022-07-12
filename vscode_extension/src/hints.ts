@@ -96,10 +96,10 @@ export class HintsDecorations implements vs.Disposable {
           hint.position
         );
 
-        // Ensure the hint we got looks like a sensible position, otherwise the type info
-        // might be stale (e.g., we sent two updates, and the type from in between them just
-        // arrived). In this case, we'll just bail and do nothing, assuming a future update will
-        // have the correct info.
+        // Ensure that the hint we got has a sensible position. Otherwise, the
+        // hint might be stale (e.g., we sent two updates, and the hint from in
+        // between them just arrived). In this case, we'll just bail and do
+        // nothing, assuming a future update will have the correct hint.
         // TODO(later, JonasWanke): do we really need this check?
         if (position.character < 1) {
           return;
@@ -126,8 +126,8 @@ export class HintsDecorations implements vs.Disposable {
           editor.setDecorations(decorationType, []);
         }
       } catch {
-        // It's possible the editor was closed, but there
-        // doesn't seem to be a way to tell.
+        // It's possible the editor was closed, but there doesn't seem to be a
+        // way to tell.
       }
     }
     this.subscriptions.forEach((s) => s.dispose());
