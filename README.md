@@ -115,16 +115,16 @@ Major milestones:
 
 ## Short-term TODOs
 
+- start fuzzing in language server
+- show fuzzing hints in the editor
+- make `PROJECT_DIRECTORY` non-global
 - extra closure value type
 - use BigInts
-- mini-heaps?
-- start fuzzing in language server
-- make `PROJECT_DIRECTORY` non-global
-- show fuzzing hints in the editor
 - implement fibers and nurseries
 - implement channels
 - remove builtinPrint
 - new name?
+- mini-heaps?
 - parse calls with call as a receiver: `(foo Bar) Baz`
 
 ## How to use Candy
