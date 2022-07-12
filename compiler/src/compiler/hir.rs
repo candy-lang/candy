@@ -197,10 +197,10 @@ impl Body {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum HirError {
-    UnknownReference { symbol: String },
+    UnknownReference { identifier: String },
     UnknownFunction { name: String },
     PublicAssignmentInNotTopLevel,
-    NeedsWithWrongNumberOfArguments,
+    NeedsWithWrongNumberOfArguments { num_args: usize },
 }
 
 impl Body {

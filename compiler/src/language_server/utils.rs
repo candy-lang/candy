@@ -1,5 +1,8 @@
 use crate::{
-    compiler::error::{CompilerError, CompilerErrorPayload},
+    compiler::{
+        error::{CompilerError, CompilerErrorPayload},
+        hir::HirError,
+    },
     database::Database,
     input::{Input, InputDb},
 };
@@ -20,14 +23,27 @@ impl CompilerError {
             code_description: None,
             source: Some("🍭 Candy".to_owned()),
             message: match self.payload {
-                CompilerErrorPayload::InvalidUtf8 => format!("Invalid UTF8"),
+                CompilerErrorPayload::InvalidUtf8 => format!("Invalid UTF-8"),
                 CompilerErrorPayload::Rcst(rcst) => format!("RCST: {rcst:?}"),
                 CompilerErrorPayload::Ast(ast) => format!("AST: {ast:?}"),
-                CompilerErrorPayload::Hir(hir) => format!("HIR: {hir:?}"),
+                CompilerErrorPayload::Hir(hir) => hir.format_message(),
             },
             related_information: None,
             tags: None,
             data: None,
+        }
+    }
+}
+
+impl HirError {
+    fn format_message(&self) -> String {
+        match self {
+            HirError::UnknownReference { identifier } => format!("Unknown identifier “{identifier}”."),
+            HirError::UnknownFunction { name } => format!("Unknown function “{name}”."),
+            HirError::PublicAssignmentInNotTopLevel => {
+                "Public assignments (:=) can only be used in top-level code.".to_string()
+            }
+            HirError::NeedsWithWrongNumberOfArguments{num_args} => format!("`needs` accepts one or two arguments, but was called with {num_args} arguments. Its parameters are the `condition` and an optional `message`."),
         }
     }
 }

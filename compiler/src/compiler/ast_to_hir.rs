@@ -167,12 +167,12 @@ impl<'a> Context<'a> {
                 Expression::Text(string.value.to_owned()),
                 None,
             ),
-            AstKind::Identifier(Identifier(symbol)) => {
-                let reference = match self.identifiers.get(&symbol.value) {
+            AstKind::Identifier(Identifier(identifier)) => {
+                let reference = match self.identifiers.get(&identifier.value) {
                     Some(reference) => reference.to_owned(),
                     None => {
                         return self.push(
-                            Some(symbol.id.clone()),
+                            Some(identifier.id.clone()),
                             Expression::Error {
                                 child: None,
                                 errors: vec![CompilerError {
@@ -180,7 +180,7 @@ impl<'a> Context<'a> {
                                     span: self.db.ast_id_to_span(ast.id.clone()).unwrap(),
                                     payload: CompilerErrorPayload::Hir(
                                         HirError::UnknownReference {
-                                            symbol: symbol.value.clone(),
+                                            identifier: identifier.value.clone(),
                                         },
                                     ),
                                 }],
@@ -367,7 +367,9 @@ impl<'a> Context<'a> {
                                 input: name.id.input.clone(),
                                 span: self.db.ast_id_to_span(name.id.clone()).unwrap(),
                                 payload: CompilerErrorPayload::Hir(
-                                    HirError::NeedsWithWrongNumberOfArguments,
+                                    HirError::NeedsWithWrongNumberOfArguments {
+                                        num_args: call.arguments.len(),
+                                    },
                                 ),
                             }],
                         },
