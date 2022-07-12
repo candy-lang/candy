@@ -247,15 +247,17 @@ fn panic_hint(db: &Database, input: Input, vm: &Vm, panic_message: Value) -> Opt
         _ => unreachable!(),
     };
 
+    let message = if let Value::Text(message) = panic_message {
+        message
+    } else {
+        format!("{panic_message}")
+    };
     Some(Hint {
         kind: HintKind::Panic,
         text: format!(
-            " # Calling {call_info} panicked because {}.",
-            if let Value::Text(message) = panic_message {
-                message
-            } else {
-                format!("{panic_message}")
-            }
+            " # Calling `{call_info}` panicked because {}{}",
+            message,
+            if message.ends_with('.') { "" } else { "." }
         ),
         position: id_to_end_of_line(db, input, id.clone())?,
     })
