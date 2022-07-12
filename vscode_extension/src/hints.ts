@@ -50,11 +50,7 @@ export class HintsDecorations implements vs.Disposable {
             vs.window.activeTextEditor.document &&
             uri === vs.window.activeTextEditor.document.uri.toString()
           ) {
-            // Delay this so if we're getting lots of updates, we don't flicker.
-            if (this.updateTimeout) {
-              clearTimeout(this.updateTimeout);
-            }
-            this.updateTimeout = setTimeout(() => this.update(), 500);
+            this.update();
           }
         }
       );
