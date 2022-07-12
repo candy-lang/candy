@@ -41,9 +41,9 @@ pub struct Hint {
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, Copy)]
 #[serde(rename_all = "camelCase")]
 pub enum HintKind {
-    Panic,
-    Fuzz,
     Value,
+    Fuzz,
+    Panic,
 }
 
 #[derive(Serialize, Deserialize)]
