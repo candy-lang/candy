@@ -66,6 +66,7 @@ fn query_for_offset(db: &Database, input: Input, offset: usize) -> Option<Refere
                             // TODO: Handle struct access
                             return None;
                         }
+                        Expression::Error { .. } => return None,
                         _ => panic!("Expected a reference, got {:?}", hir_expr),
                     }
                 }
