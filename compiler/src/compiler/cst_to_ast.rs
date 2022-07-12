@@ -275,7 +275,7 @@ impl LoweringContext {
                 let mut errors = vec![];
 
                 assert!(
-                    !matches!(opening_bracket.kind, CstKind::OpeningBracket),
+                    matches!(opening_bracket.kind, CstKind::OpeningBracket),
                     "Struct should always have an opening bracket, but instead had {}.",
                     opening_bracket
                 );
