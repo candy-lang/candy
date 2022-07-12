@@ -26,6 +26,12 @@ impl Vm {
 
         let return_value_or_panic_message = match &builtin_function {
             BuiltinFunction::Add => self.add(args),
+            BuiltinFunction::Call => match self.call(use_provider, args) {
+                // If successful, Call doesn't return a value, but diverges
+                // the control flow.
+                Ok(()) => return,
+                Err(message) => Err(message),
+            },
             BuiltinFunction::Equals => self.equals(args),
             BuiltinFunction::GetArgumentCount => self.get_argument_count(args),
             BuiltinFunction::IfElse => match self.if_else(use_provider, args) {
@@ -63,6 +69,34 @@ impl Vm {
         destructure!(args, [Value::Int(a), Value::Int(b)], { Ok((a + b).into()) })
     }
 
+    fn call<U: UseProvider>(&mut self, use_provider: &U, args: Vec<Value>) -> Result<(), String> {
+        destructure!(
+            args,
+            [Value::Closure {
+                captured,
+                num_args,
+                body
+            }],
+            {
+                if *num_args > 0 {
+                    return Err(format!("Call expects a closure without arguments as the body, but got one with {num_args} arguments."));
+                }
+                let closure_object = self.heap.import(Value::Closure {
+                    captured: captured.to_owned(),
+                    num_args: *num_args,
+                    body: body.to_owned(),
+                });
+                log::debug!(
+                    "Call executing the closure: {:?}",
+                    self.heap.export_without_dropping(closure_object)
+                );
+                self.data_stack.push(closure_object);
+                self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
+                Ok(())
+            }
+        )
+    }
+
     fn equals(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [a, b], { Ok((a == b).into()) })
     }
@@ -95,10 +129,10 @@ impl Vm {
             ],
             {
                 if *then_num_args > 0 {
-                    return Err(format!("IfElse expects a closure without arguments as the then, got one with {then_num_args} arguments."));
+                    return Err(format!("IfElse expects a closure without arguments as the then, but got one with {then_num_args} arguments."));
                 }
                 if *else_num_args > 0 {
-                    return Err(format!("IfElse expects a closure without arguments as the else, got one with {else_num_args} arguments."));
+                    return Err(format!("IfElse expects a closure without arguments as the else, but got one with {else_num_args} arguments."));
                 }
                 let condition = match condition.as_str() {
                     "True" => true,

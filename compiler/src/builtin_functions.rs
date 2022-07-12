@@ -5,6 +5,7 @@ use strum_macros::EnumIter;
 #[derive(Debug, EnumIter, PartialEq, Eq, Clone, Hash, Copy)]
 pub enum BuiltinFunction {
     Add,              // int int -> int
+    Call,             // (lambdaWith0Arguments) -> (returnValue: any)
     Equals,           // any any -> booleanSymbol
     GetArgumentCount, // closure -> argumentCount
     IfElse,           // condition thenClosure elseClosure -> resultOfExecutedClosure
