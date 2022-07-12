@@ -278,7 +278,9 @@ impl Vm {
                         self.heap.drop(closure_address);
                         self.run_builtin_function(use_provider, &builtin, &args);
                     }
-                    _ => panic!("Can only call closures and builtins."),
+                    _ => {
+                        self.panic("you can only call closures and builtins".to_string());
+                    }
                 };
             }
             Instruction::Needs => {
