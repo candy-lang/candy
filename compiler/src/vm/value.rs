@@ -7,7 +7,7 @@ use crate::{
     database::Database,
     input::Input,
 };
-use im::HashMap;
+use im::{hashmap, HashMap};
 use itertools::Itertools;
 use num_bigint::BigInt;
 use std::fmt::{self, Display, Formatter};
@@ -115,5 +115,21 @@ impl From<String> for Value {
 impl From<bool> for Value {
     fn from(it: bool) -> Self {
         Value::Symbol(if it { "True" } else { "False" }.to_string())
+    }
+}
+impl<F> From<Option<F>> for Value
+where
+    F: Into<Value>,
+{
+    fn from(it: Option<F>) -> Self {
+        match it {
+            Some(it) => Value::Struct(hashmap! {
+                Value::Symbol("Type".to_string()) => Value::Symbol("Some".to_string()),
+                Value::Symbol("Value".to_string()) => it.into(),
+            }),
+            None => Value::Struct(hashmap! {
+                Value::Symbol("Type".to_string()) => Value::Symbol("None".to_string()),
+            }),
+        }
     }
 }

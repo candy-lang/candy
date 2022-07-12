@@ -2,7 +2,30 @@ type = use "..Type"
 
 is value := type.is value Int
 
-add a b :=
-  needs (is a)
-  needs (is b)
-  ✨.add a b
+add summandA summandB :=
+  needs (is summandA)
+  needs (is summandB)
+  ✨.intAdd summandA summandB
+subtract minuend subtrahend :=
+  needs (is minuend)
+  needs (is subtrahend)
+  ✨.intSubtract minuend subtrahend
+negate value :=
+  needs (is value)
+  ✨.intNegate value
+multiply factorA factorB :=
+  needs (is factorA)
+  needs (is factorB)
+  ✨.intMultiply factorA factorB
+divideTruncating dividend divisor :=
+  needs (is dividend)
+  needs (is divisor)
+  ✨.intDivideTruncating dividend divisor
+modulo dividend divisor :=
+  needs (is dividend)
+  needs (is divisor)
+  ✨.intModulo dividend divisor
+
+parse text :=
+  needs (type.is text Text)
+  ✨.intParse text

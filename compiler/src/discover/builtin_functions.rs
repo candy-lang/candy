@@ -40,9 +40,9 @@ pub fn run_builtin_function(
         .map(|it| environment.get(it).transitive())
         .collect::<DiscoverResult<_>>()?;
     match builtin_function {
-        BuiltinFunction::Add => add(arguments),
         BuiltinFunction::Equals => equals(arguments),
         BuiltinFunction::GetArgumentCount => get_argument_count(db, arguments),
+        BuiltinFunction::IntAdd => int_add(arguments),
         BuiltinFunction::Panic => panic(arguments),
         BuiltinFunction::Print => print(arguments),
         BuiltinFunction::StructGet => struct_get(arguments),
@@ -62,12 +62,6 @@ macro_rules! destructure {
             DiscoverResult::panic(format!("Invalid arguments").to_owned())
         }
     }};
-}
-
-fn add(arguments: Vec<Value>) -> DiscoverResult {
-    destructure!(arguments, [Value::Int(a), Value::Int(b)], {
-        Value::Int(a + b).into()
-    })
 }
 
 fn equals(arguments: Vec<Value>) -> DiscoverResult {
@@ -112,6 +106,12 @@ fn if_else(
             3
         ))
     }
+}
+
+fn int_add(arguments: Vec<Value>) -> DiscoverResult {
+    destructure!(arguments, [Value::Int(a), Value::Int(b)], {
+        Value::Int(a + b).into()
+    })
 }
 
 fn panic(arguments: Vec<Value>) -> DiscoverResult {

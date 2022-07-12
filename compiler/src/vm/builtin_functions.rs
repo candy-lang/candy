@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use super::{heap::ObjectPointer, use_provider::UseProvider, value::Value, Vm};
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
 use itertools::Itertools;
@@ -26,7 +28,6 @@ impl Vm {
         let args = args.iter().map(|it| self.heap.export(*it)).collect_vec();
 
         let return_value_or_panic_message = match &builtin_function {
-            BuiltinFunction::Add => self.add(args),
             BuiltinFunction::Call => match self.call(use_provider, args) {
                 // If successful, Call doesn't return a value, but diverges
                 // the control flow.
@@ -41,6 +42,13 @@ impl Vm {
                 Ok(()) => return,
                 Err(message) => Err(message),
             },
+            BuiltinFunction::IntAdd => self.int_add(args),
+            BuiltinFunction::IntDivideTruncating => self.int_divide_truncating(args),
+            BuiltinFunction::IntModulo => self.int_modulo(args),
+            BuiltinFunction::IntMultiply => self.int_multiply(args),
+            BuiltinFunction::IntNegate => self.int_negate(args),
+            BuiltinFunction::IntParse => self.int_parse(args),
+            BuiltinFunction::IntSubtract => self.int_subtract(args),
             BuiltinFunction::Panic => self.panic_builtin(args).map(|_| panic!()),
             BuiltinFunction::Print => self.print(args),
             BuiltinFunction::StructGet => self.struct_get(args),
@@ -64,10 +72,6 @@ impl Vm {
 
         let return_object = self.heap.import(return_value);
         self.data_stack.push(return_object);
-    }
-
-    fn add(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(a), Value::Int(b)], { Ok((a + b).into()) })
     }
 
     fn call<U: UseProvider>(&mut self, use_provider: &U, args: Vec<Value>) -> Result<(), String> {
@@ -167,6 +171,40 @@ impl Vm {
                 Ok(())
             }
         )
+    }
+
+    fn int_add(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(summand_a), Value::Int(summand_b)], {
+            Ok((summand_a + summand_b).into())
+        })
+    }
+    fn int_divide_truncating(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(dividend), Value::Int(divisor)], {
+            Ok((dividend / divisor).into())
+        })
+    }
+    fn int_modulo(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(dividend), Value::Int(divisor)], {
+            Ok((dividend % divisor).into())
+        })
+    }
+    fn int_multiply(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(factor_a), Value::Int(factor_b)], {
+            Ok((factor_a * factor_b).into())
+        })
+    }
+    fn int_negate(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(value)], { Ok((-value).into()) })
+    }
+    fn int_parse(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Text(text)], {
+            Ok(BigInt::from_str(text).ok().into())
+        })
+    }
+    fn int_subtract(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(minuend), Value::Int(subtrahend)], {
+            Ok((minuend - subtrahend).into())
+        })
     }
 
     fn panic_builtin(&mut self, args: Vec<Value>) -> Result<!, String> {

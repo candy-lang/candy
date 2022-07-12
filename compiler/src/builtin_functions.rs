@@ -4,19 +4,25 @@ use strum_macros::EnumIter;
 
 #[derive(Debug, EnumIter, PartialEq, Eq, Clone, Hash, Copy)]
 pub enum BuiltinFunction {
-    Add,              // int int -> int
-    Call,             // (lambdaWith0Arguments) -> (returnValue: any)
-    Equals,           // any any -> booleanSymbol
-    GetArgumentCount, // closure -> argumentCount
-    IfElse,           // condition thenClosure elseClosure -> resultOfExecutedClosure
-    Panic,            // message -> Never
-    Print,            // message -> Nothing
-    StructGet,        // struct key -> value
-    StructGetKeys,    // struct -> listOfKeys
-    StructHasKey,     // struct key -> bool
-    TypeOf,           // any -> typeSymbol
-    UseAsset,         // currentPath target -> targetAsString
-    UseLocalModule,   // currentPath target -> targetAsStruct
+    Call,                // (lambdaWith0Arguments) -> (returnValue: any)
+    Equals,              // any any -> booleanSymbol
+    GetArgumentCount,    // closure -> argumentCount
+    IfElse,              // condition thenClosure elseClosure -> resultOfExecutedClosure
+    IntAdd,              // (summandA: int) (summandB: int) -> (sum: int)
+    IntDivideTruncating, // (dividend: int) (divisor: int) -> (quotient: int)
+    IntModulo,           // (dividend: int) (divisor: int) -> (remainder: int)
+    IntMultiply,         // (factorA: int) (factorB: int) -> (product: int)
+    IntNegate,           // (value: int) -> (valueWithOppositeSign: int)
+    IntParse,            // (text: text) -> (parsedInt: maybeOfInt)
+    IntSubtract,         // (minuend: int) (subtrahend: int) -> (difference: int)
+    Panic,               // message -> Never
+    Print,               // message -> Nothing
+    StructGet,           // struct key -> value
+    StructGetKeys,       // struct -> listOfKeys
+    StructHasKey,        // struct key -> bool
+    TypeOf,              // any -> typeSymbol
+    UseAsset,            // currentPath target -> targetAsString
+    UseLocalModule,      // currentPath target -> targetAsStruct
 }
 lazy_static! {
     pub static ref VALUES: Vec<BuiltinFunction> = BuiltinFunction::iter().collect();
