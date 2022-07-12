@@ -26,7 +26,7 @@ use crate::{
     database::{Database, PROJECT_DIRECTORY},
     input::Input,
     language_server::utils::LspPositionConversion,
-    vm::{use_provider::DbUseProvider, value::Value, Status, Vm},
+    vm::{use_provider::DbUseProvider, value::Closure, Status, TearDownResult, Vm},
 };
 use compiler::lir::Lir;
 use fern::colors::{Color, ColoredLevelConfig};
@@ -211,7 +211,7 @@ fn run(options: CandyRunOptions) {
         log::info!("Build failed.");
         return;
     };
-    let module_closure = Value::module_closure_of_input(&db, input.clone()).unwrap();
+    let module_closure = Closure::of_input(&db, input.clone()).unwrap();
 
     let path_string = options.file.to_string_lossy();
     log::info!("Running `{path_string}`.");
@@ -225,7 +225,7 @@ fn run(options: CandyRunOptions) {
         match vm.status() {
             Status::Running => log::info!("VM is still running."),
             Status::Done => {
-                let return_value = vm.tear_down_module_closure_execution();
+                let TearDownResult { return_value, .. } = vm.tear_down_module_closure_execution();
                 log::info!("VM is done. Export map: {return_value}");
                 break;
             }

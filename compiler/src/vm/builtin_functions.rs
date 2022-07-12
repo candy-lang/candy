@@ -1,4 +1,9 @@
-use super::{heap::ObjectPointer, use_provider::UseProvider, value::Value, Vm};
+use super::{
+    heap::ObjectPointer,
+    use_provider::UseProvider,
+    value::{Closure, Value},
+    Vm,
+};
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
 use itertools::Itertools;
 use log;
@@ -68,7 +73,7 @@ impl Vm {
     }
 
     fn get_argument_count(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Closure { num_args, .. }], {
+        destructure!(args, [Value::Closure(Closure { num_args, .. })], {
             Ok((*num_args as u64).into())
         })
     }
@@ -82,23 +87,15 @@ impl Vm {
             args,
             [
                 Value::Symbol(condition),
-                Value::Closure {
-                    captured: then_captured,
-                    num_args: then_num_args,
-                    body: then_body
-                },
-                Value::Closure {
-                    captured: else_captured,
-                    num_args: else_num_args,
-                    body: else_body
-                }
+                Value::Closure(then_closure),
+                Value::Closure(else_closure)
             ],
             {
-                if *then_num_args > 0 {
-                    return Err(format!("IfElse expects a closure without arguments as the then, got one with {then_num_args} arguments."));
+                if then_closure.num_args > 0 {
+                    return Err(format!("IfElse expects a closure without arguments as the then, got one with {} arguments.", then_closure.num_args));
                 }
-                if *else_num_args > 0 {
-                    return Err(format!("IfElse expects a closure without arguments as the else, got one with {else_num_args} arguments."));
+                if else_closure.num_args > 0 {
+                    return Err(format!("IfElse expects a closure without arguments as the else, got one with {} arguments.", else_closure.num_args));
                 }
                 let condition = match condition.as_str() {
                     "True" => true,
@@ -111,17 +108,9 @@ impl Vm {
                 };
 
                 let closure_object = self.heap.import(if condition {
-                    Value::Closure {
-                        captured: then_captured.to_owned(),
-                        num_args: *then_num_args,
-                        body: then_body.to_owned(),
-                    }
+                    Value::Closure(then_closure.clone())
                 } else {
-                    Value::Closure {
-                        captured: else_captured.to_owned(),
-                        num_args: *else_num_args,
-                        body: else_body.to_owned(),
-                    }
+                    Value::Closure(else_closure.clone())
                 });
                 log::debug!(
                     "IfElse executing the closure: {:?}",
@@ -216,7 +205,7 @@ impl Vm {
             return Err("couldn't import module".to_string());
         };
 
-        let module_closure = Value::module_closure_of_lir(input.clone(), lir);
+        let module_closure = Value::Closure(Closure::of_lir(input.clone(), lir));
         let address = self.heap.import(module_closure);
         self.data_stack.push(address);
         self.run_instruction(use_provider, Instruction::Call { num_args: 0 });

@@ -2,7 +2,7 @@ use super::{
     heap::{Heap, ObjectData, ObjectPointer},
     tracer::{TraceEntry, Tracer},
     use_provider::UseProvider,
-    value::Value,
+    value::{Closure, Value},
 };
 use crate::{
     compiler::{hir::Id, lir::Instruction},
@@ -10,7 +10,7 @@ use crate::{
 };
 use itertools::Itertools;
 use log;
-use std::collections::HashMap;
+use std::{collections::HashMap, mem};
 
 /// A VM can execute some byte code.
 #[derive(Clone)]
@@ -22,7 +22,8 @@ pub struct Vm {
     pub call_stack: Vec<InstructionPointer>,
     pub import_stack: Vec<Input>,
     pub tracer: Tracer,
-    pub fuzzable_closures: Vec<(Id, ObjectPointer)>,
+    pub fuzzable_closures: Vec<(Id, Closure)>,
+    pub num_instructions_executed: usize,
 }
 
 #[derive(Clone)]
@@ -55,6 +56,11 @@ impl InstructionPointer {
     }
 }
 
+pub struct TearDownResult {
+    pub return_value: Value,
+    pub fuzzable_closures: Vec<(Id, Closure)>,
+}
+
 impl Vm {
     pub fn new() -> Self {
         Self {
@@ -66,60 +72,57 @@ impl Vm {
             import_stack: vec![],
             tracer: Tracer::default(),
             fuzzable_closures: vec![],
+            num_instructions_executed: 0,
         }
     }
 
     pub fn set_up_closure_execution<U: UseProvider>(
         &mut self,
         use_provider: &U,
-        closure: Value,
+        closure: Closure,
         arguments: Vec<Value>,
     ) {
         assert!(matches!(self.status, Status::Done));
         assert!(self.data_stack.is_empty());
         assert!(self.call_stack.is_empty());
 
-        let num_args = if let Value::Closure { num_args, .. } = closure.clone() {
-            num_args
-        } else {
-            panic!("Called start_closure with a non-closure.");
-        };
-
-        assert_eq!(num_args, arguments.len());
+        assert_eq!(closure.num_args, arguments.len());
 
         for arg in arguments {
             let address = self.heap.import(arg);
             self.data_stack.push(address);
         }
-        let address = self.heap.import(closure);
+        let address = self.heap.import(Value::Closure(closure.clone()));
         self.data_stack.push(address);
 
-        self.run_instruction(use_provider, Instruction::Call { num_args });
+        self.run_instruction(
+            use_provider,
+            Instruction::Call {
+                num_args: closure.num_args,
+            },
+        );
         self.status = Status::Running;
     }
-    pub fn tear_down_closure_execution(&mut self) -> Value {
+    pub fn tear_down_closure_execution(&mut self) -> TearDownResult {
         assert!(matches!(self.status, Status::Done));
         let return_value = self.data_stack.pop().unwrap();
-        self.heap.export(return_value)
+        let return_value = self.heap.export(return_value);
+        TearDownResult {
+            return_value,
+            fuzzable_closures: mem::replace(&mut self.fuzzable_closures, vec![]),
+        }
     }
 
     pub fn set_up_module_closure_execution<U: UseProvider>(
         &mut self,
         use_provider: &U,
-        closure: Value,
+        closure: Closure,
     ) {
-        if let Value::Closure {
-            captured, num_args, ..
-        } = closure.clone()
-        {
-            assert_eq!(captured.len(), 0, "Called start_module_closure with a closure that is not a module closure (it captures stuff).");
-            assert_eq!(num_args, 0, "Called start_module_closure with a closure that is not a module closure (it has arguments).");
-        } else {
-            panic!("Called start_module_closure with a non-closure.");
-        };
+        assert_eq!(closure.captured.len(), 0, "Called start_module_closure with a closure that is not a module closure (it captures stuff).");
+        assert_eq!(closure.num_args, 0, "Called start_module_closure with a closure that is not a module closure (it has arguments).");
         self.set_up_closure_execution(use_provider, closure, vec![]);
     }
-    pub fn tear_down_module_closure_execution(&mut self) -> Value {
+    pub fn tear_down_module_closure_execution(&mut self) -> TearDownResult {
         self.tear_down_closure_execution()
     }
 
@@ -131,7 +134,7 @@ impl Vm {
         self.data_stack[self.data_stack.len() - 1 - offset as usize].clone()
     }
 
-    pub fn run<U: UseProvider>(&mut self, use_provider: &U, mut num_instructions: u16) {
+    pub fn run<U: UseProvider>(&mut self, use_provider: &U, mut num_instructions: usize) {
         assert!(
             matches!(self.status, Status::Running),
             "Called Vm::run on a vm that is not ready to run."
@@ -171,6 +174,7 @@ impl Vm {
             log::trace!("Running instruction: {instruction:?}");
             self.next_instruction.instruction += 1;
             self.run_instruction(use_provider, instruction);
+            self.num_instructions_executed += 1;
 
             if self.next_instruction == InstructionPointer::null_pointer() {
                 self.status = Status::Done;
@@ -306,8 +310,10 @@ impl Vm {
             }
             Instruction::RegisterFuzzableClosure(id) => {
                 let closure = self.data_stack.last().unwrap().clone();
-                self.heap.dup(closure);
-                self.fuzzable_closures.push((id, closure));
+                match self.heap.export_without_dropping(closure) {
+                    Value::Closure(closure) => self.fuzzable_closures.push((id, closure)),
+                    _ => panic!("Instruction RegisterFuzzableClosure executed, but stack top is not a closure."),
+                }
             }
             Instruction::TraceValueEvaluated(id) => {
                 let address = *self.data_stack.last().unwrap();
