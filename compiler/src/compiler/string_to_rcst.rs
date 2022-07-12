@@ -1633,6 +1633,7 @@ mod parse {
             Some(it) => it,
             None => equals_sign(input)?,
         };
+        let original_assignment_sign = assignment_sign.clone();
         let input_after_assignment_sign = input;
 
         let (input, more_whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
@@ -1642,17 +1643,25 @@ mod parse {
             || parameters.is_multiline()
             || whitespace.is_multiline()
             || more_whitespace.is_multiline();
-        let (input, body) = if is_multiline {
+        let (input, assignment_sign, body) = if is_multiline {
             let (input, body) = body(input, indentation + 1);
             if body.is_empty() {
-                (input_after_assignment_sign, body)
+                (
+                    input_after_assignment_sign,
+                    original_assignment_sign,
+                    vec![],
+                )
             } else {
-                (input, body)
+                (input, assignment_sign, body)
             }
         } else {
             match expression(input, indentation, true) {
-                Some((input, expression)) => (input, vec![expression]),
-                None => (input_after_assignment_sign, vec![]),
+                Some((input, expression)) => (input, assignment_sign, vec![expression]),
+                None => (
+                    input_after_assignment_sign,
+                    original_assignment_sign,
+                    vec![],
+                ),
             }
         };
 
@@ -1753,6 +1762,21 @@ mod parse {
                         value: 3,
                         string: "3".to_string()
                     }],
+                }
+            ))
+        );
+        assert_eq!(
+            assignment("foo =\n  ", 0),
+            Some((
+                "\n  ",
+                Rcst::Assignment {
+                    name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    parameters: vec![],
+                    assignment_sign: Box::new(Rcst::EqualsSign),
+                    body: vec![],
                 }
             ))
         );
