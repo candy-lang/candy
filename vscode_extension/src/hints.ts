@@ -12,7 +12,6 @@ export class HintsDecorations implements vs.Disposable {
   private subscriptions: vs.Disposable[] = [];
   private hints = new Map<String, Hint[]>();
   private editors = new Map<String, vs.TextEditor>();
-  private updateTimeout?: NodeJS.Timer;
 
   private readonly decorationTypes = new Map<
     HintKind,
