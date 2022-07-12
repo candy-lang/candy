@@ -1,5 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
+use num_bigint::BigUint;
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Rcst {
     EqualsSign,         // =
@@ -29,7 +31,7 @@ pub enum Rcst {
     Identifier(String),
     Symbol(String),
     Int {
-        value: u64,
+        value: BigUint,
         string: String,
     },
     Text {

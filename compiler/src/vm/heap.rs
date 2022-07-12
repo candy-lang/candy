@@ -2,6 +2,7 @@ use super::value::Value;
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
 use itertools::Itertools;
 use log;
+use num_bigint::BigInt;
 use std::collections::HashMap;
 
 #[derive(Clone)]
@@ -19,7 +20,7 @@ pub struct Object {
 }
 #[derive(Clone)]
 pub enum ObjectData {
-    Int(u64),
+    Int(BigInt),
     Text(String),
     Symbol(String),
     Struct(HashMap<ObjectPointer, ObjectPointer>),
@@ -163,7 +164,7 @@ impl Heap {
     }
     pub fn export_without_dropping(&self, address: ObjectPointer) -> Value {
         match &self.get(address).data {
-            ObjectData::Int(int) => Value::Int(*int),
+            ObjectData::Int(int) => Value::Int(int.clone()),
             ObjectData::Text(text) => Value::Text(text.clone()),
             ObjectData::Symbol(symbol) => Value::Symbol(symbol.clone()),
             ObjectData::Struct(struct_) => {

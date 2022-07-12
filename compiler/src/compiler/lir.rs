@@ -1,6 +1,7 @@
 use super::error::CompilerError;
 use crate::{builtin_functions::BuiltinFunction, hir, input::Input};
 use itertools::Itertools;
+use num_bigint::BigUint;
 use std::fmt::Display;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -13,7 +14,7 @@ pub type StackOffset = usize; // 0 is the last item, 1 the one before that, etc.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Instruction {
     /// Pushes an int.
-    CreateInt(u64),
+    CreateInt(BigUint),
 
     /// Pushes a text.
     CreateText(String),

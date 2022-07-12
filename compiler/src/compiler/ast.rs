@@ -2,6 +2,7 @@ use super::{error::CompilerError, utils::AdjustCasingOfFirstLetter};
 use crate::input::Input;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
+use num_bigint::BigUint;
 use std::{
     fmt::{self, Display, Formatter},
     ops::Deref,
@@ -49,7 +50,7 @@ pub enum AstKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct Int(pub u64);
+pub struct Int(pub BigUint);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Text(pub AstString);

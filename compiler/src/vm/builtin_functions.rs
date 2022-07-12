@@ -2,6 +2,7 @@ use super::{heap::ObjectPointer, use_provider::UseProvider, value::Value, Vm};
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
 use itertools::Itertools;
 use log;
+use num_bigint::BigInt;
 
 macro_rules! destructure {
     ($args:expr, $enum:pat, $body:block) => {{
@@ -103,7 +104,7 @@ impl Vm {
 
     fn get_argument_count(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Closure { num_args, .. }], {
-            Ok((*num_args as u64).into())
+            Ok(BigInt::from(*num_args).into())
         })
     }
 
@@ -228,7 +229,7 @@ impl Vm {
         Ok(Value::list(
             content
                 .iter()
-                .map(|byte| Value::Int(*byte as u64))
+                .map(|byte| Value::Int(BigInt::from(*byte)))
                 .collect_vec(),
         ))
     }
@@ -265,7 +266,9 @@ impl Vm {
                 // `current_path_struct` is set by us and not users, hence we don't have to validate it that strictly.
                 let mut current_path = vec![];
                 let mut index = 0;
-                while let Some(component) = current_path_struct.get(&Value::Int(index)) {
+                while let Some(component) =
+                    current_path_struct.get(&Value::Int(BigInt::from(index)))
+                {
                     current_path.push(component.clone().try_into_text().unwrap());
                     index += 1;
                 }

@@ -10,6 +10,7 @@ use crate::{
 };
 use itertools::Itertools;
 use log;
+use num_bigint::{BigInt, Sign, ToBigInt};
 use std::collections::HashMap;
 
 /// A VM can execute some byte code.
@@ -180,7 +181,9 @@ impl Vm {
     pub fn run_instruction<U: UseProvider>(&mut self, use_provider: &U, instruction: Instruction) {
         match instruction {
             Instruction::CreateInt(int) => {
-                let address = self.heap.create(ObjectData::Int(int));
+                let address = self
+                    .heap
+                    .create(ObjectData::Int(BigInt::from_biguint(Sign::Plus, int)));
                 self.data_stack.push(address);
             }
             Instruction::CreateText(text) => {

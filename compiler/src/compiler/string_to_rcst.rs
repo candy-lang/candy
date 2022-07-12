@@ -73,12 +73,15 @@ mod parse {
     // all the surrounding code still has a chance to be properly parsed – even
     // mid-writing after putting the opening bracket of a struct.
 
+    use std::str::FromStr;
+
     use crate::compiler::{
         rcst::SplitOuterTrailingWhitespace, string_to_rcst::whitespace_indentation_score,
     };
 
     use super::super::rcst::{IsMultiline, Rcst, RcstError};
     use itertools::Itertools;
+    use num_bigint::BigUint;
 
     static MEANINGFUL_PUNCTUATION: &'static str = "()[]:,{}->=.";
     static SUPPORTED_WHITESPACE: &'static str = " \r\n\t";
@@ -281,7 +284,7 @@ mod parse {
             return None;
         }
         if w.chars().all(|c| c.is_ascii_digit()) {
-            let value = u64::from_str_radix(&w, 10).expect("Couldn't parse int.");
+            let value = BigUint::from_str(&w).expect("Couldn't parse int.");
             Some((input, Rcst::Int { value, string: w }))
         } else {
             Some((
@@ -300,7 +303,7 @@ mod parse {
             Some((
                 " ",
                 Rcst::Int {
-                    value: 42,
+                    value: BigUint::from(42u8),
                     string: "42".to_string()
                 }
             ))
@@ -310,7 +313,7 @@ mod parse {
             Some((
                 "",
                 Rcst::Int {
-                    value: 12,
+                    value: BigUint::from(12u8),
                     string: "012".to_string()
                 }
             ))
@@ -320,7 +323,7 @@ mod parse {
             Some((
                 " years",
                 Rcst::Int {
-                    value: 123,
+                    value: BigUint::from(123u8),
                     string: "123".to_string()
                 }
             ))
@@ -929,7 +932,7 @@ mod parse {
                     arguments: vec![
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::Int {
-                                value: 4,
+                                value: BigUint::from(4u8),
                                 string: "4".to_string()
                             }),
                             whitespace: vec![Rcst::Whitespace(" ".to_string())],
@@ -984,14 +987,14 @@ mod parse {
                     arguments: vec![
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::Int {
-                                value: 1,
+                                value: BigUint::from(1u8),
                                 string: "1".to_string()
                             }),
                             whitespace: vec![Rcst::Whitespace(" ".to_string())],
                         },
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::Int {
-                                value: 2,
+                                value: BigUint::from(2u8),
                                 string: "2".to_string()
                             }),
                             whitespace: vec![
@@ -1001,7 +1004,7 @@ mod parse {
                         },
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::Int {
-                                value: 3,
+                                value: BigUint::from(3u8),
                                 string: "3".to_string()
                             }),
                             whitespace: vec![
@@ -1010,7 +1013,7 @@ mod parse {
                             ],
                         },
                         Rcst::Int {
-                            value: 4,
+                            value: BigUint::from(4u8),
                             string: "4".to_string()
                         }
                     ],
@@ -1239,7 +1242,7 @@ mod parse {
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::StructField {
                                 key: Box::new(Rcst::Int {
-                                    value: 4,
+                                    value: BigUint::from(4u8),
                                     string: "4".to_string()
                                 }),
                                 colon: Box::new(Rcst::TrailingWhitespace {
@@ -1508,7 +1511,7 @@ mod parse {
                     parameters_and_arrow: None,
                     body: vec![Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Int {
-                            value: 2,
+                            value: BigUint::from(2u8),
                             string: "2".to_string()
                         }),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
@@ -1695,7 +1698,7 @@ mod parse {
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
                     body: vec![Rcst::Int {
-                        value: 42,
+                        value: BigUint::from(42u8),
                         string: "42".to_string()
                     }],
                 }
@@ -1726,7 +1729,7 @@ mod parse {
                         ],
                     }),
                     body: vec![Rcst::Int {
-                        value: 3,
+                        value: BigUint::from(3u8),
                         string: "3".to_string()
                     }],
                 }
@@ -1759,7 +1762,7 @@ mod parse {
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
                     body: vec![Rcst::Int {
-                        value: 3,
+                        value: BigUint::from(3u8),
                         string: "3".to_string()
                     }],
                 }

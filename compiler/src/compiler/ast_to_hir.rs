@@ -15,6 +15,7 @@ use crate::{
 };
 use im::HashMap;
 use itertools::Itertools;
+use num_bigint::BigUint;
 use std::{mem, ops::Range, sync::Arc};
 
 #[salsa::query_group(AstToHirStorage)]
@@ -506,7 +507,11 @@ impl<'a> Context<'a> {
                     .enumerate()
                     .map(|(index, it)| {
                         (
-                            self.push(None, Expression::Int(index as u64), Some("key".to_string())),
+                            self.push(
+                                None,
+                                Expression::Int(BigUint::from(index)),
+                                Some("key".to_string()),
+                            ),
                             self.push(
                                 None,
                                 Expression::Text(it.to_owned()),

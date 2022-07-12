@@ -9,6 +9,7 @@ use crate::{
 };
 use im::HashMap;
 use itertools::Itertools;
+use num_bigint::BigInt;
 use std::fmt::{self, Display, Formatter};
 
 /// A self-contained value. Unlike objects, these are not tied to a running VM,
@@ -21,7 +22,7 @@ use std::fmt::{self, Display, Formatter};
 /// self-contained values.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Value {
-    Int(u64),
+    Int(BigInt),
     Text(String),
     Symbol(String),
     Struct(HashMap<Value, Value>),
@@ -64,7 +65,7 @@ impl Value {
         let items = items
             .into_iter()
             .enumerate()
-            .map(|(index, it)| (Value::Int(index as u64), it))
+            .map(|(index, it)| (Value::Int(BigInt::from(index)), it))
             .collect();
         Value::Struct(items)
     }
@@ -101,8 +102,8 @@ impl Display for Value {
     }
 }
 
-impl From<u64> for Value {
-    fn from(value: u64) -> Self {
+impl From<BigInt> for Value {
+    fn from(value: BigInt) -> Self {
         Value::Int(value)
     }
 }

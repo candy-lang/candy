@@ -7,6 +7,7 @@ use super::{
 };
 use crate::{builtin_functions::BuiltinFunction, input::Input};
 use itertools::Itertools;
+use num_bigint::BigUint;
 use std::sync::Arc;
 
 #[salsa::query_group(HirToLirStorage)]
@@ -54,7 +55,7 @@ impl LoweringContext {
         log::trace!("Compiling expression {expression:?}");
 
         match expression {
-            Expression::Int(int) => self.emit_create_int(id.clone(), *int),
+            Expression::Int(int) => self.emit_create_int(id.clone(), int.clone()),
             Expression::Text(text) => self.emit_create_text(id.clone(), text.clone()),
             Expression::Reference(reference) => {
                 self.emit_push_from_stack(reference.clone());
@@ -115,7 +116,7 @@ impl LoweringContext {
         self.emit_trace_value_evaluated(id.clone());
     }
 
-    fn emit_create_int(&mut self, id: hir::Id, int: u64) {
+    fn emit_create_int(&mut self, id: hir::Id, int: BigUint) {
         self.emit(Instruction::CreateInt(int));
         self.stack.push(id);
     }

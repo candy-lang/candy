@@ -1,3 +1,5 @@
+use num_bigint::BigUint;
+
 use super::{rcst::RcstError, rcst_to_cst::RcstToCst};
 use crate::input::Input;
 use std::{
@@ -66,7 +68,7 @@ pub enum CstKind {
     Identifier(String),
     Symbol(String),
     Int {
-        value: u64,
+        value: BigUint,
         string: String,
     },
     Text {

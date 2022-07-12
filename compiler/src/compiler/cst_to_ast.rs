@@ -131,7 +131,7 @@ impl LoweringContext {
                 let string = self.create_string_without_id_mapping(symbol.to_string());
                 self.create_ast(cst.id, AstKind::Symbol(Symbol(string)))
             }
-            CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(*value))),
+            CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(value.clone()))),
             CstKind::Text {
                 opening_quote,
                 parts,

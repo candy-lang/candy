@@ -3,6 +3,7 @@ use crate::{builtin_functions::BuiltinFunction, input::Input};
 use im::HashMap;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
+use num_bigint::BigUint;
 use std::{
     collections::HashSet,
     fmt::{self, Display, Formatter},
@@ -132,7 +133,7 @@ impl Display for Id {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Expression {
-    Int(u64),
+    Int(BigUint),
     Text(String),
     Reference(Id),
     Symbol(String),
