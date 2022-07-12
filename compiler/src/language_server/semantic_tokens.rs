@@ -169,8 +169,9 @@ impl<'a> Context<'a> {
                 self.visit_cst(octothorpe, None);
                 self.add_token(cst.span.clone(), SemanticTokenType::Comment);
             }
-            CstKind::TrailingWhitespace { child, .. } => {
-                self.visit_cst(child, token_type_for_identifier)
+            CstKind::TrailingWhitespace { child, whitespace } => {
+                self.visit_cst(child, token_type_for_identifier);
+                self.visit_csts(whitespace, token_type_for_identifier);
             }
             CstKind::Identifier { .. } => self.add_token(
                 cst.span.clone(),
