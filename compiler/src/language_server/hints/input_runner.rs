@@ -1,135 +1,21 @@
-//! Unlike the usual language server features, hints are not generated on-demand
-//! with the usual request-response model. Instead, a hints server runs in the
-//! background all the time. That way, the hints can progressively get better.
-//! For example, when opening a long file, the hints may appear from top to
-//! bottom as more code is evaluated. Then, the individual closures could get
-//! fuzzed with ever-more-complex inputs, resulting in some error cases to be
-//! displayed over time.
-//! While doing all that, we can pause regularly between executing instructions
-//! so that we don't occupy a single CPU at 100%.
-
-use super::utils::LspPositionConversion;
+use super::Hint;
 use crate::{
     compiler::{
         ast::{AstKind, FindAst},
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
-        hir,
     },
     database::Database,
-    input::{Input, InputDb},
-    language_server::utils::TupleToPosition,
+    input::Input,
+    language_server::hints::{utils::id_to_end_of_line, HintKind},
     vm::{tracer::TraceEntry, use_provider::DbUseProvider, value::Value, Status, Vm},
     CloneWithExtension,
 };
 use itertools::Itertools;
-use lsp_types::{notification::Notification, Position};
-use rand::{prelude::SliceRandom, thread_rng};
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, sync::Arc, time::Duration};
-use tokio::{
-    sync::{
-        mpsc::{error::TryRecvError, Receiver, Sender},
-        Mutex,
-    },
-    time::sleep,
-};
+use std::{fs, sync::Arc};
+use tokio::sync::Mutex;
 
-pub enum Event {
-    UpdateModule(Input),
-    CloseModule(Input),
-    Shutdown,
-}
-
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
-pub struct Hint {
-    kind: HintKind,
-    text: String,
-    position: Position,
-}
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum HintKind {
-    Value,
-    Panic,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct HintsNotification {
-    pub uri: String,
-    pub hints: Vec<Hint>,
-}
-impl Notification for HintsNotification {
-    const METHOD: &'static str = "candy/textDocument/publishHints";
-
-    type Params = Self;
-}
-
-pub async fn run_server(
-    db: Arc<Mutex<Database>>,
-    mut incoming_events: Receiver<Event>,
-    outgoing_hints: Sender<(Input, Vec<Hint>)>,
-) {
-    let mut vms = HashMap::new();
-
-    'server_loop: loop {
-        loop {
-            match incoming_events.try_recv() {
-                Ok(event) => handle_event(db.clone(), &mut incoming_events, &mut vms, event).await,
-                Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => break 'server_loop,
-            }
-        }
-
-        let input_of_chosen_vm = vms
-            .iter()
-            .filter(|(_, vm)| match vm.status() {
-                Status::Running => true,
-                Status::Done => false,
-                Status::Panicked(_) => false,
-            })
-            .collect_vec()
-            .choose(&mut thread_rng())
-            .map(|(input, _)| (*input).clone());
-
-        if let Some(input) = input_of_chosen_vm {
-            let hints = {
-                let vm = vms.get_mut(&input).unwrap();
-                let db = db.lock().await;
-                let use_provider = DbUseProvider { db: &db };
-                vm.run(&use_provider, 5);
-                collect_hints(&db, &input, vm)
-            };
-            outgoing_hints.send((input, hints)).await.unwrap();
-        }
-
-        sleep(Duration::from_millis(100)).await;
-    }
-}
-
-async fn handle_event(
-    db: Arc<Mutex<Database>>,
-    incoming_events: &mut Receiver<Event>,
-    vms: &mut HashMap<Input, Vm>,
-    event: Event,
-) {
-    match event {
-        Event::UpdateModule(input) => match vm_for_input(db, input.clone()).await {
-            Some(vm) => {
-                vms.insert(input, vm);
-            }
-            None => {}
-        },
-        Event::CloseModule(input) => {
-            vms.remove(&input);
-        }
-        Event::Shutdown => {
-            incoming_events.close();
-        }
-    }
-}
-
-async fn vm_for_input(db: Arc<Mutex<Database>>, input: Input) -> Option<Vm> {
+pub async fn vm_for_input(db: Arc<Mutex<Database>>, input: Input) -> Option<Vm> {
     let db = db.lock().await;
     let module_closure = Value::module_closure_of_input(&db, input.clone())?;
     let mut vm = Vm::new();
@@ -138,7 +24,7 @@ async fn vm_for_input(db: Arc<Mutex<Database>>, input: Input) -> Option<Vm> {
     Some(vm)
 }
 
-fn collect_hints(db: &Database, input: &Input, vm: &mut Vm) -> Vec<Hint> {
+pub fn collect_hints(db: &Database, input: &Input, vm: &mut Vm) -> Vec<Hint> {
     log::debug!("Calculating hints for {input}");
     let mut hints = vec![];
 
@@ -259,23 +145,4 @@ fn panic_hint(db: &Database, input: Input, vm: &Vm, panic_message: Value) -> Opt
         ),
         position: id_to_end_of_line(db, input, id.clone())?,
     })
-}
-
-fn id_to_end_of_line(db: &Database, input: Input, id: hir::Id) -> Option<Position> {
-    let span = db.hir_id_to_display_span(id.clone())?;
-
-    let line = db
-        .offset_to_lsp(input.clone(), span.start)
-        .to_position()
-        .line;
-    let line_start_offsets = db.line_start_utf8_byte_offsets(input.clone());
-    let last_characer_of_line = if line as usize == line_start_offsets.len() - 1 {
-        db.get_input(input.clone()).unwrap().len()
-    } else {
-        line_start_offsets[(line + 1) as usize] - 1
-    };
-    let position = db
-        .offset_to_lsp(input.clone(), last_characer_of_line)
-        .to_position();
-    Some(position)
 }
