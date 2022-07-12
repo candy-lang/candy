@@ -1,3 +1,4 @@
+function = use "..Function"
 type = use "..Type"
 
 is value := type.is value Bool
@@ -13,3 +14,7 @@ or a b :=
   needs (is a)
   needs (is b)
   ✨.ifElse a { True } { b }
+implies a b :=
+  needs (is a)
+  needs (is b)
+  ✨.ifElse a { b } { True }

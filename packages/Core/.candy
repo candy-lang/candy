@@ -1,6 +1,10 @@
 bool = use ".Bool"
 check = (use ".Check").check
-conditionals = use ".Conditionals"
+
+controlFlow = use ".ControlFlow"
+if := controlFlow.if
+ifElse := controlFlow.ifElse
+
 equals = (use ".Equality").equals
 function = use ".Function"
 int = use ".Int"

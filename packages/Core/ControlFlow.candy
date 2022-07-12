@@ -1,0 +1,43 @@
+isBool = (use "..Bool").is
+isFunction0 = (use "..Function").is0
+
+ifElse condition then else :=
+  needs (isBool condition)
+  needs (isFunction0 then)
+  needs (isFunction0 else)
+  ✨.ifElse condition then else
+
+if condition then :=
+  needs (isBool condition)
+  needs (isFunction0 then)
+  ifElse condition then {}
+
+run body =
+  # A function that runs the given `body` with no arguments.
+  #
+  # Calling this function is the same as calling the `body` by adding parenthesis at the end, but it
+  # looks nicer:
+  #
+  # ```
+  # let a = run {
+  #   // Some code that can create local variables without cluttering the surrounding namespace.
+  # }
+  # ```
+  needs (isFunction0 body)
+  ✨.call body
+
+doNotRun body =
+  # A function that doesn't run the given `body`.
+  #
+  # This function is useful during development to mark code that's not ready to run yet. In contrast
+  # to commenting out the code, the code is still part of the analyzed program.
+  #
+  # These are some of the benefits over commenting code out:
+  #
+  # * Refactorings, like renaming of functions, also affect the code.
+  # * Candy doesn't report linter warnings for fields and functions in the outer scope that are
+  #   only used in the code.
+  # * Making the code invalid (for example, by deleting needed functions) results in compiler
+  #   errors.
+  needs (isFunction0 body)
+  Nothing
