@@ -185,7 +185,7 @@ impl Vm {
 
     fn use_asset(&mut self, db: &Database, args: Vec<Value>) -> Result<Value, String> {
         let (current_path, target) = Self::parse_current_path_and_target(args)?;
-        let target = UseAssetTarget::parse(&target)?;
+        let target = UseTarget::parse(&target)?;
         let input = target.resolve_asset(&current_path)?;
         let content = db
             .get_input(input.clone())
@@ -200,16 +200,13 @@ impl Vm {
 
     fn use_local_module(&mut self, db: &Database, args: Vec<Value>) -> Result<(), String> {
         let (current_path, target) = Self::parse_current_path_and_target(args)?;
-        let target = UseAssetTarget::parse(&target)?;
+        let target = UseTarget::parse(&target)?;
         let possible_inputs = target.resolve_local_module(&current_path)?;
-        let input = 'find_existing_input: {
-            for input in possible_inputs {
-                if db.get_input(input.clone()).is_some() {
-                    break 'find_existing_input input;
-                }
-            }
-            return Err("couldn't import module".to_string());
-        };
+        let input = possible_inputs
+            .into_iter()
+            .filter(|input| db.get_input(input.clone()).is_some())
+            .next()
+            .ok_or_else(|| "couldn't import module".to_string())?;
 
         let module_closure = Value::module_closure_of_input(db, input.clone())
             .ok_or_else(|| "couldn't import module".to_string())?;
@@ -237,19 +234,19 @@ impl Vm {
     }
 }
 
-struct UseAssetTarget {
+struct UseTarget {
     parent_navigations: usize,
     path: String,
 }
-impl UseAssetTarget {
+impl UseTarget {
     const PARENT_NAVIGATION_CHAR: char = '.';
 
     fn parse(mut target: &str) -> Result<Self, String> {
         let parent_navigations = {
             let mut navigations = 0;
-            while target.chars().next() == Some(UseAssetTarget::PARENT_NAVIGATION_CHAR) {
+            while target.chars().next() == Some(UseTarget::PARENT_NAVIGATION_CHAR) {
                 navigations += 1;
-                target = &target[UseAssetTarget::PARENT_NAVIGATION_CHAR.len_utf8()..];
+                target = &target[UseTarget::PARENT_NAVIGATION_CHAR.len_utf8()..];
             }
             match navigations {
                 0 => return Err("the target must start with at least one dot".to_string()),
@@ -265,7 +262,7 @@ impl UseAssetTarget {
             }
             target.to_string()
         };
-        Ok(UseAssetTarget {
+        Ok(UseTarget {
             parent_navigations,
             path,
         })
@@ -273,20 +270,16 @@ impl UseAssetTarget {
 
     fn resolve_asset(&self, current_path: &[String]) -> Result<Input, String> {
         let mut path = current_path.to_owned();
-        for _ in 0..self.parent_navigations {
-            if path.pop() == None {
-                return Err("too many parent navigations".to_string());
-            }
-        }
-        if path
-            .last()
-            .map(|it| it.ends_with(".candy"))
-            .unwrap_or(false)
-        {
+        if self.parent_navigations == 0 && path.last() != Some(&".candy".to_string()) {
             return Err(
                 "importing child files (starting with a single dot) only works from `.candy` files"
                     .to_string(),
             );
+        }
+        for _ in 0..self.parent_navigations {
+            if path.pop() == None {
+                return Err("too many parent navigations".to_string());
+            }
         }
         path.push(self.path.to_string());
         Ok(Input::File(path.clone()))

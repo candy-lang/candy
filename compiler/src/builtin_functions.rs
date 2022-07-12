@@ -4,18 +4,18 @@ use strum_macros::EnumIter;
 
 #[derive(Debug, EnumIter, PartialEq, Eq, Clone, Hash, Copy)]
 pub enum BuiltinFunction {
-    Add,              // int int -> int
-    Equals,           // any any -> booleanSymbol
-    GetArgumentCount, // closure -> argumentCount
-    IfElse,           // condition thenClosure elseClosure -> resultOfExecutedClosure
-    Panic,            // message -> Never
-    Print,            // message -> Nothing
-    StructGet,        // struct key -> value
-    StructGetKeys,    // struct -> listOfKeys
-    StructHasKey,     // struct key -> bool
-    TypeOf,           // any -> typeSymbol
-    UseAsset,         // currentPath target -> targetAsString
-    UseLocalModule,   // currentPath target -> targetAsStruct
+    Add,              // (summandA: int) (summandB: int) -> (sum: int)
+    Equals,           // (a: any) (b: any) -> (boolean: True | False)
+    GetArgumentCount, // (closure: Lambda) -> (argumentCount: int)
+    IfElse, // (condition: True | False) (then: lambda) (else: lambda) -> (resultOfExecutedClosure: any)
+    Panic,  // (message: Text) -> Never
+    Print,  // (message: Text) -> Nothing
+    StructGet, // (struct: struct) (key: any) -> (value: any)
+    StructGetKeys, // (struct: struct) -> (listOfKeys: listOfAny)
+    StructHasKey, // (struct: struct) (key: any) -> (isKeyInStruct: True | False)
+    TypeOf, // (value: any) -> (type: Int | Text | Symbol | Struct | Function | Builtin)
+    UseAsset, // (currentPath: struct) (target: text) -> (target: text)
+    UseLocalModule, // (currentPath: struct) (target: text) -> (target: struct)
 }
 lazy_static! {
     pub static ref VALUES: Vec<BuiltinFunction> = BuiltinFunction::iter().collect();

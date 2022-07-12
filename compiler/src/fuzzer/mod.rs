@@ -111,7 +111,6 @@ fn test_closure_with_args(
     arguments: Vec<Value>,
 ) -> TestResult {
     let closure = vm.heap.export_without_dropping(closure_address);
-    println!("Starting closure {closure}.");
     vm.set_up_closure_execution(db, closure, arguments);
 
     vm.run(db, 1000);

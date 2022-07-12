@@ -94,8 +94,8 @@ impl Vm {
         let address = self.heap.import(closure);
         self.data_stack.push(address);
 
-        self.run_instruction(db, Instruction::Call { num_args });
         self.status = Status::Running;
+        self.run_instruction(db, Instruction::Call { num_args });
     }
     pub fn tear_down_closure_execution(&mut self) -> Value {
         assert!(matches!(self.status, Status::Done));
@@ -116,8 +116,6 @@ impl Vm {
         } else {
             panic!("Called start_module_closure with a non-closure.");
         };
-        instructions.insert(0, Instruction::TraceModuleStarts { input });
-        instructions.push(Instruction::TraceModuleEnds);
         self.set_up_closure_execution(db, closure, vec![])
     }
     pub fn tear_down_module_closure_execution(&mut self) -> Value {
@@ -357,7 +355,7 @@ impl Vm {
                             .skip_while(|it| **it != input)
                             .chain([&input])
                             .map(|input| format!("{input}"))
-                            .join(" -> "),
+                            .join(" → "),
                     ));
                 }
                 self.import_stack.push(input.clone());
