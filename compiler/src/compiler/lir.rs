@@ -94,7 +94,7 @@ pub enum Instruction {
 
     Error {
         id: hir::Id,
-        error: CompilerError,
+        errors: Vec<CompilerError>,
     },
 }
 
@@ -163,7 +163,18 @@ impl Display for Instruction {
             Instruction::TraceNeedsEnds => write!(f, "traceNeedsEnds"),
             Instruction::TraceModuleStarts { input } => write!(f, "traceModuleStarts {input}"),
             Instruction::TraceModuleEnds => write!(f, "traceModuleEnds"),
-            Instruction::Error { id, error } => write!(f, "error at {id}: {error:?}"),
+            Instruction::Error { id, errors } => {
+                write!(
+                    f,
+                    "{} at {id}:",
+                    if errors.len() == 1 { "error" } else { "errors" }
+                )?;
+                write!(f, "error(s) at {id}")?;
+                for error in errors {
+                    write!(f, "\n  {error:?}")?;
+                }
+                Ok(())
+            }
         }
     }
 }

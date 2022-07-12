@@ -370,9 +370,14 @@ impl Vm {
                         .export_without_dropping(*self.data_stack.last().unwrap()),
                 })
             }
-            Instruction::Error { id, error } => {
+            Instruction::Error { id, errors } => {
                 self.panic(format!(
-                    "The VM crashed because there was an error at {id}: {error:?}"
+                    "The VM crashed because there {} at {id}: {errors:?}",
+                    if errors.len() == 1 {
+                        "was an error"
+                    } else {
+                        "were errors"
+                    }
                 ));
             }
         }

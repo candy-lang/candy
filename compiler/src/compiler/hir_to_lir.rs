@@ -109,9 +109,7 @@ impl LoweringContext {
                 self.emit_trace_needs_ends();
             }
             Expression::Error { errors, .. } => {
-                for error in errors {
-                    self.emit_error(id.clone(), error.clone());
-                }
+                self.emit_errors(id.clone(), errors.clone());
             }
         };
         self.emit_trace_value_evaluated(id.clone());
@@ -196,10 +194,10 @@ impl LoweringContext {
     fn emit_trace_needs_ends(&mut self) {
         self.emit(Instruction::TraceNeedsEnds);
     }
-    fn emit_error(&mut self, id: hir::Id, error: CompilerError) {
+    fn emit_errors(&mut self, id: hir::Id, errors: Vec<CompilerError>) {
         self.emit(Instruction::Error {
             id: id.clone(),
-            error,
+            errors,
         });
         self.stack.push(id);
     }

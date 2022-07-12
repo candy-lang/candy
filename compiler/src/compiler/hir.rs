@@ -274,7 +274,7 @@ impl fmt::Display for Expression {
                 write!(f, "needs {condition} with message {message}")
             }
             Expression::Error { child, errors } => {
-                write!(f, "error")?;
+                write!(f, "{}", if errors.len() == 1 { "error" } else { "errors" })?;
                 for error in errors {
                     write!(f, "\n  {error:?}")?;
                 }
