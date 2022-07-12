@@ -32,6 +32,13 @@ export class HintsDecorations implements vs.Disposable {
         rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
       }),
     ],
+    [
+      'fuzz',
+      vs.window.createTextEditorDecorationType({
+        after: { color: new vs.ThemeColor('candy.hints.fuzzColor') },
+        rangeBehavior: vs.DecorationRangeBehavior.ClosedOpen,
+      }),
+    ],
   ]);
 
   constructor(private readonly analyzer: LanguageClient) {

@@ -89,12 +89,6 @@ impl LanguageServer for CandyLanguageServer {
         let client = self.client.clone();
         let hint_reporter = async move || {
             while let Some((input, hints)) = hints_receiver.recv().await {
-                if let Some(path) = input.to_path() {
-                    let hints_file = path.clone_with_extension("candy.hints");
-                    let content = hints.iter().map(|hint| format!("{hint:?}")).join("\n");
-                    fs::write(hints_file.clone(), content).unwrap();
-                }
-
                 client
                     .send_notification::<HintsNotification>(HintsNotification {
                         uri: Url::from(input).to_string(),

@@ -8,20 +8,16 @@
 //! While doing all that, we can pause regularly between executing instructions
 //! so that we don't occupy a single CPU at 100%.
 
-mod input_runner;
+mod constant_evaluator;
+mod fuzzer;
 mod utils;
 
-use self::input_runner::{collect_hints, vm_for_input};
-use crate::{
-    database::Database,
-    input::Input,
-    vm::{use_provider::DbUseProvider, Status, Vm},
-};
+use self::{constant_evaluator::ConstantEvaluator, fuzzer::Fuzzer};
+use crate::{database::Database, input::Input, CloneWithExtension};
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position};
-use rand::{prelude::SliceRandom, thread_rng};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, fs, sync::Arc, time::Duration};
 use tokio::{
     sync::{
         mpsc::{error::TryRecvError, Receiver, Sender},
@@ -42,11 +38,12 @@ pub struct Hint {
     text: String,
     position: Position,
 }
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, Copy)]
 #[serde(rename_all = "camelCase")]
 pub enum HintKind {
-    Value,
     Panic,
+    Fuzz,
+    Value,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -65,61 +62,97 @@ pub async fn run_server(
     mut incoming_events: Receiver<Event>,
     outgoing_hints: Sender<(Input, Vec<Hint>)>,
 ) {
-    let mut vms = HashMap::new();
+    let mut constant_evaluator = ConstantEvaluator::default();
+    let mut fuzzer = Fuzzer::default();
+    let mut outgoing_hints = OutgoingHints::new(outgoing_hints);
 
     'server_loop: loop {
+        sleep(Duration::from_millis(100)).await;
+
         loop {
-            match incoming_events.try_recv() {
-                Ok(event) => handle_event(db.clone(), &mut incoming_events, &mut vms, event).await,
+            let event = match incoming_events.try_recv() {
+                Ok(event) => event,
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => break 'server_loop,
+            };
+            match event {
+                Event::UpdateModule(input) => {
+                    constant_evaluator
+                        .update_input(db.clone(), input.clone())
+                        .await;
+                    fuzzer.update_input(input, vec![]);
+                }
+                Event::CloseModule(input) => {
+                    constant_evaluator.remove_input(input.clone());
+                    fuzzer.remove_input(input);
+                }
+                Event::Shutdown => {
+                    incoming_events.close();
+                }
             }
         }
 
-        let input_of_chosen_vm = vms
-            .iter()
-            .filter(|(_, vm)| match vm.status() {
-                Status::Running => true,
-                Status::Done => false,
-                Status::Panicked(_) => false,
-            })
-            .collect_vec()
-            .choose(&mut thread_rng())
-            .map(|(input, _)| (*input).clone());
+        // First, try to constant-evaluate some input – that has a higher
+        // priority. When constant evaluation is done, we try fuzzing the
+        // functions we found.
+        let input_with_new_insight = 'new_insight: {
+            if let Some(input) = constant_evaluator.run(db.clone()).await {
+                fuzzer.update_input(
+                    input.clone(),
+                    constant_evaluator.get_fuzzable_closures(&input),
+                );
+                break 'new_insight Some(input);
+            }
+            if let Some(input) = fuzzer.run(db.clone()).await {
+                break 'new_insight Some(input);
+            }
+            None
+        };
 
-        if let Some(input) = input_of_chosen_vm {
-            let hints = {
-                let vm = vms.get_mut(&input).unwrap();
-                let db = db.lock().await;
-                let use_provider = DbUseProvider { db: &db };
-                vm.run(&use_provider, 5);
-                collect_hints(&db, &input, vm)
-            };
-            outgoing_hints.send((input, hints)).await.unwrap();
+        if let Some(input) = input_with_new_insight {
+            let mut hints = constant_evaluator
+                .get_hints(db.clone(), &input)
+                .await
+                .into_iter()
+                .chain(fuzzer.get_hints(db.clone(), &input).await.into_iter())
+                .collect_vec();
+            hints.sort_by_key(|hint| hint.position);
+
+            if let Some(path) = input.to_path() {
+                let hints_file = path.clone_with_extension("candy.hints");
+                let content = hints.iter().map(|hint| format!("{hint:?}")).join("\n");
+                fs::write(hints_file.clone(), content).unwrap();
+            }
+
+            // Only show the most important hint per line.
+            let hints = hints
+                .into_iter()
+                .group_by(|hint| hint.position.line)
+                .into_iter()
+                .map(|(_, hints)| hints.max_by_key(|hint| hint.kind).unwrap())
+                .collect_vec();
+
+            outgoing_hints.report_hints(input, hints).await;
         }
-
-        sleep(Duration::from_millis(100)).await;
     }
 }
 
-async fn handle_event(
-    db: Arc<Mutex<Database>>,
-    incoming_events: &mut Receiver<Event>,
-    vms: &mut HashMap<Input, Vm>,
-    event: Event,
-) {
-    match event {
-        Event::UpdateModule(input) => match vm_for_input(db, input.clone()).await {
-            Some(vm) => {
-                vms.insert(input, vm);
-            }
-            None => {}
-        },
-        Event::CloseModule(input) => {
-            vms.remove(&input);
+struct OutgoingHints {
+    sender: Sender<(Input, Vec<Hint>)>,
+    last_sent: HashMap<Input, Vec<Hint>>,
+}
+impl OutgoingHints {
+    fn new(sender: Sender<(Input, Vec<Hint>)>) -> Self {
+        Self {
+            sender,
+            last_sent: HashMap::new(),
         }
-        Event::Shutdown => {
-            incoming_events.close();
+    }
+
+    async fn report_hints(&mut self, input: Input, mut hints: Vec<Hint>) {
+        if self.last_sent.get(&input) != Some(&hints) {
+            self.last_sent.insert(input.clone(), hints.clone());
+            self.sender.send((input, hints)).await.unwrap();
         }
     }
 }

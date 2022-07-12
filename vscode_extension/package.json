@@ -41,6 +41,15 @@
           "light": "editorError.foreground",
           "highContrast": "editorError.foreground"
         }
+      },
+      {
+        "id": "candy.hints.fuzzColor",
+        "description": "The text color of hints indicating that a function panics for a certain input. If not supplied, the color for `editorError.foreground` will be used.",
+        "defaults": {
+          "dark": "editorError.foreground",
+          "light": "editorError.foreground",
+          "highContrast": "editorError.foreground"
+        }
       }
     ],
     "configuration": {
