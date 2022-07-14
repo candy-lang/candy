@@ -20,7 +20,7 @@ pub async fn fuzz_closure(
     closure_id: &hir::Id,
     mut num_instructions: usize,
 ) -> ClosureFuzzResult {
-    loop {
+    while num_instructions > 0 {
         let arguments = generate_n_values(closure.num_args);
         let result = test_closure_with_args(
             db.clone(),
@@ -31,21 +31,18 @@ pub async fn fuzz_closure(
         )
         .await;
 
-        match result {
+        let num_instructions_executed = match result {
             TestResult::DidNotFinishRunning => {
                 break;
             }
             TestResult::FinishedRunningWithoutPanicking {
                 num_instructions_executed,
-            } => {
-                num_instructions -= num_instructions_executed;
-            }
+            } => num_instructions_executed,
+
             TestResult::ArgumentsDidNotFulfillNeeds {
                 num_instructions_executed,
-            } => {
-                // This is the fuzzer's fault.
-                num_instructions -= num_instructions_executed;
-            }
+            } => num_instructions_executed,
+
             TestResult::InternalPanic { message, tracer } => {
                 return ClosureFuzzResult::PanickedForArguments {
                     arguments,
@@ -53,7 +50,8 @@ pub async fn fuzz_closure(
                     tracer,
                 }
             }
-        }
+        };
+        num_instructions -= num_instructions_executed;
     }
     ClosureFuzzResult::NoProblemFound
 }
