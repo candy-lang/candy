@@ -17,12 +17,9 @@ use crate::{database::Database, input::Input, CloneWithExtension};
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, sync::Arc, time::Duration};
+use std::{collections::HashMap, fs, time::Duration};
 use tokio::{
-    sync::{
-        mpsc::{error::TryRecvError, Receiver, Sender},
-        Mutex,
-    },
+    sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
 };
 
@@ -58,10 +55,10 @@ impl Notification for HintsNotification {
 }
 
 pub async fn run_server(
-    db: Arc<Mutex<Database>>,
     mut incoming_events: Receiver<Event>,
     outgoing_hints: Sender<(Input, Vec<Hint>)>,
 ) {
+    let db = Database::default();
     let mut constant_evaluator = ConstantEvaluator::default();
     let mut fuzzer = Fuzzer::default();
     let mut outgoing_hints = OutgoingHints::new(outgoing_hints);
@@ -77,9 +74,7 @@ pub async fn run_server(
             };
             match event {
                 Event::UpdateModule(input) => {
-                    constant_evaluator
-                        .update_input(db.clone(), input.clone())
-                        .await;
+                    constant_evaluator.update_input(&db, input.clone());
                     fuzzer.update_input(input, vec![]);
                 }
                 Event::CloseModule(input) => {
@@ -96,14 +91,14 @@ pub async fn run_server(
         // priority. When constant evaluation is done, we try fuzzing the
         // functions we found.
         let input_with_new_insight = 'new_insight: {
-            if let Some(input) = constant_evaluator.run(db.clone()).await {
+            if let Some(input) = constant_evaluator.run(&db) {
                 fuzzer.update_input(
                     input.clone(),
                     constant_evaluator.get_fuzzable_closures(&input),
                 );
                 break 'new_insight Some(input);
             }
-            if let Some(input) = fuzzer.run(db.clone()).await {
+            if let Some(input) = fuzzer.run(&db) {
                 break 'new_insight Some(input);
             }
             None
@@ -111,10 +106,9 @@ pub async fn run_server(
 
         if let Some(input) = input_with_new_insight {
             let mut hints = constant_evaluator
-                .get_hints(db.clone(), &input)
-                .await
+                .get_hints(&db, &input)
                 .into_iter()
-                .chain(fuzzer.get_hints(db.clone(), &input).await.into_iter())
+                .chain(fuzzer.get_hints(&db, &input).into_iter())
                 .collect_vec();
             hints.sort_by_key(|hint| hint.position);
 
@@ -149,7 +143,7 @@ impl OutgoingHints {
         }
     }
 
-    async fn report_hints(&mut self, input: Input, mut hints: Vec<Hint>) {
+    async fn report_hints(&mut self, input: Input, hints: Vec<Hint>) {
         if self.last_sent.get(&input) != Some(&hints) {
             self.last_sent.insert(input.clone(), hints.clone());
             self.sender.send((input, hints)).await.unwrap();

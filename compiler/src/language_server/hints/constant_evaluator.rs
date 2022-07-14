@@ -19,8 +19,7 @@ use crate::{
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::{collections::HashMap, fs, sync::Arc};
-use tokio::sync::Mutex;
+use std::{collections::HashMap, fs};
 
 #[derive(Default)]
 pub struct ConstantEvaluator {
@@ -28,8 +27,7 @@ pub struct ConstantEvaluator {
 }
 
 impl ConstantEvaluator {
-    pub async fn update_input(&mut self, db: Arc<Mutex<Database>>, input: Input) {
-        let db = db.lock().await;
+    pub fn update_input(&mut self, db: &Database, input: Input) {
         let module_closure = Closure::of_input(&db, input.clone()).unwrap();
         let mut vm = Vm::new();
         let use_provider = DbUseProvider { db: &db };
@@ -42,7 +40,7 @@ impl ConstantEvaluator {
         self.vms.remove(&input).unwrap();
     }
 
-    pub async fn run(&mut self, db: Arc<Mutex<Database>>) -> Option<Input> {
+    pub fn run(&mut self, db: &Database) -> Option<Input> {
         let mut running_vms = self
             .vms
             .iter_mut()
@@ -55,7 +53,6 @@ impl ConstantEvaluator {
 
         running_vms.shuffle(&mut thread_rng());
         if let Some((input, vm)) = running_vms.pop() {
-            let db = db.lock().await;
             let use_provider = DbUseProvider { db: &db };
             vm.run(&use_provider, 500);
             Some(input.clone())
@@ -73,8 +70,7 @@ impl ConstantEvaluator {
             .collect_vec()
     }
 
-    pub async fn get_hints(&self, db: Arc<Mutex<Database>>, input: &Input) -> Vec<Hint> {
-        let db = db.lock().await;
+    pub fn get_hints(&self, db: &Database, input: &Input) -> Vec<Hint> {
         let vm = &self.vms[input];
 
         log::debug!("Calculating hints for {input}");

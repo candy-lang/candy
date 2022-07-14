@@ -10,11 +10,9 @@ use crate::{
         Status, Vm,
     },
 };
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
-pub async fn fuzz_closure(
-    db: Arc<Mutex<Database>>,
+pub fn fuzz_closure(
+    db: &Database,
     input: &Input,
     closure: Closure,
     closure_id: &hir::Id,
@@ -28,8 +26,7 @@ pub async fn fuzz_closure(
             closure_id,
             arguments.clone(),
             num_instructions,
-        )
-        .await;
+        );
 
         let num_instructions_executed = match result {
             TestResult::DidNotFinishRunning => {
@@ -65,8 +62,8 @@ pub enum ClosureFuzzResult {
     },
 }
 
-async fn test_closure_with_args(
-    db: Arc<Mutex<Database>>,
+fn test_closure_with_args(
+    db: &Database,
     closure: Closure,
     closure_id: &hir::Id,
     arguments: Vec<Value>,
@@ -75,9 +72,7 @@ async fn test_closure_with_args(
     let mut vm = Vm::new();
 
     {
-        let db = db.lock().await;
-        println!("Starting closure {closure:?}.");
-        let use_provider = DbUseProvider { db: &db };
+        let use_provider = DbUseProvider { db };
         vm.set_up_closure_execution(&use_provider, closure, arguments);
         vm.run(&use_provider, num_instructions);
     }
@@ -90,9 +85,8 @@ async fn test_closure_with_args(
         Status::Panicked(message) => {
             // If a `needs` directly inside the tested closure was not
             // satisfied, then the panic is closure's fault, but our fault.
-            let db = db.lock().await;
             let is_our_fault =
-                did_need_in_closure_cause_panic(&db, &closure_id, vm.tracer.log().last().unwrap());
+                did_need_in_closure_cause_panic(db, &closure_id, vm.tracer.log().last().unwrap());
             if is_our_fault {
                 TestResult::ArgumentsDidNotFulfillNeeds {
                     num_instructions_executed: vm.num_instructions_executed,

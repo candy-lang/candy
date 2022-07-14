@@ -37,7 +37,7 @@ use tower_lsp::{jsonrpc, Client, LanguageServer};
 
 pub struct CandyLanguageServer {
     pub client: Client,
-    pub db: Arc<Mutex<Database>>,
+    pub db: Mutex<Database>,
     pub hints_server_sink: Arc<Mutex<Option<Sender<hints::Event>>>>,
 }
 impl CandyLanguageServer {
@@ -80,15 +80,12 @@ impl LanguageServer for CandyLanguageServer {
 
         let (events_sender, events_receiver) = tokio::sync::mpsc::channel(16);
         let (hints_sender, mut hints_receiver) = tokio::sync::mpsc::channel(8);
-        tokio::spawn(hints::run_server(
-            self.db.clone(),
-            events_receiver,
-            hints_sender,
-        ));
+        tokio::spawn(hints::run_server(events_receiver, hints_sender));
         *self.hints_server_sink.lock().await = Some(events_sender);
         let client = self.client.clone();
         let hint_reporter = async move || {
             while let Some((input, hints)) = hints_receiver.recv().await {
+                log::debug!("Reporting hints for {input}: {hints:?}");
                 client
                     .send_notification::<HintsNotification>(HintsNotification {
                         uri: Url::from(input).to_string(),

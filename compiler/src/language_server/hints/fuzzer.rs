@@ -1,3 +1,4 @@
+use super::{utils::id_to_end_of_line, Hint, HintKind};
 use crate::{
     compiler::hir::Id,
     database::Database,
@@ -10,10 +11,7 @@ use crate::{
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::{collections::HashMap, sync::Arc};
-use tokio::sync::Mutex;
-
-use super::{utils::id_to_end_of_line, Hint, HintKind};
+use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct Fuzzer {
@@ -36,7 +34,7 @@ impl Fuzzer {
         self.fuzzable_closures.remove(&input).unwrap();
     }
 
-    pub async fn run(&mut self, db: Arc<Mutex<Database>>) -> Option<Input> {
+    pub fn run(&mut self, db: &Database) -> Option<Input> {
         let mut non_panicked_closures = self
             .fuzzable_closures
             .iter()
@@ -52,7 +50,7 @@ impl Fuzzer {
 
         non_panicked_closures.shuffle(&mut thread_rng());
         let (input, closure_id, closure) = non_panicked_closures.pop()?;
-        match fuzzer::fuzz_closure(db, &input, closure.clone(), &closure_id, 1000).await {
+        match fuzzer::fuzz_closure(db, &input, closure.clone(), &closure_id, 20) {
             fuzzer::ClosureFuzzResult::NoProblemFound => None,
             fuzzer::ClosureFuzzResult::PanickedForArguments {
                 arguments,
@@ -72,8 +70,7 @@ impl Fuzzer {
         }
     }
 
-    pub async fn get_hints(&self, db: Arc<Mutex<Database>>, input: &Input) -> Vec<Hint> {
-        let db = db.lock().await;
+    pub fn get_hints(&self, db: &Database, input: &Input) -> Vec<Hint> {
         let mut hints = vec![];
 
         for (id, closure) in &self.fuzzable_closures[input] {

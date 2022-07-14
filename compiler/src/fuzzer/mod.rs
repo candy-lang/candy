@@ -12,11 +12,10 @@ use crate::{
 };
 use itertools::Itertools;
 use log;
-use std::{fs, sync::Arc};
-use tokio::sync::Mutex;
+use std::fs;
 
-pub async fn fuzz(db: Arc<Mutex<Database>>, input: Input) {
-    let panics = fuzz_input(db.clone(), input.clone()).await;
+pub async fn fuzz(db: &Database, input: Input) {
+    let panics = fuzz_input(db, input.clone()).await;
     for ClosurePanic {
         closure,
         closure_id,
@@ -35,7 +34,6 @@ pub async fn fuzz(db: Arc<Mutex<Database>>, input: Input) {
             },
         );
         log::error!("This was the stack trace:");
-        let db = db.lock().await;
         tracer.dump_stack_trace(&db, input.clone());
 
         let trace = tracer.dump_call_tree();

@@ -10,15 +10,12 @@ use crate::{
         Status, TearDownResult, Vm,
     },
 };
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
-pub async fn fuzz_input(db: Arc<Mutex<Database>>, input: Input) -> Vec<ClosurePanic> {
+pub async fn fuzz_input(db: &Database, input: Input) -> Vec<ClosurePanic> {
     let mut vm = {
         let mut vm = Vm::new();
-        let db = db.lock().await;
-        let module_closure = Closure::of_input(&db, input.clone()).unwrap();
-        let use_provider = DbUseProvider { db: &db };
+        let module_closure = Closure::of_input(db, input.clone()).unwrap();
+        let use_provider = DbUseProvider { db };
         vm.set_up_module_closure_execution(&use_provider, module_closure);
         vm.run(&use_provider, 1000);
         vm
@@ -32,8 +29,7 @@ pub async fn fuzz_input(db: Arc<Mutex<Database>>, input: Input) -> Vec<ClosurePa
         Status::Done => log::debug!("The VM is done."),
         Status::Panicked(value) => {
             log::error!("The VM panicked with value {value}.");
-            let db = db.lock().await;
-            log::error!("{}", vm.tracer.format_stack_trace(&db, input.clone()));
+            log::error!("{}", vm.tracer.format_stack_trace(db, input.clone()));
             return vec![];
         }
     }
@@ -48,7 +44,7 @@ pub async fn fuzz_input(db: Arc<Mutex<Database>>, input: Input) -> Vec<ClosurePa
 
     let mut panics = vec![];
     for (id, closure) in fuzzable_closures {
-        match fuzz_closure(db.clone(), &input, closure.clone(), &id, 1000).await {
+        match fuzz_closure(db, &input, closure.clone(), &id, 1000) {
             ClosureFuzzResult::NoProblemFound => {}
             ClosureFuzzResult::PanickedForArguments {
                 arguments,

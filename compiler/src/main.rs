@@ -255,7 +255,7 @@ async fn fuzz(options: CandyFuzzOptions) {
     log::debug!("Building `{}`.\n", options.file.display());
 
     let input: Input = options.file.clone().into();
-    let db = Arc::new(Mutex::new(Database::default()));
+    let db = Database::default();
 
     if raw_build(&options.file, false).is_none() {
         log::info!("Build failed.");
@@ -265,7 +265,7 @@ async fn fuzz(options: CandyFuzzOptions) {
     let path_string = options.file.to_string_lossy();
     log::debug!("Fuzzing `{path_string}`.");
 
-    fuzzer::fuzz(db, input).await;
+    fuzzer::fuzz(&db, input).await;
 }
 
 async fn lsp() {
