@@ -12,7 +12,7 @@ subtract minuend subtrahend :=
   ✨.intSubtract minuend subtrahend
 negate value :=
   needs (is value)
-  ✨.intNegate value
+  subtract 0 value
 multiply factorA factorB :=
   needs (is factorA)
   needs (is factorB)

@@ -46,7 +46,6 @@ impl Vm {
             BuiltinFunction::IntDivideTruncating => self.int_divide_truncating(args),
             BuiltinFunction::IntModulo => self.int_modulo(args),
             BuiltinFunction::IntMultiply => self.int_multiply(args),
-            BuiltinFunction::IntNegate => self.int_negate(args),
             BuiltinFunction::IntParse => self.int_parse(args),
             BuiltinFunction::IntSubtract => self.int_subtract(args),
             BuiltinFunction::Panic => self.panic_builtin(args).map(|_| panic!()),
@@ -192,9 +191,6 @@ impl Vm {
         destructure!(args, [Value::Int(factor_a), Value::Int(factor_b)], {
             Ok((factor_a * factor_b).into())
         })
-    }
-    fn int_negate(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(value)], { Ok((-value).into()) })
     }
     fn int_parse(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Text(text)], {
