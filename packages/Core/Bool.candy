@@ -1,7 +1,11 @@
 function = use "..Function"
 type = use "..Type"
 
-is value := type.is value Bool
+is value :=
+  ✨.ifElse
+    (✨.equals value True)
+    { True }
+    { ✨.equals value False }
 
 not a :=
   needs (is a)

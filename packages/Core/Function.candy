@@ -7,9 +7,9 @@ getArgumentCount function :=
   needs (is function)
   ✨.getArgumentCount function
 
-is0 value := ✨.ifElse (is value) { False } { equals (getArgumentCount value) 0 }
-is1 value := ✨.ifElse (is value) { False } { equals (getArgumentCount value) 1 }
-is2 value := ✨.ifElse (is value) { False } { equals (getArgumentCount value) 2 }
-is3 value := ✨.ifElse (is value) { False } { equals (getArgumentCount value) 3 }
-is4 value := ✨.ifElse (is value) { False } { equals (getArgumentCount value) 4 }
-is5 value := ✨.ifElse (is value) { False } { equals (getArgumentCount value) 5 }
+is0 value := ✨.ifElse (is value) { equals (getArgumentCount value) 0 } { False }
+is1 value := ✨.ifElse (is value) { equals (getArgumentCount value) 1 } { False }
+is2 value := ✨.ifElse (is value) { equals (getArgumentCount value) 2 } { False }
+is3 value := ✨.ifElse (is value) { equals (getArgumentCount value) 3 } { False }
+is4 value := ✨.ifElse (is value) { equals (getArgumentCount value) 4 } { False }
+is5 value := ✨.ifElse (is value) { equals (getArgumentCount value) 5 } { False }
