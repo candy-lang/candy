@@ -9,6 +9,7 @@ pub enum BuiltinFunction {
     GetArgumentCount,    // closure -> argumentCount
     IfElse,              // condition thenClosure elseClosure -> resultOfExecutedClosure
     IntAdd,              // (summandA: int) (summandB: int) -> (sum: int)
+    IntCompareTo,        // (valueA: int) (valueB: int) -> (ordering: Less | Equal | Greater)
     IntDivideTruncating, // (dividend: int) (divisor: int) -> (quotient: int)
     IntModulo,           // (dividend: int) (divisor: int) -> (remainder: int)
     IntMultiply,         // (factorA: int) (factorB: int) -> (product: int)

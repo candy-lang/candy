@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{cmp::Ordering, str::FromStr};
 
 use super::{heap::ObjectPointer, use_provider::UseProvider, value::Value, Vm};
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
@@ -43,6 +43,7 @@ impl Vm {
                 Err(message) => Err(message),
             },
             BuiltinFunction::IntAdd => self.int_add(args),
+            BuiltinFunction::IntCompareTo => self.int_compare_to(args),
             BuiltinFunction::IntDivideTruncating => self.int_divide_truncating(args),
             BuiltinFunction::IntModulo => self.int_modulo(args),
             BuiltinFunction::IntMultiply => self.int_multiply(args),
@@ -175,6 +176,16 @@ impl Vm {
     fn int_add(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Int(summand_a), Value::Int(summand_b)], {
             Ok((summand_a + summand_b).into())
+        })
+    }
+    fn int_compare_to(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(value_a), Value::Int(value_b)], {
+            let result = match value_a.cmp(&value_b) {
+                Ordering::Less => "Less".to_string(),
+                Ordering::Equal => "Equal".to_string(),
+                Ordering::Greater => "Greater".to_string(),
+            };
+            Ok(Value::Symbol(result))
         })
     }
     fn int_divide_truncating(&mut self, args: Vec<Value>) -> Result<Value, String> {

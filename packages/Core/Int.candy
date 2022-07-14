@@ -1,3 +1,6 @@
+bool = use "..Bool"
+controlFlow = use "..ControlFlow"
+equals = (use "..Equality").equals
 type = use "..Type"
 
 is value := type.is value Int
@@ -25,6 +28,58 @@ modulo dividend divisor :=
   needs (is dividend)
   needs (is divisor)
   ✨.intModulo dividend divisor
+
+compareTo valueA valueB =
+  needs (is valueA)
+  needs (is valueB)
+  result = ✨.intCompareTo valueA valueB
+  bool.implies (equals result Equal) (equals valueA valueB)
+  result
+isLessThan valueA valueB =
+  needs (is valueA)
+  needs (is valueB)
+  equals (compareTo valueA valueB) Less
+isGreaterThan valueA valueB =
+  needs (is valueA)
+  needs (is valueB)
+  equals (compareTo valueA valueB) Greater
+isLessThanOrEqualTo valueA valueB =
+  needs (is valueA)
+  needs (is valueB)
+  bool.not (isGreaterThan valueA valueB)
+isGreaterThanOrEqualTo valueA valueB =
+  needs (is valueA)
+  needs (is valueB)
+  bool.not (isLessThan valueA valueB)
+
+min valueA valueB =
+  needs (is valueA)
+  needs (is valueB)
+  controlFlow.ifElse
+    (isLessThanOrEqualTo valueA valueB)
+    { valueA }
+    { valueB }
+max valueA valueB =
+  needs (is valueA)
+  needs (is valueB)
+  controlFlow.ifElse
+    (isGreaterThanOrEqualTo valueA valueB)
+    { valueA }
+    { valueB }
+coerceAtLeast value minimum =
+  needs (is value)
+  needs (is minimum)
+  max value minimum
+coerceAtMost value maximum =
+  needs (is value)
+  needs (is maximum)
+  min value maximum
+coerceIn value minimum maximum =
+  needs (is value)
+  needs (is minimum)
+  needs (is maximum)
+  needs (isLessThanOrEqualTo minimum maximum)
+  coerceAtMost (coerceAtLeast value minimum) maximum
 
 parse text :=
   needs (type.is text Text)
