@@ -120,6 +120,8 @@ Major milestones:
 - make `PROJECT_DIRECTORY` non-global
 - extra closure value type
 - use BigInts
+- turn needs `message` into `reason`
+- panic with strings instead of values
 - implement fibers and nurseries
 - implement channels
 - remove builtinPrint
