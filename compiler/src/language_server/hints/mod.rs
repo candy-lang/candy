@@ -24,7 +24,7 @@ use tokio::{
 };
 
 pub enum Event {
-    UpdateModule(Input),
+    UpdateModule(Input, Vec<u8>),
     CloseModule(Input),
     Shutdown,
 }
@@ -58,7 +58,7 @@ pub async fn run_server(
     mut incoming_events: Receiver<Event>,
     outgoing_hints: Sender<(Input, Vec<Hint>)>,
 ) {
-    let db = Database::default();
+    let mut db = Database::default();
     let mut constant_evaluator = ConstantEvaluator::default();
     let mut fuzzer = Fuzzer::default();
     let mut outgoing_hints = OutgoingHints::new(outgoing_hints);
@@ -74,11 +74,14 @@ pub async fn run_server(
                 Err(TryRecvError::Disconnected) => break 'server_loop,
             };
             match event {
-                Event::UpdateModule(input) => {
+                Event::UpdateModule(input, content) => {
+                    db.did_change_input(&input, content);
+                    outgoing_hints.report_hints(input.clone(), vec![]).await;
                     constant_evaluator.update_input(&db, input.clone());
                     fuzzer.update_input(input, vec![]);
                 }
                 Event::CloseModule(input) => {
+                    db.did_close_input(&input);
                     constant_evaluator.remove_input(input.clone());
                     fuzzer.remove_input(input);
                 }

@@ -218,25 +218,27 @@ impl LanguageServer for CandyLanguageServer {
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let input = params.text_document.uri.into();
+        let content = params.text_document.text.into_bytes();
         {
             let mut db = self.db.lock().await;
-            db.did_open_input(&input, params.text_document.text.into_bytes());
+            db.did_open_input(&input, content.clone());
         }
         self.analyze_files(vec![input.clone()]).await;
-        self.send_to_hints_server(hints::Event::UpdateModule(input))
+        self.send_to_hints_server(hints::Event::UpdateModule(input, content))
             .await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let input: Input = params.text_document.uri.into();
         let mut open_inputs = Vec::<Input>::new();
-        {
+        let content = {
             let mut db = self.db.lock().await;
             let text = apply_text_changes(&db, input.clone(), params.content_changes);
-            db.did_change_input(&input, text.into_bytes());
+            db.did_change_input(&input, text.clone().into_bytes());
             open_inputs.extend(db.open_inputs.keys().cloned());
-        }
+            text.into_bytes()
+        };
         self.analyze_files(open_inputs).await;
-        self.send_to_hints_server(hints::Event::UpdateModule(input))
+        self.send_to_hints_server(hints::Event::UpdateModule(input, content))
             .await;
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
