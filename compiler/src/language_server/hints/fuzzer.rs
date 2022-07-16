@@ -1,11 +1,14 @@
-use super::{utils::id_to_end_of_line, Hint, HintKind};
+use super::{super::utils::JoinWithCommasAndAnd, utils::id_to_end_of_line, Hint, HintKind};
 use crate::{
-    compiler::hir::Id,
+    compiler::{
+        ast_to_hir::AstToHir,
+        hir::{Expression, HirDb, Id, Lambda},
+    },
     database::Database,
     fuzzer,
     input::Input,
     vm::{
-        tracer::Tracer,
+        tracer::{TraceEntry, Tracer},
         value::{Closure, Value},
     },
 };
@@ -55,7 +58,7 @@ impl Fuzzer {
 
         non_panicked_closures.shuffle(&mut thread_rng());
         let (input, closure_id, closure) = non_panicked_closures.pop()?;
-        match fuzzer::fuzz_closure(db, &input, closure.clone(), &closure_id, 20) {
+        match fuzzer::fuzz_closure(db, &input, closure.clone(), &closure_id, 100) {
             fuzzer::ClosureFuzzResult::NoProblemFound => None,
             fuzzer::ClosureFuzzResult::PanickedForArguments {
                 arguments,
@@ -85,20 +88,111 @@ impl Fuzzer {
                 tracer,
             }) = self.found_panics.get(closure)
             {
-                hints.push(Hint {
-                    kind: HintKind::Fuzz,
-                    text: format!(
-                        " # If this is called with the arguments {}, it panics because {message}.",
-                        arguments
-                            .iter()
-                            .map(|argument| format!("{argument}"))
-                            .join(" ")
-                    ),
-                    position: id_to_end_of_line(&db, id.clone()).unwrap(),
-                });
+                let first_hint = {
+                    let parameter_names = match db.find_expression(id.clone()) {
+                        Some(Expression::Lambda(Lambda { parameters, .. })) => parameters
+                            .into_iter()
+                            .map(|parameter| parameter.keys.last().unwrap().to_string())
+                            .collect_vec(),
+                        Some(_) => {
+                            log::warn!("Looks like we fuzzed a non-closure. That's weird.");
+                            continue;
+                        }
+                        None => {
+                            log::warn!(
+                                "Using fuzzing, we found a possible error in a generated closure."
+                            );
+                            continue;
+                        }
+                    };
+                    Hint {
+                        kind: HintKind::Fuzz,
+                        text: format!(
+                            " # If this is called with {},",
+                            parameter_names
+                                .iter()
+                                .zip(arguments.iter())
+                                .map(|(name, argument)| format!("`{name} = {argument}`"))
+                                .collect_vec()
+                                .join_with_commas_and_and(),
+                        ),
+                        position: id_to_end_of_line(&db, id.clone()).unwrap(),
+                    }
+                };
+
+                let second_hint = {
+                    let panicking_inner_call = tracer
+                        .log()
+                        .iter()
+                        .rev()
+                        .filter(|entry| {
+                            let inner_call_id = match entry {
+                                TraceEntry::CallStarted { id, .. } => id,
+                                TraceEntry::NeedsStarted { id, .. } => id,
+                                _ => return false,
+                            };
+                            // Make sure the entry comes from the same file and is not generated code.
+                            id.is_same_module_parent_of(inner_call_id)
+                                && db.hir_to_cst_id(id.clone()).is_some()
+                        })
+                        .next()
+                        .expect(
+                            "Fuzzer found a panicking function without an inner panicking needs",
+                        );
+                    let (call_id, name, arguments) = match panicking_inner_call {
+                        TraceEntry::CallStarted { id, closure, args } => {
+                            (id.clone(), format!("{closure}"), args.clone())
+                        }
+                        TraceEntry::NeedsStarted {
+                            id,
+                            condition,
+                            message,
+                        } => (
+                            id.clone(),
+                            "needs".to_string(),
+                            vec![condition.clone(), message.clone()],
+                        ),
+                        _ => unreachable!(),
+                    };
+                    Hint {
+                        kind: HintKind::Fuzz,
+                        text: format!(
+                            " # then `{name} {}` panics because {}.",
+                            arguments.iter().map(|arg| format!("{arg}")).join(" "),
+                            if let Value::Text(message) = message {
+                                message.to_string()
+                            } else {
+                                format!("{message}")
+                            }
+                        ),
+                        position: id_to_end_of_line(db, call_id).unwrap(),
+                    }
+                };
+
+                let mut panic_hints = vec![first_hint, second_hint];
+                panic_hints.align_hint_columns();
+                hints.extend(panic_hints);
             }
         }
 
         hints
+    }
+}
+
+trait AlignHints {
+    fn align_hint_columns(&mut self);
+}
+impl AlignHints for Vec<Hint> {
+    fn align_hint_columns(&mut self) {
+        assert!(!self.is_empty());
+        let max_indentation = self.iter().map(|it| it.position.character).max().unwrap();
+        for hint in self {
+            let additional_indentation = max_indentation - hint.position.character;
+            hint.text = format!(
+                "{}{}",
+                " ".repeat(additional_indentation as usize),
+                hint.text
+            );
+        }
     }
 }

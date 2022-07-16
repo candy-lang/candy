@@ -173,7 +173,7 @@ fn panic_hint(db: &Database, input: Input, vm: &Vm, panic_message: Value) -> Opt
     Some(Hint {
         kind: HintKind::Panic,
         text: format!(
-            " # Calling {call_info} panicked because {}.",
+            " # Calling `{call_info}` panics because {}.",
             if let Value::Text(message) = panic_message {
                 message
             } else {
