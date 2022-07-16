@@ -143,7 +143,6 @@ fn panic_hint(db: &Database, input: Input, vm: &Vm, panic_message: Value) -> Opt
         .tracer
         .stack()
         .iter()
-        .rev()
         .filter(|entry| {
             let id = match entry {
                 TraceEntry::CallStarted { id, .. } => id,
