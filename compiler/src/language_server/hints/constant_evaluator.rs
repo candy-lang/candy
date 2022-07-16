@@ -59,7 +59,7 @@ impl ConstantEvaluator {
 
         running_vms.shuffle(&mut thread_rng());
         if let Some((input, vm)) = running_vms.pop() {
-            let use_provider = DbUseProvider { db: &db };
+            let use_provider = DbUseProvider { db };
             vm.run(&use_provider, 500);
             Some(input.clone())
         } else {

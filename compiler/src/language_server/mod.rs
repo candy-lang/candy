@@ -17,7 +17,7 @@ use crate::{
     compiler::{ast_to_hir::AstToHir, hir::CollectErrors},
     database::PROJECT_DIRECTORY,
     input::{Input, InputDb},
-    CloneWithExtension, Database,
+    Database,
 };
 use itertools::Itertools;
 use lsp_types::{
@@ -31,7 +31,7 @@ use lsp_types::{
     TextDocumentChangeRegistrationOptions, TextDocumentContentChangeEvent,
     TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
 };
-use std::{fs, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::{mpsc::Sender, Mutex};
 use tower_lsp::{jsonrpc, Client, LanguageServer};
 

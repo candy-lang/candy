@@ -26,7 +26,7 @@ pub struct Vm {
     pub num_instructions_executed: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Status {
     Running,
     Done,
