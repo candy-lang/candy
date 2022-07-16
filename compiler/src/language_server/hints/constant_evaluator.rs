@@ -41,6 +41,7 @@ impl ConstantEvaluator {
     }
 
     pub fn run(&mut self, db: &Database) -> Option<Input> {
+        let num_vms = self.vms.len();
         let mut running_vms = self
             .vms
             .iter_mut()
@@ -50,6 +51,11 @@ impl ConstantEvaluator {
                 Status::Panicked(_) => false,
             })
             .collect_vec();
+        log::trace!(
+            "Constant evaluator running. {} running VMs, {} in total.",
+            running_vms.len(),
+            num_vms,
+        );
 
         running_vms.shuffle(&mut thread_rng());
         if let Some((input, vm)) = running_vms.pop() {

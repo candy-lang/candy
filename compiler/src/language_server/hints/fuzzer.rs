@@ -47,6 +47,11 @@ impl Fuzzer {
             .flatten()
             .filter(|(_, _, closure)| !self.found_panics.contains_key(closure))
             .collect_vec();
+        log::trace!(
+            "Fuzzer running. {} non-panicked closures, {} in total.",
+            non_panicked_closures.len(),
+            self.fuzzable_closures.len(),
+        );
 
         non_panicked_closures.shuffle(&mut thread_rng());
         let (input, closure_id, closure) = non_panicked_closures.pop()?;

@@ -64,6 +64,7 @@ pub async fn run_server(
     let mut outgoing_hints = OutgoingHints::new(outgoing_hints);
 
     'server_loop: loop {
+        log::trace!("Hints server is running.");
         sleep(Duration::from_millis(100)).await;
 
         loop {
@@ -99,6 +100,7 @@ pub async fn run_server(
                 break 'new_insight Some(input);
             }
             if let Some(input) = fuzzer.run(&db) {
+                log::warn!("Fuzzer found a problem!");
                 break 'new_insight Some(input);
             }
             None
