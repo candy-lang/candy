@@ -249,7 +249,7 @@ impl UseTarget {
                 .chars()
                 .all(|c| c.is_ascii_alphanumeric() || c == '.')
             {
-                return Err("the target name can only contain letters".to_string());
+                return Err("the target name can only contain letters and dots".to_string());
             }
             target.to_string()
         };
