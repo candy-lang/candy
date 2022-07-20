@@ -1629,10 +1629,8 @@ mod parse {
         let parameters = signature.split_off(1);
         let name = signature.into_iter().next().unwrap();
 
-        let (input, mut assignment_sign) = match colon_equals_sign(input) {
-            Some(it) => it,
-            None => equals_sign(input)?,
-        };
+        let (input, mut assignment_sign) =
+            colon_equals_sign(input).or_else(|| equals_sign(input))?;
         let input_after_assignment_sign = input;
 
         let (input, more_whitespace) = whitespaces_and_newlines(input, indentation + 1, true);

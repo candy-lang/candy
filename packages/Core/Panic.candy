@@ -1,1 +1,5 @@
-panic := { message -> ✨.panic message }
+text = use "..Text"
+
+panic reason :=
+  needs (text.is reason) "panic needs a text as the reason"
+  needs False reason
