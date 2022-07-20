@@ -41,7 +41,6 @@ use std::{
     time::Duration,
 };
 use structopt::StructOpt;
-use tokio::sync::Mutex;
 use tower_lsp::{LspService, Server};
 
 #[derive(StructOpt, Debug)]

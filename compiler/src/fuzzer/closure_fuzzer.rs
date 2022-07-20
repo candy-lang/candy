@@ -2,7 +2,6 @@ use super::{generator::generate_n_values, utils::did_need_in_closure_cause_panic
 use crate::{
     compiler::hir,
     database::Database,
-    input::Input,
     vm::{
         tracer::Tracer,
         use_provider::DbUseProvider,
@@ -13,7 +12,6 @@ use crate::{
 
 pub fn fuzz_closure(
     db: &Database,
-    input: &Input,
     closure: Closure,
     closure_id: &hir::Id,
     mut num_instructions: usize,

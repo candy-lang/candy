@@ -17,11 +17,11 @@ use std::fs;
 pub async fn fuzz(db: &Database, input: Input) {
     let panics = fuzz_input(db, input.clone()).await;
     for ClosurePanic {
-        closure,
         closure_id,
         arguments,
         message,
         tracer,
+        ..
     } in panics
     {
         log::error!("The fuzzer discovered an input that crashes {closure_id}:");

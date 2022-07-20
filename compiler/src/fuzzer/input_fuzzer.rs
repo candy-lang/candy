@@ -44,7 +44,7 @@ pub async fn fuzz_input(db: &Database, input: Input) -> Vec<ClosurePanic> {
 
     let mut panics = vec![];
     for (id, closure) in fuzzable_closures {
-        match fuzz_closure(db, &input, closure.clone(), &id, 1000) {
+        match fuzz_closure(db, closure.clone(), &id, 1000) {
             ClosureFuzzResult::NoProblemFound => {}
             ClosureFuzzResult::PanickedForArguments {
                 arguments,

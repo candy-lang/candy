@@ -58,7 +58,7 @@ impl Fuzzer {
 
         non_panicked_closures.shuffle(&mut thread_rng());
         let (input, closure_id, closure) = non_panicked_closures.pop()?;
-        match fuzzer::fuzz_closure(db, &input, closure.clone(), &closure_id, 100) {
+        match fuzzer::fuzz_closure(db, closure.clone(), &closure_id, 100) {
             fuzzer::ClosureFuzzResult::NoProblemFound => None,
             fuzzer::ClosureFuzzResult::PanickedForArguments {
                 arguments,
