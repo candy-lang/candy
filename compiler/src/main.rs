@@ -7,7 +7,6 @@
 mod builtin_functions;
 mod compiler;
 mod database;
-mod discover;
 mod fuzzer;
 mod input;
 mod language_server;
