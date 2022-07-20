@@ -94,8 +94,8 @@ impl Vm {
         let address = self.heap.import(closure);
         self.data_stack.push(address);
 
-        self.run_instruction(use_provider, Instruction::Call { num_args });
         self.status = Status::Running;
+        self.run_instruction(use_provider, Instruction::Call { num_args });
     }
     pub fn tear_down_closure_execution(&mut self) -> Value {
         assert!(matches!(self.status, Status::Done));
@@ -356,7 +356,7 @@ impl Vm {
                             .skip_while(|it| **it != input)
                             .chain([&input])
                             .map(|input| format!("{input}"))
-                            .join(" -> "),
+                            .join(" → "),
                     ));
                 }
                 self.import_stack.push(input.clone());

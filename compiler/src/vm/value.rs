@@ -91,12 +91,8 @@ impl Display for Value {
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
             ),
-            Value::Closure { .. } => {
-                write!(f, "{{...}}")
-            }
-            Value::Builtin(builtin) => {
-                write!(f, "builtin{builtin:?}")
-            }
+            Value::Closure { .. } => write!(f, "{{...}}"),
+            Value::Builtin(builtin) => write!(f, "builtin{builtin:?}"),
         }
     }
 }
