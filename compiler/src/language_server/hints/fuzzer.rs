@@ -132,7 +132,7 @@ impl Fuzzer {
                                 _ => return false,
                             };
                             // Make sure the entry comes from the same file and is not generated code.
-                            id.is_same_module_parent_of(inner_call_id)
+                            id.is_same_module_and_any_parent_of(inner_call_id)
                                 && db.hir_to_cst_id(id.clone()).is_some()
                         })
                         .next()
