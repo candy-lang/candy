@@ -85,8 +85,15 @@ fn test_closure_with_args(
         Status::Panicked(message) => {
             // If a `needs` directly inside the tested closure was not
             // satisfied, then the panic is closure's fault, but our fault.
-            let is_our_fault =
-                did_need_in_closure_cause_panic(db, &closure_id, vm.tracer.log().last().unwrap());
+            let is_our_fault = if let Some(entry) = vm.tracer.log().last() {
+                did_need_in_closure_cause_panic(db, &closure_id, entry)
+            } else {
+                // The only way there's no trace log before the panic is when
+                // there's an error from an earlier compilation stage that got
+                // lowered into the LIR. That's also definitely the fault of the
+                // function.
+                false
+            };
             if is_our_fault {
                 TestResult::ArgumentsDidNotFulfillNeeds {
                     num_instructions_executed: vm.num_instructions_executed,
