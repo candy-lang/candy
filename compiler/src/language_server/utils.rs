@@ -117,8 +117,11 @@ pub fn offset_from_lsp_raw(text: &str, line_start_offsets: &[usize], position: P
     line_offset + char_offset
 }
 
-fn offset_to_lsp(db: &dyn LspPositionConversion, input: Input, offset: usize) -> (u32, u32) {
+fn offset_to_lsp(db: &dyn LspPositionConversion, input: Input, mut offset: usize) -> (u32, u32) {
     let text = db.get_string_input(input.clone()).unwrap();
+    if offset > text.len() {
+        offset = text.len();
+    }
     let line_start_offsets = db.line_start_utf8_byte_offsets(input);
 
     let line = line_start_offsets
