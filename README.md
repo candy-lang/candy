@@ -68,7 +68,7 @@ Major milestones:
 * [x] add CLI arguments for printing the CST, AST, or HIR
 * [ ] make functions independent of their order in top-level scope
 * [x] support importing other files (`use`)
-* [ ] namespaces/modules including visibility modifiers
+* [x] namespaces/modules including visibility modifiers
 * [ ] IDE support:
   * [ ] completion, completion resolve
   * [ ] hover
@@ -95,10 +95,10 @@ Major milestones:
   * [ ] moniker
 * [x] incremental compilation
 * [ ] lists
-* [ ] maps
+* [x] maps
 * [ ] sets
 * [ ] text interpolation
-* [ ] constant evaluation
+* [x] constant evaluation
 * [ ] fibers
 * [ ] channels
 * [ ] io
@@ -115,16 +115,14 @@ Major milestones:
 
 ## Short-term TODOs
 
-- start fuzzing in language server
-- show fuzzing hints in the editor
 - make `PROJECT_DIRECTORY` non-global
-- extra closure value type
 - use BigInts
 - turn needs `message` into `reason`
 - panic with strings instead of values
 - fuzz parser
 - also fuzz long-running functions
 - add caching to hints server
+- do we need the `CallReceiver`?
 - minimize inputs found through fuzzing
 - implement fibers and nurseries
 - implement channels
