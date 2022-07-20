@@ -413,6 +413,7 @@ mod parse {
             let c = input.chars().next()?;
             let is_weird = match c {
                 ' ' => false,
+                '\n' | '\r' => return None,
                 c if c.is_whitespace() => true,
                 _ => return None,
             };
@@ -1037,6 +1038,28 @@ mod parse {
                         whitespace: vec![Rcst::Whitespace(" ".to_string())]
                     }),
                     arguments: vec![Rcst::Symbol("Baz".to_string())]
+                }
+            ))
+        );
+        // foo T
+        //
+        // bar = 5
+        assert_eq!(
+            call("foo T\n\n\nbar = 5", 0),
+            Some((
+                "\nbar = 5",
+                Rcst::TrailingWhitespace {
+                    child: Box::new(Rcst::Call {
+                        name: Box::new(Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Identifier("foo".to_string())),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())]
+                        }),
+                        arguments: vec![Rcst::Symbol("T".to_string())]
+                    }),
+                    whitespace: vec![
+                        Rcst::Newline("\n".to_string()),
+                        Rcst::Newline("\n".to_string())
+                    ],
                 }
             ))
         );
