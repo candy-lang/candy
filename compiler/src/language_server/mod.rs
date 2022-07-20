@@ -53,7 +53,7 @@ impl CandyLanguageServer {
         let event_sink = self.hints_server_sink.lock().await;
         match event_sink.as_ref().unwrap().send(event).await {
             Ok(_) => {}
-            Err(_) => panic!("Couldn't shutdown hints server."),
+            Err(_) => panic!("Couldn't send message to hints server."),
         }
     }
 }
