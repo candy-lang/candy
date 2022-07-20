@@ -39,7 +39,6 @@ impl Vm {
                 Ok(()) => return,
                 Err(message) => Err(message),
             },
-            BuiltinFunction::Panic => self.panic_builtin(args).map(|_| panic!()),
             BuiltinFunction::Print => self.print(args),
             BuiltinFunction::StructGet => self.struct_get(args),
             BuiltinFunction::StructGetKeys => self.struct_get_keys(args),
@@ -133,10 +132,6 @@ impl Vm {
                 Ok(())
             }
         )
-    }
-
-    fn panic_builtin(&mut self, args: Vec<Value>) -> Result<!, String> {
-        destructure!(args, [Value::Text(message)], { Err(message.to_string()) })
     }
 
     fn print(&mut self, args: Vec<Value>) -> Result<Value, String> {

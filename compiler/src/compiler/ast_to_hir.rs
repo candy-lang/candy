@@ -489,6 +489,23 @@ impl<'a> Context<'a> {
         self.push(None, sparkles_map, Some("✨".to_string()));
     }
 
+    fn generate_panicking_code(&mut self, message: String) -> hir::Id {
+        let condition = self.push(
+            None,
+            Expression::Symbol("False".to_string()),
+            Some("false".to_string()),
+        );
+        let message = self.push(None, Expression::Text(message), Some("message".to_string()));
+        self.push(
+            None,
+            Expression::Needs {
+                condition: Box::new(condition),
+                message: Box::new(message),
+            },
+            None,
+        )
+    }
+
     // Generates a struct that contains the current path as a struct. Generates
     // panicking code if the current file is not on the file system and of the
     // current project.
@@ -498,11 +515,6 @@ impl<'a> Context<'a> {
         // HirId(~:test.candy:something:currentPath) = struct [
         //   HirId(~:test.candy:something:key): HirId(~:test.candy:something:raw_path),
         // ]
-        let panic_id = self.push(
-            None,
-            Expression::Builtin(BuiltinFunction::Panic),
-            Some("panic".to_string()),
-        );
         match self.input.clone() {
             Input::File(path) => {
                 let current_path_content = path
@@ -526,44 +538,17 @@ impl<'a> Context<'a> {
                     Some("currentPath".to_string()),
                 )
             }
-            Input::ExternalFile(_) => {
-                let message_id = self.push(
-                    None,
-                    Expression::Text(
-                        "file doesn't belong to the currently opened project.".to_string(),
-                    ),
-                    Some("message".to_string()),
-                );
-                self.push(
-                    None,
-                    Expression::Call {
-                        function: panic_id,
-                        arguments: vec![message_id],
-                    },
-                    Some("panicked".to_string()),
-                )
-            }
-            Input::Untitled(_) => {
-                let message_id = self.push(
-                    None,
-                    Expression::Text("untitled files can't call `use` or `useAsset`.".to_string()),
-                    Some("message".to_string()),
-                );
-                self.push(
-                    None,
-                    Expression::Call {
-                        function: panic_id,
-                        arguments: vec![message_id],
-                    },
-                    Some("panicked".to_string()),
-                )
-            }
+            Input::ExternalFile(_) => self.generate_panicking_code(
+                "file doesn't belong to the currently opened project.".to_string(),
+            ),
+            Input::Untitled(_) => self.generate_panicking_code(
+                "untitled files can't call `use` or `useAsset`.".to_string(),
+            ),
         }
     }
 
     fn generate_use_asset(&mut self) {
         // HirId(~:test.candy:useAsset) = lambda { HirId(~:test.candy:useAsset:target) ->
-        //   HirId(~:test.candy:useAsset:panic) = builtinPanic
         //   HirId(~:test.candy:useAsset:key) = int 0
         //   HirId(~:test.candy:useAsset:raw_path) = text "test.candy"
         //   HirId(~:test.candy:useAsset:currentPath) = struct [

@@ -8,7 +8,6 @@ pub enum BuiltinFunction {
     Equals,           // (a: any) (b: any) -> (boolean: True | False)
     GetArgumentCount, // (closure: Lambda) -> (argumentCount: int)
     IfElse, // (condition: True | False) (then: lambda) (else: lambda) -> (resultOfExecutedClosure: any)
-    Panic,  // (message: Text) -> Never
     Print,  // (message: Text) -> Nothing
     StructGet, // (struct: struct) (key: any) -> (value: any)
     StructGetKeys, // (struct: struct) -> (listOfKeys: listOfAny)
