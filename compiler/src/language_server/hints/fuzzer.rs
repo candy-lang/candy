@@ -5,10 +5,10 @@ use crate::{
         hir::{Expression, HirDb, Id, Lambda},
     },
     database::Database,
-    fuzzer,
+    fuzzer::{Fuzzer, Status},
     input::Input,
     vm::{
-        tracer::{TraceEntry, Tracer},
+        tracer::TraceEntry,
         value::{Closure, Value},
     },
 };
@@ -17,20 +17,32 @@ use rand::{prelude::SliceRandom, thread_rng};
 use std::collections::HashMap;
 
 #[derive(Default)]
-pub struct Fuzzer {
-    fuzzable_closures: HashMap<Input, Vec<(Id, Closure)>>,
-    found_panics: HashMap<Closure, Panic>,
-}
-struct Panic {
-    arguments: Vec<Value>,
-    message: Value,
-    tracer: Tracer,
+pub struct FuzzerManager {
+    fuzzable_closures: HashMap<Input, HashMap<Id, Closure>>,
+    fuzzers: HashMap<Closure, Fuzzer>,
 }
 
-impl Fuzzer {
-    pub fn update_input(&mut self, input: Input, fuzzable_closures: Vec<(Id, Closure)>) {
-        self.fuzzable_closures
-            .insert(input.clone(), fuzzable_closures);
+impl FuzzerManager {
+    pub fn update_input(
+        &mut self,
+        db: &Database,
+        input: Input,
+        fuzzable_closures: Vec<(Id, Closure)>,
+    ) {
+        let closures = self
+            .fuzzable_closures
+            .entry(input.clone())
+            .or_insert_with(|| HashMap::new());
+
+        for (id, new_closure) in fuzzable_closures {
+            let old_closure = closures.insert(id.clone(), new_closure.clone());
+            self.fuzzers
+                .entry(new_closure.clone())
+                .or_insert_with(|| Fuzzer::new(db, new_closure.clone(), id));
+            if let Some(old_closure) = old_closure && old_closure != new_closure {
+                self.fuzzers.remove(&old_closure);
+            }
+        }
     }
 
     pub fn remove_input(&mut self, input: Input) {
@@ -38,56 +50,42 @@ impl Fuzzer {
     }
 
     pub fn run(&mut self, db: &Database) -> Option<Input> {
-        let mut non_panicked_closures = self
-            .fuzzable_closures
-            .iter()
-            .map(|(input, closures)| {
-                closures
-                    .iter()
-                    .map(|(id, closure)| (input.clone(), id.clone(), closure.clone()))
-                    .collect_vec()
-            })
-            .flatten()
-            .filter(|(_, _, closure)| !self.found_panics.contains_key(closure))
+        let mut running_fuzzers = self
+            .fuzzers
+            .values_mut()
+            .filter(|fuzzer| matches!(fuzzer.status, Status::StillFuzzing { .. }))
             .collect_vec();
         log::trace!(
-            "Fuzzer running. {} non-panicked closures, {} in total.",
-            non_panicked_closures.len(),
-            self.fuzzable_closures.len(),
+            "Fuzzer running. {} fuzzers for relevant closures are running.",
+            running_fuzzers.len(),
         );
 
-        non_panicked_closures.shuffle(&mut thread_rng());
-        let (input, closure_id, closure) = non_panicked_closures.pop()?;
-        match fuzzer::fuzz_closure(db, closure.clone(), &closure_id, 100) {
-            fuzzer::ClosureFuzzResult::NoProblemFound => None,
-            fuzzer::ClosureFuzzResult::PanickedForArguments {
-                arguments,
-                message,
-                tracer,
-            } => {
-                self.found_panics.insert(
-                    closure,
-                    Panic {
-                        arguments,
-                        message,
-                        tracer,
-                    },
-                );
-                Some(input)
-            }
+        running_fuzzers.shuffle(&mut thread_rng());
+        let fuzzer = running_fuzzers.pop()?;
+        fuzzer.run(db, 100);
+
+        match &fuzzer.status {
+            Status::StillFuzzing { .. } => None,
+            Status::PanickedForArguments { .. } => Some(fuzzer.closure_id.input.clone()),
+            Status::TemporarilyUninitialized => unreachable!(),
         }
     }
 
-    pub fn get_hints(&self, db: &Database, input: &Input) -> Vec<Hint> {
+    pub fn get_hints(&self, db: &Database, input: &Input) -> Vec<Vec<Hint>> {
+        let relevant_fuzzers = self.fuzzable_closures[input]
+            .iter()
+            .map(|(_, closure)| &self.fuzzers[closure])
+            .collect_vec();
         let mut hints = vec![];
 
-        for (id, closure) in &self.fuzzable_closures[input] {
-            if let Some(Panic {
+        for fuzzer in &relevant_fuzzers {
+            if let Status::PanickedForArguments {
                 arguments,
                 message,
                 tracer,
-            }) = self.found_panics.get(closure)
+            } = &fuzzer.status
             {
+                let id = fuzzer.closure_id.clone();
                 let first_hint = {
                     let parameter_names = match db.find_expression(id.clone()) {
                         Some(Expression::Lambda(Lambda { parameters, .. })) => parameters

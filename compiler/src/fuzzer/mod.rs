@@ -3,7 +3,7 @@ mod generator;
 mod input_fuzzer;
 mod utils;
 
-pub use self::closure_fuzzer::{fuzz_closure, ClosureFuzzResult};
+pub use self::closure_fuzzer::{Fuzzer, Status};
 use crate::{
     database::Database,
     fuzzer::input_fuzzer::{fuzz_input, ClosurePanic},

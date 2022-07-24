@@ -12,7 +12,7 @@ mod constant_evaluator;
 mod fuzzer;
 mod utils;
 
-use self::{constant_evaluator::ConstantEvaluator, fuzzer::Fuzzer};
+use self::{constant_evaluator::ConstantEvaluator, fuzzer::FuzzerManager};
 use crate::{database::Database, input::Input, CloneWithExtension};
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position};
@@ -60,7 +60,7 @@ pub async fn run_server(
 ) {
     let mut db = Database::default();
     let mut constant_evaluator = ConstantEvaluator::default();
-    let mut fuzzer = Fuzzer::default();
+    let mut fuzzer = FuzzerManager::default();
     let mut outgoing_hints = OutgoingHints::new(outgoing_hints);
 
     'server_loop: loop {
@@ -78,7 +78,7 @@ pub async fn run_server(
                     db.did_change_input(&input, content);
                     outgoing_hints.report_hints(input.clone(), vec![]).await;
                     constant_evaluator.update_input(&db, input.clone());
-                    fuzzer.update_input(input, vec![]);
+                    fuzzer.update_input(&db, input, vec![]);
                 }
                 Event::CloseModule(input) => {
                     db.did_close_input(&input);
@@ -97,6 +97,7 @@ pub async fn run_server(
         let input_with_new_insight = 'new_insight: {
             if let Some(input) = constant_evaluator.run(&db) {
                 fuzzer.update_input(
+                    &db,
                     input.clone(),
                     constant_evaluator.get_fuzzable_closures(&input),
                 );
