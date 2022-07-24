@@ -17,7 +17,7 @@ use crate::{database::Database, input::Input, CloneWithExtension};
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, time::Duration};
+use std::{collections::HashMap, fs, time::Duration, vec};
 use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
@@ -110,12 +110,27 @@ pub async fn run_server(
         };
 
         if let Some(input) = input_with_new_insight {
-            let mut hints = constant_evaluator
+            let hints = constant_evaluator
                 .get_hints(&db, &input)
                 .into_iter()
+                // The fuzzer returns groups of related hints.
+                .map(|hint| vec![hint])
                 .chain(fuzzer.get_hints(&db, &input).into_iter())
+                // Make hints look like comments.
+                .map(|mut hint_group| {
+                    for hint in &mut hint_group {
+                        hint.text = format!("{}# {}", quasi_spaces(2), hint.text);
+                    }
+                    hint_group
+                })
+                // Show related hints at the same indentation.
+                .map(|mut hint_group| {
+                    hint_group.align_hint_columns();
+                    hint_group
+                })
+                .flatten()
+                .sorted_by_key(|hint| hint.position)
                 .collect_vec();
-            hints.sort_by_key(|hint| hint.position);
 
             if let Some(path) = input.to_path() {
                 let hints_file = path.clone_with_extension("candy.hints");
@@ -152,6 +167,31 @@ impl OutgoingHints {
         if self.last_sent.get(&input) != Some(&hints) {
             self.last_sent.insert(input.clone(), hints.clone());
             self.sender.send((input, hints)).await.unwrap();
+        }
+    }
+}
+
+/// VSCode trims multiple leading spaces to one. That's why we use an
+/// [em quad](https://en.wikipedia.org/wiki/Quad_(typography)) instead, which
+/// per definition has the same width as a normal space.
+fn quasi_spaces(n: usize) -> String {
+    format!(" ").repeat(n)
+}
+
+trait AlignHints {
+    fn align_hint_columns(&mut self);
+}
+impl AlignHints for Vec<Hint> {
+    fn align_hint_columns(&mut self) {
+        assert!(!self.is_empty());
+        let max_indentation = self.iter().map(|it| it.position.character).max().unwrap();
+        for hint in self {
+            let additional_indentation = max_indentation - hint.position.character;
+            hint.text = format!(
+                "{}{}",
+                quasi_spaces(additional_indentation as usize),
+                hint.text
+            );
         }
     }
 }

@@ -108,7 +108,7 @@ impl Fuzzer {
                     Hint {
                         kind: HintKind::Fuzz,
                         text: format!(
-                            " # If this is called with {},",
+                            "If this is called with {},",
                             parameter_names
                                 .iter()
                                 .zip(arguments.iter())
@@ -157,7 +157,7 @@ impl Fuzzer {
                     Hint {
                         kind: HintKind::Fuzz,
                         text: format!(
-                            " # then `{name} {}` panics because {}.",
+                            "then `{name} {}` panics because {}.",
                             arguments.iter().map(|arg| format!("{arg}")).join(" "),
                             if let Value::Text(message) = message {
                                 message.to_string()
@@ -169,30 +169,10 @@ impl Fuzzer {
                     }
                 };
 
-                let mut panic_hints = vec![first_hint, second_hint];
-                panic_hints.align_hint_columns();
-                hints.extend(panic_hints);
+                hints.push(vec![first_hint, second_hint]);
             }
         }
 
         hints
-    }
-}
-
-trait AlignHints {
-    fn align_hint_columns(&mut self);
-}
-impl AlignHints for Vec<Hint> {
-    fn align_hint_columns(&mut self) {
-        assert!(!self.is_empty());
-        let max_indentation = self.iter().map(|it| it.position.character).max().unwrap();
-        for hint in self {
-            let additional_indentation = max_indentation - hint.position.character;
-            hint.text = format!(
-                "{}{}",
-                " ".repeat(additional_indentation as usize),
-                hint.text
-            );
-        }
     }
 }

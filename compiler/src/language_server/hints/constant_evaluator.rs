@@ -1,7 +1,7 @@
 use super::Hint;
 use crate::{
     compiler::{
-        ast::{AstKind, FindAst},
+        ast::{Assignment, AstKind, FindAst},
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
         hir::Id,
@@ -99,7 +99,7 @@ impl ConstantEvaluator {
         }
 
         for entry in vm.tracer.log() {
-            let (id, value) = match entry {
+            let (id, name, value) = match entry {
                 TraceEntry::ValueEvaluated { id, value } => {
                     if &id.input != input {
                         continue;
@@ -112,21 +112,21 @@ impl ConstantEvaluator {
                         Some((ast, _)) => (*ast).clone(),
                         None => continue,
                     };
-                    match ast.find(&ast_id) {
+                    let name = match ast.find(&ast_id) {
                         None => continue,
-                        Some(ast) => match ast.kind {
-                            AstKind::Assignment { .. } => {}
+                        Some(ast) => match &ast.kind {
+                            AstKind::Assignment(Assignment { name, .. }) => name.value.clone(),
                             _ => continue,
                         },
-                    }
-                    (id.clone(), value.clone())
+                    };
+                    (id.clone(), name, value.clone())
                 }
                 _ => continue,
             };
 
             hints.push(Hint {
                 kind: HintKind::Value,
-                text: format!(" # {value}"),
+                text: format!("{name} = {value}"),
                 position: id_to_end_of_line(&db, id).unwrap(),
             });
         }
@@ -173,7 +173,7 @@ fn panic_hint(db: &Database, input: Input, vm: &Vm, panic_message: Value) -> Opt
     Some(Hint {
         kind: HintKind::Panic,
         text: format!(
-            " # Calling `{call_info}` panics because {}.",
+            "Calling `{call_info}` panics because {}.",
             if let Value::Text(message) = panic_message {
                 message
             } else {
