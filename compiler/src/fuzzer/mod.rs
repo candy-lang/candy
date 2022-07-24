@@ -33,7 +33,7 @@ pub async fn fuzz(db: &Database, input: Input) {
                 vm::Status::Panicked { reason } => {
                     log::error!("The module panicked because {reason}.");
                     log::error!("This is the stack trace:");
-                    vm.tracer.dump_stack_trace(&db, input.clone());
+                    vm.tracer.dump_stack_trace(&db);
                     return;
                 }
             }
@@ -67,7 +67,7 @@ pub async fn fuzz(db: &Database, input: Input) {
                     arguments.iter().map(|it| format!("{}", it)).join(" "),
                 );
                 log::error!("This was the stack trace:");
-                tracer.dump_stack_trace(&db, input.clone());
+                tracer.dump_stack_trace(&db);
 
                 let trace = tracer.dump_call_tree();
                 let mut trace_file = input.to_path().unwrap();

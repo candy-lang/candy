@@ -230,7 +230,7 @@ fn run(options: CandyRunOptions) {
             Status::Panicked { reason } => {
                 log::error!("The module panicked because {reason}.");
                 log::error!("This is the stack trace:");
-                vm.tracer.dump_stack_trace(&db, input.clone());
+                vm.tracer.dump_stack_trace(&db);
                 break;
             }
         }

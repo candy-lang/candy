@@ -1,6 +1,6 @@
 use super::value::Value;
 use crate::{
-    compiler::{ast_to_hir::AstToHir, cst::CstDb, cst_to_ast::CstToAst, hir::Id},
+    compiler::{ast_to_hir::AstToHir, cst::CstDb, hir::Id},
     database::Database,
     input::Input,
     language_server::utils::LspPositionConversion,
@@ -72,15 +72,12 @@ impl Tracer {
     pub fn stack(&self) -> &[TraceEntry] {
         &self.stack
     }
-    pub fn dump_stack_trace(&self, db: &Database, input: Input) {
-        for line in self.format_stack_trace(db, input).lines() {
+    pub fn dump_stack_trace(&self, db: &Database) {
+        for line in self.format_stack_trace(db).lines() {
             log::error!("{}", line);
         }
     }
-    pub fn format_stack_trace(&self, db: &Database, input: Input) -> String {
-        let (_, hir_to_ast_ids) = db.hir(input.clone()).unwrap();
-        let (_, ast_to_cst_ids) = db.ast(input.clone()).unwrap();
-
+    pub fn format_stack_trace(&self, db: &Database) -> String {
         self.stack
             .iter()
             .rev()
@@ -102,22 +99,21 @@ impl Tracer {
                     _ => unreachable!(),
                 };
                 let caller_location_string = {
-                    let ast_id = hir_id
-                        .and_then(|id| hir_to_ast_ids.get(&id))
-                        .map(|id| id.clone());
-                    let cst_id = ast_id
-                        .as_ref()
-                        .and_then(|id| ast_to_cst_ids.get(&id))
-                        .map(|id| id.clone());
-                    let cst = cst_id
-                        .map(|id| db.find_cst(input.clone(), id))
-                        .map(|id| id.clone());
-                    let span = cst.map(|cst| {
-                        (
-                            db.offset_to_lsp(input.clone(), cst.span.start),
-                            db.offset_to_lsp(input.clone(), cst.span.end),
-                        )
-                    });
+                    let (hir_id, ast_id, cst_id, span) = if let Some(hir_id) = hir_id {
+                        let input = hir_id.input.clone();
+                        let ast_id = db.hir_to_ast_id(hir_id.clone());
+                        let cst_id = db.hir_to_cst_id(hir_id.clone());
+                        let cst = cst_id.map(|id| db.find_cst(input.clone(), id));
+                        let span = cst.map(|cst| {
+                            (
+                                db.offset_to_lsp(input.clone(), cst.span.start),
+                                db.offset_to_lsp(input.clone(), cst.span.end),
+                            )
+                        });
+                        (Some(hir_id), ast_id, cst_id, span)
+                    } else {
+                        (None, None, None, None)
+                    };
                     format!(
                         "{}, {}, {}, {}",
                         hir_id
