@@ -29,7 +29,7 @@ impl Vm {
 
         let args = args.iter().map(|it| self.heap.export(*it)).collect_vec();
 
-        let return_value_or_panic_message = match &builtin_function {
+        let return_value_or_panic_reason = match &builtin_function {
             BuiltinFunction::Add => self.add(args),
             BuiltinFunction::Equals => self.equals(args),
             BuiltinFunction::GetArgumentCount => self.get_argument_count(args),
@@ -37,7 +37,7 @@ impl Vm {
                 // If successful, IfElse doesn't return a value, but diverges
                 // the control flow.
                 Ok(()) => return,
-                Err(message) => Err(message),
+                Err(reason) => Err(reason),
             },
             BuiltinFunction::Print => self.print(args),
             BuiltinFunction::StructGet => self.struct_get(args),
@@ -50,13 +50,13 @@ impl Vm {
                 // diverges the control flow.
                 match self.use_local_module(use_provider, args) {
                     Ok(()) => return,
-                    Err(message) => Err(message),
+                    Err(reason) => Err(reason),
                 }
             }
         };
-        let return_value = match return_value_or_panic_message {
+        let return_value = match return_value_or_panic_reason {
             Ok(value) => value,
-            Err(panic_message) => self.panic(panic_message),
+            Err(reason) => self.panic(reason),
         };
 
         let return_object = self.heap.import(return_value);

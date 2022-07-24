@@ -30,7 +30,7 @@ pub enum Status {
     // arguments.
     PanickedForArguments {
         arguments: Vec<Value>,
-        message: Value,
+        reason: String,
         tracer: Tracer,
     },
     // TODO: Find a better way of handling this. The fuzzer's status is a state
@@ -78,7 +78,7 @@ impl Fuzzer {
                     // The VM finished running without panicking.
                     Status::new_fuzzing_attempt(db, self.closure.clone())
                 }
-                vm::Status::Panicked(message) => {
+                vm::Status::Panicked { reason } => {
                     // If a `needs` directly inside the tested closure was not
                     // satisfied, then the panic is not closure's fault, but our
                     // fault.
@@ -89,7 +89,7 @@ impl Fuzzer {
                     } else {
                         Status::PanickedForArguments {
                             arguments: arguments.clone(),
-                            message: message.clone(),
+                            reason: reason.clone(),
                             tracer: vm.tracer.clone(),
                         }
                     }
@@ -99,11 +99,11 @@ impl Fuzzer {
             // so there's nothing more to do.
             Status::PanickedForArguments {
                 arguments,
-                message,
+                reason,
                 tracer,
             } => Status::PanickedForArguments {
                 arguments,
-                message,
+                reason,
                 tracer,
             },
             Status::TemporarilyUninitialized => unreachable!(),

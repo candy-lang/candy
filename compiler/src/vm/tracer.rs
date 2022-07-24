@@ -29,7 +29,7 @@ pub enum TraceEntry {
     NeedsStarted {
         id: Id,
         condition: Value,
-        message: Value,
+        reason: Value,
     },
     NeedsEnded,
     ModuleStarted {
@@ -96,8 +96,8 @@ impl Tracer {
                     TraceEntry::NeedsStarted {
                         id,
                         condition,
-                        message,
-                    } => (format!("needs {condition} {message}"), Some(id)),
+                        reason,
+                    } => (format!("needs {condition} {reason}"), Some(id)),
                     TraceEntry::ModuleStarted { input } => (format!("module {input}"), None),
                     _ => unreachable!(),
                 };
@@ -155,8 +155,8 @@ impl Tracer {
                 TraceEntry::NeedsStarted {
                     id,
                     condition,
-                    message,
-                } => Action::Start(format!("{id} needs {condition} {message}")),
+                    reason,
+                } => Action::Start(format!("{id} needs {condition} {reason}")),
                 TraceEntry::NeedsEnded => Action::End(" = Nothing".to_string()),
                 TraceEntry::ModuleStarted { input } => Action::Start(format!("module {input}")),
                 TraceEntry::ModuleEnded { export_map } => Action::End(format!("{export_map}")),

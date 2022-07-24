@@ -6,12 +6,7 @@ pub use self::fuzzer::{Fuzzer, Status};
 use crate::{
     database::Database,
     input::Input,
-    vm::{
-        self,
-        use_provider::DbUseProvider,
-        value::{Closure, Value},
-        TearDownResult, Vm,
-    },
+    vm::{self, use_provider::DbUseProvider, value::Closure, TearDownResult, Vm},
 };
 use itertools::Itertools;
 use log;
@@ -28,15 +23,15 @@ pub async fn fuzz(db: &Database, input: Input) {
         loop {
             vm.run(&use_provider, 10000);
             match vm.status() {
-                vm::Status::Running => log::info!("VM is still running."),
+                vm::Status::Running => log::info!("Code is still running."),
                 vm::Status::Done => {
                     let TearDownResult { return_value, .. } =
                         vm.tear_down_module_closure_execution();
-                    log::info!("VM is done. Export map: {return_value}");
+                    log::info!("The module exports these definitions: {return_value}");
                     break vm;
                 }
-                vm::Status::Panicked(value) => {
-                    log::error!("VM panicked with value {value}.");
+                vm::Status::Panicked { reason } => {
+                    log::error!("The module panicked because {reason}.");
                     log::error!("This is the stack trace:");
                     vm.tracer.dump_stack_trace(&db, input.clone());
                     return;
@@ -63,17 +58,13 @@ pub async fn fuzz(db: &Database, input: Input) {
             Status::StillFuzzing { .. } => {}
             Status::PanickedForArguments {
                 arguments,
-                message,
+                reason,
                 tracer,
             } => {
                 log::error!("The fuzzer discovered an input that crashes {id}:");
                 log::error!(
-                    "Calling `{id} {}` doesn't work because {}.",
+                    "Calling `{id} {}` doesn't work because {reason}.",
                     arguments.iter().map(|it| format!("{}", it)).join(" "),
-                    match message {
-                        Value::Text(message) => message,
-                        other => format!("{}", other),
-                    },
                 );
                 log::error!("This was the stack trace:");
                 tracer.dump_stack_trace(&db, input.clone());

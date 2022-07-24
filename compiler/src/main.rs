@@ -221,14 +221,14 @@ fn run(options: CandyRunOptions) {
     loop {
         vm.run(&use_provider, 10000);
         match vm.status() {
-            Status::Running => log::info!("VM is still running."),
+            Status::Running => log::info!("Code is still running."),
             Status::Done => {
                 let TearDownResult { return_value, .. } = vm.tear_down_module_closure_execution();
-                log::info!("VM is done. Export map: {return_value}");
+                log::info!("The module exports these definitions: {return_value}");
                 break;
             }
-            Status::Panicked(value) => {
-                log::error!("VM panicked with value {value}.");
+            Status::Panicked { reason } => {
+                log::error!("The module panicked because {reason}.");
                 log::error!("This is the stack trace:");
                 vm.tracer.dump_stack_trace(&db, input.clone());
                 break;
