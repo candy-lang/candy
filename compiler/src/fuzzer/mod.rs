@@ -6,7 +6,7 @@ pub use self::fuzzer::{Fuzzer, Status};
 use crate::{
     database::Database,
     input::Input,
-    vm::{self, use_provider::DbUseProvider, value::Closure, TearDownResult, Vm},
+    vm::{use_provider::DbUseProvider, value::Closure, TearDownResult, Vm},
 };
 use itertools::Itertools;
 use log;
@@ -18,26 +18,8 @@ pub async fn fuzz(db: &Database, input: Input) {
         let module_closure = Closure::of_input(db, input.clone()).unwrap();
         let use_provider = DbUseProvider { db };
         vm.set_up_module_closure_execution(&use_provider, module_closure);
-        vm.run(&use_provider, 1000);
-
-        loop {
-            vm.run(&use_provider, 10000);
-            match vm.status() {
-                vm::Status::Running => log::info!("Code is still running."),
-                vm::Status::Done => {
-                    let TearDownResult { return_value, .. } =
-                        vm.tear_down_module_closure_execution();
-                    log::info!("The module exports these definitions: {return_value}");
-                    break vm;
-                }
-                vm::Status::Panicked { reason } => {
-                    log::error!("The module panicked because {reason}.");
-                    log::error!("This is the stack trace:");
-                    vm.tracer.dump_stack_trace(&db);
-                    return;
-                }
-            }
-        }
+        vm.run_synchronously_until_completion(&db).ok();
+        vm
     };
 
     let TearDownResult {

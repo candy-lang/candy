@@ -1,11 +1,12 @@
 use super::{
     heap::{Heap, ObjectData, ObjectPointer},
     tracer::{TraceEntry, Tracer},
-    use_provider::UseProvider,
+    use_provider::{DbUseProvider, UseProvider},
     value::{Closure, Value},
 };
 use crate::{
     compiler::{hir::Id, lir::Instruction},
+    database::Database,
     input::Input,
 };
 use itertools::Itertools;
@@ -394,5 +395,32 @@ impl Vm {
     pub fn panic(&mut self, reason: String) -> Value {
         self.status = Status::Panicked { reason };
         Value::Symbol("Never".to_string())
+    }
+
+    pub fn run_synchronously_until_completion(
+        &mut self,
+        db: &Database,
+    ) -> Result<TearDownResult, String> {
+        let use_provider = DbUseProvider { db };
+        loop {
+            self.run(&use_provider, 10000);
+            match self.status() {
+                Status::Running => log::info!("Code is still running."),
+                Status::Done => {
+                    let result = self.tear_down_module_closure_execution();
+                    log::info!(
+                        "The module exports these definitions: {}",
+                        result.return_value
+                    );
+                    return Ok(result);
+                }
+                Status::Panicked { reason } => {
+                    log::error!("The module panicked because {reason}.");
+                    log::error!("This is the stack trace:");
+                    self.tracer.dump_stack_trace(&db);
+                    return Err(reason);
+                }
+            }
+        }
     }
 }
