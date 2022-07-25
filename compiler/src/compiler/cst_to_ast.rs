@@ -6,6 +6,7 @@ use super::{
     cst::{self, Cst, CstDb, CstKind},
     error::{CompilerError, CompilerErrorPayload},
     rcst_to_cst::RcstToCst,
+    string_to_rcst::InvalidInputError,
     utils::AdjustCasingOfFirstLetter,
 };
 use crate::{
@@ -47,10 +48,30 @@ fn cst_to_ast_id(db: &dyn CstToAst, input: Input, id: cst::Id) -> Option<ast::Id
 }
 
 fn ast(db: &dyn CstToAst, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)> {
-    let cst = db.cst(input.clone())?;
-    let cst = cst.unwrap_whitespace_and_comment();
-    let mut context = LoweringContext::new(input);
-    let asts = (&mut context).lower_csts(&cst);
+    let mut context = LoweringContext::new(input.clone());
+
+    let asts = match db.cst(input.clone()) {
+        Ok(cst) => {
+            let cst = cst.unwrap_whitespace_and_comment();
+            let asts = (&mut context).lower_csts(&cst);
+            asts
+        }
+        Err(InvalidInputError::DoesNotExist) => return None,
+        Err(InvalidInputError::InvalidUtf8) => {
+            vec![Ast {
+                id: context.create_next_id_without_mapping(),
+                kind: AstKind::Error {
+                    child: None,
+                    errors: vec![CompilerError {
+                        input,
+                        span: 0..0,
+                        payload: CompilerErrorPayload::InvalidUtf8,
+                    }],
+                },
+            }]
+        }
+    };
+
     Some((Arc::new(asts), context.id_mapping))
 }
 
@@ -76,6 +97,7 @@ impl LoweringContext {
             | CstKind::Comma
             | CstKind::Dot
             | CstKind::Colon
+            | CstKind::ColonEqualsSign
             | CstKind::OpeningParenthesis
             | CstKind::ClosingParenthesis
             | CstKind::OpeningBracket
@@ -402,16 +424,16 @@ impl LoweringContext {
             CstKind::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign,
                 body,
             } => {
                 let name = self.lower_identifier(name);
                 let (parameters, errors) = self.lower_parameters(parameters);
 
                 assert!(
-                    matches!(equals_sign.kind, CstKind::EqualsSign),
-                    "Expected an equals sign for the assignment, but found {} instead.",
-                    equals_sign,
+                    matches!(assignment_sign.kind, CstKind::EqualsSign | CstKind::ColonEqualsSign),
+                    "Expected an equals sign or colon equals sign for the assignment, but found {} instead.",
+                    assignment_sign,
                 );
 
                 let body = self.lower_csts(body);
@@ -425,8 +447,14 @@ impl LoweringContext {
                     AssignmentBody::Body(body)
                 };
 
-                let mut ast =
-                    self.create_ast(cst.id, AstKind::Assignment(ast::Assignment { name, body }));
+                let mut ast = self.create_ast(
+                    cst.id,
+                    AstKind::Assignment(ast::Assignment {
+                        name,
+                        is_public: matches!(assignment_sign.kind, CstKind::ColonEqualsSign),
+                        body,
+                    }),
+                );
                 if !errors.is_empty() {
                     ast = self.create_ast(
                         cst.id,

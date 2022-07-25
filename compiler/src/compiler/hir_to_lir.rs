@@ -1,12 +1,13 @@
 use super::{
     ast_to_hir::AstToHir,
     cst::CstDb,
+    error::CompilerError,
     hir::{self, Body, Expression},
-    lir::{Chunk, ChunkIndex, Instruction, Lir, StackOffset},
+    lir::{Instruction, Lir, StackOffset},
 };
 use crate::{builtin_functions::BuiltinFunction, input::Input};
 use itertools::Itertools;
-use std::{mem::swap, sync::Arc};
+use std::sync::Arc;
 
 #[salsa::query_group(HirToLirStorage)]
 pub trait HirToLir: CstDb + AstToHir {
@@ -15,54 +16,39 @@ pub trait HirToLir: CstDb + AstToHir {
 
 fn lir(db: &dyn HirToLir, input: Input) -> Option<Arc<Lir>> {
     let (hir, _) = db.hir(input.clone())?;
+    let instructions = compile_lambda(&[], &[], &hir);
+    Some(Arc::new(Lir { instructions }))
+}
 
+fn compile_lambda(captured: &[hir::Id], parameters: &[hir::Id], body: &Body) -> Vec<Instruction> {
     let mut context = LoweringContext::default();
-    context.compile_body(&hir);
-    let lir = context.finalize();
-
-    Some(Arc::new(lir))
-}
-
-#[derive(Default)]
-struct ChunkRegistry {
-    chunks: Vec<Chunk>,
-}
-impl ChunkRegistry {
-    fn register_chunk(&mut self, chunk: Chunk) -> ChunkIndex {
-        let index = self.chunks.len();
-        self.chunks.push(chunk);
-        index
+    for captured in captured {
+        context.stack.push(captured.clone());
     }
+    for parameter in parameters {
+        context.stack.push(parameter.clone());
+    }
+
+    for (id, expression) in &body.expressions {
+        context.compile_expression(id, expression);
+    }
+
+    context.emit_pop_multiple_below_top(body.expressions.len() - 1);
+    context.emit_pop_multiple_below_top(parameters.len());
+    context.emit_pop_multiple_below_top(captured.len());
+    context.emit_return();
+
+    assert_eq!(context.stack.len(), 1); // The stack should only contain the return value.
+
+    context.instructions
 }
 
 #[derive(Default)]
 struct LoweringContext {
-    registry: ChunkRegistry,
     stack: Vec<hir::Id>,
     instructions: Vec<Instruction>,
 }
 impl LoweringContext {
-    fn finalize(mut self) -> Lir {
-        self.stack.pop().unwrap(); // Top-level has no return value.
-        assert!(self.stack.is_empty());
-
-        self.registry.register_chunk(Chunk {
-            num_args: 0,
-            instructions: self.instructions,
-        });
-        Lir {
-            chunks: self.registry.chunks,
-        }
-    }
-
-    fn compile_body(&mut self, body: &Body) {
-        let stack_size_before = self.stack.len();
-        for (id, expression) in &body.expressions {
-            self.compile_expression(id, expression);
-        }
-        self.emit_pop_multiple_below_top(body.expressions.len() - 1);
-        assert_eq!(self.stack.len(), stack_size_before + 1); // extra return value
-    }
     fn compile_expression(&mut self, id: &hir::Id, expression: &Expression) {
         log::trace!("Stack: {:?}", self.stack);
         log::trace!("Compiling expression {expression:?}");
@@ -83,29 +69,18 @@ impl LoweringContext {
                 self.emit_create_struct(id.clone(), entries.len());
             }
             Expression::Lambda(lambda) => {
-                let mut registry = ChunkRegistry::default();
-                swap(&mut self.registry, &mut registry);
-                let captured_stack = self.stack.clone();
-                let mut lambda_context = LoweringContext {
-                    registry,
-                    stack: captured_stack.clone(),
-                    instructions: vec![],
-                };
-                for parameter in &lambda.parameters {
-                    lambda_context.stack.push(parameter.clone());
-                }
-                lambda_context.compile_body(&lambda.body);
-                lambda_context.emit_pop_multiple_below_top(lambda.parameters.len());
-                lambda_context.emit_pop_multiple_below_top(captured_stack.len());
-                lambda_context.emit_return();
-                swap(&mut self.registry, &mut lambda_context.registry);
+                let captured = lambda.captured_ids(id);
+                let instructions = compile_lambda(&captured, &lambda.parameters, &lambda.body);
 
-                let lambda_chunk = Chunk {
-                    num_args: lambda.parameters.len(),
-                    instructions: lambda_context.instructions,
-                };
-                let chunk_index = self.registry.register_chunk(lambda_chunk);
-                self.emit_create_closure(id.clone(), chunk_index);
+                self.emit_create_closure(
+                    id.clone(),
+                    captured
+                        .iter()
+                        .map(|id| self.stack.find_id(id))
+                        .collect_vec(),
+                    lambda.parameters.len(),
+                    instructions,
+                );
                 if lambda.fuzzable {
                     self.emit_register_fuzzable_closure(id.clone());
                 }
@@ -133,7 +108,11 @@ impl LoweringContext {
                 self.emit_needs(id.clone());
                 self.emit_trace_needs_ends();
             }
-            Expression::Error { .. } => self.emit_error(id.to_owned()),
+            Expression::Error { errors, .. } => {
+                for error in errors {
+                    self.emit_error(id.clone(), error.clone());
+                }
+            }
         };
         self.emit_trace_value_evaluated(id.clone());
     }
@@ -155,8 +134,18 @@ impl LoweringContext {
         self.stack.pop_multiple(2 * num_entries);
         self.stack.push(id);
     }
-    fn emit_create_closure(&mut self, id: hir::Id, chunk: usize) {
-        self.emit(Instruction::CreateClosure(chunk));
+    fn emit_create_closure(
+        &mut self,
+        id: hir::Id,
+        captured: Vec<StackOffset>,
+        num_args: usize,
+        instructions: Vec<Instruction>,
+    ) {
+        self.emit(Instruction::CreateClosure {
+            captured,
+            num_args,
+            body: instructions,
+        });
         self.stack.push(id);
     }
     fn emit_create_builtin(&mut self, id: hir::Id, builtin: BuiltinFunction) {
@@ -207,8 +196,11 @@ impl LoweringContext {
     fn emit_trace_needs_ends(&mut self) {
         self.emit(Instruction::TraceNeedsEnds);
     }
-    fn emit_error(&mut self, id: hir::Id) {
-        self.emit(Instruction::Error(id.clone()));
+    fn emit_error(&mut self, id: hir::Id, error: CompilerError) {
+        self.emit(Instruction::Error {
+            id: id.clone(),
+            error,
+        });
         self.stack.push(id);
     }
 

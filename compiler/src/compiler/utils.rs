@@ -10,7 +10,7 @@ impl AdjustCasingOfFirstLetter for str {
             Some(f) => f.to_lowercase().collect::<String>() + c.as_str(),
         }
     }
-    
+
     fn uppercase_first_letter(&self) -> String {
         let mut c = self.chars();
         match c.next() {
@@ -19,4 +19,3 @@ impl AdjustCasingOfFirstLetter for str {
         }
     }
 }
-

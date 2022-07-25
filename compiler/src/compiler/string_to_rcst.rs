@@ -4,11 +4,17 @@ use std::sync::Arc;
 
 #[salsa::query_group(StringToRcstStorage)]
 pub trait StringToRcst: InputDb {
-    fn rcst(&self, input: Input) -> Option<Arc<Vec<Rcst>>>;
+    fn rcst(&self, input: Input) -> Result<Arc<Vec<Rcst>>, InvalidInputError>;
 }
 
-fn rcst(db: &dyn StringToRcst, input: Input) -> Option<Arc<Vec<Rcst>>> {
-    let source = db.get_input(input)?;
+fn rcst(db: &dyn StringToRcst, input: Input) -> Result<Arc<Vec<Rcst>>, InvalidInputError> {
+    let source = db.get_input(input).ok_or(InvalidInputError::DoesNotExist)?;
+    let source = match String::from_utf8((*source).clone()) {
+        Ok(source) => source,
+        Err(_) => {
+            return Err(InvalidInputError::InvalidUtf8);
+        }
+    };
     let (rest, mut rcsts) = parse::body(&source, 0);
     if !rest.is_empty() {
         rcsts.push(Rcst::Error {
@@ -16,7 +22,13 @@ fn rcst(db: &dyn StringToRcst, input: Input) -> Option<Arc<Vec<Rcst>>> {
             error: RcstError::UnparsedRest,
         });
     }
-    Some(Arc::new(rcsts))
+    Ok(Arc::new(rcsts))
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub enum InvalidInputError {
+    DoesNotExist,
+    InvalidUtf8,
 }
 
 impl Rcst {
@@ -100,6 +112,10 @@ mod parse {
     pub fn colon(input: &str) -> Option<(&str, Rcst)> {
         let input = literal(input, ":")?;
         Some((input, Rcst::Colon))
+    }
+    pub fn colon_equals_sign(input: &str) -> Option<(&str, Rcst)> {
+        let input = literal(input, ":=")?;
+        Some((input, Rcst::ColonEqualsSign))
     }
     fn opening_bracket(input: &str) -> Option<(&str, Rcst)> {
         let input = literal(input, "[")?;
@@ -1613,11 +1629,12 @@ mod parse {
         let parameters = signature.split_off(1);
         let name = signature.into_iter().next().unwrap();
 
-        let (input, mut equals_sign) = equals_sign(input)?;
-        let input_after_equals_sign = input;
+        let (input, mut assignment_sign) =
+            colon_equals_sign(input).or_else(|| equals_sign(input))?;
+        let input_after_assignment_sign = input;
 
         let (input, more_whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
-        equals_sign = equals_sign.wrap_in_whitespace(more_whitespace.clone());
+        assignment_sign = assignment_sign.wrap_in_whitespace(more_whitespace.clone());
 
         let is_multiline = name.is_multiline()
             || parameters.is_multiline()
@@ -1626,25 +1643,25 @@ mod parse {
         let (input, body) = if is_multiline {
             let (input, body) = body(input, indentation + 1);
             if body.is_empty() {
-                (input_after_equals_sign, body)
+                (input_after_assignment_sign, body)
             } else {
                 (input, body)
             }
         } else {
             match expression(input, indentation, true) {
                 Some((input, expression)) => (input, vec![expression]),
-                None => (input_after_equals_sign, vec![]),
+                None => (input_after_assignment_sign, vec![]),
             }
         };
 
-        let (whitespace, (equals_sign, body)) =
-            (equals_sign, body).split_outer_trailing_whitespace();
+        let (whitespace, (assignment_sign, body)) =
+            (assignment_sign, body).split_outer_trailing_whitespace();
         Some((
             input,
             Rcst::Assignment {
                 name: Box::new(name),
                 parameters,
-                equals_sign: Box::new(equals_sign),
+                assignment_sign: Box::new(assignment_sign),
                 body,
             }
             .wrap_in_whitespace(whitespace),
@@ -1662,7 +1679,7 @@ mod parse {
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
                     parameters: vec![],
-                    equals_sign: Box::new(Rcst::TrailingWhitespace {
+                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
@@ -1690,7 +1707,7 @@ mod parse {
                         child: Box::new(Rcst::Identifier("bar".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }],
-                    equals_sign: Box::new(Rcst::TrailingWhitespace {
+                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![
                             Rcst::Newline("\n".to_string()),
@@ -1726,7 +1743,7 @@ mod parse {
                             Rcst::Whitespace("  ".to_string())
                         ],
                     }],
-                    equals_sign: Box::new(Rcst::TrailingWhitespace {
+                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::EqualsSign),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),

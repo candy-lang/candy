@@ -43,13 +43,12 @@ pub fn run_builtin_function(
         BuiltinFunction::Add => add(arguments),
         BuiltinFunction::Equals => equals(arguments),
         BuiltinFunction::GetArgumentCount => get_argument_count(db, arguments),
-        BuiltinFunction::Panic => panic(arguments),
         BuiltinFunction::Print => print(arguments),
         BuiltinFunction::StructGet => struct_get(arguments),
         BuiltinFunction::StructGetKeys => struct_get_keys(arguments),
         BuiltinFunction::StructHasKey => struct_has_key(arguments),
         BuiltinFunction::TypeOf => type_of(arguments),
-        BuiltinFunction::Use => use_(db, import_chain, arguments),
+        BuiltinFunction::UseAsset => use_(db, import_chain, arguments),
         _ => panic!("Unhandled builtin function: {:?}", builtin_function),
     }
 }

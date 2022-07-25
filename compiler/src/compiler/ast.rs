@@ -19,7 +19,7 @@ impl Id {
 }
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "AstId({}:{:?})", self.input, self.local)
+        write!(f, "AstId({}:{})", self.input, self.local)
     }
 }
 
@@ -92,6 +92,7 @@ pub enum CallReceiver {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Assignment {
     pub name: AstString,
+    pub is_public: bool,
     pub body: AssignmentBody,
 }
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

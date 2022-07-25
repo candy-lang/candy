@@ -1,9 +1,10 @@
 use super::value::Value;
-use crate::{builtin_functions::BuiltinFunction, compiler::lir::ChunkIndex};
+use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
+use itertools::Itertools;
 use log;
 use std::collections::HashMap;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Heap {
     objects: HashMap<ObjectPointer, Object>,
     next_address: ObjectPointer,
@@ -11,12 +12,12 @@ pub struct Heap {
 
 pub type ObjectPointer = usize;
 
-#[derive(Debug, Clone)] // TODO: remove Clone once it's no longer needed
+#[derive(Clone)]
 pub struct Object {
     reference_count: usize,
     pub data: ObjectData,
 }
-#[derive(Clone, Debug)] // TODO: remove Clone once it's no longer needed
+#[derive(Clone)]
 pub enum ObjectData {
     Int(u64),
     Text(String),
@@ -24,16 +25,35 @@ pub enum ObjectData {
     Struct(HashMap<ObjectPointer, ObjectPointer>),
     Closure {
         captured: Vec<ObjectPointer>,
-        body: ChunkIndex,
+        num_args: usize,
+        body: Vec<Instruction>,
     },
     Builtin(BuiltinFunction),
+}
+
+impl std::fmt::Debug for Heap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut objects = self.objects.clone().into_iter().collect_vec();
+        objects.sort_by_key(|(address, _)| *address);
+
+        writeln!(f, "{{")?;
+        for (address, object) in objects {
+            writeln!(
+                f,
+                "{address}: {} {}",
+                object.reference_count,
+                self.export_without_dropping(address)
+            )?;
+        }
+        write!(f, "}}")
+    }
 }
 
 impl Heap {
     pub fn new() -> Self {
         Self {
             objects: HashMap::new(),
-            next_address: 0,
+            next_address: 1,
         }
     }
 
@@ -71,7 +91,6 @@ impl Heap {
 
     pub fn create(&mut self, object: ObjectData) -> ObjectPointer {
         let address = self.next_address;
-        log::trace!("Creating object {object:?} at {address}.");
         // TODO: Remove this special case once closures are self-contained.
         if let ObjectData::Closure { captured, .. } = &object {
             for captured in captured {
@@ -85,12 +104,14 @@ impl Heap {
                 data: object,
             },
         );
+        let value = self.export_without_dropping(address);
+        log::trace!("Created object {value} at {address}.");
         self.next_address += 1;
         address
     }
     pub fn free(&mut self, address: ObjectPointer) {
         let object = self.objects.remove(&address).unwrap();
-        log::trace!("Freeing object {object:?} at {address}.");
+        log::trace!("Freeing object at {address}.");
         assert_eq!(object.reference_count, 0);
         match object.data {
             ObjectData::Int(_) => {}
@@ -125,7 +146,15 @@ impl Heap {
                 }
                 ObjectData::Struct(entries)
             }
-            Value::Closure { captured, body } => ObjectData::Closure { captured, body },
+            Value::Closure {
+                captured,
+                num_args,
+                body,
+            } => ObjectData::Closure {
+                captured,
+                num_args,
+                body,
+            },
             Value::Builtin(builtin) => ObjectData::Builtin(builtin),
         };
         self.create(value)
@@ -149,9 +178,14 @@ impl Heap {
                 }
                 Value::Struct(entries)
             }
-            ObjectData::Closure { captured, body } => Value::Closure {
+            ObjectData::Closure {
+                captured,
+                num_args,
+                body,
+            } => Value::Closure {
                 captured: captured.clone(),
-                body: *body,
+                num_args: *num_args,
+                body: body.clone(),
             },
             ObjectData::Builtin(builtin) => Value::Builtin(*builtin),
         }

@@ -24,6 +24,11 @@ fn find_cst_by_offset(db: &dyn CstDb, input: Input, offset: usize) -> Cst {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct Id(pub usize);
+impl Display for Id {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "CstId({})", self.0)
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Cst {
@@ -38,6 +43,7 @@ pub enum CstKind {
     Comma,              // ,
     Dot,                // .
     Colon,              // :
+    ColonEqualsSign,    // :=
     OpeningParenthesis, // (
     ClosingParenthesis, // )
     OpeningBracket,     // [
@@ -103,7 +109,7 @@ pub enum CstKind {
     Assignment {
         name: Box<Cst>,
         parameters: Vec<Cst>,
-        equals_sign: Box<Cst>,
+        assignment_sign: Box<Cst>,
         body: Vec<Cst>,
     },
     Error {
@@ -119,6 +125,7 @@ impl Display for Cst {
             CstKind::Comma => ','.fmt(f),
             CstKind::Dot => '.'.fmt(f),
             CstKind::Colon => ':'.fmt(f),
+            CstKind::ColonEqualsSign => ":=".fmt(f),
             CstKind::OpeningParenthesis => '('.fmt(f),
             CstKind::ClosingParenthesis => ')'.fmt(f),
             CstKind::OpeningBracket => '['.fmt(f),
@@ -222,14 +229,14 @@ impl Display for Cst {
             CstKind::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign,
                 body,
             } => {
                 name.fmt(f)?;
                 for parameter in parameters {
                     parameter.fmt(f)?;
                 }
-                equals_sign.fmt(f)?;
+                assignment_sign.fmt(f)?;
                 for expression in body {
                     expression.fmt(f)?;
                 }
@@ -342,12 +349,12 @@ impl UnwrapWhitespaceAndComment for Cst {
             CstKind::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign,
                 body,
             } => CstKind::Assignment {
                 name: Box::new(name.unwrap_whitespace_and_comment()),
                 parameters: parameters.unwrap_whitespace_and_comment(),
-                equals_sign: Box::new(equals_sign.unwrap_whitespace_and_comment()),
+                assignment_sign: Box::new(assignment_sign.unwrap_whitespace_and_comment()),
                 body: body.unwrap_whitespace_and_comment(),
             },
             other_kind => other_kind.clone(),
@@ -389,6 +396,7 @@ impl TreeWithIds for Cst {
             CstKind::Comma => None,
             CstKind::Dot => None,
             CstKind::Colon => None,
+            CstKind::ColonEqualsSign => None,
             CstKind::OpeningParenthesis => None,
             CstKind::ClosingParenthesis => None,
             CstKind::OpeningBracket => None,
@@ -466,12 +474,12 @@ impl TreeWithIds for Cst {
             CstKind::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign,
                 body,
             } => name
                 .find(id)
                 .or_else(|| parameters.find(id))
-                .or_else(|| equals_sign.find(id))
+                .or_else(|| assignment_sign.find(id))
                 .or_else(|| body.find(id)),
             CstKind::Error { .. } => None,
         }
@@ -486,6 +494,7 @@ impl TreeWithIds for Cst {
             CstKind::Comma { .. } => (None, false),
             CstKind::Dot { .. } => (None, false),
             CstKind::Colon { .. } => (None, false),
+            CstKind::ColonEqualsSign { .. } => (None, false),
             CstKind::OpeningParenthesis { .. } => (None, false),
             CstKind::ClosingParenthesis { .. } => (None, false),
             CstKind::OpeningBracket { .. } => (None, false),
@@ -544,12 +553,12 @@ impl TreeWithIds for Cst {
             CstKind::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign,
                 body,
             } => (
                 name.find_by_offset(offset)
                     .or_else(|| parameters.find_by_offset(offset))
-                    .or_else(|| equals_sign.find_by_offset(offset))
+                    .or_else(|| assignment_sign.find_by_offset(offset))
                     .or_else(|| body.find_by_offset(offset)),
                 false,
             ),

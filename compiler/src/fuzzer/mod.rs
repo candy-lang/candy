@@ -2,10 +2,7 @@ mod generator;
 
 use self::generator::generate_n_values;
 use crate::{
-    compiler::{
-        hir::{self, Expression, HirDb, Lambda},
-        hir_to_lir::HirToLir,
-    },
+    compiler::hir::{self, Expression, HirDb, Lambda},
     database::Database,
     input::Input,
     vm::{tracer::TraceEntry, value::Value, Status, Vm},
@@ -15,22 +12,24 @@ use log;
 use std::fs;
 
 pub fn fuzz(db: &Database, input: Input) {
-    let lir = db.lir(input.clone()).unwrap();
+    let module_closure = Value::module_closure_of_input(&db, input.clone()).unwrap();
 
-    let mut vm = Vm::new(lir.chunks.clone());
-    vm.run(1000);
+    let mut vm = Vm::new();
+    vm.set_up_module_closure_execution(db, input.clone(), module_closure);
+    vm.run(db, 1000);
     match vm.status() {
         Status::Running => {
             log::warn!("VM didn't finish running, so we're not fuzzing it.");
             return;
         }
-        Status::Done(value) => log::debug!("VM is done: {value}"),
+        Status::Done => log::debug!("VM is done."),
         Status::Panicked(value) => {
             log::error!("VM panicked with value {value}.");
             log::error!("{}", vm.tracer.format_stack_trace(db, input));
             return;
         }
     }
+    let _ = vm.tear_down_module_closure_execution();
 
     log::info!(
         "Now, the fuzzing begins. So far, we have {} closures to fuzz.",
@@ -47,8 +46,8 @@ fn fuzz_vm(db: &Database, input: Input, vm: &Vm, num_fuzzable_closures_to_skip: 
         .skip(num_fuzzable_closures_to_skip)
     {
         let closure = vm.heap.export_without_dropping(*closure_address);
-        let num_args = if let Value::Closure { body, .. } = closure {
-            vm.chunks[body].num_args
+        let num_args = if let Value::Closure { num_args, .. } = closure {
+            num_args
         } else {
             panic!("The VM registered a fuzzable closure that's not a closure.");
         };
@@ -111,12 +110,13 @@ fn test_closure_with_args(
     closure_address: usize,
     arguments: Vec<Value>,
 ) -> TestResult {
-    vm.run_closure(closure_address, arguments);
+    let closure = vm.heap.export_without_dropping(closure_address);
+    vm.set_up_closure_execution(db, closure, arguments);
 
-    vm.run(1000);
+    vm.run(db, 1000);
     match vm.status() {
         Status::Running => TestResult::StillRunning,
-        Status::Done(_) => TestResult::NoPanic,
+        Status::Done => TestResult::NoPanic,
         Status::Panicked(message) => {
             // If a needs directly inside the tested closure was
             // dissatisfied, then the panic is not the fault of the code

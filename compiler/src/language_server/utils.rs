@@ -20,6 +20,7 @@ impl CompilerError {
             code_description: None,
             source: Some("🍭 Candy".to_owned()),
             message: match self.payload {
+                CompilerErrorPayload::InvalidUtf8 => format!("Invalid UTF8"),
                 CompilerErrorPayload::Rcst(rcst) => format!("RCST: {rcst:?}"),
                 CompilerErrorPayload::Ast(ast) => format!("AST: {ast:?}"),
                 CompilerErrorPayload::Hir(hir) => format!("HIR: {hir:?}"),
@@ -85,7 +86,7 @@ fn offset_from_lsp(
     line: u32,
     character: u32,
 ) -> usize {
-    let text = db.get_input(input.clone()).unwrap();
+    let text = db.get_string_input(input.clone()).unwrap();
     let line_start_offsets = db.line_start_utf8_byte_offsets(input);
     offset_from_lsp_raw(
         text.as_ref(),
@@ -116,7 +117,7 @@ pub fn offset_from_lsp_raw(text: &str, line_start_offsets: &[usize], position: P
 }
 
 fn offset_to_lsp(db: &dyn LspPositionConversion, input: Input, offset: usize) -> (u32, u32) {
-    let text = db.get_input(input.clone()).unwrap();
+    let text = db.get_string_input(input.clone()).unwrap();
     let line_start_offsets = db.line_start_utf8_byte_offsets(input);
 
     let line = line_start_offsets
@@ -141,9 +142,8 @@ impl TupleToPosition for (u32, u32) {
 }
 
 fn line_start_utf8_byte_offsets(db: &dyn LspPositionConversion, input: Input) -> Arc<Vec<usize>> {
-    Arc::new(line_start_utf8_byte_offsets_raw(
-        db.get_input(input).unwrap().as_ref(),
-    ))
+    let text = db.get_string_input(input).unwrap();
+    Arc::new(line_start_utf8_byte_offsets_raw(&text))
 }
 pub fn line_start_utf8_byte_offsets_raw(text: &str) -> Vec<usize> {
     let mut offsets = vec![0];

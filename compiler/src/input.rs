@@ -2,18 +2,26 @@ use crate::database::PROJECT_DIRECTORY;
 use salsa::query_group;
 use std::{
     fmt::{self, Display, Formatter},
-    fs::{self, read_to_string},
+    fs,
     path::PathBuf,
     sync::Arc,
 };
 
 #[query_group(InputDbStorage)]
 pub trait InputDb: InputWatcher {
-    fn get_input(&self, input: Input) -> Option<Arc<String>>;
-    fn get_open_input(&self, input: Input) -> Option<Arc<String>>;
+    fn get_string_input(&self, input: Input) -> Option<Arc<String>>;
+    fn get_input(&self, input: Input) -> Option<Arc<Vec<u8>>>;
+    fn get_open_input(&self, input: Input) -> Option<Arc<Vec<u8>>>;
 }
 
-fn get_input(db: &dyn InputDb, input: Input) -> Option<Arc<String>> {
+fn get_string_input(db: &dyn InputDb, input: Input) -> Option<Arc<String>> {
+    let content = get_input(db, input)?;
+    String::from_utf8((*content).clone())
+        .ok()
+        .map(|it| Arc::new(it))
+}
+
+fn get_input(db: &dyn InputDb, input: Input) -> Option<Arc<Vec<u8>>> {
     if let Some(content) = db.get_open_input(input.clone()) {
         return Some(content);
     };
@@ -21,16 +29,19 @@ fn get_input(db: &dyn InputDb, input: Input) -> Option<Arc<String>> {
     match input {
         Input::File(_) | Input::ExternalFile(_) => {
             let path = input.to_path().unwrap();
-            match read_to_string(path.clone()) {
+            match fs::read(path.clone()) {
                 Ok(content) => Some(Arc::new(content)),
                 Err(error) if matches!(error.kind(), std::io::ErrorKind::NotFound) => None,
-                _ => panic!("Unexpected error when reading file {:?}.", path),
+                Err(_) => {
+                    log::error!("Unexpected error when reading file {:?}.", path);
+                    None
+                }
             }
         }
         Input::Untitled(_) => None,
     }
 }
-fn get_open_input(db: &dyn InputDb, input: Input) -> Option<Arc<String>> {
+fn get_open_input(db: &dyn InputDb, input: Input) -> Option<Arc<Vec<u8>>> {
     // The following line of code shouldn't be neccessary, but it is.
     //
     // We call `GetOpenInputQuery.in_db_mut(self).invalidate(input);`
@@ -47,7 +58,7 @@ fn get_open_input(db: &dyn InputDb, input: Input) -> Option<Arc<String>> {
 }
 
 pub trait InputWatcher {
-    fn get_open_input_raw(&self, input: &Input) -> Option<String>;
+    fn get_open_input_raw(&self, input: &Input) -> Option<Vec<u8>>;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
@@ -139,9 +150,9 @@ mod test {
         let mut db = Database::default();
         let input: Input = PathBuf::from("/foo.rs").into();
 
-        db.did_open_input(&input, "123".to_owned());
+        db.did_open_input(&input, "123".to_string().into_bytes());
         assert_eq!(
-            db.get_input(input.clone()).unwrap().as_ref().to_owned(),
+            String::from_utf8(db.get_input(input.clone()).unwrap().as_ref().to_owned()).unwrap(),
             "123"
         );
         assert_eq!(
@@ -152,9 +163,9 @@ mod test {
             },],
         );
 
-        db.did_change_input(&input, "456".to_owned());
+        db.did_change_input(&input, "456".to_string().into_bytes());
         assert_eq!(
-            db.get_input(input.clone()).unwrap().as_ref().to_owned(),
+            String::from_utf8(db.get_input(input.clone()).unwrap().as_ref().to_owned()).unwrap(),
             "456"
         );
         assert_eq!(

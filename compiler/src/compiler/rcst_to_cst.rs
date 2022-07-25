@@ -1,17 +1,17 @@
 use super::{
     cst::{self, Cst, CstKind},
     rcst::Rcst,
-    string_to_rcst::StringToRcst,
+    string_to_rcst::{InvalidInputError, StringToRcst},
 };
 use crate::input::Input;
 use std::sync::Arc;
 
 #[salsa::query_group(RcstToCstStorage)]
 pub trait RcstToCst: StringToRcst {
-    fn cst(&self, input: Input) -> Option<Arc<Vec<Cst>>>;
+    fn cst(&self, input: Input) -> Result<Arc<Vec<Cst>>, InvalidInputError>;
 }
 
-fn cst(db: &dyn RcstToCst, input: Input) -> Option<Arc<Vec<Cst>>> {
+fn cst(db: &dyn RcstToCst, input: Input) -> Result<Arc<Vec<Cst>>, InvalidInputError> {
     let rcsts = db.rcst(input)?;
 
     let mut state = State {
@@ -20,7 +20,7 @@ fn cst(db: &dyn RcstToCst, input: Input) -> Option<Arc<Vec<Cst>>> {
     };
     let csts = (*rcsts).clone().to_csts(&mut state);
 
-    Some(Arc::new(csts))
+    Ok(Arc::new(csts))
 }
 
 struct State {
@@ -62,6 +62,10 @@ impl RcstToCstExt for Rcst {
             Rcst::Colon => {
                 state.offset += 1;
                 CstKind::Colon
+            }
+            Rcst::ColonEqualsSign => {
+                state.offset += 2;
+                CstKind::ColonEqualsSign
             }
             Rcst::OpeningParenthesis => {
                 state.offset += 1;
@@ -171,7 +175,7 @@ impl RcstToCstExt for Rcst {
                 value: Box::new(value.to_cst(state)),
                 comma: comma.map(|comma| Box::new(comma.to_cst(state))),
             },
-            Rcst::StructAccess { struct_, dot, key } => CstKind::StructAccess{
+            Rcst::StructAccess { struct_, dot, key } => CstKind::StructAccess {
                 struct_: Box::new(struct_.to_cst(state)),
                 dot: Box::new(dot.to_cst(state)),
                 key: Box::new(key.to_cst(state)),
@@ -201,12 +205,12 @@ impl RcstToCstExt for Rcst {
             Rcst::Assignment {
                 name,
                 parameters,
-                equals_sign,
+                assignment_sign,
                 body,
             } => CstKind::Assignment {
                 name: Box::new(name.to_cst(state)),
                 parameters: parameters.to_csts(state),
-                equals_sign: Box::new(equals_sign.to_cst(state)),
+                assignment_sign: Box::new(assignment_sign.to_cst(state)),
                 body: body.to_csts(state),
             },
             Rcst::Error {

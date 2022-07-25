@@ -45,6 +45,7 @@ impl<'a> Context<'a> {
             CstKind::Comma => {}
             CstKind::Dot => {}
             CstKind::Colon => {}
+            CstKind::ColonEqualsSign => {}
             CstKind::OpeningParenthesis => {}
             CstKind::ClosingParenthesis => {}
             CstKind::OpeningBracket => {}
@@ -121,18 +122,16 @@ impl<'a> Context<'a> {
             }
             CstKind::Assignment {
                 name,
-                equals_sign,
+                assignment_sign,
                 parameters,
                 body,
             } => {
                 if !body.is_empty() {
-                    let equals_sign = equals_sign.unwrap_whitespace_and_comment();
-                    assert!(matches!(equals_sign.kind, CstKind::EqualsSign { .. }));
-
+                    let assignment_sign = assignment_sign.unwrap_whitespace_and_comment();
                     let last_expression = body.last().unwrap().unwrap_whitespace_and_comment();
 
                     self.push(
-                        equals_sign.span.end,
+                        assignment_sign.span.end,
                         last_expression.span.end,
                         FoldingRangeKind::Region,
                     );

@@ -1,15 +1,15 @@
 type = use ".Type"
 
-is value = type.is value Bool
+is value := type.is value Bool
 
-not a =
+not a :=
   needs (is a)
   ✨.ifElse a { False } { True }
-and a b =
+and a b :=
   needs (is a)
   needs (is b)
   ✨.ifElse a { b } { False }
-or a b =
+or a b :=
   needs (is a)
   needs (is b)
   ✨.ifElse a { True } { b }

@@ -32,6 +32,12 @@ pub enum TraceEntry {
         message: Value,
     },
     NeedsEnded,
+    ModuleStarted {
+        input: Input,
+    },
+    ModuleEnded {
+        export_map: Value,
+    },
 }
 
 impl Tracer {
@@ -42,13 +48,19 @@ impl Tracer {
                 self.stack.push(entry);
             }
             TraceEntry::CallEnded { .. } => {
-                self.stack.pop();
+                self.stack.pop().unwrap();
             }
             TraceEntry::NeedsStarted { .. } => {
                 self.stack.push(entry);
             }
             TraceEntry::NeedsEnded => {
-                self.stack.pop();
+                self.stack.pop().unwrap();
+            }
+            TraceEntry::ModuleStarted { .. } => {
+                self.stack.push(entry);
+            }
+            TraceEntry::ModuleEnded { .. } => {
+                self.stack.pop().unwrap();
             }
             _ => {}
         }
@@ -76,24 +88,49 @@ impl Tracer {
                             "{closure} {}",
                             args.iter().map(|arg| format!("{arg}")).join(" ")
                         ),
-                        id,
+                        Some(id),
                     ),
                     TraceEntry::NeedsStarted {
                         id,
                         condition,
                         message,
-                    } => (format!("needs {condition} {message}"), id),
+                    } => (format!("needs {condition} {message}"), Some(id)),
+                    TraceEntry::ModuleStarted { input } => (format!("module {input}"), None),
                     _ => unreachable!(),
                 };
                 let caller_location_string = {
-                    let ast_id = hir_to_ast_ids[&hir_id].clone();
-                    let cst_id = ast_to_cst_ids[&ast_id];
-                    let cst = db.find_cst(input.clone(), cst_id);
-                    let start = db.offset_to_lsp(input.clone(), cst.span.start);
-                    let end = db.offset_to_lsp(input.clone(), cst.span.end);
+                    let ast_id = hir_id
+                        .and_then(|id| hir_to_ast_ids.get(&id))
+                        .map(|id| id.clone());
+                    let cst_id = ast_id
+                        .as_ref()
+                        .and_then(|id| ast_to_cst_ids.get(&id))
+                        .map(|id| id.clone());
+                    let cst = cst_id
+                        .map(|id| db.find_cst(input.clone(), id))
+                        .map(|id| id.clone());
+                    let span = cst.map(|cst| {
+                        (
+                            db.offset_to_lsp(input.clone(), cst.span.start),
+                            db.offset_to_lsp(input.clone(), cst.span.end),
+                        )
+                    });
                     format!(
-                        "{hir_id}, {ast_id}, {cst_id:?}, {}:{} – {}:{}",
-                        start.0, start.1, end.0, end.1
+                        "{}, {}, {}, {}",
+                        hir_id
+                            .map(|id| format!("{id}"))
+                            .unwrap_or("<no hir>".to_string()),
+                        ast_id
+                            .map(|id| format!("{id}"))
+                            .unwrap_or("<no ast>".to_string()),
+                        cst_id
+                            .map(|id| format!("{id}"))
+                            .unwrap_or("<no cst>".to_string()),
+                        span.map(|((start_line, start_col), (end_line, end_col))| format!(
+                            "{}:{} – {}:{}",
+                            start_line, start_col, end_line, end_col
+                        ))
+                        .unwrap_or("<no location>".to_string())
                     )
                 };
                 format!("{caller_location_string:90} {call_string}")
@@ -102,78 +139,56 @@ impl Tracer {
     }
 
     pub fn dump_call_tree(&self) -> String {
-        let mut calls = vec![];
-        let mut stack = vec![];
-        let mut indentation = 0;
-
-        for entry in &self.log {
-            match entry {
-                TraceEntry::ValueEvaluated { .. } => {}
-                TraceEntry::CallStarted { id, closure, args } => {
-                    stack.push(calls.len());
-                    calls.push(DumpableCall {
-                        indentation,
-                        id: id.clone(),
-                        closure: closure.clone(),
-                        args: args.clone(),
-                        return_value: None,
-                    });
-                    indentation += 1;
-                }
-                TraceEntry::CallEnded { return_value } => {
-                    let start = stack.pop().unwrap();
-                    calls[start].return_value = Some(return_value.clone());
-                    indentation -= 1;
-                }
+        let actions = self
+            .log
+            .iter()
+            .map(|entry| match entry {
+                TraceEntry::ValueEvaluated { id, value } => Action::Stay(format!("{id} = {value}")),
+                TraceEntry::CallStarted { id, closure, args } => Action::Start(format!(
+                    "{id} {closure} {}",
+                    args.iter().map(|arg| format!("{arg}")).join(" ")
+                )),
+                TraceEntry::CallEnded { return_value } => Action::End(format!(" = {return_value}")),
                 TraceEntry::NeedsStarted {
                     id,
                     condition,
                     message,
-                } => {
-                    stack.push(calls.len());
-                    calls.push(DumpableCall {
-                        indentation,
-                        id: id.clone(),
-                        closure: Value::Symbol("Needs".to_string()),
-                        args: vec![condition.clone(), message.clone()],
-                        return_value: None,
-                    });
+                } => Action::Start(format!("{id} needs {condition} {message}")),
+                TraceEntry::NeedsEnded => Action::End(" = Nothing".to_string()),
+                TraceEntry::ModuleStarted { input } => Action::Start(format!("module {input}")),
+                TraceEntry::ModuleEnded { export_map } => Action::End(format!("{export_map}")),
+            })
+            .collect_vec();
+
+        let mut lines = vec![];
+        let mut stack = vec![];
+        let mut indentation = 0;
+
+        for action in actions {
+            let indent = "  ".repeat(indentation);
+            match action {
+                Action::Start(line) => {
+                    stack.push(lines.len());
+                    lines.push(format!("{indent}{line}"));
                     indentation += 1;
                 }
-                TraceEntry::NeedsEnded => {
+                Action::End(addendum) => {
                     let start = stack.pop().unwrap();
-                    calls[start].return_value = Some(Value::nothing());
+                    lines[start].push_str(&addendum);
                     indentation -= 1;
+                }
+                Action::Stay(line) => {
+                    lines.push(format!("{indent}{line}"));
                 }
             }
         }
 
-        let mut dump = "".to_string();
-        for call in calls {
-            dump.push_str(&"  ".repeat(call.indentation));
-            dump.push_str(&format!("{}", call.id));
-            dump.push(' ');
-            dump.push_str(&format!("{}", call.closure));
-            for arg in call.args {
-                dump.push(' ');
-                dump.push_str(&format!("{arg}"));
-            }
-            if let Some(value) = call.return_value {
-                dump.push_str(" = ");
-                dump.push_str(&format!("{value}"));
-            } else {
-                dump.push_str(" (panicked)");
-            }
-            dump.push('\n');
-        }
-        dump
+        lines.join("\n")
     }
 }
 
-struct DumpableCall {
-    indentation: usize,
-    id: Id,
-    closure: Value,
-    args: Vec<Value>,
-    return_value: Option<Value>,
+enum Action {
+    Start(String),
+    End(String),
+    Stay(String),
 }

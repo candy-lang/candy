@@ -4,17 +4,17 @@ use strum_macros::EnumIter;
 
 #[derive(Debug, EnumIter, PartialEq, Eq, Clone, Hash, Copy)]
 pub enum BuiltinFunction {
-    Add,
-    Equals,
-    GetArgumentCount,
-    IfElse,
-    Panic,
-    Print,
-    StructGet,     // struct.get struct key -> value
-    StructGetKeys, // struct.getKeys struct -> listOfKeys
-    StructHasKey,  // struct.hasKey struct key -> bool
-    TypeOf,
-    Use, // use currentPath target -> targetAsStruct
+    Add,              // (summandA: int) (summandB: int) -> (sum: int)
+    Equals,           // (a: any) (b: any) -> (boolean: True | False)
+    GetArgumentCount, // (closure: Lambda) -> (argumentCount: int)
+    IfElse, // (condition: True | False) (then: lambda) (else: lambda) -> (resultOfExecutedClosure: any)
+    Print,  // (message: Text) -> Nothing
+    StructGet, // (struct: struct) (key: any) -> (value: any)
+    StructGetKeys, // (struct: struct) -> (listOfKeys: listOfAny)
+    StructHasKey, // (struct: struct) (key: any) -> (isKeyInStruct: True | False)
+    TypeOf, // (value: any) -> (type: Int | Text | Symbol | Struct | Function | Builtin)
+    UseAsset, // (currentPath: struct) (target: text) -> (target: text)
+    UseLocalModule, // (currentPath: struct) (target: text) -> (target: struct)
 }
 lazy_static! {
     pub static ref VALUES: Vec<BuiltinFunction> = BuiltinFunction::iter().collect();

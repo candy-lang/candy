@@ -1,15 +1,15 @@
 equals = (use ".Equality").equals
 type = use ".Type"
 
-is value = type.is value Function
+is value := type.is value Function
 
-getArgumentCount function =
+getArgumentCount function :=
   needs (is function)
   ✨.getArgumentCount function
 
-is0 value = ✨.ifElse (is value) { False } { equals (getArgumentCount value) 0 }
-is1 value = ✨.ifElse (is value) { False } { equals (getArgumentCount value) 1 }
-is2 value = ✨.ifElse (is value) { False } { equals (getArgumentCount value) 2 }
-is3 value = ✨.ifElse (is value) { False } { equals (getArgumentCount value) 3 }
-is4 value = ✨.ifElse (is value) { False } { equals (getArgumentCount value) 4 }
-is5 value = ✨.ifElse (is value) { False } { equals (getArgumentCount value) 5 }
+is0 value := ✨.ifElse (is value) { False } { equals (getArgumentCount value) 0 }
+is1 value := ✨.ifElse (is value) { False } { equals (getArgumentCount value) 1 }
+is2 value := ✨.ifElse (is value) { False } { equals (getArgumentCount value) 2 }
+is3 value := ✨.ifElse (is value) { False } { equals (getArgumentCount value) 3 }
+is4 value := ✨.ifElse (is value) { False } { equals (getArgumentCount value) 4 }
+is5 value := ✨.ifElse (is value) { False } { equals (getArgumentCount value) 5 }

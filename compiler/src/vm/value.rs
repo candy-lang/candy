@@ -1,5 +1,10 @@
 use super::heap::ObjectPointer;
-use crate::{builtin_functions::BuiltinFunction, compiler::lir::ChunkIndex};
+use crate::{
+    builtin_functions::BuiltinFunction,
+    compiler::{hir_to_lir::HirToLir, lir::Instruction},
+    database::Database,
+    input::Input,
+};
 use im::HashMap;
 use itertools::Itertools;
 use std::fmt::{self, Display, Formatter};
@@ -20,15 +25,36 @@ pub enum Value {
     Struct(HashMap<Value, Value>),
     Closure {
         captured: Vec<ObjectPointer>,
-        body: ChunkIndex,
+        num_args: usize,
+        body: Vec<Instruction>,
     },
     Builtin(BuiltinFunction),
 }
 
 impl Value {
-    pub fn nothing() -> Value {
+    pub fn nothing() -> Self {
         Value::Symbol("Nothing".to_owned())
     }
+
+    pub fn module_closure_of_input(db: &Database, input: Input) -> Option<Self> {
+        let lir = db.lir(input.clone())?;
+        Some(Value::Closure {
+            captured: vec![],
+            num_args: 0,
+            body: vec![
+                Instruction::TraceModuleStarts { input },
+                Instruction::CreateClosure {
+                    captured: vec![],
+                    num_args: 0,
+                    body: lir.instructions.clone(),
+                },
+                Instruction::Call { num_args: 0 },
+                Instruction::TraceModuleEnds,
+                Instruction::Return,
+            ],
+        })
+    }
+
     pub fn list(items: Vec<Value>) -> Self {
         let items = items
             .into_iter()
@@ -49,23 +75,19 @@ impl Value {
 impl Display for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Int(int) => write!(f, "{}", int),
-            Value::Text(text) => write!(f, "{:?}", text),
-            Value::Symbol(symbol) => write!(f, "{}", symbol),
+            Value::Int(int) => write!(f, "{int}"),
+            Value::Text(text) => write!(f, "{text:?}"),
+            Value::Symbol(symbol) => write!(f, "{symbol}"),
             Value::Struct(entries) => write!(
                 f,
-                "{{ {} }}",
+                "[ {} ]",
                 entries
                     .iter()
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
             ),
-            Value::Closure { body, .. } => {
-                write!(f, "{{{body}}}")
-            }
-            Value::Builtin(builtin) => {
-                write!(f, "builtin{builtin:?}")
-            }
+            Value::Closure { .. } => write!(f, "{{...}}"),
+            Value::Builtin(builtin) => write!(f, "builtin{builtin:?}"),
         }
     }
 }

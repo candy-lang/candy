@@ -1,7 +1,7 @@
 type = use ".Type"
 panic = (use ".Panic").panic
 
-check condition =
+check condition :=
   needs (type.is condition Bool)
   ✨.ifElse
     condition

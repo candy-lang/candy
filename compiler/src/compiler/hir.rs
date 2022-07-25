@@ -4,6 +4,7 @@ use im::HashMap;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use std::{
+    collections::HashSet,
     fmt::{self, Display, Formatter},
     sync::Arc,
 };
@@ -116,6 +117,12 @@ impl Id {
             }),
         }
     }
+
+    pub fn is_same_module_and_any_parent_of(&self, other: &Self) -> bool {
+        self.input == other.input
+            && self.keys.len() < other.keys.len()
+            && self.keys.iter().zip(&other.keys).all(|(a, b)| a == b)
+    }
 }
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -157,6 +164,21 @@ pub struct Lambda {
     pub body: Body,
     pub fuzzable: bool,
 }
+impl Lambda {
+    pub fn captured_ids(&self, my_id: &Id) -> Vec<Id> {
+        let mut captured = vec![];
+        self.body.collect_all_ids(&mut captured);
+        let captured = captured
+            .into_iter()
+            .filter(|potentially_captured_id| {
+                !my_id.is_same_module_and_any_parent_of(potentially_captured_id)
+            })
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect_vec();
+        captured
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Body {
@@ -177,6 +199,8 @@ impl Body {
 pub enum HirError {
     UnknownReference { symbol: String },
     UnknownFunction { name: String },
+    PublicAssignmentInNotTopLevel,
+    PublicAssignmentWithSameName { name: String },
     NeedsWithWrongNumberOfArguments,
 }
 
