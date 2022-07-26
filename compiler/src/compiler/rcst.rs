@@ -219,14 +219,14 @@ impl Display for Rcst {
             Rcst::Assignment {
                 name,
                 parameters,
-                assignment_sign: equals_sign,
+                assignment_sign,
                 body,
             } => {
                 name.fmt(f)?;
                 for parameter in parameters {
                     parameter.fmt(f)?;
                 }
-                equals_sign.fmt(f)?;
+                assignment_sign.fmt(f)?;
                 for expression in body {
                     expression.fmt(f)?;
                 }
@@ -332,12 +332,12 @@ impl IsMultiline for Rcst {
             Rcst::Assignment {
                 name,
                 parameters,
-                assignment_sign: equals_sign,
+                assignment_sign,
                 body,
             } => {
                 name.is_multiline()
                     || parameters.is_multiline()
-                    || equals_sign.is_multiline()
+                    || assignment_sign.is_multiline()
                     || body.is_multiline()
             }
             Rcst::Error {

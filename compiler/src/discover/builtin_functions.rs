@@ -43,7 +43,6 @@ pub fn run_builtin_function(
         BuiltinFunction::Equals => equals(arguments),
         BuiltinFunction::GetArgumentCount => get_argument_count(db, arguments),
         BuiltinFunction::IntAdd => int_add(arguments),
-        BuiltinFunction::Panic => panic(arguments),
         BuiltinFunction::Print => print(arguments),
         BuiltinFunction::StructGet => struct_get(arguments),
         BuiltinFunction::StructGetKeys => struct_get_keys(arguments),

@@ -56,7 +56,6 @@ impl Vm {
             BuiltinFunction::IntShiftRightArithmetic => self.int_shift_right_arithmetic(args),
             BuiltinFunction::IntShiftRightLogical => self.int_shift_right_logical(args),
             BuiltinFunction::IntSubtract => self.int_subtract(args),
-            BuiltinFunction::Panic => self.panic_builtin(args).map(|_| panic!()),
             BuiltinFunction::Print => self.print(args),
             BuiltinFunction::StructGet => self.struct_get(args),
             BuiltinFunction::StructGetKeys => self.struct_get_keys(args),
@@ -260,13 +259,9 @@ impl Vm {
         })
     }
 
-    fn panic_builtin(&mut self, args: Vec<Value>) -> Result<!, String> {
-        destructure!(args, [Value::Text(message)], { Err(message.to_string()) })
-    }
-
     fn print(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Text(message)], {
-            println!("{message:?}");
+            log::info!("{message:?}");
             Ok(Value::nothing())
         })
     }
@@ -320,7 +315,7 @@ impl Vm {
         args: Vec<Value>,
     ) -> Result<Value, String> {
         let (current_path, target) = Self::parse_current_path_and_target(args)?;
-        let target = UseAssetTarget::parse(&target)?;
+        let target = UseTarget::parse(&target)?;
         let input = target.resolve_asset(&current_path)?;
         let content = use_provider.use_asset(input)?;
         Ok(Value::list(
@@ -337,7 +332,7 @@ impl Vm {
         args: Vec<Value>,
     ) -> Result<(), String> {
         let (current_path, target) = Self::parse_current_path_and_target(args)?;
-        let target = UseAssetTarget::parse(&target)?;
+        let target = UseTarget::parse(&target)?;
         let possible_inputs = target.resolve_local_module(&current_path)?;
         let (input, lir) = 'find_existing_input: {
             for input in possible_inputs {
@@ -375,19 +370,19 @@ impl Vm {
     }
 }
 
-struct UseAssetTarget {
+struct UseTarget {
     parent_navigations: usize,
     path: String,
 }
-impl UseAssetTarget {
+impl UseTarget {
     const PARENT_NAVIGATION_CHAR: char = '.';
 
     fn parse(mut target: &str) -> Result<Self, String> {
         let parent_navigations = {
             let mut navigations = 0;
-            while target.chars().next() == Some(UseAssetTarget::PARENT_NAVIGATION_CHAR) {
+            while target.chars().next() == Some(UseTarget::PARENT_NAVIGATION_CHAR) {
                 navigations += 1;
-                target = &target[UseAssetTarget::PARENT_NAVIGATION_CHAR.len_utf8()..];
+                target = &target[UseTarget::PARENT_NAVIGATION_CHAR.len_utf8()..];
             }
             match navigations {
                 0 => return Err("the target must start with at least one dot".to_string()),
@@ -403,7 +398,7 @@ impl UseAssetTarget {
             }
             target.to_string()
         };
-        Ok(UseAssetTarget {
+        Ok(UseTarget {
             parent_navigations,
             path,
         })
@@ -411,20 +406,16 @@ impl UseAssetTarget {
 
     fn resolve_asset(&self, current_path: &[String]) -> Result<Input, String> {
         let mut path = current_path.to_owned();
-        for _ in 0..self.parent_navigations {
-            if path.pop() == None {
-                return Err("too many parent navigations".to_string());
-            }
-        }
-        if path
-            .last()
-            .map(|it| it.ends_with(".candy"))
-            .unwrap_or(false)
-        {
+        if self.parent_navigations == 0 && path.last() != Some(&".candy".to_string()) {
             return Err(
                 "importing child files (starting with a single dot) only works from `.candy` files"
                     .to_string(),
             );
+        }
+        for _ in 0..self.parent_navigations {
+            if path.pop() == None {
+                return Err("too many parent navigations".to_string());
+            }
         }
         path.push(self.path.to_string());
         Ok(Input::File(path.clone()))

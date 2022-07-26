@@ -22,7 +22,6 @@ pub enum BuiltinFunction {
     IntShiftRightArithmetic, // (value: int) (amount: int) -> (shifted: int)
     IntShiftRightLogical,    // (value: int) (amount: int) -> (shifted: int)
     IntSubtract,             // (minuend: int) (subtrahend: int) -> (difference: int)
-    Panic,                   // message -> Never
     Print,                   // message -> Nothing
     StructGet,               // struct key -> value
     StructGetKeys,           // struct -> listOfKeys

@@ -172,21 +172,13 @@ impl<'a> Context<'a> {
                 let reference = match self.identifiers.get(&identifier.value) {
                     Some(reference) => reference.to_owned(),
                     None => {
-                        return self.push(
+                        return self.push_error(
                             Some(identifier.id.clone()),
-                            Expression::Error {
-                                child: None,
-                                errors: vec![CompilerError {
-                                    input: ast.id.input.clone(),
-                                    span: self.db.ast_id_to_span(ast.id.clone()).unwrap(),
-                                    payload: CompilerErrorPayload::Hir(
-                                        HirError::UnknownReference {
-                                            identifier: identifier.value.clone(),
-                                        },
-                                    ),
-                                }],
+                            ast.id.input.clone(),
+                            self.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                            HirError::UnknownReference {
+                                identifier: identifier.value.clone(),
                             },
-                            None,
                         );
                     }
                 };
@@ -238,21 +230,23 @@ impl<'a> Context<'a> {
                 );
                 if *is_public {
                     if self.is_top_level {
+                        if self.public_identifiers.contains_key(&name_string) {
+                            self.push_error(
+                                None,
+                                ast.id.input.clone(),
+                                self.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                                HirError::PublicAssignmentWithSameName {
+                                    name: name_string.clone(),
+                                },
+                            );
+                        }
                         self.public_identifiers.insert(name_string, body.clone());
                     } else {
-                        self.push(
+                        self.push_error(
                             None,
-                            Expression::Error {
-                                child: None,
-                                errors: vec![CompilerError {
-                                    input: ast.id.input.clone(),
-                                    span: self.db.ast_id_to_span(ast.id.clone()).unwrap(),
-                                    payload: CompilerErrorPayload::Hir(
-                                        HirError::PublicAssignmentInNotTopLevel,
-                                    ),
-                                }],
-                            },
-                            None,
+                            ast.id.input.clone(),
+                            self.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                            HirError::PublicAssignmentInNotTopLevel,
                         );
                     }
                 }
@@ -383,19 +377,13 @@ impl<'a> Context<'a> {
                         self.push(Some(name.id), Expression::Reference(function), None)
                     }
                     None => {
-                        return self.push(
+                        return self.push_error(
                             Some(name.id.clone()),
-                            Expression::Error {
-                                child: None,
-                                errors: vec![CompilerError {
-                                    input: name.id.input.clone(),
-                                    span: self.db.ast_id_to_span(name.id.clone()).unwrap(),
-                                    payload: CompilerErrorPayload::Hir(HirError::UnknownFunction {
-                                        name: name.value.clone(),
-                                    }),
-                                }],
+                            name.id.input.clone(),
+                            self.db.ast_id_to_span(name.id.clone()).unwrap(),
+                            HirError::UnknownFunction {
+                                name: name.value.clone(),
                             },
-                            None,
                         );
                     }
                 }
@@ -437,13 +425,32 @@ impl<'a> Context<'a> {
         expression: Expression,
         identifier: Option<String>,
     ) -> hir::Id {
-        let identifier: Option<_> = identifier.into();
         self.body
             .push(id.to_owned(), expression, identifier.clone());
         if let Some(identifier) = identifier {
             self.identifiers.insert(identifier, id.clone());
         }
         id
+    }
+    fn push_error(
+        &mut self,
+        ast_id: Option<ast::Id>,
+        input: Input,
+        span: Range<usize>,
+        error: HirError,
+    ) -> hir::Id {
+        self.push(
+            ast_id,
+            Expression::Error {
+                child: None,
+                errors: vec![CompilerError {
+                    input,
+                    span,
+                    payload: CompilerErrorPayload::Hir(error),
+                }],
+            },
+            None,
+        )
     }
 
     fn create_next_id(&mut self, ast_id: Option<ast::Id>, key: Option<String>) -> hir::Id {
@@ -485,6 +492,23 @@ impl<'a> Context<'a> {
         self.push(None, sparkles_map, Some("✨".to_string()));
     }
 
+    fn generate_panicking_code(&mut self, message: String) -> hir::Id {
+        let condition = self.push(
+            None,
+            Expression::Symbol("False".to_string()),
+            Some("false".to_string()),
+        );
+        let message = self.push(None, Expression::Text(message), Some("message".to_string()));
+        self.push(
+            None,
+            Expression::Needs {
+                condition: Box::new(condition),
+                message: Box::new(message),
+            },
+            None,
+        )
+    }
+
     // Generates a struct that contains the current path as a struct. Generates
     // panicking code if the current file is not on the file system and of the
     // current project.
@@ -494,11 +518,6 @@ impl<'a> Context<'a> {
         // HirId(~:test.candy:something:currentPath) = struct [
         //   HirId(~:test.candy:something:key): HirId(~:test.candy:something:raw_path),
         // ]
-        let panic_id = self.push(
-            None,
-            Expression::Builtin(BuiltinFunction::Panic),
-            Some("panic".to_string()),
-        );
         match self.input.clone() {
             Input::File(path) => {
                 let current_path_content = path
@@ -526,50 +545,23 @@ impl<'a> Context<'a> {
                     Some("currentPath".to_string()),
                 )
             }
-            Input::ExternalFile(_) => {
-                let message_id = self.push(
-                    None,
-                    Expression::Text(
-                        "File doesn't belong to the currently opened project.".to_string(),
-                    ),
-                    Some("message".to_string()),
-                );
-                self.push(
-                    None,
-                    Expression::Call {
-                        function: panic_id,
-                        arguments: vec![message_id],
-                    },
-                    Some("panicked".to_string()),
-                )
-            }
-            Input::Untitled(_) => {
-                let message_id = self.push(
-                    None,
-                    Expression::Text("Untitled files can't call `useAsset`.".to_string()),
-                    Some("message".to_string()),
-                );
-                self.push(
-                    None,
-                    Expression::Call {
-                        function: panic_id,
-                        arguments: vec![message_id],
-                    },
-                    Some("panicked".to_string()),
-                )
-            }
+            Input::ExternalFile(_) => self.generate_panicking_code(
+                "file doesn't belong to the currently opened project.".to_string(),
+            ),
+            Input::Untitled(_) => self.generate_panicking_code(
+                "untitled files can't call `use` or `useAsset`.".to_string(),
+            ),
         }
     }
 
     fn generate_use_asset(&mut self) {
         // HirId(~:test.candy:useAsset) = lambda { HirId(~:test.candy:useAsset:target) ->
-        //   HirId(~:test.candy:useAsset:panic) = builtinPanic
-        //   HirId(~:test.candy:useAsset:useAsset) = builtinUseAsset
         //   HirId(~:test.candy:useAsset:key) = int 0
         //   HirId(~:test.candy:useAsset:raw_path) = text "test.candy"
         //   HirId(~:test.candy:useAsset:currentPath) = struct [
         //     HirId(~:test.candy:useAsset:key): HirId(~:test.candy:useAsset:raw_path),
         //   ]
+        //   HirId(~:test.candy:useAsset:useAsset) = builtinUseAsset
         //   HirId(~:test.candy:useAsset:importedFileContent) = call HirId(~:test.candy:useAsset:useAsset) with these arguments:
         //     HirId(~:test.candy:useAsset:currentPath)
         //     HirId(~:test.candy:useAsset:target)
@@ -577,11 +569,11 @@ impl<'a> Context<'a> {
 
         let reset_state = self.start_scope();
         self.prefix_keys.push("useAsset".to_string());
-
         let lambda_parameter_id = hir::Id::new(
             self.input.clone(),
             add_keys(&self.prefix_keys[..], "target".to_string()),
         );
+
         let current_path = self.generate_current_path_struct();
         let use_id = self.push(
             None,
