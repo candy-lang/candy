@@ -221,16 +221,17 @@ impl<'a> Context<'a> {
         }
         self.discovered_references.insert(id.clone());
 
-        let span = self.db.hir_id_to_span(id.clone()).unwrap();
-        self.references.push(DocumentHighlight {
-            range: lsp_types::Range {
-                start: self
-                    .db
-                    .offset_to_lsp(id.input.clone(), span.start)
-                    .to_position(),
-                end: self.db.offset_to_lsp(id.input, span.end).to_position(),
-            },
-            kind: Some(kind),
-        });
+        if let Some(span) = self.db.hir_id_to_span(id.clone()) {
+            self.references.push(DocumentHighlight {
+                range: lsp_types::Range {
+                    start: self
+                        .db
+                        .offset_to_lsp(id.input.clone(), span.start)
+                        .to_position(),
+                    end: self.db.offset_to_lsp(id.input, span.end).to_position(),
+                },
+                kind: Some(kind),
+            });
+        }
     }
 }

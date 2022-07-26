@@ -68,7 +68,7 @@ Major milestones:
 * [x] add CLI arguments for printing the CST, AST, or HIR
 * [ ] make functions independent of their order in top-level scope
 * [x] support importing other files (`use`)
-* [ ] namespaces/modules including visibility modifiers
+* [x] namespaces/modules including visibility modifiers
 * [ ] IDE support:
   * [ ] completion, completion resolve
   * [ ] hover
@@ -95,17 +95,17 @@ Major milestones:
   * [ ] moniker
 * [x] incremental compilation
 * [ ] lists
-* [ ] maps
+* [x] structs
 * [ ] sets
 * [ ] text interpolation
-* [ ] constant evaluation
+* [x] constant evaluation
 * [ ] fibers
 * [ ] channels
 * [ ] io
 * [ ] random
 * [ ] standard library
 * [ ] pipe operator
-* [ ] auto-fuzzing
+* [x] auto-fuzzing
 * [ ] "type" proofs
 * [ ] testing
 * [ ] fuzzing of the compiler itself
@@ -115,17 +115,20 @@ Major milestones:
 
 ## Short-term TODOs
 
-- extra closure value type
-- use BigInts
-- mini-heaps?
-- start fuzzing in language server
 - make `PROJECT_DIRECTORY` non-global
-- show fuzzing hints in the editor
+- use BigInts
+- minimize inputs found through fuzzing
+- make condition whether to keep running more granular
+- fuzz parser
+- add caching to hints server
 - implement fibers and nurseries
 - implement channels
 - remove builtinPrint
+- support recursion
+- tail call optimization
 - new name?
-- parse calls with call as a receiver: `(foo Bar) Baz`
+- mini-heaps?
+- parse calls with call as a receiver: `(foo Bar) Baz`. or do we even need the `CallReceiver`?
 
 ## How to use Candy
 

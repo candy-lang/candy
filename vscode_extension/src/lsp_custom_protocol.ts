@@ -14,4 +14,4 @@ export interface Hint {
   readonly text: string;
   readonly position: Position;
 }
-export type HintKind = 'value' | 'panic';
+export type HintKind = 'value' | 'panic' | 'fuzz';

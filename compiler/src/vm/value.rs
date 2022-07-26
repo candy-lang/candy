@@ -26,39 +26,19 @@ pub enum Value {
     Text(String),
     Symbol(String),
     Struct(HashMap<Value, Value>),
-    Closure {
-        captured: Vec<Value>,
-        num_args: usize,
-        body: Vec<Instruction>,
-    },
+    Closure(Closure),
     Builtin(BuiltinFunction),
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Closure {
+    pub captured: Vec<Value>,
+    pub num_args: usize,
+    pub body: Vec<Instruction>,
 }
 
 impl Value {
     pub fn nothing() -> Self {
         Value::Symbol("Nothing".to_owned())
-    }
-
-    pub fn module_closure_of_lir(input: Input, lir: Lir) -> Self {
-        Value::Closure {
-            captured: vec![],
-            num_args: 0,
-            body: vec![
-                Instruction::TraceModuleStarts { input },
-                Instruction::CreateClosure {
-                    captured: vec![],
-                    num_args: 0,
-                    body: lir.instructions.clone(),
-                },
-                Instruction::Call { num_args: 0 },
-                Instruction::TraceModuleEnds,
-                Instruction::Return,
-            ],
-        }
-    }
-    pub fn module_closure_of_input(db: &Database, input: Input) -> Option<Self> {
-        let lir = db.lir(input.clone())?;
-        Some(Self::module_closure_of_lir(input, (*lir).clone()))
     }
 
     pub fn list(items: Vec<Value>) -> Self {
@@ -75,6 +55,29 @@ impl Value {
             Value::Text(text) => Ok(text),
             it => Err(it),
         }
+    }
+}
+impl Closure {
+    pub fn of_lir(input: Input, lir: Lir) -> Self {
+        Closure {
+            captured: vec![],
+            num_args: 0,
+            body: vec![
+                Instruction::TraceModuleStarts { input },
+                Instruction::CreateClosure {
+                    captured: vec![],
+                    num_args: 0,
+                    body: lir.instructions.clone(),
+                },
+                Instruction::Call { num_args: 0 },
+                Instruction::TraceModuleEnds,
+                Instruction::Return,
+            ],
+        }
+    }
+    pub fn of_input(db: &Database, input: Input) -> Option<Self> {
+        let lir = db.lir(input.clone())?;
+        Some(Self::of_lir(input, (*lir).clone()))
     }
 }
 

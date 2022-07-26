@@ -102,9 +102,9 @@ impl LoweringContext {
             Expression::Builtin(builtin) => {
                 self.emit_create_builtin(id.clone(), *builtin);
             }
-            Expression::Needs { condition, message } => {
-                self.emit_push_from_stack(*message.clone());
+            Expression::Needs { condition, reason } => {
                 self.emit_push_from_stack(*condition.clone());
+                self.emit_push_from_stack(*reason.clone());
                 self.emit_trace_needs_starts(id.clone());
                 self.emit_needs(id.clone());
                 self.emit_trace_needs_ends();
@@ -169,8 +169,8 @@ impl LoweringContext {
         self.stack.push(id);
     }
     fn emit_needs(&mut self, id: hir::Id) {
+        self.stack.pop(); // reason
         self.stack.pop(); // condition
-        self.stack.pop(); // message
         self.emit(Instruction::Needs);
         self.stack.push(id); // Nothing
     }

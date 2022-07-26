@@ -1,15 +1,15 @@
-bool = use ".Bool"
-check = (use ".Check").check
+bool := use ".Bool"
+check := (use ".Check").check
 
 controlFlow = use ".ControlFlow"
 if := controlFlow.if
 ifElse := controlFlow.ifElse
 
-equals = (use ".Equality").equals
-function = use ".Function"
-int = use ".Int"
-panic = (use ".Panic").panic
-struct = use ".Struct"
-text = use ".Text"
-todo = (use ".Todo").todo
-type = use ".Type"
+equals := (use ".Equality").equals
+function := use ".Function"
+int := use ".Int"
+panic := (use ".Panic").panic
+struct := use ".Struct"
+text := use ".Text"
+todo := (use ".Todo").todo
+type := use ".Type"

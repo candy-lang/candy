@@ -1,6 +1,11 @@
 use std::{cmp::Ordering, str::FromStr};
 
-use super::{heap::ObjectPointer, use_provider::UseProvider, value::Value, Vm};
+use super::{
+    heap::ObjectPointer,
+    use_provider::UseProvider,
+    value::{Closure, Value},
+    Vm,
+};
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
 use itertools::Itertools;
 use log;
@@ -27,7 +32,7 @@ impl Vm {
 
         let args = args.iter().map(|it| self.heap.export(*it)).collect_vec();
 
-        let return_value_or_panic_message = match &builtin_function {
+        let return_value_or_panic_reason = match &builtin_function {
             BuiltinFunction::Call => match self.call(use_provider, args) {
                 // If successful, Call doesn't return a value, but diverges
                 // the control flow.
@@ -40,7 +45,7 @@ impl Vm {
                 // If successful, IfElse doesn't return a value, but diverges
                 // the control flow.
                 Ok(()) => return,
-                Err(message) => Err(message),
+                Err(reason) => Err(reason),
             },
             BuiltinFunction::IntAdd => self.int_add(args),
             BuiltinFunction::IntBitLength => self.int_bit_length(args),
@@ -68,13 +73,13 @@ impl Vm {
                 // diverges the control flow.
                 match self.use_local_module(use_provider, args) {
                     Ok(()) => return,
-                    Err(message) => Err(message),
+                    Err(reason) => Err(reason),
                 }
             }
         };
-        let return_value = match return_value_or_panic_message {
+        let return_value = match return_value_or_panic_reason {
             Ok(value) => value,
-            Err(panic_message) => self.panic(panic_message),
+            Err(reason) => self.panic(reason),
         };
 
         let return_object = self.heap.import(return_value);
@@ -84,20 +89,20 @@ impl Vm {
     fn call<U: UseProvider>(&mut self, use_provider: &U, args: Vec<Value>) -> Result<(), String> {
         destructure!(
             args,
-            [Value::Closure {
+            [Value::Closure(Closure {
                 captured,
                 num_args,
                 body
-            }],
+            })],
             {
                 if *num_args > 0 {
                     return Err(format!("Call expects a closure without arguments as the body, but got one with {num_args} arguments."));
                 }
-                let closure_object = self.heap.import(Value::Closure {
+                let closure_object = self.heap.import(Value::Closure(Closure {
                     captured: captured.to_owned(),
                     num_args: *num_args,
                     body: body.to_owned(),
-                });
+                }));
                 log::debug!(
                     "Call executing the closure: {:?}",
                     self.heap.export_without_dropping(closure_object)
@@ -114,7 +119,7 @@ impl Vm {
     }
 
     fn get_argument_count(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Closure { num_args, .. }], {
+        destructure!(args, [Value::Closure(Closure { num_args, .. })], {
             Ok(BigInt::from(*num_args).into())
         })
     }
@@ -128,23 +133,15 @@ impl Vm {
             args,
             [
                 Value::Symbol(condition),
-                Value::Closure {
-                    captured: then_captured,
-                    num_args: then_num_args,
-                    body: then_body
-                },
-                Value::Closure {
-                    captured: else_captured,
-                    num_args: else_num_args,
-                    body: else_body
-                }
+                Value::Closure(then_closure),
+                Value::Closure(else_closure)
             ],
             {
-                if *then_num_args > 0 {
-                    return Err(format!("IfElse expects a closure without arguments as the then, but got one with {then_num_args} arguments."));
+                if then_closure.num_args > 0 {
+                    return Err(format!("IfElse expects a closure without arguments as the then, but got one with {} arguments.", then_closure.num_args));
                 }
-                if *else_num_args > 0 {
-                    return Err(format!("IfElse expects a closure without arguments as the else, but got one with {else_num_args} arguments."));
+                if else_closure.num_args > 0 {
+                    return Err(format!("IfElse expects a closure without arguments as the else, but got one with {} arguments.", else_closure.num_args));
                 }
                 let condition = match condition.as_str() {
                     "True" => true,
@@ -157,17 +154,9 @@ impl Vm {
                 };
 
                 let closure_object = self.heap.import(if condition {
-                    Value::Closure {
-                        captured: then_captured.to_owned(),
-                        num_args: *then_num_args,
-                        body: then_body.to_owned(),
-                    }
+                    Value::Closure(then_closure.clone())
                 } else {
-                    Value::Closure {
-                        captured: else_captured.to_owned(),
-                        num_args: *else_num_args,
-                        body: else_body.to_owned(),
-                    }
+                    Value::Closure(else_closure.clone())
                 });
                 log::debug!(
                     "IfElse executing the closure: {:?}",
@@ -343,7 +332,7 @@ impl Vm {
             return Err("couldn't import module".to_string());
         };
 
-        let module_closure = Value::module_closure_of_lir(input.clone(), lir);
+        let module_closure = Value::Closure(Closure::of_lir(input.clone(), lir));
         let address = self.heap.import(module_closure);
         self.data_stack.push(address);
         self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
@@ -394,7 +383,7 @@ impl UseTarget {
                 .chars()
                 .all(|c| c.is_ascii_alphanumeric() || c == '.')
             {
-                return Err("the target name can only contain letters".to_string());
+                return Err("the target name can only contain letters and dots".to_string());
             }
             target.to_string()
         };

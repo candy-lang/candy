@@ -1,17 +1,18 @@
 use super::{
     heap::{Heap, ObjectData, ObjectPointer},
     tracer::{TraceEntry, Tracer},
-    use_provider::UseProvider,
-    value::Value,
+    use_provider::{DbUseProvider, UseProvider},
+    value::{Closure, Value},
 };
 use crate::{
     compiler::{hir::Id, lir::Instruction},
+    database::Database,
     input::Input,
 };
 use itertools::Itertools;
 use log;
 use num_bigint::{BigInt, Sign, ToBigInt};
-use std::collections::HashMap;
+use std::{collections::HashMap, mem};
 
 /// A VM can execute some byte code.
 #[derive(Clone)]
@@ -23,14 +24,15 @@ pub struct Vm {
     pub call_stack: Vec<InstructionPointer>,
     pub import_stack: Vec<Input>,
     pub tracer: Tracer,
-    pub fuzzable_closures: Vec<(Id, ObjectPointer)>,
+    pub fuzzable_closures: Vec<(Id, Closure)>,
+    pub num_instructions_executed: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Status {
     Running,
     Done,
-    Panicked(Value),
+    Panicked { reason: String },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -56,6 +58,11 @@ impl InstructionPointer {
     }
 }
 
+pub struct TearDownResult {
+    pub return_value: Value,
+    pub fuzzable_closures: Vec<(Id, Closure)>,
+}
+
 impl Vm {
     pub fn new() -> Self {
         Self {
@@ -67,60 +74,57 @@ impl Vm {
             import_stack: vec![],
             tracer: Tracer::default(),
             fuzzable_closures: vec![],
+            num_instructions_executed: 0,
         }
     }
 
     pub fn set_up_closure_execution<U: UseProvider>(
         &mut self,
         use_provider: &U,
-        closure: Value,
+        closure: Closure,
         arguments: Vec<Value>,
     ) {
         assert!(matches!(self.status, Status::Done));
         assert!(self.data_stack.is_empty());
         assert!(self.call_stack.is_empty());
 
-        let num_args = if let Value::Closure { num_args, .. } = closure.clone() {
-            num_args
-        } else {
-            panic!("Called start_closure with a non-closure.");
-        };
-
-        assert_eq!(num_args, arguments.len());
+        assert_eq!(closure.num_args, arguments.len());
 
         for arg in arguments {
             let address = self.heap.import(arg);
             self.data_stack.push(address);
         }
-        let address = self.heap.import(closure);
+        let address = self.heap.import(Value::Closure(closure.clone()));
         self.data_stack.push(address);
 
         self.status = Status::Running;
-        self.run_instruction(use_provider, Instruction::Call { num_args });
+        self.run_instruction(
+            use_provider,
+            Instruction::Call {
+                num_args: closure.num_args,
+            },
+        );
     }
-    pub fn tear_down_closure_execution(&mut self) -> Value {
+    pub fn tear_down_closure_execution(&mut self) -> TearDownResult {
         assert!(matches!(self.status, Status::Done));
         let return_value = self.data_stack.pop().unwrap();
-        self.heap.export(return_value)
+        let return_value = self.heap.export(return_value);
+        TearDownResult {
+            return_value,
+            fuzzable_closures: mem::replace(&mut self.fuzzable_closures, vec![]),
+        }
     }
 
     pub fn set_up_module_closure_execution<U: UseProvider>(
         &mut self,
         use_provider: &U,
-        closure: Value,
+        closure: Closure,
     ) {
-        if let Value::Closure {
-            captured, num_args, ..
-        } = closure.clone()
-        {
-            assert_eq!(captured.len(), 0, "Called start_module_closure with a closure that is not a module closure (it captures stuff).");
-            assert_eq!(num_args, 0, "Called start_module_closure with a closure that is not a module closure (it has arguments).");
-        } else {
-            panic!("Called start_module_closure with a non-closure.");
-        };
+        assert_eq!(closure.captured.len(), 0, "Called start_module_closure with a closure that is not a module closure (it captures stuff).");
+        assert_eq!(closure.num_args, 0, "Called start_module_closure with a closure that is not a module closure (it has arguments).");
         self.set_up_closure_execution(use_provider, closure, vec![]);
     }
-    pub fn tear_down_module_closure_execution(&mut self) -> Value {
+    pub fn tear_down_module_closure_execution(&mut self) -> TearDownResult {
         self.tear_down_closure_execution()
     }
 
@@ -132,7 +136,7 @@ impl Vm {
         self.data_stack[self.data_stack.len() - 1 - offset as usize].clone()
     }
 
-    pub fn run<U: UseProvider>(&mut self, use_provider: &U, mut num_instructions: u16) {
+    pub fn run<U: UseProvider>(&mut self, use_provider: &U, mut num_instructions: usize) {
         assert!(
             matches!(self.status, Status::Running),
             "Called Vm::run on a vm that is not ready to run."
@@ -172,6 +176,7 @@ impl Vm {
             log::trace!("Running instruction: {instruction:?}");
             self.next_instruction.instruction += 1;
             self.run_instruction(use_provider, instruction);
+            self.num_instructions_executed += 1;
 
             if self.next_instruction == InstructionPointer::null_pointer() {
                 self.status = Status::Done;
@@ -277,22 +282,29 @@ impl Vm {
                         self.heap.drop(closure_address);
                         self.run_builtin_function(use_provider, &builtin, &args);
                     }
-                    _ => panic!("Can only call closures and builtins."),
+                    _ => {
+                        self.panic("you can only call closures and builtins".to_string());
+                    }
                 };
             }
             Instruction::Needs => {
+                let reason = self.data_stack.pop().unwrap();
                 let condition = self.data_stack.pop().unwrap();
-                let message = self.data_stack.pop().unwrap();
+
+                let reason = match self.heap.export(reason) {
+                    Value::Text(reason) => reason,
+                    _ => {
+                        self.panic("you can only use text as the reason of a `needs`".to_string());
+                        return;
+                    }
+                };
 
                 match self.heap.get(condition).data.clone() {
                     ObjectData::Symbol(symbol) => match symbol.as_str() {
                         "True" => {
                             self.data_stack.push(self.heap.import(Value::nothing()));
                         }
-                        "False" => {
-                            self.status =
-                                Status::Panicked(self.heap.export_without_dropping(message))
-                        }
+                        "False" => self.status = Status::Panicked { reason },
                         _ => {
                             self.panic("Needs expects True or False as a symbol.".to_string());
                         }
@@ -309,8 +321,10 @@ impl Vm {
             }
             Instruction::RegisterFuzzableClosure(id) => {
                 let closure = self.data_stack.last().unwrap().clone();
-                self.heap.dup(closure);
-                self.fuzzable_closures.push((id, closure));
+                match self.heap.export_without_dropping(closure) {
+                    Value::Closure(closure) => self.fuzzable_closures.push((id, closure)),
+                    _ => panic!("Instruction RegisterFuzzableClosure executed, but stack top is not a closure."),
+                }
             }
             Instruction::TraceValueEvaluated(id) => {
                 let address = *self.data_stack.last().unwrap();
@@ -340,13 +354,13 @@ impl Vm {
             }
             Instruction::TraceNeedsStarts { id } => {
                 let condition = self.data_stack[self.data_stack.len() - 1];
-                let message = self.data_stack[self.data_stack.len() - 2];
+                let reason = self.data_stack[self.data_stack.len() - 2];
                 let condition = self.heap.export_without_dropping(condition);
-                let message = self.heap.export_without_dropping(message);
+                let reason = self.heap.export_without_dropping(reason);
                 self.tracer.push(TraceEntry::NeedsStarted {
                     id,
                     condition,
-                    message,
+                    reason,
                 });
             }
             Instruction::TraceNeedsEnds => self.tracer.push(TraceEntry::NeedsEnded),
@@ -386,8 +400,35 @@ impl Vm {
         }
     }
 
-    pub fn panic(&mut self, message: String) -> Value {
-        self.status = Status::Panicked(Value::Text(message));
+    pub fn panic(&mut self, reason: String) -> Value {
+        self.status = Status::Panicked { reason };
         Value::Symbol("Never".to_string())
+    }
+
+    pub fn run_synchronously_until_completion(
+        &mut self,
+        db: &Database,
+    ) -> Result<TearDownResult, String> {
+        let use_provider = DbUseProvider { db };
+        loop {
+            self.run(&use_provider, 10000);
+            match self.status() {
+                Status::Running => log::info!("Code is still running."),
+                Status::Done => {
+                    let result = self.tear_down_module_closure_execution();
+                    log::info!(
+                        "The module exports these definitions: {}",
+                        result.return_value
+                    );
+                    return Ok(result);
+                }
+                Status::Panicked { reason } => {
+                    log::error!("The module panicked because {reason}.");
+                    log::error!("This is the stack trace:");
+                    self.tracer.dump_stack_trace(&db);
+                    return Err(reason);
+                }
+            }
+        }
     }
 }

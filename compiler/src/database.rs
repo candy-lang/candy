@@ -4,7 +4,6 @@ use crate::{
         hir::HirDbStorage, hir_to_lir::HirToLirStorage, rcst_to_cst::RcstToCstStorage,
         string_to_rcst::StringToRcstStorage,
     },
-    discover::run::DiscoverStorage,
     input::{GetOpenInputQuery, Input, InputDbStorage, InputWatcher},
     language_server::{
         folding_range::FoldingRangeDbStorage, references::ReferencesDbStorage,
@@ -19,7 +18,6 @@ use std::{path::PathBuf, sync::Mutex};
     AstToHirStorage,
     CstDbStorage,
     CstToAstStorage,
-    DiscoverStorage,
     FoldingRangeDbStorage,
     HirDbStorage,
     HirToLirStorage,
