@@ -9,7 +9,8 @@ use super::{
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
 use itertools::Itertools;
 use log;
-use num_bigint::BigInt;
+use num_bigint::{BigInt, ToBigInt};
+use num_traits::ToPrimitive;
 
 macro_rules! destructure {
     ($args:expr, $enum:pat, $body:block) => {{
@@ -58,8 +59,7 @@ impl Vm {
             BuiltinFunction::IntMultiply => self.int_multiply(args),
             BuiltinFunction::IntParse => self.int_parse(args),
             BuiltinFunction::IntShiftLeft => self.int_shift_left(args),
-            BuiltinFunction::IntShiftRightArithmetic => self.int_shift_right_arithmetic(args),
-            BuiltinFunction::IntShiftRightLogical => self.int_shift_right_logical(args),
+            BuiltinFunction::IntShiftRight => self.int_shift_right(args),
             BuiltinFunction::IntSubtract => self.int_subtract(args),
             BuiltinFunction::Print => self.print(args),
             BuiltinFunction::StructGet => self.struct_get(args),
@@ -230,16 +230,11 @@ impl Vm {
             Ok((value << amount).into())
         })
     }
-    fn int_shift_right_arithmetic(&mut self, args: Vec<Value>) -> Result<Value, String> {
+    fn int_shift_right(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Int(value), Value::Int(amount)], {
+            let value = value.to_biguint().unwrap();
             let amount = amount.to_u128().unwrap();
-            Ok((value >> amount).into())
-        })
-    }
-    fn int_shift_right_logical(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(value), Value::Int(amount)], {
-            let amount = amount.to_u128().unwrap();
-            Ok((value >>> amount).into())
+            Ok((value >> amount).to_bigint().unwrap().into())
         })
     }
     fn int_subtract(&mut self, args: Vec<Value>) -> Result<Value, String> {

@@ -20,7 +20,7 @@ log = "0.4.16"
 lsp-types = "0.93.0"
 notify = "4.0.17"
 num-bigint = { version = "0.4.3", features = ["rand"] }
-num-traits = { version = "0.2.15", features = ["u128"] }
+num-traits = { version = "0.2.15", features = ["i128"] }
 proptest = "1.0.0"
 rand = "0.8.5"
 regex = "1.5.5"

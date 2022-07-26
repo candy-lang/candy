@@ -72,7 +72,9 @@ absolute value :=
 fitsInRustU128 value =
   needs (is value)
   needs (isNonNegative value)
+
   rustU128Max = 340282366920938463463374607431768211455
+  # https://doc.rust-lang.org/std/primitive.u128.html#associatedconstant.MAX
   isLessThan value rustU128Max
 shiftLeft value amount :=
   needs (is value)
@@ -80,18 +82,12 @@ shiftLeft value amount :=
   needs (isNonNegative amount)
   needs (fitsInRustU128 amount) "shifts by that much are not yet supported"
   ✨.intShiftLeft value amount
-shiftRightArithmetic value amount :=
+shiftRight value amount :=
   needs (is value)
   needs (is amount)
   needs (isNonNegative amount)
   needs (fitsInRustU128 amount) "shifts by that much are not yet supported"
-  ✨.intShiftRightArithmetic value amount
-shiftRightLogical value amount :=
-  needs (is value)
-  needs (is amount)
-  needs (isNonNegative amount)
-  needs (fitsInRustU128 amount) "shifts by that much are not yet supported"
-  ✨.intShiftRightLogical value amount
+  ✨.intShiftRight value amount
 
 bitLength value :=
   # Determines the fewest bits necessary to express this integer, not including
