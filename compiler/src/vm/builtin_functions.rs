@@ -11,6 +11,7 @@ use itertools::Itertools;
 use log;
 use num_bigint::{BigInt, ToBigInt};
 use num_traits::ToPrimitive;
+use unicode_segmentation::UnicodeSegmentation;
 
 macro_rules! destructure {
     ($args:expr, $enum:pat, $body:block) => {{
@@ -65,7 +66,16 @@ impl Vm {
             BuiltinFunction::StructGet => self.struct_get(args),
             BuiltinFunction::StructGetKeys => self.struct_get_keys(args),
             BuiltinFunction::StructHasKey => self.struct_has_key(args),
+            BuiltinFunction::TextCharacters => self.text_characters(args),
             BuiltinFunction::TextConcatenate => self.text_concatenate(args),
+            BuiltinFunction::TextContains => self.text_contains(args),
+            BuiltinFunction::TextEndsWith => self.text_ends_with(args),
+            BuiltinFunction::TextGetRange => self.text_get_range(args),
+            BuiltinFunction::TextIsEmpty => self.text_is_empty(args),
+            BuiltinFunction::TextLength => self.text_length(args),
+            BuiltinFunction::TextStartsWith => self.text_starts_with(args),
+            BuiltinFunction::TextTrimEnd => self.text_trim_end(args),
+            BuiltinFunction::TextTrimStart => self.text_trim_start(args),
             BuiltinFunction::TypeOf => self.type_of(args),
             BuiltinFunction::UseAsset => self.use_asset(use_provider, args),
             BuiltinFunction::UseLocalModule => {
@@ -271,9 +281,76 @@ impl Vm {
         })
     }
 
+    fn text_characters(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Text(text)], {
+            Ok(Value::list(
+                text.graphemes(true)
+                    .map(|it| it.to_string().into())
+                    .collect(),
+            ))
+        })
+    }
     fn text_concatenate(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Text(value_a), Value::Text(value_b)], {
             Ok(format!("{value_a}{value_b}").into())
+        })
+    }
+    fn text_contains(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Text(text), Value::Text(pattern)], {
+            Ok(text.contains(pattern).into())
+        })
+    }
+    fn text_ends_with(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Text(text), Value::Text(suffix)], {
+            Ok(text.ends_with(suffix).into())
+        })
+    }
+    fn text_get_range(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(
+            args,
+            [
+                Value::Text(text),
+                Value::Int(start_inclusive),
+                Value::Int(end_exclusive)
+            ],
+            {
+                let start_inclusive = start_inclusive.to_usize().expect(
+                    "Tried to get a range from a text with an index that's too large for usize.",
+                );
+                let end_exclusive = end_exclusive.to_usize().expect(
+                    "Tried to get a range from a text with an index that's too large for usize.",
+                );
+                let text = text
+                    .graphemes(true)
+                    .skip(start_inclusive)
+                    .take(end_exclusive - start_inclusive)
+                    .collect::<String>()
+                    .into();
+                Ok(text)
+            }
+        )
+    }
+    fn text_is_empty(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Text(text)], { Ok(text.is_empty().into()) })
+    }
+    fn text_length(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Text(text)], {
+            Ok(text.graphemes(true).count().into())
+        })
+    }
+    fn text_starts_with(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Text(text), Value::Text(prefix)], {
+            Ok(text.starts_with(prefix).into())
+        })
+    }
+    fn text_trim_end(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Text(text)], {
+            Ok(text.trim_end().to_string().into())
+        })
+    }
+    fn text_trim_start(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Text(text)], {
+            Ok(text.trim_start().to_string().into())
         })
     }
 

@@ -130,6 +130,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tower-lsp",
+ "unicode-segmentation",
 ]
 
 [[package]]

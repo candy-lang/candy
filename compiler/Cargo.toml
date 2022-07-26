@@ -33,6 +33,7 @@ strum_macros = "0.24"
 tokio = { version = "1.18.0", features = ["full"] }
 tokio-util = "0.7.1"
 tower-lsp = "0.17.0"
+unicode-segmentation = "1.9.0"
 
 [target.x86_64-unknown-linux-gnu]
 linker = "/usr/bin/clang"

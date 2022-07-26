@@ -24,8 +24,17 @@ pub enum BuiltinFunction {
     Print,               // message -> Nothing
     StructGet,           // struct key -> value
     StructGetKeys,       // struct -> listOfKeys
-    StructHasKey,        // struct key -> bool
+    StructHasKey,        // struct key -> booleanSymbol
+    TextCharacters,      // text -> (listOfText: list)
     TextConcatenate,     // (valueA: text) (valueB: text) -> (concatenated: text)
+    TextContains,        // text (pattern: text) -> booleanSymbol
+    TextEndsWith,        // text (pattern: text) -> booleanSymbol
+    TextGetRange,        // text (startInclusive: int) (endExclusive: int) -> (substring: text)
+    TextIsEmpty,         // text -> (isEmpty: booleanSymbol)
+    TextLength,          // text -> (length: int)
+    TextStartsWith,      // text (pattern: text) -> booleanSymbol
+    TextTrimEnd,         // text -> text
+    TextTrimStart,       // text -> text
     TypeOf,              // any -> typeSymbol
     UseAsset,            // currentPath target -> targetAsString
     UseLocalModule,      // currentPath target -> targetAsStruct
