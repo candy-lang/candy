@@ -1,3 +1,4 @@
+equals = (use "..Equality").equals
 function = use "..Function"
 type = use "..Type"
 
@@ -42,6 +43,11 @@ or a b :=
   needs (is a)
   needs (is b)
   lazyOr a { b }
+
+xor a b :=
+  needs (is a)
+  needs (is b)
+  equals a (not b)
 
 implies a b :=
   needs (is a)
