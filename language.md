@@ -25,6 +25,7 @@ Note that not all of the features described here are implemented or even finaliz
   - [Symbols](#symbols)
   - [Structs](#structs)
   - [Closures](#closures)
+  - [More?](#more)
   - [Channel Ends](#channel-ends)
 - [Variables](#variables)
 - [Functions](#functions)
@@ -143,6 +144,8 @@ Structs are mappings from keys to values (also known as dictionaries or hash map
 
 TODO: Struct access using dot
 
+TODO: Modifying structs. Original idea: `{ Name: "Marcel", Age: 21 }` copied using `{ original | Name: "Jonas" }`
+
 ### Closures
 
 Closures are pieces of code that can be executed.
@@ -153,6 +156,14 @@ longClosure = { foo ->
   ...
 }
 ```
+
+### More?
+
+TODO: Lists? Sets?
+
+- lists: [1, 2, 3]
+- sets: Clojure has %{ value }
+  - or like Toit? {hey, you, there} for set, empty map is {:}
 
 ### Channel Ends
 
