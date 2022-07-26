@@ -63,7 +63,7 @@ pub enum Instruction {
     },
 
     /// Pops a boolean condition and a reason. If the condition is true, it
-    /// just pushes Nothing. If the condition is false, it panic with the
+    /// just pushes Nothing. If the condition is false, it panics with the
     /// reason.
     ///
     /// a, condition, reason -> a, Nothing
