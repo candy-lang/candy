@@ -35,11 +35,12 @@ Note that not all of the features described here are implemented or even finaliz
 - [Needs](#needs)
 - [Pattern matching](#pattern-matching)
 - [Concurrency](#concurrency)
+  - [Channels](#channels)
 - [Packages](#packages)
 - [Environment](#environment)
-- [Build system](#build-system)
 - [Interoperability with other languages](#interoperability-with-other-languages)
-- [Optimizing code](#optimizing-code)
+  - [Add to the Environment](#add-to-the-environment)
+  - [Contain Pure Code](#contain-pure-code)
 - [Deploying code](#deploying-code)
 
 ## Basic Syntax
@@ -318,7 +319,23 @@ brown = [
 ]
 ```
 
-TODO: `useAsset`
+The `useAsset` also allows you to import arbitrary non-Candy-files part from your module hierarchy.
+In some cases, it makes more sense to express some data in other formats.
+For example, you might want to store user-facing translations for your program in a JSON file.
+
+```
+main.candy
+translations.json
+```
+
+```
+# inside main.candy
+
+translations = json.parse(useAsset "..translations.json")
+translations.helloWorld
+```
+
+Changes to these files are also tracked by the Candy tooling and autocompletions and hints will update accordingly.
 
 ## Comments
 
@@ -404,20 +421,60 @@ To enforce structured concurrency, they can only be spawned using a special conc
 In the following code, the surrounding call to `core.parallel` only exits when all fibers inside have completed.
 
 ```candy
-foo = { print ->
-  core.parallel { nursery ->
-    core.fiber.spawn nursery { print "Banana" }
-    core.fiber.spawn nursery { print "Kiwi" }
-    # Banana and Kiwi may print in any order
-  }
-  print "Peach"  # Always prints after the others
+core.parallel { nursery ->
+  core.fiber.spawn nursery { print "Banana" }
+  core.fiber.spawn nursery { print "Kiwi" }
+  # Banana and Kiwi may print in any order
 }
+print "Peach"  # Always prints after the others
 ```
 
 This way, if you call a function, you can be sure that it doesn't continue running code in the background even after it returns.
 The only exception is if you pass it a nursery, which it can use to spawn other fibers.
 
-TODO: Channels
+### Channels
+
+Channels can be used to communicate between fibers.
+You can think of a channel like a conveyer belt or a pipe:
+It has a *send end*, which you can use to put messages into it, and it has a *receive end*, which you can use to read messages from it.
+A channel also has a capacity, which indicates how many messages it can hold simultaneously.
+
+```candy
+channel = core.channel.new 5  # creates a new channel with capacity 5
+sender = channel.sendEnd
+receiver = channel.receiveEnd
+
+core.channel.send sender Foo
+core.channel.send sender Bar
+core.channel.receive receiver  # Foo
+core.channel.receive receiver  # Bar
+```
+
+There is no guaranteed ordering between messages sent by multiple fibers, but messages coming from the same fiber are guaranteed to arrive in the same order they were sent.
+
+All channel operations are blocking.
+Thus, channels also function as a synchronization primitive and can generate *backpressure*.
+
+```candy
+core.parallel { nursery ->
+  channel = core.channel.new 3
+  core.fiber.spawn nursery {
+    loop {
+      core.channel.send channel.sendEnd "Hi!"
+    }
+  }
+  core.fiber.spawn nursery {
+    loop {
+      print (core.channel.receive channel.receiveEnd)
+    }
+  }
+}
+```
+
+In this example, if the printing takes longer than the generating of new texts to print, the generator will wait for the printing to happen.
+At most 3 texts will exist before being printed.
+
+TODO: Write about async await as soon as they are in the Core package
 
 ## Packages
 
@@ -432,8 +489,9 @@ For example, on desktop platforms, the environment looks something like this:
 
 ```candy
 [
-  Stdin: <receive end>,
-  Stdout: <send end>,
+  Stdin: <channel receive end>,
+  Stdout: <channel send end>,
+  WorkingDirectory: ...,
   Variables: [
     ...
   ],
@@ -441,22 +499,45 @@ For example, on desktop platforms, the environment looks something like this:
 ]
 ```
 
-TODO: Write about permissions
+Channels also function as *capabilities* here:
+If you don't pass the stdout channel to a function, there's no way for it to print anything.
+This is especially useful for more "powerful" capabilities like accessing the file system or network:
+When using a package, without reading its source code, you can be confident that it won't delete your files under some special circumstances.
 
-## Build system
-
-TODO: Write something
+If a function expects a stdout channel, there's no way it can tell if you gave it another channel that you just created.
+You could for example process the output of the function, filter some information out, and forward the rest to the real stdout channel.
 
 ## Interoperability with other languages
 
-TODO: Write something
+Candy has no plans to directly support Foreign Function Interfaces (FFI) to communicate with other code.
+The reason is that doing so inherently breaks the isolation of code.
 
-## Optimizing code
+Depending on the use case, we offer two alternative options:
 
-TODO: Write something
+### Add to the Environment
+
+If you develop for a new platform or want to enable more functionality in the native platform, we will have some way of plugging a new part of native code into the runtime that can make its own capabilities available on the environment passed to `main`.
+
+For example, on a microcontroller, the stdout capability doesn't make sense.
+Instead, you might wave a pin capability that allows you to modify the voltage of the hardware pins.
+
+### Contain Pure Code
+
+If you want to use existing code that implements pure functions, it can make sense to compile the existing code into WebAssembly (WASM).
+You can put the resulting WASM module in your Candy module hierarchy, call `useAsset` with that file, and pass the data to a WASM runtime that we'll write in Candy when we get to it.
+
+This approach moves the native code entirely into the Candy domain, so the Candy compiler can also reason about the WASM code.
+For example, if you call a function of your WASM module only with inputs known at compile-time, the Candy compiler may execute those calls directly and not include the original WASM code in the binary at all.
 
 ## Deploying code
 
-- VM
-- LLVM
-- WASM
+This chapter is especially experimental and spitball-y.
+
+Similar to how Zig build scripts work, we may support having a `build.candy` file that contains information about how to compile and optimize your code.
+
+Next to the interpreted VM, we plan to compile to LLVM or WASM.
+
+One idea we had is to let you provide a custom scoring function in the build script instead of having binary options like "optimize for speed" or "optimize for performance".
+This scoring function could get used by the optimizer to choose which paths to take.
+For example, you could formulate a build where you're okay with a resulting binary blowup of 1 KiB per 10 ms of saved time in some annotated performance-crititcal section.
+Or when developing for an embedded device with limited storage capacity, you might want to generate a binary that fits in the limit but is otherwise as fast as possible.
