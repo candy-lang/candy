@@ -1,18 +1,18 @@
 use super::{
     cst::{self, Cst, CstKind},
     rcst::Rcst,
-    string_to_rcst::{InvalidInputError, StringToRcst},
+    string_to_rcst::{InvalidModuleError, StringToRcst},
 };
-use crate::input::Input;
+use crate::module::Module;
 use std::sync::Arc;
 
 #[salsa::query_group(RcstToCstStorage)]
 pub trait RcstToCst: StringToRcst {
-    fn cst(&self, input: Input) -> Result<Arc<Vec<Cst>>, InvalidInputError>;
+    fn cst(&self, module: Module) -> Result<Arc<Vec<Cst>>, InvalidModuleError>;
 }
 
-fn cst(db: &dyn RcstToCst, input: Input) -> Result<Arc<Vec<Cst>>, InvalidInputError> {
-    let rcsts = db.rcst(input)?;
+fn cst(db: &dyn RcstToCst, module: Module) -> Result<Arc<Vec<Cst>>, InvalidModuleError> {
+    let rcsts = db.rcst(module)?;
 
     let mut state = State {
         offset: 0,

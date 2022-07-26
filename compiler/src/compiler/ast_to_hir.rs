@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     builtin_functions::{self, BuiltinFunction},
-    input::Input,
+    module::{Module, Package},
 };
 use im::HashMap;
 use itertools::Itertools;
@@ -25,13 +25,13 @@ pub trait AstToHir: CstDb + CstToAst {
     fn hir_id_to_display_span(&self, id: hir::Id) -> Option<Range<usize>>;
 
     fn ast_to_hir_id(&self, id: ast::Id) -> Option<hir::Id>;
-    fn cst_to_hir_id(&self, input: Input, id: cst::Id) -> Option<hir::Id>;
+    fn cst_to_hir_id(&self, module: Module, id: cst::Id) -> Option<hir::Id>;
 
-    fn hir(&self, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)>;
+    fn hir(&self, module: Module) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)>;
 }
 
 fn hir_to_ast_id(db: &dyn AstToHir, id: hir::Id) -> Option<ast::Id> {
-    let (_, hir_to_ast_id_mapping) = db.hir(id.input.clone()).unwrap();
+    let (_, hir_to_ast_id_mapping) = db.hir(id.module.clone()).unwrap();
     hir_to_ast_id_mapping.get(&id).cloned()
 }
 fn hir_to_cst_id(db: &dyn AstToHir, id: hir::Id) -> Option<cst::Id> {
@@ -42,34 +42,34 @@ fn hir_id_to_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<usize>> {
 }
 fn hir_id_to_display_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<usize>> {
     let cst_id = db.hir_to_cst_id(id.clone())?;
-    Some(db.find_cst(id.input, cst_id).display_span())
+    Some(db.find_cst(id.module, cst_id).display_span())
 }
 
 fn ast_to_hir_id(db: &dyn AstToHir, id: ast::Id) -> Option<hir::Id> {
-    let (_, hir_to_ast_id_mapping) = db.hir(id.input.clone()).unwrap();
+    let (_, hir_to_ast_id_mapping) = db.hir(id.module.clone()).unwrap();
     hir_to_ast_id_mapping
         .iter()
         .find_map(|(key, value)| if value == &id { Some(key) } else { None })
         .cloned()
 }
-fn cst_to_hir_id(db: &dyn AstToHir, input: Input, id: cst::Id) -> Option<hir::Id> {
-    let id = db.cst_to_ast_id(input, id)?;
+fn cst_to_hir_id(db: &dyn AstToHir, module: Module, id: cst::Id) -> Option<hir::Id> {
+    let id = db.cst_to_ast_id(module, id)?;
     db.ast_to_hir_id(id)
 }
 
-fn hir(db: &dyn AstToHir, input: Input) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)> {
-    let (ast, _) = db.ast(input.clone())?;
-    let (body, id_mapping) = compile_top_level(db, input, &ast);
+fn hir(db: &dyn AstToHir, module: Module) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)> {
+    let (ast, _) = db.ast(module.clone())?;
+    let (body, id_mapping) = compile_top_level(db, module, &ast);
     Some((Arc::new(body), id_mapping))
 }
 
 fn compile_top_level(
     db: &dyn AstToHir,
-    input: Input,
+    module: Module,
     ast: &[Ast],
 ) -> (Body, HashMap<hir::Id, ast::Id>) {
     let mut context = Context {
-        input,
+        module,
         id_mapping: HashMap::new(),
         db,
         public_identifiers: HashMap::new(),
@@ -100,7 +100,7 @@ fn compile_top_level(
 }
 
 struct Context<'a> {
-    input: Input,
+    module: Module,
     id_mapping: HashMap<hir::Id, Option<ast::Id>>,
     db: &'a dyn AstToHir,
     public_identifiers: HashMap<String, hir::Id>,
@@ -173,7 +173,7 @@ impl<'a> Context<'a> {
                     None => {
                         return self.push_error(
                             Some(symbol.id.clone()),
-                            ast.id.input.clone(),
+                            ast.id.module.clone(),
                             self.db.ast_id_to_span(ast.id.clone()).unwrap(),
                             HirError::UnknownReference {
                                 symbol: symbol.value.clone(),
@@ -232,7 +232,7 @@ impl<'a> Context<'a> {
                         if self.public_identifiers.contains_key(&name_string) {
                             self.push_error(
                                 None,
-                                ast.id.input.clone(),
+                                ast.id.module.clone(),
                                 self.db.ast_id_to_span(ast.id.clone()).unwrap(),
                                 HirError::PublicAssignmentWithSameName {
                                     name: name_string.clone(),
@@ -243,7 +243,7 @@ impl<'a> Context<'a> {
                     } else {
                         self.push_error(
                             None,
-                            ast.id.input.clone(),
+                            ast.id.module.clone(),
                             self.db.ast_id_to_span(ast.id.clone()).unwrap(),
                             HirError::PublicAssignmentInNotTopLevel,
                         );
@@ -280,7 +280,7 @@ impl<'a> Context<'a> {
 
         for parameter in lambda.parameters.iter() {
             let name = parameter.value.to_string();
-            let id = hir::Id::new(self.input.clone(), add_keys(&lambda_id.keys, name.clone()));
+            let id = hir::Id::new(self.module.clone(), add_keys(&lambda_id.keys, name.clone()));
             self.id_mapping
                 .insert(id.clone(), Some(parameter.id.clone()));
             self.body.identifiers.insert(id.clone(), name.clone());
@@ -304,7 +304,7 @@ impl<'a> Context<'a> {
                     .iter()
                     .map(|parameter| {
                         hir::Id::new(
-                            self.input.clone(),
+                            self.module.clone(),
                             add_keys(&lambda_id.keys[..], parameter.value.to_string()),
                         )
                     })
@@ -358,7 +358,7 @@ impl<'a> Context<'a> {
                         _ => Expression::Error {
                             child: None,
                             errors: vec![CompilerError {
-                                input: name.id.input.clone(),
+                                module: name.id.module.clone(),
                                 span: self.db.ast_id_to_span(name.id.clone()).unwrap(),
                                 payload: CompilerErrorPayload::Hir(
                                     HirError::NeedsWithWrongNumberOfArguments,
@@ -376,7 +376,7 @@ impl<'a> Context<'a> {
                     None => {
                         return self.push_error(
                             Some(name.id.clone()),
-                            name.id.input.clone(),
+                            name.id.module.clone(),
                             self.db.ast_id_to_span(name.id.clone()).unwrap(),
                             HirError::UnknownFunction {
                                 name: name.value.clone(),
@@ -432,7 +432,7 @@ impl<'a> Context<'a> {
     fn push_error(
         &mut self,
         ast_id: Option<ast::Id>,
-        input: Input,
+        module: Module,
         span: Range<usize>,
         error: HirError,
     ) -> hir::Id {
@@ -441,7 +441,7 @@ impl<'a> Context<'a> {
             Expression::Error {
                 child: None,
                 errors: vec![CompilerError {
-                    input,
+                    module,
                     span,
                     payload: CompilerErrorPayload::Hir(error),
                 }],
@@ -461,7 +461,7 @@ impl<'a> Context<'a> {
             } else {
                 format!("{}", disambiguator)
             };
-            let id = hir::Id::new(self.input.clone(), add_keys(&self.prefix_keys, last_part));
+            let id = hir::Id::new(self.module.clone(), add_keys(&self.prefix_keys, last_part));
             if !self.id_mapping.contains_key(&id) {
                 assert!(self.id_mapping.insert(id.to_owned(), ast_id).is_none());
                 return id;
@@ -516,8 +516,8 @@ impl<'a> Context<'a> {
         //   HirId(~:test.candy:something:key): HirId(~:test.candy:something:raw_path),
         // ]
 
-        match self.input.clone() {
-            Input::File(path) => {
+        match self.module.package {
+            Package::User(path) => {
                 let current_path_content = path
                     .into_iter()
                     .filter(|path| *path != ".candy")
@@ -527,7 +527,7 @@ impl<'a> Context<'a> {
                             self.push(None, Expression::Int(index as u64), Some("key".to_string())),
                             self.push(
                                 None,
-                                Expression::Text(it.to_owned()),
+                                Expression::Text(it.to_str().unwrap().to_string()),
                                 Some("rawPath".to_string()),
                             ),
                         )
@@ -539,10 +539,10 @@ impl<'a> Context<'a> {
                     Some("currentPath".to_string()),
                 )
             }
-            Input::ExternalFile(_) => self.generate_panicking_code(
+            Package::External(_) => self.generate_panicking_code(
                 "file doesn't belong to the currently opened project.".to_string(),
             ),
-            Input::Untitled(_) => self.generate_panicking_code(
+            Package::Anonymous { .. } => self.generate_panicking_code(
                 "untitled files can't call `use` or `useAsset`.".to_string(),
             ),
         }
@@ -564,7 +564,7 @@ impl<'a> Context<'a> {
         let reset_state = self.start_scope();
         self.prefix_keys.push("useAsset".to_string());
         let lambda_parameter_id = hir::Id::new(
-            self.input.clone(),
+            self.module.clone(),
             add_keys(&self.prefix_keys[..], "target".to_string()),
         );
 
@@ -613,7 +613,7 @@ impl<'a> Context<'a> {
         let reset_state = self.start_scope();
         self.prefix_keys.push("use".to_string());
         let lambda_parameter_id = hir::Id::new(
-            self.input.clone(),
+            self.module.clone(),
             add_keys(&self.prefix_keys[..], "target".to_string()),
         );
 

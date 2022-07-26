@@ -6,7 +6,7 @@ use crate::{
         hir::{Expression, HirDb},
     },
     database::Database,
-    input::Input,
+    module::Module,
 };
 use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, LocationLink};
 
@@ -15,30 +15,30 @@ pub fn find_definition(
     params: GotoDefinitionParams,
 ) -> Option<GotoDefinitionResponse> {
     let params = params.text_document_position_params;
-    let input: Input = params.text_document.uri.clone().into();
+    let module: Module = params.text_document.uri.clone().into();
     let position = params.position;
-    let offset = db.offset_from_lsp(input.clone(), position.line, position.character);
+    let offset = db.offset_from_lsp(module.clone(), position.line, position.character);
 
-    let origin_cst = db.find_cst_by_offset(input.clone(), offset);
+    let origin_cst = db.find_cst_by_offset(module.clone(), offset);
     match origin_cst.kind {
         CstKind::Identifier { .. } => {}
         _ => return None,
     }
 
-    let origin_hir_id = db.cst_to_hir_id(input.clone(), origin_cst.id)?;
+    let origin_hir_id = db.cst_to_hir_id(module.clone(), origin_cst.id)?;
     let origin_expression = db.find_expression(origin_hir_id)?;
     let target_hir_id = match origin_expression {
         Expression::Reference(id) => id,
         _ => return None,
     };
     let target_cst_id = db.hir_to_cst_id(target_hir_id)?;
-    let target_cst = db.find_cst(input.clone(), target_cst_id);
+    let target_cst = db.find_cst(module.clone(), target_cst_id);
 
     let result = GotoDefinitionResponse::Link(vec![LocationLink {
-        origin_selection_range: Some(db.range_to_lsp(input.clone(), origin_cst.span.clone())),
+        origin_selection_range: Some(db.range_to_lsp(module.clone(), origin_cst.span.clone())),
         target_uri: params.text_document.uri,
-        target_range: db.range_to_lsp(input.clone(), target_cst.span.clone()),
-        target_selection_range: db.range_to_lsp(input, target_cst.display_span()),
+        target_range: db.range_to_lsp(module.clone(), target_cst.span.clone()),
+        target_selection_range: db.range_to_lsp(module, target_cst.display_span()),
     }]);
     Some(result)
 }

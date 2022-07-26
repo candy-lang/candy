@@ -4,7 +4,7 @@ use super::{
     value::{Closure, Value},
     Vm,
 };
-use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
+use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, module::Module};
 use itertools::Itertools;
 use log;
 
@@ -173,8 +173,8 @@ impl Vm {
     ) -> Result<Value, String> {
         let (current_path, target) = Self::parse_current_path_and_target(args)?;
         let target = UseTarget::parse(&target)?;
-        let input = target.resolve_asset(&current_path)?;
-        let content = use_provider.use_asset(input)?;
+        let asset_module = target.resolve_asset(&current_path)?;
+        let content = use_provider.use_asset_module(asset_module)?;
         Ok(Value::list(
             content
                 .iter()
@@ -190,17 +190,17 @@ impl Vm {
     ) -> Result<(), String> {
         let (current_path, target) = Self::parse_current_path_and_target(args)?;
         let target = UseTarget::parse(&target)?;
-        let possible_inputs = target.resolve_local_module(&current_path)?;
-        let (input, lir) = 'find_existing_input: {
-            for input in possible_inputs {
-                if let Some(lir) = use_provider.use_local_module(input.clone()) {
-                    break 'find_existing_input (input, lir);
+        let possible_module_locations = target.resolve_local_module(&current_path)?;
+        let (module, lir) = 'find_existing_module: {
+            for possible_module in possible_module_locations {
+                if let Some(lir) = use_provider.use_code_module(possible_module.clone()) {
+                    break 'find_existing_module (possible_module, lir);
                 }
             }
             return Err("couldn't import module".to_string());
         };
 
-        let module_closure = Value::Closure(Closure::of_lir(input.clone(), lir));
+        let module_closure = Value::Closure(Closure::of_lir(module.clone(), lir));
         let address = self.heap.import(module_closure);
         self.data_stack.push(address);
         self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
@@ -259,8 +259,8 @@ impl UseTarget {
         })
     }
 
-    fn resolve_asset(&self, current_path: &[String]) -> Result<Input, String> {
-        let mut path = current_path.to_owned();
+    fn resolve_asset(&self, current_module: Module) -> Result<Module, String> {
+        let mut path = current_module.path;
         if self.parent_navigations == 0 && path.last() != Some(&".candy".to_string()) {
             return Err(
                 "importing child files (starting with a single dot) only works from `.candy` files"
@@ -273,15 +273,18 @@ impl UseTarget {
             }
         }
         path.push(self.path.to_string());
-        Ok(Input::File(path.clone()))
+        Ok(Module {
+            package: current_module.package,
+            path: path.clone(),
+        })
     }
 
-    fn resolve_local_module(&self, current_path: &[String]) -> Result<Vec<Input>, String> {
+    fn resolve_local_module(&self, current_module: Module) -> Result<Vec<Module>, String> {
         if self.path.contains('.') {
             return Err("the target name contains a file ending".to_string());
         }
 
-        let mut path = current_path.to_owned();
+        let mut path = current_module.path;
         for _ in 0..self.parent_navigations {
             if path.pop() == None {
                 return Err("too many parent navigations".to_string());
@@ -299,7 +302,10 @@ impl UseTarget {
         ];
         Ok(possible_paths
             .into_iter()
-            .map(|path| Input::File(path))
+            .map(|path| Module {
+                package: current_module.package.clone(),
+                path,
+            })
             .collect_vec())
     }
 }

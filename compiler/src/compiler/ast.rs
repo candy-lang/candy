@@ -1,5 +1,5 @@
 use super::{error::CompilerError, utils::AdjustCasingOfFirstLetter};
-use crate::input::Input;
+use crate::module::Module;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use std::{
@@ -9,17 +9,17 @@ use std::{
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Id {
-    pub input: Input,
+    pub module: Module,
     pub local: usize,
 }
 impl Id {
-    pub fn new(input: Input, local: usize) -> Self {
-        Self { input, local }
+    pub fn new(module: Module, local: usize) -> Self {
+        Self { module, local }
     }
 }
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "AstId({}:{})", self.input, self.local)
+        write!(f, "AstId({}:{})", self.module, self.local)
     }
 }
 

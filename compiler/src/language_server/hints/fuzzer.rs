@@ -6,7 +6,7 @@ use crate::{
     },
     database::Database,
     fuzzer::{Fuzzer, Status},
-    input::Input,
+    module::Module,
     vm::{tracer::TraceEntry, value::Closure},
 };
 use itertools::Itertools;
@@ -15,20 +15,20 @@ use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct FuzzerManager {
-    fuzzable_closures: HashMap<Input, HashMap<Id, Closure>>,
+    fuzzable_closures: HashMap<Module, HashMap<Id, Closure>>,
     fuzzers: HashMap<Closure, Fuzzer>,
 }
 
 impl FuzzerManager {
-    pub fn update_input(
+    pub fn update_module(
         &mut self,
         db: &Database,
-        input: Input,
+        module: Module,
         fuzzable_closures: Vec<(Id, Closure)>,
     ) {
         let closures = self
             .fuzzable_closures
-            .entry(input.clone())
+            .entry(module.clone())
             .or_insert_with(|| HashMap::new());
 
         for (id, new_closure) in fuzzable_closures {
@@ -42,11 +42,11 @@ impl FuzzerManager {
         }
     }
 
-    pub fn remove_input(&mut self, input: Input) {
-        self.fuzzable_closures.remove(&input).unwrap();
+    pub fn remove_module(&mut self, module: Module) {
+        self.fuzzable_closures.remove(&module).unwrap();
     }
 
-    pub fn run(&mut self, db: &Database) -> Option<Input> {
+    pub fn run(&mut self, db: &Database) -> Option<Module> {
         let mut running_fuzzers = self
             .fuzzers
             .values_mut()
@@ -63,13 +63,13 @@ impl FuzzerManager {
 
         match &fuzzer.status {
             Status::StillFuzzing { .. } => None,
-            Status::PanickedForArguments { .. } => Some(fuzzer.closure_id.input.clone()),
+            Status::PanickedForArguments { .. } => Some(fuzzer.closure_id.module.clone()),
             Status::TemporarilyUninitialized => unreachable!(),
         }
     }
 
-    pub fn get_hints(&self, db: &Database, input: &Input) -> Vec<Vec<Hint>> {
-        let relevant_fuzzers = self.fuzzable_closures[input]
+    pub fn get_hints(&self, db: &Database, module: &Module) -> Vec<Vec<Hint>> {
+        let relevant_fuzzers = self.fuzzable_closures[module]
             .iter()
             .map(|(_, closure)| &self.fuzzers[closure])
             .collect_vec();

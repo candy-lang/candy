@@ -7,7 +7,7 @@ use super::{
 use crate::{
     compiler::{hir::Id, lir::Instruction},
     database::Database,
-    input::Input,
+    module::Module,
 };
 use itertools::Itertools;
 use log;
@@ -21,7 +21,7 @@ pub struct Vm {
     pub heap: Heap,
     pub data_stack: Vec<ObjectPointer>,
     pub call_stack: Vec<InstructionPointer>,
-    pub import_stack: Vec<Input>,
+    pub import_stack: Vec<Module>,
     pub tracer: Tracer,
     pub fuzzable_closures: Vec<(Id, Closure)>,
     pub num_instructions_executed: usize,
@@ -361,20 +361,20 @@ impl Vm {
                 });
             }
             Instruction::TraceNeedsEnds => self.tracer.push(TraceEntry::NeedsEnded),
-            Instruction::TraceModuleStarts { input } => {
-                if self.import_stack.contains(&input) {
+            Instruction::TraceModuleStarts { module } => {
+                if self.import_stack.contains(&module) {
                     self.panic(format!(
                         "there's an import cycle ({})",
                         self.import_stack
                             .iter()
-                            .skip_while(|it| **it != input)
-                            .chain([&input])
-                            .map(|input| format!("{input}"))
+                            .skip_while(|it| **it != module)
+                            .chain([&module])
+                            .map(|module| format!("{module}"))
                             .join(" → "),
                     ));
                 }
-                self.import_stack.push(input.clone());
-                self.tracer.push(TraceEntry::ModuleStarted { input });
+                self.import_stack.push(module.clone());
+                self.tracer.push(TraceEntry::ModuleStarted { module });
             }
             Instruction::TraceModuleEnds => {
                 self.import_stack.pop().unwrap();

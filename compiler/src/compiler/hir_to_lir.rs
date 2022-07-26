@@ -5,17 +5,17 @@ use super::{
     hir::{self, Body, Expression},
     lir::{Instruction, Lir, StackOffset},
 };
-use crate::{builtin_functions::BuiltinFunction, input::Input};
+use crate::{builtin_functions::BuiltinFunction, module::Module};
 use itertools::Itertools;
 use std::sync::Arc;
 
 #[salsa::query_group(HirToLirStorage)]
 pub trait HirToLir: CstDb + AstToHir {
-    fn lir(&self, input: Input) -> Option<Arc<Lir>>;
+    fn lir(&self, module: Module) -> Option<Arc<Lir>>;
 }
 
-fn lir(db: &dyn HirToLir, input: Input) -> Option<Arc<Lir>> {
-    let (hir, _) = db.hir(input.clone())?;
+fn lir(db: &dyn HirToLir, module: Module) -> Option<Arc<Lir>> {
+    let (hir, _) = db.hir(module.clone())?;
     let instructions = compile_lambda(&[], &[], &hir);
     Some(Arc::new(Lir { instructions }))
 }

@@ -4,8 +4,8 @@ use crate::{
         cst::{Cst, CstKind},
         rcst_to_cst::RcstToCst,
     },
-    input::Input,
     language_server::utils::TupleToPosition,
+    module::Module,
 };
 use im::HashMap;
 use lazy_static::lazy_static;
@@ -16,12 +16,12 @@ use strum_macros::EnumIter;
 
 #[salsa::query_group(SemanticTokenDbStorage)]
 pub trait SemanticTokenDb: LspPositionConversion + RcstToCst {
-    fn semantic_tokens(&self, input: Input) -> Vec<SemanticToken>;
+    fn semantic_tokens(&self, module: Module) -> Vec<SemanticToken>;
 }
 
-fn semantic_tokens(db: &dyn SemanticTokenDb, input: Input) -> Vec<SemanticToken> {
-    let mut context = Context::new(db, input.clone());
-    let cst = db.cst(input).unwrap();
+fn semantic_tokens(db: &dyn SemanticTokenDb, module: Module) -> Vec<SemanticToken> {
+    let mut context = Context::new(db, module.clone());
+    let cst = db.cst(module).unwrap();
     context.visit_csts(&cst, None);
     context.tokens
 }
@@ -71,15 +71,15 @@ impl SemanticTokenType {
 
 struct Context<'a> {
     db: &'a dyn SemanticTokenDb,
-    input: Input,
+    module: Module,
     tokens: Vec<SemanticToken>,
     cursor: Position,
 }
 impl<'a> Context<'a> {
-    fn new(db: &'a dyn SemanticTokenDb, input: Input) -> Context {
+    fn new(db: &'a dyn SemanticTokenDb, module: Module) -> Context {
         Context {
             db,
-            input,
+            module,
             tokens: vec![],
             cursor: Position::new(0, 0),
         }
@@ -89,15 +89,15 @@ impl<'a> Context<'a> {
 
         let mut start = self
             .db
-            .offset_to_lsp(self.input.clone(), range.start)
+            .offset_to_lsp(self.module.clone(), range.start)
             .to_position();
         let end = self
             .db
-            .offset_to_lsp(self.input.clone(), range.end)
+            .offset_to_lsp(self.module.clone(), range.end)
             .to_position();
 
         if start.line != end.line {
-            let line_start_offsets = self.db.line_start_utf8_byte_offsets(self.input.clone());
+            let line_start_offsets = self.db.line_start_utf8_byte_offsets(self.module.clone());
             while start.line != end.line {
                 assert!(start.line < end.line);
 

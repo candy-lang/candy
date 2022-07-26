@@ -1,5 +1,5 @@
 use super::{rcst::RcstError, rcst_to_cst::RcstToCst};
-use crate::input::Input;
+use crate::module::Module;
 use std::{
     fmt::{self, Display, Formatter},
     ops::Range,
@@ -7,15 +7,15 @@ use std::{
 
 #[salsa::query_group(CstDbStorage)]
 pub trait CstDb: RcstToCst {
-    fn find_cst(&self, input: Input, id: Id) -> Cst;
-    fn find_cst_by_offset(&self, input: Input, offset: usize) -> Cst;
+    fn find_cst(&self, module: Module, id: Id) -> Cst;
+    fn find_cst_by_offset(&self, module: Module, offset: usize) -> Cst;
 }
 
-fn find_cst(db: &dyn CstDb, input: Input, id: Id) -> Cst {
-    db.cst(input).unwrap().find(&id).unwrap().to_owned()
+fn find_cst(db: &dyn CstDb, module: Module, id: Id) -> Cst {
+    db.cst(module).unwrap().find(&id).unwrap().to_owned()
 }
-fn find_cst_by_offset(db: &dyn CstDb, input: Input, offset: usize) -> Cst {
-    db.cst(input)
+fn find_cst_by_offset(db: &dyn CstDb, module: Module, offset: usize) -> Cst {
+    db.cst(module)
         .unwrap()
         .find_by_offset(&offset)
         .unwrap()

@@ -6,7 +6,7 @@ use crate::{
         hir::{self, Body, Expression, HirDb, Lambda},
     },
     database::Database,
-    input::Input,
+    module::Module,
 };
 use im::HashSet;
 use lsp_types::{
@@ -38,21 +38,21 @@ fn find(
     params: TextDocumentPositionParams,
     include_declaration: bool,
 ) -> Option<Vec<DocumentHighlight>> {
-    let input: Input = params.text_document.uri.clone().into();
+    let module: Module = params.text_document.uri.clone().into();
     let position = params.position;
-    let offset = db.offset_from_lsp(input.clone(), position.line, position.character);
-    let query = query_for_offset(db, input, offset)?;
+    let offset = db.offset_from_lsp(module.clone(), position.line, position.character);
+    let query = query_for_offset(db, module, offset)?;
     Some(db.references(query, include_declaration))
 }
 
-fn query_for_offset(db: &Database, input: Input, offset: usize) -> Option<ReferenceQuery> {
-    let origin_cst = db.find_cst_by_offset(input.clone(), offset);
+fn query_for_offset(db: &Database, module: Module, offset: usize) -> Option<ReferenceQuery> {
+    let origin_cst = db.find_cst_by_offset(module.clone(), offset);
     match origin_cst.kind {
         CstKind::Identifier(identifier) if identifier == "needs" => {
-            Some(ReferenceQuery::Needs(input))
+            Some(ReferenceQuery::Needs(module))
         }
         CstKind::Identifier { .. } => {
-            let hir_id = db.cst_to_hir_id(input, origin_cst.id)?;
+            let hir_id = db.cst_to_hir_id(module, origin_cst.id)?;
             let target_id = if let Some(hir_expr) = db.find_expression(hir_id.clone()) {
                 let containing_body = db.containing_body_of(hir_id.clone());
                 if containing_body.identifiers.contains_key(&hir_id) {
@@ -75,7 +75,7 @@ fn query_for_offset(db: &Database, input: Input, offset: usize) -> Option<Refere
             };
             Some(ReferenceQuery::Id(target_id))
         }
-        CstKind::Symbol(symbol) => Some(ReferenceQuery::Symbol(input, symbol)),
+        CstKind::Symbol(symbol) => Some(ReferenceQuery::Symbol(module, symbol)),
         _ => None,
     }
 }
@@ -95,12 +95,12 @@ fn references(
     include_declaration: bool,
 ) -> Vec<DocumentHighlight> {
     // TODO: search all files
-    let input = match &query {
-        ReferenceQuery::Id(id) => id.input.clone(),
-        ReferenceQuery::Symbol(input, _) => input.to_owned(),
-        ReferenceQuery::Needs(input) => input.to_owned(),
+    let module = match &query {
+        ReferenceQuery::Id(id) => id.module.clone(),
+        ReferenceQuery::Symbol(module, _) => module.to_owned(),
+        ReferenceQuery::Needs(module) => module.to_owned(),
     };
-    let (hir, _) = db.hir(input).unwrap();
+    let (hir, _) = db.hir(module).unwrap();
 
     let mut context = Context::new(db, query, include_declaration);
     context.visit_body(hir.as_ref());
@@ -117,8 +117,8 @@ struct Context<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ReferenceQuery {
     Id(hir::Id),
-    Symbol(Input, String),
-    Needs(Input),
+    Symbol(Module, String),
+    Needs(Module),
 }
 impl<'a> Context<'a> {
     fn new(db: &'a dyn ReferencesDb, query: ReferenceQuery, include_declaration: bool) -> Self {
@@ -225,9 +225,9 @@ impl<'a> Context<'a> {
                 range: lsp_types::Range {
                     start: self
                         .db
-                        .offset_to_lsp(id.input.clone(), span.start)
+                        .offset_to_lsp(id.module.clone(), span.start)
                         .to_position(),
-                    end: self.db.offset_to_lsp(id.input, span.end).to_position(),
+                    end: self.db.offset_to_lsp(id.module, span.end).to_position(),
                 },
                 kind: Some(kind),
             });

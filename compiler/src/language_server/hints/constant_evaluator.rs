@@ -7,8 +7,8 @@ use crate::{
         hir::Id,
     },
     database::Database,
-    input::Input,
     language_server::hints::{utils::id_to_end_of_line, HintKind},
+    module::Module,
     vm::{tracer::TraceEntry, use_provider::DbUseProvider, value::Closure, Status, Vm},
     CloneWithExtension,
 };
@@ -18,24 +18,24 @@ use std::{collections::HashMap, fs};
 
 #[derive(Default)]
 pub struct ConstantEvaluator {
-    vms: HashMap<Input, Vm>,
+    vms: HashMap<Module, Vm>,
 }
 
 impl ConstantEvaluator {
-    pub fn update_input(&mut self, db: &Database, input: Input) {
-        let module_closure = Closure::of_input(&db, input.clone()).unwrap();
+    pub fn update_module(&mut self, db: &Database, module: Module) {
+        let module_closure = Closure::of_module(&db, module.clone()).unwrap();
         let mut vm = Vm::new();
         let use_provider = DbUseProvider { db: &db };
         vm.set_up_module_closure_execution(&use_provider, module_closure);
 
-        self.vms.insert(input.clone(), vm);
+        self.vms.insert(module.clone(), vm);
     }
 
-    pub fn remove_input(&mut self, input: Input) {
-        self.vms.remove(&input).unwrap();
+    pub fn remove_module(&mut self, module: Module) {
+        self.vms.remove(&module).unwrap();
     }
 
-    pub fn run(&mut self, db: &Database) -> Option<Input> {
+    pub fn run(&mut self, db: &Database) -> Option<Module> {
         let num_vms = self.vms.len();
         let mut running_vms = self
             .vms
@@ -49,39 +49,39 @@ impl ConstantEvaluator {
         );
 
         running_vms.shuffle(&mut thread_rng());
-        if let Some((input, vm)) = running_vms.pop() {
+        if let Some((module, vm)) = running_vms.pop() {
             let use_provider = DbUseProvider { db };
             vm.run(&use_provider, 500);
-            Some(input.clone())
+            Some(module.clone())
         } else {
             None
         }
     }
 
-    pub fn get_fuzzable_closures(&self, input: &Input) -> Vec<(Id, Closure)> {
-        self.vms[input]
+    pub fn get_fuzzable_closures(&self, module: &Module) -> Vec<(Id, Closure)> {
+        self.vms[module]
             .fuzzable_closures
             .iter()
-            .filter(|(id, _)| &id.input == input)
+            .filter(|(id, _)| &id.module == module)
             .map(|it| it.clone())
             .collect_vec()
     }
 
-    pub fn get_hints(&self, db: &Database, input: &Input) -> Vec<Hint> {
-        let vm = &self.vms[input];
+    pub fn get_hints(&self, db: &Database, module: &Module) -> Vec<Hint> {
+        let vm = &self.vms[module];
 
-        log::debug!("Calculating hints for {input}");
+        log::debug!("Calculating hints for {module}");
         let mut hints = vec![];
 
         if let Status::Panicked { reason } = vm.status() {
-            match panic_hint(&db, input.clone(), &vm, reason) {
+            match panic_hint(&db, module.clone(), &vm, reason) {
                 Some(hint) => {
                     hints.push(hint);
                 }
                 None => log::error!("Module panicked, but we are not displaying an error."),
             }
         };
-        if let Some(path) = input.to_path() {
+        if let Some(path) = module.to_path() {
             let trace = vm.tracer.dump_call_tree();
             let trace_file = path.clone_with_extension("candy.trace");
             fs::write(trace_file.clone(), trace).unwrap();
@@ -90,14 +90,14 @@ impl ConstantEvaluator {
         for entry in vm.tracer.log() {
             let (id, name, value) = match entry {
                 TraceEntry::ValueEvaluated { id, value } => {
-                    if &id.input != input {
+                    if &id.module != module {
                         continue;
                     }
                     let ast_id = match db.hir_to_ast_id(id.clone()) {
                         Some(ast_id) => ast_id,
                         None => continue,
                     };
-                    let ast = match db.ast(input.clone()) {
+                    let ast = match db.ast(module.clone()) {
                         Some((ast, _)) => (*ast).clone(),
                         None => continue,
                     };
@@ -124,7 +124,7 @@ impl ConstantEvaluator {
     }
 }
 
-fn panic_hint(db: &Database, input: Input, vm: &Vm, reason: String) -> Option<Hint> {
+fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<Hint> {
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.
@@ -140,7 +140,7 @@ fn panic_hint(db: &Database, input: Input, vm: &Vm, reason: String) -> Option<Hi
             };
             // Make sure the entry comes from the same file and is not generated
             // code.
-            id.input == input && db.hir_to_cst_id(id.clone()).is_some()
+            id.module == module && db.hir_to_cst_id(id.clone()).is_some()
         })
         .next()?;
 
