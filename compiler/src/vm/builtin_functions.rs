@@ -130,7 +130,7 @@ impl Vm {
 
     fn get_argument_count(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Closure(Closure { num_args, .. })], {
-            Ok(BigInt::from(*num_args).into())
+            Ok((*num_args).into())
         })
     }
 
@@ -231,7 +231,7 @@ impl Vm {
     }
     fn int_parse(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Text(text)], {
-            Ok(BigInt::from_str(text).ok().into())
+            Ok(BigInt::from_str(text).map_err(|it| format!("{it}")).into())
         })
     }
     fn int_shift_left(&mut self, args: Vec<Value>) -> Result<Value, String> {
@@ -419,9 +419,7 @@ impl Vm {
                 // `current_path_struct` is set by us and not users, hence we don't have to validate it that strictly.
                 let mut current_path = vec![];
                 let mut index = 0;
-                while let Some(component) =
-                    current_path_struct.get(&Value::Int(BigInt::from(index)))
-                {
+                while let Some(component) = current_path_struct.get(&index.into()) {
                     current_path.push(component.clone().try_into_text().unwrap());
                     index += 1;
                 }

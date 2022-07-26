@@ -101,6 +101,11 @@ impl Display for Value {
     }
 }
 
+impl From<usize> for Value {
+    fn from(value: usize) -> Self {
+        BigInt::from(value).into()
+    }
+}
 impl From<BigInt> for Value {
     fn from(value: BigInt) -> Self {
         Value::Int(value)
@@ -116,19 +121,19 @@ impl From<bool> for Value {
         Value::Symbol(if it { "True" } else { "False" }.to_string())
     }
 }
-impl<F> From<Option<F>> for Value
+impl<T, E> From<Result<T, E>> for Value
 where
-    F: Into<Value>,
+    T: Into<Value>,
+    E: Into<Value>,
 {
-    fn from(it: Option<F>) -> Self {
-        match it {
-            Some(it) => Value::Struct(hashmap! {
-                Value::Symbol("Type".to_string()) => Value::Symbol("Some".to_string()),
-                Value::Symbol("Value".to_string()) => it.into(),
-            }),
-            None => Value::Struct(hashmap! {
-                Value::Symbol("Type".to_string()) => Value::Symbol("None".to_string()),
-            }),
-        }
+    fn from(it: Result<T, E>) -> Self {
+        let (type_, value) = match it {
+            Ok(it) => ("Ok".to_string(), it.into()),
+            Err(it) => ("Error".to_string(), it.into()),
+        };
+        Value::Struct(hashmap! {
+            Value::Symbol("Type".to_string()) => Value::Symbol(type_.to_string()),
+            Value::Symbol("Value".to_string()) => value,
+        })
     }
 }
