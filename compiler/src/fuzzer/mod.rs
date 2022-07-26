@@ -56,9 +56,7 @@ pub async fn fuzz(db: &Database, input: Input) {
 
     for (id, closure) in fuzzable_closures {
         let mut fuzzer = Fuzzer::new(db, closure.clone(), id.clone());
-        for _ in 0..20 {
-            fuzzer.run(db, 100);
-        }
+        fuzzer.run(db, 1000);
         match fuzzer.status() {
             Status::StillFuzzing { .. } => {}
             Status::PanickedForArguments {

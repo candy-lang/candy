@@ -59,29 +59,49 @@ impl Fuzzer {
         self.status.as_ref().unwrap()
     }
 
-    pub fn run(&mut self, db: &Database, num_instructions: usize) {
-        let status = mem::replace(&mut self.status, None).unwrap();
-        self.status = Some(self.map_status(db, status, num_instructions));
+    pub fn run(&mut self, db: &Database, mut num_instructions: usize) {
+        let mut status = mem::replace(&mut self.status, None).unwrap();
+        while matches!(status, Status::StillFuzzing { .. }) {
+            let (new_status, num_instructions_executed) =
+                self.map_status(db, status, num_instructions);
+            status = new_status;
+
+            if num_instructions_executed > num_instructions {
+                break;
+            } else {
+                num_instructions -= num_instructions_executed;
+            }
+        }
+        self.status = Some(status);
     }
-    fn map_status(&self, db: &Database, status: Status, num_instructions: usize) -> Status {
+    fn map_status(
+        &self,
+        db: &Database,
+        status: Status,
+        num_instructions: usize,
+    ) -> (Status, usize) {
         match status {
             Status::StillFuzzing { mut vm, arguments } => match &vm.status {
                 vm::Status::Running => {
                     let use_provider = DbUseProvider { db };
+                    let num_instructions_executed_before = vm.num_instructions_executed;
                     vm.run(&use_provider, num_instructions);
-                    Status::StillFuzzing { vm, arguments }
+                    let num_instruction_executed =
+                        vm.num_instructions_executed - num_instructions_executed_before;
+                    (
+                        Status::StillFuzzing { vm, arguments },
+                        num_instruction_executed,
+                    )
                 }
-                vm::Status::Done => {
-                    // The VM finished running without panicking.
-                    Status::new_fuzzing_attempt(db, self.closure.clone())
-                }
+                // The VM finished running without panicking.
+                vm::Status::Done => (Status::new_fuzzing_attempt(db, self.closure.clone()), 0),
                 vm::Status::Panicked(message) => {
                     // If a `needs` directly inside the tested closure was not
                     // satisfied, then the panic is not closure's fault, but our
                     // fault.
                     let is_our_fault =
                         did_need_in_closure_cause_panic(db, &self.closure_id, &vm.tracer);
-                    if is_our_fault {
+                    let status = if is_our_fault {
                         Status::new_fuzzing_attempt(db, self.closure.clone())
                     } else {
                         Status::PanickedForArguments {
@@ -89,7 +109,8 @@ impl Fuzzer {
                             message: message.clone(),
                             tracer: vm.tracer.clone(),
                         }
-                    }
+                    };
+                    (status, 0)
                 }
             },
             // We already found some arguments that caused the closure to panic,
@@ -98,11 +119,14 @@ impl Fuzzer {
                 arguments,
                 message,
                 tracer,
-            } => Status::PanickedForArguments {
-                arguments,
-                message,
-                tracer,
-            },
+            } => (
+                Status::PanickedForArguments {
+                    arguments,
+                    message,
+                    tracer,
+                },
+                0,
+            ),
         }
     }
 }
