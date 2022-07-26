@@ -112,6 +112,15 @@ bitwiseXor valueA valueB :=
   needs (is valueB)
   ✨.intBitwiseXor valueA valueB
 
+isEven value :=
+  needs (is value)
+  equals (bitwiseAnd value 1) 0
+isOdd value :=
+  needs (is value)
+  isOdd = equals (bitwiseAnd value 1) 1
+  check (equals (isEven value) (bool.not isOdd))
+  isOdd
+
 min valueA valueB :=
   needs (is valueA)
   needs (is valueB)
