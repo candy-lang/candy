@@ -1,7 +1,7 @@
 use super::Hint;
 use crate::{
     compiler::{
-        ast::{Assignment, AstKind, FindAst},
+        ast::{AstKind, FindAst},
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
         hir::Id,
