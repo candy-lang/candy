@@ -82,33 +82,3 @@ trimEnd text :=
 trim text :=
   needs (is text)
   trimEnd (trimStart text)
-
-padLeft text targetWidth padding :=
-  needs (is text)
-  needs (int.is targetWidth)
-  needs (is padding)
-  needs (equals (length padding) 1)
-  # TODO
-padRight text targetWidth padding :=
-  needs (is text)
-  needs (int.is targetWidth)
-  needs (is padding)
-  needs (equals (length padding) 1)
-  # TODO
-
-repeat text count :=
-  needs (is text)
-  needs (int.is count)
-  needs (int.isNonNegative count)
-  # TODO
-
-# split text pattern :=
-#   needs (is text)
-#   needs (is pattern)
-#   needs (bool.not (isEmpty pattern))
-#   ✨.textSplit text pattern
-# splitFirst text pattern limit :=
-#   needs (is text)
-#   needs (is pattern)
-#   needs (bool.not (isEmpty pattern))
-#   ✨.textSplit text pattern
