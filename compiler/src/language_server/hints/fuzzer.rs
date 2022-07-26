@@ -50,21 +50,19 @@ impl FuzzerManager {
         let mut running_fuzzers = self
             .fuzzers
             .values_mut()
-            .filter(|fuzzer| matches!(fuzzer.status, Status::StillFuzzing { .. }))
+            .filter(|fuzzer| matches!(fuzzer.status(), Status::StillFuzzing { .. }))
             .collect_vec();
         log::trace!(
             "Fuzzer running. {} fuzzers for relevant closures are running.",
             running_fuzzers.len(),
         );
 
-        running_fuzzers.shuffle(&mut thread_rng());
-        let fuzzer = running_fuzzers.pop()?;
+        let fuzzer = running_fuzzers.choose_mut(&mut thread_rng())?;
         fuzzer.run(db, 100);
 
-        match &fuzzer.status {
+        match &fuzzer.status() {
             Status::StillFuzzing { .. } => None,
             Status::PanickedForArguments { .. } => Some(fuzzer.closure_id.input.clone()),
-            Status::TemporarilyUninitialized => unreachable!(),
         }
     }
 
@@ -80,7 +78,7 @@ impl FuzzerManager {
                 arguments,
                 reason,
                 tracer,
-            } = &fuzzer.status
+            } = fuzzer.status()
             {
                 let id = fuzzer.closure_id.clone();
                 let first_hint = {
@@ -90,8 +88,7 @@ impl FuzzerManager {
                             .map(|parameter| parameter.keys.last().unwrap().to_string())
                             .collect_vec(),
                         Some(_) => {
-                            log::warn!("Looks like we fuzzed a non-closure. That's weird.");
-                            continue;
+                            panic!("Looks like we fuzzed a non-closure. That's weird.")
                         }
                         None => {
                             log::warn!("Using fuzzing, we found an error in a generated closure.");
@@ -118,14 +115,15 @@ impl FuzzerManager {
                         .log()
                         .iter()
                         .rev()
+                        // Find the innermost panicking call that is in the
+                        // function.
                         .filter(|entry| {
-                            let inner_call_id = match entry {
+                            let innermost_panicking_call_id = match entry {
                                 TraceEntry::CallStarted { id, .. } => id,
                                 TraceEntry::NeedsStarted { id, .. } => id,
                                 _ => return false,
                             };
-                            // Make sure the entry comes from the same file and is not generated code.
-                            id.is_same_module_and_any_parent_of(inner_call_id)
+                            id.is_same_module_and_any_parent_of(innermost_panicking_call_id)
                                 && db.hir_to_cst_id(id.clone()).is_some()
                         })
                         .next()

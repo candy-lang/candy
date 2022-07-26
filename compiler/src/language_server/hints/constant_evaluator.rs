@@ -1,7 +1,7 @@
 use super::Hint;
 use crate::{
     compiler::{
-        ast::{Assignment, AstKind, FindAst},
+        ast::{AstKind, FindAst},
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
         hir::Id,
@@ -48,8 +48,7 @@ impl ConstantEvaluator {
             num_vms,
         );
 
-        running_vms.shuffle(&mut thread_rng());
-        if let Some((input, vm)) = running_vms.pop() {
+        if let Some((input, vm)) = running_vms.choose_mut(&mut thread_rng()) {
             let use_provider = DbUseProvider { db };
             vm.run(&use_provider, 500);
             Some(input.clone())
@@ -74,12 +73,9 @@ impl ConstantEvaluator {
         let mut hints = vec![];
 
         if let Status::Panicked { reason } = vm.status() {
-            match panic_hint(&db, input.clone(), &vm, reason) {
-                Some(hint) => {
-                    hints.push(hint);
-                }
-                None => log::error!("Module panicked, but we are not displaying an error."),
-            }
+            let hint = panic_hint(&db, input.clone(), &vm, reason)
+                .expect("Module panicked, but we couldn't build a panic hint to communicate that.");
+            hints.push(hint);
         };
         if let Some(path) = input.to_path() {
             let trace = vm.tracer.dump_call_tree();
@@ -88,7 +84,7 @@ impl ConstantEvaluator {
         }
 
         for entry in vm.tracer.log() {
-            let (id, name, value) = match entry {
+            let (id, value) = match entry {
                 TraceEntry::ValueEvaluated { id, value } => {
                     if &id.input != input {
                         continue;
@@ -101,21 +97,21 @@ impl ConstantEvaluator {
                         Some((ast, _)) => (*ast).clone(),
                         None => continue,
                     };
-                    let name = match ast.find(&ast_id) {
+                    let ast = match ast.find(&ast_id) {
+                        Some(ast) => ast,
                         None => continue,
-                        Some(ast) => match &ast.kind {
-                            AstKind::Assignment(Assignment { name, .. }) => name.value.clone(),
-                            _ => continue,
-                        },
                     };
-                    (id.clone(), name, value.clone())
+                    if !matches!(ast.kind, AstKind::Assignment(_)) {
+                        continue;
+                    }
+                    (id.clone(), value.clone())
                 }
                 _ => continue,
             };
 
             hints.push(Hint {
                 kind: HintKind::Value,
-                text: format!("{name} = {value}"),
+                text: format!("{value}"),
                 position: id_to_end_of_line(&db, id).unwrap(),
             });
         }

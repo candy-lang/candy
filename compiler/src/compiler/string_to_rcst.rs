@@ -1043,6 +1043,7 @@ mod parse {
         );
         // foo T
         //
+        //
         // bar = 5
         assert_eq!(
             call("foo T\n\n\nbar = 5", 0),

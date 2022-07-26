@@ -95,7 +95,7 @@ Major milestones:
   * [ ] moniker
 * [x] incremental compilation
 * [ ] lists
-* [x] maps
+* [x] structs
 * [ ] sets
 * [ ] text interpolation
 * [x] constant evaluation
@@ -105,7 +105,7 @@ Major milestones:
 * [ ] random
 * [ ] standard library
 * [ ] pipe operator
-* [ ] auto-fuzzing
+* [x] auto-fuzzing
 * [ ] "type" proofs
 * [ ] testing
 * [ ] fuzzing of the compiler itself
@@ -118,17 +118,17 @@ Major milestones:
 - make `PROJECT_DIRECTORY` non-global
 - use BigInts
 - minimize inputs found through fuzzing
+- make condition whether to keep running more granular
+- fuzz parser
 - add caching to hints server
-- do we need the `CallReceiver`?
 - implement fibers and nurseries
 - implement channels
 - remove builtinPrint
 - support recursion
-- optimize tail recursion
-- fuzz parser
+- tail call optimization
 - new name?
 - mini-heaps?
-- parse calls with call as a receiver: `(foo Bar) Baz`
+- parse calls with call as a receiver: `(foo Bar) Baz`. or do we even need the `CallReceiver`?
 
 ## How to use Candy
 
