@@ -20,6 +20,7 @@ pub enum BuiltinFunction {
     StructGet,           // struct key -> value
     StructGetKeys,       // struct -> listOfKeys
     StructHasKey,        // struct key -> bool
+    TextConcatenate,     // (valueA: text) (valueB: text) -> (concatenated: text)
     TypeOf,              // any -> typeSymbol
     UseAsset,            // currentPath target -> targetAsString
     UseLocalModule,      // currentPath target -> targetAsStruct

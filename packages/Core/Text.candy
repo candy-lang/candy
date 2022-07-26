@@ -1,3 +1,8 @@
 type = use "..Type"
 
 is value := type.is value Text
+
+concatenate valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ✨.textConcatenate valueA valueB

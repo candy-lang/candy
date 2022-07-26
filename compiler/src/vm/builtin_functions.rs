@@ -54,6 +54,7 @@ impl Vm {
             BuiltinFunction::StructGet => self.struct_get(args),
             BuiltinFunction::StructGetKeys => self.struct_get_keys(args),
             BuiltinFunction::StructHasKey => self.struct_has_key(args),
+            BuiltinFunction::TextConcatenate => self.text_concatenate(args),
             BuiltinFunction::TypeOf => self.type_of(args),
             BuiltinFunction::UseAsset => self.use_asset(use_provider, args),
             BuiltinFunction::UseLocalModule => {
@@ -243,6 +244,12 @@ impl Vm {
     fn struct_has_key(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Struct(struct_), key], {
             Ok((struct_.contains_key(key)).into())
+        })
+    }
+
+    fn text_concatenate(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Text(value_a), Value::Text(value_b)], {
+            Ok(format!("{value_a}{value_b}").into())
         })
     }
 
