@@ -120,13 +120,15 @@ impl FuzzerManager {
                         .log()
                         .iter()
                         .rev()
+                        // Find the innermost panicking call that is in the
+                        // function.
                         .filter(|entry| {
-                            let innermost_needs_id = match entry {
+                            let innermost_panicking_call_id = match entry {
+                                TraceEntry::CallStarted { id, .. } => id,
                                 TraceEntry::NeedsStarted { id, .. } => id,
                                 _ => return false,
                             };
-                            // Make sure the entry comes from the same file and is not generated code.
-                            id.is_same_module_and_any_parent_of(innermost_needs_id)
+                            id.is_same_module_and_any_parent_of(innermost_panicking_call_id)
                                 && db.hir_to_cst_id(id.clone()).is_some()
                         })
                         .next()
