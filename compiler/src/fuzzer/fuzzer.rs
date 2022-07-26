@@ -15,7 +15,7 @@ use std::mem;
 pub struct Fuzzer {
     pub closure: Closure,
     pub closure_id: hir::Id,
-    pub status: Status,
+    status: Option<Status>, // only `None` during transitions
 }
 pub enum Status {
     // TODO: Have some sort of timeout or track how long we've been running. If
@@ -33,17 +33,6 @@ pub enum Status {
         message: Value,
         tracer: Tracer,
     },
-    // TODO: Find a better way of handling this. The fuzzer's status is a state
-    // machine and during transitioning to a new state (aka running the fuzzer),
-    // we'd like to consume the old status and then produce a new status.
-    // Rust's ownership rules don't let us take ownership of the status (leaving
-    // it uninitialized), even if it's "just temporarily" while we're
-    // transitioning. The reason is that our state machine code could panic and
-    // in that case, some status needs to be there to be freed.
-    // In the future, we could use `unsafe` to set the status to `uninit()`. But
-    // currently, I'm not 100% that our VM won't panic, so we instead set it to
-    // this temporary value.
-    TemporarilyUninitialized,
 }
 
 impl Status {
@@ -62,12 +51,20 @@ impl Fuzzer {
         Self {
             closure: closure.clone(),
             closure_id,
-            status: Status::new_fuzzing_attempt(db, closure),
+            status: Some(Status::new_fuzzing_attempt(db, closure)),
         }
     }
 
+    pub fn status(&self) -> &Status {
+        self.status.as_ref().unwrap()
+    }
+
     pub fn run(&mut self, db: &Database, num_instructions: usize) {
-        self.status = match mem::replace(&mut self.status, Status::TemporarilyUninitialized) {
+        let status = mem::replace(&mut self.status, None).unwrap();
+        self.status = Some(self.map_status(db, status, num_instructions));
+    }
+    fn map_status(&self, db: &Database, status: Status, num_instructions: usize) -> Status {
+        match status {
             Status::StillFuzzing { mut vm, arguments } => match &vm.status {
                 vm::Status::Running => {
                     let use_provider = DbUseProvider { db };
@@ -106,7 +103,6 @@ impl Fuzzer {
                 message,
                 tracer,
             },
-            Status::TemporarilyUninitialized => unreachable!(),
         }
     }
 }

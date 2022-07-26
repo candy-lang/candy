@@ -95,7 +95,7 @@ Major milestones:
   * [ ] moniker
 * [x] incremental compilation
 * [ ] lists
-* [x] maps
+* [x] structs
 * [ ] sets
 * [ ] text interpolation
 * [x] constant evaluation

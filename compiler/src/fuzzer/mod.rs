@@ -59,7 +59,7 @@ pub async fn fuzz(db: &Database, input: Input) {
         for _ in 0..20 {
             fuzzer.run(db, 100);
         }
-        match fuzzer.status {
+        match fuzzer.status() {
             Status::StillFuzzing { .. } => {}
             Status::PanickedForArguments {
                 arguments,
@@ -71,7 +71,7 @@ pub async fn fuzz(db: &Database, input: Input) {
                     "Calling `{id} {}` doesn't work because {}.",
                     arguments.iter().map(|it| format!("{}", it)).join(" "),
                     match message {
-                        Value::Text(message) => message,
+                        Value::Text(message) => message.to_string(),
                         other => format!("{}", other),
                     },
                 );
@@ -87,7 +87,6 @@ pub async fn fuzz(db: &Database, input: Input) {
                     trace_file.as_path().display()
                 );
             }
-            Status::TemporarilyUninitialized => unreachable!(),
         }
     }
 }
