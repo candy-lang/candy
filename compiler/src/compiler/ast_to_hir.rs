@@ -175,7 +175,7 @@ impl<'a> Context<'a> {
                         return self.push_error(
                             Some(identifier.id.clone()),
                             ast.id.input.clone(),
-                            self.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                            self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                             HirError::UnknownReference {
                                 identifier: identifier.value.clone(),
                             },
@@ -234,7 +234,7 @@ impl<'a> Context<'a> {
                             self.push_error(
                                 None,
                                 ast.id.input.clone(),
-                                self.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                                self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                                 HirError::PublicAssignmentWithSameName {
                                     name: name_string.clone(),
                                 },
@@ -245,7 +245,7 @@ impl<'a> Context<'a> {
                         self.push_error(
                             None,
                             ast.id.input.clone(),
-                            self.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                            self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                             HirError::PublicAssignmentInNotTopLevel,
                         );
                     }
@@ -360,7 +360,7 @@ impl<'a> Context<'a> {
                             child: None,
                             errors: vec![CompilerError {
                                 input: name.id.input.clone(),
-                                span: self.db.ast_id_to_span(name.id.clone()).unwrap(),
+                                span: self.db.ast_id_to_display_span(name.id.clone()).unwrap(),
                                 payload: CompilerErrorPayload::Hir(
                                     HirError::NeedsWithWrongNumberOfArguments {
                                         num_args: call.arguments.len(),
@@ -380,7 +380,7 @@ impl<'a> Context<'a> {
                         return self.push_error(
                             Some(name.id.clone()),
                             name.id.input.clone(),
-                            self.db.ast_id_to_span(name.id.clone()).unwrap(),
+                            self.db.ast_id_to_display_span(name.id.clone()).unwrap(),
                             HirError::UnknownFunction {
                                 name: name.value.clone(),
                             },

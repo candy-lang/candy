@@ -24,6 +24,7 @@ use std::{ops::Range, sync::Arc};
 pub trait CstToAst: CstDb + RcstToCst {
     fn ast_to_cst_id(&self, id: ast::Id) -> Option<cst::Id>;
     fn ast_id_to_span(&self, id: ast::Id) -> Option<Range<usize>>;
+    fn ast_id_to_display_span(&self, id: ast::Id) -> Option<Range<usize>>;
 
     fn cst_to_ast_id(&self, input: Input, id: cst::Id) -> Option<ast::Id>;
 
@@ -37,6 +38,10 @@ fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
 fn ast_id_to_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<usize>> {
     let cst_id = db.ast_to_cst_id(id.clone())?;
     Some(db.find_cst(id.input, cst_id).span)
+}
+fn ast_id_to_display_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<usize>> {
+    let cst_id = db.ast_to_cst_id(id.clone())?;
+    Some(db.find_cst(id.input, cst_id).display_span())
 }
 
 fn cst_to_ast_id(db: &dyn CstToAst, input: Input, id: cst::Id) -> Option<ast::Id> {
