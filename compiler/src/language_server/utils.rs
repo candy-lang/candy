@@ -44,7 +44,7 @@ impl HirError {
             HirError::PublicAssignmentInNotTopLevel => {
                 "Public assignments (:=) can only be used in top-level code.".to_string()
             }
-            HirError::PublicAssignmentWithSameName {name} => format!("A public assignment with the same name already exists."),
+            HirError::PublicAssignmentWithSameName { .. } => format!("A public assignment with the same name already exists."),
             HirError::NeedsWithWrongNumberOfArguments { num_args } => format!("`needs` accepts one or two arguments, but was called with {num_args} arguments. Its parameters are the `condition` and an optional `message`."),
         }
     }
