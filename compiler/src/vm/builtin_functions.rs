@@ -43,11 +43,18 @@ impl Vm {
                 Err(message) => Err(message),
             },
             BuiltinFunction::IntAdd => self.int_add(args),
+            BuiltinFunction::IntBitLength => self.int_bit_length(args),
+            BuiltinFunction::IntBitwiseAnd => self.int_bitwise_and(args),
+            BuiltinFunction::IntBitwiseOr => self.int_bitwise_or(args),
+            BuiltinFunction::IntBitwiseXor => self.int_bitwise_xor(args),
             BuiltinFunction::IntCompareTo => self.int_compare_to(args),
             BuiltinFunction::IntDivideTruncating => self.int_divide_truncating(args),
             BuiltinFunction::IntModulo => self.int_modulo(args),
             BuiltinFunction::IntMultiply => self.int_multiply(args),
             BuiltinFunction::IntParse => self.int_parse(args),
+            BuiltinFunction::IntShiftLeft => self.int_shift_left(args),
+            BuiltinFunction::IntShiftRightArithmetic => self.int_shift_right_arithmetic(args),
+            BuiltinFunction::IntShiftRightLogical => self.int_shift_right_logical(args),
             BuiltinFunction::IntSubtract => self.int_subtract(args),
             BuiltinFunction::Panic => self.panic_builtin(args).map(|_| panic!()),
             BuiltinFunction::Print => self.print(args),
@@ -179,6 +186,26 @@ impl Vm {
             Ok((summand_a + summand_b).into())
         })
     }
+    fn int_bit_length(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(value)], {
+            Ok(BigInt::from(value.bits()).into())
+        })
+    }
+    fn int_bitwise_and(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(value_a), Value::Int(value_b)], {
+            Ok((value_a & value_b).into())
+        })
+    }
+    fn int_bitwise_or(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(value_a), Value::Int(value_b)], {
+            Ok((value_a | value_b).into())
+        })
+    }
+    fn int_bitwise_xor(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(value_a), Value::Int(value_b)], {
+            Ok((value_a ^ value_b).into())
+        })
+    }
     fn int_compare_to(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Int(value_a), Value::Int(value_b)], {
             let result = match value_a.cmp(&value_b) {
@@ -207,6 +234,24 @@ impl Vm {
     fn int_parse(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Text(text)], {
             Ok(BigInt::from_str(text).ok().into())
+        })
+    }
+    fn int_shift_left(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(value), Value::Int(amount)], {
+            let amount = amount.to_u128().unwrap();
+            Ok((value << amount).into())
+        })
+    }
+    fn int_shift_right_arithmetic(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(value), Value::Int(amount)], {
+            let amount = amount.to_u128().unwrap();
+            Ok((value >> amount).into())
+        })
+    }
+    fn int_shift_right_logical(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(value), Value::Int(amount)], {
+            let amount = amount.to_u128().unwrap();
+            Ok((value >>> amount).into())
         })
     }
     fn int_subtract(&mut self, args: Vec<Value>) -> Result<Value, String> {

@@ -1,4 +1,5 @@
 bool = use "..Bool"
+check = use "..Check"
 controlFlow = use "..ControlFlow"
 equals = (use "..Equality").equals
 type = use "..Type"
@@ -67,6 +68,49 @@ isNonNegative value :=
 absolute value :=
   needs (is value)
   controlFlow.ifElse isNegative (negate value) value
+
+fitsInRustU128 value =
+  needs (is value)
+  needs (isNonNegative value)
+  rustU128Max = 340282366920938463463374607431768211455
+  isLessThan value rustU128Max
+shiftLeft value amount :=
+  needs (is value)
+  needs (is amount)
+  needs (isNonNegative amount)
+  needs (fitsInRustU128 amount) "shifts by that much are not yet supported"
+  ✨.intShiftLeft value amount
+shiftRightArithmetic value amount :=
+  needs (is value)
+  needs (is amount)
+  needs (isNonNegative amount)
+  needs (fitsInRustU128 amount) "shifts by that much are not yet supported"
+  ✨.intShiftRightArithmetic value amount
+shiftRightLogical value amount :=
+  needs (is value)
+  needs (is amount)
+  needs (isNonNegative amount)
+  needs (fitsInRustU128 amount) "shifts by that much are not yet supported"
+  ✨.intShiftRightLogical value amount
+
+bitLength value :=
+  # Determines the fewest bits necessary to express this integer, not including
+  # the sign.
+  needs (is value)
+  ✨.intBitLength value
+
+bitwiseAnd valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ✨.intBitwiseAnd valueA valueB
+bitwiseOr valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ✨.intBitwiseOr valueA valueB
+bitwiseXor valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ✨.intBitwiseXor valueA valueB
 
 min valueA valueB :=
   needs (is valueA)
