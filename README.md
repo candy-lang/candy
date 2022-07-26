@@ -117,18 +117,15 @@ Major milestones:
 
 - make `PROJECT_DIRECTORY` non-global
 - use BigInts
-- turn needs `message` into `reason`
-- panic with strings instead of values
-- fuzz parser
-- also fuzz long-running functions
+- minimize inputs found through fuzzing
 - add caching to hints server
 - do we need the `CallReceiver`?
-- minimize inputs found through fuzzing
 - implement fibers and nurseries
 - implement channels
 - remove builtinPrint
 - support recursion
-- support tail recursion
+- optimize tail recursion
+- fuzz parser
 - new name?
 - mini-heaps?
 - parse calls with call as a receiver: `(foo Bar) Baz`
