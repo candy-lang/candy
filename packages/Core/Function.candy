@@ -13,3 +13,7 @@ is2 value := ✨.ifElse (is value) { equals (getArgumentCount value) 2 } { False
 is3 value := ✨.ifElse (is value) { equals (getArgumentCount value) 3 } { False }
 is4 value := ✨.ifElse (is value) { equals (getArgumentCount value) 4 } { False }
 is5 value := ✨.ifElse (is value) { equals (getArgumentCount value) 5 } { False }
+
+call function0 :=
+  needs (is0 function0)
+  ✨.call function0
