@@ -7,9 +7,8 @@ use crate::{
     discover::run::DiscoverStorage,
     input::{GetOpenInputQuery, Input, InputDbStorage, InputWatcher},
     language_server::{
-        folding_range::FoldingRangeDbStorage, hints::HintsDbStorage,
-        references::ReferencesDbStorage, semantic_tokens::SemanticTokenDbStorage,
-        utils::LspPositionConversionStorage,
+        folding_range::FoldingRangeDbStorage, references::ReferencesDbStorage,
+        semantic_tokens::SemanticTokenDbStorage, utils::LspPositionConversionStorage,
     },
 };
 use im::HashMap;
@@ -22,7 +21,6 @@ use std::{path::PathBuf, sync::Mutex};
     CstToAstStorage,
     DiscoverStorage,
     FoldingRangeDbStorage,
-    HintsDbStorage,
     HirDbStorage,
     HirToLirStorage,
     InputDbStorage,

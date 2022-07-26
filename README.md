@@ -115,9 +115,11 @@ Major milestones:
 
 ## Short-term TODOs
 
+- extra closure value type
 - use BigInts
-- mini-heaps
+- mini-heaps?
 - start fuzzing in language server
+- make `PROJECT_DIRECTORY` non-global
 - show fuzzing hints in the editor
 - implement fibers and nurseries
 - implement channels

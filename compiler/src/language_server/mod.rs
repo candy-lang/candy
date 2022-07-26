@@ -1,3 +1,10 @@
+pub mod definition;
+pub mod folding_range;
+pub mod hints;
+pub mod references;
+pub mod semantic_tokens;
+pub mod utils;
+
 use self::{
     definition::find_definition,
     folding_range::FoldingRangeDb,
@@ -10,8 +17,7 @@ use crate::{
     compiler::{ast_to_hir::AstToHir, hir::CollectErrors},
     database::PROJECT_DIRECTORY,
     input::{Input, InputDb},
-    language_server::hints::HintsDb,
-    Database,
+    CloneWithExtension, Database,
 };
 use itertools::Itertools;
 use lsp_types::{
@@ -25,25 +31,29 @@ use lsp_types::{
     TextDocumentChangeRegistrationOptions, TextDocumentContentChangeEvent,
     TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
 };
-use tokio::sync::Mutex;
+use std::{fs, sync::Arc};
+use tokio::sync::{mpsc::Sender, Mutex};
 use tower_lsp::{jsonrpc, Client, LanguageServer};
-
-pub mod definition;
-pub mod folding_range;
-pub mod hints;
-pub mod references;
-pub mod semantic_tokens;
-pub mod utils;
 
 pub struct CandyLanguageServer {
     pub client: Client,
-    pub db: Mutex<Database>,
+    pub db: Arc<Mutex<Database>>,
+    pub hints_server_sink: Arc<Mutex<Option<Sender<hints::Event>>>>,
 }
 impl CandyLanguageServer {
     pub fn from_client(client: Client) -> Self {
         Self {
             client,
-            db: Mutex::new(Database::default()),
+            db: Default::default(),
+            hints_server_sink: Default::default(),
+        }
+    }
+
+    async fn send_to_hints_server(&self, event: hints::Event) {
+        let event_sink = self.hints_server_sink.lock().await;
+        match event_sink.as_ref().unwrap().send(event).await {
+            Ok(_) => {}
+            Err(_) => panic!("Couldn't send message to hints server."),
         }
     }
 }
@@ -67,6 +77,33 @@ impl LanguageServer for CandyLanguageServer {
             "file" => Some(first_workspace_folder.to_file_path().unwrap()),
             _ => panic!("Workspace folder must be a file URI."),
         };
+
+        let (events_sender, events_receiver) = tokio::sync::mpsc::channel(16);
+        let (hints_sender, mut hints_receiver) = tokio::sync::mpsc::channel(8);
+        tokio::spawn(hints::run_server(
+            self.db.clone(),
+            events_receiver,
+            hints_sender,
+        ));
+        *self.hints_server_sink.lock().await = Some(events_sender);
+        let client = self.client.clone();
+        let hint_reporter = async move || {
+            while let Some((input, hints)) = hints_receiver.recv().await {
+                if let Some(path) = input.to_path() {
+                    let hints_file = path.clone_with_extension("candy.hints");
+                    let content = hints.iter().map(|hint| format!("{hint:?}")).join("\n");
+                    fs::write(hints_file.clone(), content).unwrap();
+                }
+
+                client
+                    .send_notification::<HintsNotification>(HintsNotification {
+                        uri: Url::from(input).to_string(),
+                        hints,
+                    })
+                    .await;
+            }
+        };
+        tokio::spawn(hint_reporter());
 
         Ok(InitializeResult {
             // We only support dynamic registration for now.
@@ -184,6 +221,7 @@ impl LanguageServer for CandyLanguageServer {
     }
 
     async fn shutdown(&self) -> jsonrpc::Result<()> {
+        self.send_to_hints_server(hints::Event::Shutdown).await;
         Ok(())
     }
 
@@ -193,7 +231,9 @@ impl LanguageServer for CandyLanguageServer {
             let mut db = self.db.lock().await;
             db.did_open_input(&input, params.text_document.text.into_bytes());
         }
-        self.analyze_files(vec![input]).await;
+        self.analyze_files(vec![input.clone()]).await;
+        self.send_to_hints_server(hints::Event::UpdateModule(input))
+            .await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let input: Input = params.text_document.uri.into();
@@ -205,11 +245,15 @@ impl LanguageServer for CandyLanguageServer {
             open_inputs.extend(db.open_inputs.keys().cloned());
         }
         self.analyze_files(open_inputs).await;
+        self.send_to_hints_server(hints::Event::UpdateModule(input))
+            .await;
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         let input = params.text_document.uri.into();
         let mut db = self.db.lock().await;
         db.did_close_input(&input);
+        self.send_to_hints_server(hints::Event::CloseModule(input))
+            .await;
     }
 
     async fn goto_definition(
@@ -273,13 +317,6 @@ impl CandyLanguageServer {
             };
             self.client
                 .publish_diagnostics(input.clone().into(), diagnostics, None)
-                .await;
-            let hints = db.hints(input.clone());
-            self.client
-                .send_notification::<HintsNotification>(HintsNotification {
-                    uri: Url::from(input).to_string(),
-                    hints,
-                })
                 .await;
         }
     }

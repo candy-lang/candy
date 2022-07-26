@@ -127,6 +127,90 @@ pub enum AstError {
     LambdaWithoutClosingCurlyBrace,
 }
 
+pub trait FindAst {
+    fn find(&self, id: &Id) -> Option<&Ast>;
+}
+impl FindAst for Ast {
+    fn find(&self, id: &Id) -> Option<&Ast> {
+        if id == &self.id {
+            return Some(self);
+        };
+
+        match &self.kind {
+            AstKind::Int(_) => None,
+            AstKind::Text(_) => None,
+            AstKind::Identifier(_) => None,
+            AstKind::Symbol(_) => None,
+            AstKind::Struct(struct_) => struct_.find(id),
+            AstKind::StructAccess(access) => access.find(id),
+            AstKind::Lambda(lambda) => lambda.find(id),
+            AstKind::Call(call) => call.find(id),
+            AstKind::Assignment(assignment) => assignment.find(id),
+            AstKind::Error { child, .. } => child.as_ref().and_then(|child| child.find(id)),
+        }
+    }
+}
+impl FindAst for Struct {
+    fn find(&self, id: &Id) -> Option<&Ast> {
+        for (key, value) in &self.fields {
+            if let Some(ast) = key.find(id) {
+                return Some(ast);
+            }
+            if let Some(ast) = value.find(id) {
+                return Some(ast);
+            }
+        }
+        None
+    }
+}
+impl FindAst for StructAccess {
+    fn find(&self, id: &Id) -> Option<&Ast> {
+        self.struct_.find(id)
+    }
+}
+impl FindAst for Lambda {
+    fn find(&self, id: &Id) -> Option<&Ast> {
+        self.body.find(id)
+    }
+}
+impl FindAst for Call {
+    fn find(&self, id: &Id) -> Option<&Ast> {
+        self.receiver.find(id).or_else(|| self.arguments.find(id))
+    }
+}
+impl FindAst for CallReceiver {
+    fn find(&self, id: &Id) -> Option<&Ast> {
+        match self {
+            CallReceiver::Identifier(_) => None,
+            CallReceiver::StructAccess(access) => access.find(id),
+            CallReceiver::Call(call) => call.find(id),
+        }
+    }
+}
+impl FindAst for Assignment {
+    fn find(&self, id: &Id) -> Option<&Ast> {
+        self.body.find(id)
+    }
+}
+impl FindAst for AssignmentBody {
+    fn find(&self, id: &Id) -> Option<&Ast> {
+        match self {
+            AssignmentBody::Lambda(lambda) => lambda.find(id),
+            AssignmentBody::Body(body) => body.find(id),
+        }
+    }
+}
+impl FindAst for Vec<Ast> {
+    fn find(&self, id: &Id) -> Option<&Ast> {
+        for ast in self {
+            if let Some(ast) = ast.find(id) {
+                return Some(ast);
+            }
+        }
+        None
+    }
+}
+
 pub trait CollectErrors {
     fn collect_errors(self, errors: &mut Vec<CompilerError>);
 }

@@ -1,5 +1,5 @@
-isBool = (use ".Bool").is
-isFunction0 = (use ".Function").is0
+isBool = (use "..Bool").is
+isFunction0 = (use "..Function").is0
 
 ifElse condition then else :=
   needs (isBool condition)

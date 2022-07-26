@@ -5,18 +5,24 @@ use crate::{
     compiler::hir::{self, Expression, HirDb, Lambda},
     database::Database,
     input::Input,
-    vm::{tracer::TraceEntry, value::Value, Status, Vm},
+    vm::{tracer::TraceEntry, use_provider::DbUseProvider, value::Value, Status, Vm},
 };
 use itertools::Itertools;
 use log;
-use std::fs;
+use std::{fs, sync::Arc};
+use tokio::sync::Mutex;
 
-pub fn fuzz(db: &Database, input: Input) {
-    let module_closure = Value::module_closure_of_input(&db, input.clone()).unwrap();
+pub async fn fuzz(db: Arc<Mutex<Database>>, input: Input) {
+    let mut vm = {
+        let mut vm = Vm::new();
+        let db = db.lock().await;
+        let module_closure = Value::module_closure_of_input(&db, input.clone()).unwrap();
+        let use_provider = DbUseProvider { db: &db };
+        vm.set_up_module_closure_execution(&use_provider, module_closure);
+        vm.run(&use_provider, 1000);
+        vm
+    };
 
-    let mut vm = Vm::new();
-    vm.set_up_module_closure_execution(db, input.clone(), module_closure);
-    vm.run(db, 1000);
     match vm.status() {
         Status::Running => {
             log::warn!("VM didn't finish running, so we're not fuzzing it.");
@@ -25,7 +31,8 @@ pub fn fuzz(db: &Database, input: Input) {
         Status::Done => log::debug!("VM is done."),
         Status::Panicked(value) => {
             log::error!("VM panicked with value {value}.");
-            log::error!("{}", vm.tracer.format_stack_trace(db, input));
+            let db = db.lock().await;
+            log::error!("{}", vm.tracer.format_stack_trace(&db, input));
             return;
         }
     }
@@ -36,10 +43,15 @@ pub fn fuzz(db: &Database, input: Input) {
         vm.fuzzable_closures.len()
     );
 
-    fuzz_vm(db, input, &vm, 0);
+    fuzz_vm(db, input, &vm, 0).await;
 }
 
-fn fuzz_vm(db: &Database, input: Input, vm: &Vm, num_fuzzable_closures_to_skip: usize) {
+async fn fuzz_vm(
+    db: Arc<Mutex<Database>>,
+    input: Input,
+    vm: &Vm,
+    num_fuzzable_closures_to_skip: usize,
+) {
     'test_different_closures: for (closure_id, closure_address) in vm
         .fuzzable_closures
         .iter()
@@ -61,13 +73,15 @@ fn fuzz_vm(db: &Database, input: Input, vm: &Vm, num_fuzzable_closures_to_skip: 
             let mut vm = vm.clone();
             let arguments = generate_n_values(num_args);
 
-            match test_closure_with_args(
-                db,
+            let result = test_closure_with_args(
+                db.clone(),
                 closure_id,
                 &mut vm,
                 *closure_address,
                 arguments.clone(),
-            ) {
+            )
+            .await;
+            match result {
                 TestResult::StillRunning => {
                     log::warn!("The fuzzer is giving up because the VM didn't finish running.")
                 }
@@ -84,7 +98,8 @@ fn fuzz_vm(db: &Database, input: Input, vm: &Vm, num_fuzzable_closures_to_skip: 
                         },
                     );
                     log::error!("This was the stack trace:");
-                    vm.tracer.dump_stack_trace(db, input.clone());
+                    let db = db.lock().await;
+                    vm.tracer.dump_stack_trace(&db, input.clone());
 
                     let trace = vm.tracer.dump_call_tree();
                     // PathBuff::new(input.to_path().unwrap())
@@ -103,17 +118,23 @@ fn fuzz_vm(db: &Database, input: Input, vm: &Vm, num_fuzzable_closures_to_skip: 
     }
 }
 
-fn test_closure_with_args(
-    db: &Database,
+async fn test_closure_with_args(
+    db: Arc<Mutex<Database>>,
     closure_id: &hir::Id,
     vm: &mut Vm,
     closure_address: usize,
     arguments: Vec<Value>,
 ) -> TestResult {
     let closure = vm.heap.export_without_dropping(closure_address);
-    vm.set_up_closure_execution(db, closure, arguments);
 
-    vm.run(db, 1000);
+    {
+        let db = db.lock().await;
+        println!("Starting closure {closure}.");
+        let use_provider = DbUseProvider { db: &db };
+        vm.set_up_closure_execution(&use_provider, closure, arguments);
+        vm.run(&use_provider, 1000);
+    }
+
     match vm.status() {
         Status::Running => TestResult::StillRunning,
         Status::Done => TestResult::NoPanic,
@@ -121,8 +142,9 @@ fn test_closure_with_args(
             // If a needs directly inside the tested closure was
             // dissatisfied, then the panic is not the fault of the code
             // inside the code, but of the caller.
+            let db = db.lock().await;
             let is_our_fault =
-                did_need_in_closure_cause_panic(db, &closure_id, vm.tracer.log().last().unwrap());
+                did_need_in_closure_cause_panic(&db, &closure_id, vm.tracer.log().last().unwrap());
             if is_our_fault {
                 TestResult::WrongInputs
             } else {

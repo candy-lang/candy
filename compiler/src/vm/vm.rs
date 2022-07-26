@@ -1,11 +1,11 @@
 use super::{
     heap::{Heap, ObjectData, ObjectPointer},
     tracer::{TraceEntry, Tracer},
+    use_provider::UseProvider,
     value::Value,
 };
 use crate::{
     compiler::{hir::Id, lir::Instruction},
-    database::Database,
     input::Input,
 };
 use itertools::Itertools;
@@ -69,9 +69,9 @@ impl Vm {
         }
     }
 
-    pub fn set_up_closure_execution(
+    pub fn set_up_closure_execution<U: UseProvider>(
         &mut self,
-        db: &Database,
+        use_provider: &U,
         closure: Value,
         arguments: Vec<Value>,
     ) {
@@ -95,7 +95,7 @@ impl Vm {
         self.data_stack.push(address);
 
         self.status = Status::Running;
-        self.run_instruction(db, Instruction::Call { num_args });
+        self.run_instruction(use_provider, Instruction::Call { num_args });
     }
     pub fn tear_down_closure_execution(&mut self) -> Value {
         assert!(matches!(self.status, Status::Done));
@@ -103,20 +103,21 @@ impl Vm {
         self.heap.export(return_value)
     }
 
-    pub fn set_up_module_closure_execution(&mut self, db: &Database, input: Input, closure: Value) {
-        let mut instructions = if let Value::Closure {
-            captured,
-            num_args,
-            body,
+    pub fn set_up_module_closure_execution<U: UseProvider>(
+        &mut self,
+        use_provider: &U,
+        closure: Value,
+    ) {
+        if let Value::Closure {
+            captured, num_args, ..
         } = closure.clone()
         {
             assert_eq!(captured.len(), 0, "Called start_module_closure with a closure that is not a module closure (it captures stuff).");
             assert_eq!(num_args, 0, "Called start_module_closure with a closure that is not a module closure (it has arguments).");
-            body
         } else {
             panic!("Called start_module_closure with a non-closure.");
         };
-        self.set_up_closure_execution(db, closure, vec![])
+        self.set_up_closure_execution(use_provider, closure, vec![]);
     }
     pub fn tear_down_module_closure_execution(&mut self) -> Value {
         self.tear_down_closure_execution()
@@ -130,7 +131,7 @@ impl Vm {
         self.data_stack[self.data_stack.len() - 1 - offset as usize].clone()
     }
 
-    pub fn run(&mut self, db: &Database, mut num_instructions: u16) {
+    pub fn run<U: UseProvider>(&mut self, use_provider: &U, mut num_instructions: u16) {
         assert!(
             matches!(self.status, Status::Running),
             "Called Vm::run on a vm that is not ready to run."
@@ -146,37 +147,37 @@ impl Vm {
             };
             let instruction = current_body[self.next_instruction.instruction].clone();
 
-            log::trace!(
-                "Data stack: {}",
-                self.data_stack
-                    .iter()
-                    .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
-                    .join(", ")
-            );
-            log::trace!(
-                "Call stack: {}",
-                self.call_stack
-                    .iter()
-                    .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
-                    .join(", ")
-            );
-            log::trace!(
-                "Instruction pointer: {}:{}",
-                self.next_instruction.closure,
-                self.next_instruction.instruction
-            );
-            log::trace!("Heap: {:?}", self.heap);
+            // log::trace!(
+            //     "Data stack: {}",
+            //     self.data_stack
+            //         .iter()
+            //         .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
+            //         .join(", ")
+            // );
+            // log::trace!(
+            //     "Call stack: {}",
+            //     self.call_stack
+            //         .iter()
+            //         .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
+            //         .join(", ")
+            // );
+            // log::trace!(
+            //     "Instruction pointer: {}:{}",
+            //     self.next_instruction.closure,
+            //     self.next_instruction.instruction
+            // );
+            // log::trace!("Heap: {:?}", self.heap);
 
             log::trace!("Running instruction: {instruction:?}");
             self.next_instruction.instruction += 1;
-            self.run_instruction(db, instruction);
+            self.run_instruction(use_provider, instruction);
 
             if self.next_instruction == InstructionPointer::null_pointer() {
                 self.status = Status::Done;
             }
         }
     }
-    pub fn run_instruction(&mut self, db: &Database, instruction: Instruction) {
+    pub fn run_instruction<U: UseProvider>(&mut self, use_provider: &U, instruction: Instruction) {
         match instruction {
             Instruction::CreateInt(int) => {
                 let address = self.heap.create(ObjectData::Int(int));
@@ -271,7 +272,7 @@ impl Vm {
                     }
                     ObjectData::Builtin(builtin) => {
                         self.heap.drop(closure_address);
-                        self.run_builtin_function(db, &builtin, &args);
+                        self.run_builtin_function(use_provider, &builtin, &args);
                     }
                     _ => panic!("Can only call closures and builtins."),
                 };

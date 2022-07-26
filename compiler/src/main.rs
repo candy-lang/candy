@@ -1,3 +1,4 @@
+#![feature(async_closure)]
 #![feature(label_break_value)]
 #![feature(let_chains)]
 #![feature(never_type)]
@@ -25,7 +26,7 @@ use crate::{
     database::{Database, PROJECT_DIRECTORY},
     input::Input,
     language_server::utils::LspPositionConversion,
-    vm::{value::Value, Status, Vm},
+    vm::{use_provider::DbUseProvider, value::Value, Status, Vm},
 };
 use compiler::lir::Lir;
 use fern::colors::{Color, ColoredLevelConfig};
@@ -41,6 +42,7 @@ use std::{
     time::Duration,
 };
 use structopt::StructOpt;
+use tokio::sync::Mutex;
 use tower_lsp::{LspService, Server};
 
 #[derive(StructOpt, Debug)]
@@ -85,7 +87,7 @@ async fn main() {
     match CandyOptions::from_args() {
         CandyOptions::Build(options) => build(options),
         CandyOptions::Run(options) => run(options),
-        CandyOptions::Fuzz(options) => fuzz(options),
+        CandyOptions::Fuzz(options) => fuzz(options).await,
         CandyOptions::Lsp => lsp().await,
     }
 }
@@ -215,18 +217,24 @@ fn run(options: CandyRunOptions) {
     log::info!("Running `{path_string}`.");
 
     let mut vm = Vm::new();
-    vm.set_up_module_closure_execution(&db, input.clone(), module_closure);
-    vm.run(&db, 1000);
-    match vm.status() {
-        Status::Running => log::info!("VM is still running."),
-        Status::Done => {
-            let return_value = vm.tear_down_module_closure_execution();
-            log::info!("VM is done. Export map: {return_value}");
-        }
-        Status::Panicked(value) => {
-            log::error!("VM panicked with value {value}.");
-            log::error!("This is the stack trace:");
-            vm.tracer.dump_stack_trace(&db, input);
+    let use_provider = DbUseProvider { db: &db };
+    vm.set_up_module_closure_execution(&use_provider, module_closure);
+
+    loop {
+        vm.run(&use_provider, 10000);
+        match vm.status() {
+            Status::Running => log::info!("VM is still running."),
+            Status::Done => {
+                let return_value = vm.tear_down_module_closure_execution();
+                log::info!("VM is done. Export map: {return_value}");
+                break;
+            }
+            Status::Panicked(value) => {
+                log::error!("VM panicked with value {value}.");
+                log::error!("This is the stack trace:");
+                vm.tracer.dump_stack_trace(&db, input.clone());
+                break;
+            }
         }
     }
 
@@ -241,13 +249,13 @@ fn run(options: CandyRunOptions) {
     }
 }
 
-fn fuzz(options: CandyFuzzOptions) {
+async fn fuzz(options: CandyFuzzOptions) {
     *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
 
     log::debug!("Building `{}`.\n", options.file.display());
 
     let input: Input = options.file.clone().into();
-    let db = Database::default();
+    let db = Arc::new(Mutex::new(Database::default()));
 
     if raw_build(&options.file, false).is_none() {
         log::info!("Build failed.");
@@ -257,7 +265,7 @@ fn fuzz(options: CandyFuzzOptions) {
     let path_string = options.file.to_string_lossy();
     log::debug!("Fuzzing `{path_string}`.");
 
-    fuzzer::fuzz(&db, input);
+    fuzzer::fuzz(db, input).await;
 }
 
 async fn lsp() {

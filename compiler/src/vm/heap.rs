@@ -91,12 +91,6 @@ impl Heap {
 
     pub fn create(&mut self, object: ObjectData) -> ObjectPointer {
         let address = self.next_address;
-        // TODO: Remove this special case once closures are self-contained.
-        if let ObjectData::Closure { captured, .. } = &object {
-            for captured in captured {
-                self.dup(*captured);
-            }
-        }
         self.objects.insert(
             address,
             Object {
@@ -151,7 +145,10 @@ impl Heap {
                 num_args,
                 body,
             } => ObjectData::Closure {
-                captured,
+                captured: captured
+                    .into_iter()
+                    .map(|value| self.import(value))
+                    .collect(),
                 num_args,
                 body,
             },
@@ -183,7 +180,10 @@ impl Heap {
                 num_args,
                 body,
             } => Value::Closure {
-                captured: captured.clone(),
+                captured: captured
+                    .iter()
+                    .map(|address| self.export_without_dropping(*address))
+                    .collect(),
                 num_args: *num_args,
                 body: body.clone(),
             },
