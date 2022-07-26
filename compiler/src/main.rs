@@ -273,6 +273,7 @@ fn init_logger() {
         })
         .level_for("candy::compiler::hir_to_lir", LevelFilter::Debug)
         .level_for("candy::compiler::string_to_rcst", LevelFilter::Debug)
+        .level_for("candy::language_server::hints", LevelFilter::Debug)
         .level_for("candy::vm::builtin_functions", LevelFilter::Warn)
         .level_for("candy::vm::heap", LevelFilter::Debug)
         .level_for("candy::vm::vm", LevelFilter::Info)

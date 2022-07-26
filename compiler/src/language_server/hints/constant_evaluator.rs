@@ -69,7 +69,7 @@ impl ConstantEvaluator {
     pub fn get_hints(&self, db: &Database, input: &Input) -> Vec<Hint> {
         let vm = &self.vms[input];
 
-        log::debug!("Calculating hints for {input}");
+        log::trace!("Calculating hints for {input}");
         let mut hints = vec![];
 
         if let Status::Panicked { reason } = vm.status() {
