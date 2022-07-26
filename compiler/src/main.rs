@@ -22,7 +22,7 @@ use crate::{
         rcst_to_cst::RcstToCst,
         string_to_rcst::StringToRcst,
     },
-    database::{Database, PROJECT_DIRECTORY},
+    database::Database,
     input::Input,
     language_server::utils::LspPositionConversion,
     vm::{use_provider::DbUseProvider, value::Closure, Status, TearDownResult, Vm},
@@ -91,6 +91,36 @@ async fn main() {
 }
 
 fn build(options: CandyBuildOptions) {
+    Input::File {
+        package: Package::User(current_dir()),
+        path: options.file,
+    };
+    //         let path = match fs::canonicalize(&path)
+    //             .expect("Path does not exist or is invalid.")
+    //             .strip_prefix(fs::canonicalize(project_dir).unwrap().clone())
+    //         {
+    //             Ok(path) => path.to_owned(),
+    //             Err(_) => return Input::ExternalFile(path),
+    //         };
+
+    //         let components = path
+    //             .components()
+    //             .into_iter()
+    //             .map(|it| match it {
+    //                 std::path::Component::Prefix(_) => unreachable!(),
+    //                 std::path::Component::RootDir => unreachable!(),
+    //                 std::path::Component::CurDir => panic!("`.` is not allowed in an input path."),
+    //                 std::path::Component::ParentDir => {
+    //                     panic!("`..` is not allowed in an input path.")
+    //                 }
+    //                 std::path::Component::Normal(it) => {
+    //                     it.to_str().expect("Invalid UTF-8 in path.").to_owned()
+    //                 }
+    //             })
+    //             .collect();
+    //         Input::File(components)
+    //     }
+    // }
     *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
 
     raw_build(&options.file, options.debug);
