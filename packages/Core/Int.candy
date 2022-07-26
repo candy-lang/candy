@@ -52,6 +52,22 @@ isGreaterThanOrEqualTo valueA valueB :=
   needs (is valueB)
   bool.not (isLessThan valueA valueB)
 
+isPositive value :=
+  needs (is value)
+  isGreaterThan value 0
+isNonPositive value :=
+  needs (is value)
+  bool.not (isPositive value)
+isNegative value :=
+  needs (is value)
+  isLessThan value 0
+isNonNegative value :=
+  needs (is value)
+  bool.not (isNegative value)
+absolute value :=
+  needs (is value)
+  controlFlow.ifElse isNegative (negate value) value
+
 min valueA valueB :=
   needs (is valueA)
   needs (is valueB)
