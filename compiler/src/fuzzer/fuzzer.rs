@@ -66,7 +66,7 @@ impl Fuzzer {
                 self.map_status(db, status, num_instructions);
             status = new_status;
 
-            if num_instructions_executed > num_instructions {
+            if num_instructions_executed >= num_instructions {
                 break;
             } else {
                 num_instructions -= num_instructions_executed;
