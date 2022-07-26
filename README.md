@@ -117,21 +117,18 @@ Major milestones:
 
 - make `PROJECT_DIRECTORY` non-global
 - use BigInts
-- turn needs `message` into `reason`
-- panic with strings instead of values
+- minimize inputs found through fuzzing
 - make condition whether to keep running more granular
 - fuzz parser
 - add caching to hints server
-- do we need the `CallReceiver`?
-- minimize inputs found through fuzzing
 - implement fibers and nurseries
 - implement channels
 - remove builtinPrint
 - support recursion
-- support tail recursion
+- tail call optimization
 - new name?
 - mini-heaps?
-- parse calls with call as a receiver: `(foo Bar) Baz`
+- parse calls with call as a receiver: `(foo Bar) Baz`. or do we even need the `CallReceiver`?
 
 ## How to use Candy
 

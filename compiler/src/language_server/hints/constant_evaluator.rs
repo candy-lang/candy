@@ -9,12 +9,7 @@ use crate::{
     database::Database,
     input::Input,
     language_server::hints::{utils::id_to_end_of_line, HintKind},
-    vm::{
-        tracer::TraceEntry,
-        use_provider::DbUseProvider,
-        value::{Closure, Value},
-        Status, Vm,
-    },
+    vm::{tracer::TraceEntry, use_provider::DbUseProvider, value::Closure, Status, Vm},
     CloneWithExtension,
 };
 use itertools::Itertools;
@@ -77,15 +72,10 @@ impl ConstantEvaluator {
         log::debug!("Calculating hints for {input}");
         let mut hints = vec![];
 
-        match vm.status() {
-            Status::Running => {}
-            Status::Done => {}
-            Status::Panicked(value) => {
-                let hint = panic_hint(&db, input.clone(), &vm, value).expect(
-                    "Module panicked, but we couldn't build a panic hint to communicate that.",
-                );
-                hints.push(hint);
-            }
+        if let Status::Panicked { reason } = vm.status() {
+            let hint = panic_hint(&db, input.clone(), &vm, reason)
+                .expect("Module panicked, but we couldn't build a panic hint to communicate that.");
+            hints.push(hint);
         };
         if let Some(path) = input.to_path() {
             let trace = vm.tracer.dump_call_tree();
@@ -130,7 +120,7 @@ impl ConstantEvaluator {
     }
 }
 
-fn panic_hint(db: &Database, input: Input, vm: &Vm, panic_message: Value) -> Option<Hint> {
+fn panic_hint(db: &Database, input: Input, vm: &Vm, reason: String) -> Option<Hint> {
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.
@@ -144,7 +134,8 @@ fn panic_hint(db: &Database, input: Input, vm: &Vm, panic_message: Value) -> Opt
                 TraceEntry::NeedsStarted { id, .. } => id,
                 _ => return false,
             };
-            // Make sure the entry comes from the same file and is not generated code.
+            // Make sure the entry comes from the same file and is not generated
+            // code.
             id.input == input && db.hir_to_cst_id(id.clone()).is_some()
         })
         .next()?;
@@ -160,21 +151,14 @@ fn panic_hint(db: &Database, input: Input, vm: &Vm, panic_message: Value) -> Opt
         TraceEntry::NeedsStarted {
             id,
             condition,
-            message,
-        } => (id, format!("needs {condition} {message}")),
+            reason,
+        } => (id, format!("needs {condition} {reason}")),
         _ => unreachable!(),
     };
 
     Some(Hint {
         kind: HintKind::Panic,
-        text: format!(
-            "Calling `{call_info}` panics because {}.",
-            if let Value::Text(message) = panic_message {
-                message
-            } else {
-                format!("{panic_message}")
-            }
-        ),
+        text: format!("Calling `{call_info}` panics because {reason}."),
         position: id_to_end_of_line(db, id.clone())?,
     })
 }

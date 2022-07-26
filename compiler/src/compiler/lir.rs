@@ -62,11 +62,11 @@ pub enum Instruction {
         num_args: usize,
     },
 
-    /// Pops a boolean condition and a message. If the condition is true, it
-    /// just pushes Nothing. If the condition is false, it panic with the
-    /// message.
+    /// Pops a boolean condition and a reason. If the condition is true, it
+    /// just pushes Nothing. If the condition is false, it panics with the
+    /// reason.
     ///
-    /// a, message, condition -> a, Nothing
+    /// a, condition, reason -> a, Nothing
     Needs,
 
     /// Returns from the current closure to the original caller.

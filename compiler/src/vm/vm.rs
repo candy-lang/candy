@@ -1,11 +1,12 @@
 use super::{
     heap::{Heap, ObjectData, ObjectPointer},
     tracer::{TraceEntry, Tracer},
-    use_provider::UseProvider,
+    use_provider::{DbUseProvider, UseProvider},
     value::{Closure, Value},
 };
 use crate::{
     compiler::{hir::Id, lir::Instruction},
+    database::Database,
     input::Input,
 };
 use itertools::Itertools;
@@ -30,7 +31,7 @@ pub struct Vm {
 pub enum Status {
     Running,
     Done,
-    Panicked(Value),
+    Panicked { reason: String },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -284,18 +285,23 @@ impl Vm {
                 };
             }
             Instruction::Needs => {
+                let reason = self.data_stack.pop().unwrap();
                 let condition = self.data_stack.pop().unwrap();
-                let message = self.data_stack.pop().unwrap();
+
+                let reason = match self.heap.export(reason) {
+                    Value::Text(reason) => reason,
+                    _ => {
+                        self.panic("you can only use text as the reason of a `needs`".to_string());
+                        return;
+                    }
+                };
 
                 match self.heap.get(condition).data.clone() {
                     ObjectData::Symbol(symbol) => match symbol.as_str() {
                         "True" => {
                             self.data_stack.push(self.heap.import(Value::nothing()));
                         }
-                        "False" => {
-                            self.status =
-                                Status::Panicked(self.heap.export_without_dropping(message))
-                        }
+                        "False" => self.status = Status::Panicked { reason },
                         _ => {
                             self.panic("Needs expects True or False as a symbol.".to_string());
                         }
@@ -345,13 +351,13 @@ impl Vm {
             }
             Instruction::TraceNeedsStarts { id } => {
                 let condition = self.data_stack[self.data_stack.len() - 1];
-                let message = self.data_stack[self.data_stack.len() - 2];
+                let reason = self.data_stack[self.data_stack.len() - 2];
                 let condition = self.heap.export_without_dropping(condition);
-                let message = self.heap.export_without_dropping(message);
+                let reason = self.heap.export_without_dropping(reason);
                 self.tracer.push(TraceEntry::NeedsStarted {
                     id,
                     condition,
-                    message,
+                    reason,
                 });
             }
             Instruction::TraceNeedsEnds => self.tracer.push(TraceEntry::NeedsEnded),
@@ -386,8 +392,35 @@ impl Vm {
         }
     }
 
-    pub fn panic(&mut self, message: String) -> Value {
-        self.status = Status::Panicked(Value::Text(message));
+    pub fn panic(&mut self, reason: String) -> Value {
+        self.status = Status::Panicked { reason };
         Value::Symbol("Never".to_string())
+    }
+
+    pub fn run_synchronously_until_completion(
+        &mut self,
+        db: &Database,
+    ) -> Result<TearDownResult, String> {
+        let use_provider = DbUseProvider { db };
+        loop {
+            self.run(&use_provider, 10000);
+            match self.status() {
+                Status::Running => log::info!("Code is still running."),
+                Status::Done => {
+                    let result = self.tear_down_module_closure_execution();
+                    log::info!(
+                        "The module exports these definitions: {}",
+                        result.return_value
+                    );
+                    return Ok(result);
+                }
+                Status::Panicked { reason } => {
+                    log::error!("The module panicked because {reason}.");
+                    log::error!("This is the stack trace:");
+                    self.tracer.dump_stack_trace(&db);
+                    return Err(reason);
+                }
+            }
+        }
     }
 }

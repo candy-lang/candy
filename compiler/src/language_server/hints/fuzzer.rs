@@ -7,10 +7,7 @@ use crate::{
     database::Database,
     fuzzer::{Fuzzer, Status},
     input::Input,
-    vm::{
-        tracer::TraceEntry,
-        value::{Closure, Value},
-    },
+    vm::{tracer::TraceEntry, value::Closure},
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
@@ -79,7 +76,7 @@ impl FuzzerManager {
         for fuzzer in &relevant_fuzzers {
             if let Status::PanickedForArguments {
                 arguments,
-                message,
+                reason,
                 tracer,
             } = fuzzer.status()
             {
@@ -94,9 +91,7 @@ impl FuzzerManager {
                             panic!("Looks like we fuzzed a non-closure. That's weird.")
                         }
                         None => {
-                            log::warn!(
-                                "Using fuzzing, we found a possible error in a generated closure."
-                            );
+                            log::warn!("Using fuzzing, we found an error in a generated closure.");
                             continue;
                         }
                     };
@@ -142,24 +137,19 @@ impl FuzzerManager {
                         TraceEntry::NeedsStarted {
                             id,
                             condition,
-                            message,
+                            reason,
                         } => (
                             id.clone(),
                             "needs".to_string(),
-                            vec![condition.clone(), message.clone()],
+                            vec![condition.clone(), reason.clone()],
                         ),
                         _ => unreachable!(),
                     };
                     Hint {
                         kind: HintKind::Fuzz,
                         text: format!(
-                            "then `{name} {}` panics because {}.",
+                            "then `{name} {}` panics because {reason}.",
                             arguments.iter().map(|arg| format!("{arg}")).join(" "),
-                            if let Value::Text(message) = message {
-                                message.to_string()
-                            } else {
-                                format!("{message}")
-                            }
                         ),
                         position: id_to_end_of_line(db, call_id).unwrap(),
                     }

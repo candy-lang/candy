@@ -343,13 +343,13 @@ impl<'a> Context<'a> {
             CallReceiver::Identifier(name) => {
                 if name.value == "needs" {
                     let expression = match &self.lower_call_arguments(&call.arguments[..])[..] {
-                        [condition, message] => Expression::Needs {
+                        [condition, reason] => Expression::Needs {
                             condition: Box::new(condition.clone()),
-                            message: Box::new(message.clone()),
+                            reason: Box::new(reason.clone()),
                         },
                         [condition] => Expression::Needs {
                             condition: Box::new(condition.clone()),
-                            message: Box::new(self.push(
+                            reason: Box::new(self.push(
                                 None,
                                 Expression::Text("needs not satisfied".to_string()),
                                 None,
@@ -489,18 +489,18 @@ impl<'a> Context<'a> {
         self.push(None, sparkles_map, Some("✨".to_string()));
     }
 
-    fn generate_panicking_code(&mut self, message: String) -> hir::Id {
+    fn generate_panicking_code(&mut self, reason: String) -> hir::Id {
         let condition = self.push(
             None,
             Expression::Symbol("False".to_string()),
             Some("false".to_string()),
         );
-        let message = self.push(None, Expression::Text(message), Some("message".to_string()));
+        let reason = self.push(None, Expression::Text(reason), Some("reason".to_string()));
         self.push(
             None,
             Expression::Needs {
                 condition: Box::new(condition),
-                message: Box::new(message),
+                reason: Box::new(reason),
             },
             None,
         )
@@ -515,6 +515,7 @@ impl<'a> Context<'a> {
         // HirId(~:test.candy:something:currentPath) = struct [
         //   HirId(~:test.candy:something:key): HirId(~:test.candy:something:raw_path),
         // ]
+
         match self.input.clone() {
             Input::File(path) => {
                 let current_path_content = path
