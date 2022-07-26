@@ -29,52 +29,52 @@ modulo dividend divisor :=
   needs (is divisor)
   ✨.intModulo dividend divisor
 
-compareTo valueA valueB =
+compareTo valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   result = ✨.intCompareTo valueA valueB
   bool.implies (equals result Equal) (equals valueA valueB)
   result
-isLessThan valueA valueB =
+isLessThan valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   equals (compareTo valueA valueB) Less
-isGreaterThan valueA valueB =
+isGreaterThan valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   equals (compareTo valueA valueB) Greater
-isLessThanOrEqualTo valueA valueB =
+isLessThanOrEqualTo valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   bool.not (isGreaterThan valueA valueB)
-isGreaterThanOrEqualTo valueA valueB =
+isGreaterThanOrEqualTo valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   bool.not (isLessThan valueA valueB)
 
-min valueA valueB =
+min valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   controlFlow.ifElse
     (isLessThanOrEqualTo valueA valueB)
     { valueA }
     { valueB }
-max valueA valueB =
+max valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   controlFlow.ifElse
     (isGreaterThanOrEqualTo valueA valueB)
     { valueA }
     { valueB }
-coerceAtLeast value minimum =
+coerceAtLeast value minimum :=
   needs (is value)
   needs (is minimum)
   max value minimum
-coerceAtMost value maximum =
+coerceAtMost value maximum :=
   needs (is value)
   needs (is maximum)
   min value maximum
-coerceIn value minimum maximum =
+coerceIn value minimum maximum :=
   needs (is value)
   needs (is minimum)
   needs (is maximum)
