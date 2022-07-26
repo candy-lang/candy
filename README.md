@@ -105,7 +105,7 @@ Major milestones:
 * [ ] random
 * [ ] standard library
 * [ ] pipe operator
-* [ ] auto-fuzzing
+* [x] auto-fuzzing
 * [ ] "type" proofs
 * [ ] testing
 * [ ] fuzzing of the compiler itself
@@ -119,8 +119,8 @@ Major milestones:
 - use BigInts
 - turn needs `message` into `reason`
 - panic with strings instead of values
+- make condition whether to keep running more granular
 - fuzz parser
-- also fuzz long-running functions
 - add caching to hints server
 - do we need the `CallReceiver`?
 - minimize inputs found through fuzzing
