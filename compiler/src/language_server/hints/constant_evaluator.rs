@@ -73,9 +73,9 @@ impl ConstantEvaluator {
         let mut hints = vec![];
 
         if let Status::Panicked { reason } = vm.status() {
-            let hint = panic_hint(&db, input.clone(), &vm, reason)
-                .expect("Module panicked, but we couldn't build a panic hint to communicate that.");
-            hints.push(hint);
+            if let Some(hint) = panic_hint(&db, input.clone(), &vm, reason) {
+                hints.push(hint);
+            }
         };
         if let Some(path) = input.to_path() {
             let trace = vm.tracer.dump_call_tree();
@@ -124,9 +124,14 @@ fn panic_hint(db: &Database, input: Input, vm: &Vm, reason: String) -> Option<Hi
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.
-    let last_call_in_this_module = vm
-        .tracer
-        .stack()
+    let stack = vm.tracer.stack();
+    if stack.len() == 1 {
+        // The stack only contains a `ModuleStarted` entry. This indicates an
+        // error during compilation resulting in a top-level error instruction.
+        return None;
+    }
+
+    let last_call_in_this_module = stack
         .iter()
         .filter(|entry| {
             let id = match entry {
@@ -138,7 +143,8 @@ fn panic_hint(db: &Database, input: Input, vm: &Vm, reason: String) -> Option<Hi
             // code.
             id.input == input && db.hir_to_cst_id(id.clone()).is_some()
         })
-        .next()?;
+        .next()
+        .expect("Module panicked, but we can't build a panic hint to communicate that.");
 
     let (id, call_info) = match last_call_in_this_module {
         TraceEntry::CallStarted { id, closure, args } => (
