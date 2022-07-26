@@ -9,6 +9,7 @@ equals := (use ".Equality").equals
 function := use ".Function"
 int := use ".Int"
 panic := (use ".Panic").panic
+result := use ".Result"
 struct := use ".Struct"
 text := use ".Text"
 todo := (use ".Todo").todo
