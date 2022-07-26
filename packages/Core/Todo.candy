@@ -1,0 +1,6 @@
+text = use "..Text"
+
+todo message :=
+  needs (text.is message)
+  ## TODO: use text interpolation when available
+  needs False (text.concatenate "TODO: " message)

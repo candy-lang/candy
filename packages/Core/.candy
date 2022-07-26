@@ -11,4 +11,5 @@ int = use ".Int"
 panic = (use ".Panic").panic
 struct = use ".Struct"
 text = use ".Text"
+todo = (use ".Todo").todo
 type = use ".Type"
