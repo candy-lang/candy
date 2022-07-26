@@ -1,4 +1,4 @@
-use super::value::Value;
+use super::value::{Closure, Value};
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
 use itertools::Itertools;
 use log;
@@ -140,11 +140,11 @@ impl Heap {
                 }
                 ObjectData::Struct(entries)
             }
-            Value::Closure {
+            Value::Closure(Closure {
                 captured,
                 num_args,
                 body,
-            } => ObjectData::Closure {
+            }) => ObjectData::Closure {
                 captured: captured
                     .into_iter()
                     .map(|value| self.import(value))
@@ -179,14 +179,14 @@ impl Heap {
                 captured,
                 num_args,
                 body,
-            } => Value::Closure {
+            } => Value::Closure(Closure {
                 captured: captured
                     .iter()
                     .map(|address| self.export_without_dropping(*address))
                     .collect(),
                 num_args: *num_args,
                 body: body.clone(),
-            },
+            }),
             ObjectData::Builtin(builtin) => Value::Builtin(*builtin),
         }
     }

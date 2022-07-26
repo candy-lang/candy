@@ -5,4 +5,4 @@ pub mod use_provider;
 pub mod value;
 mod vm;
 
-pub use vm::{Status, Vm};
+pub use vm::{Status, TearDownResult, Vm};

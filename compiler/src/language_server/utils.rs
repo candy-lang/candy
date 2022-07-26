@@ -3,6 +3,7 @@ use crate::{
     database::Database,
     input::{Input, InputDb},
 };
+use itertools::Itertools;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
 use std::{ops::Range, sync::Arc};
 
@@ -116,8 +117,11 @@ pub fn offset_from_lsp_raw(text: &str, line_start_offsets: &[usize], position: P
     line_offset + char_offset
 }
 
-fn offset_to_lsp(db: &dyn LspPositionConversion, input: Input, offset: usize) -> (u32, u32) {
+fn offset_to_lsp(db: &dyn LspPositionConversion, input: Input, mut offset: usize) -> (u32, u32) {
     let text = db.get_string_input(input.clone()).unwrap();
+    if offset > text.len() {
+        offset = text.len();
+    }
     let line_start_offsets = db.line_start_utf8_byte_offsets(input);
 
     let line = line_start_offsets
@@ -156,4 +160,21 @@ pub fn line_start_utf8_byte_offsets_raw(text: &str) -> Vec<usize> {
             .collect(),
     );
     offsets
+}
+
+pub trait JoinWithCommasAndAnd {
+    fn join_with_commas_and_and(self) -> String;
+}
+impl JoinWithCommasAndAnd for Vec<String> {
+    fn join_with_commas_and_and(mut self) -> String {
+        match &self[..] {
+            [] => panic!("Joining no parts."),
+            [part] => part.to_string(),
+            [first, second] => format!("{first} and {second}"),
+            _ => {
+                let last = self.pop().unwrap();
+                format!("{}, and {last}", self.into_iter().join(", "))
+            }
+        }
+    }
 }

@@ -17,7 +17,7 @@ use crate::{
     compiler::{ast_to_hir::AstToHir, hir::CollectErrors},
     database::PROJECT_DIRECTORY,
     input::{Input, InputDb},
-    CloneWithExtension, Database,
+    Database,
 };
 use itertools::Itertools;
 use lsp_types::{
@@ -31,13 +31,13 @@ use lsp_types::{
     TextDocumentChangeRegistrationOptions, TextDocumentContentChangeEvent,
     TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
 };
-use std::{fs, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::{mpsc::Sender, Mutex};
 use tower_lsp::{jsonrpc, Client, LanguageServer};
 
 pub struct CandyLanguageServer {
     pub client: Client,
-    pub db: Arc<Mutex<Database>>,
+    pub db: Mutex<Database>,
     pub hints_server_sink: Arc<Mutex<Option<Sender<hints::Event>>>>,
 }
 impl CandyLanguageServer {
@@ -80,21 +80,12 @@ impl LanguageServer for CandyLanguageServer {
 
         let (events_sender, events_receiver) = tokio::sync::mpsc::channel(16);
         let (hints_sender, mut hints_receiver) = tokio::sync::mpsc::channel(8);
-        tokio::spawn(hints::run_server(
-            self.db.clone(),
-            events_receiver,
-            hints_sender,
-        ));
+        tokio::spawn(hints::run_server(events_receiver, hints_sender));
         *self.hints_server_sink.lock().await = Some(events_sender);
         let client = self.client.clone();
         let hint_reporter = async move || {
             while let Some((input, hints)) = hints_receiver.recv().await {
-                if let Some(path) = input.to_path() {
-                    let hints_file = path.clone_with_extension("candy.hints");
-                    let content = hints.iter().map(|hint| format!("{hint:?}")).join("\n");
-                    fs::write(hints_file.clone(), content).unwrap();
-                }
-
+                log::debug!("Reporting hints for {input}: {hints:?}");
                 client
                     .send_notification::<HintsNotification>(HintsNotification {
                         uri: Url::from(input).to_string(),
@@ -227,25 +218,27 @@ impl LanguageServer for CandyLanguageServer {
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let input = params.text_document.uri.into();
+        let content = params.text_document.text.into_bytes();
         {
             let mut db = self.db.lock().await;
-            db.did_open_input(&input, params.text_document.text.into_bytes());
+            db.did_open_input(&input, content.clone());
         }
         self.analyze_files(vec![input.clone()]).await;
-        self.send_to_hints_server(hints::Event::UpdateModule(input))
+        self.send_to_hints_server(hints::Event::UpdateModule(input, content))
             .await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let input: Input = params.text_document.uri.into();
         let mut open_inputs = Vec::<Input>::new();
-        {
+        let content = {
             let mut db = self.db.lock().await;
             let text = apply_text_changes(&db, input.clone(), params.content_changes);
-            db.did_change_input(&input, text.into_bytes());
+            db.did_change_input(&input, text.clone().into_bytes());
             open_inputs.extend(db.open_inputs.keys().cloned());
-        }
+            text.into_bytes()
+        };
         self.analyze_files(open_inputs).await;
-        self.send_to_hints_server(hints::Event::UpdateModule(input))
+        self.send_to_hints_server(hints::Event::UpdateModule(input, content))
             .await;
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
