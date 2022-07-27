@@ -13,10 +13,7 @@ if condition then :=
   ifElse condition then {}
 
 run body =
-  # A function that runs the given `body` with no arguments.
-  #
-  # Calling this function is the same as calling the `body` by adding parenthesis at the end, but it
-  # looks nicer:
+  # A function that runs the given `body` with no arguments and returns its result.
   #
   # ```
   # let a = run {
