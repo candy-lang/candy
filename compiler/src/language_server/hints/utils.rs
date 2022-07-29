@@ -20,7 +20,7 @@ pub fn id_to_end_of_line(db: &Database, id: hir::Id) -> Option<Position> {
         line_start_offsets[(line + 1) as usize] - 1
     };
     let position = db
-        .offset_to_lsp(id.input.clone(), last_character_of_line)
+        .offset_to_lsp(id.input, last_character_of_line)
         .to_position();
     Some(position)
 }

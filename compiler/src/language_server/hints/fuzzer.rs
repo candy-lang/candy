@@ -28,8 +28,8 @@ impl FuzzerManager {
     ) {
         let closures = self
             .fuzzable_closures
-            .entry(input.clone())
-            .or_insert_with(|| HashMap::new());
+            .entry(input)
+            .or_insert_with(HashMap::new);
 
         for (id, new_closure) in fuzzable_closures {
             let old_closure = closures.insert(id.clone(), new_closure.clone());
@@ -106,7 +106,7 @@ impl FuzzerManager {
                                 .collect_vec()
                                 .join_with_commas_and_and(),
                         ),
-                        position: id_to_end_of_line(&db, id.clone()).unwrap(),
+                        position: id_to_end_of_line(db, id.clone()).unwrap(),
                     }
                 };
 
@@ -117,7 +117,7 @@ impl FuzzerManager {
                         .rev()
                         // Find the innermost panicking call that is in the
                         // function.
-                        .filter(|entry| {
+                        .find(|entry| {
                             let innermost_panicking_call_id = match entry {
                                 TraceEntry::CallStarted { id, .. } => id,
                                 TraceEntry::NeedsStarted { id, .. } => id,
@@ -126,7 +126,6 @@ impl FuzzerManager {
                             id.is_same_module_and_any_parent_of(innermost_panicking_call_id)
                                 && db.hir_to_cst_id(id.clone()).is_some()
                         })
-                        .next()
                         .expect(
                             "Fuzzer found a panicking function without an inner panicking needs",
                         );

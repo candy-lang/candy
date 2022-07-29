@@ -105,7 +105,7 @@ impl Fuzzer {
                         Status::new_fuzzing_attempt(db, self.closure.clone())
                     } else {
                         Status::PanickedForArguments {
-                            arguments: arguments.clone(),
+                            arguments,
                             reason: reason.clone(),
                             tracer: vm.tracer.clone(),
                         }

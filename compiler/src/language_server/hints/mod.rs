@@ -126,11 +126,10 @@ pub async fn run_server(
                     hint_group
                 })
                 // Show related hints at the same indentation.
-                .map(|mut hint_group| {
+                .flat_map(|mut hint_group| {
                     hint_group.align_hint_columns();
                     hint_group
                 })
-                .flatten()
                 .sorted_by_key(|hint| hint.position)
                 .collect_vec();
 
@@ -177,7 +176,7 @@ impl OutgoingHints {
 /// [em quad](https://en.wikipedia.org/wiki/Quad_(typography)) instead, which
 /// seems to have the same width as a normal space in VSCode.
 fn quasi_spaces(n: usize) -> String {
-    format!(" ").repeat(n)
+    " ".repeat(n)
 }
 
 trait AlignHints {

@@ -27,8 +27,10 @@ pub trait CstToAst: CstDb + RcstToCst {
 
     fn cst_to_ast_id(&self, input: Input, id: cst::Id) -> Option<ast::Id>;
 
-    fn ast(&self, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)>;
+    fn ast(&self, input: Input) -> Option<AstResult>;
 }
+
+type AstResult = (Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>);
 
 fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
     let (_, ast_to_cst_id_mapping) = db.ast(id.input.clone()).unwrap();
@@ -47,7 +49,7 @@ fn cst_to_ast_id(db: &dyn CstToAst, input: Input, id: cst::Id) -> Option<ast::Id
         .cloned()
 }
 
-fn ast(db: &dyn CstToAst, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)> {
+fn ast(db: &dyn CstToAst, input: Input) -> Option<AstResult> {
     let mut context = LoweringContext::new(input.clone());
 
     let asts = match db.cst(input.clone()) {

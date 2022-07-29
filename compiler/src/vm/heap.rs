@@ -1,7 +1,6 @@
 use super::value::{Closure, Value};
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
 use itertools::Itertools;
-use log;
 use std::collections::HashMap;
 
 #[derive(Clone)]
