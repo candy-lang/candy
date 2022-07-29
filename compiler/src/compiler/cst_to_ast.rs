@@ -53,8 +53,7 @@ fn ast(db: &dyn CstToAst, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::I
     let asts = match db.cst(input.clone()) {
         Ok(cst) => {
             let cst = cst.unwrap_whitespace_and_comment();
-            let asts = (&mut context).lower_csts(&cst);
-            asts
+            context.lower_csts(&cst)
         }
         Err(InvalidInputError::DoesNotExist) => return None,
         Err(InvalidInputError::InvalidUtf8) => {
@@ -144,7 +143,7 @@ impl LoweringContext {
                 );
 
                 let text = parts
-                    .into_iter()
+                    .iter()
                     .filter_map(|it| match it {
                         Cst {
                             kind: CstKind::TextPart(text),
@@ -281,7 +280,7 @@ impl LoweringContext {
                 );
 
                 let fields = fields
-                    .into_iter()
+                    .iter()
                     .filter_map(|field| {
                         if let CstKind::StructField {
                             key,
@@ -493,6 +492,7 @@ impl LoweringContext {
             CstKind::Identifier(identifier) => {
                 self.create_string(key.id.to_owned(), identifier.uppercase_first_letter())
             }
+            // TODO: handle CstKind::Error
             _ => panic!(
                 "Expected an identifier after the dot in a struct access, but found `{}`.",
                 key
@@ -508,7 +508,7 @@ impl LoweringContext {
     fn lower_parameters(&mut self, csts: &[Cst]) -> (Vec<AstString>, Vec<CompilerError>) {
         let mut errors = vec![];
         let parameters = csts
-            .into_iter()
+            .iter()
             .enumerate()
             .map(|(index, it)| match self.lower_parameter(it) {
                 Ok(parameter) => parameter,

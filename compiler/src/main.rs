@@ -25,7 +25,7 @@ use crate::{
     database::{Database, PROJECT_DIRECTORY},
     input::Input,
     language_server::utils::LspPositionConversion,
-    vm::{use_provider::DbUseProvider, value::Closure, Status, TearDownResult, Vm},
+    vm::{use_provider::DbUseProvider, value::Closure, Vm},
 };
 use compiler::lir::Lir;
 use fern::colors::{Color, ColoredLevelConfig};
@@ -124,14 +124,14 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", path_string, err));
     if debug {
         let rcst_file = file.clone_with_extension("candy.rcst");
-        fs::write(rcst_file, format!("{:#?}\n", rcst.clone())).unwrap();
+        fs::write(rcst_file, format!("{:#?}\n", rcst)).unwrap();
     }
 
     log::debug!("Turning RCST to CST…");
     let cst = db.cst(input.clone()).expect("RCST should have failed");
     if debug {
         let cst_file = file.clone_with_extension("candy.cst");
-        fs::write(cst_file, format!("{:#?}\n", cst.clone())).unwrap();
+        fs::write(cst_file, format!("{:#?}\n", cst)).unwrap();
     }
 
     log::debug!("Abstracting CST to AST…");
@@ -165,7 +165,7 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
         .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
     if debug {
         let hir_file = file.clone_with_extension("candy.hir");
-        fs::write(hir_file, format!("{}", hir.clone())).unwrap();
+        fs::write(hir_file, format!("{}", hir)).unwrap();
 
         let hir_ast_id_file = file.clone_with_extension("candy.hir_to_ast_ids");
         fs::write(
@@ -209,7 +209,7 @@ fn run(options: CandyRunOptions) {
         log::info!("Build failed.");
         return;
     };
-    let module_closure = Closure::of_input(&db, input.clone()).unwrap();
+    let module_closure = Closure::of_input(&db, input).unwrap();
 
     let path_string = options.file.to_string_lossy();
     log::info!("Running `{path_string}`.");
@@ -251,7 +251,7 @@ async fn fuzz(options: CandyFuzzOptions) {
 
 async fn lsp() {
     log::info!("Starting language server…");
-    let (service, socket) = LspService::new(|client| CandyLanguageServer::from_client(client));
+    let (service, socket) = LspService::new(CandyLanguageServer::from_client);
     Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
         .serve(service)
         .await;

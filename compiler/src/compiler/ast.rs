@@ -245,7 +245,9 @@ impl CollectErrors for Ast {
                 errors: mut recovered_errors,
             } => {
                 errors.append(&mut recovered_errors);
-                child.map(|child| child.collect_errors(errors));
+                if let Some(child) = child {
+                    child.collect_errors(errors)
+                }
             }
         }
     }

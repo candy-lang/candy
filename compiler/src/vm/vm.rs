@@ -10,8 +10,7 @@ use crate::{
     input::Input,
 };
 use itertools::Itertools;
-use log;
-use std::{collections::HashMap, mem};
+use std::collections::HashMap;
 
 /// A VM can execute some byte code.
 #[derive(Clone)]
@@ -110,7 +109,7 @@ impl Vm {
         let return_value = self.heap.export(return_value);
         TearDownResult {
             return_value,
-            fuzzable_closures: mem::replace(&mut self.fuzzable_closures, vec![]),
+            fuzzable_closures: std::mem::take(&mut self.fuzzable_closures),
         }
     }
 
@@ -132,7 +131,7 @@ impl Vm {
     }
 
     fn get_from_data_stack(&self, offset: usize) -> ObjectPointer {
-        self.data_stack[self.data_stack.len() - 1 - offset as usize].clone()
+        self.data_stack[self.data_stack.len() - 1 - offset as usize]
     }
 
     pub fn run<U: UseProvider>(&mut self, use_provider: &U, mut num_instructions: usize) {
@@ -317,7 +316,7 @@ impl Vm {
                 self.next_instruction = caller;
             }
             Instruction::RegisterFuzzableClosure(id) => {
-                let closure = self.data_stack.last().unwrap().clone();
+                let closure = *self.data_stack.last().unwrap();
                 match self.heap.export_without_dropping(closure) {
                     Value::Closure(closure) => self.fuzzable_closures.push((id, closure)),
                     _ => panic!("Instruction RegisterFuzzableClosure executed, but stack top is not a closure."),
@@ -417,7 +416,7 @@ impl Vm {
                 Status::Panicked { reason } => {
                     log::error!("The module panicked because {reason}.");
                     log::error!("This is the stack trace:");
-                    self.tracer.dump_stack_trace(&db);
+                    self.tracer.dump_stack_trace(db);
                     return Err(reason);
                 }
             }

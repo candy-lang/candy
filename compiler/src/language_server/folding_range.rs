@@ -79,7 +79,7 @@ impl<'a> Context<'a> {
                 }
 
                 self.visit_cst(name);
-                self.visit_csts(&arguments);
+                self.visit_csts(arguments);
             }
             // TODO: support folding ranges for structs
             CstKind::Struct { fields, .. } => self.visit_csts(fields),
@@ -116,9 +116,9 @@ impl<'a> Context<'a> {
                     FoldingRangeKind::Region,
                 );
                 if let Some((parameters, _)) = parameters_and_arrow {
-                    self.visit_csts(&parameters);
+                    self.visit_csts(parameters);
                 }
-                self.visit_csts(&body);
+                self.visit_csts(body);
             }
             CstKind::Assignment {
                 name,
@@ -138,8 +138,8 @@ impl<'a> Context<'a> {
                 }
 
                 self.visit_cst(name);
-                self.visit_csts(&parameters);
-                self.visit_csts(&body);
+                self.visit_csts(parameters);
+                self.visit_csts(body);
             }
             CstKind::Error { .. } => {}
         }

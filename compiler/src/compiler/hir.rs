@@ -27,7 +27,7 @@ fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
     match id.parent() {
         Some(lambda_id) => {
             if lambda_id.is_root() {
-                db.hir(id.input.clone()).unwrap().0
+                db.hir(id.input).unwrap().0
             } else {
                 match db.find_expression(lambda_id).unwrap() {
                     Expression::Lambda(lambda) => Arc::new(lambda.body),
@@ -168,15 +168,14 @@ impl Lambda {
     pub fn captured_ids(&self, my_id: &Id) -> Vec<Id> {
         let mut captured = vec![];
         self.body.collect_all_ids(&mut captured);
-        let captured = captured
+        captured
             .into_iter()
             .filter(|potentially_captured_id| {
                 !my_id.is_same_module_and_any_parent_of(potentially_captured_id)
             })
             .collect::<HashSet<_>>()
             .into_iter()
-            .collect_vec();
-        captured
+            .collect_vec()
     }
 }
 
@@ -258,7 +257,7 @@ impl fmt::Display for Expression {
                 function,
                 arguments,
             } => {
-                assert!(arguments.len() > 0, "A call needs to have arguments.");
+                assert!(!arguments.is_empty(), "A call needs to have arguments.");
                 write!(
                     f,
                     "call {function} with these arguments:\n{}",
@@ -289,9 +288,9 @@ impl fmt::Display for Expression {
 }
 impl fmt::Display for Lambda {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
+        writeln!(
             f,
-            "{} ->\n",
+            "{} ->",
             self.parameters
                 .iter()
                 .map(|parameter| format!("{parameter}"))
@@ -304,7 +303,7 @@ impl fmt::Display for Lambda {
 impl fmt::Display for Body {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (id, expression) in self.expressions.iter() {
-            write!(f, "{id} = {expression}\n")?;
+            writeln!(f, "{id} = {expression}")?;
         }
         Ok(())
     }

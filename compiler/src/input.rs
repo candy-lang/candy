@@ -16,9 +16,7 @@ pub trait InputDb: InputWatcher {
 
 fn get_string_input(db: &dyn InputDb, input: Input) -> Option<Arc<String>> {
     let content = get_input(db, input)?;
-    String::from_utf8((*content).clone())
-        .ok()
-        .map(|it| Arc::new(it))
+    String::from_utf8((*content).clone()).ok().map(Arc::new)
 }
 
 fn get_input(db: &dyn InputDb, input: Input) -> Option<Arc<Vec<u8>>> {
@@ -79,7 +77,7 @@ impl From<PathBuf> for Input {
         let project_dir = PROJECT_DIRECTORY.lock().unwrap().clone().unwrap();
         let path = match fs::canonicalize(&path)
             .expect("Path does not exist or is invalid.")
-            .strip_prefix(fs::canonicalize(project_dir).unwrap().clone())
+            .strip_prefix(fs::canonicalize(project_dir).unwrap())
         {
             Ok(path) => path.to_owned(),
             Err(_) => return Input::ExternalFile(path),
@@ -107,7 +105,7 @@ impl Input {
     pub fn to_path(&self) -> Option<PathBuf> {
         match self {
             Input::File(components) => {
-                let mut path = PROJECT_DIRECTORY.lock().unwrap().clone().unwrap().clone();
+                let mut path = PROJECT_DIRECTORY.lock().unwrap().clone().unwrap();
                 for component in components {
                     path.push(component);
                 }

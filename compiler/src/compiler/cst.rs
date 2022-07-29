@@ -567,7 +567,7 @@ impl TreeWithIds for Cst {
 
         inner.or_else(|| {
             if self.span.contains(offset) || (is_end_inclusive && &self.span.end == offset) {
-                return Some(self);
+                Some(self)
             } else {
                 None
             }
@@ -609,31 +609,29 @@ impl<T: TreeWithIds> TreeWithIds for [T] {
         self.iter()
             .map(|it| it.first_id())
             .filter_map(Some)
-            .nth(0)
+            .next()
             .flatten()
     }
     fn find(&self, id: &Id) -> Option<&Cst> {
-        let slice = self.as_ref();
-        let child_index = slice
+        let child_index = self
             .binary_search_by_key(id, |it| it.first_id().unwrap())
             .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
             .ok()?;
-        slice[child_index].find(id)
+        self[child_index].find(id)
     }
 
     fn first_offset(&self) -> Option<usize> {
         self.iter()
             .map(|it| it.first_offset())
             .filter_map(Some)
-            .nth(0)
+            .next()
             .flatten()
     }
     fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
-        let slice = self.as_ref();
-        let child_index = slice
+        let child_index = self
             .binary_search_by_key(offset, |it| it.first_offset().unwrap())
             .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
             .ok()?;
-        slice[child_index].find_by_offset(offset)
+        self[child_index].find_by_offset(offset)
     }
 }

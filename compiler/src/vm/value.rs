@@ -66,7 +66,7 @@ impl Closure {
                 Instruction::CreateClosure {
                     captured: vec![],
                     num_args: 0,
-                    body: lir.instructions.clone(),
+                    body: lir.instructions,
                 },
                 Instruction::Call { num_args: 0 },
                 Instruction::TraceModuleEnds,

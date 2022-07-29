@@ -80,16 +80,12 @@ mod parse {
     use super::super::rcst::{IsMultiline, Rcst, RcstError};
     use itertools::Itertools;
 
-    static MEANINGFUL_PUNCTUATION: &'static str = "()[]:,{}->=.";
-    static SUPPORTED_WHITESPACE: &'static str = " \r\n\t";
+    static MEANINGFUL_PUNCTUATION: &str = "()[]:,{}->=.";
+    static SUPPORTED_WHITESPACE: &str = " \r\n\t";
 
     fn literal<'a>(input: &'a str, literal: &'static str) -> Option<&'a str> {
         log::trace!("literal({input:?}, {literal:?})");
-        if input.starts_with(literal) {
-            Some(&input[literal.len()..])
-        } else {
-            None
-        }
+        input.strip_prefix(literal)
     }
     #[test]
     fn test_literal() {
@@ -281,7 +277,7 @@ mod parse {
             return None;
         }
         if w.chars().all(|c| c.is_ascii_digit()) {
-            let value = u64::from_str_radix(&w, 10).expect("Couldn't parse int.");
+            let value = str::parse(&w).expect("Couldn't parse int.");
             Some((input, Rcst::Int { value, string: w }))
         } else {
             Some((
@@ -1160,7 +1156,7 @@ mod parse {
                 key: Box::new(key),
                 colon: Box::new(colon),
                 value: Box::new(value),
-                comma: comma.map(|it| Box::new(it)),
+                comma: comma.map(Box::new),
             });
         }
         let input = outer_input;

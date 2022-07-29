@@ -60,12 +60,12 @@ impl Heap {
     pub fn get(&self, address: ObjectPointer) -> &Object {
         self.objects
             .get(&address)
-            .expect(&format!("Couldn't get object {address}."))
+            .unwrap_or_else(|| panic!("Couldn't get object {address}."))
     }
     pub fn get_mut(&mut self, address: ObjectPointer) -> &mut Object {
         self.objects
             .get_mut(&address)
-            .expect(&format!("Couldn't get object {address}."))
+            .unwrap_or_else(|| panic!("Couldn't get object {address}."))
     }
 
     pub fn dup(&mut self, address: ObjectPointer) {

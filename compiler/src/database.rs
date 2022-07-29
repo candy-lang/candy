@@ -33,12 +33,12 @@ pub struct Database {
     storage: salsa::Storage<Self>,
     pub open_inputs: HashMap<Input, Vec<u8>>,
 }
-impl<'a> salsa::Database for Database {}
+impl salsa::Database for Database {}
 
 impl Database {
     pub fn did_open_input(&mut self, input: &Input, content: Vec<u8>) {
         let old_value = self.open_inputs.insert(input.clone(), content);
-        if let Some(_) = old_value {
+        if old_value.is_some() {
             log::warn!("Input {input} was opened, but it was already open.");
         }
 
@@ -46,7 +46,7 @@ impl Database {
     }
     pub fn did_change_input(&mut self, input: &Input, content: Vec<u8>) {
         let old_value = self.open_inputs.insert(input.to_owned(), content);
-        if let None = old_value {
+        if old_value.is_none() {
             log::warn!("Input {input} was changed, but it wasn't open before.");
         }
 
@@ -54,7 +54,7 @@ impl Database {
     }
     pub fn did_close_input(&mut self, input: &Input) {
         let old_value = self.open_inputs.remove(input);
-        if let None = old_value {
+        if old_value.is_none() {
             log::warn!("Input {input} was closed, but it wasn't open before.");
         }
 

@@ -21,7 +21,7 @@ impl CompilerError {
             code_description: None,
             source: Some("🍭 Candy".to_owned()),
             message: match self.payload {
-                CompilerErrorPayload::InvalidUtf8 => format!("Invalid UTF8"),
+                CompilerErrorPayload::InvalidUtf8 => "Invalid UTF8".to_string(),
                 CompilerErrorPayload::Rcst(rcst) => format!("RCST: {rcst:?}"),
                 CompilerErrorPayload::Ast(ast) => format!("AST: {ast:?}"),
                 CompilerErrorPayload::Hir(hir) => format!("HIR: {hir:?}"),

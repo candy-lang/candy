@@ -15,7 +15,7 @@ pub trait HirToLir: CstDb + AstToHir {
 }
 
 fn lir(db: &dyn HirToLir, input: Input) -> Option<Arc<Lir>> {
-    let (hir, _) = db.hir(input.clone())?;
+    let (hir, _) = db.hir(input)?;
     let instructions = compile_lambda(&[], &[], &hir);
     Some(Arc::new(Lir { instructions }))
 }
