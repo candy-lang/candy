@@ -88,9 +88,11 @@ impl Display for Value {
             Value::Symbol(symbol) => write!(f, "{symbol}"),
             Value::Struct(entries) => write!(
                 f,
-                "[ {} ]",
+                "[{}]",
                 entries
                     .iter()
+                    .map(|(key, value)| (format!("{}", key), value))
+                    .sorted_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b))
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
             ),
