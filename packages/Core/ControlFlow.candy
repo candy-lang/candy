@@ -16,8 +16,8 @@ run body =
   # A function that runs the given `body` with no arguments and returns its result.
   #
   # ```
-  # let a = run {
-  #   // Some code that can create local variables without cluttering the surrounding namespace.
+  # a = run {
+  #   ## Some code that can create local variables without cluttering the surrounding namespace.
   # }
   # ```
   needs (isFunction0 body)
