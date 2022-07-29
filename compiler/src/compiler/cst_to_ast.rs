@@ -18,6 +18,7 @@ use crate::{
 };
 use im::HashMap;
 use itertools::Itertools;
+use linked_hash_map::LinkedHashMap;
 use std::{ops::Range, sync::Arc};
 
 #[salsa::query_group(CstToAstStorage)]
@@ -285,19 +286,17 @@ impl LoweringContext {
                     opening_bracket
                 );
 
-                let fields = fields
-                    .into_iter()
-                    .filter_map(|field| {
-                        if let CstKind::StructField {
-                            key,
-                            colon,
-                            value,
-                            comma,
-                        } = &field.kind
-                        {
+                let mut positional_fields = vec![];
+                let mut named_fields = LinkedHashMap::new();
+                for field in fields {
+                    if let CstKind::StructField {
+                        key_and_colon,
+                        value,
+                        comma,
+                    } = &field.kind
+                    {
+                        let key = key_and_colon.as_ref().map(|box (key, colon)| {
                             let mut key = self.lower_cst(&key.clone());
-                            let mut value = self.lower_cst(&value.clone());
-
                             if !matches!(colon.kind, CstKind::Colon) {
                                 key = self.create_ast(
                                     colon.id,
@@ -312,38 +311,58 @@ impl LoweringContext {
                                         }],
                                     },
                                 )
-                            }
-                            if let Some(comma) = comma {
-                                if !matches!(comma.kind, CstKind::Comma) {
-                                    value = self.create_ast(
-                                        comma.id,
-                                        AstKind::Error {
-                                            child: Some(Box::new(value)),
-                                            errors: vec![CompilerError {
-                                                input: self.input.clone(),
-                                                span: comma.span.clone(),
-                                                payload: CompilerErrorPayload::Ast(
-                                                    AstError::StructValueWithoutComma,
-                                                ),
-                                            }],
-                                        },
-                                    )
-                                }
-                            }
+                            };
+                            key
+                        });
 
-                            Some((key, value))
-                        } else {
-                            errors.push(CompilerError {
-                                input: self.input.clone(),
-                                span: cst.span.clone(),
-                                payload: CompilerErrorPayload::Ast(
-                                    AstError::StructWithNonStructField,
-                                ),
-                            });
-                            None
+                        let mut value = self.lower_cst(&value.clone());
+                        if !named_fields.is_empty() && key.is_none() {
+                            value = self.create_ast(
+                                field.id,
+                                AstKind::Error {
+                                    child: Some(Box::new(value)),
+                                    errors: vec![CompilerError {
+                                        input: self.input.clone(),
+                                        span: field.span.clone(),
+                                        payload: CompilerErrorPayload::Ast(
+                                            AstError::StructPositionalAfterNamedField,
+                                        ),
+                                    }],
+                                },
+                            )
                         }
-                    })
-                    .collect();
+
+                        if let Some(comma) = comma {
+                            if !matches!(comma.kind, CstKind::Comma) {
+                                value = self.create_ast(
+                                    comma.id,
+                                    AstKind::Error {
+                                        child: Some(Box::new(value)),
+                                        errors: vec![CompilerError {
+                                            input: self.input.clone(),
+                                            span: comma.span.clone(),
+                                            payload: CompilerErrorPayload::Ast(
+                                                AstError::StructValueWithoutComma,
+                                            ),
+                                        }],
+                                    },
+                                )
+                            }
+                        }
+
+                        if let Some(key) = key {
+                            named_fields.insert(key, value);
+                        } else {
+                            positional_fields.push(value);
+                        }
+                    } else {
+                        errors.push(CompilerError {
+                            input: self.input.clone(),
+                            span: cst.span.clone(),
+                            payload: CompilerErrorPayload::Ast(AstError::StructWithNonStructField),
+                        });
+                    }
+                }
 
                 if !matches!(closing_bracket.kind, CstKind::ClosingBracket) {
                     errors.push(CompilerError {
@@ -353,7 +372,13 @@ impl LoweringContext {
                     });
                 }
 
-                let ast = self.create_ast(cst.id, AstKind::Struct(Struct { fields }));
+                let ast = self.create_ast(
+                    cst.id,
+                    AstKind::Struct(Struct {
+                        positional_fields,
+                        named_fields,
+                    }),
+                );
                 if errors.is_empty() {
                     ast
                 } else {

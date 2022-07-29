@@ -1,4 +1,5 @@
 #![feature(async_closure)]
+#![feature(box_patterns)]
 #![feature(label_break_value)]
 #![feature(let_chains)]
 #![feature(never_type)]
@@ -25,7 +26,7 @@ use crate::{
     database::{Database, PROJECT_DIRECTORY},
     input::Input,
     language_server::utils::LspPositionConversion,
-    vm::{use_provider::DbUseProvider, value::Closure, Status, TearDownResult, Vm},
+    vm::{use_provider::DbUseProvider, value::Closure, Vm},
 };
 use compiler::lir::Lir;
 use fern::colors::{Color, ColoredLevelConfig};

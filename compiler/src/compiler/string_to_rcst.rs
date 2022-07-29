@@ -1091,25 +1091,18 @@ mod parse {
                 fields.push(last.wrap_in_whitespace(whitespace));
             }
 
-            // The key itself.
-            let (input, key, has_key) = match expression(input, fields_indentation, true) {
-                Some((input, key)) => (input, key, true),
-                None => (
-                    input,
-                    Rcst::Error {
-                        unparsable_input: "".to_string(),
-                        error: RcstError::StructFieldMissesKey,
-                    },
-                    false,
-                ),
+            // The key for a named field or the name for a positional field.
+            let (input, key_or_value) = match expression(input, fields_indentation, true) {
+                Some((input, key)) => (input, Some(key)),
+                None => (input, None),
             };
 
-            // Whitespace between key and colon.
-            let (input, whitespace) = whitespaces_and_newlines(input, fields_indentation + 1, true);
-            if whitespace.is_multiline() {
+            // Whitespace between key/value and colon.
+            let (input, key_or_value_whitespace) =
+                whitespaces_and_newlines(input, fields_indentation + 1, true);
+            if key_or_value_whitespace.is_multiline() {
                 fields_indentation = indentation + 1;
             }
-            let key = key.wrap_in_whitespace(whitespace);
 
             // Colon.
             let (input, colon, has_colon) = match colon(input) {
@@ -1157,17 +1150,37 @@ mod parse {
                 None => (input, None),
             };
 
-            if !has_key && !has_colon && !has_value && comma.is_none() {
+            if key_or_value.is_none() && !has_colon && !has_value && comma.is_none() {
                 break;
             }
 
-            outer_input = input;
-            fields.push(Rcst::StructField {
-                key: Box::new(key),
-                colon: Box::new(colon),
-                value: Box::new(value),
-                comma: comma.map(|it| Box::new(it)),
+            let is_positional = key_or_value.is_some() && !has_colon && !has_value;
+            let key_or_value = key_or_value.unwrap_or_else(|| Rcst::Error {
+                unparsable_input: "".to_string(),
+                error: if is_positional {
+                    RcstError::StructFieldMissesValue
+                } else {
+                    RcstError::StructFieldMissesKey
+                },
             });
+            let key_or_value = key_or_value.wrap_in_whitespace(key_or_value_whitespace);
+
+            outer_input = input;
+            let comma = comma.map(|it| Box::new(it));
+            let field = if is_positional {
+                Rcst::StructField {
+                    key_and_colon: None,
+                    value: Box::new(key_or_value),
+                    comma,
+                }
+            } else {
+                Rcst::StructField {
+                    key_and_colon: Some(Box::new((key_or_value, colon))),
+                    value: Box::new(value),
+                    comma,
+                }
+            };
+            fields.push(field);
         }
         let input = outer_input;
 
@@ -1222,11 +1235,38 @@ mod parse {
                 Rcst::Struct {
                     opening_bracket: Box::new(Rcst::OpeningBracket),
                     fields: vec![Rcst::StructField {
-                        key: Box::new(Rcst::Identifier("foo".to_string())),
-                        colon: Box::new(Rcst::Colon),
+                        key_and_colon: Some(Box::new((
+                            Rcst::Identifier("foo".to_string()),
+                            Rcst::Colon,
+                        ))),
                         value: Box::new(Rcst::Identifier("bar".to_string())),
                         comma: None,
                     },],
+                    closing_bracket: Box::new(Rcst::ClosingBracket),
+                }
+            ))
+        );
+        assert_eq!(
+            struct_("[foo,bar:baz]", 0),
+            Some((
+                "",
+                Rcst::Struct {
+                    opening_bracket: Box::new(Rcst::OpeningBracket),
+                    fields: vec![
+                        Rcst::StructField {
+                            key_and_colon: None,
+                            value: Box::new(Rcst::Identifier("foo".to_string())),
+                            comma: Some(Box::new(Rcst::Comma)),
+                        },
+                        Rcst::StructField {
+                            key_and_colon: Some(Box::new((
+                                Rcst::Identifier("bar".to_string()),
+                                Rcst::Colon,
+                            ))),
+                            value: Box::new(Rcst::Identifier("baz".to_string())),
+                            comma: None,
+                        },
+                    ],
                     closing_bracket: Box::new(Rcst::ClosingBracket),
                 }
             ))
@@ -1250,11 +1290,13 @@ mod parse {
                     fields: vec![
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::StructField {
-                                key: Box::new(Rcst::Identifier("foo".to_string())),
-                                colon: Box::new(Rcst::TrailingWhitespace {
-                                    child: Box::new(Rcst::Colon),
-                                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                                }),
+                                key_and_colon: Some(Box::new((
+                                    Rcst::Identifier("foo".to_string()),
+                                    Rcst::TrailingWhitespace {
+                                        child: Box::new(Rcst::Colon),
+                                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                                    },
+                                ))),
                                 value: Box::new(Rcst::Identifier("bar".to_string())),
                                 comma: Some(Box::new(Rcst::Comma)),
                             }),
@@ -1265,14 +1307,16 @@ mod parse {
                         },
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::StructField {
-                                key: Box::new(Rcst::Int {
-                                    value: 4u8.into(),
-                                    string: "4".to_string()
-                                }),
-                                colon: Box::new(Rcst::TrailingWhitespace {
-                                    child: Box::new(Rcst::Colon),
-                                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
-                                }),
+                                key_and_colon: Some(Box::new((
+                                    Rcst::Int {
+                                        value: 4u8.into(),
+                                        string: "4".to_string()
+                                    },
+                                    Rcst::TrailingWhitespace {
+                                        child: Box::new(Rcst::Colon),
+                                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                                    },
+                                ))),
                                 value: Box::new(Rcst::Text {
                                     opening_quote: Box::new(Rcst::DoubleQuote),
                                     parts: vec![Rcst::TextPart("Hi".to_string())],

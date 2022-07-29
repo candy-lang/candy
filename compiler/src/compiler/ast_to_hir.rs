@@ -193,11 +193,23 @@ impl<'a> Context<'a> {
                 Expression::Symbol(symbol.value.to_owned()),
                 None,
             ),
-            AstKind::Struct(Struct { fields }) => {
-                let fields = fields
+            AstKind::Struct(Struct {
+                positional_fields,
+                named_fields,
+            }) => {
+                let mut fields = positional_fields
                     .iter()
-                    .map(|(key, value)| (self.compile_single(key), self.compile_single(value)))
-                    .collect();
+                    .enumerate()
+                    .map(|(index, value)| {
+                        (
+                            self.push(None, Expression::Int(index.into()), None),
+                            self.compile_single(value),
+                        )
+                    })
+                    .collect::<HashMap<_, _>>();
+                for (key, value) in named_fields {
+                    fields.insert(self.compile_single(key), self.compile_single(value));
+                }
                 self.push(Some(ast.id.clone()), Expression::Struct(fields), None)
             }
             AstKind::StructAccess(struct_access) => {

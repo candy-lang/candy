@@ -63,7 +63,8 @@ pub struct Symbol(pub AstString);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Struct {
-    pub fields: LinkedHashMap<Ast, Ast>,
+    pub positional_fields: Vec<Ast>,
+    pub named_fields: LinkedHashMap<Ast, Ast>,
 }
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct StructAccess {
@@ -124,6 +125,7 @@ pub enum AstError {
     StructWithoutClosingBrace,
     StructKeyWithoutColon,
     StructValueWithoutComma,
+    StructPositionalAfterNamedField,
     ExpectedIdentifier,
     ExpectedParameter,
     LambdaWithoutClosingCurlyBrace,
@@ -154,15 +156,15 @@ impl FindAst for Ast {
 }
 impl FindAst for Struct {
     fn find(&self, id: &Id) -> Option<&Ast> {
-        for (key, value) in &self.fields {
-            if let Some(ast) = key.find(id) {
-                return Some(ast);
-            }
-            if let Some(ast) = value.find(id) {
-                return Some(ast);
-            }
-        }
-        None
+        self.positional_fields
+            .iter()
+            .filter_map(|value| value.find(id))
+            .chain(
+                self.named_fields
+                    .iter()
+                    .filter_map(|(key, value)| key.find(id).or_else(|| value.find(id))),
+            )
+            .next()
     }
 }
 impl FindAst for StructAccess {
@@ -224,7 +226,10 @@ impl CollectErrors for Ast {
             AstKind::Identifier(_) => {}
             AstKind::Symbol(_) => {}
             AstKind::Struct(struct_) => {
-                for (key, value) in struct_.fields {
+                for value in struct_.positional_fields {
+                    value.collect_errors(errors);
+                }
+                for (key, value) in struct_.named_fields {
                     key.collect_errors(errors);
                     value.collect_errors(errors);
                 }
@@ -273,9 +278,15 @@ impl Display for Ast {
                     f,
                     "struct [\n{}\n]",
                     struct_
-                        .fields
+                        .positional_fields
                         .iter()
-                        .map(|(key, value)| format!("{key}: {value},"))
+                        .map(|value| format!("{value},"))
+                        .chain(
+                            struct_
+                                .named_fields
+                                .iter()
+                                .map(|(key, value)| format!("{key}: {value},"))
+                        )
                         .join("\n")
                         .lines()
                         .map(|line| format!("  {line}"))
