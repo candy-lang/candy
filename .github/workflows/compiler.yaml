@@ -1,6 +1,6 @@
 on: pull_request
 
-name: Continuous Integration
+name: Compiler
 
 env:
   RUST_VERSION: nightly
