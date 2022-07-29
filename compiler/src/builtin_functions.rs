@@ -17,7 +17,7 @@ pub enum BuiltinFunction {
     IntDivideTruncating, // (dividend: int) (divisor: int) -> (quotient: int)
     IntModulo,           // (dividend: int) (divisor: int) -> (remainder: int)
     IntMultiply,         // (factorA: int) (factorB: int) -> (product: int)
-    IntParse,            // (text: text) -> (parsedInt: maybeOfInt)
+    IntParse,            // text -> (parsedInt: maybeOfInt)
     IntShiftLeft,        // (value: int) (amount: int) -> (shifted: int)
     IntShiftRight,       // (value: int) (amount: int) -> (shifted: int)
     IntSubtract,         // (minuend: int) (subtrahend: int) -> (difference: int)

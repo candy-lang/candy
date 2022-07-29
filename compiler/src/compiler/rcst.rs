@@ -415,12 +415,13 @@ impl<A: SplitOuterTrailingWhitespace, B: SplitOuterTrailingWhitespace> SplitOute
     for (A, Vec<B>)
 {
     fn split_outer_trailing_whitespace(self) -> (Vec<Rcst>, Self) {
-        if self.1.is_empty() {
-            let (whitespace, first) = self.0.split_outer_trailing_whitespace();
-            (whitespace, (first, self.1))
+        let (left, right) = self;
+        if right.is_empty() {
+            let (whitespace, first) = left.split_outer_trailing_whitespace();
+            (whitespace, (first, right))
         } else {
-            let (whitespace, second) = self.1.split_outer_trailing_whitespace();
-            (whitespace, (self.0, second))
+            let (whitespace, second) = right.split_outer_trailing_whitespace();
+            (whitespace, (left, second))
         }
     }
 }
