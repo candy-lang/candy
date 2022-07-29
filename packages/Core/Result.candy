@@ -6,10 +6,10 @@ struct = use "..Struct"
 
 is value :=
   bool.lazyAnd
-    (struct.is value)
+    struct.is value
     {
       bool.lazyAnd
-        (bool.and (struct.hasKey value Type) (struct.hasKey value Value))
+        bool.and (struct.hasKey value Type) (struct.hasKey value Value)
         {
           type = value.type
           bool.or (equals type Ok) (equals type Error)
@@ -49,7 +49,7 @@ mapOrElse result okMapper errorMapper :=
   needs (function.is1 okMapper)
   needs (function.is1 errorMapper)
   controlFlow.ifElse
-    (equals result.type Ok)
+    equals result.type Ok
     { okMapper result.value }
     { errorMapper result.value }
 mapOr result okMapper errorValue :=

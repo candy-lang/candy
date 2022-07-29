@@ -5,5 +5,5 @@ panic = (use "..Panic").panic
 check condition :=
   needs (bool.is condition)
   if
-    (bool.not condition)
+    bool.not condition
     { panic "A check didn't succeed" }

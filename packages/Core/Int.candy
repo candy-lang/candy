@@ -121,14 +121,14 @@ min valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   controlFlow.ifElse
-    (isLessThanOrEqualTo valueA valueB)
+    isLessThanOrEqualTo valueA valueB
     { valueA }
     { valueB }
 max valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   controlFlow.ifElse
-    (isGreaterThanOrEqualTo valueA valueB)
+    isGreaterThanOrEqualTo valueA valueB
     { valueA }
     { valueB }
 coerceAtLeast value minimum :=

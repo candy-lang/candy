@@ -61,7 +61,7 @@ removePrefix text prefix :=
   needs (is text)
   needs (is prefix)
   controlFlow.ifElse
-    (startsWith text prefix)
+    startsWith text prefix
     { getRange text (length prefix) (length text) }
     { text }
 removeSuffix text suffix :=
@@ -69,7 +69,7 @@ removeSuffix text suffix :=
   needs (is suffix)
   textLength = length text
   controlFlow.ifElse
-    (startsWith text suffix)
+    startsWith text suffix
     { getRange text (int.subtract textLength (length suffix)) textLength }
     { text }
 
