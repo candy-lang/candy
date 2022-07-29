@@ -139,8 +139,6 @@ impl Display for Input {
 
 #[cfg(test)]
 mod test {
-    use num_bigint::BigUint;
-
     use super::*;
     use crate::{
         compiler::{rcst::Rcst, string_to_rcst::StringToRcst},
@@ -160,7 +158,7 @@ mod test {
         assert_eq!(
             db.rcst(input.clone()).unwrap().as_ref().to_owned(),
             vec![Rcst::Int {
-                value: BigUint::from(123u8),
+                value: 12u8.into(),
                 string: "123".to_string()
             },],
         );
@@ -173,7 +171,7 @@ mod test {
         assert_eq!(
             db.rcst(input.clone()).unwrap().as_ref().to_owned(),
             vec![Rcst::Int {
-                value: BigUint::from(456u16),
+                value: 456u16.into(),
                 string: "456".to_string()
             }],
         );

@@ -186,9 +186,7 @@ impl Vm {
     pub fn run_instruction<U: UseProvider>(&mut self, use_provider: &U, instruction: Instruction) {
         match instruction {
             Instruction::CreateInt(int) => {
-                let address = self
-                    .heap
-                    .create(ObjectData::Int(BigInt::from_biguint(Sign::Plus, int)));
+                let address = self.heap.create(ObjectData::Int(int.into()));
                 self.data_stack.push(address);
             }
             Instruction::CreateText(text) => {

@@ -382,7 +382,7 @@ impl Vm {
         Ok(Value::list(
             content
                 .iter()
-                .map(|byte| Value::Int(BigInt::from(*byte)))
+                .map(|byte| BigInt::from(*byte).into())
                 .collect_vec(),
         ))
     }
