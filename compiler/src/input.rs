@@ -148,7 +148,7 @@ mod test {
     #[test]
     fn on_demand_input_works() {
         let mut db = Database::default();
-        let input: Input = PathBuf::from("/foo.rs").into();
+        let input = Input::File(vec!["foo.rs".to_string()]);
 
         db.did_open_input(&input, "123".to_string().into_bytes());
         assert_eq!(

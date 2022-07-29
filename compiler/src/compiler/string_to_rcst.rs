@@ -584,11 +584,8 @@ mod parse {
                         comment: " foo".to_string()
                     },
                     Rcst::Newline("\n".to_string()),
-                    Rcst::Error {
-                        unparsable_input: "\n ".to_string(),
-                        error: RcstError::WeirdWhitespaceInIndentation
-                    },
-                    Rcst::Whitespace(" ".to_string()),
+                    Rcst::Newline("\n".to_string()),
+                    Rcst::Whitespace("  ".to_string()),
                     Rcst::Comment {
                         octothorpe: Box::new(Rcst::Octothorpe),
                         comment: "bar".to_string()
