@@ -49,14 +49,14 @@ Candy's syntax is inspired by Elm and Haskell.
 
 Source code is stored in plain text files with a `.candy` file extension.
 
-Line [comments](#comments) start with `#` and end at the end of the line:
+[Comments](#comments) start with `#` and end at the end of the line:
 
 ```candy
 # This is a comment.
 ```
 
 Naming rules are similar to other programming languages.
-Identifiers start with a lowecase letter and may contain letters or digits.
+Identifiers start with a lowercase letter and may contain letters or digits.
 Case is sensitive.
 
 ```candy
@@ -82,7 +82,7 @@ bar =
 
 All data in your program is composed of values.
 Values can be created through literals, expressions that evaluate to a value.
-All values are immutable – once created, they do not change.
+All values are immutable – once created, they do not change.
 The number `3` is always the number `3`.
 The string `"frozen"` can never have its character array modified in place.
 
@@ -119,7 +119,7 @@ Finally, you can use curly braces (`{}`) containing a value to insert a stringif
 '"This is a meta text, where you can use " inside the text."'
 ''"This is a double-meta text, allowing you to use "' inside it without ending it."''
 "Some {interpolation}."
-'"In meta texts, {{interpolation}} requires more curly braces, otherwise the values are {not interpolated}."'
+'"In meta texts, {{interpolation}} requires more curly braces; otherwise, the values are {not interpolated}."'
 ```
 
 ### Symbols
@@ -199,10 +199,10 @@ foo =
 bar = hello  # error because hello doesn't exist anymore
 ```
 
-Variables at the top level of a file are visible to the module system.
+Variables at the file's top level are visible to the module system (“public”) if they are declared using `:=`.
 All other variables are local.
 
-Declaring a variable with the same name as another simply shadows that variable:
+Declaring a variable with the same name as another simply shadows that variable, though that's not allowed for public variables.
 From that point forward, the name will refer to the new variable.
 Note that this is different from reassigning to a variable.
 
@@ -217,7 +217,7 @@ bar =
 
 ## Functions
 
-Functions can either be defined using closure literals or by writing them as parameterized variables with arguments in front of the `=`.
+Functions can either be defined using closure literals or by writing them as parameterized variables with arguments in front of the `=` or `:=`.
 Both representations are equivalent with respect to what they do during runtime.
 
 ```candy
@@ -285,7 +285,7 @@ foo = use "...green" # imports the green parent module
 
 Each additional dot at the beginning symbolizes a navigation one level up.
 The possible multiple dots are followed by the name of the module to import.
-Note that you can't navigate further than one level in – for example, the `yellow` module can't import the `brown` module, only its parent module `green`.
+Note that you can't navigate further than one level in – for example, the `yellow` module can't import the `brown` module, only its parent module `green`.
 
 The `use` call evaluates the given module and returns a struct containing all its exported definitions (variables and functions using `:=`).
 
@@ -319,7 +319,7 @@ brown = [
 ]
 ```
 
-The `useAsset` also allows you to import arbitrary non-Candy-files part from your module hierarchy.
+The `useAsset` also allows you to import arbitrary non-Candy files that are part of your module hierarchy.
 In some cases, it makes more sense to express some data in other formats.
 For example, you might want to store user-facing translations for your program in a JSON file.
 
@@ -331,7 +331,7 @@ translations.json
 ```
 # inside main.candy
 
-translations = json.parse(useAsset "..translations.json")
+translations = json.parse (useAsset "..translations.json")
 translations.helloWorld
 ```
 
@@ -346,7 +346,7 @@ TODO: Write something including doc comments
 Candy programs can panic, causing them to crash.
 Contrary to crashes in other programming languages, it's always programmatically clear which part of the code is at fault.
 
-For example, in Rust, if a function panics you have to look at its documentation to understand if the panic is your fault or not:
+For example, in Rust, if a function panics, you have to look at its documentation to understand if the panic is your fault or not:
 The panic of `None.unwrap()` is not `unwrap`'s fault, while a panicking call to `my_complicated_algorithm(input)` may well be the fault of the algorithm itself.
 
 In Candy, code panics if a `needs` is not satisfied.
@@ -482,7 +482,7 @@ TODO: Write something
 
 ## Environment
 
-At some point, your Candy program needs to have side-effects – otherwise, it's just heating up your CPU.
+At some point, your Candy program needs to have side effects – otherwise, it's just heating up your CPU.
 To model that, the `main` function receives an `environment`, which is a struct containing platform-specific values, including channels.
 
 For example, on desktop platforms, the environment looks something like this:
@@ -539,5 +539,5 @@ Next to the interpreted VM, we plan to compile to LLVM or WASM.
 
 One idea we had is to let you provide a custom scoring function in the build script instead of having binary options like "optimize for speed" or "optimize for performance".
 This scoring function could get used by the optimizer to choose which paths to take.
-For example, you could formulate a build where you're okay with a resulting binary blowup of 1 KiB per 10 ms of saved time in some annotated performance-crititcal section.
-Or when developing for an embedded device with limited storage capacity, you might want to generate a binary that fits in the limit but is otherwise as fast as possible.
+For example, you could formulate a build where you're okay with a resulting binary blowup of 1  KiB per 10 ms of saved time in some annotated performance-critical section.
+Or, when developing for an embedded device with limited storage capacity, you might want to generate a binary that fits within the limit but is otherwise as fast as possible.
