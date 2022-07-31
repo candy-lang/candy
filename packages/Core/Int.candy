@@ -34,7 +34,7 @@ compareTo valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   result = ✨.intCompareTo valueA valueB
-  bool.implies (equals result Equal) (equals valueA valueB)
+  check (bool.implies (equals result Equal) (equals valueA valueB))
   result
 isLessThan valueA valueB :=
   needs (is valueA)
