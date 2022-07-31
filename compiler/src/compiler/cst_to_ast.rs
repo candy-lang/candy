@@ -1,7 +1,7 @@
 use super::{
     ast::{
-        self, Ast, AstError, AstKind, AstString, CallReceiver, CollectErrors, Identifier, Int,
-        Lambda, Symbol, Text,
+        self, Ast, AstError, AstKind, AstString, CollectErrors, Identifier, Int, Lambda, Symbol,
+        Text,
     },
     cst::{self, Cst, CstDb, CstKind},
     error::{CompilerError, CompilerErrorPayload},
@@ -125,8 +125,7 @@ impl LoweringContext {
                 panic!("Whitespace should have been removed before lowering to AST.")
             }
             CstKind::Identifier(identifier) => {
-                let string = self.create_string_without_id_mapping(identifier.to_string());
-                self.create_ast(cst.id, AstKind::Identifier(Identifier(string)))
+                self.lower_identifier(cst.id, identifier.to_string())
             }
             CstKind::Symbol(symbol) => {
                 let string = self.create_string_without_id_mapping(symbol.to_string());
@@ -233,12 +232,12 @@ impl LoweringContext {
                     };
                 }
                 let receiver = match &name.kind {
-                    CstKind::Identifier(identifier) => Some(CallReceiver::Identifier(
-                        self.create_string(name.id.to_owned(), identifier.to_owned()),
-                    )),
-                    CstKind::StructAccess { struct_, dot, key } => Some(
-                        CallReceiver::StructAccess(self.lower_struct_access(struct_, dot, key)),
-                    ),
+                    CstKind::Identifier(identifier) => {
+                        Some(self.lower_identifier(name.id, identifier.to_string()))
+                    }
+                    CstKind::StructAccess { struct_, dot, key } => {
+                        Some(self.lower_struct_access(name.id.to_owned(), struct_, dot, key))
+                    }
                     _ => None,
                 };
                 let arguments = self.lower_csts(arguments);
@@ -247,7 +246,7 @@ impl LoweringContext {
                     self.create_ast(
                         cst.id,
                         AstKind::Call(ast::Call {
-                            receiver,
+                            receiver: receiver.into(),
                             arguments,
                         }),
                     )
@@ -364,8 +363,7 @@ impl LoweringContext {
             }
             CstKind::StructField { .. } => panic!("StructField should only appear in Struct."),
             CstKind::StructAccess { struct_, dot, key } => {
-                let struct_access = self.lower_struct_access(struct_, dot, key);
-                self.create_ast(cst.id, AstKind::StructAccess(struct_access))
+                self.lower_struct_access(cst.id, struct_, dot, key)
             }
             CstKind::Lambda {
                 opening_curly_brace,
@@ -428,7 +426,12 @@ impl LoweringContext {
                 assignment_sign,
                 body,
             } => {
-                let name = self.lower_identifier(name);
+                let name = match &name.kind {
+                    CstKind::Identifier(identifier) => {
+                        self.create_string(name.id.to_owned(), identifier.to_owned())
+                    }
+                    _ => panic!("Expected an identifier, but found `{}`.", name),
+                };
                 let (parameters, errors) = self.lower_parameters(parameters);
 
                 assert!(
@@ -481,7 +484,11 @@ impl LoweringContext {
         }
     }
 
-    fn lower_struct_access(&mut self, struct_: &Cst, dot: &Cst, key: &Cst) -> ast::StructAccess {
+    fn lower_identifier(&mut self, id: cst::Id, identifier: String) -> Ast {
+        let string = self.create_string_without_id_mapping(identifier);
+        self.create_ast(id, AstKind::Identifier(Identifier(string)))
+    }
+    fn lower_struct_access(&mut self, id: cst::Id, struct_: &Cst, dot: &Cst, key: &Cst) -> Ast {
         let struct_ = self.lower_cst(struct_);
 
         assert!(
@@ -501,10 +508,13 @@ impl LoweringContext {
             ),
         };
 
-        ast::StructAccess {
-            struct_: Box::new(struct_),
-            key,
-        }
+        self.create_ast(
+            id,
+            AstKind::StructAccess(ast::StructAccess {
+                struct_: Box::new(struct_),
+                key,
+            }),
+        )
     }
 
     fn lower_parameters(&mut self, csts: &[Cst]) -> (Vec<AstString>, Vec<CompilerError>) {
@@ -531,18 +541,6 @@ impl LoweringContext {
                 span: cst.span.clone(),
                 payload: CompilerErrorPayload::Ast(AstError::ExpectedParameter),
             })
-        }
-    }
-    fn lower_identifier(&mut self, cst: &Cst) -> AstString {
-        match cst {
-            Cst {
-                id,
-                kind: CstKind::Identifier(identifier),
-                ..
-            } => self.create_string(id.to_owned(), identifier.clone()),
-            _ => {
-                panic!("Expected an identifier, but found `{}`.", cst);
-            }
         }
     }
 

@@ -1,6 +1,6 @@
 use super::{
     ast::{
-        self, Assignment, Ast, AstKind, Call, CallReceiver, Identifier, Int, Struct, StructAccess,
+        self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, Struct, StructAccess,
         Symbol, Text,
     },
     cst::{self, CstDb},
@@ -325,56 +325,36 @@ impl<'a> Context<'a> {
     }
 
     fn lower_call(&mut self, id: Option<ast::Id>, call: &Call) -> hir::Id {
-        let function = match call.receiver.clone() {
-            CallReceiver::Identifier(name) => {
-                if name.value == "needs" {
-                    let expression = match &self.lower_call_arguments(&call.arguments[..])[..] {
-                        [condition, reason] => Expression::Needs {
-                            condition: Box::new(condition.clone()),
-                            reason: Box::new(reason.clone()),
-                        },
-                        [condition] => Expression::Needs {
-                            condition: Box::new(condition.clone()),
-                            reason: Box::new(self.push(
-                                None,
-                                Expression::Text("needs not satisfied".to_string()),
-                                None,
-                            )),
-                        },
-                        _ => Expression::Error {
-                            child: None,
-                            errors: vec![CompilerError {
-                                input: name.id.input.clone(),
-                                span: self.db.ast_id_to_span(name.id).unwrap(),
-                                payload: CompilerErrorPayload::Hir(
-                                    HirError::NeedsWithWrongNumberOfArguments,
-                                ),
-                            }],
-                        },
-                    };
-                    return self.push(id, expression, None);
-                }
-
-                match self.identifiers.get(&name.value).cloned() {
-                    Some(function) => {
-                        self.push(Some(name.id), Expression::Reference(function), None)
-                    }
-                    None => {
+        let function = match &call.receiver.kind {
+            AstKind::Identifier(Identifier(AstString {
+                id: name_id,
+                value: name,
+            })) if name == "needs" => {
+                let expression = match &self.lower_call_arguments(&call.arguments[..])[..] {
+                    [condition, reason] => Expression::Needs {
+                        condition: Box::new(condition.clone()),
+                        reason: Box::new(reason.clone()),
+                    },
+                    [condition] => Expression::Needs {
+                        condition: Box::new(condition.clone()),
+                        reason: Box::new(self.push(
+                            None,
+                            Expression::Text("needs not satisfied".to_string()),
+                            None,
+                        )),
+                    },
+                    _ => {
                         return self.push_error(
-                            Some(name.id.clone()),
-                            name.id.input.clone(),
-                            self.db.ast_id_to_span(name.id.clone()).unwrap(),
-                            HirError::UnknownFunction {
-                                name: name.value.clone(),
-                            },
+                            id,
+                            name_id.input.clone(),
+                            self.db.ast_id_to_span(name_id.to_owned()).unwrap(),
+                            HirError::NeedsWithWrongNumberOfArguments,
                         );
                     }
-                }
+                };
+                return self.push(id, expression, None);
             }
-            CallReceiver::StructAccess(struct_access) => {
-                self.lower_struct_access(None, &struct_access)
-            }
-            CallReceiver::Call(call) => self.lower_call(None, &call),
+            _ => self.compile_single(call.receiver.as_ref()),
         };
         let arguments = self.lower_call_arguments(&call.arguments[..]);
         self.push(
