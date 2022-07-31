@@ -35,13 +35,13 @@ impl Vm {
         let args = args.iter().map(|it| self.heap.export(*it)).collect_vec();
 
         let return_value_or_panic_reason = match &builtin_function {
-            BuiltinFunction::Call => match self.call(use_provider, args) {
-                // If successful, Call doesn't return a value, but diverges
-                // the control flow.
+            BuiltinFunction::Equals => self.equals(args),
+            BuiltinFunction::FunctionRun => match self.function_run(use_provider, args) {
+                // If successful, `functionRun` doesn't return a value, but
+                // diverges the control flow.
                 Ok(()) => return,
                 Err(message) => Err(message),
             },
-            BuiltinFunction::Equals => self.equals(args),
             BuiltinFunction::GetArgumentCount => self.get_argument_count(args),
             BuiltinFunction::IfElse => match self.if_else(use_provider, args) {
                 // If successful, IfElse doesn't return a value, but diverges
@@ -96,7 +96,15 @@ impl Vm {
         self.data_stack.push(return_object);
     }
 
-    fn call<U: UseProvider>(&mut self, use_provider: &U, args: Vec<Value>) -> Result<(), String> {
+    fn equals(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [a, b], { Ok((a == b).into()) })
+    }
+
+    fn function_run<U: UseProvider>(
+        &mut self,
+        use_provider: &U,
+        args: Vec<Value>,
+    ) -> Result<(), String> {
         destructure!(
             args,
             [Value::Closure(Closure {
@@ -106,7 +114,7 @@ impl Vm {
             })],
             {
                 if *num_args > 0 {
-                    return Err(format!("Call expects a closure without arguments as the body, but got one with {num_args} arguments."));
+                    return Err(format!("`functionRun` expects a closure without arguments as the body, but got one with {num_args} arguments."));
                 }
                 let closure_object = self.heap.import(Value::Closure(Closure {
                     captured: captured.to_owned(),
@@ -114,7 +122,7 @@ impl Vm {
                     body: body.to_owned(),
                 }));
                 log::debug!(
-                    "Call executing the closure: {:?}",
+                    "`functionRun` executing the closure: {:?}",
                     self.heap.export_without_dropping(closure_object)
                 );
                 self.data_stack.push(closure_object);
@@ -122,10 +130,6 @@ impl Vm {
                 Ok(())
             }
         )
-    }
-
-    fn equals(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [a, b], { Ok((a == b).into()) })
     }
 
     fn get_argument_count(&mut self, args: Vec<Value>) -> Result<Value, String> {

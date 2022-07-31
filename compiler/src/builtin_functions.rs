@@ -4,8 +4,8 @@ use strum_macros::EnumIter;
 
 #[derive(Debug, EnumIter, PartialEq, Eq, Clone, Hash, Copy)]
 pub enum BuiltinFunction {
-    Call,                // (lambdaWith0Arguments) -> (returnValue: any)
     Equals,              // any any -> booleanSymbol
+    FunctionRun,         // (lambdaWith0Arguments) -> (returnValue: any)
     GetArgumentCount,    // closure -> argumentCount
     IfElse,              // condition thenClosure elseClosure -> resultOfExecutedClosure
     IntAdd,              // (summandA: int) (summandB: int) -> (sum: int)

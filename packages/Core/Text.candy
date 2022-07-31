@@ -1,5 +1,5 @@
 bool = use "..Bool"
-controlFlow = use "..ControlFlow"
+conditionals = use "..Conditionals"
 equals = (use "..Equality").equals
 int = use "..Int"
 struct = use "..Struct"
@@ -60,7 +60,7 @@ contains text pattern :=
 removePrefix text prefix :=
   needs (is text)
   needs (is prefix)
-  controlFlow.ifElse
+  conditionals.ifElse
     startsWith text prefix
     { getRange text (length prefix) (length text) }
     { text }
@@ -68,7 +68,7 @@ removeSuffix text suffix :=
   needs (is text)
   needs (is suffix)
   textLength = length text
-  controlFlow.ifElse
+  conditionals.ifElse
     startsWith text suffix
     { getRange text (int.subtract textLength (length suffix)) textLength }
     { text }

@@ -1,9 +1,9 @@
 bool := use ".Bool"
 check := (use ".Check").check
 
-controlFlow = use ".ControlFlow"
-if := controlFlow.if
-ifElse := controlFlow.ifElse
+conditionals = use ".Conditionals"
+if := conditionals.if
+ifElse := conditionals.ifElse
 
 equals := (use ".Equality").equals
 function := use ".Function"
