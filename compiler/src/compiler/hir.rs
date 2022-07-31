@@ -185,6 +185,7 @@ pub struct Body {
     pub identifiers: HashMap<Id, String>,
 }
 impl Body {
+    #[allow(dead_code)]
     pub fn return_value(&self) -> Id {
         self.expressions
             .keys()
