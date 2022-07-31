@@ -25,6 +25,10 @@ divideTruncating dividend divisor :=
   needs (is dividend)
   needs (is divisor)
   ✨.intDivideTruncating dividend divisor
+remainder dividend divisor :=
+  needs (is dividend)
+  needs (is divisor)
+  ✨.intRemainder dividend divisor
 modulo dividend divisor :=
   needs (is dividend)
   needs (is divisor)

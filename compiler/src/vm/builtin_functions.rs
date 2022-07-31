@@ -10,6 +10,7 @@ use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, inpu
 use itertools::Itertools;
 use log;
 use num_bigint::{BigInt, ToBigInt};
+use num_integer::Integer;
 use num_traits::ToPrimitive;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -59,6 +60,7 @@ impl Vm {
             BuiltinFunction::IntModulo => self.int_modulo(args),
             BuiltinFunction::IntMultiply => self.int_multiply(args),
             BuiltinFunction::IntParse => self.int_parse(args),
+            BuiltinFunction::IntRemainder => self.int_remainder(args),
             BuiltinFunction::IntShiftLeft => self.int_shift_left(args),
             BuiltinFunction::IntShiftRight => self.int_shift_right(args),
             BuiltinFunction::IntSubtract => self.int_subtract(args),
@@ -210,7 +212,7 @@ impl Vm {
     }
     fn int_compare_to(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Int(value_a), Value::Int(value_b)], {
-            let result = match value_a.cmp(&value_b) {
+            let result = match value_a.cmp(value_b) {
                 Ordering::Less => "Less".to_string(),
                 Ordering::Equal => "Equal".to_string(),
                 Ordering::Greater => "Greater".to_string(),
@@ -225,7 +227,7 @@ impl Vm {
     }
     fn int_modulo(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Int(dividend), Value::Int(divisor)], {
-            Ok((dividend % divisor).into())
+            Ok((dividend.mod_floor(divisor)).into())
         })
     }
     fn int_multiply(&mut self, args: Vec<Value>) -> Result<Value, String> {
@@ -236,6 +238,11 @@ impl Vm {
     fn int_parse(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Text(text)], {
             Ok(BigInt::from_str(text).map_err(|it| format!("{it}")).into())
+        })
+    }
+    fn int_remainder(&mut self, args: Vec<Value>) -> Result<Value, String> {
+        destructure!(args, [Value::Int(dividend), Value::Int(divisor)], {
+            Ok((dividend % divisor).into())
         })
     }
     fn int_shift_left(&mut self, args: Vec<Value>) -> Result<Value, String> {
