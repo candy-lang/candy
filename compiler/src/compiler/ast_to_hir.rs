@@ -161,16 +161,16 @@ impl<'a> Context<'a> {
                 Expression::Text(string.value.to_owned()),
                 None,
             ),
-            AstKind::Identifier(Identifier(symbol)) => {
-                let reference = match self.identifiers.get(&symbol.value) {
+            AstKind::Identifier(Identifier(name)) => {
+                let reference = match self.identifiers.get(&name.value) {
                     Some(reference) => reference.to_owned(),
                     None => {
                         return self.push_error(
-                            Some(symbol.id.clone()),
+                            Some(name.id.clone()),
                             ast.id.input.clone(),
                             self.db.ast_id_to_span(ast.id.clone()).unwrap(),
                             HirError::UnknownReference {
-                                symbol: symbol.value.clone(),
+                                name: name.value.clone(),
                             },
                         );
                     }
