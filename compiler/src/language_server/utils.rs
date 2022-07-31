@@ -8,7 +8,7 @@ use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
 use std::{ops::Range, sync::Arc};
 
 impl CompilerError {
-    pub fn to_diagnostic(self, db: &Database, input: Input) -> Diagnostic {
+    pub fn into_diagnostic(self, db: &Database, input: Input) -> Diagnostic {
         Diagnostic {
             range: lsp_types::Range {
                 start: db
