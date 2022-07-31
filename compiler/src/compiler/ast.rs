@@ -158,12 +158,12 @@ impl FindAst for Struct {
     fn find(&self, id: &Id) -> Option<&Ast> {
         self.positional_fields
             .iter()
-            .filter_map(|value| value.find(id))
             .chain(
                 self.named_fields
                     .iter()
-                    .filter_map(|(key, value)| key.find(id).or_else(|| value.find(id))),
+                    .flat_map(|(key, value)| vec![key, value].into_iter()),
             )
+            .filter_map(|value| value.find(id))
             .next()
     }
 }
