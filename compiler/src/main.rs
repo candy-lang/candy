@@ -1,6 +1,5 @@
 #![feature(async_closure)]
 #![feature(label_break_value)]
-#![feature(let_chains)]
 #![feature(never_type)]
 #![feature(try_trait_v2)]
 
