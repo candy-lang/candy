@@ -109,7 +109,7 @@ They start and end with double quotes (`"`) and can span multiple lines if they'
 You can also start texts with any number of single quotes (`'`) followed by a double quote (`"`).
 This so-called meta-text can only be ended with a double quote and the same number of single quotes that it started with.
 
-Finally, you can use curly braces (`{}`) containing a value to insert a stringified version of the value into the string at that position.
+Finally, you can use curly braces (`{}`) containing a text value to insert it into the text at that position.
 
 ```candy
 "Hello!"
