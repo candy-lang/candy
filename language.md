@@ -37,7 +37,7 @@ Note that not all of the features described here are implemented or even finaliz
 - [Concurrency](#concurrency)
   - [Channels](#channels)
 - [Packages](#packages)
-- [Environment](#environment)
+- [Environment and Capabilities](#environment-and-capabilities)
 - [Interoperability With Other Languages](#interoperability-with-other-languages)
   - [Add to the Environment](#add-to-the-environment)
   - [Contain Pure Code](#contain-pure-code)
@@ -421,6 +421,8 @@ Candy supports a lightweight version of threads called *fibers*.
 To enforce structured concurrency, they can only be spawned using a special concurrency object called the *nursery*.
 In the following code, the surrounding call to `core.parallel` only exits when all fibers inside have completed.
 
+Note: The actual `print` works differently, using [capabilities](#environment-and-capabilities).
+
 ```candy
 core.parallel { nursery ->
   core.fiber.spawn nursery { print "Banana" }
@@ -481,7 +483,7 @@ TODO: Write about async await as soon as they are in the Core package
 
 TODO: Write something
 
-## Environment
+## Environment and Capabilities
 
 At some point, your Candy program needs to have side effects – otherwise, it's just heating up your CPU.
 To model that, the `main` function receives an `environment`, which is a struct containing platform-specific values, including channels.
