@@ -25,20 +25,20 @@ Note that not all of the features described here are implemented or even finaliz
   - [Symbols](#symbols)
   - [Structs](#structs)
   - [Closures](#closures)
-  - [More?](#more)
   - [Channel Ends](#channel-ends)
+  - [More?](#more)
 - [Variables](#variables)
 - [Functions](#functions)
 - [Modules](#modules)
 - [Comments](#comments)
 - [Panics](#panics)
 - [Needs](#needs)
-- [Pattern matching](#pattern-matching)
+- [Pattern Matching](#pattern-matching)
 - [Concurrency](#concurrency)
   - [Channels](#channels)
 - [Packages](#packages)
 - [Environment](#environment)
-- [Interoperability with other languages](#interoperability-with-other-languages)
+- [Interoperability With Other Languages](#interoperability-with-other-languages)
   - [Add to the Environment](#add-to-the-environment)
   - [Contain Pure Code](#contain-pure-code)
 - [Deploying code](#deploying-code)
@@ -158,18 +158,20 @@ longClosure = { foo ->
 }
 ```
 
+### Channel Ends
+
+TODO: Or are they called ports?
+
+Channels ends allow you to interact with a [channel](#concurrency).
+There are receive ends and send ends to receive and send data from a channel, respectively.
+
 ### More?
 
 TODO: Lists? Sets?
 
-- lists: [1, 2, 3]
-- sets: Clojure has %{ value }
-  - or like Toit? {hey, you, there} for set, empty map is {:}
-
-### Channel Ends
-
-Channels ends allow you to interact with a [channel](#concurrency).
-There are receive ends and send ends to receive and send data from a channel, respectively.
+- lists: `[1, 2, 3]`
+- sets: Clojure has `%{ value }`
+  - or like Toit? `{hey, you, there}` for set, empty map is `{:}`
 
 ## Variables
 
@@ -408,7 +410,7 @@ mySqrt a =               # If you pass `a = -1`,
   core.int.sqrt a        # but calling `core.int.sqrt -1` panics because sqrt only works on non-negative integers. If you think this should be different, check out the `ComplexNumbers` package.
 ```
 
-## Pattern matching
+## Pattern Matching
 
 TODO: Write something
 
@@ -507,7 +509,7 @@ When using a package, without reading its source code, you can be confident that
 If a function expects a stdout channel, there's no way it can tell if you gave it another channel that you just created.
 You could for example process the output of the function, filter some information out, and forward the rest to the real stdout channel.
 
-## Interoperability with other languages
+## Interoperability With Other Languages
 
 Candy has no plans to directly support Foreign Function Interfaces (FFI) to communicate with other code.
 The reason is that doing so inherently breaks the isolation of code.
