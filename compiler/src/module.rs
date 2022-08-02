@@ -62,9 +62,10 @@ impl Module {
         }
     }
     pub fn from_package_root_and_file(package_root: PathBuf, file: PathBuf) -> Self {
-        let relative_path = match fs::canonicalize(&file)
-            .expect("Package root does not exist or is invalid.")
-            .strip_prefix(fs::canonicalize(package_root).unwrap().clone())
+        let relative_path =
+            fs::canonicalize(&file).expect("Package root does not exist or is invalid.");
+        let relative_path = match relative_path
+            .strip_prefix(fs::canonicalize(package_root.clone()).unwrap().clone())
         {
             Ok(path) => path,
             Err(_) => return Module::from_anonymous_content(fs::read_to_string(file).unwrap()),
@@ -97,14 +98,14 @@ impl Package {
         match self {
             Package::User(path) => Some(path.clone()),
             Package::External(path) => Some(path.clone()),
-            Package::Anonymous { root_content } => None,
+            Package::Anonymous { .. } => None,
         }
     }
 }
 impl Module {
     pub fn to_path(&self) -> Option<PathBuf> {
         let mut total_path = self.package.to_path()?;
-        for component in self.path {
+        for component in self.path.clone() {
             total_path.push(component);
         }
         Some(total_path)
@@ -117,7 +118,7 @@ impl Display for Package {
             Package::User(path) => write!(f, "user:{path:?}"),
             Package::External(path) => write!(f, "extern:{path:?}"),
             Package::Anonymous { root_content } => {
-                let hasher = DefaultHasher::new();
+                let mut hasher = DefaultHasher::new();
                 root_content.hash(&mut hasher);
                 let hash = hasher.finish();
                 write!(f, "anonymous:{hash:#x}")

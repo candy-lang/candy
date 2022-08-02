@@ -101,6 +101,20 @@ impl LoweringContext {
             Expression::Builtin(builtin) => {
                 self.emit_create_builtin(id.clone(), *builtin);
             }
+            Expression::UseAssetModule {
+                current_module,
+                relative_path,
+            } => {
+                self.emit_push_from_stack(relative_path.clone());
+                self.emit_use_asset_module(id.clone(), current_module.clone());
+            }
+            Expression::UseCodeModule {
+                current_module,
+                relative_path,
+            } => {
+                self.emit_push_from_stack(relative_path.clone());
+                self.emit_use_code_module(id.clone(), current_module.clone());
+            }
             Expression::Needs { condition, reason } => {
                 self.emit_push_from_stack(*condition.clone());
                 self.emit_push_from_stack(*reason.clone());
@@ -169,14 +183,24 @@ impl LoweringContext {
         self.stack.pop_multiple(num_args);
         self.stack.push(id);
     }
+    fn emit_return(&mut self) {
+        self.emit(Instruction::Return);
+    }
+    fn emit_use_asset_module(&mut self, id: hir::Id, current_module: Module) {
+        self.stack.pop(); // relative path
+        self.emit(Instruction::UseAssetModule { current_module });
+        self.stack.push(id); // bytes
+    }
+    fn emit_use_code_module(&mut self, id: hir::Id, current_module: Module) {
+        self.stack.pop(); // relative path
+        self.emit(Instruction::UseCodeModule { current_module });
+        self.stack.push(id); // exported definitions
+    }
     fn emit_needs(&mut self, id: hir::Id) {
         self.stack.pop(); // reason
         self.stack.pop(); // condition
         self.emit(Instruction::Needs);
         self.stack.push(id); // Nothing
-    }
-    fn emit_return(&mut self) {
-        self.emit(Instruction::Return);
     }
     fn emit_register_fuzzable_closure(&mut self, id: hir::Id) {
         self.emit(Instruction::RegisterFuzzableClosure(id));

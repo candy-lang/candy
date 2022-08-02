@@ -8,7 +8,7 @@ use crate::{
         folding_range::FoldingRangeDbStorage, references::ReferencesDbStorage,
         semantic_tokens::SemanticTokenDbStorage, utils::LspPositionConversionStorage,
     },
-    module::{GetOpenModuleQuery, Module, ModuleDbStorage, ModuleWatcher},
+    module::{GetOpenModuleContentQuery, Module, ModuleDbStorage, ModuleWatcher},
 };
 use im::HashMap;
 
@@ -40,7 +40,7 @@ impl Database {
             log::warn!("Module {module} was opened, but it was already open.");
         }
 
-        GetOpenModuleQuery.in_db_mut(self).invalidate(module);
+        GetOpenModuleContentQuery.in_db_mut(self).invalidate(module);
     }
     pub fn did_change_module(&mut self, module: &Module, content: Vec<u8>) {
         let old_value = self.open_modules.insert(module.to_owned(), content);
@@ -48,7 +48,7 @@ impl Database {
             log::warn!("Module {module} was changed, but it wasn't open before.");
         }
 
-        GetOpenModuleQuery.in_db_mut(self).invalidate(module);
+        GetOpenModuleContentQuery.in_db_mut(self).invalidate(module);
     }
     pub fn did_close_module(&mut self, module: &Module) {
         let old_value = self.open_modules.remove(module);
@@ -56,7 +56,7 @@ impl Database {
             log::warn!("Module {module} was closed, but it wasn't open before.");
         }
 
-        GetOpenModuleQuery.in_db_mut(self).invalidate(module);
+        GetOpenModuleContentQuery.in_db_mut(self).invalidate(module);
     }
 }
 impl ModuleWatcher for Database {

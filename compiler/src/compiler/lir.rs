@@ -42,11 +42,11 @@ pub enum Instruction {
     /// a -> a, builtin
     CreateBuiltin(BuiltinFunction),
 
-    /// Leaves the top stack item untouched, but removes n below.
-    PopMultipleBelowTop(usize),
-
     /// Pushes an item from back in the stack on the stack again.
     PushFromStack(StackOffset),
+
+    /// Leaves the top stack item untouched, but removes n below.
+    PopMultipleBelowTop(usize),
 
     /// Pops a closure and num_args arguments, pushes the current instruction
     /// pointer, all captured variables, and arguments, and then changes the
@@ -57,9 +57,34 @@ pub enum Instruction {
     /// Later, when the closure returns (perhaps many instructions after this
     /// one), the stack will contain the result:
     ///
-    /// a, arg1, arg2, ..., argN, closure -> a, return value from closure
+    /// a, arg1, arg2, ..., argN, closure ~> a, return value from closure
     Call {
         num_args: usize,
+    },
+
+    /// Returns from the current closure to the original caller.
+    ///
+    /// a, caller, return value -> a, return value
+    Return,
+
+    /// Pops a string path and then resolves the path relative to the current
+    /// module. Then pushes the content of the resolved file.
+    ///
+    /// a, path -> a, listOfContentBytes
+    UseAssetModule {
+        current_module: Module,
+    },
+
+    /// Pops a string path and then resolves the path relative to the current
+    /// module. Then compiles the module and runs the resulting module closure.
+    ///
+    /// a, path -> a
+    ///
+    /// Later, when the module returns, the stack will contain the result:
+    ///
+    /// a, path ~> a, structOfModuleExports
+    UseCodeModule {
+        current_module: Module,
     },
 
     /// Pops a boolean condition and a reason. If the condition is true, it
@@ -68,11 +93,6 @@ pub enum Instruction {
     ///
     /// a, condition, reason -> a, Nothing
     Needs,
-
-    /// Returns from the current closure to the original caller.
-    ///
-    /// a, caller, return value -> a, return value
-    Return,
 
     /// Indicates that a fuzzable closure sits at the top of the stack.
     RegisterFuzzableClosure(hir::Id),
@@ -138,15 +158,21 @@ impl Display for Instruction {
             Instruction::CreateBuiltin(builtin_function) => {
                 write!(f, "createBuiltin {builtin_function:?}")
             }
+            Instruction::PushFromStack(offset) => write!(f, "pushFromStack {offset}"),
             Instruction::PopMultipleBelowTop(count) => {
                 write!(f, "popMultipleBelowTop {count}")
             }
-            Instruction::PushFromStack(offset) => write!(f, "pushFromStack {offset}"),
             Instruction::Call { num_args } => {
                 write!(f, "call with {num_args} arguments")
             }
-            Instruction::Needs => write!(f, "needs"),
             Instruction::Return => write!(f, "return"),
+            Instruction::UseAssetModule { current_module } => {
+                write!(f, "useAssetModule (currently in {})", current_module)
+            }
+            Instruction::UseCodeModule { current_module } => {
+                write!(f, "useCodeModule (currently in {})", current_module)
+            }
+            Instruction::Needs => write!(f, "needs"),
             Instruction::RegisterFuzzableClosure(hir_id) => {
                 write!(f, "registerFuzzableClosure {hir_id}")
             }

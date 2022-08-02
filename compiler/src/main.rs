@@ -91,7 +91,7 @@ async fn main() {
 }
 
 fn build(options: CandyBuildOptions) {
-    let module = Module::from_package_root_and_file(current_dir().unwrap(), options.file);
+    let module = Module::from_package_root_and_file(current_dir().unwrap(), options.file.clone());
     raw_build(module.clone(), options.debug);
 
     if options.watch {
@@ -192,7 +192,7 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
 }
 
 fn run(options: CandyRunOptions) {
-    let module = Module::from_package_root_and_file(current_dir().unwrap(), options.file);
+    let module = Module::from_package_root_and_file(current_dir().unwrap(), options.file.clone());
     let db = Database::default();
 
     if raw_build(module.clone(), false).is_none() {

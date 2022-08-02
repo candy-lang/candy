@@ -76,6 +76,12 @@ impl Expression {
                 ids.push(function.clone());
                 ids.extend(arguments.iter().cloned());
             }
+            Expression::UseAssetModule { relative_path, .. } => {
+                ids.push(relative_path.clone());
+            }
+            Expression::UseCodeModule { relative_path, .. } => {
+                ids.push(relative_path.clone());
+            }
             Expression::Builtin(_) => {}
             Expression::Needs { condition, reason } => {
                 ids.push(*condition.clone());
@@ -138,11 +144,19 @@ pub enum Expression {
     Symbol(String),
     Struct(HashMap<Id, Id>),
     Lambda(Lambda),
+    Builtin(BuiltinFunction),
     Call {
         function: Id,
         arguments: Vec<Id>,
     },
-    Builtin(BuiltinFunction),
+    UseAssetModule {
+        current_module: Module,
+        relative_path: Id,
+    },
+    UseCodeModule {
+        current_module: Module,
+        relative_path: Id,
+    },
     Needs {
         condition: Box<Id>,
         reason: Box<Id>,
@@ -253,7 +267,9 @@ impl fmt::Display for Expression {
                         .join("\n"),
                 )
             }
-
+            Expression::Builtin(builtin) => {
+                write!(f, "builtin{builtin:?}")
+            }
             Expression::Call {
                 function,
                 arguments,
@@ -268,9 +284,22 @@ impl fmt::Display for Expression {
                         .join("\n")
                 )
             }
-            Expression::Builtin(builtin) => {
-                write!(f, "builtin{builtin:?}")
-            }
+            Expression::UseAssetModule {
+                current_module,
+                relative_path,
+            } => write!(
+                f,
+                "use asset module at {} relative to {}",
+                relative_path, current_module
+            ),
+            Expression::UseCodeModule {
+                current_module,
+                relative_path,
+            } => write!(
+                f,
+                "use code module at {} relative to {}",
+                relative_path, current_module
+            ),
             Expression::Needs { condition, reason } => {
                 write!(f, "needs {condition} with reason {reason}")
             }
@@ -319,8 +348,10 @@ impl Expression {
             Expression::Symbol { .. } => None,
             Expression::Struct(_) => None,
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
-            Expression::Call { .. } => None,
             Expression::Builtin(_) => None,
+            Expression::Call { .. } => None,
+            Expression::UseAssetModule { .. } => None,
+            Expression::UseCodeModule { .. } => None,
             Expression::Needs { .. } => None,
             Expression::Error { .. } => None,
         }
@@ -352,8 +383,10 @@ impl CollectErrors for Expression {
             | Expression::Reference(_)
             | Expression::Symbol(_)
             | Expression::Struct(_)
-            | Expression::Call { .. }
             | Expression::Builtin(_)
+            | Expression::Call { .. }
+            | Expression::UseAssetModule { .. }
+            | Expression::UseCodeModule { .. }
             | Expression::Needs { .. } => {}
             Expression::Lambda(lambda) => lambda.body.collect_errors(errors),
             Expression::Error {

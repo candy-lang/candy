@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     builtin_functions::{self, BuiltinFunction},
-    module::{Module, Package},
+    module::Module,
 };
 use im::HashMap;
 use itertools::Itertools;
@@ -489,96 +489,25 @@ impl<'a> Context<'a> {
         self.push(None, sparkles_map, Some("✨".to_string()));
     }
 
-    fn generate_panicking_code(&mut self, reason: String) -> hir::Id {
-        let condition = self.push(
-            None,
-            Expression::Symbol("False".to_string()),
-            Some("false".to_string()),
-        );
-        let reason = self.push(None, Expression::Text(reason), Some("reason".to_string()));
-        self.push(
-            None,
-            Expression::Needs {
-                condition: Box::new(condition),
-                reason: Box::new(reason),
-            },
-            None,
-        )
-    }
-
-    // Generates a struct that contains the current path as a struct. Generates
-    // panicking code if the current file is not on the file system and of the
-    // current project.
-    fn generate_current_path_struct(&mut self) -> hir::Id {
-        // HirId(~:test.candy:something:key) = int 0
-        // HirId(~:test.candy:something:raw_path) = text "test.candy"
-        // HirId(~:test.candy:something:currentPath) = struct [
-        //   HirId(~:test.candy:something:key): HirId(~:test.candy:something:raw_path),
-        // ]
-
-        match self.module.package {
-            Package::User(path) => {
-                let current_path_content = path
-                    .into_iter()
-                    .filter(|path| *path != ".candy")
-                    .enumerate()
-                    .map(|(index, it)| {
-                        (
-                            self.push(None, Expression::Int(index as u64), Some("key".to_string())),
-                            self.push(
-                                None,
-                                Expression::Text(it.to_str().unwrap().to_string()),
-                                Some("rawPath".to_string()),
-                            ),
-                        )
-                    })
-                    .collect();
-                self.push(
-                    None,
-                    Expression::Struct(current_path_content),
-                    Some("currentPath".to_string()),
-                )
-            }
-            Package::External(_) => self.generate_panicking_code(
-                "file doesn't belong to the currently opened project.".to_string(),
-            ),
-            Package::Anonymous { .. } => self.generate_panicking_code(
-                "untitled files can't call `use` or `useAsset`.".to_string(),
-            ),
-        }
-    }
-
     fn generate_use_asset(&mut self) {
         // HirId(~:test.candy:useAsset) = lambda { HirId(~:test.candy:useAsset:target) ->
-        //   HirId(~:test.candy:useAsset:key) = int 0
-        //   HirId(~:test.candy:useAsset:raw_path) = text "test.candy"
-        //   HirId(~:test.candy:useAsset:currentPath) = struct [
-        //     HirId(~:test.candy:useAsset:key): HirId(~:test.candy:useAsset:raw_path),
-        //   ]
-        //   HirId(~:test.candy:useAsset:useAsset) = builtinUseAsset
-        //   HirId(~:test.candy:useAsset:importedFileContent) = call HirId(~:test.candy:useAsset:useAsset) with these arguments:
-        //     HirId(~:test.candy:useAsset:currentPath)
-        //     HirId(~:test.candy:useAsset:target)
+        //   HirId(~:test.candy:useAsset:importedFileContent) = useAssetModule
+        //     currently in ~:test.candy:useAsset:importedFileContent
+        //     relative path: HirId(~:test.candy:useAsset:target)
         // }
 
         let reset_state = self.start_scope();
         self.prefix_keys.push("useAsset".to_string());
-        let lambda_parameter_id = hir::Id::new(
+        let relative_path = hir::Id::new(
             self.module.clone(),
             add_keys(&self.prefix_keys[..], "target".to_string()),
         );
 
-        let current_path = self.generate_current_path_struct();
-        let use_id = self.push(
-            None,
-            Expression::Builtin(BuiltinFunction::UseAsset),
-            Some("useAsset".to_string()),
-        );
         self.push(
             None,
-            Expression::Call {
-                function: use_id,
-                arguments: vec![current_path, lambda_parameter_id.clone()],
+            Expression::UseAssetModule {
+                current_module: self.module.clone(),
+                relative_path: relative_path.clone(),
             },
             Some("importedFileContent".to_string()),
         );
@@ -588,7 +517,7 @@ impl<'a> Context<'a> {
         self.push(
             None,
             Expression::Lambda(Lambda {
-                parameters: vec![lambda_parameter_id],
+                parameters: vec![relative_path],
                 body: inner_body,
                 fuzzable: false,
             }),
@@ -598,36 +527,23 @@ impl<'a> Context<'a> {
 
     fn generate_use(&mut self) {
         // HirId(~:test.candy:use) = lambda { HirId(~:test.candy:use:target) ->
-        //   HirId(~:test.candy:use:panic) = builtinPanic
-        //   HirId(~:test.candy:use:key) = int 0
-        //   HirId(~:test.candy:use:rawPath) = text "test.candy"
-        //   HirId(~:test.candy:use:currentPath) = struct [
-        //     HirId(~:test.candy:use:key): HirId(~:test.candy:use:rawPath),
-        //   ]
-        //   HirId(~:test.candy:use:useLocalModule) = builtinUseLocalModule
-        //   HirId(~:test.candy:use:importedModule) = call HirId(~:test.candy:use:useLocalModule) with these arguments:
-        //     HirId(~:test.candy:use:currentPath)
-        //     HirId(~:test.candy:use:target)
+        //   HirId(~:test.candy:useAsset:importedFileContent) = useAssetModule
+        //     currently in ~:test.candy:useAsset:importedFileContent
+        //     relative path: HirId(~:test.candy:useAsset:target)
         //  }
 
         let reset_state = self.start_scope();
         self.prefix_keys.push("use".to_string());
-        let lambda_parameter_id = hir::Id::new(
+        let relative_path = hir::Id::new(
             self.module.clone(),
             add_keys(&self.prefix_keys[..], "target".to_string()),
         );
 
-        let current_path = self.generate_current_path_struct();
-        let use_id = self.push(
-            None,
-            Expression::Builtin(BuiltinFunction::UseLocalModule),
-            Some("useLocalModule".to_string()),
-        );
         self.push(
             None,
-            Expression::Call {
-                function: use_id,
-                arguments: vec![current_path, lambda_parameter_id.clone()],
+            Expression::UseCodeModule {
+                current_module: self.module.clone(),
+                relative_path: relative_path.clone(),
             },
             Some("importedModule".to_string()),
         );
@@ -637,7 +553,7 @@ impl<'a> Context<'a> {
         self.push(
             None,
             Expression::Lambda(Lambda {
-                parameters: vec![lambda_parameter_id],
+                parameters: vec![relative_path],
                 body: inner_body,
                 fuzzable: false,
             }),

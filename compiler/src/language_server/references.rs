@@ -13,32 +13,49 @@ use lsp_types::{
     DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Location, ReferenceParams,
     TextDocumentPositionParams,
 };
+use std::path::PathBuf;
 
-pub fn find_references(db: &Database, params: ReferenceParams) -> Option<Vec<Location>> {
+pub fn find_references(
+    db: &Database,
+    project_directory: PathBuf,
+    params: ReferenceParams,
+) -> Option<Vec<Location>> {
     let position = params.text_document_position;
-    let references = find(db, position.clone(), params.context.include_declaration)?
-        .into_iter()
-        .map(|it| Location {
-            uri: position.text_document.uri.clone(),
-            range: it.range,
-        })
-        .collect();
+    let references = find(
+        db,
+        project_directory,
+        position.clone(),
+        params.context.include_declaration,
+    )?
+    .into_iter()
+    .map(|it| Location {
+        uri: position.text_document.uri.clone(),
+        range: it.range,
+    })
+    .collect();
     Some(references)
 }
 
 pub fn find_document_highlights(
     db: &Database,
+    project_directory: PathBuf,
     params: DocumentHighlightParams,
 ) -> Option<Vec<DocumentHighlight>> {
-    find(db, params.text_document_position_params, true)
+    find(
+        db,
+        project_directory,
+        params.text_document_position_params,
+        true,
+    )
 }
 
 fn find(
     db: &Database,
+    project_directory: PathBuf,
     params: TextDocumentPositionParams,
     include_declaration: bool,
 ) -> Option<Vec<DocumentHighlight>> {
-    let module: Module = params.text_document.uri.clone().into();
+    let module = Module::from_package_root_and_url(project_directory, params.text_document.uri);
     let position = params.position;
     let offset = db.offset_from_lsp(module.clone(), position.line, position.character);
     let query = query_for_offset(db, module, offset)?;
@@ -183,6 +200,7 @@ impl<'a> Context<'a> {
                 // way. Therfore, we already visit them in [visit_body].
                 self.visit_body(body);
             }
+            Expression::Builtin(_) => {}
             Expression::Call {
                 function,
                 arguments,
@@ -194,7 +212,8 @@ impl<'a> Context<'a> {
                 }
                 self.visit_ids(arguments);
             }
-            Expression::Builtin(_) => {}
+            Expression::UseAssetModule { .. } => {} // only occurs in generated code
+            Expression::UseCodeModule { .. } => {}  // only occurs in generated code
             Expression::Needs { .. } => {
                 if let ReferenceQuery::Needs(_) = &self.query {
                     self.add_reference(id, DocumentHighlightKind::READ);

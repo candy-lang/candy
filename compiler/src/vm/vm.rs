@@ -234,6 +234,11 @@ impl Vm {
                 let address = self.heap.create(ObjectData::Builtin(builtin));
                 self.data_stack.push(address);
             }
+            Instruction::PushFromStack(offset) => {
+                let address = self.get_from_data_stack(offset);
+                self.heap.dup(address);
+                self.data_stack.push(address);
+            }
             Instruction::PopMultipleBelowTop(n) => {
                 let top = self.data_stack.pop().unwrap();
                 for _ in 0..n {
@@ -241,11 +246,6 @@ impl Vm {
                     self.heap.drop(address);
                 }
                 self.data_stack.push(top);
-            }
-            Instruction::PushFromStack(offset) => {
-                let address = self.get_from_data_stack(offset);
-                self.heap.dup(address);
-                self.data_stack.push(address);
             }
             Instruction::Call { num_args } => {
                 let closure_address = self.data_stack.pop().unwrap();
@@ -284,6 +284,31 @@ impl Vm {
                     }
                 };
             }
+            Instruction::Return => {
+                self.heap.drop(self.next_instruction.closure);
+                let caller = self.call_stack.pop().unwrap();
+                self.next_instruction = caller;
+            }
+            Instruction::UseAssetModule { current_module } => {
+                let relative_path = self.data_stack.pop().unwrap();
+                match self.use_asset_module(use_provider, current_module, relative_path) {
+                    Ok(bytes) => {
+                        self.data_stack.push(self.heap.import(bytes));
+                    }
+                    Err(reason) => {
+                        self.panic(reason);
+                    }
+                }
+            }
+            Instruction::UseCodeModule { current_module } => {
+                let relative_path = self.data_stack.pop().unwrap();
+                match self.use_code_module(use_provider, current_module, relative_path) {
+                    Ok(()) => {}
+                    Err(reason) => {
+                        self.panic(reason);
+                    }
+                }
+            }
             Instruction::Needs => {
                 let reason = self.data_stack.pop().unwrap();
                 let condition = self.data_stack.pop().unwrap();
@@ -310,11 +335,6 @@ impl Vm {
                         self.panic("Needs expects a boolean symbol.".to_string());
                     }
                 }
-            }
-            Instruction::Return => {
-                self.heap.drop(self.next_instruction.closure);
-                let caller = self.call_stack.pop().unwrap();
-                self.next_instruction = caller;
             }
             Instruction::RegisterFuzzableClosure(id) => {
                 let closure = self.data_stack.last().unwrap().clone();

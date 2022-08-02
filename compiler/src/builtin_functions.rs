@@ -13,8 +13,6 @@ pub enum BuiltinFunction {
     StructGetKeys, // (struct: struct) -> (listOfKeys: listOfAny)
     StructHasKey, // (struct: struct) (key: any) -> (isKeyInStruct: True | False)
     TypeOf, // (value: any) -> (type: Int | Text | Symbol | Struct | Function | Builtin)
-    UseAsset, // (currentPath: struct) (target: text) -> (target: text)
-    UseLocalModule, // (currentPath: struct) (target: text) -> (target: struct)
 }
 lazy_static! {
     pub static ref VALUES: Vec<BuiltinFunction> = BuiltinFunction::iter().collect();

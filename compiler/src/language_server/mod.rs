@@ -31,14 +31,14 @@ use lsp_types::{
     TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
 };
 use std::{path::PathBuf, sync::Arc};
-use tokio::sync::{mpsc::Sender, Mutex};
+use tokio::sync::{mpsc::Sender, Mutex, RwLock};
 use tower_lsp::{jsonrpc, Client, LanguageServer};
 
 pub struct CandyLanguageServer {
     pub client: Client,
     pub db: Mutex<Database>,
     pub hints_server_sink: Arc<Mutex<Option<Sender<hints::Event>>>>,
-    project_directory: Option<PathBuf>,
+    project_directory: RwLock<Option<PathBuf>>,
 }
 impl CandyLanguageServer {
     pub fn from_client(client: Client) -> Self {
@@ -46,7 +46,7 @@ impl CandyLanguageServer {
             client,
             db: Default::default(),
             hints_server_sink: Default::default(),
-            project_directory: None,
+            project_directory: Default::default(),
         }
     }
 
@@ -74,7 +74,7 @@ impl LanguageServer for CandyLanguageServer {
             .unwrap()
             .uri
             .clone();
-        self.project_directory = match first_workspace_folder.scheme() {
+        *self.project_directory.write().await = match first_workspace_folder.scheme() {
             "file" => Some(first_workspace_folder.to_file_path().unwrap()),
             _ => panic!("Workspace folder must be a file URI."),
         };
@@ -218,11 +218,8 @@ impl LanguageServer for CandyLanguageServer {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let module = Module::from_package_root_and_file(
-            self.project_directory,
-            params.text_document.uri.into(),
-        )
-        .unwrap();
+        let project_directory = self.project_directory.read().await.clone().unwrap();
+        let module = Module::from_package_root_and_url(project_directory, params.text_document.uri);
         let content = params.text_document.text.into_bytes();
         {
             let mut db = self.db.lock().await;
@@ -233,7 +230,8 @@ impl LanguageServer for CandyLanguageServer {
             .await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        let module: Module = params.text_document.uri.into();
+        let project_directory = self.project_directory.read().await.clone().unwrap();
+        let module = Module::from_package_root_and_url(project_directory, params.text_document.uri);
         let mut open_modules = Vec::<Module>::new();
         let content = {
             let mut db = self.db.lock().await;
@@ -247,7 +245,8 @@ impl LanguageServer for CandyLanguageServer {
             .await;
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
-        let module = params.text_document.uri.into();
+        let project_directory = self.project_directory.read().await.clone().unwrap();
+        let module = Module::from_package_root_and_url(project_directory, params.text_document.uri);
         let mut db = self.db.lock().await;
         db.did_close_module(&module);
         self.send_to_hints_server(hints::Event::CloseModule(module))
@@ -258,28 +257,33 @@ impl LanguageServer for CandyLanguageServer {
         &self,
         params: GotoDefinitionParams,
     ) -> jsonrpc::Result<Option<GotoDefinitionResponse>> {
+        let project_directory = self.project_directory.read().await.clone().unwrap();
         let db = self.db.lock().await;
-        Ok(find_definition(&db, params))
+        Ok(find_definition(&db, project_directory, params))
     }
 
     async fn references(&self, params: ReferenceParams) -> jsonrpc::Result<Option<Vec<Location>>> {
+        let project_directory = self.project_directory.read().await.clone().unwrap();
         let db = self.db.lock().await;
-        Ok(find_references(&db, params))
+        Ok(find_references(&db, project_directory, params))
     }
     async fn document_highlight(
         &self,
         params: DocumentHighlightParams,
     ) -> jsonrpc::Result<Option<Vec<DocumentHighlight>>> {
+        let project_directory = self.project_directory.read().await.clone().unwrap();
         let db = self.db.lock().await;
-        Ok(find_document_highlights(&db, params))
+        Ok(find_document_highlights(&db, project_directory, params))
     }
 
     async fn folding_range(
         &self,
         params: FoldingRangeParams,
     ) -> jsonrpc::Result<Option<Vec<FoldingRange>>> {
+        let project_directory = self.project_directory.read().await.clone().unwrap();
+        let module = Module::from_package_root_and_url(project_directory, params.text_document.uri);
         let db = self.db.lock().await;
-        let ranges = db.folding_ranges(params.text_document.uri.into());
+        let ranges = db.folding_ranges(module);
         Ok(Some(ranges))
     }
 
@@ -287,8 +291,10 @@ impl LanguageServer for CandyLanguageServer {
         &self,
         params: SemanticTokensParams,
     ) -> jsonrpc::Result<Option<SemanticTokensResult>> {
+        let project_directory = self.project_directory.read().await.clone().unwrap();
+        let module = Module::from_package_root_and_url(project_directory, params.text_document.uri);
         let db = self.db.lock().await;
-        let tokens = db.semantic_tokens(params.text_document.uri.into());
+        let tokens = db.semantic_tokens(module);
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
             data: tokens,
