@@ -536,11 +536,13 @@ For example, if you call a function of your WASM module only with inputs known a
 
 This chapter is especially experimental and spitball-y.
 
-Similar to how Zig build scripts work, we may support having a `build.candy` file that contains information about how to compile and optimize your code.
-
 Next to the interpreted VM, we plan to compile to LLVM or WASM.
 
-One idea we had is to let you provide a custom scoring function in the build script instead of having binary options like "optimize for speed" or "optimize for performance".
+Similar to how Zig build scripts work, we may support having a `build.candy` file that contains information about how to compile and optimize your code.
+
+For instance, to build a project for some custom platform, you may need to combine several native code libraries and integrate those with the Candy code by making some capabilities available via the [environment](#environment-and-capabilities).
+
+Regarding optimization, one idea we had is to let you provide a custom scoring function in the build script instead of having binary options like "optimize for speed" or "optimize for performance".
 This scoring function could get used by the optimizer to choose which paths to take.
 For example, you could formulate a build where you're okay with a resulting binary blowup of 1  KiB per 10 ms of saved time in some annotated performance-critical section.
 Or, when developing for an embedded device with limited storage capacity, you might want to generate a binary that fits within the limit but is otherwise as fast as possible.
