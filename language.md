@@ -223,7 +223,6 @@ Functions can either be defined using closure literals or by writing them as par
 Both representations are equivalent with respect to what they do during runtime.
 
 ```candy
-# Both these definitions are equivalent.
 identity = { a -> a }
 identity a = a
 ```
@@ -304,7 +303,7 @@ baz a := a
 
 brown = use ".brown"
 
-# equivalent:
+# equivalent during runtime:
 brown =
   foo = 3
   bar = foo
@@ -314,7 +313,7 @@ brown =
     Baz: bar,
   ]
 
-# equivalent:
+# equivalent during runtime:
 brown = [
   Bar: 5,
   Baz: { a -> a },
