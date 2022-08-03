@@ -140,10 +140,28 @@ Structs are mappings from keys to values (also known as dictionaries or hash map
 [
   Name: "Candy",
   Foo: 42,
+  "TextKey": 4,
+  3: 2,
 ]
 ```
 
-TODO: Struct access using dot
+To use numbers as keys, you can also omit the keys of 
+
+Omitting keys is equivalent to using zero-indexed numbers as keys:
+
+```candy
+[Hello, World]
+
+# equivalent:
+[0: Hello, 1: World]
+```
+
+To lookup a key that is a symbol, you can use the dot syntax:
+
+```candy
+foo = [Name: "Candy", Foo: 42]
+foo.name  # "Candy"
+```
 
 TODO: Modifying structs. Original idea: `{ Name: "Marcel", Age: 21 }` copied using `{ original | Name: "Jonas" }`
 
