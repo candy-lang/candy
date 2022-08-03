@@ -428,9 +428,31 @@ mySqrt a =               # If you pass `a = -1`,
 
 ## Pattern Matching
 
-TODO: Write something
+Candy supports structural pattern matching using the match operator `%`.
 
-TODO: Irrefutable and refutable patterns
+```candy
+match (foo 5) %
+  [Ok, value] -> ...
+  [Error, errorValue], core.int.isEven errorValue -> ...
+  _ -> ...
+```
+
+Here, each indented line after the match operator represents a match case.
+Each case can match based on the pattern as well an optional condition separated by a comma.
+The first matching case is executed.
+If no case matches, you code panics.
+
+If you're sure about the structure of a value, you can also use patterns on the left-hand side of an assignment.
+These are called irrefutable patterns.
+Again, if the pattern doesn't match, the code panics.
+
+```candy
+[a, b] = myStruct
+core.int.add a b
+
+# actually a pattern:
+foo = bar 5
+```
 
 ## Concurrency
 
