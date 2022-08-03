@@ -24,6 +24,7 @@ use std::{ops::Range, sync::Arc};
 pub trait CstToAst: CstDb + RcstToCst {
     fn ast_to_cst_id(&self, id: ast::Id) -> Option<cst::Id>;
     fn ast_id_to_span(&self, id: ast::Id) -> Option<Range<usize>>;
+    fn ast_id_to_display_span(&self, id: ast::Id) -> Option<Range<usize>>;
 
     fn cst_to_ast_id(&self, input: Input, id: cst::Id) -> Option<ast::Id>;
 
@@ -37,6 +38,10 @@ fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
 fn ast_id_to_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<usize>> {
     let cst_id = db.ast_to_cst_id(id.clone())?;
     Some(db.find_cst(id.input, cst_id).span)
+}
+fn ast_id_to_display_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<usize>> {
+    let cst_id = db.ast_to_cst_id(id.clone())?;
+    Some(db.find_cst(id.input, cst_id).display_span())
 }
 
 fn cst_to_ast_id(db: &dyn CstToAst, input: Input, id: cst::Id) -> Option<ast::Id> {
@@ -131,7 +136,7 @@ impl LoweringContext {
                 let string = self.create_string_without_id_mapping(symbol.to_string());
                 self.create_ast(cst.id, AstKind::Symbol(Symbol(string)))
             }
-            CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(*value))),
+            CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(value.clone()))),
             CstKind::Text {
                 opening_quote,
                 parts,
@@ -275,7 +280,7 @@ impl LoweringContext {
                 let mut errors = vec![];
 
                 assert!(
-                    !matches!(opening_bracket.kind, CstKind::OpeningBracket),
+                    matches!(opening_bracket.kind, CstKind::OpeningBracket),
                     "Struct should always have an opening bracket, but instead had {}.",
                     opening_bracket
                 );
@@ -427,8 +432,13 @@ impl LoweringContext {
                 assignment_sign,
                 body,
             } => {
-                let name = self.lower_identifier(name);
-                let (parameters, errors) = self.lower_parameters(parameters);
+                let mut errors = vec![];
+                let (name, name_error) = self.lower_identifier(name);
+                if let Some(error) = name_error {
+                    errors.push(error);
+                }
+                let (parameters, mut parameter_errors) = self.lower_parameters(parameters);
+                errors.append(&mut parameter_errors);
 
                 assert!(
                     matches!(assignment_sign.kind, CstKind::EqualsSign | CstKind::ColonEqualsSign),
@@ -531,17 +541,19 @@ impl LoweringContext {
             })
         }
     }
-    fn lower_identifier(&mut self, cst: &Cst) -> AstString {
-        match cst {
-            Cst {
-                id,
-                kind: CstKind::Identifier(identifier),
-                ..
-            } => self.create_string(id.to_owned(), identifier.clone()),
-            _ => {
-                panic!("Expected an identifier, but found `{}`.", cst);
-            }
-        }
+    fn lower_identifier(&mut self, cst: &Cst) -> (AstString, Option<CompilerError>) {
+        let (identifier, error) = match &cst.kind {
+            CstKind::Identifier(identifier) => (identifier.clone(), None),
+            _ => (
+                "<invalid>".to_string(),
+                Some(CompilerError {
+                    input: self.input.clone(),
+                    span: cst.span.clone(),
+                    payload: CompilerErrorPayload::Ast(AstError::ExpectedIdentifier),
+                }),
+            ),
+        };
+        (self.create_string(cst.id.to_owned(), identifier), error)
     }
 
     fn create_ast(&mut self, cst_id: cst::Id, kind: AstKind) -> Ast {

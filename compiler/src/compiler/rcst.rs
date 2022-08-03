@@ -1,5 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
+use num_bigint::BigUint;
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Rcst {
     EqualsSign,         // =
@@ -29,7 +31,7 @@ pub enum Rcst {
     Identifier(String),
     Symbol(String),
     Int {
-        value: u64,
+        value: BigUint,
         string: String,
     },
     Text {
@@ -384,7 +386,7 @@ impl SplitOuterTrailingWhitespace for Rcst {
     }
 }
 
-impl SplitOuterTrailingWhitespace for Vec<Rcst> {
+impl<A: SplitOuterTrailingWhitespace> SplitOuterTrailingWhitespace for Vec<A> {
     fn split_outer_trailing_whitespace(mut self) -> (Vec<Rcst>, Self) {
         match self.pop() {
             Some(last) => {
@@ -410,10 +412,16 @@ impl<T: SplitOuterTrailingWhitespace> SplitOuterTrailingWhitespace for Option<T>
 }
 
 impl<A: SplitOuterTrailingWhitespace, B: SplitOuterTrailingWhitespace> SplitOuterTrailingWhitespace
-    for (A, B)
+    for (A, Vec<B>)
 {
     fn split_outer_trailing_whitespace(self) -> (Vec<Rcst>, Self) {
-        let (whitespace, second) = self.1.split_outer_trailing_whitespace();
-        (whitespace, (self.0, second))
+        let (left, right) = self;
+        if right.is_empty() {
+            let (whitespace, first) = left.split_outer_trailing_whitespace();
+            (whitespace, (first, right))
+        } else {
+            let (whitespace, second) = right.split_outer_trailing_whitespace();
+            (whitespace, (left, second))
+        }
     }
 }

@@ -3,6 +3,7 @@ use crate::{builtin_functions::BuiltinFunction, input::Input};
 use im::HashMap;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
+use num_bigint::BigUint;
 use std::{
     collections::HashSet,
     fmt::{self, Display, Formatter},
@@ -132,7 +133,7 @@ impl Display for Id {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Expression {
-    Int(u64),
+    Int(BigUint),
     Text(String),
     Reference(Id),
     Symbol(String),
@@ -197,11 +198,11 @@ impl Body {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum HirError {
-    UnknownReference { symbol: String },
+    UnknownReference { identifier: String },
     UnknownFunction { name: String },
     PublicAssignmentInNotTopLevel,
     PublicAssignmentWithSameName { name: String },
-    NeedsWithWrongNumberOfArguments,
+    NeedsWithWrongNumberOfArguments { num_args: usize },
 }
 
 impl Body {
@@ -275,7 +276,7 @@ impl fmt::Display for Expression {
                 write!(f, "needs {condition} with reason {reason}")
             }
             Expression::Error { child, errors } => {
-                write!(f, "error")?;
+                write!(f, "{}", if errors.len() == 1 { "error" } else { "errors" })?;
                 for error in errors {
                     write!(f, "\n  {error:?}")?;
                 }

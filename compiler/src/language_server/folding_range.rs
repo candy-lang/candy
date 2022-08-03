@@ -105,10 +105,6 @@ impl<'a> Context<'a> {
                 ));
 
                 let closing_curly_brace = closing_curly_brace.unwrap_whitespace_and_comment();
-                assert!(matches!(
-                    closing_curly_brace.kind,
-                    CstKind::ClosingCurlyBrace { .. }
-                ));
 
                 self.push(
                     opening_curly_brace.span.end,

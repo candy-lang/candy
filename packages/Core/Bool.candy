@@ -1,15 +1,55 @@
+equals = (use "..Equality").equals
+function = use "..Function"
 type = use "..Type"
 
-is value := type.is value Bool
+is value :=
+  ✨.ifElse
+    ✨.equals value True
+    { True }
+    { ✨.equals value False }
 
 not a :=
   needs (is a)
   ✨.ifElse a { False } { True }
+
+lazyAnd a b :=
+  needs (is a)
+  needs (function.is0 b)
+  ✨.ifElse
+    a
+    {
+      result = ✨.call b
+      needs (is result)
+      result
+    }
+    { False }
 and a b :=
   needs (is a)
   needs (is b)
-  ✨.ifElse a { b } { False }
+  lazyAnd a { b }
+
+lazyOr a b :=
+  needs (is a)
+  needs (function.is0 b)
+  ✨.ifElse
+    a
+    { True }
+    {
+      result = ✨.call b
+      needs (is result)
+      result
+    }
 or a b :=
   needs (is a)
   needs (is b)
-  ✨.ifElse a { True } { b }
+  lazyOr a { b }
+
+xor a b :=
+  needs (is a)
+  needs (is b)
+  equals a (not b)
+
+implies a b :=
+  needs (is a)
+  needs (is b)
+  ✨.ifElse a { b } { True }

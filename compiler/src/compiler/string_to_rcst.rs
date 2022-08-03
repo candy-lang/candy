@@ -73,12 +73,15 @@ mod parse {
     // all the surrounding code still has a chance to be properly parsed – even
     // mid-writing after putting the opening bracket of a struct.
 
+    use std::str::FromStr;
+
     use crate::compiler::{
         rcst::SplitOuterTrailingWhitespace, string_to_rcst::whitespace_indentation_score,
     };
 
     use super::super::rcst::{IsMultiline, Rcst, RcstError};
     use itertools::Itertools;
+    use num_bigint::BigUint;
 
     static MEANINGFUL_PUNCTUATION: &'static str = "()[]:,{}->=.";
     static SUPPORTED_WHITESPACE: &'static str = " \r\n\t";
@@ -281,7 +284,7 @@ mod parse {
             return None;
         }
         if w.chars().all(|c| c.is_ascii_digit()) {
-            let value = u64::from_str_radix(&w, 10).expect("Couldn't parse int.");
+            let value = BigUint::from_str(&w).expect("Couldn't parse int.");
             Some((input, Rcst::Int { value, string: w }))
         } else {
             Some((
@@ -300,7 +303,7 @@ mod parse {
             Some((
                 " ",
                 Rcst::Int {
-                    value: 42,
+                    value: 42u8.into(),
                     string: "42".to_string()
                 }
             ))
@@ -310,7 +313,7 @@ mod parse {
             Some((
                 "",
                 Rcst::Int {
-                    value: 12,
+                    value: 12u8.into(),
                     string: "012".to_string()
                 }
             ))
@@ -320,7 +323,7 @@ mod parse {
             Some((
                 " years",
                 Rcst::Int {
-                    value: 123,
+                    value: 123u8.into(),
                     string: "123".to_string()
                 }
             ))
@@ -930,7 +933,7 @@ mod parse {
                     arguments: vec![
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::Int {
-                                value: 4,
+                                value: 4u8.into(),
                                 string: "4".to_string()
                             }),
                             whitespace: vec![Rcst::Whitespace(" ".to_string())],
@@ -985,14 +988,14 @@ mod parse {
                     arguments: vec![
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::Int {
-                                value: 1,
+                                value: 1u8.into(),
                                 string: "1".to_string()
                             }),
                             whitespace: vec![Rcst::Whitespace(" ".to_string())],
                         },
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::Int {
-                                value: 2,
+                                value: 2u8.into(),
                                 string: "2".to_string()
                             }),
                             whitespace: vec![
@@ -1002,7 +1005,7 @@ mod parse {
                         },
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::Int {
-                                value: 3,
+                                value: 3u8.into(),
                                 string: "3".to_string()
                             }),
                             whitespace: vec![
@@ -1011,7 +1014,7 @@ mod parse {
                             ],
                         },
                         Rcst::Int {
-                            value: 4,
+                            value: 4u8.into(),
                             string: "4".to_string()
                         }
                     ],
@@ -1263,7 +1266,7 @@ mod parse {
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::StructField {
                                 key: Box::new(Rcst::Int {
-                                    value: 4,
+                                    value: 4u8.into(),
                                     string: "4".to_string()
                                 }),
                                 colon: Box::new(Rcst::TrailingWhitespace {
@@ -1532,7 +1535,7 @@ mod parse {
                     parameters_and_arrow: None,
                     body: vec![Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Int {
-                            value: 2,
+                            value: 2u8.into(),
                             string: "2".to_string()
                         }),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
@@ -1655,6 +1658,7 @@ mod parse {
 
         let (input, mut assignment_sign) =
             colon_equals_sign(input).or_else(|| equals_sign(input))?;
+        let original_assignment_sign = assignment_sign.clone();
         let input_after_assignment_sign = input;
 
         let (input, more_whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
@@ -1664,17 +1668,25 @@ mod parse {
             || parameters.is_multiline()
             || whitespace.is_multiline()
             || more_whitespace.is_multiline();
-        let (input, body) = if is_multiline {
+        let (input, assignment_sign, body) = if is_multiline {
             let (input, body) = body(input, indentation + 1);
             if body.is_empty() {
-                (input_after_assignment_sign, body)
+                (
+                    input_after_assignment_sign,
+                    original_assignment_sign,
+                    vec![],
+                )
             } else {
-                (input, body)
+                (input, assignment_sign, body)
             }
         } else {
             match expression(input, indentation, true) {
-                Some((input, expression)) => (input, vec![expression]),
-                None => (input_after_assignment_sign, vec![]),
+                Some((input, expression)) => (input, assignment_sign, vec![expression]),
+                None => (
+                    input_after_assignment_sign,
+                    original_assignment_sign,
+                    vec![],
+                ),
             }
         };
 
@@ -1708,7 +1720,7 @@ mod parse {
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
                     body: vec![Rcst::Int {
-                        value: 42,
+                        value: 42u8.into(),
                         string: "42".to_string()
                     }],
                 }
@@ -1739,7 +1751,7 @@ mod parse {
                         ],
                     }),
                     body: vec![Rcst::Int {
-                        value: 3,
+                        value: 3u8.into(),
                         string: "3".to_string()
                     }],
                 }
@@ -1772,9 +1784,24 @@ mod parse {
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
                     body: vec![Rcst::Int {
-                        value: 3,
+                        value: 3u8.into(),
                         string: "3".to_string()
                     }],
+                }
+            ))
+        );
+        assert_eq!(
+            assignment("foo =\n  ", 0),
+            Some((
+                "\n  ",
+                Rcst::Assignment {
+                    name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    parameters: vec![],
+                    assignment_sign: Box::new(Rcst::EqualsSign),
+                    body: vec![],
                 }
             ))
         );

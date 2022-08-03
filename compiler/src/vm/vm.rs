@@ -11,6 +11,7 @@ use crate::{
 };
 use itertools::Itertools;
 use log;
+use num_bigint::{BigInt, Sign, ToBigInt};
 use std::{collections::HashMap, mem};
 
 /// A VM can execute some byte code.
@@ -185,7 +186,7 @@ impl Vm {
     pub fn run_instruction<U: UseProvider>(&mut self, use_provider: &U, instruction: Instruction) {
         match instruction {
             Instruction::CreateInt(int) => {
-                let address = self.heap.create(ObjectData::Int(int));
+                let address = self.heap.create(ObjectData::Int(int.into()));
                 self.data_stack.push(address);
             }
             Instruction::CreateText(text) => {
@@ -384,9 +385,14 @@ impl Vm {
                         .export_without_dropping(*self.data_stack.last().unwrap()),
                 })
             }
-            Instruction::Error { id, error } => {
+            Instruction::Error { id, errors } => {
                 self.panic(format!(
-                    "The VM crashed because there was an error at {id}: {error:?}"
+                    "The VM crashed because there {} at {id}: {errors:?}",
+                    if errors.len() == 1 {
+                        "was an error"
+                    } else {
+                        "were errors"
+                    }
                 ));
             }
         }

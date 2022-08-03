@@ -1,0 +1,117 @@
+bool = use "..Bool"
+conditionals = use "..Conditionals"
+equals = (use "..Equality").equals
+function = use "..Function"
+struct = use "..Struct"
+
+is value :=
+  bool.lazyAnd
+    struct.is value
+    {
+      bool.lazyAnd
+        bool.and (struct.hasKey value Type) (struct.hasKey value Value)
+        {
+          type = value.type
+          bool.or (equals type Ok) (equals type Error)
+        }
+    }
+
+ok value := [Type: Ok, Value: value]
+isOk result :=
+  needs (is result)
+  equals result.type Ok
+unwrap result :=
+  needs (is result)
+  needs (isOk result)
+  result.value
+expect result message :=
+  needs (is result)
+  needs (isOk result) message
+  result.value
+
+error value := [Type: Error, Value: value]
+isError result :=
+  needs (is result)
+  equals result.type Error
+unwrapError result :=
+  needs (is result)
+  needs (isError result)
+  result.value
+expectError result message :=
+  needs (is result)
+  needs (isError result) message
+  result.value
+
+mapOrElse result okMapper errorMapper :=
+  # Returns `okMapper result.value` if `isOk result` and
+  # `errorMapper result.value` if `isError result`.
+  needs (is result)
+  needs (function.is1 okMapper)
+  needs (function.is1 errorMapper)
+  conditionals.ifElse
+    equals result.type Ok
+    { okMapper result.value }
+    { errorMapper result.value }
+mapOr result okMapper errorValue :=
+  # Returns `okMapper result.value` if `isOk result` and `errorValue` if
+  # `isError result`.
+  needs (is result)
+  needs (function.is1 okMapper)
+  mapOrElse result okMapper { value -> errorValue }
+
+flatMap result okMapper :=
+  # Returns `okMapper result.value` if `isOk result` and `result` if it
+  # `isError`.
+  #
+  # `okMapper` can also return a result. This is useful for chaining together
+  # multiple computations that may fail.
+  needs (is result)
+  needs (is function.is1 okMapper)
+  mapOr result { value -> okMapper value } result
+map result okMapper :=
+  # Returns `ok (okMapper result.value)` if it `isOk` and `result` if it
+  # `isError`.
+  needs (is result)
+  needs (function.is1 okMapper)
+  flatMap result { value -> ok (okMapper value) }
+and resultA resultB :=
+  # Returns `resultA` if it `isError` and `resultB` otherwise.
+  needs (is resultA)
+  needs (is resultB)
+  flatMap resultA { value -> resultB }
+
+flatMapError result errorMapper :=
+  # Returns `result` if it `isOk` and `errorMapper result.value` if it
+  # `isError`.
+  #
+  # `errorMapper` can also return a result.
+  needs (is result)
+  needs (is function.is1 errorMapper)
+  mapOr result { value -> result } { value -> errorMapper value }
+mapError result errorMapper :=
+  # Returns `result` if it `isOk` and `error (errorMapper result.value)` if it
+  # `isError`.
+  needs (is result)
+  needs (function.is1 errorMapper)
+  flatMapError result { value -> error (errorMapper value) }
+or resultA resultB :=
+  # Returns `resultA` if it `isOk` and `resultB` otherwise.
+  needs (is resultA)
+  needs (is resultB)
+  flatMapError resultA { value -> resultB }
+
+unwrapOrElse result defaultGetter :=
+  needs (is result)
+  mapOrElse result { value -> value } { value -> function.call defaultGetter }
+unwrapOr result default :=
+  needs (is result)
+  unwrapOrElse result { default }
+
+flatten resultOfResult :=
+  needs (is resultOfResult)
+  flatMap
+    resultOfResult
+    { innerResult ->
+      needs (is innerResult)
+      innerResult
+    }

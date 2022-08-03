@@ -15,6 +15,7 @@ use crate::{
 };
 use im::HashMap;
 use itertools::Itertools;
+use num_bigint::BigUint;
 use std::{mem, ops::Range, sync::Arc};
 
 #[salsa::query_group(AstToHirStorage)]
@@ -167,16 +168,16 @@ impl<'a> Context<'a> {
                 Expression::Text(string.value.to_owned()),
                 None,
             ),
-            AstKind::Identifier(Identifier(symbol)) => {
-                let reference = match self.identifiers.get(&symbol.value) {
+            AstKind::Identifier(Identifier(identifier)) => {
+                let reference = match self.identifiers.get(&identifier.value) {
                     Some(reference) => reference.to_owned(),
                     None => {
                         return self.push_error(
-                            Some(symbol.id.clone()),
+                            Some(identifier.id.clone()),
                             ast.id.input.clone(),
-                            self.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                            self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                             HirError::UnknownReference {
-                                symbol: symbol.value.clone(),
+                                identifier: identifier.value.clone(),
                             },
                         );
                     }
@@ -233,7 +234,7 @@ impl<'a> Context<'a> {
                             self.push_error(
                                 None,
                                 ast.id.input.clone(),
-                                self.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                                self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                                 HirError::PublicAssignmentWithSameName {
                                     name: name_string.clone(),
                                 },
@@ -244,7 +245,7 @@ impl<'a> Context<'a> {
                         self.push_error(
                             None,
                             ast.id.input.clone(),
-                            self.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                            self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                             HirError::PublicAssignmentInNotTopLevel,
                         );
                     }
@@ -359,9 +360,11 @@ impl<'a> Context<'a> {
                             child: None,
                             errors: vec![CompilerError {
                                 input: name.id.input.clone(),
-                                span: self.db.ast_id_to_span(name.id.clone()).unwrap(),
+                                span: self.db.ast_id_to_display_span(name.id.clone()).unwrap(),
                                 payload: CompilerErrorPayload::Hir(
-                                    HirError::NeedsWithWrongNumberOfArguments,
+                                    HirError::NeedsWithWrongNumberOfArguments {
+                                        num_args: call.arguments.len(),
+                                    },
                                 ),
                             }],
                         },
@@ -377,7 +380,7 @@ impl<'a> Context<'a> {
                         return self.push_error(
                             Some(name.id.clone()),
                             name.id.input.clone(),
-                            self.db.ast_id_to_span(name.id.clone()).unwrap(),
+                            self.db.ast_id_to_display_span(name.id.clone()).unwrap(),
                             HirError::UnknownFunction {
                                 name: name.value.clone(),
                             },
@@ -524,7 +527,7 @@ impl<'a> Context<'a> {
                     .enumerate()
                     .map(|(index, it)| {
                         (
-                            self.push(None, Expression::Int(index as u64), Some("key".to_string())),
+                            self.push(None, Expression::Int(index.into()), Some("key".to_string())),
                             self.push(
                                 None,
                                 Expression::Text(it.to_owned()),

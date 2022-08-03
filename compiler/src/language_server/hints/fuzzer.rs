@@ -87,11 +87,9 @@ impl FuzzerManager {
                             .into_iter()
                             .map(|parameter| parameter.keys.last().unwrap().to_string())
                             .collect_vec(),
-                        Some(_) => {
-                            panic!("Looks like we fuzzed a non-closure. That's weird.")
-                        }
+                        Some(_) => panic!("Looks like we fuzzed a non-closure. That's weird."),
                         None => {
-                            log::warn!("Using fuzzing, we found an error in a generated closure.");
+                            log::error!("Using fuzzing, we found an error in a generated closure.");
                             continue;
                         }
                     };
@@ -126,10 +124,16 @@ impl FuzzerManager {
                             id.is_same_module_and_any_parent_of(innermost_panicking_call_id)
                                 && db.hir_to_cst_id(id.clone()).is_some()
                         })
-                        .next()
-                        .expect(
-                            "Fuzzer found a panicking function without an inner panicking needs",
-                        );
+                        .next();
+                    let panicking_inner_call = match panicking_inner_call {
+                        Some(panicking_inner_call) => panicking_inner_call,
+                        None => {
+                            // We found a panicking function without an inner
+                            // panicking needs. This indicates an error during
+                            // compilation within a function body.
+                            continue;
+                        }
+                    };
                     let (call_id, name, arguments) = match panicking_inner_call {
                         TraceEntry::CallStarted { id, closure, args } => {
                             (id.clone(), format!("{closure}"), args.clone())
