@@ -185,9 +185,8 @@ There are receive ends and send ends to receive and send data from a channel, re
 
 ### More?
 
-TODO: Lists? Sets?
+TODO: Sets?
 
-- lists: `[1, 2, 3]`
 - sets: Clojure has `%{ value }`
   - or like Toit? `{hey, you, there}` for set, empty map is `{:}`
 
