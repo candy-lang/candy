@@ -216,13 +216,14 @@ impl<'a> Context<'a> {
                 self.visit_cst(closing_bracket, None);
             }
             CstKind::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => {
-                self.visit_cst(key, None);
-                self.visit_cst(colon, None);
+                if let Some(box (key, colon)) = key_and_colon {
+                    self.visit_cst(key, None);
+                    self.visit_cst(colon, None);
+                }
                 self.visit_cst(value, None);
                 if let Some(comma) = comma {
                     self.visit_cst(comma, None);
