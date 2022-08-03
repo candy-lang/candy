@@ -168,7 +168,7 @@ impl<'a> Context<'a> {
                         return self.push_error(
                             Some(name.id.clone()),
                             ast.id.input.clone(),
-                            self.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                            self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                             HirError::UnknownReference {
                                 name: name.value.clone(),
                             },
@@ -182,11 +182,23 @@ impl<'a> Context<'a> {
                 Expression::Symbol(symbol.value.to_owned()),
                 None,
             ),
-            AstKind::Struct(Struct { fields }) => {
-                let fields = fields
+            AstKind::Struct(Struct {
+                positional_fields,
+                named_fields,
+            }) => {
+                let mut fields = positional_fields
                     .iter()
-                    .map(|(key, value)| (self.compile_single(key), self.compile_single(value)))
-                    .collect();
+                    .enumerate()
+                    .map(|(index, value)| {
+                        (
+                            self.push(None, Expression::Int(index.into()), None),
+                            self.compile_single(value),
+                        )
+                    })
+                    .collect::<HashMap<_, _>>();
+                for (key, value) in named_fields {
+                    fields.insert(self.compile_single(key), self.compile_single(value));
+                }
                 self.push(Some(ast.id.clone()), Expression::Struct(fields), None)
             }
             AstKind::StructAccess(struct_access) => {
@@ -223,7 +235,7 @@ impl<'a> Context<'a> {
                             self.push_error(
                                 None,
                                 ast.id.input.clone(),
-                                self.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                                self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                                 HirError::PublicAssignmentWithSameName {
                                     name: name_string.clone(),
                                 },
@@ -234,7 +246,7 @@ impl<'a> Context<'a> {
                         self.push_error(
                             None,
                             ast.id.input.clone(),
-                            self.db.ast_id_to_span(ast.id.clone()).unwrap(),
+                            self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                             HirError::PublicAssignmentInNotTopLevel,
                         );
                     }
@@ -348,7 +360,9 @@ impl<'a> Context<'a> {
                             id,
                             name_id.input.clone(),
                             self.db.ast_id_to_span(name_id.to_owned()).unwrap(),
-                            HirError::NeedsWithWrongNumberOfArguments,
+                            HirError::NeedsWithWrongNumberOfArguments {
+                                num_args: call.arguments.len(),
+                            },
                         );
                     }
                 };
@@ -490,7 +504,7 @@ impl<'a> Context<'a> {
                     .enumerate()
                     .map(|(index, it)| {
                         (
-                            self.push(None, Expression::Int(index as u64), Some("key".to_string())),
+                            self.push(None, Expression::Int(index.into()), Some("key".to_string())),
                             self.push(None, Expression::Text(it), Some("rawPath".to_string())),
                         )
                     })

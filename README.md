@@ -129,6 +129,8 @@ Major milestones:
 - new name?
 - mini-heaps?
 - parse calls with call as a receiver: `(foo Bar) Baz`. or do we even need the `CallReceiver`?
+- parse function declaration with doc comment but no code
+- complain about comment lines with too much indentation
 
 ## How to use Candy
 

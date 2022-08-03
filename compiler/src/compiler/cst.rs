@@ -1,3 +1,5 @@
+use num_bigint::BigUint;
+
 use super::{rcst::RcstError, rcst_to_cst::RcstToCst};
 use crate::input::Input;
 use std::{
@@ -66,7 +68,7 @@ pub enum CstKind {
     Identifier(String),
     Symbol(String),
     Int {
-        value: u64,
+        value: BigUint,
         string: String,
     },
     Text {
@@ -90,8 +92,7 @@ pub enum CstKind {
         closing_bracket: Box<Cst>,
     },
     StructField {
-        key: Box<Cst>,
-        colon: Box<Cst>,
+        key_and_colon: Option<Box<(Cst, Cst)>>,
         value: Box<Cst>,
         comma: Option<Box<Cst>>,
     },
@@ -193,13 +194,14 @@ impl Display for Cst {
                 closing_bracket.fmt(f)
             }
             CstKind::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => {
-                key.fmt(f)?;
-                colon.fmt(f)?;
+                if let Some(box (key, colon)) = key_and_colon {
+                    key.fmt(f)?;
+                    colon.fmt(f)?;
+                }
                 value.fmt(f)?;
                 if let Some(comma) = comma {
                     comma.fmt(f)?;
@@ -319,13 +321,16 @@ impl UnwrapWhitespaceAndComment for Cst {
                 closing_bracket: Box::new(closing_bracket.unwrap_whitespace_and_comment()),
             },
             CstKind::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => CstKind::StructField {
-                key: Box::new(key.unwrap_whitespace_and_comment()),
-                colon: Box::new(colon.unwrap_whitespace_and_comment()),
+                key_and_colon: key_and_colon.as_ref().map(|box (key, colon)| {
+                    Box::new((
+                        key.unwrap_whitespace_and_comment(),
+                        colon.unwrap_whitespace_and_comment(),
+                    ))
+                }),
                 value: Box::new(value.unwrap_whitespace_and_comment()),
                 comma: comma
                     .as_ref()
@@ -455,13 +460,12 @@ impl TreeWithIds for Cst {
                 .or_else(|| dot.find(id))
                 .or_else(|| key.find(id)),
             CstKind::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
-            } => key
-                .find(id)
-                .or_else(|| colon.find(id))
+            } => key_and_colon
+                .as_ref()
+                .and_then(|box (key, colon)| key.find(id).or_else(|| colon.find(id)))
                 .or_else(|| value.find(id))
                 .or_else(|| comma.as_ref().and_then(|comma| comma.find(id))),
             CstKind::Lambda {
@@ -544,13 +548,16 @@ impl TreeWithIds for Cst {
                 false,
             ),
             CstKind::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => (
-                key.find_by_offset(offset)
-                    .or_else(|| colon.find_by_offset(offset))
+                key_and_colon
+                    .as_ref()
+                    .and_then(|box (key, colon)| {
+                        key.find_by_offset(offset)
+                            .or_else(|| colon.find_by_offset(offset))
+                    })
                     .or_else(|| value.find_by_offset(offset))
                     .or_else(|| comma.find_by_offset(offset)),
                 false,

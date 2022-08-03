@@ -15,12 +15,14 @@ use crate::{
 };
 use im::HashMap;
 use itertools::Itertools;
+use linked_hash_map::LinkedHashMap;
 use std::{ops::Range, sync::Arc};
 
 #[salsa::query_group(CstToAstStorage)]
 pub trait CstToAst: CstDb + RcstToCst {
     fn ast_to_cst_id(&self, id: ast::Id) -> Option<cst::Id>;
     fn ast_id_to_span(&self, id: ast::Id) -> Option<Range<usize>>;
+    fn ast_id_to_display_span(&self, id: ast::Id) -> Option<Range<usize>>;
 
     fn cst_to_ast_id(&self, input: Input, id: cst::Id) -> Option<ast::Id>;
 
@@ -36,6 +38,10 @@ fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
 fn ast_id_to_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<usize>> {
     let cst_id = db.ast_to_cst_id(id.clone())?;
     Some(db.find_cst(id.input, cst_id).span)
+}
+fn ast_id_to_display_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<usize>> {
+    let cst_id = db.ast_to_cst_id(id.clone())?;
+    Some(db.find_cst(id.input, cst_id).display_span())
 }
 
 fn cst_to_ast_id(db: &dyn CstToAst, input: Input, id: cst::Id) -> Option<ast::Id> {
@@ -122,13 +128,14 @@ impl LoweringContext {
                 panic!("Whitespace should have been removed before lowering to AST.")
             }
             CstKind::Identifier(identifier) => {
-                self.lower_identifier(cst.id, identifier.to_string())
+                let string = self.create_string_without_id_mapping(identifier.to_string());
+                self.create_ast(cst.id, AstKind::Identifier(Identifier(string)))
             }
             CstKind::Symbol(symbol) => {
                 let string = self.create_string_without_id_mapping(symbol.to_string());
                 self.create_ast(cst.id, AstKind::Symbol(Symbol(string)))
             }
-            CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(*value))),
+            CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(value.clone()))),
             CstKind::Text {
                 opening_quote,
                 parts,
@@ -250,24 +257,22 @@ impl LoweringContext {
                 let mut errors = vec![];
 
                 assert!(
-                    !matches!(opening_bracket.kind, CstKind::OpeningBracket),
+                    matches!(opening_bracket.kind, CstKind::OpeningBracket),
                     "Struct should always have an opening bracket, but instead had {}.",
                     opening_bracket
                 );
 
-                let fields = fields
-                    .iter()
-                    .filter_map(|field| {
-                        if let CstKind::StructField {
-                            key,
-                            colon,
-                            value,
-                            comma,
-                        } = &field.kind
-                        {
+                let mut positional_fields = vec![];
+                let mut named_fields = LinkedHashMap::new();
+                for field in fields {
+                    if let CstKind::StructField {
+                        key_and_colon,
+                        value,
+                        comma,
+                    } = &field.kind
+                    {
+                        let key = key_and_colon.as_ref().map(|box (key, colon)| {
                             let mut key = self.lower_cst(&key.clone());
-                            let mut value = self.lower_cst(&value.clone());
-
                             if !matches!(colon.kind, CstKind::Colon) {
                                 key = self.create_ast(
                                     colon.id,
@@ -282,38 +287,58 @@ impl LoweringContext {
                                         }],
                                     },
                                 )
-                            }
-                            if let Some(comma) = comma {
-                                if !matches!(comma.kind, CstKind::Comma) {
-                                    value = self.create_ast(
-                                        comma.id,
-                                        AstKind::Error {
-                                            child: Some(Box::new(value)),
-                                            errors: vec![CompilerError {
-                                                input: self.input.clone(),
-                                                span: comma.span.clone(),
-                                                payload: CompilerErrorPayload::Ast(
-                                                    AstError::StructValueWithoutComma,
-                                                ),
-                                            }],
-                                        },
-                                    )
-                                }
-                            }
+                            };
+                            key
+                        });
 
-                            Some((key, value))
-                        } else {
-                            errors.push(CompilerError {
-                                input: self.input.clone(),
-                                span: cst.span.clone(),
-                                payload: CompilerErrorPayload::Ast(
-                                    AstError::StructWithNonStructField,
-                                ),
-                            });
-                            None
+                        let mut value = self.lower_cst(&value.clone());
+                        if !named_fields.is_empty() && key.is_none() {
+                            value = self.create_ast(
+                                field.id,
+                                AstKind::Error {
+                                    child: Some(Box::new(value)),
+                                    errors: vec![CompilerError {
+                                        input: self.input.clone(),
+                                        span: field.span.clone(),
+                                        payload: CompilerErrorPayload::Ast(
+                                            AstError::StructPositionalAfterNamedField,
+                                        ),
+                                    }],
+                                },
+                            )
                         }
-                    })
-                    .collect();
+
+                        if let Some(comma) = comma {
+                            if !matches!(comma.kind, CstKind::Comma) {
+                                value = self.create_ast(
+                                    comma.id,
+                                    AstKind::Error {
+                                        child: Some(Box::new(value)),
+                                        errors: vec![CompilerError {
+                                            input: self.input.clone(),
+                                            span: comma.span.clone(),
+                                            payload: CompilerErrorPayload::Ast(
+                                                AstError::StructValueWithoutComma,
+                                            ),
+                                        }],
+                                    },
+                                )
+                            }
+                        }
+
+                        if let Some(key) = key {
+                            named_fields.insert(key, value);
+                        } else {
+                            positional_fields.push(value);
+                        }
+                    } else {
+                        errors.push(CompilerError {
+                            input: self.input.clone(),
+                            span: cst.span.clone(),
+                            payload: CompilerErrorPayload::Ast(AstError::StructWithNonStructField),
+                        });
+                    }
+                }
 
                 if !matches!(closing_bracket.kind, CstKind::ClosingBracket) {
                     errors.push(CompilerError {
@@ -323,7 +348,13 @@ impl LoweringContext {
                     });
                 }
 
-                let ast = self.create_ast(cst.id, AstKind::Struct(Struct { fields }));
+                let ast = self.create_ast(
+                    cst.id,
+                    AstKind::Struct(Struct {
+                        positional_fields,
+                        named_fields,
+                    }),
+                );
                 if errors.is_empty() {
                     ast
                 } else {
@@ -459,10 +490,6 @@ impl LoweringContext {
         }
     }
 
-    fn lower_identifier(&mut self, id: cst::Id, identifier: String) -> Ast {
-        let string = self.create_string_without_id_mapping(identifier);
-        self.create_ast(id, AstKind::Identifier(Identifier(string)))
-    }
     fn lower_struct_access(&mut self, id: cst::Id, struct_: &Cst, dot: &Cst, key: &Cst) -> Ast {
         let struct_ = self.lower_cst(struct_);
 

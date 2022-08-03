@@ -169,8 +169,9 @@ impl<'a> Context<'a> {
                 self.visit_cst(octothorpe, None);
                 self.add_token(cst.span.clone(), SemanticTokenType::Comment);
             }
-            CstKind::TrailingWhitespace { child, .. } => {
-                self.visit_cst(child, token_type_for_identifier)
+            CstKind::TrailingWhitespace { child, whitespace } => {
+                self.visit_cst(child, token_type_for_identifier);
+                self.visit_csts(whitespace, token_type_for_identifier);
             }
             CstKind::Identifier { .. } => self.add_token(
                 cst.span.clone(),
@@ -218,13 +219,14 @@ impl<'a> Context<'a> {
                 self.visit_cst(closing_bracket, None);
             }
             CstKind::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => {
-                self.visit_cst(key, None);
-                self.visit_cst(colon, None);
+                if let Some(box (key, colon)) = key_and_colon {
+                    self.visit_cst(key, None);
+                    self.visit_cst(colon, None);
+                }
                 self.visit_cst(value, None);
                 if let Some(comma) = comma {
                     self.visit_cst(comma, None);

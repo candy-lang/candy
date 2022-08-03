@@ -1,5 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
+use num_bigint::BigUint;
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Rcst {
     EqualsSign,         // =
@@ -29,7 +31,7 @@ pub enum Rcst {
     Identifier(String),
     Symbol(String),
     Int {
-        value: u64,
+        value: BigUint,
         string: String,
     },
     Text {
@@ -53,8 +55,7 @@ pub enum Rcst {
         closing_bracket: Box<Rcst>,
     },
     StructField {
-        key: Box<Rcst>,
-        colon: Box<Rcst>,
+        key_and_colon: Option<Box<(Rcst, Rcst)>>,
         value: Box<Rcst>,
         comma: Option<Box<Rcst>>,
     },
@@ -181,13 +182,14 @@ impl Display for Rcst {
                 closing_bracket.fmt(f)
             }
             Rcst::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => {
-                key.fmt(f)?;
-                colon.fmt(f)?;
+                if let Some(box (key, colon)) = key_and_colon {
+                    key.fmt(f)?;
+                    colon.fmt(f)?;
+                }
                 value.fmt(f)?;
                 if let Some(comma) = comma {
                     comma.fmt(f)?;
@@ -301,13 +303,14 @@ impl IsMultiline for Rcst {
                     || closing_bracket.is_multiline()
             }
             Rcst::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => {
-                key.is_multiline()
-                    || colon.is_multiline()
+                key_and_colon
+                    .as_ref()
+                    .map(|box (key, colon)| key.is_multiline() || colon.is_multiline())
+                    .unwrap_or(false)
                     || value.is_multiline()
                     || comma
                         .as_ref()
@@ -390,7 +393,7 @@ impl SplitOuterTrailingWhitespace for Rcst {
     }
 }
 
-impl SplitOuterTrailingWhitespace for Vec<Rcst> {
+impl<A: SplitOuterTrailingWhitespace> SplitOuterTrailingWhitespace for Vec<A> {
     fn split_outer_trailing_whitespace(mut self) -> (Vec<Rcst>, Self) {
         match self.pop() {
             Some(last) => {
@@ -416,10 +419,16 @@ impl<T: SplitOuterTrailingWhitespace> SplitOuterTrailingWhitespace for Option<T>
 }
 
 impl<A: SplitOuterTrailingWhitespace, B: SplitOuterTrailingWhitespace> SplitOuterTrailingWhitespace
-    for (A, B)
+    for (A, Vec<B>)
 {
     fn split_outer_trailing_whitespace(self) -> (Vec<Rcst>, Self) {
-        let (whitespace, second) = self.1.split_outer_trailing_whitespace();
-        (whitespace, (self.0, second))
+        let (left, right) = self;
+        if right.is_empty() {
+            let (whitespace, first) = left.split_outer_trailing_whitespace();
+            (whitespace, (first, right))
+        } else {
+            let (whitespace, second) = right.split_outer_trailing_whitespace();
+            (whitespace, (left, second))
+        }
     }
 }

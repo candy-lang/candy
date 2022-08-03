@@ -1,8 +1,155 @@
+bool = use "..Bool"
+check = use "..Check"
+conditionals = use "..Conditionals"
+equals = (use "..Equality").equals
 type = use "..Type"
 
 is value := type.is value Int
 
-add a b :=
-  needs (is a)
-  needs (is b)
-  ✨.add a b
+add summandA summandB :=
+  needs (is summandA)
+  needs (is summandB)
+  ✨.intAdd summandA summandB
+subtract minuend subtrahend :=
+  needs (is minuend)
+  needs (is subtrahend)
+  ✨.intSubtract minuend subtrahend
+negate value :=
+  needs (is value)
+  subtract 0 value
+multiply factorA factorB :=
+  needs (is factorA)
+  needs (is factorB)
+  ✨.intMultiply factorA factorB
+divideTruncating dividend divisor :=
+  needs (is dividend)
+  needs (is divisor)
+  ✨.intDivideTruncating dividend divisor
+remainder dividend divisor :=
+  needs (is dividend)
+  needs (is divisor)
+  ✨.intRemainder dividend divisor
+modulo dividend divisor :=
+  needs (is dividend)
+  needs (is divisor)
+  ✨.intModulo dividend divisor
+
+compareTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  result = ✨.intCompareTo valueA valueB
+  check (bool.implies (equals result Equal) (equals valueA valueB))
+  result
+isLessThan valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  equals (compareTo valueA valueB) Less
+isGreaterThan valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  equals (compareTo valueA valueB) Greater
+isLessThanOrEqualTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  bool.not (isGreaterThan valueA valueB)
+isGreaterThanOrEqualTo valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  bool.not (isLessThan valueA valueB)
+
+isPositive value :=
+  needs (is value)
+  isGreaterThan value 0
+isNonPositive value :=
+  needs (is value)
+  bool.not (isPositive value)
+isNegative value :=
+  needs (is value)
+  isLessThan value 0
+isNonNegative value :=
+  needs (is value)
+  bool.not (isNegative value)
+absolute value :=
+  needs (is value)
+  conditionals.ifElse isNegative (negate value) value
+
+fitsInRustU128 value =
+  needs (is value)
+  needs (isNonNegative value)
+
+  rustU128Max = 340282366920938463463374607431768211455
+  # https://doc.rust-lang.org/std/primitive.u128.html#associatedconstant.MAX
+  isLessThan value rustU128Max
+shiftLeft value amount :=
+  needs (is value)
+  needs (is amount)
+  needs (isNonNegative amount)
+  needs (fitsInRustU128 amount) "shifts by that much are not yet supported"
+  ✨.intShiftLeft value amount
+shiftRight value amount :=
+  needs (is value)
+  needs (is amount)
+  needs (isNonNegative amount)
+  needs (fitsInRustU128 amount) "shifts by that much are not yet supported"
+  ✨.intShiftRight value amount
+
+bitLength value :=
+  # Determines the fewest bits necessary to express this integer, not including
+  # the sign.
+  needs (is value)
+  ✨.intBitLength value
+
+bitwiseAnd valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ✨.intBitwiseAnd valueA valueB
+bitwiseOr valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ✨.intBitwiseOr valueA valueB
+bitwiseXor valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ✨.intBitwiseXor valueA valueB
+
+isEven value :=
+  needs (is value)
+  equals (bitwiseAnd value 1) 0
+isOdd value :=
+  needs (is value)
+  isOdd = equals (bitwiseAnd value 1) 1
+  check (equals (isEven value) (bool.not isOdd))
+  isOdd
+
+min valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  conditionals.ifElse
+    isLessThanOrEqualTo valueA valueB
+    { valueA }
+    { valueB }
+max valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  conditionals.ifElse
+    isGreaterThanOrEqualTo valueA valueB
+    { valueA }
+    { valueB }
+coerceAtLeast value minimum :=
+  needs (is value)
+  needs (is minimum)
+  max value minimum
+coerceAtMost value maximum :=
+  needs (is value)
+  needs (is maximum)
+  min value maximum
+coerceIn value minimum maximum :=
+  needs (is value)
+  needs (is minimum)
+  needs (is maximum)
+  needs (isLessThanOrEqualTo minimum maximum)
+  coerceAtMost (coerceAtLeast value minimum) maximum
+
+parse text :=
+  needs (type.is text Text)
+  ✨.intParse text

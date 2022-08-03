@@ -86,8 +86,14 @@ impl<'a> Context<'a> {
             }
             // TODO: support folding ranges for structs
             CstKind::Struct { fields, .. } => self.visit_csts(fields),
-            CstKind::StructField { key, value, .. } => {
-                self.visit_cst(key);
+            CstKind::StructField {
+                key_and_colon,
+                value,
+                ..
+            } => {
+                if let Some(box (key, _)) = key_and_colon {
+                    self.visit_cst(key);
+                }
                 self.visit_cst(value);
             }
             CstKind::StructAccess { struct_, dot, key } => {
@@ -108,10 +114,6 @@ impl<'a> Context<'a> {
                 ));
 
                 let closing_curly_brace = closing_curly_brace.unwrap_whitespace_and_comment();
-                assert!(matches!(
-                    closing_curly_brace.kind,
-                    CstKind::ClosingCurlyBrace { .. }
-                ));
 
                 self.push(
                     opening_curly_brace.span.end,
