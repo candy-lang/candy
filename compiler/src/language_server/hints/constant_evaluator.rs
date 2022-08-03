@@ -22,7 +22,7 @@ pub struct ConstantEvaluator {
 
 impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
-        let module_closure = Closure::of_module(&db, module.clone()).unwrap();
+        let module_closure = Closure::of_module(db, module.clone()).unwrap();
         let mut vm = Vm::new();
         let use_provider = DbUseProvider { db };
         vm.set_up_module_closure_execution(&use_provider, module_closure);
@@ -72,14 +72,14 @@ impl ConstantEvaluator {
         let mut hints = vec![];
 
         if let Status::Panicked { reason } = vm.status() {
-            if let Some(hint) = panic_hint(&db, module.clone(), &vm, reason) {
+            if let Some(hint) = panic_hint(db, module.clone(), vm, reason) {
                 hints.push(hint);
             }
         };
         if module.to_possible_paths().is_some() {
             let trace = vm.tracer.dump_call_tree();
             let trace_file = module.associated_debug_file("trace");
-            fs::write(trace_file.clone(), trace).unwrap();
+            fs::write(trace_file, trace).unwrap();
         }
 
         for entry in vm.tracer.log() {

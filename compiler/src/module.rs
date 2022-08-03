@@ -78,14 +78,13 @@ impl Module {
     ) -> Self {
         let relative_path =
             fs::canonicalize(&file).expect("Package root does not exist or is invalid.");
-        let relative_path = match relative_path
-            .strip_prefix(fs::canonicalize(package_root.clone()).unwrap().clone())
-        {
-            Ok(path) => path,
-            Err(_) => {
-                return Module::from_anonymous_content(fs::read_to_string(file).unwrap(), kind)
-            }
-        };
+        let relative_path =
+            match relative_path.strip_prefix(fs::canonicalize(package_root.clone()).unwrap()) {
+                Ok(path) => path,
+                Err(_) => {
+                    return Module::from_anonymous_content(fs::read_to_string(file).unwrap(), kind)
+                }
+            };
 
         let mut path = relative_path
             .components()
@@ -182,7 +181,7 @@ impl Display for Module {
             self.package,
             self.path
                 .iter()
-                .map(|component| format!("{component}"))
+                .map(|component| component.to_string())
                 .join("/")
         )?;
         Ok(())
@@ -198,9 +197,7 @@ pub trait ModuleDb: ModuleWatcher {
 
 fn get_module_content_as_string(db: &dyn ModuleDb, module: Module) -> Option<Arc<String>> {
     let content = get_module_content(db, module)?;
-    String::from_utf8((*content).clone())
-        .ok()
-        .map(|it| Arc::new(it))
+    String::from_utf8((*content).clone()).ok().map(Arc::new)
 }
 
 fn get_module_content(db: &dyn ModuleDb, module: Module) -> Option<Arc<Vec<u8>>> {
@@ -209,7 +206,7 @@ fn get_module_content(db: &dyn ModuleDb, module: Module) -> Option<Arc<Vec<u8>>>
     };
 
     if let Package::Anonymous { root_content } = module.package {
-        return Some(Arc::new(root_content.clone().into_bytes()));
+        return Some(Arc::new(root_content.into_bytes()));
     }
     for path in module.to_possible_paths().unwrap() {
         match fs::read(path.clone()) {
@@ -254,7 +251,7 @@ mod test {
     fn on_demand_module_content_works() {
         let mut db = Database::default();
         let module = Module {
-            package: Package::User(PathBuf::from("/non/existent").into()),
+            package: Package::User(PathBuf::from("/non/existent")),
             path: vec!["foo".to_string()],
             kind: ModuleKind::Code,
         };

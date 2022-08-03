@@ -360,7 +360,7 @@ fn apply_text_changes(
     changes: Vec<TextDocumentContentChangeEvent>,
 ) -> String {
     let mut text = db
-        .get_module_content_as_string(module.clone())
+        .get_module_content_as_string(module)
         .unwrap()
         .as_ref()
         .to_owned();

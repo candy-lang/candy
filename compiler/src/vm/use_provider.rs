@@ -60,7 +60,7 @@ impl Vm {
                 self.data_stack.push(self.heap.import(value));
             }
             UseResult::Code(lir) => {
-                let module_closure = Value::Closure(Closure::of_lir(module.clone(), lir));
+                let module_closure = Value::Closure(Closure::of_lir(module, lir));
                 let address = self.heap.import(module_closure);
                 self.data_stack.push(address);
                 self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
@@ -86,7 +86,7 @@ impl UsePath {
         let mut path = path.as_str();
         let parent_navigations = {
             let mut navigations = 0;
-            while path.chars().next() == Some(UsePath::PARENT_NAVIGATION_CHAR) {
+            while path.starts_with(UsePath::PARENT_NAVIGATION_CHAR) {
                 navigations += 1;
                 path = &path[UsePath::PARENT_NAVIGATION_CHAR.len_utf8()..];
             }

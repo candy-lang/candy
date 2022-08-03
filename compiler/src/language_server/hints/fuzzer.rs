@@ -29,7 +29,7 @@ impl FuzzerManager {
         let closures = self
             .fuzzable_closures
             .entry(module)
-            .or_insert_with(|| HashMap::new());
+            .or_insert_with(HashMap::new);
 
         for (id, new_closure) in fuzzable_closures {
             let old_closure = closures.insert(id.clone(), new_closure.clone());
