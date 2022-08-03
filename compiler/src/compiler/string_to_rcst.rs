@@ -775,7 +775,7 @@ mod parse {
                 Rcst::Parenthesized {
                     opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
                     inner: Box::new(Rcst::Call {
-                        name: Box::new(Rcst::TrailingWhitespace {
+                        receiver: Box::new(Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::Identifier("foo".to_string())),
                             whitespace: vec![Rcst::Whitespace(" ".to_string())]
                         }),
@@ -840,7 +840,7 @@ mod parse {
             Some((
                 "",
                 Rcst::Call {
-                    name: Box::new(Rcst::TrailingWhitespace {
+                    receiver: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![
                             Rcst::Newline("\n".to_string()),
@@ -860,7 +860,7 @@ mod parse {
                         child: Box::new(Rcst::Parenthesized {
                             opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
                             inner: Box::new(Rcst::Call {
-                                name: Box::new(Rcst::TrailingWhitespace {
+                                receiver: Box::new(Rcst::TrailingWhitespace {
                                     child: Box::new(Rcst::Identifier("foo".to_string())),
                                     whitespace: vec![Rcst::Whitespace(" ".to_string())]
                                 }),
@@ -885,11 +885,11 @@ mod parse {
 
         let (whitespace, mut expressions) = expressions.split_outer_trailing_whitespace();
         let arguments = expressions.split_off(1);
-        let name = expressions.into_iter().next().unwrap();
+        let receiver = expressions.into_iter().next().unwrap();
         Some((
             input,
             Rcst::Call {
-                name: Box::new(name),
+                receiver: Box::new(receiver),
                 arguments,
             }
             .wrap_in_whitespace(whitespace),
@@ -903,7 +903,7 @@ mod parse {
             Some((
                 "",
                 Rcst::Call {
-                    name: Box::new(Rcst::TrailingWhitespace {
+                    receiver: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
@@ -916,7 +916,7 @@ mod parse {
             Some((
                 "",
                 Rcst::Call {
-                    name: Box::new(Rcst::TrailingWhitespace {
+                    receiver: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Symbol("Foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
@@ -942,7 +942,7 @@ mod parse {
             Some((
                 "\n2",
                 Rcst::Call {
-                    name: Box::new(Rcst::TrailingWhitespace {
+                    receiver: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![
                             Rcst::Newline("\n".to_string()),
@@ -971,7 +971,7 @@ mod parse {
             Some((
                 "\nbar",
                 Rcst::Call {
-                    name: Box::new(Rcst::TrailingWhitespace {
+                    receiver: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
@@ -1016,11 +1016,11 @@ mod parse {
             Some((
                 "\n",
                 Rcst::Call {
-                    name: Box::new(Rcst::TrailingWhitespace {
+                    receiver: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Parenthesized {
                             opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
                             inner: Box::new(Rcst::Call {
-                                name: Box::new(Rcst::TrailingWhitespace {
+                                receiver: Box::new(Rcst::TrailingWhitespace {
                                     child: Box::new(Rcst::Identifier("foo".to_string())),
                                     whitespace: vec![Rcst::Whitespace(" ".to_string())]
                                 }),
@@ -1044,7 +1044,7 @@ mod parse {
                 "\nbar = 5",
                 Rcst::TrailingWhitespace {
                     child: Box::new(Rcst::Call {
-                        name: Box::new(Rcst::TrailingWhitespace {
+                        receiver: Box::new(Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::Identifier("foo".to_string())),
                             whitespace: vec![Rcst::Whitespace(" ".to_string())]
                         }),

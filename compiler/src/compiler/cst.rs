@@ -81,7 +81,7 @@ pub enum CstKind {
         closing_parenthesis: Box<Cst>,
     },
     Call {
-        name: Box<Cst>,
+        receiver: Box<Cst>,
         arguments: Vec<Cst>,
     },
     Struct {
@@ -171,8 +171,11 @@ impl Display for Cst {
                 inner,
                 closing_parenthesis,
             } => write!(f, "{}{}{}", opening_parenthesis, inner, closing_parenthesis),
-            CstKind::Call { name, arguments } => {
-                name.fmt(f)?;
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => {
+                receiver.fmt(f)?;
                 for argument in arguments {
                     argument.fmt(f)?;
                 }
@@ -257,7 +260,7 @@ impl Cst {
     pub fn display_span(&self) -> Range<usize> {
         match &self.kind {
             CstKind::TrailingWhitespace { child, .. } => child.display_span(),
-            CstKind::Call { name, .. } => name.display_span(),
+            CstKind::Call { receiver, .. } => receiver.display_span(),
             CstKind::Assignment { name, .. } => name.display_span(),
             _ => self.span.clone(),
         }
@@ -299,8 +302,11 @@ impl UnwrapWhitespaceAndComment for Cst {
                 inner: Box::new(inner.unwrap_whitespace_and_comment()),
                 closing_parenthesis: Box::new(closing_parenthesis.unwrap_whitespace_and_comment()),
             },
-            CstKind::Call { name, arguments } => CstKind::Call {
-                name: Box::new(name.unwrap_whitespace_and_comment()),
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => CstKind::Call {
+                receiver: Box::new(receiver.unwrap_whitespace_and_comment()),
                 arguments: arguments.unwrap_whitespace_and_comment(),
             },
             CstKind::Struct {
@@ -432,7 +438,10 @@ impl TreeWithIds for Cst {
                 .find(id)
                 .or_else(|| inner.find(id))
                 .or_else(|| closing_parenthesis.find(id)),
-            CstKind::Call { name, arguments } => name.find(id).or_else(|| arguments.find(id)),
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => receiver.find(id).or_else(|| arguments.find(id)),
             CstKind::Struct {
                 opening_bracket,
                 fields,
@@ -514,8 +523,12 @@ impl TreeWithIds for Cst {
             CstKind::Text { .. } => (None, false),
             CstKind::TextPart(_) => (None, false),
             CstKind::Parenthesized { inner, .. } => (inner.find_by_offset(offset), false),
-            CstKind::Call { name, arguments } => (
-                name.find_by_offset(offset)
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => (
+                receiver
+                    .find_by_offset(offset)
                     .or_else(|| arguments.find_by_offset(offset)),
                 false,
             ),

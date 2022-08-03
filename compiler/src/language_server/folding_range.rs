@@ -67,18 +67,21 @@ impl<'a> Context<'a> {
             CstKind::Text { .. } => {}
             CstKind::TextPart(_) => {}
             CstKind::Parenthesized { inner, .. } => self.visit_cst(inner),
-            CstKind::Call { name, arguments } => {
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => {
                 if !arguments.is_empty() {
-                    let name = name.unwrap_whitespace_and_comment();
+                    let receiver = receiver.unwrap_whitespace_and_comment();
                     let last_argument = arguments.last().unwrap().unwrap_whitespace_and_comment();
                     self.push(
-                        name.span.end,
+                        receiver.span.end,
                         last_argument.span.end,
                         FoldingRangeKind::Region,
                     );
                 }
 
-                self.visit_cst(name);
+                self.visit_cst(receiver);
                 self.visit_csts(arguments);
             }
             // TODO: support folding ranges for structs

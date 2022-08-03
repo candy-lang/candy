@@ -205,10 +205,13 @@ impl LoweringContext {
 
                 ast
             }
-            CstKind::Call { name, arguments } => {
-                let mut name_kind = &name.kind;
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => {
+                let mut receiver_kind = &receiver.kind;
                 loop {
-                    name_kind = match name_kind {
+                    receiver_kind = match receiver_kind {
                         CstKind::Parenthesized {
                             opening_parenthesis,
                             inner,
@@ -231,22 +234,22 @@ impl LoweringContext {
                         _ => break,
                     };
                 }
-                let receiver = match &name.kind {
+                let receiver_ast = match &receiver.kind {
                     CstKind::Identifier(identifier) => {
-                        Some(self.lower_identifier(name.id, identifier.to_string()))
+                        Some(self.lower_identifier(receiver.id, identifier.to_string()))
                     }
                     CstKind::StructAccess { struct_, dot, key } => {
-                        Some(self.lower_struct_access(name.id.to_owned(), struct_, dot, key))
+                        Some(self.lower_struct_access(receiver.id.to_owned(), struct_, dot, key))
                     }
                     _ => None,
                 };
                 let arguments = self.lower_csts(arguments);
 
-                if let Some(receiver) = receiver {
+                if let Some(receiver_ast) = receiver_ast {
                     self.create_ast(
                         cst.id,
                         AstKind::Call(ast::Call {
-                            receiver: receiver.into(),
+                            receiver: receiver_ast.into(),
                             arguments,
                         }),
                     )
@@ -254,7 +257,7 @@ impl LoweringContext {
                     let mut errors = vec![];
                     errors.push(CompilerError {
                         input: self.input.clone(),
-                        span: name.span.clone(),
+                        span: receiver.span.clone(),
                         payload: CompilerErrorPayload::Ast(AstError::CallOfANonIdentifier),
                     });
                     arguments.collect_errors(&mut errors);

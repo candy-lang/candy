@@ -201,8 +201,11 @@ impl<'a> Context<'a> {
                 self.visit_cst(inner, None);
                 self.visit_cst(closing_parenthesis, None);
             }
-            CstKind::Call { name, arguments } => {
-                self.visit_cst(name, Some(SemanticTokenType::Function));
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => {
+                self.visit_cst(receiver, Some(SemanticTokenType::Function));
                 self.visit_csts(arguments, None);
             }
             CstKind::Struct {

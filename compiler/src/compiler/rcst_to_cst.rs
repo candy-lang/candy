@@ -151,8 +151,11 @@ impl RcstToCstExt for Rcst {
                 state.offset += text.len();
                 CstKind::TextPart(text)
             }
-            Rcst::Call { name, arguments } => CstKind::Call {
-                name: Box::new(name.to_cst(state)),
+            Rcst::Call {
+                receiver,
+                arguments,
+            } => CstKind::Call {
+                receiver: Box::new(receiver.to_cst(state)),
                 arguments: arguments.to_csts(state),
             },
             Rcst::Struct {
