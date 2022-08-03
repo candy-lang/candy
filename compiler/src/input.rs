@@ -156,7 +156,7 @@ mod test {
         assert_eq!(
             db.rcst(input.clone()).unwrap().as_ref().to_owned(),
             vec![Rcst::Int {
-                value: 12u8.into(),
+                value: 123u8.into(),
                 string: "123".to_string()
             },],
         );
