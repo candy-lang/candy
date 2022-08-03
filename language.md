@@ -145,15 +145,13 @@ Structs are mappings from keys to values (also known as dictionaries or hash map
 ]
 ```
 
-To use numbers as keys, you can also omit the keys of 
-
-Omitting keys is equivalent to using zero-indexed numbers as keys:
+Omitting keys is equivalent to using zero-indexed numbers as keys. You can also add fields with explicit keys after these:
 
 ```candy
-[Hello, World]
+[Hello, World, Foo: Bar]
 
 # equivalent:
-[0: Hello, 1: World]
+[0: Hello, 1: World, Foo: Bar]
 ```
 
 To lookup a key that is a symbol, you can use the dot syntax:
@@ -440,14 +438,14 @@ match (foo 5) %
 Here, each indented line after the match operator represents a match case.
 Each case can match based on the pattern as well an optional condition separated by a comma.
 The first matching case is executed.
-If no case matches, you code panics.
+If no case matches, your code panics.
 
 If you're sure about the structure of a value, you can also use patterns on the left-hand side of an assignment.
 These are called irrefutable patterns.
 Again, if the pattern doesn't match, the code panics.
 
 ```candy
-[a, b] = myStruct
+[a, b] = myList
 core.int.add a b
 
 # actually a pattern:
