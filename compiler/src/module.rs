@@ -13,7 +13,13 @@ use std::{
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub struct Module {
     pub package: Package,
-    pub path: Vec<String>, // path components, but `.` and `..` are not allowed
+    pub path: Vec<String>,
+    pub kind: ModuleKind,
+}
+#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
+pub enum ModuleKind {
+    Code,
+    Asset,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
@@ -43,38 +49,48 @@ pub enum Package {
 }
 
 impl Module {
-    pub fn from_anonymous_content(content: String) -> Self {
+    pub fn from_anonymous_content(content: String, kind: ModuleKind) -> Self {
         Module {
             package: Package::Anonymous {
                 root_content: content,
             },
             path: vec![],
+            kind,
         }
     }
 
-    pub fn from_package_root_and_url(package_root: PathBuf, url: Url) -> Self {
+    pub fn from_package_root_and_url(package_root: PathBuf, url: Url, kind: ModuleKind) -> Self {
         match url.scheme() {
-            "file" => Module::from_package_root_and_file(package_root, url.to_file_path().unwrap()),
-            "untitled" => {
-                Module::from_anonymous_content(url.to_string()["untitled:".len()..].to_owned())
+            "file" => {
+                Module::from_package_root_and_file(package_root, url.to_file_path().unwrap(), kind)
             }
+            "untitled" => Module::from_anonymous_content(
+                url.to_string()["untitled:".len()..].to_owned(),
+                kind,
+            ),
             _ => panic!("Unsupported URI scheme: {}", url.scheme()),
         }
     }
-    pub fn from_package_root_and_file(package_root: PathBuf, file: PathBuf) -> Self {
+    pub fn from_package_root_and_file(
+        package_root: PathBuf,
+        file: PathBuf,
+        kind: ModuleKind,
+    ) -> Self {
         let relative_path =
             fs::canonicalize(&file).expect("Package root does not exist or is invalid.");
         let relative_path = match relative_path
             .strip_prefix(fs::canonicalize(package_root.clone()).unwrap().clone())
         {
             Ok(path) => path,
-            Err(_) => return Module::from_anonymous_content(fs::read_to_string(file).unwrap()),
+            Err(_) => {
+                return Module::from_anonymous_content(fs::read_to_string(file).unwrap(), kind)
+            }
         };
 
-        let path = relative_path
+        let mut path = relative_path
             .components()
             .into_iter()
-            .map(|it| match it {
+            .map(|component| match component {
                 std::path::Component::Prefix(_) => unreachable!(),
                 std::path::Component::RootDir => unreachable!(),
                 std::path::Component::CurDir => panic!("`.` is not allowed in an module path."),
@@ -85,10 +101,22 @@ impl Module {
                     it.to_str().expect("Invalid UTF-8 in path.").to_owned()
                 }
             })
-            .collect();
+            .collect_vec();
+
+        if kind == ModuleKind::Code {
+            let last = path.pop().unwrap();
+            let last = last
+                .strip_suffix(".candy")
+                .expect("Code module doesn't end with `.candy`?");
+            if !last.is_empty() {
+                path.push(last.to_string());
+            }
+        }
+
         Module {
             package: Package::User(package_root),
             path,
+            kind,
         }
     }
 }
@@ -103,12 +131,32 @@ impl Package {
     }
 }
 impl Module {
-    pub fn to_path(&self) -> Option<PathBuf> {
-        let mut total_path = self.package.to_path()?;
+    pub fn to_possible_paths(&self) -> Option<Vec<PathBuf>> {
+        let mut path = self.package.to_path()?;
         for component in self.path.clone() {
-            total_path.push(component);
+            path.push(component);
         }
-        Some(total_path)
+        Some(match self.kind {
+            ModuleKind::Asset => vec![path],
+            ModuleKind::Code => vec![
+                {
+                    let mut path = path.clone();
+                    path.push(".candy");
+                    path
+                },
+                {
+                    let mut path = path.clone();
+                    path.set_extension("candy");
+                    path
+                },
+            ],
+        })
+    }
+
+    pub fn associated_debug_file(&self, debug_type: &str) -> PathBuf {
+        let mut path = self.to_possible_paths().unwrap().pop().unwrap();
+        path.set_extension(format!("candy.{}", debug_type));
+        path
     }
 }
 
@@ -163,15 +211,16 @@ fn get_module_content(db: &dyn ModuleDb, module: Module) -> Option<Arc<Vec<u8>>>
     if let Package::Anonymous { root_content } = module.package {
         return Some(Arc::new(root_content.clone().into_bytes()));
     }
-    let path = module.to_path().unwrap();
-    match fs::read(path.clone()) {
-        Ok(content) => Some(Arc::new(content)),
-        Err(error) if matches!(error.kind(), std::io::ErrorKind::NotFound) => None,
-        Err(_) => {
-            log::error!("Unexpected error when reading file {:?}.", path);
-            None
+    for path in module.to_possible_paths().unwrap() {
+        match fs::read(path.clone()) {
+            Ok(content) => return Some(Arc::new(content)),
+            Err(error) if matches!(error.kind(), std::io::ErrorKind::NotFound) => {}
+            Err(_) => {
+                log::error!("Unexpected error when reading file {:?}.", path);
+            }
         }
     }
+    None
 }
 fn get_open_module_content(db: &dyn ModuleDb, module: Module) -> Option<Arc<Vec<u8>>> {
     // The following line of code shouldn't be neccessary, but it is.
@@ -206,7 +255,8 @@ mod test {
         let mut db = Database::default();
         let module = Module {
             package: Package::User(PathBuf::from("/non/existent").into()),
-            path: vec!["foo.candy".to_string()],
+            path: vec!["foo".to_string()],
+            kind: ModuleKind::Code,
         };
 
         db.did_open_module(&module, "123".to_string().into_bytes());

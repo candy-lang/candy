@@ -36,9 +36,16 @@ impl CompilerError {
 impl From<Module> for Url {
     fn from(module: Module) -> Url {
         match module.package {
-            Package::User(_) | Package::External(_) => {
-                Url::from_file_path(module.to_path().unwrap()).unwrap()
-            }
+            Package::User(_) | Package::External(_) => Url::from_file_path(
+                module
+                    .to_possible_paths()
+                    .unwrap()
+                    .into_iter()
+                    .filter(|path| path.exists())
+                    .next()
+                    .unwrap(),
+            )
+            .unwrap(),
             Package::Anonymous { .. } => Url::parse(&format!("untitled")).unwrap(),
         }
     }

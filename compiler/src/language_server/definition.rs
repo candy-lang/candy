@@ -6,7 +6,7 @@ use crate::{
         hir::{Expression, HirDb},
     },
     database::Database,
-    module::Module,
+    module::{Module, ModuleKind},
 };
 use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, LocationLink};
 use std::path::PathBuf;
@@ -17,8 +17,11 @@ pub fn find_definition(
     params: GotoDefinitionParams,
 ) -> Option<GotoDefinitionResponse> {
     let params = params.text_document_position_params;
-    let module =
-        Module::from_package_root_and_url(project_directory, params.text_document.uri.clone());
+    let module = Module::from_package_root_and_url(
+        project_directory,
+        params.text_document.uri.clone(),
+        ModuleKind::Code,
+    );
     let position = params.position;
     let offset = db.offset_from_lsp(module.clone(), position.line, position.character);
 

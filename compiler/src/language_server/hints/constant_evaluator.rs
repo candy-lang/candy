@@ -81,9 +81,9 @@ impl ConstantEvaluator {
                 None => log::error!("Module panicked, but we are not displaying an error."),
             }
         };
-        if let Some(path) = module.to_path() {
+        if module.to_possible_paths().is_some() {
             let trace = vm.tracer.dump_call_tree();
-            let trace_file = path.clone_with_extension("candy.trace");
+            let trace_file = module.associated_debug_file("trace");
             fs::write(trace_file.clone(), trace).unwrap();
         }
 

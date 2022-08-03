@@ -76,10 +76,7 @@ impl Expression {
                 ids.push(function.clone());
                 ids.extend(arguments.iter().cloned());
             }
-            Expression::UseAssetModule { relative_path, .. } => {
-                ids.push(relative_path.clone());
-            }
-            Expression::UseCodeModule { relative_path, .. } => {
+            Expression::UseModule { relative_path, .. } => {
                 ids.push(relative_path.clone());
             }
             Expression::Builtin(_) => {}
@@ -149,11 +146,7 @@ pub enum Expression {
         function: Id,
         arguments: Vec<Id>,
     },
-    UseAssetModule {
-        current_module: Module,
-        relative_path: Id,
-    },
-    UseCodeModule {
+    UseModule {
         current_module: Module,
         relative_path: Id,
     },
@@ -284,20 +277,12 @@ impl fmt::Display for Expression {
                         .join("\n")
                 )
             }
-            Expression::UseAssetModule {
+            Expression::UseModule {
                 current_module,
                 relative_path,
             } => write!(
                 f,
-                "use asset module at {} relative to {}",
-                relative_path, current_module
-            ),
-            Expression::UseCodeModule {
-                current_module,
-                relative_path,
-            } => write!(
-                f,
-                "use code module at {} relative to {}",
+                "use module {} relative to {}",
                 relative_path, current_module
             ),
             Expression::Needs { condition, reason } => {
@@ -350,8 +335,7 @@ impl Expression {
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
             Expression::Builtin(_) => None,
             Expression::Call { .. } => None,
-            Expression::UseAssetModule { .. } => None,
-            Expression::UseCodeModule { .. } => None,
+            Expression::UseModule { .. } => None,
             Expression::Needs { .. } => None,
             Expression::Error { .. } => None,
         }
@@ -385,8 +369,7 @@ impl CollectErrors for Expression {
             | Expression::Struct(_)
             | Expression::Builtin(_)
             | Expression::Call { .. }
-            | Expression::UseAssetModule { .. }
-            | Expression::UseCodeModule { .. }
+            | Expression::UseModule { .. }
             | Expression::Needs { .. } => {}
             Expression::Lambda(lambda) => lambda.body.collect_errors(errors),
             Expression::Error {

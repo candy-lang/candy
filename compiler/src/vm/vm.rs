@@ -289,20 +289,9 @@ impl Vm {
                 let caller = self.call_stack.pop().unwrap();
                 self.next_instruction = caller;
             }
-            Instruction::UseAssetModule { current_module } => {
+            Instruction::UseModule { current_module } => {
                 let relative_path = self.data_stack.pop().unwrap();
-                match self.use_asset_module(use_provider, current_module, relative_path) {
-                    Ok(bytes) => {
-                        self.data_stack.push(self.heap.import(bytes));
-                    }
-                    Err(reason) => {
-                        self.panic(reason);
-                    }
-                }
-            }
-            Instruction::UseCodeModule { current_module } => {
-                let relative_path = self.data_stack.pop().unwrap();
-                match self.use_code_module(use_provider, current_module, relative_path) {
+                match self.use_module(use_provider, current_module, relative_path) {
                     Ok(()) => {}
                     Err(reason) => {
                         self.panic(reason);

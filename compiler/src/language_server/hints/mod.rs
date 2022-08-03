@@ -133,11 +133,9 @@ pub async fn run_server(
                 .sorted_by_key(|hint| hint.position)
                 .collect_vec();
 
-            if let Some(path) = module.to_path() {
-                let hints_file = path.clone_with_extension("candy.hints");
-                let content = hints.iter().map(|hint| format!("{hint:?}")).join("\n");
-                fs::write(hints_file.clone(), content).unwrap();
-            }
+            let hints_file = module.associated_debug_file("hints");
+            let content = hints.iter().map(|hint| format!("{hint:?}")).join("\n");
+            fs::write(hints_file.clone(), content).unwrap();
 
             // Only show the most important hint per line.
             let hints = hints

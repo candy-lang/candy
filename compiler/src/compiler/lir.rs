@@ -68,22 +68,23 @@ pub enum Instruction {
     Return,
 
     /// Pops a string path and then resolves the path relative to the current
-    /// module. Then pushes the content of the resolved file.
+    /// module. Then does different things depending on whether this is a code
+    /// or asset module.
     ///
-    /// a, path -> a, listOfContentBytes
-    UseAssetModule {
-        current_module: Module,
-    },
-
-    /// Pops a string path and then resolves the path relative to the current
-    /// module. Then compiles the module and runs the resulting module closure.
+    /// - Code module:
     ///
-    /// a, path -> a
+    ///   Loads and parses the module, then runs the module closure. Later,
+    ///   when the module returns, the stack will contain the struct of the
+    ///   exported definitions:
     ///
-    /// Later, when the module returns, the stack will contain the result:
+    ///   a, path ~> a, structOfModuleExports
     ///
-    /// a, path ~> a, structOfModuleExports
-    UseCodeModule {
+    /// - Asset module:
+    ///   
+    ///   Loads the file and pushes its content onto the stack:
+    ///
+    ///   a, path -> a, listOfContentBytes
+    UseModule {
         current_module: Module,
     },
 
@@ -166,11 +167,8 @@ impl Display for Instruction {
                 write!(f, "call with {num_args} arguments")
             }
             Instruction::Return => write!(f, "return"),
-            Instruction::UseAssetModule { current_module } => {
-                write!(f, "useAssetModule (currently in {})", current_module)
-            }
-            Instruction::UseCodeModule { current_module } => {
-                write!(f, "useCodeModule (currently in {})", current_module)
+            Instruction::UseModule { current_module } => {
+                write!(f, "useModule (currently in {})", current_module)
             }
             Instruction::Needs => write!(f, "needs"),
             Instruction::RegisterFuzzableClosure(hir_id) => {

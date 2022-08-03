@@ -80,7 +80,6 @@ fn compile_top_level(
     };
 
     context.generate_sparkles();
-    context.generate_use_asset();
     context.generate_use();
     context.compile(&mut &ast);
     context.generate_exports_struct();
@@ -489,59 +488,23 @@ impl<'a> Context<'a> {
         self.push(None, sparkles_map, Some("✨".to_string()));
     }
 
-    fn generate_use_asset(&mut self) {
-        // HirId(~:test.candy:useAsset) = lambda { HirId(~:test.candy:useAsset:target) ->
-        //   HirId(~:test.candy:useAsset:importedFileContent) = useAssetModule
-        //     currently in ~:test.candy:useAsset:importedFileContent
-        //     relative path: HirId(~:test.candy:useAsset:target)
-        // }
-
-        let reset_state = self.start_scope();
-        self.prefix_keys.push("useAsset".to_string());
-        let relative_path = hir::Id::new(
-            self.module.clone(),
-            add_keys(&self.prefix_keys[..], "target".to_string()),
-        );
-
-        self.push(
-            None,
-            Expression::UseAssetModule {
-                current_module: self.module.clone(),
-                relative_path: relative_path.clone(),
-            },
-            Some("importedFileContent".to_string()),
-        );
-
-        let inner_body = self.end_scope(reset_state);
-
-        self.push(
-            None,
-            Expression::Lambda(Lambda {
-                parameters: vec![relative_path],
-                body: inner_body,
-                fuzzable: false,
-            }),
-            Some("useAsset".to_string()),
-        );
-    }
-
     fn generate_use(&mut self) {
-        // HirId(~:test.candy:use) = lambda { HirId(~:test.candy:use:target) ->
+        // HirId(~:test.candy:use) = lambda { HirId(~:test.candy:use:relativePath) ->
         //   HirId(~:test.candy:useAsset:importedFileContent) = useAssetModule
         //     currently in ~:test.candy:useAsset:importedFileContent
-        //     relative path: HirId(~:test.candy:useAsset:target)
+        //     relative path: HirId(~:test.candy:useAsset:relativePath)
         //  }
 
         let reset_state = self.start_scope();
         self.prefix_keys.push("use".to_string());
         let relative_path = hir::Id::new(
             self.module.clone(),
-            add_keys(&self.prefix_keys[..], "target".to_string()),
+            add_keys(&self.prefix_keys[..], "relativePath".to_string()),
         );
 
         self.push(
             None,
-            Expression::UseCodeModule {
+            Expression::UseModule {
                 current_module: self.module.clone(),
                 relative_path: relative_path.clone(),
             },

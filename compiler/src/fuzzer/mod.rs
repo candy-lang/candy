@@ -52,8 +52,7 @@ pub async fn fuzz(db: &Database, module: Module) {
                 tracer.dump_stack_trace(&db);
 
                 let trace = tracer.dump_call_tree();
-                let mut trace_file = module.to_path().unwrap();
-                trace_file.set_extension("candy.trace");
+                let trace_file = module.associated_debug_file("trace");
                 fs::write(trace_file.clone(), trace).unwrap();
                 log::info!(
                     "Trace has been written to `{}`.",

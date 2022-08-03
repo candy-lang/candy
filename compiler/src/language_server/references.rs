@@ -6,7 +6,7 @@ use crate::{
         hir::{self, Body, Expression, HirDb, Lambda},
     },
     database::Database,
-    module::Module,
+    module::{Module, ModuleKind},
 };
 use im::HashSet;
 use lsp_types::{
@@ -55,7 +55,11 @@ fn find(
     params: TextDocumentPositionParams,
     include_declaration: bool,
 ) -> Option<Vec<DocumentHighlight>> {
-    let module = Module::from_package_root_and_url(project_directory, params.text_document.uri);
+    let module = Module::from_package_root_and_url(
+        project_directory,
+        params.text_document.uri,
+        ModuleKind::Code,
+    );
     let position = params.position;
     let offset = db.offset_from_lsp(module.clone(), position.line, position.character);
     let query = query_for_offset(db, module, offset)?;
@@ -212,8 +216,7 @@ impl<'a> Context<'a> {
                 }
                 self.visit_ids(arguments);
             }
-            Expression::UseAssetModule { .. } => {} // only occurs in generated code
-            Expression::UseCodeModule { .. } => {}  // only occurs in generated code
+            Expression::UseModule { .. } => {} // only occurs in generated code
             Expression::Needs { .. } => {
                 if let ReferenceQuery::Needs(_) = &self.query {
                     self.add_reference(id, DocumentHighlightKind::READ);

@@ -24,7 +24,7 @@ use crate::{
     },
     database::Database,
     language_server::utils::LspPositionConversion,
-    module::Module,
+    module::{Module, ModuleKind},
     vm::{use_provider::DbUseProvider, value::Closure, Vm},
 };
 use compiler::lir::Lir;
@@ -91,7 +91,11 @@ async fn main() {
 }
 
 fn build(options: CandyBuildOptions) {
-    let module = Module::from_package_root_and_file(current_dir().unwrap(), options.file.clone());
+    let module = Module::from_package_root_and_file(
+        current_dir().unwrap(),
+        options.file.clone(),
+        ModuleKind::Code,
+    );
     raw_build(module.clone(), options.debug);
 
     if options.watch {
@@ -112,7 +116,6 @@ fn build(options: CandyBuildOptions) {
 }
 fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
     log::info!("Building `{module}`.");
-    let file = module.to_path().unwrap();
 
     let db = Database::default();
 
@@ -121,28 +124,28 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
         .rcst(module.clone())
         .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", module, err));
     if debug {
-        let rcst_file = file.clone_with_extension("candy.rcst");
+        let rcst_file = module.associated_debug_file("rcst");
         fs::write(rcst_file, format!("{:#?}\n", rcst.clone())).unwrap();
     }
 
     log::debug!("Turning RCST to CST…");
     let cst = db.cst(module.clone()).unwrap();
     if debug {
-        let cst_file = file.clone_with_extension("candy.cst");
+        let cst_file = module.associated_debug_file("cst");
         fs::write(cst_file, format!("{:#?}\n", cst.clone())).unwrap();
     }
 
     log::debug!("Abstracting CST to AST…");
     let (asts, ast_cst_id_map) = db.ast(module.clone()).unwrap();
     if debug {
-        let ast_file = file.clone_with_extension("candy.ast");
+        let ast_file = module.associated_debug_file("ast");
         fs::write(
             ast_file,
             format!("{}\n", asts.iter().map(|ast| format!("{}", ast)).join("\n")),
         )
         .unwrap();
 
-        let ast_to_cst_ids_file = file.clone_with_extension("candy.ast_to_cst_ids");
+        let ast_to_cst_ids_file = module.associated_debug_file("ast_to_cst_ids");
         fs::write(
             ast_to_cst_ids_file,
             ast_cst_id_map
@@ -158,10 +161,10 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
     log::debug!("Turning AST to HIR…");
     let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
     if debug {
-        let hir_file = file.clone_with_extension("candy.hir");
+        let hir_file = module.associated_debug_file("hir");
         fs::write(hir_file, format!("{}", hir.clone())).unwrap();
 
-        let hir_ast_id_file = file.clone_with_extension("candy.hir_to_ast_ids");
+        let hir_ast_id_file = module.associated_debug_file("hir_to_ast_ids");
         fs::write(
             hir_ast_id_file,
             hir_ast_id_map
@@ -176,7 +179,7 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
     log::debug!("Lowering HIR to LIR…");
     let lir = db.lir(module.clone()).unwrap();
     if debug {
-        let lir_file = file.clone_with_extension("candy.lir");
+        let lir_file = module.associated_debug_file("lir");
         fs::write(lir_file, format!("{lir}")).unwrap();
     }
 
@@ -192,7 +195,11 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
 }
 
 fn run(options: CandyRunOptions) {
-    let module = Module::from_package_root_and_file(current_dir().unwrap(), options.file.clone());
+    let module = Module::from_package_root_and_file(
+        current_dir().unwrap(),
+        options.file.clone(),
+        ModuleKind::Code,
+    );
     let db = Database::default();
 
     if raw_build(module.clone(), false).is_none() {
@@ -221,7 +228,11 @@ fn run(options: CandyRunOptions) {
 }
 
 async fn fuzz(options: CandyFuzzOptions) {
-    let module = Module::from_package_root_and_file(current_dir().unwrap(), options.file.clone());
+    let module = Module::from_package_root_and_file(
+        current_dir().unwrap(),
+        options.file.clone(),
+        ModuleKind::Code,
+    );
     log::debug!("Building `{}`.\n", module);
 
     if raw_build(module.clone(), false).is_none() {
