@@ -1,8 +1,5 @@
 use super::{
-    ast::{
-        self, Ast, AstError, AstKind, AstString, CollectErrors, Identifier, Int, Lambda, Symbol,
-        Text,
-    },
+    ast::{self, Ast, AstError, AstKind, AstString, Identifier, Int, Lambda, Symbol, Text},
     cst::{self, Cst, CstDb, CstKind},
     error::{CompilerError, CompilerErrorPayload},
     rcst_to_cst::RcstToCst,
@@ -234,41 +231,16 @@ impl LoweringContext {
                         _ => break,
                     };
                 }
-                let receiver_ast = match &receiver.kind {
-                    CstKind::Identifier(identifier) => {
-                        Some(self.lower_identifier(receiver.id, identifier.to_string()))
-                    }
-                    CstKind::StructAccess { struct_, dot, key } => {
-                        Some(self.lower_struct_access(receiver.id.to_owned(), struct_, dot, key))
-                    }
-                    _ => None,
-                };
+                let receiver = self.lower_cst(receiver);
                 let arguments = self.lower_csts(arguments);
 
-                if let Some(receiver_ast) = receiver_ast {
-                    self.create_ast(
-                        cst.id,
-                        AstKind::Call(ast::Call {
-                            receiver: receiver_ast.into(),
-                            arguments,
-                        }),
-                    )
-                } else {
-                    let mut errors = vec![];
-                    errors.push(CompilerError {
-                        input: self.input.clone(),
-                        span: receiver.span.clone(),
-                        payload: CompilerErrorPayload::Ast(AstError::CallOfANonIdentifier),
-                    });
-                    arguments.collect_errors(&mut errors);
-                    self.create_ast(
-                        cst.id,
-                        AstKind::Error {
-                            child: None,
-                            errors,
-                        },
-                    )
-                }
+                self.create_ast(
+                    cst.id,
+                    AstKind::Call(ast::Call {
+                        receiver: receiver.into(),
+                        arguments,
+                    }),
+                )
             }
             CstKind::Struct {
                 opening_bracket,

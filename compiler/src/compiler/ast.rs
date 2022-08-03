@@ -112,7 +112,6 @@ pub enum AstError {
     UnexpectedPunctuation,
     TextWithoutClosingQuote,
     ParenthesizedWithoutClosingParenthesis,
-    CallOfANonIdentifier,
     StructWithNonStructField,
     StructWithoutClosingBrace,
     StructKeyWithoutColon,
