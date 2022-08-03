@@ -46,7 +46,7 @@ pub enum Rcst {
         closing_parenthesis: Box<Rcst>,
     },
     Call {
-        name: Box<Rcst>,
+        receiver: Box<Rcst>,
         arguments: Vec<Rcst>,
     },
     Struct {
@@ -160,8 +160,11 @@ impl Display for Rcst {
                 inner.fmt(f)?;
                 closing_parenthesis.fmt(f)
             }
-            Rcst::Call { name, arguments } => {
-                name.fmt(f)?;
+            Rcst::Call {
+                receiver,
+                arguments,
+            } => {
+                receiver.fmt(f)?;
                 for argument in arguments {
                     argument.fmt(f)?;
                 }
@@ -286,7 +289,10 @@ impl IsMultiline for Rcst {
                     || inner.is_multiline()
                     || closing_parenthesis.is_multiline()
             }
-            Rcst::Call { name, arguments } => name.is_multiline() || arguments.is_multiline(),
+            Rcst::Call {
+                receiver,
+                arguments,
+            } => receiver.is_multiline() || arguments.is_multiline(),
             Rcst::Struct {
                 opening_bracket,
                 fields,

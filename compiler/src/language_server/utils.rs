@@ -11,7 +11,7 @@ use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
 use std::{ops::Range, sync::Arc};
 
 impl CompilerError {
-    pub fn to_diagnostic(self, db: &Database, input: Input) -> Diagnostic {
+    pub fn into_diagnostic(self, db: &Database, input: Input) -> Diagnostic {
         Diagnostic {
             range: lsp_types::Range {
                 start: db
@@ -24,7 +24,7 @@ impl CompilerError {
             code_description: None,
             source: Some("🍭 Candy".to_owned()),
             message: match self.payload {
-                CompilerErrorPayload::InvalidUtf8 => format!("Invalid UTF-8"),
+                CompilerErrorPayload::InvalidUtf8 => "Invalid UTF-8".to_string(),
                 CompilerErrorPayload::Rcst(rcst) => format!("RCST: {rcst:?}"),
                 CompilerErrorPayload::Ast(ast) => format!("AST: {ast:?}"),
                 CompilerErrorPayload::Hir(hir) => hir.format_message(),
@@ -39,12 +39,11 @@ impl CompilerError {
 impl HirError {
     fn format_message(&self) -> String {
         match self {
-            HirError::UnknownReference { identifier } => format!("Unknown identifier “{identifier}”."),
-            HirError::UnknownFunction { name } => format!("Unknown function “{name}”."),
+            HirError::UnknownReference { name } => format!("Unknown reference “{name}”."),
             HirError::PublicAssignmentInNotTopLevel => {
                 "Public assignments (:=) can only be used in top-level code.".to_string()
             }
-            HirError::PublicAssignmentWithSameName { .. } => format!("A public assignment with the same name already exists."),
+            HirError::PublicAssignmentWithSameName { .. } => "A public assignment with the same name already exists.".to_string(),
             HirError::NeedsWithWrongNumberOfArguments { num_args } => format!("`needs` accepts one or two arguments, but was called with {num_args} arguments. Its parameters are the `condition` and an optional `message`."),
         }
     }

@@ -28,7 +28,7 @@ fn semantic_tokens(db: &dyn SemanticTokenDb, input: Input) -> Vec<SemanticToken>
 
 lazy_static! {
     pub static ref LEGEND: SemanticTokensLegend = SemanticTokensLegend {
-        token_types: SemanticTokenType::iter().map(|it| it.to_lsp()).collect(),
+        token_types: SemanticTokenType::iter().map(|it| it.as_lsp()).collect(),
         token_modifiers: vec![
             lsp_types::SemanticTokenModifier::DEFINITION,
             lsp_types::SemanticTokenModifier::READONLY,
@@ -55,7 +55,7 @@ lazy_static! {
 }
 
 impl SemanticTokenType {
-    fn to_lsp(&self) -> lsp_types::SemanticTokenType {
+    fn as_lsp(&self) -> lsp_types::SemanticTokenType {
         match self {
             SemanticTokenType::Parameter => lsp_types::SemanticTokenType::PARAMETER,
             SemanticTokenType::Assignment => lsp_types::SemanticTokenType::VARIABLE,
@@ -202,8 +202,11 @@ impl<'a> Context<'a> {
                 self.visit_cst(inner, None);
                 self.visit_cst(closing_parenthesis, None);
             }
-            CstKind::Call { name, arguments } => {
-                self.visit_cst(name, Some(SemanticTokenType::Function));
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => {
+                self.visit_cst(receiver, Some(SemanticTokenType::Function));
                 self.visit_csts(arguments, None);
             }
             CstKind::Struct {

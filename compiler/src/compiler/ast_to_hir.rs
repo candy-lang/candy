@@ -1,6 +1,6 @@
 use super::{
     ast::{
-        self, Assignment, Ast, AstKind, Call, CallReceiver, Identifier, Int, Struct, StructAccess,
+        self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, Struct, StructAccess,
         Symbol, Text,
     },
     cst::{self, CstDb},
@@ -15,7 +15,6 @@ use crate::{
 };
 use im::HashMap;
 use itertools::Itertools;
-use num_bigint::BigUint;
 use std::{mem, ops::Range, sync::Arc};
 
 #[salsa::query_group(AstToHirStorage)]
@@ -36,10 +35,10 @@ fn hir_to_ast_id(db: &dyn AstToHir, id: hir::Id) -> Option<ast::Id> {
     hir_to_ast_id_mapping.get(&id).cloned()
 }
 fn hir_to_cst_id(db: &dyn AstToHir, id: hir::Id) -> Option<cst::Id> {
-    db.ast_to_cst_id(db.hir_to_ast_id(id.clone())?)
+    db.ast_to_cst_id(db.hir_to_ast_id(id)?)
 }
 fn hir_id_to_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<usize>> {
-    db.ast_id_to_span(db.hir_to_ast_id(id.clone())?)
+    db.ast_id_to_span(db.hir_to_ast_id(id)?)
 }
 fn hir_id_to_display_span(db: &dyn AstToHir, id: hir::Id) -> Option<Range<usize>> {
     let cst_id = db.hir_to_cst_id(id.clone())?;
@@ -83,19 +82,13 @@ fn compile_top_level(
     context.generate_sparkles();
     context.generate_use_asset();
     context.generate_use();
-    context.compile(&mut &ast);
+    context.compile(ast);
     context.generate_exports_struct();
 
     let id_mapping = context
         .id_mapping
         .into_iter()
-        .filter_map(|(key, value)| {
-            if let Some(value) = value {
-                Some((key, value))
-            } else {
-                None
-            }
-        })
+        .filter_map(|(key, value)| value.map(|value| (key, value)))
         .collect();
     (context.body, id_mapping)
 }
@@ -151,7 +144,7 @@ impl<'a> Context<'a> {
             self.push(None, Expression::nothing(), None)
         } else {
             let mut last_id = None;
-            for ast in asts.into_iter() {
+            for ast in asts {
                 last_id = Some(self.compile_single(ast));
             }
             last_id.unwrap()
@@ -168,25 +161,21 @@ impl<'a> Context<'a> {
                 Expression::Text(string.value.to_owned()),
                 None,
             ),
-            AstKind::Identifier(Identifier(identifier)) => {
-                let reference = match self.identifiers.get(&identifier.value) {
+            AstKind::Identifier(Identifier(name)) => {
+                let reference = match self.identifiers.get(&name.value) {
                     Some(reference) => reference.to_owned(),
                     None => {
                         return self.push_error(
-                            Some(identifier.id.clone()),
+                            Some(name.id.clone()),
                             ast.id.input.clone(),
                             self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
                             HirError::UnknownReference {
-                                identifier: identifier.value.clone(),
+                                name: name.value.clone(),
                             },
                         );
                     }
                 };
-                self.push(
-                    Some(ast.id.clone()),
-                    Expression::Reference(reference.to_owned()),
-                    None,
-                )
+                self.push(Some(ast.id.clone()), Expression::Reference(reference), None)
             }
             AstKind::Symbol(Symbol(symbol)) => self.push(
                 Some(ast.id.clone()),
@@ -265,11 +254,7 @@ impl<'a> Context<'a> {
                 body
             }
             AstKind::Error { child, errors } => {
-                let child = if let Some(child) = child {
-                    Some(self.compile_single(&*child))
-                } else {
-                    None
-                };
+                let child = child.as_ref().map(|child| self.compile_single(child));
                 self.push(
                     Some(ast.id.clone()),
                     Expression::Error {
@@ -289,7 +274,7 @@ impl<'a> Context<'a> {
         identifier: Option<String>,
     ) -> hir::Id {
         let assignment_reset_state = self.start_scope();
-        let lambda_id = self.create_next_id(Some(id), identifier.clone());
+        let lambda_id = self.create_next_id(Some(id), identifier);
 
         for parameter in lambda.parameters.iter() {
             let name = parameter.value.to_string();
@@ -334,7 +319,7 @@ impl<'a> Context<'a> {
         id: Option<ast::Id>,
         struct_access: &StructAccess,
     ) -> hir::Id {
-        let struct_ = self.compile_single(&*struct_access.struct_);
+        let struct_ = self.compile_single(&struct_access.struct_);
         let key_id = self.push(
             Some(struct_access.key.id.clone()),
             Expression::Symbol(struct_access.key.value.uppercase_first_letter()),
@@ -352,58 +337,38 @@ impl<'a> Context<'a> {
     }
 
     fn lower_call(&mut self, id: Option<ast::Id>, call: &Call) -> hir::Id {
-        let function = match call.receiver.clone() {
-            CallReceiver::Identifier(name) => {
-                if name.value == "needs" {
-                    let expression = match &self.lower_call_arguments(&call.arguments[..])[..] {
-                        [condition, reason] => Expression::Needs {
-                            condition: Box::new(condition.clone()),
-                            reason: Box::new(reason.clone()),
-                        },
-                        [condition] => Expression::Needs {
-                            condition: Box::new(condition.clone()),
-                            reason: Box::new(self.push(
-                                None,
-                                Expression::Text("needs not satisfied".to_string()),
-                                None,
-                            )),
-                        },
-                        _ => Expression::Error {
-                            child: None,
-                            errors: vec![CompilerError {
-                                input: name.id.input.clone(),
-                                span: self.db.ast_id_to_display_span(name.id.clone()).unwrap(),
-                                payload: CompilerErrorPayload::Hir(
-                                    HirError::NeedsWithWrongNumberOfArguments {
-                                        num_args: call.arguments.len(),
-                                    },
-                                ),
-                            }],
-                        },
-                    };
-                    return self.push(id, expression, None);
-                }
-
-                match self.identifiers.get(&name.value).map(|id| id.clone()) {
-                    Some(function) => {
-                        self.push(Some(name.id), Expression::Reference(function), None)
-                    }
-                    None => {
+        let function = match &call.receiver.kind {
+            AstKind::Identifier(Identifier(AstString {
+                id: name_id,
+                value: name,
+            })) if name == "needs" => {
+                let expression = match &self.lower_call_arguments(&call.arguments[..])[..] {
+                    [condition, reason] => Expression::Needs {
+                        condition: Box::new(condition.clone()),
+                        reason: Box::new(reason.clone()),
+                    },
+                    [condition] => Expression::Needs {
+                        condition: Box::new(condition.clone()),
+                        reason: Box::new(self.push(
+                            None,
+                            Expression::Text("needs not satisfied".to_string()),
+                            None,
+                        )),
+                    },
+                    _ => {
                         return self.push_error(
-                            Some(name.id.clone()),
-                            name.id.input.clone(),
-                            self.db.ast_id_to_display_span(name.id.clone()).unwrap(),
-                            HirError::UnknownFunction {
-                                name: name.value.clone(),
+                            id,
+                            name_id.input.clone(),
+                            self.db.ast_id_to_span(name_id.to_owned()).unwrap(),
+                            HirError::NeedsWithWrongNumberOfArguments {
+                                num_args: call.arguments.len(),
                             },
                         );
                     }
-                }
+                };
+                return self.push(id, expression, None);
             }
-            CallReceiver::StructAccess(struct_access) => {
-                self.lower_struct_access(None, &struct_access)
-            }
-            CallReceiver::Call(call) => self.lower_call(None, &*call),
+            _ => self.compile_single(call.receiver.as_ref()),
         };
         let arguments = self.lower_call_arguments(&call.arguments[..]);
         self.push(
@@ -540,11 +505,7 @@ impl<'a> Context<'a> {
                     .map(|(index, it)| {
                         (
                             self.push(None, Expression::Int(index.into()), Some("key".to_string())),
-                            self.push(
-                                None,
-                                Expression::Text(it.to_owned()),
-                                Some("rawPath".to_string()),
-                            ),
+                            self.push(None, Expression::Text(it), Some("rawPath".to_string())),
                         )
                     })
                     .collect();

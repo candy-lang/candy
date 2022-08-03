@@ -73,26 +73,19 @@ mod parse {
     // all the surrounding code still has a chance to be properly parsed – even
     // mid-writing after putting the opening bracket of a struct.
 
-    use std::str::FromStr;
-
     use crate::compiler::{
         rcst::SplitOuterTrailingWhitespace, string_to_rcst::whitespace_indentation_score,
     };
 
     use super::super::rcst::{IsMultiline, Rcst, RcstError};
     use itertools::Itertools;
-    use num_bigint::BigUint;
 
-    static MEANINGFUL_PUNCTUATION: &'static str = "()[]:,{}->=.";
-    static SUPPORTED_WHITESPACE: &'static str = " \r\n\t";
+    static MEANINGFUL_PUNCTUATION: &str = "()[]:,{}->=.";
+    static SUPPORTED_WHITESPACE: &str = " \r\n\t";
 
     fn literal<'a>(input: &'a str, literal: &'static str) -> Option<&'a str> {
         log::trace!("literal({input:?}, {literal:?})");
-        if input.starts_with(literal) {
-            Some(&input[literal.len()..])
-        } else {
-            None
-        }
+        input.strip_prefix(literal)
     }
     #[test]
     fn test_literal() {
@@ -284,7 +277,7 @@ mod parse {
             return None;
         }
         if w.chars().all(|c| c.is_ascii_digit()) {
-            let value = BigUint::from_str(&w).expect("Couldn't parse int.");
+            let value = str::parse(&w).expect("Couldn't parse int.");
             Some((input, Rcst::Int { value, string: w }))
         } else {
             Some((
@@ -587,11 +580,8 @@ mod parse {
                         comment: " foo".to_string()
                     },
                     Rcst::Newline("\n".to_string()),
-                    Rcst::Error {
-                        unparsable_input: "\n ".to_string(),
-                        error: RcstError::WeirdWhitespaceInIndentation
-                    },
-                    Rcst::Whitespace(" ".to_string()),
+                    Rcst::Newline("\n".to_string()),
+                    Rcst::Whitespace("  ".to_string()),
                     Rcst::Comment {
                         octothorpe: Box::new(Rcst::Octothorpe),
                         comment: "bar".to_string()
@@ -785,7 +775,7 @@ mod parse {
                 Rcst::Parenthesized {
                     opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
                     inner: Box::new(Rcst::Call {
-                        name: Box::new(Rcst::TrailingWhitespace {
+                        receiver: Box::new(Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::Identifier("foo".to_string())),
                             whitespace: vec![Rcst::Whitespace(" ".to_string())]
                         }),
@@ -850,7 +840,7 @@ mod parse {
             Some((
                 "",
                 Rcst::Call {
-                    name: Box::new(Rcst::TrailingWhitespace {
+                    receiver: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![
                             Rcst::Newline("\n".to_string()),
@@ -870,7 +860,7 @@ mod parse {
                         child: Box::new(Rcst::Parenthesized {
                             opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
                             inner: Box::new(Rcst::Call {
-                                name: Box::new(Rcst::TrailingWhitespace {
+                                receiver: Box::new(Rcst::TrailingWhitespace {
                                     child: Box::new(Rcst::Identifier("foo".to_string())),
                                     whitespace: vec![Rcst::Whitespace(" ".to_string())]
                                 }),
@@ -895,11 +885,11 @@ mod parse {
 
         let (whitespace, mut expressions) = expressions.split_outer_trailing_whitespace();
         let arguments = expressions.split_off(1);
-        let name = expressions.into_iter().next().unwrap();
+        let receiver = expressions.into_iter().next().unwrap();
         Some((
             input,
             Rcst::Call {
-                name: Box::new(name),
+                receiver: Box::new(receiver),
                 arguments,
             }
             .wrap_in_whitespace(whitespace),
@@ -913,7 +903,7 @@ mod parse {
             Some((
                 "",
                 Rcst::Call {
-                    name: Box::new(Rcst::TrailingWhitespace {
+                    receiver: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
@@ -926,7 +916,7 @@ mod parse {
             Some((
                 "",
                 Rcst::Call {
-                    name: Box::new(Rcst::TrailingWhitespace {
+                    receiver: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Symbol("Foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
@@ -952,7 +942,7 @@ mod parse {
             Some((
                 "\n2",
                 Rcst::Call {
-                    name: Box::new(Rcst::TrailingWhitespace {
+                    receiver: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![
                             Rcst::Newline("\n".to_string()),
@@ -981,7 +971,7 @@ mod parse {
             Some((
                 "\nbar",
                 Rcst::Call {
-                    name: Box::new(Rcst::TrailingWhitespace {
+                    receiver: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
@@ -1026,11 +1016,11 @@ mod parse {
             Some((
                 "\n",
                 Rcst::Call {
-                    name: Box::new(Rcst::TrailingWhitespace {
+                    receiver: Box::new(Rcst::TrailingWhitespace {
                         child: Box::new(Rcst::Parenthesized {
                             opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
                             inner: Box::new(Rcst::Call {
-                                name: Box::new(Rcst::TrailingWhitespace {
+                                receiver: Box::new(Rcst::TrailingWhitespace {
                                     child: Box::new(Rcst::Identifier("foo".to_string())),
                                     whitespace: vec![Rcst::Whitespace(" ".to_string())]
                                 }),
@@ -1054,7 +1044,7 @@ mod parse {
                 "\nbar = 5",
                 Rcst::TrailingWhitespace {
                     child: Box::new(Rcst::Call {
-                        name: Box::new(Rcst::TrailingWhitespace {
+                        receiver: Box::new(Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::Identifier("foo".to_string())),
                             whitespace: vec![Rcst::Whitespace(" ".to_string())]
                         }),
@@ -1166,7 +1156,7 @@ mod parse {
             let key_or_value = key_or_value.wrap_in_whitespace(key_or_value_whitespace);
 
             outer_input = input;
-            let comma = comma.map(|it| Box::new(it));
+            let comma = comma.map(Box::new);
             let field = if is_positional {
                 Rcst::StructField {
                     key_and_colon: None,

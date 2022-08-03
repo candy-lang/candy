@@ -67,7 +67,7 @@ impl Closure {
                 Instruction::CreateClosure {
                     captured: vec![],
                     num_args: 0,
-                    body: lir.instructions.clone(),
+                    body: lir.instructions,
                 },
                 Instruction::Call { num_args: 0 },
                 Instruction::TraceModuleEnds,
@@ -134,7 +134,7 @@ where
             Err(it) => ("Error".to_string(), it.into()),
         };
         Value::Struct(hashmap! {
-            Value::Symbol("Type".to_string()) => Value::Symbol(type_.to_string()),
+            Value::Symbol("Type".to_string()) => Value::Symbol(type_),
             Value::Symbol("Value".to_string()) => value,
         })
     }

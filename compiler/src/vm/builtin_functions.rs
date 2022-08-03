@@ -8,7 +8,6 @@ use super::{
 };
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
 use itertools::Itertools;
-use log;
 use num_bigint::{BigInt, ToBigInt};
 use num_integer::Integer;
 use num_traits::ToPrimitive;
@@ -273,8 +272,8 @@ impl Vm {
 
     fn struct_get(&mut self, args: Vec<Value>) -> Result<Value, String> {
         destructure!(args, [Value::Struct(struct_), key], {
-            match struct_.get(&key) {
-                Some(value) => Ok(value.clone().into()),
+            match struct_.get(key) {
+                Some(value) => Ok(value.clone()),
                 None => Err(format!("Struct does not contain key {key:?}.")),
             }
         })
@@ -415,7 +414,7 @@ impl Vm {
             return Err("couldn't import module".to_string());
         };
 
-        let module_closure = Value::Closure(Closure::of_lir(input.clone(), lir));
+        let module_closure = Value::Closure(Closure::of_lir(input, lir));
         let address = self.heap.import(module_closure);
         self.data_stack.push(address);
         self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
@@ -450,7 +449,7 @@ impl UseTarget {
     fn parse(mut target: &str) -> Result<Self, String> {
         let parent_navigations = {
             let mut navigations = 0;
-            while target.chars().next() == Some(UseTarget::PARENT_NAVIGATION_CHAR) {
+            while target.starts_with(UseTarget::PARENT_NAVIGATION_CHAR) {
                 navigations += 1;
                 target = &target[UseTarget::PARENT_NAVIGATION_CHAR.len_utf8()..];
             }
@@ -512,9 +511,6 @@ impl UseTarget {
                 .chain([self.path.to_string(), ".candy".to_string()])
                 .collect_vec(),
         ];
-        Ok(possible_paths
-            .into_iter()
-            .map(|path| Input::File(path))
-            .collect_vec())
+        Ok(possible_paths.into_iter().map(Input::File).collect_vec())
     }
 }

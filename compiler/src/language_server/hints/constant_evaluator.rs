@@ -23,12 +23,12 @@ pub struct ConstantEvaluator {
 
 impl ConstantEvaluator {
     pub fn update_input(&mut self, db: &Database, input: Input) {
-        let module_closure = Closure::of_input(&db, input.clone()).unwrap();
+        let module_closure = Closure::of_input(db, input.clone()).unwrap();
         let mut vm = Vm::new();
-        let use_provider = DbUseProvider { db: &db };
+        let use_provider = DbUseProvider { db };
         vm.set_up_module_closure_execution(&use_provider, module_closure);
 
-        self.vms.insert(input.clone(), vm);
+        self.vms.insert(input, vm);
     }
 
     pub fn remove_input(&mut self, input: Input) {
@@ -62,7 +62,7 @@ impl ConstantEvaluator {
             .fuzzable_closures
             .iter()
             .filter(|(id, _)| &id.input == input)
-            .map(|it| it.clone())
+            .cloned()
             .collect_vec()
     }
 
@@ -73,14 +73,14 @@ impl ConstantEvaluator {
         let mut hints = vec![];
 
         if let Status::Panicked { reason } = vm.status() {
-            if let Some(hint) = panic_hint(&db, input.clone(), &vm, reason) {
+            if let Some(hint) = panic_hint(db, input.clone(), vm, reason) {
                 hints.push(hint);
             }
         };
         if let Some(path) = input.to_path() {
             let trace = vm.tracer.dump_call_tree();
             let trace_file = path.clone_with_extension("candy.trace");
-            fs::write(trace_file.clone(), trace).unwrap();
+            fs::write(trace_file, trace).unwrap();
         }
 
         for entry in vm.tracer.log() {
@@ -112,7 +112,7 @@ impl ConstantEvaluator {
             hints.push(Hint {
                 kind: HintKind::Value,
                 text: format!("{value}"),
-                position: id_to_end_of_line(&db, id).unwrap(),
+                position: id_to_end_of_line(db, id).unwrap(),
             });
         }
 
@@ -131,20 +131,16 @@ fn panic_hint(db: &Database, input: Input, vm: &Vm, reason: String) -> Option<Hi
         return None;
     }
 
-    let last_call_in_this_module = stack
-        .iter()
-        .filter(|entry| {
-            let id = match entry {
-                TraceEntry::CallStarted { id, .. } => id,
-                TraceEntry::NeedsStarted { id, .. } => id,
-                _ => return false,
-            };
-            // Make sure the entry comes from the same file and is not generated
-            // code.
-            id.input == input && db.hir_to_cst_id(id.clone()).is_some()
-        })
-        .next()
-        .expect("Module panicked, but we can't build a panic hint to communicate that.");
+    let last_call_in_this_module = stack.iter().find(|entry| {
+        let id = match entry {
+            TraceEntry::CallStarted { id, .. } => id,
+            TraceEntry::NeedsStarted { id, .. } => id,
+            _ => return false,
+        };
+        // Make sure the entry comes from the same file and is not generated
+        // code.
+        id.input == input && db.hir_to_cst_id(id.clone()).is_some()
+    })?;
 
     let (id, call_info) = match last_call_in_this_module {
         TraceEntry::CallStarted { id, closure, args } => (

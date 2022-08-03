@@ -35,7 +35,7 @@ pub fn find_definition(
     let target_cst = db.find_cst(input.clone(), target_cst_id);
 
     let result = GotoDefinitionResponse::Link(vec![LocationLink {
-        origin_selection_range: Some(db.range_to_lsp(input.clone(), origin_cst.span.clone())),
+        origin_selection_range: Some(db.range_to_lsp(input.clone(), origin_cst.span)),
         target_uri: params.text_document.uri,
         target_range: db.range_to_lsp(input.clone(), target_cst.span.clone()),
         target_selection_range: db.range_to_lsp(input, target_cst.display_span()),

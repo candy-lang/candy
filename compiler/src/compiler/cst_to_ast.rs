@@ -1,8 +1,5 @@
 use super::{
-    ast::{
-        self, Ast, AstError, AstKind, AstString, CallReceiver, CollectErrors, Identifier, Int,
-        Lambda, Symbol, Text,
-    },
+    ast::{self, Ast, AstError, AstKind, AstString, Identifier, Int, Lambda, Symbol, Text},
     cst::{self, Cst, CstDb, CstKind},
     error::{CompilerError, CompilerErrorPayload},
     rcst_to_cst::RcstToCst,
@@ -29,8 +26,10 @@ pub trait CstToAst: CstDb + RcstToCst {
 
     fn cst_to_ast_id(&self, input: Input, id: cst::Id) -> Option<ast::Id>;
 
-    fn ast(&self, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)>;
+    fn ast(&self, input: Input) -> Option<AstResult>;
 }
+
+type AstResult = (Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>);
 
 fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
     let (_, ast_to_cst_id_mapping) = db.ast(id.input.clone()).unwrap();
@@ -53,14 +52,13 @@ fn cst_to_ast_id(db: &dyn CstToAst, input: Input, id: cst::Id) -> Option<ast::Id
         .cloned()
 }
 
-fn ast(db: &dyn CstToAst, input: Input) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)> {
+fn ast(db: &dyn CstToAst, input: Input) -> Option<AstResult> {
     let mut context = LoweringContext::new(input.clone());
 
     let asts = match db.cst(input.clone()) {
         Ok(cst) => {
             let cst = cst.unwrap_whitespace_and_comment();
-            let asts = (&mut context).lower_csts(&cst);
-            asts
+            context.lower_csts(&cst)
         }
         Err(InvalidInputError::DoesNotExist) => return None,
         Err(InvalidInputError::InvalidUtf8) => {
@@ -150,7 +148,7 @@ impl LoweringContext {
                 );
 
                 let text = parts
-                    .into_iter()
+                    .iter()
                     .filter_map(|it| match it {
                         Cst {
                             kind: CstKind::TextPart(text),
@@ -211,10 +209,13 @@ impl LoweringContext {
 
                 ast
             }
-            CstKind::Call { name, arguments } => {
-                let mut name_kind = &name.kind;
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => {
+                let mut receiver_kind = &receiver.kind;
                 loop {
-                    name_kind = match name_kind {
+                    receiver_kind = match receiver_kind {
                         CstKind::Parenthesized {
                             opening_parenthesis,
                             inner,
@@ -237,41 +238,16 @@ impl LoweringContext {
                         _ => break,
                     };
                 }
-                let receiver = match &name.kind {
-                    CstKind::Identifier(identifier) => Some(CallReceiver::Identifier(
-                        self.create_string(name.id.to_owned(), identifier.to_owned()),
-                    )),
-                    CstKind::StructAccess { struct_, dot, key } => Some(
-                        CallReceiver::StructAccess(self.lower_struct_access(struct_, dot, key)),
-                    ),
-                    _ => None,
-                };
+                let receiver = self.lower_cst(receiver);
                 let arguments = self.lower_csts(arguments);
 
-                if let Some(receiver) = receiver {
-                    self.create_ast(
-                        cst.id,
-                        AstKind::Call(ast::Call {
-                            receiver,
-                            arguments,
-                        }),
-                    )
-                } else {
-                    let mut errors = vec![];
-                    errors.push(CompilerError {
-                        input: self.input.clone(),
-                        span: name.span.clone(),
-                        payload: CompilerErrorPayload::Ast(AstError::CallOfANonIdentifier),
-                    });
-                    arguments.collect_errors(&mut errors);
-                    self.create_ast(
-                        cst.id,
-                        AstKind::Error {
-                            child: None,
-                            errors,
-                        },
-                    )
-                }
+                self.create_ast(
+                    cst.id,
+                    AstKind::Call(ast::Call {
+                        receiver: receiver.into(),
+                        arguments,
+                    }),
+                )
             }
             CstKind::Struct {
                 opening_bracket,
@@ -393,8 +369,7 @@ impl LoweringContext {
             }
             CstKind::StructField { .. } => panic!("StructField should only appear in Struct."),
             CstKind::StructAccess { struct_, dot, key } => {
-                let struct_access = self.lower_struct_access(struct_, dot, key);
-                self.create_ast(cst.id, AstKind::StructAccess(struct_access))
+                self.lower_struct_access(cst.id, struct_, dot, key)
             }
             CstKind::Lambda {
                 opening_curly_brace,
@@ -457,13 +432,13 @@ impl LoweringContext {
                 assignment_sign,
                 body,
             } => {
-                let mut errors = vec![];
-                let (name, name_error) = self.lower_identifier(name);
-                if let Some(error) = name_error {
-                    errors.push(error);
-                }
-                let (parameters, mut parameter_errors) = self.lower_parameters(parameters);
-                errors.append(&mut parameter_errors);
+                let name = match &name.kind {
+                    CstKind::Identifier(identifier) => {
+                        self.create_string(name.id.to_owned(), identifier.to_owned())
+                    }
+                    _ => panic!("Expected an identifier, but found `{}`.", name),
+                };
+                let (parameters, errors) = self.lower_parameters(parameters);
 
                 assert!(
                     matches!(assignment_sign.kind, CstKind::EqualsSign | CstKind::ColonEqualsSign),
@@ -515,7 +490,7 @@ impl LoweringContext {
         }
     }
 
-    fn lower_struct_access(&mut self, struct_: &Cst, dot: &Cst, key: &Cst) -> ast::StructAccess {
+    fn lower_struct_access(&mut self, id: cst::Id, struct_: &Cst, dot: &Cst, key: &Cst) -> Ast {
         let struct_ = self.lower_cst(struct_);
 
         assert!(
@@ -528,22 +503,26 @@ impl LoweringContext {
             CstKind::Identifier(identifier) => {
                 self.create_string(key.id.to_owned(), identifier.uppercase_first_letter())
             }
+            // TODO: handle CstKind::Error
             _ => panic!(
                 "Expected an identifier after the dot in a struct access, but found `{}`.",
                 key
             ),
         };
 
-        ast::StructAccess {
-            struct_: Box::new(struct_),
-            key,
-        }
+        self.create_ast(
+            id,
+            AstKind::StructAccess(ast::StructAccess {
+                struct_: Box::new(struct_),
+                key,
+            }),
+        )
     }
 
     fn lower_parameters(&mut self, csts: &[Cst]) -> (Vec<AstString>, Vec<CompilerError>) {
         let mut errors = vec![];
         let parameters = csts
-            .into_iter()
+            .iter()
             .enumerate()
             .map(|(index, it)| match self.lower_parameter(it) {
                 Ok(parameter) => parameter,
@@ -565,20 +544,6 @@ impl LoweringContext {
                 payload: CompilerErrorPayload::Ast(AstError::ExpectedParameter),
             })
         }
-    }
-    fn lower_identifier(&mut self, cst: &Cst) -> (AstString, Option<CompilerError>) {
-        let (identifier, error) = match &cst.kind {
-            CstKind::Identifier(identifier) => (identifier.clone(), None),
-            _ => (
-                "<invalid>".to_string(),
-                Some(CompilerError {
-                    input: self.input.clone(),
-                    span: cst.span.clone(),
-                    payload: CompilerErrorPayload::Ast(AstError::ExpectedIdentifier),
-                }),
-            ),
-        };
-        (self.create_string(cst.id.to_owned(), identifier), error)
     }
 
     fn create_ast(&mut self, cst_id: cst::Id, kind: AstKind) -> Ast {

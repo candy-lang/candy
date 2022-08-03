@@ -83,7 +83,7 @@ pub enum CstKind {
         closing_parenthesis: Box<Cst>,
     },
     Call {
-        name: Box<Cst>,
+        receiver: Box<Cst>,
         arguments: Vec<Cst>,
     },
     Struct {
@@ -172,8 +172,11 @@ impl Display for Cst {
                 inner,
                 closing_parenthesis,
             } => write!(f, "{}{}{}", opening_parenthesis, inner, closing_parenthesis),
-            CstKind::Call { name, arguments } => {
-                name.fmt(f)?;
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => {
+                receiver.fmt(f)?;
                 for argument in arguments {
                     argument.fmt(f)?;
                 }
@@ -259,7 +262,7 @@ impl Cst {
     pub fn display_span(&self) -> Range<usize> {
         match &self.kind {
             CstKind::TrailingWhitespace { child, .. } => child.display_span(),
-            CstKind::Call { name, .. } => name.display_span(),
+            CstKind::Call { receiver, .. } => receiver.display_span(),
             CstKind::Assignment { name, .. } => name.display_span(),
             _ => self.span.clone(),
         }
@@ -301,8 +304,11 @@ impl UnwrapWhitespaceAndComment for Cst {
                 inner: Box::new(inner.unwrap_whitespace_and_comment()),
                 closing_parenthesis: Box::new(closing_parenthesis.unwrap_whitespace_and_comment()),
             },
-            CstKind::Call { name, arguments } => CstKind::Call {
-                name: Box::new(name.unwrap_whitespace_and_comment()),
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => CstKind::Call {
+                receiver: Box::new(receiver.unwrap_whitespace_and_comment()),
                 arguments: arguments.unwrap_whitespace_and_comment(),
             },
             CstKind::Struct {
@@ -437,7 +443,10 @@ impl TreeWithIds for Cst {
                 .find(id)
                 .or_else(|| inner.find(id))
                 .or_else(|| closing_parenthesis.find(id)),
-            CstKind::Call { name, arguments } => name.find(id).or_else(|| arguments.find(id)),
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => receiver.find(id).or_else(|| arguments.find(id)),
             CstKind::Struct {
                 opening_bracket,
                 fields,
@@ -518,8 +527,12 @@ impl TreeWithIds for Cst {
             CstKind::Text { .. } => (None, false),
             CstKind::TextPart(_) => (None, false),
             CstKind::Parenthesized { inner, .. } => (inner.find_by_offset(offset), false),
-            CstKind::Call { name, arguments } => (
-                name.find_by_offset(offset)
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => (
+                receiver
+                    .find_by_offset(offset)
                     .or_else(|| arguments.find_by_offset(offset)),
                 false,
             ),
@@ -574,7 +587,7 @@ impl TreeWithIds for Cst {
 
         inner.or_else(|| {
             if self.span.contains(offset) || (is_end_inclusive && &self.span.end == offset) {
-                return Some(self);
+                Some(self)
             } else {
                 None
             }
@@ -616,31 +629,29 @@ impl<T: TreeWithIds> TreeWithIds for [T] {
         self.iter()
             .map(|it| it.first_id())
             .filter_map(Some)
-            .nth(0)
+            .next()
             .flatten()
     }
     fn find(&self, id: &Id) -> Option<&Cst> {
-        let slice = self.as_ref();
-        let child_index = slice
+        let child_index = self
             .binary_search_by_key(id, |it| it.first_id().unwrap())
             .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
             .ok()?;
-        slice[child_index].find(id)
+        self[child_index].find(id)
     }
 
     fn first_offset(&self) -> Option<usize> {
         self.iter()
             .map(|it| it.first_offset())
             .filter_map(Some)
-            .nth(0)
+            .next()
             .flatten()
     }
     fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
-        let slice = self.as_ref();
-        let child_index = slice
+        let child_index = self
             .binary_search_by_key(offset, |it| it.first_offset().unwrap())
             .or_else(|err| if err == 0 { Err(()) } else { Ok(err - 1) })
             .ok()?;
-        slice[child_index].find_by_offset(offset)
+        self[child_index].find_by_offset(offset)
     }
 }

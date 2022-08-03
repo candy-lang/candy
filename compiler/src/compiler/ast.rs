@@ -81,14 +81,8 @@ pub struct Lambda {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Call {
-    pub receiver: CallReceiver,
+    pub receiver: Box<Ast>,
     pub arguments: Vec<Ast>,
-}
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum CallReceiver {
-    Identifier(AstString),
-    StructAccess(StructAccess),
-    Call(Box<Call>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -120,13 +114,11 @@ pub enum AstError {
     UnexpectedPunctuation,
     TextWithoutClosingQuote,
     ParenthesizedWithoutClosingParenthesis,
-    CallOfANonIdentifier,
     StructWithNonStructField,
     StructWithoutClosingBrace,
     StructKeyWithoutColon,
     StructValueWithoutComma,
     StructPositionalAfterNamedField,
-    ExpectedIdentifier,
     ExpectedParameter,
     LambdaWithoutClosingCurlyBrace,
 }
@@ -180,15 +172,6 @@ impl FindAst for Lambda {
 impl FindAst for Call {
     fn find(&self, id: &Id) -> Option<&Ast> {
         self.receiver.find(id).or_else(|| self.arguments.find(id))
-    }
-}
-impl FindAst for CallReceiver {
-    fn find(&self, id: &Id) -> Option<&Ast> {
-        match self {
-            CallReceiver::Identifier(_) => None,
-            CallReceiver::StructAccess(access) => access.find(id),
-            CallReceiver::Call(call) => call.find(id),
-        }
     }
 }
 impl FindAst for Assignment {
@@ -252,7 +235,9 @@ impl CollectErrors for Ast {
                 errors: mut recovered_errors,
             } => {
                 errors.append(&mut recovered_errors);
-                child.map(|child| child.collect_errors(errors));
+                if let Some(child) = child {
+                    child.collect_errors(errors)
+                }
             }
         }
     }
@@ -373,15 +358,6 @@ impl Display for Call {
                 .map(|argument| format!("  {argument}"))
                 .join("\n")
         )
-    }
-}
-impl Display for CallReceiver {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            CallReceiver::Identifier(identifier) => write!(f, "{}", identifier),
-            CallReceiver::StructAccess(struct_access) => write!(f, "{}", struct_access),
-            CallReceiver::Call(call) => write!(f, "{}", call),
-        }
     }
 }
 impl Display for AstString {
