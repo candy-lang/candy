@@ -2,6 +2,7 @@ use super::{error::CompilerError, utils::AdjustCasingOfFirstLetter};
 use crate::module::Module;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
+use num_bigint::BigUint;
 use std::{
     fmt::{self, Display, Formatter},
     ops::Deref,
@@ -49,7 +50,7 @@ pub enum AstKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct Int(pub u64);
+pub struct Int(pub BigUint);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Text(pub AstString);
@@ -62,7 +63,8 @@ pub struct Symbol(pub AstString);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Struct {
-    pub fields: LinkedHashMap<Ast, Ast>,
+    pub positional_fields: Vec<Ast>,
+    pub named_fields: LinkedHashMap<Ast, Ast>,
 }
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct StructAccess {
@@ -79,14 +81,8 @@ pub struct Lambda {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Call {
-    pub receiver: CallReceiver,
+    pub receiver: Box<Ast>,
     pub arguments: Vec<Ast>,
-}
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum CallReceiver {
-    Identifier(AstString),
-    StructAccess(StructAccess),
-    Call(Box<Call>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -118,11 +114,11 @@ pub enum AstError {
     UnexpectedPunctuation,
     TextWithoutClosingQuote,
     ParenthesizedWithoutClosingParenthesis,
-    CallOfANonIdentifier,
     StructWithNonStructField,
     StructWithoutClosingBrace,
     StructKeyWithoutColon,
     StructValueWithoutComma,
+    StructPositionalAfterNamedField,
     ExpectedParameter,
     LambdaWithoutClosingCurlyBrace,
 }
@@ -152,15 +148,15 @@ impl FindAst for Ast {
 }
 impl FindAst for Struct {
     fn find(&self, id: &Id) -> Option<&Ast> {
-        for (key, value) in &self.fields {
-            if let Some(ast) = key.find(id) {
-                return Some(ast);
-            }
-            if let Some(ast) = value.find(id) {
-                return Some(ast);
-            }
-        }
-        None
+        self.positional_fields
+            .iter()
+            .chain(
+                self.named_fields
+                    .iter()
+                    .flat_map(|(key, value)| vec![key, value].into_iter()),
+            )
+            .filter_map(|value| value.find(id))
+            .next()
     }
 }
 impl FindAst for StructAccess {
@@ -176,15 +172,6 @@ impl FindAst for Lambda {
 impl FindAst for Call {
     fn find(&self, id: &Id) -> Option<&Ast> {
         self.receiver.find(id).or_else(|| self.arguments.find(id))
-    }
-}
-impl FindAst for CallReceiver {
-    fn find(&self, id: &Id) -> Option<&Ast> {
-        match self {
-            CallReceiver::Identifier(_) => None,
-            CallReceiver::StructAccess(access) => access.find(id),
-            CallReceiver::Call(call) => call.find(id),
-        }
     }
 }
 impl FindAst for Assignment {
@@ -222,7 +209,10 @@ impl CollectErrors for Ast {
             AstKind::Identifier(_) => {}
             AstKind::Symbol(_) => {}
             AstKind::Struct(struct_) => {
-                for (key, value) in struct_.fields {
+                for value in struct_.positional_fields {
+                    value.collect_errors(errors);
+                }
+                for (key, value) in struct_.named_fields {
                     key.collect_errors(errors);
                     value.collect_errors(errors);
                 }
@@ -245,7 +235,9 @@ impl CollectErrors for Ast {
                 errors: mut recovered_errors,
             } => {
                 errors.append(&mut recovered_errors);
-                child.map(|child| child.collect_errors(errors));
+                if let Some(child) = child {
+                    child.collect_errors(errors)
+                }
             }
         }
     }
@@ -271,9 +263,15 @@ impl Display for Ast {
                     f,
                     "struct [\n{}\n]",
                     struct_
-                        .fields
+                        .positional_fields
                         .iter()
-                        .map(|(key, value)| format!("{key}: {value},"))
+                        .map(|value| format!("{value},"))
+                        .chain(
+                            struct_
+                                .named_fields
+                                .iter()
+                                .map(|(key, value)| format!("{key}: {value},"))
+                        )
                         .join("\n")
                         .lines()
                         .map(|line| format!("  {line}"))
@@ -360,15 +358,6 @@ impl Display for Call {
                 .map(|argument| format!("  {argument}"))
                 .join("\n")
         )
-    }
-}
-impl Display for CallReceiver {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            CallReceiver::Identifier(identifier) => write!(f, "{}", identifier),
-            CallReceiver::StructAccess(struct_access) => write!(f, "{}", struct_access),
-            CallReceiver::Call(call) => write!(f, "{}", call),
-        }
     }
 }
 impl Display for AstString {

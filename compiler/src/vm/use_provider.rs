@@ -54,7 +54,7 @@ impl Vm {
                 let value = Value::list(
                     bytes
                         .iter()
-                        .map(|byte| Value::Int(*byte as u64))
+                        .map(|byte| Value::Int((*byte).into()))
                         .collect_vec(),
                 );
                 self.data_stack.push(self.heap.import(value));

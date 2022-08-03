@@ -28,7 +28,7 @@ impl FuzzerManager {
     ) {
         let closures = self
             .fuzzable_closures
-            .entry(module.clone())
+            .entry(module)
             .or_insert_with(|| HashMap::new());
 
         for (id, new_closure) in fuzzable_closures {
@@ -50,21 +50,19 @@ impl FuzzerManager {
         let mut running_fuzzers = self
             .fuzzers
             .values_mut()
-            .filter(|fuzzer| matches!(fuzzer.status, Status::StillFuzzing { .. }))
+            .filter(|fuzzer| matches!(fuzzer.status(), Status::StillFuzzing { .. }))
             .collect_vec();
         log::trace!(
             "Fuzzer running. {} fuzzers for relevant closures are running.",
             running_fuzzers.len(),
         );
 
-        running_fuzzers.shuffle(&mut thread_rng());
-        let fuzzer = running_fuzzers.pop()?;
+        let fuzzer = running_fuzzers.choose_mut(&mut thread_rng())?;
         fuzzer.run(db, 100);
 
-        match &fuzzer.status {
+        match &fuzzer.status() {
             Status::StillFuzzing { .. } => None,
             Status::PanickedForArguments { .. } => Some(fuzzer.closure_id.module.clone()),
-            Status::TemporarilyUninitialized => unreachable!(),
         }
     }
 
@@ -80,7 +78,7 @@ impl FuzzerManager {
                 arguments,
                 reason,
                 tracer,
-            } = &fuzzer.status
+            } = fuzzer.status()
             {
                 let id = fuzzer.closure_id.clone();
                 let first_hint = {
@@ -89,12 +87,9 @@ impl FuzzerManager {
                             .into_iter()
                             .map(|parameter| parameter.keys.last().unwrap().to_string())
                             .collect_vec(),
-                        Some(_) => {
-                            log::warn!("Looks like we fuzzed a non-closure. That's weird.");
-                            continue;
-                        }
+                        Some(_) => panic!("Looks like we fuzzed a non-closure. That's weird."),
                         None => {
-                            log::warn!("Using fuzzing, we found an error in a generated closure.");
+                            log::error!("Using fuzzing, we found an error in a generated closure.");
                             continue;
                         }
                     };
@@ -109,7 +104,7 @@ impl FuzzerManager {
                                 .collect_vec()
                                 .join_with_commas_and_and(),
                         ),
-                        position: id_to_end_of_line(&db, id.clone()).unwrap(),
+                        position: id_to_end_of_line(db, id.clone()).unwrap(),
                     }
                 };
 
@@ -118,20 +113,26 @@ impl FuzzerManager {
                         .log()
                         .iter()
                         .rev()
-                        .filter(|entry| {
-                            let inner_call_id = match entry {
+                        // Find the innermost panicking call that is in the
+                        // function.
+                        .find(|entry| {
+                            let innermost_panicking_call_id = match entry {
                                 TraceEntry::CallStarted { id, .. } => id,
                                 TraceEntry::NeedsStarted { id, .. } => id,
                                 _ => return false,
                             };
-                            // Make sure the entry comes from the same file and is not generated code.
-                            id.is_same_module_and_any_parent_of(inner_call_id)
+                            id.is_same_module_and_any_parent_of(innermost_panicking_call_id)
                                 && db.hir_to_cst_id(id.clone()).is_some()
-                        })
-                        .next()
-                        .expect(
-                            "Fuzzer found a panicking function without an inner panicking needs",
-                        );
+                        });
+                    let panicking_inner_call = match panicking_inner_call {
+                        Some(panicking_inner_call) => panicking_inner_call,
+                        None => {
+                            // We found a panicking function without an inner
+                            // panicking needs. This indicates an error during
+                            // compilation within a function body.
+                            continue;
+                        }
+                    };
                     let (call_id, name, arguments) = match panicking_inner_call {
                         TraceEntry::CallStarted { id, closure, args } => {
                             (id.clone(), format!("{closure}"), args.clone())

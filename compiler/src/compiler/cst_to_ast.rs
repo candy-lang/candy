@@ -1,8 +1,5 @@
 use super::{
-    ast::{
-        self, Ast, AstError, AstKind, AstString, CallReceiver, CollectErrors, Identifier, Int,
-        Lambda, Symbol, Text,
-    },
+    ast::{self, Ast, AstError, AstKind, AstString, Identifier, Int, Lambda, Symbol, Text},
     cst::{self, Cst, CstDb, CstKind},
     error::{CompilerError, CompilerErrorPayload},
     rcst_to_cst::RcstToCst,
@@ -18,17 +15,21 @@ use crate::{
 };
 use im::HashMap;
 use itertools::Itertools;
+use linked_hash_map::LinkedHashMap;
 use std::{ops::Range, sync::Arc};
 
 #[salsa::query_group(CstToAstStorage)]
 pub trait CstToAst: CstDb + RcstToCst {
     fn ast_to_cst_id(&self, id: ast::Id) -> Option<cst::Id>;
     fn ast_id_to_span(&self, id: ast::Id) -> Option<Range<usize>>;
+    fn ast_id_to_display_span(&self, id: ast::Id) -> Option<Range<usize>>;
 
     fn cst_to_ast_id(&self, module: Module, id: cst::Id) -> Option<ast::Id>;
 
-    fn ast(&self, module: Module) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)>;
+    fn ast(&self, module: Module) -> Option<AstResult>;
 }
+
+type AstResult = (Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>);
 
 fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
     let (_, ast_to_cst_id_mapping) = db.ast(id.module.clone()).unwrap();
@@ -37,6 +38,10 @@ fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
 fn ast_id_to_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<usize>> {
     let cst_id = db.ast_to_cst_id(id.clone())?;
     Some(db.find_cst(id.module, cst_id).span)
+}
+fn ast_id_to_display_span(db: &dyn CstToAst, id: ast::Id) -> Option<Range<usize>> {
+    let cst_id = db.ast_to_cst_id(id.clone())?;
+    Some(db.find_cst(id.module, cst_id).display_span())
 }
 
 fn cst_to_ast_id(db: &dyn CstToAst, module: Module, id: cst::Id) -> Option<ast::Id> {
@@ -47,14 +52,13 @@ fn cst_to_ast_id(db: &dyn CstToAst, module: Module, id: cst::Id) -> Option<ast::
         .cloned()
 }
 
-fn ast(db: &dyn CstToAst, module: Module) -> Option<(Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>)> {
+fn ast(db: &dyn CstToAst, module: Module) -> Option<AstResult> {
     let mut context = LoweringContext::new(module.clone());
 
     let asts = match db.cst(module.clone()) {
         Ok(cst) => {
             let cst = cst.unwrap_whitespace_and_comment();
-            let asts = (&mut context).lower_csts(&cst);
-            asts
+            context.lower_csts(&cst)
         }
         Err(InvalidModuleError::DoesNotExist) => return None,
         Err(InvalidModuleError::InvalidUtf8) => {
@@ -131,7 +135,7 @@ impl LoweringContext {
                 let string = self.create_string_without_id_mapping(symbol.to_string());
                 self.create_ast(cst.id, AstKind::Symbol(Symbol(string)))
             }
-            CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(*value))),
+            CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(value.clone()))),
             CstKind::Text {
                 opening_quote,
                 parts,
@@ -144,7 +148,7 @@ impl LoweringContext {
                 );
 
                 let text = parts
-                    .into_iter()
+                    .iter()
                     .filter_map(|it| match it {
                         Cst {
                             kind: CstKind::TextPart(text),
@@ -205,10 +209,13 @@ impl LoweringContext {
 
                 ast
             }
-            CstKind::Call { name, arguments } => {
-                let mut name_kind = &name.kind;
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => {
+                let mut receiver_kind = &receiver.kind;
                 loop {
-                    name_kind = match name_kind {
+                    receiver_kind = match receiver_kind {
                         CstKind::Parenthesized {
                             opening_parenthesis,
                             inner,
@@ -231,41 +238,16 @@ impl LoweringContext {
                         _ => break,
                     };
                 }
-                let receiver = match &name.kind {
-                    CstKind::Identifier(identifier) => Some(CallReceiver::Identifier(
-                        self.create_string(name.id.to_owned(), identifier.to_owned()),
-                    )),
-                    CstKind::StructAccess { struct_, dot, key } => Some(
-                        CallReceiver::StructAccess(self.lower_struct_access(struct_, dot, key)),
-                    ),
-                    _ => None,
-                };
+                let receiver = self.lower_cst(receiver);
                 let arguments = self.lower_csts(arguments);
 
-                if let Some(receiver) = receiver {
-                    self.create_ast(
-                        cst.id,
-                        AstKind::Call(ast::Call {
-                            receiver,
-                            arguments,
-                        }),
-                    )
-                } else {
-                    let mut errors = vec![];
-                    errors.push(CompilerError {
-                        module: self.module.clone(),
-                        span: name.span.clone(),
-                        payload: CompilerErrorPayload::Ast(AstError::CallOfANonIdentifier),
-                    });
-                    arguments.collect_errors(&mut errors);
-                    self.create_ast(
-                        cst.id,
-                        AstKind::Error {
-                            child: None,
-                            errors,
-                        },
-                    )
-                }
+                self.create_ast(
+                    cst.id,
+                    AstKind::Call(ast::Call {
+                        receiver: receiver.into(),
+                        arguments,
+                    }),
+                )
             }
             CstKind::Struct {
                 opening_bracket,
@@ -275,24 +257,22 @@ impl LoweringContext {
                 let mut errors = vec![];
 
                 assert!(
-                    !matches!(opening_bracket.kind, CstKind::OpeningBracket),
+                    matches!(opening_bracket.kind, CstKind::OpeningBracket),
                     "Struct should always have an opening bracket, but instead had {}.",
                     opening_bracket
                 );
 
-                let fields = fields
-                    .into_iter()
-                    .filter_map(|field| {
-                        if let CstKind::StructField {
-                            key,
-                            colon,
-                            value,
-                            comma,
-                        } = &field.kind
-                        {
+                let mut positional_fields = vec![];
+                let mut named_fields = LinkedHashMap::new();
+                for field in fields {
+                    if let CstKind::StructField {
+                        key_and_colon,
+                        value,
+                        comma,
+                    } = &field.kind
+                    {
+                        let key = key_and_colon.as_ref().map(|box (key, colon)| {
                             let mut key = self.lower_cst(&key.clone());
-                            let mut value = self.lower_cst(&value.clone());
-
                             if !matches!(colon.kind, CstKind::Colon) {
                                 key = self.create_ast(
                                     colon.id,
@@ -307,38 +287,58 @@ impl LoweringContext {
                                         }],
                                     },
                                 )
-                            }
-                            if let Some(comma) = comma {
-                                if !matches!(comma.kind, CstKind::Comma) {
-                                    value = self.create_ast(
-                                        comma.id,
-                                        AstKind::Error {
-                                            child: Some(Box::new(value)),
-                                            errors: vec![CompilerError {
-                                                module: self.module.clone(),
-                                                span: comma.span.clone(),
-                                                payload: CompilerErrorPayload::Ast(
-                                                    AstError::StructValueWithoutComma,
-                                                ),
-                                            }],
-                                        },
-                                    )
-                                }
-                            }
+                            };
+                            key
+                        });
 
-                            Some((key, value))
-                        } else {
-                            errors.push(CompilerError {
-                                module: self.module.clone(),
-                                span: cst.span.clone(),
-                                payload: CompilerErrorPayload::Ast(
-                                    AstError::StructWithNonStructField,
-                                ),
-                            });
-                            None
+                        let mut value = self.lower_cst(&value.clone());
+                        if !named_fields.is_empty() && key.is_none() {
+                            value = self.create_ast(
+                                field.id,
+                                AstKind::Error {
+                                    child: Some(Box::new(value)),
+                                    errors: vec![CompilerError {
+                                        module: self.module.clone(),
+                                        span: field.span.clone(),
+                                        payload: CompilerErrorPayload::Ast(
+                                            AstError::StructPositionalAfterNamedField,
+                                        ),
+                                    }],
+                                },
+                            )
                         }
-                    })
-                    .collect();
+
+                        if let Some(comma) = comma {
+                            if !matches!(comma.kind, CstKind::Comma) {
+                                value = self.create_ast(
+                                    comma.id,
+                                    AstKind::Error {
+                                        child: Some(Box::new(value)),
+                                        errors: vec![CompilerError {
+                                            module: self.module.clone(),
+                                            span: comma.span.clone(),
+                                            payload: CompilerErrorPayload::Ast(
+                                                AstError::StructValueWithoutComma,
+                                            ),
+                                        }],
+                                    },
+                                )
+                            }
+                        }
+
+                        if let Some(key) = key {
+                            named_fields.insert(key, value);
+                        } else {
+                            positional_fields.push(value);
+                        }
+                    } else {
+                        errors.push(CompilerError {
+                            module: self.module.clone(),
+                            span: cst.span.clone(),
+                            payload: CompilerErrorPayload::Ast(AstError::StructWithNonStructField),
+                        });
+                    }
+                }
 
                 if !matches!(closing_bracket.kind, CstKind::ClosingBracket) {
                     errors.push(CompilerError {
@@ -348,7 +348,13 @@ impl LoweringContext {
                     });
                 }
 
-                let ast = self.create_ast(cst.id, AstKind::Struct(Struct { fields }));
+                let ast = self.create_ast(
+                    cst.id,
+                    AstKind::Struct(Struct {
+                        positional_fields,
+                        named_fields,
+                    }),
+                );
                 if errors.is_empty() {
                     ast
                 } else {
@@ -363,8 +369,7 @@ impl LoweringContext {
             }
             CstKind::StructField { .. } => panic!("StructField should only appear in Struct."),
             CstKind::StructAccess { struct_, dot, key } => {
-                let struct_access = self.lower_struct_access(struct_, dot, key);
-                self.create_ast(cst.id, AstKind::StructAccess(struct_access))
+                self.lower_struct_access(cst.id, struct_, dot, key)
             }
             CstKind::Lambda {
                 opening_curly_brace,
@@ -427,7 +432,12 @@ impl LoweringContext {
                 assignment_sign,
                 body,
             } => {
-                let name = self.lower_identifier(name);
+                let name = match &name.kind {
+                    CstKind::Identifier(identifier) => {
+                        self.create_string(name.id.to_owned(), identifier.to_owned())
+                    }
+                    _ => panic!("Expected an identifier, but found `{}`.", name),
+                };
                 let (parameters, errors) = self.lower_parameters(parameters);
 
                 assert!(
@@ -480,7 +490,7 @@ impl LoweringContext {
         }
     }
 
-    fn lower_struct_access(&mut self, struct_: &Cst, dot: &Cst, key: &Cst) -> ast::StructAccess {
+    fn lower_struct_access(&mut self, id: cst::Id, struct_: &Cst, dot: &Cst, key: &Cst) -> Ast {
         let struct_ = self.lower_cst(struct_);
 
         assert!(
@@ -493,22 +503,26 @@ impl LoweringContext {
             CstKind::Identifier(identifier) => {
                 self.create_string(key.id.to_owned(), identifier.uppercase_first_letter())
             }
+            // TODO: handle CstKind::Error
             _ => panic!(
                 "Expected an identifier after the dot in a struct access, but found `{}`.",
                 key
             ),
         };
 
-        ast::StructAccess {
-            struct_: Box::new(struct_),
-            key,
-        }
+        self.create_ast(
+            id,
+            AstKind::StructAccess(ast::StructAccess {
+                struct_: Box::new(struct_),
+                key,
+            }),
+        )
     }
 
     fn lower_parameters(&mut self, csts: &[Cst]) -> (Vec<AstString>, Vec<CompilerError>) {
         let mut errors = vec![];
         let parameters = csts
-            .into_iter()
+            .iter()
             .enumerate()
             .map(|(index, it)| match self.lower_parameter(it) {
                 Ok(parameter) => parameter,
@@ -529,18 +543,6 @@ impl LoweringContext {
                 span: cst.span.clone(),
                 payload: CompilerErrorPayload::Ast(AstError::ExpectedParameter),
             })
-        }
-    }
-    fn lower_identifier(&mut self, cst: &Cst) -> AstString {
-        match cst {
-            Cst {
-                id,
-                kind: CstKind::Identifier(identifier),
-                ..
-            } => self.create_string(id.to_owned(), identifier.clone()),
-            _ => {
-                panic!("Expected an identifier, but found `{}`.", cst);
-            }
         }
     }
 

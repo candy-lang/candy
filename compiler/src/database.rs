@@ -31,12 +31,12 @@ pub struct Database {
     storage: salsa::Storage<Self>,
     pub open_modules: HashMap<Module, Vec<u8>>,
 }
-impl<'a> salsa::Database for Database {}
+impl salsa::Database for Database {}
 
 impl Database {
     pub fn did_open_module(&mut self, module: &Module, content: Vec<u8>) {
         let old_value = self.open_modules.insert(module.clone(), content);
-        if let Some(_) = old_value {
+        if old_value.is_some() {
             log::warn!("Module {module} was opened, but it was already open.");
         }
 
@@ -44,7 +44,7 @@ impl Database {
     }
     pub fn did_change_module(&mut self, module: &Module, content: Vec<u8>) {
         let old_value = self.open_modules.insert(module.to_owned(), content);
-        if let None = old_value {
+        if old_value.is_none() {
             log::warn!("Module {module} was changed, but it wasn't open before.");
         }
 
@@ -52,7 +52,7 @@ impl Database {
     }
     pub fn did_close_module(&mut self, module: &Module) {
         let old_value = self.open_modules.remove(module);
-        if let None = old_value {
+        if old_value.is_none() {
             log::warn!("Module {module} was closed, but it wasn't open before.");
         }
 

@@ -87,6 +87,7 @@ fn query_for_offset(db: &Database, module: Module, offset: usize) -> Option<Refe
                             // TODO: Handle struct access
                             return None;
                         }
+                        Expression::Error { .. } => return None,
                         _ => panic!("Expected a reference, got {:?}", hir_expr),
                     }
                 }
@@ -154,7 +155,7 @@ impl<'a> Context<'a> {
 
     fn visit_body(&mut self, body: &Body) {
         if let ReferenceQuery::Id(id) = &self.query.clone() {
-            if body.identifiers.contains_key(&id) {
+            if body.identifiers.contains_key(id) {
                 self.add_reference(id.clone(), DocumentHighlightKind::WRITE);
             }
         }

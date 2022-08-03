@@ -42,5 +42,5 @@ pub fn did_need_in_closure_cause_panic(
             }
         }
     }
-    return false;
+    false
 }

@@ -1,5 +1,8 @@
 use crate::{
-    compiler::error::{CompilerError, CompilerErrorPayload},
+    compiler::{
+        error::{CompilerError, CompilerErrorPayload},
+        hir::HirError,
+    },
     database::Database,
     module::{Module, ModuleDb, Package},
 };
@@ -8,7 +11,7 @@ use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Url};
 use std::{ops::Range, sync::Arc};
 
 impl CompilerError {
-    pub fn to_diagnostic(self, db: &Database, module: Module) -> Diagnostic {
+    pub fn into_diagnostic(self, db: &Database, module: Module) -> Diagnostic {
         Diagnostic {
             range: lsp_types::Range {
                 start: db
@@ -21,14 +24,27 @@ impl CompilerError {
             code_description: None,
             source: Some("🍭 Candy".to_owned()),
             message: match self.payload {
-                CompilerErrorPayload::InvalidUtf8 => format!("Invalid UTF8"),
+                CompilerErrorPayload::InvalidUtf8 => "Invalid UTF-8".to_string(),
                 CompilerErrorPayload::Rcst(rcst) => format!("RCST: {rcst:?}"),
                 CompilerErrorPayload::Ast(ast) => format!("AST: {ast:?}"),
-                CompilerErrorPayload::Hir(hir) => format!("HIR: {hir:?}"),
+                CompilerErrorPayload::Hir(hir) => hir.format_message(),
             },
             related_information: None,
             tags: None,
             data: None,
+        }
+    }
+}
+
+impl HirError {
+    fn format_message(&self) -> String {
+        match self {
+            HirError::UnknownReference { name } => format!("Unknown reference “{name}”."),
+            HirError::PublicAssignmentInNotTopLevel => {
+                "Public assignments (:=) can only be used in top-level code.".to_string()
+            }
+            HirError::PublicAssignmentWithSameName { .. } => "A public assignment with the same name already exists.".to_string(),
+            HirError::NeedsWithWrongNumberOfArguments { num_args } => format!("`needs` accepts one or two arguments, but was called with {num_args} arguments. Its parameters are the `condition` and an optional `message`."),
         }
     }
 }
@@ -41,8 +57,7 @@ impl From<Module> for Url {
                     .to_possible_paths()
                     .unwrap()
                     .into_iter()
-                    .filter(|path| path.exists())
-                    .next()
+                    .find(|path| path.exists())
                     .unwrap(),
             )
             .unwrap(),

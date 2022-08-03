@@ -344,7 +344,7 @@ impl CandyLanguageServer {
                 hir.collect_errors(&mut errors);
                 errors
                     .into_iter()
-                    .map(|it| it.to_diagnostic(&db, module.clone()))
+                    .map(|it| it.into_diagnostic(&db, module.clone()))
                     .collect()
             };
             self.client

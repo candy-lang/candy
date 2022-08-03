@@ -20,5 +20,8 @@
       "name": "Old Packages",
       "path": "old-packages"
     }
-  ]
+  ],
+  "settings": {
+    "rust-analyzer.checkOnSave.command": "clippy"
+  }
 }

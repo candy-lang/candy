@@ -5,7 +5,7 @@ The compiler uses query-based compilation to do the least amount of work necessa
 These are the compiler stages:
 
 * String: The literal source code
-* RCST ("Raw Concrete Syntax Tree"): A tree that represents the syntax of the code including every single character and whitespace.
+* RCST ("Raw Concrete Syntax Tree"): A tree that represents the syntax of the code, including every single character and whitespace.
 * CST ("Concrete Syntax Tree"): Similar to RCST, but tree nodes also have IDs and know what ranges in the source file they correspond to.
 * AST ("Abstract Syntax Tree"): A tree where unnecessary cruft is removed and some invariants are validated.
 * HIR ("High-level Intermediate Representation"): The canonical representation of source code in single-static-assignment form (SSA).

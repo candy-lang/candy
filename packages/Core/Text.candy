@@ -1,3 +1,84 @@
+bool = use "..Bool"
+conditionals = use "..Conditionals"
+equals = (use "..Equality").equals
+int = use "..Int"
+struct = use "..Struct"
 type = use "..Type"
 
 is value := type.is value Text
+
+isEmpty text :=
+  needs (is text)
+  ✨.textIsEmpty text
+length text :=
+  # Returns the number of Unicode grapheme clusters in this text.
+  needs (is text)
+  ✨.textLength text
+
+characters text :=
+  needs (is text)
+  ✨.textCharacters text
+characterAt text index :=
+  needs (is text)
+  needs (int.is index)
+  needs (int.isNonNegative index)
+  needs (int.isLessThan index (length text))
+  struct.getUnwrap (characters text) index
+
+getRange text startInclusive endExclusive :=
+  needs (is text)
+
+  needs (int.is startInclusive)
+  needs (int.isNonNegative startInclusive)
+  needs (int.is endExclusive)
+
+  needs (int.isNonNegative endExclusive)
+  needs (int.isLessThanOrEqualTo startInclusive endExclusive)
+  needs (int.isLessThan endExclusive (length text))
+
+  # TODO: support ranges when we have them
+  ✨.textGetRange text startInclusive endExclusive
+
+concatenate valueA valueB :=
+  needs (is valueA)
+  needs (is valueB)
+  ✨.textConcatenate valueA valueB
+
+startsWith text pattern :=
+  needs (is text)
+  needs (is pattern)
+  ✨.textStartsWith text pattern
+endsWith text pattern :=
+  needs (is text)
+  needs (is pattern)
+  ✨.textEndsWith text pattern
+contains text pattern :=
+  needs (is text)
+  needs (is pattern)
+  ✨.textContains text pattern
+
+removePrefix text prefix :=
+  needs (is text)
+  needs (is prefix)
+  conditionals.ifElse
+    startsWith text prefix
+    { getRange text (length prefix) (length text) }
+    { text }
+removeSuffix text suffix :=
+  needs (is text)
+  needs (is suffix)
+  textLength = length text
+  conditionals.ifElse
+    startsWith text suffix
+    { getRange text (int.subtract textLength (length suffix)) textLength }
+    { text }
+
+trimStart text :=
+  needs (is text)
+  ✨.textTrimStart text
+trimEnd text :=
+  needs (is text)
+  ✨.textTrimEnd text
+trim text :=
+  needs (is text)
+  trimEnd (trimStart text)

@@ -1,9 +1,9 @@
-type = use "..Type"
+bool = use "..Bool"
+if = (use "..Conditionals").if
 panic = (use "..Panic").panic
 
 check condition :=
-  needs (type.is condition Bool)
-  ✨.ifElse
-    condition
-    {}
+  needs (bool.is condition)
+  if
+    bool.not condition
     { panic "A check didn't succeed" }

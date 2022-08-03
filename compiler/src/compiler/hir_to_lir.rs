@@ -7,6 +7,7 @@ use super::{
 };
 use crate::{builtin_functions::BuiltinFunction, module::Module};
 use itertools::Itertools;
+use num_bigint::BigUint;
 use std::sync::Arc;
 
 #[salsa::query_group(HirToLirStorage)]
@@ -15,7 +16,7 @@ pub trait HirToLir: CstDb + AstToHir {
 }
 
 fn lir(db: &dyn HirToLir, module: Module) -> Option<Arc<Lir>> {
-    let (hir, _) = db.hir(module.clone())?;
+    let (hir, _) = db.hir(module)?;
     let instructions = compile_lambda(&[], &[], &hir);
     Some(Arc::new(Lir { instructions }))
 }
@@ -54,7 +55,7 @@ impl LoweringContext {
         log::trace!("Compiling expression {expression:?}");
 
         match expression {
-            Expression::Int(int) => self.emit_create_int(id.clone(), *int),
+            Expression::Int(int) => self.emit_create_int(id.clone(), int.clone()),
             Expression::Text(text) => self.emit_create_text(id.clone(), text.clone()),
             Expression::Reference(reference) => {
                 self.emit_push_from_stack(reference.clone());
@@ -116,15 +117,13 @@ impl LoweringContext {
                 self.emit_trace_needs_ends();
             }
             Expression::Error { errors, .. } => {
-                for error in errors {
-                    self.emit_error(id.clone(), error.clone());
-                }
+                self.emit_errors(id.clone(), errors.clone());
             }
         };
         self.emit_trace_value_evaluated(id.clone());
     }
 
-    fn emit_create_int(&mut self, id: hir::Id, int: u64) {
+    fn emit_create_int(&mut self, id: hir::Id, int: BigUint) {
         self.emit(Instruction::CreateInt(int));
         self.stack.push(id);
     }
@@ -208,10 +207,10 @@ impl LoweringContext {
     fn emit_trace_needs_ends(&mut self) {
         self.emit(Instruction::TraceNeedsEnds);
     }
-    fn emit_error(&mut self, id: hir::Id, error: CompilerError) {
+    fn emit_errors(&mut self, id: hir::Id, errors: Vec<CompilerError>) {
         self.emit(Instruction::Error {
             id: id.clone(),
-            error,
+            errors,
         });
         self.stack.push(id);
     }

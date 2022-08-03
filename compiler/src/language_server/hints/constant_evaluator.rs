@@ -1,7 +1,7 @@
 use super::Hint;
 use crate::{
     compiler::{
-        ast::{Assignment, AstKind, FindAst},
+        ast::{AstKind, FindAst},
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
         hir::Id,
@@ -10,7 +10,6 @@ use crate::{
     language_server::hints::{utils::id_to_end_of_line, HintKind},
     module::Module,
     vm::{tracer::TraceEntry, use_provider::DbUseProvider, value::Closure, Status, Vm},
-    CloneWithExtension,
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
@@ -25,10 +24,10 @@ impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
         let module_closure = Closure::of_module(&db, module.clone()).unwrap();
         let mut vm = Vm::new();
-        let use_provider = DbUseProvider { db: &db };
+        let use_provider = DbUseProvider { db };
         vm.set_up_module_closure_execution(&use_provider, module_closure);
 
-        self.vms.insert(module.clone(), vm);
+        self.vms.insert(module, vm);
     }
 
     pub fn remove_module(&mut self, module: Module) {
@@ -48,8 +47,7 @@ impl ConstantEvaluator {
             num_vms,
         );
 
-        running_vms.shuffle(&mut thread_rng());
-        if let Some((module, vm)) = running_vms.pop() {
+        if let Some((module, vm)) = running_vms.choose_mut(&mut thread_rng()) {
             let use_provider = DbUseProvider { db };
             vm.run(&use_provider, 500);
             Some(module.clone())
@@ -63,7 +61,7 @@ impl ConstantEvaluator {
             .fuzzable_closures
             .iter()
             .filter(|(id, _)| &id.module == module)
-            .map(|it| it.clone())
+            .cloned()
             .collect_vec()
     }
 
@@ -74,11 +72,8 @@ impl ConstantEvaluator {
         let mut hints = vec![];
 
         if let Status::Panicked { reason } = vm.status() {
-            match panic_hint(&db, module.clone(), &vm, reason) {
-                Some(hint) => {
-                    hints.push(hint);
-                }
-                None => log::error!("Module panicked, but we are not displaying an error."),
+            if let Some(hint) = panic_hint(&db, module.clone(), &vm, reason) {
+                hints.push(hint);
             }
         };
         if module.to_possible_paths().is_some() {
@@ -88,7 +83,7 @@ impl ConstantEvaluator {
         }
 
         for entry in vm.tracer.log() {
-            let (id, name, value) = match entry {
+            let (id, value) = match entry {
                 TraceEntry::ValueEvaluated { id, value } => {
                     if &id.module != module {
                         continue;
@@ -101,22 +96,22 @@ impl ConstantEvaluator {
                         Some((ast, _)) => (*ast).clone(),
                         None => continue,
                     };
-                    let name = match ast.find(&ast_id) {
+                    let ast = match ast.find(&ast_id) {
+                        Some(ast) => ast,
                         None => continue,
-                        Some(ast) => match &ast.kind {
-                            AstKind::Assignment(Assignment { name, .. }) => name.value.clone(),
-                            _ => continue,
-                        },
                     };
-                    (id.clone(), name, value.clone())
+                    if !matches!(ast.kind, AstKind::Assignment(_)) {
+                        continue;
+                    }
+                    (id.clone(), value.clone())
                 }
                 _ => continue,
             };
 
             hints.push(Hint {
                 kind: HintKind::Value,
-                text: format!("{name} = {value}"),
-                position: id_to_end_of_line(&db, id).unwrap(),
+                text: format!("{value}"),
+                position: id_to_end_of_line(db, id).unwrap(),
             });
         }
 
@@ -128,21 +123,23 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.
-    let last_call_in_this_module = vm
-        .tracer
-        .stack()
-        .iter()
-        .filter(|entry| {
-            let id = match entry {
-                TraceEntry::CallStarted { id, .. } => id,
-                TraceEntry::NeedsStarted { id, .. } => id,
-                _ => return false,
-            };
-            // Make sure the entry comes from the same file and is not generated
-            // code.
-            id.module == module && db.hir_to_cst_id(id.clone()).is_some()
-        })
-        .next()?;
+    let stack = vm.tracer.stack();
+    if stack.len() == 1 {
+        // The stack only contains a `ModuleStarted` entry. This indicates an
+        // error during compilation resulting in a top-level error instruction.
+        return None;
+    }
+
+    let last_call_in_this_module = stack.iter().find(|entry| {
+        let id = match entry {
+            TraceEntry::CallStarted { id, .. } => id,
+            TraceEntry::NeedsStarted { id, .. } => id,
+            _ => return false,
+        };
+        // Make sure the entry comes from the same file and is not generated
+        // code.
+        id.module == module && db.hir_to_cst_id(id.clone()).is_some()
+    })?;
 
     let (id, call_info) = match last_call_in_this_module {
         TraceEntry::CallStarted { id, closure, args } => (

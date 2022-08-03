@@ -1,8 +1,10 @@
 #![feature(async_closure)]
+#![feature(box_patterns)]
 #![feature(label_break_value)]
 #![feature(let_chains)]
 #![feature(never_type)]
 #![feature(try_trait_v2)]
+#![allow(clippy::module_inception)]
 
 mod builtin_functions;
 mod compiler;
@@ -125,14 +127,14 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
         .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", module, err));
     if debug {
         let rcst_file = module.associated_debug_file("rcst");
-        fs::write(rcst_file, format!("{:#?}\n", rcst.clone())).unwrap();
+        fs::write(rcst_file, format!("{:#?}\n", rcst)).unwrap();
     }
 
     log::debug!("Turning RCST to CST…");
     let cst = db.cst(module.clone()).unwrap();
     if debug {
         let cst_file = module.associated_debug_file("cst");
-        fs::write(cst_file, format!("{:#?}\n", cst.clone())).unwrap();
+        fs::write(cst_file, format!("{:#?}\n", cst)).unwrap();
     }
 
     log::debug!("Abstracting CST to AST…");
@@ -162,7 +164,7 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
     let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
     if debug {
         let hir_file = module.associated_debug_file("hir");
-        fs::write(hir_file, format!("{}", hir.clone())).unwrap();
+        fs::write(hir_file, format!("{}", hir)).unwrap();
 
         let hir_ast_id_file = module.associated_debug_file("hir_to_ast_ids");
         fs::write(
@@ -218,7 +220,7 @@ fn run(options: CandyRunOptions) {
 
     if options.debug {
         let trace = vm.tracer.dump_call_tree();
-        let trace_file = options.file.clone_with_extension("candy.trace");
+        let trace_file = module.associated_debug_file("trace");
         fs::write(trace_file.clone(), trace).unwrap();
         log::info!(
             "Trace has been written to `{}`.",
@@ -247,7 +249,7 @@ async fn fuzz(options: CandyFuzzOptions) {
 
 async fn lsp() {
     log::info!("Starting language server…");
-    let (service, socket) = LspService::new(|client| CandyLanguageServer::from_client(client));
+    let (service, socket) = LspService::new(CandyLanguageServer::from_client);
     Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
         .serve(service)
         .await;
@@ -269,6 +271,7 @@ fn init_logger() {
         })
         .level_for("candy::compiler::hir_to_lir", LevelFilter::Debug)
         .level_for("candy::compiler::string_to_rcst", LevelFilter::Debug)
+        .level_for("candy::language_server::hints", LevelFilter::Debug)
         .level_for("candy::vm::builtin_functions", LevelFilter::Warn)
         .level_for("candy::vm::heap", LevelFilter::Debug)
         .level_for("candy::vm::vm", LevelFilter::Info)
@@ -278,15 +281,4 @@ fn init_logger() {
         .chain(std::io::stderr())
         .apply()
         .unwrap();
-}
-
-trait CloneWithExtension {
-    fn clone_with_extension(&self, extension: &'static str) -> Self;
-}
-impl CloneWithExtension for PathBuf {
-    fn clone_with_extension(&self, extension: &'static str) -> Self {
-        let mut path = self.clone();
-        assert!(path.set_extension(extension));
-        path
-    }
 }

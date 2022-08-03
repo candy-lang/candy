@@ -1,6 +1,7 @@
 use super::error::CompilerError;
 use crate::{builtin_functions::BuiltinFunction, hir, module::Module};
 use itertools::Itertools;
+use num_bigint::BigUint;
 use std::fmt::Display;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -13,7 +14,7 @@ pub type StackOffset = usize; // 0 is the last item, 1 the one before that, etc.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Instruction {
     /// Pushes an int.
-    CreateInt(u64),
+    CreateInt(BigUint),
 
     /// Pushes a text.
     CreateText(String),
@@ -89,7 +90,7 @@ pub enum Instruction {
     },
 
     /// Pops a boolean condition and a reason. If the condition is true, it
-    /// just pushes Nothing. If the condition is false, it panic with the
+    /// just pushes Nothing. If the condition is false, it panics with the
     /// reason.
     ///
     /// a, condition, reason -> a, Nothing
@@ -115,7 +116,7 @@ pub enum Instruction {
 
     Error {
         id: hir::Id,
-        error: CompilerError,
+        errors: Vec<CompilerError>,
     },
 }
 
@@ -187,7 +188,18 @@ impl Display for Instruction {
             Instruction::TraceNeedsEnds => write!(f, "traceNeedsEnds"),
             Instruction::TraceModuleStarts { module } => write!(f, "traceModuleStarts {module}"),
             Instruction::TraceModuleEnds => write!(f, "traceModuleEnds"),
-            Instruction::Error { id, error } => write!(f, "error at {id}: {error:?}"),
+            Instruction::Error { id, errors } => {
+                write!(
+                    f,
+                    "{} at {id}:",
+                    if errors.len() == 1 { "error" } else { "errors" }
+                )?;
+                write!(f, "error(s) at {id}")?;
+                for error in errors {
+                    write!(f, "\n  {error:?}")?;
+                }
+                Ok(())
+            }
         }
     }
 }

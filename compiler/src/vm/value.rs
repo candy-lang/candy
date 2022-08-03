@@ -7,8 +7,9 @@ use crate::{
     database::Database,
     module::Module,
 };
-use im::HashMap;
+use im::{hashmap, HashMap};
 use itertools::Itertools;
+use num_bigint::BigInt;
 use std::fmt::{self, Display, Formatter};
 
 /// A self-contained value. Unlike objects, these are not tied to a running VM,
@@ -21,7 +22,7 @@ use std::fmt::{self, Display, Formatter};
 /// self-contained values.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Value {
-    Int(u64),
+    Int(BigInt),
     Text(String),
     Symbol(String),
     Struct(HashMap<Value, Value>),
@@ -44,16 +45,9 @@ impl Value {
         let items = items
             .into_iter()
             .enumerate()
-            .map(|(index, it)| (Value::Int(index as u64), it))
+            .map(|(index, it)| (Value::Int(BigInt::from(index)), it))
             .collect();
         Value::Struct(items)
-    }
-
-    pub fn try_into_text(self) -> Result<String, Value> {
-        match self {
-            Value::Text(text) => Ok(text),
-            it => Err(it),
-        }
     }
 }
 impl Closure {
@@ -66,7 +60,7 @@ impl Closure {
                 Instruction::CreateClosure {
                     captured: vec![],
                     num_args: 0,
-                    body: lir.instructions.clone(),
+                    body: lir.instructions,
                 },
                 Instruction::Call { num_args: 0 },
                 Instruction::TraceModuleEnds,
@@ -88,20 +82,27 @@ impl Display for Value {
             Value::Symbol(symbol) => write!(f, "{symbol}"),
             Value::Struct(entries) => write!(
                 f,
-                "[ {} ]",
+                "[{}]",
                 entries
                     .iter()
+                    .map(|(key, value)| (format!("{}", key), value))
+                    .sorted_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b))
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
             ),
-            Value::Closure { .. } => write!(f, "{{...}}"),
+            Value::Closure(_) => write!(f, "{{…}}"),
             Value::Builtin(builtin) => write!(f, "builtin{builtin:?}"),
         }
     }
 }
 
-impl From<u64> for Value {
-    fn from(value: u64) -> Self {
+impl From<usize> for Value {
+    fn from(value: usize) -> Self {
+        BigInt::from(value).into()
+    }
+}
+impl From<BigInt> for Value {
+    fn from(value: BigInt) -> Self {
         Value::Int(value)
     }
 }
@@ -113,5 +114,21 @@ impl From<String> for Value {
 impl From<bool> for Value {
     fn from(it: bool) -> Self {
         Value::Symbol(if it { "True" } else { "False" }.to_string())
+    }
+}
+impl<T, E> From<Result<T, E>> for Value
+where
+    T: Into<Value>,
+    E: Into<Value>,
+{
+    fn from(it: Result<T, E>) -> Self {
+        let (type_, value) = match it {
+            Ok(it) => ("Ok".to_string(), it.into()),
+            Err(it) => ("Error".to_string(), it.into()),
+        };
+        Value::Struct(hashmap! {
+            Value::Symbol("Type".to_string()) => Value::Symbol(type_),
+            Value::Symbol("Value".to_string()) => value,
+        })
     }
 }

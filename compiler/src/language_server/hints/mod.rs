@@ -1,19 +1,20 @@
-//! Unlike the usual language server features, hints are not generated on-demand
+//! Unlike other language server features, hints are not generated on-demand
 //! with the usual request-response model. Instead, a hints server runs in the
 //! background all the time. That way, the hints can progressively get better.
 //! For example, when opening a long file, the hints may appear from top to
 //! bottom as more code is evaluated. Then, the individual closures could get
 //! fuzzed with ever-more-complex inputs, resulting in some error cases to be
 //! displayed over time.
+//!
 //! While doing all that, we can pause regularly between executing instructions
-//! so that we don't occupy a single CPU at 100%.
+//! so that we don't occupy a single CPU at 100 %.
 
 mod constant_evaluator;
 mod fuzzer;
 mod utils;
 
 use self::{constant_evaluator::ConstantEvaluator, fuzzer::FuzzerManager};
-use crate::{database::Database, module::Module, CloneWithExtension};
+use crate::{database::Database, module::Module};
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position};
 use serde::{Deserialize, Serialize};
@@ -125,11 +126,10 @@ pub async fn run_server(
                     hint_group
                 })
                 // Show related hints at the same indentation.
-                .map(|mut hint_group| {
+                .flat_map(|mut hint_group| {
                     hint_group.align_hint_columns();
                     hint_group
                 })
-                .flatten()
                 .sorted_by_key(|hint| hint.position)
                 .collect_vec();
 
@@ -172,9 +172,9 @@ impl OutgoingHints {
 
 /// VSCode trims multiple leading spaces to one. That's why we use an
 /// [em quad](https://en.wikipedia.org/wiki/Quad_(typography)) instead, which
-/// per definition has the same width as a normal space.
+/// seems to have the same width as a normal space in VSCode.
 fn quasi_spaces(n: usize) -> String {
-    format!(" ").repeat(n)
+    " ".repeat(n)
 }
 
 trait AlignHints {

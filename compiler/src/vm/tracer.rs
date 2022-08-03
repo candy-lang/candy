@@ -118,18 +118,18 @@ impl Tracer {
                         "{}, {}, {}, {}",
                         hir_id
                             .map(|id| format!("{id}"))
-                            .unwrap_or("<no hir>".to_string()),
+                            .unwrap_or_else(|| "<no hir>".to_string()),
                         ast_id
                             .map(|id| format!("{id}"))
-                            .unwrap_or("<no ast>".to_string()),
+                            .unwrap_or_else(|| "<no ast>".to_string()),
                         cst_id
                             .map(|id| format!("{id}"))
-                            .unwrap_or("<no cst>".to_string()),
+                            .unwrap_or_else(|| "<no cst>".to_string()),
                         span.map(|((start_line, start_col), (end_line, end_col))| format!(
                             "{}:{} – {}:{}",
                             start_line, start_col, end_line, end_col
                         ))
-                        .unwrap_or("<no location>".to_string())
+                        .unwrap_or_else(|| "<no location>".to_string())
                     )
                 };
                 format!("{caller_location_string:90} {call_string}")

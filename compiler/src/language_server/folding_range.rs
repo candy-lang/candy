@@ -67,24 +67,33 @@ impl<'a> Context<'a> {
             CstKind::Text { .. } => {}
             CstKind::TextPart(_) => {}
             CstKind::Parenthesized { inner, .. } => self.visit_cst(inner),
-            CstKind::Call { name, arguments } => {
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => {
                 if !arguments.is_empty() {
-                    let name = name.unwrap_whitespace_and_comment();
+                    let receiver = receiver.unwrap_whitespace_and_comment();
                     let last_argument = arguments.last().unwrap().unwrap_whitespace_and_comment();
                     self.push(
-                        name.span.end,
+                        receiver.span.end,
                         last_argument.span.end,
                         FoldingRangeKind::Region,
                     );
                 }
 
-                self.visit_cst(name);
-                self.visit_csts(&arguments);
+                self.visit_cst(receiver);
+                self.visit_csts(arguments);
             }
             // TODO: support folding ranges for structs
             CstKind::Struct { fields, .. } => self.visit_csts(fields),
-            CstKind::StructField { key, value, .. } => {
-                self.visit_cst(key);
+            CstKind::StructField {
+                key_and_colon,
+                value,
+                ..
+            } => {
+                if let Some(box (key, _)) = key_and_colon {
+                    self.visit_cst(key);
+                }
                 self.visit_cst(value);
             }
             CstKind::StructAccess { struct_, dot, key } => {
@@ -105,10 +114,6 @@ impl<'a> Context<'a> {
                 ));
 
                 let closing_curly_brace = closing_curly_brace.unwrap_whitespace_and_comment();
-                assert!(matches!(
-                    closing_curly_brace.kind,
-                    CstKind::ClosingCurlyBrace { .. }
-                ));
 
                 self.push(
                     opening_curly_brace.span.end,
@@ -116,9 +121,9 @@ impl<'a> Context<'a> {
                     FoldingRangeKind::Region,
                 );
                 if let Some((parameters, _)) = parameters_and_arrow {
-                    self.visit_csts(&parameters);
+                    self.visit_csts(parameters);
                 }
-                self.visit_csts(&body);
+                self.visit_csts(body);
             }
             CstKind::Assignment {
                 name,
@@ -138,8 +143,8 @@ impl<'a> Context<'a> {
                 }
 
                 self.visit_cst(name);
-                self.visit_csts(&parameters);
-                self.visit_csts(&body);
+                self.visit_csts(parameters);
+                self.visit_csts(body);
             }
             CstKind::Error { .. } => {}
         }

@@ -1,7 +1,7 @@
 [package]
 name = "candy"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [profile.release]
 debug = true
@@ -19,6 +19,9 @@ linked-hash-map = "0.5.4"
 log = "0.4.16"
 lsp-types = "0.93.0"
 notify = "4.0.17"
+num-bigint = { version = "0.4.3", features = ["rand"] }
+num-integer = { version = "0.1.45", features = ["i128"] }
+num-traits = { version = "0.2.15", features = ["i128"] }
 proptest = "1.0.0"
 rand = "0.8.5"
 regex = "1.5.5"
@@ -31,6 +34,7 @@ strum_macros = "0.24"
 tokio = { version = "1.18.0", features = ["full"] }
 tokio-util = "0.7.1"
 tower-lsp = "0.17.0"
+unicode-segmentation = "1.9.0"
 
 [target.x86_64-unknown-linux-gnu]
 linker = "/usr/bin/clang"

@@ -1,7 +1,7 @@
 use super::value::{Closure, Value};
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
 use itertools::Itertools;
-use log;
+use num_bigint::BigInt;
 use std::collections::HashMap;
 
 #[derive(Clone)]
@@ -19,7 +19,7 @@ pub struct Object {
 }
 #[derive(Clone)]
 pub enum ObjectData {
-    Int(u64),
+    Int(BigInt),
     Text(String),
     Symbol(String),
     Struct(HashMap<ObjectPointer, ObjectPointer>),
@@ -60,12 +60,12 @@ impl Heap {
     pub fn get(&self, address: ObjectPointer) -> &Object {
         self.objects
             .get(&address)
-            .expect(&format!("Couldn't get object {address}."))
+            .unwrap_or_else(|| panic!("Couldn't get object {address}."))
     }
     pub fn get_mut(&mut self, address: ObjectPointer) -> &mut Object {
         self.objects
             .get_mut(&address)
-            .expect(&format!("Couldn't get object {address}."))
+            .unwrap_or_else(|| panic!("Couldn't get object {address}."))
     }
 
     pub fn dup(&mut self, address: ObjectPointer) {
@@ -163,7 +163,7 @@ impl Heap {
     }
     pub fn export_without_dropping(&self, address: ObjectPointer) -> Value {
         match &self.get(address).data {
-            ObjectData::Int(int) => Value::Int(*int),
+            ObjectData::Int(int) => Value::Int(int.clone()),
             ObjectData::Text(text) => Value::Text(text.clone()),
             ObjectData::Symbol(symbol) => Value::Symbol(symbol.clone()),
             ObjectData::Struct(struct_) => {

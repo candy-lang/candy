@@ -28,7 +28,7 @@ fn semantic_tokens(db: &dyn SemanticTokenDb, module: Module) -> Vec<SemanticToke
 
 lazy_static! {
     pub static ref LEGEND: SemanticTokensLegend = SemanticTokensLegend {
-        token_types: SemanticTokenType::iter().map(|it| it.to_lsp()).collect(),
+        token_types: SemanticTokenType::iter().map(|it| it.as_lsp()).collect(),
         token_modifiers: vec![
             lsp_types::SemanticTokenModifier::DEFINITION,
             lsp_types::SemanticTokenModifier::READONLY,
@@ -55,7 +55,7 @@ lazy_static! {
 }
 
 impl SemanticTokenType {
-    fn to_lsp(&self) -> lsp_types::SemanticTokenType {
+    fn as_lsp(&self) -> lsp_types::SemanticTokenType {
         match self {
             SemanticTokenType::Parameter => lsp_types::SemanticTokenType::PARAMETER,
             SemanticTokenType::Assignment => lsp_types::SemanticTokenType::VARIABLE,
@@ -169,8 +169,9 @@ impl<'a> Context<'a> {
                 self.visit_cst(octothorpe, None);
                 self.add_token(cst.span.clone(), SemanticTokenType::Comment);
             }
-            CstKind::TrailingWhitespace { child, .. } => {
-                self.visit_cst(child, token_type_for_identifier)
+            CstKind::TrailingWhitespace { child, whitespace } => {
+                self.visit_cst(child, token_type_for_identifier);
+                self.visit_csts(whitespace, token_type_for_identifier);
             }
             CstKind::Identifier { .. } => self.add_token(
                 cst.span.clone(),
@@ -201,8 +202,11 @@ impl<'a> Context<'a> {
                 self.visit_cst(inner, None);
                 self.visit_cst(closing_parenthesis, None);
             }
-            CstKind::Call { name, arguments } => {
-                self.visit_cst(name, Some(SemanticTokenType::Function));
+            CstKind::Call {
+                receiver,
+                arguments,
+            } => {
+                self.visit_cst(receiver, Some(SemanticTokenType::Function));
                 self.visit_csts(arguments, None);
             }
             CstKind::Struct {
@@ -215,13 +219,14 @@ impl<'a> Context<'a> {
                 self.visit_cst(closing_bracket, None);
             }
             CstKind::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => {
-                self.visit_cst(key, None);
-                self.visit_cst(colon, None);
+                if let Some(box (key, colon)) = key_and_colon {
+                    self.visit_cst(key, None);
+                    self.visit_cst(colon, None);
+                }
                 self.visit_cst(value, None);
                 if let Some(comma) = comma {
                     self.visit_cst(comma, None);
