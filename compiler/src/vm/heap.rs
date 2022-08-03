@@ -190,4 +190,11 @@ impl Heap {
             ObjectData::Builtin(builtin) => Value::Builtin(*builtin),
         }
     }
+    pub fn export_all(&mut self, addresses: &[ObjectPointer]) -> Vec<Value> {
+        let mut values = vec![];
+        for address in addresses {
+            values.push(self.export(*address));
+        }
+        values
+    }
 }
