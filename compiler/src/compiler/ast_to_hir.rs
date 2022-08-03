@@ -13,9 +13,8 @@ use crate::{
     builtin_functions::{self, BuiltinFunction},
     module::Module,
 };
-use im::HashMap;
 use itertools::Itertools;
-use std::{mem, ops::Range, sync::Arc};
+use std::{collections::HashMap, mem, ops::Range, sync::Arc};
 
 #[salsa::query_group(AstToHirStorage)]
 pub trait AstToHir: CstDb + CstToAst {
@@ -75,7 +74,7 @@ fn compile_top_level(
         public_identifiers: HashMap::new(),
         body: Body::new(),
         prefix_keys: vec![],
-        identifiers: HashMap::new(),
+        identifiers: im::HashMap::new(),
         is_top_level: true,
     };
 
@@ -99,7 +98,7 @@ struct Context<'a> {
     public_identifiers: HashMap<String, hir::Id>,
     body: Body,
     prefix_keys: Vec<String>,
-    identifiers: HashMap<String, hir::Id>,
+    identifiers: im::HashMap<String, hir::Id>,
     is_top_level: bool,
 }
 
@@ -133,7 +132,7 @@ impl<'a> Context<'a> {
 struct ScopeResetState {
     body: Body,
     prefix_keys: Vec<String>,
-    identifiers: HashMap<String, hir::Id>,
+    identifiers: im::HashMap<String, hir::Id>,
     non_top_level_reset_state: NonTopLevelResetState,
 }
 
@@ -198,7 +197,11 @@ impl<'a> Context<'a> {
                 for (key, value) in named_fields {
                     fields.insert(self.compile_single(key), self.compile_single(value));
                 }
-                self.push(Some(ast.id.clone()), Expression::Struct(fields), None)
+                self.push(
+                    Some(ast.id.clone()),
+                    Expression::Struct(fields.into()),
+                    None,
+                )
             }
             AstKind::StructAccess(struct_access) => {
                 self.lower_struct_access(Some(ast.id.clone()), struct_access)
@@ -452,7 +455,7 @@ impl<'a> Context<'a> {
 
 impl<'a> Context<'a> {
     fn generate_sparkles(&mut self) {
-        let mut sparkles_map = HashMap::new();
+        let mut sparkles_map = im::HashMap::new();
 
         for builtin_function in builtin_functions::VALUES.iter() {
             let symbol = self.push(
@@ -510,7 +513,7 @@ impl<'a> Context<'a> {
         //   HirId(~:test.candy:100): HirId(~:test.candy:101),
         // ]
 
-        let mut exports = HashMap::new();
+        let mut exports = im::HashMap::new();
         for (name, id) in self.public_identifiers.clone() {
             exports.insert(
                 self.push(

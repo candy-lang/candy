@@ -7,10 +7,9 @@ use crate::{
     language_server::utils::TupleToPosition,
     module::Module,
 };
-use im::HashMap;
 use lazy_static::lazy_static;
 use lsp_types::{self, Position, SemanticToken, SemanticTokensLegend};
-use std::ops::Range;
+use std::{collections::HashMap, ops::Range};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
