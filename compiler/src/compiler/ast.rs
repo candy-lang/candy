@@ -119,7 +119,6 @@ pub enum AstError {
     StructKeyWithoutColon,
     StructValueWithoutComma,
     StructPositionalAfterNamedField,
-    ExpectedIdentifier,
     ExpectedParameter,
     LambdaWithoutClosingCurlyBrace,
 }

@@ -134,7 +134,7 @@ where
             Err(it) => ("Error".to_string(), it.into()),
         };
         Value::Struct(hashmap! {
-            Value::Symbol("Type".to_string()) => Value::Symbol(type_.to_string()),
+            Value::Symbol("Type".to_string()) => Value::Symbol(type_),
             Value::Symbol("Value".to_string()) => value,
         })
     }
