@@ -1,3 +1,4 @@
+use super::heap::{Heap, ObjectPointer};
 use crate::{
     builtin_functions::BuiltinFunction,
     compiler::{
@@ -10,30 +11,15 @@ use crate::{
 use im::{hashmap, HashMap};
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::fmt::{self, Display, Formatter};
+use std::{
+    cell::Cell,
+    fmt::{self, Display, Formatter},
+    rc::Rc,
+};
 
-/// A self-contained value. Unlike objects, these are not tied to a running VM,
-/// which makes them useful for being sent through channels between multiple
-/// reference-counted heaps, for example ones running concurrently logically, on
-/// other cores, or on different computers.
-///
-/// VMs can import these values to turn them into heap-contained,
-/// reference-counted objects. They can export objects from the heap into
-/// self-contained values.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub enum Value {
-    Int(BigInt),
-    Text(String),
-    Symbol(String),
-    Struct(HashMap<Value, Value>),
-    Closure(Closure),
-    Builtin(BuiltinFunction),
-}
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct Closure {
-    pub captured: Vec<Value>,
-    pub num_args: usize,
-    pub body: Vec<Instruction>,
+struct Value {
+    heap: Rc<Cell<Heap>>,
+    address: ObjectPointer,
 }
 
 impl Value {
@@ -93,42 +79,5 @@ impl Display for Value {
             Value::Closure(_) => write!(f, "{{…}}"),
             Value::Builtin(builtin) => write!(f, "builtin{builtin:?}"),
         }
-    }
-}
-
-impl From<usize> for Value {
-    fn from(value: usize) -> Self {
-        BigInt::from(value).into()
-    }
-}
-impl From<BigInt> for Value {
-    fn from(value: BigInt) -> Self {
-        Value::Int(value)
-    }
-}
-impl From<String> for Value {
-    fn from(value: String) -> Self {
-        Value::Text(value)
-    }
-}
-impl From<bool> for Value {
-    fn from(it: bool) -> Self {
-        Value::Symbol(if it { "True" } else { "False" }.to_string())
-    }
-}
-impl<T, E> From<Result<T, E>> for Value
-where
-    T: Into<Value>,
-    E: Into<Value>,
-{
-    fn from(it: Result<T, E>) -> Self {
-        let (type_, value) = match it {
-            Ok(it) => ("Ok".to_string(), it.into()),
-            Err(it) => ("Error".to_string(), it.into()),
-        };
-        Value::Struct(hashmap! {
-            Value::Symbol("Type".to_string()) => Value::Symbol(type_),
-            Value::Symbol("Value".to_string()) => value,
-        })
     }
 }

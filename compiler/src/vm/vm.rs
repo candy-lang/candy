@@ -2,7 +2,6 @@ use super::{
     heap::{Heap, ObjectData, ObjectPointer},
     tracer::{TraceEntry, Tracer},
     use_provider::{DbUseProvider, UseProvider},
-    value::{Closure, Value},
 };
 use crate::{
     compiler::{hir::Id, lir::Instruction},
@@ -22,7 +21,7 @@ pub struct Vm {
     pub call_stack: Vec<InstructionPointer>,
     pub import_stack: Vec<Module>,
     pub tracer: Tracer,
-    pub fuzzable_closures: Vec<(Id, Closure)>,
+    pub fuzzable_closures: Vec<(Id, ObjectPointer)>,
     pub num_instructions_executed: usize,
 }
 
@@ -57,8 +56,9 @@ impl InstructionPointer {
 }
 
 pub struct TearDownResult {
-    pub return_value: Value,
-    pub fuzzable_closures: Vec<(Id, Closure)>,
+    pub heap: Heap,
+    pub return_value: ObjectPointer,
+    pub fuzzable_closures: Vec<(Id, ObjectPointer)>,
 }
 
 impl Vm {

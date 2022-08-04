@@ -1,8 +1,4 @@
-use super::{
-    heap::ObjectPointer,
-    value::{Closure, Value},
-    Vm,
-};
+use super::{heap::ObjectPointer, Vm};
 use crate::{
     compiler::{
         hir_to_lir::HirToLir,

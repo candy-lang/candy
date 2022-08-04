@@ -1,4 +1,3 @@
-use super::value::Value;
 use crate::{
     compiler::{ast_to_hir::AstToHir, cst::CstDb, hir::Id},
     database::Database,
