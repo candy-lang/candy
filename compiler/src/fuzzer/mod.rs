@@ -9,7 +9,6 @@ use crate::{
     vm::{use_provider::DbUseProvider, value::Closure, TearDownResult, Vm},
 };
 use itertools::Itertools;
-use std::fs;
 
 pub async fn fuzz(db: &Database, module: Module) {
     let mut vm = {
@@ -48,13 +47,7 @@ pub async fn fuzz(db: &Database, module: Module) {
                 log::error!("This was the stack trace:");
                 tracer.dump_stack_trace(db);
 
-                let trace = tracer.dump_call_tree();
-                let trace_file = module.associated_debug_file("trace");
-                fs::write(trace_file.clone(), trace).unwrap();
-                log::info!(
-                    "Trace has been written to `{}`.",
-                    trace_file.as_path().display()
-                );
+                module.dump_associated_debug_file("trace", &tracer.dump_call_tree());
             }
         }
     }

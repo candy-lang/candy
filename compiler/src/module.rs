@@ -65,7 +65,10 @@ impl Module {
                 Module::from_package_root_and_file(package_root, url.to_file_path().unwrap(), kind)
             }
             "untitled" => Module::from_anonymous_content(
-                url.to_string()["untitled:".len()..].to_owned(),
+                url.to_string()
+                    .strip_prefix("untitled:")
+                    .unwrap()
+                    .to_string(),
                 kind,
             ),
             _ => panic!("Unsupported URI scheme: {}", url.scheme()),
@@ -77,7 +80,7 @@ impl Module {
         kind: ModuleKind,
     ) -> Self {
         let relative_path =
-            fs::canonicalize(&file).expect("Package root does not exist or is invalid.");
+            fs::canonicalize(&file).expect("File does not exist or its path is invalid.");
         let relative_path =
             match relative_path.strip_prefix(fs::canonicalize(package_root.clone()).unwrap()) {
                 Ok(path) => path,
@@ -152,10 +155,15 @@ impl Module {
         })
     }
 
-    pub fn associated_debug_file(&self, debug_type: &str) -> PathBuf {
-        let mut path = self.to_possible_paths().unwrap().pop().unwrap();
+    pub fn dump_associated_debug_file(&self, debug_type: &str, content: &str) {
+        let mut path = match self.to_possible_paths() {
+            Some(path) => path,
+            None => return,
+        }
+        .pop()
+        .unwrap();
         path.set_extension(format!("candy.{}", debug_type));
-        path
+        fs::write(path, content).unwrap();
     }
 }
 

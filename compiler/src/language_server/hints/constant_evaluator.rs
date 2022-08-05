@@ -77,9 +77,7 @@ impl ConstantEvaluator {
             }
         };
         if module.to_possible_paths().is_some() {
-            let trace = vm.tracer.dump_call_tree();
-            let trace_file = module.associated_debug_file("trace");
-            fs::write(trace_file, trace).unwrap();
+            module.dump_associated_debug_file("trace", &vm.tracer.dump_call_tree());
         }
 
         for entry in vm.tracer.log() {

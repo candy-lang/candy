@@ -470,9 +470,9 @@ impl<'a> Context<'a> {
 
     fn generate_use(&mut self) {
         // HirId(~:test.candy:use) = lambda { HirId(~:test.candy:use:relativePath) ->
-        //   HirId(~:test.candy:useAsset:importedFileContent) = useAssetModule
-        //     currently in ~:test.candy:useAsset:importedFileContent
-        //     relative path: HirId(~:test.candy:useAsset:relativePath)
+        //   HirId(~:test.candy:use:importedFileContent) = useModule
+        //     currently in ~:test.candy:use:importedFileContent
+        //     relative path: HirId(~:test.candy:use:relativePath)
         //  }
 
         let reset_state = self.start_scope();
