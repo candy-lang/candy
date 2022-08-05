@@ -37,8 +37,6 @@ pub enum BuiltinFunction {
     TextTrimEnd,         // text -> text
     TextTrimStart,       // text -> text
     TypeOf,              // any -> typeSymbol
-    UseAsset,            // currentPath target -> targetAsString
-    UseLocalModule,      // currentPath target -> targetAsStruct
 }
 lazy_static! {
     pub static ref VALUES: Vec<BuiltinFunction> = BuiltinFunction::iter().collect();

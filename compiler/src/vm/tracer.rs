@@ -2,8 +2,8 @@ use super::value::Value;
 use crate::{
     compiler::{ast_to_hir::AstToHir, cst::CstDb, hir::Id},
     database::Database,
-    input::Input,
     language_server::utils::LspPositionConversion,
+    module::Module,
 };
 use itertools::Itertools;
 
@@ -33,7 +33,7 @@ pub enum TraceEntry {
     },
     NeedsEnded,
     ModuleStarted {
-        input: Input,
+        module: Module,
     },
     ModuleEnded {
         export_map: Value,
@@ -95,19 +95,19 @@ impl Tracer {
                         condition,
                         reason,
                     } => (format!("needs {condition} {reason}"), Some(id)),
-                    TraceEntry::ModuleStarted { input } => (format!("module {input}"), None),
+                    TraceEntry::ModuleStarted { module } => (format!("module {module}"), None),
                     _ => unreachable!(),
                 };
                 let caller_location_string = {
                     let (hir_id, ast_id, cst_id, span) = if let Some(hir_id) = hir_id {
-                        let input = hir_id.input.clone();
+                        let module = hir_id.module.clone();
                         let ast_id = db.hir_to_ast_id(hir_id.clone());
                         let cst_id = db.hir_to_cst_id(hir_id.clone());
-                        let cst = cst_id.map(|id| db.find_cst(input.clone(), id));
+                        let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
                         let span = cst.map(|cst| {
                             (
-                                db.offset_to_lsp(input.clone(), cst.span.start),
-                                db.offset_to_lsp(input.clone(), cst.span.end),
+                                db.offset_to_lsp(module.clone(), cst.span.start),
+                                db.offset_to_lsp(module.clone(), cst.span.end),
                             )
                         });
                         (Some(hir_id), ast_id, cst_id, span)
@@ -154,7 +154,7 @@ impl Tracer {
                     reason,
                 } => Action::Start(format!("{id} needs {condition} {reason}")),
                 TraceEntry::NeedsEnded => Action::End(" = Nothing".to_string()),
-                TraceEntry::ModuleStarted { input } => Action::Start(format!("module {input}")),
+                TraceEntry::ModuleStarted { module } => Action::Start(format!("module {module}")),
                 TraceEntry::ModuleEnded { export_map } => Action::End(format!("{export_map}")),
             })
             .collect_vec();

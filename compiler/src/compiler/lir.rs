@@ -1,5 +1,5 @@
 use super::error::CompilerError;
-use crate::{builtin_functions::BuiltinFunction, hir, input::Input};
+use crate::{builtin_functions::BuiltinFunction, hir, module::Module};
 use itertools::Itertools;
 use num_bigint::BigUint;
 use std::fmt::Display;
@@ -43,11 +43,11 @@ pub enum Instruction {
     /// a -> a, builtin
     CreateBuiltin(BuiltinFunction),
 
-    /// Leaves the top stack item untouched, but removes n below.
-    PopMultipleBelowTop(usize),
-
     /// Pushes an item from back in the stack on the stack again.
     PushFromStack(StackOffset),
+
+    /// Leaves the top stack item untouched, but removes n below.
+    PopMultipleBelowTop(usize),
 
     /// Pops a closure and num_args arguments, pushes the current instruction
     /// pointer, all captured variables, and arguments, and then changes the
@@ -58,9 +58,35 @@ pub enum Instruction {
     /// Later, when the closure returns (perhaps many instructions after this
     /// one), the stack will contain the result:
     ///
-    /// a, arg1, arg2, ..., argN, closure -> a, return value from closure
+    /// a, arg1, arg2, ..., argN, closure ~> a, return value from closure
     Call {
         num_args: usize,
+    },
+
+    /// Returns from the current closure to the original caller.
+    ///
+    /// a, caller, return value -> a, return value
+    Return,
+
+    /// Pops a string path and then resolves the path relative to the current
+    /// module. Then does different things depending on whether this is a code
+    /// or asset module.
+    ///
+    /// - Code module:
+    ///
+    ///   Loads and parses the module, then runs the module closure. Later,
+    ///   when the module returns, the stack will contain the struct of the
+    ///   exported definitions:
+    ///
+    ///   a, path ~> a, structOfModuleExports
+    ///
+    /// - Asset module:
+    ///   
+    ///   Loads the file and pushes its content onto the stack:
+    ///
+    ///   a, path -> a, listOfContentBytes
+    UseModule {
+        current_module: Module,
     },
 
     /// Pops a boolean condition and a reason. If the condition is true, it
@@ -69,11 +95,6 @@ pub enum Instruction {
     ///
     /// a, condition, reason -> a, Nothing
     Needs,
-
-    /// Returns from the current closure to the original caller.
-    ///
-    /// a, caller, return value -> a, return value
-    Return,
 
     /// Indicates that a fuzzable closure sits at the top of the stack.
     RegisterFuzzableClosure(hir::Id),
@@ -89,7 +110,7 @@ pub enum Instruction {
     },
     TraceNeedsEnds,
     TraceModuleStarts {
-        input: Input,
+        module: Module,
     },
     TraceModuleEnds,
 
@@ -139,15 +160,18 @@ impl Display for Instruction {
             Instruction::CreateBuiltin(builtin_function) => {
                 write!(f, "createBuiltin {builtin_function:?}")
             }
+            Instruction::PushFromStack(offset) => write!(f, "pushFromStack {offset}"),
             Instruction::PopMultipleBelowTop(count) => {
                 write!(f, "popMultipleBelowTop {count}")
             }
-            Instruction::PushFromStack(offset) => write!(f, "pushFromStack {offset}"),
             Instruction::Call { num_args } => {
                 write!(f, "call with {num_args} arguments")
             }
-            Instruction::Needs => write!(f, "needs"),
             Instruction::Return => write!(f, "return"),
+            Instruction::UseModule { current_module } => {
+                write!(f, "useModule (currently in {})", current_module)
+            }
+            Instruction::Needs => write!(f, "needs"),
             Instruction::RegisterFuzzableClosure(hir_id) => {
                 write!(f, "registerFuzzableClosure {hir_id}")
             }
@@ -162,7 +186,7 @@ impl Display for Instruction {
                 write!(f, "traceNeedsStarts {id}")
             }
             Instruction::TraceNeedsEnds => write!(f, "traceNeedsEnds"),
-            Instruction::TraceModuleStarts { input } => write!(f, "traceModuleStarts {input}"),
+            Instruction::TraceModuleStarts { module } => write!(f, "traceModuleStarts {module}"),
             Instruction::TraceModuleEnds => write!(f, "traceModuleEnds"),
             Instruction::Error { id, errors } => {
                 write!(

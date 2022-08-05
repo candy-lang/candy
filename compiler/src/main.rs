@@ -9,8 +9,8 @@ mod builtin_functions;
 mod compiler;
 mod database;
 mod fuzzer;
-mod input;
 mod language_server;
+mod module;
 mod vm;
 
 use crate::{
@@ -23,9 +23,9 @@ use crate::{
         rcst_to_cst::RcstToCst,
         string_to_rcst::StringToRcst,
     },
-    database::{Database, PROJECT_DIRECTORY},
-    input::Input,
+    database::Database,
     language_server::utils::LspPositionConversion,
+    module::{Module, ModuleKind},
     vm::{use_provider::DbUseProvider, value::Closure, Vm},
 };
 use compiler::lir::Lir;
@@ -36,7 +36,6 @@ use log::{self, LevelFilter};
 use notify::{watcher, RecursiveMode, Watcher};
 use std::{
     env::current_dir,
-    fs,
     path::PathBuf,
     sync::{mpsc::channel, Arc},
     time::Duration,
@@ -92,9 +91,12 @@ async fn main() {
 }
 
 fn build(options: CandyBuildOptions) {
-    *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
-
-    raw_build(&options.file, options.debug);
+    let module = Module::from_package_root_and_file(
+        current_dir().unwrap(),
+        options.file.clone(),
+        ModuleKind::Code,
+    );
+    raw_build(module.clone(), options.debug);
 
     if options.watch {
         let (tx, rx) = channel();
@@ -105,95 +107,75 @@ fn build(options: CandyBuildOptions) {
         loop {
             match rx.recv() {
                 Ok(_) => {
-                    raw_build(&options.file, options.debug);
+                    raw_build(module.clone(), options.debug);
                 }
                 Err(e) => log::error!("watch error: {e:#?}"),
             }
         }
     }
 }
-fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
-    let path_string = file.to_string_lossy();
-    log::info!("Building `{path_string}`.");
+fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
+    log::info!("Building `{module}`.");
 
-    let input: Input = file.clone().into();
     let db = Database::default();
 
     log::debug!("Parsing string to RCST…");
     let rcst = db
-        .rcst(input.clone())
-        .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", path_string, err));
+        .rcst(module.clone())
+        .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", module, err));
     if debug {
-        let rcst_file = file.clone_with_extension("candy.rcst");
-        fs::write(rcst_file, format!("{:#?}\n", rcst)).unwrap();
+        module.dump_associated_debug_file("rcst", &format!("{:#?}\n", rcst));
     }
 
     log::debug!("Turning RCST to CST…");
-    let cst = db.cst(input.clone()).expect("RCST should have failed");
+    let cst = db.cst(module.clone()).unwrap();
     if debug {
-        let cst_file = file.clone_with_extension("candy.cst");
-        fs::write(cst_file, format!("{:#?}\n", cst)).unwrap();
+        module.dump_associated_debug_file("cst", &format!("{:#?}\n", cst));
     }
 
     log::debug!("Abstracting CST to AST…");
-    let (asts, ast_cst_id_map) = db
-        .ast(input.clone())
-        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+    let (asts, ast_cst_id_map) = db.ast(module.clone()).unwrap();
     if debug {
-        let ast_file = file.clone_with_extension("candy.ast");
-        fs::write(
-            ast_file,
-            format!("{}\n", asts.iter().map(|ast| format!("{}", ast)).join("\n")),
-        )
-        .unwrap();
-
-        let ast_to_cst_ids_file = file.clone_with_extension("candy.ast_to_cst_ids");
-        fs::write(
-            ast_to_cst_ids_file,
-            ast_cst_id_map
+        module.dump_associated_debug_file(
+            "ast",
+            &format!("{}\n", asts.iter().map(|ast| format!("{}", ast)).join("\n")),
+        );
+        module.dump_associated_debug_file(
+            "ast_to_cst_ids",
+            &ast_cst_id_map
                 .keys()
                 .into_iter()
                 .sorted_by_key(|it| it.local)
                 .map(|key| format!("{key} -> {}\n", ast_cst_id_map[key].0))
                 .join(""),
-        )
-        .unwrap();
+        );
     }
 
     log::debug!("Turning AST to HIR…");
-    let (hir, hir_ast_id_map) = db
-        .hir(input.clone())
-        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+    let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
     if debug {
-        let hir_file = file.clone_with_extension("candy.hir");
-        fs::write(hir_file, format!("{}", hir)).unwrap();
-
-        let hir_ast_id_file = file.clone_with_extension("candy.hir_to_ast_ids");
-        fs::write(
-            hir_ast_id_file,
-            hir_ast_id_map
+        module.dump_associated_debug_file("hir", &format!("{}", hir));
+        module.dump_associated_debug_file(
+            "hir_to_ast_ids",
+            &hir_ast_id_map
                 .keys()
                 .into_iter()
                 .map(|key| format!("{key} -> {}\n", hir_ast_id_map[key]))
                 .join(""),
-        )
-        .unwrap();
+        );
     }
 
     log::debug!("Lowering HIR to LIR…");
-    let lir = db
-        .lir(input.clone())
-        .unwrap_or_else(|| panic!("File `{}` not found.", path_string));
+    let lir = db.lir(module.clone()).unwrap();
     if debug {
-        let lir_file = file.clone_with_extension("candy.lir");
-        fs::write(lir_file, format!("{lir}")).unwrap();
+        module.dump_associated_debug_file("lir", &format!("{lir}"));
     }
 
     let mut errors = vec![];
     hir.collect_errors(&mut errors);
     for CompilerError { span, payload, .. } in errors {
-        let (start_line, start_col) = db.offset_to_lsp(input.clone(), span.start);
-        let (end_line, end_col) = db.offset_to_lsp(input.clone(), span.end);
+        let (start_line, start_col) = db.offset_to_lsp(module.clone(), span.start);
+        let (end_line, end_col) = db.offset_to_lsp(module.clone(), span.end);
         log::warn!("{start_line}:{start_col} – {end_line}:{end_col}: {payload:?}");
     }
 
@@ -201,16 +183,18 @@ fn raw_build(file: &PathBuf, debug: bool) -> Option<Arc<Lir>> {
 }
 
 fn run(options: CandyRunOptions) {
-    *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
-
-    let input: Input = options.file.clone().into();
+    let module = Module::from_package_root_and_file(
+        current_dir().unwrap(),
+        options.file.clone(),
+        ModuleKind::Code,
+    );
     let db = Database::default();
 
-    if raw_build(&options.file, false).is_none() {
+    if raw_build(module.clone(), false).is_none() {
         log::info!("Build failed.");
         return;
     };
-    let module_closure = Closure::of_input(&db, input).unwrap();
+    let module_closure = Closure::of_module(&db, module.clone()).unwrap();
 
     let path_string = options.file.to_string_lossy();
     log::info!("Running `{path_string}`.");
@@ -221,33 +205,26 @@ fn run(options: CandyRunOptions) {
     vm.run_synchronously_until_completion(&db).ok();
 
     if options.debug {
-        let trace = vm.tracer.dump_call_tree();
-        let trace_file = options.file.clone_with_extension("candy.trace");
-        fs::write(trace_file.clone(), trace).unwrap();
-        log::info!(
-            "Trace has been written to `{}`.",
-            trace_file.as_path().display()
-        );
+        module.dump_associated_debug_file("trace", &vm.tracer.dump_call_tree());
     }
 }
 
 async fn fuzz(options: CandyFuzzOptions) {
-    *PROJECT_DIRECTORY.lock().unwrap() = Some(current_dir().unwrap());
+    let module = Module::from_package_root_and_file(
+        current_dir().unwrap(),
+        options.file.clone(),
+        ModuleKind::Code,
+    );
+    log::debug!("Building `{}`.\n", module);
 
-    log::debug!("Building `{}`.\n", options.file.display());
-
-    let input: Input = options.file.clone().into();
-    let db = Database::default();
-
-    if raw_build(&options.file, false).is_none() {
+    if raw_build(module.clone(), false).is_none() {
         log::info!("Build failed.");
         return;
     }
 
-    let path_string = options.file.to_string_lossy();
-    log::debug!("Fuzzing `{path_string}`.");
-
-    fuzzer::fuzz(&db, input).await;
+    log::debug!("Fuzzing `{module}`.");
+    let db = Database::default();
+    fuzzer::fuzz(&db, module).await;
 }
 
 async fn lsp() {
@@ -284,15 +261,4 @@ fn init_logger() {
         .chain(std::io::stderr())
         .apply()
         .unwrap();
-}
-
-trait CloneWithExtension {
-    fn clone_with_extension(&self, extension: &'static str) -> Self;
-}
-impl CloneWithExtension for PathBuf {
-    fn clone_with_extension(&self, extension: &'static str) -> Self {
-        let mut path = self.clone();
-        assert!(path.set_extension(extension));
-        path
-    }
 }

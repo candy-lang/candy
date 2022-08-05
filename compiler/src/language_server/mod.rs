@@ -15,8 +15,7 @@ use self::{
 };
 use crate::{
     compiler::{ast_to_hir::AstToHir, hir::CollectErrors},
-    database::PROJECT_DIRECTORY,
-    input::{Input, InputDb},
+    module::{Module, ModuleDb, ModuleKind},
     Database,
 };
 use itertools::Itertools;
@@ -31,14 +30,15 @@ use lsp_types::{
     TextDocumentChangeRegistrationOptions, TextDocumentContentChangeEvent,
     TextDocumentRegistrationOptions, Url, WorkDoneProgressOptions,
 };
-use std::sync::Arc;
-use tokio::sync::{mpsc::Sender, Mutex};
+use std::{path::PathBuf, sync::Arc};
+use tokio::sync::{mpsc::Sender, Mutex, RwLock};
 use tower_lsp::{jsonrpc, Client, LanguageServer};
 
 pub struct CandyLanguageServer {
     pub client: Client,
     pub db: Mutex<Database>,
     pub hints_server_sink: Arc<Mutex<Option<Sender<hints::Event>>>>,
+    project_directory: RwLock<Option<PathBuf>>,
 }
 impl CandyLanguageServer {
     pub fn from_client(client: Client) -> Self {
@@ -46,6 +46,7 @@ impl CandyLanguageServer {
             client,
             db: Default::default(),
             hints_server_sink: Default::default(),
+            project_directory: Default::default(),
         }
     }
 
@@ -55,6 +56,11 @@ impl CandyLanguageServer {
             Ok(_) => {}
             Err(_) => panic!("Couldn't send message to hints server."),
         }
+    }
+
+    async fn code_module_from_url(&self, url: Url) -> Module {
+        let project_directory = self.project_directory.read().await.clone().unwrap();
+        Module::from_package_root_and_url(project_directory, url, ModuleKind::Code)
     }
 }
 
@@ -73,7 +79,7 @@ impl LanguageServer for CandyLanguageServer {
             .unwrap()
             .uri
             .clone();
-        *PROJECT_DIRECTORY.lock().unwrap() = match first_workspace_folder.scheme() {
+        *self.project_directory.write().await = match first_workspace_folder.scheme() {
             "file" => Some(first_workspace_folder.to_file_path().unwrap()),
             _ => panic!("Workspace folder must be a file URI."),
         };
@@ -84,11 +90,11 @@ impl LanguageServer for CandyLanguageServer {
         *self.hints_server_sink.lock().await = Some(events_sender);
         let client = self.client.clone();
         let hint_reporter = async move || {
-            while let Some((input, hints)) = hints_receiver.recv().await {
-                log::debug!("Reporting hints for {input}: {hints:?}");
+            while let Some((module, hints)) = hints_receiver.recv().await {
+                log::debug!("Reporting hints for {module}: {hints:?}");
                 client
                     .send_notification::<HintsNotification>(HintsNotification {
-                        uri: Url::from(input).to_string(),
+                        uri: Url::from(module).to_string(),
                         hints,
                     })
                     .await;
@@ -217,35 +223,35 @@ impl LanguageServer for CandyLanguageServer {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let input = params.text_document.uri.into();
+        let module = self.code_module_from_url(params.text_document.uri).await;
         let content = params.text_document.text.into_bytes();
         {
             let mut db = self.db.lock().await;
-            db.did_open_input(&input, content.clone());
+            db.did_open_module(&module, content.clone());
         }
-        self.analyze_files(vec![input.clone()]).await;
-        self.send_to_hints_server(hints::Event::UpdateModule(input, content))
+        self.analyze_modules(vec![module.clone()]).await;
+        self.send_to_hints_server(hints::Event::UpdateModule(module, content))
             .await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        let input: Input = params.text_document.uri.into();
-        let mut open_inputs = Vec::<Input>::new();
+        let module = self.code_module_from_url(params.text_document.uri).await;
+        let mut open_modules = Vec::<Module>::new();
         let content = {
             let mut db = self.db.lock().await;
-            let text = apply_text_changes(&db, input.clone(), params.content_changes);
-            db.did_change_input(&input, text.clone().into_bytes());
-            open_inputs.extend(db.open_inputs.keys().cloned());
+            let text = apply_text_changes(&db, module.clone(), params.content_changes);
+            db.did_change_module(&module, text.clone().into_bytes());
+            open_modules.extend(db.open_modules.keys().cloned());
             text.into_bytes()
         };
-        self.analyze_files(open_inputs).await;
-        self.send_to_hints_server(hints::Event::UpdateModule(input, content))
+        self.analyze_modules(open_modules).await;
+        self.send_to_hints_server(hints::Event::UpdateModule(module, content))
             .await;
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
-        let input = params.text_document.uri.into();
+        let module = self.code_module_from_url(params.text_document.uri).await;
         let mut db = self.db.lock().await;
-        db.did_close_input(&input);
-        self.send_to_hints_server(hints::Event::CloseModule(input))
+        db.did_close_module(&module);
+        self.send_to_hints_server(hints::Event::CloseModule(module))
             .await;
     }
 
@@ -253,28 +259,32 @@ impl LanguageServer for CandyLanguageServer {
         &self,
         params: GotoDefinitionParams,
     ) -> jsonrpc::Result<Option<GotoDefinitionResponse>> {
+        let project_directory = self.project_directory.read().await.clone().unwrap();
         let db = self.db.lock().await;
-        Ok(find_definition(&db, params))
+        Ok(find_definition(&db, project_directory, params))
     }
 
     async fn references(&self, params: ReferenceParams) -> jsonrpc::Result<Option<Vec<Location>>> {
+        let project_directory = self.project_directory.read().await.clone().unwrap();
         let db = self.db.lock().await;
-        Ok(find_references(&db, params))
+        Ok(find_references(&db, project_directory, params))
     }
     async fn document_highlight(
         &self,
         params: DocumentHighlightParams,
     ) -> jsonrpc::Result<Option<Vec<DocumentHighlight>>> {
+        let project_directory = self.project_directory.read().await.clone().unwrap();
         let db = self.db.lock().await;
-        Ok(find_document_highlights(&db, params))
+        Ok(find_document_highlights(&db, project_directory, params))
     }
 
     async fn folding_range(
         &self,
         params: FoldingRangeParams,
     ) -> jsonrpc::Result<Option<Vec<FoldingRange>>> {
+        let module = self.code_module_from_url(params.text_document.uri).await;
         let db = self.db.lock().await;
-        let ranges = db.folding_ranges(params.text_document.uri.into());
+        let ranges = db.folding_ranges(module);
         Ok(Some(ranges))
     }
 
@@ -282,8 +292,9 @@ impl LanguageServer for CandyLanguageServer {
         &self,
         params: SemanticTokensParams,
     ) -> jsonrpc::Result<Option<SemanticTokensResult>> {
+        let module = self.code_module_from_url(params.text_document.uri).await;
         let db = self.db.lock().await;
-        let tokens = db.semantic_tokens(params.text_document.uri.into());
+        let tokens = db.semantic_tokens(module);
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
             data: tokens,
@@ -292,24 +303,32 @@ impl LanguageServer for CandyLanguageServer {
 }
 
 impl CandyLanguageServer {
-    async fn analyze_files(&self, inputs: Vec<Input>) {
-        log::debug!("Analyzing file(s) {}", inputs.iter().join(", "));
+    async fn analyze_modules(&self, modules: Vec<Module>) {
+        log::debug!(
+            "Analyzing {} {}",
+            if modules.len() == 1 {
+                "module"
+            } else {
+                "modules"
+            },
+            modules.iter().join(", ")
+        );
         let db = self.db.lock().await;
         log::debug!("Locked.");
 
-        for input in inputs {
-            let (hir, _mapping) = db.hir(input.clone()).unwrap();
+        for module in modules {
+            let (hir, _mapping) = db.hir(module.clone()).unwrap();
 
             let diagnostics = {
                 let mut errors = vec![];
                 hir.collect_errors(&mut errors);
                 errors
                     .into_iter()
-                    .map(|it| it.into_diagnostic(&db, input.clone()))
+                    .map(|it| it.into_diagnostic(&db, module.clone()))
                     .collect()
             };
             self.client
-                .publish_diagnostics(input.clone().into(), diagnostics, None)
+                .publish_diagnostics(module.clone().into(), diagnostics, None)
                 .await;
         }
     }
@@ -317,15 +336,14 @@ impl CandyLanguageServer {
 
 fn apply_text_changes(
     db: &Database,
-    input: Input,
+    module: Module,
     changes: Vec<TextDocumentContentChangeEvent>,
 ) -> String {
     let mut text = db
-        .get_string_input(input.clone())
+        .get_module_content_as_string(module)
         .unwrap()
         .as_ref()
         .to_owned();
-    db.get_input(input).unwrap().as_ref();
     for change in changes {
         match change.range {
             Some(range) => {

@@ -6,7 +6,7 @@ use super::{
     value::{Closure, Value},
     Vm,
 };
-use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
+use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
 use itertools::Itertools;
 use num_bigint::{BigInt, ToBigInt};
 use num_integer::Integer;
@@ -78,15 +78,6 @@ impl Vm {
             BuiltinFunction::TextTrimEnd => self.text_trim_end(args),
             BuiltinFunction::TextTrimStart => self.text_trim_start(args),
             BuiltinFunction::TypeOf => self.type_of(args),
-            BuiltinFunction::UseAsset => self.use_asset(use_provider, args),
-            BuiltinFunction::UseLocalModule => {
-                // If successful, UseLocalModule doesn't return a value, but
-                // diverges the control flow.
-                match self.use_local_module(use_provider, args) {
-                    Ok(()) => return,
-                    Err(reason) => Err(reason),
-                }
-            }
         };
         let return_value = match return_value_or_panic_reason {
             Ok(value) => value,
@@ -378,139 +369,5 @@ impl Vm {
                 .to_owned(),
             ))
         })
-    }
-
-    fn use_asset<U: UseProvider>(
-        &mut self,
-        use_provider: &U,
-        args: Vec<Value>,
-    ) -> Result<Value, String> {
-        let (current_path, target) = Self::parse_current_path_and_target(args)?;
-        let target = UseTarget::parse(&target)?;
-        let input = target.resolve_asset(&current_path)?;
-        let content = use_provider.use_asset(input)?;
-        Ok(Value::list(
-            content
-                .iter()
-                .map(|byte| BigInt::from(*byte).into())
-                .collect_vec(),
-        ))
-    }
-
-    fn use_local_module<U: UseProvider>(
-        &mut self,
-        use_provider: &U,
-        args: Vec<Value>,
-    ) -> Result<(), String> {
-        let (current_path, target) = Self::parse_current_path_and_target(args)?;
-        let target = UseTarget::parse(&target)?;
-        let possible_inputs = target.resolve_local_module(&current_path)?;
-        let (input, lir) = 'find_existing_input: {
-            for input in possible_inputs {
-                if let Some(lir) = use_provider.use_local_module(input.clone()) {
-                    break 'find_existing_input (input, lir);
-                }
-            }
-            return Err("couldn't import module".to_string());
-        };
-
-        let module_closure = Value::Closure(Closure::of_lir(input, lir));
-        let address = self.heap.import(module_closure);
-        self.data_stack.push(address);
-        self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
-        Ok(())
-    }
-
-    fn parse_current_path_and_target(args: Vec<Value>) -> Result<(Vec<String>, String), String> {
-        destructure!(
-            args,
-            [Value::Struct(current_path_struct), Value::Text(target)],
-            {
-                // `current_path_struct` is set by us and not users, hence we don't have to validate it that strictly.
-                let mut current_path = vec![];
-                let mut index = 0;
-                while let Some(component) = current_path_struct.get(&index.into()) {
-                    current_path.push(component.clone().try_into_text().unwrap());
-                    index += 1;
-                }
-                Ok((current_path, target.to_string()))
-            }
-        )
-    }
-}
-
-struct UseTarget {
-    parent_navigations: usize,
-    path: String,
-}
-impl UseTarget {
-    const PARENT_NAVIGATION_CHAR: char = '.';
-
-    fn parse(mut target: &str) -> Result<Self, String> {
-        let parent_navigations = {
-            let mut navigations = 0;
-            while target.starts_with(UseTarget::PARENT_NAVIGATION_CHAR) {
-                navigations += 1;
-                target = &target[UseTarget::PARENT_NAVIGATION_CHAR.len_utf8()..];
-            }
-            match navigations {
-                0 => return Err("the target must start with at least one dot".to_string()),
-                i => i - 1, // two dots means one parent navigation
-            }
-        };
-        let path = {
-            if !target
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '.')
-            {
-                return Err("the target name can only contain letters and dots".to_string());
-            }
-            target.to_string()
-        };
-        Ok(UseTarget {
-            parent_navigations,
-            path,
-        })
-    }
-
-    fn resolve_asset(&self, current_path: &[String]) -> Result<Input, String> {
-        let mut path = current_path.to_owned();
-        if self.parent_navigations == 0 && path.last() != Some(&".candy".to_string()) {
-            return Err(
-                "importing child files (starting with a single dot) only works from `.candy` files"
-                    .to_string(),
-            );
-        }
-        for _ in 0..self.parent_navigations {
-            if path.pop() == None {
-                return Err("too many parent navigations".to_string());
-            }
-        }
-        path.push(self.path.to_string());
-        Ok(Input::File(path.clone()))
-    }
-
-    fn resolve_local_module(&self, current_path: &[String]) -> Result<Vec<Input>, String> {
-        if self.path.contains('.') {
-            return Err("the target name contains a file ending".to_string());
-        }
-
-        let mut path = current_path.to_owned();
-        for _ in 0..self.parent_navigations {
-            if path.pop() == None {
-                return Err("too many parent navigations".to_string());
-            }
-        }
-        let possible_paths = vec![
-            path.clone()
-                .into_iter()
-                .chain([format!("{}.candy", self.path)])
-                .collect_vec(),
-            path.clone()
-                .into_iter()
-                .chain([self.path.to_string(), ".candy".to_string()])
-                .collect_vec(),
-        ];
-        Ok(possible_paths.into_iter().map(Input::File).collect_vec())
     }
 }

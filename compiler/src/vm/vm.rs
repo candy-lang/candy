@@ -7,7 +7,7 @@ use super::{
 use crate::{
     compiler::{hir::Id, lir::Instruction},
     database::Database,
-    input::Input,
+    module::Module,
 };
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -20,7 +20,7 @@ pub struct Vm {
     pub heap: Heap,
     pub data_stack: Vec<ObjectPointer>,
     pub call_stack: Vec<InstructionPointer>,
-    pub import_stack: Vec<Input>,
+    pub import_stack: Vec<Module>,
     pub tracer: Tracer,
     pub fuzzable_closures: Vec<(Id, Closure)>,
     pub num_instructions_executed: usize,
@@ -233,6 +233,11 @@ impl Vm {
                 let address = self.heap.create(ObjectData::Builtin(builtin));
                 self.data_stack.push(address);
             }
+            Instruction::PushFromStack(offset) => {
+                let address = self.get_from_data_stack(offset);
+                self.heap.dup(address);
+                self.data_stack.push(address);
+            }
             Instruction::PopMultipleBelowTop(n) => {
                 let top = self.data_stack.pop().unwrap();
                 for _ in 0..n {
@@ -240,11 +245,6 @@ impl Vm {
                     self.heap.drop(address);
                 }
                 self.data_stack.push(top);
-            }
-            Instruction::PushFromStack(offset) => {
-                let address = self.get_from_data_stack(offset);
-                self.heap.dup(address);
-                self.data_stack.push(address);
             }
             Instruction::Call { num_args } => {
                 let closure_address = self.data_stack.pop().unwrap();
@@ -283,6 +283,20 @@ impl Vm {
                     }
                 };
             }
+            Instruction::Return => {
+                self.heap.drop(self.next_instruction.closure);
+                let caller = self.call_stack.pop().unwrap();
+                self.next_instruction = caller;
+            }
+            Instruction::UseModule { current_module } => {
+                let relative_path = self.data_stack.pop().unwrap();
+                match self.use_module(use_provider, current_module, relative_path) {
+                    Ok(()) => {}
+                    Err(reason) => {
+                        self.panic(reason);
+                    }
+                }
+            }
             Instruction::Needs => {
                 let reason = self.data_stack.pop().unwrap();
                 let condition = self.data_stack.pop().unwrap();
@@ -309,11 +323,6 @@ impl Vm {
                         self.panic("Needs expects a boolean symbol.".to_string());
                     }
                 }
-            }
-            Instruction::Return => {
-                self.heap.drop(self.next_instruction.closure);
-                let caller = self.call_stack.pop().unwrap();
-                self.next_instruction = caller;
             }
             Instruction::RegisterFuzzableClosure(id) => {
                 let closure = *self.data_stack.last().unwrap();
@@ -360,20 +369,20 @@ impl Vm {
                 });
             }
             Instruction::TraceNeedsEnds => self.tracer.push(TraceEntry::NeedsEnded),
-            Instruction::TraceModuleStarts { input } => {
-                if self.import_stack.contains(&input) {
+            Instruction::TraceModuleStarts { module } => {
+                if self.import_stack.contains(&module) {
                     self.panic(format!(
                         "there's an import cycle ({})",
                         self.import_stack
                             .iter()
-                            .skip_while(|it| **it != input)
-                            .chain([&input])
-                            .map(|input| format!("{input}"))
+                            .skip_while(|it| **it != module)
+                            .chain([&module])
+                            .map(|module| format!("{module}"))
                             .join(" → "),
                     ));
                 }
-                self.import_stack.push(input.clone());
-                self.tracer.push(TraceEntry::ModuleStarted { input });
+                self.import_stack.push(module.clone());
+                self.tracer.push(TraceEntry::ModuleStarted { module });
             }
             Instruction::TraceModuleEnds => {
                 self.import_stack.pop().unwrap();

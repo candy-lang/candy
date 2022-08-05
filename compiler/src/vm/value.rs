@@ -5,7 +5,7 @@ use crate::{
         lir::{Instruction, Lir},
     },
     database::Database,
-    input::Input,
+    module::Module,
 };
 use im::{hashmap, HashMap};
 use itertools::Itertools;
@@ -49,21 +49,14 @@ impl Value {
             .collect();
         Value::Struct(items)
     }
-
-    pub fn try_into_text(self) -> Result<String, Value> {
-        match self {
-            Value::Text(text) => Ok(text),
-            it => Err(it),
-        }
-    }
 }
 impl Closure {
-    pub fn of_lir(input: Input, lir: Lir) -> Self {
+    pub fn of_lir(module: Module, lir: Lir) -> Self {
         Closure {
             captured: vec![],
             num_args: 0,
             body: vec![
-                Instruction::TraceModuleStarts { input },
+                Instruction::TraceModuleStarts { module },
                 Instruction::CreateClosure {
                     captured: vec![],
                     num_args: 0,
@@ -75,9 +68,9 @@ impl Closure {
             ],
         }
     }
-    pub fn of_input(db: &Database, input: Input) -> Option<Self> {
-        let lir = db.lir(input.clone())?;
-        Some(Self::of_lir(input, (*lir).clone()))
+    pub fn of_module(db: &Database, module: Module) -> Option<Self> {
+        let lir = db.lir(module.clone())?;
+        Some(Self::of_lir(module, (*lir).clone()))
     }
 }
 

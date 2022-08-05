@@ -1,5 +1,5 @@
 use super::{ast_to_hir::AstToHir, error::CompilerError};
-use crate::{builtin_functions::BuiltinFunction, input::Input};
+use crate::{builtin_functions::BuiltinFunction, module::Module};
 use im::HashMap;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
@@ -14,10 +14,10 @@ use std::{
 pub trait HirDb: AstToHir {
     fn find_expression(&self, id: Id) -> Option<Expression>;
     fn containing_body_of(&self, id: Id) -> Arc<Body>;
-    fn all_hir_ids(&self, input: Input) -> Option<Vec<Id>>;
+    fn all_hir_ids(&self, module: Module) -> Option<Vec<Id>>;
 }
 fn find_expression(db: &dyn HirDb, id: Id) -> Option<Expression> {
-    let (hir, _) = db.hir(id.input.clone()).unwrap();
+    let (hir, _) = db.hir(id.module.clone()).unwrap();
     if id.is_root() {
         panic!("You can't get the root because that got lowered into multiple IDs.");
     }
@@ -28,7 +28,7 @@ fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
     match id.parent() {
         Some(lambda_id) => {
             if lambda_id.is_root() {
-                db.hir(id.input).unwrap().0
+                db.hir(id.module).unwrap().0
             } else {
                 match db.find_expression(lambda_id).unwrap() {
                     Expression::Lambda(lambda) => Arc::new(lambda.body),
@@ -39,8 +39,8 @@ fn containing_body_of(db: &dyn HirDb, id: Id) -> Arc<Body> {
         None => panic!("The root scope has no parent."),
     }
 }
-fn all_hir_ids(db: &dyn HirDb, input: Input) -> Option<Vec<Id>> {
-    let (hir, _) = db.hir(input)?;
+fn all_hir_ids(db: &dyn HirDb, module: Module) -> Option<Vec<Id>> {
+    let (hir, _) = db.hir(module)?;
     let mut ids = vec![];
     hir.collect_all_ids(&mut ids);
     log::info!("all HIR IDs: {ids:?}");
@@ -77,6 +77,9 @@ impl Expression {
                 ids.push(function.clone());
                 ids.extend(arguments.iter().cloned());
             }
+            Expression::UseModule { relative_path, .. } => {
+                ids.push(relative_path.clone());
+            }
             Expression::Builtin(_) => {}
             Expression::Needs { condition, reason } => {
                 ids.push(*condition.clone());
@@ -97,12 +100,12 @@ impl Body {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub struct Id {
-    pub input: Input,
+    pub module: Module,
     pub keys: Vec<String>,
 }
 impl Id {
-    pub fn new(input: Input, keys: Vec<String>) -> Self {
-        Self { input, keys }
+    pub fn new(module: Module, keys: Vec<String>) -> Self {
+        Self { module, keys }
     }
 
     pub fn is_root(&self) -> bool {
@@ -113,21 +116,21 @@ impl Id {
         match self.keys.len() {
             0 => None,
             _ => Some(Id {
-                input: self.input.clone(),
+                module: self.module.clone(),
                 keys: self.keys[..self.keys.len() - 1].to_vec(),
             }),
         }
     }
 
     pub fn is_same_module_and_any_parent_of(&self, other: &Self) -> bool {
-        self.input == other.input
+        self.module == other.module
             && self.keys.len() < other.keys.len()
             && self.keys.iter().zip(&other.keys).all(|(a, b)| a == b)
     }
 }
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "HirId({}:{})", self.input, self.keys.iter().join(":"))
+        write!(f, "HirId({}:{})", self.module, self.keys.iter().join(":"))
     }
 }
 
@@ -139,11 +142,15 @@ pub enum Expression {
     Symbol(String),
     Struct(HashMap<Id, Id>),
     Lambda(Lambda),
+    Builtin(BuiltinFunction),
     Call {
         function: Id,
         arguments: Vec<Id>,
     },
-    Builtin(BuiltinFunction),
+    UseModule {
+        current_module: Module,
+        relative_path: Id,
+    },
     Needs {
         condition: Box<Id>,
         reason: Box<Id>,
@@ -253,7 +260,9 @@ impl fmt::Display for Expression {
                         .join("\n"),
                 )
             }
-
+            Expression::Builtin(builtin) => {
+                write!(f, "builtin{builtin:?}")
+            }
             Expression::Call {
                 function,
                 arguments,
@@ -268,9 +277,14 @@ impl fmt::Display for Expression {
                         .join("\n")
                 )
             }
-            Expression::Builtin(builtin) => {
-                write!(f, "builtin{builtin:?}")
-            }
+            Expression::UseModule {
+                current_module,
+                relative_path,
+            } => write!(
+                f,
+                "use module {} relative to {}",
+                relative_path, current_module
+            ),
             Expression::Needs { condition, reason } => {
                 write!(f, "needs {condition} with reason {reason}")
             }
@@ -319,8 +333,9 @@ impl Expression {
             Expression::Symbol { .. } => None,
             Expression::Struct(_) => None,
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
-            Expression::Call { .. } => None,
             Expression::Builtin(_) => None,
+            Expression::Call { .. } => None,
+            Expression::UseModule { .. } => None,
             Expression::Needs { .. } => None,
             Expression::Error { .. } => None,
         }
@@ -352,8 +367,9 @@ impl CollectErrors for Expression {
             | Expression::Reference(_)
             | Expression::Symbol(_)
             | Expression::Struct(_)
-            | Expression::Call { .. }
             | Expression::Builtin(_)
+            | Expression::Call { .. }
+            | Expression::UseModule { .. }
             | Expression::Needs { .. } => {}
             Expression::Lambda(lambda) => lambda.body.collect_errors(errors),
             Expression::Error {
