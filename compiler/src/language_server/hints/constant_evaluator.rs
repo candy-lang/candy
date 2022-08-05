@@ -13,7 +13,7 @@ use crate::{
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::{collections::HashMap, fs};
+use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct ConstantEvaluator {

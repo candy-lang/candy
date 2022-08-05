@@ -18,7 +18,7 @@ use crate::{database::Database, module::Module};
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, time::Duration, vec};
+use std::{collections::HashMap, time::Duration, vec};
 use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,

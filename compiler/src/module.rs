@@ -45,14 +45,14 @@ pub enum Package {
     // TODO: Maybe add some sort of package indicator file after all so that we
     // can allow arbitrary opened files from the file system to access parent
     // and sibling modules if they're actually part of a larger package.
-    Anonymous { root_content: String },
+    Anonymous { root_content: Arc<Vec<u8>> },
 }
 
 impl Module {
-    pub fn from_anonymous_content(content: String, kind: ModuleKind) -> Self {
+    pub fn from_anonymous_content(content: Vec<u8>, kind: ModuleKind) -> Self {
         Module {
             package: Package::Anonymous {
-                root_content: content,
+                root_content: Arc::new(content),
             },
             path: vec![],
             kind,
@@ -68,7 +68,8 @@ impl Module {
                 url.to_string()
                     .strip_prefix("untitled:")
                     .unwrap()
-                    .to_string(),
+                    .to_string()
+                    .into_bytes(),
                 kind,
             ),
             _ => panic!("Unsupported URI scheme: {}", url.scheme()),
@@ -84,9 +85,7 @@ impl Module {
         let relative_path =
             match relative_path.strip_prefix(fs::canonicalize(package_root.clone()).unwrap()) {
                 Ok(path) => path,
-                Err(_) => {
-                    return Module::from_anonymous_content(fs::read_to_string(file).unwrap(), kind)
-                }
+                Err(_) => return Module::from_anonymous_content(fs::read(file).unwrap(), kind),
             };
 
         let mut path = relative_path
@@ -214,7 +213,7 @@ fn get_module_content(db: &dyn ModuleDb, module: Module) -> Option<Arc<Vec<u8>>>
     };
 
     if let Package::Anonymous { root_content } = module.package {
-        return Some(Arc::new(root_content.into_bytes()));
+        return Some(root_content);
     }
     for path in module.to_possible_paths().unwrap() {
         match fs::read(path.clone()) {
