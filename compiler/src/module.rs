@@ -2,10 +2,9 @@ use itertools::Itertools;
 use lsp_types::Url;
 use salsa::query_group;
 use std::{
-    collections::hash_map::DefaultHasher,
     fmt::{self, Display, Formatter},
     fs,
-    hash::{Hash, Hasher},
+    hash::Hash,
     path::PathBuf,
     sync::Arc,
 };
@@ -29,6 +28,13 @@ pub enum Package {
 
     /// A package managed by the Candy tooling. This is in some special cache
     /// directory where `use`d packages are downloaded to.
+    ///
+    /// For now, this option is also used for files picked from the file system
+    /// that are not part of the current working directory.
+    //
+    // TODO: Maybe add some sort of package indicator file after all so that we
+    // can allow arbitrary opened files from the file system to access parent
+    // and sibling modules if they're actually part of a larger package.
     //
     // TODO: Change this to just storing the package name or something like
     // that so that the root of the cached packages folder isn't stored
@@ -38,40 +44,26 @@ pub enum Package {
     /// An anonymous package. This is created for single untitled files that are
     /// not yet persisted to disk (such as when opening a new VSCode tab and
     /// typing some code).
-    ///
-    /// For now, this option is also used for files picked from the file system
-    /// that are not part of the current working directory.
-    //
-    // TODO: Maybe add some sort of package indicator file after all so that we
-    // can allow arbitrary opened files from the file system to access parent
-    // and sibling modules if they're actually part of a larger package.
-    Anonymous { root_content: Arc<Vec<u8>> },
+    Anonymous { url: String },
 }
 
 impl Module {
-    pub fn from_anonymous_content(content: Vec<u8>, kind: ModuleKind) -> Self {
-        Module {
-            package: Package::Anonymous {
-                root_content: Arc::new(content),
-            },
-            path: vec![],
-            kind,
-        }
-    }
-
     pub fn from_package_root_and_url(package_root: PathBuf, url: Url, kind: ModuleKind) -> Self {
         match url.scheme() {
             "file" => {
                 Module::from_package_root_and_file(package_root, url.to_file_path().unwrap(), kind)
             }
-            "untitled" => Module::from_anonymous_content(
-                url.to_string()
-                    .strip_prefix("untitled:")
-                    .unwrap()
-                    .to_string()
-                    .into_bytes(),
+            "untitled" => Module {
+                package: Package::Anonymous {
+                    url: url
+                        .to_string()
+                        .strip_prefix("untitled:")
+                        .unwrap()
+                        .to_string(),
+                },
+                path: vec![],
                 kind,
-            ),
+            },
             _ => panic!("Unsupported URI scheme: {}", url.scheme()),
         }
     }
@@ -85,7 +77,13 @@ impl Module {
         let relative_path =
             match relative_path.strip_prefix(fs::canonicalize(package_root.clone()).unwrap()) {
                 Ok(path) => path,
-                Err(_) => return Module::from_anonymous_content(fs::read(file).unwrap(), kind),
+                Err(_) => {
+                    return Module {
+                        package: Package::External(file),
+                        path: vec![],
+                        kind,
+                    }
+                }
             };
 
         let mut path = relative_path
@@ -171,12 +169,7 @@ impl Display for Package {
         match self {
             Package::User(path) => write!(f, "user:{path:?}"),
             Package::External(path) => write!(f, "extern:{path:?}"),
-            Package::Anonymous { root_content } => {
-                let mut hasher = DefaultHasher::new();
-                root_content.hash(&mut hasher);
-                let hash = hasher.finish();
-                write!(f, "anonymous:{hash:#x}")
-            }
+            Package::Anonymous { url } => write!(f, "anonymous:{url}"),
         }
     }
 }
@@ -212,10 +205,9 @@ fn get_module_content(db: &dyn ModuleDb, module: Module) -> Option<Arc<Vec<u8>>>
         return Some(content);
     };
 
-    if let Package::Anonymous { root_content } = module.package {
-        return Some(root_content);
-    }
-    for path in module.to_possible_paths().unwrap() {
+    for path in module.to_possible_paths().expect(
+        "Tried to get content of anonymous module that is not cached by the language server.",
+    ) {
         match fs::read(path.clone()) {
             Ok(content) => return Some(Arc::new(content)),
             Err(error) if matches!(error.kind(), std::io::ErrorKind::NotFound) => {}
