@@ -1,3 +1,4 @@
+use super::heap::{Heap, Pointer};
 use crate::{
     compiler::{ast_to_hir::AstToHir, cst::CstDb, hir::Id},
     database::Database,
@@ -15,27 +16,27 @@ pub struct Tracer {
 pub enum TraceEntry {
     ValueEvaluated {
         id: Id,
-        value: Value,
+        value: Pointer,
     },
     CallStarted {
         id: Id,
-        closure: Value,
-        args: Vec<Value>,
+        closure: Pointer,
+        args: Vec<Pointer>,
     },
     CallEnded {
-        return_value: Value,
+        return_value: Pointer,
     },
     NeedsStarted {
         id: Id,
-        condition: Value,
-        reason: Value,
+        condition: Pointer,
+        reason: Pointer,
     },
     NeedsEnded,
     ModuleStarted {
         module: Module,
     },
     ModuleEnded {
-        export_map: Value,
+        export_map: Pointer,
     },
 }
 
@@ -77,6 +78,7 @@ impl Tracer {
         }
     }
     pub fn format_stack_trace(&self, db: &Database) -> String {
+        // TODO: Format values properly.
         self.stack
             .iter()
             .rev()
@@ -137,6 +139,7 @@ impl Tracer {
     }
 
     pub fn dump_call_tree(&self) -> String {
+        // TODO: Format values properly.
         let actions = self
             .log
             .iter()

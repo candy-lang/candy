@@ -1,4 +1,7 @@
-use super::{heap::ObjectPointer, Vm};
+use super::{
+    heap::{Closure, Data, Heap, Pointer},
+    Vm,
+};
 use crate::{
     compiler::{
         hir_to_lir::HirToLir,
@@ -40,24 +43,24 @@ impl Vm {
         &mut self,
         use_provider: &U,
         current_module: Module,
-        relative_path: ObjectPointer,
+        relative_path: Pointer,
     ) -> Result<(), String> {
-        let target = UsePath::parse(self.heap.export(relative_path))?;
+        let target = UsePath::parse(&self.heap, relative_path)?;
         let module = target.resolve_relative_to(current_module)?;
 
         match use_provider.use_module(module.clone())? {
             UseResult::Asset(bytes) => {
-                let value = Value::list(
+                let address = self.heap.create_list(
                     bytes
                         .iter()
-                        .map(|byte| Value::Int((*byte).into()))
+                        .map(|byte| self.heap.create_int((*byte).into()))
                         .collect_vec(),
                 );
-                self.data_stack.push(self.heap.import(value));
+                self.data_stack.push(address);
             }
             UseResult::Code(lir) => {
-                let module_closure = Value::Closure(Closure::of_lir(module, lir));
-                let address = self.heap.import(module_closure);
+                let module_closure = Closure::of_lir(module, lir);
+                let address = self.heap.create_closure(module_closure);
                 self.data_stack.push(address);
                 self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
             }
@@ -74,9 +77,9 @@ struct UsePath {
 impl UsePath {
     const PARENT_NAVIGATION_CHAR: char = '.';
 
-    fn parse(path: Value) -> Result<Self, String> {
-        let path = match path {
-            Value::Text(path) => path,
+    fn parse(heap: &Heap, path: Pointer) -> Result<Self, String> {
+        let path = match heap.get(path).data {
+            Data::Text(path) => path.value,
             _ => return Err("the path has to be a text".to_string()),
         };
         let mut path = path.as_str();
