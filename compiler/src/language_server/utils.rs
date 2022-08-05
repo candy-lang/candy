@@ -61,7 +61,11 @@ impl From<Module> for Url {
                     .unwrap(),
             )
             .unwrap(),
-            Package::Anonymous { .. } => Url::parse("untitled").unwrap(),
+            Package::Anonymous { root_content } => Url::parse(&format!(
+                "untitled:{}",
+                String::from_utf8((*root_content).clone()).unwrap()
+            ))
+            .unwrap(),
         }
     }
 }
