@@ -132,6 +132,7 @@ dependencies = [
  "tokio-util",
  "tower-lsp",
  "unicode-segmentation",
+ "url",
 ]
 
 [[package]]
