@@ -108,12 +108,32 @@ impl Heap {
         for address in addresses {
             self.gather_objects_to_clone(&mut objects_to_refcounts, *address);
         }
-        let mut mapped_addresses = vec![];
+        let num_objects = objects_to_refcounts.len();
+
+        let address_map: HashMap<Pointer, Pointer> = objects_to_refcounts
+            .keys()
+            .cloned()
+            .zip(
+                (other.next_address.raw()..other.next_address.raw() + num_objects)
+                    .map(Pointer::from_raw),
+            )
+            .collect();
+
         for (address, refcount) in objects_to_refcounts {
-            mapped_addresses.push(other.create(self.get(address).data.clone()));
-            other.get_mut(address).reference_count = refcount;
+            other.objects.insert(
+                address_map[&address],
+                Object {
+                    reference_count: refcount,
+                    data: Self::map_addresses_in_data(&address_map, &self.get(address).data),
+                },
+            );
         }
-        mapped_addresses
+        other.next_address = Pointer::from_raw(other.next_address.raw() + num_objects);
+
+        addresses
+            .iter()
+            .map(|address| address_map[address])
+            .collect()
     }
     fn gather_objects_to_clone(
         &self,
@@ -123,6 +143,30 @@ impl Heap {
         *objects_to_refcounts.entry(address).or_default() += 1;
         for child in self.get(address).children() {
             self.gather_objects_to_clone(objects_to_refcounts, child);
+        }
+    }
+    fn map_addresses_in_data(address_map: &HashMap<Pointer, Pointer>, data: &Data) -> Data {
+        match data {
+            Data::Int(int) => Data::Int(int.clone()),
+            Data::Text(text) => Data::Text(text.clone()),
+            Data::Symbol(symbol) => Data::Symbol(symbol.clone()),
+            Data::Struct(struct_) => Data::Struct(Struct {
+                fields: struct_
+                    .fields
+                    .iter()
+                    .map(|(hash, key, value)| (*hash, address_map[key], address_map[value]))
+                    .collect_vec(),
+            }),
+            Data::Closure(closure) => Data::Closure(Closure {
+                captured: closure
+                    .captured
+                    .iter()
+                    .map(|address| address_map[address])
+                    .collect(),
+                num_args: closure.num_args,
+                body: closure.body.clone(),
+            }),
+            Data::Builtin(builtin) => Data::Builtin(builtin.clone()),
         }
     }
     pub fn clone_single_to_other_heap(&self, other: &mut Heap, address: Pointer) -> Pointer {
