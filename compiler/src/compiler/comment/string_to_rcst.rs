@@ -462,36 +462,36 @@ mod parse {
 
         fn run(mut self, line: &str) -> Option<(Vec<Rcst>, Vec<InlineFormatting>)> {
             let mut characters = line.chars();
-            loop {
-                match characters.next() {
-                    Some('_') if !self.is_in_code() => {
+            while let Some(character) = characters.next() {
+                match character {
+                    '_' if !self.is_in_code() => {
                         if !self.is_in_emphasized() {
                             self.start_formatting(InlineFormatting::Emphasized);
                         } else {
                             self.end_formatting(InlineFormatting::Emphasized, true);
                         }
                     }
-                    Some('[') if !self.is_in_link() && !self.is_in_code() => {
+                    '[' if !self.is_in_link() && !self.is_in_code() => {
                         self.start_formatting(InlineFormatting::Link)
                     }
-                    Some(']') if self.is_in_link() && !self.is_in_code() => {
+                    ']' if self.is_in_link() && !self.is_in_code() => {
                         self.end_formatting(InlineFormatting::Link, true)
                     }
-                    Some('`') => {
+                    '`' => {
                         if !self.is_in_code() {
                             self.start_formatting(InlineFormatting::Code);
                         } else {
                             self.end_formatting(InlineFormatting::Code, true);
                         }
                     }
-                    Some('\\') => {
+                    '\\' => {
                         self.finish_text_part();
                         self.push_part(escaped(characters.next()));
                     }
-                    Some(character) => self.characters.push(character),
-                    None => return self.finish(),
+                    character => self.characters.push(character),
                 }
             }
+            self.finish()
         }
     }
     fn single_line_inline(
