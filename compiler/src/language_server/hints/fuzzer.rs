@@ -7,7 +7,7 @@ use crate::{
     database::Database,
     fuzzer::{Fuzzer, Status},
     module::Module,
-    vm::{tracer::TraceEntry, value::Closure},
+    vm::{tracer::TraceEntry, Heap, Pointer},
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
@@ -15,8 +15,7 @@ use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct FuzzerManager {
-    fuzzable_closures: HashMap<Module, HashMap<Id, Closure>>,
-    fuzzers: HashMap<Closure, Fuzzer>,
+    fuzzers: HashMap<Module, HashMap<Id, Fuzzer>>,
 }
 
 impl FuzzerManager {
@@ -24,32 +23,25 @@ impl FuzzerManager {
         &mut self,
         db: &Database,
         module: Module,
-        fuzzable_closures: Vec<(Id, Closure)>,
+        heap: &Heap,
+        fuzzable_closures: &[(Id, Pointer)],
     ) {
-        let closures = self
-            .fuzzable_closures
-            .entry(module)
-            .or_insert_with(HashMap::new);
-
-        for (id, new_closure) in fuzzable_closures {
-            let old_closure = closures.insert(id.clone(), new_closure.clone());
-            self.fuzzers
-                .entry(new_closure.clone())
-                .or_insert_with(|| Fuzzer::new(db, new_closure.clone(), id));
-            if let Some(old_closure) = old_closure && old_closure != new_closure {
-                self.fuzzers.remove(&old_closure);
-            }
-        }
+        let fuzzers = fuzzable_closures
+            .iter()
+            .map(|(id, closure)| (id.clone(), Fuzzer::new(db, heap, *closure, id.clone())))
+            .collect();
+        self.fuzzers.insert(module, fuzzers);
     }
 
     pub fn remove_module(&mut self, module: Module) {
-        self.fuzzable_closures.remove(&module).unwrap();
+        self.fuzzers.remove(&module).unwrap();
     }
 
     pub fn run(&mut self, db: &Database) -> Option<Module> {
         let mut running_fuzzers = self
             .fuzzers
             .values_mut()
+            .flat_map(|fuzzers| fuzzers.values_mut())
             .filter(|fuzzer| matches!(fuzzer.status(), Status::StillFuzzing { .. }))
             .collect_vec();
         log::trace!(
@@ -67,14 +59,11 @@ impl FuzzerManager {
     }
 
     pub fn get_hints(&self, db: &Database, module: &Module) -> Vec<Vec<Hint>> {
-        let relevant_fuzzers = self.fuzzable_closures[module]
-            .iter()
-            .map(|(_, closure)| &self.fuzzers[closure])
-            .collect_vec();
         let mut hints = vec![];
 
-        for fuzzer in &relevant_fuzzers {
+        for fuzzer in self.fuzzers[module].values() {
             if let Status::PanickedForArguments {
+                heap,
                 arguments,
                 reason,
                 tracer,
@@ -100,7 +89,10 @@ impl FuzzerManager {
                             parameter_names
                                 .iter()
                                 .zip(arguments.iter())
-                                .map(|(name, argument)| format!("`{name} = {argument}`"))
+                                .map(|(name, argument)| format!(
+                                    "`{name} = {}`",
+                                    argument.format(heap)
+                                ))
                                 .collect_vec()
                                 .join_with_commas_and_and(),
                         ),
@@ -135,24 +127,20 @@ impl FuzzerManager {
                     };
                     let (call_id, name, arguments) = match panicking_inner_call {
                         TraceEntry::CallStarted { id, closure, args } => {
-                            (id.clone(), format!("{closure}"), args.clone())
+                            (id.clone(), closure.format(heap), args.clone())
                         }
                         TraceEntry::NeedsStarted {
                             id,
                             condition,
                             reason,
-                        } => (
-                            id.clone(),
-                            "needs".to_string(),
-                            vec![condition.clone(), reason.clone()],
-                        ),
+                        } => (id.clone(), "needs".to_string(), vec![*condition, *reason]),
                         _ => unreachable!(),
                     };
                     Hint {
                         kind: HintKind::Fuzz,
                         text: format!(
                             "then `{name} {}` panics because {reason}.",
-                            arguments.iter().map(|arg| format!("{arg}")).join(" "),
+                            arguments.iter().map(|arg| arg.format(heap)).join(" "),
                         ),
                         position: id_to_end_of_line(db, call_id).unwrap(),
                     }

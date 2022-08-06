@@ -32,7 +32,7 @@ pub async fn fuzz(db: &Database, module: Module) {
         match fuzzer.status() {
             Status::StillFuzzing { .. } => {}
             Status::PanickedForArguments {
-                arguments_heap,
+                heap,
                 arguments,
                 reason,
                 tracer,
@@ -42,7 +42,7 @@ pub async fn fuzz(db: &Database, module: Module) {
                     "Calling `{id} {}` doesn't work because {reason}.",
                     arguments
                         .iter()
-                        .map(|argument| argument.format(arguments_heap))
+                        .map(|argument| argument.format(heap))
                         .join(" "),
                 );
                 log::error!("This was the stack trace:");

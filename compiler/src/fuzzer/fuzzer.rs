@@ -24,7 +24,7 @@ pub enum Status {
     // TODO: In the future, also add a state for trying to simplify the
     // arguments.
     PanickedForArguments {
-        arguments_heap: Heap,
+        heap: Heap,
         arguments: Vec<Pointer>,
         reason: String,
         tracer: Tracer,
@@ -115,11 +115,8 @@ impl Fuzzer {
                     let status = if is_our_fault {
                         Status::new_fuzzing_attempt(db, &self.closure_heap, self.closure)
                     } else {
-                        let mut arguments_heap = Heap::default();
-                        vm.heap
-                            .clone_multiple_to_other_heap(&mut arguments_heap, &arguments);
                         Status::PanickedForArguments {
-                            arguments_heap,
+                            heap: vm.heap,
                             arguments,
                             reason: reason.clone(),
                             tracer: vm.tracer.clone(),
@@ -131,13 +128,13 @@ impl Fuzzer {
             // We already found some arguments that caused the closure to panic,
             // so there's nothing more to do.
             Status::PanickedForArguments {
-                arguments_heap,
+                heap,
                 arguments,
                 reason,
                 tracer,
             } => (
                 Status::PanickedForArguments {
-                    arguments_heap,
+                    heap,
                     arguments,
                     reason,
                     tracer,
