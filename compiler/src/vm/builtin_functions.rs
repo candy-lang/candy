@@ -1,7 +1,7 @@
 use super::{
     heap::{Closure, Data, Int, Pointer, Struct, Symbol, Text},
     use_provider::UseProvider,
-    Vm,
+    Heap, Vm,
 };
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
 use num_bigint::BigInt;
@@ -9,6 +9,74 @@ use num_integer::Integer;
 use num_traits::ToPrimitive;
 use std::{ops::Deref, str::FromStr};
 use unicode_segmentation::UnicodeSegmentation;
+
+impl Vm {
+    pub(super) fn run_builtin_function<U: UseProvider>(
+        &mut self,
+        use_provider: &U,
+        builtin_function: &BuiltinFunction,
+        args: &[Pointer],
+    ) {
+        log::trace!("run_builtin_function: builtin{builtin_function:?}");
+
+        let result = match &builtin_function {
+            BuiltinFunction::Equals => self.heap.equals(args),
+            BuiltinFunction::FunctionRun => self.heap.function_run(args),
+            BuiltinFunction::GetArgumentCount => self.heap.get_argument_count(args),
+            BuiltinFunction::IfElse => self.heap.if_else(args),
+            BuiltinFunction::IntAdd => self.heap.int_add(args),
+            BuiltinFunction::IntBitLength => self.heap.int_bit_length(args),
+            BuiltinFunction::IntBitwiseAnd => self.heap.int_bitwise_and(args),
+            BuiltinFunction::IntBitwiseOr => self.heap.int_bitwise_or(args),
+            BuiltinFunction::IntBitwiseXor => self.heap.int_bitwise_xor(args),
+            BuiltinFunction::IntCompareTo => self.heap.int_compare_to(args),
+            BuiltinFunction::IntDivideTruncating => self.heap.int_divide_truncating(args),
+            BuiltinFunction::IntModulo => self.heap.int_modulo(args),
+            BuiltinFunction::IntMultiply => self.heap.int_multiply(args),
+            BuiltinFunction::IntParse => self.heap.int_parse(args),
+            BuiltinFunction::IntRemainder => self.heap.int_remainder(args),
+            BuiltinFunction::IntShiftLeft => self.heap.int_shift_left(args),
+            BuiltinFunction::IntShiftRight => self.heap.int_shift_right(args),
+            BuiltinFunction::IntSubtract => self.heap.int_subtract(args),
+            BuiltinFunction::Print => self.heap.print(args),
+            BuiltinFunction::StructGet => self.heap.struct_get(args),
+            BuiltinFunction::StructGetKeys => self.heap.struct_get_keys(args),
+            BuiltinFunction::StructHasKey => self.heap.struct_has_key(args),
+            BuiltinFunction::TextCharacters => self.heap.text_characters(args),
+            BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
+            BuiltinFunction::TextContains => self.heap.text_contains(args),
+            BuiltinFunction::TextEndsWith => self.heap.text_ends_with(args),
+            BuiltinFunction::TextGetRange => self.heap.text_get_range(args),
+            BuiltinFunction::TextIsEmpty => self.heap.text_is_empty(args),
+            BuiltinFunction::TextLength => self.heap.text_length(args),
+            BuiltinFunction::TextStartsWith => self.heap.text_starts_with(args),
+            BuiltinFunction::TextTrimEnd => self.heap.text_trim_end(args),
+            BuiltinFunction::TextTrimStart => self.heap.text_trim_start(args),
+            BuiltinFunction::TypeOf => self.heap.type_of(args),
+        };
+        match result {
+            Ok(Return(value)) => self.data_stack.push(value),
+            Ok(DivergeControlFlow(closure_address)) => {
+                self.data_stack.push(closure_address);
+                self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
+            }
+            Err(reason) => self.panic(reason),
+        }
+    }
+}
+
+type BuiltinResult = Result<SuccessfulBehavior, String>;
+enum SuccessfulBehavior {
+    Return(Pointer),
+    DivergeControlFlow(Pointer),
+}
+use SuccessfulBehavior::*;
+
+impl From<SuccessfulBehavior> for BuiltinResult {
+    fn from(ok: SuccessfulBehavior) -> Self {
+        Ok(ok)
+    }
+}
 
 macro_rules! unpack_and_later_drop {
     ( $heap:expr, $args:expr, ($( $arg:ident: $type:ty ),+), $body:block ) => {
@@ -29,286 +97,185 @@ macro_rules! unpack_and_later_drop {
 
             let result = $body;
             $( $heap.drop($arg.address); )+
-            result
+            result.into()
         }
     };
 }
 
-type BuiltinResult = Result<Pointer, String>;
-type DivergingBuiltinResult = Result<(), String>;
-
-impl Vm {
-    pub(super) fn run_builtin_function<U: UseProvider>(
-        &mut self,
-        use_provider: &U,
-        builtin_function: &BuiltinFunction,
-        args: &[Pointer],
-    ) {
-        log::trace!("run_builtin_function: builtin{builtin_function:?}");
-
-        let return_value_or_panic_reason = match &builtin_function {
-            BuiltinFunction::Equals => self.equals(args),
-            BuiltinFunction::FunctionRun => match self.function_run(use_provider, args) {
-                // If successful, `functionRun` doesn't return a value, but
-                // diverges the control flow.
-                Ok(()) => return,
-                Err(reason) => Err(reason),
-            },
-            BuiltinFunction::GetArgumentCount => self.get_argument_count(args),
-            BuiltinFunction::IfElse => match self.if_else(use_provider, args) {
-                // If successful, `ifElse` doesn't return a value, but diverges
-                // the control flow.
-                Ok(()) => return,
-                Err(reason) => Err(reason),
-            },
-            BuiltinFunction::IntAdd => self.int_add(args),
-            BuiltinFunction::IntBitLength => self.int_bit_length(args),
-            BuiltinFunction::IntBitwiseAnd => self.int_bitwise_and(args),
-            BuiltinFunction::IntBitwiseOr => self.int_bitwise_or(args),
-            BuiltinFunction::IntBitwiseXor => self.int_bitwise_xor(args),
-            BuiltinFunction::IntCompareTo => self.int_compare_to(args),
-            BuiltinFunction::IntDivideTruncating => self.int_divide_truncating(args),
-            BuiltinFunction::IntModulo => self.int_modulo(args),
-            BuiltinFunction::IntMultiply => self.int_multiply(args),
-            BuiltinFunction::IntParse => self.int_parse(args),
-            BuiltinFunction::IntRemainder => self.int_remainder(args),
-            BuiltinFunction::IntShiftLeft => self.int_shift_left(args),
-            BuiltinFunction::IntShiftRight => self.int_shift_right(args),
-            BuiltinFunction::IntSubtract => self.int_subtract(args),
-            BuiltinFunction::Print => self.print(args),
-            BuiltinFunction::StructGet => self.struct_get(args),
-            BuiltinFunction::StructGetKeys => self.struct_get_keys(args),
-            BuiltinFunction::StructHasKey => self.struct_has_key(args),
-            BuiltinFunction::TextCharacters => self.text_characters(args),
-            BuiltinFunction::TextConcatenate => self.text_concatenate(args),
-            BuiltinFunction::TextContains => self.text_contains(args),
-            BuiltinFunction::TextEndsWith => self.text_ends_with(args),
-            BuiltinFunction::TextGetRange => self.text_get_range(args),
-            BuiltinFunction::TextIsEmpty => self.text_is_empty(args),
-            BuiltinFunction::TextLength => self.text_length(args),
-            BuiltinFunction::TextStartsWith => self.text_starts_with(args),
-            BuiltinFunction::TextTrimEnd => self.text_trim_end(args),
-            BuiltinFunction::TextTrimStart => self.text_trim_start(args),
-            BuiltinFunction::TypeOf => self.type_of(args),
-        };
-        match return_value_or_panic_reason {
-            Ok(return_value) => self.data_stack.push(return_value),
-            Err(reason) => self.panic(reason),
-        }
-    }
-
+impl Heap {
     fn equals(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (a: Any, b: Any), {
-            let is_equal = a.equals(&self.heap, &*b);
-            Ok(self.heap.create_bool(is_equal))
+        unpack_and_later_drop!(self, args, (a: Any, b: Any), {
+            let is_equal = a.equals(self, &b);
+            Return(self.create_bool(is_equal))
         })
     }
 
-    fn function_run<U: UseProvider>(
-        &mut self,
-        use_provider: &U,
-        args: &[Pointer],
-    ) -> DivergingBuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (closure: Closure), {
+    fn function_run(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, (closure: Closure), {
             closure.should_take_no_arguments()?;
             log::debug!(
                 "`functionRun` executing the closure: {}",
-                closure.address.format(&self.heap),
+                closure.address.format(self),
             );
-            self.heap.dup(closure.address);
-            self.data_stack.push(closure.address);
-            self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
-            Ok(())
+            self.dup(closure.address);
+            DivergeControlFlow(closure.address)
         })
     }
 
     fn get_argument_count(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (closure: Closure), {
-            Ok(self.heap.create_int(closure.num_args.into()))
+        unpack_and_later_drop!(self, args, (closure: Closure), {
+            Return(self.create_int(closure.num_args.into()))
         })
     }
 
-    fn if_else<U: UseProvider>(
-        &mut self,
-        use_provider: &U,
-        args: &[Pointer],
-    ) -> DivergingBuiltinResult {
+    fn if_else(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(
-            self.heap,
+            self,
             args,
             (condition: bool, then: Closure, else_: Closure),
             {
-                if *condition {
-                    self.heap.dup(then.address);
-                    self.data_stack.push(then.address);
-                } else {
-                    self.heap.dup(else_.address);
-                    self.data_stack.push(else_.address);
-                }
-                self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
-                Ok(())
+                let closure_to_run = if *condition { &then } else { &else_ }.address;
+                self.dup(closure_to_run);
+                DivergeControlFlow(closure_to_run)
             }
         )
     }
 
     fn int_add(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (a: Int, b: Int), {
-            Ok(self
-                .heap
-                .create_int((a.value.clone() + b.value.clone()).into()))
+        unpack_and_later_drop!(self, args, (a: Int, b: Int), {
+            Return(self.create_int(a.value.clone() + b.value.clone()))
         })
     }
     fn int_bit_length(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (a: Int), {
-            Ok(self.heap.create_int(a.value.bits().into()))
+        unpack_and_later_drop!(self, args, (a: Int), {
+            Return(self.create_int(a.value.bits().into()))
         })
     }
     fn int_bitwise_and(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (a: Int, b: Int), {
-            Ok(self
-                .heap
-                .create_int((a.value.clone() & b.value.clone()).into()))
+        unpack_and_later_drop!(self, args, (a: Int, b: Int), {
+            Return(self.create_int(a.value.clone() & b.value.clone()))
         })
     }
     fn int_bitwise_or(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (a: Int, b: Int), {
-            Ok(self
-                .heap
-                .create_int((a.value.clone() | b.value.clone()).into()))
+        unpack_and_later_drop!(self, args, (a: Int, b: Int), {
+            Return(self.create_int(a.value.clone() | b.value.clone()))
         })
     }
     fn int_bitwise_xor(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (a: Int, b: Int), {
-            Ok(self
-                .heap
-                .create_int((a.value.clone() ^ b.value.clone()).into()))
+        unpack_and_later_drop!(self, args, (a: Int, b: Int), {
+            Return(self.create_int(a.value.clone() ^ b.value.clone()))
         })
     }
     fn int_compare_to(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (a: Int, b: Int), {
-            Ok(self.heap.create_ordering(a.value.cmp(&b.value)))
+        unpack_and_later_drop!(self, args, (a: Int, b: Int), {
+            Return(self.create_ordering(a.value.cmp(&b.value)))
         })
     }
     fn int_divide_truncating(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (dividend: Int, divisor: Int), {
-            Ok(self
-                .heap
-                .create_int((dividend.value.clone() / divisor.value.clone()).into()))
+        unpack_and_later_drop!(self, args, (dividend: Int, divisor: Int), {
+            Return(self.create_int(dividend.value.clone() / divisor.value.clone()))
         })
     }
     fn int_modulo(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (dividend: Int, divisor: Int), {
-            Ok(self
-                .heap
-                .create_int(dividend.value.clone().mod_floor(&divisor.value).into()))
+        unpack_and_later_drop!(self, args, (dividend: Int, divisor: Int), {
+            Return(self.create_int(dividend.value.clone().mod_floor(&divisor.value)))
         })
     }
     fn int_multiply(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (factor_a: Int, factor_b: Int), {
-            Ok(self
-                .heap
-                .create_int((factor_a.value.clone() * factor_b.value.clone()).into()))
+        unpack_and_later_drop!(self, args, (factor_a: Int, factor_b: Int), {
+            Return(self.create_int(factor_a.value.clone() * factor_b.value.clone()))
         })
     }
     fn int_parse(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (text: Text), {
+        unpack_and_later_drop!(self, args, (text: Text), {
             let result = match BigInt::from_str(&text.value) {
-                Ok(int) => Ok(self.heap.create_int(int)),
-                Err(err) => Err(self.heap.create_text(format!("{err}"))),
+                Ok(int) => Ok(self.create_int(int)),
+                Err(err) => Err(self.create_text(format!("{err}"))),
             };
-            Ok(self.heap.create_result(result))
+            Return(self.create_result(result))
         })
     }
     fn int_remainder(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (dividend: Int, divisor: Int), {
-            Ok(self
-                .heap
-                .create_int((dividend.value.clone() % divisor.value.clone()).into()))
+        unpack_and_later_drop!(self, args, (dividend: Int, divisor: Int), {
+            Return(self.create_int(dividend.value.clone() % divisor.value.clone()))
         })
     }
     fn int_shift_left(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (value: Int, amount: Int), {
+        unpack_and_later_drop!(self, args, (value: Int, amount: Int), {
             let amount = amount.value.to_u128().unwrap();
-            Ok(self.heap.create_int((value.value.clone() << amount).into()))
+            Return(self.create_int(value.value.clone() << amount))
         })
     }
     fn int_shift_right(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (value: Int, amount: Int), {
+        unpack_and_later_drop!(self, args, (value: Int, amount: Int), {
             let value = value.value.to_biguint().unwrap();
             let amount = amount.value.to_u128().unwrap();
-            Ok(self.heap.create_int((value >> amount).into()))
+            Return(self.create_int((value >> amount).into()))
         })
     }
     fn int_subtract(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (minuend: Int, subtrahend: Int), {
-            Ok(self
-                .heap
-                .create_int((minuend.value.clone() - subtrahend.value.clone()).into()))
+        unpack_and_later_drop!(self, args, (minuend: Int, subtrahend: Int), {
+            Return(self.create_int(minuend.value.clone() - subtrahend.value.clone()))
         })
     }
 
     fn print(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (message: Text), {
+        unpack_and_later_drop!(self, args, (message: Text), {
             log::info!("{:?}", message.value);
-            Ok(self.heap.create_nothing())
+            Return(self.create_nothing())
         })
     }
 
     fn struct_get(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (struct_: Struct, key: Any), {
-            match struct_.get(&self.heap, key.address) {
+        unpack_and_later_drop!(self, args, (struct_: Struct, key: Any), {
+            match struct_.get(self, key.address) {
                 Some(value) => {
-                    self.heap.dup(value);
-                    Ok(value)
+                    self.dup(value);
+                    Ok(Return(value))
                 }
-                None => Err(format!(
-                    "Struct does not contain key {}.",
-                    key.format(&self.heap)
-                )),
+                None => Err(format!("Struct does not contain key {}.", key.format(self))),
             }
         })
     }
     fn struct_get_keys(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (struct_: Struct), {
-            Ok(self
-                .heap
-                .create_list(struct_.iter().map(|(key, _)| key.clone()).collect()))
+        unpack_and_later_drop!(self, args, (struct_: Struct), {
+            Return(self.create_list(struct_.iter().map(|(key, _)| key).collect()))
         })
     }
     fn struct_has_key(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (struct_: Struct, key: Any), {
-            let has_key = struct_.get(&self.heap, key.address).is_some();
-            Ok(self.heap.create_bool(has_key))
+        unpack_and_later_drop!(self, args, (struct_: Struct, key: Any), {
+            let has_key = struct_.get(self, key.address).is_some();
+            Return(self.create_bool(has_key))
         })
     }
 
     fn text_characters(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (text: Text), {
+        unpack_and_later_drop!(self, args, (text: Text), {
             let mut character_addresses = vec![];
             for c in text.value.graphemes(true) {
-                character_addresses.push(self.heap.create_text(c.to_string()));
+                character_addresses.push(self.create_text(c.to_string()));
             }
-            Ok(self.heap.create_list(character_addresses))
+            Return(self.create_list(character_addresses))
         })
     }
     fn text_concatenate(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (a: Text, b: Text), {
-            Ok(self.heap.create_text(format!("{}{}", a.value, b.value)))
+        unpack_and_later_drop!(self, args, (a: Text, b: Text), {
+            Return(self.create_text(format!("{}{}", a.value, b.value)))
         })
     }
     fn text_contains(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (text: Text, pattern: Text), {
-            Ok(self.heap.create_bool(text.value.contains(&pattern.value)))
+        unpack_and_later_drop!(self, args, (text: Text, pattern: Text), {
+            Return(self.create_bool(text.value.contains(&pattern.value)))
         })
     }
     fn text_ends_with(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (text: Text, suffix: Text), {
-            Ok(self.heap.create_bool(text.value.ends_with(&suffix.value)))
+        unpack_and_later_drop!(self, args, (text: Text, suffix: Text), {
+            Return(self.create_bool(text.value.ends_with(&suffix.value)))
         })
     }
     fn text_get_range(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(
-            self.heap,
+            self,
             args,
             (text: Text, start_inclusive: Int, end_exclusive: Int),
             {
@@ -324,39 +291,39 @@ impl Vm {
                     .skip(start_inclusive)
                     .take(end_exclusive - start_inclusive)
                     .collect();
-                Ok(self.heap.create_text(text))
+                Return(self.create_text(text))
             }
         )
     }
     fn text_is_empty(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (text: Text), {
-            Ok(self.heap.create_bool(text.value.is_empty()))
+        unpack_and_later_drop!(self, args, (text: Text), {
+            Return(self.create_bool(text.value.is_empty()))
         })
     }
     fn text_length(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (text: Text), {
+        unpack_and_later_drop!(self, args, (text: Text), {
             let length = text.value.graphemes(true).count().into();
-            Ok(self.heap.create_int(length))
+            Return(self.create_int(length))
         })
     }
     fn text_starts_with(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (text: Text, prefix: Text), {
-            Ok(self.heap.create_bool(text.value.starts_with(&prefix.value)))
+        unpack_and_later_drop!(self, args, (text: Text, prefix: Text), {
+            Return(self.create_bool(text.value.starts_with(&prefix.value)))
         })
     }
     fn text_trim_end(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (text: Text), {
-            Ok(self.heap.create_text(text.value.trim_end().to_string()))
+        unpack_and_later_drop!(self, args, (text: Text), {
+            Return(self.create_text(text.value.trim_end().to_string()))
         })
     }
     fn text_trim_start(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (text: Text), {
-            Ok(self.heap.create_text(text.value.trim_start().to_string()))
+        unpack_and_later_drop!(self, args, (text: Text), {
+            Return(self.create_text(text.value.trim_start().to_string()))
         })
     }
 
     fn type_of(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (value: Any), {
+        unpack_and_later_drop!(self, args, (value: Any), {
             let symbol = match **value {
                 Data::Int(_) => "Int",
                 Data::Text(_) => "Text",
@@ -365,7 +332,7 @@ impl Vm {
                 Data::Closure(_) => "Function",
                 Data::Builtin(_) => "Builtin",
             };
-            Ok(self.heap.create_symbol(symbol.to_string()))
+            Return(self.create_symbol(symbol.to_string()))
         })
     }
 }

@@ -50,13 +50,12 @@ impl Vm {
 
         match use_provider.use_module(module.clone())? {
             UseResult::Asset(bytes) => {
-                let address = self.heap.create_list(
-                    bytes
-                        .iter()
-                        .map(|byte| self.heap.create_int((*byte).into()))
-                        .collect_vec(),
-                );
-                self.data_stack.push(address);
+                let bytes = bytes
+                    .iter()
+                    .map(|byte| self.heap.create_int((*byte).into()))
+                    .collect_vec();
+                let list = self.heap.create_list(bytes);
+                self.data_stack.push(list);
             }
             UseResult::Code(lir) => {
                 let module_closure = Closure::of_lir(module, lir);
@@ -78,8 +77,8 @@ impl UsePath {
     const PARENT_NAVIGATION_CHAR: char = '.';
 
     fn parse(heap: &Heap, path: Pointer) -> Result<Self, String> {
-        let path = match heap.get(path).data {
-            Data::Text(path) => path.value,
+        let path = match &heap.get(path).data {
+            Data::Text(path) => path.value.clone(),
             _ => return Err("the path has to be a text".to_string()),
         };
         let mut path = path.as_str();

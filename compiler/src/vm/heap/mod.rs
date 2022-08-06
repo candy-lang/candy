@@ -5,7 +5,7 @@ pub use self::{
     object::{Builtin, Closure, Data, Int, Object, Struct, Symbol, Text},
     pointer::Pointer,
 };
-use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
+use crate::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use std::{cmp::Ordering, collections::HashMap};
@@ -19,7 +19,7 @@ pub struct Heap {
 impl std::fmt::Debug for Heap {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut objects = self.objects.clone().into_iter().collect_vec();
-        objects.sort_by_key(|(address, _)| address.to_raw());
+        objects.sort_by_key(|(address, _)| address.raw());
 
         writeln!(f, "{{")?;
         for (address, object) in objects {
@@ -85,7 +85,7 @@ impl Heap {
             },
         );
         log::trace!("Created object {} at {address}.", address.format(self));
-        self.next_address = Pointer::from_raw(self.next_address.to_raw() + 1);
+        self.next_address = Pointer::from_raw(self.next_address.raw() + 1);
         address
     }
     pub fn free(&mut self, address: Pointer) {
@@ -99,16 +99,16 @@ impl Heap {
 
     /// Clones all objects at the `root_addresses` into the `other` heap and
     /// returns a list of their addresses in the other heap.
-    pub fn clone_to_other_heap(
+    pub fn clone_multiple_to_other_heap(
         &self,
         other: &mut Heap,
-        root_addresses: Vec<Pointer>,
+        addresses: &[Pointer],
     ) -> Vec<Pointer> {
-        let objects_to_refcounts = HashMap::new();
-        for address in root_addresses {
-            self.gather_objects_to_clone(&mut objects_to_refcounts, address);
+        let mut objects_to_refcounts = HashMap::new();
+        for address in addresses {
+            self.gather_objects_to_clone(&mut objects_to_refcounts, *address);
         }
-        let mapped_addresses = vec![];
+        let mut mapped_addresses = vec![];
         for (address, refcount) in objects_to_refcounts {
             mapped_addresses.push(other.create(self.get(address).data.clone()));
             other.get_mut(address).reference_count = refcount;
@@ -124,6 +124,11 @@ impl Heap {
         for child in self.get(address).children() {
             self.gather_objects_to_clone(objects_to_refcounts, child);
         }
+    }
+    pub fn clone_single_to_other_heap(&self, other: &mut Heap, address: Pointer) -> Pointer {
+        self.clone_multiple_to_other_heap(other, &[address])
+            .pop()
+            .unwrap()
     }
 
     pub fn create_int(&mut self, int: BigInt) -> Pointer {
@@ -148,7 +153,7 @@ impl Heap {
         self.create_symbol("Nothing".to_string())
     }
     pub fn create_list(&mut self, items: Vec<Pointer>) -> Pointer {
-        let fields = vec![];
+        let mut fields = vec![];
         for (index, item) in items.into_iter().enumerate() {
             fields.push((self.create_int(index.into()), item));
         }

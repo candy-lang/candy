@@ -10,7 +10,7 @@ impl Pointer {
     pub fn from_raw(raw: usize) -> Self {
         Self(raw)
     }
-    pub fn to_raw(&self) -> usize {
+    pub fn raw(&self) -> usize {
         self.0
     }
 }

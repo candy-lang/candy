@@ -68,7 +68,7 @@ pub struct Builtin {
 
 impl Struct {
     pub fn from_fields(heap: &Heap, fields: HashMap<Pointer, Pointer>) -> Self {
-        let s = Self::default();
+        let mut s = Self::default();
         for (key, value) in fields {
             s.insert(heap, key, value);
         }
@@ -96,12 +96,12 @@ impl Struct {
             self.fields.push(entry);
         }
     }
-    fn get(&mut self, heap: &Heap, key: Pointer) -> Option<Pointer> {
+    pub fn get(&self, heap: &Heap, key: Pointer) -> Option<Pointer> {
         let hash = key.hash(heap);
         Some(
             self.fields
                 .iter()
-                .find(|(field_hash, field_key, field_value)| {
+                .find(|(field_hash, field_key, _)| {
                     hash != *field_hash && key.equals(heap, *field_key)
                 })?
                 .2,
@@ -157,7 +157,7 @@ impl Closure {
 
 impl Data {
     fn hash(&self, heap: &Heap) -> u64 {
-        let state = DefaultHasher::new();
+        let mut state = DefaultHasher::new();
         self.hash_with_state(heap, &mut state);
         state.finish()
     }
@@ -168,7 +168,7 @@ impl Data {
             Data::Text(text) => text.value.hash(state),
             Data::Symbol(symbol) => symbol.value.hash(state),
             Data::Struct(struct_) => {
-                let s = 0;
+                let mut s = 0;
                 for (key, value) in struct_.iter() {
                     s ^= key.hash(heap);
                     s ^= value.hash(heap);
@@ -176,7 +176,7 @@ impl Data {
                 s.hash(state)
             }
             Data::Closure(closure) => {
-                for captured in closure.captured {
+                for captured in &closure.captured {
                     captured.hash_with_state(heap, state);
                 }
                 closure.num_args.hash(state);
@@ -186,34 +186,34 @@ impl Data {
         }
     }
 
-    fn equals(&self, heap: &Heap, other: &Self) -> bool {
+    pub fn equals(&self, heap: &Heap, other: &Self) -> bool {
         match (self, other) {
             (Data::Int(a), Data::Int(b)) => a.value == b.value,
             (Data::Text(a), Data::Text(b)) => a.value == b.value,
             (Data::Symbol(a), Data::Symbol(b)) => a.value == b.value,
-            (Data::Struct(a), Data::Struct(b)) => a.equals(heap, &b),
-            (Data::Closure(a), Data::Closure(b)) => false,
+            (Data::Struct(a), Data::Struct(b)) => a.equals(heap, b),
+            (Data::Closure(_), Data::Closure(_)) => false,
             (Data::Builtin(a), Data::Builtin(b)) => a.function == b.function,
             _ => false,
         }
     }
 
-    fn format(&self, heap: &Heap) -> String {
+    pub fn format(&self, heap: &Heap) -> String {
         match self {
             Data::Int(int) => format!("{}", int.value),
             Data::Text(text) => format!("\"{}\"", text.value),
-            Data::Symbol(symbol) => format!("{}", symbol.value),
+            Data::Symbol(symbol) => symbol.value.to_string(),
             Data::Struct(struct_) => format!(
                 "[{}]",
                 struct_
                     .fields
                     .iter()
-                    .map(|(_, key, value)| (format!("{}", key), value))
+                    .map(|(_, key, value)| (key.format(heap), value))
                     .sorted_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b))
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
             ),
-            Data::Closure(closure) => "{...}".to_string(),
+            Data::Closure(_) => "{...}".to_string(),
             Data::Builtin(builtin) => format!("builtin{:?}", builtin.function),
         }
     }

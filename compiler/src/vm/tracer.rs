@@ -1,4 +1,4 @@
-use super::heap::{Heap, Pointer};
+use super::heap::Pointer;
 use crate::{
     compiler::{ast_to_hir::AstToHir, cst::CstDb, hir::Id},
     database::Database,

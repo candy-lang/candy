@@ -57,14 +57,12 @@ impl InstructionPointer {
 
 pub struct TearDownResult {
     pub heap: Heap,
-    pub return_value: Pointer,
+    pub result: Result<Pointer, String>,
     pub fuzzable_closures: Vec<(Id, Pointer)>,
+    pub tracer: Tracer,
 }
 
 impl Vm {
-    pub fn new() -> Self {
-        Self::new_with_heap(Heap::default())
-    }
     fn new_with_heap(heap: Heap) -> Self {
         Self {
             status: Status::Done,
@@ -82,11 +80,11 @@ impl Vm {
         heap: Heap,
         use_provider: &U,
         closure: Pointer,
-        arguments: Vec<Pointer>,
+        arguments: &[Pointer],
     ) -> Self {
-        let vm = Self::new_with_heap(heap);
+        let mut vm = Self::new_with_heap(heap);
 
-        vm.data_stack.extend(arguments.into_iter());
+        vm.data_stack.extend(arguments);
         vm.data_stack.push(closure);
 
         vm.status = Status::Running;
@@ -99,7 +97,6 @@ impl Vm {
         vm
     }
     pub fn new_for_running_module_closure<U: UseProvider>(
-        &mut self,
         use_provider: &U,
         closure: Closure,
     ) -> Self {
@@ -107,15 +104,21 @@ impl Vm {
         assert_eq!(closure.num_args, 0, "Called start_module_closure with a closure that is not a module closure (it has arguments).");
         let mut heap = Heap::default();
         let closure = heap.create_closure(closure);
-        Self::new_for_running_closure(heap, use_provider, closure, vec![])
+        Self::new_for_running_closure(heap, use_provider, closure, &[])
     }
-    pub fn tear_down(self) -> TearDownResult {
+    pub fn tear_down(mut self) -> TearDownResult {
         assert!(matches!(self.status, Status::Done));
 
+        let result = match self.status {
+            Status::Running => panic!("Called `tear_down` on a VM that's still running."),
+            Status::Done => Ok(self.data_stack.pop().unwrap()),
+            Status::Panicked { reason } => Err(reason),
+        };
         TearDownResult {
             heap: self.heap,
-            return_value: self.data_stack.pop().unwrap(),
+            result,
             fuzzable_closures: self.fuzzable_closures,
+            tracer: self.tracer,
         }
     }
 
@@ -247,7 +250,7 @@ impl Vm {
                 }
                 args.reverse();
 
-                match self.heap.get(closure_address).data {
+                match self.heap.get(closure_address).data.clone() {
                     Data::Closure(Closure {
                         captured,
                         num_args: expected_num_args,
@@ -294,7 +297,7 @@ impl Vm {
                 let reason = self.data_stack.pop().unwrap();
                 let condition = self.data_stack.pop().unwrap();
 
-                let reason = match self.heap.get(reason).data {
+                let reason = match self.heap.get(reason).data.clone() {
                     Data::Text(reason) => reason.value,
                     _ => {
                         self.panic("you can only use text as the reason of a `needs`".to_string());
@@ -302,7 +305,7 @@ impl Vm {
                     }
                 };
 
-                match self.heap.get(condition).data {
+                match self.heap.get(condition).data.clone() {
                     Data::Symbol(symbol) => match symbol.value.as_str() {
                         "True" => {
                             self.data_stack.push(self.heap.create_nothing());
@@ -401,29 +404,13 @@ impl Vm {
         self.status = Status::Panicked { reason };
     }
 
-    pub fn run_synchronously_until_completion(
-        &mut self,
-        db: &Database,
-    ) -> Result<TearDownResult, String> {
+    pub fn run_synchronously_until_completion(mut self, db: &Database) -> TearDownResult {
         let use_provider = DbUseProvider { db };
         loop {
             self.run(&use_provider, 10000);
             match self.status() {
                 Status::Running => log::info!("Code is still running."),
-                Status::Done => {
-                    let result = self.tear_down();
-                    log::info!(
-                        "The module exports these definitions: {}",
-                        result.return_value
-                    );
-                    return Ok(result);
-                }
-                Status::Panicked { reason } => {
-                    log::error!("The module panicked because {reason}.");
-                    log::error!("This is the stack trace:");
-                    self.tracer.dump_stack_trace(db);
-                    return Err(reason);
-                }
+                _ => return self.tear_down(),
             }
         }
     }

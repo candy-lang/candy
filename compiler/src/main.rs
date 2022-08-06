@@ -1,7 +1,6 @@
 #![feature(async_closure)]
 #![feature(box_patterns)]
 #![feature(label_break_value)]
-#![feature(let_chains)]
 #![feature(never_type)]
 #![feature(try_trait_v2)]
 #![allow(clippy::module_inception)]
@@ -27,7 +26,7 @@ use crate::{
     database::Database,
     language_server::utils::LspPositionConversion,
     module::{Module, ModuleKind},
-    vm::{use_provider::DbUseProvider, Vm},
+    vm::{use_provider::DbUseProvider, Closure, TearDownResult, Vm},
 };
 use compiler::lir::Lir;
 use fern::colors::{Color, ColoredLevelConfig};
@@ -213,13 +212,12 @@ fn run(options: CandyRunOptions) {
     let path_string = options.file.to_string_lossy();
     log::info!("Running `{path_string}`.");
 
-    let mut vm = Vm::new();
     let use_provider = DbUseProvider { db: &db };
-    vm.set_up_module_closure_execution(&use_provider, module_closure);
-    vm.run_synchronously_until_completion(&db).ok();
+    let vm = Vm::new_for_running_module_closure(&use_provider, module_closure);
+    let TearDownResult { tracer, .. } = vm.run_synchronously_until_completion(&db);
 
     if options.debug {
-        let trace = vm.tracer.dump_call_tree();
+        let trace = tracer.dump_call_tree();
         let trace_file = module.associated_debug_file("trace");
         fs::write(trace_file.clone(), trace).unwrap();
         log::info!(
