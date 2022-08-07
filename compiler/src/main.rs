@@ -214,7 +214,24 @@ fn run(options: CandyRunOptions) {
 
     let use_provider = DbUseProvider { db: &db };
     let vm = Vm::new_for_running_module_closure(&use_provider, module_closure);
-    let TearDownResult { tracer, .. } = vm.run_synchronously_until_completion(&db);
+    let TearDownResult {
+        tracer,
+        result,
+        heap,
+        ..
+    } = vm.run_synchronously_until_completion(&db);
+
+    match result {
+        Ok(return_value) => log::info!(
+            "The module exports these definitions: {}",
+            return_value.format(&heap)
+        ),
+        Err(reason) => {
+            log::error!("The module panicked because {reason}.");
+            log::error!("This is the stack trace:");
+            tracer.dump_stack_trace(&db, &heap);
+        }
+    }
 
     if options.debug {
         let trace = tracer.dump_call_tree();
