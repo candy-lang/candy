@@ -410,7 +410,7 @@ impl Vm {
     pub fn run_synchronously_until_completion(mut self, db: &Database) -> TearDownResult {
         let use_provider = DbUseProvider { db };
         loop {
-            self.run(&use_provider, 10000);
+            self.run(&use_provider, 100000);
             match self.status() {
                 Status::Running => info!("Code is still running."),
                 _ => return self.tear_down(),
