@@ -9,7 +9,26 @@ use crate::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use std::{cmp::Ordering, collections::HashMap};
-use tracing::trace;
+
+const TRACE: bool = false;
+
+macro_rules! trace {
+    ($format_string:tt, $($args:expr,)+) => {
+        if TRACE {
+            tracing::trace!($format_string, $($args),+)
+        }
+    };
+    ($format_string:tt, $($args:expr),+) => {
+        if TRACE {
+            tracing::trace!($format_string, $($args),+)
+        }
+    };
+    ($format_string:tt) => {
+        if TRACE {
+            tracing::trace!($format_string)
+        }
+    };
+}
 
 #[derive(Clone)]
 pub struct Heap {
@@ -64,13 +83,13 @@ impl Heap {
         );
     }
     pub fn drop(&mut self, address: Pointer) {
-        let formatted_value = address.format(self);
+        trace!(
+            "RefCount of {address} reduced to {}. Value: {}",
+            self.get(address).reference_count - 1,
+            address.format(self),
+        );
         let object = self.get_mut(address);
         object.reference_count -= 1;
-        trace!(
-            "RefCount of {address} reduced to {}. Value: {formatted_value}",
-            object.reference_count,
-        );
         if object.reference_count == 0 {
             self.free(address);
         }

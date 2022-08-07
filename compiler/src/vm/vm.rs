@@ -12,6 +12,8 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use tracing::{info, trace};
 
+const TRACE: bool = false;
+
 /// A VM can execute some byte code.
 #[derive(Clone)]
 pub struct Vm {
@@ -145,28 +147,30 @@ impl Vm {
             };
             let instruction = current_body[self.next_instruction.instruction].clone();
 
-            // trace!(
-            //     "Data stack: {}",
-            //     self.data_stack
-            //         .iter()
-            //         .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
-            //         .join(", ")
-            // );
-            // trace!(
-            //     "Call stack: {}",
-            //     self.call_stack
-            //         .iter()
-            //         .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
-            //         .join(", ")
-            // );
-            // trace!(
-            //     "Instruction pointer: {}:{}",
-            //     self.next_instruction.closure,
-            //     self.next_instruction.instruction
-            // );
-            // trace!("Heap: {:?}", self.heap);
+            if TRACE {
+                trace!(
+                    "Data stack: {}",
+                    self.data_stack
+                        .iter()
+                        .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
+                        .join(", ")
+                );
+                trace!(
+                    "Call stack: {}",
+                    self.call_stack
+                        .iter()
+                        .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
+                        .join(", ")
+                );
+                trace!(
+                    "Instruction pointer: {}:{}",
+                    self.next_instruction.closure,
+                    self.next_instruction.instruction
+                );
+                trace!("Heap: {:?}", self.heap);
+                trace!("Running instruction: {instruction:?}");
+            }
 
-            trace!("Running instruction: {instruction:?}");
             self.next_instruction.instruction += 1;
             self.run_instruction(use_provider, instruction);
             self.num_instructions_executed += 1;
