@@ -152,7 +152,7 @@ impl Vm {
                     "Data stack: {}",
                     self.data_stack
                         .iter()
-                        .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
+                        .map(|it| it.format(&self.heap))
                         .join(", ")
                 );
                 trace!(
