@@ -50,6 +50,8 @@ Candy blurs the line between those stages, for example, by replacing compile-tim
     "Hello, {efficientTextReverse name}"  # then this fails because efficientTextReverse only works on palindromes.
   ```
 
+To get a more in-depth introduction, read the [language document](language.md).
+
 ## Discussion
 
 [Join our Discord server.](https://discord.gg/5Vr4eAJ7gU)

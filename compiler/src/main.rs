@@ -36,7 +36,6 @@ use log::{self, LevelFilter};
 use notify::{watcher, RecursiveMode, Watcher};
 use std::{
     env::current_dir,
-    fs,
     path::PathBuf,
     sync::{mpsc::channel, Arc},
     time::Duration,
@@ -125,63 +124,51 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
         .rcst(module.clone())
         .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", module, err));
     if debug {
-        let rcst_file = module.associated_debug_file("rcst");
-        fs::write(rcst_file, format!("{:#?}\n", rcst)).unwrap();
+        module.dump_associated_debug_file("rcst", &format!("{:#?}\n", rcst));
     }
 
     log::debug!("Turning RCST to CST…");
     let cst = db.cst(module.clone()).unwrap();
     if debug {
-        let cst_file = module.associated_debug_file("cst");
-        fs::write(cst_file, format!("{:#?}\n", cst)).unwrap();
+        module.dump_associated_debug_file("cst", &format!("{:#?}\n", cst));
     }
 
     log::debug!("Abstracting CST to AST…");
     let (asts, ast_cst_id_map) = db.ast(module.clone()).unwrap();
     if debug {
-        let ast_file = module.associated_debug_file("ast");
-        fs::write(
-            ast_file,
-            format!("{}\n", asts.iter().map(|ast| format!("{}", ast)).join("\n")),
-        )
-        .unwrap();
-
-        let ast_to_cst_ids_file = module.associated_debug_file("ast_to_cst_ids");
-        fs::write(
-            ast_to_cst_ids_file,
-            ast_cst_id_map
+        module.dump_associated_debug_file(
+            "ast",
+            &format!("{}\n", asts.iter().map(|ast| format!("{}", ast)).join("\n")),
+        );
+        module.dump_associated_debug_file(
+            "ast_to_cst_ids",
+            &ast_cst_id_map
                 .keys()
                 .into_iter()
                 .sorted_by_key(|it| it.local)
                 .map(|key| format!("{key} -> {}\n", ast_cst_id_map[key].0))
                 .join(""),
-        )
-        .unwrap();
+        );
     }
 
     log::debug!("Turning AST to HIR…");
     let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
     if debug {
-        let hir_file = module.associated_debug_file("hir");
-        fs::write(hir_file, format!("{}", hir)).unwrap();
-
-        let hir_ast_id_file = module.associated_debug_file("hir_to_ast_ids");
-        fs::write(
-            hir_ast_id_file,
-            hir_ast_id_map
+        module.dump_associated_debug_file("hir", &format!("{}", hir));
+        module.dump_associated_debug_file(
+            "hir_to_ast_ids",
+            &hir_ast_id_map
                 .keys()
                 .into_iter()
                 .map(|key| format!("{key} -> {}\n", hir_ast_id_map[key]))
                 .join(""),
-        )
-        .unwrap();
+        );
     }
 
     log::debug!("Lowering HIR to LIR…");
     let lir = db.lir(module.clone()).unwrap();
     if debug {
-        let lir_file = module.associated_debug_file("lir");
-        fs::write(lir_file, format!("{lir}")).unwrap();
+        module.dump_associated_debug_file("lir", &format!("{lir}"));
     }
 
     let mut errors = vec![];
@@ -234,13 +221,7 @@ fn run(options: CandyRunOptions) {
     }
 
     if options.debug {
-        let trace = tracer.dump_call_tree();
-        let trace_file = module.associated_debug_file("trace");
-        fs::write(trace_file.clone(), trace).unwrap();
-        log::info!(
-            "Trace has been written to `{}`.",
-            trace_file.as_path().display()
-        );
+        module.dump_associated_debug_file("trace", &tracer.dump_call_tree());
     }
 }
 

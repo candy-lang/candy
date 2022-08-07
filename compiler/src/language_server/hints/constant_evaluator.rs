@@ -13,7 +13,7 @@ use crate::{
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::{collections::HashMap, fs};
+use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct ConstantEvaluator {
@@ -79,9 +79,7 @@ impl ConstantEvaluator {
             }
         };
         if module.to_possible_paths().is_some() {
-            let trace = vm.tracer.dump_call_tree();
-            let trace_file = module.associated_debug_file("trace");
-            fs::write(trace_file, trace).unwrap();
+            module.dump_associated_debug_file("trace", &vm.tracer.dump_call_tree());
         }
 
         for entry in vm.tracer.log() {

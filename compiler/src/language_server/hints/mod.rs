@@ -18,7 +18,7 @@ use crate::{database::Database, module::Module, vm::Heap};
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, time::Duration, vec};
+use std::{collections::HashMap, time::Duration, vec};
 use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
@@ -130,9 +130,10 @@ pub async fn run_server(
                 .sorted_by_key(|hint| hint.position)
                 .collect_vec();
 
-            let hints_file = module.associated_debug_file("hints");
-            let content = hints.iter().map(|hint| format!("{hint:?}")).join("\n");
-            fs::write(hints_file.clone(), content).unwrap();
+            module.dump_associated_debug_file(
+                "hints",
+                &hints.iter().map(|hint| format!("{hint:?}")).join("\n"),
+            );
 
             // Only show the most important hint per line.
             let hints = hints

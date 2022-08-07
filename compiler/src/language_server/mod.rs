@@ -57,6 +57,11 @@ impl CandyLanguageServer {
             Err(_) => panic!("Couldn't send message to hints server."),
         }
     }
+
+    async fn code_module_from_url(&self, url: Url) -> Module {
+        let project_directory = self.project_directory.read().await.clone().unwrap();
+        Module::from_package_root_and_url(project_directory, url, ModuleKind::Code)
+    }
 }
 
 #[tower_lsp::async_trait]
@@ -218,12 +223,7 @@ impl LanguageServer for CandyLanguageServer {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let project_directory = self.project_directory.read().await.clone().unwrap();
-        let module = Module::from_package_root_and_url(
-            project_directory,
-            params.text_document.uri,
-            ModuleKind::Code,
-        );
+        let module = self.code_module_from_url(params.text_document.uri).await;
         let content = params.text_document.text.into_bytes();
         {
             let mut db = self.db.lock().await;
@@ -234,12 +234,7 @@ impl LanguageServer for CandyLanguageServer {
             .await;
     }
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        let project_directory = self.project_directory.read().await.clone().unwrap();
-        let module = Module::from_package_root_and_url(
-            project_directory,
-            params.text_document.uri,
-            ModuleKind::Code,
-        );
+        let module = self.code_module_from_url(params.text_document.uri).await;
         let mut open_modules = Vec::<Module>::new();
         let content = {
             let mut db = self.db.lock().await;
@@ -253,12 +248,7 @@ impl LanguageServer for CandyLanguageServer {
             .await;
     }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
-        let project_directory = self.project_directory.read().await.clone().unwrap();
-        let module = Module::from_package_root_and_url(
-            project_directory,
-            params.text_document.uri,
-            ModuleKind::Code,
-        );
+        let module = self.code_module_from_url(params.text_document.uri).await;
         let mut db = self.db.lock().await;
         db.did_close_module(&module);
         self.send_to_hints_server(hints::Event::CloseModule(module))
@@ -292,12 +282,7 @@ impl LanguageServer for CandyLanguageServer {
         &self,
         params: FoldingRangeParams,
     ) -> jsonrpc::Result<Option<Vec<FoldingRange>>> {
-        let project_directory = self.project_directory.read().await.clone().unwrap();
-        let module = Module::from_package_root_and_url(
-            project_directory,
-            params.text_document.uri,
-            ModuleKind::Code,
-        );
+        let module = self.code_module_from_url(params.text_document.uri).await;
         let db = self.db.lock().await;
         let ranges = db.folding_ranges(module);
         Ok(Some(ranges))
@@ -307,12 +292,7 @@ impl LanguageServer for CandyLanguageServer {
         &self,
         params: SemanticTokensParams,
     ) -> jsonrpc::Result<Option<SemanticTokensResult>> {
-        let project_directory = self.project_directory.read().await.clone().unwrap();
-        let module = Module::from_package_root_and_url(
-            project_directory,
-            params.text_document.uri,
-            ModuleKind::Code,
-        );
+        let module = self.code_module_from_url(params.text_document.uri).await;
         let db = self.db.lock().await;
         let tokens = db.semantic_tokens(module);
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
