@@ -208,7 +208,7 @@ impl Data {
                 struct_
                     .fields
                     .iter()
-                    .map(|(_, key, value)| (key.format(heap), value))
+                    .map(|(_, key, value)| (key.format(heap), value.format(heap)))
                     .sorted_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b))
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
