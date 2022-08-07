@@ -635,18 +635,9 @@ mod parse {
         }
 
         loop {
-            let (new_input, newline) = if let Some(it) = newline(input.clone()) {
-                it
-            } else {
-                break;
-            };
+            let Some((new_input, newline)) = newline(input.clone()) else { break };
 
-            let (new_input, indentation) =
-                if let Some(it) = leading_indentation(new_input, indentation) {
-                    it
-                } else {
-                    break;
-                };
+            let Some((new_input, indentation)) = leading_indentation(new_input, indentation) else { break };
 
             // TODO: use `if let … && let …`, https://github.com/rust-lang/rust/issues/99852
             let (remaining, (mut line_text, new_formatting_state)) =
@@ -714,12 +705,7 @@ mod parse {
         }
 
         loop {
-            let (new_input, whitespace) = if let Some(it) = newline_and_whitespace(input.clone(), 0)
-            {
-                it
-            } else {
-                break;
-            };
+            let Some((new_input, whitespace)) =newline_and_whitespace(input.clone(), 0) else { break };
 
             if let Some((line, remaining)) = new_input.split_first()
                     && let Some((new_title_line, new_formatting_state)) = title_line(line, formatting_state) {
@@ -823,12 +809,7 @@ mod parse {
         }
 
         loop {
-            let (new_input, whitespace) = if let Some(it) = newline_and_whitespace(input.clone(), 0)
-            {
-                it
-            } else {
-                break;
-            };
+            let Some((new_input, whitespace)) = newline_and_whitespace(input.clone(), 0) else { break };
 
             if let Some((new_input, url)) = url_line(new_input) {
                 input = new_input;

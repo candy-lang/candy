@@ -1,6 +1,7 @@
 #![feature(async_closure)]
 #![feature(box_patterns)]
 #![feature(label_break_value)]
+#![feature(let_else)]
 #![feature(never_type)]
 #![feature(try_trait_v2)]
 #![allow(clippy::module_inception)]
