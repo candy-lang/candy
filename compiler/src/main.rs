@@ -41,7 +41,7 @@ use std::{
 use structopt::StructOpt;
 use tower_lsp::{LspService, Server};
 use tracing::{debug, error, info, warn, Level, Metadata};
-use tracing_subscriber::{filter, fmt::format::FmtSpan, layer::Filter, prelude::*, FmtSubscriber};
+use tracing_subscriber::{filter, fmt::format::FmtSpan, prelude::*};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "candy", about = "The 🍭 Candy CLI.")]
@@ -256,7 +256,7 @@ async fn lsp() {
 fn init_logger() {
     let console_log = tracing_subscriber::fmt::layer()
         .compact()
-        .with_span_events(FmtSpan::FULL)
+        .with_span_events(FmtSpan::ENTER)
         .with_filter(filter::filter_fn(|metadata| {
             // For external packages, show only the error logs.
             metadata.level() <= &Level::ERROR
