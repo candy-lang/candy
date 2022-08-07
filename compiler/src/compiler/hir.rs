@@ -9,6 +9,7 @@ use std::{
     fmt::{self, Display, Formatter},
     sync::Arc,
 };
+use tracing::info;
 
 #[salsa::query_group(HirDbStorage)]
 pub trait HirDb: AstToHir {
@@ -43,7 +44,7 @@ fn all_hir_ids(db: &dyn HirDb, module: Module) -> Option<Vec<Id>> {
     let (hir, _) = db.hir(module)?;
     let mut ids = vec![];
     hir.collect_all_ids(&mut ids);
-    log::info!("all HIR IDs: {ids:?}");
+    info!("All HIR IDs: {ids:?}");
     Some(ids)
 }
 

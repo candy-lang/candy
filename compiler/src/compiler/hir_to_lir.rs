@@ -9,6 +9,7 @@ use crate::{builtin_functions::BuiltinFunction, module::Module};
 use itertools::Itertools;
 use num_bigint::BigUint;
 use std::sync::Arc;
+use tracing::{span, Level};
 
 #[salsa::query_group(HirToLirStorage)]
 pub trait HirToLir: CstDb + AstToHir {
@@ -51,8 +52,8 @@ struct LoweringContext {
 }
 impl LoweringContext {
     fn compile_expression(&mut self, id: &hir::Id, expression: &Expression) {
-        log::trace!("Stack: {:?}", self.stack);
-        log::trace!("Compiling expression {expression:?}");
+        let span = span!(Level::TRACE, "Compiling expression {expression:?}");
+        let _enter = span.enter();
 
         match expression {
             Expression::Int(int) => self.emit_create_int(id.clone(), int.clone()),

@@ -6,6 +6,7 @@ use crate::{
     module::Module,
 };
 use itertools::Itertools;
+use tracing::error;
 
 #[derive(Default, Clone)]
 pub struct Tracer {
@@ -74,7 +75,7 @@ impl Tracer {
     }
     pub fn dump_stack_trace(&self, db: &Database, heap: &Heap) {
         for line in self.format_stack_trace(db, heap).lines() {
-            log::error!("{}", line);
+            error!("{}", line);
         }
     }
     pub fn format_stack_trace(&self, db: &Database, heap: &Heap) -> String {

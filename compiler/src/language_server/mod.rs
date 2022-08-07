@@ -33,6 +33,7 @@ use lsp_types::{
 use std::{path::PathBuf, sync::Arc};
 use tokio::sync::{mpsc::Sender, Mutex, RwLock};
 use tower_lsp::{jsonrpc, Client, LanguageServer};
+use tracing::{debug, span, Level};
 
 pub struct CandyLanguageServer {
     pub client: Client,
@@ -67,7 +68,7 @@ impl CandyLanguageServer {
 #[tower_lsp::async_trait]
 impl LanguageServer for CandyLanguageServer {
     async fn initialize(&self, params: InitializeParams) -> jsonrpc::Result<InitializeResult> {
-        log::info!("LSP: initialize");
+        span!(Level::DEBUG, "LSP: initialize");
         self.client
             .log_message(MessageType::INFO, "Initializing!")
             .await;
@@ -91,7 +92,7 @@ impl LanguageServer for CandyLanguageServer {
         let client = self.client.clone();
         let hint_reporter = async move || {
             while let Some((module, hints)) = hints_receiver.recv().await {
-                log::debug!("Reporting hints for {module}: {hints:?}");
+                debug!("Reporting hints for {module}: {hints:?}");
                 client
                     .send_notification::<HintsNotification>(HintsNotification {
                         uri: Url::from(module).to_string(),
@@ -113,7 +114,7 @@ impl LanguageServer for CandyLanguageServer {
     }
 
     async fn initialized(&self, _: InitializedParams) {
-        log::info!("LSP: initialized");
+        debug!("LSP: initialized");
         let candy_files = vec![
             DocumentFilter {
                 language: Some("candy".to_owned()),
@@ -304,7 +305,7 @@ impl LanguageServer for CandyLanguageServer {
 
 impl CandyLanguageServer {
     async fn analyze_modules(&self, modules: Vec<Module>) {
-        log::debug!(
+        debug!(
             "Analyzing {} {}",
             if modules.len() == 1 {
                 "module"
@@ -314,7 +315,6 @@ impl CandyLanguageServer {
             modules.iter().join(", ")
         );
         let db = self.db.lock().await;
-        log::debug!("Locked.");
 
         for module in modules {
             let (hir, _mapping) = db.hir(module.clone()).unwrap();

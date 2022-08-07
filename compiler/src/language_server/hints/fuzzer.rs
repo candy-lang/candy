@@ -12,6 +12,7 @@ use crate::{
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::collections::HashMap;
+use tracing::{error, trace};
 
 #[derive(Default)]
 pub struct FuzzerManager {
@@ -44,7 +45,7 @@ impl FuzzerManager {
             .flat_map(|fuzzers| fuzzers.values_mut())
             .filter(|fuzzer| matches!(fuzzer.status(), Status::StillFuzzing { .. }))
             .collect_vec();
-        log::trace!(
+        trace!(
             "Fuzzer running. {} fuzzers for relevant closures are running.",
             running_fuzzers.len(),
         );
@@ -78,7 +79,7 @@ impl FuzzerManager {
                             .collect_vec(),
                         Some(_) => panic!("Looks like we fuzzed a non-closure. That's weird."),
                         None => {
-                            log::error!("Using fuzzing, we found an error in a generated closure.");
+                            error!("Using fuzzing, we found an error in a generated closure.");
                             continue;
                         }
                     };

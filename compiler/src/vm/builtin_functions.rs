@@ -8,6 +8,7 @@ use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::ToPrimitive;
 use std::{ops::Deref, str::FromStr};
+use tracing::{info, span, Level};
 use unicode_segmentation::UnicodeSegmentation;
 
 impl Vm {
@@ -17,43 +18,43 @@ impl Vm {
         builtin_function: &BuiltinFunction,
         args: &[Pointer],
     ) {
-        log::trace!("run_builtin_function: builtin{builtin_function:?}");
-
-        let result = match &builtin_function {
-            BuiltinFunction::Equals => self.heap.equals(args),
-            BuiltinFunction::FunctionRun => self.heap.function_run(args),
-            BuiltinFunction::GetArgumentCount => self.heap.get_argument_count(args),
-            BuiltinFunction::IfElse => self.heap.if_else(args),
-            BuiltinFunction::IntAdd => self.heap.int_add(args),
-            BuiltinFunction::IntBitLength => self.heap.int_bit_length(args),
-            BuiltinFunction::IntBitwiseAnd => self.heap.int_bitwise_and(args),
-            BuiltinFunction::IntBitwiseOr => self.heap.int_bitwise_or(args),
-            BuiltinFunction::IntBitwiseXor => self.heap.int_bitwise_xor(args),
-            BuiltinFunction::IntCompareTo => self.heap.int_compare_to(args),
-            BuiltinFunction::IntDivideTruncating => self.heap.int_divide_truncating(args),
-            BuiltinFunction::IntModulo => self.heap.int_modulo(args),
-            BuiltinFunction::IntMultiply => self.heap.int_multiply(args),
-            BuiltinFunction::IntParse => self.heap.int_parse(args),
-            BuiltinFunction::IntRemainder => self.heap.int_remainder(args),
-            BuiltinFunction::IntShiftLeft => self.heap.int_shift_left(args),
-            BuiltinFunction::IntShiftRight => self.heap.int_shift_right(args),
-            BuiltinFunction::IntSubtract => self.heap.int_subtract(args),
-            BuiltinFunction::Print => self.heap.print(args),
-            BuiltinFunction::StructGet => self.heap.struct_get(args),
-            BuiltinFunction::StructGetKeys => self.heap.struct_get_keys(args),
-            BuiltinFunction::StructHasKey => self.heap.struct_has_key(args),
-            BuiltinFunction::TextCharacters => self.heap.text_characters(args),
-            BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
-            BuiltinFunction::TextContains => self.heap.text_contains(args),
-            BuiltinFunction::TextEndsWith => self.heap.text_ends_with(args),
-            BuiltinFunction::TextGetRange => self.heap.text_get_range(args),
-            BuiltinFunction::TextIsEmpty => self.heap.text_is_empty(args),
-            BuiltinFunction::TextLength => self.heap.text_length(args),
-            BuiltinFunction::TextStartsWith => self.heap.text_starts_with(args),
-            BuiltinFunction::TextTrimEnd => self.heap.text_trim_end(args),
-            BuiltinFunction::TextTrimStart => self.heap.text_trim_start(args),
-            BuiltinFunction::TypeOf => self.heap.type_of(args),
-        };
+        let result = span!(Level::TRACE, "Running builtin{builtin_function:?}").in_scope(|| {
+            match &builtin_function {
+                BuiltinFunction::Equals => self.heap.equals(args),
+                BuiltinFunction::FunctionRun => self.heap.function_run(args),
+                BuiltinFunction::GetArgumentCount => self.heap.get_argument_count(args),
+                BuiltinFunction::IfElse => self.heap.if_else(args),
+                BuiltinFunction::IntAdd => self.heap.int_add(args),
+                BuiltinFunction::IntBitLength => self.heap.int_bit_length(args),
+                BuiltinFunction::IntBitwiseAnd => self.heap.int_bitwise_and(args),
+                BuiltinFunction::IntBitwiseOr => self.heap.int_bitwise_or(args),
+                BuiltinFunction::IntBitwiseXor => self.heap.int_bitwise_xor(args),
+                BuiltinFunction::IntCompareTo => self.heap.int_compare_to(args),
+                BuiltinFunction::IntDivideTruncating => self.heap.int_divide_truncating(args),
+                BuiltinFunction::IntModulo => self.heap.int_modulo(args),
+                BuiltinFunction::IntMultiply => self.heap.int_multiply(args),
+                BuiltinFunction::IntParse => self.heap.int_parse(args),
+                BuiltinFunction::IntRemainder => self.heap.int_remainder(args),
+                BuiltinFunction::IntShiftLeft => self.heap.int_shift_left(args),
+                BuiltinFunction::IntShiftRight => self.heap.int_shift_right(args),
+                BuiltinFunction::IntSubtract => self.heap.int_subtract(args),
+                BuiltinFunction::Print => self.heap.print(args),
+                BuiltinFunction::StructGet => self.heap.struct_get(args),
+                BuiltinFunction::StructGetKeys => self.heap.struct_get_keys(args),
+                BuiltinFunction::StructHasKey => self.heap.struct_has_key(args),
+                BuiltinFunction::TextCharacters => self.heap.text_characters(args),
+                BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
+                BuiltinFunction::TextContains => self.heap.text_contains(args),
+                BuiltinFunction::TextEndsWith => self.heap.text_ends_with(args),
+                BuiltinFunction::TextGetRange => self.heap.text_get_range(args),
+                BuiltinFunction::TextIsEmpty => self.heap.text_is_empty(args),
+                BuiltinFunction::TextLength => self.heap.text_length(args),
+                BuiltinFunction::TextStartsWith => self.heap.text_starts_with(args),
+                BuiltinFunction::TextTrimEnd => self.heap.text_trim_end(args),
+                BuiltinFunction::TextTrimStart => self.heap.text_trim_start(args),
+                BuiltinFunction::TypeOf => self.heap.type_of(args),
+            }
+        });
         match result {
             Ok(Return(value)) => self.data_stack.push(value),
             Ok(DivergeControlFlow(closure_address)) => {
@@ -113,10 +114,6 @@ impl Heap {
     fn function_run(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, (closure: Closure), {
             closure.should_take_no_arguments()?;
-            log::debug!(
-                "`functionRun` executing the closure: {}",
-                closure.address.format(self),
-            );
             self.dup(closure.address);
             DivergeControlFlow(closure.address)
         })
@@ -221,7 +218,7 @@ impl Heap {
 
     fn print(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, (message: Text), {
-            log::info!("{:?}", message.value);
+            info!("{:?}", message.value);
             Return(self.create_nothing())
         })
     }

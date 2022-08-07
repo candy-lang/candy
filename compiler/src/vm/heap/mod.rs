@@ -9,6 +9,7 @@ use crate::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use std::{cmp::Ordering, collections::HashMap};
+use tracing::trace;
 
 #[derive(Clone)]
 pub struct Heap {
@@ -56,7 +57,7 @@ impl Heap {
 
     pub fn dup(&mut self, address: Pointer) {
         self.get_mut(address).reference_count += 1;
-        log::trace!(
+        trace!(
             "RefCount of {address} increased to {}. Value: {}",
             self.get(address).reference_count,
             address.format(self),
@@ -66,7 +67,7 @@ impl Heap {
         let formatted_value = address.format(self);
         let object = self.get_mut(address);
         object.reference_count -= 1;
-        log::trace!(
+        trace!(
             "RefCount of {address} reduced to {}. Value: {formatted_value}",
             object.reference_count,
         );
@@ -84,13 +85,13 @@ impl Heap {
                 data: object,
             },
         );
-        log::trace!("Created object {} at {address}.", address.format(self));
+        trace!("Created object {} at {address}.", address.format(self));
         self.next_address = Pointer::from_raw(self.next_address.raw() + 1);
         address
     }
     pub fn free(&mut self, address: Pointer) {
         let object = self.objects.remove(&address).unwrap();
-        log::trace!("Freeing object at {address}.");
+        trace!("Freeing object at {address}.");
         assert_eq!(object.reference_count, 0);
         for child in object.children() {
             self.drop(child);
