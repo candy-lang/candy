@@ -46,7 +46,7 @@ pub async fn fuzz(db: &Database, module: Module) {
                         .join(" "),
                 );
                 log::error!("This was the stack trace:");
-                tracer.dump_stack_trace(db);
+                tracer.dump_stack_trace(db, heap);
 
                 let trace = tracer.dump_call_tree();
                 let trace_file = module.associated_debug_file("trace");

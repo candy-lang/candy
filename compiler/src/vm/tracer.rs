@@ -1,4 +1,4 @@
-use super::heap::Pointer;
+use super::{heap::Pointer, Heap};
 use crate::{
     compiler::{ast_to_hir::AstToHir, cst::CstDb, hir::Id},
     database::Database,
@@ -72,12 +72,12 @@ impl Tracer {
     pub fn stack(&self) -> &[TraceEntry] {
         &self.stack
     }
-    pub fn dump_stack_trace(&self, db: &Database) {
-        for line in self.format_stack_trace(db).lines() {
+    pub fn dump_stack_trace(&self, db: &Database, heap: &Heap) {
+        for line in self.format_stack_trace(db, heap).lines() {
             log::error!("{}", line);
         }
     }
-    pub fn format_stack_trace(&self, db: &Database) -> String {
+    pub fn format_stack_trace(&self, db: &Database, heap: &Heap) -> String {
         // TODO: Format values properly.
         self.stack
             .iter()
@@ -87,7 +87,7 @@ impl Tracer {
                     TraceEntry::CallStarted { id, closure, args } => (
                         format!(
                             "{closure} {}",
-                            args.iter().map(|arg| format!("{arg}")).join(" ")
+                            args.iter().map(|arg| arg.format(heap)).join(" ")
                         ),
                         Some(id),
                     ),
@@ -95,7 +95,10 @@ impl Tracer {
                         id,
                         condition,
                         reason,
-                    } => (format!("needs {condition} {reason}"), Some(id)),
+                    } => (
+                        format!("needs {} {}", condition.format(heap), reason.format(heap)),
+                        Some(id),
+                    ),
                     TraceEntry::ModuleStarted { module } => (format!("module {module}"), None),
                     _ => unreachable!(),
                 };
