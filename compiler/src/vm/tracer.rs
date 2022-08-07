@@ -141,26 +141,35 @@ impl Tracer {
             .join("\n")
     }
 
-    pub fn dump_call_tree(&self) -> String {
+    pub fn format_call_tree(&self, heap: &Heap) -> String {
         // TODO: Format values properly.
         let actions = self
             .log
             .iter()
             .map(|entry| match entry {
-                TraceEntry::ValueEvaluated { id, value } => Action::Stay(format!("{id} = {value}")),
+                TraceEntry::ValueEvaluated { id, value } => {
+                    Action::Stay(format!("{id} = {}", value.format(heap)))
+                }
                 TraceEntry::CallStarted { id, closure, args } => Action::Start(format!(
-                    "{id} {closure} {}",
-                    args.iter().map(|arg| format!("{arg}")).join(" ")
+                    "{id} {} {}",
+                    closure.format(heap),
+                    args.iter().map(|arg| arg.format(heap)).join(" ")
                 )),
-                TraceEntry::CallEnded { return_value } => Action::End(format!(" = {return_value}")),
+                TraceEntry::CallEnded { return_value } => {
+                    Action::End(format!(" = {}", return_value.format(heap)))
+                }
                 TraceEntry::NeedsStarted {
                     id,
                     condition,
                     reason,
-                } => Action::Start(format!("{id} needs {condition} {reason}")),
+                } => Action::Start(format!(
+                    "{id} needs {} {}",
+                    condition.format(heap),
+                    reason.format(heap)
+                )),
                 TraceEntry::NeedsEnded => Action::End(" = Nothing".to_string()),
                 TraceEntry::ModuleStarted { module } => Action::Start(format!("module {module}")),
-                TraceEntry::ModuleEnded { export_map } => Action::End(format!("{export_map}")),
+                TraceEntry::ModuleEnded { export_map } => Action::End(export_map.format(heap)),
             })
             .collect_vec();
 

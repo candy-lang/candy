@@ -221,7 +221,7 @@ fn run(options: CandyRunOptions) {
     }
 
     if options.debug {
-        module.dump_associated_debug_file("trace", &tracer.dump_call_tree());
+        module.dump_associated_debug_file("trace", &tracer.format_call_tree(&heap));
     }
 }
 

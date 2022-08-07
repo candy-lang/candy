@@ -79,7 +79,7 @@ impl ConstantEvaluator {
             }
         };
         if module.to_possible_paths().is_some() {
-            module.dump_associated_debug_file("trace", &vm.tracer.dump_call_tree());
+            module.dump_associated_debug_file("trace", &vm.tracer.format_call_tree(&vm.heap));
         }
 
         for entry in vm.tracer.log() {
