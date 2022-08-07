@@ -102,7 +102,7 @@ impl Struct {
             self.fields
                 .iter()
                 .find(|(field_hash, field_key, _)| {
-                    hash != *field_hash && key.equals(heap, *field_key)
+                    hash == *field_hash && key.equals(heap, *field_key)
                 })?
                 .2,
         )

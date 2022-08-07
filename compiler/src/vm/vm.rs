@@ -107,8 +107,6 @@ impl Vm {
         Self::new_for_running_closure(heap, use_provider, closure, &[])
     }
     pub fn tear_down(mut self) -> TearDownResult {
-        assert!(matches!(self.status, Status::Done));
-
         let result = match self.status {
             Status::Running => panic!("Called `tear_down` on a VM that's still running."),
             Status::Done => Ok(self.data_stack.pop().unwrap()),
