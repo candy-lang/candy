@@ -164,7 +164,7 @@ impl Heap {
 
     fn int_add(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, (a: Int, b: Int), {
-            Return(self.create_int(a.value.clone() + b.value.clone()))
+            Return(self.create_int(&a.value + &b.value))
         })
     }
     fn int_bit_length(&mut self, args: &[Pointer]) -> BuiltinResult {
@@ -174,17 +174,17 @@ impl Heap {
     }
     fn int_bitwise_and(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, (a: Int, b: Int), {
-            Return(self.create_int(a.value.clone() & b.value.clone()))
+            Return(self.create_int(&a.value & &b.value))
         })
     }
     fn int_bitwise_or(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, (a: Int, b: Int), {
-            Return(self.create_int(a.value.clone() | b.value.clone()))
+            Return(self.create_int(&a.value | &b.value))
         })
     }
     fn int_bitwise_xor(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, (a: Int, b: Int), {
-            Return(self.create_int(a.value.clone() ^ b.value.clone()))
+            Return(self.create_int(&a.value ^ &b.value))
         })
     }
     fn int_compare_to(&mut self, args: &[Pointer]) -> BuiltinResult {
@@ -194,17 +194,17 @@ impl Heap {
     }
     fn int_divide_truncating(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, (dividend: Int, divisor: Int), {
-            Return(self.create_int(dividend.value.clone() / divisor.value.clone()))
+            Return(self.create_int(&dividend.value / &divisor.value))
         })
     }
     fn int_modulo(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, (dividend: Int, divisor: Int), {
-            Return(self.create_int(dividend.value.clone().mod_floor(&divisor.value)))
+            Return(self.create_int(dividend.value.mod_floor(&divisor.value)))
         })
     }
     fn int_multiply(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, (factor_a: Int, factor_b: Int), {
-            Return(self.create_int(factor_a.value.clone() * factor_b.value.clone()))
+            Return(self.create_int(&factor_a.value * &factor_b.value))
         })
     }
     fn int_parse(&mut self, args: &[Pointer]) -> BuiltinResult {
@@ -218,13 +218,13 @@ impl Heap {
     }
     fn int_remainder(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, (dividend: Int, divisor: Int), {
-            Return(self.create_int(dividend.value.clone() % divisor.value.clone()))
+            Return(self.create_int(&dividend.value % &divisor.value))
         })
     }
     fn int_shift_left(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, (value: Int, amount: Int), {
             let amount = amount.value.to_u128().unwrap();
-            Return(self.create_int(value.value.clone() << amount))
+            Return(self.create_int(&value.value << amount))
         })
     }
     fn int_shift_right(&mut self, args: &[Pointer]) -> BuiltinResult {
@@ -236,7 +236,7 @@ impl Heap {
     }
     fn int_subtract(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, (minuend: Int, subtrahend: Int), {
-            Return(self.create_int(minuend.value.clone() - subtrahend.value.clone()))
+            Return(self.create_int(&minuend.value - &subtrahend.value))
         })
     }
 
