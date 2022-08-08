@@ -18,7 +18,7 @@ pub struct Heap {
 
 impl std::fmt::Debug for Heap {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut objects = self.objects.clone().into_iter().collect_vec();
+        let mut objects = self.objects.iter().collect_vec();
         objects.sort_by_key(|(address, _)| address.raw());
 
         writeln!(f, "{{")?;
@@ -27,7 +27,7 @@ impl std::fmt::Debug for Heap {
                 f,
                 "{address}: {} {}",
                 object.reference_count,
-                address.format(self),
+                object.format(self),
             )?;
         }
         write!(f, "}}")
