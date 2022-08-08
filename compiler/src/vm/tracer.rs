@@ -78,7 +78,6 @@ impl Tracer {
         }
     }
     pub fn format_stack_trace(&self, db: &Database, heap: &Heap) -> String {
-        // TODO: Format values properly.
         self.stack
             .iter()
             .rev()
@@ -142,7 +141,6 @@ impl Tracer {
     }
 
     pub fn format_call_tree(&self, heap: &Heap) -> String {
-        // TODO: Format values properly.
         let actions = self
             .log
             .iter()
