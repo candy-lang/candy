@@ -112,7 +112,7 @@ impl Heap {
 
         let address_map: HashMap<Pointer, Pointer> = objects_to_refcounts
             .keys()
-            .cloned()
+            .copied()
             .zip(
                 (other.next_address.raw()..other.next_address.raw() + num_objects)
                     .map(Pointer::from_raw),
