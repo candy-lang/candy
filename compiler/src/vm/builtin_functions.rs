@@ -397,56 +397,26 @@ impl TryInto<Any> for Data {
         Ok(Any { data: self })
     }
 }
-impl TryInto<Int> for Data {
-    type Error = String;
+macro_rules! impl_data_try_into_type {
+    ($type:ty, $variant:tt, $error_message:expr) => {
+        impl TryInto<$type> for Data {
+            type Error = String;
 
-    fn try_into(self) -> Result<Int, Self::Error> {
-        match self {
-            Data::Int(int) => Ok(int),
-            _ => Err("a builtin function expected an int".to_string()),
+            fn try_into(self) -> Result<$type, Self::Error> {
+                match self {
+                    Data::$variant(it) => Ok(it),
+                    _ => Err($error_message.to_string()),
+                }
+            }
         }
-    }
+    };
 }
-impl TryInto<Text> for Data {
-    type Error = String;
+impl_data_try_into_type!(Int, Int, "a builtin function expected an int");
+impl_data_try_into_type!(Text, Text, "a builtin function expected a text");
+impl_data_try_into_type!(Symbol, Symbol, "a builtin function expected a symbol");
+impl_data_try_into_type!(Struct, Struct, "a builtin function expected a struct");
+impl_data_try_into_type!(Closure, Closure, "a builtin function expected a closure");
 
-    fn try_into(self) -> Result<Text, Self::Error> {
-        match self {
-            Data::Text(text) => Ok(text),
-            _ => Err("a builtin function expected a text".to_string()),
-        }
-    }
-}
-impl TryInto<Symbol> for Data {
-    type Error = String;
-
-    fn try_into(self) -> Result<Symbol, Self::Error> {
-        match self {
-            Data::Symbol(symbol) => Ok(symbol),
-            _ => Err("a builtin function expected a symbol".to_string()),
-        }
-    }
-}
-impl TryInto<Struct> for Data {
-    type Error = String;
-
-    fn try_into(self) -> Result<Struct, Self::Error> {
-        match self {
-            Data::Struct(struct_) => Ok(struct_),
-            _ => Err("a builtin function expected a struct".to_string()),
-        }
-    }
-}
-impl TryInto<Closure> for Data {
-    type Error = String;
-
-    fn try_into(self) -> Result<Closure, Self::Error> {
-        match self {
-            Data::Closure(closure) => Ok(closure),
-            _ => Err("a builtin function expected a function".to_string()),
-        }
-    }
-}
 impl TryInto<bool> for Data {
     type Error = String;
 
