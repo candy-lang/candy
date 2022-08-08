@@ -78,6 +78,27 @@ impl From<SuccessfulBehavior> for BuiltinResult {
     }
 }
 
+macro_rules! unpack {
+    ( $heap:expr, $args:expr, ($( $arg:ident: $type:ty ),+), $body:block ) => {
+        {
+            let ( $( $arg, )+ ) = if let [$( $arg, )+] = $args {
+                ( $( *$arg, )+ )
+            } else {
+                return Err(
+                    "a builtin function was called with the wrong number of arguments".to_string(),
+                );
+            };
+            let ( $( $arg, )+ ): ( $( UnpackedData<$type>, )+ ) = ( $(
+                UnpackedData {
+                    address: $arg,
+                    data: $heap.get($arg).data.clone().try_into()?,
+                },
+            )+ );
+
+            $body.into()
+        }
+    };
+}
 macro_rules! unpack_and_later_drop {
     ( $heap:expr, $args:expr, ($( $arg:ident: $type:ty ),+), $body:block ) => {
         {
@@ -111,13 +132,8 @@ impl Heap {
     }
 
     fn function_run(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (closure: Closure), {
+        unpack!(self, args, (closure: Closure), {
             closure.should_take_no_arguments()?;
-            log::debug!(
-                "`functionRun` executing the closure: {}",
-                closure.address.format(self),
-            );
-            self.dup(closure.address);
             DivergeControlFlow(closure.address)
         })
     }
@@ -129,14 +145,19 @@ impl Heap {
     }
 
     fn if_else(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(
+        unpack!(
             self,
             args,
             (condition: bool, then: Closure, else_: Closure),
             {
-                let closure_to_run = if *condition { &then } else { &else_ }.address;
-                self.dup(closure_to_run);
-                DivergeControlFlow(closure_to_run)
+                let (run, dont_run) = if *condition {
+                    (then, else_)
+                } else {
+                    (else_, then)
+                };
+                self.drop(condition.address);
+                self.drop(dont_run.address);
+                DivergeControlFlow(run.address)
             }
         )
     }
