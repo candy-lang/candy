@@ -43,8 +43,7 @@ pub struct Text {
 
 #[derive(Clone)]
 pub struct Symbol {
-    // TODO: For better memory efficiency, store the symbol as a null-terminated
-    // string.
+    // TODO: Choose a more efficient representation.
     pub value: String,
 }
 
