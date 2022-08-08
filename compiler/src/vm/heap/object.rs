@@ -50,7 +50,7 @@ pub struct Symbol {
 #[derive(Default, Clone)]
 pub struct Struct {
     // TODO: Choose a more efficient representation.
-    pub fields: Vec<(u64, Pointer, Pointer)>, // hash, key, and value
+    pub buckets: HashMap<u64, Vec<(Pointer, Pointer)>>, // hash -> list of keys and values
 }
 
 #[derive(Clone)]
@@ -74,46 +74,29 @@ impl Struct {
         s
     }
     fn insert(&mut self, heap: &Heap, key: Pointer, value: Pointer) {
-        let hash = key.hash(heap);
-        for (existing_hash, existing_key, existing_value) in &mut self.fields {
-            if hash != *existing_hash {
-                continue;
-            }
+        let bucket = self.buckets.entry(key.hash(heap)).or_default();
+        for (existing_key, existing_value) in bucket.iter_mut() {
             if existing_key.equals(heap, key) {
                 *existing_value = value;
                 return;
             }
         }
-        let entry = (hash, key, value);
-        if let Some(index) = self
-            .fields
-            .iter()
-            .position(|(the_hash, _, _)| *the_hash > hash)
-        {
-            self.fields.insert(index, entry);
-        } else {
-            self.fields.push(entry);
-        }
+        bucket.push((key, value));
     }
     pub fn get(&self, heap: &Heap, key: Pointer) -> Option<Pointer> {
-        let hash = key.hash(heap);
-        Some(
-            self.fields
-                .iter()
-                .find(|(field_hash, field_key, _)| {
-                    hash == *field_hash && key.equals(heap, *field_key)
-                })?
-                .2,
-        )
+        let bucket = self.buckets.get(&key.hash(heap))?;
+        for (existing_key, existing_value) in bucket {
+            if existing_key.equals(heap, key) {
+                return Some(*existing_value);
+            }
+        }
+        None
     }
     fn len(&self) -> usize {
-        self.fields.len()
+        self.buckets.values().map(|bucket| bucket.len()).sum()
     }
     pub fn iter(&self) -> impl Iterator<Item = (Pointer, Pointer)> {
-        self.fields
-            .clone()
-            .into_iter()
-            .map(|(_, key, value)| (key, value))
+        self.buckets.clone().into_values().flatten()
     }
     fn equals(&self, heap: &Heap, other: &Struct) -> bool {
         if self.len() != other.len() {
@@ -205,9 +188,8 @@ impl Data {
             Data::Struct(struct_) => format!(
                 "[{}]",
                 struct_
-                    .fields
                     .iter()
-                    .map(|(_, key, value)| (key.format(heap), value.format(heap)))
+                    .map(|(key, value)| (key.format(heap), value.format(heap)))
                     .sorted_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b))
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
