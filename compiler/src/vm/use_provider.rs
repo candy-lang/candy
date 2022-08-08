@@ -1,5 +1,5 @@
 use super::{
-    heap::{Closure, Data, Heap, Pointer},
+    heap::{Closure, Heap, Pointer, Text},
     Vm,
 };
 use crate::{
@@ -77,11 +77,13 @@ impl UsePath {
     const PARENT_NAVIGATION_CHAR: char = '.';
 
     fn parse(heap: &Heap, path: Pointer) -> Result<Self, String> {
-        let path = match &heap.get(path).data {
-            Data::Text(path) => path.value.clone(),
-            _ => return Err("the path has to be a text".to_string()),
-        };
-        let mut path = path.as_str();
+        let path: Text = heap
+            .get(path)
+            .data
+            .clone()
+            .try_into()
+            .map_err(|_| "the path has to be a text".to_string())?;
+        let mut path = path.value.as_str();
         let parent_navigations = {
             let mut navigations = 0;
             while path.starts_with(UsePath::PARENT_NAVIGATION_CHAR) {
