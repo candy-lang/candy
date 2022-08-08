@@ -358,10 +358,7 @@ impl Heap {
     }
 }
 
-trait ClosureShouldHaveNoArguments {
-    fn should_take_no_arguments(&self) -> Result<(), String>;
-}
-impl ClosureShouldHaveNoArguments for Closure {
+impl Closure {
     fn should_take_no_arguments(&self) -> Result<(), String> {
         match self.num_args {
             0 => Ok(()),
