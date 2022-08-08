@@ -211,15 +211,13 @@ impl Heap {
             Ok(it) => ("Ok".to_string(), it),
             Err(it) => ("Error".to_string(), it),
         };
-        let fields = vec![
+        let fields = HashMap::from([
             (
                 self.create_symbol("Type".to_string()),
                 self.create_symbol(type_),
             ),
             (self.create_symbol("Value".to_string()), value),
-        ]
-        .into_iter()
-        .collect();
+        ]);
         self.create_struct(fields)
     }
     pub fn create_ordering(&mut self, ordering: Ordering) -> Pointer {
