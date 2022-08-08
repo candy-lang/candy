@@ -131,7 +131,7 @@ impl Struct {
 }
 
 impl Closure {
-    pub fn of_lir(module: Module, lir: Lir) -> Self {
+    pub fn of_module_lir(module: Module, lir: Lir) -> Self {
         Closure {
             captured: vec![],
             num_args: 0,
@@ -150,7 +150,7 @@ impl Closure {
     }
     pub fn of_module(db: &Database, module: Module) -> Option<Self> {
         let lir = db.lir(module.clone())?;
-        Some(Self::of_lir(module, (*lir).clone()))
+        Some(Self::of_module_lir(module, (*lir).clone()))
     }
 }
 
