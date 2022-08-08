@@ -212,7 +212,7 @@ impl Data {
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
             ),
-            Data::Closure(_) => "{...}".to_string(),
+            Data::Closure(_) => "{…}".to_string(),
             Data::Builtin(builtin) => format!("builtin{:?}", builtin.function),
         }
     }
