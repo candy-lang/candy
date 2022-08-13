@@ -494,21 +494,21 @@ mod parse {
             self.finish()
         }
     }
-    fn single_line_inline(
+    fn inline(
         line: &str,
         initial_formatting_state: &[InlineFormatting],
     ) -> Option<(Vec<Rcst>, Vec<InlineFormatting>)> {
-        log::trace!("single_line_inline({line:?}, {initial_formatting_state:?})");
+        log::trace!("inline({line:?}, {initial_formatting_state:?})");
         SingleLineInlineParser::parse(line, initial_formatting_state)
     }
     #[test]
-    fn test_single_line_inline() {
+    fn test_inline() {
         assert_eq!(
-            single_line_inline("abc", &[]),
+            inline("abc", &[]),
             Some((vec![Rcst::TextPart("abc".to_string())], vec![]))
         );
         assert_eq!(
-            single_line_inline("abc _def_ ghi", &[]),
+            inline("abc _def_ ghi", &[]),
             Some((
                 vec![
                     Rcst::TextPart("abc ".to_string()),
@@ -523,7 +523,7 @@ mod parse {
             ))
         );
         assert_eq!(
-            single_line_inline("abc [def] ghi", &[]),
+            inline("abc [def] ghi", &[]),
             Some((
                 vec![
                     Rcst::TextPart("abc ".to_string()),
@@ -538,7 +538,7 @@ mod parse {
             ))
         );
         assert_eq!(
-            single_line_inline("abc `def` ghi", &[]),
+            inline("abc `def` ghi", &[]),
             Some((
                 vec![
                     Rcst::TextPart("abc ".to_string()),
@@ -553,7 +553,7 @@ mod parse {
             ))
         );
         assert_eq!(
-            single_line_inline("abc [_def ` ghi", &[]),
+            inline("abc [_def ` ghi", &[]),
             Some((
                 vec![
                     Rcst::TextPart("abc ".to_string()),
@@ -582,7 +582,7 @@ mod parse {
             ))
         );
         assert_eq!(
-            single_line_inline(
+            inline(
                 "abc` def]_ ghi",
                 &[
                     InlineFormatting::Link,
@@ -618,52 +618,6 @@ mod parse {
             ))
         );
     }
-    fn multi_line_inline(
-        mut input: Vec<&str>,
-        indentation: usize,
-    ) -> Option<(Vec<&str>, Vec<Rcst>)> {
-        log::trace!("multi_line_inline({input:?})");
-
-        let mut parts = vec![];
-        let mut formatting_state = vec![];
-        if let Some((line, remaining)) = input.split_first() {
-            let (new_parts, new_formatting_state) =
-                single_line_inline(line, formatting_state.as_slice())?;
-            parts.extend(new_parts);
-            formatting_state = new_formatting_state;
-            input = recombine("", remaining);
-        }
-
-        loop {
-            let Some((new_input, newline)) = newline(input.clone()) else { break };
-
-            let Some((new_input, indentation)) = leading_indentation(new_input, indentation) else { break };
-
-            // TODO: use `if let … && let …`, https://github.com/rust-lang/rust/issues/99852
-            let (remaining, (mut line_text, new_formatting_state)) =
-                if let Some((line, remaining)) = new_input.split_first() {
-                    if let Some(result) = single_line_inline(line, formatting_state.as_slice()) {
-                        (remaining, result)
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                };
-
-            let last_text = line_text.pop().unwrap();
-            line_text.push(last_text.wrap_in_whitespace(vec![newline, indentation]));
-            parts.append(&mut line_text);
-            input = recombine("", remaining);
-            formatting_state = new_formatting_state;
-        }
-
-        if parts.is_empty() {
-            None
-        } else {
-            Some((input, parts))
-        }
-    }
 
     fn title_line(
         line: &str,
@@ -680,8 +634,8 @@ mod parse {
         }
         let line = &line[octothorpe_count..];
 
-        let (text, formatting_state) = single_line_inline(line, formatting_state.as_slice())
-            .unwrap_or((vec![], formatting_state));
+        let (text, formatting_state) =
+            inline(line, formatting_state.as_slice()).unwrap_or((vec![], formatting_state));
         Some((
             Rcst::TitleLine {
                 octothorpe_count,
@@ -768,8 +722,45 @@ mod parse {
 
     fn paragraph(input: Vec<&str>, indentation: usize) -> Option<(Vec<&str>, Rcst)> {
         log::trace!("paragraph({input:?})");
-        let (input, text) = multi_line_inline(input, indentation)?;
-        Some((input, Rcst::Paragraph(text)))
+
+        let mut parts = vec![];
+        let mut formatting_state = vec![];
+        if let Some((line, remaining)) = input.split_first() {
+            let (new_parts, new_formatting_state) = inline(line, formatting_state.as_slice())?;
+            parts.extend(new_parts);
+            formatting_state = new_formatting_state;
+            input = recombine("", remaining);
+        }
+
+        loop {
+            let Some((new_input, newline)) = newline(input.clone()) else { break };
+
+            let Some((new_input, indentation)) = leading_indentation(new_input, indentation) else { break };
+
+            // TODO: use `if let … && let …`, https://github.com/rust-lang/rust/issues/99852
+            let (remaining, (mut line_text, new_formatting_state)) =
+                if let Some((line, remaining)) = new_input.split_first() {
+                    if let Some(result) = inline(line, formatting_state.as_slice()) {
+                        (remaining, result)
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                };
+
+            let last_text = line_text.pop().unwrap();
+            line_text.push(last_text.wrap_in_whitespace(vec![newline, indentation]));
+            parts.append(&mut line_text);
+            input = recombine("", remaining);
+            formatting_state = new_formatting_state;
+        }
+
+        if parts.is_empty() {
+            None
+        } else {
+            Some((input, Rcst::Paragraph(parts)))
+        }
     }
 
     fn url_line(input: Vec<&str>) -> Option<(Vec<&str>, Rcst)> {
