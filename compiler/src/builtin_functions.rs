@@ -4,6 +4,9 @@ use strum_macros::EnumIter;
 
 #[derive(Debug, EnumIter, PartialEq, Eq, Clone, Hash, Copy)]
 pub enum BuiltinFunction {
+    ChannelCreate,       // capacity -> [sendPort, receivePort]
+    ChannelSend,         // channel any -> Nothing
+    ChannelReceive,      // channel -> any
     Equals,              // any any -> booleanSymbol
     FunctionRun,         // (lambdaWith0Arguments) -> (returnValue: any)
     GetArgumentCount,    // closure -> argumentCount

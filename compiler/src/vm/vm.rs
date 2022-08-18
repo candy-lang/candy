@@ -1,5 +1,6 @@
 use super::{
-    heap::{Builtin, Closure, Data, Heap, Pointer},
+    channel::{Channel, Packet},
+    heap::{Builtin, ChannelId, Closure, Data, Heap, Pointer},
     tracer::{TraceEntry, Tracer},
     use_provider::{DbUseProvider, UseProvider},
 };
@@ -9,20 +10,40 @@ use crate::{
     module::Module,
 };
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use tracing::{info, trace};
 
 const TRACE: bool = false;
 
-/// A VM can execute some byte code.
+/// A VM is a Candy program that thinks it's currently running. Because VMs are
+/// first-class Rust structs, they enable other code to store "freezed" programs
+/// and to remain in control about when and for how long they run.
 #[derive(Clone)]
 pub struct Vm {
+    // Core functionality to run code. VMs are stack-based machines that run
+    // instructions from a LIR. All values are stored on a heap.
     pub status: Status,
     next_instruction: InstructionPointer,
-    pub heap: Heap,
     pub data_stack: Vec<Pointer>,
     pub call_stack: Vec<InstructionPointer>,
     pub import_stack: Vec<Module>,
+    pub heap: Heap,
+
+    // Channel functionality. VMs communicate with the outer world using
+    // channels. Each channel is identified using an ID that is valid inside
+    // this particular VM. Channels created by the program are managed ("owned")
+    // by the VM itself. For channels owned by the outside world (such as those
+    // referenced in the environment argument), the VM maintains a mapping
+    // between internal and external IDs.
+    pub internal_channels: HashMap<ChannelId, Channel>,
+    pub next_internal_channel_id: ChannelId,
+    pub external_to_internal_channels: HashMap<ChannelId, ChannelId>,
+    pub internal_to_external_channels: HashMap<ChannelId, ChannelId>,
+    pub channel_operations: HashMap<ChannelId, VecDeque<ChannelOperation>>,
+
+    // Debug properties. These are not essential to a correct working of the VM,
+    // but they enable advanced functionality like stack traces or finding out
+    // who's fault a panic is.
     pub tracer: Tracer,
     pub fuzzable_closures: Vec<(Id, Pointer)>,
     pub num_instructions_executed: usize,
@@ -58,6 +79,12 @@ impl InstructionPointer {
     }
 }
 
+#[derive(Clone)]
+pub enum ChannelOperation {
+    Send { packet: Packet },
+    Receive,
+}
+
 pub struct TearDownResult {
     pub heap: Heap,
     pub result: Result<Pointer, String>,
@@ -70,10 +97,15 @@ impl Vm {
         Self {
             status: Status::Done,
             next_instruction: InstructionPointer::null_pointer(),
-            heap,
             data_stack: vec![],
             call_stack: vec![],
             import_stack: vec![],
+            heap,
+            internal_channels: HashMap::new(),
+            next_internal_channel_id: 0,
+            external_to_internal_channels: HashMap::new(),
+            internal_to_external_channels: HashMap::new(),
+            channel_operations: Default::default(),
             tracer: Tracer::default(),
             fuzzable_closures: vec![],
             num_instructions_executed: 0,

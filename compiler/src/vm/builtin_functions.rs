@@ -1,9 +1,12 @@
 use super::{
-    heap::{Closure, Data, Int, Pointer, Struct, Symbol, Text},
+    channel::Channel,
+    heap::{Closure, Data, Int, Pointer, SendPort, Struct, Symbol, Text},
     use_provider::UseProvider,
+    vm::ChannelOperation,
     Heap, Vm,
 };
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
+use itertools::Itertools;
 use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::ToPrimitive;
@@ -20,6 +23,9 @@ impl Vm {
     ) {
         let result = span!(Level::TRACE, "Running builtin{builtin_function:?}").in_scope(|| {
             match &builtin_function {
+                BuiltinFunction::ChannelCreate => self.channel_create(args),
+                BuiltinFunction::ChannelSend => self.channel_send(args),
+                BuiltinFunction::ChannelReceive => self.channel_receive(args),
                 BuiltinFunction::Equals => self.heap.equals(args),
                 BuiltinFunction::FunctionRun => self.heap.function_run(args),
                 BuiltinFunction::GetArgumentCount => self.heap.get_argument_count(args),
@@ -101,6 +107,44 @@ macro_rules! unpack_and_later_drop {
             result.into()
         }
     };
+}
+
+impl Vm {
+    fn channel_create(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self.heap, args, (capacity: Int), {
+            let id = self.next_internal_channel_id + 1;
+            self.next_internal_channel_id += 1;
+            self.internal_channels.insert(
+                id,
+                Channel::new(capacity.value.try_into().expect(
+                    "you tried to create a channel with a capacity bigger than the maximum usize",
+                )),
+            );
+
+            let send_port = self.heap.create_send_port(id);
+            let receive_port = self.heap.create_receive_port(id);
+            Return(self.heap.create_list(&[send_port, receive_port]))
+        })
+    }
+
+    fn channel_send(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self.heap, args, (port: SendPort, packet: Any), {
+            if let Some(channel) = self.internal_channels.get(&port.channel) {
+                // An internal channel.
+            } else {
+                // An external channel.
+                let external_id = self.internal_to_external_channels[&port.channel];
+                self.channel_operations
+                    .entry(external_id)
+                    .or_default()
+                    .push(ChannelOperation::Send { packet: () })
+            }
+        })
+    }
+
+    fn channel_receive(&mut self, args: &[Pointer]) -> BuiltinResult {
+        todo!()
+    }
 }
 
 impl Heap {
@@ -328,6 +372,8 @@ impl Heap {
                 Data::Struct(_) => "Struct",
                 Data::Closure(_) => "Function",
                 Data::Builtin(_) => "Builtin",
+                Data::SendPort(_) => "SendPort",
+                Data::ReceivePort(_) => "ReceivePort",
             };
             Return(self.create_symbol(symbol.to_string()))
         })
