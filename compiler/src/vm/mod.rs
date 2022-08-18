@@ -1,4 +1,5 @@
 mod builtin_functions;
+mod channel;
 mod heap;
 pub mod tracer;
 pub mod use_provider;
