@@ -238,10 +238,10 @@ impl Heap {
     pub fn create_nothing(&mut self) -> Pointer {
         self.create_symbol("Nothing".to_string())
     }
-    pub fn create_list(&mut self, items: Vec<Pointer>) -> Pointer {
+    pub fn create_list(&mut self, items: &[Pointer]) -> Pointer {
         let mut fields = vec![];
-        for (index, item) in items.into_iter().enumerate() {
-            fields.push((self.create_int(index.into()), item));
+        for (index, item) in items.iter().enumerate() {
+            fields.push((self.create_int(index.into()), *item));
         }
         self.create_struct(fields.into_iter().collect())
     }
