@@ -1,6 +1,6 @@
 use super::{
+    fiber::Fiber,
     heap::{Closure, Data, Heap, Pointer},
-    Vm,
 };
 use crate::{
     compiler::{
@@ -38,7 +38,7 @@ impl<'a> UseProvider for DbUseProvider<'a> {
     }
 }
 
-impl Vm {
+impl Fiber {
     pub fn use_module<U: UseProvider>(
         &mut self,
         use_provider: &U,

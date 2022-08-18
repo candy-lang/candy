@@ -1,9 +1,9 @@
 use super::{
-    channel::Channel,
-    heap::{Closure, Data, Int, Pointer, SendPort, Struct, Symbol, Text},
+    channel::{Capacity, Packet},
+    fiber::{Fiber, Status},
+    heap::{ChannelId, Closure, Data, Int, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
     use_provider::UseProvider,
-    vm::ChannelOperation,
-    Heap, Vm,
+    Heap,
 };
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
 use itertools::Itertools;
@@ -14,59 +14,61 @@ use std::{ops::Deref, str::FromStr};
 use tracing::{info, span, Level};
 use unicode_segmentation::UnicodeSegmentation;
 
-impl Vm {
+impl Fiber {
     pub(super) fn run_builtin_function<U: UseProvider>(
         &mut self,
         use_provider: &U,
         builtin_function: &BuiltinFunction,
         args: &[Pointer],
     ) {
-        let result = span!(Level::TRACE, "Running builtin{builtin_function:?}").in_scope(|| {
-            match &builtin_function {
-                BuiltinFunction::ChannelCreate => self.channel_create(args),
-                BuiltinFunction::ChannelSend => self.channel_send(args),
-                BuiltinFunction::ChannelReceive => self.channel_receive(args),
-                BuiltinFunction::Equals => self.heap.equals(args),
-                BuiltinFunction::FunctionRun => self.heap.function_run(args),
-                BuiltinFunction::GetArgumentCount => self.heap.get_argument_count(args),
-                BuiltinFunction::IfElse => self.heap.if_else(args),
-                BuiltinFunction::IntAdd => self.heap.int_add(args),
-                BuiltinFunction::IntBitLength => self.heap.int_bit_length(args),
-                BuiltinFunction::IntBitwiseAnd => self.heap.int_bitwise_and(args),
-                BuiltinFunction::IntBitwiseOr => self.heap.int_bitwise_or(args),
-                BuiltinFunction::IntBitwiseXor => self.heap.int_bitwise_xor(args),
-                BuiltinFunction::IntCompareTo => self.heap.int_compare_to(args),
-                BuiltinFunction::IntDivideTruncating => self.heap.int_divide_truncating(args),
-                BuiltinFunction::IntModulo => self.heap.int_modulo(args),
-                BuiltinFunction::IntMultiply => self.heap.int_multiply(args),
-                BuiltinFunction::IntParse => self.heap.int_parse(args),
-                BuiltinFunction::IntRemainder => self.heap.int_remainder(args),
-                BuiltinFunction::IntShiftLeft => self.heap.int_shift_left(args),
-                BuiltinFunction::IntShiftRight => self.heap.int_shift_right(args),
-                BuiltinFunction::IntSubtract => self.heap.int_subtract(args),
-                BuiltinFunction::Print => self.heap.print(args),
-                BuiltinFunction::StructGet => self.heap.struct_get(args),
-                BuiltinFunction::StructGetKeys => self.heap.struct_get_keys(args),
-                BuiltinFunction::StructHasKey => self.heap.struct_has_key(args),
-                BuiltinFunction::TextCharacters => self.heap.text_characters(args),
-                BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
-                BuiltinFunction::TextContains => self.heap.text_contains(args),
-                BuiltinFunction::TextEndsWith => self.heap.text_ends_with(args),
-                BuiltinFunction::TextGetRange => self.heap.text_get_range(args),
-                BuiltinFunction::TextIsEmpty => self.heap.text_is_empty(args),
-                BuiltinFunction::TextLength => self.heap.text_length(args),
-                BuiltinFunction::TextStartsWith => self.heap.text_starts_with(args),
-                BuiltinFunction::TextTrimEnd => self.heap.text_trim_end(args),
-                BuiltinFunction::TextTrimStart => self.heap.text_trim_start(args),
-                BuiltinFunction::TypeOf => self.heap.type_of(args),
-            }
+        let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
+            BuiltinFunction::ChannelCreate => self.heap.channel_create(args),
+            BuiltinFunction::ChannelSend => self.heap.channel_send(args),
+            BuiltinFunction::ChannelReceive => self.heap.channel_receive(args),
+            BuiltinFunction::Equals => self.heap.equals(args),
+            BuiltinFunction::FunctionRun => self.heap.function_run(args),
+            BuiltinFunction::GetArgumentCount => self.heap.get_argument_count(args),
+            BuiltinFunction::IfElse => self.heap.if_else(args),
+            BuiltinFunction::IntAdd => self.heap.int_add(args),
+            BuiltinFunction::IntBitLength => self.heap.int_bit_length(args),
+            BuiltinFunction::IntBitwiseAnd => self.heap.int_bitwise_and(args),
+            BuiltinFunction::IntBitwiseOr => self.heap.int_bitwise_or(args),
+            BuiltinFunction::IntBitwiseXor => self.heap.int_bitwise_xor(args),
+            BuiltinFunction::IntCompareTo => self.heap.int_compare_to(args),
+            BuiltinFunction::IntDivideTruncating => self.heap.int_divide_truncating(args),
+            BuiltinFunction::IntModulo => self.heap.int_modulo(args),
+            BuiltinFunction::IntMultiply => self.heap.int_multiply(args),
+            BuiltinFunction::IntParse => self.heap.int_parse(args),
+            BuiltinFunction::IntRemainder => self.heap.int_remainder(args),
+            BuiltinFunction::IntShiftLeft => self.heap.int_shift_left(args),
+            BuiltinFunction::IntShiftRight => self.heap.int_shift_right(args),
+            BuiltinFunction::IntSubtract => self.heap.int_subtract(args),
+            BuiltinFunction::Parallel => self.heap.parallel(args),
+            BuiltinFunction::Print => self.heap.print(args),
+            BuiltinFunction::StructGet => self.heap.struct_get(args),
+            BuiltinFunction::StructGetKeys => self.heap.struct_get_keys(args),
+            BuiltinFunction::StructHasKey => self.heap.struct_has_key(args),
+            BuiltinFunction::TextCharacters => self.heap.text_characters(args),
+            BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
+            BuiltinFunction::TextContains => self.heap.text_contains(args),
+            BuiltinFunction::TextEndsWith => self.heap.text_ends_with(args),
+            BuiltinFunction::TextGetRange => self.heap.text_get_range(args),
+            BuiltinFunction::TextIsEmpty => self.heap.text_is_empty(args),
+            BuiltinFunction::TextLength => self.heap.text_length(args),
+            BuiltinFunction::TextStartsWith => self.heap.text_starts_with(args),
+            BuiltinFunction::TextTrimEnd => self.heap.text_trim_end(args),
+            BuiltinFunction::TextTrimStart => self.heap.text_trim_start(args),
+            BuiltinFunction::TypeOf => self.heap.type_of(args),
         });
         match result {
             Ok(Return(value)) => self.data_stack.push(value),
-            Ok(DivergeControlFlow(closure_address)) => {
-                self.data_stack.push(closure_address);
+            Ok(DivergeControlFlow { closure }) => {
+                self.data_stack.push(closure);
                 self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
             }
+            Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
+            Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },
+            Ok(Receive { channel }) => self.status = Status::Receiving { channel },
             Err(reason) => self.panic(reason),
         }
     }
@@ -75,7 +77,10 @@ impl Vm {
 type BuiltinResult = Result<SuccessfulBehavior, String>;
 enum SuccessfulBehavior {
     Return(Pointer),
-    DivergeControlFlow(Pointer),
+    DivergeControlFlow { closure: Pointer },
+    CreateChannel { capacity: Capacity },
+    Send { channel: ChannelId, packet: Packet },
+    Receive { channel: ChannelId },
 }
 use SuccessfulBehavior::*;
 
@@ -109,45 +114,36 @@ macro_rules! unpack_and_later_drop {
     };
 }
 
-impl Vm {
+impl Heap {
     fn channel_create(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (capacity: Int), {
-            let id = self.next_internal_channel_id + 1;
-            self.next_internal_channel_id += 1;
-            self.internal_channels.insert(
-                id,
-                Channel::new(capacity.value.try_into().expect(
+        unpack_and_later_drop!(self, args, (capacity: Int), {
+            CreateChannel {
+                capacity: capacity.value.clone().try_into().expect(
                     "you tried to create a channel with a capacity bigger than the maximum usize",
-                )),
-            );
-
-            let send_port = self.heap.create_send_port(id);
-            let receive_port = self.heap.create_receive_port(id);
-            Return(self.heap.create_list(&[send_port, receive_port]))
+                ),
+            }
         })
     }
 
     fn channel_send(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self.heap, args, (port: SendPort, packet: Any), {
-            if let Some(channel) = self.internal_channels.get(&port.channel) {
-                // An internal channel.
-            } else {
-                // An external channel.
-                let external_id = self.internal_to_external_channels[&port.channel];
-                self.channel_operations
-                    .entry(external_id)
-                    .or_default()
-                    .push(ChannelOperation::Send { packet: () })
+        unpack_and_later_drop!(self, args, (port: SendPort, packet: Any), {
+            let mut heap = Heap::default();
+            let value = self.clone_single_to_other_heap(&mut heap, packet.address);
+            Send {
+                channel: port.channel,
+                packet: Packet { heap, value },
             }
         })
     }
 
     fn channel_receive(&mut self, args: &[Pointer]) -> BuiltinResult {
-        todo!()
+        unpack_and_later_drop!(self, args, (port: ReceivePort), {
+            Receive {
+                channel: port.channel,
+            }
+        })
     }
-}
 
-impl Heap {
     fn equals(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, (a: Any, b: Any), {
             let is_equal = a.equals(self, &b);
@@ -159,7 +155,9 @@ impl Heap {
         unpack_and_later_drop!(self, args, (closure: Closure), {
             closure.should_take_no_arguments()?;
             self.dup(closure.address);
-            DivergeControlFlow(closure.address)
+            DivergeControlFlow {
+                closure: closure.address,
+            }
         })
     }
 
@@ -177,7 +175,9 @@ impl Heap {
             {
                 let closure_to_run = if *condition { &then } else { &else_ }.address;
                 self.dup(closure_to_run);
-                DivergeControlFlow(closure_to_run)
+                DivergeControlFlow {
+                    closure: closure_to_run,
+                }
             }
         )
     }
@@ -469,6 +469,26 @@ impl TryInto<Closure> for Data {
         match self {
             Data::Closure(closure) => Ok(closure),
             _ => Err("a builtin function expected a function".to_string()),
+        }
+    }
+}
+impl TryInto<SendPort> for Data {
+    type Error = String;
+
+    fn try_into(self) -> Result<SendPort, Self::Error> {
+        match self {
+            Data::SendPort(port) => Ok(port),
+            _ => Err("a builtin function expected a send port".to_string()),
+        }
+    }
+}
+impl TryInto<ReceivePort> for Data {
+    type Error = String;
+
+    fn try_into(self) -> Result<ReceivePort, Self::Error> {
+        match self {
+            Data::ReceivePort(port) => Ok(port),
+            _ => Err("a builtin function expected a receive port".to_string()),
         }
     }
 }

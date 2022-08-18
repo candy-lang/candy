@@ -10,19 +10,21 @@ use std::collections::VecDeque;
 /// enables buggy code that leaks memory.
 #[derive(Clone)]
 pub struct Channel {
-    pub capacity: usize,
+    pub capacity: Capacity,
     packets: VecDeque<Packet>,
 }
 
+pub type Capacity = usize;
+
 /// A self-contained value that is sent over a channel.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Packet {
-    heap: Heap,
-    value: Pointer,
+    pub heap: Heap,
+    pub value: Pointer,
 }
 
 impl Channel {
-    pub fn new(capacity: usize) -> Self {
+    pub fn new(capacity: Capacity) -> Self {
         Self {
             capacity,
             packets: Default::default(),
@@ -33,9 +35,12 @@ impl Channel {
         self.packets.len() == self.capacity
     }
 
-    pub fn send(&mut self, packet: Packet) {
-        assert!(!self.is_full());
+    pub fn send(&mut self, packet: Packet) -> bool {
+        if self.is_full() {
+            return false;
+        }
         self.packets.push_back(packet);
+        return true;
     }
 
     pub fn receive(&mut self) -> Option<Packet> {

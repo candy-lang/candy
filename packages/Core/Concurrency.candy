@@ -1,0 +1,5 @@
+isFunction1 = (use "..Function").is1
+
+parallel body := 
+  needs (isFunction1 body)
+  ✨.parallel body

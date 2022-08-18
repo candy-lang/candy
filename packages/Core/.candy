@@ -1,5 +1,9 @@
 bool := use ".Bool"
+channel := (use ".Channel")
 check := (use ".Check").check
+
+concurrency = use ".Concurrency"
+parallel := concurrency.parallel
 
 conditionals = use ".Conditionals"
 if := conditionals.if
