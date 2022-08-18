@@ -29,6 +29,8 @@ pub enum Data {
     Struct(Struct),
     Closure(Closure),
     Builtin(Builtin),
+    SendPort(SendPort),
+    ReceivePort(ReceivePort),
 }
 
 #[derive(Clone)]
@@ -155,6 +157,28 @@ impl Closure {
     }
 }
 
+#[derive(Clone)]
+pub struct SendPort {
+    pub channel: ChannelId,
+}
+#[derive(Clone)]
+pub struct ReceivePort {
+    pub channel: ChannelId,
+}
+
+pub type ChannelId = usize;
+
+impl SendPort {
+    pub fn new(channel: ChannelId) -> Self {
+        Self { channel }
+    }
+}
+impl ReceivePort {
+    pub fn new(channel: ChannelId) -> Self {
+        Self { channel }
+    }
+}
+
 impl Data {
     fn hash(&self, heap: &Heap) -> u64 {
         let mut state = DefaultHasher::new();
@@ -183,6 +207,8 @@ impl Data {
                 closure.body.hash(state);
             }
             Data::Builtin(builtin) => builtin.function.hash(state),
+            Data::SendPort(port) => port.channel.hash(state),
+            Data::ReceivePort(port) => port.channel.hash(state),
         }
     }
 
@@ -194,6 +220,8 @@ impl Data {
             (Data::Struct(a), Data::Struct(b)) => a.equals(heap, b),
             (Data::Closure(_), Data::Closure(_)) => false,
             (Data::Builtin(a), Data::Builtin(b)) => a.function == b.function,
+            (Data::SendPort(a), Data::SendPort(b)) => a.channel == b.channel,
+            (Data::ReceivePort(a), Data::ReceivePort(b)) => a.channel == b.channel,
             _ => false,
         }
     }
@@ -215,12 +243,19 @@ impl Data {
             ),
             Data::Closure(_) => "{...}".to_string(),
             Data::Builtin(builtin) => format!("builtin{:?}", builtin.function),
+            Data::SendPort(port) => format!("<sendPort {:x}>", port.channel),
+            Data::ReceivePort(port) => format!("<sendPort {:x}>", port.channel),
         }
     }
 
     pub fn children(&self) -> Vec<Pointer> {
         match self {
-            Data::Int(_) | Data::Text(_) | Data::Symbol(_) | Data::Builtin(_) => vec![],
+            Data::Int(_)
+            | Data::Text(_)
+            | Data::Symbol(_)
+            | Data::Builtin(_)
+            | Data::SendPort(_)
+            | Data::ReceivePort(_) => vec![],
             Data::Struct(struct_) => struct_
                 .iter()
                 .flat_map(|(a, b)| vec![a, b].into_iter())

@@ -2,7 +2,9 @@ mod object;
 mod pointer;
 
 pub use self::{
-    object::{Builtin, Closure, Data, Int, Object, Struct, Symbol, Text},
+    object::{
+        Builtin, ChannelId, Closure, Data, Int, Object, ReceivePort, SendPort, Struct, Symbol, Text,
+    },
     pointer::Pointer,
 };
 use crate::builtin_functions::BuiltinFunction;
@@ -123,6 +125,7 @@ impl Heap {
         &self,
         other: &mut Heap,
         addresses: &[Pointer],
+        channel_map: &HashMap<ChannelId, ChannelId>,
     ) -> Vec<Pointer> {
         let mut objects_to_refcounts = HashMap::new();
         for address in addresses {
@@ -144,7 +147,7 @@ impl Heap {
                 address_map[&address],
                 Object {
                     reference_count: refcount,
-                    data: Self::map_addresses_in_data(&address_map, &self.get(address).data),
+                    data: Self::map_data(&address_map, channel_map, &self.get(address).data),
                 },
             );
         }
@@ -165,7 +168,11 @@ impl Heap {
             self.gather_objects_to_clone(objects_to_refcounts, child);
         }
     }
-    fn map_addresses_in_data(address_map: &HashMap<Pointer, Pointer>, data: &Data) -> Data {
+    fn map_data(
+        address_map: &HashMap<Pointer, Pointer>,
+        channel_map: &HashMap<ChannelId, ChannelId>,
+        data: &Data,
+    ) -> Data {
         match data {
             Data::Int(int) => Data::Int(int.clone()),
             Data::Text(text) => Data::Text(text.clone()),
@@ -187,10 +194,19 @@ impl Heap {
                 body: closure.body.clone(),
             }),
             Data::Builtin(builtin) => Data::Builtin(builtin.clone()),
+            Data::SendPort(port) => Data::SendPort(SendPort::new(channel_map[&port.channel])),
+            Data::ReceivePort(port) => {
+                Data::ReceivePort(ReceivePort::new(channel_map[&port.channel]))
+            }
         }
     }
-    pub fn clone_single_to_other_heap(&self, other: &mut Heap, address: Pointer) -> Pointer {
-        self.clone_multiple_to_other_heap(other, &[address])
+    pub fn clone_single_to_other_heap(
+        &self,
+        other: &mut Heap,
+        address: Pointer,
+        channel_map: &HashMap<ChannelId, ChannelId>,
+    ) -> Pointer {
+        self.clone_multiple_to_other_heap(other, &[address], channel_map)
             .pop()
             .unwrap()
     }
@@ -212,6 +228,12 @@ impl Heap {
     }
     pub fn create_builtin(&mut self, builtin: BuiltinFunction) -> Pointer {
         self.create(Data::Builtin(Builtin { function: builtin }))
+    }
+    pub fn create_send_port(&mut self, channel: ChannelId) -> Pointer {
+        self.create(Data::SendPort(SendPort::new(channel)))
+    }
+    pub fn create_receive_port(&mut self, channel: ChannelId) -> Pointer {
+        self.create(Data::ReceivePort(ReceivePort::new(channel)))
     }
     pub fn create_nothing(&mut self) -> Pointer {
         self.create_symbol("Nothing".to_string())
