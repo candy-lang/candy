@@ -102,9 +102,6 @@ impl Fiber {
             num_instructions_executed: 0,
         }
     }
-    pub fn new_in_done_state() -> Self {
-        Self::new_with_heap(Heap::default())
-    }
     pub fn new_for_running_closure<U: UseProvider>(
         heap: Heap,
         use_provider: &U,

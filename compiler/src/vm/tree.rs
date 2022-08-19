@@ -7,13 +7,12 @@ use super::{
     Closure, Heap, Pointer, TearDownResult,
 };
 use crate::{database::Database, vm::fiber};
-use itertools::Itertools;
-use rand::{seq::IteratorRandom, thread_rng};
+use rand::seq::IteratorRandom;
 use std::{
     collections::{HashMap, VecDeque},
     mem,
 };
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, info, warn};
 
 /// A fiber tree is a part of or an entire Candy program that thinks it's
 /// currently running. Because fiber trees are first-class Rust structs, they
@@ -22,6 +21,9 @@ use tracing::{debug, error, info, trace, warn};
 ///
 /// While fibers are simple, pure virtual machines that manage a heap and stack,
 /// fiber _trees_ encapsulate fibers and manage channels that are used by them.
+///
+/// ## Fibers
+///
 /// As the name suggests, every Candy program can be represented by a tree at
 /// any point in time. In particular, you can create new nodes in the tree by
 /// entering a `core.parallel` scope.
@@ -48,8 +50,8 @@ use tracing::{debug, error, info, trace, warn};
 /// its state. First, it generates a channel ID for a nursery; while a nursery
 /// isn't a channel, it behaves just like one (you can send it closures). Then,
 /// the fiber tree creates a send port for the nursery. Finally, it spawns a new
-/// fiber with the body code of the parallel section and gives it a send port of
-/// the nursery as an argument.
+/// fiber tree with the body code of the parallel section, giving it a send port
+/// of the nursery as an argument.
 ///
 /// When asked to run code, the fiber tree will not run the original main fiber,
 /// but the body of the parallel section instead.
@@ -58,9 +60,11 @@ use tracing::{debug, error, info, trace, warn};
 ///                |
 ///         +------+------+
 ///         |             |
-///       Fiber         Fiber
-///       main          body
-/// (parallel scope)  (running)
+///       Fiber       FiberTree
+///       main            |
+/// (parallel scope)    Fiber
+///                     body
+///                   (running)
 ///
 /// Calls to `core.async` internally just send packets to the nursery containing
 /// the closures to spawn. The fiber tree knows that the channel ID is that of
@@ -72,21 +76,64 @@ use tracing::{debug, error, info, trace, warn};
 ///
 ///            FiberTree
 ///                |
-///         +------+------+---------+-----------+
-///         |             |         |           |
-///       Fiber         Fiber     Fiber       Fiber
-///       main          body      banana      peach
-/// (parallel scope)  (running)  (running)  (running)
+///         +------+------+----------+----------+
+///         |             |          |          |
+///       Fiber       FiberTree  FiberTree  FiberTree
+///       main            |          |          |
+/// (parallel scope)    Fiber      Fiber      Fiber
+///                     body      banana      peach
+///                   (running)  (running)  (running)
 ///
 /// Now, when the tree is asked to run code, it will run a random running fiber.
 ///
 /// Once a spawned fiber is done, its return value is stored in the
-/// corresponding channel and the fiber is deleted.
-/// Once all fibers are done, the fiber tree exits the parallel section, using
-/// the return value of the body fiber as the return value of the call to
-/// `core.parallel`.
-/// If any of the children panic, the parallel section itself will immediately
-/// panic as well.
+/// corresponding channel and the fiber is deleted. Once all fibers finished
+/// running, the fiber tree exits the parallel section. The `core.parallel` and
+/// `core.await` calls take care of actually returning the values put into the
+/// channels. If any of the children panic, the parallel section itself will
+/// immediately panic as well.
+///
+/// The internal fiber trees can of course also start their own parallel
+/// sections, resulting in a nested tree.
+///
+/// ## Channels
+///
+/// In Candy code, channels only appear via their ends, the send and receive
+/// ports. Those are unlike other values. In particular, they have an identity
+/// and are mutable. Operations like `channel.receive` are not pure and may
+/// return different values every time. Also, operations on channels are
+/// blocking.
+///
+/// Unlike fibers, channels don't form a tree – they can go all over the place!
+/// Because you can transmit ports over channels, any two parts of a fiber tree
+/// could theoretically be connected via channels.
+///
+/// In most programs, we expect channels to stay "relatively" local. In
+/// particular, most channels don't escape the fiber tree that they are created
+/// in. In order to get the most benefit out of actual paralellism, it's
+/// beneficial to store channels as local as possible. For example, if two
+/// completely different parts of a program use channels locally to model
+/// mutable variables or some other data flow, all channel operations should be
+/// local only and not need to be propagated to a central location, avoiding
+/// contention. This becomes even more important when (if?) we distribute
+/// programs across multiple machines; local channels shouldn't require any
+/// communication whatsoever.
+///
+/// That's why channels are stored in the local-most subtree of the Candy
+/// program that has access to corresponding ports. Fibers themselves don't
+/// store channels though – the surrounding nodes of the fiber trees take care
+/// of managing channels.
+///
+/// The identity of channels is modelled using a channel ID, which is unique
+/// within a node of the fiber tree. Whenever data with ports is transmitted to
+/// child or parent nodes in the tree, the channel IDs of the ports need to be
+/// translated.
+///
+/// TODO: Example
+///
+/// ## Catching panics
+///
+/// TODO: Implement
 #[derive(Clone)]
 pub struct FiberTree {
     status: Status,
