@@ -41,6 +41,7 @@ pub enum Status {
     CreatingChannel { capacity: Capacity },
     Sending { channel: ChannelId, packet: Packet },
     Receiving { channel: ChannelId },
+    InParallelScope { body: Pointer },
     Done,
     Panicked { reason: String },
 }
@@ -151,10 +152,15 @@ impl Fiber {
         self.status = Status::Running;
     }
     pub fn complete_receive(&mut self, packet: Packet) {
-        let address_in_local_heap = packet
+        let address = packet
             .heap
             .clone_single_to_other_heap(&mut self.heap, packet.value);
-        self.data_stack.push(address_in_local_heap);
+        self.data_stack.push(address);
+        self.status = Status::Running;
+    }
+    pub fn complete_parallel_scope(&mut self, heap: &mut Heap, return_value: Pointer) {
+        let return_value = heap.clone_single_to_other_heap(&mut self.heap, return_value);
+        self.data_stack.push(return_value);
         self.status = Status::Running;
     }
 

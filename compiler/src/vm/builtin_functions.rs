@@ -69,6 +69,7 @@ impl Fiber {
             Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
             Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
+            Ok(Parallel { body }) => self.status = Status::InParallelScope { body },
             Err(reason) => self.panic(reason),
         }
     }
@@ -81,6 +82,7 @@ enum SuccessfulBehavior {
     CreateChannel { capacity: Capacity },
     Send { channel: ChannelId, packet: Packet },
     Receive { channel: ChannelId },
+    Parallel { body: Pointer },
 }
 use SuccessfulBehavior::*;
 
@@ -257,6 +259,15 @@ impl Heap {
     fn int_subtract(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, (minuend: Int, subtrahend: Int), {
             Return(self.create_int(minuend.value.clone() - subtrahend.value.clone()))
+        })
+    }
+
+    fn parallel(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, (body_taking_nursery: Closure), {
+            self.dup(body_taking_nursery.address);
+            Parallel {
+                body: body_taking_nursery.address,
+            }
         })
     }
 

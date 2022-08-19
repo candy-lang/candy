@@ -4,6 +4,8 @@ check := (use ".Check").check
 
 concurrency = use ".Concurrency"
 parallel := concurrency.parallel
+async := concurrency.async
+await := concurrency.await
 
 conditionals = use ".Conditionals"
 if := conditionals.if

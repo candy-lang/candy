@@ -2,7 +2,7 @@ use super::{generator::generate_n_values, utils::did_need_in_closure_cause_panic
 use crate::{
     compiler::hir,
     database::Database,
-    vm::{self, tracer::Tracer, use_provider::DbUseProvider, Closure, Heap, Pointer, Vm},
+    vm::{tracer::Tracer, use_provider::DbUseProvider, vm, Closure, Heap, Pointer, Vm},
 };
 use std::mem;
 
@@ -89,18 +89,19 @@ impl Fuzzer {
         num_instructions: usize,
     ) -> (Status, usize) {
         match status {
-            Status::StillFuzzing { mut vm, arguments } => match &vm.status {
+            Status::StillFuzzing { mut vm, arguments } => match vm.status() {
                 vm::Status::Running => {
                     let use_provider = DbUseProvider { db };
-                    let num_instructions_executed_before = vm.num_instructions_executed;
+                    let num_instructions_executed_before = vm.num_instructions_executed();
                     vm.run(&use_provider, num_instructions);
                     let num_instruction_executed =
-                        vm.num_instructions_executed - num_instructions_executed_before;
+                        vm.num_instructions_executed() - num_instructions_executed_before;
                     (
                         Status::StillFuzzing { vm, arguments },
                         num_instruction_executed,
                     )
                 }
+                vm::Status::WaitingForOperations => panic!("Fuzzing should not have to wait on channel operations because arguments were not channels."),
                 // The VM finished running without panicking.
                 vm::Status::Done => (
                     Status::new_fuzzing_attempt(db, &self.closure_heap, self.closure),
@@ -111,15 +112,15 @@ impl Fuzzer {
                     // satisfied, then the panic is not closure's fault, but our
                     // fault.
                     let is_our_fault =
-                        did_need_in_closure_cause_panic(db, &self.closure_id, &vm.tracer);
+                        did_need_in_closure_cause_panic(db, &self.closure_id, &vm.cloned_tracer());
                     let status = if is_our_fault {
                         Status::new_fuzzing_attempt(db, &self.closure_heap, self.closure)
                     } else {
                         Status::PanickedForArguments {
-                            heap: vm.heap,
+                            heap: vm.fiber().heap.clone(),
                             arguments,
-                            reason: reason.clone(),
-                            tracer: vm.tracer.clone(),
+                            reason,
+                            tracer: vm.fiber().tracer.clone(),
                         }
                     };
                     (status, 0)

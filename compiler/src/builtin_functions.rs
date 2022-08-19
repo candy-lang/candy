@@ -25,6 +25,7 @@ pub enum BuiltinFunction {
     IntShiftLeft,        // (value: int) (amount: int) -> (shifted: int)
     IntShiftRight,       // (value: int) (amount: int) -> (shifted: int)
     IntSubtract,         // (minuend: int) (subtrahend: int) -> (difference: int)
+    Parallel,            // bodyClosureTakingNursery -> resultOfClosure
     Print,               // message -> Nothing
     StructGet,           // struct key -> value
     StructGetKeys,       // struct -> listOfKeys

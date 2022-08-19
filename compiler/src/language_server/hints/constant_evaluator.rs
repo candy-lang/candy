@@ -9,7 +9,7 @@ use crate::{
     database::Database,
     language_server::hints::{utils::id_to_end_of_line, HintKind},
     module::Module,
-    vm::{tracer::TraceEntry, use_provider::DbUseProvider, Closure, Heap, Pointer, Status, Vm},
+    vm::{tracer::TraceEntry, use_provider::DbUseProvider, vm, Closure, Heap, Pointer, Vm},
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
@@ -39,7 +39,7 @@ impl ConstantEvaluator {
         let mut running_vms = self
             .vms
             .iter_mut()
-            .filter(|(_, vm)| matches!(vm.status(), Status::Running))
+            .filter(|(_, vm)| matches!(vm.status(), vm::Status::Running))
             .collect_vec();
         trace!(
             "Constant evaluator running. {} running VMs, {} in total.",
@@ -59,8 +59,9 @@ impl ConstantEvaluator {
     pub fn get_fuzzable_closures(&self, module: &Module) -> (&Heap, Vec<(Id, Pointer)>) {
         let vm = &self.vms[module];
         (
-            &vm.heap,
-            vm.fuzzable_closures
+            &vm.fiber().heap,
+            vm.fiber()
+                .fuzzable_closures
                 .iter()
                 .filter(|(id, _)| &id.module == module)
                 .cloned()
@@ -75,16 +76,19 @@ impl ConstantEvaluator {
         let vm = &self.vms[module];
         let mut hints = vec![];
 
-        if let Status::Panicked { reason } = vm.status() {
+        if let vm::Status::Panicked { reason } = vm.status() {
             if let Some(hint) = panic_hint(db, module.clone(), vm, reason) {
                 hints.push(hint);
             }
         };
         if module.to_possible_paths().is_some() {
-            module.dump_associated_debug_file("trace", &vm.tracer.format_call_tree(&vm.heap));
+            module.dump_associated_debug_file(
+                "trace",
+                &vm.fiber().tracer.format_call_tree(&vm.fiber().heap),
+            );
         }
 
-        for entry in vm.tracer.log() {
+        for entry in vm.cloned_tracer().log() {
             let (id, value) = match entry {
                 TraceEntry::ValueEvaluated { id, value } => {
                     if &id.module != module {
@@ -112,7 +116,7 @@ impl ConstantEvaluator {
 
             hints.push(Hint {
                 kind: HintKind::Value,
-                text: value.format(&vm.heap),
+                text: value.format(&vm.fiber().heap),
                 position: id_to_end_of_line(db, id).unwrap(),
             });
         }
@@ -125,7 +129,7 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.
-    let stack = vm.tracer.stack();
+    let stack = vm.fiber().tracer.stack();
     if stack.len() == 1 {
         // The stack only contains a `ModuleStarted` entry. This indicates an
         // error during compilation resulting in a top-level error instruction.
@@ -148,8 +152,10 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
             id,
             format!(
                 "{} {}",
-                closure.format(&vm.heap),
-                args.iter().map(|arg| arg.format(&vm.heap)).join(" ")
+                closure.format(&vm.fiber().heap),
+                args.iter()
+                    .map(|arg| arg.format(&vm.fiber().heap))
+                    .join(" ")
             ),
         ),
         TraceEntry::NeedsStarted {
@@ -160,8 +166,8 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
             id,
             format!(
                 "needs {} {}",
-                condition.format(&vm.heap),
-                reason.format(&vm.heap)
+                condition.format(&vm.fiber().heap),
+                reason.format(&vm.fiber().heap)
             ),
         ),
         _ => unreachable!(),

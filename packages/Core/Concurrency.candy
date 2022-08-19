@@ -1,5 +1,16 @@
-isFunction1 = (use "..Function").is1
+channel = use "..Channel"
+function = use "..Function"
 
 parallel body := 
-  needs (isFunction1 body)
+  needs (function.is1 body)
   ✨.parallel body
+
+async nursery body :=
+  needs (channel.isSendPort nursery)
+  needs (function.is0 body)
+  channel.send nursery [Spawn, body]
+
+await childChannel :=
+  needs (channel.isReceivePort childChannel)
+  result = channel.receive childChannel
+  needs False "Todo: Implement await"
