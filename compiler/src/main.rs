@@ -26,7 +26,7 @@ use crate::{
     database::Database,
     language_server::utils::LspPositionConversion,
     module::{Module, ModuleKind},
-    vm::{use_provider::DbUseProvider, Closure, TearDownResult, Vm},
+    vm::{use_provider::DbUseProvider, Closure, FiberTree, TearDownResult},
 };
 use compiler::lir::Lir;
 use itertools::Itertools;
@@ -203,7 +203,7 @@ fn run(options: CandyRunOptions) {
     info!("Running `{path_string}`.");
 
     let use_provider = DbUseProvider { db: &db };
-    let vm = Vm::new_for_running_module_closure(&use_provider, module_closure);
+    let vm = FiberTree::new_for_running_module_closure(&use_provider, module_closure);
     let TearDownResult {
         tracer,
         result,

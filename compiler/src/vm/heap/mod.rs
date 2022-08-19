@@ -199,6 +199,13 @@ impl Heap {
             .unwrap()
     }
 
+    pub fn all_objects(&self) -> &HashMap<Pointer, Object> {
+        &self.objects
+    }
+    pub fn all_objects_mut(&mut self) -> &mut HashMap<Pointer, Object> {
+        &mut self.objects
+    }
+
     pub fn create_int(&mut self, int: BigInt) -> Pointer {
         self.create(Data::Int(Int { value: int }))
     }

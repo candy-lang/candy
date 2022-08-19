@@ -6,14 +6,14 @@ pub use self::fuzzer::{Fuzzer, Status};
 use crate::{
     database::Database,
     module::Module,
-    vm::{use_provider::DbUseProvider, Closure, Vm},
+    vm::{use_provider::DbUseProvider, Closure, FiberTree},
 };
 use itertools::Itertools;
 use tracing::{error, info};
 
 pub async fn fuzz(db: &Database, module: Module) {
     let (fuzzables_heap, fuzzables) = {
-        let result = Vm::new_for_running_module_closure(
+        let result = FiberTree::new_for_running_module_closure(
             &DbUseProvider { db },
             Closure::of_module(db, module.clone()).unwrap(),
         )

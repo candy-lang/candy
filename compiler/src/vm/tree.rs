@@ -1,7 +1,7 @@
 use super::{
     channel::{Channel, Packet},
     fiber::Fiber,
-    heap::ChannelId,
+    heap::{ChannelId, Data, ReceivePort, SendPort},
     tracer::Tracer,
     use_provider::{DbUseProvider, UseProvider},
     Closure, Heap, Pointer, TearDownResult,
@@ -15,20 +15,89 @@ use std::{
 };
 use tracing::{debug, error, info, trace, warn};
 
-/// A VM is a Candy program that thinks it's currently running. Because VMs are
-/// first-class Rust structs, they enable other code to store "freezed" programs
-/// and to remain in control about when and for how long they run.
+/// A fiber tree is a part of or an entire Candy program that thinks it's
+/// currently running. Because fiber trees are first-class Rust structs, they
+/// enable other code to store "freezed" programs and to remain in control about
+/// when and for how long code runs.
+///
+/// While fibers are simple, pure virtual machines that manage a heap and stack,
+/// fiber _trees_ encapsulate fibers and manage channels that are used by them.
+/// As the name suggests, every Candy program can be represented by a tree at
+/// any point in time. In particular, you can create new nodes in the tree by
+/// entering a `core.parallel` scope.
+///
+/// ```candy
+/// core.parallel { nursery ->
+///   banana = core.async { "Banana" }
+///   peach = core.async { "Peach" }
+/// }
+/// ```
+///
+/// In this example, after `banana` and `peach` have been assigned, both those
+/// closures run concurrently. Let's walk through what happens at each point in
+/// time. Before entering the `core.parallel` scope, we only have a single fiber
+/// managed by a `FiberTree`.
+///
+/// FiberTree
+///     |
+///   Fiber
+///   main
+/// (running)
+///
+/// As the program enters the `core.parallel` section, the fiber tree changes
+/// its state. First, it generates a channel ID for a nursery; while a nursery
+/// isn't a channel, it behaves just like one (you can send it closures). Then,
+/// the fiber tree creates a send port for the nursery. Finally, it spawns a new
+/// fiber with the body code of the parallel section and gives it a send port of
+/// the nursery as an argument.
+///
+/// When asked to run code, the fiber tree will not run the original main fiber,
+/// but the body of the parallel section instead.
+///
+///            FiberTree
+///                |
+///         +------+------+
+///         |             |
+///       Fiber         Fiber
+///       main          body
+/// (parallel scope)  (running)
+///
+/// Calls to `core.async` internally just send packets to the nursery containing
+/// the closures to spawn. The fiber tree knows that the channel ID is that of
+/// the nursery and instead of actually saving the packets spawns new fibers.
+/// The packets also contain a send port of a channel that `core.async` creates
+/// locally and that is expected to be sent the result of the running closure.
+///
+/// After the two calls to `core.async` finished, the tree looks like this:
+///
+///            FiberTree
+///                |
+///         +------+------+---------+-----------+
+///         |             |         |           |
+///       Fiber         Fiber     Fiber       Fiber
+///       main          body      banana      peach
+/// (parallel scope)  (running)  (running)  (running)
+///
+/// Now, when the tree is asked to run code, it will run a random running fiber.
+///
+/// Once a spawned fiber is done, its return value is stored in the
+/// corresponding channel and the fiber is deleted.
+/// Once all fibers are done, the fiber tree exits the parallel section, using
+/// the return value of the body fiber as the return value of the call to
+/// `core.parallel`.
+/// If any of the children panic, the parallel section itself will immediately
+/// panic as well.
 #[derive(Clone)]
-pub struct Vm {
+pub struct FiberTree {
     status: Status,
     state: Option<State>, // Only `None` temporarily during state transitions.
 
-    // Channel functionality. VMs communicate with the outer world using
+    // Channel functionality. Fiber trees communicate with the outer world using
     // channels. Each channel is identified using an ID that is valid inside
-    // this particular VM. Channels created by the program are managed ("owned")
-    // by the VM itself. For channels owned by the outside world (such as those
-    // referenced in the environment argument), the VM maintains a mapping
-    // between internal and external IDs.
+    // this particular tree node. Channels created by the current fiber are
+    // managed ("owned") by this node directly. For channels owned by the
+    // outside world (such as those referenced in the environment argument),
+    // this node maintains a mapping between internal and external IDs.
     pub internal_channels: HashMap<ChannelId, Channel>,
     pub next_internal_channel_id: ChannelId,
     pub external_to_internal_channels: HashMap<ChannelId, ChannelId>,
@@ -46,23 +115,22 @@ pub enum Status {
 
 #[derive(Clone)]
 enum State {
+    /// This tree is currently focused on running a single fiber.
     SingleFiber(Fiber),
-    ParallelSection {
-        /// The main fiber of this VM. Should have Status::InParallelSection.
-        paused_main_fiber: Fiber,
 
-        /// The channel that you can send spawn commands to.
+    /// The fiber of this tree entered a `core.parallel` scope so that it's now
+    /// paused and waits for the parallel scope to end. Instead of the main
+    /// former single fiber, the tree now runs the closure passed to
+    /// `core.parallel` as well as any other spawned children.
+    ParallelSection {
+        paused_main_fiber: Fiber, // Should have Status::InParallelSection.
         nursery: ChannelId,
 
-        /// The VM for the closure with which `core.parallel` was called.
-        parallel_body: Box<Vm>,
-
-        /// Spawned child VMs. For each VM, there also exists a channel that
-        /// will contain the result of the VM (once it's done or panicked). This
-        /// channel is directly returned by the `core.async` function.
+        /// Children and a channels where to send the result of the child. The
+        /// channel's receive port is directly returned by the `core.async` function.
         /// Here, we save the ID of the channel where the result of the VM will
         /// be sent.
-        spawned_children: Vec<(ChannelId, Vm)>,
+        children: Vec<(ChannelId, FiberTree)>,
     },
 }
 
@@ -72,17 +140,27 @@ pub enum ChannelOperation {
     Receive,
 }
 
-impl Vm {
-    fn new_with_fiber(fiber: Fiber) -> Self {
-        Self {
-            status: Status::Running,
-            state: Some(State::SingleFiber(fiber)),
+impl FiberTree {
+    fn new_with_fiber(mut fiber: Fiber) -> Self {
+        let mut tree = Self {
+            status: match fiber.status {
+                fiber::Status::Done => Status::Done,
+                fiber::Status::Running => Status::Running,
+                _ => panic!("Tried to create fiber tree with invalid fiber."),
+            },
+            state: None,
             internal_channels: Default::default(),
             next_internal_channel_id: 0,
             external_to_internal_channels: Default::default(),
             internal_to_external_channels: Default::default(),
             channel_operations: Default::default(),
-        }
+        };
+        tree.create_channel_mappings_for(&fiber.heap);
+        fiber
+            .heap
+            .map_channel_ids(&tree.external_to_internal_channels);
+        tree.state = Some(State::SingleFiber(fiber));
+        tree
     }
     pub fn new_for_running_closure<U: UseProvider>(
         heap: Heap,
@@ -115,6 +193,12 @@ impl Vm {
     pub fn status(&self) -> Status {
         self.status.clone()
     }
+    fn is_running(&self) -> bool {
+        matches!(self.status, Status::Running)
+    }
+    fn is_finished(&self) -> bool {
+        matches!(self.status, Status::Done | Status::Panicked { .. })
+    }
     pub fn fiber(&self) -> &Fiber {
         match self.state() {
             State::SingleFiber(fiber) => fiber,
@@ -137,6 +221,22 @@ impl Vm {
         self.state
             .as_ref()
             .expect("Tried to get VM state during state transition")
+    }
+
+    fn create_channel_mappings_for(&mut self, heap: &Heap) {
+        for object in heap.all_objects().values() {
+            if let Data::SendPort(SendPort { channel })
+            | Data::ReceivePort(ReceivePort { channel }) = object.data
+            {
+                if !self.external_to_internal_channels.contains_key(&channel) {
+                    let internal_id = self.generate_channel_id();
+                    self.external_to_internal_channels
+                        .insert(channel, internal_id);
+                    self.internal_to_external_channels
+                        .insert(internal_id, channel);
+                }
+            }
+        }
     }
 
     pub fn run<U: UseProvider>(&mut self, use_provider: &U, mut num_instructions: usize) {
@@ -182,6 +282,7 @@ impl Vm {
                             fiber.complete_channel_create(id);
                         }
                         fiber::Status::Sending { channel, packet } => {
+                            info!("Sending packet to channel {channel}.");
                             if let Some(channel) = self.internal_channels.get_mut(&channel) {
                                 // Internal channel.
                                 if channel.send(packet) {
@@ -200,6 +301,7 @@ impl Vm {
                             }
                         }
                         fiber::Status::Receiving { channel } => {
+                            info!("Sending packet to channel {channel}.");
                             if let Some(channel) = self.internal_channels.get_mut(&channel) {
                                 // Internal channel.
                                 if let Some(packet) = channel.receive() {
@@ -219,43 +321,48 @@ impl Vm {
                                 self.status = Status::WaitingForOperations;
                             }
                         }
-                        fiber::Status::InParallelScope { body } => {
+                        fiber::Status::InParallelScope {
+                            body,
+                            return_channel,
+                        } => {
+                            info!("Entering parallel scope.");
                             let mut heap = Heap::default();
                             let body = fiber.heap.clone_single_to_other_heap(&mut heap, body);
                             let nursery = self.generate_channel_id();
                             let nursery_send_port = heap.create_send_port(nursery);
+                            let tree = FiberTree::new_for_running_closure(
+                                heap,
+                                use_provider,
+                                body,
+                                &[nursery_send_port],
+                            );
+
                             break 'new_state State::ParallelSection {
                                 paused_main_fiber: fiber,
                                 nursery,
-                                parallel_body: Box::new(Vm::new_for_running_closure(
-                                    heap,
-                                    use_provider,
-                                    body,
-                                    &[nursery_send_port],
-                                )),
-                                spawned_children: vec![],
+                                children: vec![(return_channel, tree)],
                             };
                         }
                         fiber::Status::Done => {
+                            info!("Fiber done.");
                             self.status = Status::Done;
                         }
                         fiber::Status::Panicked { reason } => {
+                            info!("Fiber panicked because of {reason}.");
                             self.status = Status::Panicked { reason };
                         }
                     }
                     State::SingleFiber(fiber)
                 }
                 State::ParallelSection {
-                    paused_main_fiber,
+                    mut paused_main_fiber,
                     nursery,
-                    mut parallel_body,
-                    mut spawned_children,
+                    mut children,
                 } => {
-                    let (index_and_result_channel, vm) = spawned_children
+                    let (index_and_result_channel, vm) = children
                         .iter_mut()
                         .enumerate()
                         .map(|(i, (channel, vm))| (Some((i, *channel)), vm))
-                        .chain([(None, &mut *parallel_body)].into_iter())
                         .filter(|(_, vm)| matches!(vm.status, Status::Running))
                         .choose(&mut rand::thread_rng())
                         .expect("Tried to run Vm, but no child can run.");
@@ -265,7 +372,7 @@ impl Vm {
 
                     for (channel, operations) in &vm.channel_operations {
                         // TODO
-                        warn!("Handle operations on channel {channel}")
+                        warn!("Todo: Handle operations on channel {channel}")
                     }
 
                     // If this was a spawned channel and it ended execution, the result should be
@@ -274,7 +381,7 @@ impl Vm {
                         let packet = match vm.status() {
                             Status::Done => {
                                 info!("Child done.");
-                                let (_, vm) = spawned_children.remove(index);
+                                let (_, vm) = children.remove(index);
                                 let TearDownResult {
                                     heap: vm_heap,
                                     result,
@@ -305,38 +412,19 @@ impl Vm {
                     }
 
                     // Update status and state.
-                    // let all_vms = spawned_children
-                    //     .iter()
-                    //     .map(|(_, vm)| vm)
-                    //     .chain([*parallel_body].iter())
-                    //     .collect_vec();
-
-                    // let can_something_run = all_vms
-                    //     .iter()
-                    //     .any(|vm| matches!(vm.status, Status::Running));
-                    // if can_something_run {
-                    //     self.status = Status::Running
-                    // }
-
-                    // let all_finished = all_vms
-                    //     .iter()
-                    //     .all(|vm| matches!(vm.status, Status::Done | Status::Panicked { .. }));
-                    // if all_finished {
-                    //     let TearDownResult { heap, result, .. } = parallel_body.tear_down();
-                    //     match result {
-                    //         Ok(return_value) => {
-                    //             paused_main_fiber.complete_parallel_scope(&mut heap, return_value);
-                    //             break 'new_state State::SingleFiber(paused_main_fiber);
-                    //         }
-                    //         Err(_) => todo!(),
-                    //     }
-                    // }
+                    if children.iter().any(|(_, vm)| vm.is_running()) {
+                        self.status = Status::Running
+                    }
+                    if children.iter().all(|(_, vm)| vm.is_finished()) {
+                        paused_main_fiber.complete_parallel_scope();
+                        self.status = Status::Running;
+                        break 'new_state State::SingleFiber(paused_main_fiber);
+                    }
 
                     State::ParallelSection {
                         paused_main_fiber,
                         nursery,
-                        parallel_body,
-                        spawned_children,
+                        children,
                     }
                 }
             }
@@ -358,5 +446,17 @@ impl Vm {
         let id = self.next_internal_channel_id;
         self.next_internal_channel_id += 1;
         id
+    }
+}
+
+impl Heap {
+    fn map_channel_ids(&mut self, mapping: &HashMap<ChannelId, ChannelId>) {
+        for object in self.all_objects_mut().values_mut() {
+            if let Data::SendPort(SendPort { channel })
+            | Data::ReceivePort(ReceivePort { channel }) = &mut object.data
+            {
+                *channel = mapping[channel];
+            }
+        }
     }
 }

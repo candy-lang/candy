@@ -69,7 +69,15 @@ impl Fiber {
             Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
             Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
-            Ok(Parallel { body }) => self.status = Status::InParallelScope { body },
+            Ok(Parallel {
+                body,
+                return_channel,
+            }) => {
+                self.status = Status::InParallelScope {
+                    body,
+                    return_channel,
+                }
+            }
             Err(reason) => self.panic(reason),
         }
     }
@@ -78,11 +86,23 @@ impl Fiber {
 type BuiltinResult = Result<SuccessfulBehavior, String>;
 enum SuccessfulBehavior {
     Return(Pointer),
-    DivergeControlFlow { closure: Pointer },
-    CreateChannel { capacity: Capacity },
-    Send { channel: ChannelId, packet: Packet },
-    Receive { channel: ChannelId },
-    Parallel { body: Pointer },
+    DivergeControlFlow {
+        closure: Pointer,
+    },
+    CreateChannel {
+        capacity: Capacity,
+    },
+    Send {
+        channel: ChannelId,
+        packet: Packet,
+    },
+    Receive {
+        channel: ChannelId,
+    },
+    Parallel {
+        body: Pointer,
+        return_channel: ChannelId,
+    },
 }
 use SuccessfulBehavior::*;
 
@@ -263,12 +283,18 @@ impl Heap {
     }
 
     fn parallel(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (body_taking_nursery: Closure), {
-            self.dup(body_taking_nursery.address);
-            Parallel {
-                body: body_taking_nursery.address,
+        unpack_and_later_drop!(
+            self,
+            args,
+            (body_taking_nursery: Closure, return_channel: SendPort),
+            {
+                self.dup(body_taking_nursery.address);
+                Parallel {
+                    body: body_taking_nursery.address,
+                    return_channel: return_channel.channel,
+                }
             }
-        })
+        )
     }
 
     fn print(&mut self, args: &[Pointer]) -> BuiltinResult {

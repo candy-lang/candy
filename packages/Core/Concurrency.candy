@@ -1,16 +1,24 @@
 channel = use "..Channel"
 function = use "..Function"
+structGet = (use "..Struct").getUnwrap
 
 parallel body := 
   needs (function.is1 body)
-  ✨.parallel body
+  returnValueChannel = channel.create 1
+  returnValueSendPort = structGet returnValueChannel 0
+  returnValueReceivePort = structGet returnValueChannel 1
+  ✨.parallel body returnValueSendPort
+  channel.receive returnValueReceivePort
 
 async nursery body :=
   needs (channel.isSendPort nursery)
   needs (function.is0 body)
-  channel.send nursery [Spawn, body]
+  returnValueChannel = channel.create 1
+  returnValueSendPort = structGet returnValueChannel 0
+  returnValueReceivePort = structGet returnValueChannel 1
+  channel.send nursery [Spawn, body, returnValueSendPort]
+  returnValueReceivePort
 
-await childChannel :=
-  needs (channel.isReceivePort childChannel)
-  result = channel.receive childChannel
-  needs False "Todo: Implement await"
+await fiber :=
+  needs (channel.isReceivePort fiber)
+  channel.receive fiber

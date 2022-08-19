@@ -9,7 +9,9 @@ use crate::{
     database::Database,
     language_server::hints::{utils::id_to_end_of_line, HintKind},
     module::Module,
-    vm::{tracer::TraceEntry, use_provider::DbUseProvider, vm, Closure, Heap, Pointer, Vm},
+    vm::{
+        tracer::TraceEntry, tree, use_provider::DbUseProvider, Closure, FiberTree, Heap, Pointer,
+    },
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
@@ -18,12 +20,12 @@ use tracing::{span, trace, Level};
 
 #[derive(Default)]
 pub struct ConstantEvaluator {
-    vms: HashMap<Module, Vm>,
+    vms: HashMap<Module, FiberTree>,
 }
 
 impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
-        let vm = Vm::new_for_running_module_closure(
+        let vm = FiberTree::new_for_running_module_closure(
             &DbUseProvider { db },
             Closure::of_module(db, module.clone()).unwrap(),
         );
@@ -39,7 +41,7 @@ impl ConstantEvaluator {
         let mut running_vms = self
             .vms
             .iter_mut()
-            .filter(|(_, vm)| matches!(vm.status(), vm::Status::Running))
+            .filter(|(_, vm)| matches!(vm.status(), tree::Status::Running))
             .collect_vec();
         trace!(
             "Constant evaluator running. {} running VMs, {} in total.",
@@ -76,7 +78,7 @@ impl ConstantEvaluator {
         let vm = &self.vms[module];
         let mut hints = vec![];
 
-        if let vm::Status::Panicked { reason } = vm.status() {
+        if let tree::Status::Panicked { reason } = vm.status() {
             if let Some(hint) = panic_hint(db, module.clone(), vm, reason) {
                 hints.push(hint);
             }
@@ -125,7 +127,7 @@ impl ConstantEvaluator {
     }
 }
 
-fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<Hint> {
+fn panic_hint(db: &Database, module: Module, vm: &FiberTree, reason: String) -> Option<Hint> {
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.

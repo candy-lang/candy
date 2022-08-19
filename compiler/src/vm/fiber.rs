@@ -38,12 +38,24 @@ pub struct Fiber {
 #[derive(Clone, Debug)]
 pub enum Status {
     Running,
-    CreatingChannel { capacity: Capacity },
-    Sending { channel: ChannelId, packet: Packet },
-    Receiving { channel: ChannelId },
-    InParallelScope { body: Pointer },
+    CreatingChannel {
+        capacity: Capacity,
+    },
+    Sending {
+        channel: ChannelId,
+        packet: Packet,
+    },
+    Receiving {
+        channel: ChannelId,
+    },
+    InParallelScope {
+        body: Pointer,
+        return_channel: ChannelId,
+    },
     Done,
-    Panicked { reason: String },
+    Panicked {
+        reason: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -89,6 +101,9 @@ impl Fiber {
             fuzzable_closures: vec![],
             num_instructions_executed: 0,
         }
+    }
+    pub fn new_in_done_state() -> Self {
+        Self::new_with_heap(Heap::default())
     }
     pub fn new_for_running_closure<U: UseProvider>(
         heap: Heap,
@@ -158,9 +173,8 @@ impl Fiber {
         self.data_stack.push(address);
         self.status = Status::Running;
     }
-    pub fn complete_parallel_scope(&mut self, heap: &mut Heap, return_value: Pointer) {
-        let return_value = heap.clone_single_to_other_heap(&mut self.heap, return_value);
-        self.data_stack.push(return_value);
+    pub fn complete_parallel_scope(&mut self) {
+        self.data_stack.push(self.heap.create_nothing());
         self.status = Status::Running;
     }
 
