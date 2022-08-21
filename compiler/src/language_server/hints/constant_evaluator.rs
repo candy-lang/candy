@@ -10,7 +10,9 @@ use crate::{
     language_server::hints::{utils::id_to_end_of_line, HintKind},
     module::Module,
     vm::{
-        tracer::TraceEntry, tree, use_provider::DbUseProvider, Closure, FiberTree, Heap, Pointer,
+        context::{DbUseProvider, ModularContext, RunLimitedNumberOfInstructions},
+        tracer::TraceEntry,
+        tree, Closure, FiberTree, Heap, Pointer,
     },
 };
 use itertools::Itertools;
@@ -26,7 +28,6 @@ pub struct ConstantEvaluator {
 impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
         let vm = FiberTree::new_for_running_module_closure(
-            &DbUseProvider { db },
             Closure::of_module(db, module.clone()).unwrap(),
         );
         self.vms.insert(module, vm);
@@ -50,8 +51,10 @@ impl ConstantEvaluator {
         );
 
         if let Some((module, vm)) = running_vms.choose_mut(&mut thread_rng()) {
-            let use_provider = DbUseProvider { db };
-            vm.run(&use_provider, 500);
+            vm.run(&mut ModularContext {
+                use_provider: DbUseProvider { db },
+                execution_controller: RunLimitedNumberOfInstructions::new(500),
+            });
             Some(module.clone())
         } else {
             None

@@ -1,12 +1,13 @@
 use super::{
     channel::{Capacity, Packet},
+    context::Context,
     heap::{Builtin, ChannelId, Closure, Data, Heap, Pointer},
     tracer::{TraceEntry, Tracer},
-    use_provider::UseProvider,
 };
 use crate::{
     compiler::{hir::Id, lir::Instruction},
     module::Module,
+    vm::context::DummyContext,
 };
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -32,7 +33,6 @@ pub struct Fiber {
     // fault a panic is.
     pub tracer: Tracer,
     pub fuzzable_closures: Vec<(Id, Pointer)>,
-    pub num_instructions_executed: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -99,15 +99,18 @@ impl Fiber {
             heap,
             tracer: Tracer::default(),
             fuzzable_closures: vec![],
-            num_instructions_executed: 0,
         }
     }
-    pub fn new_for_running_closure<U: UseProvider>(
+    pub fn new_for_running_closure(
         heap: Heap,
-        use_provider: &U,
         closure: Pointer,
         arguments: &[Pointer],
     ) -> Self {
+        assert!(
+            !matches!(heap.get(closure).data, Data::Builtin(_),),
+            "can only use with closures, not builtins"
+        );
+
         let mut fiber = Self::new_with_heap(heap);
 
         fiber.data_stack.extend(arguments);
@@ -115,22 +118,19 @@ impl Fiber {
 
         fiber.status = Status::Running;
         fiber.run_instruction(
-            use_provider,
+            &DummyContext,
             Instruction::Call {
                 num_args: arguments.len(),
             },
         );
         fiber
     }
-    pub fn new_for_running_module_closure<U: UseProvider>(
-        use_provider: &U,
-        closure: Closure,
-    ) -> Self {
+    pub fn new_for_running_module_closure(closure: Closure) -> Self {
         assert_eq!(closure.captured.len(), 0, "Called start_module_closure with a closure that is not a module closure (it captures stuff).");
         assert_eq!(closure.num_args, 0, "Called start_module_closure with a closure that is not a module closure (it has arguments).");
         let mut heap = Heap::default();
         let closure = heap.create_closure(closure);
-        Self::new_for_running_closure(heap, use_provider, closure, &[])
+        Self::new_for_running_closure(heap, closure, &[])
     }
     pub fn tear_down(mut self) -> TearDownResult {
         let result = match self.status {
@@ -179,14 +179,12 @@ impl Fiber {
         self.data_stack[self.data_stack.len() - 1 - offset as usize]
     }
 
-    pub fn run<U: UseProvider>(&mut self, use_provider: &U, mut num_instructions: usize) {
+    pub fn run<C: Context>(&mut self, context: &mut C) {
         assert!(
             matches!(self.status, Status::Running),
             "Called Fiber::run on a fiber that is not ready to run."
         );
-        while matches!(self.status, Status::Running) && num_instructions > 0 {
-            num_instructions -= 1;
-
+        while matches!(self.status, Status::Running) && context.should_continue_running() {
             let current_closure = self.heap.get(self.next_instruction.closure);
             let current_body = if let Data::Closure(Closure { body, .. }) = &current_closure.data {
                 body
@@ -220,15 +218,15 @@ impl Fiber {
             }
 
             self.next_instruction.instruction += 1;
-            self.run_instruction(use_provider, instruction);
-            self.num_instructions_executed += 1;
+            self.run_instruction(context, instruction);
+            context.instruction_executed();
 
             if self.next_instruction == InstructionPointer::null_pointer() {
                 self.status = Status::Done;
             }
         }
     }
-    pub fn run_instruction<U: UseProvider>(&mut self, use_provider: &U, instruction: Instruction) {
+    pub fn run_instruction<C: Context>(&mut self, context: &C, instruction: Instruction) {
         match instruction {
             Instruction::CreateInt(int) => {
                 let address = self.heap.create_int(int.into());
@@ -323,7 +321,7 @@ impl Fiber {
                     }
                     Data::Builtin(Builtin { function: builtin }) => {
                         self.heap.drop(closure_address);
-                        self.run_builtin_function(use_provider, &builtin, &args);
+                        self.run_builtin_function(context, &builtin, &args);
                     }
                     _ => {
                         self.panic("you can only call closures and builtins".to_string());
@@ -337,7 +335,7 @@ impl Fiber {
             }
             Instruction::UseModule { current_module } => {
                 let relative_path = self.data_stack.pop().unwrap();
-                match self.use_module(use_provider, current_module, relative_path) {
+                match self.use_module(context, current_module, relative_path) {
                     Ok(()) => {}
                     Err(reason) => {
                         self.panic(reason);

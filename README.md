@@ -125,7 +125,6 @@ Major milestones:
 - eliminate common subtrees
 - inline functions
 - minimize inputs found through fuzzing
-- make condition whether to keep running more granular
 - fuzz parser
 - support recursion
 - tail call optimization

@@ -7,7 +7,11 @@ use crate::{
     database::Database,
     fuzzer::{Fuzzer, Status},
     module::Module,
-    vm::{tracer::TraceEntry, Heap, Pointer},
+    vm::{
+        context::{DbUseProvider, ModularContext, RunLimitedNumberOfInstructions},
+        tracer::TraceEntry,
+        Heap, Pointer,
+    },
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
@@ -22,14 +26,13 @@ pub struct FuzzerManager {
 impl FuzzerManager {
     pub fn update_module(
         &mut self,
-        db: &Database,
         module: Module,
         heap: &Heap,
         fuzzable_closures: &[(Id, Pointer)],
     ) {
         let fuzzers = fuzzable_closures
             .iter()
-            .map(|(id, closure)| (id.clone(), Fuzzer::new(db, heap, *closure, id.clone())))
+            .map(|(id, closure)| (id.clone(), Fuzzer::new(heap, *closure, id.clone())))
             .collect();
         self.fuzzers.insert(module, fuzzers);
     }
@@ -51,7 +54,13 @@ impl FuzzerManager {
         );
 
         let fuzzer = running_fuzzers.choose_mut(&mut thread_rng())?;
-        fuzzer.run(db, 100);
+        fuzzer.run(
+            db,
+            &mut ModularContext {
+                use_provider: DbUseProvider { db },
+                execution_controller: RunLimitedNumberOfInstructions::new(100),
+            },
+        );
 
         match &fuzzer.status() {
             Status::StillFuzzing { .. } => None,

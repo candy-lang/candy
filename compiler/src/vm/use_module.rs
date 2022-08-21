@@ -1,54 +1,25 @@
 use super::{
-    fiber::Fiber,
-    heap::{Closure, Data, Heap, Pointer},
+    context::{Context, UseResult},
+    heap::Data,
+    Closure, Fiber, Heap, Pointer,
 };
 use crate::{
-    compiler::{
-        hir_to_lir::HirToLir,
-        lir::{Instruction, Lir},
-    },
-    database::Database,
-    module::{Module, ModuleDb, ModuleKind},
+    compiler::lir::Instruction,
+    module::{Module, ModuleKind},
 };
 use itertools::Itertools;
 
-pub trait UseProvider {
-    fn use_module(&self, module: Module) -> Result<UseResult, String>;
-}
-pub enum UseResult {
-    Asset(Vec<u8>),
-    Code(Lir),
-}
-
-pub struct DbUseProvider<'a> {
-    pub db: &'a Database,
-}
-impl<'a> UseProvider for DbUseProvider<'a> {
-    fn use_module(&self, module: Module) -> Result<UseResult, String> {
-        match module.kind {
-            ModuleKind::Asset => match self.db.get_module_content(module.clone()) {
-                Some(bytes) => Ok(UseResult::Asset((*bytes).clone())),
-                None => Err(format!("use couldn't import the asset module `{}`", module)),
-            },
-            ModuleKind::Code => match self.db.lir(module.clone()) {
-                Some(lir) => Ok(UseResult::Code((*lir).clone())),
-                None => Err(format!("use couldn't import the code module `{}`", module)),
-            },
-        }
-    }
-}
-
 impl Fiber {
-    pub fn use_module<U: UseProvider>(
+    pub fn use_module<C: Context>(
         &mut self,
-        use_provider: &U,
+        context: &C,
         current_module: Module,
         relative_path: Pointer,
     ) -> Result<(), String> {
         let target = UsePath::parse(&self.heap, relative_path)?;
         let module = target.resolve_relative_to(current_module)?;
 
-        match use_provider.use_module(module.clone())? {
+        match context.use_module(module.clone())? {
             UseResult::Asset(bytes) => {
                 let bytes = bytes
                     .iter()
@@ -61,7 +32,7 @@ impl Fiber {
                 let module_closure = Closure::of_lir(module, lir);
                 let address = self.heap.create_closure(module_closure);
                 self.data_stack.push(address);
-                self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
+                self.run_instruction(context, Instruction::Call { num_args: 0 });
             }
         }
 

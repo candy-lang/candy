@@ -1,10 +1,11 @@
 mod builtin_functions;
 mod channel;
+pub mod context;
 mod fiber;
 mod heap;
 pub mod tracer;
 pub mod tree;
-pub mod use_provider;
+mod use_module;
 
 pub use fiber::{Fiber, TearDownResult};
 pub use heap::{Closure, Heap, Object, Pointer};

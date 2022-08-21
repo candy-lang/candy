@@ -1,8 +1,8 @@
 use super::{
     channel::{Capacity, Packet},
+    context::Context,
     fiber::{Fiber, Status},
     heap::{ChannelId, Closure, Data, Int, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
-    use_provider::UseProvider,
     Heap,
 };
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
@@ -15,9 +15,9 @@ use tracing::{info, span, Level};
 use unicode_segmentation::UnicodeSegmentation;
 
 impl Fiber {
-    pub(super) fn run_builtin_function<U: UseProvider>(
+    pub(super) fn run_builtin_function<C: Context>(
         &mut self,
-        use_provider: &U,
+        context: &C,
         builtin_function: &BuiltinFunction,
         args: &[Pointer],
     ) {
@@ -64,7 +64,7 @@ impl Fiber {
             Ok(Return(value)) => self.data_stack.push(value),
             Ok(DivergeControlFlow { closure }) => {
                 self.data_stack.push(closure);
-                self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
+                self.run_instruction(context, Instruction::Call { num_args: 0 });
             }
             Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
             Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },

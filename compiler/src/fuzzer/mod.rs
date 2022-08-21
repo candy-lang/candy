@@ -6,18 +6,24 @@ pub use self::fuzzer::{Fuzzer, Status};
 use crate::{
     database::Database,
     module::Module,
-    vm::{use_provider::DbUseProvider, Closure, FiberTree},
+    vm::{
+        context::{DbUseProvider, ModularContext, RunForever, RunLimitedNumberOfInstructions},
+        Closure, FiberTree,
+    },
 };
 use itertools::Itertools;
 use tracing::{error, info};
 
 pub async fn fuzz(db: &Database, module: Module) {
     let (fuzzables_heap, fuzzables) = {
-        let result = FiberTree::new_for_running_module_closure(
-            &DbUseProvider { db },
+        let mut vm = FiberTree::new_for_running_module_closure(
             Closure::of_module(db, module.clone()).unwrap(),
-        )
-        .run_synchronously_until_completion(db);
+        );
+        vm.run(&mut ModularContext {
+            use_provider: DbUseProvider { db },
+            execution_controller: RunForever,
+        });
+        let result = vm.tear_down();
         (result.heap, result.fuzzable_closures)
     };
 
@@ -27,8 +33,14 @@ pub async fn fuzz(db: &Database, module: Module) {
     );
 
     for (id, closure) in fuzzables {
-        let mut fuzzer = Fuzzer::new(db, &fuzzables_heap, closure, id.clone());
-        fuzzer.run(db, 1000);
+        let mut fuzzer = Fuzzer::new(&fuzzables_heap, closure, id.clone());
+        fuzzer.run(
+            db,
+            &mut ModularContext {
+                use_provider: DbUseProvider { db },
+                execution_controller: RunLimitedNumberOfInstructions::new(1000),
+            },
+        );
         match fuzzer.status() {
             Status::StillFuzzing { .. } => {}
             Status::PanickedForArguments {

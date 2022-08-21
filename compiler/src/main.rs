@@ -26,7 +26,10 @@ use crate::{
     database::Database,
     language_server::utils::LspPositionConversion,
     module::{Module, ModuleKind},
-    vm::{use_provider::DbUseProvider, Closure, FiberTree, TearDownResult},
+    vm::{
+        context::{DbUseProvider, ModularContext, RunForever},
+        Closure, FiberTree, TearDownResult,
+    },
 };
 use compiler::lir::Lir;
 use itertools::Itertools;
@@ -202,14 +205,17 @@ fn run(options: CandyRunOptions) {
     let path_string = options.file.to_string_lossy();
     info!("Running `{path_string}`.");
 
-    let use_provider = DbUseProvider { db: &db };
-    let vm = FiberTree::new_for_running_module_closure(&use_provider, module_closure);
+    let mut vm = FiberTree::new_for_running_module_closure(module_closure);
+    vm.run(&mut ModularContext {
+        use_provider: DbUseProvider { db: &db },
+        execution_controller: RunForever,
+    });
     let TearDownResult {
         tracer,
         result,
         heap,
         ..
-    } = vm.run_synchronously_until_completion(&db);
+    } = vm.tear_down();
 
     match result {
         Ok(return_value) => info!(
