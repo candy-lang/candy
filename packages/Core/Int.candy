@@ -1,5 +1,5 @@
 bool = use "..Bool"
-check = use "..Check"
+check = (use "..Check").check
 conditionals = use "..Conditionals"
 equals = (use "..Equality").equals
 type = use "..Type"
