@@ -279,7 +279,11 @@ fn init_logger() {
 }
 fn level_for(module: &'static str, level: Level) -> impl Fn(&Metadata) -> bool {
     move |metadata| {
-        if metadata.module_path().unwrap_or("").starts_with(module) {
+        if metadata
+            .module_path()
+            .unwrap_or_default()
+            .starts_with(module)
+        {
             metadata.level() <= &level
         } else {
             true
