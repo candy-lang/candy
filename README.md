@@ -122,16 +122,18 @@ Major milestones:
 - add caching while compile-time evaluating code
 - pattern matching
 - pipe operator
+- text interpolation
 - eliminate common subtrees
 - inline functions
 - minimize inputs found through fuzzing
 - fuzz parser
-- support recursion
 - tail call optimization
 - new name?
 - parse function declaration with doc comment but no code
 - complain about comment lines with too much indentation
 - develop guidelines about how to format reasons
+- module files: `.candy` vs `_.candy`?
+- casing of module names?
 
 ## How to use Candy
 
