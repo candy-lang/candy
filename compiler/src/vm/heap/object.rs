@@ -104,7 +104,7 @@ impl Struct {
         }
         for (key_a, value_a) in self.iter() {
             for (key_b, value_b) in other.iter() {
-                if !key_a.equals(heap, key_b) || !value_a.equals(heap, value_b) {
+                if key_a.equals(heap, key_b) && !value_a.equals(heap, value_b) {
                     return false;
                 }
             }
