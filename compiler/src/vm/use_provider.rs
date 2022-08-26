@@ -116,7 +116,7 @@ impl UsePath {
 
         let mut path = current_module.path;
         for _ in 0..self.parent_navigations {
-            if path.pop() == None {
+            if path.pop().is_none() {
                 return Err("too many parent navigations".to_string());
             }
         }
