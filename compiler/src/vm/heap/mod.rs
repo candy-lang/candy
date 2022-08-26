@@ -56,10 +56,12 @@ impl Heap {
 
     pub fn dup(&mut self, address: Pointer) {
         self.get_mut(address).reference_count += 1;
+
+        let object = self.get(address);
         log::trace!(
             "RefCount of {address} increased to {}. Value: {}",
-            self.get(address).reference_count,
-            address.format(self),
+            object.reference_count,
+            object.format(self),
         );
     }
     pub fn drop(&mut self, address: Pointer) {
@@ -77,18 +79,17 @@ impl Heap {
 
     pub fn create(&mut self, object: Data) -> Pointer {
         let address = self.next_address;
-        self.objects.insert(
-            address,
-            Object {
-                reference_count: 1,
-                data: object,
-            },
-        );
-        log::trace!("Created object {} at {address}.", address.format(self));
         self.next_address = Pointer::from_raw(self.next_address.raw() + 1);
+
+        let object = Object {
+            reference_count: 1,
+            data: object,
+        };
+        log::trace!("Creating object {} at {address}.", object.format(self));
+        self.objects.insert(address, object);
         address
     }
-    pub fn free(&mut self, address: Pointer) {
+    fn free(&mut self, address: Pointer) {
         let object = self.objects.remove(&address).unwrap();
         log::trace!("Freeing object at {address}.");
         assert_eq!(object.reference_count, 0);
