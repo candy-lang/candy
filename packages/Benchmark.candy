@@ -1,100 +1,35 @@
 core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
-core = use "..Core"
+✨.print "Imported Core"
+
+#fibRec fibRec n =
+#  core.ifElse (core.int.isLessThan n 2) { n } {
+#    core.int.add
+#      fibRec fibRec (core.int.subtract n 1)
+#      fibRec fibRec (core.int.subtract n 2)
+#  }
+#fib n = fibRec fibRec n
+#
+#✨.print "Defined fib"
+#✨.print (fib 8)
+
+
+channel = core.channel.create 3
+sendPort = core.struct.getUnwrap channel 0
+receivePort = core.struct.getUnwrap channel 1
+core.channel.send sendPort "One"
+core.channel.send sendPort "Two"
+✨.print (core.channel.receive receivePort)
+core.channel.send sendPort "Three"
+✨.print (core.channel.receive receivePort)
+✨.print (core.channel.receive receivePort)
+
+core.parallel { nursery ->
+  ✨.print (core.await (core.async nursery {
+    ✨.print "Hello from fiber!"
+    "Hello, async await!"
+  }))
+
+  core.async nursery { ✨.print "Kiwi" }
+  core.async nursery { ✨.print "Banana" }
+  ✨.print "Hi"
+}
