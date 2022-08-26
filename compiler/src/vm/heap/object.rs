@@ -49,8 +49,7 @@ pub struct Symbol {
 
 #[derive(Default, Clone)]
 pub struct Struct {
-    // TODO: Choose a more efficient representation.
-    pub buckets: HashMap<u64, Vec<(Pointer, Pointer)>>, // hash -> list of keys and values
+    pub fields: Vec<(u64, Pointer, Pointer)>, // list of hash, key, and value
 }
 
 #[derive(Clone)]
@@ -73,30 +72,49 @@ impl Struct {
         }
         s
     }
-    fn insert(&mut self, heap: &Heap, key: Pointer, value: Pointer) {
-        let bucket = self.buckets.entry(key.hash(heap)).or_default();
-        for (existing_key, existing_value) in bucket.iter_mut() {
+    /// If the struct contains the key, returns the index of its field.
+    /// Otherwise, returns the index of where the key would be inserted.
+    fn index_of_key(&self, heap: &Heap, key: Pointer) -> Result<usize, usize> {
+        let hash = key.hash(heap);
+        let index_of_hash = self
+            .fields
+            .binary_search_by_key(&hash, |(hash, _, _)| *hash)?;
+        let going_right = self.fields[index_of_hash..]
+            .iter()
+            .enumerate()
+            .take_while(|(_, (existing_hash, _, _))| *existing_hash == hash)
+            .map(|(i, (_, key, _))| (index_of_hash + i, key));
+        let going_left = self.fields[0..index_of_hash]
+            .iter()
+            .rev()
+            .enumerate()
+            .take_while(|(_, (existing_hash, _, _))| *existing_hash == hash)
+            .map(|(i, (_, key, _))| (index_of_hash - i - 1, key));
+
+        for (index, existing_key) in going_left.chain(going_right) {
             if existing_key.equals(heap, key) {
-                *existing_value = value;
-                return;
+                return Ok(index);
             }
         }
-        bucket.push((key, value));
+        Err(index_of_hash)
+    }
+    fn insert(&mut self, heap: &Heap, key: Pointer, value: Pointer) {
+        let index = self.index_of_key(heap, key);
+        self.fields
+            .insert(index.into_ok_or_err(), (key.hash(heap), key, value));
     }
     pub fn get(&self, heap: &Heap, key: Pointer) -> Option<Pointer> {
-        let bucket = self.buckets.get(&key.hash(heap))?;
-        for (existing_key, existing_value) in bucket {
-            if existing_key.equals(heap, key) {
-                return Some(*existing_value);
-            }
-        }
-        None
+        let index = self.index_of_key(heap, key).ok()?;
+        Some(self.fields[index].1)
     }
     fn len(&self) -> usize {
-        self.buckets.values().map(|bucket| bucket.len()).sum()
+        self.fields.len()
     }
     pub fn iter(&self) -> impl Iterator<Item = (Pointer, Pointer)> {
-        self.buckets.clone().into_values().flatten()
+        self.fields
+            .clone()
+            .into_iter()
+            .map(|(_, key, value)| (key, value))
     }
     fn equals(&self, heap: &Heap, other: &Struct) -> bool {
         if self.len() != other.len() {
@@ -104,7 +122,7 @@ impl Struct {
         }
         for (key_a, value_a) in self.iter() {
             for (key_b, value_b) in other.iter() {
-                if key_a.equals(heap, key_b) && !value_a.equals(heap, value_b) {
+                if !key_a.equals(heap, key_b) || !value_a.equals(heap, value_b) {
                     return false;
                 }
             }

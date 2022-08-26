@@ -152,18 +152,10 @@ impl Heap {
             Data::Text(text) => Data::Text(text.clone()),
             Data::Symbol(symbol) => Data::Symbol(symbol.clone()),
             Data::Struct(struct_) => Data::Struct(Struct {
-                buckets: struct_
-                    .buckets
+                fields: struct_
+                    .fields
                     .iter()
-                    .map(|(hash, bucket)| {
-                        (
-                            *hash,
-                            bucket
-                                .iter()
-                                .map(|(key, value)| (address_map[key], address_map[value]))
-                                .collect_vec(),
-                        )
-                    })
+                    .map(|(hash, key, value)| (*hash, address_map[key], address_map[value]))
                     .collect(),
             }),
             Data::Closure(closure) => Data::Closure(Closure {
