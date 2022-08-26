@@ -101,11 +101,7 @@ impl Fiber {
             fuzzable_closures: vec![],
         }
     }
-    pub fn new_for_running_closure(
-        heap: Heap,
-        closure: Pointer,
-        arguments: &[Pointer],
-    ) -> Self {
+    pub fn new_for_running_closure(heap: Heap, closure: Pointer, arguments: &[Pointer]) -> Self {
         assert!(
             !matches!(heap.get(closure).data, Data::Builtin(_),),
             "can only use with closures, not builtins"
@@ -299,7 +295,8 @@ impl Fiber {
                 }
                 args.reverse();
 
-                match self.heap.get(closure_address).data.clone() {
+                let object = self.heap.get(closure_address);
+                match object.data.clone() {
                     Data::Closure(Closure {
                         captured,
                         num_args: expected_num_args,
@@ -324,7 +321,10 @@ impl Fiber {
                         self.run_builtin_function(context, &builtin, &args);
                     }
                     _ => {
-                        self.panic("you can only call closures and builtins".to_string());
+                        self.panic(format!(
+                            "you can only call closures and builtins, but you tried to call {}",
+                            object.format(&self.heap),
+                        ));
                     }
                 };
             }

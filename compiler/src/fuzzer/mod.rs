@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use itertools::Itertools;
-use tracing::{error, info};
+use tracing::info;
 
 pub async fn fuzz(db: &Database, module: Module) {
     let (fuzzables_heap, fuzzables) = {
@@ -49,15 +49,15 @@ pub async fn fuzz(db: &Database, module: Module) {
                 reason,
                 tracer,
             } => {
-                error!("The fuzzer discovered an input that crashes {id}:");
-                error!(
+                info!("The fuzzer discovered an input that crashes {id}:");
+                info!(
                     "Calling `{id} {}` doesn't work because {reason}.",
                     arguments
                         .iter()
                         .map(|argument| argument.format(heap))
                         .join(" "),
                 );
-                error!("This was the stack trace:");
+                info!("This was the stack trace:");
                 tracer.dump_stack_trace(db, heap);
 
                 module.dump_associated_debug_file("trace", &tracer.format_call_tree(heap));

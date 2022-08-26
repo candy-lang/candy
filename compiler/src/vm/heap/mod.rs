@@ -40,7 +40,7 @@ pub struct Heap {
 
 impl std::fmt::Debug for Heap {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut objects = self.objects.clone().into_iter().collect_vec();
+        let mut objects = self.objects.iter().collect_vec();
         objects.sort_by_key(|(address, _)| address.raw());
 
         writeln!(f, "{{")?;
@@ -49,7 +49,7 @@ impl std::fmt::Debug for Heap {
                 f,
                 "{address}: {} {}",
                 object.reference_count,
-                address.format(self),
+                object.format(self),
             )?;
         }
         write!(f, "}}")
@@ -78,10 +78,12 @@ impl Heap {
 
     pub fn dup(&mut self, address: Pointer) {
         self.get_mut(address).reference_count += 1;
+
+        let object = self.get(address);
         trace!(
             "RefCount of {address} increased to {}. Value: {}",
-            self.get(address).reference_count,
-            address.format(self),
+            object.reference_count,
+            object.format(self),
         );
     }
     pub fn drop(&mut self, address: Pointer) {
@@ -99,18 +101,17 @@ impl Heap {
 
     pub fn create(&mut self, object: Data) -> Pointer {
         let address = self.next_address;
-        self.objects.insert(
-            address,
-            Object {
-                reference_count: 1,
-                data: object,
-            },
-        );
-        trace!("Created object {} at {address}.", address.format(self));
         self.next_address = Pointer::from_raw(self.next_address.raw() + 1);
+
+        let object = Object {
+            reference_count: 1,
+            data: object,
+        };
+        trace!("Creating object {} at {address}.", object.format(self));
+        self.objects.insert(address, object);
         address
     }
-    pub fn free(&mut self, address: Pointer) {
+    fn free(&mut self, address: Pointer) {
         let object = self.objects.remove(&address).unwrap();
         trace!("Freeing object at {address}.");
         assert_eq!(object.reference_count, 0);
@@ -134,7 +135,7 @@ impl Heap {
 
         let address_map: HashMap<Pointer, Pointer> = objects_to_refcounts
             .keys()
-            .cloned()
+            .copied()
             .zip(
                 (other.next_address.raw()..other.next_address.raw() + num_objects)
                     .map(Pointer::from_raw),
@@ -177,7 +178,7 @@ impl Heap {
                     .fields
                     .iter()
                     .map(|(hash, key, value)| (*hash, address_map[key], address_map[value]))
-                    .collect_vec(),
+                    .collect(),
             }),
             Data::Closure(closure) => Data::Closure(Closure {
                 captured: closure
@@ -248,15 +249,13 @@ impl Heap {
             Ok(it) => ("Ok".to_string(), it),
             Err(it) => ("Error".to_string(), it),
         };
-        let fields = vec![
+        let fields = HashMap::from([
             (
                 self.create_symbol("Type".to_string()),
                 self.create_symbol(type_),
             ),
             (self.create_symbol("Value".to_string()), value),
-        ]
-        .into_iter()
-        .collect();
+        ]);
         self.create_struct(fields)
     }
     pub fn create_ordering(&mut self, ordering: Ordering) -> Pointer {

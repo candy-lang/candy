@@ -1,7 +1,7 @@
 use super::{
     context::{Context, UseResult},
-    heap::Data,
-    Closure, Fiber, Heap, Pointer,
+    heap::{Closure, Heap, Pointer, Text},
+    Fiber,
 };
 use crate::{
     compiler::lir::Instruction,
@@ -29,7 +29,7 @@ impl Fiber {
                 self.data_stack.push(list);
             }
             UseResult::Code(lir) => {
-                let module_closure = Closure::of_lir(module, lir);
+                let module_closure = Closure::of_module_lir(module, lir);
                 let address = self.heap.create_closure(module_closure);
                 self.data_stack.push(address);
                 self.run_instruction(context, Instruction::Call { num_args: 0 });
@@ -48,11 +48,13 @@ impl UsePath {
     const PARENT_NAVIGATION_CHAR: char = '.';
 
     fn parse(heap: &Heap, path: Pointer) -> Result<Self, String> {
-        let path = match &heap.get(path).data {
-            Data::Text(path) => path.value.clone(),
-            _ => return Err("the path has to be a text".to_string()),
-        };
-        let mut path = path.as_str();
+        let path: Text = heap
+            .get(path)
+            .data
+            .clone()
+            .try_into()
+            .map_err(|_| "the path has to be a text".to_string())?;
+        let mut path = path.value.as_str();
         let parent_navigations = {
             let mut navigations = 0;
             while path.starts_with(UsePath::PARENT_NAVIGATION_CHAR) {
@@ -85,7 +87,7 @@ impl UsePath {
 
         let mut path = current_module.path;
         for _ in 0..self.parent_navigations {
-            if path.pop() == None {
+            if path.pop().is_none() {
                 return Err("too many parent navigations".to_string());
             }
         }

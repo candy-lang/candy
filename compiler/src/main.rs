@@ -1,8 +1,8 @@
 #![feature(async_closure)]
 #![feature(box_patterns)]
-#![feature(label_break_value)]
 #![feature(never_type)]
 #![feature(try_trait_v2)]
+#![feature(result_into_ok_or_err)]
 #![allow(clippy::module_inception)]
 
 mod builtin_functions;
@@ -285,7 +285,11 @@ fn init_logger() {
 }
 fn level_for(module: &'static str, level: Level) -> impl Fn(&Metadata) -> bool {
     move |metadata| {
-        if metadata.module_path().unwrap_or("").starts_with(module) {
+        if metadata
+            .module_path()
+            .unwrap_or_default()
+            .starts_with(module)
+        {
             metadata.level() <= &level
         } else {
             true
