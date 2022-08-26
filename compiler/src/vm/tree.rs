@@ -10,6 +10,7 @@ use crate::vm::fiber;
 use rand::seq::IteratorRandom;
 use std::{
     collections::{HashMap, VecDeque},
+    marker::PhantomData,
     mem,
 };
 use tracing::{debug, info, warn};
@@ -145,11 +146,11 @@ pub struct FiberTree {
     // managed ("owned") by this node directly. For channels owned by the
     // outside world (such as those referenced in the environment argument),
     // this node maintains a mapping between internal and external IDs.
-    pub internal_channels: HashMap<ChannelId, Channel>,
-    pub next_internal_channel_id: ChannelId,
+    pub internal_channels: HashMap<ChannelId, (Channel, Operations)>,
+    external_operations: HashMap<ChannelId, Operations>,
+    internal_channel_id_generator: IdGenerator<ChannelId>,
     pub external_to_internal_channels: HashMap<ChannelId, ChannelId>,
     pub internal_to_external_channels: HashMap<ChannelId, ChannelId>,
-    pub channel_operations: HashMap<ChannelId, VecDeque<ChannelOperation>>,
 }
 
 #[derive(Clone, Debug)]
@@ -172,17 +173,29 @@ enum State {
     ParallelSection {
         paused_main_fiber: Fiber, // Should have Status::InParallelSection.
         nursery: ChannelId,
+        child_id_generator: IdGenerator<ChildId>,
 
         /// Children and a channels where to send the result of the child. The
         /// channel's receive port is directly returned by the `core.async` function.
         /// Here, we save the ID of the channel where the result of the VM will
         /// be sent.
-        children: Vec<(ChannelId, FiberTree)>,
+        children: HashMap<ChildId, (ChannelId, FiberTree)>,
     },
 }
 
+type ChildId = usize;
+
+/// A list of pending operations. All operations should be of the same kind
+/// – if a send and a receive operation meet, they should cancel each other out.
+type Operations = VecDeque<Operation>;
+
 #[derive(Clone)]
-pub enum ChannelOperation {
+pub struct Operation {
+    child: ChildId,
+    kind: OperationKind,
+}
+#[derive(Clone)]
+pub enum OperationKind {
     Send { packet: Packet },
     Receive,
 }
@@ -197,10 +210,10 @@ impl FiberTree {
             },
             state: None,
             internal_channels: Default::default(),
-            next_internal_channel_id: 0,
+            internal_channel_id_generator: IdGenerator::new(),
             external_to_internal_channels: Default::default(),
             internal_to_external_channels: Default::default(),
-            channel_operations: Default::default(),
+            external_operations: Default::default(),
         };
         tree.create_channel_mappings_for(&fiber.heap);
         fiber
@@ -260,7 +273,7 @@ impl FiberTree {
             | Data::ReceivePort(ReceivePort { channel }) = object.data
             {
                 if !self.external_to_internal_channels.contains_key(&channel) {
-                    let internal_id = self.generate_channel_id();
+                    let internal_id = self.internal_channel_id_generator.generate();
                     self.external_to_internal_channels
                         .insert(channel, internal_id);
                     self.internal_to_external_channels
@@ -268,6 +281,61 @@ impl FiberTree {
                 }
             }
         }
+    }
+
+    fn push_operation(&mut self, channel_id: ChannelId, new_operation: Operation) {
+        if let Some((channel, operations)) = self.internal_channels.get_mut(&channel_id) {
+            // Internal channel.
+            if let Some(operation) = operations.front() && new_operation.cancels_out(operation) {
+                let operation = operations.pop_front().unwrap();
+                self.complete_canceling_operations(channel_id, operation, new_operation);
+                return;
+            }
+            match &new_operation.kind {
+                OperationKind::Send { packet } => {
+                    if channel.send(packet.clone()) {
+                        self.complete_send(channel_id, new_operation.child);
+                        return;
+                    }
+                }
+                OperationKind::Receive => {
+                    if let Some(packet) = channel.receive() {
+                        self.complete_receive(channel_id, new_operation.child, packet);
+                        return;
+                    }
+                }
+            }
+            operations.push_back(new_operation);
+        } else {
+            // External channel.
+            let channel_id = self.internal_to_external_channels[&channel_id];
+            let operations = self.external_operations.entry(channel_id).or_default();
+            if let Some(operation) = operations.front() && new_operation.cancels_out(operation) {
+                let operation = operations.pop_front().unwrap();
+                self.complete_canceling_operations(channel_id, operation, new_operation);
+            } else {
+                operations.push_back(new_operation);
+            }
+        }
+    }
+    fn complete_canceling_operations(&mut self, channel: ChannelId, a: Operation, b: Operation) {
+        match (a.kind, b.kind) {
+            (OperationKind::Send { packet }, OperationKind::Receive) => {
+                self.complete_send(channel, a.child);
+                self.complete_receive(channel, b.child, packet);
+            }
+            (OperationKind::Receive, OperationKind::Send { packet }) => {
+                self.complete_send(channel, b.child);
+                self.complete_receive(channel, a.child, packet);
+            }
+            _ => panic!("operations do not cancel each other out"),
+        }
+    }
+    fn complete_send(&mut self, channel: ChannelId, child: ChildId) {
+        todo!()
+    }
+    fn complete_receive(&mut self, channel: ChannelId, child: ChildId, packet: Packet) {
+        todo!()
     }
 
     pub fn run<C: Context>(&mut self, context: &mut C) {
@@ -291,49 +359,30 @@ impl FiberTree {
                 match fiber.status() {
                     fiber::Status::Running => {}
                     fiber::Status::CreatingChannel { capacity } => {
-                        let id = self.generate_channel_id();
-                        self.internal_channels.insert(id, Channel::new(capacity));
+                        let id = self.internal_channel_id_generator.generate();
+                        self.internal_channels
+                            .insert(id, (Channel::new(capacity), VecDeque::new()));
                         fiber.complete_channel_create(id);
                     }
                     fiber::Status::Sending { channel, packet } => {
                         info!("Sending packet to channel {channel}.");
-                        if let Some(channel) = self.internal_channels.get_mut(&channel) {
-                            // Internal channel.
-                            if channel.send(packet) {
-                                fiber.complete_send();
-                            } else {
-                                warn!("Tried to send to a full channel that is local to a fiber. This will never complete.");
-                            }
-                        } else {
-                            // External channel.
-                            let channel = self.internal_to_external_channels[&channel];
-                            self.channel_operations
-                                .entry(channel)
-                                .or_default()
-                                .push_back(ChannelOperation::Send { packet });
-                            self.status = Status::WaitingForOperations;
-                        }
+                        self.push_operation(
+                            channel,
+                            Operation {
+                                child: 0,
+                                kind: OperationKind::Send { packet },
+                            },
+                        );
                     }
                     fiber::Status::Receiving { channel } => {
-                        info!("Sending packet to channel {channel}.");
-                        if let Some(channel) = self.internal_channels.get_mut(&channel) {
-                            // Internal channel.
-                            if let Some(packet) = channel.receive() {
-                                fiber.complete_receive(packet);
-                            } else {
-                                warn!(
-                                        "Tried to receive from an empty channel that is local to a fiber. This will never complete."
-                                    );
-                            }
-                        } else {
-                            // External channel.
-                            let channel = self.internal_to_external_channels[&channel];
-                            self.channel_operations
-                                .entry(channel)
-                                .or_default()
-                                .push_back(ChannelOperation::Receive);
-                            self.status = Status::WaitingForOperations;
-                        }
+                        info!("Receiving packet from channel {channel}.");
+                        self.push_operation(
+                            channel,
+                            Operation {
+                                child: 0,
+                                kind: OperationKind::Receive,
+                            },
+                        );
                     }
                     fiber::Status::InParallelScope {
                         body,
@@ -342,91 +391,97 @@ impl FiberTree {
                         info!("Entering parallel scope.");
                         let mut heap = Heap::default();
                         let body = fiber.heap.clone_single_to_other_heap(&mut heap, body);
-                        let nursery = self.generate_channel_id();
+                        let nursery = self.internal_channel_id_generator.generate();
                         let nursery_send_port = heap.create_send_port(nursery);
                         let tree =
                             FiberTree::new_for_running_closure(heap, body, &[nursery_send_port]);
 
+                        let mut fiber_id_generator = IdGenerator::start_at(1);
+                        let mut children = HashMap::new();
+                        children.insert(fiber_id_generator.generate(), (return_channel, tree));
+
                         return State::ParallelSection {
                             paused_main_fiber: fiber,
                             nursery,
-                            children: vec![(return_channel, tree)],
+                            child_id_generator: fiber_id_generator,
+                            children,
                         };
                     }
-                    fiber::Status::Done => {
-                        info!("Fiber done.");
-                        self.status = Status::Done;
-                    }
+                    fiber::Status::Done => info!("Fiber done."),
                     fiber::Status::Panicked { reason } => {
-                        info!("Fiber panicked because of {reason}.");
-                        self.status = Status::Panicked { reason };
+                        info!("Fiber panicked because of {reason}.")
                     }
                 }
+                self.status = match fiber.status() {
+                    fiber::Status::Running => Status::Running,
+                    fiber::Status::Sending { .. } | fiber::Status::Receiving { .. } => {
+                        Status::WaitingForOperations
+                    }
+                    fiber::Status::Done => Status::Done,
+                    fiber::Status::Panicked { reason } => Status::Panicked { reason },
+                    _ => unreachable!(),
+                };
                 State::SingleFiber(fiber)
             }
             State::ParallelSection {
                 mut paused_main_fiber,
                 nursery,
+                child_id_generator: fiber_id_generator,
                 mut children,
             } => {
-                let (index_and_result_channel, vm) = children
+                let (child_id, result_channel, vm) = children
                     .iter_mut()
-                    .enumerate()
-                    .map(|(i, (channel, vm))| (Some((i, *channel)), vm))
-                    .filter(|(_, vm)| matches!(vm.status, Status::Running))
+                    .map(|(id, (channel, vm))| (*id, *channel, vm))
+                    .filter(|(_, _, vm)| matches!(vm.status, Status::Running))
                     .choose(&mut rand::thread_rng())
                     .expect("Tried to run Vm, but no child can run.");
 
                 info!("Running child VM.");
                 vm.run(context);
 
-                for (channel, operations) in &vm.channel_operations {
-                    // TODO
-                    warn!("Todo: Handle operations on channel {channel}");
-                    // for operation in operations {}
-                }
-
-                // If this was a spawned channel and it ended execution, the result should be
-                // transmitted to the channel that's returned by the `core.async` call.
-                if let Some((index, result_channel)) = index_and_result_channel {
-                    let packet = match vm.status() {
-                        Status::Done => {
-                            info!("Child done.");
-                            let (_, vm) = children.remove(index);
-                            let TearDownResult {
-                                heap: vm_heap,
-                                result,
-                                ..
-                            } = vm.tear_down();
-                            let return_value = result.unwrap();
-                            let mut heap = Heap::default();
-                            let return_value =
-                                vm_heap.clone_single_to_other_heap(&mut heap, return_value);
-                            let value = heap.create_result(Ok(return_value));
-                            Some(Packet { heap, value })
-                        }
-                        Status::Panicked { reason } => {
-                            warn!("Child panicked with reason {reason}");
-                            let mut heap = Heap::default();
-                            let reason = heap.create_text(reason);
-                            let value = heap.create_result(Err(reason));
-                            Some(Packet { heap, value })
-                        }
-                        _ => None,
-                    };
-                    if let Some(packet) = packet {
-                        self.channel_operations
-                            .entry(result_channel)
-                            .or_default()
-                            .push_back(ChannelOperation::Send { packet })
+                // If the child finished executing, the result should be
+                // transmitted to the channel that's returned by the
+                // `core.async` call.
+                let packet = match vm.status() {
+                    Status::Done => {
+                        info!("Child done.");
+                        let (_, vm) = children.remove(&child_id).unwrap();
+                        let TearDownResult {
+                            heap: vm_heap,
+                            result,
+                            ..
+                        } = vm.tear_down();
+                        let return_value = result.unwrap();
+                        let mut heap = Heap::default();
+                        let return_value =
+                            vm_heap.clone_single_to_other_heap(&mut heap, return_value);
+                        let value = heap.create_result(Ok(return_value));
+                        Some(Packet { heap, value })
                     }
+                    Status::Panicked { reason } => {
+                        warn!("Child panicked with reason {reason}");
+                        let mut heap = Heap::default();
+                        let reason = heap.create_text(reason);
+                        let value = heap.create_result(Err(reason));
+                        Some(Packet { heap, value })
+                    }
+                    _ => None,
+                };
+                if let Some(packet) = packet {
+                    self.push_operation(
+                        result_channel,
+                        Operation {
+                            child: child_id,
+                            kind: OperationKind::Send { packet },
+                        },
+                    );
                 }
 
                 // Update status and state.
-                if children.iter().any(|(_, vm)| vm.is_running()) {
+                if children.values().any(|(_, tree)| tree.is_running()) {
                     self.status = Status::Running
                 }
-                if children.iter().all(|(_, vm)| vm.is_finished()) {
+                if children.values().all(|(_, tree)| tree.is_finished()) {
                     paused_main_fiber.complete_parallel_scope();
                     self.status = Status::Running;
                     return State::SingleFiber(paused_main_fiber);
@@ -435,16 +490,21 @@ impl FiberTree {
                 State::ParallelSection {
                     paused_main_fiber,
                     nursery,
+                    child_id_generator: fiber_id_generator,
                     children,
                 }
             }
         }
     }
+}
 
-    fn generate_channel_id(&mut self) -> ChannelId {
-        let id = self.next_internal_channel_id;
-        self.next_internal_channel_id += 1;
-        id
+impl Operation {
+    fn cancels_out(&self, other: &Self) -> bool {
+        matches!(
+            (&self.kind, &other.kind),
+            (OperationKind::Send { .. }, OperationKind::Receive)
+                | (OperationKind::Receive, OperationKind::Send { .. })
+        )
     }
 }
 
@@ -457,5 +517,30 @@ impl Heap {
                 *channel = mapping[channel];
             }
         }
+    }
+}
+
+#[derive(Clone)]
+struct IdGenerator<T: From<usize>> {
+    next_id: usize,
+    _data: PhantomData<T>,
+}
+impl<T: From<usize>> IdGenerator<T> {
+    fn new() -> Self {
+        Self {
+            next_id: 0,
+            _data: Default::default(),
+        }
+    }
+    fn start_at(id: usize) -> Self {
+        Self {
+            next_id: id,
+            _data: Default::default(),
+        }
+    }
+    fn generate(&mut self) -> T {
+        let id = self.next_id;
+        self.next_id += 1;
+        id.into()
     }
 }

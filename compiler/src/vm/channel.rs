@@ -31,6 +31,9 @@ impl Channel {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.packets.is_empty()
+    }
     pub fn is_full(&self) -> bool {
         self.packets.len() == self.capacity
     }
