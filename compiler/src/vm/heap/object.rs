@@ -43,15 +43,13 @@ pub struct Text {
 
 #[derive(Clone)]
 pub struct Symbol {
-    // TODO: For better memory efficiency, store the symbol as a null-terminated
-    // string.
+    // TODO: Choose a more efficient representation.
     pub value: String,
 }
 
 #[derive(Default, Clone)]
 pub struct Struct {
-    // TODO: Choose a more efficient representation.
-    pub fields: Vec<(u64, Pointer, Pointer)>, // hash, key, and value
+    pub fields: Vec<(u64, Pointer, Pointer)>, // list of hash, key, and value
 }
 
 #[derive(Clone)]
@@ -74,38 +72,40 @@ impl Struct {
         }
         s
     }
-    fn insert(&mut self, heap: &Heap, key: Pointer, value: Pointer) {
+    /// If the struct contains the key, returns the index of its field.
+    /// Otherwise, returns the index of where the key would be inserted.
+    fn index_of_key(&self, heap: &Heap, key: Pointer) -> Result<usize, usize> {
         let hash = key.hash(heap);
-        for (existing_hash, existing_key, existing_value) in &mut self.fields {
-            if hash != *existing_hash {
-                continue;
-            }
-            if existing_key.equals(heap, key) {
-                *existing_value = value;
-                return;
-            }
-        }
-        let entry = (hash, key, value);
-        if let Some(index) = self
+        let index_of_hash = self
             .fields
+            .binary_search_by_key(&hash, |(hash, _, _)| *hash)?;
+        let going_right = self.fields[index_of_hash..]
             .iter()
-            .position(|(the_hash, _, _)| *the_hash > hash)
-        {
-            self.fields.insert(index, entry);
-        } else {
-            self.fields.push(entry);
+            .enumerate()
+            .take_while(|(_, (existing_hash, _, _))| *existing_hash == hash)
+            .map(|(i, (_, key, _))| (index_of_hash + i, key));
+        let going_left = self.fields[0..index_of_hash]
+            .iter()
+            .rev()
+            .enumerate()
+            .take_while(|(_, (existing_hash, _, _))| *existing_hash == hash)
+            .map(|(i, (_, key, _))| (index_of_hash - i - 1, key));
+
+        for (index, existing_key) in going_left.chain(going_right) {
+            if existing_key.equals(heap, key) {
+                return Ok(index);
+            }
         }
+        Err(index_of_hash)
+    }
+    fn insert(&mut self, heap: &Heap, key: Pointer, value: Pointer) {
+        let index = self.index_of_key(heap, key);
+        self.fields
+            .insert(index.into_ok_or_err(), (key.hash(heap), key, value));
     }
     pub fn get(&self, heap: &Heap, key: Pointer) -> Option<Pointer> {
-        let hash = key.hash(heap);
-        Some(
-            self.fields
-                .iter()
-                .find(|(field_hash, field_key, _)| {
-                    hash == *field_hash && key.equals(heap, *field_key)
-                })?
-                .2,
-        )
+        let index = self.index_of_key(heap, key).ok()?;
+        Some(self.fields[index].1)
     }
     fn len(&self) -> usize {
         self.fields.len()
@@ -122,7 +122,7 @@ impl Struct {
         }
         for (key_a, value_a) in self.iter() {
             for (key_b, value_b) in other.iter() {
-                if key_a.equals(heap, key_b) && !value_a.equals(heap, value_b) {
+                if !key_a.equals(heap, key_b) || !value_a.equals(heap, value_b) {
                     return false;
                 }
             }
@@ -132,7 +132,7 @@ impl Struct {
 }
 
 impl Closure {
-    pub fn of_lir(module: Module, lir: Lir) -> Self {
+    pub fn of_module_lir(module: Module, lir: Lir) -> Self {
         Closure {
             captured: vec![],
             num_args: 0,
@@ -151,7 +151,7 @@ impl Closure {
     }
     pub fn of_module(db: &Database, module: Module) -> Option<Self> {
         let lir = db.lir(module.clone())?;
-        Some(Self::of_lir(module, (*lir).clone()))
+        Some(Self::of_module_lir(module, (*lir).clone()))
     }
 }
 
@@ -206,14 +206,13 @@ impl Data {
             Data::Struct(struct_) => format!(
                 "[{}]",
                 struct_
-                    .fields
                     .iter()
-                    .map(|(_, key, value)| (key.format(heap), value.format(heap)))
+                    .map(|(key, value)| (key.format(heap), value.format(heap)))
                     .sorted_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b))
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
             ),
-            Data::Closure(_) => "{...}".to_string(),
+            Data::Closure(_) => "{…}".to_string(),
             Data::Builtin(builtin) => format!("builtin{:?}", builtin.function),
         }
     }

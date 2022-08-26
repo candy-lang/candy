@@ -79,8 +79,29 @@ impl From<SuccessfulBehavior> for BuiltinResult {
     }
 }
 
+macro_rules! unpack {
+    ( $heap:expr, $args:expr, |$( $arg:ident: $type:ty ),+| $body:block ) => {
+        {
+            let ( $( $arg, )+ ) = if let [$( $arg, )+] = $args {
+                ( $( *$arg, )+ )
+            } else {
+                return Err(
+                    "a builtin function was called with the wrong number of arguments".to_string(),
+                );
+            };
+            let ( $( $arg, )+ ): ( $( UnpackedData<$type>, )+ ) = ( $(
+                UnpackedData {
+                    address: $arg,
+                    data: $heap.get($arg).data.clone().try_into()?,
+                },
+            )+ );
+
+            $body.into()
+        }
+    };
+}
 macro_rules! unpack_and_later_drop {
-    ( $heap:expr, $args:expr, ($( $arg:ident: $type:ty ),+), $body:block ) => {
+    ( $heap:expr, $args:expr, |$( $arg:ident: $type:ty ),+| $body:block ) => {
         {
             let ( $( $arg, )+ ) = if let [$( $arg, )+] = $args {
                 ( $( *$arg, )+ )
@@ -105,86 +126,87 @@ macro_rules! unpack_and_later_drop {
 
 impl Heap {
     fn equals(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (a: Any, b: Any), {
+        unpack_and_later_drop!(self, args, |a: Any, b: Any| {
             let is_equal = a.equals(self, &b);
             Return(self.create_bool(is_equal))
         })
     }
 
     fn function_run(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (closure: Closure), {
+        unpack!(self, args, |closure: Closure| {
             closure.should_take_no_arguments()?;
-            self.dup(closure.address);
             DivergeControlFlow(closure.address)
         })
     }
 
     fn get_argument_count(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (closure: Closure), {
+        unpack_and_later_drop!(self, args, |closure: Closure| {
             Return(self.create_int(closure.num_args.into()))
         })
     }
 
     fn if_else(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(
-            self,
-            args,
-            (condition: bool, then: Closure, else_: Closure),
-            {
-                let closure_to_run = if *condition { &then } else { &else_ }.address;
-                self.dup(closure_to_run);
-                DivergeControlFlow(closure_to_run)
-            }
-        )
+        unpack!(self, args, |condition: bool,
+                             then: Closure,
+                             else_: Closure| {
+            let (run, dont_run) = if *condition {
+                (then, else_)
+            } else {
+                (else_, then)
+            };
+            self.drop(condition.address);
+            self.drop(dont_run.address);
+            DivergeControlFlow(run.address)
+        })
     }
 
     fn int_add(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (a: Int, b: Int), {
-            Return(self.create_int(a.value.clone() + b.value.clone()))
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
+            Return(self.create_int(&a.value + &b.value))
         })
     }
     fn int_bit_length(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (a: Int), {
+        unpack_and_later_drop!(self, args, |a: Int| {
             Return(self.create_int(a.value.bits().into()))
         })
     }
     fn int_bitwise_and(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (a: Int, b: Int), {
-            Return(self.create_int(a.value.clone() & b.value.clone()))
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
+            Return(self.create_int(&a.value & &b.value))
         })
     }
     fn int_bitwise_or(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (a: Int, b: Int), {
-            Return(self.create_int(a.value.clone() | b.value.clone()))
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
+            Return(self.create_int(&a.value | &b.value))
         })
     }
     fn int_bitwise_xor(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (a: Int, b: Int), {
-            Return(self.create_int(a.value.clone() ^ b.value.clone()))
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
+            Return(self.create_int(&a.value ^ &b.value))
         })
     }
     fn int_compare_to(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (a: Int, b: Int), {
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
             Return(self.create_ordering(a.value.cmp(&b.value)))
         })
     }
     fn int_divide_truncating(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (dividend: Int, divisor: Int), {
-            Return(self.create_int(dividend.value.clone() / divisor.value.clone()))
+        unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
+            Return(self.create_int(&dividend.value / &divisor.value))
         })
     }
     fn int_modulo(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (dividend: Int, divisor: Int), {
-            Return(self.create_int(dividend.value.clone().mod_floor(&divisor.value)))
+        unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
+            Return(self.create_int(dividend.value.mod_floor(&divisor.value)))
         })
     }
     fn int_multiply(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (factor_a: Int, factor_b: Int), {
-            Return(self.create_int(factor_a.value.clone() * factor_b.value.clone()))
+        unpack_and_later_drop!(self, args, |factor_a: Int, factor_b: Int| {
+            Return(self.create_int(&factor_a.value * &factor_b.value))
         })
     }
     fn int_parse(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (text: Text), {
+        unpack_and_later_drop!(self, args, |text: Text| {
             let result = match BigInt::from_str(&text.value) {
                 Ok(int) => Ok(self.create_int(int)),
                 Err(err) => Err(self.create_text(format!("{err}"))),
@@ -193,38 +215,38 @@ impl Heap {
         })
     }
     fn int_remainder(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (dividend: Int, divisor: Int), {
-            Return(self.create_int(dividend.value.clone() % divisor.value.clone()))
+        unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
+            Return(self.create_int(&dividend.value % &divisor.value))
         })
     }
     fn int_shift_left(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (value: Int, amount: Int), {
+        unpack_and_later_drop!(self, args, |value: Int, amount: Int| {
             let amount = amount.value.to_u128().unwrap();
-            Return(self.create_int(value.value.clone() << amount))
+            Return(self.create_int(&value.value << amount))
         })
     }
     fn int_shift_right(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (value: Int, amount: Int), {
+        unpack_and_later_drop!(self, args, |value: Int, amount: Int| {
             let value = value.value.to_biguint().unwrap();
             let amount = amount.value.to_u128().unwrap();
             Return(self.create_int((value >> amount).into()))
         })
     }
     fn int_subtract(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (minuend: Int, subtrahend: Int), {
-            Return(self.create_int(minuend.value.clone() - subtrahend.value.clone()))
+        unpack_and_later_drop!(self, args, |minuend: Int, subtrahend: Int| {
+            Return(self.create_int(&minuend.value - &subtrahend.value))
         })
     }
 
     fn print(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (message: Text), {
+        unpack_and_later_drop!(self, args, |message: Text| {
             info!("{:?}", message.value);
             Return(self.create_nothing())
         })
     }
 
     fn struct_get(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (struct_: Struct, key: Any), {
+        unpack_and_later_drop!(self, args, |struct_: Struct, key: Any| {
             match struct_.get(self, key.address) {
                 Some(value) => {
                     self.dup(value);
@@ -235,19 +257,19 @@ impl Heap {
         })
     }
     fn struct_get_keys(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (struct_: Struct), {
+        unpack_and_later_drop!(self, args, |struct_: Struct| {
             Return(self.create_list(struct_.iter().map(|(key, _)| key).collect()))
         })
     }
     fn struct_has_key(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (struct_: Struct, key: Any), {
+        unpack_and_later_drop!(self, args, |struct_: Struct, key: Any| {
             let has_key = struct_.get(self, key.address).is_some();
             Return(self.create_bool(has_key))
         })
     }
 
     fn text_characters(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (text: Text), {
+        unpack_and_later_drop!(self, args, |text: Text| {
             let mut character_addresses = vec![];
             for c in text.value.graphemes(true) {
                 character_addresses.push(self.create_text(c.to_string()));
@@ -256,17 +278,17 @@ impl Heap {
         })
     }
     fn text_concatenate(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (a: Text, b: Text), {
+        unpack_and_later_drop!(self, args, |a: Text, b: Text| {
             Return(self.create_text(format!("{}{}", a.value, b.value)))
         })
     }
     fn text_contains(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (text: Text, pattern: Text), {
+        unpack_and_later_drop!(self, args, |text: Text, pattern: Text| {
             Return(self.create_bool(text.value.contains(&pattern.value)))
         })
     }
     fn text_ends_with(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (text: Text, suffix: Text), {
+        unpack_and_later_drop!(self, args, |text: Text, suffix: Text| {
             Return(self.create_bool(text.value.ends_with(&suffix.value)))
         })
     }
@@ -274,8 +296,7 @@ impl Heap {
         unpack_and_later_drop!(
             self,
             args,
-            (text: Text, start_inclusive: Int, end_exclusive: Int),
-            {
+            |text: Text, start_inclusive: Int, end_exclusive: Int| {
                 let start_inclusive = start_inclusive.value.to_usize().expect(
                     "Tried to get a range from a text with an index that's too large for usize.",
                 );
@@ -293,34 +314,34 @@ impl Heap {
         )
     }
     fn text_is_empty(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (text: Text), {
+        unpack_and_later_drop!(self, args, |text: Text| {
             Return(self.create_bool(text.value.is_empty()))
         })
     }
     fn text_length(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (text: Text), {
+        unpack_and_later_drop!(self, args, |text: Text| {
             let length = text.value.graphemes(true).count().into();
             Return(self.create_int(length))
         })
     }
     fn text_starts_with(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (text: Text, prefix: Text), {
+        unpack_and_later_drop!(self, args, |text: Text, prefix: Text| {
             Return(self.create_bool(text.value.starts_with(&prefix.value)))
         })
     }
     fn text_trim_end(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (text: Text), {
+        unpack_and_later_drop!(self, args, |text: Text| {
             Return(self.create_text(text.value.trim_end().to_string()))
         })
     }
     fn text_trim_start(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (text: Text), {
+        unpack_and_later_drop!(self, args, |text: Text| {
             Return(self.create_text(text.value.trim_start().to_string()))
         })
     }
 
     fn type_of(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, (value: Any), {
+        unpack_and_later_drop!(self, args, |value: Any| {
             let symbol = match **value {
                 Data::Int(_) => "Int",
                 Data::Text(_) => "Text",
@@ -334,10 +355,7 @@ impl Heap {
     }
 }
 
-trait ClosureShouldHaveNoArguments {
-    fn should_take_no_arguments(&self) -> Result<(), String>;
-}
-impl ClosureShouldHaveNoArguments for Closure {
+impl Closure {
     fn should_take_no_arguments(&self) -> Result<(), String> {
         match self.num_args {
             0 => Ok(()),
@@ -376,56 +394,26 @@ impl TryInto<Any> for Data {
         Ok(Any { data: self })
     }
 }
-impl TryInto<Int> for Data {
-    type Error = String;
+macro_rules! impl_data_try_into_type {
+    ($type:ty, $variant:tt, $error_message:expr) => {
+        impl TryInto<$type> for Data {
+            type Error = String;
 
-    fn try_into(self) -> Result<Int, Self::Error> {
-        match self {
-            Data::Int(int) => Ok(int),
-            _ => Err("a builtin function expected an int".to_string()),
+            fn try_into(self) -> Result<$type, Self::Error> {
+                match self {
+                    Data::$variant(it) => Ok(it),
+                    _ => Err($error_message.to_string()),
+                }
+            }
         }
-    }
+    };
 }
-impl TryInto<Text> for Data {
-    type Error = String;
+impl_data_try_into_type!(Int, Int, "a builtin function expected an int");
+impl_data_try_into_type!(Text, Text, "a builtin function expected a text");
+impl_data_try_into_type!(Symbol, Symbol, "a builtin function expected a symbol");
+impl_data_try_into_type!(Struct, Struct, "a builtin function expected a struct");
+impl_data_try_into_type!(Closure, Closure, "a builtin function expected a closure");
 
-    fn try_into(self) -> Result<Text, Self::Error> {
-        match self {
-            Data::Text(text) => Ok(text),
-            _ => Err("a builtin function expected a text".to_string()),
-        }
-    }
-}
-impl TryInto<Symbol> for Data {
-    type Error = String;
-
-    fn try_into(self) -> Result<Symbol, Self::Error> {
-        match self {
-            Data::Symbol(symbol) => Ok(symbol),
-            _ => Err("a builtin function expected a symbol".to_string()),
-        }
-    }
-}
-impl TryInto<Struct> for Data {
-    type Error = String;
-
-    fn try_into(self) -> Result<Struct, Self::Error> {
-        match self {
-            Data::Struct(struct_) => Ok(struct_),
-            _ => Err("a builtin function expected a struct".to_string()),
-        }
-    }
-}
-impl TryInto<Closure> for Data {
-    type Error = String;
-
-    fn try_into(self) -> Result<Closure, Self::Error> {
-        match self {
-            Data::Closure(closure) => Ok(closure),
-            _ => Err("a builtin function expected a function".to_string()),
-        }
-    }
-}
 impl TryInto<bool> for Data {
     type Error = String;
 
