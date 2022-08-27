@@ -9,7 +9,7 @@ use crate::{
     vm::{use_provider::DbUseProvider, Closure, Vm},
 };
 use itertools::Itertools;
-use tracing::{error, info};
+use tracing::info;
 
 pub async fn fuzz(db: &Database, module: Module) {
     let (fuzzables_heap, fuzzables) = {
