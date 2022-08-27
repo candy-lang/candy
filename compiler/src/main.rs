@@ -2,7 +2,6 @@
 #![feature(box_patterns)]
 #![feature(never_type)]
 #![feature(try_trait_v2)]
-#![feature(result_into_ok_or_err)]
 #![allow(clippy::module_inception)]
 
 mod builtin_functions;

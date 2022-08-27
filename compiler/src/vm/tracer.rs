@@ -99,7 +99,7 @@ impl Tracer {
                         format!("needs {} {}", condition.format(heap), reason.format(heap)),
                         Some(id),
                     ),
-                    TraceEntry::ModuleStarted { module } => (format!("module {module}"), None),
+                    TraceEntry::ModuleStarted { module } => (format!("use {module}"), None),
                     _ => unreachable!(),
                 };
                 let caller_location_string = {
