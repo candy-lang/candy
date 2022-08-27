@@ -146,8 +146,7 @@ pub struct FiberTree {
     // managed ("owned") by this node directly. For channels owned by the
     // outside world (such as those referenced in the environment argument),
     // this node maintains a mapping between internal and external IDs.
-    pub internal_channels: HashMap<ChannelId, (Channel, Operations)>,
-    external_operations: HashMap<ChannelId, Operations>,
+    pub internal_channels: HashMap<ChannelId, (Channel, VecDeque<Operation>)>,
     internal_channel_id_generator: IdGenerator<ChannelId>,
     pub external_to_internal_channels: HashMap<ChannelId, ChannelId>,
     pub internal_to_external_channels: HashMap<ChannelId, ChannelId>,
@@ -180,18 +179,24 @@ enum State {
         /// Here, we save the ID of the channel where the result of the VM will
         /// be sent.
         children: HashMap<ChildId, (ChannelId, FiberTree)>,
+
+        /// Channel operations may be long-running and complete in any order.
+        /// That's why we expose operations to the parent node in the fiber
+        /// tree. The parent can complete operations by calling the `complete_*`
+        /// methods.
+        pending_operations: HashMap<OperationId, Operation>,
+        operation_id_generator: IdGenerator<OperationId>,
+        operation_id_to_child_and_its_operation_id: HashMap<OperationId, (ChildId, OperationId)>,
     },
 }
 
 type ChildId = usize;
-
-/// A list of pending operations. All operations should be of the same kind
-/// – if a send and a receive operation meet, they should cancel each other out.
-type Operations = VecDeque<Operation>;
+type OperationId = usize;
 
 #[derive(Clone)]
 pub struct Operation {
-    child: ChildId,
+    id: OperationId,
+    channel: ChannelId,
     kind: OperationKind,
 }
 #[derive(Clone)]
@@ -213,7 +218,6 @@ impl FiberTree {
             internal_channel_id_generator: IdGenerator::new(),
             external_to_internal_channels: Default::default(),
             internal_to_external_channels: Default::default(),
-            external_operations: Default::default(),
         };
         tree.create_channel_mappings_for(&fiber.heap);
         fiber
@@ -246,6 +250,42 @@ impl FiberTree {
     fn is_finished(&self) -> bool {
         matches!(self.status, Status::Done | Status::Panicked { .. })
     }
+
+    fn operations(&self) -> HashMap<OperationId, Operation> {
+        match self.state.unwrap() {
+            State::SingleFiber(fiber) => {
+                let mut operations = HashMap::new();
+                match fiber.status() {
+                    fiber::Status::Sending { channel, packet } => {
+                        operations.insert(
+                            0,
+                            Operation {
+                                id: 0,
+                                channel,
+                                kind: OperationKind::Send { packet },
+                            },
+                        );
+                    }
+                    fiber::Status::Receiving { channel } => {
+                        operations.insert(
+                            0,
+                            Operation {
+                                id: 0,
+                                channel,
+                                kind: OperationKind::Receive,
+                            },
+                        );
+                    }
+                    _ => {}
+                }
+                operations
+            }
+            State::ParallelSection {
+                pending_operations, ..
+            } => pending_operations,
+        }
+    }
+
     pub fn fiber(&self) -> &Fiber {
         match self.state() {
             State::SingleFiber(fiber) => fiber,
@@ -283,24 +323,25 @@ impl FiberTree {
         }
     }
 
-    fn push_operation(&mut self, channel_id: ChannelId, new_operation: Operation) {
-        if let Some((channel, operations)) = self.internal_channels.get_mut(&channel_id) {
+    fn push_operation(&mut self, new_operation: Operation) {
+        if let Some((channel, operations)) = self.internal_channels.get_mut(&new_operation.channel)
+        {
             // Internal channel.
             if let Some(operation) = operations.front() && new_operation.cancels_out(operation) {
                 let operation = operations.pop_front().unwrap();
-                self.complete_canceling_operations(channel_id, operation, new_operation);
+                self.complete_canceling_operations(operation, new_operation);
                 return;
             }
             match &new_operation.kind {
                 OperationKind::Send { packet } => {
                     if channel.send(packet.clone()) {
-                        self.complete_send(channel_id, new_operation.child);
+                        self.complete_send(0);
                         return;
                     }
                 }
                 OperationKind::Receive => {
                     if let Some(packet) = channel.receive() {
-                        self.complete_receive(channel_id, new_operation.child, packet);
+                        self.complete_receive(0, packet);
                         return;
                     }
                 }
@@ -308,34 +349,80 @@ impl FiberTree {
             operations.push_back(new_operation);
         } else {
             // External channel.
-            let channel_id = self.internal_to_external_channels[&channel_id];
-            let operations = self.external_operations.entry(channel_id).or_default();
-            if let Some(operation) = operations.front() && new_operation.cancels_out(operation) {
-                let operation = operations.pop_front().unwrap();
-                self.complete_canceling_operations(channel_id, operation, new_operation);
-            } else {
-                operations.push_back(new_operation);
+            match self.state.unwrap() {
+                State::SingleFiber(_) => {
+                    // Nothing to do. When the parent node asks for this fiber's
+                    // `operations()`, the single pending operation will be
+                    // created and communicated on-the-fly based on the status
+                    // of the fiber.
+                }
+                State::ParallelSection {
+                    paused_main_fiber,
+                    nursery,
+                    child_id_generator,
+                    children,
+                    pending_operations,
+                    operation_id_generator,
+                    operation_id_to_child_and_its_operation_id,
+                } => {
+                    let id = operation_id_generator.generate();
+                    let channel = self.internal_to_external_channels[&new_operation.channel];
+                    pending_operations.insert(
+                        id,
+                        Operation {
+                            channel,
+                            ..new_operation
+                        },
+                    );
+                }
             }
         }
     }
-    fn complete_canceling_operations(&mut self, channel: ChannelId, a: Operation, b: Operation) {
+    fn complete_canceling_operations(&mut self, a: Operation, b: Operation) {
+        assert_eq!(a.channel, b.channel);
         match (a.kind, b.kind) {
             (OperationKind::Send { packet }, OperationKind::Receive) => {
-                self.complete_send(channel, a.child);
-                self.complete_receive(channel, b.child, packet);
+                self.complete_send(a.id);
+                self.complete_receive(b.id, packet);
             }
             (OperationKind::Receive, OperationKind::Send { packet }) => {
-                self.complete_send(channel, b.child);
-                self.complete_receive(channel, a.child, packet);
+                self.complete_send(b.id);
+                self.complete_receive(a.id, packet);
             }
             _ => panic!("operations do not cancel each other out"),
         }
     }
-    fn complete_send(&mut self, channel: ChannelId, child: ChildId) {
-        todo!()
+    fn complete_send(&mut self, id: OperationId) {
+        match self.state.unwrap() {
+            State::SingleFiber(fiber) => {
+                assert_eq!(id, 0);
+                fiber.complete_send();
+            }
+            State::ParallelSection {
+                children,
+                operation_id_to_child_and_its_operation_id,
+                ..
+            } => {
+                let (operation_id, child_id) = operation_id_to_child_and_its_operation_id[&id];
+                children[&child_id].1.complete_send(operation_id);
+            }
+        }
     }
-    fn complete_receive(&mut self, channel: ChannelId, child: ChildId, packet: Packet) {
-        todo!()
+    fn complete_receive(&mut self, id: OperationId, packet: Packet) {
+        match self.state.unwrap() {
+            State::SingleFiber(fiber) => {
+                assert_eq!(id, 0);
+                fiber.complete_receive(packet);
+            }
+            State::ParallelSection {
+                children,
+                operation_id_to_child_and_its_operation_id,
+                ..
+            } => {
+                let (operation_id, child_id) = operation_id_to_child_and_its_operation_id[&id];
+                children[&child_id].1.complete_receive(operation_id, packet);
+            }
+        }
     }
 
     pub fn run<C: Context>(&mut self, context: &mut C) {
@@ -366,23 +453,19 @@ impl FiberTree {
                     }
                     fiber::Status::Sending { channel, packet } => {
                         info!("Sending packet to channel {channel}.");
-                        self.push_operation(
+                        self.push_operation(Operation {
+                            id: 0,
                             channel,
-                            Operation {
-                                child: 0,
-                                kind: OperationKind::Send { packet },
-                            },
-                        );
+                            kind: OperationKind::Send { packet },
+                        });
                     }
                     fiber::Status::Receiving { channel } => {
                         info!("Receiving packet from channel {channel}.");
-                        self.push_operation(
+                        self.push_operation(Operation {
+                            id: 0,
                             channel,
-                            Operation {
-                                child: 0,
-                                kind: OperationKind::Receive,
-                            },
-                        );
+                            kind: OperationKind::Receive,
+                        });
                     }
                     fiber::Status::InParallelScope {
                         body,
@@ -405,6 +488,9 @@ impl FiberTree {
                             nursery,
                             child_id_generator: fiber_id_generator,
                             children,
+                            pending_operations: Default::default(),
+                            operation_id_generator: IdGenerator::start_at(0),
+                            operation_id_to_child_and_its_operation_id: Default::default(),
                         };
                     }
                     fiber::Status::Done => info!("Fiber done."),
@@ -428,6 +514,10 @@ impl FiberTree {
                 nursery,
                 child_id_generator: fiber_id_generator,
                 mut children,
+                pending_operations,
+                mut operation_id_generator,
+                operation_id_to_child_and_its_operation_id,
+                ..
             } => {
                 let (child_id, result_channel, vm) = children
                     .iter_mut()
@@ -468,13 +558,11 @@ impl FiberTree {
                     _ => None,
                 };
                 if let Some(packet) = packet {
-                    self.push_operation(
-                        result_channel,
-                        Operation {
-                            child: child_id,
-                            kind: OperationKind::Send { packet },
-                        },
-                    );
+                    self.push_operation(Operation {
+                        id: operation_id_generator.generate(),
+                        channel: result_channel,
+                        kind: OperationKind::Send { packet },
+                    });
                 }
 
                 // Update status and state.
@@ -492,6 +580,9 @@ impl FiberTree {
                     nursery,
                     child_id_generator: fiber_id_generator,
                     children,
+                    pending_operations,
+                    operation_id_generator,
+                    operation_id_to_child_and_its_operation_id,
                 }
             }
         }
