@@ -74,15 +74,14 @@ impl Struct {
     }
     /// If the struct contains the key, returns the index of its field.
     /// Otherwise, returns the index of where the key would be inserted.
-    fn index_of_key(&self, heap: &Heap, key: Pointer) -> Result<usize, usize> {
-        let hash = key.hash(heap);
+    fn index_of_key(&self, heap: &Heap, key: Pointer, key_hash: u64) -> Result<usize, usize> {
         let index_of_first_hash_occurrence = self
             .fields
-            .partition_point(|(existing_hash, _, _)| *existing_hash < hash);
+            .partition_point(|(existing_hash, _, _)| *existing_hash < key_hash);
         let fields_with_same_hash = self.fields[index_of_first_hash_occurrence..]
             .iter()
             .enumerate()
-            .take_while(|(_, (existing_hash, _, _))| *existing_hash == hash)
+            .take_while(|(_, (existing_hash, _, _))| *existing_hash == key_hash)
             .map(|(i, (_, key, _))| (index_of_first_hash_occurrence + i, key));
 
         for (index, existing_key) in fields_with_same_hash {
@@ -93,14 +92,15 @@ impl Struct {
         Err(index_of_first_hash_occurrence)
     }
     fn insert(&mut self, heap: &Heap, key: Pointer, value: Pointer) {
-        let field = (key.hash(heap), key, value);
-        match self.index_of_key(heap, key) {
+        let hash = key.hash(heap);
+        let field = (hash, key, value);
+        match self.index_of_key(heap, key, hash) {
             Ok(index) => self.fields[index] = field,
             Err(index) => self.fields.insert(index, field),
         }
     }
     pub fn get(&self, heap: &Heap, key: Pointer) -> Option<Pointer> {
-        let index = self.index_of_key(heap, key).ok()?;
+        let index = self.index_of_key(heap, key, key.hash(heap)).ok()?;
         Some(self.fields[index].2)
     }
     fn len(&self) -> usize {
