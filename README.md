@@ -117,13 +117,16 @@ Major milestones:
 
 ## Short-term TODOs
 
+- implement fibers, channels, and nurseries
+- remove builtinPrint
+- add caching while compile-time evaluating code
+- pattern matching
+- pipe operator
+- eliminate common subtrees
+- inline functions
 - minimize inputs found through fuzzing
 - make condition whether to keep running more granular
 - fuzz parser
-- add caching to hints server
-- implement fibers and nurseries
-- implement channels
-- remove builtinPrint
 - support recursion
 - tail call optimization
 - new name?

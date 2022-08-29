@@ -10,6 +10,9 @@ use crate::{
 };
 use itertools::Itertools;
 use std::collections::HashMap;
+use tracing::{info, trace};
+
+const TRACE: bool = false;
 
 /// A VM can execute some byte code.
 #[derive(Clone)]
@@ -144,28 +147,30 @@ impl Vm {
             };
             let instruction = current_body[self.next_instruction.instruction].clone();
 
-            // log::trace!(
-            //     "Data stack: {}",
-            //     self.data_stack
-            //         .iter()
-            //         .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
-            //         .join(", ")
-            // );
-            // log::trace!(
-            //     "Call stack: {}",
-            //     self.call_stack
-            //         .iter()
-            //         .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
-            //         .join(", ")
-            // );
-            // log::trace!(
-            //     "Instruction pointer: {}:{}",
-            //     self.next_instruction.closure,
-            //     self.next_instruction.instruction
-            // );
-            // log::trace!("Heap: {:?}", self.heap);
+            if TRACE {
+                trace!(
+                    "Data stack: {}",
+                    self.data_stack
+                        .iter()
+                        .map(|it| it.format(&self.heap))
+                        .join(", ")
+                );
+                trace!(
+                    "Call stack: {}",
+                    self.call_stack
+                        .iter()
+                        .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
+                        .join(", ")
+                );
+                trace!(
+                    "Instruction pointer: {}:{}",
+                    self.next_instruction.closure,
+                    self.next_instruction.instruction
+                );
+                trace!("Heap: {:?}", self.heap);
+                trace!("Running instruction: {instruction:?}");
+            }
 
-            log::trace!("Running instruction: {instruction:?}");
             self.next_instruction.instruction += 1;
             self.run_instruction(use_provider, instruction);
             self.num_instructions_executed += 1;
@@ -405,9 +410,9 @@ impl Vm {
     pub fn run_synchronously_until_completion(mut self, db: &Database) -> TearDownResult {
         let use_provider = DbUseProvider { db };
         loop {
-            self.run(&use_provider, 10000);
+            self.run(&use_provider, 100000);
             match self.status() {
-                Status::Running => log::info!("Code is still running."),
+                Status::Running => info!("Code is still running."),
                 _ => return self.tear_down(),
             }
         }

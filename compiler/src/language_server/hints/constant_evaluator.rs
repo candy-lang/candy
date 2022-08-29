@@ -14,6 +14,7 @@ use crate::{
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::collections::HashMap;
+use tracing::{span, trace, Level};
 
 #[derive(Default)]
 pub struct ConstantEvaluator {
@@ -40,7 +41,7 @@ impl ConstantEvaluator {
             .iter_mut()
             .filter(|(_, vm)| matches!(vm.status(), Status::Running))
             .collect_vec();
-        log::trace!(
+        trace!(
             "Constant evaluator running. {} running VMs, {} in total.",
             running_vms.len(),
             num_vms,
@@ -68,9 +69,10 @@ impl ConstantEvaluator {
     }
 
     pub fn get_hints(&self, db: &Database, module: &Module) -> Vec<Hint> {
-        let vm = &self.vms[module];
+        let span = span!(Level::DEBUG, "Calculating hints for {module}");
+        let _enter = span.enter();
 
-        log::debug!("Calculating hints for {module}");
+        let vm = &self.vms[module];
         let mut hints = vec![];
 
         if let Status::Panicked { reason } = vm.status() {

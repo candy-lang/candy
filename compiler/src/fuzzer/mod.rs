@@ -9,6 +9,7 @@ use crate::{
     vm::{use_provider::DbUseProvider, Closure, Vm},
 };
 use itertools::Itertools;
+use tracing::info;
 
 pub async fn fuzz(db: &Database, module: Module) {
     let (fuzzables_heap, fuzzables) = {
@@ -20,7 +21,7 @@ pub async fn fuzz(db: &Database, module: Module) {
         (result.heap, result.fuzzable_closures)
     };
 
-    log::info!(
+    info!(
         "Now, the fuzzing begins. So far, we have {} closures to fuzz.",
         fuzzables.len()
     );
@@ -36,15 +37,15 @@ pub async fn fuzz(db: &Database, module: Module) {
                 reason,
                 tracer,
             } => {
-                log::error!("The fuzzer discovered an input that crashes {id}:");
-                log::error!(
+                info!("The fuzzer discovered an input that crashes {id}:");
+                info!(
                     "Calling `{id} {}` doesn't work because {reason}.",
                     arguments
                         .iter()
                         .map(|argument| argument.format(heap))
                         .join(" "),
                 );
-                log::error!("This was the stack trace:");
+                info!("This was the stack trace:");
                 tracer.dump_stack_trace(db, heap);
 
                 module.dump_associated_debug_file("trace", &tracer.format_call_tree(heap));

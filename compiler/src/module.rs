@@ -8,6 +8,7 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
+use tracing::error;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub struct Module {
@@ -212,7 +213,7 @@ fn get_module_content(db: &dyn ModuleDb, module: Module) -> Option<Arc<Vec<u8>>>
             Ok(content) => return Some(Arc::new(content)),
             Err(error) if matches!(error.kind(), std::io::ErrorKind::NotFound) => {}
             Err(_) => {
-                log::error!("Unexpected error when reading file {:?}.", path);
+                error!("Unexpected error when reading file {:?}.", path);
             }
         }
     }

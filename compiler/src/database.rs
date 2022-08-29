@@ -11,6 +11,7 @@ use crate::{
     module::{GetOpenModuleContentQuery, Module, ModuleDbStorage, ModuleWatcher},
 };
 use std::collections::HashMap;
+use tracing::warn;
 
 #[salsa::database(
     AstToHirStorage,
@@ -37,7 +38,7 @@ impl Database {
     pub fn did_open_module(&mut self, module: &Module, content: Vec<u8>) {
         let old_value = self.open_modules.insert(module.clone(), content);
         if old_value.is_some() {
-            log::warn!("Module {module} was opened, but it was already open.");
+            warn!("Module {module} was opened, but it was already open.");
         }
 
         GetOpenModuleContentQuery.in_db_mut(self).invalidate(module);
@@ -45,7 +46,7 @@ impl Database {
     pub fn did_change_module(&mut self, module: &Module, content: Vec<u8>) {
         let old_value = self.open_modules.insert(module.to_owned(), content);
         if old_value.is_none() {
-            log::warn!("Module {module} was changed, but it wasn't open before.");
+            warn!("Module {module} was changed, but it wasn't open before.");
         }
 
         GetOpenModuleContentQuery.in_db_mut(self).invalidate(module);
@@ -53,7 +54,7 @@ impl Database {
     pub fn did_close_module(&mut self, module: &Module) {
         let old_value = self.open_modules.remove(module);
         if old_value.is_none() {
-            log::warn!("Module {module} was closed, but it wasn't open before.");
+            warn!("Module {module} was closed, but it wasn't open before.");
         }
 
         GetOpenModuleContentQuery.in_db_mut(self).invalidate(module);
