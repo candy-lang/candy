@@ -1,4 +1,4 @@
-use super::value::Value;
+use super::{heap::Pointer, Heap};
 use crate::{
     compiler::{ast_to_hir::AstToHir, cst::CstDb, hir::Id},
     database::Database,
@@ -16,27 +16,27 @@ pub struct Tracer {
 pub enum TraceEntry {
     ValueEvaluated {
         id: Id,
-        value: Value,
+        value: Pointer,
     },
     CallStarted {
         id: Id,
-        closure: Value,
-        args: Vec<Value>,
+        closure: Pointer,
+        args: Vec<Pointer>,
     },
     CallEnded {
-        return_value: Value,
+        return_value: Pointer,
     },
     NeedsStarted {
         id: Id,
-        condition: Value,
-        reason: Value,
+        condition: Pointer,
+        reason: Pointer,
     },
     NeedsEnded,
     ModuleStarted {
         module: Module,
     },
     ModuleEnded {
-        export_map: Value,
+        export_map: Pointer,
     },
 }
 
@@ -72,12 +72,12 @@ impl Tracer {
     pub fn stack(&self) -> &[TraceEntry] {
         &self.stack
     }
-    pub fn dump_stack_trace(&self, db: &Database) {
-        for line in self.format_stack_trace(db).lines() {
+    pub fn dump_stack_trace(&self, db: &Database, heap: &Heap) {
+        for line in self.format_stack_trace(db, heap).lines() {
             log::error!("{}", line);
         }
     }
-    pub fn format_stack_trace(&self, db: &Database) -> String {
+    pub fn format_stack_trace(&self, db: &Database, heap: &Heap) -> String {
         self.stack
             .iter()
             .rev()
@@ -86,7 +86,7 @@ impl Tracer {
                     TraceEntry::CallStarted { id, closure, args } => (
                         format!(
                             "{closure} {}",
-                            args.iter().map(|arg| format!("{arg}")).join(" ")
+                            args.iter().map(|arg| arg.format(heap)).join(" ")
                         ),
                         Some(id),
                     ),
@@ -94,8 +94,11 @@ impl Tracer {
                         id,
                         condition,
                         reason,
-                    } => (format!("needs {condition} {reason}"), Some(id)),
-                    TraceEntry::ModuleStarted { module } => (format!("module {module}"), None),
+                    } => (
+                        format!("needs {} {}", condition.format(heap), reason.format(heap)),
+                        Some(id),
+                    ),
+                    TraceEntry::ModuleStarted { module } => (format!("use {module}"), None),
                     _ => unreachable!(),
                 };
                 let caller_location_string = {
@@ -137,25 +140,34 @@ impl Tracer {
             .join("\n")
     }
 
-    pub fn dump_call_tree(&self) -> String {
+    pub fn format_call_tree(&self, heap: &Heap) -> String {
         let actions = self
             .log
             .iter()
             .map(|entry| match entry {
-                TraceEntry::ValueEvaluated { id, value } => Action::Stay(format!("{id} = {value}")),
+                TraceEntry::ValueEvaluated { id, value } => {
+                    Action::Stay(format!("{id} = {}", value.format(heap)))
+                }
                 TraceEntry::CallStarted { id, closure, args } => Action::Start(format!(
-                    "{id} {closure} {}",
-                    args.iter().map(|arg| format!("{arg}")).join(" ")
+                    "{id} {} {}",
+                    closure.format(heap),
+                    args.iter().map(|arg| arg.format(heap)).join(" ")
                 )),
-                TraceEntry::CallEnded { return_value } => Action::End(format!(" = {return_value}")),
+                TraceEntry::CallEnded { return_value } => {
+                    Action::End(format!(" = {}", return_value.format(heap)))
+                }
                 TraceEntry::NeedsStarted {
                     id,
                     condition,
                     reason,
-                } => Action::Start(format!("{id} needs {condition} {reason}")),
+                } => Action::Start(format!(
+                    "{id} needs {} {}",
+                    condition.format(heap),
+                    reason.format(heap)
+                )),
                 TraceEntry::NeedsEnded => Action::End(" = Nothing".to_string()),
                 TraceEntry::ModuleStarted { module } => Action::Start(format!("module {module}")),
-                TraceEntry::ModuleEnded { export_map } => Action::End(format!("{export_map}")),
+                TraceEntry::ModuleEnded { export_map } => Action::End(export_map.format(heap)),
             })
             .collect_vec();
 

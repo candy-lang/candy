@@ -117,8 +117,6 @@ Major milestones:
 
 ## Short-term TODOs
 
-- make `PROJECT_DIRECTORY` non-global
-- use BigInts
 - minimize inputs found through fuzzing
 - make condition whether to keep running more granular
 - fuzz parser
@@ -129,10 +127,9 @@ Major milestones:
 - support recursion
 - tail call optimization
 - new name?
-- mini-heaps?
-- parse calls with call as a receiver: `(foo Bar) Baz`. or do we even need the `CallReceiver`?
 - parse function declaration with doc comment but no code
 - complain about comment lines with too much indentation
+- develop guidelines about how to format reasons
 
 ## How to use Candy
 

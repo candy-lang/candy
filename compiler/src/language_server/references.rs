@@ -8,12 +8,11 @@ use crate::{
     database::Database,
     module::{Module, ModuleKind},
 };
-use im::HashSet;
 use lsp_types::{
     DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Location, ReferenceParams,
     TextDocumentPositionParams,
 };
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 pub fn find_references(
     db: &Database,

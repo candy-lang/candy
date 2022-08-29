@@ -10,7 +10,7 @@ use crate::{
     },
     module::{GetOpenModuleContentQuery, Module, ModuleDbStorage, ModuleWatcher},
 };
-use im::HashMap;
+use std::collections::HashMap;
 
 #[salsa::database(
     AstToHirStorage,

@@ -1,6 +1,5 @@
 use super::{
-    heap::ObjectPointer,
-    value::{Closure, Value},
+    heap::{Closure, Heap, Pointer, Text},
     Vm,
 };
 use crate::{
@@ -44,24 +43,23 @@ impl Vm {
         &mut self,
         use_provider: &U,
         current_module: Module,
-        relative_path: ObjectPointer,
+        relative_path: Pointer,
     ) -> Result<(), String> {
-        let target = UsePath::parse(self.heap.export(relative_path))?;
+        let target = UsePath::parse(&self.heap, relative_path)?;
         let module = target.resolve_relative_to(current_module)?;
 
         match use_provider.use_module(module.clone())? {
             UseResult::Asset(bytes) => {
-                let value = Value::list(
-                    bytes
-                        .iter()
-                        .map(|byte| Value::Int((*byte).into()))
-                        .collect_vec(),
-                );
-                self.data_stack.push(self.heap.import(value));
+                let bytes = bytes
+                    .iter()
+                    .map(|byte| self.heap.create_int((*byte).into()))
+                    .collect_vec();
+                let list = self.heap.create_list(bytes);
+                self.data_stack.push(list);
             }
             UseResult::Code(lir) => {
-                let module_closure = Value::Closure(Closure::of_lir(module, lir));
-                let address = self.heap.import(module_closure);
+                let module_closure = Closure::of_module_lir(module, lir);
+                let address = self.heap.create_closure(module_closure);
                 self.data_stack.push(address);
                 self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
             }
@@ -78,12 +76,14 @@ struct UsePath {
 impl UsePath {
     const PARENT_NAVIGATION_CHAR: char = '.';
 
-    fn parse(path: Value) -> Result<Self, String> {
-        let path = match path {
-            Value::Text(path) => path,
-            _ => return Err("the path has to be a text".to_string()),
-        };
-        let mut path = path.as_str();
+    fn parse(heap: &Heap, path: Pointer) -> Result<Self, String> {
+        let path: Text = heap
+            .get(path)
+            .data
+            .clone()
+            .try_into()
+            .map_err(|_| "the path has to be a text".to_string())?;
+        let mut path = path.value.as_str();
         let parent_navigations = {
             let mut navigations = 0;
             while path.starts_with(UsePath::PARENT_NAVIGATION_CHAR) {
@@ -116,7 +116,7 @@ impl UsePath {
 
         let mut path = current_module.path;
         for _ in 0..self.parent_navigations {
-            if path.pop() == None {
+            if path.pop().is_none() {
                 return Err("too many parent navigations".to_string());
             }
         }

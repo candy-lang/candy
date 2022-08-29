@@ -9,7 +9,7 @@ use crate::{
     database::Database,
     language_server::hints::{utils::id_to_end_of_line, HintKind},
     module::Module,
-    vm::{tracer::TraceEntry, use_provider::DbUseProvider, value::Closure, Status, Vm},
+    vm::{tracer::TraceEntry, use_provider::DbUseProvider, Closure, Heap, Pointer, Status, Vm},
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
@@ -22,11 +22,10 @@ pub struct ConstantEvaluator {
 
 impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
-        let module_closure = Closure::of_module(db, module.clone()).unwrap();
-        let mut vm = Vm::new();
-        let use_provider = DbUseProvider { db };
-        vm.set_up_module_closure_execution(&use_provider, module_closure);
-
+        let vm = Vm::new_for_running_module_closure(
+            &DbUseProvider { db },
+            Closure::of_module(db, module.clone()).unwrap(),
+        );
         self.vms.insert(module, vm);
     }
 
@@ -56,13 +55,16 @@ impl ConstantEvaluator {
         }
     }
 
-    pub fn get_fuzzable_closures(&self, module: &Module) -> Vec<(Id, Closure)> {
-        self.vms[module]
-            .fuzzable_closures
-            .iter()
-            .filter(|(id, _)| &id.module == module)
-            .cloned()
-            .collect_vec()
+    pub fn get_fuzzable_closures(&self, module: &Module) -> (&Heap, Vec<(Id, Pointer)>) {
+        let vm = &self.vms[module];
+        (
+            &vm.heap,
+            vm.fuzzable_closures
+                .iter()
+                .filter(|(id, _)| &id.module == module)
+                .cloned()
+                .collect_vec(),
+        )
     }
 
     pub fn get_hints(&self, db: &Database, module: &Module) -> Vec<Hint> {
@@ -77,7 +79,7 @@ impl ConstantEvaluator {
             }
         };
         if module.to_possible_paths().is_some() {
-            module.dump_associated_debug_file("trace", &vm.tracer.dump_call_tree());
+            module.dump_associated_debug_file("trace", &vm.tracer.format_call_tree(&vm.heap));
         }
 
         for entry in vm.tracer.log() {
@@ -101,14 +103,14 @@ impl ConstantEvaluator {
                     if !matches!(ast.kind, AstKind::Assignment(_)) {
                         continue;
                     }
-                    (id.clone(), value.clone())
+                    (id.clone(), value)
                 }
                 _ => continue,
             };
 
             hints.push(Hint {
                 kind: HintKind::Value,
-                text: format!("{value}"),
+                text: value.format(&vm.heap),
                 position: id_to_end_of_line(db, id).unwrap(),
             });
         }
@@ -143,15 +145,23 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
         TraceEntry::CallStarted { id, closure, args } => (
             id,
             format!(
-                "{closure} {}",
-                args.iter().map(|arg| format!("{arg}")).join(" ")
+                "{} {}",
+                closure.format(&vm.heap),
+                args.iter().map(|arg| arg.format(&vm.heap)).join(" ")
             ),
         ),
         TraceEntry::NeedsStarted {
             id,
             condition,
             reason,
-        } => (id, format!("needs {condition} {reason}")),
+        } => (
+            id,
+            format!(
+                "needs {} {}",
+                condition.format(&vm.heap),
+                reason.format(&vm.heap)
+            ),
+        ),
         _ => unreachable!(),
     };
 

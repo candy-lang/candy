@@ -13,10 +13,9 @@ use crate::{
     },
     module::Module,
 };
-use im::HashMap;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
-use std::{ops::Range, sync::Arc};
+use std::{collections::HashMap, ops::Range, sync::Arc};
 
 #[salsa::query_group(CstToAstStorage)]
 pub trait CstToAst: CstDb + RcstToCst {

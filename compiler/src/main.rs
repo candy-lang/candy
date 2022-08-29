@@ -1,6 +1,5 @@
 #![feature(async_closure)]
 #![feature(box_patterns)]
-#![feature(label_break_value)]
 #![feature(never_type)]
 #![feature(try_trait_v2)]
 #![allow(clippy::module_inception)]
@@ -26,7 +25,7 @@ use crate::{
     database::Database,
     language_server::utils::LspPositionConversion,
     module::{Module, ModuleKind},
-    vm::{use_provider::DbUseProvider, value::Closure, Vm},
+    vm::{use_provider::DbUseProvider, Closure, TearDownResult, Vm},
 };
 use compiler::lir::Lir;
 use fern::colors::{Color, ColoredLevelConfig};
@@ -199,13 +198,29 @@ fn run(options: CandyRunOptions) {
     let path_string = options.file.to_string_lossy();
     log::info!("Running `{path_string}`.");
 
-    let mut vm = Vm::new();
     let use_provider = DbUseProvider { db: &db };
-    vm.set_up_module_closure_execution(&use_provider, module_closure);
-    vm.run_synchronously_until_completion(&db).ok();
+    let vm = Vm::new_for_running_module_closure(&use_provider, module_closure);
+    let TearDownResult {
+        tracer,
+        result,
+        heap,
+        ..
+    } = vm.run_synchronously_until_completion(&db);
+
+    match result {
+        Ok(return_value) => log::info!(
+            "The module exports these definitions: {}",
+            return_value.format(&heap)
+        ),
+        Err(reason) => {
+            log::error!("The module panicked because {reason}.");
+            log::error!("This is the stack trace:");
+            tracer.dump_stack_trace(&db, &heap);
+        }
+    }
 
     if options.debug {
-        module.dump_associated_debug_file("trace", &vm.tracer.dump_call_tree());
+        module.dump_associated_debug_file("trace", &tracer.format_call_tree(&heap));
     }
 }
 
