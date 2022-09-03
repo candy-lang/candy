@@ -59,59 +59,71 @@ Candy blurs the line between those stages, for example, by replacing compile-tim
 We are currently implementing a first version of Candy in Rust.
 We already have a language server that provides some tooling.
 
-Major milestones:
+## Long-term TODOs
 
-* [x] build a basic parser
-* [x] lower CST to AST
-* [x] lower AST to HIR
-* [x] build a basic interpreter
-* [x] add CLI arguments for printing the CST, AST, or HIR
-* [ ] make functions independent of their order in top-level scope
-* [x] support importing other files (`use`)
-* [x] namespaces/modules including visibility modifiers
-* [ ] IDE support:
-  * [ ] completion, completion resolve
-  * [ ] hover
-  * [ ] signatureHelp
-  * [x] ~~declaration~~, definition, ~~typeDefinition~~
-  * [ ] implementation
-  * [x] references
-  * [x] documentHighlight
-  * [ ] documentSymbol
-  * [ ] codeAction, codeAction resolve
-  * [ ] codeLens, codeLens resolve, codeLens refresh
-  * [ ] documentLink, documentLink resolve
-  * [x] ~~documentColor, colorPresentation~~
-  * [ ] formatting
-  * [ ] rangeFormatting
-  * [ ] onTypeFormatting
-  * [ ] rename, prepareRename
-  * [x] foldingRange
-  * [ ] selectionRange
-  * [ ] prepareCallHierarchy
-  * [ ] callHierarchy incoming, callHierarchy outgoing
-  * [x] semantic tokens
-  * [x] ~~linkedEditingRange~~
-  * [ ] moniker
-* [x] incremental compilation
-* [ ] lists
-* [x] structs
-* [ ] sets
-* [ ] text interpolation
-* [x] constant evaluation
-* [ ] fibers
-* [ ] channels
-* [ ] io
-* [ ] random
-* [ ] standard library
-* [ ] pipe operator
-* [x] auto-fuzzing
-* [ ] "type" proofs
-* [ ] testing
-* [ ] fuzzing of the compiler itself
-* [ ] clean up repo (delete a bunch of stuff!)
-* [ ] package manager
-* [ ] online playground
+- Core
+  - io
+  - random
+  - timing
+  - environment variables
+  - HTTP, UDP
+- compiler
+  - make functions independent of their order in top-level scope
+  - lists
+  - text interpolation
+  - fibers, channels
+  - patterns
+  - pipe operator
+  - "type" proofs
+  - fuzzing of the compiler itself
+  - package root marker
+  - package path dependencies
+  - performance
+    - multithreading
+    - object deduplication
+    - profiler
+    - memory representation
+      - inlining of ints/etc.
+      - size of an object
+      - heap management
+  - LLVM, WASM
+- IDE support:
+  - generate debug files
+  - [ ] completion, completion resolve
+  - [ ] hover
+  - [ ] signatureHelp
+  - [x] ~~declaration~~, definition, ~~typeDefinition~~
+  - [ ] implementation
+  - [x] references
+  - [x] documentHighlight
+  - [ ] documentSymbol
+  - [ ] codeAction, codeAction resolve
+  - [ ] codeLens, codeLens resolve, codeLens refresh
+  - [ ] documentLink, documentLink resolve
+  - [x] ~~documentColor, colorPresentation~~
+  - [ ] formatting
+  - [ ] rangeFormatting
+  - [ ] onTypeFormatting
+  - [ ] rename, prepareRename
+  - [x] foldingRange
+  - [ ] selectionRange
+  - [ ] prepareCallHierarchy
+  - [ ] callHierarchy incoming, callHierarchy outgoing
+  - [x] semantic tokens
+  - [x] ~~linkedEditingRange~~
+  - [ ] moniker
+- packages
+  - logging
+  - HTTP Server
+  - Markdown
+  - custom binary serialization
+  - Cap'n Proto
+  - DateTime?
+  - SI?
+  - MongoDB?
+  - package manager
+- online playground
+- clean up repo (delete a bunch of stuff!)
 
 ## Short-term TODOs
 
