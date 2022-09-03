@@ -27,7 +27,7 @@ impl Channel {
     pub fn new(capacity: Capacity) -> Self {
         Self {
             capacity,
-            packets: Default::default(),
+            packets: VecDeque::with_capacity(capacity),
         }
     }
 
