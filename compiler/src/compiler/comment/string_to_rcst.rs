@@ -720,8 +720,8 @@ mod parse {
         assert_eq!(title(vec!["abc"]), None);
     }
 
-    fn paragraph(input: Vec<&str>, indentation: usize) -> Option<(Vec<&str>, Rcst)> {
-        log::trace!("paragraph({input:?})");
+    fn paragraph(mut input: Vec<&str>, indentation: usize) -> Option<(Vec<&str>, Rcst)> {
+        log::trace!("paragraph({input:?}, {indentation})");
 
         let mut parts = vec![];
         let mut formatting_state = vec![];
@@ -733,9 +733,14 @@ mod parse {
         }
 
         loop {
-            let Some((new_input, newline)) = newline(input.clone()) else { break };
+            let Some((mut new_input, newline)) = newline(input.clone()) else { break };
+            let mut whitespace = vec![newline];
 
-            let Some((new_input, indentation)) = leading_indentation(new_input, indentation) else { break };
+            if indentation > 0 {
+                let Some((new_new_input, indentation)) = leading_indentation(new_input, indentation) else { break };
+                new_input = new_new_input;
+                whitespace.push(indentation);
+            };
 
             // TODO: use `if let … && let …`, https://github.com/rust-lang/rust/issues/99852
             let (remaining, (mut line_text, new_formatting_state)) =
@@ -749,8 +754,11 @@ mod parse {
                     break;
                 };
 
-            let last_text = line_text.pop().unwrap();
-            line_text.push(last_text.wrap_in_whitespace(vec![newline, indentation]));
+            if let Some(part) = parts.pop() {
+                parts.push(part.wrap_in_whitespace(whitespace));
+            } else {
+                parts.append(&mut whitespace);
+            }
             parts.append(&mut line_text);
             input = recombine("", remaining);
             formatting_state = new_formatting_state;
@@ -761,6 +769,35 @@ mod parse {
         } else {
             Some((input, Rcst::Paragraph(parts)))
         }
+    }
+    #[test]
+    fn test_paragraph() {
+        assert_eq!(
+            paragraph(vec!["item 1 item item item", "item item "], 0),
+            Some((
+                vec![""],
+                Rcst::Paragraph(vec![
+                    Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::TextPart("item 1 item item item".to_string())),
+                        whitespace: vec![Rcst::Newline]
+                    },
+                    Rcst::TextPart("item item ".to_string()),
+                ]),
+            ))
+        );
+        assert_eq!(
+            paragraph(vec!["item 1 item item item", "  item item ", ""], 2),
+            Some((
+                vec!["", ""],
+                Rcst::Paragraph(vec![
+                    Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::TextPart("item 1 item item item".to_string())),
+                        whitespace: vec![Rcst::Newline, Rcst::Whitespace("  ".to_string())]
+                    },
+                    Rcst::TextPart("item item ".to_string()),
+                ]),
+            ))
+        );
     }
 
     fn url_line(input: Vec<&str>) -> Option<(Vec<&str>, Rcst)> {
