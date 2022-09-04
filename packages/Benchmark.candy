@@ -3,15 +3,15 @@
 
 core = use "..Core"
 
-fibRec fibRec n =
-  core.ifElse (core.int.isLessThan n 2) { n } {
-    core.int.add
-      fibRec fibRec (core.int.subtract n 1)
-      fibRec fibRec (core.int.subtract n 2)
-  }
-fib n = fibRec fibRec n
-
-twentyOne := fib 8
+# fibRec fibRec n =
+#   core.ifElse (core.int.isLessThan n 2) { n } {
+#     core.int.add
+#       fibRec fibRec (core.int.subtract n 1)
+#       fibRec fibRec (core.int.subtract n 2)
+#   }
+# fib n = fibRec fibRec n
+# 
+# twentyOne := fib 8
 
 channel = core.channel.create 3
 sendPort = core.struct.getUnwrap channel 0
