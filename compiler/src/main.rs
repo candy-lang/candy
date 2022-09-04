@@ -206,14 +206,15 @@ fn run(options: CandyRunOptions) {
     info!("Running `{path_string}`.");
     let mut vm = FiberTree::new_for_running_module_closure(module_closure);
     loop {
+        info!("Tree: {:#?}", vm);
         match vm.status() {
             Status::Running => {
-                info!("VM still running.");
+                debug!("VM still running.");
                 let operations = vm.run(&mut ModularContext {
                     use_provider: DbUseProvider { db: &db },
                     execution_controller: RunForever,
                 });
-                info!("Operations: {operations:?}");
+                debug!("Operations: {operations:?}");
             },
             Status::WaitingForOperations => {
                 todo!("VM can't proceed until some operations complete.");

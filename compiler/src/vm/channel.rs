@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use super::{Heap, Pointer};
 use std::{collections::VecDeque, fmt};
 
@@ -8,7 +9,7 @@ use std::{collections::VecDeque, fmt};
 /// Channels always have a maximum capacity of packets that they can hold
 /// simultaneously – you can set it to something large, but having no capacity
 /// enables buggy code that leaks memory.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Channel {
     pub capacity: Capacity,
     packets: VecDeque<Packet>,
@@ -51,6 +52,15 @@ impl Channel {
     }
 }
 
+impl fmt::Debug for Channel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_empty() {
+            write!(f, "<empty>")
+        } else {
+            write!(f, "{}", self.packets.iter().map(|packet| format!("{:?}", packet)).join(", "))
+        }
+    }
+}
 impl fmt::Debug for Packet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.value.format(&self.heap))
