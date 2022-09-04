@@ -1,5 +1,5 @@
 use super::{Heap, Pointer};
-use std::collections::VecDeque;
+use std::{collections::VecDeque, fmt};
 
 /// A conveyer belt or pipe that flows between send and receive ports in the
 /// program. Using send ports, you can put packets into a channel. Using receive
@@ -8,7 +8,7 @@ use std::collections::VecDeque;
 /// Channels always have a maximum capacity of packets that they can hold
 /// simultaneously – you can set it to something large, but having no capacity
 /// enables buggy code that leaks memory.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Channel {
     pub capacity: Capacity,
     packets: VecDeque<Packet>,
@@ -17,7 +17,7 @@ pub struct Channel {
 pub type Capacity = usize;
 
 /// A self-contained value that is sent over a channel.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Packet {
     pub heap: Heap,
     pub value: Pointer,
@@ -48,5 +48,11 @@ impl Channel {
 
     pub fn receive(&mut self) -> Option<Packet> {
         self.packets.pop_front()
+    }
+}
+
+impl fmt::Debug for Packet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value.format(&self.heap))
     }
 }
