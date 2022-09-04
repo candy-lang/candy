@@ -1,5 +1,6 @@
 #![feature(async_closure)]
 #![feature(box_patterns)]
+#![feature(let_chains)]
 #![feature(never_type)]
 #![feature(try_trait_v2)]
 #![allow(clippy::module_inception)]
@@ -27,7 +28,7 @@ use crate::{
     module::{Module, ModuleKind},
     vm::{
         context::{DbUseProvider, ModularContext, RunForever},
-        Closure, FiberTree, TearDownResult,
+        Closure, FiberTree, TearDownResult, tree::Status,
     },
 };
 use compiler::lir::Lir;
@@ -203,12 +204,23 @@ fn run(options: CandyRunOptions) {
 
     let path_string = options.file.to_string_lossy();
     info!("Running `{path_string}`.");
-
     let mut vm = FiberTree::new_for_running_module_closure(module_closure);
-    vm.run(&mut ModularContext {
-        use_provider: DbUseProvider { db: &db },
-        execution_controller: RunForever,
-    });
+    loop {
+        match vm.status() {
+            Status::Running => {
+                info!("VM still running.");
+                let operations = vm.run(&mut ModularContext {
+                    use_provider: DbUseProvider { db: &db },
+                    execution_controller: RunForever,
+                });
+                info!("Operations: {operations:?}");
+            },
+            Status::WaitingForOperations => {
+                todo!("VM can't proceed until some operations complete.");
+            },
+            _ => break,
+        }
+    }
     let TearDownResult {
         tracer,
         result,
