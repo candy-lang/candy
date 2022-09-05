@@ -17,15 +17,16 @@ use std::{
 };
 use tracing::{debug, info, warn};
 
-/// A fiber tree is a part of or an entire Candy program that thinks it's
-/// currently running. Because fiber trees are first-class Rust structs, they
-/// enable other code to store "freezed" programs and to remain in control about
-/// when and for how long code runs.
+/// A fiber tree a Candy program that thinks it's currently running. Everything
+/// from a single fiber to a whole program spanning multiple nested parallel
+/// scopes is represented as a fiber tree. Because fiber trees are first-class
+/// Rust structs, they enable other code to store "freezed" programs and to
+/// remain in control about when and for how long code runs.
 ///
-/// While fibers are simple, pure virtual machines that manage a heap and stack,
-/// fiber _trees_ encapsulate fibers and manage channels that are used by them.
+/// While fibers are "pure" virtual machines that manage a heap and stack, fiber
+/// _trees_ encapsulate fibers and manage channels that are used by them.
 ///
-/// ## Fibers
+/// ## A Tree of Fibers
 ///
 /// As the name suggests, every Candy program can be represented by a tree at
 /// any point in time. In particular, you can create new nodes in the tree by
@@ -326,6 +327,7 @@ impl FiberTree {
         );
         let mut state = mem::replace(&mut self.state, None).unwrap();
         let mut operations = vec![];
+        // FIXME: Comment in before merging PR.
         // while state.is_running() && context.should_continue_running() {
             state = self.run_and_map_state(state, &mut operations, context);
         // }
@@ -335,21 +337,21 @@ impl FiberTree {
         let mut external_operations = vec![];
         for operation in operations {
             let (channel, channel_operations) = match self.internal_channels.get_mut(&operation.channel) {
+                Some(it) => it,
                 None => {
                     if let State::ParallelSection { nursery, children , ..} = self.state.as_mut().unwrap() && operation.channel == *nursery {
                         info!("Operation is for nursery.");
-                        todo!();
+                        todo!("Handle message for nursery.");
                         continue;
                     }
                     info!("Operation is for channel ch#{}, which is an external channel: {operation:?}", operation.channel);
-                    todo!(); // Migrate channels if necessary.
+                    todo!("Migrate channels if necessary.");
                     external_operations.push(Operation {
                             channel: self.internal_to_external_channels[&operation.channel],
                         ..operation});
                     info!("In particular, it corresponds to channel ch#{} in the outer node.", self.internal_to_external_channels[&operation.channel]);
                     continue;
                 },
-                Some(it) => it,
             };
 
             let was_completed = match &operation.kind {
