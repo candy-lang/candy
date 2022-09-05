@@ -10,7 +10,7 @@ use std::{collections::VecDeque, fmt};
 /// simultaneously – you can set it to something large, but having no capacity
 /// enables buggy code that leaks memory.
 #[derive(Clone)]
-pub struct Channel {
+pub struct ChannelBuf {
     pub capacity: Capacity,
     packets: VecDeque<Packet>,
 }
@@ -24,7 +24,7 @@ pub struct Packet {
     pub value: Pointer,
 }
 
-impl Channel {
+impl ChannelBuf {
     pub fn new(capacity: Capacity) -> Self {
         Self {
             capacity,
@@ -52,7 +52,7 @@ impl Channel {
     }
 }
 
-impl fmt::Debug for Channel {
+impl fmt::Debug for ChannelBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_empty() {
             write!(f, "<empty>")

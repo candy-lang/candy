@@ -77,7 +77,7 @@ impl Fuzzer {
         match status {
             Status::StillFuzzing { mut vm, arguments } => match vm.status() {
                 tree::Status::Running => {
-                    vm.run(context);
+                    vm.run(context, todo!());
                     Status::StillFuzzing { vm, arguments }
                 }
                 tree::Status::WaitingForOperations => panic!("Fuzzing should not have to wait on channel operations because arguments were not channels."),

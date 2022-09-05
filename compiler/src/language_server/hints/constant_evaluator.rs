@@ -54,7 +54,7 @@ impl ConstantEvaluator {
             vm.run(&mut ModularContext {
                 use_provider: DbUseProvider { db },
                 execution_controller: RunLimitedNumberOfInstructions::new(500),
-            });
+            }, todo!());
             Some(module.clone())
         } else {
             None

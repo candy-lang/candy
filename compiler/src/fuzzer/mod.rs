@@ -22,7 +22,7 @@ pub async fn fuzz(db: &Database, module: Module) {
         vm.run(&mut ModularContext {
             use_provider: DbUseProvider { db },
             execution_controller: RunForever,
-        });
+        }, todo!());
         let result = vm.tear_down();
         (result.heap, result.fuzzable_closures)
     };

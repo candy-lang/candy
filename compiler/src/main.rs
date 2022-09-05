@@ -28,7 +28,7 @@ use crate::{
     module::{Module, ModuleKind},
     vm::{
         context::{DbUseProvider, ModularContext, RunForever},
-        Closure, FiberTree, TearDownResult, tree::Status,
+        Closure, FiberTree, TearDownResult, tree::Status, utils::IdGenerator,
     },
 };
 use compiler::lir::Lir;
@@ -204,16 +204,17 @@ fn run(options: CandyRunOptions) {
 
     let path_string = options.file.to_string_lossy();
     info!("Running `{path_string}`.");
-    let mut vm = FiberTree::new_for_running_module_closure(module_closure);
+    let mut tree = FiberTree::new_for_running_module_closure(module_closure);
+    let mut id_generator = IdGenerator::start_at(0);
     loop {
-        info!("Tree: {:#?}", vm);
-        match vm.status() {
+        // info!("Tree: {:#?}", tree);
+        match tree.status() {
             Status::Running => {
                 debug!("VM still running.");
-                let operations = vm.run(&mut ModularContext {
+                let operations = tree.run(&mut ModularContext {
                     use_provider: DbUseProvider { db: &db },
                     execution_controller: RunForever,
-                });
+                }, &mut id_generator);
                 debug!("Operations: {operations:?}");
             },
             Status::WaitingForOperations => {
@@ -227,7 +228,7 @@ fn run(options: CandyRunOptions) {
         result,
         heap,
         ..
-    } = vm.tear_down();
+    } = tree.tear_down();
 
     match result {
         Ok(return_value) => info!(
