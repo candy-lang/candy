@@ -4,20 +4,20 @@ structGet = (use "..Struct").getUnwrap
 
 parallel body := 
   needs (function.is1 body)
-  returnValueChannel = channel.create 1
-  returnValueSendPort = structGet returnValueChannel 0
-  returnValueReceivePort = structGet returnValueChannel 1
-  ✨.parallel body returnValueSendPort
-  channel.receive returnValueReceivePort
+  returnChannel = channel.create 1
+  returnSendPort = structGet returnChannel 0
+  returnReceivePort = structGet returnChannel 1
+  ✨.parallel body returnSendPort
+  channel.receive returnReceivePort
 
 async nursery body :=
   needs (channel.isSendPort nursery)
   needs (function.is0 body)
-  returnValueChannel = channel.create 1
-  returnValueSendPort = structGet returnValueChannel 0
-  returnValueReceivePort = structGet returnValueChannel 1
-  channel.send nursery [Spawn, body, returnValueSendPort]
-  returnValueReceivePort
+  returnChannel = channel.create 1
+  returnSendPort = structGet returnChannel 0
+  returnReceivePort = structGet returnChannel 1
+  channel.send nursery [Closure: body, ReturnChannel: returnSendPort]
+  returnReceivePort
 
 await fiber :=
   needs (channel.isReceivePort fiber)

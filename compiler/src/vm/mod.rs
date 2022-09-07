@@ -11,7 +11,9 @@ pub use fiber::{Fiber, TearDownResult};
 pub use heap::{Closure, Heap, Object, Pointer};
 use rand::seq::SliceRandom;
 use tracing::{info, warn};
-use self::{heap::ChannelId, channel::{ChannelBuf, Packet}, context::Context, tracer::Tracer};
+use crate::vm::heap::Struct;
+
+use self::{heap::{ChannelId, Symbol, SendPort}, channel::{ChannelBuf, Packet}, context::Context, tracer::Tracer};
 
 /// A fiber tree a Candy program that thinks it's currently running. Everything
 /// from a single fiber to a whole program spanning multiple nested parallel
@@ -170,7 +172,7 @@ enum Channel {
 #[derive(Clone, Debug)]
 struct Child {
     fiber: FiberId,
-    return_value_channel: ChannelId,
+    return_channel: ChannelId,
 }
 
 #[derive(Clone)]
@@ -259,14 +261,14 @@ impl Vm {
                     _ => unreachable!(),
                 };
                 for child in children {
-                    return match self.status_of(child.fiber) {
-                        Status::Running => Status::Running,
-                        Status::WaitingForOperations => Status::WaitingForOperations,
+                    match self.status_of(child.fiber) {
+                        Status::Running => return Status::Running,
+                        Status::WaitingForOperations => {},
                         Status::Done => continue,
-                        Status::Panicked { reason } => Status::Panicked { reason },
+                        Status::Panicked { reason } => return Status::Panicked { reason },
                     };
                 }
-                unreachable!("We should have exited the parallel section")
+                Status::WaitingForOperations
             },
         }
     }
@@ -322,6 +324,10 @@ impl Vm {
             }
         };
 
+        if !matches!(fiber.status(), fiber::Status::Running) {
+            return;
+        }
+
         fiber.run(context);
 
         match fiber.status() {
@@ -352,7 +358,7 @@ impl Vm {
                     // TODO: Make it so that the initial fiber doesn't need a return channel.
                     let children = vec![Child {
                         fiber: child_id,
-                        return_value_channel: return_channel,
+                        return_channel: return_channel,
                     }];
                     self.channels.insert(id, Channel::Nursery { children });
                     id
@@ -400,9 +406,37 @@ impl Vm {
                 })
             },
             Channel::Nursery { children } => {
-                todo!("Stuff is being sent to nursery.");
+                info!("Nursery received packet {:?}", packet);
+                let (heap, closure_to_spawn, return_channel) = match Self::parse_spawn_packet(packet) {
+                    Some(it) => it,
+                    None => {
+                        // The nursery received an invalid message. TODO: Panic.
+                        panic!("A nursery received an invalid message.");
+                    }
+                };
+                let fiber_id = self.fiber_id_generator.generate();
+                self.fibers.insert(fiber_id, FiberTree::SingleFiber(Fiber::new_for_running_closure(heap, closure_to_spawn, &[])));
+                children.push(Child { fiber: fiber_id, return_channel });
+                self.complete_send(performing_fiber);
             },
         }
+    }
+    fn parse_spawn_packet(packet: Packet) -> Option<(Heap, Pointer, usize)> {
+        let Packet { mut heap, value } = packet;
+        let arguments: Struct = heap.get(value).data.clone().try_into().ok()?;
+        
+        let closure_symbol = heap.create_symbol("Closure".to_string());
+        let closure_address = arguments.get(&heap, closure_symbol)?;
+        let closure: Closure = heap.get(closure_address).data.clone().try_into().ok()?;
+        if closure.num_args > 0 {
+            return None;
+        }
+
+        let return_channel_symbol = heap.create_symbol("ReturnChannel".to_string());
+        let return_channel_address = arguments.get(&heap, return_channel_symbol)?;
+        let return_channel: SendPort = heap.get(return_channel_address).data.clone().try_into().ok()?;
+
+        Some((heap, closure_address, return_channel.channel))
     }
 
     fn receive_from_channel(&mut self, performing_fiber: FiberId, channel: ChannelId) {
@@ -455,7 +489,7 @@ impl fmt::Debug for Operation {
 impl fmt::Debug for FiberTree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::SingleFiber(arg0) => f.debug_tuple("SingleFiber").finish(),
+            Self::SingleFiber(fiber) => f.debug_tuple("SingleFiber").field(&fiber.status()).finish(),
             Self::ParallelSection { paused_main_fiber, nursery } => f.debug_struct("ParallelSection").field("nursery", nursery).finish(),
         }
     }
