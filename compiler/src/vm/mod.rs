@@ -12,8 +12,7 @@ pub use heap::{Closure, Heap, Object, Pointer};
 use rand::seq::SliceRandom;
 use tracing::{info, warn};
 use crate::vm::heap::Struct;
-
-use self::{heap::{ChannelId, Symbol, SendPort}, channel::{ChannelBuf, Packet}, context::Context, tracer::Tracer};
+use self::{heap::{ChannelId, SendPort}, channel::{ChannelBuf, Packet}, context::Context, tracer::Tracer};
 
 /// A VM represents a Candy program that thinks it's currently running. Because
 /// VMs are first-class Rust structs, they enable other code to store "freezed"
@@ -30,8 +29,11 @@ pub struct Vm {
     channel_id_generator: IdGenerator<ChannelId>,
 }
 
-type FiberId = usize;
-type OperationId = usize;
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct FiberId(usize);
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct OperationId(usize);
 
 #[derive(Clone, Debug)]
 enum Channel {
@@ -89,7 +91,7 @@ pub enum Status {
 }
 
 impl Vm {
-    fn new_with_fiber(mut fiber: Fiber) -> Self {
+    fn new_with_fiber(fiber: Fiber) -> Self {
         let fiber = FiberTree::SingleFiber { fiber, parent_nursery: None };
         let mut fiber_id_generator = IdGenerator::start_at(0);
         let root_fiber_id = fiber_id_generator.generate();
@@ -208,16 +210,12 @@ impl Vm {
                     id
                 };
 
-                let nursery_id = {
-                    let id = self.fiber_id_generator.generate();
-                    // TODO: Make it so that the initial fiber doesn't need a return channel.
-                    let children = vec![Child {
-                        fiber: child_id,
-                        return_channel: return_channel,
-                    }];
-                    self.channels.insert(id, Channel::Nursery { parent: fiber_id, children });
-                    id
-                };
+                // TODO: Make it so that the initial fiber doesn't need a return channel.
+                let children = vec![Child {
+                    fiber: child_id,
+                    return_channel: return_channel,
+                }];
+                self.channels.insert(nursery_id, Channel::Nursery { parent: fiber_id, children });
 
                 let paused_tree = self.fibers.remove(&fiber_id).unwrap();
                 self.fibers.insert(fiber_id, FiberTree::ParallelSection { paused_tree: Box::new(paused_tree), nursery: nursery_id });
@@ -245,7 +243,7 @@ impl Vm {
                 FiberTree::SingleFiber { fiber, parent_nursery } => (fiber, parent_nursery),
                 _ => unreachable!(),
             };
-            let TearDownResult { mut heap, result, fuzzable_closures, tracer } = fiber.tear_down();
+            let TearDownResult { heap, result, .. } = fiber.tear_down();
 
             if let Some(nursery) = parent_nursery {
                 let children = self.channels.get_mut(&nursery).unwrap().as_nursery_children_mut().unwrap();
@@ -254,7 +252,7 @@ impl Vm {
                 let child = children.remove(index);
                 let is_finished = children.is_empty();
 
-                let result = match result {
+                match result {
                     Ok(return_value) => self.send_to_channel(None, child.return_channel, Packet { heap, value: return_value }),
                     Err(panic_reason) => {
                         // TODO: Handle panicking parallel section.
@@ -314,7 +312,7 @@ impl Vm {
             },
         }
     }
-    fn parse_spawn_packet(packet: Packet) -> Option<(Heap, Pointer, usize)> {
+    fn parse_spawn_packet(packet: Packet) -> Option<(Heap, Pointer, ChannelId)> {
         let Packet { mut heap, value } = packet;
         let arguments: Struct = heap.get(value).data.clone().try_into().ok()?;
         
@@ -353,16 +351,6 @@ impl Vm {
     }
 }
 
-impl Operation {
-    fn cancels_out(&self, other: &Self) -> bool {
-        matches!(
-            (&self.kind, &other.kind),
-            (OperationKind::Send { .. }, OperationKind::Receive)
-                | (OperationKind::Receive, OperationKind::Send { .. })
-        )
-    }
-}
-
 impl InternalChannel {
     fn send(&mut self, fibers: &mut HashMap<FiberId, FiberTree>, performing_fiber: Option<FiberId>, packet: Packet) {
         self.pending_sends.push_back((performing_fiber, packet));
@@ -378,7 +366,7 @@ impl InternalChannel {
         if self.buffer.capacity == 0 {
             while !self.pending_sends.is_empty() && !self.pending_receives.is_empty() {
                 let (send_id, packet) = self.pending_sends.pop_front().unwrap();
-                let (receive_id) = self.pending_receives.pop_front().unwrap();
+                let receive_id = self.pending_receives.pop_front().unwrap();
                 Self::complete_send(fibers, send_id);
                 Self::complete_receive(fibers, receive_id, packet);
             }
@@ -464,7 +452,7 @@ impl FiberTree {
 impl fmt::Debug for Operation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(fiber) = self.performing_fiber {
-            write!(f, "{} ", fiber)?;
+            write!(f, "{:?} ", fiber)?;
         }
         match &self.kind {
             OperationKind::Send { packet } => write!(f, "sending {:?}", packet),
@@ -476,13 +464,24 @@ impl fmt::Debug for FiberTree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::SingleFiber { fiber, parent_nursery } => f.debug_struct("SingleFiber").field("status", &fiber.status()).field("parent_nursery", parent_nursery).finish(),
-            Self::ParallelSection { paused_tree, nursery } => f.debug_struct("ParallelSection").field("nursery", nursery).finish(),
+            Self::ParallelSection { nursery, .. } => f.debug_struct("ParallelSection").field("nursery", nursery).finish(),
         }
     }
 }
 impl fmt::Debug for Vm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Vm").field("fibers", &self.fibers).field("channels", &self.channels).field("external_operations", &self.external_operations).finish()
+    }
+}
+impl fmt::Debug for FiberId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:x}", self.0)
+    }
+}
+
+impl From<usize> for FiberId {
+    fn from(id: usize) -> Self {
+        Self(id)
     }
 }
 
@@ -492,12 +491,6 @@ struct IdGenerator<T: From<usize>> {
     _data: PhantomData<T>,
 }
 impl<T: From<usize>> IdGenerator<T> {
-    fn new() -> Self {
-        Self {
-            next_id: 0,
-            _data: Default::default(),
-        }
-    }
     fn start_at(id: usize) -> Self {
         Self {
             next_id: id,
