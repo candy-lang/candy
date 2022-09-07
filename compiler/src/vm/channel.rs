@@ -53,11 +53,7 @@ impl ChannelBuf {
 
 impl fmt::Debug for ChannelBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_empty() {
-            write!(f, "<empty>")
-        } else {
-            write!(f, "{}", self.packets.iter().map(|packet| format!("{:?}", packet)).join(", "))
-        }
+        f.debug_list().entries(self.packets.iter()).finish()
     }
 }
 impl fmt::Debug for Packet {

@@ -9,6 +9,7 @@ mod use_module;
 use std::{marker::PhantomData, collections::{HashMap, VecDeque}, fmt};
 pub use fiber::{Fiber, TearDownResult};
 pub use heap::{Closure, Heap, Object, Pointer};
+use itertools::Itertools;
 use rand::seq::SliceRandom;
 use tracing::{info, warn};
 use crate::vm::heap::Struct;
@@ -35,7 +36,7 @@ struct FiberId(usize);
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct OperationId(usize);
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 enum Channel {
     Internal(InternalChannel),
     External(ChannelId),
@@ -47,7 +48,7 @@ struct InternalChannel {
     pending_sends: VecDeque<(Option<FiberId>, Packet)>,
     pending_receives: VecDeque<Option<FiberId>>,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 struct Child {
     fiber: FiberId,
     return_channel: ChannelId,
@@ -460,6 +461,29 @@ impl fmt::Debug for Operation {
         }
     }
 }
+impl fmt::Debug for Channel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Internal(InternalChannel { buffer, pending_sends, pending_receives }) =>
+                f.debug_struct("InternalChannel")
+                    .field("buffer", buffer)
+                    .field("operations", 
+                        &pending_sends.iter()
+                            .map(|(fiber, packet)| Operation { performing_fiber: fiber.clone(), kind: OperationKind::Send { packet: packet.clone() } })
+                            .chain(pending_receives.iter().map(|fiber| Operation { performing_fiber: fiber.clone(), kind: OperationKind::Receive }))
+                            .collect_vec()
+                    )
+                    .finish(),
+            Self::External(arg0) => f.debug_tuple("External").field(arg0).finish(),
+            Self::Nursery { parent, children } => f.debug_struct("Nursery").field("parent", parent).field("children", children).finish(),
+        }
+    }
+}
+impl fmt::Debug for Child {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?} returning to {:?}", self.fiber, self.return_channel)
+    }
+}
 impl fmt::Debug for FiberTree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -475,7 +499,7 @@ impl fmt::Debug for Vm {
 }
 impl fmt::Debug for FiberId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:x}", self.0)
+        write!(f, "fiber_{:x}", self.0)
     }
 }
 
