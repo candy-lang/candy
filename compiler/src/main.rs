@@ -222,6 +222,7 @@ fn run(options: CandyRunOptions) {
             _ => break,
         }
     }
+    info!("Tree: {:#?}", vm);
     let TearDownResult {
         tracer,
         result,
