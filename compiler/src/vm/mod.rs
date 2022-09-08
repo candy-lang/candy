@@ -33,8 +33,23 @@ pub struct Vm {
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct FiberId(usize);
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-struct OperationId(usize);
+#[derive(Clone)]
+enum FiberTree {
+    /// This tree is currently focused on running a single fiber.
+    SingleFiber {
+        fiber: Fiber,
+        parent_nursery: Option<ChannelId>,
+    },
+
+    /// The fiber of this tree entered a `core.parallel` scope so that it's now
+    /// paused and waits for the parallel scope to end. Instead of the main
+    /// former single fiber, the tree now runs the closure passed to
+    /// `core.parallel` as well as any other spawned children.
+    ParallelSection {
+        paused_tree: Box<FiberTree>,
+        nursery: ChannelId,
+    },
+}
 
 #[derive(Clone)]
 enum Channel {
@@ -54,6 +69,9 @@ struct Child {
     return_channel: ChannelId,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct OperationId(usize);
+
 #[derive(Clone)]
 pub struct Operation {
     performing_fiber: Option<FiberId>,
@@ -63,24 +81,6 @@ pub struct Operation {
 pub enum OperationKind {
     Send { packet: Packet },
     Receive,
-}
-
-#[derive(Clone)]
-enum FiberTree {
-    /// This tree is currently focused on running a single fiber.
-    SingleFiber {
-        fiber: Fiber,
-        parent_nursery: Option<ChannelId>,
-    },
-
-    /// The fiber of this tree entered a `core.parallel` scope so that it's now
-    /// paused and waits for the parallel scope to end. Instead of the main
-    /// former single fiber, the tree now runs the closure passed to
-    /// `core.parallel` as well as any other spawned children.
-    ParallelSection {
-        paused_tree: Box<FiberTree>,
-        nursery: ChannelId,
-    },
 }
 
 #[derive(Clone, Debug)]
