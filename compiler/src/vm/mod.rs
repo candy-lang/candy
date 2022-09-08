@@ -23,6 +23,7 @@ pub struct Vm {
     fibers: HashMap<FiberId, FiberTree>,
     root_fiber: FiberId,
     
+    // TODO: Drop channels
     channels: HashMap<ChannelId, Channel>,
     pub external_operations: HashMap<ChannelId, Vec<Operation>>,
 
@@ -265,7 +266,9 @@ impl Vm {
                         }
                     },
                     Err(panic_reason) => {
-                        // TODO: Cancel other children.
+                        for child in children.clone() {
+                            self.cancel(child.fiber);
+                        }
                         Some(Err(panic_reason))
                     },
                 };
@@ -276,8 +279,18 @@ impl Vm {
                     paused_tree.as_single_fiber_mut().unwrap().complete_parallel_scope(result);
                     self.fibers.insert(parent_fiber_id, paused_tree);
                 }
-
             }
+        }
+    }
+    fn cancel(&mut self, fiber: FiberId) {
+        match self.fibers.remove(&fiber).unwrap() {
+            FiberTree::SingleFiber { .. } => {},
+            FiberTree::ParallelSection { nursery, .. } => {
+                let (_, children) = self.channels.remove(&nursery).unwrap().into_nursery().unwrap();
+                for child in children {
+                    self.cancel(child.fiber);
+                }
+            },
         }
     }
 
