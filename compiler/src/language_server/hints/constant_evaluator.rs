@@ -42,7 +42,7 @@ impl ConstantEvaluator {
         let mut running_vms = self
             .vms
             .iter_mut()
-            .filter(|(_, vm)| matches!(vm.status(), vm::Status::Running))
+            .filter(|(_, vm)| matches!(vm.status(), vm::Status::CanRun))
             .collect_vec();
         trace!(
             "Constant evaluator running. {} running VMs, {} in total.",

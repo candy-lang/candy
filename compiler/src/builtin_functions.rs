@@ -25,7 +25,13 @@ pub enum BuiltinFunction {
     IntShiftLeft,        // (value: int) (amount: int) -> (shifted: int)
     IntShiftRight,       // (value: int) (amount: int) -> (shifted: int)
     IntSubtract,         // (minuend: int) (subtrahend: int) -> (difference: int)
-    Parallel,            // bodyClosureTakingNursery -> resultOfClosure
+
+    /// Implementation note: Why does `✨.parallel` not return the value
+    /// directly? The current architecture is chosen to make the VM's code more
+    /// uniform – every nursery child just sends its result to a channel and
+    /// there's no special casing for the first child, the closure passed to
+    /// `✨.parallel`.
+    Parallel,            // (body: Closure, result: SendPort) -> Nothing
     Print,               // message -> Nothing
     StructGet,           // struct key -> value
     StructGetKeys,       // struct -> listOfKeys

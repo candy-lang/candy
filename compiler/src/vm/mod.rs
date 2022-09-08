@@ -85,7 +85,7 @@ pub enum OperationKind {
 
 #[derive(Clone, Debug)]
 pub enum Status {
-    Running,
+    CanRun,
     WaitingForOperations,
     Done,
     Panicked { reason: String },
@@ -122,7 +122,7 @@ impl Vm {
     fn status_of(&self, fiber: FiberId) -> Status {
         match &self.fibers[&fiber] {
             FiberTree::SingleFiber { fiber, .. } => match &fiber.status {
-                fiber::Status::Running => Status::Running,
+                fiber::Status::Running => Status::CanRun,
                 fiber::Status::Sending { .. } |
                 fiber::Status::Receiving { .. } => Status::WaitingForOperations,
                 fiber::Status::CreatingChannel { .. } |
@@ -131,16 +131,17 @@ impl Vm {
                 fiber::Status::Panicked { reason } => Status::Panicked { reason: reason.clone() },
             },
             FiberTree::ParallelSection { nursery, .. } => {
-                let children = self.channels[nursery].as_nursery_children().unwrap();
-                if children.is_empty() {
+                // The section is still running, otherwise it would have been removed.
+                let (_, children) = self.channels[nursery].as_nursery().unwrap();
+                if children.is_empty() { // TODO: Remove
                     return Status::Done;
                 }
                 for child in children {
                     match self.status_of(child.fiber) {
-                        Status::Running => return Status::Running,
+                        Status::CanRun => return Status::CanRun,
                         Status::WaitingForOperations => {},
-                        Status::Done => continue,
-                        Status::Panicked { reason } => return Status::Panicked { reason },
+                        Status::Done => continue, // TODO: Make unreachable
+                        Status::Panicked { reason } => return Status::Panicked { reason }, // TODO: Make unreachable
                     };
                 }
                 Status::WaitingForOperations
@@ -148,7 +149,7 @@ impl Vm {
         }
     }
     fn is_running(&self) -> bool {
-        matches!(self.status(), Status::Running)
+        matches!(self.status(), Status::CanRun)
     }
     fn is_finished(&self) -> bool {
         matches!(self.status(), Status::Done | Status::Panicked { .. })
@@ -169,7 +170,7 @@ impl Vm {
             match self.fibers.get_mut(&fiber_id).unwrap() {
                 FiberTree::SingleFiber { fiber, .. } => break fiber,
                 FiberTree::ParallelSection { nursery, .. } => {
-                    let children = self.channels.get_mut(&nursery).unwrap().as_nursery_children_mut().unwrap();
+                    let (_, children) = self.channels.get_mut(&nursery).unwrap().as_nursery_mut().unwrap();
                     fiber_id = children
                         .choose(&mut rand::thread_rng()).unwrap().fiber;
                 },
@@ -237,36 +238,45 @@ impl Vm {
                 true
             },
         };
-        
+
         if is_finished && fiber_id != self.root_fiber {
             let fiber = self.fibers.remove(&fiber_id).unwrap();
-            let (fiber, parent_nursery) = match fiber {
+            let (fiber, parent_nursery_id) = match fiber {
                 FiberTree::SingleFiber { fiber, parent_nursery } => (fiber, parent_nursery),
                 _ => unreachable!(),
             };
             let TearDownResult { heap, result, .. } = fiber.tear_down();
 
-            if let Some(nursery) = parent_nursery {
-                let children = self.channels.get_mut(&nursery).unwrap().as_nursery_children_mut().unwrap();
+            if let Some(parent_nursery_id) = parent_nursery_id {
+                let (parent_fiber_id, children) = self.channels.get_mut(&parent_nursery_id).unwrap().as_nursery_mut().unwrap();
                 // TODO: Turn children into map to make this less awkward.
                 let index = children.iter_mut().position(|child| child.fiber == fiber_id).unwrap();
                 let child = children.remove(index);
-                let is_finished = children.is_empty();
 
-                match result {
-                    Ok(return_value) => self.send_to_channel(None, child.return_channel, Packet { heap, value: return_value }),
+                let parallel_section_result = match result {
+                    Ok(return_value) => {
+                        let is_finished = children.is_empty();
+                        self.send_to_channel(None, child.return_channel, Packet { heap, value: return_value });
+
+                        if is_finished {
+                            Some(Ok(()))
+                        } else {
+                            None
+                        }
+                    },
                     Err(panic_reason) => {
-                        // TODO: Handle panicking parallel section.
+                        // TODO: Cancel other children.
+                        Some(Err(panic_reason))
                     },
                 };
 
-                if is_finished {
-                    let (parent, _) = self.channels.remove(&nursery).unwrap().into_nursery().unwrap();
-
-                    let (mut paused_tree, _) = self.fibers.remove(&parent).unwrap().into_parallel_section().unwrap();
-                    paused_tree.as_single_fiber_mut().unwrap().complete_parallel_scope();
-                    self.fibers.insert(parent, paused_tree);
+                if let Some(result) = parallel_section_result {
+                    let (parent_fiber_id, _) = self.channels.remove(&parent_nursery_id).unwrap().into_nursery().unwrap();
+                    let (mut paused_tree, _) = self.fibers.remove(&parent_fiber_id).unwrap().into_parallel_section().unwrap();
+                    paused_tree.as_single_fiber_mut().unwrap().complete_parallel_scope(result);
+                    self.fibers.insert(parent_fiber_id, paused_tree);
                 }
+
             }
         }
     }
@@ -415,15 +425,15 @@ impl Channel {
             _ => None,
         }
     }
-    fn as_nursery_children(&self) -> Option<&Vec<Child>> {
+    fn as_nursery(&self) -> Option<(&FiberId, &Vec<Child>)> {
         match self {
-            Channel::Nursery { children, .. } => Some(children),
+            Channel::Nursery { parent, children } => Some((parent, children)),
             _ => None,
         }
     }
-    fn as_nursery_children_mut(&mut self) -> Option<&mut Vec<Child>> {
+    fn as_nursery_mut(&mut self) -> Option<(&mut FiberId, &mut Vec<Child>)> {
         match self {
-            Channel::Nursery { children, .. } => Some(children),
+            Channel::Nursery { parent, children } => Some((parent, children)),
             _ => None,
         }
     }

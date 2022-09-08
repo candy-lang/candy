@@ -76,7 +76,7 @@ impl Fuzzer {
     fn map_status<C: Context>(&self, status: Status, db: &Database, context: &mut C) -> Status {
         match status {
             Status::StillFuzzing { mut vm, arguments } => match vm.status() {
-                vm::Status::Running => {
+                vm::Status::CanRun => {
                     vm.run(context);
                     Status::StillFuzzing { vm, arguments }
                 }

@@ -208,7 +208,7 @@ fn run(options: CandyRunOptions) {
     loop {
         info!("Tree: {:#?}", vm);
         match vm.status() {
-            Status::Running => {
+            Status::CanRun => {
                 debug!("VM still running.");
                 vm.run(&mut ModularContext {
                     use_provider: DbUseProvider { db: &db },

@@ -166,9 +166,14 @@ impl Fiber {
         self.data_stack.push(address);
         self.status = Status::Running;
     }
-    pub fn complete_parallel_scope(&mut self) {
-        self.data_stack.push(self.heap.create_nothing());
-        self.status = Status::Running;
+    pub fn complete_parallel_scope(&mut self, result: Result<(), String>) {
+        match result {
+            Ok(()) => {
+                self.data_stack.push(self.heap.create_nothing());
+                self.status = Status::Running;
+            },
+            Err(reason) => self.panic(reason),
+        }
     }
 
     fn get_from_data_stack(&self, offset: usize) -> Pointer {
