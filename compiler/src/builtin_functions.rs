@@ -46,6 +46,7 @@ pub enum BuiltinFunction {
     TextStartsWith,      // text (pattern: text) -> booleanSymbol
     TextTrimEnd,         // text -> text
     TextTrimStart,       // text -> text
+    Try,                 // closure -> okWithClosureResultOrErrorWithPanicReason
     TypeOf,              // any -> typeSymbol
 }
 lazy_static! {

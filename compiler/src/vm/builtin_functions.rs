@@ -58,6 +58,7 @@ impl Fiber {
             BuiltinFunction::TextStartsWith => self.heap.text_starts_with(args),
             BuiltinFunction::TextTrimEnd => self.heap.text_trim_end(args),
             BuiltinFunction::TextTrimStart => self.heap.text_trim_start(args),
+            BuiltinFunction::Try => self.heap.try_(args),
             BuiltinFunction::TypeOf => self.heap.type_of(args),
         });
         match result {
@@ -69,14 +70,14 @@ impl Fiber {
             Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
             Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
-            Ok(Parallel {
-                body,
-                return_channel,
-            }) => {
+            Ok(Parallel { body, return_channel }) => {
                 self.status = Status::InParallelScope {
                     body,
                     return_channel,
                 }
+            }
+            Ok(Try { body }) => {
+                self.status = Status::InTry { body }
             }
             Err(reason) => self.panic(reason),
         }
@@ -103,6 +104,7 @@ enum SuccessfulBehavior {
         body: Pointer,
         return_channel: ChannelId,
     },
+    Try { body: Pointer }
 }
 use SuccessfulBehavior::*;
 
@@ -417,6 +419,12 @@ impl Heap {
     fn text_trim_start(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
             Return(self.create_text(text.value.trim_start().to_string()))
+        })
+    }
+
+    fn try_(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack!(self, args, |body: Closure| {
+            Try { body: body.address }
         })
     }
 

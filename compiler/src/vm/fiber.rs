@@ -52,6 +52,7 @@ pub enum Status {
         body: Pointer,
         return_channel: ChannelId,
     },
+    InTry { body: Pointer },
     Done,
     Panicked {
         reason: String,
@@ -174,6 +175,22 @@ impl Fiber {
             },
             Err(reason) => self.panic(reason),
         }
+    }
+    pub fn complete_try(&mut self, result: Result<Packet, String>) {
+        let result = match result {
+            Ok(Packet { heap, value: return_value }) => {
+                let ok = self.heap.create_symbol("Ok".to_string());
+                let return_value = heap.clone_single_to_other_heap(&mut self.heap, return_value);
+                self.heap.create_list(&[ok, return_value])
+            },
+            Err(panic_reason) => {
+                let err = self.heap.create_symbol("Err".to_string());
+                let reason = self.heap.create_text(panic_reason);
+                self.heap.create_list(&[err, reason])
+            },
+        };
+        self.data_stack.push(result);
+        self.status = Status::Running;
     }
 
     fn get_from_data_stack(&self, offset: usize) -> Pointer {
