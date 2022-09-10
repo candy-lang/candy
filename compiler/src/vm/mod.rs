@@ -8,11 +8,10 @@ mod use_module;
 
 use std::{marker::PhantomData, collections::{HashMap, VecDeque}, fmt};
 pub use fiber::{Fiber, TearDownResult};
-pub use heap::{Closure, Heap, Object, Pointer};
+pub use heap::{Closure, Heap, Object, Pointer, Struct};
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use tracing::{info, warn};
-use crate::vm::heap::Struct;
 use self::{heap::{ChannelId, SendPort}, channel::{ChannelBuf, Packet}, context::Context, tracer::Tracer};
 
 /// A VM represents a Candy program that thinks it's currently running. Because
@@ -171,6 +170,12 @@ impl Vm {
     }
     pub fn cloned_tracer(&self) -> Tracer {
         self.fiber().tracer.clone()
+    }
+
+    pub fn create_channel(&mut self) -> ChannelId {
+        let id = self.channel_id_generator.generate();
+        self.channels.insert(id, Channel::External);
+        id
     }
 
     pub fn run<C: Context>(&mut self, context: &mut C) {

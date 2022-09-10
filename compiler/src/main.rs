@@ -28,7 +28,7 @@ use crate::{
     module::{Module, ModuleKind},
     vm::{
         context::{DbUseProvider, ModularContext, RunForever},
-        Closure, Vm, TearDownResult, Status,
+        Closure, Vm, TearDownResult, Status, Struct,
     },
 };
 use compiler::lir::Lir;
@@ -39,7 +39,7 @@ use std::{
     env::current_dir,
     path::PathBuf,
     sync::{mpsc::channel, Arc},
-    time::Duration,
+    time::Duration, convert::TryInto, collections::HashMap,
 };
 use structopt::StructOpt;
 use tower_lsp::{LspService, Server};
@@ -226,24 +226,79 @@ fn run(options: CandyRunOptions) {
     let TearDownResult {
         tracer,
         result,
+        mut heap,
+        ..
+    } = vm.tear_down();
+
+    if options.debug {
+        module.dump_associated_debug_file("trace", &tracer.format_call_tree(&heap));
+    }
+
+    let exported_definitions: Struct = match result {
+        Ok(return_value) => {
+            info!(
+                "The module exports these definitions: {}",
+                return_value.format(&heap),
+            );
+            heap.get(return_value).data.clone().try_into().unwrap()
+    },
+        Err(reason) => {
+            error!("The module panicked because {reason}.");
+            error!("This is the stack trace:");
+            tracer.dump_stack_trace(&db, &heap);
+            return;
+        }
+    };
+
+    let main = heap.create_symbol("Main".to_string());
+    let main = match exported_definitions.get(&heap, main) {
+        Some(main) => main,
+        None => {
+            error!("The module doesn't contain a main function.");
+            return;
+        },
+    };
+
+    info!("Running main function.");
+    // TODO: Add environment stuff.
+    let environment = heap.create_struct(HashMap::new());
+    let mut vm = Vm::new_for_running_closure(heap, main, &[environment]);
+    loop {
+        info!("Tree: {:#?}", vm);
+        match vm.status() {
+            Status::CanRun => {
+                debug!("VM still running.");
+                vm.run(&mut ModularContext {
+                    use_provider: DbUseProvider { db: &db },
+                    execution_controller: RunForever,
+                });
+                // TODO: handle operations
+            },
+            Status::WaitingForOperations => {
+                todo!("VM can't proceed until some operations complete.");
+            },
+            _ => break,
+        }
+    }
+    info!("Tree: {:#?}", vm);
+    let TearDownResult {
+        tracer,
+        result,
         heap,
         ..
     } = vm.tear_down();
 
     match result {
         Ok(return_value) => info!(
-            "The module exports these definitions: {}",
+            "The main function returned: {}",
             return_value.format(&heap)
         ),
         Err(reason) => {
-            error!("The module panicked because {reason}.");
+            error!("The main function panicked because {reason}.");
             error!("This is the stack trace:");
             tracer.dump_stack_trace(&db, &heap);
+            return;
         }
-    }
-
-    if options.debug {
-        module.dump_associated_debug_file("trace", &tracer.format_call_tree(&heap));
     }
 }
 
