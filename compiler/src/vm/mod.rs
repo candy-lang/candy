@@ -19,6 +19,7 @@ use rand::seq::SliceRandom;
 use std::{
     collections::{HashMap, VecDeque},
     fmt,
+    hash::Hash,
     marker::PhantomData,
 };
 use tracing::{info, warn};
@@ -148,13 +149,9 @@ impl Vm {
         Self::new_with_fiber(Fiber::new_for_running_module_closure(closure))
     }
     pub fn tear_down(mut self) -> TearDownResult {
-        let fiber = self
-            .fibers
-            .remove(&self.root_fiber)
-            .unwrap()
-            .into_single()
-            .unwrap();
-        fiber.fiber.tear_down()
+        let tree = self.fibers.remove(&self.root_fiber).unwrap();
+        let single = tree.into_single().unwrap();
+        single.fiber.tear_down()
     }
 
     pub fn status(&self) -> Status {
@@ -280,24 +277,17 @@ impl Vm {
                     id
                 };
 
-                // TODO: Create utility method for removing and adding under same ID.
-                let paused_fiber = self
-                    .fibers
-                    .remove(&fiber_id)
-                    .unwrap()
-                    .into_single()
-                    .unwrap();
-                self.fibers.insert(
-                    fiber_id,
+                self.fibers.replace(fiber_id, |tree| {
+                    let single = tree.into_single().unwrap();
                     FiberTree::Parallel(Parallel {
-                        paused_fiber,
+                        paused_fiber: single,
                         children: [(first_child_id, ChildKind::InitialChild)]
                             .into_iter()
                             .collect(),
                         return_value: None,
                         nursery: nursery_id,
-                    }),
-                );
+                    })
+                });
 
                 false
             }
@@ -316,19 +306,13 @@ impl Vm {
                     id
                 };
 
-                let paused_fiber = self
-                    .fibers
-                    .remove(&fiber_id)
-                    .unwrap()
-                    .into_single()
-                    .unwrap();
-                self.fibers.insert(
-                    fiber_id,
+                self.fibers.replace(fiber_id, |tree| {
+                    let single = tree.into_single().unwrap();
                     FiberTree::Try(Try {
-                        paused_fiber,
+                        paused_fiber: single,
                         child: child_id,
-                    }),
-                );
+                    })
+                });
 
                 false
             }
@@ -343,12 +327,8 @@ impl Vm {
         };
 
         if is_finished && fiber_id != self.root_fiber {
-            let single = self
-                .fibers
-                .remove(&fiber_id)
-                .unwrap()
-                .into_single()
-                .unwrap();
+            let tree = self.fibers.remove(&fiber_id).unwrap();
+            let single = tree.into_single().unwrap();
             let TearDownResult { heap, result, .. } = single.fiber.tear_down();
 
             let parent_id = single
@@ -389,31 +369,22 @@ impl Vm {
                     };
 
                     if let Some(result) = result_of_parallel {
-                        self.channels
-                            .remove(&nursery)
-                            .unwrap()
-                            .to_nursery()
-                            .unwrap();
-                        let Parallel {
-                            mut paused_fiber, ..
-                        } = self
-                            .fibers
-                            .remove(&parent_id)
-                            .unwrap()
-                            .into_parallel()
-                            .unwrap();
-                        paused_fiber.fiber.complete_parallel_scope(result);
-                        self.fibers
-                            .insert(parent_id, FiberTree::Single(paused_fiber));
+                        self.channels.remove(&nursery).unwrap();
+                        self.fibers.replace(parent_id, |tree| {
+                            let mut paused_fiber = tree.into_parallel().unwrap().paused_fiber;
+                            paused_fiber.fiber.complete_parallel_scope(result);
+                            FiberTree::Single(paused_fiber)
+                        });
                     }
                 }
                 FiberTree::Try(Try { .. }) => {
-                    let Try {
-                        mut paused_fiber, ..
-                    } = self.fibers.remove(&parent_id).unwrap().into_try().unwrap();
-                    paused_fiber
-                        .fiber
-                        .complete_try(result.map(|value| Packet { heap, value }));
+                    self.fibers.replace(parent_id, |tree| {
+                        let mut paused_fiber = tree.into_try().unwrap().paused_fiber;
+                        paused_fiber
+                            .fiber
+                            .complete_try(result.map(|value| Packet { heap, value }));
+                        FiberTree::Single(paused_fiber)
+                    });
                 }
             }
         }
@@ -460,7 +431,7 @@ impl Vm {
                     match Self::parse_spawn_packet(packet) {
                         Some(it) => it,
                         None => {
-                            // The nursery received an invalid message. TODO: Panic.
+                            // The nursery received an invalid message. TODO: Handle this.
                             panic!("A nursery received an invalid message.");
                         }
                     };
@@ -755,5 +726,16 @@ impl<T: From<usize>> IdGenerator<T> {
         let id = self.next_id;
         self.next_id += 1;
         id.into()
+    }
+}
+
+trait ReplaceHashMapValue<K, V> {
+    fn replace<F: FnOnce(V) -> V>(&mut self, key: K, replacer: F);
+}
+impl<K: Eq + Hash, V> ReplaceHashMapValue<K, V> for HashMap<K, V> {
+    fn replace<F: FnOnce(V) -> V>(&mut self, key: K, replacer: F) {
+        let value = self.remove(&key).unwrap();
+        let value = replacer(value);
+        self.insert(key, value);
     }
 }
