@@ -28,7 +28,7 @@ use crate::{
     module::{Module, ModuleKind},
     vm::{
         context::{DbUseProvider, ModularContext, RunForever},
-        Closure, Vm, Status, TearDownResult, Struct,
+        Closure, Status, Struct, TearDownResult, Vm,
     },
 };
 use compiler::lir::Lir;
@@ -36,10 +36,12 @@ use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use notify::{watcher, RecursiveMode, Watcher};
 use std::{
+    collections::HashMap,
+    convert::TryInto,
     env::current_dir,
     path::PathBuf,
     sync::{mpsc::channel, Arc},
-    time::Duration, convert::TryInto, collections::HashMap,
+    time::Duration,
 };
 use structopt::StructOpt;
 use tower_lsp::{LspService, Server};
@@ -215,10 +217,10 @@ fn run(options: CandyRunOptions) {
                     execution_controller: RunForever,
                 });
                 // TODO: handle operations
-            },
+            }
             Status::WaitingForOperations => {
                 todo!("VM can't proceed until some operations complete.");
-            },
+            }
             _ => break,
         }
     }
@@ -241,7 +243,7 @@ fn run(options: CandyRunOptions) {
                 return_value.format(&heap),
             );
             heap.get(return_value).data.clone().try_into().unwrap()
-    },
+        }
         Err(reason) => {
             error!("The module panicked because {reason}.");
             error!("This is the stack trace:");
@@ -256,7 +258,7 @@ fn run(options: CandyRunOptions) {
         None => {
             error!("The module doesn't contain a main function.");
             return;
-        },
+        }
     };
 
     info!("Running main function.");
@@ -273,10 +275,10 @@ fn run(options: CandyRunOptions) {
                     execution_controller: RunForever,
                 });
                 // TODO: handle operations
-            },
+            }
             Status::WaitingForOperations => {
                 todo!("VM can't proceed until some operations complete.");
-            },
+            }
             _ => break,
         }
     }
@@ -289,15 +291,11 @@ fn run(options: CandyRunOptions) {
     } = vm.tear_down();
 
     match result {
-        Ok(return_value) => info!(
-            "The main function returned: {}",
-            return_value.format(&heap)
-        ),
+        Ok(return_value) => info!("The main function returned: {}", return_value.format(&heap)),
         Err(reason) => {
             error!("The main function panicked because {reason}.");
             error!("This is the stack trace:");
             tracer.dump_stack_trace(&db, &heap);
-            return;
         }
     }
 }

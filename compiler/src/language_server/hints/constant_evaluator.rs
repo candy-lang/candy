@@ -10,9 +10,10 @@ use crate::{
     language_server::hints::{utils::id_to_end_of_line, HintKind},
     module::Module,
     vm::{
+        self,
         context::{DbUseProvider, ModularContext, RunLimitedNumberOfInstructions},
         tracer::TraceEntry,
-        Closure, Vm, Heap, Pointer, self,
+        Closure, Heap, Pointer, Vm,
     },
 };
 use itertools::Itertools;
@@ -27,9 +28,8 @@ pub struct ConstantEvaluator {
 
 impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
-        let vm = Vm::new_for_running_module_closure(
-            Closure::of_module(db, module.clone()).unwrap(),
-        );
+        let vm =
+            Vm::new_for_running_module_closure(Closure::of_module(db, module.clone()).unwrap());
         self.vms.insert(module, vm);
     }
 
@@ -54,7 +54,7 @@ impl ConstantEvaluator {
             vm.run(&mut ModularContext {
                 use_provider: DbUseProvider { db },
                 execution_controller: RunLimitedNumberOfInstructions::new(500),
-            }, todo!());
+            });
             Some(module.clone())
         } else {
             None

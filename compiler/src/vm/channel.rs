@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use super::{Heap, Pointer};
 use std::{collections::VecDeque, fmt};
 
@@ -47,7 +46,9 @@ impl ChannelBuf {
     }
 
     pub fn receive(&mut self) -> Packet {
-        self.packets.pop_front().expect("Tried to receive from channel that is empty.")
+        self.packets
+            .pop_front()
+            .expect("Tried to receive from channel that is empty.")
     }
 }
 

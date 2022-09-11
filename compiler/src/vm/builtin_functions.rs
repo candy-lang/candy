@@ -70,15 +70,16 @@ impl Fiber {
             Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
             Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
-            Ok(Parallel { body, return_channel }) => {
+            Ok(Parallel {
+                body,
+                return_channel,
+            }) => {
                 self.status = Status::InParallelScope {
                     body,
                     return_channel,
                 }
             }
-            Ok(Try { body }) => {
-                self.status = Status::InTry { body }
-            }
+            Ok(Try { body }) => self.status = Status::InTry { body },
             Err(reason) => self.panic(reason),
         }
     }
@@ -104,7 +105,9 @@ enum SuccessfulBehavior {
         body: Pointer,
         return_channel: ChannelId,
     },
-    Try { body: Pointer }
+    Try {
+        body: Pointer,
+    },
 }
 use SuccessfulBehavior::*;
 
@@ -423,9 +426,7 @@ impl Heap {
     }
 
     fn try_(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack!(self, args, |body: Closure| {
-            Try { body: body.address }
-        })
+        unpack!(self, args, |body: Closure| { Try { body: body.address } })
     }
 
     fn type_of(&mut self, args: &[Pointer]) -> BuiltinResult {
