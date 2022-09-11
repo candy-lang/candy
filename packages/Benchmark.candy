@@ -33,3 +33,6 @@ core.parallel { nursery ->
   core.async nursery { ✨.print "Banana" }
   ✨.print "Hi"
 }
+
+main environment :=
+  ✨.print "Hello, world!"
