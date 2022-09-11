@@ -38,27 +38,13 @@ pub struct Fiber {
 #[derive(Clone, Debug)]
 pub enum Status {
     Running,
-    CreatingChannel {
-        capacity: Capacity,
-    },
-    Sending {
-        channel: ChannelId,
-        packet: Packet,
-    },
-    Receiving {
-        channel: ChannelId,
-    },
-    InParallelScope {
-        body: Pointer,
-        return_channel: ChannelId,
-    },
-    InTry {
-        body: Pointer,
-    },
+    CreatingChannel { capacity: Capacity },
+    Sending { channel: ChannelId, packet: Packet },
+    Receiving { channel: ChannelId },
+    InParallelScope { body: Pointer },
+    InTry { body: Pointer },
     Done,
-    Panicked {
-        reason: String,
-    },
+    Panicked { reason: String },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

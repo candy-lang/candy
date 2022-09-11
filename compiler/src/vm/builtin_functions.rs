@@ -70,15 +70,7 @@ impl Fiber {
             Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
             Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
-            Ok(Parallel {
-                body,
-                return_channel,
-            }) => {
-                self.status = Status::InParallelScope {
-                    body,
-                    return_channel,
-                }
-            }
+            Ok(Parallel { body }) => self.status = Status::InParallelScope { body },
             Ok(Try { body }) => self.status = Status::InTry { body },
             Err(reason) => self.panic(reason),
         }
@@ -88,26 +80,12 @@ impl Fiber {
 type BuiltinResult = Result<SuccessfulBehavior, String>;
 enum SuccessfulBehavior {
     Return(Pointer),
-    DivergeControlFlow {
-        closure: Pointer,
-    },
-    CreateChannel {
-        capacity: Capacity,
-    },
-    Send {
-        channel: ChannelId,
-        packet: Packet,
-    },
-    Receive {
-        channel: ChannelId,
-    },
-    Parallel {
-        body: Pointer,
-        return_channel: ChannelId,
-    },
-    Try {
-        body: Pointer,
-    },
+    DivergeControlFlow { closure: Pointer },
+    CreateChannel { capacity: Capacity },
+    Send { channel: ChannelId, packet: Packet },
+    Receive { channel: ChannelId },
+    Parallel { body: Pointer },
+    Try { body: Pointer },
 }
 use SuccessfulBehavior::*;
 
@@ -310,17 +288,14 @@ impl Heap {
     }
 
     fn parallel(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(
-            self,
-            args,
-            |body_taking_nursery: Closure, return_channel: SendPort| {
-                self.dup(body_taking_nursery.address);
-                Parallel {
-                    body: body_taking_nursery.address,
-                    return_channel: return_channel.channel,
-                }
+        unpack!(self, args, |body_taking_nursery: Closure| {
+            if body_taking_nursery.num_args != 1 {
+                return Err("Parallel expects a closure that takes a nursery.".to_string());
             }
-        )
+            Parallel {
+                body: body_taking_nursery.address,
+            }
+        })
     }
 
     fn print(&mut self, args: &[Pointer]) -> BuiltinResult {

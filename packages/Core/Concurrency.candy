@@ -4,11 +4,7 @@ structGet = (use "..Struct").getUnwrap
 
 parallel body := 
   needs (function.is1 body)
-  returnChannel = channel.create 1
-  returnSendPort = structGet returnChannel 0
-  returnReceivePort = structGet returnChannel 1
-  ✨.parallel body returnSendPort
-  channel.receive returnReceivePort
+  ✨.parallel body
 
 async nursery body :=
   needs (channel.isSendPort nursery)
