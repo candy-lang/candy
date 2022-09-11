@@ -55,30 +55,34 @@ enum FiberTree {
 
     Try(Try),
 }
+
+/// Single fibers are the leafs of the fiber tree.
 #[derive(Clone)]
 struct Single {
     fiber: Fiber,
     parent: Option<FiberId>,
 }
+
+/// When a parallel section is entered, the fiber that started the section is
+/// paused. Instead, the children of the parallel section are run. Initially,
+/// there's only one child – the closure given to the parallel builtin function.
+/// Using the nursery parameter (a nursery can be thought of as a pointer to a
+/// parallel section), you can also spawn other fibers. In contrast to the first
+/// child, those children also have an explicit send port where the closure's
+/// result is sent to.
 #[derive(Clone)]
 struct Parallel {
     paused_fiber: Single,
-    children: Vec<Child>,
-    return_value: Option<Packet>,
+    children: HashMap<FiberId, ChildKind>,
+    return_value: Option<Packet>, // will later contain the body's return value
     nursery: ChannelId,
 }
 #[derive(Clone)]
-struct Child {
-    fiber: FiberId,
-
-    /// Most children of a nursery are spawned by sending a packet of the form
-    /// `[Closure: someClosure, ReturnChannel: someSendPort]` to the nursery –
-    /// the `core.async` function internally creates a channel, then sends this
-    /// packet, and finally returns the channel's receive port.
-    /// The child that doesn't have a return channel is the first child, which
-    /// is the body of the `✨.parallel` call.
-    return_channel: Option<ChannelId>,
+enum ChildKind {
+    InitialChild,
+    SpawnedChild(ChannelId),
 }
+
 #[derive(Clone)]
 struct Try {
     paused_fiber: Single,
@@ -172,8 +176,8 @@ impl Vm {
                 },
             },
             FiberTree::Parallel(Parallel { children, .. }) => {
-                for child in children {
-                    match self.status_of(child.fiber) {
+                for child_fiber in children.keys() {
+                    match self.status_of(*child_fiber) {
                         Status::CanRun => return Status::CanRun,
                         Status::WaitingForOperations => {}
                         Status::Done | Status::Panicked { .. } => unreachable!(),
@@ -219,7 +223,9 @@ impl Vm {
             match self.fibers.get_mut(&fiber_id).unwrap() {
                 FiberTree::Single(Single { fiber, .. }) => break fiber,
                 FiberTree::Parallel(Parallel { children, .. }) => {
-                    fiber_id = children.choose(&mut rand::thread_rng()).unwrap().fiber;
+                    let children_as_vec = children.iter().collect_vec();
+                    let random_child = children_as_vec.choose(&mut rand::thread_rng()).unwrap();
+                    fiber_id = *random_child.0
                 }
                 FiberTree::Try(Try { child, .. }) => fiber_id = *child,
             }
@@ -275,7 +281,6 @@ impl Vm {
                 };
 
                 // TODO: Create utility method for removing and adding under same ID.
-                // TODO: Make it so that the initial fiber doesn't need a return channel.
                 let paused_fiber = self
                     .fibers
                     .remove(&fiber_id)
@@ -286,10 +291,9 @@ impl Vm {
                     fiber_id,
                     FiberTree::Parallel(Parallel {
                         paused_fiber,
-                        children: vec![Child {
-                            fiber: first_child_id,
-                            return_channel: None,
-                        }],
+                        children: [(first_child_id, ChildKind::InitialChild)]
+                            .into_iter()
+                            .collect(),
                         return_value: None,
                         nursery: nursery_id,
                     }),
@@ -347,74 +351,69 @@ impl Vm {
                 .unwrap();
             let TearDownResult { heap, result, .. } = single.fiber.tear_down();
 
-            // TODO: Are there non-root fibers without parents?
-            if let Some(parent_id) = single.parent {
-                match self.fibers.get_mut(&parent_id).unwrap() {
-                    FiberTree::Single(_) => unreachable!(),
-                    FiberTree::Parallel(parallel) => {
-                        // TODO: Turn children into map to make this less awkward.
-                        let index = parallel
-                            .children
-                            .iter_mut()
-                            .position(|child| child.fiber == fiber_id)
-                            .unwrap();
-                        let child = parallel.children.remove(index);
-                        let nursery = parallel.nursery;
+            let parent_id = single
+                .parent
+                .expect("we already checked we're not the root fiber");
+            match self.fibers.get_mut(&parent_id).unwrap() {
+                FiberTree::Single(_) => unreachable!(),
+                FiberTree::Parallel(parallel) => {
+                    let child = parallel.children.remove(&fiber_id).unwrap();
+                    let nursery = parallel.nursery;
 
-                        let result_of_parallel = match result {
-                            Ok(return_value) => {
-                                let is_finished = parallel.children.is_empty();
-                                let packet = Packet {
-                                    heap,
-                                    value: return_value,
-                                };
-                                if let Some(return_channel) = child.return_channel {
-                                    self.send_to_channel(None, return_channel, packet);
-                                } else {
-                                    parallel.return_value = Some(packet);
-                                }
-
-                                if is_finished {
-                                    Some(Ok(()))
-                                } else {
-                                    None
+                    let result_of_parallel = match result {
+                        Ok(return_value) => {
+                            let is_finished = parallel.children.is_empty();
+                            let packet = Packet {
+                                heap,
+                                value: return_value,
+                            };
+                            match child {
+                                ChildKind::InitialChild => parallel.return_value = Some(packet),
+                                ChildKind::SpawnedChild(return_channel) => {
+                                    self.send_to_channel(None, return_channel, packet)
                                 }
                             }
-                            Err(panic_reason) => {
-                                for child in parallel.children.clone() {
-                                    self.cancel(child.fiber);
-                                }
-                                Some(Err(panic_reason))
-                            }
-                        };
 
-                        if let Some(result) = result_of_parallel {
-                            self.channels
-                                .remove(&nursery)
-                                .unwrap()
-                                .to_nursery()
-                                .unwrap();
-                            let Parallel {
-                                mut paused_fiber, ..
-                            } = self
-                                .fibers
-                                .remove(&parent_id)
-                                .unwrap()
-                                .into_parallel()
-                                .unwrap();
-                            paused_fiber.fiber.complete_parallel_scope(result);
-                            self.fibers
-                                .insert(parent_id, FiberTree::Single(paused_fiber));
+                            if is_finished {
+                                Some(Ok(()))
+                            } else {
+                                None
+                            }
                         }
-                    }
-                    FiberTree::Try(Try { .. }) => {
-                        let Try {
+                        Err(panic_reason) => {
+                            for fiber_id in parallel.children.clone().into_keys() {
+                                self.cancel(fiber_id);
+                            }
+                            Some(Err(panic_reason))
+                        }
+                    };
+
+                    if let Some(result) = result_of_parallel {
+                        self.channels
+                            .remove(&nursery)
+                            .unwrap()
+                            .to_nursery()
+                            .unwrap();
+                        let Parallel {
                             mut paused_fiber, ..
-                        } = self.fibers.remove(&parent_id).unwrap().into_try().unwrap();
-                        paused_fiber
-                            .fiber
-                            .complete_try(result.map(|value| Packet { heap, value }));
+                        } = self
+                            .fibers
+                            .remove(&parent_id)
+                            .unwrap()
+                            .into_parallel()
+                            .unwrap();
+                        paused_fiber.fiber.complete_parallel_scope(result);
+                        self.fibers
+                            .insert(parent_id, FiberTree::Single(paused_fiber));
                     }
+                }
+                FiberTree::Try(Try { .. }) => {
+                    let Try {
+                        mut paused_fiber, ..
+                    } = self.fibers.remove(&parent_id).unwrap().into_try().unwrap();
+                    paused_fiber
+                        .fiber
+                        .complete_try(result.map(|value| Packet { heap, value }));
                 }
             }
         }
@@ -430,8 +429,8 @@ impl Vm {
                     .unwrap()
                     .to_nursery()
                     .unwrap();
-                for child in children {
-                    self.cancel(child.fiber);
+                for child_fiber in children.keys() {
+                    self.cancel(*child_fiber);
                 }
             }
             FiberTree::Try(Try { child, .. }) => self.cancel(child),
@@ -480,10 +479,9 @@ impl Vm {
                     .unwrap()
                     .as_parallel_mut()
                     .unwrap();
-                parent.children.push(Child {
-                    fiber: child_id,
-                    return_channel: Some(return_channel),
-                });
+                parent
+                    .children
+                    .insert(child_id, ChildKind::SpawnedChild(return_channel));
 
                 InternalChannel::complete_send(&mut self.fibers, performing_fiber);
             }
@@ -683,9 +681,12 @@ impl fmt::Debug for FiberTree {
         }
     }
 }
-impl fmt::Debug for Child {
+impl fmt::Debug for ChildKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?} returning to {:?}", self.fiber, self.return_channel)
+        match self {
+            ChildKind::InitialChild => write!(f, "is initial child"),
+            ChildKind::SpawnedChild(return_channel) => write!(f, "returns to {:?}", return_channel),
+        }
     }
 }
 impl fmt::Debug for Channel {
