@@ -2,7 +2,7 @@ use super::{generator::generate_n_values, utils::did_need_in_closure_cause_panic
 use crate::{
     compiler::hir,
     database::Database,
-    vm::{context::Context, tracer::Tracer, tree, Closure, FiberTree, Heap, Pointer},
+    vm::{context::Context, tracer::Tracer, Closure, Vm, Heap, Pointer, self},
 };
 use std::mem;
 
@@ -18,7 +18,7 @@ pub enum Status {
     // stuff, we'll never find the errors if we accidentally first choose an
     // input that triggers the loop.
     StillFuzzing {
-        vm: FiberTree,
+        vm: Vm,
         arguments: Vec<Pointer>,
     },
     // TODO: In the future, also add a state for trying to simplify the
@@ -42,7 +42,7 @@ impl Status {
         let closure = closure_heap.clone_single_to_other_heap(&mut vm_heap, closure);
         let arguments = generate_n_values(&mut vm_heap, num_args);
 
-        let vm = FiberTree::new_for_running_closure(vm_heap, closure, &arguments);
+        let vm = Vm::new_for_running_closure(vm_heap, closure, &arguments);
 
         Status::StillFuzzing { vm, arguments }
     }
@@ -76,14 +76,14 @@ impl Fuzzer {
     fn map_status<C: Context>(&self, status: Status, db: &Database, context: &mut C) -> Status {
         match status {
             Status::StillFuzzing { mut vm, arguments } => match vm.status() {
-                tree::Status::Running => {
-                    vm.run(context, todo!());
+                vm::Status::CanRun => {
+                    vm.run(context);
                     Status::StillFuzzing { vm, arguments }
                 }
-                tree::Status::WaitingForOperations => panic!("Fuzzing should not have to wait on channel operations because arguments were not channels."),
+                vm::Status::WaitingForOperations => panic!("Fuzzing should not have to wait on channel operations because arguments were not channels."),
                 // The VM finished running without panicking.
-                tree::Status::Done => Status::new_fuzzing_attempt(&self.closure_heap, self.closure),
-                tree::Status::Panicked { reason } => {
+                vm::Status::Done => Status::new_fuzzing_attempt(&self.closure_heap, self.closure),
+                vm::Status::Panicked { reason } => {
                     // If a `needs` directly inside the tested closure was not
                     // satisfied, then the panic is not closure's fault, but our
                     // fault.

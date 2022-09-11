@@ -39,26 +39,21 @@ impl ChannelBuf {
         self.packets.len() == self.capacity
     }
 
-    pub fn send(&mut self, packet: Packet) -> bool {
+    pub fn send(&mut self, packet: Packet) {
         if self.is_full() {
-            return false;
+            panic!("Tried to send on channel that is full.");
         }
         self.packets.push_back(packet);
-        return true;
     }
 
-    pub fn receive(&mut self) -> Option<Packet> {
-        self.packets.pop_front()
+    pub fn receive(&mut self) -> Packet {
+        self.packets.pop_front().expect("Tried to receive from channel that is empty.")
     }
 }
 
 impl fmt::Debug for ChannelBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_empty() {
-            write!(f, "<empty>")
-        } else {
-            write!(f, "{}", self.packets.iter().map(|packet| format!("{:?}", packet)).join(", "))
-        }
+        f.debug_list().entries(self.packets.iter()).finish()
     }
 }
 impl fmt::Debug for Packet {

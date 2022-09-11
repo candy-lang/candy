@@ -14,6 +14,7 @@ use std::{
     collections::{hash_map::DefaultHasher, HashMap},
     hash::{Hash, Hasher},
     ops::Deref,
+    fmt,
 };
 
 #[derive(Clone)]
@@ -162,7 +163,19 @@ pub struct ReceivePort {
     pub channel: ChannelId,
 }
 
-pub type ChannelId = usize;
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ChannelId(usize);
+
+impl From<usize> for ChannelId {
+    fn from(id: usize) -> Self {
+        Self(id)
+    }
+}
+impl fmt::Debug for ChannelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "channel_{:x}", self.0)
+    }
+}
 
 impl SendPort {
     pub fn new(channel: ChannelId) -> Self {
@@ -238,8 +251,8 @@ impl Data {
             ),
             Data::Closure(_) => "{…}".to_string(),
             Data::Builtin(builtin) => format!("builtin{:?}", builtin.function),
-            Data::SendPort(port) => format!("<sendPort {:x}>", port.channel),
-            Data::ReceivePort(port) => format!("<sendPort {:x}>", port.channel),
+            Data::SendPort(port) => format!("sendPort {:?}", port.channel),
+            Data::ReceivePort(port) => format!("receivePort {:?}", port.channel),
         }
     }
 

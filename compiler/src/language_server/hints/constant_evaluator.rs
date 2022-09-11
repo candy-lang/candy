@@ -12,7 +12,7 @@ use crate::{
     vm::{
         context::{DbUseProvider, ModularContext, RunLimitedNumberOfInstructions},
         tracer::TraceEntry,
-        tree, Closure, FiberTree, Heap, Pointer,
+        Closure, Vm, Heap, Pointer, self,
     },
 };
 use itertools::Itertools;
@@ -22,12 +22,12 @@ use tracing::{span, trace, Level};
 
 #[derive(Default)]
 pub struct ConstantEvaluator {
-    vms: HashMap<Module, FiberTree>,
+    vms: HashMap<Module, Vm>,
 }
 
 impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
-        let vm = FiberTree::new_for_running_module_closure(
+        let vm = Vm::new_for_running_module_closure(
             Closure::of_module(db, module.clone()).unwrap(),
         );
         self.vms.insert(module, vm);
@@ -42,7 +42,7 @@ impl ConstantEvaluator {
         let mut running_vms = self
             .vms
             .iter_mut()
-            .filter(|(_, vm)| matches!(vm.status(), tree::Status::Running))
+            .filter(|(_, vm)| matches!(vm.status(), vm::Status::CanRun))
             .collect_vec();
         trace!(
             "Constant evaluator running. {} running VMs, {} in total.",
@@ -81,7 +81,7 @@ impl ConstantEvaluator {
         let vm = &self.vms[module];
         let mut hints = vec![];
 
-        if let tree::Status::Panicked { reason } = vm.status() {
+        if let vm::Status::Panicked { reason } = vm.status() {
             if let Some(hint) = panic_hint(db, module.clone(), vm, reason) {
                 hints.push(hint);
             }
@@ -130,7 +130,7 @@ impl ConstantEvaluator {
     }
 }
 
-fn panic_hint(db: &Database, module: Module, vm: &FiberTree, reason: String) -> Option<Hint> {
+fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<Hint> {
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.

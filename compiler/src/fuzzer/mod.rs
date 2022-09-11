@@ -8,7 +8,7 @@ use crate::{
     module::Module,
     vm::{
         context::{DbUseProvider, ModularContext, RunForever, RunLimitedNumberOfInstructions},
-        Closure, FiberTree,
+        Closure, Vm,
     },
 };
 use itertools::Itertools;
@@ -16,7 +16,7 @@ use tracing::info;
 
 pub async fn fuzz(db: &Database, module: Module) {
     let (fuzzables_heap, fuzzables) = {
-        let mut vm = FiberTree::new_for_running_module_closure(
+        let mut vm = Vm::new_for_running_module_closure(
             Closure::of_module(db, module.clone()).unwrap(),
         );
         vm.run(&mut ModularContext {
