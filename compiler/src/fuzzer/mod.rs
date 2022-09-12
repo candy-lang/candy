@@ -16,8 +16,8 @@ use tracing::info;
 
 pub async fn fuzz(db: &Database, module: Module) {
     let (fuzzables_heap, fuzzables) = {
-        let mut vm =
-            Vm::new_for_running_module_closure(Closure::of_module(db, module.clone()).unwrap());
+        let mut vm = Vm::new();
+        vm.set_up_for_running_module_closure(Closure::of_module(db, module.clone()).unwrap());
         vm.run(&mut ModularContext {
             use_provider: DbUseProvider { db },
             execution_controller: RunForever,

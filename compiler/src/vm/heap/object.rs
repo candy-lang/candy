@@ -12,9 +12,9 @@ use itertools::Itertools;
 use num_bigint::BigInt;
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
+    fmt,
     hash::{Hash, Hasher},
     ops::Deref,
-    fmt,
 };
 
 #[derive(Clone)]
@@ -269,6 +269,16 @@ impl Data {
                 .flat_map(|(a, b)| vec![a, b].into_iter())
                 .collect_vec(),
             Data::Closure(closure) => closure.captured.clone(),
+        }
+    }
+
+    pub fn channel(&self) -> Option<ChannelId> {
+        if let Data::SendPort(SendPort { channel }) | Data::ReceivePort(ReceivePort { channel }) =
+            self
+        {
+            Some(*channel)
+        } else {
+            None
         }
     }
 }

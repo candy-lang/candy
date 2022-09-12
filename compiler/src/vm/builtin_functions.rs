@@ -72,7 +72,7 @@ impl Fiber {
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
             Ok(Parallel { body }) => self.status = Status::InParallelScope { body },
             Ok(Try { body }) => self.status = Status::InTry { body },
-            Err(reason) => self.panic(reason),
+            Err(reason) => self.status = Status::Panicked { reason },
         }
     }
 }

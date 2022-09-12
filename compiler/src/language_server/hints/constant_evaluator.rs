@@ -28,8 +28,8 @@ pub struct ConstantEvaluator {
 
 impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
-        let vm =
-            Vm::new_for_running_module_closure(Closure::of_module(db, module.clone()).unwrap());
+        let mut vm = Vm::new();
+        vm.set_up_for_running_module_closure(Closure::of_module(db, module.clone()).unwrap());
         self.vms.insert(module, vm);
     }
 

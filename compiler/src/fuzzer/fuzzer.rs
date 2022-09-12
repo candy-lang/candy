@@ -2,7 +2,7 @@ use super::{generator::generate_n_values, utils::did_need_in_closure_cause_panic
 use crate::{
     compiler::hir,
     database::Database,
-    vm::{context::Context, tracer::Tracer, Closure, Vm, Heap, Pointer, self},
+    vm::{self, context::Context, tracer::Tracer, Closure, Heap, Pointer, Vm},
 };
 use std::mem;
 
@@ -42,7 +42,8 @@ impl Status {
         let closure = closure_heap.clone_single_to_other_heap(&mut vm_heap, closure);
         let arguments = generate_n_values(&mut vm_heap, num_args);
 
-        let vm = Vm::new_for_running_closure(vm_heap, closure, &arguments);
+        let mut vm = Vm::new();
+        vm.set_up_for_running_closure(vm_heap, closure, &arguments);
 
         Status::StillFuzzing { vm, arguments }
     }

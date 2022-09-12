@@ -117,6 +117,7 @@ impl Fiber {
         let closure = heap.create_closure(closure);
         Self::new_for_running_closure(heap, closure, &[])
     }
+
     pub fn tear_down(mut self) -> TearDownResult {
         let result = match self.status {
             Status::Done => Ok(self.data_stack.pop().unwrap()),
@@ -134,9 +135,12 @@ impl Fiber {
     pub fn status(&self) -> Status {
         self.status.clone()
     }
-    pub fn panic(&mut self, reason: String) {
-        self.status = Status::Panicked { reason };
-    }
+
+    // If the status of this fiber is something else than `Status::Running`
+    // after running, then the VM that manages this fiber is expected to perform
+    // some action and to then call the corresponding `complete_*` method before
+    // calling `run` again.
+
     pub fn complete_channel_create(&mut self, channel: ChannelId) {
         let send_port = self.heap.create_send_port(channel);
         let receive_port = self.heap.create_receive_port(channel);
@@ -186,6 +190,9 @@ impl Fiber {
 
     fn get_from_data_stack(&self, offset: usize) -> Pointer {
         self.data_stack[self.data_stack.len() - 1 - offset as usize]
+    }
+    fn panic(&mut self, reason: String) {
+        self.status = Status::Panicked { reason };
     }
 
     pub fn run<C: Context>(&mut self, context: &mut C) {

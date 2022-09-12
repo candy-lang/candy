@@ -36,7 +36,6 @@ use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use notify::{watcher, RecursiveMode, Watcher};
 use std::{
-    collections::HashMap,
     convert::TryInto,
     env::current_dir,
     path::PathBuf,
@@ -206,7 +205,8 @@ fn run(options: CandyRunOptions) {
 
     let path_string = options.file.to_string_lossy();
     info!("Running `{path_string}`.");
-    let mut vm = Vm::new_for_running_module_closure(module_closure);
+    let mut vm = Vm::new();
+    vm.set_up_for_running_module_closure(module_closure);
     loop {
         info!("Tree: {:#?}", vm);
         match vm.status() {
@@ -263,8 +263,14 @@ fn run(options: CandyRunOptions) {
 
     info!("Running main function.");
     // TODO: Add environment stuff.
-    let environment = heap.create_struct(HashMap::new());
-    let mut vm = Vm::new_for_running_closure(heap, main, &[environment]);
+    let mut vm = Vm::new();
+    let stdout = vm.create_channel();
+    let environment = {
+        let stdout_symbol = heap.create_symbol("Stdout".to_string());
+        let stdout_port = heap.create_send_port(stdout);
+        heap.create_struct([(stdout_symbol, stdout_port)].into_iter().collect())
+    };
+    vm.set_up_for_running_closure(heap, main, &[environment]);
     loop {
         info!("Tree: {:#?}", vm);
         match vm.status() {
@@ -280,6 +286,25 @@ fn run(options: CandyRunOptions) {
                 todo!("VM can't proceed until some operations complete.");
             }
             _ => break,
+        }
+        let stdout_operations = vm
+            .external_operations
+            .get_mut(&stdout)
+            .unwrap()
+            .drain(..)
+            .collect_vec();
+        for operation in stdout_operations {
+            match operation {
+                vm::Operation::Send {
+                    performing_fiber,
+                    packet,
+                } => {
+                    info!("Sent to stdout: {}", packet.value.format(&packet.heap));
+                    vm.complete_send(performing_fiber);
+                }
+                vm::Operation::Receive { .. } => unreachable!(),
+                vm::Operation::Drop => vm.free_channel(stdout),
+            }
         }
     }
     info!("Tree: {:#?}", vm);

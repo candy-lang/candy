@@ -10,7 +10,10 @@ pub use self::{
 use crate::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::{cmp::Ordering, collections::HashMap};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+};
 
 const TRACE: bool = false;
 
@@ -92,6 +95,7 @@ impl Heap {
             self.get(address).reference_count - 1,
             address.format(self),
         );
+
         let object = self.get_mut(address);
         object.reference_count -= 1;
         if object.reference_count == 0 {
@@ -200,11 +204,14 @@ impl Heap {
             .unwrap()
     }
 
-    pub fn all_objects(&self) -> &HashMap<Pointer, Object> {
-        &self.objects
-    }
-    pub fn all_objects_mut(&mut self) -> &mut HashMap<Pointer, Object> {
-        &mut self.objects
+    pub fn known_channels(&self) -> HashSet<ChannelId> {
+        let mut known = HashSet::new();
+        for object in self.objects.values() {
+            if let Some(channel) = object.data.channel() {
+                known.insert(channel);
+            }
+        }
+        known
     }
 
     pub fn create_int(&mut self, int: BigInt) -> Pointer {
