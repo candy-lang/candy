@@ -474,15 +474,23 @@ impl Vm {
     fn send_to_channel(
         &mut self,
         performing_fiber: Option<FiberId>,
-        channel: ChannelId,
+        channel_id: ChannelId,
         packet: Packet,
     ) {
-        match self.channels.get_mut(&channel).unwrap() {
+        let channel = match self.channels.get_mut(&channel_id) {
+            Some(channel) => channel,
+            None => {
+                // The channel was a nursery which is now dead.
+                InternalChannel::complete_send(&mut self.fibers, performing_fiber);
+                return;
+            }
+        };
+        match channel {
             Channel::Internal(channel) => {
                 channel.send(&mut self.fibers, performing_fiber, packet);
             }
             Channel::External => self.push_external_operation(
-                channel,
+                channel_id,
                 Operation::Send {
                     performing_fiber,
                     packet,
