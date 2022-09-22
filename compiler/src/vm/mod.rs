@@ -480,8 +480,14 @@ impl Vm {
         let channel = match self.channels.get_mut(&channel_id) {
             Some(channel) => channel,
             None => {
-                // The channel was a nursery which is now dead.
-                InternalChannel::complete_send(&mut self.fibers, performing_fiber);
+                // The channel was a nursery that died.
+                if let Some(fiber) = performing_fiber {
+                    let tree = self.fibers.get_mut(&fiber).unwrap();
+                    tree.as_single_mut().unwrap().fiber.panic(
+                        "the nursery is already dead because the parallel section ended"
+                            .to_string(),
+                    );
+                }
                 return;
             }
         };
