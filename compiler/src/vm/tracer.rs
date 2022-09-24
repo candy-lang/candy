@@ -6,15 +6,22 @@ use crate::{
     module::Module,
 };
 use itertools::Itertools;
+use std::time::Instant;
 use tracing::error;
 
-#[derive(Default, Clone)]
-pub struct Tracer {
-    log: Vec<TraceEntry>,
-    stack: Vec<TraceEntry>,
-}
 #[derive(Clone)]
-pub enum TraceEntry {
+pub struct Tracer {
+    pub events: Vec<Event>,
+}
+
+#[derive(Clone)]
+pub struct Event {
+    pub when: Instant,
+    pub data: EventData,
+}
+
+#[derive(Clone)]
+pub enum EventData {
     ValueEvaluated {
         id: Id,
         value: Pointer,
@@ -32,7 +39,17 @@ pub enum TraceEntry {
         condition: Pointer,
         reason: Pointer,
     },
-    NeedsEnded,
+    NeedsEnded {
+        nothing: Pointer,
+    },
+    ParallelStarted,
+    ParallelChildFinished {
+        tracer: Tracer,
+        heap: Heap,
+    },
+    ParallelEnded {
+        return_value: Pointer,
+    },
     ModuleStarted {
         module: Module,
     },
@@ -42,56 +59,100 @@ pub enum TraceEntry {
 }
 
 impl Tracer {
-    pub fn push(&mut self, entry: TraceEntry) {
-        self.log.push(entry.clone());
-        match entry {
-            TraceEntry::CallStarted { .. } => {
-                self.stack.push(entry);
-            }
-            TraceEntry::CallEnded { .. } => {
-                self.stack.pop().unwrap();
-            }
-            TraceEntry::NeedsStarted { .. } => {
-                self.stack.push(entry);
-            }
-            TraceEntry::NeedsEnded => {
-                self.stack.pop().unwrap();
-            }
-            TraceEntry::ModuleStarted { .. } => {
-                self.stack.push(entry);
-            }
-            TraceEntry::ModuleEnded { .. } => {
-                self.stack.pop().unwrap();
-            }
-            _ => {}
-        }
+    pub fn push(&mut self, data: EventData) {
+        self.events.push(Event {
+            when: Instant::now(),
+            data,
+        });
     }
-    pub fn log(&self) -> &[TraceEntry] {
-        &self.log
-    }
+}
 
-    pub fn stack(&self) -> &[TraceEntry] {
-        &self.stack
+// Stack traces are a reduced view of the tracing state that represent the stack
+// trace at a given moment in time.
+
+#[derive(Clone)]
+pub enum StackEntry {
+    Call {
+        id: Id,
+        closure: Pointer,
+        args: Vec<Pointer>,
+    },
+    Needs {
+        id: Id,
+        condition: Pointer,
+        reason: Pointer,
+    },
+    Parallel {
+        children: Vec<(Tracer, Heap)>,
+    },
+    Module {
+        module: Module,
+    },
+}
+
+impl Tracer {
+    pub fn new() -> Self {
+        Self { events: vec![] }
     }
-    pub fn dump_stack_trace(&self, db: &Database, heap: &Heap) {
-        for line in self.format_stack_trace(db, heap).lines() {
-            error!("{}", line);
+    pub fn stack_trace(&self) -> Vec<StackEntry> {
+        let mut stack = vec![];
+        for Event { data, .. } in &self.events {
+            match data.clone() {
+                EventData::ValueEvaluated { .. } => {}
+                EventData::CallStarted { id, closure, args } => {
+                    stack.push(StackEntry::Call { id, closure, args })
+                }
+                EventData::CallEnded { .. } => {
+                    stack.pop().unwrap();
+                }
+                EventData::NeedsStarted {
+                    id,
+                    condition,
+                    reason,
+                } => stack.push(StackEntry::Needs {
+                    id,
+                    condition,
+                    reason,
+                }),
+                EventData::NeedsEnded { .. } => {
+                    stack.pop().unwrap();
+                }
+                EventData::ParallelStarted => {
+                    stack.push(StackEntry::Parallel { children: vec![] });
+                }
+                EventData::ParallelChildFinished { tracer, heap } => {
+                    let entry = stack.last_mut().unwrap();
+                    let children = match entry {
+                        StackEntry::Parallel { children } => children,
+                        _ => unreachable!(),
+                    };
+                    children.push((tracer, heap));
+                }
+                EventData::ParallelEnded { .. } => {
+                    stack.pop().unwrap();
+                }
+                EventData::ModuleStarted { module } => stack.push(StackEntry::Module { module }),
+                EventData::ModuleEnded { .. } => {
+                    stack.pop().unwrap();
+                }
+            }
         }
+        stack
     }
     pub fn format_stack_trace(&self, db: &Database, heap: &Heap) -> String {
-        self.stack
+        self.stack_trace()
             .iter()
             .rev()
             .map(|entry| {
                 let (call_string, hir_id) = match entry {
-                    TraceEntry::CallStarted { id, closure, args } => (
+                    StackEntry::Call { id, closure, args } => (
                         format!(
                             "{closure} {}",
                             args.iter().map(|arg| arg.format(heap)).join(" ")
                         ),
                         Some(id),
                     ),
-                    TraceEntry::NeedsStarted {
+                    StackEntry::Needs {
                         id,
                         condition,
                         reason,
@@ -99,8 +160,11 @@ impl Tracer {
                         format!("needs {} {}", condition.format(heap), reason.format(heap)),
                         Some(id),
                     ),
-                    TraceEntry::ModuleStarted { module } => (format!("use {module}"), None),
-                    _ => unreachable!(),
+                    StackEntry::Parallel { .. } => {
+                        (format!("parallel section (todo: format children)"), None)
+                        // TODO: format
+                    }
+                    StackEntry::Module { module } => (format!("use {module}"), None),
                 };
                 let caller_location_string = {
                     let (hir_id, ast_id, cst_id, span) = if let Some(hir_id) = hir_id {
@@ -140,67 +204,245 @@ impl Tracer {
             })
             .join("\n")
     }
-
-    pub fn format_call_tree(&self, heap: &Heap) -> String {
-        let actions = self
-            .log
-            .iter()
-            .map(|entry| match entry {
-                TraceEntry::ValueEvaluated { id, value } => {
-                    Action::Stay(format!("{id} = {}", value.format(heap)))
-                }
-                TraceEntry::CallStarted { id, closure, args } => Action::Start(format!(
-                    "{id} {} {}",
-                    closure.format(heap),
-                    args.iter().map(|arg| arg.format(heap)).join(" ")
-                )),
-                TraceEntry::CallEnded { return_value } => {
-                    Action::End(format!(" = {}", return_value.format(heap)))
-                }
-                TraceEntry::NeedsStarted {
-                    id,
-                    condition,
-                    reason,
-                } => Action::Start(format!(
-                    "{id} needs {} {}",
-                    condition.format(heap),
-                    reason.format(heap)
-                )),
-                TraceEntry::NeedsEnded => Action::End(" = Nothing".to_string()),
-                TraceEntry::ModuleStarted { module } => Action::Start(format!("module {module}")),
-                TraceEntry::ModuleEnded { export_map } => Action::End(export_map.format(heap)),
-            })
-            .collect_vec();
-
-        let mut lines = vec![];
-        let mut stack = vec![];
-        let mut indentation = 0;
-
-        for action in actions {
-            let indent = "  ".repeat(indentation);
-            match action {
-                Action::Start(line) => {
-                    stack.push(lines.len());
-                    lines.push(format!("{indent}{line}"));
-                    indentation += 1;
-                }
-                Action::End(addendum) => {
-                    let start = stack.pop().unwrap();
-                    lines[start].push_str(&addendum);
-                    indentation -= 1;
-                }
-                Action::Stay(line) => {
-                    lines.push(format!("{indent}{line}"));
-                }
-            }
+    pub fn dump_stack_trace(&self, db: &Database, heap: &Heap) {
+        for line in self.format_stack_trace(db, heap).lines() {
+            error!("{}", line);
         }
-
-        lines.join("\n")
     }
 }
 
-enum Action {
-    Start(String),
-    End(String),
-    Stay(String),
+// Full traces are a computed tree view of the whole execution.
+
+pub struct Trace {
+    start: Instant,
+    end: Instant,
+    data: TraceData,
+}
+pub enum TraceData {
+    Call {
+        id: Id,
+        closure: Pointer,
+        args: Vec<Pointer>,
+        inner: Vec<Trace>,
+        result: TraceResult,
+    },
+    Needs {
+        id: Id,
+        condition: Pointer,
+        reason: Pointer,
+        result: TraceResult,
+    },
+    Parallel {
+        id: Id,
+        children: Vec<TraceData>,
+        result: TraceResult,
+    },
+    Module {
+        module: Module,
+        inner: Vec<Trace>,
+        result: TraceResult,
+    },
+}
+pub enum TraceResult {
+    Returned(Pointer),
+    Panicked(Pointer),
+    Canceled,
+}
+
+impl Tracer {
+    pub fn full_trace(&self) -> Trace {
+        let mut stack = vec![Span {
+            start: self
+                .events
+                .first()
+                .map(|event| event.when)
+                .unwrap_or_else(Instant::now),
+            data: None,
+            inner: vec![],
+        }];
+        for event in &self.events {
+            match &event.data {
+                EventData::ValueEvaluated { .. } => {}
+                EventData::CallStarted { id, closure, args } => {
+                    stack.push(Span {
+                        start: event.when,
+                        data: Some(StackEntry::Call {
+                            id: id.clone(),
+                            closure: *closure,
+                            args: args.clone(),
+                        }),
+                        inner: vec![],
+                    });
+                }
+                EventData::CallEnded { return_value } => {
+                    let span = stack.pop().unwrap();
+                    let (id, closure, args) = match span.data.unwrap() {
+                        StackEntry::Call { id, closure, args } => (id, closure, args),
+                        StackEntry::Needs { .. } => unreachable!(),
+                        StackEntry::Module { .. } => unreachable!(),
+                    };
+                    stack.last_mut().unwrap().inner.push(Trace {
+                        start: span.start,
+                        end: event.when,
+                        data: TraceData::Call {
+                            id,
+                            closure,
+                            args,
+                            inner: span.inner,
+                            result: TraceResult::Returned(*return_value),
+                        },
+                    });
+                }
+                EventData::NeedsStarted {
+                    id,
+                    condition,
+                    reason,
+                } => {
+                    stack.push(Span {
+                        start: event.when,
+                        data: Some(StackEntry::Needs {
+                            id: id.clone(),
+                            condition: *condition,
+                            reason: *reason,
+                        }),
+                        inner: vec![],
+                    });
+                }
+                EventData::NeedsEnded { nothing } => {
+                    let span = stack.pop().unwrap();
+                    let (id, condition, reason) = match span.data.unwrap() {
+                        StackEntry::Needs {
+                            id,
+                            condition,
+                            reason,
+                        } => (id, condition, reason),
+                        _ => unreachable!(),
+                    };
+                    stack.last_mut().unwrap().inner.push(Trace {
+                        start: span.start,
+                        end: event.when,
+                        data: TraceData::Needs {
+                            id,
+                            condition,
+                            reason,
+                            result: TraceResult::Returned(*nothing),
+                        },
+                    });
+                }
+                EventData::ParallelStarted => {}
+                EventData::ParallelEnded { return_value } => {
+                    let span = stack.pop().unwrap();
+                    let children = match span.data.unwrap() {
+                        StackEntry::Parallel { children } => children,
+                        _ => unreachable!(),
+                    };
+                    stack.last_mut().unwrap().inner.push(Trace {
+                        start: span.start,
+                        end: event.when,
+                        data: TraceData::Parallel {
+                            id,
+                            children,
+                            result: TraceResult::Returned(return_value),
+                        },
+                    });
+                }
+                EventData::ModuleStarted { module } => {
+                    stack.push(Span {
+                        start: event.when,
+                        data: Some(StackEntry::Module {
+                            module: module.clone(),
+                        }),
+                        inner: vec![],
+                    });
+                }
+                EventData::ModuleEnded { export_map } => {
+                    let span = stack.pop().unwrap();
+                    let module = match span.data.unwrap() {
+                        StackEntry::Call { .. } => unreachable!(),
+                        StackEntry::Needs { .. } => unreachable!(),
+                        StackEntry::Module { module } => module,
+                    };
+                    stack.last_mut().unwrap().inner.push(Trace {
+                        start: span.start,
+                        end: event.when,
+                        data: TraceData::Module {
+                            module,
+                            inner: span.inner,
+                            result: TraceResult::Returned(*export_map),
+                        },
+                    });
+                }
+            }
+        }
+        stack.pop().unwrap().inner.pop().unwrap() // TODO: handle multiple traces
+    }
+    pub fn format_full_trace(&self, heap: &Heap) -> String {
+        self.full_trace().format(heap)
+    }
+}
+
+struct Span {
+    start: Instant,
+    data: Option<StackEntry>,
+    inner: Vec<Trace>,
+}
+
+impl TraceResult {
+    fn format(&self, heap: &Heap) -> String {
+        match self {
+            TraceResult::Returned(return_value) => return_value.format(heap),
+            TraceResult::Panicked(panic_value) => {
+                format!("panicked with {}", panic_value.format(heap))
+            }
+            TraceResult::Canceled => "canceled".to_string(),
+        }
+    }
+}
+
+impl Trace {
+    pub fn format(&self, heap: &Heap) -> String {
+        let mut lines = vec![];
+        match &self.data {
+            TraceData::Call {
+                id,
+                args,
+                inner,
+                result,
+                ..
+            } => {
+                lines.push(format!(
+                    "call {id} {} = {}",
+                    args.iter().map(|arg| arg.format(heap)).join(" "),
+                    result.format(heap),
+                ));
+                for trace in inner {
+                    lines.extend(trace.format(heap).lines().map(|line| format!("  {line}")));
+                }
+            }
+            TraceData::Needs {
+                condition,
+                reason,
+                result,
+                ..
+            } => {
+                lines.push(format!(
+                    "needs {} {} = {}",
+                    result.format(heap),
+                    condition.format(heap),
+                    reason.format(heap),
+                ));
+            }
+            TraceData::Module {
+                module,
+                inner,
+                result,
+            } => {
+                lines.push(format!("{module} = {}", result.format(heap)));
+                for trace in inner {
+                    lines.extend(trace.format(heap).lines().map(|line| format!("  {line}")));
+                }
+            }
+        }
+        lines.join("\n")
+    }
 }

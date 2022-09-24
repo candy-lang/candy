@@ -12,7 +12,7 @@ use crate::{
     vm::{
         self,
         context::{DbUseProvider, ModularContext, RunLimitedNumberOfInstructions},
-        tracer::TraceEntry,
+        tracer::{EventData, StackEntry},
         Closure, Heap, Pointer, Vm,
     },
 };
@@ -87,43 +87,38 @@ impl ConstantEvaluator {
             }
         };
         if module.to_possible_paths().is_some() {
-            module.dump_associated_debug_file(
-                "trace",
-                &vm.fiber().tracer.format_call_tree(&vm.fiber().heap),
-            );
+            let fiber = vm.fiber();
+            module
+                .dump_associated_debug_file("trace", &fiber.tracer.format_full_trace(&fiber.heap));
         }
 
-        for entry in vm.cloned_tracer().log() {
-            let (id, value) = match entry {
-                TraceEntry::ValueEvaluated { id, value } => {
-                    if &id.module != module {
-                        continue;
-                    }
-                    let ast_id = match db.hir_to_ast_id(id.clone()) {
-                        Some(ast_id) => ast_id,
-                        None => continue,
-                    };
-                    let ast = match db.ast(module.clone()) {
-                        Some((ast, _)) => (*ast).clone(),
-                        None => continue,
-                    };
-                    let ast = match ast.find(&ast_id) {
-                        Some(ast) => ast,
-                        None => continue,
-                    };
-                    if !matches!(ast.kind, AstKind::Assignment(_)) {
-                        continue;
-                    }
-                    (id.clone(), value)
+        for entry in &vm.cloned_tracer().events {
+            if let EventData::ValueEvaluated { id, value } = &entry.data {
+                if &id.module != module {
+                    continue;
                 }
-                _ => continue,
-            };
+                let ast_id = match db.hir_to_ast_id(id.clone()) {
+                    Some(ast_id) => ast_id,
+                    None => continue,
+                };
+                let ast = match db.ast(module.clone()) {
+                    Some((ast, _)) => (*ast).clone(),
+                    None => continue,
+                };
+                let ast = match ast.find(&ast_id) {
+                    Some(ast) => ast,
+                    None => continue,
+                };
+                if !matches!(ast.kind, AstKind::Assignment(_)) {
+                    continue;
+                }
 
-            hints.push(Hint {
-                kind: HintKind::Value,
-                text: value.format(&vm.fiber().heap),
-                position: id_to_end_of_line(db, id).unwrap(),
-            });
+                hints.push(Hint {
+                    kind: HintKind::Value,
+                    text: value.format(&vm.fiber().heap),
+                    position: id_to_end_of_line(db, id.clone()).unwrap(),
+                });
+            }
         }
 
         hints
@@ -134,17 +129,17 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.
-    let stack = vm.fiber().tracer.stack();
+    let stack = vm.fiber().tracer.stack_trace();
     if stack.len() == 1 {
-        // The stack only contains a `ModuleStarted` entry. This indicates an
-        // error during compilation resulting in a top-level error instruction.
+        // The stack only contains an `InModule` entry. This indicates an error
+        // during compilation resulting in a top-level error instruction.
         return None;
     }
 
     let last_call_in_this_module = stack.iter().find(|entry| {
         let id = match entry {
-            TraceEntry::CallStarted { id, .. } => id,
-            TraceEntry::NeedsStarted { id, .. } => id,
+            StackEntry::Call { id, .. } => id,
+            StackEntry::Needs { id, .. } => id,
             _ => return false,
         };
         // Make sure the entry comes from the same file and is not generated
@@ -153,7 +148,7 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
     })?;
 
     let (id, call_info) = match last_call_in_this_module {
-        TraceEntry::CallStarted { id, closure, args } => (
+        StackEntry::Call { id, closure, args } => (
             id,
             format!(
                 "{} {}",
@@ -163,7 +158,7 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
                     .join(" ")
             ),
         ),
-        TraceEntry::NeedsStarted {
+        StackEntry::Needs {
             id,
             condition,
             reason,

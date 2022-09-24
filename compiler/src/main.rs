@@ -233,7 +233,7 @@ fn run(options: CandyRunOptions) {
     } = vm.tear_down();
 
     if options.debug {
-        module.dump_associated_debug_file("trace", &tracer.format_call_tree(&heap));
+        module.dump_associated_debug_file("trace", &tracer.full_trace().format(&heap));
     }
 
     let exported_definitions: Struct = match result {

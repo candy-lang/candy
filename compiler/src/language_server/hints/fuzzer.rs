@@ -9,7 +9,7 @@ use crate::{
     module::Module,
     vm::{
         context::{DbUseProvider, ModularContext, RunLimitedNumberOfInstructions},
-        tracer::TraceEntry,
+        tracer::EventData,
         Heap, Pointer,
     },
 };
@@ -112,15 +112,15 @@ impl FuzzerManager {
 
                 let second_hint = {
                     let panicking_inner_call = tracer
-                        .log()
+                        .events
                         .iter()
                         .rev()
                         // Find the innermost panicking call that is in the
                         // function.
                         .find(|entry| {
-                            let innermost_panicking_call_id = match entry {
-                                TraceEntry::CallStarted { id, .. } => id,
-                                TraceEntry::NeedsStarted { id, .. } => id,
+                            let innermost_panicking_call_id = match &entry.data {
+                                EventData::CallStarted { id, .. } => id,
+                                EventData::NeedsStarted { id, .. } => id,
                                 _ => return false,
                             };
                             id.is_same_module_and_any_parent_of(innermost_panicking_call_id)
@@ -135,11 +135,11 @@ impl FuzzerManager {
                             continue;
                         }
                     };
-                    let (call_id, name, arguments) = match panicking_inner_call {
-                        TraceEntry::CallStarted { id, closure, args } => {
+                    let (call_id, name, arguments) = match &panicking_inner_call.data {
+                        EventData::CallStarted { id, closure, args } => {
                             (id.clone(), closure.format(heap), args.clone())
                         }
-                        TraceEntry::NeedsStarted {
+                        EventData::NeedsStarted {
                             id,
                             condition,
                             reason,

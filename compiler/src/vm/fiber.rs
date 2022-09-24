@@ -2,7 +2,7 @@ use super::{
     channel::{Capacity, Packet},
     context::Context,
     heap::{Builtin, ChannelId, Closure, Data, Heap, Pointer},
-    tracer::{TraceEntry, Tracer},
+    tracer::{EventData, Tracer},
 };
 use crate::{
     compiler::{hir::Id, lir::Instruction},
@@ -86,7 +86,7 @@ impl Fiber {
             call_stack: vec![],
             import_stack: vec![],
             heap,
-            tracer: Tracer::default(),
+            tracer: Tracer::new(),
             fuzzable_closures: vec![],
         }
     }
@@ -191,7 +191,7 @@ impl Fiber {
     fn get_from_data_stack(&self, offset: usize) -> Pointer {
         self.data_stack[self.data_stack.len() - 1 - offset as usize]
     }
-    fn panic(&mut self, reason: String) {
+    pub fn panic(&mut self, reason: String) {
         self.status = Status::Panicked { reason };
     }
 
@@ -400,7 +400,7 @@ impl Fiber {
             Instruction::TraceValueEvaluated(id) => {
                 let value = *self.data_stack.last().unwrap();
                 self.heap.dup(value);
-                self.tracer.push(TraceEntry::ValueEvaluated { id, value });
+                self.tracer.push(EventData::ValueEvaluated { id, value });
             }
             Instruction::TraceCallStarts { id, num_args } => {
                 let closure = *self.data_stack.last().unwrap();
@@ -416,25 +416,29 @@ impl Fiber {
                 args.reverse();
 
                 self.tracer
-                    .push(TraceEntry::CallStarted { id, closure, args });
+                    .push(EventData::CallStarted { id, closure, args });
             }
             Instruction::TraceCallEnds => {
                 let return_value = *self.data_stack.last().unwrap();
                 self.heap.dup(return_value);
-                self.tracer.push(TraceEntry::CallEnded { return_value });
+                self.tracer.push(EventData::CallEnded { return_value });
             }
             Instruction::TraceNeedsStarts { id } => {
                 let condition = self.data_stack[self.data_stack.len() - 1];
                 let reason = self.data_stack[self.data_stack.len() - 2];
                 self.heap.dup(condition);
                 self.heap.dup(reason);
-                self.tracer.push(TraceEntry::NeedsStarted {
+                self.tracer.push(EventData::NeedsStarted {
                     id,
                     condition,
                     reason,
                 });
             }
-            Instruction::TraceNeedsEnds => self.tracer.push(TraceEntry::NeedsEnded),
+            Instruction::TraceNeedsEnds => {
+                let nothing = *self.data_stack.last().unwrap();
+                self.heap.dup(nothing);
+                self.tracer.push(EventData::NeedsEnded { nothing });
+            }
             Instruction::TraceModuleStarts { module } => {
                 if self.import_stack.contains(&module) {
                     self.panic(format!(
@@ -448,13 +452,13 @@ impl Fiber {
                     ));
                 }
                 self.import_stack.push(module.clone());
-                self.tracer.push(TraceEntry::ModuleStarted { module });
+                self.tracer.push(EventData::ModuleStarted { module });
             }
             Instruction::TraceModuleEnds => {
                 self.import_stack.pop().unwrap();
                 let export_map = *self.data_stack.last().unwrap();
                 self.heap.dup(export_map);
-                self.tracer.push(TraceEntry::ModuleEnded { export_map })
+                self.tracer.push(EventData::ModuleEnded { export_map })
             }
             Instruction::Error { id, errors } => {
                 self.panic(format!(
