@@ -199,11 +199,8 @@ impl Vm {
             FiberTree::Try(Try { child, .. }) => self.status_of(*child),
         }
     }
-    fn is_running(&self) -> bool {
+    fn can_run(&self) -> bool {
         matches!(self.status(), Status::CanRun)
-    }
-    fn is_finished(&self) -> bool {
-        matches!(self.status(), Status::Done | Status::Panicked { .. })
     }
 
     pub fn fiber(&self) -> &Fiber {
@@ -246,10 +243,11 @@ impl Vm {
 
     pub fn run<C: Context>(&mut self, context: &mut C) {
         assert!(
-            self.is_running(),
+            self.can_run(),
             "Called Vm::run on a VM that is not ready to run."
         );
 
+        // Choose a random fiber to run.
         let mut fiber_id = self.root_fiber.unwrap();
         let fiber = loop {
             match self.fibers.get_mut(&fiber_id).unwrap() {
@@ -262,9 +260,8 @@ impl Vm {
                 FiberTree::Try(Try { child, .. }) => fiber_id = *child,
             }
         };
-
         if !matches!(fiber.status(), fiber::Status::Running) {
-            return;
+            return; // TODO: handle
         }
 
         // TODO: Limit context.
@@ -362,20 +359,23 @@ impl Vm {
         };
 
         if is_finished && fiber_id != self.root_fiber.unwrap() {
-            let tree = self.fibers.remove(&fiber_id).unwrap();
-            let single = tree.into_single().unwrap();
+            let single = self
+                .fibers
+                .remove(&fiber_id)
+                .unwrap()
+                .into_single()
+                .unwrap();
             let TearDownResult { heap, result, .. } = single.fiber.tear_down();
-
-            let parent_id = single
+            let parent = single
                 .parent
                 .expect("we already checked we're not the root fiber");
-            match self.fibers.get_mut(&parent_id).unwrap() {
-                FiberTree::Single(_) => unreachable!(),
+
+            match self.fibers.get_mut(&parent).unwrap() {
+                FiberTree::Single(_) => unreachable!("single fibers can't have children"),
                 FiberTree::Parallel(parallel) => {
                     let child = parallel.children.remove(&fiber_id).unwrap();
-                    let nursery = parallel.nursery;
 
-                    let result_of_parallel = match result {
+                    match result {
                         Ok(return_value) => {
                             let is_finished = parallel.children.is_empty();
                             let packet = Packet {
@@ -390,30 +390,14 @@ impl Vm {
                             }
 
                             if is_finished {
-                                Some(Ok(()))
-                            } else {
-                                None
+                                self.finish_parallel(parent, Ok(()))
                             }
                         }
-                        Err(panic_reason) => {
-                            for fiber_id in parallel.children.clone().into_keys() {
-                                self.cancel(fiber_id);
-                            }
-                            Some(Err(panic_reason))
-                        }
-                    };
-
-                    if let Some(result) = result_of_parallel {
-                        self.channels.remove(&nursery).unwrap();
-                        self.fibers.replace(parent_id, |tree| {
-                            let mut paused_fiber = tree.into_parallel().unwrap().paused_fiber;
-                            paused_fiber.fiber.complete_parallel_scope(result);
-                            FiberTree::Single(paused_fiber)
-                        });
+                        Err(panic_reason) => self.finish_parallel(parent, Err(panic_reason)),
                     }
                 }
                 FiberTree::Try(Try { .. }) => {
-                    self.fibers.replace(parent_id, |tree| {
+                    self.fibers.replace(parent, |tree| {
                         let mut paused_fiber = tree.into_try().unwrap().paused_fiber;
                         paused_fiber
                             .fiber
@@ -434,16 +418,17 @@ impl Vm {
         let forgotten_channels = all_channels.difference(&known_channels);
         for channel in forgotten_channels {
             match self.channels.get(channel).unwrap() {
-                // If an internal channel is not referenced anymore by any
-                // fiber, no future reference to it can be obtained in the
-                // future. Thus, it's safe to remove such channels.
+                // If an internal channel is not referenced by any fiber, no
+                // reference to it can be obtained in the future. Thus, it's
+                // safe to remove such channels.
                 Channel::Internal(_) => {
                     self.channels.remove(channel);
                 }
                 // External channels may be re-sent into the VM from the outside
                 // even after no fibers remember them. Rather than removing them
                 // directly, we communicate to the outside that no fiber
-                // references them anymore.
+                // references them anymore. The outside can then call
+                // `free_channel` when it doesn't intend to re-use the channel.
                 Channel::External => {
                     self.push_external_operation(*channel, Operation::Drop);
                 }
@@ -451,6 +436,29 @@ impl Vm {
                 Channel::Nursery(_) => {}
             }
         }
+    }
+    fn finish_parallel(&mut self, parallel_id: FiberId, result: Result<(), String>) {
+        let parallel = self
+            .fibers
+            .get_mut(&parallel_id)
+            .unwrap()
+            .as_parallel_mut()
+            .unwrap();
+
+        for child_id in parallel.children.clone().into_keys() {
+            self.cancel(child_id);
+        }
+
+        self.fibers.replace(parallel_id, |tree| {
+            let Parallel {
+                mut paused_fiber,
+                nursery,
+                ..
+            } = tree.into_parallel().unwrap();
+            self.channels.remove(&nursery).unwrap();
+            paused_fiber.fiber.complete_parallel_scope(result);
+            FiberTree::Single(paused_fiber)
+        });
     }
     fn cancel(&mut self, fiber: FiberId) {
         match self.fibers.remove(&fiber).unwrap() {
@@ -504,32 +512,32 @@ impl Vm {
             ),
             Channel::Nursery(parent_id) => {
                 info!("Nursery received packet {:?}", packet);
-                let (heap, closure_to_spawn, return_channel) =
-                    match Self::parse_spawn_packet(packet) {
-                        Some(it) => it,
-                        None => {
-                            // The nursery received an invalid message. TODO: Handle this.
-                            panic!("A nursery received an invalid message.");
-                        }
-                    };
-                let child_id = self.fiber_id_generator.generate();
-                self.fibers.insert(
-                    child_id,
-                    FiberTree::Single(Single {
-                        fiber: Fiber::new_for_running_closure(heap, closure_to_spawn, &[]),
-                        parent: Some(*parent_id),
-                    }),
-                );
+                let parent_id = *parent_id;
 
-                let parent = self
-                    .fibers
-                    .get_mut(parent_id)
-                    .unwrap()
-                    .as_parallel_mut()
-                    .unwrap();
-                parent
-                    .children
-                    .insert(child_id, ChildKind::SpawnedChild(return_channel));
+                match Self::parse_spawn_packet(packet) {
+                    Some((heap, closure_to_spawn, return_channel)) => {
+                        let child_id = self.fiber_id_generator.generate();
+                        self.fibers.insert(
+                            child_id,
+                            FiberTree::Single(Single {
+                                fiber: Fiber::new_for_running_closure(heap, closure_to_spawn, &[]),
+                                parent: Some(parent_id),
+                            }),
+                        );
+
+                        self.fibers
+                            .get_mut(&parent_id)
+                            .unwrap()
+                            .as_parallel_mut()
+                            .unwrap()
+                            .children
+                            .insert(child_id, ChildKind::SpawnedChild(return_channel));
+                    }
+                    None => self.finish_parallel(
+                        parent_id,
+                        Err("a nursery received an invalid message".to_string()),
+                    ),
+                }
 
                 InternalChannel::complete_send(&mut self.fibers, performing_fiber);
             }
