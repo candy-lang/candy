@@ -424,8 +424,8 @@ impl Fiber {
                 self.tracer.push(EventData::CallEnded { return_value });
             }
             Instruction::TraceNeedsStarts { id } => {
-                let condition = self.data_stack[self.data_stack.len() - 1];
-                let reason = self.data_stack[self.data_stack.len() - 2];
+                let condition = self.data_stack[self.data_stack.len() - 2];
+                let reason = self.data_stack[self.data_stack.len() - 1];
                 self.heap.dup(condition);
                 self.heap.dup(reason);
                 self.tracer.push(EventData::NeedsStarted {

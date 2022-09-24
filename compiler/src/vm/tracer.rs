@@ -43,10 +43,6 @@ pub enum EventData {
         nothing: Pointer,
     },
     ParallelStarted,
-    ParallelChildFinished {
-        tracer: Tracer,
-        heap: Heap,
-    },
     ParallelEnded {
         return_value: Pointer,
     },
@@ -82,9 +78,7 @@ pub enum StackEntry {
         condition: Pointer,
         reason: Pointer,
     },
-    Parallel {
-        children: Vec<(Tracer, Heap)>,
-    },
+    Parallel,
     Module {
         module: Module,
     },
@@ -118,15 +112,7 @@ impl Tracer {
                     stack.pop().unwrap();
                 }
                 EventData::ParallelStarted => {
-                    stack.push(StackEntry::Parallel { children: vec![] });
-                }
-                EventData::ParallelChildFinished { tracer, heap } => {
-                    let entry = stack.last_mut().unwrap();
-                    let children = match entry {
-                        StackEntry::Parallel { children } => children,
-                        _ => unreachable!(),
-                    };
-                    children.push((tracer, heap));
+                    stack.push(StackEntry::Parallel);
                 }
                 EventData::ParallelEnded { .. } => {
                     stack.pop().unwrap();
@@ -233,8 +219,6 @@ pub enum TraceData {
         result: TraceResult,
     },
     Parallel {
-        id: Id,
-        children: Vec<TraceData>,
         result: TraceResult,
     },
     Module {
@@ -278,8 +262,7 @@ impl Tracer {
                     let span = stack.pop().unwrap();
                     let (id, closure, args) = match span.data.unwrap() {
                         StackEntry::Call { id, closure, args } => (id, closure, args),
-                        StackEntry::Needs { .. } => unreachable!(),
-                        StackEntry::Module { .. } => unreachable!(),
+                        _ => unreachable!(),
                     };
                     stack.last_mut().unwrap().inner.push(Trace {
                         start: span.start,
@@ -332,17 +315,11 @@ impl Tracer {
                 EventData::ParallelStarted => {}
                 EventData::ParallelEnded { return_value } => {
                     let span = stack.pop().unwrap();
-                    let children = match span.data.unwrap() {
-                        StackEntry::Parallel { children } => children,
-                        _ => unreachable!(),
-                    };
                     stack.last_mut().unwrap().inner.push(Trace {
                         start: span.start,
                         end: event.when,
                         data: TraceData::Parallel {
-                            id,
-                            children,
-                            result: TraceResult::Returned(return_value),
+                            result: TraceResult::Returned(*return_value),
                         },
                     });
                 }
@@ -358,9 +335,8 @@ impl Tracer {
                 EventData::ModuleEnded { export_map } => {
                     let span = stack.pop().unwrap();
                     let module = match span.data.unwrap() {
-                        StackEntry::Call { .. } => unreachable!(),
-                        StackEntry::Needs { .. } => unreachable!(),
                         StackEntry::Module { module } => module,
+                        _ => unreachable!(),
                     };
                     stack.last_mut().unwrap().inner.push(Trace {
                         start: span.start,
@@ -427,9 +403,15 @@ impl Trace {
             } => {
                 lines.push(format!(
                     "needs {} {} = {}",
-                    result.format(heap),
                     condition.format(heap),
                     reason.format(heap),
+                    result.format(heap),
+                ));
+            }
+            TraceData::Parallel { result } => {
+                lines.push(format!(
+                    "parallel section that completed with {}",
+                    result.format(heap),
                 ));
             }
             TraceData::Module {
