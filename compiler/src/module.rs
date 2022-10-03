@@ -141,7 +141,7 @@ impl Module {
             ModuleKind::Code => vec![
                 {
                     let mut path = path.clone();
-                    path.push(".candy");
+                    path.push("_.candy");
                     path
                 },
                 {
