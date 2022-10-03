@@ -99,7 +99,7 @@ pub async fn run_server(
         let module_with_new_insight = 'new_insight: {
             if let Some(module) = constant_evaluator.run(&db) {
                 let (heap, closures) = constant_evaluator.get_fuzzable_closures(&module);
-                fuzzer.update_module(module.clone(), heap, &closures);
+                fuzzer.update_module(module.clone(), &heap, &closures);
                 break 'new_insight Some(module);
             }
             if let Some(module) = fuzzer.run(&db) {

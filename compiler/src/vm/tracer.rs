@@ -42,10 +42,6 @@ pub enum EventData {
     NeedsEnded {
         nothing: Pointer,
     },
-    ParallelStarted,
-    ParallelEnded {
-        return_value: Pointer,
-    },
     ModuleStarted {
         module: Module,
     },
@@ -78,7 +74,6 @@ pub enum StackEntry {
         condition: Pointer,
         reason: Pointer,
     },
-    Parallel,
     Module {
         module: Module,
     },
@@ -111,12 +106,6 @@ impl Tracer {
                 EventData::NeedsEnded { .. } => {
                     stack.pop().unwrap();
                 }
-                EventData::ParallelStarted => {
-                    stack.push(StackEntry::Parallel);
-                }
-                EventData::ParallelEnded { .. } => {
-                    stack.pop().unwrap();
-                }
                 EventData::ModuleStarted { module } => stack.push(StackEntry::Module { module }),
                 EventData::ModuleEnded { .. } => {
                     stack.pop().unwrap();
@@ -146,9 +135,6 @@ impl Tracer {
                         format!("needs {} {}", condition.format(heap), reason.format(heap)),
                         Some(id),
                     ),
-                    StackEntry::Parallel { .. } => {
-                        ("parallel section (todo: format children)".to_string(), None)
-                    }
                     StackEntry::Module { module } => (format!("use {module}"), None),
                 };
                 let caller_location_string = {
@@ -215,9 +201,6 @@ pub enum TraceData {
         id: Id,
         condition: Pointer,
         reason: Pointer,
-        result: TraceResult,
-    },
-    Parallel {
         result: TraceResult,
     },
     Module {
@@ -311,17 +294,6 @@ impl Tracer {
                         },
                     });
                 }
-                EventData::ParallelStarted => {}
-                EventData::ParallelEnded { return_value } => {
-                    let span = stack.pop().unwrap();
-                    stack.last_mut().unwrap().inner.push(Trace {
-                        start: span.start,
-                        end: event.when,
-                        data: TraceData::Parallel {
-                            result: TraceResult::Returned(*return_value),
-                        },
-                    });
-                }
                 EventData::ModuleStarted { module } => {
                     stack.push(Span {
                         start: event.when,
@@ -350,9 +322,6 @@ impl Tracer {
             }
         }
         stack.pop().unwrap().inner.pop().unwrap() // TODO: handle multiple traces
-    }
-    pub fn format_full_trace(&self, heap: &Heap) -> String {
-        self.full_trace().format(heap)
     }
 }
 
@@ -404,12 +373,6 @@ impl Trace {
                     "needs {} {} = {}",
                     condition.format(heap),
                     reason.format(heap),
-                    result.format(heap),
-                ));
-            }
-            TraceData::Parallel { result } => {
-                lines.push(format!(
-                    "parallel section that completed with {}",
                     result.format(heap),
                 ));
             }

@@ -6,7 +6,7 @@ use crate::{
         self,
         context::{ExecutionController, UseProvider},
         tracer::Tracer,
-        Closure, Heap, Pointer, Vm,
+        Closure, Heap, Pointer, TearDownResult, Vm,
     },
 };
 use std::mem;
@@ -106,16 +106,17 @@ impl Fuzzer {
                     // If a `needs` directly inside the tested closure was not
                     // satisfied, then the panic is not closure's fault, but our
                     // fault.
+                    let TearDownResult { heap, tracer, .. } = vm.tear_down();
                     let is_our_fault =
-                        did_need_in_closure_cause_panic(db, &self.closure_id, &vm.cloned_tracer());
+                        did_need_in_closure_cause_panic(db, &self.closure_id, &tracer);
                     if is_our_fault {
                         Status::new_fuzzing_attempt(&self.closure_heap, self.closure)
                     } else {
                         Status::PanickedForArguments {
-                            heap: vm.fiber().heap.clone(),
+                            heap,
                             arguments,
                             reason,
-                            tracer: vm.fiber().tracer.clone(),
+                            tracer,
                         }
                     }
                 }

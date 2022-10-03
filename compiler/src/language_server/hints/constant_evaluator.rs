@@ -13,7 +13,7 @@ use crate::{
         self,
         context::{DbUseProvider, RunLimitedNumberOfInstructions},
         tracer::{EventData, StackEntry},
-        Closure, Heap, Pointer, Vm,
+        Closure, Heap, Pointer, TearDownResult, Vm,
     },
 };
 use itertools::Itertools;
@@ -61,17 +61,14 @@ impl ConstantEvaluator {
         }
     }
 
-    pub fn get_fuzzable_closures(&self, module: &Module) -> (&Heap, Vec<(Id, Pointer)>) {
+    pub fn get_fuzzable_closures(&self, module: &Module) -> (Heap, Vec<(Id, Pointer)>) {
         let vm = &self.vms[module];
-        (
-            &vm.fiber().heap,
-            vm.fiber()
-                .fuzzable_closures
-                .iter()
-                .filter(|(id, _)| &id.module == module)
-                .cloned()
-                .collect_vec(),
-        )
+        let TearDownResult {
+            heap,
+            fuzzable_closures,
+            ..
+        } = vm.clone().tear_down();
+        (heap, fuzzable_closures)
     }
 
     pub fn get_hints(&self, db: &Database, module: &Module) -> Vec<Hint> {
@@ -86,13 +83,9 @@ impl ConstantEvaluator {
                 hints.push(hint);
             }
         };
-        if module.to_possible_paths().is_some() {
-            let fiber = vm.fiber();
-            module
-                .dump_associated_debug_file("trace", &fiber.tracer.format_full_trace(&fiber.heap));
-        }
 
-        for entry in &vm.cloned_tracer().events {
+        let TearDownResult { heap, tracer, .. } = vm.clone().tear_down();
+        for entry in &tracer.events {
             if let EventData::ValueEvaluated { id, value } = &entry.data {
                 if &id.module != module {
                     continue;
@@ -115,7 +108,7 @@ impl ConstantEvaluator {
 
                 hints.push(Hint {
                     kind: HintKind::Value,
-                    text: value.format(&vm.fiber().heap),
+                    text: value.format(&heap),
                     position: id_to_end_of_line(db, id.clone()).unwrap(),
                 });
             }
@@ -129,7 +122,8 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.
-    let stack = vm.fiber().tracer.stack_trace();
+    let TearDownResult { heap, tracer, .. } = vm.clone().tear_down();
+    let stack = tracer.stack_trace();
     if stack.len() == 1 {
         // The stack only contains an `InModule` entry. This indicates an error
         // during compilation resulting in a top-level error instruction.
@@ -152,10 +146,8 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
             id,
             format!(
                 "{} {}",
-                closure.format(&vm.fiber().heap),
-                args.iter()
-                    .map(|arg| arg.format(&vm.fiber().heap))
-                    .join(" ")
+                closure.format(&heap),
+                args.iter().map(|arg| arg.format(&heap)).join(" ")
             ),
         ),
         StackEntry::Needs {
@@ -164,11 +156,7 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
             reason,
         } => (
             id,
-            format!(
-                "needs {} {}",
-                condition.format(&vm.fiber().heap),
-                reason.format(&vm.fiber().heap)
-            ),
+            format!("needs {} {}", condition.format(&heap), reason.format(&heap)),
         ),
         _ => unreachable!(),
     };

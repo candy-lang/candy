@@ -13,7 +13,6 @@ use self::{
         UseProvider,
     },
     heap::{ChannelId, SendPort},
-    tracer::Tracer,
 };
 pub use fiber::{Fiber, TearDownResult};
 pub use heap::{Closure, Heap, Object, Pointer, Struct};
@@ -205,14 +204,14 @@ impl Vm {
         matches!(self.status(), Status::CanRun)
     }
 
-    pub fn fiber(&self) -> &Fiber {
-        // TODO: Remove before merging the PR
-        todo!()
-    }
-    pub fn cloned_tracer(&self) -> Tracer {
-        // TODO: Remove
-        self.fiber().tracer.clone()
-    }
+    // pub fn fiber(&self) -> &Fiber {
+    //     // TODO: Remove before merging the PR
+    //     todo!()
+    // }
+    // pub fn cloned_tracer(&self) -> Tracer {
+    //     // TODO: Remove
+    //     self.fiber().tracer.clone()
+    // }
 
     /// Can be called at any time from outside the VM to create a channel that
     /// can be used to communicate with the outside world.
