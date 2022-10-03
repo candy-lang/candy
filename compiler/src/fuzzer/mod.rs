@@ -54,7 +54,7 @@ pub async fn fuzz(db: &Database, module: Module) {
                 info!("This was the stack trace:");
                 tracer.dump_stack_trace(db, heap);
 
-                module.dump_associated_debug_file("trace", &tracer.full_trace().format(&heap));
+                module.dump_associated_debug_file("trace", &tracer.full_trace().format(heap));
             }
         }
     }

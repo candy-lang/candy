@@ -185,8 +185,12 @@ impl Tracer {
 // Full traces are a computed tree view of the whole execution.
 
 pub struct Trace {
+    #[allow(dead_code)]
     start: Instant,
+
+    #[allow(dead_code)]
     end: Instant,
+
     data: TraceData,
 }
 pub enum TraceData {
@@ -211,7 +215,11 @@ pub enum TraceData {
 }
 pub enum TraceResult {
     Returned(Pointer),
+
+    #[allow(dead_code)]
     Panicked(Pointer),
+
+    #[allow(dead_code)]
     Canceled,
 }
 

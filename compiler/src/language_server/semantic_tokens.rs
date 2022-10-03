@@ -121,6 +121,7 @@ impl<'a> Context<'a> {
             self.cursor,
         );
 
+        #[allow(clippy::bool_to_int_with_if)]
         let definition_modifier = if type_ == SemanticTokenType::Assignment {
             0b1
         } else {
