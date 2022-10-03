@@ -117,9 +117,12 @@ Major milestones:
 
 ## Short-term TODOs
 
-- implement fibers, channels, and nurseries
-- remove builtinPrint
+- casing of module names
+- fix fault attribution
+- rearchitect tracing
+- new name?
 - add caching while compile-time evaluating code
+- tags?
 - pattern matching
 - pipe operator
 - text interpolation
@@ -127,13 +130,14 @@ Major milestones:
 - inline functions
 - minimize inputs found through fuzzing
 - fuzz parser
+- remove builtinPrint
 - tail call optimization
-- new name?
 - parse function declaration with doc comment but no code
+- tracing visualization
+- distinguish packages from normal modules
 - complain about comment lines with too much indentation
 - develop guidelines about how to format reasons
 - module files: `.candy` vs `_.candy`?
-- casing of module names?
 
 ## How to use Candy
 
