@@ -27,7 +27,7 @@ use crate::{
     language_server::utils::LspPositionConversion,
     module::{Module, ModuleKind},
     vm::{
-        context::{DbUseProvider, ModularContext, RunForever},
+        context::{DbUseProvider, RunForever},
         Closure, Status, Struct, TearDownResult, Vm,
     },
 };
@@ -212,11 +212,7 @@ fn run(options: CandyRunOptions) {
         match vm.status() {
             Status::CanRun => {
                 debug!("VM still running.");
-                vm.run(&mut ModularContext {
-                    use_provider: DbUseProvider { db: &db },
-                    execution_controller: RunForever,
-                });
-                // TODO: handle operations
+                vm.run(&mut DbUseProvider { db: &db }, &mut RunForever);
             }
             Status::WaitingForOperations => {
                 todo!("VM can't proceed until some operations complete.");
@@ -276,10 +272,7 @@ fn run(options: CandyRunOptions) {
         match vm.status() {
             Status::CanRun => {
                 debug!("VM still running.");
-                vm.run(&mut ModularContext {
-                    use_provider: DbUseProvider { db: &db },
-                    execution_controller: RunForever,
-                });
+                vm.run(&mut DbUseProvider { db: &db }, &mut RunForever);
                 // TODO: handle operations
             }
             Status::WaitingForOperations => {

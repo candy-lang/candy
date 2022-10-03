@@ -1,6 +1,6 @@
 use super::{
     channel::{Capacity, Packet},
-    context::Context,
+    context::PanickingUseProvider,
     fiber::{Fiber, Status},
     heap::{ChannelId, Closure, Data, Int, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
     Heap,
@@ -15,9 +15,8 @@ use tracing::{info, span, Level};
 use unicode_segmentation::UnicodeSegmentation;
 
 impl Fiber {
-    pub(super) fn run_builtin_function<C: Context>(
+    pub(super) fn run_builtin_function(
         &mut self,
-        context: &C,
         builtin_function: &BuiltinFunction,
         args: &[Pointer],
     ) {
@@ -65,7 +64,7 @@ impl Fiber {
             Ok(Return(value)) => self.data_stack.push(value),
             Ok(DivergeControlFlow { closure }) => {
                 self.data_stack.push(closure);
-                self.run_instruction(context, Instruction::Call { num_args: 0 });
+                self.run_instruction(&PanickingUseProvider, Instruction::Call { num_args: 0 });
             }
             Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
             Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },

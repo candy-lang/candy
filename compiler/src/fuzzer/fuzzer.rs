@@ -2,7 +2,12 @@ use super::{generator::generate_n_values, utils::did_need_in_closure_cause_panic
 use crate::{
     compiler::hir,
     database::Database,
-    vm::{self, context::Context, tracer::Tracer, Closure, Heap, Pointer, Vm},
+    vm::{
+        self,
+        context::{ExecutionController, UseProvider},
+        tracer::Tracer,
+        Closure, Heap, Pointer, Vm,
+    },
 };
 use std::mem;
 
@@ -67,18 +72,31 @@ impl Fuzzer {
         self.status.as_ref().unwrap()
     }
 
-    pub fn run<C: Context>(&mut self, db: &Database, context: &mut C) {
+    pub fn run<U: UseProvider, E: ExecutionController>(
+        &mut self,
+        db: &Database,
+        use_provider: &mut U,
+        execution_controller: &mut E,
+    ) {
         let mut status = mem::replace(&mut self.status, None).unwrap();
-        while matches!(status, Status::StillFuzzing { .. }) && context.should_continue_running() {
-            status = self.map_status(status, db, context);
+        while matches!(status, Status::StillFuzzing { .. })
+            && execution_controller.should_continue_running()
+        {
+            status = self.map_status(status, db, use_provider, execution_controller);
         }
         self.status = Some(status);
     }
-    fn map_status<C: Context>(&self, status: Status, db: &Database, context: &mut C) -> Status {
+    fn map_status<U: UseProvider, E: ExecutionController>(
+        &self,
+        status: Status,
+        db: &Database,
+        use_provider: &mut U,
+        execution_controller: &mut E,
+    ) -> Status {
         match status {
             Status::StillFuzzing { mut vm, arguments } => match vm.status() {
                 vm::Status::CanRun => {
-                    vm.run(context);
+                    vm.run(use_provider, execution_controller);
                     Status::StillFuzzing { vm, arguments }
                 }
                 vm::Status::WaitingForOperations => panic!("Fuzzing should not have to wait on channel operations because arguments were not channels."),

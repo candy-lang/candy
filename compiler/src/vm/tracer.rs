@@ -147,8 +147,7 @@ impl Tracer {
                         Some(id),
                     ),
                     StackEntry::Parallel { .. } => {
-                        (format!("parallel section (todo: format children)"), None)
-                        // TODO: format
+                        ("parallel section (todo: format children)".to_string(), None)
                     }
                     StackEntry::Module { module } => (format!("use {module}"), None),
                 };

@@ -7,7 +7,7 @@ use crate::{
     database::Database,
     module::Module,
     vm::{
-        context::{DbUseProvider, ModularContext, RunForever, RunLimitedNumberOfInstructions},
+        context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
         Closure, Vm,
     },
 };
@@ -18,10 +18,7 @@ pub async fn fuzz(db: &Database, module: Module) {
     let (fuzzables_heap, fuzzables) = {
         let mut vm = Vm::new();
         vm.set_up_for_running_module_closure(Closure::of_module(db, module.clone()).unwrap());
-        vm.run(&mut ModularContext {
-            use_provider: DbUseProvider { db },
-            execution_controller: RunForever,
-        });
+        vm.run(&mut DbUseProvider { db }, &mut RunForever);
         let result = vm.tear_down();
         (result.heap, result.fuzzable_closures)
     };
@@ -35,10 +32,8 @@ pub async fn fuzz(db: &Database, module: Module) {
         let mut fuzzer = Fuzzer::new(&fuzzables_heap, closure, id.clone());
         fuzzer.run(
             db,
-            &mut ModularContext {
-                use_provider: DbUseProvider { db },
-                execution_controller: RunLimitedNumberOfInstructions::new(1000),
-            },
+            &mut DbUseProvider { db },
+            &mut RunLimitedNumberOfInstructions::new(1000),
         );
         match fuzzer.status() {
             Status::StillFuzzing { .. } => {}

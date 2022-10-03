@@ -8,7 +8,10 @@ mod use_module;
 
 use self::{
     channel::{ChannelBuf, Packet},
-    context::Context,
+    context::{
+        CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions,
+        UseProvider,
+    },
     heap::{ChannelId, SendPort},
     tracer::Tracer,
 };
@@ -32,7 +35,6 @@ pub struct Vm {
     fibers: HashMap<FiberId, FiberTree>,
     root_fiber: Option<FiberId>, // only None when no fiber is created yet
 
-    // TODO: Drop channels
     channels: HashMap<ChannelId, Channel>,
     pub external_operations: HashMap<ChannelId, Vec<Operation>>,
 
@@ -241,7 +243,26 @@ impl Vm {
         self.external_operations.remove(&channel);
     }
 
-    pub fn run<C: Context>(&mut self, context: &mut C) {
+    pub fn run<U: UseProvider, E: ExecutionController>(
+        &mut self,
+        use_provider: &mut U,
+        execution_controller: &mut E,
+    ) {
+        while self.can_run() && execution_controller.should_continue_running() {
+            self.run_raw(
+                use_provider,
+                &mut CombiningExecutionController::new(
+                    execution_controller,
+                    &mut RunLimitedNumberOfInstructions::new(100),
+                ),
+            );
+        }
+    }
+    fn run_raw<U: UseProvider, E: ExecutionController>(
+        &mut self,
+        use_provider: &mut U,
+        execution_controller: &mut E,
+    ) {
         assert!(
             self.can_run(),
             "Called Vm::run on a VM that is not ready to run."
@@ -261,11 +282,10 @@ impl Vm {
             }
         };
         if !matches!(fiber.status(), fiber::Status::Running) {
-            return; // TODO: handle
+            return;
         }
 
-        // TODO: Limit context.
-        fiber.run(context);
+        fiber.run(use_provider, execution_controller);
 
         let is_finished = match fiber.status() {
             fiber::Status::Running => false,

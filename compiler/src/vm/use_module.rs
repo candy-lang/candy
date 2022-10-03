@@ -1,5 +1,5 @@
 use super::{
-    context::{Context, UseResult},
+    context::{PanickingUseProvider, UseProvider, UseResult},
     heap::{Closure, Heap, Pointer, Text},
     Fiber,
 };
@@ -10,16 +10,16 @@ use crate::{
 use itertools::Itertools;
 
 impl Fiber {
-    pub fn use_module<C: Context>(
+    pub fn use_module<U: UseProvider>(
         &mut self,
-        context: &C,
+        use_provider: &U,
         current_module: Module,
         relative_path: Pointer,
     ) -> Result<(), String> {
         let target = UsePath::parse(&self.heap, relative_path)?;
         let module = target.resolve_relative_to(current_module)?;
 
-        match context.use_module(module.clone())? {
+        match use_provider.use_module(module.clone())? {
             UseResult::Asset(bytes) => {
                 let bytes = bytes
                     .iter()
@@ -32,7 +32,7 @@ impl Fiber {
                 let module_closure = Closure::of_module_lir(module, lir);
                 let address = self.heap.create_closure(module_closure);
                 self.data_stack.push(address);
-                self.run_instruction(context, Instruction::Call { num_args: 0 });
+                self.run_instruction(&PanickingUseProvider, Instruction::Call { num_args: 0 });
             }
         }
 

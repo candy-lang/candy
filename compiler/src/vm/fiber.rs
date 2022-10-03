@@ -1,13 +1,13 @@
 use super::{
     channel::{Capacity, Packet},
-    context::Context,
+    context::{ExecutionController, UseProvider},
     heap::{Builtin, ChannelId, Closure, Data, Heap, Pointer},
     tracer::{EventData, Tracer},
 };
 use crate::{
     compiler::{hir::Id, lir::Instruction},
     module::Module,
-    vm::context::DummyContext,
+    vm::context::PanickingUseProvider,
 };
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -103,7 +103,7 @@ impl Fiber {
 
         fiber.status = Status::Running;
         fiber.run_instruction(
-            &DummyContext,
+            &PanickingUseProvider,
             Instruction::Call {
                 num_args: arguments.len(),
             },
@@ -195,12 +195,18 @@ impl Fiber {
         self.status = Status::Panicked { reason };
     }
 
-    pub fn run<C: Context>(&mut self, context: &mut C) {
+    pub fn run<U: UseProvider, E: ExecutionController>(
+        &mut self,
+        use_provider: &mut U,
+        execution_controller: &mut E,
+    ) {
         assert!(
             matches!(self.status, Status::Running),
             "Called Fiber::run on a fiber that is not ready to run."
         );
-        while matches!(self.status, Status::Running) && context.should_continue_running() {
+        while matches!(self.status, Status::Running)
+            && execution_controller.should_continue_running()
+        {
             let current_closure = self.heap.get(self.next_instruction.closure);
             let current_body = if let Data::Closure(Closure { body, .. }) = &current_closure.data {
                 body
@@ -234,15 +240,15 @@ impl Fiber {
             }
 
             self.next_instruction.instruction += 1;
-            self.run_instruction(context, instruction);
-            context.instruction_executed();
+            self.run_instruction(use_provider, instruction);
+            execution_controller.instruction_executed();
 
             if self.next_instruction == InstructionPointer::null_pointer() {
                 self.status = Status::Done;
             }
         }
     }
-    pub fn run_instruction<C: Context>(&mut self, context: &C, instruction: Instruction) {
+    pub fn run_instruction<U: UseProvider>(&mut self, use_provider: &U, instruction: Instruction) {
         match instruction {
             Instruction::CreateInt(int) => {
                 let address = self.heap.create_int(int.into());
@@ -338,7 +344,7 @@ impl Fiber {
                     }
                     Data::Builtin(Builtin { function: builtin }) => {
                         self.heap.drop(closure_address);
-                        self.run_builtin_function(context, &builtin, &args);
+                        self.run_builtin_function(&builtin, &args);
                     }
                     _ => {
                         self.panic(format!(
@@ -355,7 +361,7 @@ impl Fiber {
             }
             Instruction::UseModule { current_module } => {
                 let relative_path = self.data_stack.pop().unwrap();
-                match self.use_module(context, current_module, relative_path) {
+                match self.use_module(use_provider, current_module, relative_path) {
                     Ok(()) => {}
                     Err(reason) => {
                         self.panic(reason);

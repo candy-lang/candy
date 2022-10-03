@@ -11,7 +11,7 @@ use crate::{
     module::Module,
     vm::{
         self,
-        context::{DbUseProvider, ModularContext, RunLimitedNumberOfInstructions},
+        context::{DbUseProvider, RunLimitedNumberOfInstructions},
         tracer::{EventData, StackEntry},
         Closure, Heap, Pointer, Vm,
     },
@@ -51,10 +51,10 @@ impl ConstantEvaluator {
         );
 
         if let Some((module, vm)) = running_vms.choose_mut(&mut thread_rng()) {
-            vm.run(&mut ModularContext {
-                use_provider: DbUseProvider { db },
-                execution_controller: RunLimitedNumberOfInstructions::new(500),
-            });
+            vm.run(
+                &mut DbUseProvider { db },
+                &mut RunLimitedNumberOfInstructions::new(500),
+            );
             Some(module.clone())
         } else {
             None

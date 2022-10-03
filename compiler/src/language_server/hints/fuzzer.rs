@@ -8,7 +8,7 @@ use crate::{
     fuzzer::{Fuzzer, Status},
     module::Module,
     vm::{
-        context::{DbUseProvider, ModularContext, RunLimitedNumberOfInstructions},
+        context::{DbUseProvider, RunLimitedNumberOfInstructions},
         tracer::EventData,
         Heap, Pointer,
     },
@@ -56,10 +56,8 @@ impl FuzzerManager {
         let fuzzer = running_fuzzers.choose_mut(&mut thread_rng())?;
         fuzzer.run(
             db,
-            &mut ModularContext {
-                use_provider: DbUseProvider { db },
-                execution_controller: RunLimitedNumberOfInstructions::new(100),
-            },
+            &mut DbUseProvider { db },
+            &mut RunLimitedNumberOfInstructions::new(100),
         );
 
         match &fuzzer.status() {
