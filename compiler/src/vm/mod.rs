@@ -229,6 +229,7 @@ impl Vm {
         }
     }
 
+    #[allow(dead_code)]
     pub fn complete_receive(&mut self, performing_fiber: Option<FiberId>, packet: Packet) {
         if let Some(fiber) = performing_fiber {
             let tree = self.fibers.get_mut(&fiber).unwrap();
