@@ -60,7 +60,7 @@ impl FullTracer {
         }
         stacks
     }
-    pub fn format_stack_traces(&self, db: &Database, heap: &Heap) -> String {
+    pub fn format_stack_traces(&self, db: &Database) -> String {
         let mut lines = vec![];
 
         for (fiber, stack) in self.stack_traces() {
@@ -70,7 +70,7 @@ impl FullTracer {
                     StackEntry::Call { id, closure, args } => (
                         format!(
                             "{closure} {}",
-                            args.iter().map(|arg| arg.format(heap)).join(" ")
+                            args.iter().map(|arg| arg.format(&self.heap)).join(" ")
                         ),
                         Some(id),
                     ),
@@ -79,7 +79,11 @@ impl FullTracer {
                         condition,
                         reason,
                     } => (
-                        format!("needs {} {}", condition.format(heap), reason.format(heap)),
+                        format!(
+                            "needs {} {}",
+                            condition.format(&self.heap),
+                            reason.format(&self.heap)
+                        ),
                         Some(id),
                     ),
                     StackEntry::Module { module } => (format!("use {module}"), None),
@@ -123,8 +127,8 @@ impl FullTracer {
         }
         lines.join("\n")
     }
-    pub fn dump_stack_traces(&self, db: &Database, heap: &Heap) {
-        for line in self.format_stack_traces(db, heap).lines() {
+    pub fn dump_stack_traces(&self, db: &Database) {
+        for line in self.format_stack_traces(db).lines() {
             error!("{}", line);
         }
     }

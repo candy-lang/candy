@@ -28,8 +28,8 @@ use crate::{
     language_server::utils::LspPositionConversion,
     module::{Module, ModuleKind},
     vm::{
-        context::{DbUseProvider, RunForever},
-        tracer::DummyTracer,
+        context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
+        tracer::{DummyTracer, FullTracer},
         Closure, Status, Struct, Vm,
     },
 };
@@ -207,6 +207,9 @@ fn run(options: CandyRunOptions) {
 
     let path_string = options.file.to_string_lossy();
     info!("Running `{path_string}`.");
+
+    let mut tracer = FullTracer::new();
+
     let mut vm = Vm::new();
     vm.set_up_for_running_module_closure(module_closure);
     loop {
@@ -216,8 +219,8 @@ fn run(options: CandyRunOptions) {
                 debug!("VM still running.");
                 vm.run(
                     &mut DbUseProvider { db: &db },
-                    &mut RunForever,
-                    &mut DummyTracer,
+                    &mut RunLimitedNumberOfInstructions::new(100),
+                    &mut tracer,
                 );
             }
             Status::WaitingForOperations => {
@@ -249,8 +252,7 @@ fn run(options: CandyRunOptions) {
         Err(reason) => {
             error!("The module panicked because {reason}.");
             error!("This is the stack trace:");
-            // tracer.dump_stack_trace(&db, &heap);
-            todo!();
+            tracer.dump_stack_traces(&db);
             return;
         }
     };
