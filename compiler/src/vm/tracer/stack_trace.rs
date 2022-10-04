@@ -39,6 +39,14 @@ impl FullTracer {
             if let Event::InFiber { fiber, event } = &timed_event.event {
                 let stack = stacks.entry(*fiber).or_default();
                 match event {
+                    InFiberEvent::ModuleStarted { module } => {
+                        stack.push(StackEntry::Module {
+                            module: module.clone(),
+                        });
+                    }
+                    InFiberEvent::ModuleEnded { .. } => {
+                        stack.pop().unwrap();
+                    }
                     InFiberEvent::CallStarted { id, closure, args } => {
                         stack.push(StackEntry::Call {
                             id: id.clone(),
@@ -49,12 +57,18 @@ impl FullTracer {
                     InFiberEvent::CallEnded { .. } => {
                         stack.pop().unwrap();
                     }
-                    InFiberEvent::ModuleStarted { module } => {
-                        stack.push(StackEntry::Module {
-                            module: module.clone(),
+                    InFiberEvent::NeedsStarted {
+                        id,
+                        condition,
+                        reason,
+                    } => {
+                        stack.push(StackEntry::Needs {
+                            id: id.clone(),
+                            condition: *condition,
+                            reason: *reason,
                         });
                     }
-                    InFiberEvent::ModuleEnded { .. } => {
+                    InFiberEvent::NeedsEnded => {
                         stack.pop().unwrap();
                     }
                     _ => {}

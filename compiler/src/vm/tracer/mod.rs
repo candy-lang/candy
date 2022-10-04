@@ -26,6 +26,8 @@ pub trait InFiberTracer<'a> {
     fn found_fuzzable_closure(&mut self, heap: &Heap, id: Id, closure: Pointer);
     fn call_started(&mut self, heap: &Heap, id: Id, closure: Pointer, args: Vec<Pointer>);
     fn call_ended(&mut self, heap: &Heap, return_value: Pointer);
+    fn needs_started(&mut self, heap: &Heap, id: Id, condition: Pointer, reason: Pointer);
+    fn needs_ended(&mut self);
 }
 
 // A dummy version of the tracer that is used when running known instructions
@@ -53,6 +55,8 @@ impl<'a> InFiberTracer<'a> for DummyInFiberTracer {
     fn found_fuzzable_closure(&mut self, _heap: &Heap, _id: Id, _closure: Pointer) {}
     fn call_started(&mut self, _heap: &Heap, _id: Id, _closure: Pointer, _args: Vec<Pointer>) {}
     fn call_ended(&mut self, _heap: &Heap, _return_value: Pointer) {}
+    fn needs_started(&mut self, _heap: &Heap, _id: Id, _condition: Pointer, _reason: Pointer) {}
+    fn needs_ended(&mut self) {}
 }
 
 // A full tracer that saves all events that occur with timestamps.
@@ -130,6 +134,12 @@ pub enum InFiberEvent {
     CallEnded {
         return_value: Pointer,
     },
+    NeedsStarted {
+        id: Id,
+        condition: Pointer,
+        reason: Pointer,
+    },
+    NeedsEnded,
 }
 
 impl FullTracer {
@@ -221,5 +231,17 @@ impl<'a> InFiberTracer<'a> for FullInFiberTracer<'a> {
     fn call_ended(&mut self, heap: &Heap, return_value: Pointer) {
         let return_value = self.import_from_fiber_heap(heap, return_value);
         self.push(InFiberEvent::CallEnded { return_value });
+    }
+    fn needs_started(&mut self, heap: &Heap, id: Id, condition: Pointer, reason: Pointer) {
+        let condition = self.import_from_fiber_heap(heap, condition);
+        let reason = self.import_from_fiber_heap(heap, reason);
+        self.push(InFiberEvent::NeedsStarted {
+            id,
+            condition,
+            reason,
+        });
+    }
+    fn needs_ended(&mut self) {
+        self.push(InFiberEvent::NeedsEnded);
     }
 }

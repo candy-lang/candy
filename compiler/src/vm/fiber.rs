@@ -420,18 +420,12 @@ impl Fiber {
                 let reason = self.data_stack[self.data_stack.len() - 1];
                 self.heap.dup(condition);
                 self.heap.dup(reason);
-                // TODO: Trace or remove this after fault analysis works.
-                // self.tracer.push(EventData::NeedsStarted {
-                //     id,
-                //     condition,
-                //     reason,
-                // });
+                tracer.needs_started(&self.heap, id, condition, reason);
             }
             Instruction::TraceNeedsEnds => {
                 let nothing = *self.data_stack.last().unwrap();
                 self.heap.dup(nothing);
-                // TODO: Trace or remove this after fault analysis works.
-                // self.tracer.push(EventData::NeedsEnded { nothing });
+                tracer.needs_ended();
             }
             Instruction::TraceModuleStarts { module } => {
                 if self.import_stack.contains(&module) {
