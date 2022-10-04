@@ -7,15 +7,19 @@ pub mod tracer;
 mod use_module;
 
 use self::{
-    channel::{ChannelBuf, Packet},
+    channel::ChannelBuf,
     context::{
         CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions,
         UseProvider,
     },
     heap::{ChannelId, SendPort},
+    tracer::Tracer,
 };
-pub use fiber::{Fiber, TearDownResult};
-pub use heap::{Closure, Heap, Object, Pointer, Struct};
+pub use self::{
+    channel::Packet,
+    fiber::Fiber,
+    heap::{Closure, Heap, Object, Pointer, Struct},
+};
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use std::{
@@ -160,7 +164,7 @@ impl Vm {
         self.set_up_with_fiber(Fiber::new_for_running_module_closure(closure))
     }
 
-    pub fn tear_down(mut self) -> TearDownResult {
+    pub fn tear_down(mut self) -> Result<Packet, String> {
         let tree = self.fibers.remove(&self.root_fiber.unwrap()).unwrap();
         let single = tree.into_single().unwrap();
         single.fiber.tear_down()
@@ -247,6 +251,7 @@ impl Vm {
         &mut self,
         use_provider: &mut U,
         execution_controller: &mut E,
+        tracer: &mut dyn Tracer,
     ) {
         while self.can_run() && execution_controller.should_continue_running() {
             self.run_raw(
@@ -255,6 +260,7 @@ impl Vm {
                     execution_controller,
                     &mut RunLimitedNumberOfInstructions::new(100),
                 ),
+                tracer,
             );
         }
     }
@@ -262,6 +268,7 @@ impl Vm {
         &mut self,
         use_provider: &mut U,
         execution_controller: &mut E,
+        tracer: &mut dyn Tracer,
     ) {
         assert!(
             self.can_run(),
@@ -285,7 +292,8 @@ impl Vm {
             return;
         }
 
-        fiber.run(use_provider, execution_controller);
+        let mut tracer = tracer.in_fiber_tracer(fiber_id);
+        fiber.run(use_provider, execution_controller, &mut *tracer);
 
         let is_finished = match fiber.status() {
             fiber::Status::Running => false,
@@ -385,7 +393,7 @@ impl Vm {
                 .unwrap()
                 .into_single()
                 .unwrap();
-            let TearDownResult { heap, result, .. } = single.fiber.tear_down();
+            let result = single.fiber.tear_down();
             let parent = single
                 .parent
                 .expect("we already checked we're not the root fiber");
@@ -398,14 +406,12 @@ impl Vm {
                     match result {
                         Ok(return_value) => {
                             let is_finished = parallel.children.is_empty();
-                            let packet = Packet {
-                                heap,
-                                value: return_value,
-                            };
                             match child {
-                                ChildKind::InitialChild => parallel.return_value = Some(packet),
+                                ChildKind::InitialChild => {
+                                    parallel.return_value = Some(return_value)
+                                }
                                 ChildKind::SpawnedChild(return_channel) => {
-                                    self.send_to_channel(None, return_channel, packet)
+                                    self.send_to_channel(None, return_channel, return_value)
                                 }
                             }
 
@@ -419,9 +425,7 @@ impl Vm {
                 FiberTree::Try(Try { .. }) => {
                     self.fibers.replace(parent, |tree| {
                         let mut paused_fiber = tree.into_try().unwrap().paused_fiber;
-                        paused_fiber
-                            .fiber
-                            .complete_try(result.map(|value| Packet { heap, value }));
+                        paused_fiber.fiber.complete_try(result);
                         FiberTree::Single(paused_fiber)
                     });
                 }
@@ -564,8 +568,8 @@ impl Vm {
         }
     }
     fn parse_spawn_packet(packet: Packet) -> Option<(Heap, Pointer, ChannelId)> {
-        let Packet { mut heap, value } = packet;
-        let arguments: Struct = heap.get(value).data.clone().try_into().ok()?;
+        let Packet { mut heap, address } = packet;
+        let arguments: Struct = heap.get(address).data.clone().try_into().ok()?;
 
         let closure_symbol = heap.create_symbol("Closure".to_string());
         let closure_address = arguments.get(&heap, closure_symbol)?;

@@ -20,7 +20,7 @@ pub type Capacity = usize;
 #[derive(Clone)]
 pub struct Packet {
     pub heap: Heap,
-    pub value: Pointer,
+    pub address: Pointer,
 }
 
 impl ChannelBuf {
@@ -52,6 +52,12 @@ impl ChannelBuf {
     }
 }
 
+impl Packet {
+    pub fn clone_to_other_heap(&self, other: &mut Heap) -> Pointer {
+        self.heap.clone_single_to_other_heap(other, self.address)
+    }
+}
+
 impl fmt::Debug for ChannelBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self.packets.iter()).finish()
@@ -59,6 +65,6 @@ impl fmt::Debug for ChannelBuf {
 }
 impl fmt::Debug for Packet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.value.format(&self.heap))
+        write!(f, "{}", self.address.format(&self.heap))
     }
 }

@@ -5,10 +5,11 @@ use crate::{
     vm::{
         self,
         context::{ExecutionController, UseProvider},
-        tracer::Tracer,
-        Closure, Heap, Pointer, TearDownResult, Vm,
+        tracer::{DummyTracer, FullTracer},
+        Closure, Heap, Packet, Pointer, Vm,
     },
 };
+use itertools::Itertools;
 use std::mem;
 
 pub struct Fuzzer {
@@ -24,15 +25,15 @@ pub enum Status {
     // input that triggers the loop.
     StillFuzzing {
         vm: Vm,
-        arguments: Vec<Pointer>,
+        arguments: Vec<Packet>,
+        tracer: FullTracer,
     },
     // TODO: In the future, also add a state for trying to simplify the
     // arguments.
     PanickedForArguments {
-        heap: Heap,
-        arguments: Vec<Pointer>,
+        arguments: Vec<Packet>,
         reason: String,
-        tracer: Tracer,
+        tracer: FullTracer,
     },
 }
 
@@ -45,12 +46,20 @@ impl Status {
 
         let mut vm_heap = Heap::default();
         let closure = closure_heap.clone_single_to_other_heap(&mut vm_heap, closure);
-        let arguments = generate_n_values(&mut vm_heap, num_args);
+        let arguments = generate_n_values(num_args);
+        let argument_addresses = arguments
+            .iter()
+            .map(|arg| arg.clone_to_other_heap(&mut vm_heap))
+            .collect_vec();
 
         let mut vm = Vm::new();
-        vm.set_up_for_running_closure(vm_heap, closure, &arguments);
+        vm.set_up_for_running_closure(vm_heap, closure, &argument_addresses);
 
-        Status::StillFuzzing { vm, arguments }
+        Status::StillFuzzing {
+            vm,
+            arguments,
+            tracer: FullTracer::new(),
+        }
     }
 }
 impl Fuzzer {
@@ -94,10 +103,10 @@ impl Fuzzer {
         execution_controller: &mut E,
     ) -> Status {
         match status {
-            Status::StillFuzzing { mut vm, arguments } => match vm.status() {
+            Status::StillFuzzing { mut vm, arguments, tracer } => match vm.status() {
                 vm::Status::CanRun => {
-                    vm.run(use_provider, execution_controller);
-                    Status::StillFuzzing { vm, arguments }
+                    vm.run(use_provider, execution_controller, &mut DummyTracer);
+                    Status::StillFuzzing { vm, arguments, tracer }
                 }
                 vm::Status::WaitingForOperations => panic!("Fuzzing should not have to wait on channel operations because arguments were not channels."),
                 // The VM finished running without panicking.
@@ -106,14 +115,13 @@ impl Fuzzer {
                     // If a `needs` directly inside the tested closure was not
                     // satisfied, then the panic is not closure's fault, but our
                     // fault.
-                    let TearDownResult { heap, tracer, .. } = vm.tear_down();
+                    let result = vm.tear_down();
                     let is_our_fault =
-                        did_need_in_closure_cause_panic(db, &self.closure_id, &tracer);
+                        did_need_in_closure_cause_panic(db, &self.closure_id);
                     if is_our_fault {
                         Status::new_fuzzing_attempt(&self.closure_heap, self.closure)
                     } else {
                         Status::PanickedForArguments {
-                            heap,
                             arguments,
                             reason,
                             tracer,
@@ -124,12 +132,10 @@ impl Fuzzer {
             // We already found some arguments that caused the closure to panic,
             // so there's nothing more to do.
             Status::PanickedForArguments {
-                heap,
                 arguments,
                 reason,
                 tracer,
             } => Status::PanickedForArguments {
-                heap,
                 arguments,
                 reason,
                 tracer,

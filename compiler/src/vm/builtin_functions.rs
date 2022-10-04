@@ -3,6 +3,7 @@ use super::{
     context::PanickingUseProvider,
     fiber::{Fiber, Status},
     heap::{ChannelId, Closure, Data, Int, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
+    tracer::DummyInFiberTracer,
     Heap,
 };
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
@@ -64,7 +65,11 @@ impl Fiber {
             Ok(Return(value)) => self.data_stack.push(value),
             Ok(DivergeControlFlow { closure }) => {
                 self.data_stack.push(closure);
-                self.run_instruction(&PanickingUseProvider, Instruction::Call { num_args: 0 });
+                self.run_instruction(
+                    &mut PanickingUseProvider,
+                    &mut DummyInFiberTracer,
+                    Instruction::Call { num_args: 0 },
+                );
             }
             Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
             Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },
@@ -153,10 +158,10 @@ impl Heap {
     fn channel_send(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |port: SendPort, packet: Any| {
             let mut heap = Heap::default();
-            let value = self.clone_single_to_other_heap(&mut heap, packet.address);
+            let address = self.clone_single_to_other_heap(&mut heap, packet.address);
             Send {
                 channel: port.channel,
-                packet: Packet { heap, value },
+                packet: Packet { heap, address },
             }
         })
     }

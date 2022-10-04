@@ -12,8 +12,8 @@ use crate::{
     vm::{
         self,
         context::{DbUseProvider, RunLimitedNumberOfInstructions},
-        tracer::{EventData, StackEntry},
-        Closure, Heap, Pointer, TearDownResult, Vm,
+        tracer::{stack_trace::StackEntry, DummyTracer, FullTracer},
+        Closure, Heap, Pointer, Vm,
     },
 };
 use itertools::Itertools;
@@ -54,6 +54,7 @@ impl ConstantEvaluator {
             vm.run(
                 &mut DbUseProvider { db },
                 &mut RunLimitedNumberOfInstructions::new(500),
+                &mut DummyTracer,
             );
             Some(module.clone())
         } else {
@@ -63,12 +64,9 @@ impl ConstantEvaluator {
 
     pub fn get_fuzzable_closures(&self, module: &Module) -> (Heap, Vec<(Id, Pointer)>) {
         let vm = &self.vms[module];
-        let TearDownResult {
-            heap,
-            fuzzable_closures,
-            ..
-        } = vm.clone().tear_down();
-        (heap, fuzzable_closures)
+        let result = vm.clone().tear_down();
+        // (heap, fuzzable_closures)
+        todo!()
     }
 
     pub fn get_hints(&self, db: &Database, module: &Module) -> Vec<Hint> {
@@ -84,34 +82,36 @@ impl ConstantEvaluator {
             }
         };
 
-        let TearDownResult { heap, tracer, .. } = vm.clone().tear_down();
+        // let TearDownResult { heap, tracer, .. } = vm.clone().tear_down();
+        let heap: Heap = todo!();
+        let tracer: FullTracer = todo!();
         for entry in &tracer.events {
-            if let EventData::ValueEvaluated { id, value } = &entry.data {
-                if &id.module != module {
-                    continue;
-                }
-                let ast_id = match db.hir_to_ast_id(id.clone()) {
-                    Some(ast_id) => ast_id,
-                    None => continue,
-                };
-                let ast = match db.ast(module.clone()) {
-                    Some((ast, _)) => (*ast).clone(),
-                    None => continue,
-                };
-                let ast = match ast.find(&ast_id) {
-                    Some(ast) => ast,
-                    None => continue,
-                };
-                if !matches!(ast.kind, AstKind::Assignment(_)) {
-                    continue;
-                }
+            // if let EventData::ValueEvaluated { id, value } = &entry.data {
+            //     if &id.module != module {
+            //         continue;
+            //     }
+            //     let ast_id = match db.hir_to_ast_id(id.clone()) {
+            //         Some(ast_id) => ast_id,
+            //         None => continue,
+            //     };
+            //     let ast = match db.ast(module.clone()) {
+            //         Some((ast, _)) => (*ast).clone(),
+            //         None => continue,
+            //     };
+            //     let ast = match ast.find(&ast_id) {
+            //         Some(ast) => ast,
+            //         None => continue,
+            //     };
+            //     if !matches!(ast.kind, AstKind::Assignment(_)) {
+            //         continue;
+            //     }
 
-                hints.push(Hint {
-                    kind: HintKind::Value,
-                    text: value.format(&heap),
-                    position: id_to_end_of_line(db, id.clone()).unwrap(),
-                });
-            }
+            //     hints.push(Hint {
+            //         kind: HintKind::Value,
+            //         text: value.format(&heap),
+            //         position: id_to_end_of_line(db, id.clone()).unwrap(),
+            //     });
+            // }
         }
 
         hints
@@ -122,8 +122,10 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.
-    let TearDownResult { heap, tracer, .. } = vm.clone().tear_down();
-    let stack = tracer.stack_trace();
+    let heap: Heap = todo!(); // vm.clone().tear_down();
+    let tracer: FullTracer = todo!();
+    // let stack = tracer.stack_trace();
+    let stack: Vec<StackEntry> = todo!();
     if stack.len() == 1 {
         // The stack only contains an `InModule` entry. This indicates an error
         // during compilation resulting in a top-level error instruction.

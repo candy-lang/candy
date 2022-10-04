@@ -1,5 +1,6 @@
 #![feature(async_closure)]
 #![feature(box_patterns)]
+#![feature(generic_associated_types)]
 #![feature(let_chains)]
 #![feature(never_type)]
 #![feature(try_trait_v2)]
@@ -28,7 +29,8 @@ use crate::{
     module::{Module, ModuleKind},
     vm::{
         context::{DbUseProvider, RunForever},
-        Closure, Status, Struct, TearDownResult, Vm,
+        tracer::DummyTracer,
+        Closure, Status, Struct, Vm,
     },
 };
 use compiler::lir::Lir;
@@ -212,7 +214,11 @@ fn run(options: CandyRunOptions) {
         match vm.status() {
             Status::CanRun => {
                 debug!("VM still running.");
-                vm.run(&mut DbUseProvider { db: &db }, &mut RunForever);
+                vm.run(
+                    &mut DbUseProvider { db: &db },
+                    &mut RunForever,
+                    &mut DummyTracer,
+                );
             }
             Status::WaitingForOperations => {
                 todo!("VM can't proceed until some operations complete.");
@@ -221,29 +227,30 @@ fn run(options: CandyRunOptions) {
         }
     }
     info!("Tree: {:#?}", vm);
-    let TearDownResult {
-        tracer,
-        result,
-        mut heap,
-        ..
-    } = vm.tear_down();
+    let result = vm.tear_down();
 
     if options.debug {
-        module.dump_associated_debug_file("trace", &tracer.full_trace().format(&heap));
+        todo!();
+        // module.dump_associated_debug_file("trace", &tracer.full_trace().format(&heap));
     }
 
-    let exported_definitions: Struct = match result {
+    let (mut heap, exported_definitions): (_, Struct) = match result {
         Ok(return_value) => {
-            info!(
-                "The module exports these definitions: {}",
-                return_value.format(&heap),
-            );
-            heap.get(return_value).data.clone().try_into().unwrap()
+            info!("The module exports these definitions: {return_value:?}",);
+            let exported = return_value
+                .heap
+                .get(return_value.address)
+                .data
+                .clone()
+                .try_into()
+                .unwrap();
+            (return_value.heap, exported)
         }
         Err(reason) => {
             error!("The module panicked because {reason}.");
             error!("This is the stack trace:");
-            tracer.dump_stack_trace(&db, &heap);
+            // tracer.dump_stack_trace(&db, &heap);
+            todo!();
             return;
         }
     };
@@ -272,7 +279,11 @@ fn run(options: CandyRunOptions) {
         match vm.status() {
             Status::CanRun => {
                 debug!("VM still running.");
-                vm.run(&mut DbUseProvider { db: &db }, &mut RunForever);
+                vm.run(
+                    &mut DbUseProvider { db: &db },
+                    &mut RunForever,
+                    &mut DummyTracer,
+                );
                 // TODO: handle operations
             }
             Status::WaitingForOperations => {
@@ -292,7 +303,7 @@ fn run(options: CandyRunOptions) {
                     performing_fiber,
                     packet,
                 } => {
-                    info!("Sent to stdout: {}", packet.value.format(&packet.heap));
+                    info!("Sent to stdout: {}", packet.address.format(&packet.heap));
                     vm.complete_send(performing_fiber);
                 }
                 vm::Operation::Receive { .. } => unreachable!(),
@@ -301,19 +312,13 @@ fn run(options: CandyRunOptions) {
         }
     }
     info!("Tree: {:#?}", vm);
-    let TearDownResult {
-        tracer,
-        result,
-        heap,
-        ..
-    } = vm.tear_down();
-
-    match result {
-        Ok(return_value) => info!("The main function returned: {}", return_value.format(&heap)),
+    match vm.tear_down() {
+        Ok(return_value) => info!("The main function returned: {return_value:?}"),
         Err(reason) => {
             error!("The main function panicked because {reason}.");
             error!("This is the stack trace:");
-            tracer.dump_stack_trace(&db, &heap);
+            // tracer.dump_stack_trace(&db, &heap);
+            todo!();
         }
     }
 }

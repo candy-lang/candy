@@ -9,7 +9,6 @@ use crate::{
     module::Module,
     vm::{
         context::{DbUseProvider, RunLimitedNumberOfInstructions},
-        tracer::EventData,
         Heap, Pointer,
     },
 };
@@ -71,7 +70,6 @@ impl FuzzerManager {
 
         for fuzzer in self.fuzzers[module].values() {
             if let Status::PanickedForArguments {
-                heap,
                 arguments,
                 reason,
                 tracer,
@@ -97,10 +95,7 @@ impl FuzzerManager {
                             parameter_names
                                 .iter()
                                 .zip(arguments.iter())
-                                .map(|(name, argument)| format!(
-                                    "`{name} = {}`",
-                                    argument.format(heap)
-                                ))
+                                .map(|(name, argument)| format!("`{name} = {argument:?}`"))
                                 .collect_vec()
                                 .join_with_commas_and_and(),
                         ),
@@ -116,11 +111,12 @@ impl FuzzerManager {
                         // Find the innermost panicking call that is in the
                         // function.
                         .find(|entry| {
-                            let innermost_panicking_call_id = match &entry.data {
-                                EventData::CallStarted { id, .. } => id,
-                                EventData::NeedsStarted { id, .. } => id,
-                                _ => return false,
-                            };
+                            let innermost_panicking_call_id = todo!();
+                            // match &entry.event {
+                            //     EventData::CallStarted { id, .. } => id,
+                            //     EventData::NeedsStarted { id, .. } => id,
+                            //     _ => return false,
+                            // };
                             id.is_same_module_and_any_parent_of(innermost_panicking_call_id)
                                 && db.hir_to_cst_id(id.clone()).is_some()
                         });
@@ -133,25 +129,26 @@ impl FuzzerManager {
                             continue;
                         }
                     };
-                    let (call_id, name, arguments) = match &panicking_inner_call.data {
-                        EventData::CallStarted { id, closure, args } => {
-                            (id.clone(), closure.format(heap), args.clone())
-                        }
-                        EventData::NeedsStarted {
-                            id,
-                            condition,
-                            reason,
-                        } => (id.clone(), "needs".to_string(), vec![*condition, *reason]),
-                        _ => unreachable!(),
-                    };
-                    Hint {
-                        kind: HintKind::Fuzz,
-                        text: format!(
-                            "then `{name} {}` panics because {reason}.",
-                            arguments.iter().map(|arg| arg.format(heap)).join(" "),
-                        ),
-                        position: id_to_end_of_line(db, call_id).unwrap(),
-                    }
+                    todo!()
+                    // let (call_id, name, arguments) = match &panicking_inner_call.data {
+                    //     EventData::CallStarted { id, closure, args } => {
+                    //         (id.clone(), closure.format(heap), args.clone())
+                    //     }
+                    //     EventData::NeedsStarted {
+                    //         id,
+                    //         condition,
+                    //         reason,
+                    //     } => (id.clone(), "needs".to_string(), vec![*condition, *reason]),
+                    //     _ => unreachable!(),
+                    // };
+                    // Hint {
+                    //     kind: HintKind::Fuzz,
+                    //     text: format!(
+                    //         "then `{name} {}` panics because {reason}.",
+                    //         arguments.iter().map(|arg| arg.format(heap)).join(" "),
+                    //     ),
+                    //     position: id_to_end_of_line(db, call_id).unwrap(),
+                    // }
                 };
 
                 hints.push(vec![first_hint, second_hint]);

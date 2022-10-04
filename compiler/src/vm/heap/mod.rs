@@ -104,15 +104,18 @@ impl Heap {
     }
 
     pub fn create(&mut self, object: Data) -> Pointer {
-        let address = self.next_address;
-        self.next_address = Pointer::from_raw(self.next_address.raw() + 1);
-
+        let address = self.reserve_address();
         let object = Object {
             reference_count: 1,
             data: object,
         };
         trace!("Creating object {} at {address}.", object.format(self));
         self.objects.insert(address, object);
+        address
+    }
+    fn reserve_address(&mut self) -> Pointer {
+        let address = self.next_address;
+        self.next_address = Pointer::from_raw(self.next_address.raw() + 1);
         address
     }
     fn free(&mut self, address: Pointer) {
@@ -126,36 +129,32 @@ impl Heap {
 
     /// Clones all objects at the `root_addresses` into the `other` heap and
     /// returns a list of their addresses in the other heap.
-    pub fn clone_multiple_to_other_heap(
+    pub fn clone_multiple_to_other_heap_with_existing_mapping(
         &self,
         other: &mut Heap,
         addresses: &[Pointer],
+        address_map: &mut HashMap<Pointer, Pointer>,
     ) -> Vec<Pointer> {
         let mut objects_to_refcounts = HashMap::new();
         for address in addresses {
             self.gather_objects_to_clone(&mut objects_to_refcounts, *address);
         }
-        let num_objects = objects_to_refcounts.len();
 
-        let address_map: HashMap<Pointer, Pointer> = objects_to_refcounts
-            .keys()
-            .copied()
-            .zip(
-                (other.next_address.raw()..other.next_address.raw() + num_objects)
-                    .map(Pointer::from_raw),
-            )
-            .collect();
+        for object in objects_to_refcounts.keys() {
+            address_map
+                .entry(*object)
+                .or_insert_with(|| other.reserve_address());
+        }
 
         for (address, refcount) in objects_to_refcounts {
             other.objects.insert(
                 address_map[&address],
                 Object {
                     reference_count: refcount,
-                    data: Self::map_data(&address_map, &self.get(address).data),
+                    data: Self::map_data(address_map, &self.get(address).data),
                 },
             );
         }
-        other.next_address = Pointer::from_raw(other.next_address.raw() + num_objects);
 
         addresses
             .iter()
@@ -198,10 +197,29 @@ impl Heap {
             Data::ReceivePort(port) => Data::ReceivePort(ReceivePort::new(port.channel)),
         }
     }
-    pub fn clone_single_to_other_heap(&self, other: &mut Heap, address: Pointer) -> Pointer {
-        self.clone_multiple_to_other_heap(other, &[address])
+    pub fn clone_single_to_other_heap_with_existing_mapping(
+        &self,
+        other: &mut Heap,
+        address: Pointer,
+        address_map: &mut HashMap<Pointer, Pointer>,
+    ) -> Pointer {
+        self.clone_multiple_to_other_heap_with_existing_mapping(other, &[address], address_map)
             .pop()
             .unwrap()
+    }
+    pub fn clone_multiple_to_other_heap(
+        &self,
+        other: &mut Heap,
+        addresses: &[Pointer],
+    ) -> Vec<Pointer> {
+        self.clone_multiple_to_other_heap_with_existing_mapping(
+            other,
+            addresses,
+            &mut HashMap::new(),
+        )
+    }
+    pub fn clone_single_to_other_heap(&self, other: &mut Heap, address: Pointer) -> Pointer {
+        self.clone_single_to_other_heap_with_existing_mapping(other, address, &mut HashMap::new())
     }
 
     pub fn known_channels(&self) -> HashSet<ChannelId> {
