@@ -219,7 +219,7 @@ fn run(options: CandyRunOptions) {
                 debug!("VM still running.");
                 vm.run(
                     &mut DbUseProvider { db: &db },
-                    &mut RunLimitedNumberOfInstructions::new(100),
+                    &mut RunLimitedNumberOfInstructions::new(100000),
                     &mut tracer,
                 );
             }
@@ -251,8 +251,10 @@ fn run(options: CandyRunOptions) {
         }
         Err(reason) => {
             error!("The module panicked because {reason}.");
-            error!("This is the stack trace:");
-            tracer.dump_stack_traces(&db);
+            error!(
+                "This is the stack trace:\n{}",
+                tracer.format_stack_traces(&db)
+            );
             return;
         }
     };
@@ -318,9 +320,10 @@ fn run(options: CandyRunOptions) {
         Ok(return_value) => info!("The main function returned: {return_value:?}"),
         Err(reason) => {
             error!("The main function panicked because {reason}.");
-            error!("This is the stack trace:");
-            // tracer.dump_stack_trace(&db, &heap);
-            todo!();
+            error!(
+                "This is the stack trace:\n{}",
+                tracer.format_stack_traces(&db)
+            );
         }
     }
 }

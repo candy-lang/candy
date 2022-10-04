@@ -1,13 +1,16 @@
-use super::{super::heap::Pointer, Event, FiberId, FullTracer, Heap, InFiberEvent};
+use super::{super::heap::Pointer, Event, FiberId, FullTracer, InFiberEvent};
 use crate::{
-    compiler::{ast_to_hir::AstToHir, cst::CstDb, hir::Id},
+    compiler::{
+        ast_to_hir::AstToHir,
+        cst::{Cst, CstDb, CstKind},
+        hir::Id,
+    },
     database::Database,
     language_server::utils::LspPositionConversion,
     module::Module,
 };
 use itertools::Itertools;
 use std::collections::HashMap;
-use tracing::error;
 
 // Stack traces are a reduced view of the tracing state that represent the stack
 // trace at a given moment in time.
@@ -39,7 +42,7 @@ impl FullTracer {
                     InFiberEvent::CallStarted { id, closure, args } => {
                         stack.push(StackEntry::Call {
                             id: id.clone(),
-                            closure: closure.clone(),
+                            closure: *closure,
                             args: args.clone(),
                         });
                     }
@@ -66,70 +69,80 @@ impl FullTracer {
         for (fiber, stack) in self.stack_traces() {
             lines.push(format!("{fiber:?}:"));
             for entry in stack.iter().rev() {
-                let (call_string, hir_id) = match entry {
-                    StackEntry::Call { id, closure, args } => (
-                        format!(
-                            "{closure} {}",
-                            args.iter().map(|arg| arg.format(&self.heap)).join(" ")
-                        ),
-                        Some(id),
+                let hir_id = match entry {
+                    StackEntry::Call { id, .. } => Some(id),
+                    StackEntry::Needs { id, .. } => Some(id),
+                    StackEntry::Module { .. } => None,
+                };
+                let (cst_id, span) = if let Some(hir_id) = hir_id {
+                    let module = hir_id.module.clone();
+                    let cst_id = db.hir_to_cst_id(hir_id.clone());
+                    let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
+                    let span = cst.map(|cst| {
+                        (
+                            db.offset_to_lsp(module.clone(), cst.span.start),
+                            db.offset_to_lsp(module.clone(), cst.span.end),
+                        )
+                    });
+                    (cst_id, span)
+                } else {
+                    (None, None)
+                };
+                let caller_location_string = format!(
+                    "{} {}",
+                    hir_id
+                        .map(|id| format!("{id}"))
+                        .unwrap_or_else(|| "<no hir>".to_string()),
+                    span.map(|((start_line, start_col), (end_line, end_col))| format!(
+                        "{}:{} – {}:{}",
+                        start_line, start_col, end_line, end_col
+                    ))
+                    .unwrap_or_else(|| "<no location>".to_string())
+                );
+                let call_string = match entry {
+                    StackEntry::Call { closure, args, .. } => format!(
+                        "{} {}",
+                        cst_id
+                            .and_then(|id| {
+                                let cst = db.find_cst(hir_id.unwrap().module.clone(), id);
+                                match cst.kind {
+                                    CstKind::Call { receiver, .. } => {
+                                        receiver.extract_receiver_name()
+                                    }
+                                    _ => None,
+                                }
+                            })
+                            .unwrap_or_else(|| closure.format(&self.heap)),
+                        args.iter().map(|arg| arg.format(&self.heap)).join(" ")
                     ),
                     StackEntry::Needs {
-                        id,
-                        condition,
-                        reason,
-                    } => (
-                        format!(
-                            "needs {} {}",
-                            condition.format(&self.heap),
-                            reason.format(&self.heap)
-                        ),
-                        Some(id),
+                        condition, reason, ..
+                    } => format!(
+                        "needs {} {}",
+                        condition.format(&self.heap),
+                        reason.format(&self.heap),
                     ),
-                    StackEntry::Module { module } => (format!("use {module}"), None),
-                };
-                let caller_location_string = {
-                    let (hir_id, ast_id, cst_id, span) = if let Some(hir_id) = hir_id {
-                        let module = hir_id.module.clone();
-                        let ast_id = db.hir_to_ast_id(hir_id.clone());
-                        let cst_id = db.hir_to_cst_id(hir_id.clone());
-                        let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
-                        let span = cst.map(|cst| {
-                            (
-                                db.offset_to_lsp(module.clone(), cst.span.start),
-                                db.offset_to_lsp(module.clone(), cst.span.end),
-                            )
-                        });
-                        (Some(hir_id), ast_id, cst_id, span)
-                    } else {
-                        (None, None, None, None)
-                    };
-                    format!(
-                        "{}, {}, {}, {}",
-                        hir_id
-                            .map(|id| format!("{id}"))
-                            .unwrap_or_else(|| "<no hir>".to_string()),
-                        ast_id
-                            .map(|id| format!("{id}"))
-                            .unwrap_or_else(|| "<no ast>".to_string()),
-                        cst_id
-                            .map(|id| format!("{id}"))
-                            .unwrap_or_else(|| "<no cst>".to_string()),
-                        span.map(|((start_line, start_col), (end_line, end_col))| format!(
-                            "{}:{} – {}:{}",
-                            start_line, start_col, end_line, end_col
-                        ))
-                        .unwrap_or_else(|| "<no location>".to_string())
-                    )
+                    StackEntry::Module { module } => format!("module {module}"),
                 };
                 lines.push(format!("{caller_location_string:90} {call_string}"));
             }
         }
         lines.join("\n")
     }
-    pub fn dump_stack_traces(&self, db: &Database) {
-        for line in self.format_stack_traces(db).lines() {
-            error!("{}", line);
+}
+
+impl Cst {
+    fn extract_receiver_name(&self) -> Option<String> {
+        match &self.kind {
+            CstKind::TrailingWhitespace { child, .. } => child.extract_receiver_name(),
+            CstKind::Identifier(identifier) => Some(identifier.to_string()),
+            CstKind::Parenthesized { inner, .. } => inner.extract_receiver_name(),
+            CstKind::StructAccess { struct_, key, .. } => {
+                let struct_string = struct_.extract_receiver_name()?;
+                let key = key.extract_receiver_name()?;
+                Some(format!("{struct_string}.{key}"))
+            }
+            _ => None,
         }
     }
 }
