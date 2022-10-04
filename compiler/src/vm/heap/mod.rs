@@ -135,25 +135,26 @@ impl Heap {
         addresses: &[Pointer],
         address_map: &mut HashMap<Pointer, Pointer>,
     ) -> Vec<Pointer> {
-        let mut objects_to_refcounts = HashMap::new();
+        let mut additional_refcounts = HashMap::new();
         for address in addresses {
-            self.gather_objects_to_clone(&mut objects_to_refcounts, *address);
+            self.prepare_object_cloning(address_map, &mut additional_refcounts, other, *address);
         }
 
-        for object in objects_to_refcounts.keys() {
+        for object in additional_refcounts.keys() {
             address_map
                 .entry(*object)
                 .or_insert_with(|| other.reserve_address());
         }
 
-        for (address, refcount) in objects_to_refcounts {
-            other.objects.insert(
-                address_map[&address],
-                Object {
-                    reference_count: refcount,
+        for (address, refcount) in additional_refcounts {
+            other
+                .objects
+                .entry(address_map[&address])
+                .or_insert_with(|| Object {
+                    reference_count: 0,
                     data: Self::map_data(address_map, &self.get(address).data),
-                },
-            );
+                })
+                .reference_count += refcount;
         }
 
         addresses
@@ -161,14 +162,21 @@ impl Heap {
             .map(|address| address_map[address])
             .collect()
     }
-    fn gather_objects_to_clone(
+    fn prepare_object_cloning(
         &self,
-        objects_to_refcounts: &mut HashMap<Pointer, usize>,
+        address_map: &mut HashMap<Pointer, Pointer>,
+        additional_refcounts: &mut HashMap<Pointer, usize>,
+        other: &mut Heap,
         address: Pointer,
     ) {
-        *objects_to_refcounts.entry(address).or_default() += 1;
-        for child in self.get(address).children() {
-            self.gather_objects_to_clone(objects_to_refcounts, child);
+        *additional_refcounts.entry(address).or_default() += 1;
+
+        let is_new = !address_map.contains_key(&address);
+        if is_new {
+            address_map.insert(address, other.reserve_address());
+            for child in self.get(address).children() {
+                self.prepare_object_cloning(address_map, additional_refcounts, other, child);
+            }
         }
     }
     fn map_data(address_map: &HashMap<Pointer, Pointer>, data: &Data) -> Data {
@@ -206,17 +214,6 @@ impl Heap {
         self.clone_multiple_to_other_heap_with_existing_mapping(other, &[address], address_map)
             .pop()
             .unwrap()
-    }
-    pub fn clone_multiple_to_other_heap(
-        &self,
-        other: &mut Heap,
-        addresses: &[Pointer],
-    ) -> Vec<Pointer> {
-        self.clone_multiple_to_other_heap_with_existing_mapping(
-            other,
-            addresses,
-            &mut HashMap::new(),
-        )
     }
     pub fn clone_single_to_other_heap(&self, other: &mut Heap, address: Pointer) -> Pointer {
         self.clone_single_to_other_heap_with_existing_mapping(other, address, &mut HashMap::new())
