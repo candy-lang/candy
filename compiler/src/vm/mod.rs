@@ -36,7 +36,6 @@ use tracing::{info, warn};
 #[derive(Clone)]
 pub struct Vm {
     fibers: HashMap<FiberId, FiberTree>,
-    root_fiber: Option<FiberId>, // only None when no fiber is created yet
 
     channels: HashMap<ChannelId, Channel>,
     pub external_operations: HashMap<ChannelId, Vec<Operation>>,
@@ -128,29 +127,35 @@ pub enum Status {
     Panicked { reason: String },
 }
 
+impl FiberId {
+    pub fn root() -> Self {
+        0.into()
+    }
+}
+
 impl Vm {
     pub fn new() -> Self {
         Self {
             channels: Default::default(),
             fibers: HashMap::new(),
-            root_fiber: None,
             external_operations: Default::default(),
             channel_id_generator: IdGenerator::start_at(0),
-            fiber_id_generator: IdGenerator::start_at(0),
+            fiber_id_generator: IdGenerator::start_at(FiberId::root().0 + 1),
         }
     }
 
     fn set_up_with_fiber(&mut self, fiber: Fiber) {
-        assert!(self.root_fiber.is_none(), "VM already set up");
-        let root_fiber_id = self.fiber_id_generator.generate();
+        assert!(
+            !self.fibers.contains_key(&FiberId::root()),
+            "already set up"
+        );
         self.fibers.insert(
-            root_fiber_id,
+            FiberId::root(),
             FiberTree::Single(Single {
                 fiber,
                 parent: None,
             }),
         );
-        self.root_fiber = Some(root_fiber_id);
     }
     pub fn set_up_for_running_closure(
         &mut self,
@@ -165,13 +170,13 @@ impl Vm {
     }
 
     pub fn tear_down(mut self) -> Result<Packet, String> {
-        let tree = self.fibers.remove(&self.root_fiber.unwrap()).unwrap();
+        let tree = self.fibers.remove(&FiberId::root()).unwrap();
         let single = tree.into_single().unwrap();
         single.fiber.tear_down()
     }
 
     pub fn status(&self) -> Status {
-        self.status_of(self.root_fiber.expect("VM not set up yet"))
+        self.status_of(FiberId::root())
     }
     fn status_of(&self, fiber: FiberId) -> Status {
         match &self.fibers[&fiber] {
@@ -207,15 +212,6 @@ impl Vm {
     fn can_run(&self) -> bool {
         matches!(self.status(), Status::CanRun)
     }
-
-    // pub fn fiber(&self) -> &Fiber {
-    //     // TODO: Remove before merging the PR
-    //     todo!()
-    // }
-    // pub fn cloned_tracer(&self) -> Tracer {
-    //     // TODO: Remove
-    //     self.fiber().tracer.clone()
-    // }
 
     /// Can be called at any time from outside the VM to create a channel that
     /// can be used to communicate with the outside world.
@@ -276,7 +272,7 @@ impl Vm {
         );
 
         // Choose a random fiber to run.
-        let mut fiber_id = self.root_fiber.unwrap();
+        let mut fiber_id = FiberId::root();
         let fiber = loop {
             match self.fibers.get_mut(&fiber_id).unwrap() {
                 FiberTree::Single(Single { fiber, .. }) => break fiber,
@@ -292,8 +288,13 @@ impl Vm {
             return;
         }
 
-        let mut tracer = tracer.in_fiber_tracer(fiber_id);
-        fiber.run(use_provider, execution_controller, &mut *tracer);
+        tracer.fiber_execution_started(fiber_id);
+        fiber.run(
+            use_provider,
+            execution_controller,
+            &mut *tracer.in_fiber_tracer(fiber_id),
+        );
+        tracer.fiber_execution_ended(fiber_id);
 
         let is_finished = match fiber.status() {
             fiber::Status::Running => false,
@@ -308,10 +309,11 @@ impl Vm {
                     }),
                 );
                 fiber.complete_channel_create(channel_id);
+                tracer.channel_created(channel_id);
                 false
             }
             fiber::Status::Sending { channel, packet } => {
-                self.send_to_channel(Some(fiber_id), channel, packet);
+                self.send_to_channel(tracer, Some(fiber_id), channel, packet);
                 false
             }
             fiber::Status::Receiving { channel } => {
@@ -378,15 +380,17 @@ impl Vm {
             }
             fiber::Status::Done => {
                 info!("A fiber is done.");
+                tracer.fiber_done(fiber_id);
                 true
             }
             fiber::Status::Panicked { reason } => {
                 warn!("A fiber panicked because {reason}.");
+                tracer.fiber_panicked(fiber_id, None);
                 true
             }
         };
 
-        if is_finished && fiber_id != self.root_fiber.unwrap() {
+        if is_finished && fiber_id != FiberId::root() {
             let single = self
                 .fibers
                 .remove(&fiber_id)
@@ -411,15 +415,17 @@ impl Vm {
                                     parallel.return_value = Some(return_value)
                                 }
                                 ChildKind::SpawnedChild(return_channel) => {
-                                    self.send_to_channel(None, return_channel, return_value)
+                                    self.send_to_channel(tracer, None, return_channel, return_value)
                                 }
                             }
 
                             if is_finished {
-                                self.finish_parallel(parent, Ok(()))
+                                self.finish_parallel(tracer, parent, Some(fiber_id), Ok(()))
                             }
                         }
-                        Err(panic_reason) => self.finish_parallel(parent, Err(panic_reason)),
+                        Err(panic_reason) => {
+                            self.finish_parallel(tracer, parent, Some(fiber_id), Err(panic_reason))
+                        }
                     }
                 }
                 FiberTree::Try(Try { .. }) => {
@@ -461,7 +467,13 @@ impl Vm {
             }
         }
     }
-    fn finish_parallel(&mut self, parallel_id: FiberId, result: Result<(), String>) {
+    fn finish_parallel(
+        &mut self,
+        tracer: &mut dyn Tracer,
+        parallel_id: FiberId,
+        causing_child: Option<FiberId>,
+        result: Result<(), String>,
+    ) {
         let parallel = self
             .fibers
             .get_mut(&parallel_id)
@@ -470,7 +482,7 @@ impl Vm {
             .unwrap();
 
         for child_id in parallel.children.clone().into_keys() {
-            self.cancel(child_id);
+            self.cancel(tracer, child_id);
         }
 
         self.fibers.replace(parallel_id, |tree| {
@@ -483,8 +495,9 @@ impl Vm {
             paused_fiber.fiber.complete_parallel_scope(result);
             FiberTree::Single(paused_fiber)
         });
+        tracer.fiber_panicked(parallel_id, causing_child);
     }
-    fn cancel(&mut self, fiber: FiberId) {
+    fn cancel(&mut self, tracer: &mut dyn Tracer, fiber: FiberId) {
         match self.fibers.remove(&fiber).unwrap() {
             FiberTree::Single(_) => {}
             FiberTree::Parallel(Parallel {
@@ -496,15 +509,17 @@ impl Vm {
                     .to_nursery()
                     .unwrap();
                 for child_fiber in children.keys() {
-                    self.cancel(*child_fiber);
+                    self.cancel(tracer, *child_fiber);
                 }
             }
-            FiberTree::Try(Try { child, .. }) => self.cancel(child),
+            FiberTree::Try(Try { child, .. }) => self.cancel(tracer, child),
         }
+        tracer.fiber_canceled(fiber);
     }
 
     fn send_to_channel(
         &mut self,
+        tracer: &mut dyn Tracer,
         performing_fiber: Option<FiberId>,
         channel_id: ChannelId,
         packet: Packet,
@@ -556,9 +571,13 @@ impl Vm {
                             .unwrap()
                             .children
                             .insert(child_id, ChildKind::SpawnedChild(return_channel));
+
+                        tracer.fiber_created(child_id);
                     }
                     None => self.finish_parallel(
+                        tracer,
                         parent_id,
+                        performing_fiber,
                         Err("a nursery received an invalid message".to_string()),
                     ),
                 }

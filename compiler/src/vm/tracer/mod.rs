@@ -6,11 +6,17 @@ use super::{
     FiberId, Heap,
 };
 use crate::{compiler::hir::Id, module::Module};
-use std::{collections::HashMap, time::Instant};
+use itertools::Itertools;
+use std::{collections::HashMap, fmt, time::Instant};
 
 pub trait Tracer {
+    fn fiber_created(&mut self, fiber: FiberId);
+    fn fiber_done(&mut self, fiber: FiberId);
+    fn fiber_panicked(&mut self, fiber: FiberId, panicked_child: Option<FiberId>);
+    fn fiber_canceled(&mut self, fiber: FiberId);
     fn fiber_execution_started(&mut self, fiber: FiberId);
     fn fiber_execution_ended(&mut self, fiber: FiberId);
+    fn channel_created(&mut self, channel: ChannelId);
     fn sent_to_channel(&mut self, value: Pointer, from: FiberId, to: ChannelId);
     fn received_from_channel(&mut self, value: Pointer, from: ChannelId, to: FiberId);
 
@@ -36,8 +42,13 @@ pub trait InFiberTracer<'a> {
 pub struct DummyTracer;
 pub struct DummyInFiberTracer;
 impl Tracer for DummyTracer {
+    fn fiber_created(&mut self, _fiber: FiberId) {}
+    fn fiber_done(&mut self, _fiber: FiberId) {}
+    fn fiber_panicked(&mut self, _fiber: FiberId, _panicked_child: Option<FiberId>) {}
+    fn fiber_canceled(&mut self, _fiber: FiberId) {}
     fn fiber_execution_started(&mut self, _fiber: FiberId) {}
     fn fiber_execution_ended(&mut self, _fiber: FiberId) {}
+    fn channel_created(&mut self, _channel: ChannelId) {}
     fn sent_to_channel(&mut self, _value: Pointer, _from: FiberId, _to: ChannelId) {}
     fn received_from_channel(&mut self, _value: Pointer, _from: ChannelId, _to: FiberId) {}
 
@@ -82,6 +93,7 @@ pub enum Event {
     },
     FiberPanicked {
         fiber: FiberId,
+        panicked_child: Option<FiberId>,
     },
     FiberCanceled {
         fiber: FiberId,
@@ -160,16 +172,34 @@ impl FullTracer {
         let address_map = self
             .transferred_objects
             .entry(fiber)
-            .or_insert_with(|| HashMap::new());
+            .or_insert_with(HashMap::new);
         heap.clone_single_to_other_heap_with_existing_mapping(&mut self.heap, value, address_map)
     }
 }
 impl Tracer for FullTracer {
+    fn fiber_created(&mut self, fiber: FiberId) {
+        self.push(Event::FiberCreated { fiber });
+    }
+    fn fiber_done(&mut self, fiber: FiberId) {
+        self.push(Event::FiberDone { fiber });
+    }
+    fn fiber_panicked(&mut self, fiber: FiberId, panicked_child: Option<FiberId>) {
+        self.push(Event::FiberPanicked {
+            fiber,
+            panicked_child,
+        });
+    }
+    fn fiber_canceled(&mut self, fiber: FiberId) {
+        self.push(Event::FiberCanceled { fiber });
+    }
     fn fiber_execution_started(&mut self, fiber: FiberId) {
         self.push(Event::FiberExecutionStarted { fiber });
     }
     fn fiber_execution_ended(&mut self, fiber: FiberId) {
         self.push(Event::FiberExecutionEnded { fiber });
+    }
+    fn channel_created(&mut self, channel: ChannelId) {
+        self.push(Event::ChannelCreated { channel });
     }
     fn sent_to_channel(&mut self, value: Pointer, from: FiberId, to: ChannelId) {
         self.push(Event::SentToChannel { value, from, to });
@@ -243,5 +273,75 @@ impl<'a> InFiberTracer<'a> for FullInFiberTracer<'a> {
     }
     fn needs_ended(&mut self) {
         self.push(InFiberEvent::NeedsEnded);
+    }
+}
+
+impl fmt::Debug for FullTracer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let start = self.events.first().map(|event| event.when);
+        for event in &self.events {
+            writeln!(
+                f,
+                "{:?} us: {}",
+                event.when.duration_since(start.unwrap()).as_micros(),
+                match &event.event {
+                    Event::FiberCreated { fiber } => format!("{fiber:?}: created"),
+                    Event::FiberDone { fiber } => format!("{fiber:?}: done"),
+                    Event::FiberPanicked {
+                        fiber,
+                        panicked_child,
+                    } => format!(
+                        "{fiber:?}: panicked{}",
+                        if let Some(child) = panicked_child {
+                            format!(" because child {child:?} panicked")
+                        } else {
+                            "".to_string()
+                        }
+                    ),
+                    Event::FiberCanceled { fiber } => format!("{fiber:?}: canceled"),
+                    Event::FiberExecutionStarted { fiber } =>
+                        format!("{fiber:?}: execution started"),
+                    Event::FiberExecutionEnded { fiber } => format!("{fiber:?}: execution ended"),
+                    Event::ChannelCreated { channel } => format!("{channel:?}: created"),
+                    Event::SentToChannel { value, from, to } =>
+                        format!("{from:?} sent {} to {to:?}", value.format(&self.heap)),
+                    Event::ReceivedFromChannel { value, from, to } =>
+                        format!("{to:?} received {} from {from:?}", value.format(&self.heap)),
+                    Event::InFiber { fiber, event } => format!(
+                        "{fiber:?}: {}",
+                        match event {
+                            InFiberEvent::ModuleStarted { module } =>
+                                format!("module {module} started"),
+                            InFiberEvent::ModuleEnded { export_map } => format!(
+                                "module ended and exported {}",
+                                export_map.format(&self.heap)
+                            ),
+                            InFiberEvent::ValueEvaluated { id, value } =>
+                                format!("value {id} is {}", value.format(&self.heap)),
+                            InFiberEvent::FoundFuzzableClosure { id, .. } =>
+                                format!("found fuzzable closure {id}"),
+                            InFiberEvent::CallStarted { id, closure, args } => format!(
+                                "call {id} started: {} {}",
+                                closure.format(&self.heap),
+                                args.iter().map(|arg| arg.format(&self.heap)).join(" ")
+                            ),
+                            InFiberEvent::CallEnded { return_value } =>
+                                format!("call ended: {}", return_value.format(&self.heap)),
+                            InFiberEvent::NeedsStarted {
+                                id,
+                                condition,
+                                reason,
+                            } => format!(
+                                "needs {id} started: needs {} {}",
+                                condition.format(&self.heap),
+                                reason.format(&self.heap)
+                            ),
+                            InFiberEvent::NeedsEnded => "needs ended".to_string(),
+                        }
+                    ),
+                }
+            )?;
+        }
+        Ok(())
     }
 }

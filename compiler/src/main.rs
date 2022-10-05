@@ -233,8 +233,7 @@ fn run(options: CandyRunOptions) {
     let result = vm.tear_down();
 
     if options.debug {
-        todo!();
-        // module.dump_associated_debug_file("trace", &tracer.full_trace().format(&heap));
+        module.dump_associated_debug_file("trace", &format!("{tracer:?}"));
     }
 
     let (mut heap, exported_definitions): (_, Struct) = match result {
@@ -253,7 +252,7 @@ fn run(options: CandyRunOptions) {
             error!("The module panicked because {reason}.");
             error!(
                 "This is the stack trace:\n{}",
-                tracer.format_stack_traces(&db)
+                tracer.format_panic_stack_trace_to_root_fiber(&db)
             );
             return;
         }
@@ -322,7 +321,7 @@ fn run(options: CandyRunOptions) {
             error!("The main function panicked because {reason}.");
             error!(
                 "This is the stack trace:\n{}",
-                tracer.format_stack_traces(&db)
+                tracer.format_panic_stack_trace_to_root_fiber(&db)
             );
         }
     }

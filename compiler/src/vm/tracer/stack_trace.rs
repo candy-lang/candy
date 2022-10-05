@@ -77,71 +77,93 @@ impl FullTracer {
         }
         stacks
     }
-    pub fn format_stack_traces(&self, db: &Database) -> String {
+    pub fn format_stack_trace(&self, db: &Database, stack: &[StackEntry]) -> String {
         let mut lines = vec![];
 
-        for (fiber, stack) in self.stack_traces() {
-            lines.push(format!("{fiber:?}:"));
-            for entry in stack.iter().rev() {
-                let hir_id = match entry {
-                    StackEntry::Call { id, .. } => Some(id),
-                    StackEntry::Needs { id, .. } => Some(id),
-                    StackEntry::Module { .. } => None,
-                };
-                let (cst_id, span) = if let Some(hir_id) = hir_id {
-                    let module = hir_id.module.clone();
-                    let cst_id = db.hir_to_cst_id(hir_id.clone());
-                    let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
-                    let span = cst.map(|cst| {
-                        (
-                            db.offset_to_lsp(module.clone(), cst.span.start),
-                            db.offset_to_lsp(module.clone(), cst.span.end),
-                        )
-                    });
-                    (cst_id, span)
-                } else {
-                    (None, None)
-                };
-                let caller_location_string = format!(
+        for entry in stack.iter().rev() {
+            let hir_id = match entry {
+                StackEntry::Call { id, .. } => Some(id),
+                StackEntry::Needs { id, .. } => Some(id),
+                StackEntry::Module { .. } => None,
+            };
+            let (cst_id, span) = if let Some(hir_id) = hir_id {
+                let module = hir_id.module.clone();
+                let cst_id = db.hir_to_cst_id(hir_id.clone());
+                let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
+                let span = cst.map(|cst| {
+                    (
+                        db.offset_to_lsp(module.clone(), cst.span.start),
+                        db.offset_to_lsp(module.clone(), cst.span.end),
+                    )
+                });
+                (cst_id, span)
+            } else {
+                (None, None)
+            };
+            let caller_location_string = format!(
+                "{} {}",
+                hir_id
+                    .map(|id| format!("{id}"))
+                    .unwrap_or_else(|| "<no hir>".to_string()),
+                span.map(|((start_line, start_col), (end_line, end_col))| format!(
+                    "{}:{} – {}:{}",
+                    start_line, start_col, end_line, end_col
+                ))
+                .unwrap_or_else(|| "<no location>".to_string())
+            );
+            let call_string = match entry {
+                StackEntry::Call { closure, args, .. } => format!(
                     "{} {}",
-                    hir_id
-                        .map(|id| format!("{id}"))
-                        .unwrap_or_else(|| "<no hir>".to_string()),
-                    span.map(|((start_line, start_col), (end_line, end_col))| format!(
-                        "{}:{} – {}:{}",
-                        start_line, start_col, end_line, end_col
-                    ))
-                    .unwrap_or_else(|| "<no location>".to_string())
-                );
-                let call_string = match entry {
-                    StackEntry::Call { closure, args, .. } => format!(
-                        "{} {}",
-                        cst_id
-                            .and_then(|id| {
-                                let cst = db.find_cst(hir_id.unwrap().module.clone(), id);
-                                match cst.kind {
-                                    CstKind::Call { receiver, .. } => {
-                                        receiver.extract_receiver_name()
-                                    }
-                                    _ => None,
-                                }
-                            })
-                            .unwrap_or_else(|| closure.format(&self.heap)),
-                        args.iter().map(|arg| arg.format(&self.heap)).join(" ")
-                    ),
-                    StackEntry::Needs {
-                        condition, reason, ..
-                    } => format!(
-                        "needs {} {}",
-                        condition.format(&self.heap),
-                        reason.format(&self.heap),
-                    ),
-                    StackEntry::Module { module } => format!("module {module}"),
-                };
-                lines.push(format!("{caller_location_string:90} {call_string}"));
-            }
+                    cst_id
+                        .and_then(|id| {
+                            let cst = db.find_cst(hir_id.unwrap().module.clone(), id);
+                            match cst.kind {
+                                CstKind::Call { receiver, .. } => receiver.extract_receiver_name(),
+                                _ => None,
+                            }
+                        })
+                        .unwrap_or_else(|| closure.format(&self.heap)),
+                    args.iter().map(|arg| arg.format(&self.heap)).join(" ")
+                ),
+                StackEntry::Needs {
+                    condition, reason, ..
+                } => format!(
+                    "needs {} {}",
+                    condition.format(&self.heap),
+                    reason.format(&self.heap),
+                ),
+                StackEntry::Module { module } => format!("module {module}"),
+            };
+            lines.push(format!("{caller_location_string:90} {call_string}"));
         }
         lines.join("\n")
+    }
+    /// When a VM panics, some child fiber might be responsible for that. This
+    /// function returns a formatted stack trace spanning all fibers in the
+    /// chain from the panicking root fiber until the concrete failing needs.
+    pub fn format_panic_stack_trace_to_root_fiber(&self, db: &Database) -> String {
+        let mut panicking_fiber_chain = vec![FiberId::root()];
+        for timed_event in self.events.iter().rev() {
+            if let Event::FiberPanicked {
+                fiber,
+                panicked_child,
+            } = timed_event.event
+            {
+                if fiber == *panicking_fiber_chain.last().unwrap() {
+                    match panicked_child {
+                        Some(child) => panicking_fiber_chain.push(child),
+                        None => break,
+                    }
+                }
+            }
+        }
+
+        let stack_traces = self.stack_traces();
+        panicking_fiber_chain
+            .into_iter()
+            .rev()
+            .map(|fiber| self.format_stack_trace(db, &stack_traces[&fiber]))
+            .join("\n(fiber boundary)\n")
     }
 }
 
