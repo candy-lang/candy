@@ -9,10 +9,10 @@ use crate::{
     database::Database,
     language_server::hints::{utils::id_to_end_of_line, HintKind},
     module::Module,
+    tracer::{stack_trace::StackEntry, DummyTracer, FullTracer},
     vm::{
         self,
         context::{DbUseProvider, RunLimitedNumberOfInstructions},
-        tracer::{stack_trace::StackEntry, DummyTracer, FullTracer},
         Closure, Heap, Pointer, Vm,
     },
 };

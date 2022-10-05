@@ -12,6 +12,7 @@ mod database;
 mod fuzzer;
 mod language_server;
 mod module;
+mod tracer;
 mod vm;
 
 use crate::{
@@ -27,9 +28,9 @@ use crate::{
     database::Database,
     language_server::utils::LspPositionConversion,
     module::{Module, ModuleKind},
+    tracer::{DummyTracer, FullTracer},
     vm::{
         context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
-        tracer::{DummyTracer, FullTracer},
         Closure, Status, Struct, Vm,
     },
 };

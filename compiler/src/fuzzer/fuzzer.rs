@@ -2,10 +2,10 @@ use super::{generator::generate_n_values, utils::did_need_in_closure_cause_panic
 use crate::{
     compiler::hir,
     database::Database,
+    tracer::{DummyTracer, FullTracer},
     vm::{
         self,
         context::{ExecutionController, UseProvider},
-        tracer::{DummyTracer, FullTracer},
         Closure, Heap, Packet, Pointer, Vm,
     },
 };

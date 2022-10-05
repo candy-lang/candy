@@ -3,7 +3,6 @@ mod channel;
 pub mod context;
 mod fiber;
 mod heap;
-pub mod tracer;
 mod use_module;
 
 use self::{
@@ -12,14 +11,14 @@ use self::{
         CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions,
         UseProvider,
     },
-    heap::{ChannelId, SendPort},
-    tracer::Tracer,
+    heap::SendPort,
 };
 pub use self::{
     channel::Packet,
     fiber::Fiber,
-    heap::{Closure, Heap, Object, Pointer, Struct},
+    heap::{ChannelId, Closure, Heap, Object, Pointer, Struct},
 };
+use crate::tracer::Tracer;
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use std::{
