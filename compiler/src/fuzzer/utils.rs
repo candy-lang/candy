@@ -1,7 +1,7 @@
 use crate::{
     compiler::hir::{self, Expression, HirDb, Lambda},
     database::Database,
-    tracer::{FullTracer, Tracer},
+    vm::tracer::{FullTracer, Tracer},
 };
 
 pub fn did_need_in_closure_cause_panic(db: &Database, closure_id: &hir::Id) -> bool {

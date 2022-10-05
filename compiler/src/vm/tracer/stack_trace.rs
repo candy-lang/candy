@@ -1,6 +1,5 @@
-use super::{Event, FullTracer, InFiberEvent};
+use super::{super::heap::Pointer, Event, FiberId, FullTracer, InFiberEvent};
 use crate::{
-    vm::{Pointer, FiberId},
     compiler::{
         ast_to_hir::AstToHir,
         cst::{Cst, CstDb, CstKind},

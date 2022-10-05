@@ -1,12 +1,12 @@
 use super::{
     context::{PanickingUseProvider, UseProvider, UseResult},
     heap::{Closure, Heap, Pointer, Text},
+    tracer::DummyInFiberTracer,
     Fiber,
 };
 use crate::{
     compiler::lir::Instruction,
     module::{Module, ModuleKind},
-    tracer::DummyInFiberTracer,
 };
 use itertools::Itertools;
 

@@ -1,11 +1,11 @@
 // mod full_trace;
 pub mod stack_trace;
 
-use crate::{
-    compiler::hir::Id,
-    module::Module,
-    vm::{ChannelId, FiberId, Heap, Pointer},
+use super::{
+    heap::{ChannelId, Pointer},
+    FiberId, Heap,
 };
+use crate::{compiler::hir::Id, module::Module};
 use itertools::Itertools;
 use std::{collections::HashMap, fmt, time::Instant};
 

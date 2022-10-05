@@ -2,12 +2,12 @@ use super::{
     channel::{Capacity, Packet},
     context::{ExecutionController, UseProvider},
     heap::{Builtin, ChannelId, Closure, Data, Heap, Pointer},
+    tracer::InFiberTracer,
 };
 use crate::{
     compiler::lir::Instruction,
     module::Module,
-    tracer::{DummyInFiberTracer, InFiberTracer},
-    vm::context::PanickingUseProvider,
+    vm::{context::PanickingUseProvider, tracer::DummyInFiberTracer},
 };
 use itertools::Itertools;
 use std::collections::HashMap;

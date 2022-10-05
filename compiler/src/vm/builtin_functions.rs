@@ -3,11 +3,10 @@ use super::{
     context::PanickingUseProvider,
     fiber::{Fiber, Status},
     heap::{ChannelId, Closure, Data, Int, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
+    tracer::DummyInFiberTracer,
     Heap,
 };
-use crate::{
-    builtin_functions::BuiltinFunction, compiler::lir::Instruction, tracer::DummyInFiberTracer,
-};
+use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
 use itertools::Itertools;
 use num_bigint::BigInt;
 use num_integer::Integer;

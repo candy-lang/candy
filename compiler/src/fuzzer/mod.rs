@@ -7,9 +7,9 @@ use crate::{
     compiler::hir::Id,
     database::Database,
     module::Module,
-    tracer::DummyTracer,
     vm::{
         context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
+        tracer::DummyTracer,
         Closure, Heap, Pointer, Vm,
     },
 };
