@@ -1,6 +1,6 @@
-bool = use "..Bool"
-if = (use "..Conditionals").if
-panic = (use "..Panic").panic
+bool = use "..bool"
+if = (use "..conditionals").if
+panic = (use "..panic").panic
 
 check condition :=
   needs (bool.is condition)

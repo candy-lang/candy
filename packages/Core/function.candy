@@ -1,5 +1,5 @@
-equals = (use "..Equality").equals
-type = use "..Type"
+equals = (use "..equality").equals
+type = use "..type"
 
 is value := type.is value Function
 
