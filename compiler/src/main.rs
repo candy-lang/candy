@@ -19,7 +19,7 @@ use crate::{
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
         error::CompilerError,
-        hir::{self, CollectErrors},
+        hir::{self, CollectErrors, Id},
         hir_to_lir::HirToLir,
         rcst_to_cst::RcstToCst,
         string_to_rcst::StringToRcst,
@@ -29,8 +29,8 @@ use crate::{
     module::{Module, ModuleKind},
     vm::{
         context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
-        tracer::{DummyTracer, FullTracer},
-        Closure, Status, Struct, Vm,
+        tracer::{DummyTracer, FullTracer, Tracer},
+        Closure, ExecutionResult, FiberId, Status, Struct, Vm,
     },
 };
 use compiler::lir::Lir;
@@ -203,33 +203,21 @@ fn run(options: CandyRunOptions) {
         warn!("Build failed.");
         return;
     };
-    let module_closure = Closure::of_module(&db, module.clone()).unwrap();
+    // TODO: Optimize the code before running.
 
     let path_string = options.file.to_string_lossy();
-    info!("Running `{path_string}`.");
+    debug!("Running `{path_string}`.");
 
+    let module_closure = Closure::of_module(&db, module.clone()).unwrap();
     let mut tracer = FullTracer::new();
 
     let mut vm = Vm::new();
     vm.set_up_for_running_module_closure(module_closure);
-    loop {
-        info!("Tree: {:#?}", vm);
-        match vm.status() {
-            Status::CanRun => {
-                debug!("VM still running.");
-                vm.run(
-                    &mut DbUseProvider { db: &db },
-                    &mut RunLimitedNumberOfInstructions::new(100000),
-                    &mut tracer,
-                );
-            }
-            Status::WaitingForOperations => {
-                todo!("VM can't proceed until some operations complete.");
-            }
-            _ => break,
-        }
+    vm.run(&mut DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
+    if let Status::WaitingForOperations = vm.status() {
+        error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
+        // TODO: Show stack traces of all fibers?
     }
-    info!("Tree: {:#?}", vm);
     let result = vm.tear_down();
 
     if options.debug {
@@ -237,8 +225,8 @@ fn run(options: CandyRunOptions) {
     }
 
     let (mut heap, exported_definitions): (_, Struct) = match result {
-        Ok(return_value) => {
-            info!("The module exports these definitions: {return_value:?}",);
+        ExecutionResult::Finished(return_value) => {
+            debug!("The module exports these definitions: {return_value:?}",);
             let exported = return_value
                 .heap
                 .get(return_value.address)
@@ -248,8 +236,16 @@ fn run(options: CandyRunOptions) {
                 .unwrap();
             (return_value.heap, exported)
         }
-        Err(reason) => {
+        ExecutionResult::Panicked {
+            reason,
+            responsible,
+        } => {
             error!("The module panicked because {reason}.");
+            if let Some(responsible) = responsible {
+                error!("{responsible} is responsible.");
+            } else {
+                error!("Some top-level code panics.");
+            }
             error!(
                 "This is the stack trace:\n{}",
                 tracer.format_panic_stack_trace_to_root_fiber(&db)
@@ -267,8 +263,8 @@ fn run(options: CandyRunOptions) {
         }
     };
 
-    info!("Running main function.");
-    // TODO: Add environment stuff.
+    debug!("Running main function.");
+    // TODO: Add more environment stuff.
     let mut vm = Vm::new();
     let stdout = vm.create_channel();
     let environment = {
@@ -276,17 +272,18 @@ fn run(options: CandyRunOptions) {
         let stdout_port = heap.create_send_port(stdout);
         heap.create_struct([(stdout_symbol, stdout_port)].into_iter().collect())
     };
+    tracer.in_fiber_tracer(FiberId::root()).call_started(
+        &heap,
+        Id::new(module, vec!["main".to_string()]),
+        main,
+        vec![environment],
+    );
     vm.set_up_for_running_closure(heap, main, &[environment]);
     loop {
-        info!("Tree: {:#?}", vm);
         match vm.status() {
             Status::CanRun => {
                 debug!("VM still running.");
-                vm.run(
-                    &mut DbUseProvider { db: &db },
-                    &mut RunForever,
-                    &mut DummyTracer,
-                );
+                vm.run(&mut DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
                 // TODO: handle operations
             }
             Status::WaitingForOperations => {
@@ -306,7 +303,7 @@ fn run(options: CandyRunOptions) {
                     performing_fiber,
                     packet,
                 } => {
-                    info!("Sent to stdout: {}", packet.address.format(&packet.heap));
+                    info!("{}", packet.address.format(&packet.heap));
                     vm.complete_send(performing_fiber);
                 }
                 vm::Operation::Receive { .. } => unreachable!(),
@@ -314,11 +311,23 @@ fn run(options: CandyRunOptions) {
             }
         }
     }
-    info!("Tree: {:#?}", vm);
     match vm.tear_down() {
-        Ok(return_value) => info!("The main function returned: {return_value:?}"),
-        Err(reason) => {
+        ExecutionResult::Finished(return_value) => {
+            tracer
+                .in_fiber_tracer(FiberId::root())
+                .call_ended(&return_value.heap, return_value.address);
+            debug!("The main function returned: {return_value:?}");
+        }
+        ExecutionResult::Panicked {
+            reason,
+            responsible,
+        } => {
             error!("The main function panicked because {reason}.");
+            if let Some(responsible) = responsible {
+                error!("{responsible} is responsible.");
+            } else {
+                error!("A needs directly in the main function panicks. Perhaps the main functions expects more in the environment.");
+            }
             error!(
                 "This is the stack trace:\n{}",
                 tracer.format_panic_stack_trace_to_root_fiber(&db)
@@ -335,7 +344,7 @@ async fn fuzz(options: CandyFuzzOptions) {
     );
 
     if raw_build(module.clone(), false).is_none() {
-        info!("Build failed.");
+        warn!("Build failed.");
         return;
     }
 

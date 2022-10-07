@@ -1,4 +1,3 @@
-// mod full_trace;
 pub mod stack_trace;
 
 use super::{

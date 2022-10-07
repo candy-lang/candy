@@ -17,9 +17,10 @@ use self::{
 };
 pub use self::{
     channel::Packet,
-    fiber::Fiber,
+    fiber::{ExecutionResult, Fiber},
     heap::{Closure, Heap, Object, Pointer, Struct},
 };
+use crate::compiler::hir::Id;
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use std::{
@@ -28,7 +29,7 @@ use std::{
     hash::Hash,
     marker::PhantomData,
 };
-use tracing::{info, warn};
+use tracing::{debug, warn};
 
 /// A VM represents a Candy program that thinks it's currently running. Because
 /// VMs are first-class Rust structs, they enable other code to store "freezed"
@@ -124,7 +125,10 @@ pub enum Status {
     CanRun,
     WaitingForOperations,
     Done,
-    Panicked { reason: String },
+    Panicked {
+        reason: String,
+        responsible: Option<Id>,
+    },
 }
 
 impl FiberId {
@@ -169,7 +173,7 @@ impl Vm {
         self.set_up_with_fiber(Fiber::new_for_running_module_closure(closure))
     }
 
-    pub fn tear_down(mut self) -> Result<Packet, String> {
+    pub fn tear_down(mut self) -> ExecutionResult {
         let tree = self.fibers.remove(&FiberId::root()).unwrap();
         let single = tree.into_single().unwrap();
         single.fiber.tear_down()
@@ -189,8 +193,12 @@ impl Vm {
                 | fiber::Status::InParallelScope { .. }
                 | fiber::Status::InTry { .. } => unreachable!(),
                 fiber::Status::Done => Status::Done,
-                fiber::Status::Panicked { reason } => Status::Panicked {
+                fiber::Status::Panicked {
+                    reason,
+                    responsible,
+                } => Status::Panicked {
                     reason: reason.clone(),
+                    responsible: responsible.clone(),
                 },
             },
             FiberTree::Parallel(Parallel { children, .. }) => {
@@ -379,11 +387,14 @@ impl Vm {
                 false
             }
             fiber::Status::Done => {
-                info!("A fiber is done.");
+                debug!("A fiber is done.");
                 tracer.fiber_done(fiber_id);
                 true
             }
-            fiber::Status::Panicked { reason } => {
+            fiber::Status::Panicked {
+                reason,
+                responsible,
+            } => {
                 warn!("A fiber panicked because {reason}.");
                 tracer.fiber_panicked(fiber_id, None);
                 true
@@ -408,7 +419,7 @@ impl Vm {
                     let child = parallel.children.remove(&fiber_id).unwrap();
 
                     match result {
-                        Ok(return_value) => {
+                        ExecutionResult::Finished(return_value) => {
                             let is_finished = parallel.children.is_empty();
                             match child {
                                 ChildKind::InitialChild => {
@@ -423,9 +434,10 @@ impl Vm {
                                 self.finish_parallel(tracer, parent, Some(fiber_id), Ok(()))
                             }
                         }
-                        Err(panic_reason) => {
-                            self.finish_parallel(tracer, parent, Some(fiber_id), Err(panic_reason))
-                        }
+                        ExecutionResult::Panicked {
+                            reason,
+                            responsible,
+                        } => self.finish_parallel(tracer, parent, Some(fiber_id), Err(reason)),
                     }
                 }
                 FiberTree::Try(Try { .. }) => {
@@ -550,7 +562,7 @@ impl Vm {
                 },
             ),
             Channel::Nursery(parent_id) => {
-                info!("Nursery received packet {:?}", packet);
+                debug!("Nursery received packet {:?}", packet);
                 let parent_id = *parent_id;
 
                 match Self::parse_spawn_packet(packet) {

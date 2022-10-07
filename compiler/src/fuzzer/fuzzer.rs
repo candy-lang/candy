@@ -111,13 +111,12 @@ impl Fuzzer {
                 vm::Status::WaitingForOperations => panic!("Fuzzing should not have to wait on channel operations because arguments were not channels."),
                 // The VM finished running without panicking.
                 vm::Status::Done => Status::new_fuzzing_attempt(&self.closure_heap, self.closure),
-                vm::Status::Panicked { reason } => {
+                vm::Status::Panicked { reason, responsible } => {
                     // If a `needs` directly inside the tested closure was not
                     // satisfied, then the panic is not closure's fault, but our
                     // fault.
                     let result = vm.tear_down();
-                    let is_our_fault =
-                        did_need_in_closure_cause_panic(db, &self.closure_id);
+                    let is_our_fault = responsible.is_none();
                     if is_our_fault {
                         Status::new_fuzzing_attempt(&self.closure_heap, self.closure)
                     } else {

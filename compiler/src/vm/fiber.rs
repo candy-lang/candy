@@ -31,13 +31,27 @@ pub struct Fiber {
 #[derive(Clone, Debug)]
 pub enum Status {
     Running,
-    CreatingChannel { capacity: Capacity },
-    Sending { channel: ChannelId, packet: Packet },
-    Receiving { channel: ChannelId },
-    InParallelScope { body: Pointer },
-    InTry { body: Pointer },
+    CreatingChannel {
+        capacity: Capacity,
+    },
+    Sending {
+        channel: ChannelId,
+        packet: Packet,
+    },
+    Receiving {
+        channel: ChannelId,
+    },
+    InParallelScope {
+        body: Pointer,
+    },
+    InTry {
+        body: Pointer,
+    },
     Done,
-    Panicked { reason: String },
+    Panicked {
+        reason: String,
+        responsible: Option<Id>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -61,6 +75,14 @@ impl InstructionPointer {
             instruction: 0,
         }
     }
+}
+
+pub enum ExecutionResult {
+    Finished(Packet),
+    Panicked {
+        reason: String,
+        responsible: Option<Id>,
+    },
 }
 
 impl Fiber {
@@ -97,20 +119,33 @@ impl Fiber {
         fiber
     }
     pub fn new_for_running_module_closure(closure: Closure) -> Self {
-        assert_eq!(closure.captured.len(), 0, "Called start_module_closure with a closure that is not a module closure (it captures stuff).");
-        assert_eq!(closure.num_args, 0, "Called start_module_closure with a closure that is not a module closure (it has arguments).");
+        assert_eq!(
+            closure.captured.len(),
+            0,
+            "closure is not a module closure (it captures stuff)."
+        );
+        assert_eq!(
+            closure.num_args, 0,
+            "closure is not a module closure (it has arguments)."
+        );
         let mut heap = Heap::default();
         let closure = heap.create_closure(closure);
         Self::new_for_running_closure(heap, closure, &[])
     }
 
-    pub fn tear_down(mut self) -> Result<Packet, String> {
+    pub fn tear_down(mut self) -> ExecutionResult {
         match self.status {
-            Status::Done => Ok(Packet {
+            Status::Done => ExecutionResult::Finished(Packet {
                 heap: self.heap,
                 address: self.data_stack.pop().unwrap(),
             }),
-            Status::Panicked { reason } => Err(reason),
+            Status::Panicked {
+                reason,
+                responsible,
+            } => ExecutionResult::Panicked {
+                reason,
+                responsible,
+            },
             _ => panic!("Called `tear_down` on a fiber that's still running."),
         }
     }
@@ -151,9 +186,9 @@ impl Fiber {
             Err(reason) => self.panic(reason),
         }
     }
-    pub fn complete_try(&mut self, result: Result<Packet, String>) {
+    pub fn complete_try(&mut self, result: ExecutionResult) {
         let result = match result {
-            Ok(Packet {
+            ExecutionResult::Finished(Packet {
                 heap,
                 address: return_value,
             }) => {
@@ -161,9 +196,9 @@ impl Fiber {
                 let return_value = heap.clone_single_to_other_heap(&mut self.heap, return_value);
                 self.heap.create_list(&[ok, return_value])
             }
-            Err(panic_reason) => {
+            ExecutionResult::Panicked { reason, .. } => {
                 let err = self.heap.create_symbol("Err".to_string());
-                let reason = self.heap.create_text(panic_reason);
+                let reason = self.heap.create_text(reason);
                 self.heap.create_list(&[err, reason])
             }
         };
@@ -175,7 +210,10 @@ impl Fiber {
         self.data_stack[self.data_stack.len() - 1 - offset as usize]
     }
     pub fn panic(&mut self, reason: String) {
-        self.status = Status::Panicked { reason };
+        self.status = Status::Panicked {
+            reason,
+            responsible: self.responsible_stack.last().cloned(),
+        };
     }
 
     pub fn run(
@@ -400,7 +438,7 @@ impl Fiber {
                         "True" => {
                             self.data_stack.push(self.heap.create_nothing());
                         }
-                        "False" => self.status = Status::Panicked { reason },
+                        "False" => self.panic(reason),
                         _ => {
                             self.panic("Needs expects True or False as a symbol.".to_string());
                         }

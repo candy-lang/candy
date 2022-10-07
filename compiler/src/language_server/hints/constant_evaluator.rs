@@ -76,7 +76,11 @@ impl ConstantEvaluator {
         let vm = &self.vms[module];
         let mut hints = vec![];
 
-        if let vm::Status::Panicked { reason } = vm.status() {
+        if let vm::Status::Panicked {
+            reason,
+            responsible,
+        } = vm.status()
+        {
             if let Some(hint) = panic_hint(db, module.clone(), vm, reason) {
                 hints.push(hint);
             }
