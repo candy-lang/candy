@@ -82,6 +82,7 @@ impl LoweringContext {
                         .collect_vec(),
                     lambda.parameters.len(),
                     instructions,
+                    !lambda.fuzzable,
                 );
                 if lambda.fuzzable {
                     self.emit_register_fuzzable_closure(id.clone());
@@ -96,9 +97,11 @@ impl LoweringContext {
                 }
 
                 self.emit_push_from_stack(function.clone());
+                self.emit_start_responsibility(id.clone());
                 self.emit_trace_call_starts(id.clone(), arguments.len());
                 self.emit_call(id.clone(), arguments.len());
                 self.emit_trace_call_ends();
+                self.emit_end_responsibility();
             }
             Expression::Builtin(builtin) => {
                 self.emit_create_builtin(id.clone(), *builtin);
@@ -147,11 +150,13 @@ impl LoweringContext {
         captured: Vec<StackOffset>,
         num_args: usize,
         instructions: Vec<Instruction>,
+        is_curly: bool,
     ) {
         self.emit(Instruction::CreateClosure {
             captured,
             num_args,
             body: instructions,
+            is_curly,
         });
         self.stack.push(id);
     }
@@ -183,6 +188,12 @@ impl LoweringContext {
         self.stack.pop(); // relative path
         self.emit(Instruction::UseModule { current_module });
         self.stack.push(id); // exported definitions
+    }
+    fn emit_start_responsibility(&mut self, responsible: hir::Id) {
+        self.emit(Instruction::StartResponsibility(responsible));
+    }
+    fn emit_end_responsibility(&mut self) {
+        self.emit(Instruction::EndResponsibility);
     }
     fn emit_needs(&mut self, id: hir::Id) {
         self.stack.pop(); // reason

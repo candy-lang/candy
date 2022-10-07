@@ -5,7 +5,7 @@ use super::{
     tracer::InFiberTracer,
 };
 use crate::{
-    compiler::lir::Instruction,
+    compiler::{hir::Id, lir::Instruction},
     module::Module,
     vm::{context::PanickingUseProvider, tracer::DummyInFiberTracer},
 };
@@ -24,6 +24,7 @@ pub struct Fiber {
     pub data_stack: Vec<Pointer>,
     pub call_stack: Vec<InstructionPointer>,
     pub import_stack: Vec<Module>,
+    pub responsible_stack: Vec<Id>,
     pub heap: Heap,
 }
 
@@ -70,6 +71,7 @@ impl Fiber {
             data_stack: vec![],
             call_stack: vec![],
             import_stack: vec![],
+            responsible_stack: vec![],
             heap,
         }
     }
@@ -268,6 +270,7 @@ impl Fiber {
                 num_args,
                 body,
                 captured,
+                is_curly,
             } => {
                 let captured = captured
                     .iter()
@@ -280,6 +283,11 @@ impl Fiber {
                     captured,
                     num_args,
                     body,
+                    responsible: if is_curly {
+                        None
+                    } else {
+                        self.responsible_stack.last().cloned()
+                    },
                 });
                 self.data_stack.push(address);
             }
@@ -313,6 +321,7 @@ impl Fiber {
                     Data::Closure(Closure {
                         captured,
                         num_args: expected_num_args,
+                        responsible,
                         ..
                     }) => {
                         if num_args != expected_num_args {
@@ -326,6 +335,9 @@ impl Fiber {
                             self.heap.dup(captured);
                         }
                         self.data_stack.append(&mut args);
+                        if let Some(responsible) = responsible {
+                            self.responsible_stack.push(responsible);
+                        }
                         self.next_instruction =
                             InstructionPointer::start_of_closure(closure_address);
                     }
@@ -342,6 +354,16 @@ impl Fiber {
                 };
             }
             Instruction::Return => {
+                let closure: Closure = self
+                    .heap
+                    .get(self.next_instruction.closure)
+                    .data
+                    .clone()
+                    .try_into()
+                    .unwrap();
+                if closure.responsible.is_some() {
+                    self.responsible_stack.pop().unwrap();
+                }
                 self.heap.drop(self.next_instruction.closure);
                 let caller = self.call_stack.pop().unwrap();
                 self.next_instruction = caller;
@@ -354,6 +376,12 @@ impl Fiber {
                         self.panic(reason);
                     }
                 }
+            }
+            Instruction::StartResponsibility(responsible) => {
+                self.responsible_stack.push(responsible);
+            }
+            Instruction::EndResponsibility => {
+                self.responsible_stack.pop().unwrap();
             }
             Instruction::Needs => {
                 let reason = self.data_stack.pop().unwrap();

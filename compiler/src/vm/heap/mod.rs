@@ -199,6 +199,7 @@ impl Heap {
                     .collect(),
                 num_args: closure.num_args,
                 body: closure.body.clone(),
+                responsible: closure.responsible.clone(),
             }),
             Data::Builtin(builtin) => Data::Builtin(builtin.clone()),
             Data::SendPort(port) => Data::SendPort(SendPort::new(port.channel)),

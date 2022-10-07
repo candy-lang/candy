@@ -1,4 +1,4 @@
-use super::error::CompilerError;
+use super::{error::CompilerError, hir::Id};
 use crate::{builtin_functions::BuiltinFunction, hir, module::Module};
 use itertools::Itertools;
 use num_bigint::BigUint;
@@ -36,6 +36,7 @@ pub enum Instruction {
         captured: Vec<StackOffset>,
         num_args: usize,
         body: Vec<Instruction>,
+        is_curly: bool,
     },
 
     /// Pushes a builtin function.
@@ -89,6 +90,12 @@ pub enum Instruction {
         current_module: Module,
     },
 
+    /// Contrary to other languages, in Candy it's always clear who's fault it
+    /// is when a program panics. Each fiber maintains a responsibility stack
+    /// which notes which call-site is responsible for needs to be fulfilled.
+    StartResponsibility(Id),
+    EndResponsibility,
+
     /// Pops a boolean condition and a reason. If the condition is true, it
     /// just pushes Nothing. If the condition is false, it panics with the
     /// reason.
@@ -133,10 +140,11 @@ impl Display for Instruction {
                 captured,
                 num_args,
                 body: instructions,
+                is_curly,
             } => {
                 write!(
                     f,
-                    "createClosure with {num_args} {} capturing {}",
+                    "createClosure with {num_args} {} capturing {} {}",
                     if *num_args == 1 {
                         "argument"
                     } else {
@@ -146,7 +154,12 @@ impl Display for Instruction {
                         "nothing".to_string()
                     } else {
                         captured.iter().join(", ")
-                    }
+                    },
+                    if *is_curly {
+                        "(is curly)"
+                    } else {
+                        "(is not curly)"
+                    },
                 )?;
                 for instruction in instructions {
                     let indented = format!("{instruction}")
@@ -171,6 +184,10 @@ impl Display for Instruction {
             Instruction::UseModule { current_module } => {
                 write!(f, "useModule (currently in {})", current_module)
             }
+            Instruction::StartResponsibility(responsible) => {
+                write!(f, "responsibility of {responsible} starts")
+            }
+            Instruction::EndResponsibility => write!(f, "responsibility ends"),
             Instruction::Needs => write!(f, "needs"),
             Instruction::RegisterFuzzableClosure(hir_id) => {
                 write!(f, "registerFuzzableClosure {hir_id}")
