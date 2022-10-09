@@ -14,7 +14,7 @@ pub trait CommentStringToRcst: CstDb + HirDb {
 
 fn comment_rcst(db: &dyn CommentStringToRcst, id: hir::Id) -> Arc<Vec<Rcst>> {
     let comments_and_newlines = if id.is_root() {
-        db.cst(id.input)
+        db.cst(id.module)
             .unwrap()
             .iter()
             .take_while(|it| {
@@ -29,7 +29,7 @@ fn comment_rcst(db: &dyn CommentStringToRcst, id: hir::Id) -> Arc<Vec<Rcst>> {
             .collect_vec()
     } else {
         let cst_id = db.hir_to_cst_id(id.clone()).unwrap();
-        match db.find_cst(id.input, cst_id).kind {
+        match db.find_cst(id.module, cst_id).kind {
             cst::CstKind::Assignment {
                 box assignment_sign,
                 ..
@@ -102,10 +102,12 @@ mod parse {
         whitespace_indentation_score,
     };
     use itertools::Itertools;
+    use tracing::instrument;
     use url::Url;
 
     static SUPPORTED_WHITESPACE: &str = " \t";
 
+    #[instrument]
     fn newline(input: Vec<&str>) -> Option<(Vec<&str>, Rcst)> {
         if let ["", remaining @ ..] = input.as_slice() && !remaining.is_empty() {
             Some((remaining.to_vec(), Rcst::Newline))
@@ -114,9 +116,8 @@ mod parse {
         }
     }
 
+    #[instrument]
     fn single_line_whitespace(input: Vec<&str>) -> Option<(Vec<&str>, Rcst)> {
-        log::trace!("single_line_whitespace({input:?})");
-
         if let [line, remaining @ ..] = input.as_slice() {
             let (line, whitespace) = single_line_whitespace_raw(line)?;
             let input = recombine(line, remaining);
@@ -125,8 +126,8 @@ mod parse {
             None
         }
     }
+    #[instrument]
     fn single_line_whitespace_raw(mut line: &str) -> Option<(&str, Rcst)> {
-        log::trace!("single_line_whitespace_raw({line:?})");
         let mut chars = vec![];
         let mut has_error = false;
         for c in line.chars() {
@@ -163,8 +164,8 @@ mod parse {
         );
     }
 
+    #[instrument]
     fn leading_indentation(mut input: Vec<&str>, indentation: usize) -> Option<(Vec<&str>, Rcst)> {
-        log::trace!("leading_indentation({input:?}, {indentation:?})");
         assert!(indentation > 0);
 
         if let [line, remaining @ ..] = input.as_slice() {
@@ -215,11 +216,11 @@ mod parse {
         assert_eq!(leading_indentation(vec!["  foo"], 4), None);
     }
 
+    #[instrument]
     fn whitespaces_and_newlines(
         mut input: Vec<&str>,
         indentation: usize,
     ) -> Option<(Vec<&str>, Vec<Rcst>)> {
-        log::trace!("whitespaces_and_newlines({input:?}, {indentation:?})");
         let mut parts = vec![];
 
         if let Some((new_input, whitespace)) = single_line_whitespace(input.clone()) {
@@ -308,9 +309,8 @@ mod parse {
     }
 
     // Inline Elements
+    #[instrument]
     fn escaped(escaped_char: Option<char>) -> Rcst {
-        log::trace!("escaped({escaped_char:?})");
-
         match escaped_char {
             Some(escaped_char) if "-_[]`#\\".contains(escaped_char) => {
                 Rcst::EscapedChar(Some(escaped_char))
@@ -512,11 +512,11 @@ mod parse {
             self.finish()
         }
     }
+    #[instrument]
     fn inline(
         line: &str,
         initial_formatting_state: &[InlineFormatting],
     ) -> Option<(Vec<Rcst>, Vec<InlineFormatting>)> {
-        log::trace!("inline({line:?}, {initial_formatting_state:?})");
         SingleLineInlineParser::parse(line, initial_formatting_state)
     }
     #[test]
@@ -637,11 +637,11 @@ mod parse {
         );
     }
 
+    #[instrument]
     fn title_line(
         line: &str,
         formatting_state: Vec<InlineFormatting>,
     ) -> Option<(Rcst, Vec<InlineFormatting>)> {
-        log::trace!("title_line({line:?}, {formatting_state:?})");
         if line.is_empty() {
             return None;
         }
@@ -662,8 +662,8 @@ mod parse {
             formatting_state,
         ))
     }
+    #[instrument]
     fn title(mut input: Vec<&str>) -> Option<(Vec<&str>, Rcst)> {
-        log::trace!("title({input:?})");
         let mut title_lines = vec![];
         let mut formatting_state = vec![];
 
@@ -738,9 +738,8 @@ mod parse {
         assert_eq!(title(vec!["abc"]), None);
     }
 
+    #[instrument]
     fn paragraph(mut input: Vec<&str>, indentation: usize) -> Option<(Vec<&str>, Rcst)> {
-        log::trace!("paragraph({input:?}, {indentation})");
-
         let mut parts = vec![];
         let mut formatting_state = vec![];
         if let Some((line, remaining)) = input.split_first() {
@@ -831,9 +830,8 @@ mod parse {
         );
     }
 
+    #[instrument]
     fn url_line(input: Vec<&str>) -> Option<(Vec<&str>, Rcst)> {
-        log::trace!("url_line({input:?})");
-
         if let [line, remaining @ ..] = input.as_slice() {
             if !line.starts_with("https://") && !line.starts_with("http://") {
                 return None;
@@ -856,8 +854,8 @@ mod parse {
             None
         }
     }
+    #[instrument]
     fn urls(mut input: Vec<&str>) -> Option<(Vec<&str>, Rcst)> {
-        log::trace!("urls({input:?})");
         let mut urls = vec![];
 
         if let Some((new_input, url)) = url_line(input.clone()) {
@@ -919,9 +917,8 @@ mod parse {
         assert_eq!(urls(vec!["abc"]), None);
     }
 
+    #[instrument]
     fn code_block(input: Vec<&str>) -> Option<(Vec<&str>, Rcst)> {
-        log::trace!("code_block({input:?})");
-
         if let [line, ..] = input.as_slice() {
             const BACKTICKS: &str = "```";
             if !line.starts_with(BACKTICKS) {
@@ -1020,8 +1017,8 @@ mod parse {
         Unordered,
         Ordered,
     }
+    #[instrument]
     fn unordered_list_item_marker(line: &str) -> Option<(&str, RcstListItemMarker, usize)> {
-        log::trace!("unordered_list_item_marker({line:?})");
         line.strip_prefix('-').map(|line| {
             let (line, has_trailing_space) = line
                 .strip_prefix(' ')
@@ -1034,9 +1031,8 @@ mod parse {
             )
         })
     }
+    #[instrument]
     fn ordered_list_item_marker(mut line: &str) -> Option<(&str, RcstListItemMarker, usize)> {
-        log::trace!("ordered_list_item_marker({line:?})");
-
         let number = line
             .chars()
             .take_while(|it| it.is_ascii_digit())
@@ -1080,13 +1076,12 @@ mod parse {
             extra_indentation,
         ))
     }
+    #[instrument]
     fn list_item(
         mut input: Vec<&str>,
         mut indentation: usize,
         list_type: Option<ListType>,
     ) -> Option<(Vec<&str>, Rcst, ListType)> {
-        log::trace!("list_item({input:?}, {indentation}, {list_type:?})");
-
         let Some((line, remaining)) = input.split_first() else { return None };
         let allows_unordered = list_type
             .map(|it| it == ListType::Unordered)
@@ -1107,8 +1102,8 @@ mod parse {
         let (input, content) = blocks(input.clone(), indentation).unwrap_or((input, vec![]));
         Some((input, Rcst::ListItem { marker, content }, list_type))
     }
+    #[instrument]
     fn list(input: Vec<&str>, indentation: usize) -> Option<(Vec<&str>, Rcst)> {
-        log::trace!("list({input:?}, {indentation})");
         let mut list_items = vec![];
 
         let Some((mut input, first_item, list_type)) = list_item(input, indentation, None)  else { return None };
@@ -1379,8 +1374,8 @@ mod parse {
         assert_eq!(list(vec!["abc"], 0), None);
     }
 
+    #[instrument]
     pub fn blocks(mut input: Vec<&str>, indentation: usize) -> Option<(Vec<&str>, Vec<Rcst>)> {
-        log::trace!("blocks({input:?}, {indentation})");
         let mut blocks: Vec<Rcst> = vec![];
 
         loop {
