@@ -48,18 +48,20 @@ pub enum Rcst {
 
     List(Vec<Rcst>),
     ListItem {
-        marker: Box<Rcst>,
+        marker: RcstListItemMarker,
         content: Vec<Rcst>,
-    },
-    OrderedListItemMarker {
-        number: Box<Rcst>,
-        dot: Box<Rcst>,
     },
 
     Error {
         child: Option<Box<Rcst>>,
         error: RcstError,
     },
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum RcstListItemMarker {
+    Unordered { has_trailing_space: bool },
+    Ordered { number: Box<Rcst> },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -196,15 +198,29 @@ impl Display for Rcst {
                 }
                 Ok(())
             }
-            Rcst::OrderedListItemMarker { number, dot } => {
-                number.fmt(f)?;
-                dot.fmt(f)
-            }
             Rcst::Error { child, .. } => {
                 if let Some(child) = child {
                     child.fmt(f)?;
                 }
                 Ok(())
+            }
+        }
+    }
+}
+
+impl Display for RcstListItemMarker {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            RcstListItemMarker::Unordered { has_trailing_space } => {
+                '-'.fmt(f)?;
+                if *has_trailing_space {
+                    ' '.fmt(f)?;
+                }
+                Ok(())
+            }
+            RcstListItemMarker::Ordered { number } => {
+                number.fmt(f)?;
+                '.'.fmt(f)
             }
         }
     }

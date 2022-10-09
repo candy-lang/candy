@@ -98,7 +98,7 @@ mod parse {
     use std::collections::HashSet;
 
     use super::{
-        super::rcst::{Rcst, RcstError},
+        super::rcst::{Rcst, RcstError, RcstListItemMarker},
         whitespace_indentation_score,
     };
     use itertools::Itertools;
@@ -1007,6 +1007,260 @@ mod parse {
         assert_eq!(code_block(vec!["abc"]), None);
     }
 
+    #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+    enum ListType {
+        Unordered,
+        Ordered,
+    }
+    fn unordered_list_item_marker(line: &str) -> Option<(&str, RcstListItemMarker, usize)> {
+        log::trace!("unordered_list_item_marker({line:?})");
+        line.strip_prefix('-').map(|line| {
+            let (line, has_trailing_space) = line
+                .strip_prefix(' ')
+                .map(|line| (line, true))
+                .unwrap_or((line, false));
+            (
+                line,
+                RcstListItemMarker::Unordered { has_trailing_space },
+                if has_trailing_space { 2 } else { 1 },
+            )
+        })
+    }
+    fn list_item(
+        mut input: Vec<&str>,
+        mut indentation: usize,
+        list_type: Option<ListType>,
+    ) -> Option<(Vec<&str>, Rcst, ListType)> {
+        log::trace!("list_item({input:?}, {indentation}, {list_type:?})");
+        // TODO: ordered list item
+
+        let Some((line, remaining)) = input.split_first() else { return None };
+        let Some((line, marker, extra_indentation)) = unordered_list_item_marker(line) else { return None };
+        input = recombine(line, remaining);
+        indentation += extra_indentation;
+
+        let (input, content) = blocks(input.clone(), indentation).unwrap_or((input, vec![]));
+        Some((
+            input,
+            Rcst::ListItem { marker, content },
+            ListType::Unordered,
+        ))
+    }
+    fn list(input: Vec<&str>, indentation: usize) -> Option<(Vec<&str>, Rcst)> {
+        log::trace!("list({input:?}, {indentation})");
+        let mut list_items = vec![];
+
+        let Some((mut input, first_item, list_type)) = list_item(input, indentation, None)  else { return None };
+        list_items.push(first_item);
+
+        loop {
+            let Some((new_input, whitespace)) = whitespaces_and_newlines(input.clone(), indentation) else { break };
+
+            let Some((new_input, new_list_item, new_list_type)) = list_item(new_input, indentation, Some(list_type)) else { break };
+            assert_eq!(list_type, new_list_type);
+            input = new_input;
+            let previous_item = list_items.pop().unwrap();
+            list_items.push(previous_item.wrap_in_whitespace(whitespace));
+            list_items.push(new_list_item);
+        }
+
+        Some((input, Rcst::List(list_items)))
+    }
+    #[test]
+    fn test_list() {
+        assert_eq!(
+            list(vec!["- Foo"], 0),
+            Some((
+                vec![""],
+                Rcst::List(vec![Rcst::ListItem {
+                    marker: RcstListItemMarker::Unordered {
+                        has_trailing_space: true
+                    },
+                    content: vec![Rcst::Paragraph(vec![Rcst::TextPart("Foo".to_string())])]
+                }])
+            ))
+        );
+        assert_eq!(
+            list(vec!["-Bar"], 0),
+            Some((
+                vec![""],
+                Rcst::List(vec![Rcst::ListItem {
+                    marker: RcstListItemMarker::Unordered {
+                        has_trailing_space: false
+                    },
+                    content: vec![Rcst::Paragraph(vec![Rcst::TextPart("Bar".to_string())])]
+                }])
+            ))
+        );
+        assert_eq!(
+            list(vec!["- Foo", ""], 0),
+            Some((
+                vec!["", ""],
+                Rcst::List(vec![Rcst::ListItem {
+                    marker: RcstListItemMarker::Unordered {
+                        has_trailing_space: true
+                    },
+                    content: vec![Rcst::Paragraph(vec![Rcst::TextPart("Foo".to_string())])]
+                }])
+            ))
+        );
+        assert_eq!(
+            list(vec!["- Foo", "- Bar"], 0),
+            Some((
+                vec![""],
+                Rcst::List(vec![
+                    Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::ListItem {
+                            marker: RcstListItemMarker::Unordered {
+                                has_trailing_space: true
+                            },
+                            content: vec![Rcst::Paragraph(vec![Rcst::TextPart("Foo".to_string())])]
+                        }),
+                        whitespace: vec![Rcst::Newline]
+                    },
+                    Rcst::ListItem {
+                        marker: RcstListItemMarker::Unordered {
+                            has_trailing_space: true
+                        },
+                        content: vec![Rcst::Paragraph(vec![Rcst::TextPart("Bar".to_string())])]
+                    }
+                ])
+            ))
+        );
+        assert_eq!(
+            list(vec!["- item 1", "", "  - item 1a"], 0,),
+            Some((
+                vec![""],
+                Rcst::List(vec![Rcst::ListItem {
+                    marker: RcstListItemMarker::Unordered {
+                        has_trailing_space: true,
+                    },
+                    content: vec![
+                        Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Paragraph(vec![Rcst::TextPart(
+                                "item 1".to_string(),
+                            )])),
+                            whitespace: vec![
+                                Rcst::Newline,
+                                Rcst::Newline,
+                                Rcst::Whitespace("  ".to_string()),
+                            ],
+                        },
+                        Rcst::List(vec![Rcst::ListItem {
+                            marker: RcstListItemMarker::Unordered {
+                                has_trailing_space: true,
+                            },
+                            content: vec![Rcst::Paragraph(vec![Rcst::TextPart(
+                                "item 1a".to_string()
+                            )])],
+                        }]),
+                    ],
+                }]),
+            )),
+        );
+        assert_eq!(
+            list(
+                vec![
+                    "- item 1 item item item",
+                    "  item item ",
+                    "- item 2",
+                    "",
+                    "  - item 2a",
+                    "    item item",
+                    "  -item 2b",
+                    "",
+                    "- item 3"
+                ],
+                0,
+            ),
+            Some((
+                vec![""],
+                Rcst::List(vec![
+                    Rcst::TrailingWhitespace {
+                        whitespace: vec![Rcst::Newline],
+                        child: Box::new(Rcst::ListItem {
+                            marker: RcstListItemMarker::Unordered {
+                                has_trailing_space: true,
+                            },
+                            content: vec![Rcst::Paragraph(vec![
+                                Rcst::TrailingWhitespace {
+                                    child: Box::new(Rcst::TextPart(
+                                        "item 1 item item item".to_string(),
+                                    )),
+                                    whitespace: vec![
+                                        Rcst::Newline,
+                                        Rcst::Whitespace("  ".to_string())
+                                    ]
+                                },
+                                Rcst::TextPart("item item ".to_string()),
+                            ])],
+                        }),
+                    },
+                    Rcst::TrailingWhitespace {
+                        whitespace: vec![Rcst::Newline, Rcst::Newline],
+                        child: Box::new(Rcst::ListItem {
+                            marker: RcstListItemMarker::Unordered {
+                                has_trailing_space: true,
+                            },
+                            content: vec![
+                                Rcst::TrailingWhitespace {
+                                    child: Box::new(Rcst::Paragraph(vec![Rcst::TextPart(
+                                        "item 2".to_string(),
+                                    )])),
+                                    whitespace: vec![
+                                        Rcst::Newline,
+                                        Rcst::Newline,
+                                        Rcst::Whitespace("  ".to_string()),
+                                    ],
+                                },
+                                Rcst::List(vec![
+                                    Rcst::TrailingWhitespace {
+                                        child: Box::new(Rcst::ListItem {
+                                            marker: RcstListItemMarker::Unordered {
+                                                has_trailing_space: true,
+                                            },
+                                            content: vec![Rcst::Paragraph(vec![
+                                                Rcst::TrailingWhitespace {
+                                                    child: Box::new(Rcst::TextPart(
+                                                        "item 2a".to_string()
+                                                    )),
+                                                    whitespace: vec![
+                                                        Rcst::Newline,
+                                                        Rcst::Whitespace("    ".to_string()),
+                                                    ]
+                                                },
+                                                Rcst::TextPart("item item".to_string()),
+                                            ]),],
+                                        }),
+                                        whitespace: vec![
+                                            Rcst::Newline,
+                                            Rcst::Whitespace("  ".to_string()),
+                                        ],
+                                    },
+                                    Rcst::ListItem {
+                                        marker: RcstListItemMarker::Unordered {
+                                            has_trailing_space: false
+                                        },
+                                        content: vec![Rcst::Paragraph(vec![Rcst::TextPart(
+                                            "item 2b".to_string()
+                                        )])],
+                                    },
+                                ]),
+                            ],
+                        })
+                    },
+                    Rcst::ListItem {
+                        marker: RcstListItemMarker::Unordered {
+                            has_trailing_space: true
+                        },
+                        content: vec![Rcst::Paragraph(vec![Rcst::TextPart("item 3".to_string())])]
+                    },
+                ])
+            ))
+        );
+        assert_eq!(list(vec!["abc"], 0), None);
+    }
+
     pub fn blocks(mut input: Vec<&str>, indentation: usize) -> Option<(Vec<&str>, Vec<Rcst>)> {
         log::trace!("blocks({input:?}, {indentation})");
         let mut blocks: Vec<Rcst> = vec![];
@@ -1035,7 +1289,7 @@ mod parse {
                         None
                     }
                 })
-                // TODO: list
+                .or_else(|| list(new_input.clone(), indentation))
                 .or_else(|| paragraph(new_input.clone(), indentation));
             if let Some((new_input, block)) = block {
                 if let Some(mut whitespace) = whitespace {
