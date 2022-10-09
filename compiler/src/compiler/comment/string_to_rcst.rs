@@ -205,55 +205,59 @@ mod parse {
         assert_eq!(leading_indentation(vec!["  foo"], 4), None);
     }
 
-    fn newline_and_whitespace(
+    fn whitespaces_and_newlines(
         mut input: Vec<&str>,
         indentation: usize,
     ) -> Option<(Vec<&str>, Vec<Rcst>)> {
-        log::trace!("newline_and_whitespace({input:?}, {indentation:?})");
+        log::trace!("whitespaces_and_newlines({input:?}, {indentation:?})");
         let mut parts = vec![];
 
         if let Some((new_input, whitespace)) = single_line_whitespace(input.clone()) {
+            input = new_input;
             parts.push(whitespace);
-            input = new_input;
         }
 
-        if let Some((new_input, newline)) = newline(input.clone()) {
-            input = new_input;
-            parts.push(newline);
-        } else {
-            return None;
-        }
+        let mut new_input = input.clone();
+        let mut new_parts = vec![];
+        loop {
+            let new_input_from_iteration_start = new_input.clone();
+            let mut has_proper_indentation = false;
 
-        if indentation > 0 {
-            if let Some((new_input, indentation)) = leading_indentation(input.clone(), indentation)
-            {
-                input = new_input;
-                parts.push(indentation);
-            } else {
-                return None;
-            }
-        }
+            if let Some((new_new_input, newline)) = newline(new_input.clone()) {
+                new_input = new_new_input;
+                new_parts.push(newline);
 
-        if let Some((new_input, whitespace)) = single_line_whitespace(input.clone()) {
-            if indentation > 0 {
-                match (parts.pop().unwrap(), whitespace) {
-                    (Rcst::Whitespace(indentation), Rcst::Whitespace(whitespace)) => {
-                        parts.push(Rcst::Whitespace(indentation + &whitespace));
-                    }
-                    _ => unreachable!(),
+                if indentation == 0 {
+                    has_proper_indentation = true;
+                } else if let Some((new_new_input, whitespace)) =
+                    leading_indentation(new_input.clone(), indentation)
+                {
+                    has_proper_indentation = true;
+                    new_parts.push(whitespace);
+                    new_input = new_new_input;
                 }
-            } else {
-                parts.push(whitespace);
             }
-            input = new_input;
+
+            if let Some((new_new_input, whitespace)) = single_line_whitespace(new_input.clone()) {
+                new_parts.push(whitespace);
+                new_input = new_new_input;
+            }
+
+            if new_input == new_input_from_iteration_start {
+                break;
+            }
+            if has_proper_indentation {
+                input = new_input.clone();
+                parts.append(&mut new_parts);
+            }
         }
 
         Some((input, parts))
     }
     #[test]
-    fn test_newline_and_whitespace() {
+    fn test_whitespaces_and_newlines() {
         assert_eq!(
-            newline_and_whitespace(vec![" ", " a"], 0),
+            whitespaces_and_newlines(vec![" ", " a"], 0),
             Some((
                 vec!["a"],
                 vec![
@@ -263,9 +267,9 @@ mod parse {
                 ]
             ))
         );
-        assert_eq!(newline_and_whitespace(vec!["", " a"], 2), None);
+        assert_eq!(whitespaces_and_newlines(vec!["", " a"], 2), None);
         assert_eq!(
-            newline_and_whitespace(vec![" ", "  a"], 2),
+            whitespaces_and_newlines(vec![" ", "  a"], 2),
             Some((
                 vec!["a"],
                 vec![
@@ -276,7 +280,7 @@ mod parse {
             ))
         );
         assert_eq!(
-            newline_and_whitespace(vec![" ", "   a"], 2),
+            whitespaces_and_newlines(vec![" ", "   a"], 2),
             Some((
                 vec!["a"],
                 vec![
@@ -286,7 +290,11 @@ mod parse {
                 ]
             ))
         );
-        assert_eq!(newline_and_whitespace(vec!["abc"], 2), None);
+        assert_eq!(whitespaces_and_newlines(vec!["abc"], 2), None);
+        assert_eq!(
+            whitespaces_and_newlines(vec!["", ""], 0),
+            Some((vec![""], vec![Rcst::Newline]))
+        );
     }
 
     // Inline Elements
@@ -659,7 +667,7 @@ mod parse {
         }
 
         loop {
-            let Some((new_input, whitespace)) =newline_and_whitespace(input.clone(), 0) else { break };
+            let Some((new_input, whitespace)) =whitespaces_and_newlines(input.clone(), 0) else { break };
 
             if let Some((line, remaining)) = new_input.split_first()
                     && let Some((new_title_line, new_formatting_state)) = title_line(line, formatting_state) {
@@ -798,6 +806,19 @@ mod parse {
                 ]),
             ))
         );
+        assert_eq!(
+            paragraph(vec!["item 2a", "    item item"], 4),
+            Some((
+                vec![""],
+                Rcst::Paragraph(vec![
+                    Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::TextPart("item 2a".to_string())),
+                        whitespace: vec![Rcst::Newline, Rcst::Whitespace("    ".to_string())]
+                    },
+                    Rcst::TextPart("item item".to_string()),
+                ]),
+            ))
+        );
     }
 
     fn url_line(input: Vec<&str>) -> Option<(Vec<&str>, Rcst)> {
@@ -837,7 +858,7 @@ mod parse {
         }
 
         loop {
-            let Some((new_input, whitespace)) = newline_and_whitespace(input.clone(), 0) else { break };
+            let Some((new_input, whitespace)) = whitespaces_and_newlines(input.clone(), 0) else { break };
 
             if let Some((new_input, url)) = url_line(new_input) {
                 input = new_input;
@@ -986,52 +1007,120 @@ mod parse {
 
     pub fn blocks(mut input: Vec<&str>, indentation: usize) -> Option<(Vec<&str>, Vec<Rcst>)> {
         log::trace!("blocks({input:?}, {indentation})");
-        let mut blocks = vec![];
-
-        if let Some((new_input, whitespace)) = single_line_whitespace(input.clone()) {
-            input = new_input;
-            blocks.push(whitespace);
-        }
+        let mut blocks: Vec<Rcst> = vec![];
 
         loop {
-            let mut has_made_progress = false;
+            let (new_input, whitespace) = if let Some((new_input, whitespace)) =
+                whitespaces_and_newlines(input.clone(), indentation)
+            {
+                (new_input, Some(whitespace))
+            } else {
+                (input.clone(), None)
+            };
 
-            let block = code_block(input.clone())
+            let block = code_block(new_input.clone())
                 .or_else(|| {
                     if indentation == 0 {
-                        title(input.clone())
+                        title(new_input.clone())
                     } else {
                         None
                     }
                 })
-                .or_else(|| urls(input.clone()))
+                .or_else(|| {
+                    if indentation == 0 {
+                        urls(new_input.clone())
+                    } else {
+                        None
+                    }
+                })
                 // TODO: list
-                .or_else(|| paragraph(input.clone(), indentation));
+                .or_else(|| paragraph(new_input.clone(), indentation));
             if let Some((new_input, block)) = block {
-                has_made_progress = true;
+                if let Some(mut whitespace) = whitespace {
+                    if let Some(previous) = blocks.pop() {
+                        blocks.push(previous.wrap_in_whitespace(whitespace));
+                    } else {
+                        blocks.append(&mut whitespace);
+                    }
+                }
+
                 blocks.push(block);
                 input = new_input;
-            }
-
-            if let Some((new_input, newline)) = newline(input.clone()) {
-                has_made_progress = true;
-                let previous_block = blocks.pop().unwrap();
-                blocks.push(previous_block.wrap_in_whitespace(vec![newline]));
-                input = new_input;
-            }
-
-            if !has_made_progress {
+            } else {
                 break;
             }
         }
 
-        assert!(indentation > 0 || input.is_empty());
+        if indentation == 0 {
+            if let Some((new_input, mut whitespace)) =
+                whitespaces_and_newlines(input.clone(), indentation).or_else(|| {
+                    single_line_whitespace(input.clone())
+                        .map(|(new_input, whitespace)| (new_input, vec![whitespace]))
+                })
+            {
+                if let Some(previous) = blocks.pop() {
+                    blocks.push(previous.wrap_in_whitespace(whitespace));
+                } else {
+                    blocks.append(&mut whitespace);
+                }
+                input = new_input;
+            }
+
+            assert!(input == vec![""]);
+            input = vec![];
+        }
 
         if blocks.is_empty() {
             None
         } else {
             Some((input, blocks))
         }
+    }
+    #[test]
+    fn test_blocks() {
+        assert_eq!(
+            blocks(vec!["item 1 item item item", "item item "], 0),
+            Some((
+                vec![],
+                vec![Rcst::Paragraph(vec![
+                    Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::TextPart("item 1 item item item".to_string())),
+                        whitespace: vec![Rcst::Newline]
+                    },
+                    Rcst::TextPart("item item ".to_string()),
+                ])],
+            ))
+        );
+        assert_eq!(
+            blocks(vec!["item 1 item item item", "  item item ", ""], 2),
+            Some((
+                vec!["", ""],
+                vec![Rcst::Paragraph(vec![
+                    Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::TextPart("item 1 item item item".to_string())),
+                        whitespace: vec![Rcst::Newline, Rcst::Whitespace("  ".to_string())]
+                    },
+                    Rcst::TextPart("item item ".to_string()),
+                ])],
+            ))
+        );
+        assert_eq!(
+            blocks(vec!["foo", "", "  bar"], 2),
+            Some((
+                vec![""],
+                vec![
+                    Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Paragraph(vec![Rcst::TextPart("foo".to_string())])),
+                        whitespace: vec![
+                            Rcst::Newline,
+                            Rcst::Newline,
+                            Rcst::Whitespace("  ".to_string()),
+                        ]
+                    },
+                    Rcst::Paragraph(vec![Rcst::TextPart("bar".to_string()),])
+                ],
+            ))
+        );
     }
 
     fn recombine<'a>(first_line: &'a str, remaining_lines: &[&'a str]) -> Vec<&'a str> {
