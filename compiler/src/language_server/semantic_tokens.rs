@@ -121,7 +121,7 @@ impl<'a> Context<'a> {
             self.cursor,
         );
 
-        let definition_modifier = type_ == SemanticTokenType::Assignment as u32;
+        let definition_modifier = (type_ == SemanticTokenType::Assignment) as u32;
         let readonly_modifier = 0b10;
         self.tokens.push(SemanticToken {
             delta_line: start.line - self.cursor.line,
