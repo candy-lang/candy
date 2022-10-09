@@ -206,10 +206,6 @@ mod parse {
     #[test]
     fn test_leading_indentation() {
         assert_eq!(
-            leading_indentation(vec!["foo"], 0),
-            Some((vec!["foo"], Rcst::Whitespace("".to_string())))
-        );
-        assert_eq!(
             leading_indentation(vec!["  foo"], 2),
             Some((vec!["foo"], Rcst::Whitespace("  ".to_string())))
         );
@@ -263,7 +259,11 @@ mod parse {
             }
         }
 
-        Some((input, parts))
+        if parts.is_empty() {
+            None
+        } else {
+            Some((input, parts))
+        }
     }
     #[test]
     fn test_whitespaces_and_newlines() {
@@ -297,9 +297,10 @@ mod parse {
                 vec![
                     Rcst::Whitespace(" ".to_string()),
                     Rcst::Newline,
-                    Rcst::Whitespace("   ".to_string())
                 ]
             ))
+                    Rcst::Whitespace("  ".to_string()),
+                    Rcst::Whitespace(" ".to_string()),
         );
         assert_eq!(whitespaces_and_newlines(vec!["abc"], 2), None);
         assert_eq!(
