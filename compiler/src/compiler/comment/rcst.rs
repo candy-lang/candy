@@ -60,8 +60,13 @@ pub enum Rcst {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum RcstListItemMarker {
-    Unordered { has_trailing_space: bool },
-    Ordered { number: Box<Rcst> },
+    Unordered {
+        has_trailing_space: bool,
+    },
+    Ordered {
+        number: Box<Rcst>,
+        has_trailing_space: bool,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -218,9 +223,16 @@ impl Display for RcstListItemMarker {
                 }
                 Ok(())
             }
-            RcstListItemMarker::Ordered { number } => {
+            RcstListItemMarker::Ordered {
+                number,
+                has_trailing_space,
+            } => {
                 number.fmt(f)?;
-                '.'.fmt(f)
+                '.'.fmt(f)?;
+                if *has_trailing_space {
+                    ' '.fmt(f)?;
+                }
+                Ok(())
             }
         }
     }

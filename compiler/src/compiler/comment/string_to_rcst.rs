@@ -114,38 +114,46 @@ mod parse {
         }
     }
 
-    fn single_line_whitespace(mut input: Vec<&str>) -> Option<(Vec<&str>, Rcst)> {
+    fn single_line_whitespace(input: Vec<&str>) -> Option<(Vec<&str>, Rcst)> {
         log::trace!("single_line_whitespace({input:?})");
-        let mut chars = vec![];
-        let mut has_error = false;
-        if let [line, remaining @ ..] = input.as_slice() {
-            for c in line.chars() {
-                match c {
-                    ' ' => {}
-                    c if SUPPORTED_WHITESPACE.contains(c) => {
-                        has_error = true;
-                    }
-                    _ => break,
-                }
-                chars.push(c);
-            }
-            if chars.is_empty() {
-                return None;
-            }
 
-            let whitespace = chars.into_iter().join("");
-            input = recombine(&line[whitespace.len()..], remaining);
-            let mut whitespace = Rcst::Whitespace(whitespace);
-            if has_error {
-                whitespace = Rcst::Error {
-                    child: Some(whitespace.into()),
-                    error: RcstError::WeirdWhitespace,
-                };
-            }
+        if let [line, remaining @ ..] = input.as_slice() {
+            let (line, whitespace) = single_line_whitespace_raw(line)?;
+            let input = recombine(line, remaining);
             Some((input, whitespace))
         } else {
             None
         }
+    }
+    fn single_line_whitespace_raw(mut line: &str) -> Option<(&str, Rcst)> {
+        log::trace!("single_line_whitespace_raw({line:?})");
+        let mut chars = vec![];
+        let mut has_error = false;
+        for c in line.chars() {
+            match c {
+                ' ' => {}
+                c if SUPPORTED_WHITESPACE.contains(c) => {
+                    has_error = true;
+                }
+                _ => break,
+            }
+            chars.push(c);
+        }
+        if chars.is_empty() {
+            return None;
+        }
+
+        let whitespace = chars.into_iter().join("");
+        line = &line[whitespace.len()..];
+
+        let mut whitespace = Rcst::Whitespace(whitespace);
+        if has_error {
+            whitespace = Rcst::Error {
+                child: Some(whitespace.into()),
+                error: RcstError::WeirdWhitespace,
+            };
+        }
+        Some((line, whitespace))
     }
     #[test]
     fn test_single_line_whitespace() {
@@ -1026,25 +1034,78 @@ mod parse {
             )
         })
     }
+    fn ordered_list_item_marker(mut line: &str) -> Option<(&str, RcstListItemMarker, usize)> {
+        log::trace!("ordered_list_item_marker({line:?})");
+
+        let number = line
+            .chars()
+            .take_while(|it| it.is_ascii_digit())
+            .collect::<String>();
+        if number.is_empty() {
+            return None;
+        }
+        line = &line[number.len()..];
+        let mut number = Rcst::TextPart(number);
+
+        if let Some((new_line, whitespace)) = single_line_whitespace_raw(line) {
+            line = new_line;
+            number = Rcst::TrailingWhitespace {
+                child: number.into(),
+                whitespace: vec![whitespace],
+            };
+        }
+
+        if line.starts_with('.') {
+            line = &line[1..];
+        } else {
+            return None;
+        }
+
+        let has_trailing_space = if let Some(' ') = line.chars().next() {
+            line = &line[1..];
+            true
+        } else {
+            false
+        };
+
+        let extra_indentation =
+            format!("{}", number).len() + 1 + if has_trailing_space { 1 } else { 0 };
+
+        Some((
+            line,
+            RcstListItemMarker::Ordered {
+                number: Box::new(number),
+                has_trailing_space,
+            },
+            extra_indentation,
+        ))
+    }
     fn list_item(
         mut input: Vec<&str>,
         mut indentation: usize,
         list_type: Option<ListType>,
     ) -> Option<(Vec<&str>, Rcst, ListType)> {
         log::trace!("list_item({input:?}, {indentation}, {list_type:?})");
-        // TODO: ordered list item
 
         let Some((line, remaining)) = input.split_first() else { return None };
-        let Some((line, marker, extra_indentation)) = unordered_list_item_marker(line) else { return None };
+        let allows_unordered = list_type
+            .map(|it| it == ListType::Unordered)
+            .unwrap_or(true);
+        let allows_ordered = list_type.map(|it| it == ListType::Ordered).unwrap_or(true);
+        // TODO: move the `allow_…` before the match checks when Rust's MIR no longer breaks
+        let ((line, marker, extra_indentation), list_type) =
+            if let Some(marker) = unordered_list_item_marker(line) && allows_unordered  {
+                (marker, ListType::Unordered)
+            } else if let Some(marker) = ordered_list_item_marker(line) && allows_ordered  {
+                (marker, ListType::Ordered)
+            } else {
+                return None;
+            };
         input = recombine(line, remaining);
         indentation += extra_indentation;
 
         let (input, content) = blocks(input.clone(), indentation).unwrap_or((input, vec![]));
-        Some((
-            input,
-            Rcst::ListItem { marker, content },
-            ListType::Unordered,
-        ))
+        Some((input, Rcst::ListItem { marker, content }, list_type))
     }
     fn list(input: Vec<&str>, indentation: usize) -> Option<(Vec<&str>, Rcst)> {
         log::trace!("list({input:?}, {indentation})");
@@ -1077,8 +1138,8 @@ mod parse {
                         has_trailing_space: true
                     },
                     content: vec![Rcst::Paragraph(vec![Rcst::TextPart("Foo".to_string())])]
-                }])
-            ))
+                }]),
+            )),
         );
         assert_eq!(
             list(vec!["-Bar"], 0),
@@ -1089,8 +1150,40 @@ mod parse {
                         has_trailing_space: false
                     },
                     content: vec![Rcst::Paragraph(vec![Rcst::TextPart("Bar".to_string())])]
-                }])
-            ))
+                }]),
+            )),
+        );
+        assert_eq!(
+            list(vec!["0.Foo"], 0),
+            Some((
+                vec![""],
+                Rcst::List(vec![Rcst::ListItem {
+                    marker: RcstListItemMarker::Ordered {
+                        number: Box::new(Rcst::TextPart("0".to_string())),
+                        has_trailing_space: false,
+                    },
+                    content: vec![Rcst::Paragraph(vec![Rcst::TextPart("Foo".to_string())])]
+                }]),
+            )),
+        );
+        assert_eq!(
+            list(vec!["0 .  Foo"], 0),
+            Some((
+                vec![""],
+                Rcst::List(vec![Rcst::ListItem {
+                    marker: RcstListItemMarker::Ordered {
+                        number: Box::new(Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::TextPart("0".to_string())),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())]
+                        }),
+                        has_trailing_space: true,
+                    },
+                    content: vec![
+                        Rcst::Whitespace(" ".to_string()),
+                        Rcst::Paragraph(vec![Rcst::TextPart("Foo".to_string())]),
+                    ],
+                }]),
+            )),
         );
         assert_eq!(
             list(vec!["- Foo", ""], 0),
@@ -1101,8 +1194,8 @@ mod parse {
                         has_trailing_space: true
                     },
                     content: vec![Rcst::Paragraph(vec![Rcst::TextPart("Foo".to_string())])]
-                }])
-            ))
+                }]),
+            )),
         );
         assert_eq!(
             list(vec!["- Foo", "- Bar"], 0),
@@ -1123,9 +1216,34 @@ mod parse {
                             has_trailing_space: true
                         },
                         content: vec![Rcst::Paragraph(vec![Rcst::TextPart("Bar".to_string())])]
-                    }
-                ])
-            ))
+                    },
+                ]),
+            )),
+        );
+        assert_eq!(
+            list(vec!["0. Foo", "1. Bar"], 0),
+            Some((
+                vec![""],
+                Rcst::List(vec![
+                    Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::ListItem {
+                            marker: RcstListItemMarker::Ordered {
+                                number: Box::new(Rcst::TextPart("0".to_string())),
+                                has_trailing_space: true,
+                            },
+                            content: vec![Rcst::Paragraph(vec![Rcst::TextPart("Foo".to_string())])]
+                        }),
+                        whitespace: vec![Rcst::Newline]
+                    },
+                    Rcst::ListItem {
+                        marker: RcstListItemMarker::Ordered {
+                            number: Box::new(Rcst::TextPart("1".to_string())),
+                            has_trailing_space: true,
+                        },
+                        content: vec![Rcst::Paragraph(vec![Rcst::TextPart("Bar".to_string())])]
+                    },
+                ]),
+            )),
         );
         assert_eq!(
             list(vec!["- item 1", "", "  - item 1a"], 0,),
@@ -1247,7 +1365,7 @@ mod parse {
                                     },
                                 ]),
                             ],
-                        })
+                        }),
                     },
                     Rcst::ListItem {
                         marker: RcstListItemMarker::Unordered {
@@ -1255,8 +1373,8 @@ mod parse {
                         },
                         content: vec![Rcst::Paragraph(vec![Rcst::TextPart("item 3".to_string())])]
                     },
-                ])
-            ))
+                ]),
+            )),
         );
         assert_eq!(list(vec!["abc"], 0), None);
     }
@@ -1345,7 +1463,7 @@ mod parse {
                     },
                     Rcst::TextPart("item item ".to_string()),
                 ])],
-            ))
+            )),
         );
         assert_eq!(
             blocks(vec!["item 1 item item item", "  item item ", ""], 2),
@@ -1358,7 +1476,7 @@ mod parse {
                     },
                     Rcst::TextPart("item item ".to_string()),
                 ])],
-            ))
+            )),
         );
         assert_eq!(
             blocks(vec!["foo", "", "  bar"], 2),
@@ -1375,7 +1493,7 @@ mod parse {
                     },
                     Rcst::Paragraph(vec![Rcst::TextPart("bar".to_string()),])
                 ],
-            ))
+            )),
         );
     }
 
