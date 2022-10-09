@@ -1027,7 +1027,7 @@ mod parse {
             (
                 line,
                 RcstListItemMarker::Unordered { has_trailing_space },
-                if has_trailing_space { 2 } else { 1 },
+                1 + has_trailing_space,
             )
         })
     }
@@ -1064,16 +1064,13 @@ mod parse {
             false
         };
 
-        let extra_indentation =
-            format!("{}", number).len() + 1 + if has_trailing_space { 1 } else { 0 };
-
         Some((
             line,
             RcstListItemMarker::Ordered {
                 number: Box::new(number),
                 has_trailing_space,
             },
-            extra_indentation,
+            format!("{}", number).len() + 1 + has_trailing_space,
         ))
     }
     #[instrument]
