@@ -1,0 +1,5 @@
+type = use "..type"
+
+panic reason :=
+  needs (type.is reason Text) "panic needs a text as the reason"
+  needs False reason

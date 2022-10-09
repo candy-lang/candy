@@ -1,10 +1,10 @@
 use super::{ast::AstError, hir::HirError, rcst::RcstError};
-use crate::input::Input;
+use crate::module::Module;
 use std::ops::Range;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct CompilerError {
-    pub input: Input,
+    pub module: Module,
     pub span: Range<usize>,
     pub payload: CompilerErrorPayload,
 }

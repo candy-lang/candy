@@ -5,57 +5,50 @@ mod utils;
 pub use self::fuzzer::{Fuzzer, Status};
 use crate::{
     database::Database,
-    input::Input,
-    vm::{use_provider::DbUseProvider, value::Closure, TearDownResult, Vm},
+    module::Module,
+    vm::{use_provider::DbUseProvider, Closure, Vm},
 };
 use itertools::Itertools;
-use std::fs;
+use tracing::info;
 
-pub async fn fuzz(db: &Database, input: Input) {
-    let mut vm = {
-        let mut vm = Vm::new();
-        let module_closure = Closure::of_input(db, input.clone()).unwrap();
-        let use_provider = DbUseProvider { db };
-        vm.set_up_module_closure_execution(&use_provider, module_closure);
-        vm.run_synchronously_until_completion(db).ok();
-        vm
+pub async fn fuzz(db: &Database, module: Module) {
+    let (fuzzables_heap, fuzzables) = {
+        let result = Vm::new_for_running_module_closure(
+            &DbUseProvider { db },
+            Closure::of_module(db, module.clone()).unwrap(),
+        )
+        .run_synchronously_until_completion(db);
+        (result.heap, result.fuzzable_closures)
     };
 
-    let TearDownResult {
-        fuzzable_closures, ..
-    } = vm.tear_down_module_closure_execution();
-
-    log::info!(
+    info!(
         "Now, the fuzzing begins. So far, we have {} closures to fuzz.",
-        fuzzable_closures.len()
+        fuzzables.len()
     );
 
-    for (id, closure) in fuzzable_closures {
-        let mut fuzzer = Fuzzer::new(db, closure.clone(), id.clone());
+    for (id, closure) in fuzzables {
+        let mut fuzzer = Fuzzer::new(db, &fuzzables_heap, closure, id.clone());
         fuzzer.run(db, 1000);
         match fuzzer.status() {
             Status::StillFuzzing { .. } => {}
             Status::PanickedForArguments {
+                heap,
                 arguments,
                 reason,
                 tracer,
             } => {
-                log::error!("The fuzzer discovered an input that crashes {id}:");
-                log::error!(
+                info!("The fuzzer discovered an input that crashes {id}:");
+                info!(
                     "Calling `{id} {}` doesn't work because {reason}.",
-                    arguments.iter().map(|it| format!("{}", it)).join(" "),
+                    arguments
+                        .iter()
+                        .map(|argument| argument.format(heap))
+                        .join(" "),
                 );
-                log::error!("This was the stack trace:");
-                tracer.dump_stack_trace(db);
+                info!("This was the stack trace:");
+                tracer.dump_stack_trace(db, heap);
 
-                let trace = tracer.dump_call_tree();
-                let mut trace_file = input.to_path().unwrap();
-                trace_file.set_extension("candy.trace");
-                fs::write(trace_file.clone(), trace).unwrap();
-                log::info!(
-                    "Trace has been written to `{}`.",
-                    trace_file.as_path().display()
-                );
+                module.dump_associated_debug_file("trace", &tracer.format_call_tree(heap));
             }
         }
     }

@@ -1,11 +1,12 @@
-use super::value::Value;
+use super::{heap::Pointer, Heap};
 use crate::{
     compiler::{ast_to_hir::AstToHir, cst::CstDb, hir::Id},
     database::Database,
-    input::Input,
     language_server::utils::LspPositionConversion,
+    module::Module,
 };
 use itertools::Itertools;
+use tracing::error;
 
 #[derive(Default, Clone)]
 pub struct Tracer {
@@ -16,27 +17,27 @@ pub struct Tracer {
 pub enum TraceEntry {
     ValueEvaluated {
         id: Id,
-        value: Value,
+        value: Pointer,
     },
     CallStarted {
         id: Id,
-        closure: Value,
-        args: Vec<Value>,
+        closure: Pointer,
+        args: Vec<Pointer>,
     },
     CallEnded {
-        return_value: Value,
+        return_value: Pointer,
     },
     NeedsStarted {
         id: Id,
-        condition: Value,
-        reason: Value,
+        condition: Pointer,
+        reason: Pointer,
     },
     NeedsEnded,
     ModuleStarted {
-        input: Input,
+        module: Module,
     },
     ModuleEnded {
-        export_map: Value,
+        export_map: Pointer,
     },
 }
 
@@ -72,12 +73,12 @@ impl Tracer {
     pub fn stack(&self) -> &[TraceEntry] {
         &self.stack
     }
-    pub fn dump_stack_trace(&self, db: &Database) {
-        for line in self.format_stack_trace(db).lines() {
-            log::error!("{}", line);
+    pub fn dump_stack_trace(&self, db: &Database, heap: &Heap) {
+        for line in self.format_stack_trace(db, heap).lines() {
+            error!("{}", line);
         }
     }
-    pub fn format_stack_trace(&self, db: &Database) -> String {
+    pub fn format_stack_trace(&self, db: &Database, heap: &Heap) -> String {
         self.stack
             .iter()
             .rev()
@@ -86,7 +87,7 @@ impl Tracer {
                     TraceEntry::CallStarted { id, closure, args } => (
                         format!(
                             "{closure} {}",
-                            args.iter().map(|arg| format!("{arg}")).join(" ")
+                            args.iter().map(|arg| arg.format(heap)).join(" ")
                         ),
                         Some(id),
                     ),
@@ -94,20 +95,23 @@ impl Tracer {
                         id,
                         condition,
                         reason,
-                    } => (format!("needs {condition} {reason}"), Some(id)),
-                    TraceEntry::ModuleStarted { input } => (format!("module {input}"), None),
+                    } => (
+                        format!("needs {} {}", condition.format(heap), reason.format(heap)),
+                        Some(id),
+                    ),
+                    TraceEntry::ModuleStarted { module } => (format!("use {module}"), None),
                     _ => unreachable!(),
                 };
                 let caller_location_string = {
                     let (hir_id, ast_id, cst_id, span) = if let Some(hir_id) = hir_id {
-                        let input = hir_id.input.clone();
+                        let module = hir_id.module.clone();
                         let ast_id = db.hir_to_ast_id(hir_id.clone());
                         let cst_id = db.hir_to_cst_id(hir_id.clone());
-                        let cst = cst_id.map(|id| db.find_cst(input.clone(), id));
+                        let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
                         let span = cst.map(|cst| {
                             (
-                                db.offset_to_lsp(input.clone(), cst.span.start),
-                                db.offset_to_lsp(input.clone(), cst.span.end),
+                                db.offset_to_lsp(module.clone(), cst.span.start),
+                                db.offset_to_lsp(module.clone(), cst.span.end),
                             )
                         });
                         (Some(hir_id), ast_id, cst_id, span)
@@ -137,25 +141,34 @@ impl Tracer {
             .join("\n")
     }
 
-    pub fn dump_call_tree(&self) -> String {
+    pub fn format_call_tree(&self, heap: &Heap) -> String {
         let actions = self
             .log
             .iter()
             .map(|entry| match entry {
-                TraceEntry::ValueEvaluated { id, value } => Action::Stay(format!("{id} = {value}")),
+                TraceEntry::ValueEvaluated { id, value } => {
+                    Action::Stay(format!("{id} = {}", value.format(heap)))
+                }
                 TraceEntry::CallStarted { id, closure, args } => Action::Start(format!(
-                    "{id} {closure} {}",
-                    args.iter().map(|arg| format!("{arg}")).join(" ")
+                    "{id} {} {}",
+                    closure.format(heap),
+                    args.iter().map(|arg| arg.format(heap)).join(" ")
                 )),
-                TraceEntry::CallEnded { return_value } => Action::End(format!(" = {return_value}")),
+                TraceEntry::CallEnded { return_value } => {
+                    Action::End(format!(" = {}", return_value.format(heap)))
+                }
                 TraceEntry::NeedsStarted {
                     id,
                     condition,
                     reason,
-                } => Action::Start(format!("{id} needs {condition} {reason}")),
+                } => Action::Start(format!(
+                    "{id} needs {} {}",
+                    condition.format(heap),
+                    reason.format(heap)
+                )),
                 TraceEntry::NeedsEnded => Action::End(" = Nothing".to_string()),
-                TraceEntry::ModuleStarted { input } => Action::Start(format!("module {input}")),
-                TraceEntry::ModuleEnded { export_map } => Action::End(format!("{export_map}")),
+                TraceEntry::ModuleStarted { module } => Action::Start(format!("module {module}")),
+                TraceEntry::ModuleEnded { export_map } => Action::End(export_map.format(heap)),
             })
             .collect_vec();
 

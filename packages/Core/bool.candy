@@ -1,6 +1,6 @@
-equals = (use "..Equality").equals
-function = use "..Function"
-type = use "..Type"
+equals = (use "..equality").equals
+function = use "..function"
+type = use "..type"
 
 is value :=
   ✨.ifElse

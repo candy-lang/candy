@@ -1,0 +1,14 @@
+# Benchmark by navigating to the Candy folder and then running this command:
+# `cargo build --release --manifest-path=compiler/Cargo.toml && time compiler/target/release/candy run packages/Benchmark.candy`
+
+core = use "..Core"
+
+fibRec fibRec n =
+  core.ifElse (core.int.isLessThan n 2) { n } {
+    core.int.add
+      fibRec fibRec (core.int.subtract n 1)
+      fibRec fibRec (core.int.subtract n 2)
+  }
+fib n = fibRec fibRec n
+
+twentyOne := fib 8

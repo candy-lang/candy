@@ -1,516 +1,428 @@
-use std::{cmp::Ordering, str::FromStr};
-
 use super::{
-    heap::ObjectPointer,
+    heap::{Closure, Data, Int, Pointer, Struct, Symbol, Text},
     use_provider::UseProvider,
-    value::{Closure, Value},
-    Vm,
+    Heap, Vm,
 };
-use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction, input::Input};
-use itertools::Itertools;
-use num_bigint::{BigInt, ToBigInt};
+use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
+use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::ToPrimitive;
+use std::{ops::Deref, str::FromStr};
+use tracing::{info, span, Level};
 use unicode_segmentation::UnicodeSegmentation;
-
-macro_rules! destructure {
-    ($args:expr, $enum:pat, $body:block) => {{
-        if let $enum = &$args[..] {
-            $body
-        } else {
-            Err(format!("a builtin function received invalid arguments"))
-        }
-    }};
-}
 
 impl Vm {
     pub(super) fn run_builtin_function<U: UseProvider>(
         &mut self,
         use_provider: &U,
         builtin_function: &BuiltinFunction,
-        args: &[ObjectPointer],
+        args: &[Pointer],
     ) {
-        log::trace!("run_builtin_function: builtin{builtin_function:?}");
-
-        let args = args.iter().map(|it| self.heap.export(*it)).collect_vec();
-
-        let return_value_or_panic_reason = match &builtin_function {
-            BuiltinFunction::Equals => self.equals(args),
-            BuiltinFunction::FunctionRun => match self.function_run(use_provider, args) {
-                // If successful, `functionRun` doesn't return a value, but
-                // diverges the control flow.
-                Ok(()) => return,
-                Err(message) => Err(message),
-            },
-            BuiltinFunction::GetArgumentCount => self.get_argument_count(args),
-            BuiltinFunction::IfElse => match self.if_else(use_provider, args) {
-                // If successful, IfElse doesn't return a value, but diverges
-                // the control flow.
-                Ok(()) => return,
-                Err(reason) => Err(reason),
-            },
-            BuiltinFunction::IntAdd => self.int_add(args),
-            BuiltinFunction::IntBitLength => self.int_bit_length(args),
-            BuiltinFunction::IntBitwiseAnd => self.int_bitwise_and(args),
-            BuiltinFunction::IntBitwiseOr => self.int_bitwise_or(args),
-            BuiltinFunction::IntBitwiseXor => self.int_bitwise_xor(args),
-            BuiltinFunction::IntCompareTo => self.int_compare_to(args),
-            BuiltinFunction::IntDivideTruncating => self.int_divide_truncating(args),
-            BuiltinFunction::IntModulo => self.int_modulo(args),
-            BuiltinFunction::IntMultiply => self.int_multiply(args),
-            BuiltinFunction::IntParse => self.int_parse(args),
-            BuiltinFunction::IntRemainder => self.int_remainder(args),
-            BuiltinFunction::IntShiftLeft => self.int_shift_left(args),
-            BuiltinFunction::IntShiftRight => self.int_shift_right(args),
-            BuiltinFunction::IntSubtract => self.int_subtract(args),
-            BuiltinFunction::Print => self.print(args),
-            BuiltinFunction::StructGet => self.struct_get(args),
-            BuiltinFunction::StructGetKeys => self.struct_get_keys(args),
-            BuiltinFunction::StructHasKey => self.struct_has_key(args),
-            BuiltinFunction::TextCharacters => self.text_characters(args),
-            BuiltinFunction::TextConcatenate => self.text_concatenate(args),
-            BuiltinFunction::TextContains => self.text_contains(args),
-            BuiltinFunction::TextEndsWith => self.text_ends_with(args),
-            BuiltinFunction::TextGetRange => self.text_get_range(args),
-            BuiltinFunction::TextIsEmpty => self.text_is_empty(args),
-            BuiltinFunction::TextLength => self.text_length(args),
-            BuiltinFunction::TextStartsWith => self.text_starts_with(args),
-            BuiltinFunction::TextTrimEnd => self.text_trim_end(args),
-            BuiltinFunction::TextTrimStart => self.text_trim_start(args),
-            BuiltinFunction::TypeOf => self.type_of(args),
-            BuiltinFunction::UseAsset => self.use_asset(use_provider, args),
-            BuiltinFunction::UseLocalModule => {
-                // If successful, UseLocalModule doesn't return a value, but
-                // diverges the control flow.
-                match self.use_local_module(use_provider, args) {
-                    Ok(()) => return,
-                    Err(reason) => Err(reason),
-                }
+        let result = span!(Level::TRACE, "Running builtin{builtin_function:?}").in_scope(|| {
+            match &builtin_function {
+                BuiltinFunction::Equals => self.heap.equals(args),
+                BuiltinFunction::FunctionRun => self.heap.function_run(args),
+                BuiltinFunction::GetArgumentCount => self.heap.get_argument_count(args),
+                BuiltinFunction::IfElse => self.heap.if_else(args),
+                BuiltinFunction::IntAdd => self.heap.int_add(args),
+                BuiltinFunction::IntBitLength => self.heap.int_bit_length(args),
+                BuiltinFunction::IntBitwiseAnd => self.heap.int_bitwise_and(args),
+                BuiltinFunction::IntBitwiseOr => self.heap.int_bitwise_or(args),
+                BuiltinFunction::IntBitwiseXor => self.heap.int_bitwise_xor(args),
+                BuiltinFunction::IntCompareTo => self.heap.int_compare_to(args),
+                BuiltinFunction::IntDivideTruncating => self.heap.int_divide_truncating(args),
+                BuiltinFunction::IntModulo => self.heap.int_modulo(args),
+                BuiltinFunction::IntMultiply => self.heap.int_multiply(args),
+                BuiltinFunction::IntParse => self.heap.int_parse(args),
+                BuiltinFunction::IntRemainder => self.heap.int_remainder(args),
+                BuiltinFunction::IntShiftLeft => self.heap.int_shift_left(args),
+                BuiltinFunction::IntShiftRight => self.heap.int_shift_right(args),
+                BuiltinFunction::IntSubtract => self.heap.int_subtract(args),
+                BuiltinFunction::Print => self.heap.print(args),
+                BuiltinFunction::StructGet => self.heap.struct_get(args),
+                BuiltinFunction::StructGetKeys => self.heap.struct_get_keys(args),
+                BuiltinFunction::StructHasKey => self.heap.struct_has_key(args),
+                BuiltinFunction::TextCharacters => self.heap.text_characters(args),
+                BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
+                BuiltinFunction::TextContains => self.heap.text_contains(args),
+                BuiltinFunction::TextEndsWith => self.heap.text_ends_with(args),
+                BuiltinFunction::TextGetRange => self.heap.text_get_range(args),
+                BuiltinFunction::TextIsEmpty => self.heap.text_is_empty(args),
+                BuiltinFunction::TextLength => self.heap.text_length(args),
+                BuiltinFunction::TextStartsWith => self.heap.text_starts_with(args),
+                BuiltinFunction::TextTrimEnd => self.heap.text_trim_end(args),
+                BuiltinFunction::TextTrimStart => self.heap.text_trim_start(args),
+                BuiltinFunction::TypeOf => self.heap.type_of(args),
             }
-        };
-        let return_value = match return_value_or_panic_reason {
-            Ok(value) => value,
+        });
+        match result {
+            Ok(Return(value)) => self.data_stack.push(value),
+            Ok(DivergeControlFlow(closure_address)) => {
+                self.data_stack.push(closure_address);
+                self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
+            }
             Err(reason) => self.panic(reason),
-        };
-
-        let return_object = self.heap.import(return_value);
-        self.data_stack.push(return_object);
+        }
     }
+}
 
-    fn equals(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [a, b], { Ok((a == b).into()) })
+type BuiltinResult = Result<SuccessfulBehavior, String>;
+enum SuccessfulBehavior {
+    Return(Pointer),
+    DivergeControlFlow(Pointer),
+}
+use SuccessfulBehavior::*;
+
+impl From<SuccessfulBehavior> for BuiltinResult {
+    fn from(ok: SuccessfulBehavior) -> Self {
+        Ok(ok)
     }
+}
 
-    fn function_run<U: UseProvider>(
-        &mut self,
-        use_provider: &U,
-        args: Vec<Value>,
-    ) -> Result<(), String> {
-        destructure!(
-            args,
-            [Value::Closure(Closure {
-                captured,
-                num_args,
-                body
-            })],
-            {
-                if *num_args > 0 {
-                    return Err(format!("`functionRun` expects a closure without arguments as the body, but got one with {num_args} arguments."));
-                }
-                let closure_object = self.heap.import(Value::Closure(Closure {
-                    captured: captured.to_owned(),
-                    num_args: *num_args,
-                    body: body.to_owned(),
-                }));
-                log::debug!(
-                    "`functionRun` executing the closure: {:?}",
-                    self.heap.export_without_dropping(closure_object)
+macro_rules! unpack {
+    ( $heap:expr, $args:expr, |$( $arg:ident: $type:ty ),+| $body:block ) => {
+        {
+            let ( $( $arg, )+ ) = if let [$( $arg, )+] = $args {
+                ( $( *$arg, )+ )
+            } else {
+                return Err(
+                    "a builtin function was called with the wrong number of arguments".to_string(),
                 );
-                self.data_stack.push(closure_object);
-                self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
-                Ok(())
-            }
-        )
-    }
-
-    fn get_argument_count(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Closure(Closure { num_args, .. })], {
-            Ok((*num_args).into())
-        })
-    }
-
-    fn if_else<U: UseProvider>(
-        &mut self,
-        use_provider: &U,
-        args: Vec<Value>,
-    ) -> Result<(), String> {
-        destructure!(
-            args,
-            [
-                Value::Symbol(condition),
-                Value::Closure(then_closure),
-                Value::Closure(else_closure)
-            ],
-            {
-                if then_closure.num_args > 0 {
-                    return Err(format!("IfElse expects a closure without arguments as the then, but got one with {} arguments.", then_closure.num_args));
-                }
-                if else_closure.num_args > 0 {
-                    return Err(format!("IfElse expects a closure without arguments as the else, but got one with {} arguments.", else_closure.num_args));
-                }
-                let condition = match condition.as_str() {
-                    "True" => true,
-                    "False" => false,
-                    _ => {
-                        return Err(format!(
-                            "IfElse expected True or False as a condition, but got {condition}.",
-                        ));
-                    }
-                };
-
-                let closure_object = self.heap.import(if condition {
-                    Value::Closure(then_closure.clone())
-                } else {
-                    Value::Closure(else_closure.clone())
-                });
-                log::debug!(
-                    "IfElse executing the closure: {:?}",
-                    self.heap.export_without_dropping(closure_object)
-                );
-                self.data_stack.push(closure_object);
-                self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
-                Ok(())
-            }
-        )
-    }
-
-    fn int_add(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(summand_a), Value::Int(summand_b)], {
-            Ok((summand_a + summand_b).into())
-        })
-    }
-    fn int_bit_length(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(value)], {
-            Ok(BigInt::from(value.bits()).into())
-        })
-    }
-    fn int_bitwise_and(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(value_a), Value::Int(value_b)], {
-            Ok((value_a & value_b).into())
-        })
-    }
-    fn int_bitwise_or(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(value_a), Value::Int(value_b)], {
-            Ok((value_a | value_b).into())
-        })
-    }
-    fn int_bitwise_xor(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(value_a), Value::Int(value_b)], {
-            Ok((value_a ^ value_b).into())
-        })
-    }
-    fn int_compare_to(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(value_a), Value::Int(value_b)], {
-            let result = match value_a.cmp(value_b) {
-                Ordering::Less => "Less".to_string(),
-                Ordering::Equal => "Equal".to_string(),
-                Ordering::Greater => "Greater".to_string(),
             };
-            Ok(Value::Symbol(result))
-        })
-    }
-    fn int_divide_truncating(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(dividend), Value::Int(divisor)], {
-            Ok((dividend / divisor).into())
-        })
-    }
-    fn int_modulo(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(dividend), Value::Int(divisor)], {
-            Ok((dividend.mod_floor(divisor)).into())
-        })
-    }
-    fn int_multiply(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(factor_a), Value::Int(factor_b)], {
-            Ok((factor_a * factor_b).into())
-        })
-    }
-    fn int_parse(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Text(text)], {
-            Ok(BigInt::from_str(text).map_err(|it| format!("{it}")).into())
-        })
-    }
-    fn int_remainder(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(dividend), Value::Int(divisor)], {
-            Ok((dividend % divisor).into())
-        })
-    }
-    fn int_shift_left(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(value), Value::Int(amount)], {
-            let amount = amount.to_u128().unwrap();
-            Ok((value << amount).into())
-        })
-    }
-    fn int_shift_right(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(value), Value::Int(amount)], {
-            let value = value.to_biguint().unwrap();
-            let amount = amount.to_u128().unwrap();
-            Ok((value >> amount).to_bigint().unwrap().into())
-        })
-    }
-    fn int_subtract(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Int(minuend), Value::Int(subtrahend)], {
-            Ok((minuend - subtrahend).into())
+            let ( $( $arg, )+ ): ( $( UnpackedData<$type>, )+ ) = ( $(
+                UnpackedData {
+                    address: $arg,
+                    data: $heap.get($arg).data.clone().try_into()?,
+                },
+            )+ );
+
+            $body.into()
+        }
+    };
+}
+macro_rules! unpack_and_later_drop {
+    ( $heap:expr, $args:expr, |$( $arg:ident: $type:ty ),+| $body:block ) => {
+        {
+            let ( $( $arg, )+ ) = if let [$( $arg, )+] = $args {
+                ( $( *$arg, )+ )
+            } else {
+                return Err(
+                    "a builtin function was called with the wrong number of arguments".to_string(),
+                );
+            };
+            let ( $( $arg, )+ ): ( $( UnpackedData<$type>, )+ ) = ( $(
+                UnpackedData {
+                    address: $arg,
+                    data: $heap.get($arg).data.clone().try_into()?,
+                },
+            )+ );
+
+            let result = $body;
+            $( $heap.drop($arg.address); )+
+            result.into()
+        }
+    };
+}
+
+impl Heap {
+    fn equals(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |a: Any, b: Any| {
+            let is_equal = a.equals(self, &b);
+            Return(self.create_bool(is_equal))
         })
     }
 
-    fn print(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Text(message)], {
-            log::info!("{message:?}");
-            Ok(Value::nothing())
+    fn function_run(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack!(self, args, |closure: Closure| {
+            closure.should_take_no_arguments()?;
+            DivergeControlFlow(closure.address)
         })
     }
 
-    fn struct_get(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Struct(struct_), key], {
-            match struct_.get(key) {
-                Some(value) => Ok(value.clone()),
-                None => Err(format!("Struct does not contain key {key:?}.")),
+    fn get_argument_count(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |closure: Closure| {
+            Return(self.create_int(closure.num_args.into()))
+        })
+    }
+
+    fn if_else(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack!(self, args, |condition: bool,
+                             then: Closure,
+                             else_: Closure| {
+            let (run, dont_run) = if *condition {
+                (then, else_)
+            } else {
+                (else_, then)
+            };
+            self.drop(condition.address);
+            self.drop(dont_run.address);
+            DivergeControlFlow(run.address)
+        })
+    }
+
+    fn int_add(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
+            Return(self.create_int(&a.value + &b.value))
+        })
+    }
+    fn int_bit_length(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |a: Int| {
+            Return(self.create_int(a.value.bits().into()))
+        })
+    }
+    fn int_bitwise_and(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
+            Return(self.create_int(&a.value & &b.value))
+        })
+    }
+    fn int_bitwise_or(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
+            Return(self.create_int(&a.value | &b.value))
+        })
+    }
+    fn int_bitwise_xor(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
+            Return(self.create_int(&a.value ^ &b.value))
+        })
+    }
+    fn int_compare_to(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |a: Int, b: Int| {
+            Return(self.create_ordering(a.value.cmp(&b.value)))
+        })
+    }
+    fn int_divide_truncating(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
+            Return(self.create_int(&dividend.value / &divisor.value))
+        })
+    }
+    fn int_modulo(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
+            Return(self.create_int(dividend.value.mod_floor(&divisor.value)))
+        })
+    }
+    fn int_multiply(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |factor_a: Int, factor_b: Int| {
+            Return(self.create_int(&factor_a.value * &factor_b.value))
+        })
+    }
+    fn int_parse(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text| {
+            let result = match BigInt::from_str(&text.value) {
+                Ok(int) => Ok(self.create_int(int)),
+                Err(err) => Err(self.create_text(format!("{err}"))),
+            };
+            Return(self.create_result(result))
+        })
+    }
+    fn int_remainder(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |dividend: Int, divisor: Int| {
+            Return(self.create_int(&dividend.value % &divisor.value))
+        })
+    }
+    fn int_shift_left(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |value: Int, amount: Int| {
+            let amount = amount.value.to_u128().unwrap();
+            Return(self.create_int(&value.value << amount))
+        })
+    }
+    fn int_shift_right(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |value: Int, amount: Int| {
+            let value = value.value.to_biguint().unwrap();
+            let amount = amount.value.to_u128().unwrap();
+            Return(self.create_int((value >> amount).into()))
+        })
+    }
+    fn int_subtract(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |minuend: Int, subtrahend: Int| {
+            Return(self.create_int(&minuend.value - &subtrahend.value))
+        })
+    }
+
+    fn print(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |message: Text| {
+            info!("{:?}", message.value);
+            Return(self.create_nothing())
+        })
+    }
+
+    fn struct_get(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |struct_: Struct, key: Any| {
+            match struct_.get(self, key.address) {
+                Some(value) => {
+                    self.dup(value);
+                    Ok(Return(value))
+                }
+                None => Err(format!("Struct does not contain key {}.", key.format(self))),
             }
         })
     }
-
-    fn struct_get_keys(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Struct(struct_)], {
-            Ok(Value::list(struct_.keys().cloned().collect()))
+    fn struct_get_keys(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |struct_: Struct| {
+            Return(self.create_list(struct_.iter().map(|(key, _)| key).collect()))
+        })
+    }
+    fn struct_has_key(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |struct_: Struct, key: Any| {
+            let has_key = struct_.get(self, key.address).is_some();
+            Return(self.create_bool(has_key))
         })
     }
 
-    fn struct_has_key(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Struct(struct_), key], {
-            Ok((struct_.contains_key(key)).into())
+    fn text_characters(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text| {
+            let mut character_addresses = vec![];
+            for c in text.value.graphemes(true) {
+                character_addresses.push(self.create_text(c.to_string()));
+            }
+            Return(self.create_list(character_addresses))
         })
     }
-
-    fn text_characters(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Text(text)], {
-            Ok(Value::list(
-                text.graphemes(true)
-                    .map(|it| it.to_string().into())
-                    .collect(),
-            ))
+    fn text_concatenate(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |a: Text, b: Text| {
+            Return(self.create_text(format!("{}{}", a.value, b.value)))
         })
     }
-    fn text_concatenate(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Text(value_a), Value::Text(value_b)], {
-            Ok(format!("{value_a}{value_b}").into())
+    fn text_contains(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text, pattern: Text| {
+            Return(self.create_bool(text.value.contains(&pattern.value)))
         })
     }
-    fn text_contains(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Text(text), Value::Text(pattern)], {
-            Ok(text.contains(pattern).into())
+    fn text_ends_with(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text, suffix: Text| {
+            Return(self.create_bool(text.value.ends_with(&suffix.value)))
         })
     }
-    fn text_ends_with(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Text(text), Value::Text(suffix)], {
-            Ok(text.ends_with(suffix).into())
-        })
-    }
-    fn text_get_range(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(
+    fn text_get_range(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(
+            self,
             args,
-            [
-                Value::Text(text),
-                Value::Int(start_inclusive),
-                Value::Int(end_exclusive)
-            ],
-            {
-                let start_inclusive = start_inclusive.to_usize().expect(
+            |text: Text, start_inclusive: Int, end_exclusive: Int| {
+                let start_inclusive = start_inclusive.value.to_usize().expect(
                     "Tried to get a range from a text with an index that's too large for usize.",
                 );
-                let end_exclusive = end_exclusive.to_usize().expect(
+                let end_exclusive = end_exclusive.value.to_usize().expect(
                     "Tried to get a range from a text with an index that's too large for usize.",
                 );
                 let text = text
+                    .value
                     .graphemes(true)
                     .skip(start_inclusive)
                     .take(end_exclusive - start_inclusive)
-                    .collect::<String>()
-                    .into();
-                Ok(text)
+                    .collect();
+                Return(self.create_text(text))
             }
         )
     }
-    fn text_is_empty(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Text(text)], { Ok(text.is_empty().into()) })
-    }
-    fn text_length(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Text(text)], {
-            Ok(text.graphemes(true).count().into())
+    fn text_is_empty(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text| {
+            Return(self.create_bool(text.value.is_empty()))
         })
     }
-    fn text_starts_with(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Text(text), Value::Text(prefix)], {
-            Ok(text.starts_with(prefix).into())
+    fn text_length(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text| {
+            let length = text.value.graphemes(true).count().into();
+            Return(self.create_int(length))
         })
     }
-    fn text_trim_end(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Text(text)], {
-            Ok(text.trim_end().to_string().into())
+    fn text_starts_with(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text, prefix: Text| {
+            Return(self.create_bool(text.value.starts_with(&prefix.value)))
         })
     }
-    fn text_trim_start(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [Value::Text(text)], {
-            Ok(text.trim_start().to_string().into())
+    fn text_trim_end(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text| {
+            Return(self.create_text(text.value.trim_end().to_string()))
         })
     }
-
-    fn type_of(&mut self, args: Vec<Value>) -> Result<Value, String> {
-        destructure!(args, [value], {
-            Ok(Value::Symbol(
-                match &value {
-                    Value::Int(_) => "Int",
-                    Value::Text(_) => "Text",
-                    Value::Symbol(_) => "Symbol",
-                    Value::Struct(_) => "Struct",
-                    Value::Closure { .. } => "Function",
-                    Value::Builtin { .. } => "Builtin",
-                }
-                .to_owned(),
-            ))
+    fn text_trim_start(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |text: Text| {
+            Return(self.create_text(text.value.trim_start().to_string()))
         })
     }
 
-    fn use_asset<U: UseProvider>(
-        &mut self,
-        use_provider: &U,
-        args: Vec<Value>,
-    ) -> Result<Value, String> {
-        let (current_path, target) = Self::parse_current_path_and_target(args)?;
-        let target = UseTarget::parse(&target)?;
-        let input = target.resolve_asset(&current_path)?;
-        let content = use_provider.use_asset(input)?;
-        Ok(Value::list(
-            content
-                .iter()
-                .map(|byte| BigInt::from(*byte).into())
-                .collect_vec(),
-        ))
-    }
-
-    fn use_local_module<U: UseProvider>(
-        &mut self,
-        use_provider: &U,
-        args: Vec<Value>,
-    ) -> Result<(), String> {
-        let (current_path, target) = Self::parse_current_path_and_target(args)?;
-        let target = UseTarget::parse(&target)?;
-        let possible_inputs = target.resolve_local_module(&current_path)?;
-        let (input, lir) = 'find_existing_input: {
-            for input in possible_inputs {
-                if let Some(lir) = use_provider.use_local_module(input.clone()) {
-                    break 'find_existing_input (input, lir);
-                }
-            }
-            return Err("couldn't import module".to_string());
-        };
-
-        let module_closure = Value::Closure(Closure::of_lir(input, lir));
-        let address = self.heap.import(module_closure);
-        self.data_stack.push(address);
-        self.run_instruction(use_provider, Instruction::Call { num_args: 0 });
-        Ok(())
-    }
-
-    fn parse_current_path_and_target(args: Vec<Value>) -> Result<(Vec<String>, String), String> {
-        destructure!(
-            args,
-            [Value::Struct(current_path_struct), Value::Text(target)],
-            {
-                // `current_path_struct` is set by us and not users, hence we don't have to validate it that strictly.
-                let mut current_path = vec![];
-                let mut index = 0;
-                while let Some(component) = current_path_struct.get(&index.into()) {
-                    current_path.push(component.clone().try_into_text().unwrap());
-                    index += 1;
-                }
-                Ok((current_path, target.to_string()))
-            }
-        )
+    fn type_of(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |value: Any| {
+            let symbol = match **value {
+                Data::Int(_) => "Int",
+                Data::Text(_) => "Text",
+                Data::Symbol(_) => "Symbol",
+                Data::Struct(_) => "Struct",
+                Data::Closure(_) => "Function",
+                Data::Builtin(_) => "Builtin",
+            };
+            Return(self.create_symbol(symbol.to_string()))
+        })
     }
 }
 
-struct UseTarget {
-    parent_navigations: usize,
-    path: String,
+impl Closure {
+    fn should_take_no_arguments(&self) -> Result<(), String> {
+        match self.num_args {
+            0 => Ok(()),
+            n => Err(format!("a builtin function expected a function without arguments, but got one that takes {n} arguments")),
+        }
+    }
 }
-impl UseTarget {
-    const PARENT_NAVIGATION_CHAR: char = '.';
 
-    fn parse(mut target: &str) -> Result<Self, String> {
-        let parent_navigations = {
-            let mut navigations = 0;
-            while target.starts_with(UseTarget::PARENT_NAVIGATION_CHAR) {
-                navigations += 1;
-                target = &target[UseTarget::PARENT_NAVIGATION_CHAR.len_utf8()..];
-            }
-            match navigations {
-                0 => return Err("the target must start with at least one dot".to_string()),
-                i => i - 1, // two dots means one parent navigation
-            }
-        };
-        let path = {
-            if !target
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '.')
-            {
-                return Err("the target name can only contain letters and dots".to_string());
-            }
-            target.to_string()
-        };
-        Ok(UseTarget {
-            parent_navigations,
-            path,
-        })
+struct UnpackedData<T> {
+    address: Pointer,
+    data: T,
+}
+impl<T> Deref for UnpackedData<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
     }
+}
 
-    fn resolve_asset(&self, current_path: &[String]) -> Result<Input, String> {
-        let mut path = current_path.to_owned();
-        if self.parent_navigations == 0 && path.last() != Some(&".candy".to_string()) {
-            return Err(
-                "importing child files (starting with a single dot) only works from `.candy` files"
-                    .to_string(),
-            );
-        }
-        for _ in 0..self.parent_navigations {
-            if path.pop() == None {
-                return Err("too many parent navigations".to_string());
-            }
-        }
-        path.push(self.path.to_string());
-        Ok(Input::File(path.clone()))
+struct Any {
+    data: Data,
+}
+impl Deref for Any {
+    type Target = Data;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
     }
+}
 
-    fn resolve_local_module(&self, current_path: &[String]) -> Result<Vec<Input>, String> {
-        if self.path.contains('.') {
-            return Err("the target name contains a file ending".to_string());
-        }
+impl TryInto<Any> for Data {
+    type Error = String;
 
-        let mut path = current_path.to_owned();
-        for _ in 0..self.parent_navigations {
-            if path.pop() == None {
-                return Err("too many parent navigations".to_string());
+    fn try_into(self) -> Result<Any, Self::Error> {
+        Ok(Any { data: self })
+    }
+}
+macro_rules! impl_data_try_into_type {
+    ($type:ty, $variant:tt, $error_message:expr) => {
+        impl TryInto<$type> for Data {
+            type Error = String;
+
+            fn try_into(self) -> Result<$type, Self::Error> {
+                match self {
+                    Data::$variant(it) => Ok(it),
+                    _ => Err($error_message.to_string()),
+                }
             }
         }
-        let possible_paths = vec![
-            path.clone()
-                .into_iter()
-                .chain([format!("{}.candy", self.path)])
-                .collect_vec(),
-            path.clone()
-                .into_iter()
-                .chain([self.path.to_string(), ".candy".to_string()])
-                .collect_vec(),
-        ];
-        Ok(possible_paths.into_iter().map(Input::File).collect_vec())
+    };
+}
+impl_data_try_into_type!(Int, Int, "a builtin function expected an int");
+impl_data_try_into_type!(Text, Text, "a builtin function expected a text");
+impl_data_try_into_type!(Symbol, Symbol, "a builtin function expected a symbol");
+impl_data_try_into_type!(Struct, Struct, "a builtin function expected a struct");
+impl_data_try_into_type!(Closure, Closure, "a builtin function expected a closure");
+
+impl TryInto<bool> for Data {
+    type Error = String;
+
+    fn try_into(self) -> Result<bool, Self::Error> {
+        let symbol: Symbol = self.try_into()?;
+        match symbol.value.as_str() {
+            "True" => Ok(true),
+            "False" => Ok(false),
+            _ => Err("a builtin function expected `True` or `False`".to_string()),
+        }
     }
 }

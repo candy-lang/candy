@@ -4,32 +4,32 @@ use crate::{
         cst::{Cst, CstKind, UnwrapWhitespaceAndComment},
         rcst_to_cst::RcstToCst,
     },
-    input::Input,
+    module::Module,
 };
 use lsp_types::{FoldingRange, FoldingRangeKind};
 
 #[salsa::query_group(FoldingRangeDbStorage)]
 pub trait FoldingRangeDb: LspPositionConversion + RcstToCst {
-    fn folding_ranges(&self, input: Input) -> Vec<FoldingRange>;
+    fn folding_ranges(&self, module: Module) -> Vec<FoldingRange>;
 }
 
-fn folding_ranges(db: &dyn FoldingRangeDb, input: Input) -> Vec<FoldingRange> {
-    let mut context = Context::new(db, input.clone());
-    let cst = db.cst(input).unwrap();
+fn folding_ranges(db: &dyn FoldingRangeDb, module: Module) -> Vec<FoldingRange> {
+    let mut context = Context::new(db, module.clone());
+    let cst = db.cst(module).unwrap();
     context.visit_csts(&cst);
     context.ranges
 }
 
 struct Context<'a> {
     db: &'a dyn FoldingRangeDb,
-    input: Input,
+    module: Module,
     ranges: Vec<FoldingRange>,
 }
 impl<'a> Context<'a> {
-    fn new(db: &'a dyn FoldingRangeDb, input: Input) -> Self {
+    fn new(db: &'a dyn FoldingRangeDb, module: Module) -> Self {
         Context {
             db,
-            input,
+            module,
             ranges: vec![],
         }
     }
@@ -153,9 +153,12 @@ impl<'a> Context<'a> {
     fn push(&mut self, start: usize, end: usize, kind: FoldingRangeKind) {
         let start = self
             .db
-            .offset_to_lsp(self.input.clone(), start)
+            .offset_to_lsp(self.module.clone(), start)
             .to_position();
-        let end = self.db.offset_to_lsp(self.input.clone(), end).to_position();
+        let end = self
+            .db
+            .offset_to_lsp(self.module.clone(), end)
+            .to_position();
 
         self.ranges.push(FoldingRange {
             start_line: start.line,

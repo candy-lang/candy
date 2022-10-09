@@ -5,18 +5,19 @@ use super::{
     hir::{self, Body, Expression},
     lir::{Instruction, Lir, StackOffset},
 };
-use crate::{builtin_functions::BuiltinFunction, input::Input};
+use crate::{builtin_functions::BuiltinFunction, module::Module};
 use itertools::Itertools;
 use num_bigint::BigUint;
 use std::sync::Arc;
+use tracing::{span, Level};
 
 #[salsa::query_group(HirToLirStorage)]
 pub trait HirToLir: CstDb + AstToHir {
-    fn lir(&self, input: Input) -> Option<Arc<Lir>>;
+    fn lir(&self, module: Module) -> Option<Arc<Lir>>;
 }
 
-fn lir(db: &dyn HirToLir, input: Input) -> Option<Arc<Lir>> {
-    let (hir, _) = db.hir(input)?;
+fn lir(db: &dyn HirToLir, module: Module) -> Option<Arc<Lir>> {
+    let (hir, _) = db.hir(module)?;
     let instructions = compile_lambda(&[], &[], &hir);
     Some(Arc::new(Lir { instructions }))
 }
@@ -51,8 +52,8 @@ struct LoweringContext {
 }
 impl LoweringContext {
     fn compile_expression(&mut self, id: &hir::Id, expression: &Expression) {
-        log::trace!("Stack: {:?}", self.stack);
-        log::trace!("Compiling expression {expression:?}");
+        let span = span!(Level::TRACE, "Compiling expression {expression:?}");
+        let _enter = span.enter();
 
         match expression {
             Expression::Int(int) => self.emit_create_int(id.clone(), int.clone()),
@@ -101,6 +102,13 @@ impl LoweringContext {
             }
             Expression::Builtin(builtin) => {
                 self.emit_create_builtin(id.clone(), *builtin);
+            }
+            Expression::UseModule {
+                current_module,
+                relative_path,
+            } => {
+                self.emit_push_from_stack(relative_path.clone());
+                self.emit_use_module(id.clone(), current_module.clone());
             }
             Expression::Needs { condition, reason } => {
                 self.emit_push_from_stack(*condition.clone());
@@ -168,14 +176,19 @@ impl LoweringContext {
         self.stack.pop_multiple(num_args);
         self.stack.push(id);
     }
+    fn emit_return(&mut self) {
+        self.emit(Instruction::Return);
+    }
+    fn emit_use_module(&mut self, id: hir::Id, current_module: Module) {
+        self.stack.pop(); // relative path
+        self.emit(Instruction::UseModule { current_module });
+        self.stack.push(id); // exported definitions
+    }
     fn emit_needs(&mut self, id: hir::Id) {
         self.stack.pop(); // reason
         self.stack.pop(); // condition
         self.emit(Instruction::Needs);
         self.stack.push(id); // Nothing
-    }
-    fn emit_return(&mut self) {
-        self.emit(Instruction::Return);
     }
     fn emit_register_fuzzable_closure(&mut self, id: hir::Id) {
         self.emit(Instruction::RegisterFuzzableClosure(id));

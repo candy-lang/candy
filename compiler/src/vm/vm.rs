@@ -1,16 +1,18 @@
 use super::{
-    heap::{Heap, ObjectData, ObjectPointer},
+    heap::{Builtin, Closure, Data, Heap, Pointer},
     tracer::{TraceEntry, Tracer},
     use_provider::{DbUseProvider, UseProvider},
-    value::{Closure, Value},
 };
 use crate::{
     compiler::{hir::Id, lir::Instruction},
     database::Database,
-    input::Input,
+    module::Module,
 };
 use itertools::Itertools;
 use std::collections::HashMap;
+use tracing::{info, trace};
+
+const TRACE: bool = false;
 
 /// A VM can execute some byte code.
 #[derive(Clone)]
@@ -18,11 +20,11 @@ pub struct Vm {
     pub status: Status,
     next_instruction: InstructionPointer,
     pub heap: Heap,
-    pub data_stack: Vec<ObjectPointer>,
+    pub data_stack: Vec<Pointer>,
     pub call_stack: Vec<InstructionPointer>,
-    pub import_stack: Vec<Input>,
+    pub import_stack: Vec<Module>,
     pub tracer: Tracer,
-    pub fuzzable_closures: Vec<(Id, Closure)>,
+    pub fuzzable_closures: Vec<(Id, Pointer)>,
     pub num_instructions_executed: usize,
 }
 
@@ -36,7 +38,7 @@ pub enum Status {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct InstructionPointer {
     /// Pointer to the closure object that is currently running code.
-    closure: ObjectPointer,
+    closure: Pointer,
 
     /// Index of the next instruction to run.
     instruction: usize,
@@ -44,11 +46,11 @@ pub struct InstructionPointer {
 impl InstructionPointer {
     fn null_pointer() -> Self {
         Self {
-            closure: 0,
+            closure: Pointer::null(),
             instruction: 0,
         }
     }
-    fn start_of_closure(closure: ObjectPointer) -> Self {
+    fn start_of_closure(closure: Pointer) -> Self {
         Self {
             closure,
             instruction: 0,
@@ -57,16 +59,18 @@ impl InstructionPointer {
 }
 
 pub struct TearDownResult {
-    pub return_value: Value,
-    pub fuzzable_closures: Vec<(Id, Closure)>,
+    pub heap: Heap,
+    pub result: Result<Pointer, String>,
+    pub fuzzable_closures: Vec<(Id, Pointer)>,
+    pub tracer: Tracer,
 }
 
 impl Vm {
-    pub fn new() -> Self {
+    fn new_with_heap(heap: Heap) -> Self {
         Self {
             status: Status::Done,
             next_instruction: InstructionPointer::null_pointer(),
-            heap: Heap::new(),
+            heap,
             data_stack: vec![],
             call_stack: vec![],
             import_stack: vec![],
@@ -75,62 +79,55 @@ impl Vm {
             num_instructions_executed: 0,
         }
     }
-
-    pub fn set_up_closure_execution<U: UseProvider>(
-        &mut self,
+    pub fn new_for_running_closure<U: UseProvider>(
+        heap: Heap,
         use_provider: &U,
-        closure: Closure,
-        arguments: Vec<Value>,
-    ) {
-        assert!(matches!(self.status, Status::Done));
-        assert!(self.data_stack.is_empty());
-        assert!(self.call_stack.is_empty());
+        closure: Pointer,
+        arguments: &[Pointer],
+    ) -> Self {
+        let mut vm = Self::new_with_heap(heap);
 
-        assert_eq!(closure.num_args, arguments.len());
+        vm.data_stack.extend(arguments);
+        vm.data_stack.push(closure);
 
-        for arg in arguments {
-            let address = self.heap.import(arg);
-            self.data_stack.push(address);
-        }
-        let address = self.heap.import(Value::Closure(closure.clone()));
-        self.data_stack.push(address);
-
-        self.status = Status::Running;
-        self.run_instruction(
+        vm.status = Status::Running;
+        vm.run_instruction(
             use_provider,
             Instruction::Call {
-                num_args: closure.num_args,
+                num_args: arguments.len(),
             },
         );
+        vm
     }
-    pub fn tear_down_closure_execution(&mut self) -> TearDownResult {
-        assert!(matches!(self.status, Status::Done));
-        let return_value = self.data_stack.pop().unwrap();
-        let return_value = self.heap.export(return_value);
-        TearDownResult {
-            return_value,
-            fuzzable_closures: std::mem::take(&mut self.fuzzable_closures),
-        }
-    }
-
-    pub fn set_up_module_closure_execution<U: UseProvider>(
-        &mut self,
+    pub fn new_for_running_module_closure<U: UseProvider>(
         use_provider: &U,
         closure: Closure,
-    ) {
+    ) -> Self {
         assert_eq!(closure.captured.len(), 0, "Called start_module_closure with a closure that is not a module closure (it captures stuff).");
         assert_eq!(closure.num_args, 0, "Called start_module_closure with a closure that is not a module closure (it has arguments).");
-        self.set_up_closure_execution(use_provider, closure, vec![]);
+        let mut heap = Heap::default();
+        let closure = heap.create_closure(closure);
+        Self::new_for_running_closure(heap, use_provider, closure, &[])
     }
-    pub fn tear_down_module_closure_execution(&mut self) -> TearDownResult {
-        self.tear_down_closure_execution()
+    pub fn tear_down(mut self) -> TearDownResult {
+        let result = match self.status {
+            Status::Running => panic!("Called `tear_down` on a VM that's still running."),
+            Status::Done => Ok(self.data_stack.pop().unwrap()),
+            Status::Panicked { reason } => Err(reason),
+        };
+        TearDownResult {
+            heap: self.heap,
+            result,
+            fuzzable_closures: self.fuzzable_closures,
+            tracer: self.tracer,
+        }
     }
 
     pub fn status(&self) -> Status {
         self.status.clone()
     }
 
-    fn get_from_data_stack(&self, offset: usize) -> ObjectPointer {
+    fn get_from_data_stack(&self, offset: usize) -> Pointer {
         self.data_stack[self.data_stack.len() - 1 - offset as usize]
     }
 
@@ -143,35 +140,37 @@ impl Vm {
             num_instructions -= 1;
 
             let current_closure = self.heap.get(self.next_instruction.closure);
-            let current_body = if let ObjectData::Closure { body, .. } = &current_closure.data {
+            let current_body = if let Data::Closure(Closure { body, .. }) = &current_closure.data {
                 body
             } else {
                 panic!("The instruction pointer points to a non-closure.");
             };
             let instruction = current_body[self.next_instruction.instruction].clone();
 
-            // log::trace!(
-            //     "Data stack: {}",
-            //     self.data_stack
-            //         .iter()
-            //         .map(|address| format!("{}", self.heap.export_without_dropping(*address)))
-            //         .join(", ")
-            // );
-            // log::trace!(
-            //     "Call stack: {}",
-            //     self.call_stack
-            //         .iter()
-            //         .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
-            //         .join(", ")
-            // );
-            // log::trace!(
-            //     "Instruction pointer: {}:{}",
-            //     self.next_instruction.closure,
-            //     self.next_instruction.instruction
-            // );
-            // log::trace!("Heap: {:?}", self.heap);
+            if TRACE {
+                trace!(
+                    "Data stack: {}",
+                    self.data_stack
+                        .iter()
+                        .map(|it| it.format(&self.heap))
+                        .join(", ")
+                );
+                trace!(
+                    "Call stack: {}",
+                    self.call_stack
+                        .iter()
+                        .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
+                        .join(", ")
+                );
+                trace!(
+                    "Instruction pointer: {}:{}",
+                    self.next_instruction.closure,
+                    self.next_instruction.instruction
+                );
+                trace!("Heap: {:?}", self.heap);
+                trace!("Running instruction: {instruction:?}");
+            }
 
-            log::trace!("Running instruction: {instruction:?}");
             self.next_instruction.instruction += 1;
             self.run_instruction(use_provider, instruction);
             self.num_instructions_executed += 1;
@@ -184,15 +183,15 @@ impl Vm {
     pub fn run_instruction<U: UseProvider>(&mut self, use_provider: &U, instruction: Instruction) {
         match instruction {
             Instruction::CreateInt(int) => {
-                let address = self.heap.create(ObjectData::Int(int.into()));
+                let address = self.heap.create_int(int.into());
                 self.data_stack.push(address);
             }
             Instruction::CreateText(text) => {
-                let address = self.heap.create(ObjectData::Text(text));
+                let address = self.heap.create_text(text);
                 self.data_stack.push(address);
             }
             Instruction::CreateSymbol(symbol) => {
-                let address = self.heap.create(ObjectData::Symbol(symbol));
+                let address = self.heap.create_symbol(symbol);
                 self.data_stack.push(address);
             }
             Instruction::CreateStruct { num_entries } => {
@@ -207,7 +206,7 @@ impl Vm {
                     assert_eq!(key_and_value.next(), None);
                     entries.insert(key, value);
                 }
-                let address = self.heap.create(ObjectData::Struct(entries));
+                let address = self.heap.create_struct(entries);
                 self.data_stack.push(address);
             }
             Instruction::CreateClosure {
@@ -222,7 +221,7 @@ impl Vm {
                 for address in &captured {
                     self.heap.dup(*address);
                 }
-                let address = self.heap.create(ObjectData::Closure {
+                let address = self.heap.create_closure(Closure {
                     captured,
                     num_args,
                     body,
@@ -230,7 +229,12 @@ impl Vm {
                 self.data_stack.push(address);
             }
             Instruction::CreateBuiltin(builtin) => {
-                let address = self.heap.create(ObjectData::Builtin(builtin));
+                let address = self.heap.create_builtin(builtin);
+                self.data_stack.push(address);
+            }
+            Instruction::PushFromStack(offset) => {
+                let address = self.get_from_data_stack(offset);
+                self.heap.dup(address);
                 self.data_stack.push(address);
             }
             Instruction::PopMultipleBelowTop(n) => {
@@ -241,11 +245,6 @@ impl Vm {
                 }
                 self.data_stack.push(top);
             }
-            Instruction::PushFromStack(offset) => {
-                let address = self.get_from_data_stack(offset);
-                self.heap.dup(address);
-                self.data_stack.push(address);
-            }
             Instruction::Call { num_args } => {
                 let closure_address = self.data_stack.pop().unwrap();
                 let mut args = vec![];
@@ -255,11 +254,11 @@ impl Vm {
                 args.reverse();
 
                 match self.heap.get(closure_address).data.clone() {
-                    ObjectData::Closure {
+                    Data::Closure(Closure {
                         captured,
                         num_args: expected_num_args,
                         ..
-                    } => {
+                    }) => {
                         if num_args != expected_num_args {
                             self.panic(format!("Closure expects {expected_num_args} parameters, but you called it with {num_args} arguments."));
                             return;
@@ -274,7 +273,7 @@ impl Vm {
                         self.next_instruction =
                             InstructionPointer::start_of_closure(closure_address);
                     }
-                    ObjectData::Builtin(builtin) => {
+                    Data::Builtin(Builtin { function: builtin }) => {
                         self.heap.drop(closure_address);
                         self.run_builtin_function(use_provider, &builtin, &args);
                     }
@@ -283,12 +282,26 @@ impl Vm {
                     }
                 };
             }
+            Instruction::Return => {
+                self.heap.drop(self.next_instruction.closure);
+                let caller = self.call_stack.pop().unwrap();
+                self.next_instruction = caller;
+            }
+            Instruction::UseModule { current_module } => {
+                let relative_path = self.data_stack.pop().unwrap();
+                match self.use_module(use_provider, current_module, relative_path) {
+                    Ok(()) => {}
+                    Err(reason) => {
+                        self.panic(reason);
+                    }
+                }
+            }
             Instruction::Needs => {
                 let reason = self.data_stack.pop().unwrap();
                 let condition = self.data_stack.pop().unwrap();
 
-                let reason = match self.heap.export(reason) {
-                    Value::Text(reason) => reason,
+                let reason = match self.heap.get(reason).data.clone() {
+                    Data::Text(reason) => reason.value,
                     _ => {
                         self.panic("you can only use text as the reason of a `needs`".to_string());
                         return;
@@ -296,9 +309,9 @@ impl Vm {
                 };
 
                 match self.heap.get(condition).data.clone() {
-                    ObjectData::Symbol(symbol) => match symbol.as_str() {
+                    Data::Symbol(symbol) => match symbol.value.as_str() {
                         "True" => {
-                            self.data_stack.push(self.heap.import(Value::nothing()));
+                            self.data_stack.push(self.heap.create_nothing());
                         }
                         "False" => self.status = Status::Panicked { reason },
                         _ => {
@@ -310,32 +323,28 @@ impl Vm {
                     }
                 }
             }
-            Instruction::Return => {
-                self.heap.drop(self.next_instruction.closure);
-                let caller = self.call_stack.pop().unwrap();
-                self.next_instruction = caller;
-            }
             Instruction::RegisterFuzzableClosure(id) => {
                 let closure = *self.data_stack.last().unwrap();
-                match self.heap.export_without_dropping(closure) {
-                    Value::Closure(closure) => self.fuzzable_closures.push((id, closure)),
-                    _ => panic!("Instruction RegisterFuzzableClosure executed, but stack top is not a closure."),
+                if !matches!(self.heap.get(closure).data, Data::Closure(_)) {
+                    panic!("Instruction RegisterFuzzableClosure executed, but stack top is not a closure.");
                 }
+                self.heap.dup(closure);
+                self.fuzzable_closures.push((id, closure));
             }
             Instruction::TraceValueEvaluated(id) => {
-                let address = *self.data_stack.last().unwrap();
-                let value = self.heap.export_without_dropping(address);
+                let value = *self.data_stack.last().unwrap();
+                self.heap.dup(value);
                 self.tracer.push(TraceEntry::ValueEvaluated { id, value });
             }
             Instruction::TraceCallStarts { id, num_args } => {
-                let closure_address = self.data_stack.last().unwrap();
-                let closure = self.heap.export_without_dropping(*closure_address);
+                let closure = *self.data_stack.last().unwrap();
+                self.heap.dup(closure);
 
                 let mut args = vec![];
                 let stack_size = self.data_stack.len();
                 for i in 0..num_args {
-                    let address = self.data_stack[stack_size - i - 2];
-                    let argument = self.heap.export_without_dropping(address);
+                    let argument = self.data_stack[stack_size - i - 2];
+                    self.heap.dup(argument);
                     args.push(argument);
                 }
                 args.reverse();
@@ -344,15 +353,15 @@ impl Vm {
                     .push(TraceEntry::CallStarted { id, closure, args });
             }
             Instruction::TraceCallEnds => {
-                let return_value_address = self.data_stack.last().unwrap();
-                let return_value = self.heap.export_without_dropping(*return_value_address);
+                let return_value = *self.data_stack.last().unwrap();
+                self.heap.dup(return_value);
                 self.tracer.push(TraceEntry::CallEnded { return_value });
             }
             Instruction::TraceNeedsStarts { id } => {
                 let condition = self.data_stack[self.data_stack.len() - 1];
                 let reason = self.data_stack[self.data_stack.len() - 2];
-                let condition = self.heap.export_without_dropping(condition);
-                let reason = self.heap.export_without_dropping(reason);
+                self.heap.dup(condition);
+                self.heap.dup(reason);
                 self.tracer.push(TraceEntry::NeedsStarted {
                     id,
                     condition,
@@ -360,28 +369,26 @@ impl Vm {
                 });
             }
             Instruction::TraceNeedsEnds => self.tracer.push(TraceEntry::NeedsEnded),
-            Instruction::TraceModuleStarts { input } => {
-                if self.import_stack.contains(&input) {
+            Instruction::TraceModuleStarts { module } => {
+                if self.import_stack.contains(&module) {
                     self.panic(format!(
                         "there's an import cycle ({})",
                         self.import_stack
                             .iter()
-                            .skip_while(|it| **it != input)
-                            .chain([&input])
-                            .map(|input| format!("{input}"))
+                            .skip_while(|it| **it != module)
+                            .chain([&module])
+                            .map(|module| format!("{module}"))
                             .join(" → "),
                     ));
                 }
-                self.import_stack.push(input.clone());
-                self.tracer.push(TraceEntry::ModuleStarted { input });
+                self.import_stack.push(module.clone());
+                self.tracer.push(TraceEntry::ModuleStarted { module });
             }
             Instruction::TraceModuleEnds => {
                 self.import_stack.pop().unwrap();
-                self.tracer.push(TraceEntry::ModuleEnded {
-                    export_map: self
-                        .heap
-                        .export_without_dropping(*self.data_stack.last().unwrap()),
-                })
+                let export_map = *self.data_stack.last().unwrap();
+                self.heap.dup(export_map);
+                self.tracer.push(TraceEntry::ModuleEnded { export_map })
             }
             Instruction::Error { id, errors } => {
                 self.panic(format!(
@@ -396,34 +403,17 @@ impl Vm {
         }
     }
 
-    pub fn panic(&mut self, reason: String) -> Value {
+    pub fn panic(&mut self, reason: String) {
         self.status = Status::Panicked { reason };
-        Value::Symbol("Never".to_string())
     }
 
-    pub fn run_synchronously_until_completion(
-        &mut self,
-        db: &Database,
-    ) -> Result<TearDownResult, String> {
+    pub fn run_synchronously_until_completion(mut self, db: &Database) -> TearDownResult {
         let use_provider = DbUseProvider { db };
         loop {
-            self.run(&use_provider, 10000);
+            self.run(&use_provider, 100000);
             match self.status() {
-                Status::Running => log::info!("Code is still running."),
-                Status::Done => {
-                    let result = self.tear_down_module_closure_execution();
-                    log::info!(
-                        "The module exports these definitions: {}",
-                        result.return_value
-                    );
-                    return Ok(result);
-                }
-                Status::Panicked { reason } => {
-                    log::error!("The module panicked because {reason}.");
-                    log::error!("This is the stack trace:");
-                    self.tracer.dump_stack_trace(db);
-                    return Err(reason);
-                }
+                Status::Running => info!("Code is still running."),
+                _ => return self.tear_down(),
             }
         }
     }

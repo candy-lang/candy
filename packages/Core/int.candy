@@ -1,8 +1,8 @@
-bool = use "..Bool"
-check = use "..Check"
-conditionals = use "..Conditionals"
-equals = (use "..Equality").equals
-type = use "..Type"
+bool = use "..bool"
+check = (use "..check").check
+conditionals = use "..conditionals"
+equals = (use "..equality").equals
+type = use "..type"
 
 is value := type.is value Int
 

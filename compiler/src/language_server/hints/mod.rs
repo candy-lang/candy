@@ -14,19 +14,20 @@ mod fuzzer;
 mod utils;
 
 use self::{constant_evaluator::ConstantEvaluator, fuzzer::FuzzerManager};
-use crate::{database::Database, input::Input, CloneWithExtension};
+use crate::{database::Database, module::Module, vm::Heap};
 use itertools::Itertools;
 use lsp_types::{notification::Notification, Position};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, time::Duration, vec};
+use std::{collections::HashMap, time::Duration, vec};
 use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
 };
+use tracing::{trace, warn};
 
 pub enum Event {
-    UpdateModule(Input, Vec<u8>),
-    CloseModule(Input),
+    UpdateModule(Module, Vec<u8>),
+    CloseModule(Module),
     Shutdown,
 }
 
@@ -57,7 +58,7 @@ impl Notification for HintsNotification {
 
 pub async fn run_server(
     mut incoming_events: Receiver<Event>,
-    outgoing_hints: Sender<(Input, Vec<Hint>)>,
+    outgoing_hints: Sender<(Module, Vec<Hint>)>,
 ) {
     let mut db = Database::default();
     let mut constant_evaluator = ConstantEvaluator::default();
@@ -65,7 +66,7 @@ pub async fn run_server(
     let mut outgoing_hints = OutgoingHints::new(outgoing_hints);
 
     'server_loop: loop {
-        log::trace!("Hints server is running.");
+        trace!("Hints server is running.");
         sleep(Duration::from_millis(100)).await;
 
         loop {
@@ -75,16 +76,16 @@ pub async fn run_server(
                 Err(TryRecvError::Disconnected) => break 'server_loop,
             };
             match event {
-                Event::UpdateModule(input, content) => {
-                    db.did_change_input(&input, content);
-                    outgoing_hints.report_hints(input.clone(), vec![]).await;
-                    constant_evaluator.update_input(&db, input.clone());
-                    fuzzer.update_input(&db, input, vec![]);
+                Event::UpdateModule(module, content) => {
+                    db.did_change_module(&module, content);
+                    outgoing_hints.report_hints(module.clone(), vec![]).await;
+                    constant_evaluator.update_module(&db, module.clone());
+                    fuzzer.update_module(&db, module, &Heap::default(), &[]);
                 }
-                Event::CloseModule(input) => {
-                    db.did_close_input(&input);
-                    constant_evaluator.remove_input(input.clone());
-                    fuzzer.remove_input(input);
+                Event::CloseModule(module) => {
+                    db.did_close_module(&module);
+                    constant_evaluator.remove_module(module.clone());
+                    fuzzer.remove_module(module);
                 }
                 Event::Shutdown => {
                     incoming_events.close();
@@ -92,32 +93,29 @@ pub async fn run_server(
             }
         }
 
-        // First, try to constant-evaluate some input – that has a higher
+        // First, try to constant-evaluate opened modules – that has a higher
         // priority. When constant evaluation is done, we try fuzzing the
         // functions we found.
-        let input_with_new_insight = 'new_insight: {
-            if let Some(input) = constant_evaluator.run(&db) {
-                fuzzer.update_input(
-                    &db,
-                    input.clone(),
-                    constant_evaluator.get_fuzzable_closures(&input),
-                );
-                break 'new_insight Some(input);
+        let module_with_new_insight = 'new_insight: {
+            if let Some(module) = constant_evaluator.run(&db) {
+                let (heap, closures) = constant_evaluator.get_fuzzable_closures(&module);
+                fuzzer.update_module(&db, module.clone(), heap, &closures);
+                break 'new_insight Some(module);
             }
-            if let Some(input) = fuzzer.run(&db) {
-                log::warn!("Fuzzer found a problem!");
-                break 'new_insight Some(input);
+            if let Some(module) = fuzzer.run(&db) {
+                warn!("Fuzzer found a problem!");
+                break 'new_insight Some(module);
             }
             None
         };
 
-        if let Some(input) = input_with_new_insight {
+        if let Some(module) = module_with_new_insight {
             let hints = constant_evaluator
-                .get_hints(&db, &input)
+                .get_hints(&db, &module)
                 .into_iter()
                 // The fuzzer returns groups of related hints.
                 .map(|hint| vec![hint])
-                .chain(fuzzer.get_hints(&db, &input).into_iter())
+                .chain(fuzzer.get_hints(&db, &module).into_iter())
                 // Make hints look like comments.
                 .map(|mut hint_group| {
                     for hint in &mut hint_group {
@@ -133,11 +131,10 @@ pub async fn run_server(
                 .sorted_by_key(|hint| hint.position)
                 .collect_vec();
 
-            if let Some(path) = input.to_path() {
-                let hints_file = path.clone_with_extension("candy.hints");
-                let content = hints.iter().map(|hint| format!("{hint:?}")).join("\n");
-                fs::write(hints_file.clone(), content).unwrap();
-            }
+            module.dump_associated_debug_file(
+                "hints",
+                &hints.iter().map(|hint| format!("{hint:?}")).join("\n"),
+            );
 
             // Only show the most important hint per line.
             let hints = hints
@@ -147,27 +144,27 @@ pub async fn run_server(
                 .map(|(_, hints)| hints.max_by_key(|hint| hint.kind).unwrap())
                 .collect_vec();
 
-            outgoing_hints.report_hints(input, hints).await;
+            outgoing_hints.report_hints(module, hints).await;
         }
     }
 }
 
 struct OutgoingHints {
-    sender: Sender<(Input, Vec<Hint>)>,
-    last_sent: HashMap<Input, Vec<Hint>>,
+    sender: Sender<(Module, Vec<Hint>)>,
+    last_sent: HashMap<Module, Vec<Hint>>,
 }
 impl OutgoingHints {
-    fn new(sender: Sender<(Input, Vec<Hint>)>) -> Self {
+    fn new(sender: Sender<(Module, Vec<Hint>)>) -> Self {
         Self {
             sender,
             last_sent: HashMap::new(),
         }
     }
 
-    async fn report_hints(&mut self, input: Input, hints: Vec<Hint>) {
-        if self.last_sent.get(&input) != Some(&hints) {
-            self.last_sent.insert(input.clone(), hints.clone());
-            self.sender.send((input, hints)).await.unwrap();
+    async fn report_hints(&mut self, module: Module, hints: Vec<Hint>) {
+        if self.last_sent.get(&module) != Some(&hints) {
+            self.last_sent.insert(module.clone(), hints.clone());
+            self.sender.send((module, hints)).await.unwrap();
         }
     }
 }
