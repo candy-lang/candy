@@ -157,6 +157,8 @@ mod parse {
 
     fn leading_indentation(mut input: Vec<&str>, indentation: usize) -> Option<(Vec<&str>, Rcst)> {
         log::trace!("leading_indentation({input:?}, {indentation:?})");
+        assert!(indentation > 0);
+
         if let [line, remaining @ ..] = input.as_slice() {
             let mut chars = vec![];
             let mut has_weird_whitespace = false;
