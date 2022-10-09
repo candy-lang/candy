@@ -275,8 +275,8 @@ mod parse {
                     Rcst::Whitespace(" ".to_string()),
                     Rcst::Newline,
                     Rcst::Whitespace(" ".to_string())
-                ]
-            ))
+                ],
+            )),
         );
         assert_eq!(whitespaces_and_newlines(vec!["", " a"], 2), None);
         assert_eq!(
@@ -287,8 +287,8 @@ mod parse {
                     Rcst::Whitespace(" ".to_string()),
                     Rcst::Newline,
                     Rcst::Whitespace("  ".to_string())
-                ]
-            ))
+                ],
+            )),
         );
         assert_eq!(
             whitespaces_and_newlines(vec![" ", "   a"], 2),
@@ -297,10 +297,10 @@ mod parse {
                 vec![
                     Rcst::Whitespace(" ".to_string()),
                     Rcst::Newline,
-                ]
-            ))
                     Rcst::Whitespace("  ".to_string()),
                     Rcst::Whitespace(" ".to_string()),
+                ],
+            )),
         );
         assert_eq!(whitespaces_and_newlines(vec!["abc"], 2), None);
         assert_eq!(
@@ -524,7 +524,7 @@ mod parse {
     fn test_inline() {
         assert_eq!(
             inline("abc", &[]),
-            Some((vec![Rcst::TextPart("abc".to_string())], vec![]))
+            Some((vec![Rcst::TextPart("abc".to_string())], vec![])),
         );
         assert_eq!(
             inline("abc _def_ ghi", &[]),
@@ -534,12 +534,12 @@ mod parse {
                     Rcst::Emphasized {
                         has_opening_underscore: true,
                         text: vec![Rcst::TextPart("def".to_string())],
-                        has_closing_underscore: true
+                        has_closing_underscore: true,
                     },
-                    Rcst::TextPart(" ghi".to_string())
+                    Rcst::TextPart(" ghi".to_string()),
                 ],
-                vec![]
-            ))
+                vec![],
+            )),
         );
         assert_eq!(
             inline("abc [def] ghi", &[]),
@@ -549,12 +549,12 @@ mod parse {
                     Rcst::Link {
                         has_opening_bracket: true,
                         text: vec![Rcst::TextPart("def".to_string())],
-                        has_closing_bracket: true
+                        has_closing_bracket: true,
                     },
-                    Rcst::TextPart(" ghi".to_string())
+                    Rcst::TextPart(" ghi".to_string()),
                 ],
-                vec![]
-            ))
+                vec![],
+            )),
         );
         assert_eq!(
             inline("abc `def` ghi", &[]),
@@ -564,12 +564,12 @@ mod parse {
                     Rcst::InlineCode {
                         has_opening_backtick: true,
                         code: vec![Rcst::TextPart("def".to_string())],
-                        has_closing_backtick: true
+                        has_closing_backtick: true,
                     },
-                    Rcst::TextPart(" ghi".to_string())
+                    Rcst::TextPart(" ghi".to_string()),
                 ],
                 vec![]
-            ))
+            )),
         );
         assert_eq!(
             inline("abc [_def ` ghi", &[]),
@@ -585,20 +585,20 @@ mod parse {
                                 Rcst::InlineCode {
                                     has_opening_backtick: true,
                                     code: vec![Rcst::TextPart(" ghi".to_string())],
-                                    has_closing_backtick: false
+                                    has_closing_backtick: false,
                                 },
                             ],
-                            has_closing_underscore: false
-                        },],
-                        has_closing_bracket: false
+                            has_closing_underscore: false,
+                        }],
+                        has_closing_bracket: false,
                     },
                 ],
                 vec![
                     InlineFormatting::Link,
                     InlineFormatting::Emphasized,
-                    InlineFormatting::Code
-                ]
-            ))
+                    InlineFormatting::Code,
+                ],
+            )),
         );
         assert_eq!(
             inline(
@@ -606,8 +606,8 @@ mod parse {
                 &[
                     InlineFormatting::Link,
                     InlineFormatting::Emphasized,
-                    InlineFormatting::Code
-                ]
+                    InlineFormatting::Code,
+                ],
             ),
             Some((
                 vec![
@@ -619,22 +619,22 @@ mod parse {
                                 Rcst::InlineCode {
                                     has_opening_backtick: false,
                                     code: vec![Rcst::TextPart("abc".to_string())],
-                                    has_closing_backtick: true
+                                    has_closing_backtick: true,
                                 },
                                 Rcst::TextPart(" def".to_string()),
                             ],
-                            has_closing_underscore: false
-                        },],
-                        has_closing_bracket: true
+                            has_closing_underscore: false,
+                        }],
+                        has_closing_bracket: true,
                     },
                     Rcst::Emphasized {
                         has_opening_underscore: true,
-                        text: vec![Rcst::TextPart(" ghi".to_string()),],
-                        has_closing_underscore: false
+                        text: vec![Rcst::TextPart(" ghi".to_string())],
+                        has_closing_underscore: false,
                     },
                 ],
-                vec![InlineFormatting::Emphasized]
-            ))
+                vec![InlineFormatting::Emphasized],
+            )),
         );
     }
 
@@ -702,9 +702,9 @@ mod parse {
                 vec![""],
                 Rcst::Title(vec![Rcst::TitleLine {
                     octothorpe_count: 1,
-                    text: vec![Rcst::TextPart(" Foo".to_string())]
-                }])
-            ))
+                    text: vec![Rcst::TextPart(" Foo".to_string())],
+                }]),
+            )),
         );
         assert_eq!(
             title(vec!["##Bar"]),
@@ -712,9 +712,9 @@ mod parse {
                 vec![""],
                 Rcst::Title(vec![Rcst::TitleLine {
                     octothorpe_count: 2,
-                    text: vec![Rcst::TextPart("Bar".to_string())]
-                }])
-            ))
+                    text: vec![Rcst::TextPart("Bar".to_string())],
+                }]),
+            )),
         );
         assert_eq!(
             title(vec!["# Foo", " ##Bar", "Baz"]),
@@ -724,17 +724,17 @@ mod parse {
                     Rcst::TrailingWhitespace {
                         child: Rcst::TitleLine {
                             octothorpe_count: 1,
-                            text: vec![Rcst::TextPart(" Foo".to_string())]
+                            text: vec![Rcst::TextPart(" Foo".to_string())],
                         }
                         .into(),
                         whitespace: vec![Rcst::Newline, Rcst::Whitespace(" ".to_string())],
                     },
                     Rcst::TitleLine {
                         octothorpe_count: 2,
-                        text: vec![Rcst::TextPart("Bar".to_string())]
-                    }
-                ])
-            ))
+                        text: vec![Rcst::TextPart("Bar".to_string())],
+                    },
+                ]),
+            )),
         );
         assert_eq!(title(vec!["abc"]), None);
     }
@@ -888,9 +888,9 @@ mod parse {
             Some((
                 vec![""],
                 Rcst::Urls(vec![Rcst::UrlLine(
-                    Url::parse("https://github.com/candy-lang/candy").unwrap()
-                )])
-            ))
+                    Url::parse("https://github.com/candy-lang/candy").unwrap(),
+                )]),
+            )),
         );
         assert_eq!(
             urls(vec![
@@ -902,7 +902,7 @@ mod parse {
                 Rcst::Urls(vec![
                     Rcst::TrailingWhitespace {
                         child: Rcst::UrlLine(
-                            Url::parse("https://github.com/candy-lang/candy").unwrap()
+                            Url::parse("https://github.com/candy-lang/candy").unwrap(),
                         )
                         .into(),
                         whitespace: vec![
@@ -911,9 +911,9 @@ mod parse {
                             Rcst::Whitespace(" ".to_string())
                         ],
                     },
-                    Rcst::UrlLine(Url::parse("https://github.com/candy-lang").unwrap())
-                ])
-            ))
+                    Rcst::UrlLine(Url::parse("https://github.com/candy-lang").unwrap()),
+                ]),
+            )),
         );
         assert_eq!(urls(vec!["abc"]), None);
     }
@@ -974,11 +974,11 @@ mod parse {
                     code: vec![
                         Rcst::Newline,
                         Rcst::TextPart("abc".to_string()),
-                        Rcst::Newline
+                        Rcst::Newline,
                     ],
-                    has_closing_backticks: true
-                }
-            ))
+                    has_closing_backticks: true,
+                },
+            )),
         );
         assert_eq!(
             code_block(vec!["```", "  abc", " ``` "]),
@@ -991,9 +991,9 @@ mod parse {
                         Rcst::Newline,
                         Rcst::TextPart(" ".to_string()),
                     ],
-                    has_closing_backticks: true
-                }
-            ))
+                    has_closing_backticks: true,
+                },
+            )),
         );
         assert_eq!(
             code_block(vec!["```", "abc", "# Foo"]),
@@ -1006,9 +1006,9 @@ mod parse {
                         Rcst::Newline,
                         Rcst::TextPart("# Foo".to_string()),
                     ],
-                    has_closing_backticks: false
-                }
-            ))
+                    has_closing_backticks: false,
+                },
+            )),
         );
         assert_eq!(code_block(vec!["abc"]), None);
     }
