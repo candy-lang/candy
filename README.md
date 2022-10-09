@@ -2,41 +2,48 @@
 
 A sweet programming language that is robust, minimalistic, and expressive.
 
-Candy aims to have excellent tooling – most language features are designed with tooling in mind.
+Candy aims to have excellent tooling – most language features are designed with tooling in mind.
 Many languages have a strict separation between compile-time and runtime.
 Candy blurs the line between those stages, for example, by replacing compile-time types with edit-time fuzzing.
 
 ## Quick introduction
 
-* **Values are at the center of your computations.**
+- **Values are at the center of your computations.**
   Only a handful of predefined types of values exist:
-  ```
+
+  ```candy
   3                   # int
   "Candy"             # text
   Green               # symbol
   [ Name: "Candy" ]   # struct
   { it -> add it 2 }  # closure
   ```
-* **Minimalistic syntax.**
+
+- **Minimalistic syntax.**
   Defining variables and functions works without braces or keywords cluttering up your code.
   The syntax is indentation-aware.
-  ```
+
+  ```candy
   foo = 42
   println message =
     print message
     print "\n"
   println "Hello, world!"
   ```
-* **Extensive compile-time evaluation.**
+
+- **Extensive compile-time evaluation.**
   Many values can already be computed at compile-time.
   In your editor, you'll see the results on the right side:
-  ```
+
+  ```candy
   foo = double 2  # foo = 4
   ```
-* **Fuzzing instead of traditional types.**
-  In Candy, functions have to specify their needs *exactly.*
+
+- **Fuzzing instead of traditional types.**
+  In Candy, functions have to specify their needs _exactly._
   As you type, the tooling automatically tests your code with many input to see if one breaks the code:
-  ```
+
+  ```candy
   foo a =             # If you pass a = 0,
     needs (isInt a)
     math.logarithm a  # then this fails because logarithm only works on positive numbers.
