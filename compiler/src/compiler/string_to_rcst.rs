@@ -438,6 +438,7 @@ mod parse {
     ) -> (&str, Vec<Rcst>) {
         log::trace!("whitespaces_and_newlines({input:?}, {indentation:?}, {also_comments:?})");
         let mut parts = vec![];
+
         if let Some((new_input, whitespace)) = single_line_whitespace(input) {
             input = new_input;
             parts.push(whitespace);
@@ -450,8 +451,8 @@ mod parse {
 
             if also_comments {
                 if let Some((new_new_input, whitespace)) = comment(new_input) {
-                    new_parts.push(whitespace);
                     new_input = new_new_input;
+                    new_parts.push(whitespace);
 
                     input = new_input;
                     parts.append(&mut new_parts);
@@ -462,19 +463,19 @@ mod parse {
                 input = new_input;
                 parts.append(&mut new_parts);
 
-                new_parts.push(newline);
                 new_input = new_new_input;
+                new_parts.push(newline);
             }
 
             if let Some((new_new_input, whitespace)) = leading_indentation(new_input, indentation) {
-                new_parts.push(whitespace);
                 new_input = new_new_input;
+                new_parts.push(whitespace);
 
                 input = new_input;
                 parts.append(&mut new_parts);
-            } else if let Some((new_new_input, whitespace)) = single_line_whitespace(input) {
-                new_parts.push(whitespace);
+            } else if let Some((new_new_input, whitespace)) = single_line_whitespace(new_input) {
                 new_input = new_new_input;
+                new_parts.push(whitespace);
             }
 
             if new_input == new_input_from_iteration_start {
