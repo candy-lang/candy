@@ -1,6 +1,6 @@
-channel = use "..Channel"
-function = use "..Function"
-structGet = (use "..Struct").getUnwrap
+channel = use "..channel"
+function = use "..function"
+structGetUnwrap = (use "..struct").getUnwrap
 
 parallel body := 
   needs (function.is1 body)
@@ -10,8 +10,8 @@ async nursery body :=
   needs (channel.isSendPort nursery)
   needs (function.is0 body)
   returnChannel = channel.create 1
-  returnSendPort = structGet returnChannel 0
-  returnReceivePort = structGet returnChannel 1
+  returnSendPort = structGetUnwrap returnChannel 0
+  returnReceivePort = structGetUnwrap returnChannel 1
   channel.send nursery [Closure: body, ReturnChannel: returnSendPort]
   returnReceivePort
 

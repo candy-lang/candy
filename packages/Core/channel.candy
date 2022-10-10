@@ -1,6 +1,6 @@
-isInt = (use "..Int").is
-equals = (use "..Equality").equals
-isType = (use "..Type").is
+equals = (use "..equality").equals
+isInt = (use "..int").is
+isType = (use "..type").is
 
 isSendPort value := isType value SendPort
 isReceivePort value := isType value ReceivePort
