@@ -117,7 +117,6 @@ Major milestones:
 
 ## Short-term TODOs
 
-- casing of module names
 - fix fault attribution
 - rearchitect tracing
 - new name?
@@ -137,7 +136,6 @@ Major milestones:
 - distinguish packages from normal modules
 - complain about comment lines with too much indentation
 - develop guidelines about how to format reasons
-- module files: `.candy` vs `_.candy`?
 
 ## How to use Candy
 
