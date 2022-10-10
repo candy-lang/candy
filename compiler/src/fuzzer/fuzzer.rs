@@ -1,4 +1,4 @@
-use super::{generator::generate_n_values, utils::did_need_in_closure_cause_panic};
+use super::generator::generate_n_values;
 use crate::{
     compiler::hir,
     database::Database,
@@ -115,7 +115,6 @@ impl Fuzzer {
                     // If a `needs` directly inside the tested closure was not
                     // satisfied, then the panic is not closure's fault, but our
                     // fault.
-                    let result = vm.tear_down();
                     let is_our_fault = responsible.is_none();
                     if is_our_fault {
                         Status::new_fuzzing_attempt(&self.closure_heap, self.closure)

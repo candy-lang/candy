@@ -12,13 +12,13 @@ use self::{
         CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions,
         UseProvider,
     },
-    heap::{ChannelId, SendPort},
+    heap::SendPort,
     tracer::Tracer,
 };
 pub use self::{
     channel::Packet,
     fiber::{ExecutionResult, Fiber},
-    heap::{Closure, Heap, Object, Pointer, Struct},
+    heap::{ChannelId, Closure, Heap, Object, Pointer, Struct},
 };
 use crate::compiler::hir::Id;
 use itertools::Itertools;

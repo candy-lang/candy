@@ -11,6 +11,7 @@ use crate::{
 };
 use itertools::Itertools;
 use std::collections::HashMap;
+use tracing::debug;
 
 // Stack traces are a reduced view of the tracing state that represent the stack
 // trace at a given moment in time.
@@ -159,6 +160,7 @@ impl FullTracer {
         }
 
         let stack_traces = self.stack_traces();
+        debug!("Stack traces: {:?}", stack_traces.keys().collect_vec());
         panicking_fiber_chain
             .into_iter()
             .rev()

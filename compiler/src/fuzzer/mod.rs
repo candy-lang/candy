@@ -2,27 +2,30 @@ mod fuzzer;
 mod generator;
 mod utils;
 
-pub use self::fuzzer::{Fuzzer, Status};
+pub use self::{
+    fuzzer::{Fuzzer, Status},
+    utils::FuzzablesFinder,
+};
 use crate::{
     compiler::hir::Id,
     database::Database,
     module::Module,
     vm::{
         context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
-        tracer::DummyTracer,
         Closure, Heap, Pointer, Vm,
     },
 };
 use itertools::Itertools;
-use tracing::info;
+use tracing::{error, info};
 
 pub async fn fuzz(db: &Database, module: Module) {
     let (fuzzables_heap, fuzzables): (Heap, Vec<(Id, Pointer)>) = {
+        let mut tracer = FuzzablesFinder::new();
         let mut vm = Vm::new();
         vm.set_up_for_running_module_closure(Closure::of_module(db, module.clone()).unwrap());
-        vm.run(&mut DbUseProvider { db }, &mut RunForever, &mut DummyTracer);
+        vm.run(&mut DbUseProvider { db }, &mut RunForever, &mut tracer);
         let result = vm.tear_down();
-        (todo!(), todo!())
+        (tracer.heap, tracer.fuzzables)
     };
 
     info!(
@@ -44,17 +47,16 @@ pub async fn fuzz(db: &Database, module: Module) {
                 reason,
                 tracer,
             } => {
-                info!("The fuzzer discovered an input that crashes {id}:");
-                info!(
+                error!("The fuzzer discovered an input that crashes {id}:");
+                error!(
                     "Calling `{id} {}` doesn't work because {reason}.",
                     arguments.iter().map(|arg| format!("{arg:?}")).join(" "),
                 );
-                info!("This was the stack trace:");
-                // tracer.dump_stack_trace(db);
-                todo!();
-
-                // module.dump_associated_debug_file("trace", &tracer.full_trace().format(heap));
-                todo!();
+                error!("Events:\n {tracer:?}");
+                error!(
+                    "This is the stack trace:\n{}",
+                    tracer.format_panic_stack_trace_to_root_fiber(db)
+                );
             }
         }
     }
