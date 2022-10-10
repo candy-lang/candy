@@ -6,7 +6,7 @@ use std::{collections::VecDeque, fmt};
 /// ports, you can get packets out again.
 ///
 /// Channels always have a maximum capacity of packets that they can hold
-/// simultaneously – you can set it to something large, but having no capacity
+/// simultaneously – you can set it to something large, but having no limit
 /// enables buggy code that leaks memory.
 #[derive(Clone)]
 pub struct ChannelBuf {
@@ -40,7 +40,7 @@ impl ChannelBuf {
 
     pub fn send(&mut self, packet: Packet) {
         if self.is_full() {
-            panic!("Tried to send on channel that is full.");
+            panic!("Tried to send on a channel that is full.");
         }
         self.packets.push_back(packet);
     }
@@ -48,7 +48,7 @@ impl ChannelBuf {
     pub fn receive(&mut self) -> Packet {
         self.packets
             .pop_front()
-            .expect("Tried to receive from channel that is empty.")
+            .expect("Tried to receive from a channel that is empty.")
     }
 }
 

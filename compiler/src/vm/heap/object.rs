@@ -7,6 +7,7 @@ use crate::{
     },
     database::Database,
     module::Module,
+    vm::CountableId,
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
@@ -166,8 +167,8 @@ pub struct ReceivePort {
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChannelId(usize);
 
-impl From<usize> for ChannelId {
-    fn from(id: usize) -> Self {
+impl CountableId for ChannelId {
+    fn from_usize(id: usize) -> Self {
         Self(id)
     }
 }

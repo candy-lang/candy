@@ -43,6 +43,11 @@ pub struct Vm {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FiberId(usize);
+impl CountableId for FiberId {
+    fn from_usize(id: usize) -> Self {
+        Self(id)
+    }
+}
 
 #[derive(Clone)]
 enum FiberTree {
@@ -58,7 +63,7 @@ enum FiberTree {
     Try(Try),
 }
 
-/// Single fibers are the leafs of the fiber tree.
+/// Single fibers are the leaves of the fiber tree.
 #[derive(Clone)]
 struct Single {
     fiber: Fiber,
@@ -204,15 +209,6 @@ impl Vm {
         matches!(self.status(), Status::CanRun)
     }
 
-    // pub fn fiber(&self) -> &Fiber {
-    //     // TODO: Remove before merging the PR
-    //     todo!()
-    // }
-    // pub fn cloned_tracer(&self) -> Tracer {
-    //     // TODO: Remove
-    //     self.fiber().tracer.clone()
-    // }
-
     /// Can be called at any time from outside the VM to create a channel that
     /// can be used to communicate with the outside world.
     pub fn create_channel(&mut self) -> ChannelId {
@@ -333,9 +329,7 @@ impl Vm {
                     let single = tree.into_single().unwrap();
                     FiberTree::Parallel(Parallel {
                         paused_fiber: single,
-                        children: [(first_child_id, ChildKind::InitialChild)]
-                            .into_iter()
-                            .collect(),
+                        children: HashMap::from([(first_child_id, ChildKind::InitialChild)]),
                         return_value: None,
                         nursery: nursery_id,
                     })
@@ -817,18 +811,12 @@ impl fmt::Debug for Operation {
     }
 }
 
-impl From<usize> for FiberId {
-    fn from(id: usize) -> Self {
-        Self(id)
-    }
-}
-
 #[derive(Clone)]
-struct IdGenerator<T: From<usize>> {
+struct IdGenerator<T: CountableId> {
     next_id: usize,
     _data: PhantomData<T>,
 }
-impl<T: From<usize>> IdGenerator<T> {
+impl<T: CountableId> IdGenerator<T> {
     fn start_at(id: usize) -> Self {
         Self {
             next_id: id,
@@ -838,8 +826,11 @@ impl<T: From<usize>> IdGenerator<T> {
     fn generate(&mut self) -> T {
         let id = self.next_id;
         self.next_id += 1;
-        id.into()
+        T::from_usize(id)
     }
+}
+pub trait CountableId {
+    fn from_usize(id: usize) -> Self;
 }
 
 trait ReplaceHashMapValue<K, V> {

@@ -250,9 +250,8 @@ impl Tracer {
                 }
                 EventData::CallEnded { return_value } => {
                     let span = stack.pop().unwrap();
-                    let (id, closure, args) = match span.data.unwrap() {
-                        StackEntry::Call { id, closure, args } => (id, closure, args),
-                        _ => unreachable!(),
+                    let StackEntry::Call { id, closure, args } = span.data.unwrap() else {
+                        unreachable!()
                     };
                     stack.last_mut().unwrap().inner.push(Trace {
                         start: span.start,
@@ -283,13 +282,8 @@ impl Tracer {
                 }
                 EventData::NeedsEnded { nothing } => {
                     let span = stack.pop().unwrap();
-                    let (id, condition, reason) = match span.data.unwrap() {
-                        StackEntry::Needs {
-                            id,
-                            condition,
-                            reason,
-                        } => (id, condition, reason),
-                        _ => unreachable!(),
+                    let StackEntry::Needs { id, condition, reason } = span.data.unwrap() else {
+                        unreachable!()
                     };
                     stack.last_mut().unwrap().inner.push(Trace {
                         start: span.start,
@@ -313,9 +307,8 @@ impl Tracer {
                 }
                 EventData::ModuleEnded { export_map } => {
                     let span = stack.pop().unwrap();
-                    let module = match span.data.unwrap() {
-                        StackEntry::Module { module } => module,
-                        _ => unreachable!(),
+                    let StackEntry::Module { module } = span.data.unwrap() else {
+                        unreachable!()
                     };
                     stack.last_mut().unwrap().inner.push(Trace {
                         start: span.start,

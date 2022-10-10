@@ -1,6 +1,7 @@
 #![feature(async_closure)]
 #![feature(box_patterns)]
 #![feature(let_chains)]
+#![feature(let_else)]
 #![feature(never_type)]
 #![feature(try_trait_v2)]
 #![allow(clippy::module_inception)]
@@ -211,7 +212,7 @@ fn run(options: CandyRunOptions) {
         info!("Tree: {:#?}", vm);
         match vm.status() {
             Status::CanRun => {
-                debug!("VM still running.");
+                debug!("VM is still running.");
                 vm.run(&mut DbUseProvider { db: &db }, &mut RunForever);
             }
             Status::WaitingForOperations => {
@@ -271,7 +272,7 @@ fn run(options: CandyRunOptions) {
         info!("Tree: {:#?}", vm);
         match vm.status() {
             Status::CanRun => {
-                debug!("VM still running.");
+                debug!("VM is still running.");
                 vm.run(&mut DbUseProvider { db: &db }, &mut RunForever);
                 // TODO: handle operations
             }
