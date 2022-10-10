@@ -1,8 +1,8 @@
-bool = use "..Bool"
-conditionals = use "..Conditionals"
-equals = (use "..Equality").equals
-function = use "..Function"
-struct = use "..Struct"
+bool = use "..bool"
+conditionals = use "..conditionals"
+equals = (use "..equality").equals
+function = use "..function"
+struct = use "..struct"
 
 is value :=
   bool.lazyAnd

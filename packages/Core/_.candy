@@ -1,0 +1,16 @@
+bool := use ".bool"
+check := (use ".check").check
+
+conditionals = use ".conditionals"
+if := conditionals.if
+ifElse := conditionals.ifElse
+
+equals := (use ".equality").equals
+function := use ".function"
+int := use ".int"
+panic := (use ".panic").panic
+result := use ".result"
+struct := use ".struct"
+text := use ".text"
+todo := (use ".todo").todo
+type := use ".type"
