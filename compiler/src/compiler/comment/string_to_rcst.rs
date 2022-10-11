@@ -53,8 +53,8 @@ fn comment_rcst(db: &dyn CommentStringToRcst, id: hir::Id) -> Arc<Vec<Rcst>> {
         })
         .collect_vec();
 
-    let (rest, rcsts) = parse::blocks(comment_lines, 0).unwrap();
-    assert!(rest.is_empty());
+    let (remaining, rcsts) = parse::blocks(comment_lines, 0).unwrap();
+    assert!(remaining.is_empty());
     Arc::new(rcsts)
 }
 
