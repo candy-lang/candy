@@ -128,7 +128,7 @@ impl Vm {
     }
 
     fn get_from_data_stack(&self, offset: usize) -> Pointer {
-        self.data_stack[self.data_stack.len() - 1 - offset as usize]
+        self.data_stack[self.data_stack.len() - 1 - offset]
     }
 
     pub fn run<U: UseProvider>(&mut self, use_provider: &U, mut num_instructions: usize) {

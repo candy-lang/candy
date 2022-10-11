@@ -35,6 +35,7 @@ tower-lsp = "0.17.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.2.0", features = ["registry"] }
 unicode-segmentation = "1.9.0"
+url = "2.2.2"
 
 [target.x86_64-unknown-linux-gnu]
 linker = "/usr/bin/clang"

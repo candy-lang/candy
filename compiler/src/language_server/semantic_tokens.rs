@@ -121,14 +121,10 @@ impl<'a> Context<'a> {
             self.cursor,
         );
 
-        let definition_modifier = if type_ == SemanticTokenType::Assignment {
-            0b1
-        } else {
-            0b0
-        };
+        let definition_modifier = (type_ == SemanticTokenType::Assignment) as u32;
         let readonly_modifier = 0b10;
         self.tokens.push(SemanticToken {
-            delta_line: start.line as u32 - self.cursor.line as u32,
+            delta_line: start.line - self.cursor.line,
             delta_start: if start.line == self.cursor.line {
                 start.character - self.cursor.character
             } else {
