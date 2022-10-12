@@ -10,10 +10,8 @@ async nursery body :=
   needs (channel.isSendPort nursery)
   needs (function.is0 body)
   returnChannel = channel.create 1
-  returnSendPort = structGetUnwrap returnChannel 0
-  returnReceivePort = structGetUnwrap returnChannel 1
-  channel.send nursery [Closure: body, ReturnChannel: returnSendPort]
-  returnReceivePort
+  channel.send nursery [Closure: body, ReturnChannel: returnChannel.sendPort]
+  returnChannel.receivePort
 
 await fiber :=
   needs (channel.isReceivePort fiber)

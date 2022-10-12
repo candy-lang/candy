@@ -467,10 +467,13 @@ impl Vm {
             let Parallel {
                 mut paused_fiber,
                 nursery,
+                return_value,
                 ..
             } = tree.into_parallel().unwrap();
             self.channels.remove(&nursery).unwrap();
-            paused_fiber.fiber.complete_parallel_scope(result);
+            paused_fiber
+                .fiber
+                .complete_parallel_scope(result.map(|_| return_value.unwrap()));
             FiberTree::Single(paused_fiber)
         });
     }

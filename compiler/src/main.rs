@@ -37,6 +37,7 @@ use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use notify::{watcher, RecursiveMode, Watcher};
 use std::{
+    collections::HashMap,
     convert::TryInto,
     env::current_dir,
     path::PathBuf,
@@ -216,7 +217,9 @@ fn run(options: CandyRunOptions) {
                 vm.run(&mut DbUseProvider { db: &db }, &mut RunForever);
             }
             Status::WaitingForOperations => {
-                todo!("VM can't proceed until some operations complete.");
+                todo!(
+                    "Running the module results in a deadlock caused by some channel operations."
+                );
             }
             _ => break,
         }
@@ -265,7 +268,7 @@ fn run(options: CandyRunOptions) {
     let environment = {
         let stdout_symbol = heap.create_symbol("Stdout".to_string());
         let stdout_port = heap.create_send_port(stdout);
-        heap.create_struct([(stdout_symbol, stdout_port)].into_iter().collect())
+        heap.create_struct(HashMap::from([(stdout_symbol, stdout_port)]))
     };
     vm.set_up_for_running_closure(heap, main, &[environment]);
     loop {
