@@ -1,4 +1,4 @@
-type = use "..Type"
+type = use "..type"
 
 is value := type.is value Struct
 

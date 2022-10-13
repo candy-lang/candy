@@ -14,14 +14,12 @@ core = use "..Core"
 # twentyOne := fib 8
 
 channel = core.channel.create 3
-sendPort = core.struct.getUnwrap channel 0
-receivePort = core.struct.getUnwrap channel 1
-core.channel.send sendPort "One"
-core.channel.send sendPort "Two"
-✨.print (core.channel.receive receivePort)
-core.channel.send sendPort "Three"
-✨.print (core.channel.receive receivePort)
-✨.print (core.channel.receive receivePort)
+core.channel.send channel.sendPort "One"
+core.channel.send channel.sendPort "Two"
+✨.print (core.channel.receive channel.receivePort)
+core.channel.send channel.sendPort "Three"
+✨.print (core.channel.receive channel.receivePort)
+✨.print (core.channel.receive channel.receivePort)
 
 core.parallel { nursery ->
   ✨.print (core.await (core.async nursery {

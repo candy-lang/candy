@@ -1,9 +1,9 @@
-bool = use "..Bool"
-conditionals = use "..Conditionals"
-equals = (use "..Equality").equals
-int = use "..Int"
-struct = use "..Struct"
-type = use "..Type"
+bool = use "..bool"
+conditionals = use "..conditionals"
+equals = (use "..equality").equals
+int = use "..int"
+struct = use "..struct"
+type = use "..type"
 
 is value := type.is value Text
 

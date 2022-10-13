@@ -1,7 +1,8 @@
 use super::{
     channel::{Capacity, Packet},
     context::{ExecutionController, UseProvider},
-    heap::{Builtin, ChannelId, Closure, Data, Heap, Pointer},
+    heap::{Builtin, Closure, Data, Heap, Pointer},
+    ids::ChannelId,
     tracer::InFiberTracer,
 };
 use crate::{
@@ -160,27 +161,42 @@ impl Fiber {
     // calling `run` again.
 
     pub fn complete_channel_create(&mut self, channel: ChannelId) {
+        assert!(matches!(self.status, Status::CreatingChannel { .. }));
+
+        let send_port_symbol = self.heap.create_symbol("SendPort".to_string());
+        let receive_port_symbol = self.heap.create_symbol("ReceivePort".to_string());
         let send_port = self.heap.create_send_port(channel);
         let receive_port = self.heap.create_receive_port(channel);
-        self.data_stack
-            .push(self.heap.create_list(&[send_port, receive_port]));
+        self.data_stack.push(self.heap.create_struct(HashMap::from([
+            (send_port_symbol, send_port),
+            (receive_port_symbol, receive_port),
+        ])));
         self.status = Status::Running;
     }
     pub fn complete_send(&mut self) {
+        assert!(matches!(self.status, Status::Sending { .. }));
+
         self.data_stack.push(self.heap.create_nothing());
         self.status = Status::Running;
     }
     pub fn complete_receive(&mut self, packet: Packet) {
+        assert!(matches!(self.status, Status::Receiving { .. }));
+
         let address = packet
             .heap
             .clone_single_to_other_heap(&mut self.heap, packet.address);
         self.data_stack.push(address);
         self.status = Status::Running;
     }
-    pub fn complete_parallel_scope(&mut self, result: Result<(), String>) {
+    pub fn complete_parallel_scope(&mut self, result: Result<Packet, String>) {
+        assert!(matches!(self.status, Status::InParallelScope { .. }));
+
         match result {
-            Ok(()) => {
-                self.data_stack.push(self.heap.create_nothing());
+            Ok(packet) => {
+                let value = packet
+                    .heap
+                    .clone_single_to_other_heap(&mut self.heap, packet.address);
+                self.data_stack.push(value);
                 self.status = Status::Running;
             }
             Err(reason) => self.panic(reason),
@@ -191,18 +207,10 @@ impl Fiber {
             ExecutionResult::Finished(Packet {
                 heap,
                 address: return_value,
-            }) => {
-                let ok = self.heap.create_symbol("Ok".to_string());
-                let return_value = heap.clone_single_to_other_heap(&mut self.heap, return_value);
-                self.heap.create_list(&[ok, return_value])
-            }
-            ExecutionResult::Panicked { reason, .. } => {
-                let err = self.heap.create_symbol("Err".to_string());
-                let reason = self.heap.create_text(reason);
-                self.heap.create_list(&[err, reason])
-            }
+            }) => Ok(heap.clone_single_to_other_heap(&mut self.heap, return_value)),
+            ExecutionResult::Panicked { reason, .. } => Err(self.heap.create_text(reason)),
         };
-        self.data_stack.push(result);
+        self.data_stack.push(self.heap.create_result(result));
         self.status = Status::Running;
     }
 
@@ -210,6 +218,10 @@ impl Fiber {
         self.data_stack[self.data_stack.len() - 1 - offset as usize]
     }
     pub fn panic(&mut self, reason: String) {
+        assert!(!matches!(
+            self.status,
+            Status::Done | Status::Panicked { .. }
+        ));
         self.status = Status::Panicked {
             reason,
             responsible: self.responsible_stack.last().cloned(),

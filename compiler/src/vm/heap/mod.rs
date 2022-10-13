@@ -2,11 +2,10 @@ mod object;
 mod pointer;
 
 pub use self::{
-    object::{
-        Builtin, ChannelId, Closure, Data, Int, Object, ReceivePort, SendPort, Struct, Symbol, Text,
-    },
+    object::{Builtin, Closure, Data, Int, Object, ReceivePort, SendPort, Struct, Symbol, Text},
     pointer::Pointer,
 };
+use super::ids::ChannelId;
 use crate::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
 use num_bigint::BigInt;
@@ -258,11 +257,12 @@ impl Heap {
         self.create_symbol("Nothing".to_string())
     }
     pub fn create_list(&mut self, items: &[Pointer]) -> Pointer {
-        let mut fields = vec![];
-        for (index, item) in items.iter().enumerate() {
-            fields.push((self.create_int(index.into()), *item));
-        }
-        self.create_struct(fields.into_iter().collect())
+        let fields = items
+            .iter()
+            .enumerate()
+            .map(|(index, item)| (self.create_int(index.into()), *item))
+            .collect();
+        self.create_struct(fields)
     }
     pub fn create_bool(&mut self, value: bool) -> Pointer {
         self.create_symbol(if value { "True" } else { "False" }.to_string())

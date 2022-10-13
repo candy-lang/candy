@@ -2,6 +2,7 @@
 #![feature(box_patterns)]
 #![feature(generic_associated_types)]
 #![feature(let_chains)]
+#![feature(let_else)]
 #![feature(never_type)]
 #![feature(try_trait_v2)]
 #![allow(clippy::module_inception)]
@@ -30,7 +31,7 @@ use crate::{
     vm::{
         context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
         tracer::{DummyTracer, FullTracer, Tracer},
-        Closure, ExecutionResult, FiberId, Status, Struct, Vm,
+        Closure, Status, Struct, Vm,
     },
 };
 use compiler::lir::Lir;
@@ -38,6 +39,7 @@ use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use notify::{watcher, RecursiveMode, Watcher};
 use std::{
+    collections::HashMap,
     convert::TryInto,
     env::current_dir,
     path::PathBuf,
@@ -48,6 +50,7 @@ use structopt::StructOpt;
 use tower_lsp::{LspService, Server};
 use tracing::{debug, error, info, warn, Level, Metadata};
 use tracing_subscriber::{filter, fmt::format::FmtSpan, prelude::*};
+use vm::{ChannelId, CompletedOperation, OperationId};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "candy", about = "The 🍭 Candy CLI.")]
@@ -266,11 +269,11 @@ fn run(options: CandyRunOptions) {
     debug!("Running main function.");
     // TODO: Add more environment stuff.
     let mut vm = Vm::new();
-    let stdout = vm.create_channel();
+    let mut stdout = StdoutService::new(&mut vm);
     let environment = {
         let stdout_symbol = heap.create_symbol("Stdout".to_string());
-        let stdout_port = heap.create_send_port(stdout);
-        heap.create_struct([(stdout_symbol, stdout_port)].into_iter().collect())
+        let stdout_port = heap.create_send_port(stdout.channel);
+        heap.create_struct(HashMap::from([(stdout_symbol, stdout_port)]))
     };
     tracer.in_fiber_tracer(FiberId::root()).call_started(
         &heap,
@@ -284,30 +287,16 @@ fn run(options: CandyRunOptions) {
             Status::CanRun => {
                 debug!("VM still running.");
                 vm.run(&mut DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
-                // TODO: handle operations
             }
             Status::WaitingForOperations => {
                 todo!("VM can't proceed until some operations complete.");
             }
             _ => break,
         }
-        let stdout_operations = vm
-            .external_operations
-            .get_mut(&stdout)
-            .unwrap()
-            .drain(..)
-            .collect_vec();
-        for operation in stdout_operations {
-            match operation {
-                vm::Operation::Send {
-                    performing_fiber,
-                    packet,
-                } => {
-                    info!("{}", packet.address.format(&packet.heap));
-                    vm.complete_send(performing_fiber);
-                }
-                vm::Operation::Receive { .. } => unreachable!(),
-                vm::Operation::Drop => vm.free_channel(stdout),
+        stdout.run(&mut vm);
+        for channel in vm.unreferenced_channels.iter().copied().collect_vec() {
+            if channel != stdout.channel {
+                vm.free_channel(channel);
             }
         }
     }
@@ -332,6 +321,31 @@ fn run(options: CandyRunOptions) {
                 "This is the stack trace:\n{}",
                 tracer.format_panic_stack_trace_to_root_fiber(&db)
             );
+        }
+    }
+}
+
+/// A state machine that corresponds to a loop that always calls `receive` on
+/// the stdout channel and then logs that packet.
+struct StdoutService {
+    channel: ChannelId,
+    current_receive: OperationId,
+}
+impl StdoutService {
+    fn new(vm: &mut Vm) -> Self {
+        let channel = vm.create_channel(1);
+        let current_receive = vm.receive(channel);
+        Self {
+            channel,
+            current_receive,
+        }
+    }
+    fn run(&mut self, vm: &mut Vm) {
+        if let Some(CompletedOperation::Received { packet }) =
+            vm.completed_operations.remove(&self.current_receive)
+        {
+            info!("Sent to stdout: {}", packet.value.format(&packet.heap));
+            self.current_receive = vm.receive(self.channel);
         }
     }
 }

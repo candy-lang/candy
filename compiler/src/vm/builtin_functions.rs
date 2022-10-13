@@ -2,7 +2,8 @@ use super::{
     channel::{Capacity, Packet},
     context::PanickingUseProvider,
     fiber::{Fiber, Status},
-    heap::{ChannelId, Closure, Data, Int, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
+    heap::{Closure, Data, Int, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
+    ids::ChannelId,
     tracer::DummyInFiberTracer,
     Heap,
 };

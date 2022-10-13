@@ -1,0 +1,18 @@
+channel = use "..channel"
+function = use "..function"
+structGetUnwrap = (use "..struct").getUnwrap
+
+parallel body := 
+  needs (function.is1 body)
+  ✨.parallel body
+
+async nursery body :=
+  needs (channel.isSendPort nursery)
+  needs (function.is0 body)
+  returnChannel = channel.create 1
+  channel.send nursery [Closure: body, ReturnChannel: returnChannel.sendPort]
+  returnChannel.receivePort
+
+await fiber :=
+  needs (channel.isReceivePort fiber)
+  channel.receive fiber

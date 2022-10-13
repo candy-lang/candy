@@ -12,7 +12,7 @@ use crate::{
     vm::{
         self,
         context::{DbUseProvider, RunLimitedNumberOfInstructions},
-        tracer::{stack_trace::StackEntry, DummyTracer, FullTracer},
+        tracer::{stack_trace::StackEntry, DummyTracer, Event, FullTracer, TimedEvent},
         Closure, Heap, Pointer, Vm,
     },
 };
@@ -89,33 +89,33 @@ impl ConstantEvaluator {
         // let TearDownResult { heap, tracer, .. } = vm.clone().tear_down();
         let heap: Heap = todo!();
         let tracer: FullTracer = todo!();
-        for entry in &tracer.events {
-            // if let EventData::ValueEvaluated { id, value } = &entry.data {
-            //     if &id.module != module {
-            //         continue;
-            //     }
-            //     let ast_id = match db.hir_to_ast_id(id.clone()) {
-            //         Some(ast_id) => ast_id,
-            //         None => continue,
-            //     };
-            //     let ast = match db.ast(module.clone()) {
-            //         Some((ast, _)) => (*ast).clone(),
-            //         None => continue,
-            //     };
-            //     let ast = match ast.find(&ast_id) {
-            //         Some(ast) => ast,
-            //         None => continue,
-            //     };
-            //     if !matches!(ast.kind, AstKind::Assignment(_)) {
-            //         continue;
-            //     }
+        for TimedEvent { event, .. } in &tracer.events {
+            let Event::ValueEvaluated { id, value } = event else { continue; };
 
-            //     hints.push(Hint {
-            //         kind: HintKind::Value,
-            //         text: value.format(&heap),
-            //         position: id_to_end_of_line(db, id.clone()).unwrap(),
-            //     });
-            // }
+            if &id.module != module {
+                continue;
+            }
+            let ast_id = match db.hir_to_ast_id(id.clone()) {
+                Some(ast_id) => ast_id,
+                None => continue,
+            };
+            let ast = match db.ast(module.clone()) {
+                Some((ast, _)) => (*ast).clone(),
+                None => continue,
+            };
+            let ast = match ast.find(&ast_id) {
+                Some(ast) => ast,
+                None => continue,
+            };
+            if !matches!(ast.kind, AstKind::Assignment(_)) {
+                continue;
+            }
+
+            hints.push(Hint {
+                kind: HintKind::Value,
+                text: value.format(&heap),
+                position: id_to_end_of_line(db, id.clone()).unwrap(),
+            });
         }
 
         hints
