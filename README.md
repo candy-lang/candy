@@ -119,19 +119,21 @@ Major milestones:
 
 - casing of module names
 - fix fault attribution
-- rearchitect tracing
 - new name?
 - add caching while compile-time evaluating code
-- tags?
+- tags
 - pattern matching
 - pipe operator
+- add CI
+- add tests
+- add a more lightweight tracer that only tracks stack traces
 - text interpolation
-- eliminate common subtrees
-- inline functions
+- optimize: eliminate common subtrees
+- optimize: inline functions
 - minimize inputs found through fuzzing
 - fuzz parser
 - remove builtinPrint
-- tail call optimization
+- optimize: tail call optimization
 - parse function declaration with doc comment but no code
 - tracing visualization
 - distinguish packages from normal modules
