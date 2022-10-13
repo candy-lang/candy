@@ -20,6 +20,7 @@ impl<T: CountableId> IdGenerator<T> {
 }
 pub trait CountableId {
     fn from_usize(id: usize) -> Self;
+    fn to_usize(&self) -> usize;
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -27,6 +28,9 @@ pub struct FiberId(usize);
 impl CountableId for FiberId {
     fn from_usize(id: usize) -> Self {
         Self(id)
+    }
+    fn to_usize(&self) -> usize {
+        self.0
     }
 }
 impl fmt::Debug for FiberId {
@@ -42,6 +46,9 @@ impl CountableId for ChannelId {
     fn from_usize(id: usize) -> Self {
         Self(id)
     }
+    fn to_usize(&self) -> usize {
+        self.0
+    }
 }
 impl fmt::Debug for ChannelId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -54,6 +61,9 @@ pub struct OperationId(usize);
 impl CountableId for OperationId {
     fn from_usize(id: usize) -> Self {
         Self(id)
+    }
+    fn to_usize(&self) -> usize {
+        self.0
     }
 }
 impl fmt::Debug for OperationId {
