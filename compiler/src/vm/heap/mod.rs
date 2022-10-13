@@ -2,11 +2,10 @@ mod object;
 mod pointer;
 
 pub use self::{
-    object::{
-        Builtin, ChannelId, Closure, Data, Int, Object, ReceivePort, SendPort, Struct, Symbol, Text,
-    },
+    object::{Builtin, Closure, Data, Int, Object, ReceivePort, SendPort, Struct, Symbol, Text},
     pointer::Pointer,
 };
+use super::ids::ChannelId;
 use crate::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
 use num_bigint::BigInt;

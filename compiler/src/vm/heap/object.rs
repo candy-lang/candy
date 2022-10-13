@@ -7,13 +7,12 @@ use crate::{
     },
     database::Database,
     module::Module,
-    vm::CountableId,
+    vm::ids::ChannelId,
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
-    fmt,
     hash::{Hash, Hasher},
     ops::Deref,
 };
@@ -162,20 +161,6 @@ pub struct SendPort {
 #[derive(Clone)]
 pub struct ReceivePort {
     pub channel: ChannelId,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ChannelId(usize);
-
-impl CountableId for ChannelId {
-    fn from_usize(id: usize) -> Self {
-        Self(id)
-    }
-}
-impl fmt::Debug for ChannelId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "channel_{:x}", self.0)
-    }
 }
 
 impl SendPort {

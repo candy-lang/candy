@@ -3,26 +3,30 @@ mod channel;
 pub mod context;
 mod fiber;
 mod heap;
+mod ids;
 pub mod tracer;
 mod use_module;
 
 use self::{
-    channel::{ChannelBuf, Packet},
+    channel::{Channel, Completer, Packet, Performer},
     context::{
         CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions,
         UseProvider,
     },
-    heap::{ChannelId, SendPort},
+    heap::SendPort,
+    ids::{FiberId, IdGenerator},
 };
-pub use fiber::{Fiber, TearDownResult};
-pub use heap::{Closure, Heap, Object, Pointer, Struct};
+pub use self::{
+    fiber::{Fiber, TearDownResult},
+    heap::{Closure, Heap, Object, Pointer, Struct},
+    ids::{ChannelId, OperationId},
+};
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet},
     fmt,
     hash::Hash,
-    marker::PhantomData,
 };
 use tracing::{info, warn};
 
@@ -34,19 +38,12 @@ pub struct Vm {
     fibers: HashMap<FiberId, FiberTree>,
     root_fiber: Option<FiberId>, // only None when no fiber is created yet
 
-    channels: HashMap<ChannelId, Channel>,
-    pub external_operations: HashMap<ChannelId, Vec<Operation>>,
+    channels: HashMap<ChannelId, ChannelLike>,
+    pub completed_operations: HashMap<OperationId, CompletedOperation>,
 
+    operation_id_generator: IdGenerator<OperationId>,
     fiber_id_generator: IdGenerator<FiberId>,
     channel_id_generator: IdGenerator<ChannelId>,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct FiberId(usize);
-impl CountableId for FiberId {
-    fn from_usize(id: usize) -> Self {
-        Self(id)
-    }
 }
 
 #[derive(Clone)]
@@ -97,28 +94,15 @@ struct Try {
 }
 
 #[derive(Clone)]
-enum Channel {
-    Internal(InternalChannel),
-    External,
+enum ChannelLike {
+    Channel(Channel),
     Nursery(FiberId),
-}
-#[derive(Clone, Debug)]
-struct InternalChannel {
-    buffer: ChannelBuf,
-    pending_sends: VecDeque<(Option<FiberId>, Packet)>,
-    pending_receives: VecDeque<Option<FiberId>>,
 }
 
 #[derive(Clone)]
-pub enum Operation {
-    Send {
-        performing_fiber: Option<FiberId>,
-        packet: Packet,
-    },
-    Receive {
-        performing_fiber: Option<FiberId>,
-    },
-    Drop,
+pub enum CompletedOperation {
+    Sent,
+    Received { packet: Packet },
 }
 
 #[derive(Clone, Debug)]
@@ -132,10 +116,11 @@ pub enum Status {
 impl Vm {
     pub fn new() -> Self {
         Self {
-            channels: Default::default(),
             fibers: HashMap::new(),
             root_fiber: None,
-            external_operations: Default::default(),
+            channels: HashMap::new(),
+            completed_operations: Default::default(),
+            operation_id_generator: IdGenerator::start_at(0),
             channel_id_generator: IdGenerator::start_at(0),
             fiber_id_generator: IdGenerator::start_at(0),
         }
@@ -211,33 +196,34 @@ impl Vm {
 
     /// Can be called at any time from outside the VM to create a channel that
     /// can be used to communicate with the outside world.
-    pub fn create_channel(&mut self) -> ChannelId {
+    pub fn create_channel(&mut self, capacity: usize) -> ChannelId {
         let id = self.channel_id_generator.generate();
-        self.channels.insert(id, Channel::External);
-        self.external_operations.insert(id, vec![]);
+        self.channels
+            .insert(id, ChannelLike::Channel(Channel::new(capacity)));
         id
     }
 
-    pub fn complete_send(&mut self, performing_fiber: Option<FiberId>) {
-        if let Some(fiber) = performing_fiber {
-            let tree = self.fibers.get_mut(&fiber).unwrap();
-            tree.as_single_mut().unwrap().fiber.complete_send();
-        }
+    // This will be used as soon as the outside world tries to send something
+    // into the VM.
+    #[allow(dead_code)]
+    pub fn send(&mut self, channel: ChannelId, packet: Packet) -> OperationId {
+        let operation_id = self.operation_id_generator.generate();
+        self.send_to_channel(Performer::External(operation_id), channel, packet);
+        operation_id
     }
 
-    #[allow(dead_code)]
-    pub fn complete_receive(&mut self, performing_fiber: Option<FiberId>, packet: Packet) {
-        if let Some(fiber) = performing_fiber {
-            let tree = self.fibers.get_mut(&fiber).unwrap();
-            tree.as_single_mut().unwrap().fiber.complete_receive(packet);
-        }
+    pub fn receive(&mut self, channel: ChannelId) -> OperationId {
+        let operation_id = self.operation_id_generator.generate();
+        self.receive_from_channel(Performer::External(operation_id), channel);
+        operation_id
     }
 
     /// May only be called if a drop operation was emitted for that channel.
-    pub fn free_channel(&mut self, channel: ChannelId) {
-        self.channels.remove(&channel);
-        self.external_operations.remove(&channel);
-    }
+    /// TODO: handle drops
+    // pub fn free_channel(&mut self, channel: ChannelId) {
+    //     self.channels.remove(&channel);
+    //     self.external_operations.remove(&channel);
+    // }
 
     pub fn run<U: UseProvider, E: ExecutionController>(
         &mut self,
@@ -287,28 +273,23 @@ impl Vm {
             fiber::Status::Running => false,
             fiber::Status::CreatingChannel { capacity } => {
                 let channel_id = self.channel_id_generator.generate();
-                self.channels.insert(
-                    channel_id,
-                    Channel::Internal(InternalChannel {
-                        buffer: ChannelBuf::new(capacity),
-                        pending_sends: Default::default(),
-                        pending_receives: Default::default(),
-                    }),
-                );
+                self.channels
+                    .insert(channel_id, ChannelLike::Channel(Channel::new(capacity)));
                 fiber.complete_channel_create(channel_id);
                 false
             }
             fiber::Status::Sending { channel, packet } => {
-                self.send_to_channel(Some(fiber_id), channel, packet);
+                self.send_to_channel(Performer::Fiber(fiber_id), channel, packet);
                 false
             }
             fiber::Status::Receiving { channel } => {
-                self.receive_from_channel(Some(fiber_id), channel);
+                self.receive_from_channel(Performer::Fiber(fiber_id), channel);
                 false
             }
             fiber::Status::InParallelScope { body } => {
                 let nursery_id = self.channel_id_generator.generate();
-                self.channels.insert(nursery_id, Channel::Nursery(fiber_id));
+                self.channels
+                    .insert(nursery_id, ChannelLike::Nursery(fiber_id));
 
                 let first_child_id = {
                     let mut heap = Heap::default();
@@ -399,7 +380,7 @@ impl Vm {
                             match child {
                                 ChildKind::InitialChild => parallel.return_value = Some(packet),
                                 ChildKind::SpawnedChild(return_channel) => {
-                                    self.send_to_channel(None, return_channel, packet)
+                                    self.send_to_channel(Performer::Nursery, return_channel, packet)
                                 }
                             }
 
@@ -429,13 +410,14 @@ impl Vm {
                 known_channels.extend(single.fiber.heap.known_channels().into_iter());
             }
         }
+        // TODO: handle dropping channels
         let forgotten_channels = all_channels.difference(&known_channels);
         for channel in forgotten_channels {
             match self.channels.get(channel).unwrap() {
                 // If an internal channel is not referenced by any fiber, no
                 // reference to it can be obtained in the future. Thus, it's
                 // safe to remove such channels.
-                Channel::Internal(_) => {
+                ChannelLike::Channel(_) => {
                     self.channels.remove(channel);
                 }
                 // External channels may be re-sent into the VM from the outside
@@ -443,11 +425,11 @@ impl Vm {
                 // directly, we communicate to the outside that no fiber
                 // references them anymore. The outside can then call
                 // `free_channel` when it doesn't intend to re-use the channel.
-                Channel::External => {
-                    self.push_external_operation(*channel, Operation::Drop);
-                }
+                // ChannelLike::External => {
+                //     self.complete_external_operation(*channel, Operation::Drop);
+                // }
                 // Nurseries are automatically removed when they are exited.
-                Channel::Nursery(_) => {}
+                ChannelLike::Nursery(_) => {}
             }
         }
     }
@@ -496,17 +478,13 @@ impl Vm {
         }
     }
 
-    fn send_to_channel(
-        &mut self,
-        performing_fiber: Option<FiberId>,
-        channel_id: ChannelId,
-        packet: Packet,
-    ) {
+    fn send_to_channel(&mut self, performer: Performer, channel_id: ChannelId, packet: Packet) {
         let channel = match self.channels.get_mut(&channel_id) {
             Some(channel) => channel,
             None => {
                 // The channel was a nursery that died.
-                if let Some(fiber) = performing_fiber {
+                // TODO: also panic a nursery performer
+                if let Performer::Fiber(fiber) = performer {
                     let tree = self.fibers.get_mut(&fiber).unwrap();
                     tree.as_single_mut().unwrap().fiber.panic(
                         "the nursery is already dead because the parallel section ended"
@@ -517,17 +495,14 @@ impl Vm {
             }
         };
         match channel {
-            Channel::Internal(channel) => {
-                channel.send(&mut self.fibers, performing_fiber, packet);
+            ChannelLike::Channel(channel) => {
+                let mut completer = InternalCompleter {
+                    fibers: &mut self.fibers,
+                    completed_operations: &mut self.completed_operations,
+                };
+                channel.send(&mut completer, performer, packet);
             }
-            Channel::External => self.push_external_operation(
-                channel_id,
-                Operation::Send {
-                    performing_fiber,
-                    packet,
-                },
-            ),
-            Channel::Nursery(parent_id) => {
+            ChannelLike::Nursery(parent_id) => {
                 info!("Nursery received packet {:?}", packet);
                 let parent_id = *parent_id;
 
@@ -556,7 +531,11 @@ impl Vm {
                     ),
                 }
 
-                InternalChannel::complete_send(&mut self.fibers, performing_fiber);
+                InternalCompleter {
+                    fibers: &mut self.fibers,
+                    completed_operations: &mut self.completed_operations,
+                }
+                .complete_send(performer);
             }
         }
     }
@@ -583,99 +562,58 @@ impl Vm {
         Some((heap, closure_address, return_channel.channel))
     }
 
-    fn receive_from_channel(&mut self, performing_fiber: Option<FiberId>, channel: ChannelId) {
+    fn receive_from_channel(&mut self, performer: Performer, channel: ChannelId) {
+        let mut completer = InternalCompleter {
+            fibers: &mut self.fibers,
+            completed_operations: &mut self.completed_operations,
+        };
         match self.channels.get_mut(&channel).unwrap() {
-            Channel::Internal(channel) => {
-                channel.receive(&mut self.fibers, performing_fiber);
+            ChannelLike::Channel(channel) => {
+                channel.receive(&mut completer, performer);
             }
-            Channel::External => {
-                self.push_external_operation(channel, Operation::Receive { performing_fiber });
-            }
-            Channel::Nursery { .. } => unreachable!("nurseries are only sent stuff"),
-        }
-    }
-
-    fn push_external_operation(&mut self, channel: ChannelId, operation: Operation) {
-        self.external_operations
-            .entry(channel)
-            .or_default()
-            .push(operation);
-    }
-}
-
-impl InternalChannel {
-    fn send(
-        &mut self,
-        fibers: &mut HashMap<FiberId, FiberTree>,
-        performing_fiber: Option<FiberId>,
-        packet: Packet,
-    ) {
-        self.pending_sends.push_back((performing_fiber, packet));
-        self.work_on_pending_operations(fibers);
-    }
-
-    fn receive(
-        &mut self,
-        fibers: &mut HashMap<FiberId, FiberTree>,
-        performing_fiber: Option<FiberId>,
-    ) {
-        self.pending_receives.push_back(performing_fiber);
-        self.work_on_pending_operations(fibers);
-    }
-
-    fn work_on_pending_operations(&mut self, fibers: &mut HashMap<FiberId, FiberTree>) {
-        if self.buffer.capacity == 0 {
-            while !self.pending_sends.is_empty() && !self.pending_receives.is_empty() {
-                let (send_id, packet) = self.pending_sends.pop_front().unwrap();
-                let receive_id = self.pending_receives.pop_front().unwrap();
-                Self::complete_send(fibers, send_id);
-                Self::complete_receive(fibers, receive_id, packet);
-            }
-        } else {
-            loop {
-                let mut did_perform_operation = false;
-
-                if !self.buffer.is_full() && let Some((fiber, packet)) = self.pending_sends.pop_front() {
-                    self.buffer.send(packet);
-                    Self::complete_send(fibers, fiber);
-                    did_perform_operation = true;
-                }
-
-                if !self.buffer.is_empty() && let Some(fiber) = self.pending_receives.pop_front() {
-                    let packet = self.buffer.receive();
-                    Self::complete_receive(fibers, fiber, packet);
-                    did_perform_operation = true;
-                }
-
-                if !did_perform_operation {
-                    break;
-                }
-            }
-        }
-    }
-
-    fn complete_send(fibers: &mut HashMap<FiberId, FiberTree>, fiber: Option<FiberId>) {
-        if let Some(fiber) = fiber {
-            let fiber = fibers.get_mut(&fiber).unwrap().as_single_mut().unwrap();
-            fiber.fiber.complete_send();
-        }
-    }
-    fn complete_receive(
-        fibers: &mut HashMap<FiberId, FiberTree>,
-        fiber: Option<FiberId>,
-        packet: Packet,
-    ) {
-        if let Some(fiber) = fiber {
-            let fiber = fibers.get_mut(&fiber).unwrap().as_single_mut().unwrap();
-            fiber.fiber.complete_receive(packet);
+            ChannelLike::Nursery { .. } => unreachable!("nurseries are only sent stuff"),
         }
     }
 }
 
-impl Channel {
+struct InternalCompleter<'a> {
+    fibers: &'a mut HashMap<FiberId, FiberTree>,
+    completed_operations: &'a mut HashMap<OperationId, CompletedOperation>,
+}
+impl<'a> Completer for InternalCompleter<'a> {
+    fn complete_send(&mut self, performer: Performer) {
+        match performer {
+            Performer::Fiber(fiber) => {
+                let tree = self.fibers.get_mut(&fiber).unwrap();
+                tree.as_single_mut().unwrap().fiber.complete_send();
+            }
+            Performer::Nursery => {}
+            Performer::External(id) => {
+                self.completed_operations
+                    .insert(id, CompletedOperation::Sent);
+            }
+        }
+    }
+
+    fn complete_receive(&mut self, performer: Performer, packet: Packet) {
+        match performer {
+            Performer::Fiber(fiber) => {
+                let tree = self.fibers.get_mut(&fiber).unwrap();
+                tree.as_single_mut().unwrap().fiber.complete_receive(packet);
+            }
+            Performer::Nursery => {}
+            Performer::External(id) => {
+                self.completed_operations
+                    .insert(id, CompletedOperation::Received { packet });
+            }
+        }
+    }
+}
+
+impl ChannelLike {
     fn to_nursery(&self) -> Option<FiberId> {
         match self {
-            Channel::Nursery(fiber) => Some(*fiber),
+            ChannelLike::Nursery(fiber) => Some(*fiber),
             _ => None,
         }
     }
@@ -726,13 +664,7 @@ impl fmt::Debug for Vm {
         f.debug_struct("Vm")
             .field("fibers", &self.fibers)
             .field("channels", &self.channels)
-            .field("external_operations", &self.external_operations)
             .finish()
-    }
-}
-impl fmt::Debug for FiberId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "fiber_{:x}", self.0)
     }
 }
 impl fmt::Debug for FiberTree {
@@ -762,78 +694,13 @@ impl fmt::Debug for ChildKind {
         }
     }
 }
-impl fmt::Debug for Channel {
+impl fmt::Debug for ChannelLike {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Internal(InternalChannel {
-                buffer,
-                pending_sends,
-                pending_receives,
-            }) => f
-                .debug_struct("InternalChannel")
-                .field("buffer", buffer)
-                .field(
-                    "operations",
-                    &pending_sends
-                        .iter()
-                        .map(|(fiber, packet)| Operation::Send {
-                            performing_fiber: *fiber,
-                            packet: packet.clone(),
-                        })
-                        .chain(pending_receives.iter().map(|fiber| Operation::Receive {
-                            performing_fiber: *fiber,
-                        }))
-                        .collect_vec(),
-                )
-                .finish(),
-            Self::External => f.debug_tuple("External").finish(),
+            Self::Channel(channel) => channel.fmt(f),
             Self::Nursery(fiber) => f.debug_tuple("Nursery").field(fiber).finish(),
         }
     }
-}
-impl fmt::Debug for Operation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self {
-            Operation::Send {
-                performing_fiber,
-                packet,
-            } => {
-                if let Some(fiber) = performing_fiber {
-                    write!(f, "{:?} ", fiber)?;
-                }
-                write!(f, "sending {:?}", packet)
-            }
-            Operation::Receive { performing_fiber } => {
-                if let Some(fiber) = performing_fiber {
-                    write!(f, "{:?} ", fiber)?;
-                }
-                write!(f, "receiving")
-            }
-            Operation::Drop => write!(f, "dropping"),
-        }
-    }
-}
-
-#[derive(Clone)]
-struct IdGenerator<T: CountableId> {
-    next_id: usize,
-    _data: PhantomData<T>,
-}
-impl<T: CountableId> IdGenerator<T> {
-    fn start_at(id: usize) -> Self {
-        Self {
-            next_id: id,
-            _data: Default::default(),
-        }
-    }
-    fn generate(&mut self) -> T {
-        let id = self.next_id;
-        self.next_id += 1;
-        T::from_usize(id)
-    }
-}
-pub trait CountableId {
-    fn from_usize(id: usize) -> Self;
 }
 
 trait ReplaceHashMapValue<K, V> {

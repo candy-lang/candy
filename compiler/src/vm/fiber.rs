@@ -1,7 +1,8 @@
 use super::{
     channel::{Capacity, Packet},
     context::{ExecutionController, UseProvider},
-    heap::{Builtin, ChannelId, Closure, Data, Heap, Pointer},
+    heap::{Builtin, Closure, Data, Heap, Pointer},
+    ids::ChannelId,
     tracer::{EventData, Tracer},
 };
 use crate::{
@@ -197,7 +198,10 @@ impl Fiber {
         self.data_stack[self.data_stack.len() - 1 - offset as usize]
     }
     pub fn panic(&mut self, reason: String) {
-        assert!(matches!(self.status, Status::Running));
+        assert!(!matches!(
+            self.status,
+            Status::Done | Status::Panicked { .. }
+        ));
         self.status = Status::Panicked { reason };
     }
 

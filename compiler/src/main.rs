@@ -48,6 +48,7 @@ use structopt::StructOpt;
 use tower_lsp::{LspService, Server};
 use tracing::{debug, error, info, warn, Level, Metadata};
 use tracing_subscriber::{filter, fmt::format::FmtSpan, prelude::*};
+use vm::{ChannelId, CompletedOperation, OperationId};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "candy", about = "The 🍭 Candy CLI.")]
@@ -264,10 +265,10 @@ fn run(options: CandyRunOptions) {
     info!("Running main function.");
     // TODO: Add environment stuff.
     let mut vm = Vm::new();
-    let stdout = vm.create_channel();
+    let mut stdout = StdoutService::new(&mut vm);
     let environment = {
         let stdout_symbol = heap.create_symbol("Stdout".to_string());
-        let stdout_port = heap.create_send_port(stdout);
+        let stdout_port = heap.create_send_port(stdout.channel);
         heap.create_struct(HashMap::from([(stdout_symbol, stdout_port)]))
     };
     vm.set_up_for_running_closure(heap, main, &[environment]);
@@ -284,25 +285,7 @@ fn run(options: CandyRunOptions) {
             }
             _ => break,
         }
-        let stdout_operations = vm
-            .external_operations
-            .get_mut(&stdout)
-            .unwrap()
-            .drain(..)
-            .collect_vec();
-        for operation in stdout_operations {
-            match operation {
-                vm::Operation::Send {
-                    performing_fiber,
-                    packet,
-                } => {
-                    info!("Sent to stdout: {}", packet.value.format(&packet.heap));
-                    vm.complete_send(performing_fiber);
-                }
-                vm::Operation::Receive { .. } => unreachable!(),
-                vm::Operation::Drop => vm.free_channel(stdout),
-            }
-        }
+        stdout.run(&mut vm);
     }
     info!("Tree: {:#?}", vm);
     let TearDownResult {
@@ -318,6 +301,31 @@ fn run(options: CandyRunOptions) {
             error!("The main function panicked because {reason}.");
             error!("This is the stack trace:");
             tracer.dump_stack_trace(&db, &heap);
+        }
+    }
+}
+
+/// A state machine that corresponds to a loop that always calls `receive` on
+/// the stdout channel and then logs that packet.
+struct StdoutService {
+    channel: ChannelId,
+    current_receive: OperationId,
+}
+impl StdoutService {
+    fn new(vm: &mut Vm) -> Self {
+        let channel = vm.create_channel(1);
+        let current_receive = vm.receive(channel);
+        Self {
+            channel,
+            current_receive,
+        }
+    }
+    fn run(&mut self, vm: &mut Vm) {
+        if let Some(CompletedOperation::Received { packet }) =
+            vm.completed_operations.remove(&self.current_receive)
+        {
+            info!("Sent to stdout: {}", packet.value.format(&packet.heap));
+            self.current_receive = vm.receive(self.channel);
         }
     }
 }
