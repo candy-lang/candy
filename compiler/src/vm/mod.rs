@@ -40,6 +40,7 @@ pub struct Vm {
 
     channels: HashMap<ChannelId, ChannelLike>,
     pub completed_operations: HashMap<OperationId, CompletedOperation>,
+    pub unreferenced_channels: HashSet<ChannelId>,
 
     operation_id_generator: IdGenerator<OperationId>,
     fiber_id_generator: IdGenerator<FiberId>,
@@ -120,6 +121,7 @@ impl Vm {
             root_fiber: None,
             channels: HashMap::new(),
             completed_operations: Default::default(),
+            unreferenced_channels: Default::default(),
             operation_id_generator: IdGenerator::start_at(0),
             channel_id_generator: IdGenerator::start_at(0),
             fiber_id_generator: IdGenerator::start_at(0),
@@ -218,12 +220,12 @@ impl Vm {
         operation_id
     }
 
-    /// May only be called if a drop operation was emitted for that channel.
-    /// TODO: handle drops
-    // pub fn free_channel(&mut self, channel: ChannelId) {
-    //     self.channels.remove(&channel);
-    //     self.external_operations.remove(&channel);
-    // }
+    /// May only be called if the channel is in the `unreferenced_channels`.
+    pub fn free_channel(&mut self, channel: ChannelId) {
+        assert!(self.unreferenced_channels.contains(&channel));
+        self.channels.remove(&channel);
+        self.unreferenced_channels.remove(&channel);
+    }
 
     pub fn run<U: UseProvider, E: ExecutionController>(
         &mut self,
@@ -410,28 +412,22 @@ impl Vm {
                 known_channels.extend(single.fiber.heap.known_channels().into_iter());
             }
         }
-        // TODO: handle dropping channels
-        let forgotten_channels = all_channels.difference(&known_channels);
-        for channel in forgotten_channels {
-            match self.channels.get(channel).unwrap() {
-                // If an internal channel is not referenced by any fiber, no
-                // reference to it can be obtained in the future. Thus, it's
-                // safe to remove such channels.
-                ChannelLike::Channel(_) => {
-                    self.channels.remove(channel);
-                }
-                // External channels may be re-sent into the VM from the outside
-                // even after no fibers remember them. Rather than removing them
-                // directly, we communicate to the outside that no fiber
-                // references them anymore. The outside can then call
-                // `free_channel` when it doesn't intend to re-use the channel.
-                // ChannelLike::External => {
-                //     self.complete_external_operation(*channel, Operation::Drop);
-                // }
-                // Nurseries are automatically removed when they are exited.
-                ChannelLike::Nursery(_) => {}
-            }
-        }
+        // Because we don't track yet which channels have leaked to the outside
+        // world, any channel may be re-sent into the VM from the outside even
+        // after no fibers remember it. Rather than removing it directly, we
+        // communicate to the outside that no fiber references it anymore. If
+        // the outside doesn't intend to re-use the channel, it should call
+        // `free_channel`.
+        let unreferenced_channels = all_channels
+            .difference(&known_channels)
+            .filter(|channel| {
+                // Note that nurseries are automatically removed when their
+                // parallel scope is exited.
+                matches!(self.channels.get(channel).unwrap(), ChannelLike::Channel(_))
+            })
+            .copied()
+            .collect();
+        self.unreferenced_channels = unreferenced_channels;
     }
     fn finish_parallel(&mut self, parallel_id: FiberId, result: Result<(), String>) {
         let parallel = self

@@ -263,7 +263,7 @@ fn run(options: CandyRunOptions) {
     };
 
     info!("Running main function.");
-    // TODO: Add environment stuff.
+    // TODO: Add more environment stuff.
     let mut vm = Vm::new();
     let mut stdout = StdoutService::new(&mut vm);
     let environment = {
@@ -278,7 +278,6 @@ fn run(options: CandyRunOptions) {
             Status::CanRun => {
                 debug!("VM is still running.");
                 vm.run(&mut DbUseProvider { db: &db }, &mut RunForever);
-                // TODO: handle operations
             }
             Status::WaitingForOperations => {
                 todo!("VM can't proceed until some operations complete.");
@@ -286,6 +285,11 @@ fn run(options: CandyRunOptions) {
             _ => break,
         }
         stdout.run(&mut vm);
+        for channel in vm.unreferenced_channels.iter().copied().collect_vec() {
+            if channel != stdout.channel {
+                vm.free_channel(channel);
+            }
+        }
     }
     info!("Tree: {:#?}", vm);
     let TearDownResult {
