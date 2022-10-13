@@ -36,3 +36,4 @@ core.parallel { nursery ->
 
 main environment :=
   ✨.print "Hello, world!"
+  core.channel.send environment.stdout "Hello, world!"
