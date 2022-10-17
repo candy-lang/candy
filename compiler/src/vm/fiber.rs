@@ -341,9 +341,9 @@ impl Fiber {
                     num_args,
                     body,
                     responsible: if is_curly {
-                        None
-                    } else {
                         self.responsible_stack.last().cloned()
+                    } else {
+                        None
                     },
                 });
                 self.data_stack.push(address);
