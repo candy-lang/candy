@@ -75,11 +75,10 @@ mod parse {
     // all the surrounding code still has a chance to be properly parsed – even
     // mid-writing after putting the opening bracket of a struct.
 
-    use crate::compiler::{
-        rcst::SplitOuterTrailingWhitespace, string_to_rcst::whitespace_indentation_score,
+    use super::{
+        super::rcst::{IsMultiline, Rcst, RcstError, SplitOuterTrailingWhitespace},
+        whitespace_indentation_score,
     };
-
-    use super::super::rcst::{IsMultiline, Rcst, RcstError};
     use itertools::Itertools;
     use tracing::instrument;
 
@@ -97,74 +96,60 @@ mod parse {
     }
 
     #[instrument]
-    pub fn equals_sign(input: &str) -> Option<(&str, Rcst)> {
-        let input = literal(input, "=")?;
-        Some((input, Rcst::EqualsSign))
+    fn equals_sign(input: &str) -> Option<(&str, Rcst)> {
+        literal(input, "=").map(|it| (it, Rcst::EqualsSign))
     }
     #[instrument]
-    pub fn comma(input: &str) -> Option<(&str, Rcst)> {
-        let input = literal(input, ",")?;
-        Some((input, Rcst::Comma))
+    fn comma(input: &str) -> Option<(&str, Rcst)> {
+        literal(input, ",").map(|it| (it, Rcst::Comma))
     }
     #[instrument]
-    pub fn dot(input: &str) -> Option<(&str, Rcst)> {
-        let input = literal(input, ".")?;
-        Some((input, Rcst::Dot))
+    fn dot(input: &str) -> Option<(&str, Rcst)> {
+        literal(input, ".").map(|it| (it, Rcst::Dot))
     }
     #[instrument]
-    pub fn colon(input: &str) -> Option<(&str, Rcst)> {
-        let input = literal(input, ":")?;
-        Some((input, Rcst::Colon))
+    fn colon(input: &str) -> Option<(&str, Rcst)> {
+        literal(input, ":").map(|it| (it, Rcst::Colon))
     }
     #[instrument]
-    pub fn colon_equals_sign(input: &str) -> Option<(&str, Rcst)> {
-        let input = literal(input, ":=")?;
-        Some((input, Rcst::ColonEqualsSign))
+    fn colon_equals_sign(input: &str) -> Option<(&str, Rcst)> {
+        literal(input, ":=").map(|it| (it, Rcst::ColonEqualsSign))
     }
     #[instrument]
     fn opening_bracket(input: &str) -> Option<(&str, Rcst)> {
-        let input = literal(input, "[")?;
-        Some((input, Rcst::OpeningBracket))
+        literal(input, "[").map(|it| (it, Rcst::OpeningBracket))
     }
     #[instrument]
-    pub fn closing_bracket(input: &str) -> Option<(&str, Rcst)> {
-        let input = literal(input, "]")?;
-        Some((input, Rcst::ClosingBracket))
+    fn closing_bracket(input: &str) -> Option<(&str, Rcst)> {
+        literal(input, "]").map(|it| (it, Rcst::ClosingBracket))
     }
     #[instrument]
     fn opening_parenthesis(input: &str) -> Option<(&str, Rcst)> {
-        let input = literal(input, "(")?;
-        Some((input, Rcst::OpeningParenthesis))
+        literal(input, "(").map(|it| (it, Rcst::OpeningParenthesis))
     }
     #[instrument]
-    pub fn closing_parenthesis(input: &str) -> Option<(&str, Rcst)> {
-        let input = literal(input, ")")?;
-        Some((input, Rcst::ClosingParenthesis))
+    fn closing_parenthesis(input: &str) -> Option<(&str, Rcst)> {
+        literal(input, ")").map(|it| (it, Rcst::ClosingParenthesis))
     }
     #[instrument]
     fn opening_curly_brace(input: &str) -> Option<(&str, Rcst)> {
-        let input = literal(input, "{")?;
-        Some((input, Rcst::OpeningCurlyBrace))
+        literal(input, "{").map(|it| (it, Rcst::OpeningCurlyBrace))
     }
     #[instrument]
-    pub fn closing_curly_brace(input: &str) -> Option<(&str, Rcst)> {
-        let input = literal(input, "}")?;
-        Some((input, Rcst::ClosingCurlyBrace))
+    fn closing_curly_brace(input: &str) -> Option<(&str, Rcst)> {
+        literal(input, "}").map(|it| (it, Rcst::ClosingCurlyBrace))
     }
     #[instrument]
-    pub fn arrow(input: &str) -> Option<(&str, Rcst)> {
-        let input = literal(input, "->")?;
-        Some((input, Rcst::Arrow))
+    fn arrow(input: &str) -> Option<(&str, Rcst)> {
+        literal(input, "->").map(|it| (it, Rcst::Arrow))
     }
     #[instrument]
     fn double_quote(input: &str) -> Option<(&str, Rcst)> {
-        let input = literal(input, "\"")?;
-        Some((input, Rcst::DoubleQuote))
+        literal(input, "\"").map(|it| (it, Rcst::DoubleQuote))
     }
     #[instrument]
     fn octothorpe(input: &str) -> Option<(&str, Rcst)> {
-        let input = literal(input, "#")?;
-        Some((input, Rcst::Octothorpe))
+        literal(input, "#").map(|it| (it, Rcst::Octothorpe))
     }
     #[instrument]
     fn newline(input: &str) -> Option<(&str, Rcst)> {
@@ -357,18 +342,16 @@ mod parse {
         let mut chars = vec![];
         let mut has_error = false;
         while let Some(c) = input.chars().next() {
+            const SPACE: char = ' ';
             match c {
-                ' ' => {
-                    chars.push(' ');
-                    input = &input[1..];
-                }
+                SPACE => {}
                 c if SUPPORTED_WHITESPACE.contains(c) && c != '\n' && c != '\r' => {
-                    chars.push(c);
                     has_error = true;
-                    input = &input[c.len_utf8()..];
                 }
                 _ => break,
             }
+            chars.push(c);
+            input = &input[c.len_utf8()..];
         }
         let whitespace = chars.into_iter().join("");
         if has_error {
@@ -421,9 +404,9 @@ mod parse {
     fn leading_indentation(mut input: &str, indentation: usize) -> Option<(&str, Rcst)> {
         let mut chars = vec![];
         let mut has_weird_whitespace = false;
-        let mut indent_in_spaces = 0;
+        let mut indentation_score = 0;
 
-        while indent_in_spaces < 2 * indentation {
+        while indentation_score < 2 * indentation {
             let c = input.chars().next()?;
             let is_weird = match c {
                 ' ' => false,
@@ -433,7 +416,7 @@ mod parse {
             };
             chars.push(c);
             has_weird_whitespace |= is_weird;
-            indent_in_spaces += whitespace_indentation_score(&format!("{c}"));
+            indentation_score += whitespace_indentation_score(&format!("{c}"));
             input = &input[c.len_utf8()..];
         }
         let whitespace = chars.into_iter().join("");
@@ -467,12 +450,13 @@ mod parse {
     /// newline followed by less-indented whitespace followed by non-whitespace
     /// stuff like an expression.
     #[instrument]
-    pub fn whitespaces_and_newlines(
+    fn whitespaces_and_newlines(
         mut input: &str,
         indentation: usize,
         also_comments: bool,
     ) -> (&str, Vec<Rcst>) {
         let mut parts = vec![];
+
         if let Some((new_input, whitespace)) = single_line_whitespace(input) {
             input = new_input;
             parts.push(whitespace);
@@ -485,8 +469,8 @@ mod parse {
 
             if also_comments {
                 if let Some((new_new_input, whitespace)) = comment(new_input) {
-                    new_parts.push(whitespace);
                     new_input = new_new_input;
+                    new_parts.push(whitespace);
 
                     input = new_input;
                     parts.append(&mut new_parts);
@@ -497,19 +481,19 @@ mod parse {
                 input = new_input;
                 parts.append(&mut new_parts);
 
-                new_parts.push(newline);
                 new_input = new_new_input;
+                new_parts.push(newline);
             }
 
             if let Some((new_new_input, whitespace)) = leading_indentation(new_input, indentation) {
-                new_parts.push(whitespace);
                 new_input = new_new_input;
+                new_parts.push(whitespace);
 
                 input = new_input;
                 parts.append(&mut new_parts);
-            } else if let Some((new_new_input, whitespace)) = single_line_whitespace(input) {
-                new_parts.push(whitespace);
+            } else if let Some((new_new_input, whitespace)) = single_line_whitespace(new_input) {
                 new_input = new_new_input;
+                new_parts.push(whitespace);
             }
 
             if new_input == new_input_from_iteration_start {

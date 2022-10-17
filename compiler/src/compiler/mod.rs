@@ -1,5 +1,6 @@
 pub mod ast;
 pub mod ast_to_hir;
+pub mod comment;
 pub mod cst;
 pub mod cst_to_ast;
 pub mod error;

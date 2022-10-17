@@ -195,7 +195,7 @@ impl Fiber {
     }
 
     fn get_from_data_stack(&self, offset: usize) -> Pointer {
-        self.data_stack[self.data_stack.len() - 1 - offset as usize]
+        self.data_stack[self.data_stack.len() - 1 - offset]
     }
     pub fn panic(&mut self, reason: String) {
         assert!(!matches!(
