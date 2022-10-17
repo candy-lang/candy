@@ -2,7 +2,6 @@
 #![feature(box_patterns)]
 #![feature(generic_associated_types)]
 #![feature(let_chains)]
-#![feature(let_else)]
 #![feature(never_type)]
 #![feature(try_trait_v2)]
 #![allow(clippy::module_inception)]
