@@ -28,7 +28,7 @@ use std::{
     fmt,
     hash::Hash,
 };
-use tracing::{info, warn};
+use tracing::info;
 
 /// A VM represents a Candy program that thinks it's currently running. Because
 /// VMs are first-class Rust structs, they enable other code to store "freezed"
@@ -345,14 +345,7 @@ impl Vm {
 
                 false
             }
-            fiber::Status::Done => {
-                info!("A fiber is done.");
-                true
-            }
-            fiber::Status::Panicked { reason } => {
-                warn!("A fiber panicked because {reason}.");
-                true
-            }
+            fiber::Status::Done | fiber::Status::Panicked { .. } => true,
         };
 
         if is_finished && fiber_id != self.root_fiber.unwrap() {
