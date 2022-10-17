@@ -1,6 +1,5 @@
 #![feature(async_closure)]
 #![feature(box_patterns)]
-#![feature(generic_associated_types)]
 #![feature(let_chains)]
 #![feature(never_type)]
 #![feature(try_trait_v2)]
