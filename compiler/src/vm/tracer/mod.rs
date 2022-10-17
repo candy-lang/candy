@@ -71,13 +71,13 @@ impl<'a> InFiberTracer<'a> for DummyInFiberTracer {
 #[derive(Clone)]
 pub struct FullTracer {
     pub events: Vec<TimedEvent>,
-    heap: Heap,
+    pub heap: Heap,
     transferred_objects: HashMap<FiberId, HashMap<Pointer, Pointer>>,
 }
 #[derive(Clone)]
 pub struct TimedEvent {
-    when: Instant,
-    event: Event,
+    pub when: Instant,
+    pub event: Event,
 }
 #[derive(Clone)]
 pub enum Event {

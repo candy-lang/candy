@@ -251,6 +251,11 @@ impl Fiber {
 
             if TRACE {
                 trace!(
+                    "Instruction pointer: {}:{}",
+                    self.next_instruction.closure,
+                    self.next_instruction.instruction
+                );
+                trace!(
                     "Data stack: {}",
                     self.data_stack
                         .iter()
@@ -265,9 +270,11 @@ impl Fiber {
                         .join(", ")
                 );
                 trace!(
-                    "Instruction pointer: {}:{}",
-                    self.next_instruction.closure,
-                    self.next_instruction.instruction
+                    "Responsible stack: {}",
+                    self.responsible_stack
+                        .iter()
+                        .map(|responsible| format!("{}", responsible))
+                        .join(", ")
                 );
                 trace!("Heap: {:?}", self.heap);
                 trace!("Running instruction: {instruction:?}");

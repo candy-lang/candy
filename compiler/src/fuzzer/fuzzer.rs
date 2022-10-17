@@ -1,11 +1,10 @@
 use super::generator::generate_n_values;
 use crate::{
     compiler::hir,
-    database::Database,
     vm::{
         self,
         context::{ExecutionController, UseProvider},
-        tracer::{DummyTracer, FullTracer},
+        tracer::FullTracer,
         Closure, Heap, Packet, Pointer, Vm,
     },
 };
@@ -83,7 +82,6 @@ impl Fuzzer {
 
     pub fn run<U: UseProvider, E: ExecutionController>(
         &mut self,
-        db: &Database,
         use_provider: &mut U,
         execution_controller: &mut E,
     ) {
@@ -91,21 +89,20 @@ impl Fuzzer {
         while matches!(status, Status::StillFuzzing { .. })
             && execution_controller.should_continue_running()
         {
-            status = self.map_status(status, db, use_provider, execution_controller);
+            status = self.map_status(status, use_provider, execution_controller);
         }
         self.status = Some(status);
     }
     fn map_status<U: UseProvider, E: ExecutionController>(
         &self,
         status: Status,
-        db: &Database,
         use_provider: &mut U,
         execution_controller: &mut E,
     ) -> Status {
         match status {
-            Status::StillFuzzing { mut vm, arguments, tracer } => match vm.status() {
+            Status::StillFuzzing { mut vm, arguments, mut tracer } => match vm.status() {
                 vm::Status::CanRun => {
-                    vm.run(use_provider, execution_controller, &mut DummyTracer);
+                    vm.run(use_provider, execution_controller, &mut tracer);
                     Status::StillFuzzing { vm, arguments, tracer }
                 }
                 vm::Status::WaitingForOperations => panic!("Fuzzing should not have to wait on channel operations because arguments were not channels."),

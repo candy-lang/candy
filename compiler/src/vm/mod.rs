@@ -7,20 +7,21 @@ mod ids;
 pub mod tracer;
 mod use_module;
 
+pub use self::{
+    channel::Packet,
+    fiber::{ExecutionResult, Fiber},
+    heap::{Closure, Heap, Object, Pointer, Struct},
+    ids::{ChannelId, FiberId, OperationId},
+};
 use self::{
-    channel::{Channel, Completer, Packet, Performer},
+    channel::{Channel, Completer, Performer},
     context::{
         CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions,
         UseProvider,
     },
     heap::SendPort,
-    ids::{CountableId, FiberId, IdGenerator},
+    ids::{CountableId, IdGenerator},
     tracer::Tracer,
-};
-pub use self::{
-    fiber::{ExecutionResult, Fiber},
-    heap::{Closure, Heap, Object, Pointer, Struct},
-    ids::{ChannelId, OperationId},
 };
 use crate::compiler::hir::Id;
 use itertools::Itertools;
@@ -30,7 +31,6 @@ use std::{
     fmt,
     hash::Hash,
 };
-use tracing::{debug, warn};
 
 /// A VM represents a Candy program that thinks it's currently running. Because
 /// VMs are first-class Rust structs, they enable other code to store "freezed"
@@ -156,7 +156,7 @@ impl Vm {
         closure: Pointer,
         arguments: &[Pointer],
     ) {
-        self.set_up_with_fiber(Fiber::new_for_running_closure(heap, closure, arguments))
+        self.set_up_with_fiber(Fiber::new_for_running_closure(heap, closure, arguments));
     }
     pub fn set_up_for_running_module_closure(&mut self, closure: Closure) {
         self.set_up_with_fiber(Fiber::new_for_running_module_closure(closure))
@@ -233,7 +233,7 @@ impl Vm {
         operation_id
     }
 
-    pub fn receive(&mut self, tracer: &mut dyn Tracer, channel: ChannelId) -> OperationId {
+    pub fn receive(&mut self, channel: ChannelId) -> OperationId {
         let operation_id = self.operation_id_generator.generate();
         self.receive_from_channel(Performer::External(operation_id), channel);
         operation_id
@@ -375,15 +375,10 @@ impl Vm {
                 false
             }
             fiber::Status::Done => {
-                debug!("A fiber is done.");
                 tracer.fiber_done(fiber_id);
                 true
             }
-            fiber::Status::Panicked {
-                reason,
-                responsible,
-            } => {
-                warn!("A fiber panicked because {reason}.");
+            fiber::Status::Panicked { .. } => {
                 tracer.fiber_panicked(fiber_id, None);
                 true
             }
@@ -422,13 +417,20 @@ impl Vm {
                             }
 
                             if is_finished {
-                                self.finish_parallel(tracer, parent, Performer(fiber_id), Ok(()))
+                                self.finish_parallel(
+                                    tracer,
+                                    parent,
+                                    Performer::Fiber(fiber_id),
+                                    Ok(()),
+                                )
                             }
                         }
-                        ExecutionResult::Panicked {
-                            reason,
-                            responsible,
-                        } => self.finish_parallel(tracer, parent, Some(fiber_id), Err(reason)),
+                        ExecutionResult::Panicked { reason, .. } => self.finish_parallel(
+                            tracer,
+                            parent,
+                            Performer::Fiber(fiber_id),
+                            Err(reason),
+                        ),
                     }
                 }
                 FiberTree::Try(Try { .. }) => {
@@ -555,7 +557,6 @@ impl Vm {
                 channel.send(&mut completer, performer, packet);
             }
             ChannelLike::Nursery(parent_id) => {
-                debug!("Nursery received packet {:?}", packet);
                 let parent_id = *parent_id;
 
                 match Self::parse_spawn_packet(packet) {
@@ -582,7 +583,7 @@ impl Vm {
                     None => self.finish_parallel(
                         tracer,
                         parent_id,
-                        performer,
+                        performer.clone(),
                         Err("a nursery received an invalid message".to_string()),
                     ),
                 }

@@ -22,9 +22,8 @@ pub async fn fuzz(db: &Database, module: Module) {
     let (fuzzables_heap, fuzzables): (Heap, Vec<(Id, Pointer)>) = {
         let mut tracer = FuzzablesFinder::new();
         let mut vm = Vm::new();
-        vm.set_up_for_running_module_closure(Closure::of_module(db, module.clone()).unwrap());
+        vm.set_up_for_running_module_closure(Closure::of_module(db, module).unwrap());
         vm.run(&mut DbUseProvider { db }, &mut RunForever, &mut tracer);
-        let result = vm.tear_down();
         (tracer.heap, tracer.fuzzables)
     };
 
@@ -34,9 +33,9 @@ pub async fn fuzz(db: &Database, module: Module) {
     );
 
     for (id, closure) in fuzzables {
+        info!("Fuzzing {id}");
         let mut fuzzer = Fuzzer::new(&fuzzables_heap, closure, id.clone());
         fuzzer.run(
-            db,
             &mut DbUseProvider { db },
             &mut RunLimitedNumberOfInstructions::new(1000),
         );
@@ -52,7 +51,6 @@ pub async fn fuzz(db: &Database, module: Module) {
                     "Calling `{id} {}` doesn't work because {reason}.",
                     arguments.iter().map(|arg| format!("{arg:?}")).join(" "),
                 );
-                error!("Events:\n {tracer:?}");
                 error!(
                     "This is the stack trace:\n{}",
                     tracer.format_panic_stack_trace_to_root_fiber(db)

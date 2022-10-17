@@ -23,15 +23,15 @@ impl FuzzablesFinder {
     }
 }
 impl Tracer for FuzzablesFinder {
-    fn fiber_created(&mut self, fiber: FiberId) {}
-    fn fiber_done(&mut self, fiber: FiberId) {}
-    fn fiber_panicked(&mut self, fiber: FiberId, panicked_child: Option<FiberId>) {}
-    fn fiber_canceled(&mut self, fiber: FiberId) {}
-    fn fiber_execution_started(&mut self, fiber: FiberId) {}
-    fn fiber_execution_ended(&mut self, fiber: FiberId) {}
-    fn channel_created(&mut self, channel: ChannelId) {}
-    fn sent_to_channel(&mut self, value: Pointer, from: FiberId, to: ChannelId) {}
-    fn received_from_channel(&mut self, value: Pointer, from: ChannelId, to: FiberId) {}
+    fn fiber_created(&mut self, _fiber: FiberId) {}
+    fn fiber_done(&mut self, _fiber: FiberId) {}
+    fn fiber_panicked(&mut self, _fiber: FiberId, _panicked_child: Option<FiberId>) {}
+    fn fiber_canceled(&mut self, _fiber: FiberId) {}
+    fn fiber_execution_started(&mut self, _fiber: FiberId) {}
+    fn fiber_execution_ended(&mut self, _fiber: FiberId) {}
+    fn channel_created(&mut self, _channel: ChannelId) {}
+    fn sent_to_channel(&mut self, _value: Pointer, _from: FiberId, _to: ChannelId) {}
+    fn received_from_channel(&mut self, _value: Pointer, _from: ChannelId, _to: FiberId) {}
 
     fn in_fiber_tracer<'a>(&'a mut self, fiber: FiberId) -> Box<dyn InFiberTracer<'a> + 'a>
     where
