@@ -138,9 +138,7 @@ impl Closure {
             captured: vec![],
             num_args: 0,
             body: vec![
-                Instruction::TraceModuleStarts {
-                    module: module.clone(),
-                },
+                Instruction::TraceModuleStarts { module },
                 Instruction::CreateClosure {
                     captured: vec![],
                     num_args: 0,

@@ -29,9 +29,9 @@ use crate::{
     language_server::utils::LspPositionConversion,
     module::{Module, ModuleKind},
     vm::{
-        context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
-        tracer::{DummyTracer, FullTracer, Tracer},
-        Closure, Status, Struct, Vm,
+        context::{DbUseProvider, RunForever},
+        tracer::{FullTracer, Tracer},
+        Closure, ExecutionResult, FiberId, Status, Struct, Vm,
     },
 };
 use compiler::lir::Lir;
@@ -344,7 +344,7 @@ impl StdoutService {
         if let Some(CompletedOperation::Received { packet }) =
             vm.completed_operations.remove(&self.current_receive)
         {
-            info!("Sent to stdout: {}", packet.value.format(&packet.heap));
+            info!("Sent to stdout: {packet:?}");
             self.current_receive = vm.receive(self.channel);
         }
     }
