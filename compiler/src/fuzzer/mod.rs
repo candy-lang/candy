@@ -33,7 +33,7 @@ pub async fn fuzz(db: &Database, module: Module) {
     );
 
     for (id, closure) in fuzzables {
-        info!("Fuzzing {id}");
+        info!("Fuzzing {id}.");
         let mut fuzzer = Fuzzer::new(&fuzzables_heap, closure, id.clone());
         fuzzer.run(
             &mut DbUseProvider { db },
