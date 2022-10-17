@@ -382,7 +382,7 @@ impl Fiber {
                         ..
                     }) => {
                         if num_args != expected_num_args {
-                            self.panic(format!("Closure expects {expected_num_args} parameters, but you called it with {num_args} arguments."));
+                            self.panic(format!("a closure expected {expected_num_args} parameters, but you called it with {num_args} arguments"));
                             return;
                         }
 
@@ -459,11 +459,11 @@ impl Fiber {
                         }
                         "False" => self.panic(reason),
                         _ => {
-                            self.panic("Needs expects True or False as a symbol.".to_string());
+                            self.panic("needs expect True or False as the condition".to_string());
                         }
                     },
                     _ => {
-                        self.panic("Needs expects a boolean symbol.".to_string());
+                        self.panic("needs expect a boolean symbol as the condition".to_string());
                     }
                 }
             }
@@ -535,7 +535,7 @@ impl Fiber {
             }
             Instruction::Error { id, errors } => {
                 self.panic(format!(
-                    "The fiber crashed because there {} at {id}: {errors:?}",
+                    "there {} at {id}: {errors:?}",
                     if errors.len() == 1 {
                         "was an error"
                     } else {
