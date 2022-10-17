@@ -71,7 +71,7 @@ isNonNegative value :=
   bool.not (isNegative value)
 absolute value :=
   needs (is value)
-  conditionals.ifElse isNegative (negate value) value
+  conditionals.ifElse (isNegative value) (negate value) value
 
 fitsInRustU128 value =
   needs (is value)
