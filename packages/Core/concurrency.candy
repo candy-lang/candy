@@ -1,18 +1,22 @@
 channel = use "..channel"
 function = use "..function"
+if = (use "..conditionals").if
 structGetUnwrap = (use "..struct").getUnwrap
 
-parallel body := 
-  needs (function.is1 body)
+parallel body :=
+  if (function.is0 body) {
+    needs False "the function given to `parallel` takes no parameter, but it should accept a nursery"
+  }
+  needs (function.is1 body) "`parallel` needs a function that takes a nursery"
   ✨.parallel body
 
 async nursery body :=
-  needs (channel.isSendPort nursery)
+  needs (channel.isSendPort nursery) "`async` needs a nursery as the first argument"
   needs (function.is0 body)
   returnChannel = channel.create 1
   channel.send nursery [Closure: body, ReturnChannel: returnChannel.sendPort]
   returnChannel.receivePort
 
 await fiber :=
-  needs (channel.isReceivePort fiber)
+  needs (channel.isReceivePort fiber) "`await` needs a fiber returned by `async`"
   channel.receive fiber

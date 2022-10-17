@@ -19,7 +19,7 @@ lazyAnd a b :=
     a
     {
       result = ✨.call b
-      needs (is result)
+      needs (is result) "the function given to `lazyAnd` didn't return a bool"
       result
     }
     { False }
@@ -36,7 +36,7 @@ lazyOr a b :=
     { True }
     {
       result = ✨.call b
-      needs (is result)
+      needs (is result) "the function given to `lazyOr` didn't return a bool"
       result
     }
 or a b :=
