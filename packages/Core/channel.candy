@@ -1,14 +1,19 @@
 bool = use "..bool"
 equals = (use "..equality").equals
 if = (use "..conditionals").if
-isInt = (use "..int").is
+int = use "..int"
 isType = (use "..type").is
 
 isSendPort value := isType value SendPort
 isReceivePort value := isType value ReceivePort
 
 create capacity :=
-  needs (isInt capacity) "`create` needs an integer capacity. Otherwise, there would be no backpressure among fibers and memory leaks would go unnoticed"
+  needs (int.is capacity) "`create` needs an integer capacity. Otherwise, there would be no backpressure among fibers and memory leaks would go unnoticed"
+  needs (int.isNonNegative capacity) "the capacity of a channel can never be negative"
+  needs (int.fitsInRustU32 capacity) "the capacity must fit in a u32"
+  # Technically, it needs to fit in a usize, the natural word length on systems.
+  # Typically, this is 64-bits, so we are conservative here, although there
+  # probably also exist exotic/old systems with smaller word sizes of 16 bits.
   ✨.channelCreate capacity
 
 send port packet :=
