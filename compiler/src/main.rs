@@ -87,7 +87,7 @@ struct CandyFuzzOptions {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> ProgramResult {
     init_logger();
     match CandyOptions::from_args() {
         CandyOptions::Build(options) => build(options),
@@ -97,15 +97,28 @@ async fn main() {
     }
 }
 
-fn build(options: CandyBuildOptions) {
+type ProgramResult = Result<(), Exit>;
+#[derive(Debug)]
+enum Exit {
+    FileNotFound,
+    FuzzingFoundFailingCases,
+    CodePanicked,
+}
+
+fn build(options: CandyBuildOptions) -> ProgramResult {
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
         options.file.clone(),
         ModuleKind::Code,
     );
-    raw_build(module.clone(), options.debug);
+    let result = raw_build(module.clone(), options.debug);
 
-    if options.watch {
+    if !options.watch {
+        match result {
+            Some(_) => Ok(()),
+            None => Err(Exit::FileNotFound),
+        }
+    } else {
         let (tx, rx) = channel();
         let mut watcher = watcher(tx, Duration::from_secs(1)).unwrap();
         watcher
@@ -192,7 +205,7 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
     Some(lir)
 }
 
-fn run(options: CandyRunOptions) {
+fn run(options: CandyRunOptions) -> ProgramResult {
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
         options.file.clone(),
@@ -201,8 +214,8 @@ fn run(options: CandyRunOptions) {
     let db = Database::default();
 
     if raw_build(module.clone(), false).is_none() {
-        warn!("Build failed.");
-        return;
+        warn!("File not found.");
+        return Err(Exit::FileNotFound);
     };
     // TODO: Optimize the code before running.
 
@@ -251,7 +264,7 @@ fn run(options: CandyRunOptions) {
                 "This is the stack trace:\n{}",
                 tracer.format_panic_stack_trace_to_root_fiber(&db)
             );
-            return;
+            return Err(Exit::CodePanicked);
         }
     };
 
@@ -260,7 +273,7 @@ fn run(options: CandyRunOptions) {
         Some(main) => main,
         None => {
             error!("The module doesn't contain a main function.");
-            return;
+            return Err(Exit::CodePanicked);
         }
     };
 
@@ -304,6 +317,7 @@ fn run(options: CandyRunOptions) {
                 .in_fiber_tracer(FiberId::root())
                 .call_ended(&return_value.heap, return_value.address);
             debug!("The main function returned: {return_value:?}");
+            Ok(())
         }
         ExecutionResult::Panicked {
             reason,
@@ -319,6 +333,7 @@ fn run(options: CandyRunOptions) {
                 "This is the stack trace:\n{}",
                 tracer.format_panic_stack_trace_to_root_fiber(&db)
             );
+            Err(Exit::CodePanicked)
         }
     }
 }
@@ -348,7 +363,7 @@ impl StdoutService {
     }
 }
 
-async fn fuzz(options: CandyFuzzOptions) {
+async fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
         options.file.clone(),
@@ -356,21 +371,36 @@ async fn fuzz(options: CandyFuzzOptions) {
     );
 
     if raw_build(module.clone(), false).is_none() {
-        warn!("Build failed.");
-        return;
+        warn!("File not found.");
+        return Err(Exit::FileNotFound);
     }
 
     debug!("Fuzzing `{module}`.");
     let db = Database::default();
-    fuzzer::fuzz(&db, module).await;
+    let failing_cases = fuzzer::fuzz(&db, module).await;
+
+    if failing_cases.is_empty() {
+        info!("All found fuzzable closures seem fine.");
+        Ok(())
+    } else {
+        error!("");
+        error!("Finished fuzzing.");
+        error!("These are the failing cases:");
+        for case in failing_cases {
+            error!("");
+            case.dump(&db);
+        }
+        Err(Exit::FuzzingFoundFailingCases)
+    }
 }
 
-async fn lsp() {
+async fn lsp() -> ProgramResult {
     info!("Starting language server…");
     let (service, socket) = LspService::new(CandyLanguageServer::from_client);
     Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
         .serve(service)
         .await;
+    Ok(())
 }
 
 fn init_logger() {

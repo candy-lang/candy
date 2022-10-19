@@ -79,6 +79,9 @@ impl Fuzzer {
     pub fn status(&self) -> &Status {
         self.status.as_ref().unwrap()
     }
+    pub fn into_status(self) -> Status {
+        self.status.unwrap()
+    }
 
     pub fn run<U: UseProvider, E: ExecutionController>(
         &mut self,
