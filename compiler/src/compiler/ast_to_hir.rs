@@ -346,29 +346,29 @@ impl<'a> Context<'a> {
             })) if name == "needs" => {
                 let expression = match &self.lower_call_arguments(&call.arguments[..])[..] {
                     [condition, reason] => Expression::Needs {
-                        condition: Box::new(condition.clone()),
-                        reason: Box::new(reason.clone()),
+                        condition: condition.clone(),
+                        reason: reason.clone(),
                     },
                     [condition] => Expression::Needs {
-                        condition: Box::new(condition.clone()),
-                        reason: Box::new(self.push(
+                        condition: condition.clone(),
+                        reason: self.push(
                             None,
                             Expression::Text(
                                 match self.db.ast_id_to_span(call.arguments[0].id.clone()) {
                                     Some(span) => format!(
-                                            "`{}` was not satisfied",
-                                            &self
-                                                .db
-                                                .get_module_content_as_string(
-                                                    call.arguments[0].id.module.clone()
-                                                )
-                                                .unwrap()[span],
-                                        ),
+                                        "`{}` was not satisfied",
+                                        &self
+                                            .db
+                                            .get_module_content_as_string(
+                                                call.arguments[0].id.module.clone()
+                                            )
+                                            .unwrap()[span],
+                                    ),
                                     None => "the needs of a function were not met".to_string(),
                                 },
                             ),
                             None,
-                        )),
+                        ),
                     },
                     _ => {
                         return self.push_error(

@@ -114,8 +114,8 @@ impl LoweringContext {
                 self.emit_use_module(id.clone(), current_module.clone());
             }
             Expression::Needs { condition, reason } => {
-                self.emit_push_from_stack(*condition.clone());
-                self.emit_push_from_stack(*reason.clone());
+                self.emit_push_from_stack(condition.clone());
+                self.emit_push_from_stack(reason.clone());
                 self.emit_trace_needs_starts(id.clone());
                 self.emit_needs(id.clone());
                 self.emit_trace_needs_ends();

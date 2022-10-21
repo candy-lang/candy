@@ -83,8 +83,8 @@ impl Expression {
             }
             Expression::Builtin(_) => {}
             Expression::Needs { condition, reason } => {
-                ids.push(*condition.clone());
-                ids.push(*reason.clone());
+                ids.push(condition.clone());
+                ids.push(reason.clone());
             }
             Expression::Error { .. } => {}
         }
@@ -153,8 +153,8 @@ pub enum Expression {
         relative_path: Id,
     },
     Needs {
-        condition: Box<Id>,
-        reason: Box<Id>,
+        condition: Id,
+        reason: Id,
     },
     Error {
         child: Option<Id>,
