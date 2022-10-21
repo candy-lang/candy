@@ -21,9 +21,11 @@ use self::{
         UseProvider,
     },
     heap::SendPort,
-    ids::{CountableId, IdGenerator},
 };
-use crate::compiler::hir::Id;
+use crate::{
+    compiler::hir::Id,
+    utils::{CountableId, IdGenerator},
+};
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use std::{
