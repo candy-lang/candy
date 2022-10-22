@@ -2,6 +2,7 @@
 // mod inlining;
 mod constant_folding;
 mod follow_references;
+mod inlining;
 mod tree_shaking;
 mod utils;
 
@@ -20,5 +21,6 @@ impl Body {
         warn!("Folding constants");
         self.fold_constants();
         warn!("HIR: {self}");
+            self.inline_functions_containing_use();
     }
 }
