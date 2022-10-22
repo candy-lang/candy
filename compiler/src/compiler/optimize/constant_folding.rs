@@ -11,12 +11,13 @@ impl Body {
         self.fold_inner_constants(HashMap::new());
     }
 
-    fn fold_inner_constants(&mut self, mut outer_expressions: HashMap<Id, Expression>) {
+    fn fold_inner_constants(&mut self, mut previous_expressions: HashMap<Id, Expression>) {
         for id in self.ids.clone() {
-            let mut expression = self.expressions.get(&id).unwrap().clone();
-            match &mut expression {
+            match self.expressions.get_mut(&id).unwrap() {
                 Expression::Lambda(lambda) => {
-                    lambda.body.fold_inner_constants(outer_expressions.clone());
+                    lambda
+                        .body
+                        .fold_inner_constants(previous_expressions.clone());
                 }
                 Expression::Call {
                     function,
@@ -26,17 +27,11 @@ impl Body {
                     let arguments = arguments.clone();
 
                     if let Some(Expression::Builtin(builtin)) = self.find(&function) &&
-                        let Some(expression) = Self::run_builtin(*builtin, arguments, &outer_expressions)
+                        let Some(expression) = Self::run_builtin(*builtin, arguments, &previous_expressions)
                     {
-                        *self.expressions.get_mut(&id).unwrap() = expression.clone();
+                        self.expressions.insert(id.clone(), expression.clone());
+                        warn!("Struct access {id} inlined to {expression}.");
                     }
-                }
-                Expression::UseModule {
-                    current_module,
-                    relative_path,
-                } => {
-                    // TODO: Check if the relative path is const and insert the
-                    // code.
                 }
                 Expression::Needs { condition, reason } => {
                     // TODO: Check if the condition is const. If it's true,
@@ -47,7 +42,7 @@ impl Body {
                 }
                 _ => {}
             }
-            outer_expressions.insert(id.clone(), expression);
+            previous_expressions.insert(id.clone(), self.expressions.get(&id).unwrap().clone());
         }
     }
 
@@ -116,7 +111,7 @@ impl Body {
                 let key_id = arguments[1].clone();
 
                 let Some(Expression::Struct(fields)) = expressions.get(&struct_id) else {
-                    warn!("builtinStructGet called on non-struct");
+                    warn!("builtinStructGet called with non-constant struct");
                     return None;
                 };
                 let key = expressions.get(&key_id).unwrap();
@@ -133,7 +128,7 @@ impl Body {
                     } else {
                         // panic
                         // self.expressions.insert(id, Expression::Panic {})
-                        // todo!("Struct access will panic.")
+                        todo!("Struct access will panic.");
                         return None;
                     }
                 } else {
