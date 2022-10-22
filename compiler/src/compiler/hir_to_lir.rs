@@ -31,11 +31,11 @@ fn compile_lambda(captured: &[hir::Id], parameters: &[hir::Id], body: &Body) -> 
         context.stack.push(parameter.clone());
     }
 
-    for (id, expression) in &body.expressions {
-        context.compile_expression(id, expression);
+    for id in &body.ids {
+        context.compile_expression(id, body.expressions.get(id).unwrap());
     }
 
-    context.emit_pop_multiple_below_top(body.expressions.len() - 1);
+    context.emit_pop_multiple_below_top(body.ids.len() - 1);
     context.emit_pop_multiple_below_top(parameters.len());
     context.emit_pop_multiple_below_top(captured.len());
     context.emit_return();

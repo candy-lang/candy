@@ -190,17 +190,14 @@ impl Lambda {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Body {
-    pub expressions: LinkedHashMap<Id, Expression>,
+    pub ids: Vec<Id>,
+    pub expressions: HashMap<Id, Expression>,
     pub identifiers: HashMap<Id, String>,
 }
 impl Body {
     #[allow(dead_code)]
     pub fn return_value(&self) -> Id {
-        self.expressions
-            .keys()
-            .last()
-            .expect("no expressions")
-            .clone()
+        self.ids.iter().last().expect("empty body").clone()
     }
 }
 
@@ -215,11 +212,13 @@ pub enum HirError {
 impl Body {
     pub fn new() -> Self {
         Self {
-            expressions: LinkedHashMap::new(),
+            ids: vec![],
+            expressions: HashMap::new(),
             identifiers: HashMap::new(),
         }
     }
     pub fn push(&mut self, id: Id, expression: Expression, identifier: Option<String>) {
+        self.ids.push(id.clone());
         self.expressions.insert(id.to_owned(), expression);
         if let Some(identifier) = identifier {
             self.identifiers.insert(id, identifier);
@@ -318,8 +317,8 @@ impl fmt::Display for Lambda {
 }
 impl fmt::Display for Body {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (id, expression) in self.expressions.iter() {
-            writeln!(f, "{id} = {expression}")?;
+        for id in &self.ids {
+            writeln!(f, "{id} = {}", self.expressions.get(id).unwrap())?;
         }
         Ok(())
     }
@@ -343,7 +342,7 @@ impl Expression {
     }
 }
 impl Body {
-    fn find(&self, id: &Id) -> Option<&Expression> {
+    pub fn find(&self, id: &Id) -> Option<&Expression> {
         if let Some(expression) = self.expressions.get(id) {
             Some(expression)
         } else {
