@@ -16,6 +16,7 @@ impl Body {
         self.follow_references();
         warn!("HIR: {self}");
         warn!("Tree shaking");
+        warn!("Complexity: {}", self.complexity());
         self.tree_shake();
         warn!("HIR: {self}");
         warn!("Folding constants");
