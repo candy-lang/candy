@@ -128,7 +128,7 @@ impl Body {
                     } else {
                         // panic
                         // self.expressions.insert(id, Expression::Panic {})
-                        todo!("Struct access will panic.");
+                        warn!("Struct access will panic.");
                         return None;
                     }
                 } else {

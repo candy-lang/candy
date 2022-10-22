@@ -203,7 +203,7 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
     // });
     tracing::span!(Level::DEBUG, "Optimizing HIR").in_scope(|| {
         let mut hir = (*hir).clone();
-        hir.optimize();
+        hir.optimize(&db);
     });
 
     let lir = tracing::span!(Level::DEBUG, "Lowering HIR to LIR").in_scope(|| {
