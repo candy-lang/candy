@@ -2,7 +2,6 @@ use super::{ast_to_hir::AstToHir, error::CompilerError};
 use crate::{builtin_functions::BuiltinFunction, module::Module};
 use im::HashMap;
 use itertools::Itertools;
-use linked_hash_map::LinkedHashMap;
 use num_bigint::BigUint;
 use std::{
     collections::HashSet,
