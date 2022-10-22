@@ -1,6 +1,70 @@
-use crate::compiler::hir::{Body, Expression, Id};
+use crate::compiler::hir::{Body, Expression, Id, Lambda};
+
+impl Expression {
+    pub fn replace_ids<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+        match self {
+            Expression::Int(_)
+            | Expression::Text(_)
+            | Expression::Symbol(_)
+            | Expression::Builtin(_) => {}
+            Expression::Reference(reference) => replacer(reference),
+            Expression::Struct(fields) => {
+                *fields = fields
+                    .iter()
+                    .map(|(key, value)| {
+                        let mut key = key.clone();
+                        let mut value = value.clone();
+                        replacer(&mut key);
+                        replacer(&mut value);
+                        (key, value)
+                    })
+                    .collect();
+            }
+            Expression::Lambda(Lambda { body, .. }) => {
+                for id in &body.ids {
+                    let expression = body.expressions.get_mut(&id).unwrap();
+                    expression.replace_ids::<F>(replacer);
+                }
+            }
+            Expression::Call {
+                function,
+                arguments,
+            } => {
+                replacer(function);
+                for argument in arguments {
+                    replacer(argument);
+                }
+            }
+            Expression::UseModule { relative_path, .. } => replacer(relative_path),
+            Expression::Needs { condition, reason } => {
+                replacer(condition);
+                replacer(reason);
+            }
+            Expression::Error { child, errors } => {
+                if let Some(child) = child {
+                    replacer(child);
+                }
+            }
+        }
+    }
+}
 
 impl Body {
+    pub fn replace_ids<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+        for id in &mut self.ids {
+            let mut expression = self.expressions.remove(&id).unwrap();
+            let identifier = self.identifiers.remove(&id);
+
+            replacer(id);
+            expression.replace_ids(replacer);
+
+            self.expressions.insert(id.clone(), expression);
+            if let Some(identifier) = identifier {
+                self.identifiers.insert(id.clone(), identifier);
+            }
+        }
+    }
+
     pub fn is_constant(&self, id: &Id) -> bool {
         match self.expressions.get(id).unwrap() {
             Expression::Int(_)

@@ -17,7 +17,8 @@ impl Body {
         warn!("Tree shaking");
         self.tree_shake();
         warn!("HIR: {self}");
-        // self.fold_constants();
+        warn!("Folding constants");
+        self.fold_constants();
         warn!("HIR: {self}");
     }
 }
