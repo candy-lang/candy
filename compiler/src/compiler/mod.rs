@@ -7,6 +7,7 @@ pub mod error;
 pub mod hir;
 pub mod hir_to_lir;
 pub mod lir;
+pub mod optimize;
 pub mod rcst;
 pub mod rcst_to_cst;
 pub mod string_to_rcst;

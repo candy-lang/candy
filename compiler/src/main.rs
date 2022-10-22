@@ -11,6 +11,7 @@ mod database;
 mod fuzzer;
 mod language_server;
 mod module;
+mod utils;
 mod vm;
 
 use crate::{
@@ -172,7 +173,7 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
         }
     });
 
-    tracing::span!(Level::DEBUG, "Turning AST to HIR").in_scope(|| {
+    let hir = tracing::span!(Level::DEBUG, "Turning AST to HIR").in_scope(|| {
         let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
         if debug {
             module.dump_associated_debug_file("hir", &format!("{}", hir));
@@ -185,6 +186,7 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
                     .join(""),
             );
         }
+
         let mut errors = vec![];
         hir.collect_errors(&mut errors);
         for CompilerError { span, payload, .. } in errors {
@@ -192,6 +194,16 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
             let (end_line, end_col) = db.offset_to_lsp(module.clone(), span.end);
             warn!("{start_line}:{start_col} – {end_line}:{end_col}: {payload:?}");
         }
+        hir
+    });
+
+    // let mut mir = tracing::span!(Level::DEBUG, "Turning HIR to MIR").in_scope(|| {
+    //     let mut hir = (*hir).clone();
+    //     hir.into_mir()
+    // });
+    tracing::span!(Level::DEBUG, "Optimizing HIR").in_scope(|| {
+        let mut hir = (*hir).clone();
+        hir.optimize();
     });
 
     let lir = tracing::span!(Level::DEBUG, "Lowering HIR to LIR").in_scope(|| {
