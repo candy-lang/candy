@@ -80,26 +80,24 @@ fn compile_expression(
             body: original_body,
             fuzzable,
         }) => {
-            let mut body = vec![];
             let mut parameters = vec![];
+            let responsible_parameter: Id = id_generator.generate();
+            let mut body = vec![];
 
-            // In the MIR, lambdas automatically have one extra parameter at the
-            // front: The responsibility. Based on whether the function is
-            // fuzzable or not, this parameter is actually used to dynamically
-            // determine who's at fault if some needs is not fulfilled.
-            let mut responsible: Id = id_generator.generate();
-            parameters.push(responsible);
-            if !fuzzable {
-                // This is a lambda with curly braces, so whoever is responsible
-                // for needs in the current scope is also responsible for needs
-                // in the lambda.
-                responsible = responsible_for_needs;
-            }
             for original_parameter in original_parameters {
                 let parameter = id_generator.generate();
                 parameters.push(parameter);
                 mapping.insert(original_parameter, parameter);
             }
+
+            let responsible = if fuzzable {
+                responsible_parameter
+            } else {
+                // This is a lambda with curly braces, so whoever is responsible
+                // for `needs` in the current scope is also responsible for
+                // `needs` in the lambda.
+                responsible_for_needs
+            };
 
             for (id, expression) in original_body.expressions {
                 compile_expression(
@@ -115,6 +113,7 @@ fn compile_expression(
 
             Expression::Lambda {
                 parameters,
+                responsible_parameter,
                 body,
                 fuzzable,
             }

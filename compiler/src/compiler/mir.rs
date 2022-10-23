@@ -29,6 +29,7 @@ pub enum Expression {
     Responsibility(hir::Id),
     Lambda {
         parameters: Vec<Id>,
+        responsible_parameter: Id,
         body: Vec<Id>,
         fuzzable: bool,
     },
@@ -151,12 +152,17 @@ impl Expression {
                     .map(|(key, value)| format!("{key}: {value}"))
                     .join(", "),
             ),
+            // In the MIR, lambdas take one extra parameter: The responsibility.
+            // Based on whether the function is fuzzable or not, this parameter
+            // may be used to dynamically determine who's at fault if some
+            // `needs` is not fulfilled.
             Expression::Lambda {
                 parameters,
+                responsible_parameter,
                 body,
                 fuzzable,
             } => format!(
-                "{{ {} -> ({})\n{}\n}}",
+                "{{ {} (+ responsible {responsible_parameter}) -> ({})\n{}\n}}",
                 parameters
                     .iter()
                     .map(|parameter| format!("{parameter}"))
