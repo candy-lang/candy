@@ -1,6 +1,5 @@
 channel = use "..channel"
 function = use "..function"
-structGetUnwrap = (use "..struct").getUnwrap
 
 parallel body := 
   needs (function.is1 body)
