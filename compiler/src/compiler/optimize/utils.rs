@@ -1,7 +1,6 @@
+use crate::compiler::mir::{Expression, Id, Mir};
 use core::fmt;
-use std::ops::Add;
-
-use crate::compiler::hir::{Body, Expression, Id, Lambda};
+use std::{collections::HashSet, ops::Add};
 
 impl Expression {
     pub fn replace_ids<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
@@ -9,8 +8,8 @@ impl Expression {
             Expression::Int(_)
             | Expression::Text(_)
             | Expression::Symbol(_)
-            | Expression::Builtin(_) => {}
-            Expression::Reference(reference) => replacer(reference),
+            | Expression::Builtin(_)
+            | Expression::Responsibility(_) => {}
             Expression::Struct(fields) => {
                 *fields = fields
                     .iter()
@@ -23,27 +22,50 @@ impl Expression {
                     })
                     .collect();
             }
-            Expression::Lambda(Lambda { body, .. }) => {
-                for id in &body.ids {
-                    let expression = body.expressions.get_mut(&id).unwrap();
-                    expression.replace_ids::<F>(replacer);
+            Expression::Reference(reference) => replacer(reference),
+            Expression::Lambda {
+                parameters,
+                responsible_parameter,
+                body,
+                ..
+            } => {
+                for parameter in parameters {
+                    replacer(parameter);
+                }
+                replacer(responsible_parameter);
+                for id in body {
+                    replacer(id);
                 }
             }
             Expression::Call {
                 function,
                 arguments,
+                responsible,
             } => {
                 replacer(function);
                 for argument in arguments {
                     replacer(argument);
                 }
+                replacer(responsible);
             }
             Expression::UseModule { relative_path, .. } => replacer(relative_path),
-            Expression::Needs { condition, reason } => {
+            Expression::Needs {
+                responsible,
+                condition,
+                reason,
+            } => {
+                replacer(responsible);
                 replacer(condition);
                 replacer(reason);
             }
-            Expression::Error { child, errors } => {
+            Expression::Panic {
+                reason,
+                responsible,
+            } => {
+                replacer(reason);
+                replacer(responsible);
+            }
+            Expression::Error { child, .. } => {
                 if let Some(child) = child {
                     replacer(child);
                 }
@@ -52,20 +74,98 @@ impl Expression {
     }
 }
 
-impl Body {
-    pub fn replace_ids<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
-        for id in &mut self.ids {
-            let mut expression = self.expressions.remove(&id).unwrap();
-            let identifier = self.identifiers.remove(&id);
-
-            replacer(id);
-            expression.replace_ids(replacer);
-
-            self.expressions.insert(id.clone(), expression);
-            if let Some(identifier) = identifier {
-                self.identifiers.insert(id.clone(), identifier);
+impl Mir {
+    pub fn defined_ids(&self, id: &Id) -> Vec<Id> {
+        let mut defined = vec![];
+        self.collect_defined_ids(id, &mut defined);
+        defined
+    }
+    fn collect_defined_ids(&self, id: &Id, defined: &mut Vec<Id>) {
+        defined.push(id.clone());
+        if let Expression::Lambda {
+            parameters,
+            responsible_parameter,
+            body,
+            ..
+        } = self.expressions.get(id).unwrap()
+        {
+            defined.extend(parameters);
+            defined.push(responsible_parameter.clone());
+            for id in body {
+                self.collect_defined_ids(id, defined);
             }
         }
+    }
+
+    pub fn referenced_ids(&self, id: &Id) -> Vec<Id> {
+        let mut referenced = vec![];
+        self.collect_referenced_ids(id, &mut referenced);
+        referenced
+    }
+    fn collect_referenced_ids(&self, id: &Id, referenced: &mut Vec<Id>) {
+        match self.expressions.get(id).unwrap() {
+            Expression::Int(_)
+            | Expression::Text(_)
+            | Expression::Symbol(_)
+            | Expression::Builtin(_)
+            | Expression::Responsibility(_) => {}
+            Expression::Struct(fields) => {
+                for (key, value) in fields {
+                    referenced.push(key.clone());
+                    referenced.push(value.clone());
+                }
+            }
+            Expression::Reference(reference) => referenced.push(reference.clone()),
+            Expression::Lambda { body, .. } => {
+                for id in body {
+                    self.collect_referenced_ids(id, referenced);
+                }
+            }
+            Expression::Call {
+                function,
+                arguments,
+                responsible,
+            } => {
+                referenced.push(function.clone());
+                referenced.extend(arguments);
+                referenced.push(responsible.clone());
+            }
+            Expression::UseModule {
+                relative_path,
+                responsible,
+                ..
+            } => {
+                referenced.push(relative_path.clone());
+                referenced.push(responsible.clone());
+            }
+            Expression::Needs {
+                responsible,
+                condition,
+                reason,
+            } => {
+                referenced.push(responsible.clone());
+                referenced.push(condition.clone());
+                referenced.push(reason.clone());
+            }
+            Expression::Panic {
+                reason,
+                responsible,
+            } => {
+                referenced.push(reason.clone());
+                referenced.push(responsible.clone());
+            }
+            Expression::Error { child, errors } => {
+                if let Some(child) = child {
+                    self.collect_referenced_ids(child, referenced);
+                }
+            }
+        }
+    }
+
+    pub fn captured_ids(&self, lambda: &Id) -> Vec<Id> {
+        let defined: HashSet<Id> = self.defined_ids(lambda).into_iter().collect();
+        let referenced: HashSet<Id> = self.referenced_ids(lambda).into_iter().collect();
+        referenced.difference(&defined).copied().collect()
     }
 
     pub fn is_constant(&self, id: &Id) -> bool {
@@ -73,18 +173,19 @@ impl Body {
             Expression::Int(_)
             | Expression::Text(_)
             | Expression::Symbol(_)
-            | Expression::Builtin(_) => true,
+            | Expression::Builtin(_)
+            | Expression::Responsibility(_) => true,
             Expression::Reference(id) => self.is_constant(id),
             Expression::Struct(fields) => fields
                 .iter()
                 .all(|(key, value)| self.is_constant(key) && self.is_constant(value)),
-            Expression::Lambda(lambda) => lambda
-                .captured_ids(id)
-                .iter()
-                .all(|id| self.is_constant(id)),
+            Expression::Lambda { .. } => {
+                self.captured_ids(id).iter().all(|id| self.is_constant(id))
+            }
             Expression::Call { .. }
             | Expression::UseModule { .. }
             | Expression::Needs { .. }
+            | Expression::Panic { .. }
             | Expression::Error { .. } => false,
         }
     }
@@ -102,30 +203,25 @@ impl Body {
             return self.equals(a, reference);
         }
 
-        match (
-            self.expressions.get(a).unwrap(),
-            self.expressions.get(b).unwrap(),
-        ) {
-            (Expression::Int(a), Expression::Int(b)) => Some(a == b),
-            (Expression::Text(a), Expression::Text(b)) => Some(a == b),
-            (Expression::Symbol(a), Expression::Symbol(b)) => Some(a == b),
-            (Expression::Struct(a), Expression::Struct(b)) => {
-                // TODO
-                todo!()
-            }
-            // Also consider lambdas equal where only some IDs are named
-            // differently.
-            (Expression::Lambda(a), Expression::Lambda(b)) => Some(a == b),
-            (Expression::Builtin(a), Expression::Builtin(b)) => Some(a == b),
-            (Expression::Call { .. }, _)
-            | (Expression::UseModule { .. }, _)
-            | (Expression::Needs { .. }, _)
-            | (Expression::Error { .. }, _)
-            | (_, Expression::Call { .. })
-            | (_, Expression::UseModule { .. })
-            | (_, Expression::Needs { .. })
-            | (_, Expression::Error { .. }) => None,
-            (_, _) => Some(false),
+        if a_expr == b_expr {
+            return Some(true);
+        }
+
+        if !self.is_constant(a) || !self.is_constant(b) {
+            return None;
+        }
+
+        Some(false)
+    }
+
+    pub fn replace_ids<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+        for id in &mut self.body {
+            let mut expression = self.expressions.remove(id).unwrap();
+
+            replacer(id);
+            expression.replace_ids(replacer);
+
+            self.expressions.insert(id.clone(), expression);
         }
     }
 
@@ -222,78 +318,4 @@ impl Body {
     //         statement.replace_ids(transform);
     //     }
     // }
-}
-
-pub struct Complexity {
-    is_self_contained: bool,
-    expressions: usize,
-}
-
-impl Complexity {
-    fn none() -> Self {
-        Self {
-            is_self_contained: true,
-            expressions: 0,
-        }
-    }
-    fn single() -> Self {
-        Self {
-            is_self_contained: true,
-            expressions: 1,
-        }
-    }
-}
-impl Add for Complexity {
-    type Output = Complexity;
-
-    fn add(self, other: Self) -> Self::Output {
-        Complexity {
-            is_self_contained: self.is_self_contained && other.is_self_contained,
-            expressions: self.expressions + other.expressions,
-        }
-    }
-}
-impl fmt::Display for Complexity {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}, {} expressions",
-            if self.is_self_contained {
-                "self-contained"
-            } else {
-                "still contains `use`"
-            },
-            self.expressions
-        )
-    }
-}
-
-impl Body {
-    pub fn complexity(&self) -> Complexity {
-        let mut complexity = Complexity::none();
-        for (_, expression) in &self.expressions {
-            complexity = complexity + expression.complexity();
-        }
-        complexity
-    }
-}
-impl Expression {
-    fn complexity(&self) -> Complexity {
-        match self {
-            Expression::Int(_) => Complexity::single(),
-            Expression::Text(_) => Complexity::single(),
-            Expression::Reference(_) => Complexity::single(),
-            Expression::Symbol(_) => Complexity::single(),
-            Expression::Struct(_) => Complexity::single(),
-            Expression::Lambda(lambda) => Complexity::single() + lambda.body.complexity(),
-            Expression::Builtin(_) => Complexity::single(),
-            Expression::Call { .. } => Complexity::single(),
-            Expression::UseModule { .. } => Complexity {
-                is_self_contained: false,
-                expressions: 1,
-            },
-            Expression::Needs { .. } => Complexity::single(),
-            Expression::Error { .. } => Complexity::single(),
-        }
-    }
 }

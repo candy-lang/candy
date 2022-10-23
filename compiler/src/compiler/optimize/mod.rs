@@ -5,7 +5,8 @@
 // mod inlining;
 // mod module_folding;
 // mod tree_shaking;
-// mod utils;
+mod complexity;
+mod utils;
 
 use super::hir::Body;
 use crate::{database::Database, module::Module};
