@@ -1,7 +1,6 @@
 channel = use "..channel"
 function = use "..function"
 if = (use "..conditionals").if
-structGetUnwrap = (use "..struct").getUnwrap
 
 parallel body :=
   if (function.is0 body) {
