@@ -1,8 +1,8 @@
 use crate::{
     compiler::{
         ast_to_hir::AstToHirStorage, cst::CstDbStorage, cst_to_ast::CstToAstStorage,
-        hir::HirDbStorage, hir_to_lir::HirToLirStorage, rcst_to_cst::RcstToCstStorage,
-        string_to_rcst::StringToRcstStorage,
+        hir::HirDbStorage, hir_to_lir::HirToLirStorage, hir_to_mir::HirToMirStorage,
+        rcst_to_cst::RcstToCstStorage, string_to_rcst::StringToRcstStorage,
     },
     language_server::{
         folding_range::FoldingRangeDbStorage, references::ReferencesDbStorage,
@@ -20,6 +20,7 @@ use tracing::warn;
     FoldingRangeDbStorage,
     HirDbStorage,
     HirToLirStorage,
+    HirToMirStorage,
     ModuleDbStorage,
     LspPositionConversionStorage,
     RcstToCstStorage,
