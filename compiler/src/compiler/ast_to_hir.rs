@@ -468,7 +468,7 @@ impl<'a> Context<'a> {
 
 impl<'a> Context<'a> {
     fn generate_sparkles(&mut self) {
-        let mut sparkles_map = im::HashMap::new();
+        let mut sparkles_map = HashMap::new();
 
         for builtin_function in builtin_functions::VALUES.iter() {
             let symbol = self.push(
@@ -514,7 +514,7 @@ impl<'a> Context<'a> {
             Expression::Lambda(Lambda {
                 parameters: vec![relative_path],
                 body: inner_body,
-                fuzzable: false,
+                fuzzable: true,
             }),
             Some("use".to_string()),
         );
@@ -526,7 +526,7 @@ impl<'a> Context<'a> {
         //   HirId(~:test.candy:100): HirId(~:test.candy:101),
         // ]
 
-        let mut exports = im::HashMap::new();
+        let mut exports = HashMap::new();
         for (name, id) in self.public_identifiers.clone() {
             exports.insert(
                 self.push(

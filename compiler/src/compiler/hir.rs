@@ -1,11 +1,12 @@
 use super::{ast_to_hir::AstToHir, error::CompilerError};
 use crate::{builtin_functions::BuiltinFunction, module::Module};
-use im::HashMap;
 use itertools::Itertools;
+use linked_hash_map::LinkedHashMap;
 use num_bigint::BigUint;
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fmt::{self, Display, Formatter},
+    hash,
     sync::Arc,
 };
 use tracing::info;
@@ -134,7 +135,7 @@ impl Display for Id {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Expression {
     Int(BigUint),
     Text(String),
@@ -165,6 +166,11 @@ impl Expression {
         Expression::Symbol("Nothing".to_string())
     }
 }
+impl hash::Hash for Expression {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Lambda {
@@ -187,16 +193,19 @@ impl Lambda {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Body {
-    pub ids: Vec<Id>,
-    pub expressions: HashMap<Id, Expression>,
+    pub expressions: LinkedHashMap<Id, Expression>,
     pub identifiers: HashMap<Id, String>,
 }
 impl Body {
-    #[allow(dead_code)]
     pub fn return_value(&self) -> Id {
-        self.ids.iter().last().expect("empty body").clone()
+        self.expressions.keys().last().expect("empty body").clone()
+    }
+}
+impl hash::Hash for Body {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.expressions.hash(state);
     }
 }
 
@@ -211,13 +220,11 @@ pub enum HirError {
 impl Body {
     pub fn new() -> Self {
         Self {
-            ids: vec![],
-            expressions: HashMap::new(),
+            expressions: LinkedHashMap::new(),
             identifiers: HashMap::new(),
         }
     }
     pub fn push(&mut self, id: Id, expression: Expression, identifier: Option<String>) {
-        self.ids.push(id.clone());
         self.expressions.insert(id.to_owned(), expression);
         if let Some(identifier) = identifier {
             self.identifiers.insert(id, identifier);
@@ -316,8 +323,8 @@ impl fmt::Display for Lambda {
 }
 impl fmt::Display for Body {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for id in &self.ids {
-            writeln!(f, "{id} = {}", self.expressions.get(id).unwrap())?;
+        for (id, expression) in &self.expressions {
+            writeln!(f, "{id} = {expression}")?;
         }
         Ok(())
     }
