@@ -472,7 +472,6 @@ impl Vm {
             Some(channel) => channel,
             None => {
                 // The channel was a nursery that died.
-                // TODO: also panic a nursery performer
                 if let Performer::Fiber(fiber) = performer {
                     let tree = self.fibers.get_mut(&fiber).unwrap();
                     tree.as_single_mut().unwrap().fiber.panic(

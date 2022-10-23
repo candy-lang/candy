@@ -285,9 +285,7 @@ fn run(options: CandyRunOptions) {
         }
         stdout.run(&mut vm);
         for channel in vm.unreferenced_channels.iter().copied().collect_vec() {
-            if channel != stdout.channel {
-                vm.free_channel(channel);
-            }
+            vm.free_channel(channel);
         }
     }
     info!("Tree: {:#?}", vm);
