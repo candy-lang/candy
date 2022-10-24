@@ -1,36 +1,49 @@
 use super::{
+    channel::{Capacity, Packet},
+    context::{ExecutionController, UseProvider},
     heap::{Builtin, Closure, Data, Heap, Pointer},
-    tracer::{TraceEntry, Tracer},
-    use_provider::{DbUseProvider, UseProvider},
+    ids::ChannelId,
+    tracer::{EventData, Tracer},
 };
 use crate::{
     compiler::{hir::Id, lir::Instruction},
-    database::Database,
     module::Module,
+    vm::context::PanickingUseProvider,
 };
 use itertools::Itertools;
 use std::collections::HashMap;
-use tracing::{info, trace};
+use tracing::trace;
 
 const TRACE: bool = false;
 
-/// A VM can execute some byte code.
+/// A fiber is one execution thread of a program. A fiber is always owned and
+/// managed by a VM. A VM can own multiple fibers and run them concurrently.
 #[derive(Clone)]
-pub struct Vm {
+pub struct Fiber {
+    // Core functionality to run code. Fibers are stack-based machines that run
+    // instructions from a LIR. All values are stored on a heap.
     pub status: Status,
     next_instruction: InstructionPointer,
-    pub heap: Heap,
     pub data_stack: Vec<Pointer>,
     pub call_stack: Vec<InstructionPointer>,
     pub import_stack: Vec<Module>,
+    pub heap: Heap,
+
+    // Debug stuff. This is not essential to a correct working of the fiber, but
+    // enables advanced functionality like stack traces or finding out whose
+    // fault a panic is.
     pub tracer: Tracer,
     pub fuzzable_closures: Vec<(Id, Pointer)>,
-    pub num_instructions_executed: usize,
 }
 
 #[derive(Clone, Debug)]
 pub enum Status {
     Running,
+    CreatingChannel { capacity: Capacity },
+    Sending { channel: ChannelId, packet: Packet },
+    Receiving { channel: ChannelId },
+    InParallelScope { body: Pointer },
+    InTry { body: Pointer },
     Done,
     Panicked { reason: String },
 }
@@ -65,55 +78,52 @@ pub struct TearDownResult {
     pub tracer: Tracer,
 }
 
-impl Vm {
+impl Fiber {
     fn new_with_heap(heap: Heap) -> Self {
         Self {
             status: Status::Done,
             next_instruction: InstructionPointer::null_pointer(),
-            heap,
             data_stack: vec![],
             call_stack: vec![],
             import_stack: vec![],
-            tracer: Tracer::default(),
+            heap,
+            tracer: Tracer::new(),
             fuzzable_closures: vec![],
-            num_instructions_executed: 0,
         }
     }
-    pub fn new_for_running_closure<U: UseProvider>(
-        heap: Heap,
-        use_provider: &U,
-        closure: Pointer,
-        arguments: &[Pointer],
-    ) -> Self {
-        let mut vm = Self::new_with_heap(heap);
+    pub fn new_for_running_closure(heap: Heap, closure: Pointer, arguments: &[Pointer]) -> Self {
+        assert!(
+            !matches!(heap.get(closure).data, Data::Builtin(_),),
+            "can only use with closures, not builtins"
+        );
 
-        vm.data_stack.extend(arguments);
-        vm.data_stack.push(closure);
+        let mut fiber = Self::new_with_heap(heap);
 
-        vm.status = Status::Running;
-        vm.run_instruction(
-            use_provider,
+        fiber.data_stack.extend(arguments);
+        fiber.data_stack.push(closure);
+
+        fiber.status = Status::Running;
+        fiber.run_instruction(
+            &PanickingUseProvider,
             Instruction::Call {
                 num_args: arguments.len(),
             },
         );
-        vm
+        fiber
     }
-    pub fn new_for_running_module_closure<U: UseProvider>(
-        use_provider: &U,
-        closure: Closure,
-    ) -> Self {
+    pub fn new_for_running_module_closure(closure: Closure) -> Self {
         assert_eq!(closure.captured.len(), 0, "Called start_module_closure with a closure that is not a module closure (it captures stuff).");
         assert_eq!(closure.num_args, 0, "Called start_module_closure with a closure that is not a module closure (it has arguments).");
         let mut heap = Heap::default();
         let closure = heap.create_closure(closure);
-        Self::new_for_running_closure(heap, use_provider, closure, &[])
+        Self::new_for_running_closure(heap, closure, &[])
     }
+
     pub fn tear_down(mut self) -> TearDownResult {
         let result = match self.status {
-            Status::Running => panic!("Called `tear_down` on a VM that's still running."),
             Status::Done => Ok(self.data_stack.pop().unwrap()),
             Status::Panicked { reason } => Err(reason),
+            _ => panic!("Called `tear_down` on a fiber that's still running."),
         };
         TearDownResult {
             heap: self.heap,
@@ -127,18 +137,86 @@ impl Vm {
         self.status.clone()
     }
 
+    // If the status of this fiber is something else than `Status::Running`
+    // after running, then the VM that manages this fiber is expected to perform
+    // some action and to then call the corresponding `complete_*` method before
+    // calling `run` again.
+
+    pub fn complete_channel_create(&mut self, channel: ChannelId) {
+        assert!(matches!(self.status, Status::CreatingChannel { .. }));
+
+        let send_port_symbol = self.heap.create_symbol("SendPort".to_string());
+        let receive_port_symbol = self.heap.create_symbol("ReceivePort".to_string());
+        let send_port = self.heap.create_send_port(channel);
+        let receive_port = self.heap.create_receive_port(channel);
+        self.data_stack.push(self.heap.create_struct(HashMap::from([
+            (send_port_symbol, send_port),
+            (receive_port_symbol, receive_port),
+        ])));
+        self.status = Status::Running;
+    }
+    pub fn complete_send(&mut self) {
+        assert!(matches!(self.status, Status::Sending { .. }));
+
+        self.data_stack.push(self.heap.create_nothing());
+        self.status = Status::Running;
+    }
+    pub fn complete_receive(&mut self, packet: Packet) {
+        assert!(matches!(self.status, Status::Receiving { .. }));
+
+        let address = packet
+            .heap
+            .clone_single_to_other_heap(&mut self.heap, packet.value);
+        self.data_stack.push(address);
+        self.status = Status::Running;
+    }
+    pub fn complete_parallel_scope(&mut self, result: Result<Packet, String>) {
+        assert!(matches!(self.status, Status::InParallelScope { .. }));
+
+        match result {
+            Ok(packet) => {
+                let value = packet
+                    .heap
+                    .clone_single_to_other_heap(&mut self.heap, packet.value);
+                self.data_stack.push(value);
+                self.status = Status::Running;
+            }
+            Err(reason) => self.panic(reason),
+        }
+    }
+    pub fn complete_try(&mut self, result: Result<Packet, String>) {
+        assert!(matches!(self.status, Status::InTry { .. }));
+
+        let result = result
+            .map(|Packet { heap, value }| heap.clone_single_to_other_heap(&mut self.heap, value))
+            .map_err(|reason| self.heap.create_text(reason));
+        self.data_stack.push(self.heap.create_result(result));
+        self.status = Status::Running;
+    }
+
     fn get_from_data_stack(&self, offset: usize) -> Pointer {
         self.data_stack[self.data_stack.len() - 1 - offset]
     }
+    pub fn panic(&mut self, reason: String) {
+        assert!(!matches!(
+            self.status,
+            Status::Done | Status::Panicked { .. }
+        ));
+        self.status = Status::Panicked { reason };
+    }
 
-    pub fn run<U: UseProvider>(&mut self, use_provider: &U, mut num_instructions: usize) {
+    pub fn run<U: UseProvider, E: ExecutionController>(
+        &mut self,
+        use_provider: &mut U,
+        execution_controller: &mut E,
+    ) {
         assert!(
             matches!(self.status, Status::Running),
-            "Called Vm::run on a vm that is not ready to run."
+            "Called Fiber::run on a fiber that is not ready to run."
         );
-        while matches!(self.status, Status::Running) && num_instructions > 0 {
-            num_instructions -= 1;
-
+        while matches!(self.status, Status::Running)
+            && execution_controller.should_continue_running()
+        {
             let current_closure = self.heap.get(self.next_instruction.closure);
             let current_body = if let Data::Closure(Closure { body, .. }) = &current_closure.data {
                 body
@@ -173,7 +251,7 @@ impl Vm {
 
             self.next_instruction.instruction += 1;
             self.run_instruction(use_provider, instruction);
-            self.num_instructions_executed += 1;
+            execution_controller.instruction_executed();
 
             if self.next_instruction == InstructionPointer::null_pointer() {
                 self.status = Status::Done;
@@ -253,7 +331,8 @@ impl Vm {
                 }
                 args.reverse();
 
-                match self.heap.get(closure_address).data.clone() {
+                let object = self.heap.get(closure_address);
+                match object.data.clone() {
                     Data::Closure(Closure {
                         captured,
                         num_args: expected_num_args,
@@ -275,10 +354,13 @@ impl Vm {
                     }
                     Data::Builtin(Builtin { function: builtin }) => {
                         self.heap.drop(closure_address);
-                        self.run_builtin_function(use_provider, &builtin, &args);
+                        self.run_builtin_function(&builtin, &args);
                     }
                     _ => {
-                        self.panic("you can only call closures and builtins".to_string());
+                        self.panic(format!(
+                            "you can only call closures and builtins, but you tried to call {}",
+                            object.format(&self.heap),
+                        ));
                     }
                 };
             }
@@ -334,7 +416,7 @@ impl Vm {
             Instruction::TraceValueEvaluated(id) => {
                 let value = *self.data_stack.last().unwrap();
                 self.heap.dup(value);
-                self.tracer.push(TraceEntry::ValueEvaluated { id, value });
+                self.tracer.push(EventData::ValueEvaluated { id, value });
             }
             Instruction::TraceCallStarts { id, num_args } => {
                 let closure = *self.data_stack.last().unwrap();
@@ -350,25 +432,29 @@ impl Vm {
                 args.reverse();
 
                 self.tracer
-                    .push(TraceEntry::CallStarted { id, closure, args });
+                    .push(EventData::CallStarted { id, closure, args });
             }
             Instruction::TraceCallEnds => {
                 let return_value = *self.data_stack.last().unwrap();
                 self.heap.dup(return_value);
-                self.tracer.push(TraceEntry::CallEnded { return_value });
+                self.tracer.push(EventData::CallEnded { return_value });
             }
             Instruction::TraceNeedsStarts { id } => {
-                let condition = self.data_stack[self.data_stack.len() - 1];
-                let reason = self.data_stack[self.data_stack.len() - 2];
+                let condition = self.data_stack[self.data_stack.len() - 2];
+                let reason = self.data_stack[self.data_stack.len() - 1];
                 self.heap.dup(condition);
                 self.heap.dup(reason);
-                self.tracer.push(TraceEntry::NeedsStarted {
+                self.tracer.push(EventData::NeedsStarted {
                     id,
                     condition,
                     reason,
                 });
             }
-            Instruction::TraceNeedsEnds => self.tracer.push(TraceEntry::NeedsEnded),
+            Instruction::TraceNeedsEnds => {
+                let nothing = *self.data_stack.last().unwrap();
+                self.heap.dup(nothing);
+                self.tracer.push(EventData::NeedsEnded { nothing });
+            }
             Instruction::TraceModuleStarts { module } => {
                 if self.import_stack.contains(&module) {
                     self.panic(format!(
@@ -382,38 +468,23 @@ impl Vm {
                     ));
                 }
                 self.import_stack.push(module.clone());
-                self.tracer.push(TraceEntry::ModuleStarted { module });
+                self.tracer.push(EventData::ModuleStarted { module });
             }
             Instruction::TraceModuleEnds => {
                 self.import_stack.pop().unwrap();
                 let export_map = *self.data_stack.last().unwrap();
                 self.heap.dup(export_map);
-                self.tracer.push(TraceEntry::ModuleEnded { export_map })
+                self.tracer.push(EventData::ModuleEnded { export_map })
             }
             Instruction::Error { id, errors } => {
                 self.panic(format!(
-                    "The VM crashed because there {} at {id}: {errors:?}",
+                    "The fiber crashed because there {} at {id}: {errors:?}",
                     if errors.len() == 1 {
                         "was an error"
                     } else {
                         "were errors"
                     }
                 ));
-            }
-        }
-    }
-
-    pub fn panic(&mut self, reason: String) {
-        self.status = Status::Panicked { reason };
-    }
-
-    pub fn run_synchronously_until_completion(mut self, db: &Database) -> TearDownResult {
-        let use_provider = DbUseProvider { db };
-        loop {
-            self.run(&use_provider, 100000);
-            match self.status() {
-                Status::Running => info!("Code is still running."),
-                _ => return self.tear_down(),
             }
         }
     }

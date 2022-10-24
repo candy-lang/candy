@@ -9,7 +9,12 @@ use crate::{
     database::Database,
     language_server::hints::{utils::id_to_end_of_line, HintKind},
     module::Module,
-    vm::{tracer::TraceEntry, use_provider::DbUseProvider, Closure, Heap, Pointer, Status, Vm},
+    vm::{
+        self,
+        context::{DbUseProvider, RunLimitedNumberOfInstructions},
+        tracer::{EventData, StackEntry},
+        Closure, Heap, Pointer, TearDownResult, Vm,
+    },
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
@@ -23,10 +28,8 @@ pub struct ConstantEvaluator {
 
 impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
-        let vm = Vm::new_for_running_module_closure(
-            &DbUseProvider { db },
-            Closure::of_module(db, module.clone()).unwrap(),
-        );
+        let mut vm = Vm::new();
+        vm.set_up_for_running_module_closure(Closure::of_module(db, module.clone()).unwrap());
         self.vms.insert(module, vm);
     }
 
@@ -39,7 +42,7 @@ impl ConstantEvaluator {
         let mut running_vms = self
             .vms
             .iter_mut()
-            .filter(|(_, vm)| matches!(vm.status(), Status::Running))
+            .filter(|(_, vm)| matches!(vm.status(), vm::Status::CanRun))
             .collect_vec();
         trace!(
             "Constant evaluator running. {} running VMs, {} in total.",
@@ -48,24 +51,24 @@ impl ConstantEvaluator {
         );
 
         if let Some((module, vm)) = running_vms.choose_mut(&mut thread_rng()) {
-            let use_provider = DbUseProvider { db };
-            vm.run(&use_provider, 500);
+            vm.run(
+                &mut DbUseProvider { db },
+                &mut RunLimitedNumberOfInstructions::new(500),
+            );
             Some(module.clone())
         } else {
             None
         }
     }
 
-    pub fn get_fuzzable_closures(&self, module: &Module) -> (&Heap, Vec<(Id, Pointer)>) {
+    pub fn get_fuzzable_closures(&self, module: &Module) -> (Heap, Vec<(Id, Pointer)>) {
         let vm = &self.vms[module];
-        (
-            &vm.heap,
-            vm.fuzzable_closures
-                .iter()
-                .filter(|(id, _)| &id.module == module)
-                .cloned()
-                .collect_vec(),
-        )
+        let TearDownResult {
+            heap,
+            fuzzable_closures,
+            ..
+        } = vm.clone().tear_down();
+        (heap, fuzzable_closures)
     }
 
     pub fn get_hints(&self, db: &Database, module: &Module) -> Vec<Hint> {
@@ -75,45 +78,39 @@ impl ConstantEvaluator {
         let vm = &self.vms[module];
         let mut hints = vec![];
 
-        if let Status::Panicked { reason } = vm.status() {
+        if let vm::Status::Panicked { reason } = vm.status() {
             if let Some(hint) = panic_hint(db, module.clone(), vm, reason) {
                 hints.push(hint);
             }
         };
-        if module.to_possible_paths().is_some() {
-            module.dump_associated_debug_file("trace", &vm.tracer.format_call_tree(&vm.heap));
-        }
 
-        for entry in vm.tracer.log() {
-            let (id, value) = match entry {
-                TraceEntry::ValueEvaluated { id, value } => {
-                    if &id.module != module {
-                        continue;
-                    }
-                    let ast_id = match db.hir_to_ast_id(id.clone()) {
-                        Some(ast_id) => ast_id,
-                        None => continue,
-                    };
-                    let ast = match db.ast(module.clone()) {
-                        Some((ast, _)) => (*ast).clone(),
-                        None => continue,
-                    };
-                    let ast = match ast.find(&ast_id) {
-                        Some(ast) => ast,
-                        None => continue,
-                    };
-                    if !matches!(ast.kind, AstKind::Assignment(_)) {
-                        continue;
-                    }
-                    (id.clone(), value)
-                }
-                _ => continue,
+        let TearDownResult { heap, tracer, .. } = vm.clone().tear_down();
+        for entry in &tracer.events {
+            let EventData::ValueEvaluated { id, value } = &entry.data else { continue; };
+
+            if &id.module != module {
+                continue;
+            }
+            let ast_id = match db.hir_to_ast_id(id.clone()) {
+                Some(ast_id) => ast_id,
+                None => continue,
             };
+            let ast = match db.ast(module.clone()) {
+                Some((ast, _)) => (*ast).clone(),
+                None => continue,
+            };
+            let ast = match ast.find(&ast_id) {
+                Some(ast) => ast,
+                None => continue,
+            };
+            if !matches!(ast.kind, AstKind::Assignment(_)) {
+                continue;
+            }
 
             hints.push(Hint {
                 kind: HintKind::Value,
-                text: value.format(&vm.heap),
-                position: id_to_end_of_line(db, id).unwrap(),
+                text: value.format(&heap),
+                position: id_to_end_of_line(db, id.clone()).unwrap(),
             });
         }
 
@@ -125,17 +122,18 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.
-    let stack = vm.tracer.stack();
+    let TearDownResult { heap, tracer, .. } = vm.clone().tear_down();
+    let stack = tracer.stack_trace();
     if stack.len() == 1 {
-        // The stack only contains a `ModuleStarted` entry. This indicates an
-        // error during compilation resulting in a top-level error instruction.
+        // The stack only contains an `InModule` entry. This indicates an error
+        // during compilation resulting in a top-level error instruction.
         return None;
     }
 
     let last_call_in_this_module = stack.iter().find(|entry| {
         let id = match entry {
-            TraceEntry::CallStarted { id, .. } => id,
-            TraceEntry::NeedsStarted { id, .. } => id,
+            StackEntry::Call { id, .. } => id,
+            StackEntry::Needs { id, .. } => id,
             _ => return false,
         };
         // Make sure the entry comes from the same file and is not generated
@@ -144,25 +142,21 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
     })?;
 
     let (id, call_info) = match last_call_in_this_module {
-        TraceEntry::CallStarted { id, closure, args } => (
+        StackEntry::Call { id, closure, args } => (
             id,
             format!(
                 "{} {}",
-                closure.format(&vm.heap),
-                args.iter().map(|arg| arg.format(&vm.heap)).join(" ")
+                closure.format(&heap),
+                args.iter().map(|arg| arg.format(&heap)).join(" ")
             ),
         ),
-        TraceEntry::NeedsStarted {
+        StackEntry::Needs {
             id,
             condition,
             reason,
         } => (
             id,
-            format!(
-                "needs {} {}",
-                condition.format(&vm.heap),
-                reason.format(&vm.heap)
-            ),
+            format!("needs {} {}", condition.format(&heap), reason.format(&heap)),
         ),
         _ => unreachable!(),
     };

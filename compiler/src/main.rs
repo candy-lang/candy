@@ -26,13 +26,18 @@ use crate::{
     database::Database,
     language_server::utils::LspPositionConversion,
     module::{Module, ModuleKind},
-    vm::{use_provider::DbUseProvider, Closure, TearDownResult, Vm},
+    vm::{
+        context::{DbUseProvider, RunForever},
+        Closure, Status, Struct, TearDownResult, Vm,
+    },
 };
 use compiler::lir::Lir;
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use notify::{watcher, RecursiveMode, Watcher};
 use std::{
+    collections::HashMap,
+    convert::TryInto,
     env::current_dir,
     path::PathBuf,
     sync::{mpsc::channel, Arc},
@@ -42,6 +47,7 @@ use structopt::StructOpt;
 use tower_lsp::{LspService, Server};
 use tracing::{debug, error, info, warn, Level, Metadata};
 use tracing_subscriber::{filter, fmt::format::FmtSpan, prelude::*};
+use vm::{ChannelId, CompletedOperation, OperationId};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "candy", about = "The 🍭 Candy CLI.")]
@@ -201,30 +207,127 @@ fn run(options: CandyRunOptions) {
 
     let path_string = options.file.to_string_lossy();
     info!("Running `{path_string}`.");
+    let mut vm = Vm::new();
+    vm.set_up_for_running_module_closure(module_closure);
+    loop {
+        info!("Tree: {:#?}", vm);
+        match vm.status() {
+            Status::CanRun => {
+                debug!("VM is still running.");
+                vm.run(&mut DbUseProvider { db: &db }, &mut RunForever);
+            }
+            Status::WaitingForOperations => {
+                todo!(
+                    "Running the module results in a deadlock caused by some channel operations."
+                );
+            }
+            _ => break,
+        }
+    }
+    info!("Tree: {:#?}", vm);
+    let TearDownResult {
+        tracer,
+        result,
+        mut heap,
+        ..
+    } = vm.tear_down();
 
-    let use_provider = DbUseProvider { db: &db };
-    let vm = Vm::new_for_running_module_closure(&use_provider, module_closure);
+    if options.debug {
+        module.dump_associated_debug_file("trace", &tracer.full_trace().format(&heap));
+    }
+
+    let exported_definitions: Struct = match result {
+        Ok(return_value) => {
+            info!(
+                "The module exports these definitions: {}",
+                return_value.format(&heap),
+            );
+            heap.get(return_value).data.clone().try_into().unwrap()
+        }
+        Err(reason) => {
+            error!("The module panicked because {reason}.");
+            error!("This is the stack trace:");
+            tracer.dump_stack_trace(&db, &heap);
+            return;
+        }
+    };
+
+    let main = heap.create_symbol("Main".to_string());
+    let main = match exported_definitions.get(&heap, main) {
+        Some(main) => main,
+        None => {
+            error!("The module doesn't contain a main function.");
+            return;
+        }
+    };
+
+    info!("Running main function.");
+    // TODO: Add more environment stuff.
+    let mut vm = Vm::new();
+    let mut stdout = StdoutService::new(&mut vm);
+    let environment = {
+        let stdout_symbol = heap.create_symbol("Stdout".to_string());
+        let stdout_port = heap.create_send_port(stdout.channel);
+        heap.create_struct(HashMap::from([(stdout_symbol, stdout_port)]))
+    };
+    vm.set_up_for_running_closure(heap, main, &[environment]);
+    loop {
+        info!("Tree: {:#?}", vm);
+        match vm.status() {
+            Status::CanRun => {
+                debug!("VM is still running.");
+                vm.run(&mut DbUseProvider { db: &db }, &mut RunForever);
+            }
+            Status::WaitingForOperations => {
+                todo!("VM can't proceed until some operations complete.");
+            }
+            _ => break,
+        }
+        stdout.run(&mut vm);
+        for channel in vm.unreferenced_channels.iter().copied().collect_vec() {
+            vm.free_channel(channel);
+        }
+    }
+    info!("Tree: {:#?}", vm);
     let TearDownResult {
         tracer,
         result,
         heap,
         ..
-    } = vm.run_synchronously_until_completion(&db);
+    } = vm.tear_down();
 
     match result {
-        Ok(return_value) => info!(
-            "The module exports these definitions: {}",
-            return_value.format(&heap)
-        ),
+        Ok(return_value) => info!("The main function returned: {}", return_value.format(&heap)),
         Err(reason) => {
-            error!("The module panicked because {reason}.");
+            error!("The main function panicked because {reason}.");
             error!("This is the stack trace:");
             tracer.dump_stack_trace(&db, &heap);
         }
     }
+}
 
-    if options.debug {
-        module.dump_associated_debug_file("trace", &tracer.format_call_tree(&heap));
+/// A state machine that corresponds to a loop that always calls `receive` on
+/// the stdout channel and then logs that packet.
+struct StdoutService {
+    channel: ChannelId,
+    current_receive: OperationId,
+}
+impl StdoutService {
+    fn new(vm: &mut Vm) -> Self {
+        let channel = vm.create_channel(1);
+        let current_receive = vm.receive(channel);
+        Self {
+            channel,
+            current_receive,
+        }
+    }
+    fn run(&mut self, vm: &mut Vm) {
+        if let Some(CompletedOperation::Received { packet }) =
+            vm.completed_operations.remove(&self.current_receive)
+        {
+            info!("Sent to stdout: {}", packet.value.format(&packet.heap));
+            self.current_receive = vm.receive(self.channel);
+        }
     }
 }
 

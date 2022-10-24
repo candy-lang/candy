@@ -1,0 +1,18 @@
+equals = (use "..equality").equals
+isInt = (use "..int").is
+isType = (use "..type").is
+
+isSendPort value := isType value SendPort
+isReceivePort value := isType value ReceivePort
+
+create capacity :=
+  needs (isInt capacity)
+  ✨.channelCreate capacity
+
+send port packet :=
+  needs (isSendPort port) "send needs a send port"
+  ✨.channelSend port packet
+
+receive port :=
+  needs (isReceivePort port) "receive needs a receive port"
+  ✨.channelReceive port

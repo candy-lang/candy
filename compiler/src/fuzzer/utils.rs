@@ -1,7 +1,7 @@
 use crate::{
     compiler::hir::{self, Expression, HirDb, Lambda},
     database::Database,
-    vm::tracer::{TraceEntry, Tracer},
+    vm::tracer::{EventData, Tracer},
 };
 
 pub fn did_need_in_closure_cause_panic(
@@ -9,7 +9,7 @@ pub fn did_need_in_closure_cause_panic(
     closure_id: &hir::Id,
     tracer: &Tracer,
 ) -> bool {
-    let entry = if let Some(entry) = tracer.log().last() {
+    let entry = if let Some(entry) = tracer.events.last() {
         entry
     } else {
         // The only way there's no trace log before the panic is when there's an
@@ -17,7 +17,7 @@ pub fn did_need_in_closure_cause_panic(
         // LIR. That's also definitely the fault of the function.
         return false;
     };
-    if let TraceEntry::NeedsStarted { id, .. } = entry {
+    if let EventData::NeedsStarted { id, .. } = &entry.data {
         let mut id = id.parent().unwrap();
         loop {
             if &id == closure_id {

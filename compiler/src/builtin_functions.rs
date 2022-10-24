@@ -4,6 +4,9 @@ use strum_macros::EnumIter;
 
 #[derive(Debug, EnumIter, PartialEq, Eq, Clone, Hash, Copy)]
 pub enum BuiltinFunction {
+    ChannelCreate,       // capacity -> [sendPort, receivePort]
+    ChannelSend,         // channel any -> Nothing
+    ChannelReceive,      // channel -> any
     Equals,              // any any -> booleanSymbol
     FunctionRun,         // (lambdaWith0Arguments) -> (returnValue: any)
     GetArgumentCount,    // closure -> argumentCount
@@ -22,6 +25,7 @@ pub enum BuiltinFunction {
     IntShiftLeft,        // (value: int) (amount: int) -> (shifted: int)
     IntShiftRight,       // (value: int) (amount: int) -> (shifted: int)
     IntSubtract,         // (minuend: int) (subtrahend: int) -> (difference: int)
+    Parallel,            // body: Closure -> returnValueOfClosure
     Print,               // message -> Nothing
     StructGet,           // struct key -> value
     StructGetKeys,       // struct -> listOfKeys
@@ -36,6 +40,7 @@ pub enum BuiltinFunction {
     TextStartsWith,      // text (pattern: text) -> booleanSymbol
     TextTrimEnd,         // text -> text
     TextTrimStart,       // text -> text
+    Try,                 // closure -> okWithClosureResultOrErrorWithPanicReason
     TypeOf,              // any -> typeSymbol
 }
 lazy_static! {

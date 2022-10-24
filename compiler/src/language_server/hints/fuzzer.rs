@@ -7,7 +7,11 @@ use crate::{
     database::Database,
     fuzzer::{Fuzzer, Status},
     module::Module,
-    vm::{tracer::TraceEntry, Heap, Pointer},
+    vm::{
+        context::{DbUseProvider, RunLimitedNumberOfInstructions},
+        tracer::EventData,
+        Heap, Pointer,
+    },
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
@@ -22,14 +26,13 @@ pub struct FuzzerManager {
 impl FuzzerManager {
     pub fn update_module(
         &mut self,
-        db: &Database,
         module: Module,
         heap: &Heap,
         fuzzable_closures: &[(Id, Pointer)],
     ) {
         let fuzzers = fuzzable_closures
             .iter()
-            .map(|(id, closure)| (id.clone(), Fuzzer::new(db, heap, *closure, id.clone())))
+            .map(|(id, closure)| (id.clone(), Fuzzer::new(heap, *closure, id.clone())))
             .collect();
         self.fuzzers.insert(module, fuzzers);
     }
@@ -51,7 +54,11 @@ impl FuzzerManager {
         );
 
         let fuzzer = running_fuzzers.choose_mut(&mut thread_rng())?;
-        fuzzer.run(db, 100);
+        fuzzer.run(
+            db,
+            &mut DbUseProvider { db },
+            &mut RunLimitedNumberOfInstructions::new(100),
+        );
 
         match &fuzzer.status() {
             Status::StillFuzzing { .. } => None,
@@ -103,15 +110,15 @@ impl FuzzerManager {
 
                 let second_hint = {
                     let panicking_inner_call = tracer
-                        .log()
+                        .events
                         .iter()
                         .rev()
                         // Find the innermost panicking call that is in the
                         // function.
                         .find(|entry| {
-                            let innermost_panicking_call_id = match entry {
-                                TraceEntry::CallStarted { id, .. } => id,
-                                TraceEntry::NeedsStarted { id, .. } => id,
+                            let innermost_panicking_call_id = match &entry.data {
+                                EventData::CallStarted { id, .. } => id,
+                                EventData::NeedsStarted { id, .. } => id,
                                 _ => return false,
                             };
                             id.is_same_module_and_any_parent_of(innermost_panicking_call_id)
@@ -126,11 +133,11 @@ impl FuzzerManager {
                             continue;
                         }
                     };
-                    let (call_id, name, arguments) = match panicking_inner_call {
-                        TraceEntry::CallStarted { id, closure, args } => {
+                    let (call_id, name, arguments) = match &panicking_inner_call.data {
+                        EventData::CallStarted { id, closure, args } => {
                             (id.clone(), closure.format(heap), args.clone())
                         }
-                        TraceEntry::NeedsStarted {
+                        EventData::NeedsStarted {
                             id,
                             condition,
                             reason,

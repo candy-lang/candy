@@ -6,18 +6,20 @@ pub use self::fuzzer::{Fuzzer, Status};
 use crate::{
     database::Database,
     module::Module,
-    vm::{use_provider::DbUseProvider, Closure, Vm},
+    vm::{
+        context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
+        Closure, Vm,
+    },
 };
 use itertools::Itertools;
 use tracing::info;
 
 pub async fn fuzz(db: &Database, module: Module) {
     let (fuzzables_heap, fuzzables) = {
-        let result = Vm::new_for_running_module_closure(
-            &DbUseProvider { db },
-            Closure::of_module(db, module.clone()).unwrap(),
-        )
-        .run_synchronously_until_completion(db);
+        let mut vm = Vm::new();
+        vm.set_up_for_running_module_closure(Closure::of_module(db, module.clone()).unwrap());
+        vm.run(&mut DbUseProvider { db }, &mut RunForever);
+        let result = vm.tear_down();
         (result.heap, result.fuzzable_closures)
     };
 
@@ -27,8 +29,13 @@ pub async fn fuzz(db: &Database, module: Module) {
     );
 
     for (id, closure) in fuzzables {
-        let mut fuzzer = Fuzzer::new(db, &fuzzables_heap, closure, id.clone());
-        fuzzer.run(db, 1000);
+        info!("Fuzzing {id}.");
+        let mut fuzzer = Fuzzer::new(&fuzzables_heap, closure, id.clone());
+        fuzzer.run(
+            db,
+            &mut DbUseProvider { db },
+            &mut RunLimitedNumberOfInstructions::new(1000),
+        );
         match fuzzer.status() {
             Status::StillFuzzing { .. } => {}
             Status::PanickedForArguments {
@@ -48,7 +55,7 @@ pub async fn fuzz(db: &Database, module: Module) {
                 info!("This was the stack trace:");
                 tracer.dump_stack_trace(db, heap);
 
-                module.dump_associated_debug_file("trace", &tracer.format_call_tree(heap));
+                module.dump_associated_debug_file("trace", &tracer.full_trace().format(heap));
             }
         }
     }

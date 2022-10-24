@@ -1,5 +1,11 @@
 bool := use ".bool"
+channel := use ".channel"
 check := (use ".check").check
+
+concurrency = use ".concurrency"
+parallel := concurrency.parallel
+async := concurrency.async
+await := concurrency.await
 
 conditionals = use ".conditionals"
 if := conditionals.if
