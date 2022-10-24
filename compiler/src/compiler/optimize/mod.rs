@@ -3,9 +3,9 @@
 // mod constant_folding;
 // mod inlining;
 // mod module_folding;
-// mod tree_shaking;
 mod complexity;
 mod follow_references;
+mod tree_shaking;
 mod utils;
 
 use super::mir::Mir;
@@ -61,9 +61,9 @@ impl Mir {
             warn!("Following references");
             self.follow_references();
             warn!("Still the same? {}", *self == before);
-            // warn!("Tree shaking");
-            // self.tree_shake();
-            // warn!("Still the same? {}", *self == before);
+            warn!("Tree shaking");
+            self.tree_shake();
+            warn!("Still the same? {}", *self == before);
             // warn!("Folding constants");
             // self.fold_constants();
             // warn!("Still the same? {}", *self == before);

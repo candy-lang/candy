@@ -1,69 +1,61 @@
-use crate::compiler::hir::{Body, Expression, Lambda};
+use crate::compiler::mir::{Expression, Id, Mir};
 use itertools::Itertools;
-use std::collections::HashSet;
-use tracing::warn;
+use std::collections::{HashMap, HashSet};
+use tracing::{debug, warn};
 
-impl Body {
+impl Mir {
     pub fn tree_shake(&mut self) {
         let mut keep = HashSet::new();
-        keep.insert(self.return_value());
+        Self::tree_shake_body(&mut keep, &mut self.expressions, &mut self.body);
+    }
+    fn tree_shake_body(
+        keep: &mut HashSet<Id>,
+        expressions: &mut HashMap<Id, Expression>,
+        body: &mut Vec<Id>,
+    ) {
+        // The return value is always needed.
+        keep.insert(*body.last().unwrap());
 
-        // TODO: Do this without cloning.
-        for id in self.ids.clone().into_iter().rev() {
-            // warn!(
-            //     "Tree shaking keep list: {}",
-            //     keep.iter().map(|id| format!("{id}")).join(", ")
-            // );
-
-            if self.expressions.get(&id).unwrap().is_pure() != Some(true) {
+        for id in body.iter().rev() {
+            // Definitely keep expressions that are impure or where we don't
+            // know if they are pure.
+            if !expressions.get(id).unwrap().is_pure() {
                 keep.insert(id.clone());
             }
 
+            // A later expression depends on this one.
             if keep.contains(&id) {
-                let mut child_ids = vec![];
-                self.expressions
-                    .get(&id)
-                    .unwrap()
-                    .collect_all_ids(&mut child_ids);
-                if format!("{child_ids:?}").contains("✨") {
-                    warn!("Sparkles were added to the keep list because {id} needs them.");
-                }
-                keep.extend(child_ids.into_iter());
+                keep.extend(id.referenced_ids(expressions));
 
-                if let Expression::Lambda(lambda) = self.expressions.get_mut(&id).unwrap() {
-                    lambda.body.tree_shake();
+                let mut temporary = id.temporarily_get_mut(expressions);
+                if let Expression::Lambda { body, .. } = &mut temporary.expression {
+                    Self::tree_shake_body(keep, temporary.remaining, body);
                 }
             } else {
-                warn!("{id} will be optmized away");
+                debug!("Removing {id} because it's pure but unused.");
             }
         }
 
-        self.ids.retain(|id| keep.contains(id));
-        self.expressions.retain(|id, _| keep.contains(id));
-        self.identifiers.retain(|id, _| keep.contains(id));
+        body.retain(|id| keep.contains(id));
     }
 }
 
 impl Expression {
-    fn is_pure(&self) -> Option<bool> {
+    fn is_pure(&self) -> bool {
         match self {
-            Expression::Int(_) => Some(true),
-            Expression::Text(_) => Some(true),
-            Expression::Reference(_) => Some(true),
-            Expression::Symbol(_) => Some(true),
-            Expression::Struct(_) => Some(true),
-            Expression::Lambda(_) => Some(true),
-            Expression::Builtin(_) => Some(true),
-            Expression::Call {
-                function,
-                arguments,
-            } => None,
-            Expression::UseModule {
-                current_module,
-                relative_path,
-            } => Some(false),
-            Expression::Needs { condition, reason } => Some(false),
-            Expression::Error { child, errors } => Some(false),
+            Expression::Int(_) => true,
+            Expression::Text(_) => true,
+            Expression::Reference(_) => true,
+            Expression::Symbol(_) => true,
+            Expression::Struct(_) => true,
+            Expression::Lambda { .. } => true,
+            Expression::Builtin(_) => true,
+            Expression::Responsibility(_) => true,
+            Expression::Call { .. } => false,
+            Expression::UseModule { .. } => false,
+            Expression::Needs { .. } => false,
+            Expression::Error { child, errors } => false,
+            Expression::Panic { .. } => false,
         }
     }
 }
