@@ -57,10 +57,10 @@ impl Mir {
         loop {
             let before = self.clone();
 
-            // warn!("Optimizing self-contained obvious things");
-            // warn!("Following references");
-            // self.follow_references();
-            // warn!("Still the same? {}", *self == before);
+            warn!("Optimizing self-contained obvious things");
+            warn!("Following references");
+            self.follow_references();
+            warn!("Still the same? {}", *self == before);
             // warn!("Tree shaking");
             // self.tree_shake();
             // warn!("Still the same? {}", *self == before);
