@@ -200,10 +200,11 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
     let mut mir = tracing::span!(Level::DEBUG, "Turning HIR to MIR").in_scope(|| {
         let mir = db.mir(module.clone()).unwrap();
         info!("MIR: {mir:?}");
+        mir
     });
-    tracing::span!(Level::DEBUG, "Optimizing HIR").in_scope(|| {
-        let mut hir = (*hir).clone();
-        hir.optimize(&db);
+    tracing::span!(Level::DEBUG, "Optimizing MIR").in_scope(|| {
+        let mut mir = (*mir).clone();
+        mir.optimize(&db);
     });
 
     let lir = tracing::span!(Level::DEBUG, "Lowering HIR to LIR").in_scope(|| {

@@ -1,23 +1,21 @@
 // mod constant_folding;
 // mod inlining;
 // mod constant_folding;
-// mod follow_references;
 // mod inlining;
 // mod module_folding;
 // mod tree_shaking;
 mod complexity;
+mod follow_references;
 mod utils;
 
-use super::hir::Body;
+use super::mir::Mir;
 use crate::{database::Database, module::Module};
 use tracing::warn;
 
-impl Body {
+impl Mir {
     pub fn optimize(&mut self, db: &Database) {
-        todo!("Implement optimizations");
-
-        warn!("HIR: {self}");
-        // warn!("Complexity: {}", self.complexity());
+        warn!("MIR: {self:?}");
+        warn!("Complexity: {}", self.complexity());
         self.optimize_obvious(db, &[]);
         warn!("Done optimizing.");
         // warn!("Complexity: {}", self.complexity());
@@ -25,13 +23,13 @@ impl Body {
         // warn!("Complexity: {}", self.complexity());
         // warn!("Following references");
         // self.follow_references();
-        // warn!("HIR: {self}");
+        // warn!("MIR: {self:?}");
         // warn!("Tree shaking");
         // self.tree_shake();
-        // warn!("HIR: {self}");
+        // warn!("MIR: {self:?}");
         // warn!("Folding constants");
         // self.fold_constants();
-        // warn!("HIR: {self}");
+        // warn!("MIR: {self:?}");
         // warn!("Inlining");
         // inline HirId(user:"/home/marcel/projects/candy":packages/Benchmark:78)
         // let call = self.ids[2].clone();
@@ -39,16 +37,16 @@ impl Body {
         // self.inline_functions_containing_use();
         // self.tree_shake();
         // warn!("{result:?}");
-        warn!("HIR: {self}");
+        warn!("MIR: {self:?}");
     }
 
     /// Performs optimizations without negative effects.
     pub fn optimize_obvious(&mut self, db: &Database, import_chain: &[Module]) {
         warn!("Optimizing obvious. Import chain: {import_chain:?}");
         self.optimize_obvious_self_contained();
-        // warn!("HIR: {self}");
+        // warn!("MIR: {self:?}");
         warn!("Folding modules");
-        // warn!("HIR: {self}");
+        // warn!("MIR: {self:?}");
         // self.fold_modules(db, import_chain);
         self.optimize_obvious_self_contained();
     }

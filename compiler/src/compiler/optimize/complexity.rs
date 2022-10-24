@@ -14,7 +14,7 @@ impl Complexity {
             expressions: 0,
         }
     }
-    fn single() -> Self {
+    fn single_expression() -> Self {
         Self {
             is_self_contained: true,
             expressions: 1,
@@ -46,32 +46,29 @@ impl fmt::Display for Complexity {
     }
 }
 
-impl Body {
+impl Mir {
     pub fn complexity(&self) -> Complexity {
-        let mut complexity = Complexity::none();
-        for (_, expression) in &self.expressions {
-            complexity = complexity + expression.complexity();
-        }
-        complexity
+        self.complexity_of_many(&self.body)
     }
-}
-impl Expression {
-    fn complexity(&self) -> Complexity {
-        match self {
-            Expression::Int(_) => Complexity::single(),
-            Expression::Text(_) => Complexity::single(),
-            Expression::Reference(_) => Complexity::single(),
-            Expression::Symbol(_) => Complexity::single(),
-            Expression::Struct(_) => Complexity::single(),
-            Expression::Lambda(lambda) => Complexity::single() + lambda.body.complexity(),
-            Expression::Builtin(_) => Complexity::single(),
-            Expression::Call { .. } => Complexity::single(),
+
+    fn complexity_of_single(&self, id: &Id) -> Complexity {
+        match self.expressions.get(id).unwrap() {
+            Expression::Lambda { body, .. } => {
+                Complexity::single_expression() + self.complexity_of_many(body)
+            }
             Expression::UseModule { .. } => Complexity {
                 is_self_contained: false,
                 expressions: 1,
             },
-            Expression::Needs { .. } => Complexity::single(),
-            Expression::Error { .. } => Complexity::single(),
+            _ => Complexity::single_expression(),
         }
+    }
+
+    fn complexity_of_many(&self, ids: &[Id]) -> Complexity {
+        let mut complexity = Complexity::none();
+        for id in ids {
+            complexity = complexity + self.complexity_of_single(id);
+        }
+        complexity
     }
 }
