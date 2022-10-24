@@ -52,9 +52,6 @@ struct LoweringContext {
 }
 impl LoweringContext {
     fn compile_expression(&mut self, id: &hir::Id, expression: &Expression) {
-        let span = span!(Level::TRACE, "Compiling expression {expression:?}");
-        let _enter = span.enter();
-
         match expression {
             Expression::Int(int) => self.emit_create_int(id.clone(), int.clone()),
             Expression::Text(text) => self.emit_create_text(id.clone(), text.clone()),

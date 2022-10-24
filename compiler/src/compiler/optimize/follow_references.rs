@@ -16,7 +16,7 @@ impl Mir {
         for id in body {
             id.replace_id_references(expressions, &mut |id| {
                 if let Some(replacement) = replacements.get(id) {
-                    debug!("Replacing occurrence {id} with {replacement}.");
+                    debug!("Replacing reference to {id} with {replacement}.");
                     *id = *replacement;
                 }
             });

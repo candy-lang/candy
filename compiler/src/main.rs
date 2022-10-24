@@ -428,7 +428,18 @@ fn init_logger() {
                     .unwrap_or_default()
                     .starts_with("candy")
         }))
-        .with_filter(filter::filter_fn(level_for("candy::compiler", Level::WARN)))
+        .with_filter(filter::filter_fn(level_for(
+            "candy::compiler::optimize",
+            Level::DEBUG,
+        )))
+        .with_filter(filter::filter_fn(level_for(
+            "candy::compiler::string_to_rcst",
+            Level::WARN,
+        )))
+        // .with_filter(filter::filter_fn(level_for(
+        //     "candy::compiler",
+        //     Level::DEBUG,
+        // )))
         .with_filter(filter::filter_fn(level_for(
             "candy::language_server",
             Level::DEBUG,
