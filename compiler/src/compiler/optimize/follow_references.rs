@@ -1,6 +1,6 @@
 use crate::compiler::mir::{Expression, Id, Mir};
 use std::collections::HashMap;
-use tracing::warn;
+use tracing::{debug, warn};
 
 impl Mir {
     pub fn follow_references(&mut self) {
@@ -14,10 +14,10 @@ impl Mir {
         replacements: &mut HashMap<Id, Id>,
     ) {
         for id in body {
-            expressions.get_mut(&id).unwrap().replace_ids(&mut |id| {
+            id.replace_id_references(expressions, &mut |id| {
                 if let Some(replacement) = replacements.get(id) {
-                    warn!("Following reference");
-                    *id = replacement.clone();
+                    debug!("Replacing occurrence {id} with {replacement}.");
+                    *id = *replacement;
                 }
             });
             match expressions.get(&id).unwrap().clone() {
