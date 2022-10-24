@@ -195,7 +195,11 @@ pub struct TemporaryExpression<'a> {
 }
 impl<'a> Drop for TemporaryExpression<'a> {
     fn drop(&mut self) {
-        self.remaining.insert(self.id, self.expression.clone());
+        // If the ID was manually inserted in the meantime, that's supposed to
+        // be a newer value.
+        self.remaining
+            .entry(self.id)
+            .or_insert_with(|| self.expression.clone());
     }
 }
 

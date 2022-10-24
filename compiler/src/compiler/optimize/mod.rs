@@ -63,11 +63,7 @@ impl Mir {
             warn!("Still the same? {}", *self == before);
             warn!("Tree shaking");
             self.tree_shake();
-            warn!("Still the same? {}", *self == before);
-            // warn!("Folding constants");
-            // self.fold_constants();
-            // warn!("Still the same? {}", *self == before);
-            // warn!("Inlining functions containing use");
+            self.fold_constants();
             // self.inline_functions_containing_use();
             // warn!("Still the same? {}", *self == before);
             // warn!("Complexity: {}", self.complexity());

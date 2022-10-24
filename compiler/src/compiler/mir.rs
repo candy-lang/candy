@@ -125,8 +125,7 @@ impl hash::Hash for Expression {
 impl fmt::Debug for Mir {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for id in &self.body {
-            let expression = self.expressions.get(id).unwrap();
-            writeln!(f, "{id} = {}", expression.format(self))?;
+            writeln!(f, "{id} = {}", id.format(&self.expressions))?;
         }
         Ok(())
     }
@@ -136,9 +135,9 @@ impl fmt::Display for Id {
         write!(f, "${}", self.0)
     }
 }
-impl Expression {
-    fn format(&self, mir: &Mir) -> String {
-        match self {
+impl Id {
+    pub fn format(self, expressions: &HashMap<Id, Expression>) -> String {
+        match expressions.get(&self).unwrap() {
             Expression::Int(int) => format!("{int}"),
             Expression::Text(text) => format!("{text:?}"),
             Expression::Symbol(symbol) => format!("{symbol}"),
@@ -174,8 +173,7 @@ impl Expression {
                 },
                 body.iter()
                     .map(|id| {
-                        let expression = mir.expressions.get(id).unwrap();
-                        format!("{id} = {}", expression.format(mir))
+                        format!("{id} = {}", id.format(expressions))
                     })
                     .join("\n")
                     .lines()
@@ -188,8 +186,12 @@ impl Expression {
                 responsible,
             } => {
                 format!(
-                    "{function} {} ({responsible} is responsible)",
-                    arguments.iter().map(|arg| format!("{arg}")).join(" ")
+                    "call {function} with {} ({responsible} is responsible)",
+                    if arguments.is_empty() {
+                        "no arguments".to_string()
+                    } else {
+                        arguments.iter().map(|arg| format!("{arg}")).join(" ")
+                    }
                 )
             }
             Expression::UseModule {

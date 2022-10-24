@@ -1,39 +1,36 @@
 use crate::{
     builtin_functions::BuiltinFunction,
-    compiler::hir::{Body, Expression, Id},
+    compiler::mir::{Expression, Id, Mir},
 };
-use im::HashMap;
 use itertools::Itertools;
-use tracing::warn;
+use std::collections::HashMap;
+use tracing::{debug, warn};
 
-impl Body {
+impl Mir {
     pub fn fold_constants(&mut self) {
-        self.fold_inner_constants(HashMap::new());
+        Self::fold_inner_constants(&mut self.expressions, &mut self.body);
     }
+    fn fold_inner_constants(expressions: &mut HashMap<Id, Expression>, body: &mut Vec<Id>) {
+        for id in body {
+            let mut temporary = id.temporarily_get_mut(expressions);
 
-    fn fold_inner_constants(&mut self, mut previous_expressions: HashMap<Id, Expression>) {
-        for id in self.ids.clone() {
-            match self.expressions.get_mut(&id).unwrap() {
-                Expression::Lambda(lambda) => {
-                    lambda
-                        .body
-                        .fold_inner_constants(previous_expressions.clone());
+            match &mut temporary.expression {
+                Expression::Lambda { body, .. } => {
+                    Self::fold_inner_constants(&mut temporary.remaining, body);
                 }
                 Expression::Call {
                     function,
                     arguments,
+                    responsible,
                 } => {
-                    let function = function.clone();
-                    let arguments = arguments.clone();
-
-                    if let Some(Expression::Builtin(builtin)) = self.find(&function) &&
-                        let Some(expression) = Self::run_builtin(*builtin, arguments, &previous_expressions)
+                    if let Some(Expression::Builtin(builtin)) = temporary.remaining.get(&function) &&
+                        let Some(expression) = Self::run_builtin(*builtin, arguments, &temporary.remaining)
                     {
-                        self.expressions.insert(id.clone(), expression.clone());
-                        warn!("Struct access {id} inlined to {expression}.");
+                        temporary.remaining.insert(*id, expression);
+                        debug!("Builtin {id} inlined to {}.", id.format(temporary.remaining));
                     }
                 }
-                Expression::Needs { condition, reason } => {
+                Expression::Needs { condition, reason, responsible } => {
                     // TODO: Check if the condition is const. If it's true,
                     // remove the need. Otherwise, replace it with a panic.
                 }
@@ -42,20 +39,19 @@ impl Body {
                 }
                 _ => {}
             }
-            previous_expressions.insert(id.clone(), self.expressions.get(&id).unwrap().clone());
         }
     }
 
     fn run_builtin(
         builtin: BuiltinFunction,
-        arguments: Vec<Id>,
+        arguments: &[Id],
         expressions: &HashMap<Id, Expression>,
     ) -> Option<Expression> {
-        warn!("Constant folding candidate: builtin{builtin:?}");
-        warn!(
-            "Arguments: {}",
-            arguments.iter().map(|arg| format!("{arg}")).join(", ")
-        );
+        // warn!("Constant folding candidate: builtin{builtin:?}");
+        // warn!(
+        //     "Arguments: {}",
+        //     arguments.iter().map(|arg| format!("{arg}")).join(", ")
+        // );
         // warn!(
         //     "Expressions:\n{}",
         //     expressions
@@ -71,12 +67,12 @@ impl Body {
                     return None;
                 }
 
-                let a = arguments[0].clone();
-                let b = arguments[1].clone();
+                let a = arguments[0];
+                let b = arguments[1];
 
                 let mut are_equal = a == b;
                 if !are_equal {
-                    let Some(comparison) = equals(expressions, &a, &b) else { return None; };
+                    let Some(comparison) = a.semantically_equals(b, expressions) else { return None; };
                     are_equal = comparison;
                 };
 
@@ -111,23 +107,21 @@ impl Body {
                 let key_id = arguments[1].clone();
 
                 let Some(Expression::Struct(fields)) = expressions.get(&struct_id) else {
-                    warn!("builtinStructGet called with non-constant struct");
+                    // warn!("builtinStructGet called with non-constant struct");
                     return None;
                 };
-                let key = expressions.get(&key_id).unwrap();
 
-                if fields.keys().all(|key| is_constant(expressions, key))
-                    && is_constant(expressions, &key_id)
+                if fields.keys().all(|key| key.is_constant(expressions))
+                    && key_id.is_constant(expressions)
                 {
                     let value = fields
                         .iter()
-                        .find(|(k, _)| equals(expressions, &key_id, k).unwrap_or(false))
+                        .find(|(k, _)| k.semantically_equals(key_id, expressions).unwrap_or(false))
                         .map(|(_, value)| value.clone());
                     if let Some(value) = value {
                         Expression::Reference(value.clone())
                     } else {
                         // panic
-                        // self.expressions.insert(id, Expression::Panic {})
                         warn!("Struct access will panic.");
                         return None;
                     }
@@ -152,63 +146,5 @@ impl Body {
             // BuiltinFunction::TypeOf => todo!(),
             _ => return None,
         })
-    }
-}
-
-fn equals(expressions: &HashMap<Id, Expression>, a: &Id, b: &Id) -> Option<bool> {
-    if a == b {
-        return Some(true);
-    }
-    let a_expr = expressions.get(a).unwrap();
-    let b_expr = expressions.get(a).unwrap();
-    if let Expression::Reference(reference) = a_expr {
-        return equals(expressions, reference, b);
-    }
-    if let Expression::Reference(reference) = b_expr {
-        return equals(expressions, a, reference);
-    }
-
-    match (expressions.get(a).unwrap(), expressions.get(b).unwrap()) {
-        (Expression::Int(a), Expression::Int(b)) => Some(a == b),
-        (Expression::Text(a), Expression::Text(b)) => Some(a == b),
-        (Expression::Symbol(a), Expression::Symbol(b)) => Some(a == b),
-        (Expression::Struct(a), Expression::Struct(b)) => {
-            // TODO
-            todo!()
-        }
-        // Also consider lambdas equal where only some IDs are named
-        // differently.
-        (Expression::Lambda(a), Expression::Lambda(b)) => Some(a == b),
-        (Expression::Builtin(a), Expression::Builtin(b)) => Some(a == b),
-        (Expression::Call { .. }, _)
-        | (Expression::UseModule { .. }, _)
-        | (Expression::Needs { .. }, _)
-        | (Expression::Error { .. }, _)
-        | (_, Expression::Call { .. })
-        | (_, Expression::UseModule { .. })
-        | (_, Expression::Needs { .. })
-        | (_, Expression::Error { .. }) => None,
-        (_, _) => Some(false),
-    }
-}
-
-pub fn is_constant(expressions: &HashMap<Id, Expression>, id: &Id) -> bool {
-    match &expressions.get(id).unwrap() {
-        Expression::Int(_)
-        | Expression::Text(_)
-        | Expression::Symbol(_)
-        | Expression::Builtin(_) => true,
-        Expression::Reference(id) => is_constant(expressions, &id),
-        Expression::Struct(fields) => fields
-            .iter()
-            .all(|(key, value)| is_constant(expressions, key) && is_constant(expressions, value)),
-        Expression::Lambda(lambda) => lambda
-            .captured_ids(id)
-            .iter()
-            .all(|id| is_constant(expressions, id)),
-        Expression::Call { .. }
-        | Expression::UseModule { .. }
-        | Expression::Needs { .. }
-        | Expression::Error { .. } => false,
     }
 }
