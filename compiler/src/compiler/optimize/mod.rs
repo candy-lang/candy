@@ -1,8 +1,8 @@
-// mod module_folding;
 mod complexity;
 mod constant_folding;
 mod follow_references;
 mod inlining;
+mod module_folding;
 mod tree_shaking;
 mod utils;
 
@@ -15,26 +15,11 @@ impl Mir {
         debug!("MIR: {self:?}");
         debug!("Complexity: {}", self.complexity());
         self.optimize_obvious(db, &[]);
+        debug!("MIR: {self:?}");
+        // debug!("Folding modules");
+        // self.fold_modules(db, &[]);
         debug!("Done optimizing.");
         // debug!("Complexity: {}", self.complexity());
-        // self.tree_shake();
-        // debug!("Complexity: {}", self.complexity());
-        // debug!("Following references");
-        // self.follow_references();
-        // debug!("MIR: {self:?}");
-        // debug!("Tree shaking");
-        // self.tree_shake();
-        // debug!("MIR: {self:?}");
-        // debug!("Folding constants");
-        // self.fold_constants();
-        // debug!("MIR: {self:?}");
-        // debug!("Inlining");
-        // inline HirId(user:"/home/marcel/projects/candy":packages/Benchmark:78)
-        // let call = self.ids[2].clone();
-        // let result = self.inline_call(&call);
-        // self.inline_functions_containing_use();
-        // self.tree_shake();
-        // debug!("{result:?}");
         debug!("MIR: {self:?}");
     }
 
@@ -44,8 +29,8 @@ impl Mir {
         self.optimize_obvious_self_contained();
         // debug!("MIR: {self:?}");
         debug!("Folding modules");
+        self.fold_modules(db, import_chain);
         // debug!("MIR: {self:?}");
-        // self.fold_modules(db, import_chain);
         self.optimize_obvious_self_contained();
     }
 

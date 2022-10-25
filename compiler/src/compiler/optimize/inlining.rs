@@ -43,7 +43,7 @@ impl Mir {
             .collect();
         let ids_to_insert = body
             .iter()
-            .map(|id| id.deep_copy(id_generator, expressions, &mut mapping))
+            .map(|id| id.deep_clone(id_generator, expressions, &mut mapping))
             .collect_vec();
         debug!(
             "Id mapping: {}",
@@ -79,7 +79,7 @@ impl Mir {
 }
 
 impl Id {
-    fn deep_copy(
+    fn deep_clone(
         self,
         id_generator: &mut IdGenerator<Id>,
         expressions: &mut HashMap<Id, Expression>,
@@ -113,7 +113,7 @@ impl Id {
                 responsible_parameter: mapping[&responsible_parameter],
                 body: body
                     .iter()
-                    .map(|id| id.deep_copy(id_generator, expressions, mapping))
+                    .map(|id| id.deep_clone(id_generator, expressions, mapping))
                     .collect(),
                 fuzzable,
             },
@@ -157,8 +157,8 @@ impl Id {
             },
         };
         let id = id_generator.generate();
-        mapping.insert(self, id);
         expressions.insert(id, expression);
+        mapping.insert(self, id);
         id
     }
 }

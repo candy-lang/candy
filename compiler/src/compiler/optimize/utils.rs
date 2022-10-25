@@ -140,8 +140,8 @@ impl Id {
         if self == other {
             return Some(true);
         }
-        let self_expr = expressions.get(&self).unwrap();
-        let other_expr = expressions.get(&other).unwrap();
+        let self_expr = expressions.get(&self)?;
+        let other_expr = expressions.get(&other)?;
         if let Expression::Reference(reference) = self_expr {
             return reference.semantically_equals(other, expressions);
         }
