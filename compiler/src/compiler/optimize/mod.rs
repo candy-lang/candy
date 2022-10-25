@@ -2,12 +2,13 @@
 mod complexity;
 mod constant_folding;
 mod follow_references;
+mod inlining;
 mod tree_shaking;
 mod utils;
 
 use super::mir::Mir;
 use crate::{database::Database, module::Module};
-use tracing::{debug, warn};
+use tracing::debug;
 
 impl Mir {
     pub fn optimize(&mut self, db: &Database) {

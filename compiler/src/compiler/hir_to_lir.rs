@@ -9,7 +9,6 @@ use crate::{builtin_functions::BuiltinFunction, module::Module};
 use itertools::Itertools;
 use num_bigint::BigUint;
 use std::sync::Arc;
-use tracing::{span, Level};
 
 #[salsa::query_group(HirToLirStorage)]
 pub trait HirToLir: CstDb + AstToHir {

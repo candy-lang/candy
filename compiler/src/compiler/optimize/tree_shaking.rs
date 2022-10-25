@@ -1,7 +1,6 @@
 use crate::compiler::mir::{Expression, Id, Mir};
-use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
-use tracing::{debug, warn};
+use tracing::debug;
 
 impl Mir {
     pub fn tree_shake(&mut self) {
@@ -54,8 +53,8 @@ impl Expression {
             Expression::Call { .. } => false,
             Expression::UseModule { .. } => false,
             Expression::Needs { .. } => false,
-            Expression::Error { child, errors } => false,
             Expression::Panic { .. } => false,
+            Expression::Error { .. } => false,
         }
     }
 }

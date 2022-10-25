@@ -2,7 +2,6 @@ use crate::{
     builtin_functions::BuiltinFunction,
     compiler::mir::{Expression, Id, Mir},
 };
-use itertools::Itertools;
 use std::collections::HashMap;
 use tracing::{debug, warn};
 
@@ -21,7 +20,7 @@ impl Mir {
                 Expression::Call {
                     function,
                     arguments,
-                    responsible,
+                    ..
                 } => {
                     if let Some(Expression::Builtin(builtin)) = temporary.remaining.get(&function) &&
                         let Some(expression) = Self::run_builtin(*builtin, arguments, &temporary.remaining)

@@ -1,6 +1,6 @@
 use crate::compiler::mir::{Expression, Id, Mir};
 use std::collections::HashMap;
-use tracing::{debug, warn};
+use tracing::debug;
 
 impl Mir {
     pub fn follow_references(&mut self) {

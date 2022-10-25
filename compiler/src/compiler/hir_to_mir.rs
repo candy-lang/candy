@@ -1,16 +1,11 @@
 use super::{
     ast_to_hir::AstToHir,
     cst::CstDb,
-    error::CompilerError,
     hir,
-    lir::{Instruction, Lir, StackOffset},
     mir::{Expression, Id, Mir},
 };
-use crate::{builtin_functions::BuiltinFunction, module::Module, utils::IdGenerator};
-use itertools::Itertools;
-use num_bigint::BigUint;
+use crate::{module::Module, utils::IdGenerator};
 use std::{collections::HashMap, sync::Arc};
-use tracing::{span, Level};
 
 #[salsa::query_group(HirToMirStorage)]
 pub trait HirToMir: CstDb + AstToHir {

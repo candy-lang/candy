@@ -198,11 +198,6 @@ pub struct Body {
     pub expressions: LinkedHashMap<Id, Expression>,
     pub identifiers: HashMap<Id, String>,
 }
-impl Body {
-    pub fn return_value(&self) -> Id {
-        self.expressions.keys().last().expect("empty body").clone()
-    }
-}
 impl hash::Hash for Body {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.expressions.hash(state);

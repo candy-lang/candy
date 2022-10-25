@@ -6,7 +6,7 @@ use crate::{
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::{collections::HashMap, fmt, hash, ops::Index};
+use std::{collections::HashMap, fmt, hash};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Mir {
@@ -115,7 +115,7 @@ impl hash::Hash for Expression {
                 reason.hash(state);
                 responsible.hash(state);
             }
-            Expression::Error { child, errors } => {
+            Expression::Error { errors, .. } => {
                 errors.hash(state);
             }
         }
@@ -210,7 +210,7 @@ impl Id {
                 reason,
                 responsible,
             } => format!("panicking because {reason} ({responsible} is at fault)"),
-            Expression::Error { child, errors } => {
+            Expression::Error { errors, .. } => {
                 format!("{}\n{}",
                     format!("{}", if errors.len() == 1 { "error" } else { "errors" }),
                     errors.iter().map(|error| format!("  {error:?}")).join("\n"),
