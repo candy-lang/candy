@@ -1,3 +1,4 @@
+mod common_subtree_elimination;
 mod complexity;
 mod constant_folding;
 mod follow_references;
@@ -15,22 +16,15 @@ impl Mir {
         debug!("MIR: {self:?}");
         debug!("Complexity: {}", self.complexity());
         self.optimize_obvious(db, &[]);
-        debug!("MIR: {self:?}");
-        // debug!("Folding modules");
-        // self.fold_modules(db, &[]);
         debug!("Done optimizing.");
-        // debug!("Complexity: {}", self.complexity());
         debug!("MIR: {self:?}");
+        debug!("Complexity: {}", self.complexity());
     }
 
     /// Performs optimizations without negative effects.
     pub fn optimize_obvious(&mut self, db: &Database, import_chain: &[Module]) {
-        debug!("Optimizing obvious. Import chain: {import_chain:?}");
         self.optimize_obvious_self_contained();
-        // debug!("MIR: {self:?}");
-        debug!("Folding modules");
         self.fold_modules(db, import_chain);
-        // debug!("MIR: {self:?}");
         self.optimize_obvious_self_contained();
     }
 
@@ -40,13 +34,11 @@ impl Mir {
         loop {
             let before = self.clone();
 
-            debug!("Optimizing self-contained obvious things");
             self.follow_references();
             self.tree_shake();
             self.fold_constants();
             self.inline_functions_containing_use();
-
-            debug!("Complexity: {}", self.complexity());
+            self.eliminate_common_subtrees();
 
             if *self == before {
                 return;

@@ -106,7 +106,7 @@ impl Mir {
                 let key_id = arguments[1].clone();
 
                 let Some(Expression::Struct(fields)) = expressions.get(&struct_id) else {
-                    // warn!("builtinStructGet called with non-constant struct");
+                    warn!("builtinStructGet called with non-constant struct {struct_id}");
                     return None;
                 };
 
@@ -121,7 +121,7 @@ impl Mir {
                         Expression::Reference(value.clone())
                     } else {
                         // panic
-                        warn!("Struct access will panic.");
+                        warn!("Struct access will panic because key {key_id} isn't in there.");
                         return None;
                     }
                 } else {

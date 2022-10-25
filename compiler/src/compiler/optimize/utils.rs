@@ -161,6 +161,26 @@ impl Id {
     }
 }
 
+impl Expression {
+    pub fn is_pure(&self) -> bool {
+        match self {
+            Expression::Int(_) => true,
+            Expression::Text(_) => true,
+            Expression::Reference(_) => true,
+            Expression::Symbol(_) => true,
+            Expression::Struct(_) => true,
+            Expression::Lambda { .. } => true,
+            Expression::Builtin(_) => true,
+            Expression::Responsibility(_) => true,
+            Expression::Call { .. } => false,
+            Expression::UseModule { .. } => false,
+            Expression::Needs { .. } => false,
+            Expression::Panic { .. } => false,
+            Expression::Error { .. } => false,
+        }
+    }
+}
+
 impl Id {
     /// When traversing the expressions, we sometimes want to mutably borrow
     /// some part of an outer expression (for example, a lambda's body) while

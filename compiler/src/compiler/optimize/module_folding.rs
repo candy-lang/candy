@@ -68,7 +68,6 @@ impl Mir {
                         chain
                     };
                     mir.optimize_obvious(db, &import_chain);
-                    // debug!("Optimized imported module: {mir:?}");
 
                     let mapping: HashMap<Id, Id> = mir
                         .body

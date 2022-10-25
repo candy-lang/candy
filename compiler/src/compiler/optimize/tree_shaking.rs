@@ -38,23 +38,3 @@ impl Mir {
         body.retain(|id| keep.contains(id));
     }
 }
-
-impl Expression {
-    fn is_pure(&self) -> bool {
-        match self {
-            Expression::Int(_) => true,
-            Expression::Text(_) => true,
-            Expression::Reference(_) => true,
-            Expression::Symbol(_) => true,
-            Expression::Struct(_) => true,
-            Expression::Lambda { .. } => true,
-            Expression::Builtin(_) => true,
-            Expression::Responsibility(_) => true,
-            Expression::Call { .. } => false,
-            Expression::UseModule { .. } => false,
-            Expression::Needs { .. } => false,
-            Expression::Panic { .. } => false,
-            Expression::Error { .. } => false,
-        }
-    }
-}
