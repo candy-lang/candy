@@ -1,9 +1,6 @@
-use crate::compiler::mir::{Expression, Id, Mir};
-use core::fmt;
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Add,
-};
+use crate::compiler::mir::{Expression, Id};
+use std::collections::{HashMap, HashSet};
+use tracing::debug;
 
 impl Id {
     /// All IDs defined inside the expression of this ID. For all expressions
@@ -92,7 +89,7 @@ impl Id {
                 referenced.push(*reason);
                 referenced.push(*responsible);
             }
-            Expression::Error { child, errors } => {
+            Expression::Error { child, .. } => {
                 if let Some(child) = child {
                     child.collect_referenced_ids(expressions, referenced);
                 }
@@ -233,7 +230,7 @@ impl Id {
                 parameters,
                 responsible_parameter,
                 body,
-                ..
+                fuzzable: _,
             } => {
                 for parameter in parameters {
                     replacer(parameter);
@@ -254,7 +251,14 @@ impl Id {
                 }
                 replacer(responsible);
             }
-            Expression::UseModule { relative_path, .. } => replacer(relative_path),
+            Expression::UseModule {
+                current_module: _,
+                relative_path,
+                responsible,
+            } => {
+                replacer(relative_path);
+                replacer(responsible);
+            }
             Expression::Needs {
                 responsible,
                 condition,

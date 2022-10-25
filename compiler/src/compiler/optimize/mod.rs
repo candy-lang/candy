@@ -1,4 +1,3 @@
-// mod inlining;
 // mod module_folding;
 mod complexity;
 mod constant_folding;
@@ -59,7 +58,7 @@ impl Mir {
             self.follow_references();
             self.tree_shake();
             self.fold_constants();
-            // self.inline_functions_containing_use();
+            self.inline_functions_containing_use();
 
             debug!("Complexity: {}", self.complexity());
 
