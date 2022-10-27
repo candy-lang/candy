@@ -1,44 +1,40 @@
-use crate::compiler::mir::{Expression, Id};
+use crate::compiler::mir::{Body, Expression, Id, Mir, VisibleExpressions};
 use std::collections::{HashMap, HashSet};
-use tracing::debug;
+use tracing::error;
 
-impl Id {
-    /// All IDs defined inside the expression of this ID. For all expressions
-    /// except lambdas, this only returns the single ID itself.
-    pub fn defined_ids(self, expressions: &HashMap<Id, Expression>) -> Vec<Id> {
+impl Expression {
+    /// All IDs defined inside this expression. For all expressions except
+    /// lambdas, this returns an empty vector.
+    pub fn defined_ids(&self) -> Vec<Id> {
         let mut defined = vec![];
-        self.collect_defined_ids(expressions, &mut defined);
+        self.collect_defined_ids(&mut defined);
         defined
     }
-    fn collect_defined_ids(self, expressions: &HashMap<Id, Expression>, defined: &mut Vec<Id>) {
-        defined.push(self);
+    fn collect_defined_ids(&self, defined: &mut Vec<Id>) {
         if let Expression::Lambda {
             parameters,
             responsible_parameter,
             body,
             ..
-        } = expressions.get(&self).unwrap()
+        } = self
         {
             defined.extend(parameters);
             defined.push(*responsible_parameter);
-            for id in body {
-                id.collect_defined_ids(expressions, defined);
+            for (_, expression) in body.iter() {
+                expression.collect_defined_ids(defined);
             }
         }
     }
 
-    /// All IDs referenced inside the expression of this ID.
-    pub fn referenced_ids(self, expressions: &HashMap<Id, Expression>) -> Vec<Id> {
+    /// All IDs referenced inside this expression. If this is a lambda, this
+    /// also includes references to locally defined IDs.
+    pub fn referenced_ids(&self) -> Vec<Id> {
         let mut referenced = vec![];
-        self.collect_referenced_ids(expressions, &mut referenced);
+        self.collect_referenced_ids(&mut referenced);
         referenced
     }
-    fn collect_referenced_ids(
-        self,
-        expressions: &HashMap<Id, Expression>,
-        referenced: &mut Vec<Id>,
-    ) {
-        match expressions.get(&self).unwrap() {
+    fn collect_referenced_ids(&self, referenced: &mut Vec<Id>) {
+        match self {
             Expression::Int(_)
             | Expression::Text(_)
             | Expression::Symbol(_)
@@ -52,10 +48,11 @@ impl Id {
             }
             Expression::Reference(reference) => referenced.push(*reference),
             Expression::Lambda { body, .. } => {
-                for id in body {
-                    id.collect_referenced_ids(expressions, referenced);
+                for (_, expression) in body.iter() {
+                    expression.collect_referenced_ids(referenced);
                 }
             }
+            Expression::Parameter => {}
             Expression::Call {
                 function,
                 arguments,
@@ -66,9 +63,9 @@ impl Id {
                 referenced.push(*responsible);
             }
             Expression::UseModule {
+                current_module: _,
                 relative_path,
                 responsible,
-                ..
             } => {
                 referenced.push(*relative_path);
                 referenced.push(*responsible);
@@ -91,77 +88,18 @@ impl Id {
             }
             Expression::Error { child, .. } => {
                 if let Some(child) = child {
-                    child.collect_referenced_ids(expressions, referenced);
+                    referenced.push(*child);
                 }
             }
         }
     }
 
-    pub fn captured_ids(&self, expressions: &HashMap<Id, Expression>) -> Vec<Id> {
-        let defined = self
-            .defined_ids(expressions)
-            .into_iter()
-            .collect::<HashSet<_>>();
-        let referenced = self
-            .referenced_ids(expressions)
-            .into_iter()
-            .collect::<HashSet<_>>();
+    pub fn captured_ids(&self) -> Vec<Id> {
+        let defined = self.defined_ids().into_iter().collect::<HashSet<_>>();
+        let referenced = self.referenced_ids().into_iter().collect::<HashSet<_>>();
         referenced.difference(&defined).copied().collect()
     }
 
-    pub fn is_constant(self, expressions: &HashMap<Id, Expression>) -> bool {
-        match expressions.get(&self).unwrap() {
-            Expression::Int(_)
-            | Expression::Text(_)
-            | Expression::Symbol(_)
-            | Expression::Builtin(_)
-            | Expression::Responsibility(_) => true,
-            Expression::Reference(id) => id.is_constant(expressions),
-            Expression::Struct(fields) => fields
-                .iter()
-                .all(|(key, value)| key.is_constant(expressions) && value.is_constant(expressions)),
-            Expression::Lambda { .. } => self
-                .captured_ids(expressions)
-                .iter()
-                .all(|id| id.is_constant(expressions)),
-            Expression::Call { .. }
-            | Expression::UseModule { .. }
-            | Expression::Needs { .. }
-            | Expression::Panic { .. }
-            | Expression::Error { .. } => false,
-        }
-    }
-
-    pub fn semantically_equals(
-        self,
-        other: Id,
-        expressions: &HashMap<Id, Expression>,
-    ) -> Option<bool> {
-        if self == other {
-            return Some(true);
-        }
-        let self_expr = expressions.get(&self)?;
-        let other_expr = expressions.get(&other)?;
-        if let Expression::Reference(reference) = self_expr {
-            return reference.semantically_equals(other, expressions);
-        }
-        if let Expression::Reference(reference) = other_expr {
-            return self.semantically_equals(*reference, expressions);
-        }
-
-        if self_expr == other_expr {
-            return Some(true);
-        }
-
-        if !self.is_constant(expressions) || !other.is_constant(expressions) {
-            return None;
-        }
-
-        Some(false)
-    }
-}
-
-impl Expression {
     pub fn is_pure(&self) -> bool {
         match self {
             Expression::Int(_) => true,
@@ -170,6 +108,7 @@ impl Expression {
             Expression::Symbol(_) => true,
             Expression::Struct(_) => true,
             Expression::Lambda { .. } => true,
+            Expression::Parameter => false,
             Expression::Builtin(_) => true,
             Expression::Responsibility(_) => true,
             Expression::Call { .. } => false,
@@ -178,6 +117,64 @@ impl Expression {
             Expression::Panic { .. } => false,
             Expression::Error { .. } => false,
         }
+    }
+}
+
+impl Id {
+    /// Whether the value of this expression is known at compile-time.
+    pub fn is_constant(self, visible: &VisibleExpressions) -> bool {
+        match visible.get(self) {
+            Expression::Int(_)
+            | Expression::Text(_)
+            | Expression::Symbol(_)
+            | Expression::Builtin(_)
+            | Expression::Responsibility(_) => true,
+            Expression::Reference(id) => id.is_constant(visible),
+            Expression::Struct(fields) => fields
+                .iter()
+                .all(|(key, value)| key.is_constant(visible) && value.is_constant(visible)),
+            Expression::Lambda { .. } => visible
+                .get(self)
+                .captured_ids()
+                .iter()
+                .all(|captured| captured.is_constant(visible)),
+            Expression::Parameter
+            | Expression::Call { .. }
+            | Expression::UseModule { .. }
+            | Expression::Needs { .. }
+            | Expression::Panic { .. }
+            | Expression::Error { .. } => false,
+        }
+    }
+
+    pub fn semantically_equals(self, other: Id, visible: &VisibleExpressions) -> Option<bool> {
+        if self == other {
+            return Some(true);
+        }
+
+        let self_expr = visible.get(self);
+        let other_expr = visible.get(other);
+
+        if matches!(self_expr, Expression::Parameter) || matches!(other_expr, Expression::Parameter)
+        {
+            return None;
+        }
+        if let Expression::Reference(reference) = self_expr {
+            return reference.semantically_equals(other, visible);
+        }
+        if let Expression::Reference(reference) = other_expr {
+            return self.semantically_equals(*reference, visible);
+        }
+
+        if self_expr == other_expr {
+            return Some(true);
+        }
+
+        if !self.is_constant(visible) || !other.is_constant(visible) {
+            return None;
+        }
+
+        Some(false)
     }
 }
 
@@ -220,14 +217,9 @@ impl<'a> Drop for TemporaryExpression<'a> {
     }
 }
 
-impl Id {
-    pub fn replace_id_references<F: FnMut(&mut Id)>(
-        self,
-        expressions: &mut HashMap<Id, Expression>,
-        replacer: &mut F,
-    ) {
-        let mut temporary = self.temporarily_get_mut(expressions);
-        match &mut temporary.expression {
+impl Expression {
+    pub fn replace_id_references<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+        match self {
             Expression::Int(_)
             | Expression::Text(_)
             | Expression::Symbol(_)
@@ -256,10 +248,11 @@ impl Id {
                     replacer(parameter);
                 }
                 replacer(responsible_parameter);
-                for id in body {
-                    id.replace_id_references(temporary.remaining, replacer);
+                for (_, expression) in body.iter_mut() {
+                    expression.replace_id_references(replacer);
                 }
             }
+            Expression::Parameter => {}
             Expression::Call {
                 function,
                 arguments,
@@ -300,6 +293,53 @@ impl Id {
                     replacer(child);
                 }
             }
+        }
+    }
+}
+
+impl Mir {
+    pub fn validate(&self) {
+        self.validate_body(&self.body, &mut HashSet::new(), im::HashSet::new());
+    }
+    fn validate_body(
+        &self,
+        body: &Body,
+        defined_ids: &mut HashSet<Id>,
+        mut visible: im::HashSet<Id>,
+    ) {
+        if body.iter().next().is_none() {
+            error!("A body of a lambda is empty! Lambdas should have at least a return value.");
+            error!("This is the MIR:\n{self:?}");
+            panic!("Mir is invalid!");
+        }
+        for (id, expression) in body.iter() {
+            if defined_ids.contains(&id) {
+                error!("ID {id} exists twice.");
+                error!("This is the MIR:\n{self:?}");
+                panic!("Mir is invalid!");
+            }
+            defined_ids.insert(id);
+
+            for captured in expression.captured_ids() {
+                if !visible.contains(&captured) {
+                    error!("Mir is invalid! {id} captures {captured}, but that's not visible.");
+                    error!("This is the MIR:\n{self:?}");
+                    panic!("Mir is invalid!");
+                }
+            }
+            if let Expression::Lambda {
+                parameters,
+                responsible_parameter,
+                body,
+                fuzzable: _,
+            } = expression
+            {
+                let mut inner_visible_expressions = visible.clone();
+                inner_visible_expressions.extend(parameters.iter().copied());
+                inner_visible_expressions.insert(*responsible_parameter);
+                self.validate_body(&body, defined_ids, inner_visible_expressions);
+            }
+            visible.insert(id);
         }
     }
 }

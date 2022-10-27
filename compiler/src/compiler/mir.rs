@@ -11,12 +11,16 @@ use std::{collections::HashMap, fmt, hash};
 #[derive(Clone, PartialEq, Eq)]
 pub struct Mir {
     pub id_generator: IdGenerator<Id>,
-    pub expressions: HashMap<Id, Expression>,
-    pub body: Vec<Id>,
+    pub body: Body,
 }
 
 #[derive(Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Id(usize);
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Body {
+    expressions: Vec<(Id, Expression)>,
+}
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum Expression {
@@ -27,12 +31,20 @@ pub enum Expression {
     Struct(HashMap<Id, Id>),
     Reference(Id),
     Responsibility(hir::Id),
+    /// In the MIR, lambdas take one extra parameter: The responsibility. Based
+    /// on whether the function is fuzzable or not, this parameter may be used
+    /// to dynamically determine who's at fault if some `needs` is not
+    /// fulfilled.
     Lambda {
         parameters: Vec<Id>,
         responsible_parameter: Id,
-        body: Vec<Id>,
+        body: Body,
         fuzzable: bool,
     },
+    /// This expression is never contained in an actual MIR body, but when
+    /// dealing with expressions, its easier to not special-case IDs referring
+    /// to parameters.
+    Parameter,
     Call {
         function: Id,
         arguments: Vec<Id>,
@@ -69,6 +81,82 @@ impl CountableId for Id {
     }
 }
 
+impl Body {
+    pub fn new() -> Self {
+        Self {
+            expressions: vec![],
+        }
+    }
+    pub fn push(&mut self, id: Id, expression: Expression) {
+        self.expressions.push((id, expression));
+    }
+    pub fn get(&self, id: Id) -> &Expression {
+        self.expressions.iter()
+            .find(|(key, _)| *key == id)
+            .map(|(_, expression)| expression)
+            .unwrap_or(&Expression::Parameter)
+    }
+    pub fn remove(&mut self, id: Id) {
+        let index = self.expressions.iter().position(|(key, _)| *key == id).unwrap();
+        self.expressions.remove(index);
+    }
+    pub fn insert(&mut self, index: usize, id: Id, expression: Expression) {
+        self.expressions.insert(index, (id, expression));
+    }
+    pub fn insert_multiple(&mut self, index: usize, mut body: Body) {
+        for (i, (id, expression)) in body.expressions.into_iter().enumerate() {
+            self.expressions.insert(index + i, (id, expression));
+        }
+    }
+    pub fn iter(&self) -> impl Iterator<Item = (Id, &Expression)> {
+        self.expressions.iter().map(|(id, expression)| (*id, expression))
+    }
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Id, &mut Expression)> {
+        self.expressions.iter_mut().map(|(id, expression)| (*id, expression))
+    }
+    pub fn visit(&mut self, visitor: &mut dyn Fn(&VisibleExpressions, Id, &mut Expression) -> ()) {
+        self.visit_body(VisibleExpressions::none_visible(), visitor)
+    }
+    fn visit_body(&mut self, mut visible: VisibleExpressions, visitor: &mut dyn Fn(&VisibleExpressions, Id, &mut Expression) -> ()) {
+        let length = self.expressions.len();
+        for i in 0..length {
+            let (id, mut expression) = self.expressions.remove(i);
+            visitor(&visible, id, &mut expression);
+
+            if let Expression::Lambda { parameters, responsible_parameter, body, .. } = &mut expression {
+                let mut inner_visible = visible.clone();
+                for parameter in parameters {
+                    inner_visible.insert(*parameter, Expression::Parameter);
+                }
+                inner_visible.insert(*responsible_parameter, Expression::Parameter);
+                body.visit_body(inner_visible, visitor);
+            }
+
+            self.expressions.insert(i, (id, expression.clone()));
+            visible.insert(id, expression);
+        }
+
+    }
+}
+#[derive(Clone)]
+pub struct VisibleExpressions {
+    expressions: im::HashMap<Id, Expression>,
+}
+impl VisibleExpressions {
+    pub fn none_visible() -> Self {
+        Self {
+            expressions: im::HashMap::new(),
+        }
+    }
+    pub fn insert(&mut self, id: Id, expression: Expression) {
+        self.expressions.insert(id, expression);
+    }
+    pub fn get(&self, id: Id) -> &Expression {
+        self.expressions.get(&id).unwrap()
+    }
+}
+
+
 impl hash::Hash for Expression {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
@@ -81,6 +169,7 @@ impl hash::Hash for Expression {
             Expression::Reference(id) => id.hash(state),
             Expression::Responsibility(id) => id.hash(state),
             Expression::Lambda { body, .. } => body.hash(state),
+            Expression::Parameter => {}
             Expression::Call {
                 function,
                 arguments,
@@ -124,8 +213,13 @@ impl hash::Hash for Expression {
 
 impl fmt::Debug for Mir {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for id in &self.body {
-            writeln!(f, "{id} = {}", id.format(&self.expressions))?;
+        write!(f, "{}", self.body)
+    }
+}
+impl fmt::Display for Body {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (id, expression) in &self.expressions {
+            writeln!(f, "{id} = {expression:?}")?;
         }
         Ok(())
     }
@@ -135,32 +229,29 @@ impl fmt::Display for Id {
         write!(f, "${}", self.0)
     }
 }
-impl Id {
-    pub fn format(self, expressions: &HashMap<Id, Expression>) -> String {
-        match expressions.get(&self).unwrap() {
-            Expression::Int(int) => format!("{int}"),
-            Expression::Text(text) => format!("{text:?}"),
-            Expression::Symbol(symbol) => format!("{symbol}"),
-            Expression::Builtin(builtin) => format!("builtin{builtin:?}"),
-            Expression::Reference(id) => format!("{id}"),
-            Expression::Responsibility(id) => format!("{id}"),
-            Expression::Struct(fields) => format!(
+impl fmt::Debug for Expression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Expression::Int(int) => write!(f, "{int}"),
+            Expression::Text(text) => write!(f, "{text:?}"),
+            Expression::Symbol(symbol) => write!(f, "{symbol}"),
+            Expression::Builtin(builtin) => write!(f, "builtin{builtin:?}"),
+            Expression::Reference(id) => write!(f, "{id}"),
+            Expression::Responsibility(id) => write!(f, "{id}"),
+            Expression::Struct(fields) => write!(f, 
                 "[{}]",
                 fields
                     .iter()
                     .map(|(key, value)| format!("{key}: {value}"))
                     .join(", "),
             ),
-            // In the MIR, lambdas take one extra parameter: The responsibility.
-            // Based on whether the function is fuzzable or not, this parameter
-            // may be used to dynamically determine who's at fault if some
-            // `needs` is not fulfilled.
+            
             Expression::Lambda {
                 parameters,
                 responsible_parameter,
                 body,
                 fuzzable,
-            } => format!(
+            } => write!(f,
                 "{{ {} (+ responsible {responsible_parameter}) -> ({})\n{}\n}}",
                 parameters
                     .iter()
@@ -171,21 +262,18 @@ impl Id {
                 } else {
                     "non-fuzzable"
                 },
-                body.iter()
-                    .map(|id| {
-                        format!("{id} = {}", id.format(expressions))
-                    })
-                    .join("\n")
+                format!("{body}")
                     .lines()
                     .map(|line| format!("  {line}"))
                     .join("\n"),
             ),
+            Expression::Parameter => write!(f, "parameter"),
             Expression::Call {
                 function,
                 arguments,
                 responsible,
             } => {
-                format!(
+                write!(f, 
                     "call {function} with {} ({responsible} is responsible)",
                     if arguments.is_empty() {
                         "no arguments".to_string()
@@ -198,20 +286,20 @@ impl Id {
                 current_module,
                 relative_path,
                 responsible,
-            } => format!("use {relative_path} (relative to {current_module}; also, {responsible} is responsible)"),
+            } => write!(f, "use {relative_path} (relative to {current_module}; also, {responsible} is responsible)"),
             Expression::Needs {
                 responsible,
                 condition,
                 reason,
             } => {
-                format!("needs {condition} {reason} ({responsible} is responsible)")
+                write!(f, "needs {condition} {reason} ({responsible} is responsible)")
             }
             Expression::Panic {
                 reason,
                 responsible,
-            } => format!("panicking because {reason} ({responsible} is at fault)"),
+            } => write!(f, "panicking because {reason} ({responsible} is at fault)"),
             Expression::Error { errors, .. } => {
-                format!("{}\n{}",
+                write!(f, "{}\n{}",
                     format!("{}", if errors.len() == 1 { "error" } else { "errors" }),
                     errors.iter().map(|error| format!("  {error:?}")).join("\n"),
                 )

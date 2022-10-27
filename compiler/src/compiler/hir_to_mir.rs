@@ -2,7 +2,7 @@ use super::{
     ast_to_hir::AstToHir,
     cst::CstDb,
     hir,
-    mir::{Expression, Id, Mir},
+    mir::{Body, Expression, Id, Mir},
 };
 use crate::{module::Module, utils::IdGenerator};
 use std::{collections::HashMap, sync::Arc};
@@ -21,20 +21,17 @@ fn mir(db: &dyn HirToMir, module: Module) -> Option<Arc<Mir>> {
 
 fn compile_module(module: Module, hir: hir::Body) -> Mir {
     let mut id_generator = IdGenerator::start_at(0);
-    let mut expressions = HashMap::new();
-    let mut body = vec![];
+    let mut body = Body::new();
     let mut mapping = HashMap::<hir::Id, Id>::new();
 
     let module_responsibility = {
         let id = id_generator.generate();
-        expressions.insert(id, Expression::Responsibility(hir::Id::new(module, vec![])));
-        body.push(id);
+        body.push(id, Expression::Responsibility(hir::Id::new(module, vec![])));
         id
     };
     for (id, expression) in hir.expressions {
         compile_expression(
             &mut id_generator,
-            &mut expressions,
             &mut body,
             &mut mapping,
             module_responsibility,
@@ -43,17 +40,12 @@ fn compile_module(module: Module, hir: hir::Body) -> Mir {
         );
     }
 
-    Mir {
-        id_generator,
-        expressions,
-        body,
-    }
+    Mir { id_generator, body }
 }
 
 fn compile_expression(
     id_generator: &mut IdGenerator<Id>,
-    expressions: &mut HashMap<Id, Expression>,
-    body: &mut Vec<Id>,
+    body: &mut Body,
     mapping: &mut HashMap<hir::Id, Id>,
     responsible_for_needs: Id,
     hir_id: &hir::Id,
@@ -77,7 +69,7 @@ fn compile_expression(
         }) => {
             let mut parameters = vec![];
             let responsible_parameter: Id = id_generator.generate();
-            let mut body = vec![];
+            let mut body = Body::new();
 
             for original_parameter in original_parameters {
                 let parameter = id_generator.generate();
@@ -97,7 +89,6 @@ fn compile_expression(
             for (id, expression) in original_body.expressions {
                 compile_expression(
                     id_generator,
-                    expressions,
                     &mut body,
                     mapping,
                     responsible,
@@ -119,8 +110,7 @@ fn compile_expression(
             arguments,
         } => {
             let responsible = id_generator.generate();
-            expressions.insert(responsible, Expression::Responsibility(hir_id.clone()));
-            body.push(responsible);
+            body.push(responsible, Expression::Responsibility(hir_id.clone()));
 
             Expression::Call {
                 function: mapping[&function],
@@ -151,7 +141,6 @@ fn compile_expression(
         },
     };
     let id = id_generator.generate();
-    expressions.insert(id, expression);
-    body.push(id);
+    body.push(id, expression);
     mapping.insert(hir_id.clone(), id);
 }

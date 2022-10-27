@@ -1,4 +1,4 @@
-use crate::compiler::mir::{Expression, Id, Mir};
+use crate::compiler::mir::{Body, Expression, Mir};
 use core::fmt;
 use std::ops::Add;
 
@@ -48,27 +48,27 @@ impl fmt::Display for Complexity {
 
 impl Mir {
     pub fn complexity(&self) -> Complexity {
-        self.complexity_of_many(&self.body)
+        self.body.complexity()
     }
-
-    fn complexity_of_single(&self, id: &Id) -> Complexity {
-        match self.expressions.get(id).unwrap() {
-            Expression::Lambda { body, .. } => {
-                Complexity::single_expression() + self.complexity_of_many(body)
-            }
+}
+impl Body {
+    fn complexity(&self) -> Complexity {
+        let mut complexity = Complexity::none();
+        for (_, expression) in self.iter() {
+            complexity = complexity + expression.complexity();
+        }
+        complexity
+    }
+}
+impl Expression {
+    fn complexity(&self) -> Complexity {
+        match self {
+            Expression::Lambda { body, .. } => Complexity::single_expression() + body.complexity(),
             Expression::UseModule { .. } => Complexity {
                 is_self_contained: false,
                 expressions: 1,
             },
             _ => Complexity::single_expression(),
         }
-    }
-
-    fn complexity_of_many(&self, ids: &[Id]) -> Complexity {
-        let mut complexity = Complexity::none();
-        for id in ids {
-            complexity = complexity + self.complexity_of_single(id);
-        }
-        complexity
     }
 }

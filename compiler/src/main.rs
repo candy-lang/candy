@@ -173,7 +173,7 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
         }
     });
 
-    let hir = tracing::span!(Level::DEBUG, "Turning AST to HIR").in_scope(|| {
+    tracing::span!(Level::DEBUG, "Turning AST to HIR").in_scope(|| {
         let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
         if debug {
             module.dump_associated_debug_file("hir", &format!("{}", hir));
