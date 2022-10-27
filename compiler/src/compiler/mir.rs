@@ -103,7 +103,7 @@ impl Body {
     pub fn insert(&mut self, index: usize, id: Id, expression: Expression) {
         self.expressions.insert(index, (id, expression));
     }
-    pub fn insert_multiple(&mut self, index: usize, mut body: Body) {
+    pub fn insert_multiple(&mut self, index: usize, body: Body) {
         for (i, (id, expression)) in body.expressions.into_iter().enumerate() {
             self.expressions.insert(index + i, (id, expression));
         }

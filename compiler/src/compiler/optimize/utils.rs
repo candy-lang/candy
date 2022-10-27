@@ -342,7 +342,6 @@ impl Mir {
             defined_ids.insert(id);
 
             visible.insert(id);
-            debug!("ID {id} became visible.");
         }
     }
 }

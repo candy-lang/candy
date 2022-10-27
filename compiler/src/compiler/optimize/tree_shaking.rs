@@ -1,40 +1,37 @@
-use crate::compiler::mir::{Expression, Id, Mir};
-use std::collections::{HashMap, HashSet};
+use crate::compiler::mir::{Body, Expression, Id, Mir};
+use itertools::Itertools;
+use std::collections::HashSet;
 use tracing::debug;
 
 impl Mir {
     pub fn tree_shake(&mut self) {
-        let mut keep = HashSet::new();
-        Self::tree_shake_body(&mut keep, &mut self.expressions, &mut self.body);
+        self.body.tree_shake(&mut HashSet::new());
     }
-    fn tree_shake_body(
-        keep: &mut HashSet<Id>,
-        expressions: &mut HashMap<Id, Expression>,
-        body: &mut Vec<Id>,
-    ) {
-        // The return value is always needed.
-        keep.insert(*body.last().unwrap());
+}
+impl Body {
+    fn tree_shake(&mut self, keep: &mut HashSet<Id>) {
+        let body = self.iter_mut().collect_vec();
+        let mut ids_to_remove = vec![];
 
-        for id in body.iter().rev() {
-            // Definitely keep expressions that are impure or where we don't
-            // know if they are pure.
-            if !expressions.get(id).unwrap().is_pure() {
-                keep.insert(id.clone());
-            }
+        let return_value_id = body.last().unwrap().0;
+        keep.insert(return_value_id);
 
-            // A later expression depends on this one.
-            if keep.contains(&id) {
-                keep.extend(id.referenced_ids(expressions));
+        for (id, expression) in body.into_iter().rev() {
+            if !expression.is_pure() || keep.contains(&id) {
+                keep.insert(id);
+                keep.extend(expression.referenced_ids());
 
-                let mut temporary = id.temporarily_get_mut(expressions);
-                if let Expression::Lambda { body, .. } = &mut temporary.expression {
-                    Self::tree_shake_body(keep, temporary.remaining, body);
+                if let Expression::Lambda { body, .. } = expression {
+                    body.tree_shake(keep);
                 }
             } else {
                 debug!("Removing {id} because it's pure but unused.");
+                ids_to_remove.push(id);
             }
         }
 
-        body.retain(|id| keep.contains(id));
+        for id in ids_to_remove {
+            self.remove(id)
+        }
     }
 }

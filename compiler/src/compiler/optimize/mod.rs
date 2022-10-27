@@ -5,7 +5,7 @@ mod complexity;
 mod follow_references;
 // mod inlining;
 // mod module_folding;
-// mod tree_shaking;
+mod tree_shaking;
 mod utils;
 
 use super::mir::Mir;
@@ -36,7 +36,7 @@ impl Mir {
             let before = self.clone();
 
             self.checked_optimization(|mir| mir.follow_references());
-            // self.checked_optimization(|mir| mir.tree_shake());
+            self.checked_optimization(|mir| mir.tree_shake());
             // self.checked_optimization(|mir| mir.fold_constants());
             // self.checked_optimization(|mir| mir.inline_functions_containing_use());
             // self.checked_optimization(|mir| mir.lift_constants());
