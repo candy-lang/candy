@@ -5,6 +5,7 @@ mod constant_folding;
 mod follow_references;
 // mod inlining;
 // mod module_folding;
+mod multiple_flattening;
 mod tree_shaking;
 mod utils;
 
@@ -41,6 +42,7 @@ impl Mir {
             // self.checked_optimization(|mir| mir.inline_functions_containing_use());
             // self.checked_optimization(|mir| mir.lift_constants());
             // self.checked_optimization(|mir| mir.eliminate_common_subtrees());
+            self.checked_optimization(|mir| mir.flatten_multiples());
 
             if *self == before {
                 return;

@@ -1,6 +1,6 @@
 use crate::{
     builtin_functions::BuiltinFunction,
-    compiler::mir::{Expression, Id, Mir, VisibleExpressions},
+    compiler::mir::{Body, Expression, Id, Mir, VisibleExpressions},
 };
 use std::collections::HashMap;
 use tracing::{debug, warn};
@@ -21,10 +21,10 @@ impl Mir {
                         let evaluated_call = match result {
                             Ok(return_value) => return_value,
                             Err(panic_reason) => {
-                                // TODO (before merging PR): Insert multiple
-                                // expressions.
-                                // Expression::Panic { reason: reason that was lowered to a string, responsible: *responsible }
-                                return;
+                                let mut body = Body::new();
+                                let reason = body.push_with_new_id(&mut self.id_generator, Expression::Text(panic_reason));
+                                body.push_with_new_id(&mut self.id_generator, Expression::Panic { reason, responsible: *responsible });
+                                Expression::Multiple(body)
                             },
                         };
                         debug!("Builtin {id} inlined to {evaluated_call:?}.");
@@ -144,10 +144,9 @@ impl Mir {
                     if let Some(value) = value {
                         Expression::Reference(value.clone())
                     } else {
-                        return Some(Err(
+                        return Some(Err(format!(
                             "Struct access will panic because key {key_id} isn't in there."
-                                .to_string(),
-                        ));
+                        )));
                     }
                 } else {
                     return None;

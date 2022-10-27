@@ -6,7 +6,7 @@ use crate::{
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::{collections::HashMap, fmt, hash};
+use std::{collections::HashMap, fmt, hash, mem};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Mir {
@@ -30,11 +30,11 @@ pub enum Expression {
     Builtin(BuiltinFunction),
     Struct(HashMap<Id, Id>),
     Reference(Id),
+    /// In the MIR, responsibilities are explicitly tracked. All lambdas take a
+    /// responsibility as an extra parameter. Based on whether the function is
+    /// fuzzable or not, this parameter may be used to dynamically determine
+    /// who's at fault if some `needs` is not fulfilled.
     Responsibility(hir::Id),
-    /// In the MIR, lambdas take one extra parameter: The responsibility. Based
-    /// on whether the function is fuzzable or not, this parameter may be used
-    /// to dynamically determine who's at fault if some `needs` is not
-    /// fulfilled.
     Lambda {
         parameters: Vec<Id>,
         responsible_parameter: Id,
@@ -60,6 +60,9 @@ pub enum Expression {
         condition: Id,
         reason: Id,
     },
+    /// This expression indicates that the code will panic. It's created if the
+    /// compiler can statically determine that some expression will always
+    /// panic.
     Panic {
         reason: Id,
         responsible: Id,
@@ -70,6 +73,10 @@ pub enum Expression {
         child: Option<Id>,
         errors: Vec<CompilerError>,
     },
+    /// For convenience when writing optimization passes, this expression allows
+    /// storing multiple inner expressions. It's quickly expanded using the
+    /// TODO optimization.
+    Multiple(Body),
 }
 
 impl CountableId for Id {
@@ -87,8 +94,14 @@ impl Body {
             expressions: vec![],
         }
     }
+
     pub fn push(&mut self, id: Id, expression: Expression) {
         self.expressions.push((id, expression));
+    }
+    pub fn push_with_new_id(&mut self, id_generator: &mut IdGenerator<Id>, expression: Expression) -> Id {
+        let id = id_generator.generate();
+        self.push(id, expression);
+        id
     }
     pub fn get(&self, id: Id) -> &Expression {
         self.expressions.iter()
@@ -103,17 +116,34 @@ impl Body {
     pub fn insert(&mut self, index: usize, id: Id, expression: Expression) {
         self.expressions.insert(index, (id, expression));
     }
-    pub fn insert_multiple(&mut self, index: usize, body: Body) {
-        for (i, (id, expression)) in body.expressions.into_iter().enumerate() {
-            self.expressions.insert(index + i, (id, expression));
+
+    /// Flattens all `Expression::Multiple`.
+    pub fn flatten_multiples(&mut self) {
+        let old_expressions = mem::replace(&mut self.expressions, vec![]);
+
+        for (id, expression) in old_expressions.into_iter() {
+            if let Expression::Multiple(mut inner_body) = expression {
+                inner_body.flatten_multiples();
+                let inner_body_return_value = inner_body.expressions.last().unwrap().0;
+                for (id, expression) in inner_body.expressions {
+                    self.expressions.push((id, expression));
+                }
+                self.expressions.push((id, Expression::Reference(inner_body_return_value)));
+            } else {
+                self.expressions.push((id, expression));
+            }
         }
     }
+
     pub fn iter(&self) -> impl Iterator<Item = (Id, &Expression)> {
         self.expressions.iter().map(|(id, expression)| (*id, expression))
     }
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (Id, &mut Expression)> {
         self.expressions.iter_mut().map(|(id, expression)| (*id, expression))
     }
+
+    /// Calls the visitor for every contained expression, even expressions in
+    /// lambdas or multiples
     pub fn visit(&mut self, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
         self.visit_body(VisibleExpressions::none_visible(), visitor)
     }
@@ -131,11 +161,13 @@ impl Body {
                 inner_visible.insert(*responsible_parameter, Expression::Parameter);
                 body.visit_body(inner_visible, visitor);
             }
+            if let Expression::Multiple(body) = &mut expression {
+                body.visit_body(visible.clone(), visitor);
+            }
 
             self.expressions.insert(i, (id, expression.clone()));
             visible.insert(id, expression);
         }
-
     }
 }
 #[derive(Clone)]
@@ -204,9 +236,8 @@ impl hash::Hash for Expression {
                 reason.hash(state);
                 responsible.hash(state);
             }
-            Expression::Error { errors, .. } => {
-                errors.hash(state);
-            }
+            Expression::Error { errors, .. } => errors.hash(state),
+            Expression::Multiple(body) => body.hash(state),
         }
     }
 }
@@ -304,6 +335,13 @@ impl fmt::Debug for Expression {
                     errors.iter().map(|error| format!("  {error:?}")).join("\n"),
                 )
             }
+            Expression::Multiple(body) => write!(f,
+                "\n{}",
+                format!("{body}")
+                    .lines()
+                    .map(|line| format!("  {line}"))
+                    .join("\n"),
+            ),
         }
     }
 }

@@ -11,19 +11,27 @@ impl Expression {
         defined
     }
     fn collect_defined_ids(&self, defined: &mut Vec<Id>) {
-        if let Expression::Lambda {
-            parameters,
-            responsible_parameter,
-            body,
-            ..
-        } = self
-        {
-            defined.extend(parameters);
-            defined.push(*responsible_parameter);
-            for (id, expression) in body.iter() {
-                defined.push(id);
-                expression.collect_defined_ids(defined);
+        match self {
+            Expression::Lambda {
+                parameters,
+                responsible_parameter,
+                body,
+                ..
+            } => {
+                defined.extend(parameters);
+                defined.push(*responsible_parameter);
+                for (id, expression) in body.iter() {
+                    defined.push(id);
+                    expression.collect_defined_ids(defined);
+                }
             }
+            Expression::Multiple(body) => {
+                for (id, expression) in body.iter() {
+                    defined.push(id);
+                    expression.collect_defined_ids(defined);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -92,6 +100,11 @@ impl Expression {
                     referenced.push(*child);
                 }
             }
+            Expression::Multiple(body) => {
+                for (_, expression) in body.iter() {
+                    expression.collect_referenced_ids(referenced);
+                }
+            }
         }
     }
 
@@ -117,6 +130,7 @@ impl Expression {
             Expression::Needs { .. } => false,
             Expression::Panic { .. } => false,
             Expression::Error { .. } => false,
+            Expression::Multiple(body) => body.iter().all(|(_, expr)| expr.is_pure()),
         }
     }
 }
@@ -124,7 +138,8 @@ impl Expression {
 impl Id {
     /// Whether the value of this expression is known at compile-time.
     pub fn is_constant(self, visible: &VisibleExpressions) -> bool {
-        match visible.get(self) {
+        let expression = visible.get(self);
+        match expression {
             Expression::Int(_)
             | Expression::Text(_)
             | Expression::Symbol(_)
@@ -134,8 +149,7 @@ impl Id {
             Expression::Struct(fields) => fields
                 .iter()
                 .all(|(key, value)| key.is_constant(visible) && value.is_constant(visible)),
-            Expression::Lambda { .. } => visible
-                .get(self)
+            Expression::Lambda { .. } => expression
                 .captured_ids()
                 .iter()
                 .all(|captured| captured.is_constant(visible)),
@@ -145,6 +159,10 @@ impl Id {
             | Expression::Needs { .. }
             | Expression::Panic { .. }
             | Expression::Error { .. } => false,
+            Expression::Multiple(_) => expression
+                .captured_ids()
+                .iter()
+                .all(|captured| captured.is_constant(visible)),
         }
     }
 
@@ -294,6 +312,11 @@ impl Expression {
                     replacer(child);
                 }
             }
+            Expression::Multiple(body) => {
+                for (_, expression) in body.iter_mut() {
+                    expression.replace_id_references(replacer);
+                }
+            }
         }
     }
 }
@@ -328,10 +351,13 @@ impl Mir {
                 fuzzable: _,
             } = expression
             {
-                let mut inner_visible_expressions = visible.clone();
-                inner_visible_expressions.extend(parameters.iter().copied());
-                inner_visible_expressions.insert(*responsible_parameter);
-                self.validate_body(&body, defined_ids, inner_visible_expressions);
+                let mut inner_visible = visible.clone();
+                inner_visible.extend(parameters.iter().copied());
+                inner_visible.insert(*responsible_parameter);
+                self.validate_body(&body, defined_ids, inner_visible);
+            }
+            if let Expression::Multiple(body) = expression {
+                self.validate_body(&body, defined_ids, visible.clone());
             }
 
             if defined_ids.contains(&id) {
