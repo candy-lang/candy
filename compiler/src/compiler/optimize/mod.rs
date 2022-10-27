@@ -1,6 +1,6 @@
 // mod common_subtree_elimination;
 mod complexity;
-// mod constant_folding;
+mod constant_folding;
 // mod constant_lifting;
 mod follow_references;
 // mod inlining;
@@ -37,7 +37,7 @@ impl Mir {
 
             self.checked_optimization(|mir| mir.follow_references());
             self.checked_optimization(|mir| mir.tree_shake());
-            // self.checked_optimization(|mir| mir.fold_constants());
+            self.checked_optimization(|mir| mir.fold_constants());
             // self.checked_optimization(|mir| mir.inline_functions_containing_use());
             // self.checked_optimization(|mir| mir.lift_constants());
             // self.checked_optimization(|mir| mir.eliminate_common_subtrees());

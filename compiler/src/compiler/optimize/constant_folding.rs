@@ -1,51 +1,78 @@
 use crate::{
     builtin_functions::BuiltinFunction,
-    compiler::mir::{Expression, Id, Mir},
+    compiler::mir::{Expression, Id, Mir, VisibleExpressions},
 };
 use std::collections::HashMap;
 use tracing::{debug, warn};
 
 impl Mir {
     pub fn fold_constants(&mut self) {
-        Self::fold_inner_constants(&mut self.expressions, &mut self.body);
-    }
-    fn fold_inner_constants(expressions: &mut HashMap<Id, Expression>, body: &mut Vec<Id>) {
-        for id in body {
-            let mut temporary = id.temporarily_get_mut(expressions);
-
-            match &mut temporary.expression {
-                Expression::Lambda { body, .. } => {
-                    Self::fold_inner_constants(&mut temporary.remaining, body);
-                }
+        self.body.visit(&mut |visible, id, expression| {
+            match expression {
                 Expression::Call {
                     function,
                     arguments,
+                    responsible,
                     ..
                 } => {
-                    if let Some(Expression::Builtin(builtin)) = temporary.remaining.get(&function) &&
-                        let Some(expression) = Self::run_builtin(*builtin, arguments, &temporary.remaining)
+                    if let Expression::Builtin(builtin) = visible.get(*function) &&
+                        let Some(result) = Self::run_builtin(*builtin, arguments, visible)
                     {
-                        temporary.remaining.insert(*id, expression);
-                        debug!("Builtin {id} inlined to {}.", id.format(temporary.remaining));
+                        let evaluated_call = match result {
+                            Ok(return_value) => return_value,
+                            Err(panic_reason) => {
+                                // TODO (before merging PR): Insert multiple
+                                // expressions.
+                                // Expression::Panic { reason: reason that was lowered to a string, responsible: *responsible }
+                                return;
+                            },
+                        };
+                        debug!("Builtin {id} inlined to {evaluated_call:?}.");
+                        *expression = evaluated_call;
                     }
                 }
-                Expression::Needs { condition, reason, responsible } => {
-                    // TODO: Check if the condition is const. If it's true,
-                    // remove the need. Otherwise, replace it with a panic.
+                Expression::Needs {
+                    condition,
+                    reason,
+                    responsible,
+                } => {
+                    if let Expression::Symbol(symbol) = visible.get(*condition) {
+                        let result = match symbol.as_str() {
+                            "True" => Expression::Symbol("Nothing".to_string()),
+                            "False" => Expression::Panic {
+                                reason: *reason,
+                                responsible: *responsible,
+                            },
+                            // TODO (before merging PR): Also save the call site
+                            // in the needs expression and make that responsible
+                            // for a panic with a non-symbol given.
+                            _ => return,
+                        };
+                        *expression = result;
+                    }
                 }
                 Expression::Error { child, errors } => {
-                    // TODO: Remove and replace with a panic.
+                    // TODO (before merging PR): Remove and replace with a
+                    // panic.
                 }
                 _ => {}
             }
-        }
+        });
     }
 
+    /// This function tries to run a builtin, requiring a minimal amount of
+    /// static knowledge. For example, it can find out that the result of
+    /// `builtinEquals $3 $3` is `True`, even if the value of `$3` is not known
+    /// at compile-time.
+    ///
+    /// Returns `None` if the call couldn't be evaluated statically. Returns
+    /// `Some(Ok(expression))` if the call successfully completed with a return
+    /// value. Returns `Some(Err(reason))` if the call panics.
     fn run_builtin(
         builtin: BuiltinFunction,
         arguments: &[Id],
-        expressions: &HashMap<Id, Expression>,
-    ) -> Option<Expression> {
+        visible: &VisibleExpressions,
+    ) -> Option<Result<Expression, String>> {
         // warn!("Constant folding candidate: builtin{builtin:?}");
         // warn!(
         //     "Arguments: {}",
@@ -59,22 +86,16 @@ impl Mir {
         //         .join("\n")
         // );
 
-        Some(match builtin {
+        Some(Ok(match builtin {
             BuiltinFunction::Equals => {
                 if arguments.len() != 2 {
-                    // TODO: panic
-                    return None;
+                    return Some(Err("wrong number of arguments".to_string()));
                 }
 
                 let a = arguments[0];
                 let b = arguments[1];
 
-                let mut are_equal = a == b;
-                if !are_equal {
-                    let Some(comparison) = a.semantically_equals(b, expressions) else { return None; };
-                    are_equal = comparison;
-                };
-
+                let are_equal = a == b || a.semantically_equals(b, visible)?;
                 Expression::Symbol(if are_equal { "True" } else { "False" }.to_string())
             }
             // BuiltinFunction::FunctionRun => return,
@@ -98,34 +119,37 @@ impl Mir {
             // BuiltinFunction::Print => todo!(),
             BuiltinFunction::StructGet => {
                 if arguments.len() != 2 {
-                    // TODO: panic
-                    return None;
+                    return Some(Err("wrong number of arguments".to_string()));
                 }
 
-                let struct_id = arguments[0].clone();
-                let key_id = arguments[1].clone();
+                let struct_id = arguments[0];
+                let key_id = arguments[1];
 
-                let Some(Expression::Struct(fields)) = expressions.get(&struct_id) else {
-                    warn!("builtinStructGet called with non-constant struct {struct_id}");
+                // TODO: Also catch this being called on a non-struct and
+                // statically panic in that case.
+                let Expression::Struct(fields) = visible.get(struct_id) else {
                     return None;
                 };
 
-                if fields.keys().all(|key| key.is_constant(expressions))
-                    && key_id.is_constant(expressions)
+                // TODO: Relax this requirement. Even if not all keys are
+                // constant, we may still conclude the result of the builtin:
+                // If only one key is statically determined to be equal to the
+                // other and one is not, then we can still resolve that.
+                if fields.keys().all(|key| key.is_constant(visible)) && key_id.is_constant(visible)
                 {
                     let value = fields
                         .iter()
-                        .find(|(k, _)| k.semantically_equals(key_id, expressions).unwrap_or(false))
+                        .find(|(k, _)| k.semantically_equals(key_id, visible).unwrap_or(false))
                         .map(|(_, value)| value.clone());
                     if let Some(value) = value {
                         Expression::Reference(value.clone())
                     } else {
-                        // panic
-                        warn!("Struct access will panic because key {key_id} isn't in there.");
-                        return None;
+                        return Some(Err(
+                            "Struct access will panic because key {key_id} isn't in there."
+                                .to_string(),
+                        ));
                     }
                 } else {
-                    warn!("Not all keys are constant.");
                     return None;
                 }
             }
@@ -144,6 +168,6 @@ impl Mir {
             // BuiltinFunction::Try => todo!(),
             // BuiltinFunction::TypeOf => todo!(),
             _ => return None,
-        })
+        }))
     }
 }
