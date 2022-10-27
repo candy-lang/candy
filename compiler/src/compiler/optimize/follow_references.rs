@@ -5,31 +5,17 @@ use tracing::debug;
 impl Mir {
     pub fn follow_references(&mut self) {
         let mut replacements = HashMap::<Id, Id>::new();
-        Self::follow_inner_references(&mut self.expressions, &self.body, &mut replacements);
-    }
 
-    fn follow_inner_references(
-        expressions: &mut HashMap<Id, Expression>,
-        body: &[Id],
-        replacements: &mut HashMap<Id, Id>,
-    ) {
-        for id in body {
-            id.replace_id_references(expressions, &mut |id| {
-                if let Some(replacement) = replacements.get(id) {
+        self.body.visit(&mut |_, id, expression| {
+            expression.replace_id_references(&mut |id| {
+                if let Some(&replacement) = replacements.get(id) {
                     debug!("Replacing reference to {id} with {replacement}.");
-                    *id = *replacement;
+                    *id = replacement;
                 }
             });
-            match expressions.get(&id).unwrap().clone() {
-                Expression::Reference(reference) => {
-                    let resolved = replacements.get(&reference).cloned().unwrap_or(reference);
-                    replacements.insert(*id, resolved);
-                }
-                Expression::Lambda { body, .. } => {
-                    Self::follow_inner_references(expressions, &body, replacements);
-                }
-                _ => {}
+            if let Expression::Reference(reference) = &expression {
+                replacements.insert(id, *reference);
             }
-        }
+        });
     }
 }

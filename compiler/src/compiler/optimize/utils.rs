@@ -1,6 +1,6 @@
 use crate::compiler::mir::{Body, Expression, Id, Mir, VisibleExpressions};
 use std::collections::{HashMap, HashSet};
-use tracing::error;
+use tracing::{debug, error};
 
 impl Expression {
     /// All IDs defined inside this expression. For all expressions except
@@ -20,7 +20,8 @@ impl Expression {
         {
             defined.extend(parameters);
             defined.push(*responsible_parameter);
-            for (_, expression) in body.iter() {
+            for (id, expression) in body.iter() {
+                defined.push(id);
                 expression.collect_defined_ids(defined);
             }
         }
@@ -313,13 +314,6 @@ impl Mir {
             panic!("Mir is invalid!");
         }
         for (id, expression) in body.iter() {
-            if defined_ids.contains(&id) {
-                error!("ID {id} exists twice.");
-                error!("This is the MIR:\n{self:?}");
-                panic!("Mir is invalid!");
-            }
-            defined_ids.insert(id);
-
             for captured in expression.captured_ids() {
                 if !visible.contains(&captured) {
                     error!("Mir is invalid! {id} captures {captured}, but that's not visible.");
@@ -339,7 +333,16 @@ impl Mir {
                 inner_visible_expressions.insert(*responsible_parameter);
                 self.validate_body(&body, defined_ids, inner_visible_expressions);
             }
+
+            if defined_ids.contains(&id) {
+                error!("ID {id} exists twice.");
+                error!("This is the MIR:\n{self:?}");
+                panic!("Mir is invalid!");
+            }
+            defined_ids.insert(id);
+
             visible.insert(id);
+            debug!("ID {id} became visible.");
         }
     }
 }

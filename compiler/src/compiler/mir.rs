@@ -114,10 +114,10 @@ impl Body {
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (Id, &mut Expression)> {
         self.expressions.iter_mut().map(|(id, expression)| (*id, expression))
     }
-    pub fn visit(&mut self, visitor: &mut dyn Fn(&VisibleExpressions, Id, &mut Expression) -> ()) {
+    pub fn visit(&mut self, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
         self.visit_body(VisibleExpressions::none_visible(), visitor)
     }
-    fn visit_body(&mut self, mut visible: VisibleExpressions, visitor: &mut dyn Fn(&VisibleExpressions, Id, &mut Expression) -> ()) {
+    fn visit_body(&mut self, mut visible: VisibleExpressions, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
         let length = self.expressions.len();
         for i in 0..length {
             let (id, mut expression) = self.expressions.remove(i);
