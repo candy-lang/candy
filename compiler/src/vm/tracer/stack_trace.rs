@@ -37,42 +37,41 @@ impl FullTracer {
         let mut stacks: HashMap<FiberId, Vec<StackEntry>> = HashMap::new();
         for timed_event in &self.events {
             let Event::InFiber { fiber, event } = &timed_event.event else { continue; };
-                let stack = stacks.entry(*fiber).or_default();
-                match event {
-                    InFiberEvent::ModuleStarted { module } => {
-                        stack.push(StackEntry::Module {
-                            module: module.clone(),
-                        });
-                    }
-                    InFiberEvent::ModuleEnded { .. } => {
-                        assert!(matches!(stack.pop().unwrap(), StackEntry::Module { .. }));
-                    }
-                    InFiberEvent::CallStarted { id, closure, args } => {
-                        stack.push(StackEntry::Call {
-                            id: id.clone(),
-                            closure: *closure,
-                            args: args.clone(),
-                        });
-                    }
-                    InFiberEvent::CallEnded { .. } => {
-                        assert!(matches!(stack.pop().unwrap(), StackEntry::Call { .. }));
-                    }
-                    InFiberEvent::NeedsStarted {
-                        id,
-                        condition,
-                        reason,
-                    } => {
-                        stack.push(StackEntry::Needs {
-                            id: id.clone(),
-                            condition: *condition,
-                            reason: *reason,
-                        });
-                    }
-                    InFiberEvent::NeedsEnded => {
-                        assert!(matches!(stack.pop().unwrap(), StackEntry::Needs { .. }));
-                    }
-                    _ => {}
+            let stack = stacks.entry(*fiber).or_default();
+            match event {
+                InFiberEvent::ModuleStarted { module } => {
+                    stack.push(StackEntry::Module {
+                        module: module.clone(),
+                    });
                 }
+                InFiberEvent::ModuleEnded { .. } => {
+                    assert!(matches!(stack.pop().unwrap(), StackEntry::Module { .. }));
+                }
+                InFiberEvent::CallStarted { id, closure, args } => {
+                    stack.push(StackEntry::Call {
+                        id: id.clone(),
+                        closure: *closure,
+                        args: args.clone(),
+                    });
+                }
+                InFiberEvent::CallEnded { .. } => {
+                    assert!(matches!(stack.pop().unwrap(), StackEntry::Call { .. }));
+                }
+                InFiberEvent::NeedsStarted {
+                    id,
+                    condition,
+                    reason,
+                } => {
+                    stack.push(StackEntry::Needs {
+                        id: id.clone(),
+                        condition: *condition,
+                        reason: *reason,
+                    });
+                }
+                InFiberEvent::NeedsEnded => {
+                    assert!(matches!(stack.pop().unwrap(), StackEntry::Needs { .. }));
+                }
+                _ => {}
             }
         }
         stacks
