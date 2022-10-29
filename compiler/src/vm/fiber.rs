@@ -123,7 +123,7 @@ impl Fiber {
         assert_eq!(
             closure.captured.len(),
             0,
-            "closure is not a module closure (it captures stuff)."
+            "Closure is not a module closure (it captures stuff)."
         );
         assert_eq!(
             closure.num_args, 0,
