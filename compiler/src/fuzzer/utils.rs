@@ -8,19 +8,11 @@ use crate::{
 };
 use std::collections::HashMap;
 
+#[derive(Default)]
 pub struct FuzzablesFinder {
     pub fuzzables: Vec<(Id, Pointer)>,
     pub heap: Heap,
     transferred_objects: HashMap<FiberId, HashMap<Pointer, Pointer>>,
-}
-impl FuzzablesFinder {
-    pub fn new() -> Self {
-        Self {
-            fuzzables: vec![],
-            heap: Heap::default(),
-            transferred_objects: HashMap::new(),
-        }
-    }
 }
 impl Tracer for FuzzablesFinder {
     fn fiber_created(&mut self, _fiber: FiberId) {}

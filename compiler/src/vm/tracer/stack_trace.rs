@@ -45,7 +45,7 @@ impl FullTracer {
                         });
                     }
                     InFiberEvent::ModuleEnded { .. } => {
-                        stack.pop().unwrap();
+                        assert!(matches!(stack.pop().unwrap(), StackEntry::Module { .. }));
                     }
                     InFiberEvent::CallStarted { id, closure, args } => {
                         stack.push(StackEntry::Call {
@@ -55,7 +55,7 @@ impl FullTracer {
                         });
                     }
                     InFiberEvent::CallEnded { .. } => {
-                        stack.pop().unwrap();
+                        assert!(matches!(stack.pop().unwrap(), StackEntry::Call { .. }));
                     }
                     InFiberEvent::NeedsStarted {
                         id,
@@ -69,7 +69,7 @@ impl FullTracer {
                         });
                     }
                     InFiberEvent::NeedsEnded => {
-                        stack.pop().unwrap();
+                        assert!(matches!(stack.pop().unwrap(), StackEntry::Needs { .. }));
                     }
                     _ => {}
                 }
