@@ -36,7 +36,7 @@ impl FullTracer {
     pub fn stack_traces(&self) -> HashMap<FiberId, Vec<StackEntry>> {
         let mut stacks: HashMap<FiberId, Vec<StackEntry>> = HashMap::new();
         for timed_event in &self.events {
-            if let Event::InFiber { fiber, event } = &timed_event.event {
+            let Event::InFiber { fiber, event } = &timed_event.event else { continue; };
                 let stack = stacks.entry(*fiber).or_default();
                 match event {
                     InFiberEvent::ModuleStarted { module } => {
