@@ -218,6 +218,7 @@ impl Fiber {
         }
     }
     pub fn complete_try(&mut self, result: ExecutionResult) {
+        assert!(matches!(self.status, Status::InTry { .. }));
         let result = match result {
             ExecutionResult::Finished(Packet {
                 heap,
