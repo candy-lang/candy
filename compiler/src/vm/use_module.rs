@@ -13,7 +13,7 @@ use itertools::Itertools;
 impl Fiber {
     pub fn use_module(
         &mut self,
-        use_provider: &mut dyn UseProvider,
+        use_provider: &dyn UseProvider,
         current_module: Module,
         relative_path: Pointer,
     ) -> Result<(), String> {

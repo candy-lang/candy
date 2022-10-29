@@ -245,7 +245,7 @@ impl Fiber {
 
     pub fn run(
         &mut self,
-        use_provider: &mut dyn UseProvider,
+        use_provider: &dyn UseProvider,
         execution_controller: &mut dyn ExecutionController,
         tracer: &mut dyn InFiberTracer,
     ) {
@@ -306,7 +306,7 @@ impl Fiber {
     }
     pub fn run_instruction(
         &mut self,
-        use_provider: &mut dyn UseProvider,
+        use_provider: &dyn UseProvider,
         tracer: &mut dyn InFiberTracer,
         instruction: Instruction,
     ) {

@@ -214,7 +214,7 @@ fn run(options: CandyRunOptions) {
 
     let mut vm = Vm::new();
     vm.set_up_for_running_module_closure(module_closure);
-    vm.run(&mut DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
+    vm.run(&DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
     if let Status::WaitingForOperations = vm.status() {
         error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
         // TODO: Show stack traces of all fibers?
@@ -284,7 +284,7 @@ fn run(options: CandyRunOptions) {
         match vm.status() {
             Status::CanRun => {
                 debug!("VM still running.");
-                vm.run(&mut DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
+                vm.run(&DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
             }
             Status::WaitingForOperations => {
                 todo!("VM can't proceed until some operations complete.");

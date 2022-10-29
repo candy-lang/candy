@@ -248,7 +248,7 @@ impl Vm {
 
     pub fn run<U: UseProvider, E: ExecutionController>(
         &mut self,
-        use_provider: &mut U,
+        use_provider: &U,
         execution_controller: &mut E,
         tracer: &mut dyn Tracer,
     ) {
@@ -265,7 +265,7 @@ impl Vm {
     }
     fn run_raw<U: UseProvider, E: ExecutionController>(
         &mut self,
-        use_provider: &mut U,
+        use_provider: &U,
         execution_controller: &mut E,
         tracer: &mut dyn Tracer,
     ) {

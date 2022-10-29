@@ -23,7 +23,7 @@ pub async fn fuzz(db: &Database, module: Module) {
         let mut tracer = FuzzablesFinder::default();
         let mut vm = Vm::new();
         vm.set_up_for_running_module_closure(Closure::of_module(db, module).unwrap());
-        vm.run(&mut DbUseProvider { db }, &mut RunForever, &mut tracer);
+        vm.run(&DbUseProvider { db }, &mut RunForever, &mut tracer);
         (tracer.heap, tracer.fuzzables)
     };
 

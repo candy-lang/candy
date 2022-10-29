@@ -57,7 +57,7 @@ impl ConstantEvaluator {
 
         if let Some((module, evaluator)) = running_evaluators.choose_mut(&mut thread_rng()) {
             evaluator.vm.run(
-                &mut DbUseProvider { db },
+                &DbUseProvider { db },
                 &mut RunLimitedNumberOfInstructions::new(500),
                 &mut evaluator.tracer,
             );

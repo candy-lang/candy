@@ -96,7 +96,7 @@ impl Fuzzer {
     fn map_status<U: UseProvider, E: ExecutionController>(
         &self,
         status: Status,
-        use_provider: &mut U,
+        use_provider: &U,
         execution_controller: &mut E,
     ) -> Status {
         match status {
