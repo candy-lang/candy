@@ -33,6 +33,7 @@ pub enum Instruction {
     ///
     /// a -> a, pointer to closure
     CreateClosure {
+        id: hir::Id,
         captured: Vec<StackOffset>,
         num_args: usize,
         body: Vec<Instruction>,
@@ -137,6 +138,7 @@ impl Display for Instruction {
                 write!(f, "createStruct {num_entries}")
             }
             Instruction::CreateClosure {
+                id,
                 captured,
                 num_args,
                 body: instructions,
@@ -144,7 +146,7 @@ impl Display for Instruction {
             } => {
                 write!(
                     f,
-                    "createClosure with {num_args} {} capturing {} {}",
+                    "createClosure {id} with {num_args} {} capturing {} {}",
                     if *num_args == 1 {
                         "argument"
                     } else {

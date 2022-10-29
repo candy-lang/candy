@@ -99,23 +99,38 @@ impl Fiber {
         }
     }
     pub fn new_for_running_closure(heap: Heap, closure: Pointer, arguments: &[Pointer]) -> Self {
-        assert!(
-            !matches!(heap.get(closure).data, Data::Builtin(_)),
-            "can only use with closures, not builtins"
-        );
+        let Data::Closure(Closure { id, .. }) = &heap.get(closure).data else {
+            panic!("Can only use with closures.");
+        };
+        let id = id.clone();
 
         let mut fiber = Self::new_with_heap(heap);
-
+        let runner_closure = fiber.heap.create(Data::Closure(Closure {
+            id: id.clone(),
+            captured: vec![],
+            num_args: 0,
+            body: vec![
+                Instruction::TraceCallStarts {
+                    id: id.clone(),
+                    num_args: arguments.len(),
+                },
+                Instruction::Call {
+                    num_args: arguments.len(),
+                },
+                Instruction::TraceCallEnds,
+                Instruction::Return,
+            ],
+            responsible: None,
+        }));
         fiber.data_stack.extend(arguments);
         fiber.data_stack.push(closure);
+        fiber.data_stack.push(runner_closure);
 
         fiber.status = Status::Running;
         fiber.run_instruction(
             &mut PanickingUseProvider,
             &mut DummyInFiberTracer,
-            Instruction::Call {
-                num_args: arguments.len(),
-            },
+            Instruction::Call { num_args: 0 },
         );
         fiber
     }
@@ -324,6 +339,7 @@ impl Fiber {
                 self.data_stack.push(address);
             }
             Instruction::CreateClosure {
+                id,
                 num_args,
                 body,
                 captured,
@@ -337,6 +353,7 @@ impl Fiber {
                     self.heap.dup(*address);
                 }
                 let address = self.heap.create_closure(Closure {
+                    id,
                     captured,
                     num_args,
                     body,
