@@ -10,6 +10,7 @@ use crate::{
     module::Module,
 };
 use itertools::Itertools;
+use pad::PadStr;
 use std::collections::HashMap;
 
 // Stack traces are a reduced view of the tracing state that represent the stack
@@ -77,7 +78,7 @@ impl FullTracer {
         stacks
     }
     pub fn format_stack_trace(&self, db: &Database, stack: &[StackEntry]) -> String {
-        let mut lines = vec![];
+        let mut caller_locations_and_calls = vec![];
 
         for entry in stack.iter().rev() {
             let hir_id = match entry {
@@ -133,9 +134,19 @@ impl FullTracer {
                 ),
                 StackEntry::Module { module } => format!("module {module}"),
             };
-            lines.push(format!("{caller_location_string:90} {call_string}"));
+            caller_locations_and_calls.push((caller_location_string, call_string));
         }
-        lines.join("\n")
+
+        let longest_location = caller_locations_and_calls
+            .iter()
+            .map(|(location, _)| location.len())
+            .max()
+            .unwrap();
+
+        caller_locations_and_calls
+            .into_iter()
+            .map(|(location, call)| format!("{} {}", location.pad_to_width(longest_location), call))
+            .join("\n")
     }
     /// When a VM panics, some child fiber might be responsible for that. This
     /// function returns a formatted stack trace spanning all fibers in the
