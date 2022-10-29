@@ -127,7 +127,7 @@ impl Fiber {
         );
         assert_eq!(
             closure.num_args, 0,
-            "closure is not a module closure (it has arguments)."
+            "Closure is not a module closure (it has arguments)."
         );
         let mut heap = Heap::default();
         let closure = heap.create_closure(closure);
