@@ -46,16 +46,6 @@ pub enum StoredVmEvent {
     ChannelCreated {
         channel: ChannelId,
     },
-    SentToChannel {
-        value: Pointer,
-        from: FiberId,
-        to: ChannelId,
-    },
-    ReceivedFromChannel {
-        value: Pointer,
-        from: ChannelId,
-        to: FiberId,
-    },
     InFiber {
         fiber: FiberId,
         event: StoredFiberEvent,
@@ -137,24 +127,6 @@ impl FullTracer {
             }
             VmEvent::FiberExecutionEnded { fiber } => StoredVmEvent::FiberExecutionEnded { fiber },
             VmEvent::ChannelCreated { channel } => StoredVmEvent::ChannelCreated { channel },
-            VmEvent::SentToChannel {
-                value,
-                from,
-                to,
-                heap,
-            } => {
-                let value = self.import_from_heap(value, heap, None);
-                StoredVmEvent::SentToChannel { value, from, to }
-            }
-            VmEvent::ReceivedFromChannel {
-                value,
-                from,
-                to,
-                heap,
-            } => {
-                let value = self.import_from_heap(value, heap, None);
-                StoredVmEvent::ReceivedFromChannel { value, from, to }
-            }
             VmEvent::InFiber { fiber, event } => StoredVmEvent::InFiber {
                 fiber,
                 event: self.map_fiber_event(event, fiber),
@@ -240,10 +212,6 @@ impl fmt::Debug for FullTracer {
                     StoredVmEvent::FiberExecutionEnded { fiber } =>
                         format!("{fiber:?}: execution ended"),
                     StoredVmEvent::ChannelCreated { channel } => format!("{channel:?}: created"),
-                    StoredVmEvent::SentToChannel { value, from, to } =>
-                        format!("{from:?} sent {} to {to:?}", value.format(&self.heap)),
-                    StoredVmEvent::ReceivedFromChannel { value, from, to } =>
-                        format!("{to:?} received {} from {from:?}", value.format(&self.heap)),
                     StoredVmEvent::InFiber { fiber, event } => format!(
                         "{fiber:?}: {}",
                         match event {

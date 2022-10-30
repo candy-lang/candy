@@ -30,18 +30,6 @@ pub enum VmEvent<'event> {
     ChannelCreated {
         channel: ChannelId,
     },
-    SentToChannel {
-        value: Pointer,
-        from: FiberId,
-        to: ChannelId,
-        heap: &'event Heap,
-    },
-    ReceivedFromChannel {
-        value: Pointer,
-        from: ChannelId,
-        to: FiberId,
-        heap: &'event Heap,
-    },
     InFiber {
         fiber: FiberId,
         event: FiberEvent<'event>,
@@ -156,28 +144,6 @@ impl<'vm> VmTracer<'vm> {
     }
     pub fn channel_created(&mut self, channel: ChannelId) {
         self.add(VmEvent::ChannelCreated { channel });
-    }
-    pub fn sent_to_channel(&mut self, value: Pointer, from: FiberId, to: ChannelId, heap: &Heap) {
-        self.add(VmEvent::SentToChannel {
-            value,
-            from,
-            to,
-            heap,
-        });
-    }
-    pub fn received_from_channel(
-        &mut self,
-        value: Pointer,
-        from: ChannelId,
-        to: FiberId,
-        heap: &Heap,
-    ) {
-        self.add(VmEvent::ReceivedFromChannel {
-            value,
-            from,
-            to,
-            heap,
-        });
     }
 }
 impl<'vm, 'fiber> FiberTracer<'vm, 'fiber> {
