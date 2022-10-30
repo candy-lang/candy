@@ -374,7 +374,14 @@ impl Vm {
 
                 false
             }
-            fiber::Status::Done | fiber::Status::Panicked { .. } => true,
+            fiber::Status::Done => {
+                tracer.fiber_done(fiber_id);
+                true
+            }
+            fiber::Status::Panicked { .. } => {
+                tracer.fiber_panicked(fiber_id, None);
+                true
+            }
         };
 
         if is_finished && fiber_id != FiberId::root() {
