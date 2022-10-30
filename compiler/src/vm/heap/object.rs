@@ -144,7 +144,7 @@ impl Closure {
                     module: module.clone(),
                 },
                 Instruction::CreateClosure {
-                    id: Id::new(module.clone(), vec![]),
+                    id: Id::new(module, vec![]),
                     captured: vec![],
                     num_args: 0,
                     body: lir.instructions,

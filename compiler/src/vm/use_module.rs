@@ -34,7 +34,7 @@ impl Fiber {
                 let address = self.heap.create_closure(module_closure);
                 self.data_stack.push(address);
                 self.run_instruction(
-                    &mut PanickingUseProvider,
+                    &PanickingUseProvider,
                     &mut DummyTracer.for_vm().for_fiber(FiberId::root()),
                     Instruction::Call { num_args: 0 },
                 );

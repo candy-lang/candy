@@ -67,7 +67,7 @@ impl Fiber {
             Ok(DivergeControlFlow { closure }) => {
                 self.data_stack.push(closure);
                 self.run_instruction(
-                    &mut PanickingUseProvider,
+                    &PanickingUseProvider,
                     &mut DummyTracer.for_vm().for_fiber(FiberId::root()),
                     Instruction::Call { num_args: 0 },
                 );

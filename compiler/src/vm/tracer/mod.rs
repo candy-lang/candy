@@ -76,7 +76,7 @@ pub enum FiberEvent<'event> {
 }
 
 pub trait Tracer {
-    fn add<'event>(&mut self, event: VmEvent<'event>);
+    fn add(&mut self, event: VmEvent);
 
     fn for_vm<'a, 'vm>(&'a mut self) -> VmTracer<'vm>
     where
@@ -107,12 +107,12 @@ impl<'vm> VmTracer<'vm> {
 }
 
 impl<'vm> VmTracer<'vm> {
-    fn add<'event>(&mut self, event: VmEvent<'event>) {
+    fn add(&mut self, event: VmEvent) {
         self.tracer.add(event);
     }
 }
 impl<'vm, 'fiber> FiberTracer<'vm, 'fiber> {
-    fn add<'event>(&mut self, event: FiberEvent<'event>) {
+    fn add(&mut self, event: FiberEvent) {
         self.vm_tracer.add(VmEvent::InFiber {
             fiber: self.fiber,
             event,

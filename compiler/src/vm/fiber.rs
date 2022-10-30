@@ -111,7 +111,7 @@ impl Fiber {
             num_args: 0,
             body: vec![
                 Instruction::TraceCallStarts {
-                    id: id.clone(),
+                    id,
                     num_args: arguments.len(),
                 },
                 Instruction::Call {
@@ -128,7 +128,7 @@ impl Fiber {
 
         fiber.status = Status::Running;
         fiber.run_instruction(
-            &mut PanickingUseProvider,
+            &PanickingUseProvider,
             &mut DummyTracer.for_vm().for_fiber(FiberId::root()),
             Instruction::Call { num_args: 0 },
         );
