@@ -135,6 +135,18 @@ impl Body {
     }
 }
 
+impl Body {
+    pub fn all_ids(&self) -> Vec<Id> {
+        let mut ids = vec![];
+        self.collect_defined_ids(&mut ids);
+        self.collect_referenced_ids(&mut ids);
+        ids.into_iter()
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect()
+    }
+}
+
 impl Expression {
     pub fn is_pure(&self) -> bool {
         match self {

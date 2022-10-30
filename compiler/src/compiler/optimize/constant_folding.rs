@@ -6,7 +6,7 @@ use tracing::debug;
 
 impl Mir {
     pub fn fold_constants(&mut self) {
-        self.body.visit(VisibleExpressions::none_visible(), &mut |visible, id, expression| {
+        self.body.visit(&mut |visible, id, expression| {
             match expression {
                 Expression::Call {
                     function,

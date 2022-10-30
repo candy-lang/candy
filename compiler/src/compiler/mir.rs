@@ -141,11 +141,14 @@ impl Mir {
     /// Calls the visitor for every contained expression, even expressions in
     /// lambdas or multiples.
     pub fn visit(&mut self, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
-        self.body.visit(VisibleExpressions::none_visible(), visitor);
+        self.body.visit_inner(VisibleExpressions::none_visible(), visitor);
     }
 }
 impl Body {
-    pub fn visit(&mut self, mut visible: VisibleExpressions, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
+    pub fn visit(&mut self, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
+        self.visit_inner(VisibleExpressions::none_visible(), visitor);
+    }
+    fn visit_inner(&mut self, mut visible: VisibleExpressions, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
         let length = self.expressions.len();
         for i in 0..length {
             let (id, mut expression) = self.expressions.remove(i);
@@ -164,10 +167,10 @@ impl Body {
                 inner_visible.insert(*parameter, Expression::Parameter);
             }
             inner_visible.insert(*responsible_parameter, Expression::Parameter);
-            body.visit(inner_visible, visitor);
+            body.visit_inner(inner_visible, visitor);
         }
         if let Expression::Multiple(body) = expression {
-            body.visit(visible.clone(), visitor);
+            body.visit_inner(visible.clone(), visitor);
         }
     }
 }

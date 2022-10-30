@@ -46,6 +46,7 @@ impl Expression {
                 *id = *replacement;
             }
         });
+
         *self = Expression::Multiple(inlined_body);
 
         Ok(())
@@ -62,7 +63,7 @@ impl Mir {
                 }
         }
 
-        self.body.visit(VisibleExpressions::none_visible(), &mut |visible, _, expression| {
+        self.body.visit(&mut |visible, _, expression| {
             if let Expression::Call { function, .. } = expression && functions_with_use.contains(&function) {
                 expression.inline_call(visible, &mut self.id_generator);
             }
