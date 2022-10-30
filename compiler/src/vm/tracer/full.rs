@@ -190,7 +190,7 @@ impl fmt::Debug for FullTracer {
         for event in &self.events {
             writeln!(
                 f,
-                "{:?} us: {}",
+                "{:?} µs: {}",
                 event.when.duration_since(start.unwrap()).as_micros(),
                 match &event.event {
                     StoredVmEvent::FiberCreated { fiber } => format!("{fiber:?}: created"),
