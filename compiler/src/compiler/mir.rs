@@ -103,18 +103,9 @@ impl Body {
         self.push(id, expression);
         id
     }
-    pub fn get(&self, id: Id) -> &Expression {
-        self.expressions.iter()
-            .find(|(key, _)| *key == id)
-            .map(|(_, expression)| expression)
-            .unwrap_or(&Expression::Parameter)
-    }
     pub fn remove(&mut self, id: Id) {
         let index = self.expressions.iter().position(|(key, _)| *key == id).unwrap();
         self.expressions.remove(index);
-    }
-    pub fn insert(&mut self, index: usize, id: Id, expression: Expression) {
-        self.expressions.insert(index, (id, expression));
     }
 
     /// Flattens all `Expression::Multiple`.
@@ -141,35 +132,48 @@ impl Body {
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (Id, &mut Expression)> {
         self.expressions.iter_mut().map(|(id, expression)| (*id, expression))
     }
-
-    /// Calls the visitor for every contained expression, even expressions in
-    /// lambdas or multiples
-    pub fn visit(&mut self, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
-        self.visit_body(VisibleExpressions::none_visible(), visitor)
+    pub fn into_iter(self) -> impl Iterator<Item = (Id, Expression)> {
+        self.expressions.into_iter()
     }
-    fn visit_body(&mut self, mut visible: VisibleExpressions, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
+}
+
+impl Mir {
+    /// Calls the visitor for every contained expression, even expressions in
+    /// lambdas or multiples.
+    pub fn visit(&mut self, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
+        self.body.visit(VisibleExpressions::none_visible(), visitor);
+    }
+}
+impl Body {
+    pub fn visit(&mut self, mut visible: VisibleExpressions, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
         let length = self.expressions.len();
         for i in 0..length {
             let (id, mut expression) = self.expressions.remove(i);
-            visitor(&visible, id, &mut expression);
-
-            if let Expression::Lambda { parameters, responsible_parameter, body, .. } = &mut expression {
-                let mut inner_visible = visible.clone();
-                for parameter in parameters {
-                    inner_visible.insert(*parameter, Expression::Parameter);
-                }
-                inner_visible.insert(*responsible_parameter, Expression::Parameter);
-                body.visit_body(inner_visible, visitor);
-            }
-            if let Expression::Multiple(body) = &mut expression {
-                body.visit_body(visible.clone(), visitor);
-            }
-
+            Self::visit_expression(id, &mut expression, visible.clone(), visitor);
             self.expressions.insert(i, (id, expression.clone()));
             visible.insert(id, expression);
         }
     }
+
+    pub fn visit_expression(id: Id, expression: &mut Expression, visible: VisibleExpressions, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
+        visitor(&visible, id, expression);
+
+        if let Expression::Lambda { parameters, responsible_parameter, body, .. } = expression {
+            let mut inner_visible = visible.clone();
+            for parameter in parameters {
+                inner_visible.insert(*parameter, Expression::Parameter);
+            }
+            inner_visible.insert(*responsible_parameter, Expression::Parameter);
+            body.visit(inner_visible, visitor);
+        }
+        if let Expression::Multiple(body) = expression {
+            body.visit(visible.clone(), visitor);
+        }
+    }
 }
+impl Expression {
+}
+
 #[derive(Clone)]
 pub struct VisibleExpressions {
     expressions: im::HashMap<Id, Expression>,

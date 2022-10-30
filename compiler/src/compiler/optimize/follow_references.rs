@@ -6,7 +6,7 @@ impl Mir {
     pub fn follow_references(&mut self) {
         let mut replacements = HashMap::<Id, Id>::new();
 
-        self.body.visit(&mut |_, id, expression| {
+        self.visit(&mut |_, id, expression| {
             expression.replace_id_references(&mut |id| {
                 if let Some(&replacement) = replacements.get(id) {
                     debug!("Replacing reference to {id} with {replacement}.");

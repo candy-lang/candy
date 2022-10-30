@@ -1,6 +1,6 @@
 use crate::compiler::mir::{Body, Expression, Id, Mir, VisibleExpressions};
-use std::collections::{HashMap, HashSet};
-use tracing::{debug, error};
+use std::{collections::HashSet, mem};
+use tracing::error;
 
 impl Expression {
     /// All IDs defined inside this expression. For all expressions except
@@ -20,21 +20,28 @@ impl Expression {
             } => {
                 defined.extend(parameters);
                 defined.push(*responsible_parameter);
-                for (id, expression) in body.iter() {
-                    defined.push(id);
-                    expression.collect_defined_ids(defined);
-                }
+                body.collect_defined_ids(defined);
             }
-            Expression::Multiple(body) => {
-                for (id, expression) in body.iter() {
-                    defined.push(id);
-                    expression.collect_defined_ids(defined);
-                }
-            }
+            Expression::Multiple(body) => body.collect_defined_ids(defined),
             _ => {}
         }
     }
+}
+impl Body {
+    pub fn defined_ids(&self) -> Vec<Id> {
+        let mut defined = vec![];
+        self.collect_defined_ids(&mut defined);
+        defined
+    }
+    fn collect_defined_ids(&self, defined: &mut Vec<Id>) {
+        for (id, expression) in self.iter() {
+            defined.push(id);
+            expression.collect_defined_ids(defined);
+        }
+    }
+}
 
+impl Expression {
     /// All IDs referenced inside this expression. If this is a lambda, this
     /// also includes references to locally defined IDs.
     pub fn referenced_ids(&self) -> Vec<Id> {
@@ -56,11 +63,7 @@ impl Expression {
                 }
             }
             Expression::Reference(reference) => referenced.push(*reference),
-            Expression::Lambda { body, .. } => {
-                for (_, expression) in body.iter() {
-                    expression.collect_referenced_ids(referenced);
-                }
-            }
+            Expression::Lambda { body, .. } => body.collect_referenced_ids(referenced),
             Expression::Parameter => {}
             Expression::Call {
                 function,
@@ -100,20 +103,39 @@ impl Expression {
                     referenced.push(*child);
                 }
             }
-            Expression::Multiple(body) => {
-                for (_, expression) in body.iter() {
-                    expression.collect_referenced_ids(referenced);
-                }
-            }
+            Expression::Multiple(body) => body.collect_referenced_ids(referenced),
         }
     }
+}
+impl Body {
+    pub fn referenced_ids(&self) -> Vec<Id> {
+        let mut referenced = vec![];
+        self.collect_referenced_ids(&mut referenced);
+        referenced
+    }
+    fn collect_referenced_ids(&self, referenced: &mut Vec<Id>) {
+        for (_, expression) in self.iter() {
+            expression.collect_referenced_ids(referenced);
+        }
+    }
+}
 
+impl Expression {
     pub fn captured_ids(&self) -> Vec<Id> {
         let defined = self.defined_ids().into_iter().collect::<HashSet<_>>();
         let referenced = self.referenced_ids().into_iter().collect::<HashSet<_>>();
         referenced.difference(&defined).copied().collect()
     }
+}
+impl Body {
+    pub fn captured_ids(&self) -> Vec<Id> {
+        let defined = self.defined_ids().into_iter().collect::<HashSet<_>>();
+        let referenced = self.referenced_ids().into_iter().collect::<HashSet<_>>();
+        referenced.difference(&defined).copied().collect()
+    }
+}
 
+impl Expression {
     pub fn is_pure(&self) -> bool {
         match self {
             Expression::Int(_) => true,
@@ -197,46 +219,9 @@ impl Id {
     }
 }
 
-impl Id {
-    /// When traversing the expressions, we sometimes want to mutably borrow
-    /// some part of an outer expression (for example, a lambda's body) while
-    /// still traversing over inner expressions. The invariant that makes it
-    /// safe to have both a mutably borrowed outer expression as well as
-    /// mutably borrowed inner expressions is that expressions never reference
-    /// later expressions. Rust doesn't know about this invariant, so using this
-    /// method, you can temporarily mutably borrow an expression while
-    /// continuing to use the rest of the expressions.
-    ///
-    /// Internally, this just temporarily removes an expression from the map and
-    /// then adds it again when the wrapper is dropped.
-    pub fn temporarily_get_mut<'a>(
-        self,
-        expressions: &'a mut HashMap<Id, Expression>,
-    ) -> TemporaryExpression<'a> {
-        let expression = expressions.remove(&self).unwrap();
-        TemporaryExpression {
-            id: self,
-            expression,
-            remaining: expressions,
-        }
-    }
-}
-pub struct TemporaryExpression<'a> {
-    id: Id,
-    pub expression: Expression,
-    pub remaining: &'a mut HashMap<Id, Expression>,
-}
-impl<'a> Drop for TemporaryExpression<'a> {
-    fn drop(&mut self) {
-        // If the ID was manually inserted in the meantime, that's supposed to
-        // be a newer value.
-        self.remaining
-            .entry(self.id)
-            .or_insert_with(|| self.expression.clone());
-    }
-}
-
 impl Expression {
+    /// Replaces all referenced IDs. Does *not* replace IDs that are defined in
+    /// this expression.
     pub fn replace_id_references<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
         match self {
             Expression::Int(_)
@@ -267,9 +252,7 @@ impl Expression {
                     replacer(parameter);
                 }
                 replacer(responsible_parameter);
-                for (_, expression) in body.iter_mut() {
-                    expression.replace_id_references(replacer);
-                }
+                body.replace_id_references(replacer);
             }
             Expression::Parameter => {}
             Expression::Call {
@@ -312,11 +295,49 @@ impl Expression {
                     replacer(child);
                 }
             }
-            Expression::Multiple(body) => {
-                for (_, expression) in body.iter_mut() {
-                    expression.replace_id_references(replacer);
+            Expression::Multiple(body) => body.replace_id_references(replacer),
+        }
+    }
+}
+impl Body {
+    pub fn replace_id_references<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+        for (_, expression) in self.iter_mut() {
+            expression.replace_id_references(replacer);
+        }
+    }
+}
+
+impl Expression {
+    /// Replaces all IDs in this expression using the replacer, including
+    /// definitions.
+    pub fn replace_ids<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+        match self {
+            Expression::Lambda {
+                parameters,
+                responsible_parameter,
+                body,
+                fuzzable: _,
+            } => {
+                for parameter in parameters {
+                    replacer(parameter);
                 }
+                replacer(responsible_parameter);
+                body.replace_ids(replacer);
             }
+            Expression::Multiple(body) => body.replace_ids(replacer),
+            // All other expressions don't define IDs and instead only contain
+            // references. Thus, the function above does the job.
+            _ => self.replace_id_references(replacer),
+        }
+    }
+}
+impl Body {
+    pub fn replace_ids<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
+        let body = mem::replace(self, Body::new());
+        for (mut id, mut expression) in body.into_iter() {
+            replacer(&mut id);
+            expression.replace_ids(replacer);
+            self.push(id, expression);
         }
     }
 }

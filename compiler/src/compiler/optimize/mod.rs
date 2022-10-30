@@ -3,7 +3,7 @@ mod complexity;
 mod constant_folding;
 // mod constant_lifting;
 mod follow_references;
-// mod inlining;
+mod inlining;
 // mod module_folding;
 mod multiple_flattening;
 mod tree_shaking;

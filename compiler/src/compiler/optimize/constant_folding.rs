@@ -2,12 +2,11 @@ use crate::{
     builtin_functions::BuiltinFunction,
     compiler::mir::{Body, Expression, Id, Mir, VisibleExpressions},
 };
-use std::collections::HashMap;
-use tracing::{debug, warn};
+use tracing::debug;
 
 impl Mir {
     pub fn fold_constants(&mut self) {
-        self.body.visit(&mut |visible, id, expression| {
+        self.body.visit(VisibleExpressions::none_visible(), &mut |visible, id, expression| {
             match expression {
                 Expression::Call {
                     function,
