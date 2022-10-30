@@ -106,7 +106,7 @@ impl<'vm> VmTracer<'vm> {
     }
 }
 
-impl<'vm> VmTracer<'vm> {
+impl<'vm> Tracer for VmTracer<'vm> {
     fn add(&mut self, event: VmEvent) {
         self.tracer.add(event);
     }
