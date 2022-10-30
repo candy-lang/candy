@@ -12,6 +12,7 @@ use crate::{
     module::Module,
     vm::{
         context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
+        tracer::Tracer,
         Closure, Heap, Pointer, Vm,
     },
 };
@@ -23,7 +24,7 @@ pub async fn fuzz(db: &Database, module: Module) {
         let mut tracer = FuzzablesFinder::default();
         let mut vm = Vm::new();
         vm.set_up_for_running_module_closure(Closure::of_module(db, module).unwrap());
-        vm.run(&DbUseProvider { db }, &mut RunForever, &mut tracer);
+        vm.run(&DbUseProvider { db }, &mut RunForever, &mut tracer.for_vm());
         (tracer.heap, tracer.fuzzables)
     };
 

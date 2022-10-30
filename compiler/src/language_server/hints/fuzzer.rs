@@ -9,7 +9,7 @@ use crate::{
     module::Module,
     vm::{
         context::{DbUseProvider, RunLimitedNumberOfInstructions},
-        tracer::{Event, InFiberEvent},
+        tracer::full::{StoredFiberEvent, StoredVmEvent},
         Heap, Pointer,
     },
 };
@@ -111,13 +111,13 @@ impl FuzzerManager {
                         // Find the innermost panicking call that is in the
                         // function.
                         .filter_map(|event| match &event.event {
-                            Event::InFiber { event, .. } => Some(event),
+                            StoredVmEvent::InFiber { event, .. } => Some(event),
                             _ => None,
                         })
                         .find(|event| {
                             let innermost_panicking_call_id = match &event {
-                                InFiberEvent::CallStarted { id, .. } => id,
-                                InFiberEvent::NeedsStarted { id, .. } => id,
+                                StoredFiberEvent::CallStarted { id, .. } => id,
+                                StoredFiberEvent::NeedsStarted { id, .. } => id,
                                 _ => return false,
                             };
                             id.is_same_module_and_any_parent_of(innermost_panicking_call_id)
@@ -133,10 +133,10 @@ impl FuzzerManager {
                         }
                     };
                     let (call_id, name, arguments) = match &panicking_inner_call {
-                        InFiberEvent::CallStarted { id, closure, args } => {
+                        StoredFiberEvent::CallStarted { id, closure, args } => {
                             (id.clone(), closure.format(&tracer.heap), args.clone())
                         }
-                        InFiberEvent::NeedsStarted {
+                        StoredFiberEvent::NeedsStarted {
                             id,
                             condition,
                             reason,

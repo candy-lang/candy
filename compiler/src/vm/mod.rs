@@ -21,7 +21,7 @@ use self::{
     },
     heap::SendPort,
     ids::{CountableId, IdGenerator},
-    tracer::Tracer,
+    tracer::VmTracer,
 };
 use crate::compiler::hir::Id;
 use itertools::Itertools;
@@ -224,7 +224,7 @@ impl Vm {
     #[allow(dead_code)]
     pub fn send(
         &mut self,
-        tracer: &mut dyn Tracer,
+        tracer: &mut VmTracer,
         channel: ChannelId,
         packet: Packet,
     ) -> OperationId {
@@ -250,7 +250,7 @@ impl Vm {
         &mut self,
         use_provider: &U,
         execution_controller: &mut E,
-        tracer: &mut dyn Tracer,
+        tracer: &mut VmTracer,
     ) {
         while self.can_run() && execution_controller.should_continue_running() {
             self.run_raw(
@@ -267,7 +267,7 @@ impl Vm {
         &mut self,
         use_provider: &U,
         execution_controller: &mut E,
-        tracer: &mut dyn Tracer,
+        tracer: &mut VmTracer,
     ) {
         assert!(
             self.can_run(),
@@ -295,7 +295,7 @@ impl Vm {
         fiber.run(
             use_provider,
             execution_controller,
-            &mut *tracer.in_fiber_tracer(fiber_id),
+            &mut tracer.for_fiber(fiber_id),
         );
         tracer.fiber_execution_ended(fiber_id);
 
@@ -462,7 +462,7 @@ impl Vm {
     }
     fn finish_parallel(
         &mut self,
-        tracer: &mut dyn Tracer,
+        tracer: &mut VmTracer,
         parallel_id: FiberId,
         cause: Performer,
         result: Result<(), String>,
@@ -499,7 +499,7 @@ impl Vm {
             },
         );
     }
-    fn cancel(&mut self, tracer: &mut dyn Tracer, fiber: FiberId) {
+    fn cancel(&mut self, tracer: &mut VmTracer, fiber: FiberId) {
         match self.fibers.remove(&fiber).unwrap() {
             FiberTree::Single(_) => {}
             FiberTree::Parallel(Parallel {
@@ -521,7 +521,7 @@ impl Vm {
 
     fn send_to_channel(
         &mut self,
-        tracer: &mut dyn Tracer,
+        tracer: &mut VmTracer,
         performer: Performer,
         channel_id: ChannelId,
         packet: Packet,

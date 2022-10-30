@@ -1,8 +1,8 @@
 use super::{
     context::{PanickingUseProvider, UseProvider, UseResult},
     heap::{Closure, Heap, Pointer, Text},
-    tracer::DummyInFiberTracer,
-    Fiber,
+    tracer::{dummy::DummyTracer, Tracer},
+    Fiber, FiberId,
 };
 use crate::{
     compiler::lir::Instruction,
@@ -35,7 +35,7 @@ impl Fiber {
                 self.data_stack.push(address);
                 self.run_instruction(
                     &mut PanickingUseProvider,
-                    &mut DummyInFiberTracer,
+                    &mut DummyTracer.for_vm().for_fiber(FiberId::root()),
                     Instruction::Call { num_args: 0 },
                 );
             }

@@ -4,8 +4,8 @@ use super::{
     fiber::{Fiber, Status},
     heap::{Closure, Data, Int, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
     ids::ChannelId,
-    tracer::DummyInFiberTracer,
-    Heap,
+    tracer::{dummy::DummyTracer, Tracer},
+    FiberId, Heap,
 };
 use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
 use itertools::Itertools;
@@ -68,7 +68,7 @@ impl Fiber {
                 self.data_stack.push(closure);
                 self.run_instruction(
                     &mut PanickingUseProvider,
-                    &mut DummyInFiberTracer,
+                    &mut DummyTracer.for_vm().for_fiber(FiberId::root()),
                     Instruction::Call { num_args: 0 },
                 );
             }

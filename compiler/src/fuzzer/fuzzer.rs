@@ -4,7 +4,7 @@ use crate::{
     vm::{
         self,
         context::{ExecutionController, UseProvider},
-        tracer::FullTracer,
+        tracer::{full::FullTracer, Tracer},
         Closure, Heap, Packet, Pointer, Vm,
     },
 };
@@ -57,7 +57,7 @@ impl Status {
         Status::StillFuzzing {
             vm,
             arguments,
-            tracer: FullTracer::new(),
+            tracer: FullTracer::default(),
         }
     }
 }
@@ -102,7 +102,7 @@ impl Fuzzer {
         match status {
             Status::StillFuzzing { mut vm, arguments, mut tracer } => match vm.status() {
                 vm::Status::CanRun => {
-                    vm.run(use_provider, execution_controller, &mut tracer);
+                    vm.run(use_provider, execution_controller, &mut tracer.for_vm());
                     Status::StillFuzzing { vm, arguments, tracer }
                 }
                 vm::Status::WaitingForOperations => panic!("Fuzzing should not have to wait on channel operations because arguments were not channels."),

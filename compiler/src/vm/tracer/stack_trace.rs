@@ -1,4 +1,8 @@
-use super::{super::heap::Pointer, Event, FiberId, FullTracer, InFiberEvent};
+use super::{
+    super::heap::Pointer,
+    full::{FullTracer, StoredFiberEvent, StoredVmEvent},
+    FiberId,
+};
 use crate::{
     compiler::{
         ast_to_hir::AstToHir,
@@ -37,28 +41,28 @@ impl FullTracer {
     pub fn stack_traces(&self) -> HashMap<FiberId, Vec<StackEntry>> {
         let mut stacks: HashMap<FiberId, Vec<StackEntry>> = HashMap::new();
         for timed_event in &self.events {
-            let Event::InFiber { fiber, event } = &timed_event.event else { continue; };
+            let StoredVmEvent::InFiber { fiber, event } = &timed_event.event else { continue; };
             let stack = stacks.entry(*fiber).or_default();
             match event {
-                InFiberEvent::ModuleStarted { module } => {
+                StoredFiberEvent::ModuleStarted { module } => {
                     stack.push(StackEntry::Module {
                         module: module.clone(),
                     });
                 }
-                InFiberEvent::ModuleEnded { .. } => {
+                StoredFiberEvent::ModuleEnded { .. } => {
                     assert!(matches!(stack.pop().unwrap(), StackEntry::Module { .. }));
                 }
-                InFiberEvent::CallStarted { id, closure, args } => {
+                StoredFiberEvent::CallStarted { id, closure, args } => {
                     stack.push(StackEntry::Call {
                         id: id.clone(),
                         closure: *closure,
                         args: args.clone(),
                     });
                 }
-                InFiberEvent::CallEnded { .. } => {
+                StoredFiberEvent::CallEnded { .. } => {
                     assert!(matches!(stack.pop().unwrap(), StackEntry::Call { .. }));
                 }
-                InFiberEvent::NeedsStarted {
+                StoredFiberEvent::NeedsStarted {
                     id,
                     condition,
                     reason,
@@ -69,7 +73,7 @@ impl FullTracer {
                         reason: *reason,
                     });
                 }
-                InFiberEvent::NeedsEnded => {
+                StoredFiberEvent::NeedsEnded => {
                     assert!(matches!(stack.pop().unwrap(), StackEntry::Needs { .. }));
                 }
                 _ => {}
@@ -154,7 +158,7 @@ impl FullTracer {
     pub fn format_panic_stack_trace_to_root_fiber(&self, db: &Database) -> String {
         let mut panicking_fiber_chain = vec![FiberId::root()];
         for timed_event in self.events.iter().rev() {
-            if let Event::FiberPanicked {
+            if let StoredVmEvent::FiberPanicked {
                 fiber,
                 panicked_child,
             } = timed_event.event
