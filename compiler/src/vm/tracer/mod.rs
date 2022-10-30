@@ -120,7 +120,7 @@ impl<'vm, 'fiber> FiberTracer<'vm, 'fiber> {
     }
 }
 
-impl<'vm> VmTracer<'vm> {
+impl Tracer {
     pub fn fiber_created(&mut self, fiber: FiberId) {
         self.add(VmEvent::FiberCreated { fiber });
     }
