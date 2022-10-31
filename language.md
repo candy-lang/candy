@@ -444,7 +444,7 @@ If an input crashes in a way that your code is at fault, you will see a hint.
 ```candy
 mySqrt a =               # If you pass `a = -1`,
   needs (core.int.is a)  # this needs succeeds because `core.int.is -1 = True`,
-  core.int.sqrt a        # but calling `core.int.sqrt -1` panics: `sqrt` only works on non-negative integers. You might want to check out the `ComplexNumbers` package.
+  core.int.sqrt a        # but calling `core.int.sqrt -1` panics: If you want to take the square root of a negative integer, check out the `ComplexNumbers` package.
 ```
 
 ## Pattern Matching
