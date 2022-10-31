@@ -14,5 +14,5 @@ async nursery body :=
   returnChannel.receivePort
 
 await fiber :=
-  needs (channel.isReceivePort fiber) "`fiber` should be a value returned by `async`"
+  needs (channel.isReceivePort fiber) "`fiber` should be a value returned by `async`."
   channel.receive fiber
