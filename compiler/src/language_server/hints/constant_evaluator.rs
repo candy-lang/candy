@@ -12,7 +12,10 @@ use crate::{
     vm::{
         self,
         context::{DbUseProvider, RunLimitedNumberOfInstructions},
-        tracer::{stack_trace::StackEntry, Event, FullTracer, InFiberEvent, TimedEvent},
+        tracer::{
+            full::{FullTracer, StoredFiberEvent, StoredVmEvent, TimedEvent},
+            stack_trace::StackEntry,
+        },
         Closure, FiberId, Heap, Pointer, Vm,
     },
 };
@@ -32,7 +35,7 @@ struct Evaluator {
 
 impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
-        let tracer = FullTracer::new();
+        let tracer = FullTracer::default();
         let mut vm = Vm::new();
         vm.set_up_for_running_module_closure(Closure::of_module(db, module.clone()).unwrap());
         self.evaluators.insert(module, Evaluator { tracer, vm });
@@ -57,7 +60,7 @@ impl ConstantEvaluator {
 
         if let Some((module, evaluator)) = running_evaluators.choose_mut(&mut thread_rng()) {
             evaluator.vm.run(
-                &mut DbUseProvider { db },
+                &DbUseProvider { db },
                 &mut RunLimitedNumberOfInstructions::new(500),
                 &mut evaluator.tracer,
             );
@@ -74,8 +77,8 @@ impl ConstantEvaluator {
             .events
             .iter()
             .filter_map(|event| match &event.event {
-                Event::InFiber {
-                    event: InFiberEvent::FoundFuzzableClosure { id, closure },
+                StoredVmEvent::InFiber {
+                    event: StoredFiberEvent::FoundFuzzableClosure { id, closure },
                     ..
                 } => Some((id.clone(), *closure)),
                 _ => None,
@@ -99,7 +102,8 @@ impl ConstantEvaluator {
         };
 
         for TimedEvent { event, .. } in &evaluator.tracer.events {
-            let Event::InFiber { event: InFiberEvent::ValueEvaluated { id, value }, .. } = event else { continue; };
+            let StoredVmEvent::InFiber { event, .. } = event else { continue; };
+            let StoredFiberEvent::ValueEvaluated { id, value } = event else { continue; };
 
             if &id.module != module {
                 continue;

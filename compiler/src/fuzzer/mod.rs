@@ -21,10 +21,10 @@ use tracing::{error, info};
 
 pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
     let (fuzzables_heap, fuzzables): (Heap, Vec<(Id, Pointer)>) = {
-        let mut tracer = FuzzablesFinder::new();
+        let mut tracer = FuzzablesFinder::default();
         let mut vm = Vm::new();
         vm.set_up_for_running_module_closure(Closure::of_module(db, module).unwrap());
-        vm.run(&mut DbUseProvider { db }, &mut RunForever, &mut tracer);
+        vm.run(&DbUseProvider { db }, &mut RunForever, &mut tracer);
         (tracer.heap, tracer.fuzzables)
     };
 

@@ -4,7 +4,7 @@ use crate::{
     vm::{
         self,
         context::{ExecutionController, UseProvider},
-        tracer::FullTracer,
+        tracer::full::FullTracer,
         Closure, Heap, Packet, Pointer, Vm,
     },
 };
@@ -57,7 +57,7 @@ impl Status {
         Status::StillFuzzing {
             vm,
             arguments,
-            tracer: FullTracer::new(),
+            tracer: FullTracer::default(),
         }
     }
 }
@@ -99,7 +99,7 @@ impl Fuzzer {
     fn map_status<U: UseProvider, E: ExecutionController>(
         &self,
         status: Status,
-        use_provider: &mut U,
+        use_provider: &U,
         execution_controller: &mut E,
     ) -> Status {
         match status {

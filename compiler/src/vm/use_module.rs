@@ -1,8 +1,8 @@
 use super::{
     context::{PanickingUseProvider, UseProvider, UseResult},
     heap::{Closure, Heap, Pointer, Text},
-    tracer::DummyInFiberTracer,
-    Fiber,
+    tracer::{dummy::DummyTracer, Tracer},
+    Fiber, FiberId,
 };
 use crate::{
     compiler::lir::Instruction,
@@ -13,7 +13,7 @@ use itertools::Itertools;
 impl Fiber {
     pub fn use_module(
         &mut self,
-        use_provider: &mut dyn UseProvider,
+        use_provider: &dyn UseProvider,
         current_module: Module,
         relative_path: Pointer,
     ) -> Result<(), String> {
@@ -34,8 +34,8 @@ impl Fiber {
                 let address = self.heap.create_closure(module_closure);
                 self.data_stack.push(address);
                 self.run_instruction(
-                    &mut PanickingUseProvider,
-                    &mut DummyInFiberTracer,
+                    &PanickingUseProvider,
+                    &mut DummyTracer.for_fiber(FiberId::root()),
                     Instruction::Call { num_args: 0 },
                 );
             }
