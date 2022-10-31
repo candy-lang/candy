@@ -12,8 +12,11 @@ use crate::{
     vm::{
         self,
         context::{DbUseProvider, RunLimitedNumberOfInstructions},
-        tracer::{EventData, StackEntry},
-        Closure, Heap, Pointer, TearDownResult, Vm,
+        tracer::{
+            full::{FullTracer, StoredFiberEvent, StoredVmEvent, TimedEvent},
+            stack_trace::StackEntry,
+        },
+        Closure, FiberId, Heap, Pointer, Vm,
     },
 };
 use itertools::Itertools;
@@ -23,37 +26,43 @@ use tracing::{span, trace, Level};
 
 #[derive(Default)]
 pub struct ConstantEvaluator {
-    vms: HashMap<Module, Vm>,
+    evaluators: HashMap<Module, Evaluator>,
+}
+struct Evaluator {
+    tracer: FullTracer,
+    vm: Vm,
 }
 
 impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
+        let tracer = FullTracer::default();
         let mut vm = Vm::new();
         vm.set_up_for_running_module_closure(Closure::of_module(db, module.clone()).unwrap());
-        self.vms.insert(module, vm);
+        self.evaluators.insert(module, Evaluator { tracer, vm });
     }
 
     pub fn remove_module(&mut self, module: Module) {
-        self.vms.remove(&module).unwrap();
+        self.evaluators.remove(&module).unwrap();
     }
 
     pub fn run(&mut self, db: &Database) -> Option<Module> {
-        let num_vms = self.vms.len();
-        let mut running_vms = self
-            .vms
+        let num_evaluators = self.evaluators.len();
+        let mut running_evaluators = self
+            .evaluators
             .iter_mut()
-            .filter(|(_, vm)| matches!(vm.status(), vm::Status::CanRun))
+            .filter(|(_, evaluator)| matches!(evaluator.vm.status(), vm::Status::CanRun))
             .collect_vec();
         trace!(
             "Constant evaluator running. {} running VMs, {} in total.",
-            running_vms.len(),
-            num_vms,
+            running_evaluators.len(),
+            num_evaluators,
         );
 
-        if let Some((module, vm)) = running_vms.choose_mut(&mut thread_rng()) {
-            vm.run(
-                &mut DbUseProvider { db },
+        if let Some((module, evaluator)) = running_evaluators.choose_mut(&mut thread_rng()) {
+            evaluator.vm.run(
+                &DbUseProvider { db },
                 &mut RunLimitedNumberOfInstructions::new(500),
+                &mut evaluator.tracer,
             );
             Some(module.clone())
         } else {
@@ -62,31 +71,39 @@ impl ConstantEvaluator {
     }
 
     pub fn get_fuzzable_closures(&self, module: &Module) -> (Heap, Vec<(Id, Pointer)>) {
-        let vm = &self.vms[module];
-        let TearDownResult {
-            heap,
-            fuzzable_closures,
-            ..
-        } = vm.clone().tear_down();
-        (heap, fuzzable_closures)
+        let evaluator = &self.evaluators[module];
+        let fuzzable_closures = evaluator
+            .tracer
+            .events
+            .iter()
+            .filter_map(|event| match &event.event {
+                StoredVmEvent::InFiber {
+                    event: StoredFiberEvent::FoundFuzzableClosure { id, closure },
+                    ..
+                } => Some((id.clone(), *closure)),
+                _ => None,
+            })
+            .collect();
+        (evaluator.tracer.heap.clone(), fuzzable_closures)
     }
 
     pub fn get_hints(&self, db: &Database, module: &Module) -> Vec<Hint> {
         let span = span!(Level::DEBUG, "Calculating hints for {module}");
         let _enter = span.enter();
 
-        let vm = &self.vms[module];
+        let evaluator = &self.evaluators[module];
         let mut hints = vec![];
 
-        if let vm::Status::Panicked { reason } = vm.status() {
-            if let Some(hint) = panic_hint(db, module.clone(), vm, reason) {
+        // TODO: Think about how to highlight the responsible piece of code.
+        if let vm::Status::Panicked { reason, .. } = evaluator.vm.status() {
+            if let Some(hint) = panic_hint(db, module.clone(), evaluator, reason) {
                 hints.push(hint);
             }
         };
 
-        let TearDownResult { heap, tracer, .. } = vm.clone().tear_down();
-        for entry in &tracer.events {
-            let EventData::ValueEvaluated { id, value } = &entry.data else { continue; };
+        for TimedEvent { event, .. } in &evaluator.tracer.events {
+            let StoredVmEvent::InFiber { event, .. } = event else { continue; };
+            let StoredFiberEvent::ValueEvaluated { id, value } = event else { continue; };
 
             if &id.module != module {
                 continue;
@@ -109,7 +126,7 @@ impl ConstantEvaluator {
 
             hints.push(Hint {
                 kind: HintKind::Value,
-                text: value.format(&heap),
+                text: value.format(&evaluator.tracer.heap),
                 position: id_to_end_of_line(db, id.clone()).unwrap(),
             });
         }
@@ -118,12 +135,17 @@ impl ConstantEvaluator {
     }
 }
 
-fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<Hint> {
+fn panic_hint(
+    db: &Database,
+    module: Module,
+    evaluator: &Evaluator,
+    reason: String,
+) -> Option<Hint> {
     // We want to show the hint at the last call site still inside the current
     // module. If there is no call site in this module, then the panic results
     // from a compiler error in a previous stage which is already reported.
-    let TearDownResult { heap, tracer, .. } = vm.clone().tear_down();
-    let stack = tracer.stack_trace();
+    let stack_traces = evaluator.tracer.stack_traces();
+    let stack = stack_traces.get(&FiberId::root()).unwrap();
     if stack.len() == 1 {
         // The stack only contains an `InModule` entry. This indicates an error
         // during compilation resulting in a top-level error instruction.
@@ -146,8 +168,10 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
             id,
             format!(
                 "{} {}",
-                closure.format(&heap),
-                args.iter().map(|arg| arg.format(&heap)).join(" ")
+                closure.format(&evaluator.tracer.heap),
+                args.iter()
+                    .map(|arg| arg.format(&evaluator.tracer.heap))
+                    .join(" ")
             ),
         ),
         StackEntry::Needs {
@@ -156,7 +180,11 @@ fn panic_hint(db: &Database, module: Module, vm: &Vm, reason: String) -> Option<
             reason,
         } => (
             id,
-            format!("needs {} {}", condition.format(&heap), reason.format(&heap)),
+            format!(
+                "needs {} {}",
+                condition.format(&evaluator.tracer.heap),
+                reason.format(&evaluator.tracer.heap)
+            ),
         ),
         _ => unreachable!(),
     };

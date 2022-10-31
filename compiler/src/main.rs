@@ -18,7 +18,7 @@ use crate::{
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
         error::CompilerError,
-        hir::{self, CollectErrors},
+        hir::{self, CollectErrors, Id},
         hir_to_lir::HirToLir,
         rcst_to_cst::RcstToCst,
         string_to_rcst::StringToRcst,
@@ -28,7 +28,8 @@ use crate::{
     module::{Module, ModuleKind},
     vm::{
         context::{DbUseProvider, RunForever},
-        Closure, Status, Struct, TearDownResult, Vm,
+        tracer::{full::FullTracer, Tracer},
+        Closure, ExecutionResult, FiberId, Status, Struct, Vm,
     },
 };
 use compiler::lir::Lir;
@@ -203,51 +204,53 @@ fn run(options: CandyRunOptions) {
         warn!("Build failed.");
         return;
     };
-    let module_closure = Closure::of_module(&db, module.clone()).unwrap();
+    // TODO: Optimize the code before running.
 
     let path_string = options.file.to_string_lossy();
-    info!("Running `{path_string}`.");
+    debug!("Running `{path_string}`.");
+
+    let module_closure = Closure::of_module(&db, module.clone()).unwrap();
+    let mut tracer = FullTracer::default();
+
     let mut vm = Vm::new();
     vm.set_up_for_running_module_closure(module_closure);
-    loop {
-        info!("Tree: {:#?}", vm);
-        match vm.status() {
-            Status::CanRun => {
-                debug!("VM is still running.");
-                vm.run(&mut DbUseProvider { db: &db }, &mut RunForever);
-            }
-            Status::WaitingForOperations => {
-                todo!(
-                    "Running the module results in a deadlock caused by some channel operations."
-                );
-            }
-            _ => break,
-        }
+    vm.run(&DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
+    if let Status::WaitingForOperations = vm.status() {
+        error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
+        // TODO: Show stack traces of all fibers?
     }
-    info!("Tree: {:#?}", vm);
-    let TearDownResult {
-        tracer,
-        result,
-        mut heap,
-        ..
-    } = vm.tear_down();
+    let result = vm.tear_down();
 
     if options.debug {
-        module.dump_associated_debug_file("trace", &tracer.full_trace().format(&heap));
+        module.dump_associated_debug_file("trace", &format!("{tracer:?}"));
     }
 
-    let exported_definitions: Struct = match result {
-        Ok(return_value) => {
-            info!(
-                "The module exports these definitions: {}",
-                return_value.format(&heap),
-            );
-            heap.get(return_value).data.clone().try_into().unwrap()
+    let (mut heap, exported_definitions): (_, Struct) = match result {
+        ExecutionResult::Finished(return_value) => {
+            debug!("The module exports these definitions: {return_value:?}",);
+            let exported = return_value
+                .heap
+                .get(return_value.address)
+                .data
+                .clone()
+                .try_into()
+                .unwrap();
+            (return_value.heap, exported)
         }
-        Err(reason) => {
+        ExecutionResult::Panicked {
+            reason,
+            responsible,
+        } => {
             error!("The module panicked because {reason}.");
-            error!("This is the stack trace:");
-            tracer.dump_stack_trace(&db, &heap);
+            if let Some(responsible) = responsible {
+                error!("{responsible} is responsible.");
+            } else {
+                error!("Some top-level code panics.");
+            }
+            error!(
+                "This is the stack trace:\n{}",
+                tracer.format_panic_stack_trace_to_root_fiber(&db)
+            );
             return;
         }
     };
@@ -261,7 +264,7 @@ fn run(options: CandyRunOptions) {
         }
     };
 
-    info!("Running main function.");
+    debug!("Running main function.");
     // TODO: Add more environment stuff.
     let mut vm = Vm::new();
     let mut stdout = StdoutService::new(&mut vm);
@@ -270,13 +273,18 @@ fn run(options: CandyRunOptions) {
         let stdout_port = heap.create_send_port(stdout.channel);
         heap.create_struct(HashMap::from([(stdout_symbol, stdout_port)]))
     };
+    tracer.for_fiber(FiberId::root()).call_started(
+        Id::new(module, vec!["main".to_string()]),
+        main,
+        vec![environment],
+        &heap,
+    );
     vm.set_up_for_running_closure(heap, main, &[environment]);
     loop {
-        info!("Tree: {:#?}", vm);
         match vm.status() {
             Status::CanRun => {
-                debug!("VM is still running.");
-                vm.run(&mut DbUseProvider { db: &db }, &mut RunForever);
+                debug!("VM still running.");
+                vm.run(&DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
             }
             Status::WaitingForOperations => {
                 todo!("VM can't proceed until some operations complete.");
@@ -288,20 +296,27 @@ fn run(options: CandyRunOptions) {
             vm.free_channel(channel);
         }
     }
-    info!("Tree: {:#?}", vm);
-    let TearDownResult {
-        tracer,
-        result,
-        heap,
-        ..
-    } = vm.tear_down();
-
-    match result {
-        Ok(return_value) => info!("The main function returned: {}", return_value.format(&heap)),
-        Err(reason) => {
+    match vm.tear_down() {
+        ExecutionResult::Finished(return_value) => {
+            tracer
+                .for_fiber(FiberId::root())
+                .call_ended(return_value.address, &return_value.heap);
+            debug!("The main function returned: {return_value:?}");
+        }
+        ExecutionResult::Panicked {
+            reason,
+            responsible,
+        } => {
             error!("The main function panicked because {reason}.");
-            error!("This is the stack trace:");
-            tracer.dump_stack_trace(&db, &heap);
+            if let Some(responsible) = responsible {
+                error!("{responsible} is responsible.");
+            } else {
+                error!("A needs directly in the main function panicks. Perhaps the main functions expects more in the environment.");
+            }
+            error!(
+                "This is the stack trace:\n{}",
+                tracer.format_panic_stack_trace_to_root_fiber(&db)
+            );
         }
     }
 }
@@ -325,7 +340,7 @@ impl StdoutService {
         if let Some(CompletedOperation::Received { packet }) =
             vm.completed_operations.remove(&self.current_receive)
         {
-            info!("Sent to stdout: {}", packet.value.format(&packet.heap));
+            info!("Sent to stdout: {packet:?}");
             self.current_receive = vm.receive(self.channel);
         }
     }
@@ -339,7 +354,7 @@ async fn fuzz(options: CandyFuzzOptions) {
     );
 
     if raw_build(module.clone(), false).is_none() {
-        info!("Build failed.");
+        warn!("Build failed.");
         return;
     }
 

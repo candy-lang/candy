@@ -1,14 +1,14 @@
 use super::{
     channel::{Capacity, Packet},
-    context::{ExecutionController, UseProvider},
+    context::{ExecutionController, PanickingUseProvider, UseProvider},
     heap::{Builtin, Closure, Data, Heap, Pointer},
     ids::ChannelId,
-    tracer::{EventData, Tracer},
+    tracer::{dummy::DummyTracer, FiberTracer, Tracer},
+    FiberId,
 };
 use crate::{
     compiler::{hir::Id, lir::Instruction},
     module::Module,
-    vm::context::PanickingUseProvider,
 };
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -16,36 +16,43 @@ use tracing::trace;
 
 const TRACE: bool = false;
 
-/// A fiber is one execution thread of a program. A fiber is always owned and
-/// managed by a VM. A VM can own multiple fibers and run them concurrently.
+/// A fiber represents an execution thread of a program. It's a stack-based
+/// machine that runs instructions from a LIR. Fibers are owned by a `Vm`.
 #[derive(Clone)]
 pub struct Fiber {
-    // Core functionality to run code. Fibers are stack-based machines that run
-    // instructions from a LIR. All values are stored on a heap.
     pub status: Status,
     next_instruction: InstructionPointer,
     pub data_stack: Vec<Pointer>,
     pub call_stack: Vec<InstructionPointer>,
     pub import_stack: Vec<Module>,
+    pub responsible_stack: Vec<Id>,
     pub heap: Heap,
-
-    // Debug stuff. This is not essential to a correct working of the fiber, but
-    // enables advanced functionality like stack traces or finding out whose
-    // fault a panic is.
-    pub tracer: Tracer,
-    pub fuzzable_closures: Vec<(Id, Pointer)>,
 }
 
 #[derive(Clone, Debug)]
 pub enum Status {
     Running,
-    CreatingChannel { capacity: Capacity },
-    Sending { channel: ChannelId, packet: Packet },
-    Receiving { channel: ChannelId },
-    InParallelScope { body: Pointer },
-    InTry { body: Pointer },
+    CreatingChannel {
+        capacity: Capacity,
+    },
+    Sending {
+        channel: ChannelId,
+        packet: Packet,
+    },
+    Receiving {
+        channel: ChannelId,
+    },
+    InParallelScope {
+        body: Pointer,
+    },
+    InTry {
+        body: Pointer,
+    },
     Done,
-    Panicked { reason: String },
+    Panicked {
+        reason: String,
+        responsible: Option<Id>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -71,11 +78,12 @@ impl InstructionPointer {
     }
 }
 
-pub struct TearDownResult {
-    pub heap: Heap,
-    pub result: Result<Pointer, String>,
-    pub fuzzable_closures: Vec<(Id, Pointer)>,
-    pub tracer: Tracer,
+pub enum ExecutionResult {
+    Finished(Packet),
+    Panicked {
+        reason: String,
+        responsible: Option<Id>,
+    },
 }
 
 impl Fiber {
@@ -86,50 +94,75 @@ impl Fiber {
             data_stack: vec![],
             call_stack: vec![],
             import_stack: vec![],
+            responsible_stack: vec![],
             heap,
-            tracer: Tracer::new(),
-            fuzzable_closures: vec![],
         }
     }
     pub fn new_for_running_closure(heap: Heap, closure: Pointer, arguments: &[Pointer]) -> Self {
-        assert!(
-            !matches!(heap.get(closure).data, Data::Builtin(_),),
-            "can only use with closures, not builtins"
-        );
+        let Data::Closure(Closure { id, .. }) = &heap.get(closure).data else {
+            panic!("Can only use with closures.");
+        };
+        let id = id.clone();
 
         let mut fiber = Self::new_with_heap(heap);
-
+        let runner_closure = fiber.heap.create(Data::Closure(Closure {
+            id: id.clone(),
+            captured: vec![],
+            num_args: 0,
+            body: vec![
+                Instruction::TraceCallStarts {
+                    id,
+                    num_args: arguments.len(),
+                },
+                Instruction::Call {
+                    num_args: arguments.len(),
+                },
+                Instruction::TraceCallEnds,
+                Instruction::Return,
+            ],
+            responsible: None,
+        }));
         fiber.data_stack.extend(arguments);
         fiber.data_stack.push(closure);
+        fiber.data_stack.push(runner_closure);
 
         fiber.status = Status::Running;
         fiber.run_instruction(
             &PanickingUseProvider,
-            Instruction::Call {
-                num_args: arguments.len(),
-            },
+            &mut DummyTracer.for_fiber(FiberId::root()),
+            Instruction::Call { num_args: 0 },
         );
         fiber
     }
     pub fn new_for_running_module_closure(closure: Closure) -> Self {
-        assert_eq!(closure.captured.len(), 0, "Called start_module_closure with a closure that is not a module closure (it captures stuff).");
-        assert_eq!(closure.num_args, 0, "Called start_module_closure with a closure that is not a module closure (it has arguments).");
+        assert_eq!(
+            closure.captured.len(),
+            0,
+            "Closure is not a module closure (it captures stuff)."
+        );
+        assert_eq!(
+            closure.num_args, 0,
+            "Closure is not a module closure (it has arguments)."
+        );
         let mut heap = Heap::default();
         let closure = heap.create_closure(closure);
         Self::new_for_running_closure(heap, closure, &[])
     }
 
-    pub fn tear_down(mut self) -> TearDownResult {
-        let result = match self.status {
-            Status::Done => Ok(self.data_stack.pop().unwrap()),
-            Status::Panicked { reason } => Err(reason),
+    pub fn tear_down(mut self) -> ExecutionResult {
+        match self.status {
+            Status::Done => ExecutionResult::Finished(Packet {
+                heap: self.heap,
+                address: self.data_stack.pop().unwrap(),
+            }),
+            Status::Panicked {
+                reason,
+                responsible,
+            } => ExecutionResult::Panicked {
+                reason,
+                responsible,
+            },
             _ => panic!("Called `tear_down` on a fiber that's still running."),
-        };
-        TearDownResult {
-            heap: self.heap,
-            result,
-            fuzzable_closures: self.fuzzable_closures,
-            tracer: self.tracer,
         }
     }
 
@@ -166,7 +199,7 @@ impl Fiber {
 
         let address = packet
             .heap
-            .clone_single_to_other_heap(&mut self.heap, packet.value);
+            .clone_single_to_other_heap(&mut self.heap, packet.address);
         self.data_stack.push(address);
         self.status = Status::Running;
     }
@@ -177,19 +210,22 @@ impl Fiber {
             Ok(packet) => {
                 let value = packet
                     .heap
-                    .clone_single_to_other_heap(&mut self.heap, packet.value);
+                    .clone_single_to_other_heap(&mut self.heap, packet.address);
                 self.data_stack.push(value);
                 self.status = Status::Running;
             }
             Err(reason) => self.panic(reason),
         }
     }
-    pub fn complete_try(&mut self, result: Result<Packet, String>) {
+    pub fn complete_try(&mut self, result: ExecutionResult) {
         assert!(matches!(self.status, Status::InTry { .. }));
-
-        let result = result
-            .map(|Packet { heap, value }| heap.clone_single_to_other_heap(&mut self.heap, value))
-            .map_err(|reason| self.heap.create_text(reason));
+        let result = match result {
+            ExecutionResult::Finished(Packet {
+                heap,
+                address: return_value,
+            }) => Ok(heap.clone_single_to_other_heap(&mut self.heap, return_value)),
+            ExecutionResult::Panicked { reason, .. } => Err(self.heap.create_text(reason)),
+        };
         self.data_stack.push(self.heap.create_result(result));
         self.status = Status::Running;
     }
@@ -202,13 +238,17 @@ impl Fiber {
             self.status,
             Status::Done | Status::Panicked { .. }
         ));
-        self.status = Status::Panicked { reason };
+        self.status = Status::Panicked {
+            reason,
+            responsible: self.responsible_stack.last().cloned(),
+        };
     }
 
-    pub fn run<U: UseProvider, E: ExecutionController>(
+    pub fn run(
         &mut self,
-        use_provider: &mut U,
-        execution_controller: &mut E,
+        use_provider: &dyn UseProvider,
+        execution_controller: &mut dyn ExecutionController,
+        tracer: &mut FiberTracer,
     ) {
         assert!(
             matches!(self.status, Status::Running),
@@ -227,6 +267,11 @@ impl Fiber {
 
             if TRACE {
                 trace!(
+                    "Instruction pointer: {}:{}",
+                    self.next_instruction.closure,
+                    self.next_instruction.instruction
+                );
+                trace!(
                     "Data stack: {}",
                     self.data_stack
                         .iter()
@@ -241,16 +286,18 @@ impl Fiber {
                         .join(", ")
                 );
                 trace!(
-                    "Instruction pointer: {}:{}",
-                    self.next_instruction.closure,
-                    self.next_instruction.instruction
+                    "Responsible stack: {}",
+                    self.responsible_stack
+                        .iter()
+                        .map(|responsible| format!("{}", responsible))
+                        .join(", ")
                 );
                 trace!("Heap: {:?}", self.heap);
                 trace!("Running instruction: {instruction:?}");
             }
 
             self.next_instruction.instruction += 1;
-            self.run_instruction(use_provider, instruction);
+            self.run_instruction(use_provider, tracer, instruction);
             execution_controller.instruction_executed();
 
             if self.next_instruction == InstructionPointer::null_pointer() {
@@ -258,7 +305,12 @@ impl Fiber {
             }
         }
     }
-    pub fn run_instruction<U: UseProvider>(&mut self, use_provider: &U, instruction: Instruction) {
+    pub fn run_instruction(
+        &mut self,
+        use_provider: &dyn UseProvider,
+        tracer: &mut FiberTracer,
+        instruction: Instruction,
+    ) {
         match instruction {
             Instruction::CreateInt(int) => {
                 let address = self.heap.create_int(int.into());
@@ -288,9 +340,11 @@ impl Fiber {
                 self.data_stack.push(address);
             }
             Instruction::CreateClosure {
+                id,
                 num_args,
                 body,
                 captured,
+                is_curly,
             } => {
                 let captured = captured
                     .iter()
@@ -300,9 +354,15 @@ impl Fiber {
                     self.heap.dup(*address);
                 }
                 let address = self.heap.create_closure(Closure {
+                    id,
                     captured,
                     num_args,
                     body,
+                    responsible: if is_curly {
+                        self.responsible_stack.last().cloned()
+                    } else {
+                        None
+                    },
                 });
                 self.data_stack.push(address);
             }
@@ -336,6 +396,7 @@ impl Fiber {
                     Data::Closure(Closure {
                         captured,
                         num_args: expected_num_args,
+                        responsible,
                         ..
                     }) => {
                         if num_args != expected_num_args {
@@ -349,6 +410,9 @@ impl Fiber {
                             self.heap.dup(captured);
                         }
                         self.data_stack.append(&mut args);
+                        if let Some(responsible) = responsible {
+                            self.responsible_stack.push(responsible);
+                        }
                         self.next_instruction =
                             InstructionPointer::start_of_closure(closure_address);
                     }
@@ -365,6 +429,16 @@ impl Fiber {
                 };
             }
             Instruction::Return => {
+                let closure: Closure = self
+                    .heap
+                    .get(self.next_instruction.closure)
+                    .data
+                    .clone()
+                    .try_into()
+                    .unwrap();
+                if closure.responsible.is_some() {
+                    self.responsible_stack.pop().unwrap();
+                }
                 self.heap.drop(self.next_instruction.closure);
                 let caller = self.call_stack.pop().unwrap();
                 self.next_instruction = caller;
@@ -377,6 +451,12 @@ impl Fiber {
                         self.panic(reason);
                     }
                 }
+            }
+            Instruction::StartResponsibility(responsible) => {
+                self.responsible_stack.push(responsible);
+            }
+            Instruction::EndResponsibility => {
+                self.responsible_stack.pop().unwrap();
             }
             Instruction::Needs => {
                 let reason = self.data_stack.pop().unwrap();
@@ -395,7 +475,7 @@ impl Fiber {
                         "True" => {
                             self.data_stack.push(self.heap.create_nothing());
                         }
-                        "False" => self.status = Status::Panicked { reason },
+                        "False" => self.panic(reason),
                         _ => {
                             self.panic("Needs expects True or False as a symbol.".to_string());
                         }
@@ -411,12 +491,12 @@ impl Fiber {
                     panic!("Instruction RegisterFuzzableClosure executed, but stack top is not a closure.");
                 }
                 self.heap.dup(closure);
-                self.fuzzable_closures.push((id, closure));
+                tracer.found_fuzzable_closure(id, closure, &self.heap);
             }
             Instruction::TraceValueEvaluated(id) => {
                 let value = *self.data_stack.last().unwrap();
                 self.heap.dup(value);
-                self.tracer.push(EventData::ValueEvaluated { id, value });
+                tracer.value_evaluated(id, value, &self.heap);
             }
             Instruction::TraceCallStarts { id, num_args } => {
                 let closure = *self.data_stack.last().unwrap();
@@ -431,29 +511,24 @@ impl Fiber {
                 }
                 args.reverse();
 
-                self.tracer
-                    .push(EventData::CallStarted { id, closure, args });
+                tracer.call_started(id, closure, args, &self.heap);
             }
             Instruction::TraceCallEnds => {
                 let return_value = *self.data_stack.last().unwrap();
                 self.heap.dup(return_value);
-                self.tracer.push(EventData::CallEnded { return_value });
+                tracer.call_ended(return_value, &self.heap);
             }
             Instruction::TraceNeedsStarts { id } => {
                 let condition = self.data_stack[self.data_stack.len() - 2];
                 let reason = self.data_stack[self.data_stack.len() - 1];
                 self.heap.dup(condition);
                 self.heap.dup(reason);
-                self.tracer.push(EventData::NeedsStarted {
-                    id,
-                    condition,
-                    reason,
-                });
+                tracer.needs_started(id, condition, reason, &self.heap);
             }
             Instruction::TraceNeedsEnds => {
                 let nothing = *self.data_stack.last().unwrap();
                 self.heap.dup(nothing);
-                self.tracer.push(EventData::NeedsEnded { nothing });
+                tracer.needs_ended();
             }
             Instruction::TraceModuleStarts { module } => {
                 if self.import_stack.contains(&module) {
@@ -468,13 +543,13 @@ impl Fiber {
                     ));
                 }
                 self.import_stack.push(module.clone());
-                self.tracer.push(EventData::ModuleStarted { module });
+                tracer.module_started(module);
             }
             Instruction::TraceModuleEnds => {
                 self.import_stack.pop().unwrap();
                 let export_map = *self.data_stack.last().unwrap();
                 self.heap.dup(export_map);
-                self.tracer.push(EventData::ModuleEnded { export_map })
+                tracer.module_ended(export_map, &self.heap);
             }
             Instruction::Error { id, errors } => {
                 self.panic(format!(

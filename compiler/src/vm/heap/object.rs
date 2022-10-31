@@ -2,6 +2,7 @@ use super::{pointer::Pointer, Heap};
 use crate::{
     builtin_functions::BuiltinFunction,
     compiler::{
+        hir::Id,
         hir_to_lir::HirToLir,
         lir::{Instruction, Lir},
     },
@@ -57,9 +58,11 @@ pub struct Struct {
 
 #[derive(Clone)]
 pub struct Closure {
+    pub id: Id,
     pub captured: Vec<Pointer>,
     pub num_args: usize,
     pub body: Vec<Instruction>,
+    pub responsible: Option<Id>,
 }
 
 #[derive(Clone)]
@@ -133,19 +136,25 @@ impl Struct {
 impl Closure {
     pub fn of_module_lir(module: Module, lir: Lir) -> Self {
         Closure {
+            id: Id::new(module.clone(), vec![]),
             captured: vec![],
             num_args: 0,
             body: vec![
-                Instruction::TraceModuleStarts { module },
+                Instruction::TraceModuleStarts {
+                    module: module.clone(),
+                },
                 Instruction::CreateClosure {
+                    id: Id::new(module, vec![]),
                     captured: vec![],
                     num_args: 0,
                     body: lir.instructions,
+                    is_curly: true,
                 },
                 Instruction::Call { num_args: 0 },
                 Instruction::TraceModuleEnds,
                 Instruction::Return,
             ],
+            responsible: None,
         }
     }
     pub fn of_module(db: &Database, module: Module) -> Option<Self> {

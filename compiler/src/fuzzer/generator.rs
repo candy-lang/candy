@@ -2,21 +2,26 @@ use std::collections::HashMap;
 
 use crate::{
     builtin_functions,
-    vm::{Heap, Pointer},
+    vm::{Heap, Packet, Pointer},
 };
 use num_bigint::RandBigInt;
 use rand::{prelude::ThreadRng, Rng};
 
-pub fn generate_n_values(heap: &mut Heap, n: usize) -> Vec<Pointer> {
+pub fn generate_n_values(n: usize) -> Vec<Packet> {
     let mut values = vec![];
     for _ in 0..n {
-        values.push(generate_value(heap));
+        values.push(generate_value());
     }
     values
 }
 
-fn generate_value(heap: &mut Heap) -> Pointer {
-    generate_value_with_complexity(heap, &mut rand::thread_rng(), 100.0)
+fn generate_value() -> Packet {
+    let mut heap = Heap::default();
+    let value = generate_value_with_complexity(&mut heap, &mut rand::thread_rng(), 100.0);
+    Packet {
+        heap,
+        address: value,
+    }
 }
 fn generate_value_with_complexity(
     heap: &mut Heap,

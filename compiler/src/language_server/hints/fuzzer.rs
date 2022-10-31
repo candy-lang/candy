@@ -9,7 +9,7 @@ use crate::{
     module::Module,
     vm::{
         context::{DbUseProvider, RunLimitedNumberOfInstructions},
-        tracer::EventData,
+        tracer::full::{StoredFiberEvent, StoredVmEvent},
         Heap, Pointer,
     },
 };
@@ -55,7 +55,6 @@ impl FuzzerManager {
 
         let fuzzer = running_fuzzers.choose_mut(&mut thread_rng())?;
         fuzzer.run(
-            db,
             &mut DbUseProvider { db },
             &mut RunLimitedNumberOfInstructions::new(100),
         );
@@ -71,7 +70,6 @@ impl FuzzerManager {
 
         for fuzzer in self.fuzzers[module].values() {
             if let Status::PanickedForArguments {
-                heap,
                 arguments,
                 reason,
                 tracer,
@@ -97,10 +95,7 @@ impl FuzzerManager {
                             parameter_names
                                 .iter()
                                 .zip(arguments.iter())
-                                .map(|(name, argument)| format!(
-                                    "`{name} = {}`",
-                                    argument.format(heap)
-                                ))
+                                .map(|(name, argument)| format!("`{name} = {argument:?}`"))
                                 .collect_vec()
                                 .join_with_commas_and_and(),
                         ),
@@ -115,10 +110,14 @@ impl FuzzerManager {
                         .rev()
                         // Find the innermost panicking call that is in the
                         // function.
-                        .find(|entry| {
-                            let innermost_panicking_call_id = match &entry.data {
-                                EventData::CallStarted { id, .. } => id,
-                                EventData::NeedsStarted { id, .. } => id,
+                        .filter_map(|event| match &event.event {
+                            StoredVmEvent::InFiber { event, .. } => Some(event),
+                            _ => None,
+                        })
+                        .find(|event| {
+                            let innermost_panicking_call_id = match &event {
+                                StoredFiberEvent::CallStarted { id, .. } => id,
+                                StoredFiberEvent::NeedsStarted { id, .. } => id,
                                 _ => return false,
                             };
                             id.is_same_module_and_any_parent_of(innermost_panicking_call_id)
@@ -133,11 +132,11 @@ impl FuzzerManager {
                             continue;
                         }
                     };
-                    let (call_id, name, arguments) = match &panicking_inner_call.data {
-                        EventData::CallStarted { id, closure, args } => {
-                            (id.clone(), closure.format(heap), args.clone())
+                    let (call_id, name, arguments) = match &panicking_inner_call {
+                        StoredFiberEvent::CallStarted { id, closure, args } => {
+                            (id.clone(), closure.format(&tracer.heap), args.clone())
                         }
-                        EventData::NeedsStarted {
+                        StoredFiberEvent::NeedsStarted {
                             id,
                             condition,
                             reason,
@@ -148,7 +147,10 @@ impl FuzzerManager {
                         kind: HintKind::Fuzz,
                         text: format!(
                             "then `{name} {}` panics because {reason}.",
-                            arguments.iter().map(|arg| arg.format(heap)).join(" "),
+                            arguments
+                                .iter()
+                                .map(|arg| arg.format(&tracer.heap))
+                                .join(" "),
                         ),
                         position: id_to_end_of_line(db, call_id).unwrap(),
                     }
