@@ -71,7 +71,7 @@ isNonNegative value :=
   bool.not (isNegative value)
 absolute value :=
   needs (is value)
-  conditionals.ifElse isNegative (negate value) value
+  conditionals.ifElse (isNegative value) (negate value) value
 
 fitsInRustU128 value =
   needs (is value)
@@ -83,14 +83,16 @@ fitsInRustU128 value =
 shiftLeft value amount :=
   needs (is value)
   needs (is amount)
-  needs (isNonNegative amount)
-  needs (fitsInRustU128 amount) "shifts by that much are not yet supported"
+  needs (isNonNegative amount) "The shift `amount` is negative. You might want to call `shiftRight` instead."
+  # TODO: Add the negated value in the error message as soon as we support string interpolation.
+  needs (fitsInRustU128 amount) "Shifts by that much are not yet supported."
   ✨.intShiftLeft value amount
 shiftRight value amount :=
   needs (is value)
   needs (is amount)
-  needs (isNonNegative amount)
-  needs (fitsInRustU128 amount) "shifts by that much are not yet supported"
+  needs (isNonNegative amount) "The shift `amount` is negative. You might want to call `shiftLeft` instead."
+  # TODO: Add the negated value in the error message as soon as we support string interpolation.
+  needs (fitsInRustU128 amount) "Shifts by that much are not yet supported."
   ✨.intShiftRight value amount
 
 bitLength value :=

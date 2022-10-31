@@ -18,8 +18,8 @@ lazyAnd a b :=
   ✨.ifElse
     a
     {
-      result = ✨.call b
-      needs (is result)
+      result = ✨.functionRun b
+      needs (is result) "`b` didn't return a bool."
       result
     }
     { False }
@@ -35,8 +35,8 @@ lazyOr a b :=
     a
     { True }
     {
-      result = ✨.call b
-      needs (is result)
+      result = ✨.functionRun b
+      needs (is result) "`b` didn't return a bool."
       result
     }
 or a b :=

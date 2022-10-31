@@ -8,7 +8,7 @@ In particular, this means the following:
   That's mainly achieved by providing good tooling so that the feedback loop is fast.
 - **Candy is minimalistic.**
   The language itself is simple and can be explained in a few minutes.
-  Candy intentionally leaves out advanced concepts like types in favor of good editor tooling.
+  Candy intentionally leaves out advanced concepts like types, offsetting that with good editor tooling.
 - **Candy is expressive.**
   You can be flexible with how you model your data in Candy.
   We aim to have a reasonable concise syntax to express common patterns.
@@ -25,7 +25,7 @@ Note that not all of the features described here are implemented or even finaliz
   - [Symbols](#symbols)
   - [Structs](#structs)
   - [Closures](#closures)
-  - [Channel Ends](#channel-ends)
+  - [Ports](#ports)
   - [More?](#more)
 - [Variables](#variables)
 - [Functions](#functions)
@@ -49,11 +49,13 @@ Candy's syntax is inspired by Elm and Haskell.
 
 Source code is stored in plain text files with a `.candy` file extension.
 
-[Comments](#comments) start with `#` and end at the end of the line:
+[Comments](#comments) start with `##` and end at the end of the line:
 
 ```candy
-# This is a comment.
+## This is a comment.
 ```
+
+> One `#` is also a comment, but a doc comment for the item above it. See [Comments](#comments) for more info on that.
 
 Naming rules are similar to other programming languages.
 Identifiers start with a lowercase letter and may contain letters or digits.
@@ -174,16 +176,15 @@ longClosure = { foo ->
 }
 ```
 
-### Channel Ends
+### Ports
 
-TODO: Or are they called ports?
-
-Channels ends allow you to interact with a [channel](#concurrency).
-There are receive ends and send ends to receive and send data from a channel, respectively.
+Ports allow you to interact with a [channel](#concurrency).
+There are receive ports and send ports to receive and send data from a channel, respectively.
+See the [Concurrency](#concurrency) section for more information.
 
 ### More?
 
-TODO: Sets?
+TODO: Tuples? Tags? Sets?
 
 - sets: Clojure has `%{ value }`
   - or like Toit? `{hey, you, there}` for set, empty map is `{:}`
@@ -251,6 +252,17 @@ five = identity (identity 5)
 error = identity identity 5  # error because the first `identity` is called with two arguments
 ```
 
+You can also split arguments across multiple lines using indentation.
+This allows you to omit parentheses for nested calls.
+
+```
+foo = add
+  subtract 5 3
+  multiply
+    logarithm 5
+    divide 8 4
+```
+
 TODO: Piping
 
 ## Modules
@@ -259,18 +271,18 @@ For bigger project it becomes necessary to split code into multiple files.
 In Candy, *modules* are a unit of composition.
 Modules are self-contained units of code that choose what to expose to the outside world.
 
-Modules correspond either to single candy files or directories containing a single file that is named just `.candy`.
+Modules correspond either to single candy files or directories containing a single file that is named just `_.candy`.
 For example, a Candy project might look like this:
 
 ```
 main.candy
 green/
-  .candy
+  _.candy
   brown.candy
 red/
-  .candy
+  _.candy
   yellow/
-    .candy
+    _.candy
     purple.candy
   blue.candy
 ```
@@ -279,10 +291,10 @@ This directory structure corresponds to the following module hierarchy:
 
 ```
 main        # from main.candy
-green       # from green/.candy
+green       # from green/_.candy
   brown     # from green/brown.candy
-red         # from red/.candy
-  yellow    # from red/yellow/.candy
+red         # from red/_.candy
+  yellow    # from red/yellow/_.candy
     purple  # from red/yellow/purple.candy
   blue      # from red/blue.candy
 ```
@@ -292,7 +304,7 @@ In each module, there automatically exists a `use` function that will import oth
 You pass it a text that describes what module to import.
 
 ```
-# inside red/yellow/.candy
+# inside red/yellow/_.candy
 
 foo = use ".purple"  # imports the purple child module
 foo = use "..blue"   # imports the blue sibling module
@@ -314,7 +326,7 @@ baz a := a
 ```
 
 ```candy
-# inside green/.candy
+# inside green/_.candy
 
 brown = use ".brown"
 
@@ -395,7 +407,7 @@ Consequently, closures can't reject inputs, but they also don't promise that the
 foo a =
   needs (core.int.is a)
 
-  # `product` is a parameterized variable, so it needs to handle every input
+  # `product` is a parameterized variable, so it needs to handle every input.
   product b =
     needs (core.int.is b)
     core.int.multiply a b
@@ -415,13 +427,24 @@ foo a =
 foo Hey  # Calling `foo Hey` panics because life's not fair.
 ```
 
+Here are some recommended guidelines for writing reasons:
+
+- For `needs` that only check the type, you typically don't need a reason. 
+- Try to keep the reason short and simple.
+- Phrase the reason as a self-contained sentence, including a period at the end.
+- Write concrete references such as function or parameter names in backticks.
+- Prefer concepts over concrete functions. For example, write "This function needs a non-negative int." rather than "This function needs an int that `isNonNegative`." – after all, users can always jump to the `needs` itself.
+- Consider also highlighting what is wrong with the input rather than just spelling out the needs.
+- Consider starting new sentences in long reasons.
+- Consider special-casing typical erroneous inputs with custom reasons.
+
 The editor tooling will analyze your functions and try them out with different values.
 If an input crashes in a way that your code is at fault, you will see a hint.
 
 ```candy
 mySqrt a =               # If you pass `a = -1`,
   needs (core.int.is a)  # this needs succeeds because `core.int.is -1 = True`,
-  core.int.sqrt a        # but calling `core.int.sqrt -1` panics because sqrt only works on non-negative integers. If you think this should be different, check out the `ComplexNumbers` package.
+  core.int.sqrt a        # but calling `core.int.sqrt -1` panics: If you want to take the square root of a negative integer, check out the `ComplexNumbers` package.
 ```
 
 ## Pattern Matching
@@ -462,8 +485,8 @@ Note: The actual `print` works differently, using [capabilities](#environment-an
 
 ```candy
 core.parallel { nursery ->
-  core.fiber.spawn nursery { print "Banana" }
-  core.fiber.spawn nursery { print "Kiwi" }
+  core.async nursery { print "Banana" }
+  core.async nursery { print "Kiwi" }
   # Banana and Kiwi may print in any order
 }
 print "Peach"  # Always prints after the others
@@ -480,14 +503,14 @@ It has a *send end*, which you can use to put messages into it, and it has a *re
 A channel also has a capacity, which indicates how many messages it can hold simultaneously.
 
 ```candy
-channel = core.channel.new 5  # creates a new channel with capacity 5
-sender = channel.sendEnd
-receiver = channel.receiveEnd
+channel = core.channel.create 5  # creates a new channel with capacity 5
+sendPort = channel.sendPort
+receivePort = channel.receivePort
 
-core.channel.send sender Foo
-core.channel.send sender Bar
-core.channel.receive receiver  # Foo
-core.channel.receive receiver  # Bar
+core.channel.send sendPort Foo
+core.channel.send sendPort Bar
+core.channel.receive receivePort  # Foo
+core.channel.receive receivePort  # Bar
 ```
 
 There is no guaranteed ordering between messages sent by multiple fibers, but messages coming from the same fiber are guaranteed to arrive in the same order they were sent.
@@ -497,15 +520,15 @@ Thus, channels also function as a synchronization primitive and can generate *ba
 
 ```candy
 core.parallel { nursery ->
-  channel = core.channel.new 3
-  core.fiber.spawn nursery {
+  channel = core.channel.create 3
+  core.async nursery {
     loop {
-      core.channel.send channel.sendEnd "Hi!"
+      core.channel.send channel.sendPort "Hi!"
     }
   }
-  core.fiber.spawn nursery {
+  core.async nursery {
     loop {
-      print (core.channel.receive channel.receiveEnd)
+      print (core.channel.receive channel.receivePort)
     }
   }
 }
@@ -513,8 +536,6 @@ core.parallel { nursery ->
 
 In this example, if the printing takes longer than the generating of new texts to print, the generator will wait for the printing to happen.
 At most 3 texts will exist before being printed.
-
-TODO: Write about async await as soon as they are in the Core package
 
 ## Packages
 
@@ -529,8 +550,8 @@ For example, on desktop platforms, the environment looks something like this:
 
 ```candy
 [
-  Stdin: <channel receive end>,
-  Stdout: <channel send end>,
+  Stdin: <channel receive port>,
+  Stdout: <channel send port>,
   WorkingDirectory: ...,
   Variables: [
     ...
@@ -559,7 +580,7 @@ Depending on the use case, we offer two alternative options:
 If you develop for a new platform or want to enable more functionality in the native platform, we will have some way of plugging a new part of native code into the runtime that can make its own capabilities available on the environment passed to `main`.
 
 For example, on a microcontroller, the stdout capability doesn't make sense.
-Instead, you might wave a pin capability that allows you to modify the voltage of the hardware pins.
+Instead, you might have a pin capability that allows you to modify the voltage of the hardware pins.
 
 ### Contain Pure Code
 
