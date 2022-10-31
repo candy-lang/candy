@@ -191,6 +191,7 @@ impl Heap {
                     .collect(),
             }),
             Data::Closure(closure) => Data::Closure(Closure {
+                id: closure.id.clone(),
                 captured: closure
                     .captured
                     .iter()

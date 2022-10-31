@@ -1,4 +1,8 @@
-use super::{super::heap::Pointer, Event, FiberId, FullTracer, InFiberEvent};
+use super::{
+    super::heap::Pointer,
+    full::{FullTracer, StoredFiberEvent, StoredVmEvent},
+    FiberId,
+};
 use crate::{
     compiler::{
         ast_to_hir::AstToHir,
@@ -10,6 +14,7 @@ use crate::{
     module::Module,
 };
 use itertools::Itertools;
+use pad::PadStr;
 use std::collections::HashMap;
 
 // Stack traces are a reduced view of the tracing state that represent the stack
@@ -36,49 +41,48 @@ impl FullTracer {
     pub fn stack_traces(&self) -> HashMap<FiberId, Vec<StackEntry>> {
         let mut stacks: HashMap<FiberId, Vec<StackEntry>> = HashMap::new();
         for timed_event in &self.events {
-            if let Event::InFiber { fiber, event } = &timed_event.event {
-                let stack = stacks.entry(*fiber).or_default();
-                match event {
-                    InFiberEvent::ModuleStarted { module } => {
-                        stack.push(StackEntry::Module {
-                            module: module.clone(),
-                        });
-                    }
-                    InFiberEvent::ModuleEnded { .. } => {
-                        stack.pop().unwrap();
-                    }
-                    InFiberEvent::CallStarted { id, closure, args } => {
-                        stack.push(StackEntry::Call {
-                            id: id.clone(),
-                            closure: *closure,
-                            args: args.clone(),
-                        });
-                    }
-                    InFiberEvent::CallEnded { .. } => {
-                        stack.pop().unwrap();
-                    }
-                    InFiberEvent::NeedsStarted {
-                        id,
-                        condition,
-                        reason,
-                    } => {
-                        stack.push(StackEntry::Needs {
-                            id: id.clone(),
-                            condition: *condition,
-                            reason: *reason,
-                        });
-                    }
-                    InFiberEvent::NeedsEnded => {
-                        stack.pop().unwrap();
-                    }
-                    _ => {}
+            let StoredVmEvent::InFiber { fiber, event } = &timed_event.event else { continue; };
+            let stack = stacks.entry(*fiber).or_default();
+            match event {
+                StoredFiberEvent::ModuleStarted { module } => {
+                    stack.push(StackEntry::Module {
+                        module: module.clone(),
+                    });
                 }
+                StoredFiberEvent::ModuleEnded { .. } => {
+                    assert!(matches!(stack.pop().unwrap(), StackEntry::Module { .. }));
+                }
+                StoredFiberEvent::CallStarted { id, closure, args } => {
+                    stack.push(StackEntry::Call {
+                        id: id.clone(),
+                        closure: *closure,
+                        args: args.clone(),
+                    });
+                }
+                StoredFiberEvent::CallEnded { .. } => {
+                    assert!(matches!(stack.pop().unwrap(), StackEntry::Call { .. }));
+                }
+                StoredFiberEvent::NeedsStarted {
+                    id,
+                    condition,
+                    reason,
+                } => {
+                    stack.push(StackEntry::Needs {
+                        id: id.clone(),
+                        condition: *condition,
+                        reason: *reason,
+                    });
+                }
+                StoredFiberEvent::NeedsEnded => {
+                    assert!(matches!(stack.pop().unwrap(), StackEntry::Needs { .. }));
+                }
+                _ => {}
             }
         }
         stacks
     }
     pub fn format_stack_trace(&self, db: &Database, stack: &[StackEntry]) -> String {
-        let mut lines = vec![];
+        let mut caller_locations_and_calls = vec![];
 
         for entry in stack.iter().rev() {
             let hir_id = match entry {
@@ -134,9 +138,19 @@ impl FullTracer {
                 ),
                 StackEntry::Module { module } => format!("module {module}"),
             };
-            lines.push(format!("{caller_location_string:90} {call_string}"));
+            caller_locations_and_calls.push((caller_location_string, call_string));
         }
-        lines.join("\n")
+
+        let longest_location = caller_locations_and_calls
+            .iter()
+            .map(|(location, _)| location.len())
+            .max()
+            .unwrap();
+
+        caller_locations_and_calls
+            .into_iter()
+            .map(|(location, call)| format!("{} {}", location.pad_to_width(longest_location), call))
+            .join("\n")
     }
     /// When a VM panics, some child fiber might be responsible for that. This
     /// function returns a formatted stack trace spanning all fibers in the
@@ -144,7 +158,7 @@ impl FullTracer {
     pub fn format_panic_stack_trace_to_root_fiber(&self, db: &Database) -> String {
         let mut panicking_fiber_chain = vec![FiberId::root()];
         for timed_event in self.events.iter().rev() {
-            if let Event::FiberPanicked {
+            if let StoredVmEvent::FiberPanicked {
                 fiber,
                 panicked_child,
             } = timed_event.event

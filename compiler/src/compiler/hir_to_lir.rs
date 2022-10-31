@@ -149,6 +149,7 @@ impl LoweringContext {
         is_curly: bool,
     ) {
         self.emit(Instruction::CreateClosure {
+            id: id.clone(),
             captured,
             num_args,
             body: instructions,

@@ -10,7 +10,7 @@ use crate::{
 // of the VM.
 
 pub trait UseProvider {
-    fn use_module(&mut self, module: Module) -> Result<UseResult, String>;
+    fn use_module(&self, module: Module) -> Result<UseResult, String>;
 }
 pub enum UseResult {
     Asset(Vec<u8>),
@@ -19,7 +19,7 @@ pub enum UseResult {
 
 pub struct PanickingUseProvider;
 impl UseProvider for PanickingUseProvider {
-    fn use_module(&mut self, _: Module) -> Result<UseResult, String> {
+    fn use_module(&self, _: Module) -> Result<UseResult, String> {
         panic!()
     }
 }
@@ -28,7 +28,7 @@ pub struct DbUseProvider<'a> {
     pub db: &'a Database,
 }
 impl<'a> UseProvider for DbUseProvider<'a> {
-    fn use_module(&mut self, module: Module) -> Result<UseResult, String> {
+    fn use_module(&self, module: Module) -> Result<UseResult, String> {
         match module.kind {
             ModuleKind::Asset => match self.db.get_module_content(module.clone()) {
                 Some(bytes) => Ok(UseResult::Asset((*bytes).clone())),

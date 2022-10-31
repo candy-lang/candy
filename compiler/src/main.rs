@@ -29,7 +29,7 @@ use crate::{
     module::{Module, ModuleKind},
     vm::{
         context::{DbUseProvider, RunForever},
-        tracer::{FullTracer, Tracer},
+        tracer::{full::FullTracer, Tracer},
         Closure, ExecutionResult, FiberId, Status, Struct, Vm,
     },
 };
@@ -236,11 +236,11 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     debug!("Running `{path_string}`.");
 
     let module_closure = Closure::of_module(&db, module.clone()).unwrap();
-    let mut tracer = FullTracer::new();
+    let mut tracer = FullTracer::default();
 
     let mut vm = Vm::new();
     vm.set_up_for_running_module_closure(module_closure);
-    vm.run(&mut DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
+    vm.run(&DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
     if let Status::WaitingForOperations = vm.status() {
         error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
         // TODO: Show stack traces of all fibers?
@@ -299,18 +299,18 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         let stdout_port = heap.create_send_port(stdout.channel);
         heap.create_struct(HashMap::from([(stdout_symbol, stdout_port)]))
     };
-    tracer.in_fiber_tracer(FiberId::root()).call_started(
-        &heap,
+    tracer.for_fiber(FiberId::root()).call_started(
         Id::new(module, vec!["main".to_string()]),
         main,
         vec![environment],
+        &heap,
     );
     vm.set_up_for_running_closure(heap, main, &[environment]);
     loop {
         match vm.status() {
             Status::CanRun => {
                 debug!("VM still running.");
-                vm.run(&mut DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
+                vm.run(&DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
             }
             Status::WaitingForOperations => {
                 todo!("VM can't proceed until some operations complete.");
@@ -319,16 +319,14 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         }
         stdout.run(&mut vm);
         for channel in vm.unreferenced_channels.iter().copied().collect_vec() {
-            if channel != stdout.channel {
-                vm.free_channel(channel);
-            }
+            vm.free_channel(channel);
         }
     }
     match vm.tear_down() {
         ExecutionResult::Finished(return_value) => {
             tracer
-                .in_fiber_tracer(FiberId::root())
-                .call_ended(&return_value.heap, return_value.address);
+                .for_fiber(FiberId::root())
+                .call_ended(return_value.address, &return_value.heap);
             debug!("The main function returned: {return_value:?}");
             Ok(())
         }

@@ -224,9 +224,9 @@ impl Vm {
     // This will be used as soon as the outside world tries to send something
     // into the VM.
     #[allow(dead_code)]
-    pub fn send(
+    pub fn send<T: Tracer>(
         &mut self,
-        tracer: &mut dyn Tracer,
+        tracer: &mut T,
         channel: ChannelId,
         packet: Packet,
     ) -> OperationId {
@@ -248,11 +248,11 @@ impl Vm {
         self.unreferenced_channels.remove(&channel);
     }
 
-    pub fn run<U: UseProvider, E: ExecutionController>(
+    pub fn run<U: UseProvider, E: ExecutionController, T: Tracer>(
         &mut self,
-        use_provider: &mut U,
+        use_provider: &U,
         execution_controller: &mut E,
-        tracer: &mut dyn Tracer,
+        tracer: &mut T,
     ) {
         while self.can_run() && execution_controller.should_continue_running() {
             self.run_raw(
@@ -265,11 +265,11 @@ impl Vm {
             );
         }
     }
-    fn run_raw<U: UseProvider, E: ExecutionController>(
+    fn run_raw<U: UseProvider, E: ExecutionController, T: Tracer>(
         &mut self,
-        use_provider: &mut U,
+        use_provider: &U,
         execution_controller: &mut E,
-        tracer: &mut dyn Tracer,
+        tracer: &mut T,
     ) {
         assert!(
             self.can_run(),
@@ -297,7 +297,7 @@ impl Vm {
         fiber.run(
             use_provider,
             execution_controller,
-            &mut *tracer.in_fiber_tracer(fiber_id),
+            &mut tracer.for_fiber(fiber_id),
         );
         tracer.fiber_execution_ended(fiber_id);
 
@@ -376,7 +376,14 @@ impl Vm {
 
                 false
             }
-            fiber::Status::Done | fiber::Status::Panicked { .. } => true,
+            fiber::Status::Done => {
+                tracer.fiber_done(fiber_id);
+                true
+            }
+            fiber::Status::Panicked { .. } => {
+                tracer.fiber_panicked(fiber_id, None);
+                true
+            }
         };
 
         if is_finished && fiber_id != FiberId::root() {
@@ -462,9 +469,9 @@ impl Vm {
             .collect();
         self.unreferenced_channels = unreferenced_channels;
     }
-    fn finish_parallel(
+    fn finish_parallel<T: Tracer>(
         &mut self,
-        tracer: &mut dyn Tracer,
+        tracer: &mut T,
         parallel_id: FiberId,
         cause: Performer,
         result: Result<(), String>,
@@ -521,9 +528,9 @@ impl Vm {
         tracer.fiber_canceled(fiber);
     }
 
-    fn send_to_channel(
+    fn send_to_channel<T: Tracer>(
         &mut self,
-        tracer: &mut dyn Tracer,
+        tracer: &mut T,
         performer: Performer,
         channel_id: ChannelId,
         packet: Packet,
@@ -532,7 +539,6 @@ impl Vm {
             Some(channel) => channel,
             None => {
                 // The channel was a nursery that died.
-                // TODO: also panic a nursery performer
                 if let Performer::Fiber(fiber) = performer {
                     let tree = self.fibers.get_mut(&fiber).unwrap();
                     tree.as_single_mut().unwrap().fiber.panic(
