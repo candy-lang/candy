@@ -431,9 +431,10 @@ Here are some recommended guidelines for writing reasons:
 
 - For `needs` that only check the type, you typically don't need a reason. 
 - Try to keep the reason short and simple.
-- Phrase the reason in a way that it gramatically fits after "because".
-- Write concrete references such as function names in backticks.
-- Prefer concepts over concrete functions. For example, write "this function needs a non-negative int" rather than "this function needs an int that `isNonNegative`" – after all, users can always jump to the `needs` itself.
+- Phrase the reason as a self-contained sentence, including a period at the end.
+- Write concrete references such as function or parameter names in backticks.
+- Prefer concepts over concrete functions. For example, write "This function needs a non-negative int." rather than "This function needs an int that `isNonNegative`." – after all, users can always jump to the `needs` itself.
+- Consider also highlighting what is wrong with the input rather than just spelling out the needs.
 - Consider starting new sentences in long reasons.
 - Consider special-casing typical erroneous inputs with custom reasons.
 
@@ -443,7 +444,7 @@ If an input crashes in a way that your code is at fault, you will see a hint.
 ```candy
 mySqrt a =               # If you pass `a = -1`,
   needs (core.int.is a)  # this needs succeeds because `core.int.is -1 = True`,
-  core.int.sqrt a        # but calling `core.int.sqrt -1` panics because `sqrt` only works on non-negative integers. You might want to check out the `ComplexNumbers` package.
+  core.int.sqrt a        # but calling `core.int.sqrt -1` panics: `sqrt` only works on non-negative integers. You might want to check out the `ComplexNumbers` package.
 ```
 
 ## Pattern Matching

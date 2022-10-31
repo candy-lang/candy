@@ -75,7 +75,7 @@ absolute value :=
 
 fitsInRustU128 value =
   needs (is value)
-  needs (isNonNegative value) "you gave `fitsInRustU128` a negative int, but it needs a non-negative one"
+  needs (isNonNegative value)
 
   rustU128Max = 340282366920938463463374607431768211455
   # https://doc.rust-lang.org/std/primitive.u128.html#associatedconstant.MAX
@@ -83,15 +83,16 @@ fitsInRustU128 value =
 shiftLeft value amount :=
   needs (is value)
   needs (is amount)
-  needs (isNonNegative amount) "`shiftLeft` needs a non-negative amount. You might want to call `shiftRight` instead"
-  # TODO: Add negated value in error message as soon as we support string interpolation.
-  needs (fitsInRustU128 amount) "shifts by that much are not yet supported"
+  needs (isNonNegative amount) "The shift `amount` is negative. You might want to call `shiftRight` instead."
+  # TODO: Add the negated value in the error message as soon as we support string interpolation.
+  needs (fitsInRustU128 amount) "Shifts by that much are not yet supported."
   ✨.intShiftLeft value amount
 shiftRight value amount :=
   needs (is value)
   needs (is amount)
-  needs (isNonNegative amount) "`shiftLeft` needs a non-negative amount. You might want to call `shiftLeft` instead"
-  needs (fitsInRustU128 amount) "shifts by that much are not yet supported"
+  needs (isNonNegative amount) "The shift `amount` is negative. You might want to call `shiftLeft` instead."
+  # TODO: Add the negated value in the error message as soon as we support string interpolation.
+  needs (fitsInRustU128 amount) "Shifts by that much are not yet supported."
   ✨.intShiftRight value amount
 
 bitLength value :=

@@ -8,15 +8,15 @@ isSendPort value := isType value SendPort
 isReceivePort value := isType value ReceivePort
 
 create capacity :=
-  needs (isInt capacity) "`create` needs an integer capacity. Otherwise, there would be no backpressure among fibers and memory leaks would go unnoticed"
+  needs (isInt capacity) "`capacity` is not an integer. `create` needs a capacity because otherwise, there would be no backpressure among fibers and memory leaks would go unnoticed."
   ✨.channelCreate capacity
 
 send port packet :=
-  needs (bool.not (isReceivePort port)) "`send` needs a send port but was given a receive port"
+  needs (bool.not (isReceivePort port)) "`port` should be a send port, not a receive port"
   needs (isSendPort port)
   ✨.channelSend port packet
 
 receive port :=
-  needs (bool.not (isSendPort port)) "`receive` needs a receive port, but was given a send port"
+  needs (bool.not (isSendPort port)) "`port` should be a receive port, not a send port"
   needs (isReceivePort port)
   ✨.channelReceive port

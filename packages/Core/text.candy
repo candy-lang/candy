@@ -36,7 +36,7 @@ getRange text startInclusive endExclusive :=
   needs (int.isLessThanOrEqualTo startInclusive endExclusive)
   needs (int.isLessThan endExclusive (length text))
 
-  # TODO: support ranges when we have them
+  # TODO: Support ranges when we have them.
   ✨.textGetRange text startInclusive endExclusive
 
 concatenate valueA valueB :=
