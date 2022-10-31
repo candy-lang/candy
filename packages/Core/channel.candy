@@ -17,6 +17,6 @@ send port packet :=
   ✨.channelSend port packet
 
 receive port :=
-  needs (bool.not (isSendPort port)) "`port` should be a receive port, not a send port"
+  needs (bool.not (isSendPort port)) "`port` should be a receive port, not a send port."
   needs (isReceivePort port)
   ✨.channelReceive port
