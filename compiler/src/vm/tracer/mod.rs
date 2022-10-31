@@ -103,16 +103,6 @@ pub trait Tracer {
         self.add(VmEvent::ChannelCreated { channel });
     }
 
-    // fn in_fiber_tracer<'a>(&'a mut self, fiber: FiberId) -> Box<dyn InFiberTracer<'a> + 'a>
-    // where
-    //     Self: 'a,
-    // {
-    //     Box::new(FullInFiberTracer {
-    //         tracer: self,
-    //         fiber,
-    //     })
-    // }
-
     fn for_fiber<'a, 'fiber>(&'a mut self, fiber: FiberId) -> FiberTracer<'fiber>
     where
         Self: Sized,
