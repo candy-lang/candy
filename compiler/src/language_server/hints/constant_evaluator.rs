@@ -15,7 +15,6 @@ use crate::{
         tracer::{
             full::{FullTracer, StoredFiberEvent, StoredVmEvent, TimedEvent},
             stack_trace::StackEntry,
-            Tracer,
         },
         Closure, FiberId, Heap, Pointer, Vm,
     },
@@ -63,7 +62,7 @@ impl ConstantEvaluator {
             evaluator.vm.run(
                 &DbUseProvider { db },
                 &mut RunLimitedNumberOfInstructions::new(500),
-                &mut evaluator.tracer.for_vm(),
+                &mut evaluator.tracer,
             );
             Some(module.clone())
         } else {

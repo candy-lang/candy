@@ -217,7 +217,7 @@ fn run(options: CandyRunOptions) {
     vm.run(
         &DbUseProvider { db: &db },
         &mut RunForever,
-        &mut tracer.for_vm(),
+        &mut tracer,
     );
     if let Status::WaitingForOperations = vm.status() {
         error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
@@ -277,7 +277,7 @@ fn run(options: CandyRunOptions) {
         let stdout_port = heap.create_send_port(stdout.channel);
         heap.create_struct(HashMap::from([(stdout_symbol, stdout_port)]))
     };
-    tracer.for_vm().for_fiber(FiberId::root()).call_started(
+    tracer.for_fiber(FiberId::root()).call_started(
         Id::new(module, vec!["main".to_string()]),
         main,
         vec![environment],
@@ -291,7 +291,7 @@ fn run(options: CandyRunOptions) {
                 vm.run(
                     &DbUseProvider { db: &db },
                     &mut RunForever,
-                    &mut tracer.for_vm(),
+                    &mut tracer,
                 );
             }
             Status::WaitingForOperations => {
@@ -307,7 +307,6 @@ fn run(options: CandyRunOptions) {
     match vm.tear_down() {
         ExecutionResult::Finished(return_value) => {
             tracer
-                .for_vm()
                 .for_fiber(FiberId::root())
                 .call_ended(return_value.address, &return_value.heap);
             debug!("The main function returned: {return_value:?}");

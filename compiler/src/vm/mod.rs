@@ -21,7 +21,7 @@ use self::{
     },
     heap::SendPort,
     ids::{CountableId, IdGenerator},
-    tracer::VmTracer,
+    tracer::Tracer,
 };
 use crate::compiler::hir::Id;
 use itertools::Itertools;
@@ -222,9 +222,9 @@ impl Vm {
     // This will be used as soon as the outside world tries to send something
     // into the VM.
     #[allow(dead_code)]
-    pub fn send(
+    pub fn send<T: Tracer>(
         &mut self,
-        tracer: &mut VmTracer,
+        tracer: &mut T,
         channel: ChannelId,
         packet: Packet,
     ) -> OperationId {
@@ -246,11 +246,11 @@ impl Vm {
         self.unreferenced_channels.remove(&channel);
     }
 
-    pub fn run<U: UseProvider, E: ExecutionController>(
+    pub fn run<U: UseProvider, E: ExecutionController, T: Tracer>(
         &mut self,
         use_provider: &U,
         execution_controller: &mut E,
-        tracer: &mut VmTracer,
+        tracer: &mut T,
     ) {
         while self.can_run() && execution_controller.should_continue_running() {
             self.run_raw(
@@ -263,11 +263,11 @@ impl Vm {
             );
         }
     }
-    fn run_raw<U: UseProvider, E: ExecutionController>(
+    fn run_raw<U: UseProvider, E: ExecutionController, T: Tracer>(
         &mut self,
         use_provider: &U,
         execution_controller: &mut E,
-        tracer: &mut VmTracer,
+        tracer: &mut T,
     ) {
         assert!(
             self.can_run(),
@@ -467,9 +467,9 @@ impl Vm {
             .collect();
         self.unreferenced_channels = unreferenced_channels;
     }
-    fn finish_parallel(
+    fn finish_parallel<T: Tracer>(
         &mut self,
-        tracer: &mut VmTracer,
+        tracer: &mut T,
         parallel_id: FiberId,
         cause: Performer,
         result: Result<(), String>,
@@ -506,7 +506,7 @@ impl Vm {
             },
         );
     }
-    fn cancel(&mut self, tracer: &mut VmTracer, fiber: FiberId) {
+    fn cancel(&mut self, tracer: &mut dyn Tracer, fiber: FiberId) {
         match self.fibers.remove(&fiber).unwrap() {
             FiberTree::Single(_) => {}
             FiberTree::Parallel(Parallel {
@@ -526,9 +526,9 @@ impl Vm {
         tracer.fiber_canceled(fiber);
     }
 
-    fn send_to_channel(
+    fn send_to_channel<T: Tracer>(
         &mut self,
-        tracer: &mut VmTracer,
+        tracer: &mut T,
         performer: Performer,
         channel_id: ChannelId,
         packet: Packet,

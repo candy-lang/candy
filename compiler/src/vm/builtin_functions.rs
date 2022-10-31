@@ -68,7 +68,7 @@ impl Fiber {
                 self.data_stack.push(closure);
                 self.run_instruction(
                     &PanickingUseProvider,
-                    &mut DummyTracer.for_vm().for_fiber(FiberId::root()),
+                    &mut DummyTracer.for_fiber(FiberId::root()),
                     Instruction::Call { num_args: 0 },
                 );
             }
