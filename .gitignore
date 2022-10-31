@@ -6,6 +6,10 @@ local/
 # ANTLR
 .antlr/
 
+# Rust
+target
+Cargo.lock
+
 # Dart/Pub
 **/doc/api/
 .dart_tool/
