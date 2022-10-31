@@ -78,6 +78,31 @@ pub enum FiberEvent<'event> {
 pub trait Tracer {
     fn add(&mut self, event: VmEvent);
 
+    fn fiber_created(&mut self, fiber: FiberId) {
+        self.add(VmEvent::FiberCreated { fiber });
+    }
+    fn fiber_done(&mut self, fiber: FiberId) {
+        self.add(VmEvent::FiberDone { fiber });
+    }
+    fn fiber_panicked(&mut self, fiber: FiberId, panicked_child: Option<FiberId>) {
+        self.add(VmEvent::FiberPanicked {
+            fiber,
+            panicked_child,
+        });
+    }
+    fn fiber_canceled(&mut self, fiber: FiberId) {
+        self.add(VmEvent::FiberCanceled { fiber });
+    }
+    fn fiber_execution_started(&mut self, fiber: FiberId) {
+        self.add(VmEvent::FiberExecutionStarted { fiber });
+    }
+    fn fiber_execution_ended(&mut self, fiber: FiberId) {
+        self.add(VmEvent::FiberExecutionEnded { fiber });
+    }
+    fn channel_created(&mut self, channel: ChannelId) {
+        self.add(VmEvent::ChannelCreated { channel });
+    }
+
     fn for_vm<'a, 'vm>(&'a mut self) -> VmTracer<'vm>
     where
         Self: Sized,
@@ -120,32 +145,6 @@ impl<'vm, 'fiber> FiberTracer<'vm, 'fiber> {
     }
 }
 
-impl Tracer {
-    pub fn fiber_created(&mut self, fiber: FiberId) {
-        self.add(VmEvent::FiberCreated { fiber });
-    }
-    pub fn fiber_done(&mut self, fiber: FiberId) {
-        self.add(VmEvent::FiberDone { fiber });
-    }
-    pub fn fiber_panicked(&mut self, fiber: FiberId, panicked_child: Option<FiberId>) {
-        self.add(VmEvent::FiberPanicked {
-            fiber,
-            panicked_child,
-        });
-    }
-    pub fn fiber_canceled(&mut self, fiber: FiberId) {
-        self.add(VmEvent::FiberCanceled { fiber });
-    }
-    pub fn fiber_execution_started(&mut self, fiber: FiberId) {
-        self.add(VmEvent::FiberExecutionStarted { fiber });
-    }
-    pub fn fiber_execution_ended(&mut self, fiber: FiberId) {
-        self.add(VmEvent::FiberExecutionEnded { fiber });
-    }
-    pub fn channel_created(&mut self, channel: ChannelId) {
-        self.add(VmEvent::ChannelCreated { channel });
-    }
-}
 impl<'vm, 'fiber> FiberTracer<'vm, 'fiber> {
     pub fn module_started(&mut self, module: Module) {
         self.add(FiberEvent::ModuleStarted { module });
