@@ -6,6 +6,13 @@ local/
 # ANTLR
 .antlr/
 
+# Rust
+target
+
+# Perf
+**/perf.data
+**/perf.data.old
+
 # Dart/Pub
 **/doc/api/
 .dart_tool/

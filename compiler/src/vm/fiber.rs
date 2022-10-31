@@ -1,14 +1,14 @@
 use super::{
     channel::{Capacity, Packet},
-    context::{ExecutionController, UseProvider},
+    context::{ExecutionController, PanickingUseProvider, UseProvider},
     heap::{Builtin, Closure, Data, Heap, Pointer},
     ids::ChannelId,
-    tracer::InFiberTracer,
+    tracer::{dummy::DummyTracer, FiberTracer, Tracer},
+    FiberId,
 };
 use crate::{
     compiler::{hir::Id, lir::Instruction},
     module::Module,
-    vm::{context::PanickingUseProvider, tracer::DummyInFiberTracer},
 };
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -99,23 +99,38 @@ impl Fiber {
         }
     }
     pub fn new_for_running_closure(heap: Heap, closure: Pointer, arguments: &[Pointer]) -> Self {
-        assert!(
-            !matches!(heap.get(closure).data, Data::Builtin(_)),
-            "can only use with closures, not builtins"
-        );
+        let Data::Closure(Closure { id, .. }) = &heap.get(closure).data else {
+            panic!("Can only use with closures.");
+        };
+        let id = id.clone();
 
         let mut fiber = Self::new_with_heap(heap);
-
+        let runner_closure = fiber.heap.create(Data::Closure(Closure {
+            id: id.clone(),
+            captured: vec![],
+            num_args: 0,
+            body: vec![
+                Instruction::TraceCallStarts {
+                    id,
+                    num_args: arguments.len(),
+                },
+                Instruction::Call {
+                    num_args: arguments.len(),
+                },
+                Instruction::TraceCallEnds,
+                Instruction::Return,
+            ],
+            responsible: None,
+        }));
         fiber.data_stack.extend(arguments);
         fiber.data_stack.push(closure);
+        fiber.data_stack.push(runner_closure);
 
         fiber.status = Status::Running;
         fiber.run_instruction(
-            &mut PanickingUseProvider,
-            &mut DummyInFiberTracer,
-            Instruction::Call {
-                num_args: arguments.len(),
-            },
+            &PanickingUseProvider,
+            &mut DummyTracer.for_fiber(FiberId::root()),
+            Instruction::Call { num_args: 0 },
         );
         fiber
     }
@@ -123,11 +138,11 @@ impl Fiber {
         assert_eq!(
             closure.captured.len(),
             0,
-            "closure is not a module closure (it captures stuff)."
+            "Closure is not a module closure (it captures stuff)."
         );
         assert_eq!(
             closure.num_args, 0,
-            "closure is not a module closure (it has arguments)."
+            "Closure is not a module closure (it has arguments)."
         );
         let mut heap = Heap::default();
         let closure = heap.create_closure(closure);
@@ -203,6 +218,7 @@ impl Fiber {
         }
     }
     pub fn complete_try(&mut self, result: ExecutionResult) {
+        assert!(matches!(self.status, Status::InTry { .. }));
         let result = match result {
             ExecutionResult::Finished(Packet {
                 heap,
@@ -230,9 +246,9 @@ impl Fiber {
 
     pub fn run(
         &mut self,
-        use_provider: &mut dyn UseProvider,
+        use_provider: &dyn UseProvider,
         execution_controller: &mut dyn ExecutionController,
-        tracer: &mut dyn InFiberTracer,
+        tracer: &mut FiberTracer,
     ) {
         assert!(
             matches!(self.status, Status::Running),
@@ -291,8 +307,8 @@ impl Fiber {
     }
     pub fn run_instruction(
         &mut self,
-        use_provider: &mut dyn UseProvider,
-        tracer: &mut dyn InFiberTracer,
+        use_provider: &dyn UseProvider,
+        tracer: &mut FiberTracer,
         instruction: Instruction,
     ) {
         match instruction {
@@ -324,6 +340,7 @@ impl Fiber {
                 self.data_stack.push(address);
             }
             Instruction::CreateClosure {
+                id,
                 num_args,
                 body,
                 captured,
@@ -337,6 +354,7 @@ impl Fiber {
                     self.heap.dup(*address);
                 }
                 let address = self.heap.create_closure(Closure {
+                    id,
                     captured,
                     num_args,
                     body,
@@ -473,12 +491,12 @@ impl Fiber {
                     panic!("Instruction RegisterFuzzableClosure executed, but stack top is not a closure.");
                 }
                 self.heap.dup(closure);
-                tracer.found_fuzzable_closure(&self.heap, id, closure);
+                tracer.found_fuzzable_closure(id, closure, &self.heap);
             }
             Instruction::TraceValueEvaluated(id) => {
                 let value = *self.data_stack.last().unwrap();
                 self.heap.dup(value);
-                tracer.value_evaluated(&self.heap, id, value);
+                tracer.value_evaluated(id, value, &self.heap);
             }
             Instruction::TraceCallStarts { id, num_args } => {
                 let closure = *self.data_stack.last().unwrap();
@@ -493,19 +511,19 @@ impl Fiber {
                 }
                 args.reverse();
 
-                tracer.call_started(&self.heap, id, closure, args);
+                tracer.call_started(id, closure, args, &self.heap);
             }
             Instruction::TraceCallEnds => {
                 let return_value = *self.data_stack.last().unwrap();
                 self.heap.dup(return_value);
-                tracer.call_ended(&self.heap, return_value);
+                tracer.call_ended(return_value, &self.heap);
             }
             Instruction::TraceNeedsStarts { id } => {
                 let condition = self.data_stack[self.data_stack.len() - 2];
                 let reason = self.data_stack[self.data_stack.len() - 1];
                 self.heap.dup(condition);
                 self.heap.dup(reason);
-                tracer.needs_started(&self.heap, id, condition, reason);
+                tracer.needs_started(id, condition, reason, &self.heap);
             }
             Instruction::TraceNeedsEnds => {
                 let nothing = *self.data_stack.last().unwrap();
@@ -531,7 +549,7 @@ impl Fiber {
                 self.import_stack.pop().unwrap();
                 let export_map = *self.data_stack.last().unwrap();
                 self.heap.dup(export_map);
-                tracer.module_ended(&self.heap, export_map);
+                tracer.module_ended(export_map, &self.heap);
             }
             Instruction::Error { id, errors } => {
                 self.panic(format!(
