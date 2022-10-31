@@ -8,7 +8,10 @@ local/
 
 # Rust
 target
-Cargo.lock
+
+# Perf
+**/perf.data
+**/perf.data.old
 
 # Dart/Pub
 **/doc/api/
