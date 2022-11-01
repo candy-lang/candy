@@ -63,7 +63,7 @@ impl Mir {
                 }
         }
 
-        self.body.visit(&mut |visible, _, expression| {
+        self.body.visit(&mut |_, expression, visible, _| {
             if let Expression::Call { function, .. } = expression && functions_with_use.contains(&function) {
                 expression.inline_call(visible, &mut self.id_generator);
             }

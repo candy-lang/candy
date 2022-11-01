@@ -6,16 +6,19 @@ impl Mir {
     pub fn follow_references(&mut self) {
         let mut replacements = HashMap::<Id, Id>::new();
 
-        self.visit(&mut |_, id, expression| {
+        self.body.visit(&mut |id, expression, _, _| {
+            if let Expression::Reference(reference) = &expression {
+                let replacement = *replacements.get(reference).unwrap_or(reference);
+                replacements.insert(id, replacement);
+            }
+        });
+        self.body.visit(&mut |id, expression, _, _| {
             expression.replace_id_references(&mut |id| {
                 if let Some(&replacement) = replacements.get(id) {
                     debug!("Replacing reference to {id} with {replacement}.");
                     *id = replacement;
                 }
             });
-            if let Expression::Reference(reference) = &expression {
-                replacements.insert(id, *reference);
-            }
         });
     }
 }

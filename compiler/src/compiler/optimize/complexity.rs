@@ -1,6 +1,6 @@
 use crate::compiler::mir::{Body, Expression, Mir};
 use core::fmt;
-use std::ops::Add;
+use std::{cmp::Ordering, ops::Add};
 
 pub struct Complexity {
     is_self_contained: bool,
@@ -29,6 +29,21 @@ impl Add for Complexity {
             is_self_contained: self.is_self_contained && other.is_self_contained,
             expressions: self.expressions + other.expressions,
         }
+    }
+}
+impl PartialOrd for Complexity {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self.is_self_contained, other.is_self_contained) {
+            (false, false) => None,
+            (false, true) => Some(Ordering::Greater),
+            (true, false) => Some(Ordering::Less),
+            (true, true) => self.expressions.partial_cmp(&other.expressions),
+        }
+    }
+}
+impl PartialEq for Complexity {
+    fn eq(&self, other: &Self) -> bool {
+        self.partial_cmp(other) == Some(Ordering::Equal)
     }
 }
 impl fmt::Display for Complexity {

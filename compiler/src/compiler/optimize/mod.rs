@@ -1,7 +1,7 @@
 // mod common_subtree_elimination;
 mod complexity;
 mod constant_folding;
-// mod constant_lifting;
+mod constant_lifting;
 mod follow_references;
 mod inlining;
 mod module_folding;
@@ -36,17 +36,19 @@ impl Mir {
         loop {
             let before = self.clone();
 
-            debug!("Following references");
+            // debug!("Following references");
             self.checked_optimization(|mir| mir.follow_references());
-            debug!("Tree shake");
+            // debug!("Tree shake");
             self.checked_optimization(|mir| mir.tree_shake());
-            debug!("Fold constants");
+            // debug!("Fold constants");
             self.checked_optimization(|mir| mir.fold_constants());
-            debug!("Inline functions containing use");
+            // debug!("Inline functions containing use");
             self.checked_optimization(|mir| mir.inline_functions_containing_use());
-            // self.checked_optimization(|mir| mir.lift_constants());
+            // debug!("Lift constants");
+            self.checked_optimization(|mir| mir.lift_constants());
+            // debug!("Eliminate common subtrees");
             // self.checked_optimization(|mir| mir.eliminate_common_subtrees());
-            debug!("Flatten multiple");
+            // debug!("Flatten multiple");
             self.checked_optimization(|mir| mir.flatten_multiples());
 
             if *self == before {

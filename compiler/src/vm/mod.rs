@@ -12,7 +12,7 @@ pub use self::{
     fiber::{ExecutionResult, Fiber},
     heap::{Closure, Heap, Object, Pointer, Struct},
     ids::{ChannelId, FiberId, OperationId},
-    tracer::{FullTracer, Tracer},
+    tracer::{full::FullTracer, Tracer},
 };
 use self::{
     channel::{Channel, Completer, Performer},

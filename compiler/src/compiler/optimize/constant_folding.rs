@@ -6,7 +6,7 @@ use tracing::debug;
 
 impl Mir {
     pub fn fold_constants(&mut self) {
-        self.body.visit(&mut |visible, id, expression| {
+        self.body.visit(&mut |id, expression, visible, _| {
             match expression {
                 Expression::Call {
                     function,
@@ -134,7 +134,10 @@ impl Mir {
                 // constant, we may still conclude the result of the builtin:
                 // If only one key is statically determined to be equal to the
                 // other and one is not, then we can still resolve that.
-                if fields.keys().all(|key| key.is_constant(visible)) && key_id.is_constant(visible)
+                if fields
+                    .keys()
+                    .all(|key| visible.get(*key).is_constant(visible))
+                    && visible.get(key_id).is_constant(visible)
                 {
                     let value = fields
                         .iter()

@@ -6,6 +6,7 @@ use crate::{
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
+use tracing::debug;
 use std::{collections::HashMap, fmt, hash, mem};
 
 #[derive(Clone, PartialEq, Eq)]
@@ -103,23 +104,39 @@ impl Body {
         self.push(id, expression);
         id
     }
+    pub fn insert_at_front(&mut self, expressions: Vec<(Id, Expression)>) {
+        let old_expressions = mem::take(&mut self.expressions);
+        self.expressions.extend(expressions);
+        self.expressions.extend(old_expressions);
+    }
     pub fn remove(&mut self, id: Id) {
         let index = self.expressions.iter().position(|(key, _)| *key == id).unwrap();
         self.expressions.remove(index);
     }
+    pub fn remove_all(&mut self, predicate: &mut dyn FnMut(Id, &Expression) -> bool) {
+        self.expressions.retain(|(id, expression)| !predicate(*id, expression));
+    }
+    pub fn is_empty(&self) -> bool {
+        self.expressions.is_empty()
+    }
+
+    pub fn return_value(&mut self) -> Id {
+        let (id, expr) =self.expressions.iter_mut().last().unwrap();
+        *id
+    }
 
     /// Flattens all `Expression::Multiple`.
     pub fn flatten_multiples(&mut self) {
-        let old_expressions = mem::replace(&mut self.expressions, vec![]);
+        let old_expressions = mem::take(&mut self.expressions);
 
         for (id, expression) in old_expressions.into_iter() {
             if let Expression::Multiple(mut inner_body) = expression {
                 inner_body.flatten_multiples();
-                let inner_body_return_value = inner_body.expressions.last().unwrap().0;
+                let returned_by_inner = inner_body.return_value();
                 for (id, expression) in inner_body.expressions {
                     self.expressions.push((id, expression));
                 }
-                self.expressions.push((id, Expression::Reference(inner_body_return_value)));
+                self.expressions.push((id, Expression::Reference(returned_by_inner)));
             } else {
                 self.expressions.push((id, expression));
             }
@@ -137,44 +154,63 @@ impl Body {
     }
 }
 
-impl Mir {
-    /// Calls the visitor for every contained expression, even expressions in
-    /// lambdas or multiples.
-    pub fn visit(&mut self, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
-        self.body.visit_inner(VisibleExpressions::none_visible(), visitor);
-    }
-}
 impl Body {
-    pub fn visit(&mut self, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
-        self.visit_inner(VisibleExpressions::none_visible(), visitor);
+    /// Calls the visitor for each contained expression, even expressions in
+    /// lambdas or multiples.
+    /// 
+    /// The visitor is called in inside-out order, so if the body contains a
+    /// lambda, the visitor is first called for its body expressions and only
+    /// then for the lambda expression itself.
+    /// 
+    /// The visitor takes the ID of the current expression as well as the
+    /// expression itself. It also takes `VisibleExpressions`, which allows it
+    /// to inspect all expressions currently in scope. Finally, the visitor also
+    /// receives whether the current expression is returned from the surrounding
+    /// body.
+    pub fn visit(&mut self, visitor: &mut dyn FnMut(Id, &mut Expression, &VisibleExpressions, bool)) {
+        self.visit_with_visible(VisibleExpressions::none_visible(), visitor);
     }
-    fn visit_inner(&mut self, mut visible: VisibleExpressions, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
+    fn visit_with_visible(&mut self, mut visible: VisibleExpressions, visitor: &mut dyn FnMut(Id, &mut Expression, &VisibleExpressions, bool)) {
         let length = self.expressions.len();
         for i in 0..length {
             let (id, mut expression) = self.expressions.remove(i);
-            Self::visit_expression(id, &mut expression, visible.clone(), visitor);
+            Self::visit_expression(id, &mut expression, visible.clone(), i == length - 1, visitor);
             self.expressions.insert(i, (id, expression.clone()));
             visible.insert(id, expression);
         }
     }
 
-    pub fn visit_expression(id: Id, expression: &mut Expression, visible: VisibleExpressions, visitor: &mut dyn FnMut(&VisibleExpressions, Id, &mut Expression) -> ()) {
-        visitor(&visible, id, expression);
-
+    fn visit_expression(id: Id, expression: &mut Expression, visible: VisibleExpressions, is_returned: bool, visitor: &mut dyn FnMut(Id, &mut Expression, &VisibleExpressions, bool)) {
         if let Expression::Lambda { parameters, responsible_parameter, body, .. } = expression {
             let mut inner_visible = visible.clone();
             for parameter in parameters {
                 inner_visible.insert(*parameter, Expression::Parameter);
             }
             inner_visible.insert(*responsible_parameter, Expression::Parameter);
-            body.visit_inner(inner_visible, visitor);
+            body.visit_with_visible(inner_visible, visitor);
         }
         if let Expression::Multiple(body) = expression {
-            body.visit_inner(visible.clone(), visitor);
+            body.visit_with_visible(visible.clone(), visitor);
+        }
+
+        visitor(id, expression, &visible, is_returned);
+    }
+
+    pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Body)) {
+        visitor(self);
+        for (_, expression) in self.iter_mut() {
+            expression.visit_bodies(visitor);
         }
     }
 }
 impl Expression {
+    pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Body)) {
+        match self {
+            Expression::Lambda { body, .. } => body.visit_bodies(visitor),
+            Expression::Multiple(body) => body.visit_bodies(visitor),
+            _ => {},
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -194,7 +230,6 @@ impl VisibleExpressions {
         self.expressions.get(&id).unwrap()
     }
 }
-
 
 impl hash::Hash for Expression {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -350,5 +385,10 @@ impl fmt::Debug for Expression {
                     .join("\n"),
             ),
         }
+    }
+}
+impl fmt::Debug for VisibleExpressions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.expressions.keys().sorted().map(|id| format!("{id}")).join(", "))
     }
 }

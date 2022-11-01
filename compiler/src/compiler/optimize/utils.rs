@@ -1,6 +1,7 @@
 use crate::compiler::mir::{Body, Expression, Id, Mir, VisibleExpressions};
+use itertools::Itertools;
 use std::{collections::HashSet, mem};
-use tracing::error;
+use tracing::{debug, error};
 
 impl Expression {
     /// All IDs defined inside this expression. For all expressions except
@@ -169,37 +170,38 @@ impl Expression {
     }
 }
 
-impl Id {
+impl Expression {
     /// Whether the value of this expression is known at compile-time.
-    pub fn is_constant(self, visible: &VisibleExpressions) -> bool {
-        let expression = visible.get(self);
-        match expression {
+    pub fn is_constant(&self, visible: &VisibleExpressions) -> bool {
+        match self {
             Expression::Int(_)
             | Expression::Text(_)
             | Expression::Symbol(_)
             | Expression::Builtin(_)
             | Expression::Responsibility(_) => true,
-            Expression::Reference(id) => id.is_constant(visible),
-            Expression::Struct(fields) => fields
-                .iter()
-                .all(|(key, value)| key.is_constant(visible) && value.is_constant(visible)),
-            Expression::Lambda { .. } => expression
+            Expression::Reference(id) => visible.get(*id).is_constant(visible),
+            Expression::Struct(fields) => fields.iter().all(|(key, value)| {
+                visible.get(*key).is_constant(visible) && visible.get(*value).is_constant(visible)
+            }),
+            Expression::Lambda { .. } => self
                 .captured_ids()
                 .iter()
-                .all(|captured| captured.is_constant(visible)),
+                .all(|captured| visible.get(*captured).is_constant(visible)),
             Expression::Parameter
             | Expression::Call { .. }
             | Expression::UseModule { .. }
             | Expression::Needs { .. }
             | Expression::Panic { .. }
             | Expression::Error { .. } => false,
-            Expression::Multiple(_) => expression
+            Expression::Multiple(_) => self
                 .captured_ids()
                 .iter()
-                .all(|captured| captured.is_constant(visible)),
+                .all(|captured| visible.get(*captured).is_constant(visible)),
         }
     }
+}
 
+impl Id {
     pub fn semantically_equals(self, other: Id, visible: &VisibleExpressions) -> Option<bool> {
         if self == other {
             return Some(true);
@@ -223,7 +225,7 @@ impl Id {
             return Some(true);
         }
 
-        if !self.is_constant(visible) || !other.is_constant(visible) {
+        if !self_expr.is_constant(visible) || !other_expr.is_constant(visible) {
             return None;
         }
 

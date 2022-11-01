@@ -11,7 +11,7 @@ use tracing::warn;
 
 impl Mir {
     pub fn fold_modules(&mut self, db: &Database, import_chain: &[Module]) {
-        self.body.visit(&mut |visible, id, expression| {
+        self.body.visit(&mut |id, expression, visible, _| {
             let Expression::UseModule {
                     current_module,
                     relative_path,
