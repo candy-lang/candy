@@ -1,3 +1,19 @@
+//! Tree shaking removes unused pure expressions.
+//!
+//! Here's a before-and-after example:
+//!
+//! ```mir
+//! $0 = 4                 |  $0 = 4
+//! $1 = Foo               |
+//! $2 = $0                |
+//! $3 = call ... with $0  |  $3 = call ... with $0
+//! ```
+//!
+//! This is useful because other optimization passes such as [constant folding]
+//! cause some expressions to be no longer needed.
+//!
+//! [constant folding]: super::constant_folding
+
 use crate::compiler::mir::{Body, Expression, Id, Mir};
 use itertools::Itertools;
 use std::collections::HashSet;

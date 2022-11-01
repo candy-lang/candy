@@ -1,3 +1,32 @@
+//! Module folding evaluates imports with known argument at compile-time.
+//!
+//! This is similar to [constant folding], but for the `builtinUseModule`
+//! builtin. This is also similar to [inlining], but for entire module contents.
+//!
+//! Here's a before-and-after example of an import of Core being folded:
+//!
+//! ```mir
+//! # before:
+//! $0 = "Core"
+//! $1 = HirId(the `use "Core"` expression)
+//! $2 = use $0 relative to here, $1 responsible
+//!
+//! # after:
+//! $0 = "Core"
+//! $1 = HirId(the `use "Core"` expression)
+//! $2 =
+//!   (code of Core)
+//! ```
+//!
+//! Like [inlining], module folding enables many other optimizations, but across
+//! module boundaries. If all imports can be resolved at compile-time, that also
+//! means that the VM never needs to interrupt the program execution for parsing
+//! and compiling other modules. Module folding is a necessity for building
+//! binaries that don't include the Candy compiler itself.
+//!
+//! [constant folding]: super::constant_folding
+//! [inlining]: super::inlining
+
 use crate::{
     compiler::{
         hir_to_mir::HirToMir,

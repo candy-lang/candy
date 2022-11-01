@@ -1,3 +1,33 @@
+//! Constant folding is just a fancy term for executing instructions at
+//! compile-time when their result is known.
+//!
+//! Here's a before-and-after example:
+//!
+//! ```mir
+//! $0 = builtinIntAdd       |  $0 = builtinIntAdd
+//! $1 = 2                   |  $1 = 2
+//! $2 = call $0 with $1 $1  |  $2 = 4
+//! ```
+//!
+//! Afterwards, [tree shaking] can remove unneeded arguments. In the example
+//! above, only `$2` would remain.
+//!
+//! Not all arguments need to be compile-time known. For example, even this code
+//! could be simplified:
+//!
+//! ```mir
+//! $0 = Foo                 |  $0 = Foo
+//! $1 = struct [$0: $a]     |  $1 = struct [$0: $a]
+//! $2 = builtinStructGet    |  $2 = builtinStructGet
+//! $3 = call $3 with $1 $0  |  $3 = $a
+//! ```
+//!
+//! Not only builtins can be compile-time evaluated: Needs and compile-time
+//! errors from previous compilation stages can possibly also be executed at
+//! compile-time.
+//!
+//! [tree shaking]: super::tree_shaking
+
 use crate::{
     builtin_functions::BuiltinFunction,
     compiler::mir::{Body, Expression, Id, Mir, VisibleExpressions},
