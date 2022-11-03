@@ -47,7 +47,11 @@ use std::{
 use structopt::StructOpt;
 use tower_lsp::{LspService, Server};
 use tracing::{debug, error, info, warn, Level, Metadata};
-use tracing_subscriber::{filter, fmt::format::FmtSpan, prelude::*};
+use tracing_subscriber::{
+    filter,
+    fmt::{format::FmtSpan, writer::BoxMakeWriter},
+    prelude::*,
+};
 use vm::{ChannelId, CompletedOperation, OperationId};
 
 #[derive(StructOpt, Debug)]
@@ -88,7 +92,6 @@ struct CandyFuzzOptions {
 
 #[tokio::main]
 async fn main() {
-    init_logger();
     match CandyOptions::from_args() {
         CandyOptions::Build(options) => build(options),
         CandyOptions::Run(options) => run(options),
@@ -98,6 +101,7 @@ async fn main() {
 }
 
 fn build(options: CandyBuildOptions) {
+    init_logger(true);
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
         options.file.clone(),
@@ -193,6 +197,7 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
 }
 
 fn run(options: CandyRunOptions) {
+    init_logger(true);
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
         options.file.clone(),
@@ -347,6 +352,7 @@ impl StdoutService {
 }
 
 async fn fuzz(options: CandyFuzzOptions) {
+    init_logger(true);
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
         options.file.clone(),
@@ -364,6 +370,7 @@ async fn fuzz(options: CandyFuzzOptions) {
 }
 
 async fn lsp() {
+    init_logger(false);
     info!("Starting language server…");
     let (service, socket) = LspService::new(CandyLanguageServer::from_client);
     Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
@@ -371,9 +378,15 @@ async fn lsp() {
         .await;
 }
 
-fn init_logger() {
+fn init_logger(use_stdout: bool) {
+    let writer = if use_stdout {
+        BoxMakeWriter::new(std::io::stdout)
+    } else {
+        BoxMakeWriter::new(std::io::stderr)
+    };
     let console_log = tracing_subscriber::fmt::layer()
         .compact()
+        .with_writer(writer)
         .with_span_events(FmtSpan::ENTER)
         .with_filter(filter::filter_fn(|metadata| {
             // For external packages, show only the error logs.
