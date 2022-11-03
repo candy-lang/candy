@@ -185,11 +185,7 @@ impl<'a> Context<'a> {
                     .iter()
                     .map(|item| self.compile_single(item))
                     .collect_vec();
-                self.push(
-                    Some(ast.id.clone()),
-                    Expression::List(hir_items.into()),
-                    None,
-                )
+                self.push(Some(ast.id.clone()), Expression::List(hir_items), None)
             }
             AstKind::Struct(Struct {
                 positional_fields,
