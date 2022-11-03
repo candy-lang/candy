@@ -78,7 +78,6 @@ We already have a language server that provides some tooling.
   - HTTP, UDP
 - compiler
   - make functions independent of their order in top-level scope
-  - lists
   - text interpolation
   - fibers, channels
   - patterns
