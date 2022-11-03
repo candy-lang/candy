@@ -1176,21 +1176,21 @@ mod parse {
             ))
         );
         assert_eq!(
-            list("(foo)", 0),
+            list("(foo,)", 0),
             Some((
                 "",
                 Rcst::List {
                     opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
                     items: vec![Rcst::ListItem {
                         value: Box::new(Rcst::Identifier("foo".to_string())),
-                        comma: None,
-                    },],
+                        comma: Some(Box::new(Rcst::Comma)),
+                    }],
                     closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
                 }
             ))
         );
         assert_eq!(
-            list("[foo,bar]", 0),
+            list("(foo,bar)", 0),
             Some((
                 "",
                 Rcst::List {
@@ -1215,7 +1215,7 @@ mod parse {
         //   "Hi",
         // ]
         assert_eq!(
-            list("[\n  foo,\n  4,\n  \"Hi\",\n]", 0),
+            list("(\n  foo,\n  4,\n  \"Hi\",\n)", 0),
             Some((
                 "",
                 Rcst::List {
