@@ -26,7 +26,7 @@ impl Fiber {
                     .iter()
                     .map(|byte| self.heap.create_int((*byte).into()))
                     .collect_vec();
-                let list = self.heap.create_list(&bytes);
+                let list = self.heap.create_list(bytes);
                 self.data_stack.push(list);
             }
             UseResult::Code(lir) => {

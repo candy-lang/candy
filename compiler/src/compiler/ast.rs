@@ -36,6 +36,7 @@ pub enum AstKind {
     Text(Text),
     Identifier(Identifier),
     Symbol(Symbol),
+    List(List),
     Struct(Struct),
     StructAccess(StructAccess),
     Lambda(Lambda),
@@ -60,6 +61,9 @@ pub struct Identifier(pub AstString);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Symbol(pub AstString);
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct List(pub Vec<Ast>);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Struct {
@@ -113,6 +117,8 @@ impl Deref for AstString {
 pub enum AstError {
     ExpectedParameter,
     LambdaWithoutClosingCurlyBrace,
+    ListItemWithoutComma,
+    ListWithoutClosingParenthesis,
     ParenthesizedWithoutClosingParenthesis,
     StructKeyWithoutColon,
     StructPositionalAfterNamedField,
@@ -137,6 +143,7 @@ impl FindAst for Ast {
             AstKind::Text(_) => None,
             AstKind::Identifier(_) => None,
             AstKind::Symbol(_) => None,
+            AstKind::List(list) => list.find(id),
             AstKind::Struct(struct_) => struct_.find(id),
             AstKind::StructAccess(access) => access.find(id),
             AstKind::Lambda(lambda) => lambda.find(id),
@@ -144,6 +151,11 @@ impl FindAst for Ast {
             AstKind::Assignment(assignment) => assignment.find(id),
             AstKind::Error { child, .. } => child.as_ref().and_then(|child| child.find(id)),
         }
+    }
+}
+impl FindAst for List {
+    fn find(&self, id: &Id) -> Option<&Ast> {
+        self.0.find(id)
     }
 }
 impl FindAst for Struct {
@@ -208,6 +220,11 @@ impl CollectErrors for Ast {
             AstKind::Text(_) => {}
             AstKind::Identifier(_) => {}
             AstKind::Symbol(_) => {}
+            AstKind::List(List(items)) => {
+                for item in items {
+                    item.collect_errors(errors);
+                }
+            }
             AstKind::Struct(struct_) => {
                 for value in struct_.positional_fields {
                     value.collect_errors(errors);
@@ -254,10 +271,23 @@ impl Display for Ast {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}: ", self.id)?;
         match &self.kind {
-            AstKind::Int(int) => write!(f, "int {}", int.0),
-            AstKind::Text(text) => write!(f, "text \"{}\"", text.0),
-            AstKind::Identifier(identifier) => write!(f, "identifier {}", identifier.0),
-            AstKind::Symbol(symbol) => write!(f, "symbol {}", symbol.0),
+            AstKind::Int(Int(int)) => write!(f, "int {}", int),
+            AstKind::Text(Text(text)) => write!(f, "text \"{}\"", text),
+            AstKind::Identifier(Identifier(identifier)) => write!(f, "identifier {}", identifier),
+            AstKind::Symbol(Symbol(symbol)) => write!(f, "symbol {}", symbol),
+            AstKind::List(List(items)) => {
+                write!(
+                    f,
+                    "list (\n{}\n)",
+                    items
+                        .iter()
+                        .map(|value| format!("{value},"))
+                        .join("\n")
+                        .lines()
+                        .map(|line| format!("  {line}"))
+                        .join("\n")
+                )
+            }
             AstKind::Struct(struct_) => {
                 write!(
                     f,

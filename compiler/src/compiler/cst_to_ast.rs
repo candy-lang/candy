@@ -8,7 +8,7 @@ use super::{
 };
 use crate::{
     compiler::{
-        ast::{AssignmentBody, Struct},
+        ast::{AssignmentBody, List, Struct},
         cst::UnwrapWhitespaceAndComment,
     },
     module::Module,
@@ -248,6 +248,78 @@ impl LoweringContext {
                     }),
                 )
             }
+            CstKind::List {
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+            } => {
+                let mut errors = vec![];
+
+                assert!(
+                    matches!(opening_parenthesis.kind, CstKind::OpeningParenthesis),
+                    "List should always have an opening parenthesis, but instead had {}.",
+                    opening_parenthesis
+                );
+
+                let mut ast_items = vec![];
+                for item in items {
+                    let CstKind::ListItem {
+                        value,
+                        comma,
+                    } = &item.kind else {
+                        errors.push(CompilerError {
+                            module: self.module.clone(),
+                            span: cst.span.clone(),
+                            payload: CompilerErrorPayload::Ast(AstError::StructWithNonStructField),
+                        });
+                        continue;
+                    };
+
+                    let mut value = self.lower_cst(&value.clone());
+
+                    if let Some(comma) = comma {
+                        if !matches!(comma.kind, CstKind::Comma) {
+                            value = self.create_ast(
+                                comma.id,
+                                AstKind::Error {
+                                    child: Some(Box::new(value)),
+                                    errors: vec![CompilerError {
+                                        module: self.module.clone(),
+                                        span: comma.span.clone(),
+                                        payload: CompilerErrorPayload::Ast(
+                                            AstError::ListItemWithoutComma,
+                                        ),
+                                    }],
+                                },
+                            )
+                        }
+                    }
+
+                    ast_items.push(value);
+                }
+
+                if matches!(closing_parenthesis.kind, CstKind::ClosingParenthesis) {
+                    errors.push(CompilerError {
+                        module: self.module.clone(),
+                        span: closing_parenthesis.span.clone(),
+                        payload: CompilerErrorPayload::Ast(AstError::ListWithoutClosingParenthesis),
+                    });
+                }
+
+                let ast = self.create_ast(cst.id, AstKind::List(List(ast_items)));
+                if errors.is_empty() {
+                    ast
+                } else {
+                    self.create_ast(
+                        cst.id,
+                        AstKind::Error {
+                            child: Some(Box::new(ast)),
+                            errors,
+                        },
+                    )
+                }
+            }
+            CstKind::ListItem { .. } => panic!("ListItem should only appear in List."),
             CstKind::Struct {
                 opening_bracket,
                 fields,

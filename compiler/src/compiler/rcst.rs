@@ -49,6 +49,15 @@ pub enum Rcst {
         receiver: Box<Rcst>,
         arguments: Vec<Rcst>,
     },
+    List {
+        opening_parenthesis: Box<Rcst>,
+        items: Vec<Rcst>,
+        closing_parenthesis: Box<Rcst>,
+    },
+    ListItem {
+        value: Box<Rcst>,
+        comma: Option<Box<Rcst>>,
+    },
     Struct {
         opening_bracket: Box<Rcst>,
         fields: Vec<Rcst>,
@@ -87,6 +96,8 @@ pub enum RcstError {
     CurlyBraceNotClosed,
     IdentifierContainsNonAlphanumericAscii,
     IntContainsNonDigits,
+    ListItemMissesValue,
+    ListNotClosed,
     OpeningParenthesisWithoutExpression,
     ParenthesisNotClosed,
     StructFieldMissesColon,
@@ -167,6 +178,24 @@ impl Display for Rcst {
                 receiver.fmt(f)?;
                 for argument in arguments {
                     argument.fmt(f)?;
+                }
+                Ok(())
+            }
+            Rcst::List {
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+            } => {
+                opening_parenthesis.fmt(f)?;
+                for item in items {
+                    item.fmt(f)?;
+                }
+                closing_parenthesis.fmt(f)
+            }
+            Rcst::ListItem { value, comma } => {
+                value.fmt(f)?;
+                if let Some(comma) = comma {
+                    comma.fmt(f)?;
                 }
                 Ok(())
             }
@@ -293,6 +322,22 @@ impl IsMultiline for Rcst {
                 receiver,
                 arguments,
             } => receiver.is_multiline() || arguments.is_multiline(),
+            Rcst::List {
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+            } => {
+                opening_parenthesis.is_multiline()
+                    || items.is_multiline()
+                    || closing_parenthesis.is_multiline()
+            }
+            Rcst::ListItem { value, comma } => {
+                value.is_multiline()
+                    || comma
+                        .as_ref()
+                        .map(|comma| comma.is_multiline())
+                        .unwrap_or(false)
+            }
             Rcst::Struct {
                 opening_bracket,
                 fields,

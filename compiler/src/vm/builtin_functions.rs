@@ -323,7 +323,7 @@ impl Heap {
     }
     fn struct_get_keys(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |struct_: Struct| {
-            Return(self.create_list(&struct_.iter().map(|(key, _)| key).collect_vec()))
+            Return(self.create_list(struct_.iter().map(|(key, _)| key).collect_vec()))
         })
     }
     fn struct_has_key(&mut self, args: &[Pointer]) -> BuiltinResult {
@@ -339,7 +339,7 @@ impl Heap {
             for c in text.value.graphemes(true) {
                 character_addresses.push(self.create_text(c.to_string()));
             }
-            Return(self.create_list(&character_addresses))
+            Return(self.create_list(character_addresses))
         })
     }
     fn text_concatenate(&mut self, args: &[Pointer]) -> BuiltinResult {
@@ -415,6 +415,7 @@ impl Heap {
                 Data::Int(_) => "Int",
                 Data::Text(_) => "Text",
                 Data::Symbol(_) => "Symbol",
+                Data::List(_) => "List",
                 Data::Struct(_) => "Struct",
                 Data::Closure(_) => "Function",
                 Data::Builtin(_) => "Builtin",

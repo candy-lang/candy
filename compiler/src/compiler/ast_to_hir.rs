@@ -1,7 +1,7 @@
 use super::{
     ast::{
-        self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, Struct, StructAccess,
-        Symbol, Text,
+        self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, List, Struct,
+        StructAccess, Symbol, Text,
     },
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
@@ -180,6 +180,17 @@ impl<'a> Context<'a> {
                 Expression::Symbol(symbol.value.to_owned()),
                 None,
             ),
+            AstKind::List(List(items)) => {
+                let hir_items = items
+                    .iter()
+                    .map(|item| self.compile_single(item))
+                    .collect_vec();
+                self.push(
+                    Some(ast.id.clone()),
+                    Expression::List(hir_items.into()),
+                    None,
+                )
+            }
             AstKind::Struct(Struct {
                 positional_fields,
                 named_fields,

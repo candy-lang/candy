@@ -192,6 +192,11 @@ impl<'a> Context<'a> {
                     }
                 }
             }
+            Expression::List(items) => {
+                for item_id in items {
+                    self.visit_id(item_id.to_owned());
+                }
+            }
             Expression::Struct(entries) => {
                 for (key_id, value_id) in entries {
                     self.visit_id(key_id.to_owned());

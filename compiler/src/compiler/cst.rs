@@ -86,6 +86,15 @@ pub enum CstKind {
         receiver: Box<Cst>,
         arguments: Vec<Cst>,
     },
+    List {
+        opening_parenthesis: Box<Cst>,
+        items: Vec<Cst>,
+        closing_parenthesis: Box<Cst>,
+    },
+    ListItem {
+        value: Box<Cst>,
+        comma: Option<Box<Cst>>,
+    },
     Struct {
         opening_bracket: Box<Cst>,
         fields: Vec<Cst>,
@@ -179,6 +188,24 @@ impl Display for Cst {
                 receiver.fmt(f)?;
                 for argument in arguments {
                     argument.fmt(f)?;
+                }
+                Ok(())
+            }
+            CstKind::List {
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+            } => {
+                opening_parenthesis.fmt(f)?;
+                for field in items {
+                    field.fmt(f)?;
+                }
+                closing_parenthesis.fmt(f)
+            }
+            CstKind::ListItem { value, comma } => {
+                value.fmt(f)?;
+                if let Some(comma) = comma {
+                    comma.fmt(f)?;
                 }
                 Ok(())
             }
@@ -447,6 +474,17 @@ impl TreeWithIds for Cst {
                 receiver,
                 arguments,
             } => receiver.find(id).or_else(|| arguments.find(id)),
+            CstKind::List {
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+            } => opening_parenthesis
+                .find(id)
+                .or_else(|| items.find(id))
+                .or_else(|| closing_parenthesis.find(id)),
+            CstKind::ListItem { value, comma } => value
+                .find(id)
+                .or_else(|| comma.as_ref().and_then(|comma| comma.find(id))),
             CstKind::Struct {
                 opening_bracket,
                 fields,
@@ -455,10 +493,6 @@ impl TreeWithIds for Cst {
                 .find(id)
                 .or_else(|| fields.find(id))
                 .or_else(|| closing_bracket.find(id)),
-            CstKind::StructAccess { struct_, dot, key } => struct_
-                .find(id)
-                .or_else(|| dot.find(id))
-                .or_else(|| key.find(id)),
             CstKind::StructField {
                 key_and_colon,
                 value,
@@ -468,6 +502,10 @@ impl TreeWithIds for Cst {
                 .and_then(|box (key, colon)| key.find(id).or_else(|| colon.find(id)))
                 .or_else(|| value.find(id))
                 .or_else(|| comma.as_ref().and_then(|comma| comma.find(id))),
+            CstKind::StructAccess { struct_, dot, key } => struct_
+                .find(id)
+                .or_else(|| dot.find(id))
+                .or_else(|| key.find(id)),
             CstKind::Lambda {
                 opening_curly_brace,
                 parameters_and_arrow,
@@ -534,6 +572,23 @@ impl TreeWithIds for Cst {
                 receiver
                     .find_by_offset(offset)
                     .or_else(|| arguments.find_by_offset(offset)),
+                false,
+            ),
+            CstKind::List {
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+            } => (
+                opening_parenthesis
+                    .find_by_offset(offset)
+                    .or_else(|| items.find_by_offset(offset))
+                    .or_else(|| closing_parenthesis.find_by_offset(offset)),
+                false,
+            ),
+            CstKind::ListItem { value, comma } => (
+                value
+                    .find_by_offset(offset)
+                    .or_else(|| comma.find_by_offset(offset)),
                 false,
             ),
             CstKind::Struct {

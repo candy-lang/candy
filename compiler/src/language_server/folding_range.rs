@@ -84,6 +84,9 @@ impl<'a> Context<'a> {
                 self.visit_cst(receiver);
                 self.visit_csts(arguments);
             }
+            // TODO: support folding ranges for lists
+            CstKind::List { items, .. } => self.visit_csts(items),
+            CstKind::ListItem { value, .. } => self.visit_cst(value),
             // TODO: support folding ranges for structs
             CstKind::Struct { fields, .. } => self.visit_csts(fields),
             CstKind::StructField {

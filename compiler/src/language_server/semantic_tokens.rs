@@ -204,6 +204,21 @@ impl<'a> Context<'a> {
                 self.visit_cst(receiver, Some(SemanticTokenType::Function));
                 self.visit_csts(arguments, None);
             }
+            CstKind::List {
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+            } => {
+                self.visit_cst(opening_parenthesis, None);
+                self.visit_csts(items, None);
+                self.visit_cst(closing_parenthesis, None);
+            }
+            CstKind::ListItem { value, comma } => {
+                self.visit_cst(value, None);
+                if let Some(comma) = comma {
+                    self.visit_cst(comma, None);
+                }
+            }
             CstKind::Struct {
                 opening_bracket,
                 fields,

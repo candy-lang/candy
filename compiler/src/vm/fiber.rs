@@ -324,9 +324,18 @@ impl Fiber {
                 let address = self.heap.create_symbol(symbol);
                 self.data_stack.push(address);
             }
-            Instruction::CreateStruct { num_entries } => {
+            Instruction::CreateList { num_items } => {
+                let mut item_addresses = vec![];
+                for _ in 0..num_items {
+                    item_addresses.push(self.data_stack.pop().unwrap());
+                }
+                let items = item_addresses.into_iter().rev().collect_vec();
+                let address = self.heap.create_list(items);
+                self.data_stack.push(address);
+            }
+            Instruction::CreateStruct { num_fields } => {
                 let mut key_value_addresses = vec![];
-                for _ in 0..(2 * num_entries) {
+                for _ in 0..(2 * num_fields) {
                     key_value_addresses.push(self.data_stack.pop().unwrap());
                 }
                 let mut entries = HashMap::new();

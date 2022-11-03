@@ -713,6 +713,7 @@ mod parse {
         let (mut input, mut expression) = int(input)
             .or_else(|| text(input, indentation))
             .or_else(|| symbol(input))
+            .or_else(|| list(input, indentation))
             .or_else(|| struct_(input, indentation))
             .or_else(|| parenthesized(input, indentation))
             .or_else(|| lambda(input, indentation))
@@ -1054,6 +1055,214 @@ mod parse {
                         Rcst::Newline("\n".to_string()),
                         Rcst::Newline("\n".to_string())
                     ],
+                }
+            ))
+        );
+    }
+
+    #[instrument]
+    fn list(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
+        let (mut outer_input, mut opening_parenthesis) = opening_parenthesis(input)?;
+
+        let mut items: Vec<Rcst> = vec![];
+        let mut items_indentation = indentation;
+        let mut has_at_least_one_comma = false;
+        loop {
+            let input = outer_input;
+
+            // Whitespace before value.
+            let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+            if whitespace.is_multiline() {
+                items_indentation = indentation + 1;
+            }
+            if items.is_empty() {
+                opening_parenthesis = opening_parenthesis.wrap_in_whitespace(whitespace);
+            } else {
+                let last = items.pop().unwrap();
+                items.push(last.wrap_in_whitespace(whitespace));
+            }
+
+            // Value.
+            let (input, value, has_value) = match expression(input, items_indentation, true) {
+                Some((input, value)) => (input, value, true),
+                None => (
+                    input,
+                    Rcst::Error {
+                        unparsable_input: "".to_string(),
+                        error: RcstError::ListItemMissesValue,
+                    },
+                    false,
+                ),
+            };
+
+            // Whitespace between value and comma.
+            let (input, whitespace) = whitespaces_and_newlines(input, items_indentation + 1, true);
+            if whitespace.is_multiline() {
+                items_indentation = indentation + 1;
+            }
+            let value = value.wrap_in_whitespace(whitespace);
+
+            // Comma.
+            let (input, comma) = match comma(input) {
+                Some((input, comma)) => (input, Some(comma)),
+                None => (input, None),
+            };
+
+            if !has_value && comma.is_none() {
+                break;
+            }
+            has_at_least_one_comma |= comma.is_some();
+
+            outer_input = input;
+            items.push(Rcst::ListItem {
+                value: Box::new(value),
+                comma: comma.map(Box::new),
+            });
+        }
+        if !has_at_least_one_comma {
+            return None;
+        }
+        let input = outer_input;
+
+        let (new_input, whitespace) = whitespaces_and_newlines(input, indentation, true);
+
+        let (input, closing_parenthesis) = match closing_parenthesis(new_input) {
+            Some((input, closing_parenthesis)) => {
+                if items.is_empty() {
+                    opening_parenthesis = opening_parenthesis.wrap_in_whitespace(whitespace);
+                } else {
+                    let last = items.pop().unwrap();
+                    items.push(last.wrap_in_whitespace(whitespace));
+                }
+                (input, closing_parenthesis)
+            }
+            None => (
+                input,
+                Rcst::Error {
+                    unparsable_input: "".to_string(),
+                    error: RcstError::ListNotClosed,
+                },
+            ),
+        };
+
+        Some((
+            input,
+            Rcst::List {
+                opening_parenthesis: Box::new(opening_parenthesis),
+                items,
+                closing_parenthesis: Box::new(closing_parenthesis),
+            },
+        ))
+    }
+    #[test]
+    fn test_list() {
+        assert_eq!(list("hello", 0), None);
+        assert_eq!(list("()", 0), None);
+        assert_eq!(
+            list("(,)", 0),
+            Some((
+                "",
+                Rcst::List {
+                    opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                    items: vec![Rcst::ListItem {
+                        value: Box::new(Rcst::Error {
+                            unparsable_input: "".to_string(),
+                            error: RcstError::ListItemMissesValue,
+                        }),
+                        comma: Some(Box::new(Rcst::Comma)),
+                    }],
+                    closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
+                }
+            ))
+        );
+        assert_eq!(
+            list("(foo)", 0),
+            Some((
+                "",
+                Rcst::List {
+                    opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                    items: vec![Rcst::ListItem {
+                        value: Box::new(Rcst::Identifier("foo".to_string())),
+                        comma: None,
+                    },],
+                    closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
+                }
+            ))
+        );
+        assert_eq!(
+            list("[foo,bar]", 0),
+            Some((
+                "",
+                Rcst::List {
+                    opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                    items: vec![
+                        Rcst::ListItem {
+                            value: Box::new(Rcst::Identifier("foo".to_string())),
+                            comma: Some(Box::new(Rcst::Comma)),
+                        },
+                        Rcst::ListItem {
+                            value: Box::new(Rcst::Identifier("bar".to_string())),
+                            comma: None,
+                        },
+                    ],
+                    closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
+                }
+            ))
+        );
+        // [
+        //   foo,
+        //   4,
+        //   "Hi",
+        // ]
+        assert_eq!(
+            list("[\n  foo,\n  4,\n  \"Hi\",\n]", 0),
+            Some((
+                "",
+                Rcst::List {
+                    opening_parenthesis: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::OpeningParenthesis),
+                        whitespace: vec![
+                            Rcst::Newline("\n".to_string()),
+                            Rcst::Whitespace("  ".to_string())
+                        ],
+                    }),
+                    items: vec![
+                        Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::ListItem {
+                                value: Box::new(Rcst::Identifier("foo".to_string())),
+                                comma: Some(Box::new(Rcst::Comma)),
+                            }),
+                            whitespace: vec![
+                                Rcst::Newline("\n".to_string()),
+                                Rcst::Whitespace("  ".to_string())
+                            ],
+                        },
+                        Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::ListItem {
+                                value: Box::new(Rcst::Int {
+                                    value: 4u8.into(),
+                                    string: "4".to_string()
+                                }),
+                                comma: Some(Box::new(Rcst::Comma)),
+                            }),
+                            whitespace: vec![
+                                Rcst::Newline("\n".to_string()),
+                                Rcst::Whitespace("  ".to_string())
+                            ],
+                        },
+                        Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::ListItem {
+                                value: Box::new(Rcst::Text {
+                                    opening_quote: Box::new(Rcst::DoubleQuote),
+                                    parts: vec![Rcst::TextPart("Hi".to_string())],
+                                    closing_quote: Box::new(Rcst::DoubleQuote),
+                                }),
+                                comma: Some(Box::new(Rcst::Comma))
+                            }),
+                            whitespace: vec![Rcst::Newline("\n".to_string())]
+                        }
+                    ],
+                    closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
                 }
             ))
         );
