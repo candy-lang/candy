@@ -338,6 +338,21 @@ impl UnwrapWhitespaceAndComment for Cst {
                 receiver: Box::new(receiver.unwrap_whitespace_and_comment()),
                 arguments: arguments.unwrap_whitespace_and_comment(),
             },
+            CstKind::List {
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+            } => CstKind::List {
+                opening_parenthesis: Box::new(opening_parenthesis.unwrap_whitespace_and_comment()),
+                items: items.unwrap_whitespace_and_comment(),
+                closing_parenthesis: Box::new(closing_parenthesis.unwrap_whitespace_and_comment()),
+            },
+            CstKind::ListItem { value, comma } => CstKind::ListItem {
+                value: Box::new(value.unwrap_whitespace_and_comment()),
+                comma: comma
+                    .as_ref()
+                    .map(|comma| Box::new(comma.unwrap_whitespace_and_comment())),
+            },
             CstKind::Struct {
                 opening_bracket,
                 fields,

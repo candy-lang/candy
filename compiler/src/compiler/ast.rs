@@ -118,6 +118,7 @@ pub enum AstError {
     ExpectedParameter,
     LambdaWithoutClosingCurlyBrace,
     ListItemWithoutComma,
+    ListWithNonListItem,
     ListWithoutClosingParenthesis,
     ParenthesizedWithoutClosingParenthesis,
     StructKeyWithoutColon,

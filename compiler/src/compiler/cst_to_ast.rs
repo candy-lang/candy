@@ -262,43 +262,47 @@ impl LoweringContext {
                 );
 
                 let mut ast_items = vec![];
-                for item in items {
-                    let CstKind::ListItem {
-                        value,
-                        comma,
-                    } = &item.kind else {
-                        errors.push(CompilerError {
-                            module: self.module.clone(),
-                            span: cst.span.clone(),
-                            payload: CompilerErrorPayload::Ast(AstError::StructWithNonStructField),
-                        });
-                        continue;
-                    };
+                if items.len() == 1 && let CstKind::Comma = items[0].kind {
+                    // Empty list (`(,)`), do nothing.
+                } else {
+                    for item in items {
+                        let CstKind::ListItem {
+                            value,
+                            comma,
+                        } = &item.kind else {
+                            errors.push(CompilerError {
+                                module: self.module.clone(),
+                                span: cst.span.clone(),
+                                payload: CompilerErrorPayload::Ast(AstError::ListWithNonListItem),
+                            });
+                            continue;
+                        };
 
-                    let mut value = self.lower_cst(&value.clone());
+                        let mut value = self.lower_cst(&value.clone());
 
-                    if let Some(comma) = comma {
-                        if !matches!(comma.kind, CstKind::Comma) {
-                            value = self.create_ast(
-                                comma.id,
-                                AstKind::Error {
-                                    child: Some(Box::new(value)),
-                                    errors: vec![CompilerError {
-                                        module: self.module.clone(),
-                                        span: comma.span.clone(),
-                                        payload: CompilerErrorPayload::Ast(
-                                            AstError::ListItemWithoutComma,
-                                        ),
-                                    }],
-                                },
-                            )
+                        if let Some(comma) = comma {
+                            if !matches!(comma.kind, CstKind::Comma) {
+                                value = self.create_ast(
+                                    comma.id,
+                                    AstKind::Error {
+                                        child: Some(Box::new(value)),
+                                        errors: vec![CompilerError {
+                                            module: self.module.clone(),
+                                            span: comma.span.clone(),
+                                            payload: CompilerErrorPayload::Ast(
+                                                AstError::ListItemWithoutComma,
+                                            ),
+                                        }],
+                                    },
+                                )
+                            }
                         }
-                    }
 
-                    ast_items.push(value);
+                        ast_items.push(value);
+                    }
                 }
 
-                if matches!(closing_parenthesis.kind, CstKind::ClosingParenthesis) {
+                if !matches!(closing_parenthesis.kind, CstKind::ClosingParenthesis) {
                     errors.push(CompilerError {
                         module: self.module.clone(),
                         span: closing_parenthesis.span.clone(),

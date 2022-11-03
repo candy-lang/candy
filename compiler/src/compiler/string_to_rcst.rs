@@ -1064,6 +1064,42 @@ mod parse {
     fn list(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
         let (mut outer_input, mut opening_parenthesis) = opening_parenthesis(input)?;
 
+        // Empty list `(,)`
+        'handleEmptyList: {
+            // Whitespace before comma.
+            let (input, leading_whitespace) =
+                whitespaces_and_newlines(input, indentation + 1, true);
+            let opening_parenthesis = opening_parenthesis
+                .clone()
+                .wrap_in_whitespace(leading_whitespace);
+
+            // Comma.
+            let (input, comma) = match comma(input) {
+                Some((input, comma)) => (input, comma),
+                None => break 'handleEmptyList,
+            };
+
+            // Whitespace after comma.
+            let (input, trailing_whitespace) =
+                whitespaces_and_newlines(input, indentation + 1, true);
+            let comma = comma.wrap_in_whitespace(trailing_whitespace);
+
+            // Closing parenthesis.
+            let (input, closing_parenthesis) = match closing_parenthesis(input) {
+                Some((input, closing_parenthesis)) => (input, closing_parenthesis),
+                None => break 'handleEmptyList,
+            };
+
+            return Some((
+                input,
+                Rcst::List {
+                    opening_parenthesis: Box::new(opening_parenthesis),
+                    items: vec![comma],
+                    closing_parenthesis: Box::new(closing_parenthesis),
+                },
+            ));
+        }
+
         let mut items: Vec<Rcst> = vec![];
         let mut items_indentation = indentation;
         let mut has_at_least_one_comma = false;
@@ -1172,9 +1208,10 @@ mod parse {
                         comma: Some(Box::new(Rcst::Comma)),
                     }],
                     closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-                }
-            ))
+                },
+            )),
         );
+        assert_eq!(list("(foo)", 0), None);
         assert_eq!(
             list("(foo,)", 0),
             Some((
@@ -1186,8 +1223,8 @@ mod parse {
                         comma: Some(Box::new(Rcst::Comma)),
                     }],
                     closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-                }
-            ))
+                },
+            )),
         );
         assert_eq!(
             list("(foo,bar)", 0),
@@ -1206,8 +1243,8 @@ mod parse {
                         },
                     ],
                     closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-                }
-            ))
+                },
+            )),
         );
         // [
         //   foo,
@@ -1263,8 +1300,8 @@ mod parse {
                         }
                     ],
                     closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
-                }
-            ))
+                },
+            )),
         );
     }
 
