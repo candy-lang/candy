@@ -1,11 +1,11 @@
 use crate::compiler::mir::{Body, Expression, Id, Mir, VisibleExpressions};
-use itertools::Itertools;
 use std::{collections::HashSet, mem};
-use tracing::{debug, error};
+use tracing::error;
 
 impl Expression {
     /// All IDs defined inside this expression. For all expressions except
-    /// lambdas, this returns an empty vector.
+    /// lambdas, this returns an empty vector. The IDs are returned in the order
+    /// that they are defined in.
     pub fn defined_ids(&self) -> Vec<Id> {
         let mut defined = vec![];
         self.collect_defined_ids(&mut defined);
@@ -44,13 +44,15 @@ impl Body {
 
 impl Expression {
     /// All IDs referenced inside this expression. If this is a lambda, this
-    /// also includes references to locally defined IDs.
-    pub fn referenced_ids(&self) -> Vec<Id> {
-        let mut referenced = vec![];
+    /// also includes references to locally defined IDs. IDs are returned in the
+    /// order that they are referenced, which means that the vector may contain
+    /// the same ID multiple times.
+    pub fn referenced_ids(&self) -> HashSet<Id> {
+        let mut referenced = HashSet::new();
         self.collect_referenced_ids(&mut referenced);
         referenced
     }
-    fn collect_referenced_ids(&self, referenced: &mut Vec<Id>) {
+    fn collect_referenced_ids(&self, referenced: &mut HashSet<Id>) {
         match self {
             Expression::Int(_)
             | Expression::Text(_)
@@ -59,11 +61,13 @@ impl Expression {
             | Expression::Responsibility(_) => {}
             Expression::Struct(fields) => {
                 for (key, value) in fields {
-                    referenced.push(*key);
-                    referenced.push(*value);
+                    referenced.insert(*key);
+                    referenced.insert(*value);
                 }
             }
-            Expression::Reference(reference) => referenced.push(*reference),
+            Expression::Reference(reference) => {
+                referenced.insert(*reference);
+            }
             Expression::Lambda { body, .. } => body.collect_referenced_ids(referenced),
             Expression::Parameter => {}
             Expression::Call {
@@ -71,37 +75,37 @@ impl Expression {
                 arguments,
                 responsible,
             } => {
-                referenced.push(*function);
+                referenced.insert(*function);
                 referenced.extend(arguments);
-                referenced.push(*responsible);
+                referenced.insert(*responsible);
             }
             Expression::UseModule {
                 current_module: _,
                 relative_path,
                 responsible,
             } => {
-                referenced.push(*relative_path);
-                referenced.push(*responsible);
+                referenced.insert(*relative_path);
+                referenced.insert(*responsible);
             }
             Expression::Needs {
                 responsible,
                 condition,
                 reason,
             } => {
-                referenced.push(*responsible);
-                referenced.push(*condition);
-                referenced.push(*reason);
+                referenced.insert(*responsible);
+                referenced.insert(*condition);
+                referenced.insert(*reason);
             }
             Expression::Panic {
                 reason,
                 responsible,
             } => {
-                referenced.push(*reason);
-                referenced.push(*responsible);
+                referenced.insert(*reason);
+                referenced.insert(*responsible);
             }
             Expression::Error { child, .. } => {
                 if let Some(child) = child {
-                    referenced.push(*child);
+                    referenced.insert(*child);
                 }
             }
             Expression::Multiple(body) => body.collect_referenced_ids(referenced),
@@ -109,12 +113,7 @@ impl Expression {
     }
 }
 impl Body {
-    pub fn referenced_ids(&self) -> Vec<Id> {
-        let mut referenced = vec![];
-        self.collect_referenced_ids(&mut referenced);
-        referenced
-    }
-    fn collect_referenced_ids(&self, referenced: &mut Vec<Id>) {
+    fn collect_referenced_ids(&self, referenced: &mut HashSet<Id>) {
         for (_, expression) in self.iter() {
             expression.collect_referenced_ids(referenced);
         }
@@ -128,23 +127,13 @@ impl Expression {
         referenced.difference(&defined).copied().collect()
     }
 }
-impl Body {
-    pub fn captured_ids(&self) -> Vec<Id> {
-        let defined = self.defined_ids().into_iter().collect::<HashSet<_>>();
-        let referenced = self.referenced_ids().into_iter().collect::<HashSet<_>>();
-        referenced.difference(&defined).copied().collect()
-    }
-}
 
 impl Body {
-    pub fn all_ids(&self) -> Vec<Id> {
-        let mut ids = vec![];
-        self.collect_defined_ids(&mut ids);
+    pub fn all_ids(&self) -> HashSet<Id> {
+        let mut ids = HashSet::new();
+        ids.extend(self.defined_ids().into_iter());
         self.collect_referenced_ids(&mut ids);
-        ids.into_iter()
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect()
+        ids
     }
 }
 

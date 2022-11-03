@@ -104,7 +104,11 @@ impl Mir {
         }
 
         self.body.visit(&mut |_, expression, visible, _| {
-            if let Expression::Call { function, .. } = expression && functions_with_use.contains(&function) {
+            if let Expression::Call { function, .. } = expression && functions_with_use.contains(function) {
+                // If inlining fails with an `Err`, there's nothing we can do
+                // except apply other optimizations first and then try again
+                // later.
+                #[allow(clippy::unused_must_use)]
                 expression.inline_call(visible, &mut self.id_generator);
             }
         });

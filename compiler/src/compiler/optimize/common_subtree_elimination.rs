@@ -1,31 +1,72 @@
+//! Common subtree elimination deduplicates pure expressions that yield the same
+//! value.
+//!
+//! Here's a before-and-after example:
+//!
+//! ```mir
+//! $0 = builtinIntAdd       |  $0 = builtinIntAdd
+//! $1 = 2                   |  $1 = 2
+//! $2 = 2                   |  $2 = $1
+//! $3 = call $0 with $1 $2  |  $3 = call $0 with $1 $2
+//! ```
+//!
+//! This is especially effective after [constant lifting], because lots of
+//! constants are in the same scope. This optimization is also a necessity to
+//! avoid exponential code blowup when importing modules – after
+//! [module folding], a lot of duplicate functions exist.
+//!
+//! [constant lifting]: super::constant_lifting
+//! [module folding]: super::module_folding
+
 use crate::{
-    builtin_functions::BuiltinFunction,
     compiler::mir::{Expression, Id, Mir},
+    utils::{CountableId, IdGenerator},
 };
 use std::collections::HashMap;
-use tracing::{debug, warn};
 
-// impl Mir {
-//     pub fn eliminate_common_subtrees(&mut self) {
-//         let mut pure_expressions: HashMap<Expression, Id> = HashMap::new();
-//         let mut mapping: HashMap<Id, Id> = HashMap::new();
+impl Mir {
+    pub fn eliminate_common_subtrees(&mut self) {
+        let mut pure_expressions: HashMap<Expression, Id> = HashMap::new();
 
-//         for id in self.body.iter().copied() {
-//             id.replace_id_references(&mut self.expressions, &mut |id| {
-//                 if let Some(replacement) = mapping.get(id) {
-//                     *id = *replacement;
-//                 }
-//             });
-//             let expression = self.expressions.get(&id).unwrap();
-//             if !expression.is_pure() {
-//                 continue;
-//             }
-//             if let Some(id_with_same_expression) = pure_expressions.get(expression) {
-//                 self.expressions.insert(id, Expression::Reference(id));
-//                 mapping.insert(id, *id_with_same_expression);
-//             } else {
-//                 pure_expressions.insert(expression.clone(), id);
-//             }
-//         }
-//     }
-// }
+        self.body.visit(&mut |id, expression, visible, _| {
+            if !expression.is_pure() {
+                return;
+            }
+
+            let mut normalized = expression.clone();
+            normalized.normalize();
+
+            if let Some(id_of_same_expression) = pure_expressions.get(&normalized) && visible.contains(*id_of_same_expression) {
+                *expression = Expression::Reference(*id_of_same_expression);
+            } else {
+                pure_expressions.insert(normalized, id);
+            }
+        });
+    }
+}
+
+impl Expression {
+    /// Two lambdas where local expressions have different IDs are usually not
+    /// considered equal. This method normalizes expressions by replacing all
+    /// locally defined IDs.
+    fn normalize(&mut self) {
+        let mut generator = IdGenerator::start_at(
+            self.captured_ids()
+                .into_iter()
+                .map(|id| id.to_usize() + 1)
+                .max()
+                .unwrap_or(0),
+        );
+        let mapping: HashMap<Id, Id> = self
+            .defined_ids()
+            .into_iter()
+            .map(|id| (id, generator.generate()))
+            .collect();
+
+        self.replace_ids(&mut |id| {
+            if let Some(replacement) = mapping.get(id) {
+                *id = *replacement;
+            }
+        })
+    }
+}

@@ -6,8 +6,7 @@ use crate::{
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
-use tracing::debug;
-use std::{collections::HashMap, fmt, hash, mem};
+use std::{fmt, hash, mem, cmp::Ordering};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Mir {
@@ -29,7 +28,7 @@ pub enum Expression {
     Text(String),
     Symbol(String),
     Builtin(BuiltinFunction),
-    Struct(HashMap<Id, Id>),
+    Struct(Vec<(Id, Id)>),
     Reference(Id),
     /// In the MIR, responsibilities are explicitly tracked. All lambdas take a
     /// responsibility as an extra parameter. Based on whether the function is
@@ -109,19 +108,15 @@ impl Body {
         self.expressions.extend(expressions);
         self.expressions.extend(old_expressions);
     }
-    pub fn remove(&mut self, id: Id) {
-        let index = self.expressions.iter().position(|(key, _)| *key == id).unwrap();
-        self.expressions.remove(index);
-    }
-    pub fn remove_all(&mut self, predicate: &mut dyn FnMut(Id, &Expression) -> bool) {
+    pub fn remove_all<F>(&mut self, mut predicate: F) where F: FnMut(Id, &Expression) -> bool {
         self.expressions.retain(|(id, expression)| !predicate(*id, expression));
     }
-    pub fn is_empty(&self) -> bool {
-        self.expressions.is_empty()
+    pub fn sort_by<F>(&mut self, predicate: F) where F: FnMut(&(Id, Expression), &(Id, Expression)) -> Ordering {
+        self.expressions.sort_by(predicate);
     }
 
     pub fn return_value(&mut self) -> Id {
-        let (id, expr) =self.expressions.iter_mut().last().unwrap();
+        let (id, _) =self.expressions.iter_mut().last().unwrap();
         *id
     }
 
@@ -153,6 +148,7 @@ impl Body {
         self.expressions.into_iter()
     }
 }
+
 
 impl Body {
     /// Calls the visitor for each contained expression, even expressions in
@@ -228,6 +224,9 @@ impl VisibleExpressions {
     }
     pub fn get(&self, id: Id) -> &Expression {
         self.expressions.get(&id).unwrap()
+    }
+    pub fn contains(&self, id: Id) -> bool {
+        self.expressions.contains_key(&id)
     }
 }
 

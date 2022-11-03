@@ -40,14 +40,13 @@ use tracing::warn;
 
 impl Mir {
     pub fn fold_modules(&mut self, db: &Database, import_chain: &[Module]) {
-        self.body.visit(&mut |id, expression, visible, _| {
+        self.body.visit(&mut |_, expression, visible, _| {
             let Expression::UseModule {
                     current_module,
                     relative_path,
-                    responsible,
+                    responsible: _,
                 } = expression else { return; };
 
-            let use_id = id;
             let Expression::Text(path) = visible.get(*relative_path) else {
                 warn!("use called with non-constant text");
                 return; // TODO

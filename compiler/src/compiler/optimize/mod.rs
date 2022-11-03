@@ -42,6 +42,7 @@
 //! both performance and code size. Whenever they can be applied, they should be
 //! applied.
 
+mod cleanup;
 mod common_subtree_elimination;
 mod complexity;
 mod constant_folding;
@@ -72,6 +73,7 @@ impl Mir {
         self.optimize_obvious_self_contained();
         self.fold_modules(db, import_chain);
         self.optimize_obvious_self_contained();
+        self.cleanup();
     }
 
     /// Performs optimizations that improve both performance and code size and
@@ -80,19 +82,12 @@ impl Mir {
         loop {
             let before = self.clone();
 
-            // debug!("Following references");
             self.checked_optimization(|mir| mir.follow_references());
-            // debug!("Tree shake");
             self.checked_optimization(|mir| mir.tree_shake());
-            // debug!("Fold constants");
             self.checked_optimization(|mir| mir.fold_constants());
-            // debug!("Inline functions containing use");
             self.checked_optimization(|mir| mir.inline_functions_containing_use());
-            // debug!("Lift constants");
             self.checked_optimization(|mir| mir.lift_constants());
-            // debug!("Eliminate common subtrees");
-            // self.checked_optimization(|mir| mir.eliminate_common_subtrees());
-            // debug!("Flatten multiple");
+            self.checked_optimization(|mir| mir.eliminate_common_subtrees());
             self.checked_optimization(|mir| mir.flatten_multiples());
 
             if *self == before {

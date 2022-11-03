@@ -73,14 +73,14 @@ absolute value :=
   needs (is value)
   conditionals.ifElse (isNegative value) (negate value) value
 
-fitsInRustU32 value =
+fitsInRustU32 value :=
   needs (is value)
   needs (isNonNegative value)  "you gave `fitsInRustU128` a signed int"
 
   rustU32Max = 4294967295
   # https://doc.rust-lang.org/std/primitive.u32.html#associatedconstant.MAX
   isLessThan value rustU32Max
-fitsInRustU128 value =
+fitsInRustU128 value :=
   needs (is value)
   needs (isNonNegative value) "you gave `fitsInRustU128` a signed int"
 

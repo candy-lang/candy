@@ -40,9 +40,7 @@ use crate::{
     compiler::mir::{Body, Expression, Id, Mir},
     utils::IdGenerator,
 };
-use itertools::Itertools;
-use std::{cmp::Ordering, collections::HashSet};
-use tracing::debug;
+use std::collections::HashSet;
 
 impl Mir {
     pub fn lift_constants(&mut self) {
@@ -61,10 +59,6 @@ impl Mir {
                     constants.push((id, expression.clone()));
                 }
             });
-        debug!(
-            "Found constants: {}",
-            constants.iter().map(|(id, _)| format!("{id}")).join(", ")
-        );
 
         let constant_ids = constants.iter().map(|(id, _)| *id).collect::<HashSet<_>>();
         self.body.visit_bodies(&mut |body| {
@@ -77,26 +71,6 @@ impl Mir {
             })
         }
 
-        constants.sort_by(|(_, a), (_, b)| {
-            fn order_score(expr: &Expression) -> u8 {
-                match expr {
-                    Expression::Responsibility(_) => 0,
-                    Expression::Builtin(_) => 1,
-                    Expression::Symbol(_) => 2,
-                    Expression::Int(_) => 3,
-                    Expression::Text(_) => 4,
-                    _ => 5,
-                }
-            }
-            match (a, b) {
-                (Expression::Responsibility(_), Expression::Responsibility(_)) => Ordering::Equal,
-                (Expression::Builtin(_), Expression::Builtin(_)) => Ordering::Equal,
-                (Expression::Symbol(a), Expression::Symbol(b)) => a.cmp(b),
-                (Expression::Int(a), Expression::Int(b)) => a.cmp(b),
-                (Expression::Text(a), Expression::Text(b)) => a.cmp(b),
-                _ => order_score(a).cmp(&order_score(b)),
-            }
-        });
         self.body.insert_at_front(constants);
     }
 
@@ -106,7 +80,7 @@ impl Mir {
         id_generator: &mut IdGenerator<Id>,
     ) {
         let return_value = body.return_value();
-        body.remove_all(&mut |id, _| constant_ids.contains(&id));
+        body.remove_all(|id, _| constant_ids.contains(&id));
 
         if body.iter().map(|(id, _)| id).last() != Some(return_value) {
             // The return value was removed. Add a reference to the lifted

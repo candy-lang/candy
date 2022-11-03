@@ -18,7 +18,6 @@
 
 use crate::compiler::mir::{Expression, Id, Mir};
 use std::collections::HashMap;
-use tracing::debug;
 
 impl Mir {
     pub fn follow_references(&mut self) {
@@ -30,10 +29,9 @@ impl Mir {
                 replacements.insert(id, replacement);
             }
         });
-        self.body.visit(&mut |id, expression, _, _| {
+        self.body.visit(&mut |_, expression, _, _| {
             expression.replace_id_references(&mut |id| {
                 if let Some(&replacement) = replacements.get(id) {
-                    debug!("Replacing reference to {id} with {replacement}.");
                     *id = replacement;
                 }
             });

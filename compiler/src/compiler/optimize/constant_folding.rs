@@ -32,11 +32,10 @@ use crate::{
     builtin_functions::BuiltinFunction,
     compiler::mir::{Body, Expression, Id, Mir, VisibleExpressions},
 };
-use tracing::debug;
 
 impl Mir {
     pub fn fold_constants(&mut self) {
-        self.body.visit(&mut |id, expression, visible, _| {
+        self.body.visit(&mut |_, expression, visible, _| {
             match expression {
                 Expression::Call {
                     function,
@@ -56,7 +55,6 @@ impl Mir {
                                 Expression::Multiple(body)
                             },
                         };
-                        debug!("Builtin {id} inlined to {evaluated_call:?}.");
                         *expression = evaluated_call;
                     }
                 }
@@ -72,9 +70,6 @@ impl Mir {
                                 reason: *reason,
                                 responsible: *responsible,
                             },
-                            // TODO (before merging PR): Also save the call site
-                            // in the needs expression and make that responsible
-                            // for a panic with a non-symbol given.
                             _ => return,
                         };
                         *expression = result;
@@ -162,11 +157,11 @@ impl Mir {
 
                 // TODO: Relax this requirement. Even if not all keys are
                 // constant, we may still conclude the result of the builtin:
-                // If only one key is statically determined to be equal to the
-                // other and one is not, then we can still resolve that.
+                // If one key `semantically_equals` the requested one and all
+                // others are definitely not, then we can still resolve that.
                 if fields
-                    .keys()
-                    .all(|key| visible.get(*key).is_constant(visible))
+                    .iter()
+                    .all(|(key, _)| visible.get(*key).is_constant(visible))
                     && visible.get(key_id).is_constant(visible)
                 {
                     let value = fields

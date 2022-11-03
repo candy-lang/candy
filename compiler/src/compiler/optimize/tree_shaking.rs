@@ -17,7 +17,6 @@
 use crate::compiler::mir::{Body, Expression, Id, Mir};
 use itertools::Itertools;
 use std::collections::HashSet;
-use tracing::debug;
 
 impl Mir {
     pub fn tree_shake(&mut self) {
@@ -41,13 +40,10 @@ impl Body {
                     body.tree_shake(keep);
                 }
             } else {
-                debug!("Removing {id} because it's pure but unused.");
                 ids_to_remove.push(id);
             }
         }
 
-        for id in ids_to_remove {
-            self.remove(id)
-        }
+        self.remove_all(|id, _| ids_to_remove.contains(&id));
     }
 }

@@ -4,9 +4,9 @@ type = use "..type"
 
 is value :=
   ✨.ifElse
-    ✨.equals value True
+    equals value True
     { True }
-    { ✨.equals value False }
+    { equals value False }
 
 not a :=
   needs (is a)
