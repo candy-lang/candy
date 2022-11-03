@@ -206,10 +206,10 @@ impl Body {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum HirError {
-    UnknownReference { name: String },
+    NeedsWithWrongNumberOfArguments { num_args: usize },
     PublicAssignmentInNotTopLevel,
     PublicAssignmentWithSameName { name: String },
-    NeedsWithWrongNumberOfArguments { num_args: usize },
+    UnknownReference { name: String },
 }
 
 impl Body {

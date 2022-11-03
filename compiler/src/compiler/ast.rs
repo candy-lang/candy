@@ -111,16 +111,16 @@ impl Deref for AstString {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum AstError {
-    UnexpectedPunctuation,
-    TextWithoutClosingQuote,
-    ParenthesizedWithoutClosingParenthesis,
-    StructWithNonStructField,
-    StructWithoutClosingBrace,
-    StructKeyWithoutColon,
-    StructValueWithoutComma,
-    StructPositionalAfterNamedField,
     ExpectedParameter,
     LambdaWithoutClosingCurlyBrace,
+    ParenthesizedWithoutClosingParenthesis,
+    StructKeyWithoutColon,
+    StructPositionalAfterNamedField,
+    StructValueWithoutComma,
+    StructWithNonStructField,
+    StructWithoutClosingBrace,
+    TextWithoutClosingQuote,
+    UnexpectedPunctuation,
 }
 
 pub trait FindAst {

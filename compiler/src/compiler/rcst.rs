@@ -84,23 +84,23 @@ pub enum Rcst {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum RcstError {
+    CurlyBraceNotClosed,
     IdentifierContainsNonAlphanumericAscii,
-    SymbolContainsNonAlphanumericAscii,
     IntContainsNonDigits,
-    TextNotClosed,
-    TextNotSufficientlyIndented,
-    StructFieldMissesKey,
-    StructFieldMissesColon,
-    StructFieldMissesValue,
-    StructNotClosed,
-    WeirdWhitespace,
-    WeirdWhitespaceInIndentation,
     OpeningParenthesisWithoutExpression,
     ParenthesisNotClosed,
+    StructFieldMissesColon,
+    StructFieldMissesKey,
+    StructFieldMissesValue,
+    StructNotClosed,
+    SymbolContainsNonAlphanumericAscii,
+    TextNotClosed,
+    TextNotSufficientlyIndented,
     TooMuchWhitespace,
-    CurlyBraceNotClosed,
-    UnparsedRest,
     UnexpectedCharacters,
+    UnparsedRest,
+    WeirdWhitespace,
+    WeirdWhitespaceInIndentation,
 }
 
 impl Display for Rcst {
