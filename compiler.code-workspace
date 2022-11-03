@@ -22,6 +22,10 @@
     }
   ],
   "settings": {
-    "rust-analyzer.checkOnSave.command": "clippy"
+    // Please keep these settings in sync with ./packages/candy.code-workspace.
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.patterns": {
+      "*.candy": "${capture}.candy.*"
+    }
   }
 }

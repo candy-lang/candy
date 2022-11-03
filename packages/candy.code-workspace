@@ -1,0 +1,15 @@
+{
+  "folders": [
+    {
+      "name": "🍭 Candy",
+      "path": "."
+    }
+  ],
+  "settings": {
+    // Please keep these settings in sync with ../compiler.code-workspace.
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.patterns": {
+      "*.candy": "${capture}.candy.*"
+    }
+  }
+}
