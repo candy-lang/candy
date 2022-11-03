@@ -88,7 +88,7 @@ impl ConstantEvaluator {
     }
 
     pub fn get_hints(&self, db: &Database, module: &Module) -> Vec<Hint> {
-        let span = span!(Level::DEBUG, "Calculating hints for {}", %module);
+        let span = span!(Level::DEBUG, "Calculating hints", %module);
         let _enter = span.enter();
 
         let evaluator = &self.evaluators[module];
