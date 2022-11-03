@@ -2,7 +2,7 @@ use super::{
     channel::{Capacity, Packet},
     context::PanickingUseProvider,
     fiber::{Fiber, Status},
-    heap::{Closure, Data, Int, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
+    heap::{Closure, Data, Int, List, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
     ids::ChannelId,
     tracer::{dummy::DummyTracer, Tracer},
     FiberId, Heap,
@@ -44,6 +44,12 @@ impl Fiber {
             BuiltinFunction::IntShiftLeft => self.heap.int_shift_left(args),
             BuiltinFunction::IntShiftRight => self.heap.int_shift_right(args),
             BuiltinFunction::IntSubtract => self.heap.int_subtract(args),
+            BuiltinFunction::ListCreate => self.heap.list_create(args),
+            BuiltinFunction::ListGet => self.heap.list_get(args),
+            BuiltinFunction::ListInsert => self.heap.list_insert(args),
+            BuiltinFunction::ListLength => self.heap.list_length(args),
+            BuiltinFunction::ListRemoveAt => self.heap.list_remove_at(args),
+            BuiltinFunction::ListReplace => self.heap.list_replace(args),
             BuiltinFunction::Parallel => self.heap.parallel(args),
             BuiltinFunction::Print => self.heap.print(args),
             BuiltinFunction::StructGet => self.heap.struct_get(args),
@@ -292,6 +298,59 @@ impl Heap {
         })
     }
 
+    fn list_create(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |length: Int| {
+            let length = length.value.to_usize().unwrap();
+            let nothing = self.create_nothing();
+            Return(self.create_list(vec![nothing; length]))
+        })
+    }
+    fn list_get(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |list: List, index: Int| {
+            let index = index.value.to_usize().unwrap();
+            let item = list.items[index];
+            self.dup(item);
+            Return(item)
+        })
+    }
+    fn list_insert(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |list: List, index: Int, item: Any| {
+            let mut new_list = list.items.clone();
+
+            let index = index.value.to_usize().unwrap();
+            self.dup(item.address);
+            new_list.insert(index, item.address);
+
+            Return(self.create_list(new_list))
+        })
+    }
+    fn list_length(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |list: List| {
+            Return(self.create_int(list.items.len().into()))
+        })
+    }
+    fn list_remove_at(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |list: List, index: Int| {
+            let mut new_list = list.items.clone();
+
+            let index = index.value.to_usize().unwrap();
+            new_list.remove(index);
+
+            Return(self.create_list(new_list))
+        })
+    }
+    fn list_replace(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |list: List, index: Int, new_item: Any| {
+            let mut new_list = list.items.clone();
+
+            let index = index.value.to_usize().unwrap();
+            self.dup(new_item.address);
+            new_list[index] = new_item.address;
+
+            Return(self.create_list(new_list))
+        })
+    }
+
     fn parallel(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack!(self, args, |body_taking_nursery: Closure| {
             if body_taking_nursery.num_args != 1 {
@@ -483,6 +542,7 @@ macro_rules! impl_data_try_into_type {
 impl_data_try_into_type!(Int, Int, "a builtin function expected an int");
 impl_data_try_into_type!(Text, Text, "a builtin function expected a text");
 impl_data_try_into_type!(Symbol, Symbol, "a builtin function expected a symbol");
+impl_data_try_into_type!(List, List, "a builtin function expected a list");
 impl_data_try_into_type!(Struct, Struct, "a builtin function expected a struct");
 impl_data_try_into_type!(Closure, Closure, "a builtin function expected a closure");
 impl_data_try_into_type!(

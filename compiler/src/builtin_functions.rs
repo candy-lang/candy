@@ -25,6 +25,12 @@ pub enum BuiltinFunction {
     IntShiftLeft,        // (value: int) (amount: int) -> (shifted: int)
     IntShiftRight,       // (value: int) (amount: int) -> (shifted: int)
     IntSubtract,         // (minuend: int) (subtrahend: int) -> (difference: int)
+    ListCreate,          // (length: int) -> list
+    ListGet,             // list (index: int) -> item
+    ListInsert,          // list (index: int) item -> list
+    ListLength,          // list -> int
+    ListRemoveAt,        // list (index: int) -> (list, item)
+    ListReplace,         // list (index: int) newItem -> list
     Parallel,            // body: Closure -> returnValueOfClosure
     Print,               // message -> Nothing
     StructGet,           // struct key -> value
