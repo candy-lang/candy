@@ -45,9 +45,15 @@ use std::collections::HashSet;
 impl Mir {
     pub fn lift_constants(&mut self) {
         let mut constants = vec![];
+        let mut constant_ids = HashSet::new();
         self.body
             .visit(&mut |id, expression, visible, is_return_value| {
-                if expression.is_constant(visible) {
+                let is_constant = expression.is_pure()
+                    && expression
+                        .captured_ids()
+                        .iter()
+                        .all(|captured| constant_ids.contains(captured));
+                if is_constant {
                     if is_return_value && let Expression::Reference(_) = expression {
                         // Returned references shouldn't be lifted. For each of
                         // them, it's guaranteed that no later expression
@@ -57,10 +63,10 @@ impl Mir {
                         return;
                     }
                     constants.push((id, expression.clone()));
+                    constant_ids.insert(id);
                 }
             });
 
-        let constant_ids = constants.iter().map(|(id, _)| *id).collect::<HashSet<_>>();
         self.body.visit_bodies(&mut |body| {
             Self::remove_constants(body, &constant_ids, &mut self.id_generator)
         });

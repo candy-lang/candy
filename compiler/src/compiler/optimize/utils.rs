@@ -187,36 +187,14 @@ impl Expression {
             | Expression::TraceRegisterFuzzableClosure { .. } => false,
         }
     }
-}
 
-impl Expression {
     /// Whether the value of this expression is known at compile-time.
     pub fn is_constant(&self, visible: &VisibleExpressions) -> bool {
-        match self {
-            Expression::Int(_)
-            | Expression::Text(_)
-            | Expression::Symbol(_)
-            | Expression::Builtin(_)
-            | Expression::Responsibility(_) => true,
-            Expression::Reference(id) => visible.get(*id).is_constant(visible),
-            Expression::Struct(fields) => fields.iter().all(|(key, value)| {
-                visible.get(*key).is_constant(visible) && visible.get(*value).is_constant(visible)
-            }),
-            Expression::Lambda { .. } => self
+        self.is_pure()
+            && self
                 .captured_ids()
                 .iter()
-                .all(|captured| visible.get(*captured).is_constant(visible)),
-            Expression::Parameter
-            | Expression::Call { .. }
-            | Expression::UseModule { .. }
-            | Expression::Needs { .. }
-            | Expression::Panic { .. }
-            | Expression::Error { .. } => false,
-            Expression::Multiple(_) => self
-                .captured_ids()
-                .iter()
-                .all(|captured| visible.get(*captured).is_constant(visible)),
-        }
+                .all(|captured| visible.get(*captured).is_constant(visible))
     }
 }
 
