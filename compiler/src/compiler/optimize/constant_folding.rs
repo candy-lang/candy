@@ -62,13 +62,14 @@ impl Mir {
                     condition,
                     reason,
                     responsible,
+                    responsible_for_condition,
                 } => {
                     if let Expression::Symbol(symbol) = visible.get(*condition) {
                         let result = match symbol.as_str() {
                             "True" => Expression::Symbol("Nothing".to_string()),
                             "False" => Expression::Panic {
                                 reason: *reason,
-                                responsible: *responsible,
+                                responsible: *responsible_for_condition,
                             },
                             _ => return,
                         };

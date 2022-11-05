@@ -88,13 +88,15 @@ impl Expression {
                 referenced.insert(*responsible);
             }
             Expression::Needs {
-                responsible,
                 condition,
                 reason,
+                responsible,
+                responsible_for_condition,
             } => {
-                referenced.insert(*responsible);
                 referenced.insert(*condition);
                 referenced.insert(*reason);
+                referenced.insert(*responsible);
+                referenced.insert(*responsible_for_condition);
             }
             Expression::Panic {
                 reason,
@@ -286,13 +288,15 @@ impl Expression {
                 replacer(responsible);
             }
             Expression::Needs {
-                responsible,
                 condition,
                 reason,
+                responsible,
+                responsible_for_condition,
             } => {
-                replacer(responsible);
                 replacer(condition);
                 replacer(reason);
+                replacer(responsible);
+                replacer(responsible_for_condition);
             }
             Expression::Panic {
                 reason,

@@ -58,7 +58,11 @@ pub enum Expression {
     Needs {
         condition: Id,
         reason: Id,
+        /// Who's responsible for the needs itself, i.e. that it's given a bool
+        /// and that the reason is a text.
         responsible: Id,
+        /// Who's responsible for the condition being `True`.
+        responsible_for_condition: Id,
     },
     /// This expression indicates that the code will panic. It's created if the
     /// compiler can statically determine that some expression will always
@@ -284,13 +288,15 @@ impl hash::Hash for Expression {
                 responsible.hash(state);
             }
             Expression::Needs {
-                responsible,
                 condition,
                 reason,
+                responsible,
+                responsible_for_condition,
             } => {
-                responsible.hash(state);
                 condition.hash(state);
                 reason.hash(state);
+                responsible.hash(state);
+                responsible_for_condition.hash(state);
             }
             Expression::Panic {
                 reason,
@@ -401,11 +407,12 @@ impl fmt::Debug for Expression {
                 responsible,
             } => write!(f, "use {relative_path} (relative to {current_module}; also, {responsible} is responsible)"),
             Expression::Needs {
-                responsible,
                 condition,
                 reason,
+                responsible,
+                responsible_for_condition,
             } => {
-                write!(f, "needs {condition} {reason} ({responsible} is responsible)")
+                write!(f, "needs {condition} {reason} ({responsible} is responsible for the call, {responsible_for_condition} for the condition)")
             }
             Expression::Panic {
                 reason,
