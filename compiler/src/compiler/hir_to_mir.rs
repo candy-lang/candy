@@ -5,6 +5,7 @@ use super::{
     mir::{Body, Expression, Id, Mir},
 };
 use crate::{module::Module, utils::IdGenerator};
+use itertools::Itertools;
 use std::{collections::HashMap, sync::Arc};
 
 #[salsa::query_group(HirToMirStorage)]
@@ -116,11 +117,28 @@ fn compile_expression(
                 .map(|argument| mapping[argument])
                 .collect_vec();
 
-            Expression::Call {
-                function: mapping[&function],
-                arguments: arguments.iter().map(|arg| mapping[arg]).collect(),
-                responsible,
-            }
+            body.push_with_new_id(
+                id_generator,
+                Expression::TraceCallStarts {
+                    call_code: hir_id.clone(),
+                    function: mapping[&function],
+                    arguments: arguments.clone(),
+                    responsible,
+                },
+            );
+            let call = body.push_with_new_id(
+                id_generator,
+                Expression::Call {
+                    function: mapping[&function],
+                    arguments,
+                    responsible,
+                },
+            );
+            body.push_with_new_id(
+                id_generator,
+                Expression::TraceCallEnds { return_value: call },
+            );
+            Expression::Reference(call)
         }
         hir::Expression::UseModule {
             current_module,

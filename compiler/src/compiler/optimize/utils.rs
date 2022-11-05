@@ -109,6 +109,30 @@ impl Expression {
                 }
             }
             Expression::Multiple(body) => body.collect_referenced_ids(referenced),
+            Expression::TraceModuleStarts { module } => {}
+            Expression::TraceModuleEnds => {}
+            Expression::TraceCallStarts {
+                call_code: _,
+                function,
+                arguments,
+                responsible,
+            } => {
+                referenced.insert(*function);
+                referenced.extend(arguments);
+                referenced.insert(*responsible);
+            }
+            Expression::TraceCallEnds { return_value } => {
+                referenced.insert(*return_value);
+            }
+            Expression::TraceExpressionEvaluated {
+                expression: _,
+                value,
+            } => {
+                referenced.insert(*value);
+            }
+            Expression::TraceRegisterFuzzableClosure { code: _, closure } => {
+                referenced.insert(*closure);
+            }
         }
     }
 }
@@ -155,6 +179,12 @@ impl Expression {
             Expression::Panic { .. } => false,
             Expression::Error { .. } => false,
             Expression::Multiple(body) => body.iter().all(|(_, expr)| expr.is_pure()),
+            Expression::TraceModuleStarts { .. }
+            | Expression::TraceModuleEnds
+            | Expression::TraceCallStarts { .. }
+            | Expression::TraceCallEnds { .. }
+            | Expression::TraceExpressionEvaluated { .. }
+            | Expression::TraceRegisterFuzzableClosure { .. } => false,
         }
     }
 }
@@ -299,6 +329,28 @@ impl Expression {
                 }
             }
             Expression::Multiple(body) => body.replace_id_references(replacer),
+            Expression::TraceModuleStarts { module: _ } => {}
+            Expression::TraceModuleEnds => {}
+            Expression::TraceCallStarts {
+                call_code: _,
+                function,
+                arguments,
+                responsible,
+            } => {
+                replacer(function);
+                for argument in arguments {
+                    replacer(argument);
+                }
+                replacer(responsible);
+            }
+            Expression::TraceCallEnds { return_value } => {
+                replacer(return_value);
+            }
+            Expression::TraceExpressionEvaluated {
+                expression: _,
+                value,
+            } => replacer(value),
+            Expression::TraceRegisterFuzzableClosure { code: _, closure } => replacer(closure),
         }
     }
 }

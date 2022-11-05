@@ -77,6 +77,28 @@ pub enum Expression {
     /// storing multiple inner expressions. It's quickly expanded using the
     /// TODO optimization.
     Multiple(Body),
+
+    TraceModuleStarts {
+        module: Module,
+    },
+    TraceModuleEnds,
+    TraceCallStarts {
+        call_code: hir::Id,
+        function: Id,
+        arguments: Vec<Id>,
+        responsible: Id,
+    },
+    TraceCallEnds {
+        return_value: Id,
+    },
+    TraceExpressionEvaluated {
+        expression: hir::Id,
+        value: Id,
+    },
+    TraceRegisterFuzzableClosure {
+        code: hir::Id,
+        closure: Id,
+    }
 }
 
 impl CountableId for Id {
@@ -279,6 +301,25 @@ impl hash::Hash for Expression {
             }
             Expression::Error { errors, .. } => errors.hash(state),
             Expression::Multiple(body) => body.hash(state),
+            Expression::TraceModuleStarts { module } => {
+                module.hash(state);
+            }
+            Expression::TraceModuleEnds => {}
+            Expression::TraceCallStarts { call_code, function, arguments, responsible } => {
+                call_code.hash(state);
+                function.hash(state);
+                arguments.hash(state);
+                responsible.hash(state);
+            }
+            Expression::TraceCallEnds { return_value } => return_value.hash(state),
+            Expression::TraceExpressionEvaluated { expression, value } => {
+                expression.hash(state);
+                value.hash(state);
+            }
+            Expression::TraceRegisterFuzzableClosure { code, closure } => {
+                code.hash(state);
+                closure.hash(state);
+            }
         }
     }
 }
@@ -317,6 +358,7 @@ impl fmt::Debug for Expression {
                     .map(|(key, value)| format!("{key}: {value}"))
                     .join(", "),
             ),
+            Expression::Responsibility(responsibility) => write!(f, "{responsibility}"),
             Expression::Lambda {
                 parameters,
                 responsible_parameter,
@@ -382,6 +424,12 @@ impl fmt::Debug for Expression {
                     .map(|line| format!("  {line}"))
                     .join("\n"),
             ),
+            Expression::TraceModuleStarts { module } => write!(f, "trace: start of module {module}"),
+            Expression::TraceModuleEnds => write!(f, "trace: end of module"),
+            Expression::TraceCallStarts { call_code, function, arguments, responsible } => write!(f, "trace: start of call of {function} with {} ({responsible} is responsible, code is at {call_code})", arguments.iter().map(|arg| format!("{arg}")).join(" ")),
+            Expression::TraceCallEnds { return_value } => write!(f, "trace: end of call with return value {return_value}"),
+            Expression::TraceExpressionEvaluated { expression, value  } => write!(f, "trace: expression {expression} evaluated to {value}"),
+            Expression::TraceRegisterFuzzableClosure { code, closure } => write!(f, "trace: register fuzzable closure {closure}, defined at {code}"),
         }
     }
 }
