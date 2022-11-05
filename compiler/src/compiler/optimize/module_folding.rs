@@ -31,15 +31,26 @@ use crate::{
     compiler::{
         hir_to_mir::HirToMir,
         mir::{Expression, Id, Mir},
+        optimize::OptimizeMir,
     },
     database::Database,
     module::{Module, UsePath},
 };
 use std::collections::HashMap;
-use tracing::warn;
+use tracing::{debug, warn};
+
+// self.panic(format!(
+//     "there's an import cycle ({})",
+//     self.import_stack
+//         .iter()
+//         .skip_while(|it| **it != module)
+//         .chain([&module])
+//         .map(|module| format!("{module}"))
+//         .join(" → "),
+// ));
 
 impl Mir {
-    pub fn fold_modules(&mut self, db: &Database, import_chain: &[Module]) {
+    pub fn fold_modules(&mut self, db: &dyn OptimizeMir) {
         self.body.visit(&mut |_, expression, visible, _| {
             let Expression::UseModule {
                     current_module,
@@ -48,7 +59,7 @@ impl Mir {
                 } = expression else { return; };
 
             let Expression::Text(path) = visible.get(*relative_path) else {
-                warn!("use called with non-constant text");
+                // warn!("use called with non-constant text");
                 return; // TODO
             };
             let Ok(path) = UsePath::parse(&path) else {
@@ -59,20 +70,14 @@ impl Mir {
                 warn!("use called with an invalid path");
                 return; // TODO
             };
-            if import_chain.contains(&module_to_import) {
-                warn!("circular import");
-                return; // TODO
-            }
 
-            let mir = db.mir(module_to_import.clone()).unwrap();
-            let mut mir = (*mir).clone();
-            let import_chain = {
-                let mut chain = vec![];
-                chain.extend(import_chain.iter().cloned());
-                chain.push(module_to_import);
-                chain
+            // debug!("Loading and optimizing module {module_to_import}");
+            let mir = db.mir_with_obvious_optimized(module_to_import);
+            let Some(mir) = mir else {
+                warn!("Module not found.");
+                return; // TODO
             };
-            mir.optimize_obvious(db, &import_chain);
+            let mir = (*mir).clone();
 
             let mapping: HashMap<Id, Id> = mir
                 .body

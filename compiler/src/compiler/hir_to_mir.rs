@@ -69,7 +69,7 @@ fn compile_expression(
         }) => {
             let mut parameters = vec![];
             let responsible_parameter: Id = id_generator.generate();
-            let mut body = Body::new();
+            let mut lambda_body = Body::new();
 
             for original_parameter in original_parameters {
                 let parameter = id_generator.generate();
@@ -89,7 +89,7 @@ fn compile_expression(
             for (id, expression) in original_body.expressions {
                 compile_expression(
                     id_generator,
-                    &mut body,
+                    &mut lambda_body,
                     mapping,
                     responsible,
                     &id,
@@ -100,7 +100,7 @@ fn compile_expression(
             Expression::Lambda {
                 parameters,
                 responsible_parameter,
-                body,
+                body: lambda_body,
                 fuzzable,
             }
         }
@@ -109,8 +109,12 @@ fn compile_expression(
             function,
             arguments,
         } => {
-            let responsible = id_generator.generate();
-            body.push(responsible, Expression::Responsibility(hir_id.clone()));
+            let responsible =
+                body.push_with_new_id(id_generator, Expression::Responsibility(hir_id.clone()));
+            let arguments = arguments
+                .iter()
+                .map(|argument| mapping[argument])
+                .collect_vec();
 
             Expression::Call {
                 function: mapping[&function],
@@ -140,7 +144,14 @@ fn compile_expression(
             errors,
         },
     };
-    let id = id_generator.generate();
-    body.push(id, expression);
+
+    let id = body.push_with_new_id(id_generator, expression);
     mapping.insert(hir_id.clone(), id);
+    // body.push_with_new_id(
+    //     id_generator,
+    //     Expression::TraceExpressionEvaluated {
+    //         expression: hir_id.clone(),
+    //         value: id,
+    //     },
+    // );
 }

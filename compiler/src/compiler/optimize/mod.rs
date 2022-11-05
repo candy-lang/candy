@@ -54,25 +54,47 @@ mod reference_following;
 mod tree_shaking;
 mod utils;
 
-use super::mir::Mir;
-use crate::{database::Database, module::Module};
+use super::{
+    hir,
+    hir_to_mir::HirToMir,
+    mir::{Body, Expression, Mir},
+};
+use crate::{database::Database, module::Module, utils::IdGenerator};
+use std::sync::Arc;
 use tracing::debug;
 
+#[salsa::query_group(OptimizeMirStorage)]
+pub trait OptimizeMir: HirToMir {
+    #[salsa::cycle(recover_from_cycle)]
+    fn mir_with_obvious_optimized(&self, module: Module) -> Option<Arc<Mir>>;
+}
+
+fn mir_with_obvious_optimized(db: &dyn OptimizeMir, module: Module) -> Option<Arc<Mir>> {
+    let mir = db.mir(module.clone())?;
+    let mut mir = (*mir).clone();
+    mir.optimize_obvious(module, db);
+    Some(Arc::new(mir))
+}
+
 impl Mir {
-    pub fn optimize(&mut self, db: &Database) {
-        debug!("MIR: {self:?}");
-        debug!("Complexity: {}", self.complexity());
-        self.optimize_obvious(db, &[]);
-        debug!("Done optimizing.");
-        debug!("MIR: {self:?}");
-        debug!("Complexity: {}", self.complexity());
-    }
+    // pub fn optimize(&mut self, db: &Database) {
+    //     debug!("MIR: {self:?}");
+    //     debug!("Complexity: {}", self.complexity());
+    //     self.optimize_obvious(db, &[]);
+    //     debug!("Done optimizing.");
+    //     debug!("MIR: {self:?}");
+    //     debug!("Complexity: {}", self.complexity());
+    // }
 
     /// Performs optimizations that improve both performance and code size.
-    pub fn optimize_obvious(&mut self, db: &Database, import_chain: &[Module]) {
+    pub fn optimize_obvious(&mut self, module: Module, db: &dyn OptimizeMir) {
+        debug!("{module}: {}", self.complexity());
         self.optimize_obvious_self_contained();
-        self.fold_modules(db, import_chain);
+        debug!("{module}: {}", self.complexity());
+        self.fold_modules(db);
+        debug!("{module}: {}", self.complexity());
         self.optimize_obvious_self_contained();
+        debug!("{module}: {}", self.complexity());
         self.cleanup();
     }
 
@@ -100,4 +122,29 @@ impl Mir {
         optimization(self);
         self.validate();
     }
+}
+
+fn recover_from_cycle(
+    db: &dyn OptimizeMir,
+    cycle: &Vec<String>,
+    module: &Module,
+) -> Option<Arc<Mir>> {
+    let mut id_generator = IdGenerator::start_at(0);
+    let mut body = Body::new();
+    let reason = body.push_with_new_id(
+        &mut id_generator,
+        Expression::Text("There's a cycle in the used modules.".to_string()),
+    );
+    let responsible = body.push_with_new_id(
+        &mut id_generator,
+        Expression::Responsibility(hir::Id::new(module.clone(), vec![])),
+    );
+    body.push_with_new_id(
+        &mut id_generator,
+        Expression::Panic {
+            reason,
+            responsible,
+        },
+    );
+    Some(Arc::new(Mir { id_generator, body }))
 }

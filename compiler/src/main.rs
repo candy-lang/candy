@@ -20,7 +20,7 @@ use crate::{
         cst_to_ast::CstToAst,
         error::CompilerError,
         hir::{self, CollectErrors, Id},
-        hir_to_lir::HirToLir,
+        mir_to_lir::MirToLir,
         rcst_to_cst::RcstToCst,
         string_to_rcst::StringToRcst,
     },
@@ -33,7 +33,7 @@ use crate::{
         Closure, ExecutionResult, FiberId, Status, Struct, Vm,
     },
 };
-use compiler::{hir_to_mir::HirToMir, lir::Lir};
+use compiler::{hir_to_mir::HirToMir, lir::Lir, optimize::OptimizeMir};
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use notify::{watcher, RecursiveMode, Watcher};
@@ -194,17 +194,14 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
             let (end_line, end_col) = db.offset_to_lsp(module.clone(), span.end);
             warn!("{start_line}:{start_col} – {end_line}:{end_col}: {payload:?}");
         }
-        hir
     });
 
-    let mir = tracing::span!(Level::DEBUG, "Turning HIR to MIR").in_scope(|| {
+    tracing::span!(Level::DEBUG, "Turning HIR to MIR").in_scope(|| {
         let mir = db.mir(module.clone()).unwrap();
-        info!("MIR: {mir:?}");
-        mir
+        // info!("MIR: {mir:?}");
     });
     tracing::span!(Level::DEBUG, "Optimizing MIR").in_scope(|| {
-        let mut mir = (*mir).clone();
-        mir.optimize(&db);
+        db.mir_with_obvious_optimized(module.clone()).unwrap();
     });
 
     let lir = tracing::span!(Level::DEBUG, "Lowering HIR to LIR").in_scope(|| {
@@ -239,7 +236,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let mut tracer = FullTracer::default();
 
     let mut vm = Vm::new();
-    vm.set_up_for_running_module_closure(module_closure);
+    vm.set_up_for_running_module_closure(module.clone(), module_closure);
     vm.run(&DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
     if let Status::WaitingForOperations = vm.status() {
         error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");

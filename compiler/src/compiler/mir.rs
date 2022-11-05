@@ -56,9 +56,9 @@ pub enum Expression {
         responsible: Id,
     },
     Needs {
-        responsible: Id,
         condition: Id,
         reason: Id,
+        responsible: Id,
     },
     /// This expression indicates that the code will panic. It's created if the
     /// compiler can statically determine that some expression will always
@@ -317,7 +317,6 @@ impl fmt::Debug for Expression {
                     .map(|(key, value)| format!("{key}: {value}"))
                     .join(", "),
             ),
-            
             Expression::Lambda {
                 parameters,
                 responsible_parameter,
