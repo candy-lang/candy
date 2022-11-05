@@ -7,7 +7,7 @@ pub use self::{
     utils::FuzzablesFinder,
 };
 use crate::{
-    compiler::hir::Id,
+    compiler::{hir::Id, hir_to_mir::MirConfig},
     database::Database,
     module::Module,
     vm::{
@@ -23,8 +23,18 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
     let (fuzzables_heap, fuzzables): (Heap, Vec<(Id, Pointer)>) = {
         let mut tracer = FuzzablesFinder::default();
         let mut vm = Vm::new();
-        vm.set_up_for_running_module_closure(Closure::of_module(db, module).unwrap());
-        vm.run(&DbUseProvider { db }, &mut RunForever, &mut tracer);
+        vm.set_up_for_running_module_closure(
+            module.clone(),
+            Closure::of_module(db, module, MirConfig::default()).unwrap(),
+        );
+        vm.run(
+            &DbUseProvider {
+                db,
+                config: MirConfig::default(),
+            },
+            &mut RunForever,
+            &mut tracer,
+        );
         (tracer.heap, tracer.fuzzables)
     };
 
@@ -39,7 +49,10 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
         info!("Fuzzing {id}.");
         let mut fuzzer = Fuzzer::new(&fuzzables_heap, closure, id.clone());
         fuzzer.run(
-            &mut DbUseProvider { db },
+            &mut DbUseProvider {
+                db,
+                config: MirConfig::default(),
+            },
             &mut RunLimitedNumberOfInstructions::new(1000),
         );
         match fuzzer.into_status() {

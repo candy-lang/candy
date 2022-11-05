@@ -33,7 +33,11 @@ use crate::{
         Closure, ExecutionResult, FiberId, Status, Struct, Vm,
     },
 };
-use compiler::{hir_to_mir::HirToMir, lir::Lir, optimize::OptimizeMir};
+use compiler::{
+    hir_to_mir::{HirToMir, MirConfig},
+    lir::Lir,
+    optimize::OptimizeMir,
+};
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use notify::{watcher, RecursiveMode, Watcher};
@@ -197,15 +201,18 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
     });
 
     tracing::span!(Level::DEBUG, "Turning HIR to MIR").in_scope(|| {
-        let mir = db.mir(module.clone()).unwrap();
-        // info!("MIR: {mir:?}");
+        db.mir(module.clone(), MirConfig::default()).unwrap();
     });
     tracing::span!(Level::DEBUG, "Optimizing MIR").in_scope(|| {
-        db.mir_with_obvious_optimized(module.clone()).unwrap();
+        let mir = db
+            .mir_with_obvious_optimized(module.clone(), MirConfig::default())
+            .unwrap();
+        info!("Optimized MIR:\n{mir:?}");
     });
 
+    return None;
     let lir = tracing::span!(Level::DEBUG, "Lowering HIR to LIR").in_scope(|| {
-        let lir = db.lir(module.clone()).unwrap();
+        let lir = db.lir(module.clone(), MirConfig::default()).unwrap();
         if debug {
             module.dump_associated_debug_file("lir", &format!("{lir}"));
         }
@@ -232,12 +239,19 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let path_string = options.file.to_string_lossy();
     debug!("Running `{path_string}`.");
 
-    let module_closure = Closure::of_module(&db, module.clone()).unwrap();
+    let module_closure = Closure::of_module(&db, module.clone(), MirConfig::default()).unwrap();
     let mut tracer = FullTracer::default();
 
     let mut vm = Vm::new();
     vm.set_up_for_running_module_closure(module.clone(), module_closure);
-    vm.run(&DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
+    vm.run(
+        &DbUseProvider {
+            db: &db,
+            config: MirConfig::default(),
+        },
+        &mut RunForever,
+        &mut tracer,
+    );
     if let Status::WaitingForOperations = vm.status() {
         error!("The module waits on channel operations. Perhaps, the code tried to read from a channel without sending a packet into it.");
         // TODO: Show stack traces of all fibers?
@@ -296,18 +310,26 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         let stdout_port = heap.create_send_port(stdout.channel);
         heap.create_struct(HashMap::from([(stdout_symbol, stdout_port)]))
     };
+    let main_id = Id::new(module.clone(), vec!["main".to_string()]);
     tracer.for_fiber(FiberId::root()).call_started(
         Id::new(module, vec!["main".to_string()]),
         main,
         vec![environment],
         &heap,
     );
-    vm.set_up_for_running_closure(heap, main, &[environment]);
+    vm.set_up_for_running_closure(heap, main_id, main, &[environment]);
     loop {
         match vm.status() {
             Status::CanRun => {
                 debug!("VM still running.");
-                vm.run(&DbUseProvider { db: &db }, &mut RunForever, &mut tracer);
+                vm.run(
+                    &DbUseProvider {
+                        db: &db,
+                        config: MirConfig::default(),
+                    },
+                    &mut RunForever,
+                    &mut tracer,
+                );
             }
             Status::WaitingForOperations => {
                 todo!("VM can't proceed until some operations complete.");

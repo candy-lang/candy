@@ -87,7 +87,7 @@ pub enum Expression {
     },
     TraceModuleEnds,
     TraceCallStarts {
-        call_code: hir::Id,
+        hir_call: Id,
         function: Id,
         arguments: Vec<Id>,
         responsible: Id,
@@ -96,11 +96,11 @@ pub enum Expression {
         return_value: Id,
     },
     TraceExpressionEvaluated {
-        expression: hir::Id,
+        hir_expression: Id,
         value: Id,
     },
     TraceRegisterFuzzableClosure {
-        code: hir::Id,
+        hir_definition: Id,
         closure: Id,
     }
 }
@@ -311,19 +311,19 @@ impl hash::Hash for Expression {
                 module.hash(state);
             }
             Expression::TraceModuleEnds => {}
-            Expression::TraceCallStarts { call_code, function, arguments, responsible } => {
-                call_code.hash(state);
+            Expression::TraceCallStarts { hir_call, function, arguments, responsible } => {
+                hir_call.hash(state);
                 function.hash(state);
                 arguments.hash(state);
                 responsible.hash(state);
             }
             Expression::TraceCallEnds { return_value } => return_value.hash(state),
-            Expression::TraceExpressionEvaluated { expression, value } => {
-                expression.hash(state);
+            Expression::TraceExpressionEvaluated { hir_expression, value } => {
+                hir_expression.hash(state);
                 value.hash(state);
             }
-            Expression::TraceRegisterFuzzableClosure { code, closure } => {
-                code.hash(state);
+            Expression::TraceRegisterFuzzableClosure { hir_definition, closure } => {
+                hir_definition.hash(state);
                 closure.hash(state);
             }
         }
@@ -433,10 +433,10 @@ impl fmt::Debug for Expression {
             ),
             Expression::TraceModuleStarts { module } => write!(f, "trace: start of module {module}"),
             Expression::TraceModuleEnds => write!(f, "trace: end of module"),
-            Expression::TraceCallStarts { call_code, function, arguments, responsible } => write!(f, "trace: start of call of {function} with {} ({responsible} is responsible, code is at {call_code})", arguments.iter().map(|arg| format!("{arg}")).join(" ")),
+            Expression::TraceCallStarts { hir_call, function, arguments, responsible } => write!(f, "trace: start of call of {function} with {} ({responsible} is responsible, code is at {hir_call})", arguments.iter().map(|arg| format!("{arg}")).join(" ")),
             Expression::TraceCallEnds { return_value } => write!(f, "trace: end of call with return value {return_value}"),
-            Expression::TraceExpressionEvaluated { expression, value  } => write!(f, "trace: expression {expression} evaluated to {value}"),
-            Expression::TraceRegisterFuzzableClosure { code, closure } => write!(f, "trace: register fuzzable closure {closure}, defined at {code}"),
+            Expression::TraceExpressionEvaluated { hir_expression, value  } => write!(f, "trace: expression {hir_expression} evaluated to {value}"),
+            Expression::TraceRegisterFuzzableClosure { hir_definition, closure } => write!(f, "trace: register fuzzable closure {closure}, defined at {hir_definition}"),
         }
     }
 }

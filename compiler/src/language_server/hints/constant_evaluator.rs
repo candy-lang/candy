@@ -5,6 +5,7 @@ use crate::{
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
         hir::Id,
+        hir_to_mir::MirConfig,
     },
     database::Database,
     language_server::hints::{utils::id_to_end_of_line, HintKind},
@@ -37,7 +38,10 @@ impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
         let tracer = FullTracer::default();
         let mut vm = Vm::new();
-        vm.set_up_for_running_module_closure(Closure::of_module(db, module.clone()).unwrap());
+        vm.set_up_for_running_module_closure(
+            module.clone(),
+            Closure::of_module(db, module.clone(), MirConfig::default()).unwrap(),
+        );
         self.evaluators.insert(module, Evaluator { tracer, vm });
     }
 
@@ -60,7 +64,10 @@ impl ConstantEvaluator {
 
         if let Some((module, evaluator)) = running_evaluators.choose_mut(&mut thread_rng()) {
             evaluator.vm.run(
-                &DbUseProvider { db },
+                &DbUseProvider {
+                    db,
+                    config: MirConfig::default(),
+                },
                 &mut RunLimitedNumberOfInstructions::new(500),
                 &mut evaluator.tracer,
             );

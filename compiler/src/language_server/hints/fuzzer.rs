@@ -3,6 +3,7 @@ use crate::{
     compiler::{
         ast_to_hir::AstToHir,
         hir::{Expression, HirDb, Id, Lambda},
+        hir_to_mir::MirConfig,
     },
     database::Database,
     fuzzer::{Fuzzer, Status},
@@ -55,7 +56,10 @@ impl FuzzerManager {
 
         let fuzzer = running_fuzzers.choose_mut(&mut thread_rng())?;
         fuzzer.run(
-            &mut DbUseProvider { db },
+            &mut DbUseProvider {
+                db,
+                config: MirConfig::default(),
+            },
             &mut RunLimitedNumberOfInstructions::new(100),
         );
 

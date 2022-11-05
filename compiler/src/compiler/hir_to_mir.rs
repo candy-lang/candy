@@ -10,17 +10,24 @@ use std::{collections::HashMap, sync::Arc};
 
 #[salsa::query_group(HirToMirStorage)]
 pub trait HirToMir: CstDb + AstToHir {
-    fn mir(&self, module: Module) -> Option<Arc<Mir>>;
+    fn mir(&self, module: Module, config: MirConfig) -> Option<Arc<Mir>>;
 }
 
-fn mir(db: &dyn HirToMir, module: Module) -> Option<Arc<Mir>> {
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Default)]
+pub struct MirConfig {
+    register_fuzzables: bool,
+    trace_calls: bool,
+    trace_evaluated_expressions: bool,
+}
+
+fn mir(db: &dyn HirToMir, module: Module, config: MirConfig) -> Option<Arc<Mir>> {
     let (hir, _) = db.hir(module.clone())?;
     let hir = (*hir).clone();
-    let mir = compile_module(module, hir);
+    let mir = compile_module(module, hir, &config);
     Some(Arc::new(mir))
 }
 
-fn compile_module(module: Module, hir: hir::Body) -> Mir {
+fn compile_module(module: Module, hir: hir::Body, config: &MirConfig) -> Mir {
     let mut id_generator = IdGenerator::start_at(0);
     let mut body = Body::new();
     let mut mapping = HashMap::<hir::Id, Id>::new();
@@ -38,6 +45,7 @@ fn compile_module(module: Module, hir: hir::Body) -> Mir {
             module_responsibility,
             &id,
             expression,
+            config,
         );
     }
 
@@ -51,6 +59,7 @@ fn compile_expression(
     responsible_for_needs: Id,
     hir_id: &hir::Id,
     expression: hir::Expression,
+    config: &MirConfig,
 ) {
     let expression = match expression {
         hir::Expression::Int(int) => Expression::Int(int.into()),
@@ -60,7 +69,7 @@ fn compile_expression(
         hir::Expression::Struct(fields) => Expression::Struct(
             fields
                 .iter()
-                .map(|(key, value)| (mapping[&key], mapping[&value]))
+                .map(|(key, value)| (mapping[key], mapping[value]))
                 .collect(),
         ),
         hir::Expression::Lambda(hir::Lambda {
@@ -95,15 +104,31 @@ fn compile_expression(
                     responsible,
                     &id,
                     expression,
+                    config,
                 );
             }
 
-            Expression::Lambda {
-                parameters,
-                responsible_parameter,
-                body: lambda_body,
-                fuzzable,
+            let lambda = body.push_with_new_id(
+                id_generator,
+                Expression::Lambda {
+                    parameters,
+                    responsible_parameter,
+                    body: lambda_body,
+                    fuzzable,
+                },
+            );
+            if config.register_fuzzables && fuzzable {
+                let hir_definition =
+                    body.push_with_new_id(id_generator, Expression::Responsibility(hir_id.clone()));
+                body.push_with_new_id(
+                    id_generator,
+                    Expression::TraceRegisterFuzzableClosure {
+                        hir_definition,
+                        closure: lambda,
+                    },
+                );
             }
+            Expression::Reference(lambda)
         }
         hir::Expression::Builtin(builtin) => Expression::Builtin(builtin),
         hir::Expression::Call {
@@ -117,15 +142,19 @@ fn compile_expression(
                 .map(|argument| mapping[argument])
                 .collect_vec();
 
-            body.push_with_new_id(
-                id_generator,
-                Expression::TraceCallStarts {
-                    call_code: hir_id.clone(),
-                    function: mapping[&function],
-                    arguments: arguments.clone(),
-                    responsible,
-                },
-            );
+            if config.trace_calls {
+                let hir_call =
+                    body.push_with_new_id(id_generator, Expression::Responsibility(hir_id.clone()));
+                body.push_with_new_id(
+                    id_generator,
+                    Expression::TraceCallStarts {
+                        hir_call,
+                        function: mapping[&function],
+                        arguments: arguments.clone(),
+                        responsible,
+                    },
+                );
+            }
             let call = body.push_with_new_id(
                 id_generator,
                 Expression::Call {
@@ -134,10 +163,12 @@ fn compile_expression(
                     responsible,
                 },
             );
-            body.push_with_new_id(
-                id_generator,
-                Expression::TraceCallEnds { return_value: call },
-            );
+            if config.trace_calls {
+                body.push_with_new_id(
+                    id_generator,
+                    Expression::TraceCallEnds { return_value: call },
+                );
+            }
             Expression::Reference(call)
         }
         hir::Expression::UseModule {
@@ -152,11 +183,16 @@ fn compile_expression(
             // `needs`.
             responsible: responsible_for_needs,
         },
-        hir::Expression::Needs { condition, reason } => Expression::Needs {
-            responsible: responsible_for_needs,
-            condition: mapping[&condition],
-            reason: mapping[&reason],
-        },
+        hir::Expression::Needs { condition, reason } => {
+            let responsible =
+                body.push_with_new_id(id_generator, Expression::Responsibility(hir_id.clone()));
+            Expression::Needs {
+                condition: mapping[&condition],
+                reason: mapping[&reason],
+                responsible,
+                responsible_for_condition: responsible_for_needs,
+            }
+        }
         hir::Expression::Error { child, errors } => Expression::Error {
             child: child.map(|child| mapping[&child]),
             errors,
@@ -165,11 +201,16 @@ fn compile_expression(
 
     let id = body.push_with_new_id(id_generator, expression);
     mapping.insert(hir_id.clone(), id);
-    // body.push_with_new_id(
-    //     id_generator,
-    //     Expression::TraceExpressionEvaluated {
-    //         expression: hir_id.clone(),
-    //         value: id,
-    //     },
-    // );
+
+    if config.trace_evaluated_expressions {
+        let hir_expression =
+            body.push_with_new_id(id_generator, Expression::Responsibility(hir_id.clone()));
+        body.push_with_new_id(
+            id_generator,
+            Expression::TraceExpressionEvaluated {
+                hir_expression,
+                value: id,
+            },
+        );
+    }
 }

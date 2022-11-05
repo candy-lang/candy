@@ -29,7 +29,7 @@
 
 use crate::{
     compiler::{
-        hir_to_mir::HirToMir,
+        hir_to_mir::{HirToMir, MirConfig},
         mir::{Expression, Id, Mir},
         optimize::OptimizeMir,
     },
@@ -50,7 +50,7 @@ use tracing::{debug, warn};
 // ));
 
 impl Mir {
-    pub fn fold_modules(&mut self, db: &dyn OptimizeMir) {
+    pub fn fold_modules(&mut self, db: &dyn OptimizeMir, config: &MirConfig) {
         self.body.visit(&mut |_, expression, visible, _| {
             let Expression::UseModule {
                     current_module,
@@ -72,7 +72,7 @@ impl Mir {
             };
 
             // debug!("Loading and optimizing module {module_to_import}");
-            let mir = db.mir_with_obvious_optimized(module_to_import);
+            let mir = db.mir_with_obvious_optimized(module_to_import, config.clone());
             let Some(mir) = mir else {
                 warn!("Module not found.");
                 return; // TODO

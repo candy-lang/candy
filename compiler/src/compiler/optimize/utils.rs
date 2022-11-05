@@ -114,11 +114,12 @@ impl Expression {
             Expression::TraceModuleStarts { module } => {}
             Expression::TraceModuleEnds => {}
             Expression::TraceCallStarts {
-                call_code: _,
+                hir_call,
                 function,
                 arguments,
                 responsible,
             } => {
+                referenced.insert(*hir_call);
                 referenced.insert(*function);
                 referenced.extend(arguments);
                 referenced.insert(*responsible);
@@ -127,12 +128,17 @@ impl Expression {
                 referenced.insert(*return_value);
             }
             Expression::TraceExpressionEvaluated {
-                expression: _,
+                hir_expression,
                 value,
             } => {
+                referenced.insert(*hir_expression);
                 referenced.insert(*value);
             }
-            Expression::TraceRegisterFuzzableClosure { code: _, closure } => {
+            Expression::TraceRegisterFuzzableClosure {
+                hir_definition,
+                closure,
+            } => {
+                referenced.insert(*hir_definition);
                 referenced.insert(*closure);
             }
         }
@@ -314,11 +320,12 @@ impl Expression {
             Expression::TraceModuleStarts { module: _ } => {}
             Expression::TraceModuleEnds => {}
             Expression::TraceCallStarts {
-                call_code: _,
+                hir_call,
                 function,
                 arguments,
                 responsible,
             } => {
+                replacer(hir_call);
                 replacer(function);
                 for argument in arguments {
                     replacer(argument);
@@ -329,10 +336,19 @@ impl Expression {
                 replacer(return_value);
             }
             Expression::TraceExpressionEvaluated {
-                expression: _,
+                hir_expression,
                 value,
-            } => replacer(value),
-            Expression::TraceRegisterFuzzableClosure { code: _, closure } => replacer(closure),
+            } => {
+                replacer(hir_expression);
+                replacer(value);
+            }
+            Expression::TraceRegisterFuzzableClosure {
+                hir_definition,
+                closure,
+            } => {
+                replacer(hir_definition);
+                replacer(closure);
+            }
         }
     }
 }
