@@ -82,10 +82,6 @@ pub enum Expression {
     /// TODO optimization.
     Multiple(Body),
 
-    TraceModuleStarts {
-        module: Module,
-    },
-    TraceModuleEnds,
     TraceCallStarts {
         hir_call: Id,
         function: Id,
@@ -99,7 +95,7 @@ pub enum Expression {
         hir_expression: Id,
         value: Id,
     },
-    TraceRegisterFuzzableClosure {
+    TraceFoundFuzzableClosure {
         hir_definition: Id,
         closure: Id,
     }
@@ -307,10 +303,6 @@ impl hash::Hash for Expression {
             }
             Expression::Error { errors, .. } => errors.hash(state),
             Expression::Multiple(body) => body.hash(state),
-            Expression::TraceModuleStarts { module } => {
-                module.hash(state);
-            }
-            Expression::TraceModuleEnds => {}
             Expression::TraceCallStarts { hir_call, function, arguments, responsible } => {
                 hir_call.hash(state);
                 function.hash(state);
@@ -322,7 +314,7 @@ impl hash::Hash for Expression {
                 hir_expression.hash(state);
                 value.hash(state);
             }
-            Expression::TraceRegisterFuzzableClosure { hir_definition, closure } => {
+            Expression::TraceFoundFuzzableClosure { hir_definition, closure } => {
                 hir_definition.hash(state);
                 closure.hash(state);
             }
@@ -431,12 +423,10 @@ impl fmt::Debug for Expression {
                     .map(|line| format!("  {line}"))
                     .join("\n"),
             ),
-            Expression::TraceModuleStarts { module } => write!(f, "trace: start of module {module}"),
-            Expression::TraceModuleEnds => write!(f, "trace: end of module"),
             Expression::TraceCallStarts { hir_call, function, arguments, responsible } => write!(f, "trace: start of call of {function} with {} ({responsible} is responsible, code is at {hir_call})", arguments.iter().map(|arg| format!("{arg}")).join(" ")),
             Expression::TraceCallEnds { return_value } => write!(f, "trace: end of call with return value {return_value}"),
             Expression::TraceExpressionEvaluated { hir_expression, value  } => write!(f, "trace: expression {hir_expression} evaluated to {value}"),
-            Expression::TraceRegisterFuzzableClosure { hir_definition, closure } => write!(f, "trace: register fuzzable closure {closure}, defined at {hir_definition}"),
+            Expression::TraceFoundFuzzableClosure { hir_definition, closure } => write!(f, "trace: register fuzzable closure {closure}, defined at {hir_definition}"),
         }
     }
 }

@@ -122,7 +122,7 @@ fn compile_expression(
                     body.push_with_new_id(id_generator, Expression::Responsibility(hir_id.clone()));
                 body.push_with_new_id(
                     id_generator,
-                    Expression::TraceRegisterFuzzableClosure {
+                    Expression::TraceFoundFuzzableClosure {
                         hir_definition,
                         closure: lambda,
                     },

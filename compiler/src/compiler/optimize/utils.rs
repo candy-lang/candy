@@ -111,8 +111,6 @@ impl Expression {
                 }
             }
             Expression::Multiple(body) => body.collect_referenced_ids(referenced),
-            Expression::TraceModuleStarts { module } => {}
-            Expression::TraceModuleEnds => {}
             Expression::TraceCallStarts {
                 hir_call,
                 function,
@@ -134,7 +132,7 @@ impl Expression {
                 referenced.insert(*hir_expression);
                 referenced.insert(*value);
             }
-            Expression::TraceRegisterFuzzableClosure {
+            Expression::TraceFoundFuzzableClosure {
                 hir_definition,
                 closure,
             } => {
@@ -187,12 +185,10 @@ impl Expression {
             Expression::Panic { .. } => false,
             Expression::Error { .. } => false,
             Expression::Multiple(body) => body.iter().all(|(_, expr)| expr.is_pure()),
-            Expression::TraceModuleStarts { .. }
-            | Expression::TraceModuleEnds
-            | Expression::TraceCallStarts { .. }
+            Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
             | Expression::TraceExpressionEvaluated { .. }
-            | Expression::TraceRegisterFuzzableClosure { .. } => false,
+            | Expression::TraceFoundFuzzableClosure { .. } => false,
         }
     }
 
@@ -317,8 +313,6 @@ impl Expression {
                 }
             }
             Expression::Multiple(body) => body.replace_id_references(replacer),
-            Expression::TraceModuleStarts { module: _ } => {}
-            Expression::TraceModuleEnds => {}
             Expression::TraceCallStarts {
                 hir_call,
                 function,
@@ -342,7 +336,7 @@ impl Expression {
                 replacer(hir_expression);
                 replacer(value);
             }
-            Expression::TraceRegisterFuzzableClosure {
+            Expression::TraceFoundFuzzableClosure {
                 hir_definition,
                 closure,
             } => {
