@@ -24,7 +24,7 @@ use self::{
 };
 use crate::{
     compiler::hir::Id,
-    utils::{CountableId, IdGenerator},
+    utils::{CountableId, IdGenerator}, module::Module,
 };
 use itertools::Itertools;
 use rand::seq::SliceRandom;
@@ -114,10 +114,7 @@ pub enum Status {
     CanRun,
     WaitingForOperations,
     Done,
-    Panicked {
-        reason: String,
-        responsible: Option<Id>,
-    },
+    Panicked { reason: String, responsible: Id },
 }
 
 impl FiberId {
@@ -155,13 +152,14 @@ impl Vm {
     pub fn set_up_for_running_closure(
         &mut self,
         heap: Heap,
+        id: Id,
         closure: Pointer,
         arguments: &[Pointer],
     ) {
-        self.set_up_with_fiber(Fiber::new_for_running_closure(heap, closure, arguments));
+        self.set_up_with_fiber(Fiber::new_for_running_closure(heap, id, closure, arguments));
     }
-    pub fn set_up_for_running_module_closure(&mut self, closure: Closure) {
-        self.set_up_with_fiber(Fiber::new_for_running_module_closure(closure))
+    pub fn set_up_for_running_module_closure(&mut self, module: Module, closure: Closure) {
+        self.set_up_with_fiber(Fiber::new_for_running_module_closure(module, closure))
     }
 
     pub fn tear_down(mut self) -> ExecutionResult {
@@ -332,7 +330,12 @@ impl Vm {
                     self.fibers.insert(
                         id,
                         FiberTree::Single(Single {
-                            fiber: Fiber::new_for_running_closure(heap, body, &[nursery_send_port]),
+                            fiber: Fiber::new_for_running_closure(
+                                heap,
+                                todo!(),
+                                body,
+                                &[nursery_send_port],
+                            ),
                             parent: Some(fiber_id),
                         }),
                     );
@@ -359,7 +362,7 @@ impl Vm {
                     self.fibers.insert(
                         id,
                         FiberTree::Single(Single {
-                            fiber: Fiber::new_for_running_closure(heap, body, &[]),
+                            fiber: Fiber::new_for_running_closure(heap, todo!(), body, &[]),
                             parent: Some(fiber_id),
                         }),
                     );
@@ -544,6 +547,7 @@ impl Vm {
                     tree.as_single_mut().unwrap().fiber.panic(
                         "the nursery is already dead because the parallel section ended"
                             .to_string(),
+                        todo!(),
                     );
                 }
                 return;
@@ -566,7 +570,12 @@ impl Vm {
                         self.fibers.insert(
                             child_id,
                             FiberTree::Single(Single {
-                                fiber: Fiber::new_for_running_closure(heap, closure_to_spawn, &[]),
+                                fiber: Fiber::new_for_running_closure(
+                                    heap,
+                                    todo!(),
+                                    closure_to_spawn,
+                                    &[],
+                                ),
                                 parent: Some(parent_id),
                             }),
                         );

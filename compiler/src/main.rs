@@ -210,7 +210,7 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
         info!("Optimized MIR:\n{mir:?}");
     });
 
-    return None;
+    // return None;
     let lir = tracing::span!(Level::DEBUG, "Lowering MIR to LIR").in_scope(|| {
         let lir = db.lir(module.clone(), MirConfig::default()).unwrap();
         if debug {
@@ -279,11 +279,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
             responsible,
         } => {
             error!("The module panicked because {reason}.");
-            if let Some(responsible) = responsible {
-                error!("{responsible} is responsible.");
-            } else {
-                error!("Some top-level code panics.");
-            }
+            error!("{responsible} is responsible.");
             error!(
                 "This is the stack trace:\n{}",
                 tracer.format_panic_stack_trace_to_root_fiber(&db)
@@ -354,11 +350,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
             responsible,
         } => {
             error!("The main function panicked because {reason}.");
-            if let Some(responsible) = responsible {
-                error!("{responsible} is responsible.");
-            } else {
-                error!("A needs directly in the main function panicks. Perhaps the main functions expects more in the environment.");
-            }
+            error!("{responsible} is responsible.");
             error!(
                 "This is the stack trace:\n{}",
                 tracer.format_panic_stack_trace_to_root_fiber(&db)

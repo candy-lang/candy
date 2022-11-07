@@ -1,7 +1,7 @@
-use super::{error::CompilerError, hir::Id};
+use super::mir::Id;
 use crate::{builtin_functions::BuiltinFunction, hir, module::Module};
 use itertools::Itertools;
-use num_bigint::BigUint;
+use num_bigint::BigInt;
 use std::fmt::Display;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -14,7 +14,7 @@ pub type StackOffset = usize; // 0 is the last item, 1 the one before that, etc.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Instruction {
     /// Pushes an int.
-    CreateInt(BigUint),
+    CreateInt(BigInt),
 
     /// Pushes a text.
     CreateText(String),
@@ -22,22 +22,25 @@ pub enum Instruction {
     /// Pushes a symbol.
     CreateSymbol(String),
 
-    /// Pops 2 * num_entries items, pushes a struct.
+    /// Pops 2 * num_fields items, pushes a struct.
     ///
     /// a, key, value, key, value, ..., key, value -> a, pointer to struct
     CreateStruct {
-        num_entries: usize,
+        num_fields: usize,
+    },
+
+    /// Pushes a responsibility.
+    CreateResponsibility {
+        id: hir::Id,
     },
 
     /// Pushes a closure.
     ///
     /// a -> a, pointer to closure
     CreateClosure {
-        id: hir::Id,
         captured: Vec<StackOffset>,
         num_args: usize,
         body: Vec<Instruction>,
-        is_curly: bool,
     },
 
     /// Pushes a builtin function.
@@ -55,24 +58,24 @@ pub enum Instruction {
     /// pointer, all captured variables, and arguments, and then changes the
     /// instruction pointer to the first instruction of the closure.
     ///
-    /// a, arg1, arg2, ..., argN, closure -> a, caller, captured vars, arg1, arg2, ..., argN
+    /// a, closure, arg1, arg2, ..., argN, responsible -> a, caller, captured vars, arg1, arg2, ..., argN, responsible
     ///
     /// Later, when the closure returns (perhaps many instructions after this
     /// one), the stack will contain the result:
     ///
-    /// a, arg1, arg2, ..., argN, closure ~> a, return value from closure
+    /// a, closure, arg1, arg2, ..., argN, responsible ~> a, return value from closure
     Call {
         num_args: usize,
     },
 
-    /// Returns from the current closure to the original caller.
-    ///
-    /// a, caller, return value -> a, return value
+    /// Returns from the current closure to the original caller. Leaves the data
+    /// stack untouched, but pops a caller from the call stack and returns the
+    /// instruction pointer to continue where the current function was called.
     Return,
 
-    /// Pops a string path and then resolves the path relative to the current
-    /// module. Then does different things depending on whether this is a code
-    /// or asset module.
+    /// Pops a string path and responsibility and then resolves the path
+    /// relative to the current module. Then does different things depending on
+    /// whether this is a code or asset module.
     ///
     /// - Code module:
     ///
@@ -80,52 +83,127 @@ pub enum Instruction {
     ///   when the module returns, the stack will contain the struct of the
     ///   exported definitions:
     ///
-    ///   a, path ~> a, structOfModuleExports
+    ///   a, path, responsible ~> a, structOfModuleExports
     ///
     /// - Asset module:
     ///   
     ///   Loads the file and pushes its content onto the stack:
     ///
-    ///   a, path -> a, listOfContentBytes
+    ///   a, path, responsible -> a, listOfContentBytes
     UseModule {
         current_module: Module,
     },
 
-    /// Contrary to other languages, in Candy it's always clear who's fault it
-    /// is when a program panics. Each fiber maintains a responsibility stack
-    /// which notes which call-site is responsible for needs to be fulfilled.
-    StartResponsibility(Id),
-    EndResponsibility,
+    /// a, reason, responsible -> 💥
+    Panic,
 
-    /// Pops a boolean condition and a reason. If the condition is true, it
-    /// just pushes Nothing. If the condition is false, it panics with the
-    /// reason.
-    ///
-    /// a, condition, reason -> a, Nothing
-    Needs,
-
-    /// Indicates that a fuzzable closure sits at the top of the stack.
-    RegisterFuzzableClosure(hir::Id),
-
-    TraceValueEvaluated(hir::Id),
-    TraceCallStarts {
-        id: hir::Id,
-        num_args: usize,
-    },
-    TraceCallEnds,
-    TraceNeedsStarts {
-        id: hir::Id,
-    },
-    TraceNeedsEnds,
-    TraceModuleStarts {
+    ModuleStarts {
         module: Module,
     },
-    TraceModuleEnds,
+    ModuleEnds,
 
-    Error {
-        id: hir::Id,
-        errors: Vec<CompilerError>,
+    /// a, code reference, function, arg1, arg2, ..., argN, responsible -> a
+    TraceCallStarts {
+        num_args: usize,
     },
+
+    // a, return value -> a
+    TraceCallEnds,
+
+    /// a, code reference, value -> a
+    TraceExpressionEvaluated,
+
+    /// a, code reference, closure -> a
+    TraceFoundFuzzableClosure,
+}
+
+impl Instruction {
+    /// Applies the instruction's effect on the stack. After calling it, the
+    /// stack will be in the same state as when the control flow continues after
+    /// this instruction.
+    pub fn apply_to_stack(&self, stack: &mut Vec<Id>, result: Id) {
+        match self {
+            Instruction::CreateInt(_) => {
+                stack.push(result);
+            }
+            Instruction::CreateText(_) => {
+                stack.push(result);
+            }
+            Instruction::CreateSymbol(_) => {
+                stack.push(result);
+            }
+            Instruction::CreateStruct { num_fields } => {
+                stack.pop_multiple(2 * num_fields); // fields
+                stack.push(result);
+            }
+            Instruction::CreateResponsibility { .. } => {
+                stack.push(result);
+            }
+            Instruction::CreateClosure { .. } => {
+                stack.push(result);
+            }
+            Instruction::CreateBuiltin(_) => {
+                stack.push(result);
+            }
+            Instruction::PushFromStack(_) => {
+                stack.push(result);
+            }
+            Instruction::PopMultipleBelowTop(n) => {
+                let top = stack.pop().unwrap();
+                stack.pop_multiple(*n);
+                stack.push(top);
+            }
+            Instruction::Call { num_args } => {
+                stack.pop(); // responsible
+                stack.pop_multiple(*num_args);
+                stack.pop(); // closure/builtin
+                stack.push(result); // return value
+            }
+            Instruction::Return => {
+                // Only modifies the call stack and the instruction pointer.
+                // Leaves the return value untouched on the stack.
+            }
+            Instruction::UseModule { .. } => {
+                stack.pop(); // responsible
+                stack.pop(); // module path
+                stack.push(result); // exported members or bytes of file
+            }
+            Instruction::Panic => {
+                stack.pop(); // responsible
+                stack.pop(); // reason
+            }
+            Instruction::ModuleStarts { .. } => {}
+            Instruction::ModuleEnds => {}
+            Instruction::TraceCallStarts { num_args } => {
+                stack.pop(); // responsible
+                stack.pop_multiple(*num_args);
+                stack.pop(); // function
+                stack.pop(); // code reference
+            }
+            Instruction::TraceCallEnds => {
+                stack.pop(); // return value
+            }
+            Instruction::TraceExpressionEvaluated => {
+                stack.pop(); // value
+                stack.pop(); // code reference
+            }
+            Instruction::TraceFoundFuzzableClosure => {
+                stack.pop(); // closure
+                stack.pop(); // code reference
+            }
+        }
+    }
+}
+
+trait StackExt {
+    fn pop_multiple(&mut self, n: usize);
+}
+impl StackExt for Vec<Id> {
+    fn pop_multiple(&mut self, n: usize) {
+        for _ in 0..n {
+            self.pop();
+        }
+    }
 }
 
 impl Display for Instruction {
@@ -134,19 +212,20 @@ impl Display for Instruction {
             Instruction::CreateInt(int) => write!(f, "createInt {int}"),
             Instruction::CreateText(text) => write!(f, "createText {text:?}"),
             Instruction::CreateSymbol(symbol) => write!(f, "createSymbol {symbol}"),
-            Instruction::CreateStruct { num_entries } => {
+            Instruction::CreateStruct {
+                num_fields: num_entries,
+            } => {
                 write!(f, "createStruct {num_entries}")
             }
+            Instruction::CreateResponsibility { id } => write!(f, "createResponsibility {id}"),
             Instruction::CreateClosure {
-                id,
                 captured,
                 num_args,
                 body: instructions,
-                is_curly,
             } => {
                 write!(
                     f,
-                    "createClosure {id} with {num_args} {} capturing {} {}",
+                    "createClosure with {num_args} {} capturing {}",
                     if *num_args == 1 {
                         "argument"
                     } else {
@@ -156,11 +235,6 @@ impl Display for Instruction {
                         "nothing".to_string()
                     } else {
                         captured.iter().join(", ")
-                    },
-                    if *is_curly {
-                        "(is curly)"
-                    } else {
-                        "(is not curly)"
                     },
                 )?;
                 for instruction in instructions {
@@ -186,38 +260,18 @@ impl Display for Instruction {
             Instruction::UseModule { current_module } => {
                 write!(f, "useModule (currently in {})", current_module)
             }
-            Instruction::StartResponsibility(responsible) => {
-                write!(f, "responsibility of {responsible} starts")
+            Instruction::Panic => write!(f, "panic"),
+            Instruction::ModuleStarts { module } => write!(f, "moduleStarts {module}"),
+            Instruction::ModuleEnds => write!(f, "moduleEnds"),
+            Instruction::TraceCallStarts { num_args } => {
+                write!(f, "trace: callStarts ({num_args} args)")
             }
-            Instruction::EndResponsibility => write!(f, "responsibility ends"),
-            Instruction::Needs => write!(f, "needs"),
-            Instruction::RegisterFuzzableClosure(hir_id) => {
-                write!(f, "registerFuzzableClosure {hir_id}")
+            Instruction::TraceCallEnds => write!(f, "trace: callEnds"),
+            Instruction::TraceExpressionEvaluated => {
+                write!(f, "trace: expressionEvaluated")
             }
-            Instruction::TraceValueEvaluated(hir_id) => {
-                write!(f, "traceValueEvaluated {hir_id}")
-            }
-            Instruction::TraceCallStarts { id, num_args } => {
-                write!(f, "traceCallStarts {id} ({num_args} args)")
-            }
-            Instruction::TraceCallEnds => write!(f, "traceCallEnds"),
-            Instruction::TraceNeedsStarts { id } => {
-                write!(f, "traceNeedsStarts {id}")
-            }
-            Instruction::TraceNeedsEnds => write!(f, "traceNeedsEnds"),
-            Instruction::TraceModuleStarts { module } => write!(f, "traceModuleStarts {module}"),
-            Instruction::TraceModuleEnds => write!(f, "traceModuleEnds"),
-            Instruction::Error { id, errors } => {
-                write!(
-                    f,
-                    "{} at {id}:",
-                    if errors.len() == 1 { "error" } else { "errors" }
-                )?;
-                write!(f, "error(s) at {id}")?;
-                for error in errors {
-                    write!(f, "\n  {error:?}")?;
-                }
-                Ok(())
+            Instruction::TraceFoundFuzzableClosure => {
+                write!(f, "trace: foundFuzzableClosure")
             }
         }
     }

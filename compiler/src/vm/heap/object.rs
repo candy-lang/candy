@@ -3,8 +3,9 @@ use crate::{
     builtin_functions::BuiltinFunction,
     compiler::{
         hir::Id,
-        hir_to_lir::HirToLir,
+        hir_to_mir::MirConfig,
         lir::{Instruction, Lir},
+        mir_to_lir::MirToLir,
     },
     database::Database,
     module::Module,
@@ -29,6 +30,7 @@ pub enum Data {
     Text(Text),
     Symbol(Symbol),
     Struct(Struct),
+    Responsibility(Responsibility),
     Closure(Closure),
     Builtin(Builtin),
     SendPort(SendPort),
@@ -56,13 +58,16 @@ pub struct Struct {
     pub fields: Vec<(u64, Pointer, Pointer)>, // list of hash, key, and value
 }
 
+#[derive(Clone, Hash, Debug)]
+pub struct Responsibility {
+    pub id: Id,
+}
+
 #[derive(Clone)]
 pub struct Closure {
-    pub id: Id,
     pub captured: Vec<Pointer>,
     pub num_args: usize,
     pub body: Vec<Instruction>,
-    pub responsible: Option<Id>,
 }
 
 #[derive(Clone)]
@@ -136,29 +141,28 @@ impl Struct {
 impl Closure {
     pub fn of_module_lir(module: Module, lir: Lir) -> Self {
         Closure {
-            id: Id::new(module.clone(), vec![]),
             captured: vec![],
             num_args: 0,
             body: vec![
-                Instruction::TraceModuleStarts {
+                Instruction::ModuleStarts {
                     module: module.clone(),
                 },
                 Instruction::CreateClosure {
-                    id: Id::new(module, vec![]),
                     captured: vec![],
                     num_args: 0,
                     body: lir.instructions,
-                    is_curly: true,
+                },
+                Instruction::CreateResponsibility {
+                    id: Id::new(module, vec![]),
                 },
                 Instruction::Call { num_args: 0 },
-                Instruction::TraceModuleEnds,
+                Instruction::ModuleEnds,
                 Instruction::Return,
             ],
-            responsible: None,
         }
     }
-    pub fn of_module(db: &Database, module: Module) -> Option<Self> {
-        let lir = db.lir(module.clone())?;
+    pub fn of_module(db: &Database, module: Module, config: MirConfig) -> Option<Self> {
+        let lir = db.lir(module.clone(), config)?;
         Some(Self::of_module_lir(module, (*lir).clone()))
     }
 }
@@ -203,6 +207,7 @@ impl Data {
                 }
                 s.hash(state)
             }
+            Data::Responsibility(responsibility) => responsibility.hash(state),
             Data::Closure(closure) => {
                 for captured in &closure.captured {
                     captured.hash_with_state(heap, state);
@@ -222,6 +227,7 @@ impl Data {
             (Data::Text(a), Data::Text(b)) => a.value == b.value,
             (Data::Symbol(a), Data::Symbol(b)) => a.value == b.value,
             (Data::Struct(a), Data::Struct(b)) => a.equals(heap, b),
+            (Data::Responsibility(a), Data::Responsibility(b)) => a.id == b.id,
             (Data::Closure(_), Data::Closure(_)) => false,
             (Data::Builtin(a), Data::Builtin(b)) => a.function == b.function,
             (Data::SendPort(a), Data::SendPort(b)) => a.channel == b.channel,
@@ -244,6 +250,7 @@ impl Data {
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
             ),
+            Data::Responsibility(id) => format!("{id:?}"),
             Data::Closure(_) => "{…}".to_string(),
             Data::Builtin(builtin) => format!("builtin{:?}", builtin.function),
             Data::SendPort(port) => format!("sendPort {:?}", port.channel),
@@ -257,6 +264,7 @@ impl Data {
             | Data::Text(_)
             | Data::Symbol(_)
             | Data::Builtin(_)
+            | Data::Responsibility(_)
             | Data::SendPort(_)
             | Data::ReceivePort(_) => vec![],
             Data::Struct(struct_) => struct_

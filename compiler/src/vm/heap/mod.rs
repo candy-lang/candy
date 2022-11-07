@@ -2,11 +2,14 @@ mod object;
 mod pointer;
 
 pub use self::{
-    object::{Builtin, Closure, Data, Int, Object, ReceivePort, SendPort, Struct, Symbol, Text},
+    object::{
+        Builtin, Closure, Data, Int, Object, ReceivePort, Responsibility, SendPort, Struct, Symbol,
+        Text,
+    },
     pointer::Pointer,
 };
 use super::ids::ChannelId;
-use crate::builtin_functions::BuiltinFunction;
+use crate::{builtin_functions::BuiltinFunction, compiler::hir::Id};
 use itertools::Itertools;
 use num_bigint::BigInt;
 use std::{
@@ -76,6 +79,10 @@ impl Heap {
         self.objects
             .get_mut(&address)
             .unwrap_or_else(|| panic!("Couldn't get object {address}."))
+    }
+    pub fn get_responsibility(&self, address: Pointer) -> Id {
+        let responsibility: Responsibility = self.get(address).data.clone().try_into().unwrap();
+        responsibility.id
     }
 
     pub fn dup(&mut self, address: Pointer) {
@@ -190,8 +197,8 @@ impl Heap {
                     .map(|(hash, key, value)| (*hash, address_map[key], address_map[value]))
                     .collect(),
             }),
+            Data::Responsibility(responsibility) => Data::Responsibility(responsibility.clone()),
             Data::Closure(closure) => Data::Closure(Closure {
-                id: closure.id.clone(),
                 captured: closure
                     .captured
                     .iter()
@@ -199,7 +206,6 @@ impl Heap {
                     .collect(),
                 num_args: closure.num_args,
                 body: closure.body.clone(),
-                responsible: closure.responsible.clone(),
             }),
             Data::Builtin(builtin) => Data::Builtin(builtin.clone()),
             Data::SendPort(port) => Data::SendPort(SendPort::new(port.channel)),

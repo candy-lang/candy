@@ -2,12 +2,17 @@ use super::{
     channel::{Capacity, Packet},
     context::PanickingUseProvider,
     fiber::{Fiber, Status},
-    heap::{Closure, Data, Int, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
+    heap::{
+        Closure, Data, Int, Pointer, ReceivePort, Responsibility, SendPort, Struct, Symbol, Text,
+    },
     ids::ChannelId,
     tracer::{dummy::DummyTracer, Tracer},
     FiberId, Heap,
 };
-use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
+use crate::{
+    builtin_functions::BuiltinFunction,
+    compiler::{hir::Id, lir::Instruction},
+};
 use itertools::Itertools;
 use num_bigint::BigInt;
 use num_integer::Integer;
@@ -21,6 +26,7 @@ impl Fiber {
         &mut self,
         builtin_function: &BuiltinFunction,
         args: &[Pointer],
+        responsible: Id,
     ) {
         let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
             BuiltinFunction::ChannelCreate => self.heap.channel_create(args),
@@ -77,7 +83,7 @@ impl Fiber {
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
             Ok(Parallel { body }) => self.status = Status::InParallelScope { body },
             Ok(Try { body }) => self.status = Status::InTry { body },
-            Err(reason) => self.panic(reason),
+            Err(reason) => self.panic(reason, responsible),
         }
     }
 }
@@ -418,6 +424,7 @@ impl Heap {
                 Data::Text(_) => "Text",
                 Data::Symbol(_) => "Symbol",
                 Data::Struct(_) => "Struct",
+                Data::Responsibility(_) => unreachable!(),
                 Data::Closure(_) => "Function",
                 Data::Builtin(_) => "Builtin",
                 Data::SendPort(_) => "SendPort",
@@ -485,6 +492,11 @@ impl_data_try_into_type!(Int, Int, "a builtin function expected an int");
 impl_data_try_into_type!(Text, Text, "a builtin function expected a text");
 impl_data_try_into_type!(Symbol, Symbol, "a builtin function expected a symbol");
 impl_data_try_into_type!(Struct, Struct, "a builtin function expected a struct");
+impl_data_try_into_type!(
+    Responsibility,
+    Responsibility,
+    "a builtin function expected a responsibility"
+);
 impl_data_try_into_type!(Closure, Closure, "a builtin function expected a closure");
 impl_data_try_into_type!(
     SendPort,
