@@ -46,15 +46,14 @@ impl Mir {
     pub fn lift_constants(&mut self) {
         let mut constants = vec![];
         let mut constant_ids = HashSet::new();
-        self.body
-            .visit(&mut |id, expression, visible, is_return_value| {
-                let is_constant = expression.is_pure()
-                    && expression
-                        .captured_ids()
-                        .iter()
-                        .all(|captured| constant_ids.contains(captured));
-                if is_constant {
-                    if is_return_value && let Expression::Reference(_) = expression {
+        self.body.visit(&mut |id, expression, _, is_return_value| {
+            let is_constant = expression.is_pure()
+                && expression
+                    .captured_ids()
+                    .iter()
+                    .all(|captured| constant_ids.contains(captured));
+            if is_constant {
+                if is_return_value && let Expression::Reference(_) = expression {
                         // Returned references shouldn't be lifted. For each of
                         // them, it's guaranteed that no later expression
                         // depends on it (because it's the last in the body) and
@@ -62,10 +61,10 @@ impl Mir {
                         // anyway.
                         return;
                     }
-                    constants.push((id, expression.clone()));
-                    constant_ids.insert(id);
-                }
-            });
+                constants.push((id, expression.clone()));
+                constant_ids.insert(id);
+            }
+        });
 
         self.body.visit_bodies(&mut |body| {
             Self::remove_constants(body, &constant_ids, &mut self.id_generator)

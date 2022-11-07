@@ -211,7 +211,7 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
     });
 
     return None;
-    let lir = tracing::span!(Level::DEBUG, "Lowering HIR to LIR").in_scope(|| {
+    let lir = tracing::span!(Level::DEBUG, "Lowering MIR to LIR").in_scope(|| {
         let lir = db.lir(module.clone(), MirConfig::default()).unwrap();
         if debug {
             module.dump_associated_debug_file("lir", &format!("{lir}"));

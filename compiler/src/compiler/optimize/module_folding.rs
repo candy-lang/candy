@@ -29,25 +29,14 @@
 
 use crate::{
     compiler::{
-        hir_to_mir::{HirToMir, MirConfig},
+        hir_to_mir::MirConfig,
         mir::{Expression, Id, Mir},
         optimize::OptimizeMir,
     },
-    database::Database,
-    module::{Module, UsePath},
+    module::UsePath,
 };
 use std::collections::HashMap;
-use tracing::{debug, warn};
-
-// self.panic(format!(
-//     "there's an import cycle ({})",
-//     self.import_stack
-//         .iter()
-//         .skip_while(|it| **it != module)
-//         .chain([&module])
-//         .map(|module| format!("{module}"))
-//         .join(" → "),
-// ));
+use tracing::warn;
 
 impl Mir {
     pub fn fold_modules(&mut self, db: &dyn OptimizeMir, config: &MirConfig) {

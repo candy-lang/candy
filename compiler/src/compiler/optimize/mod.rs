@@ -59,7 +59,7 @@ use super::{
     hir_to_mir::{HirToMir, MirConfig},
     mir::{Body, Expression, Mir},
 };
-use crate::{database::Database, module::Module, utils::IdGenerator};
+use crate::{module::Module, utils::IdGenerator};
 use std::sync::Arc;
 use tracing::debug;
 
@@ -129,11 +129,21 @@ impl Mir {
 }
 
 fn recover_from_cycle(
-    db: &dyn OptimizeMir,
-    cycle: &Vec<String>,
+    _db: &dyn OptimizeMir,
+    _cycle: &Vec<String>,
     module: &Module,
-    config: &MirConfig,
+    _config: &MirConfig,
 ) -> Option<Arc<Mir>> {
+    // self.panic(format!(
+    //     "there's an import cycle ({})",
+    //     self.import_stack
+    //         .iter()
+    //         .skip_while(|it| **it != module)
+    //         .chain([&module])
+    //         .map(|module| format!("{module}"))
+    //         .join(" → "),
+    // ));
+
     let mut id_generator = IdGenerator::start_at(0);
     let mut body = Body::new();
     let reason = body.push_with_new_id(
