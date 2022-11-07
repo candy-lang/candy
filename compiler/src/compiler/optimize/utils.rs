@@ -100,6 +100,8 @@ impl Expression {
                 }
             }
             Expression::Multiple(body) => body.collect_referenced_ids(referenced),
+            Expression::ModuleStarts { .. } => {}
+            Expression::ModuleEnds => {}
             Expression::TraceCallStarts {
                 hir_call,
                 function,
@@ -173,6 +175,8 @@ impl Expression {
             Expression::Panic { .. } => false,
             Expression::Error { .. } => false,
             Expression::Multiple(body) => body.iter().all(|(_, expr)| expr.is_pure()),
+            Expression::ModuleStarts { .. } => false,
+            Expression::ModuleEnds => false,
             Expression::TraceCallStarts { .. }
             | Expression::TraceCallEnds { .. }
             | Expression::TraceExpressionEvaluated { .. }
@@ -302,6 +306,8 @@ impl Expression {
                 }
                 replacer(responsible);
             }
+            Expression::ModuleStarts { module: _ } => {}
+            Expression::ModuleEnds => {}
             Expression::TraceCallEnds { return_value } => {
                 replacer(return_value);
             }

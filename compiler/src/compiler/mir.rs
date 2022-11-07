@@ -39,7 +39,6 @@ pub enum Expression {
         parameters: Vec<Id>,
         responsible_parameter: Id,
         body: Body,
-        fuzzable: bool,
     },
     /// This expression is never contained in an actual MIR body, but when
     /// dealing with expressions, its easier to not special-case IDs referring
@@ -73,6 +72,20 @@ pub enum Expression {
     /// TODO optimization.
     Multiple(Body),
 
+    /// Indicates that a module started.
+    /// 
+    /// Unlike the trace instructions below, this expression is not optional –
+    /// it needs to always be compiled into the MIR because the `ModuleStarts`
+    /// and `ModuleEnds` instructions directly influence the import stack of the
+    /// VM and thereby the behavior of the program. Depending on the order of
+    /// instructions being executed, an import may succeed or panic because of a
+    /// circular import.
+    /// 
+    /// If there's no `use` between the `ModuleStarts` and `ModuleEnds`
+    /// expressions, they can be optimized away.
+    ModuleStarts { module: Module },
+    ModuleEnds,
+    
     TraceCallStarts {
         hir_call: Id,
         function: Id,
@@ -283,6 +296,8 @@ impl hash::Hash for Expression {
             }
             Expression::Error { errors, .. } => errors.hash(state),
             Expression::Multiple(body) => body.hash(state),
+            Expression::ModuleStarts { module } => module.hash(state),
+            Expression::ModuleEnds => {},
             Expression::TraceCallStarts { hir_call, function, arguments, responsible } => {
                 hir_call.hash(state);
                 function.hash(state);
@@ -389,6 +404,8 @@ impl fmt::Debug for Expression {
                     .map(|line| format!("  {line}"))
                     .join("\n"),
             ),
+            Expression::ModuleStarts { module } => write!(f, "module {module} starts"),
+            Expression::ModuleEnds => write!(f, "module ends"),
             Expression::TraceCallStarts { hir_call, function, arguments, responsible } => write!(f, "trace: start of call of {function} with {} ({responsible} is responsible, code is at {hir_call})", arguments.iter().map(|arg| format!("{arg}")).join(" ")),
             Expression::TraceCallEnds { return_value } => write!(f, "trace: end of call with return value {return_value}"),
             Expression::TraceExpressionEvaluated { hir_expression, value  } => write!(f, "trace: expression {hir_expression} evaluated to {value}"),
