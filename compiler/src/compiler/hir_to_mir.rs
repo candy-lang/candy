@@ -4,7 +4,11 @@ use super::{
     hir,
     mir::{Body, Expression, Id, Mir},
 };
-use crate::{module::Module, utils::IdGenerator};
+use crate::{
+    builtin_functions::BuiltinFunction,
+    module::{Module, ModuleKind, Package},
+    utils::IdGenerator,
+};
 use itertools::Itertools;
 use std::{collections::HashMap, sync::Arc};
 
@@ -32,16 +36,19 @@ fn compile_module(module: Module, hir: hir::Body, config: &MirConfig) -> Mir {
     let mut body = Body::new();
     let mut mapping = HashMap::<hir::Id, Id>::new();
 
-    let module_responsibility = {
-        let id = id_generator.generate();
-        body.push(id, Expression::Responsibility(hir::Id::new(module, vec![])));
-        id
-    };
+    let needs_function = generate_needs_function(&mut id_generator);
+    let needs_function = body.push_with_new_id(&mut id_generator, needs_function);
+
+    let module_responsibility = body.push_with_new_id(
+        &mut id_generator,
+        Expression::Responsibility(hir::Id::new(module, vec![])),
+    );
     for (id, expression) in hir.expressions {
         compile_expression(
             &mut id_generator,
             &mut body,
             &mut mapping,
+            needs_function,
             module_responsibility,
             &id,
             expression,
@@ -52,10 +59,197 @@ fn compile_module(module: Module, hir: hir::Body, config: &MirConfig) -> Mir {
     Mir { id_generator, body }
 }
 
+/// In the MIR, there's no longer the concept of needs. Instead, responsibilites
+/// are first-class objects and there's a `panic` expression that takes a
+/// responsibility.
+///
+/// This function generates the `needs` function. Unlike regular functions, it
+/// also expects a responsibility as a normal parameter.
+///
+/// Here's a high-level pseudocode of the generated needs function:
+///
+/// ```pseudocode
+/// needs = { condition reason responsibleForCondition (responsibleForCall) ->
+///   isConditionBool = builtinIfElse
+///     (builtinEquals condition True)
+///     { True }
+///     { builtinEquals condition False }
+///   builtinIfElse isConditionBool { Nothing } {
+///     panic "The condition must be either `True` or `False`." responsibleForCall
+///   }
+///
+///   builtinIfElse (builtinEquals (builtinTypeOf reason) Text) { Nothing} {
+///     panic "The `reason` must be a text." responsibleForCall
+///   }
+///
+///   builtinIfElse condition { Nothing } { panic reason responsibleForCondition }
+/// }
+/// ```
+fn generate_needs_function(id_generator: &mut IdGenerator<Id>) -> Expression {
+    Expression::build_lambda(id_generator, |body, responsible_for_call| {
+        let condition = body.new_parameter();
+        let reason = body.new_parameter();
+        let responsible_for_condition = body.new_parameter();
+
+        // Common stuff.
+        let needs_code = body.push(Expression::Responsibility(hir::Id::new(
+            Module {
+                package: Package::Anonymous {
+                    url: "$generated".to_string(),
+                },
+                path: vec![],
+                kind: ModuleKind::Code,
+            },
+            vec!["needs".to_string()],
+        )));
+        let builtin_equals = body.push(Expression::Builtin(BuiltinFunction::Equals));
+        let builtin_if_else = body.push(Expression::Builtin(BuiltinFunction::IfElse));
+        let nothing_symbol = body.push(Expression::Symbol("Nothing".to_string()));
+        let lambda_returning_nothing = body.push_lambda(|body, _| {
+            body.push(Expression::Reference(nothing_symbol));
+        });
+
+        // Make sure the condition is a bool.
+        let true_symbol = body.push(Expression::Symbol("True".to_string()));
+        let false_symbol = body.push(Expression::Symbol("False".to_string()));
+        let is_condition_true = body.push(Expression::Call {
+            function: builtin_equals,
+            arguments: vec![condition, true_symbol],
+            responsible: needs_code,
+        });
+        let is_condition_false = body.push(Expression::Call {
+            function: builtin_equals,
+            arguments: vec![condition, false_symbol],
+            responsible: needs_code,
+        });
+        let lambda_returning_true = body.push_lambda(|body, _| {
+            body.push(Expression::Reference(true_symbol));
+        });
+        let lambda_returning_whether_condition_is_false = body.push_lambda(|body, _| {
+            body.push(Expression::Reference(is_condition_false));
+        });
+        let is_condition_bool = body.push_lambda(|body, _| {
+            body.push(Expression::Call {
+                function: builtin_if_else,
+                arguments: vec![
+                    is_condition_true,
+                    lambda_returning_true,
+                    lambda_returning_whether_condition_is_false,
+                ],
+                responsible: needs_code,
+            });
+        });
+        let on_invalid_condition = body.push_lambda(|body, _| {
+            let panic_reason = body.push(Expression::Text(
+                "The `condition` must be either `True` or `False`.".to_string(),
+            ));
+            body.push(Expression::Panic {
+                reason: panic_reason,
+                responsible: responsible_for_call,
+            });
+        });
+        body.push(Expression::Call {
+            function: builtin_if_else,
+            arguments: vec![
+                is_condition_bool,
+                lambda_returning_nothing,
+                on_invalid_condition,
+            ],
+            responsible: needs_code,
+        });
+
+        // Make sure the reason is a text.
+        let builtin_type_of = body.push(Expression::Builtin(BuiltinFunction::TypeOf));
+        let type_of_reason = body.push(Expression::Call {
+            function: builtin_type_of,
+            arguments: vec![reason],
+            responsible: responsible_for_call,
+        });
+        let text_symbol = body.push(Expression::Symbol("Text".to_string()));
+        let is_reason_text = body.push(Expression::Call {
+            function: builtin_equals,
+            arguments: vec![type_of_reason, text_symbol],
+            responsible: responsible_for_call,
+        });
+        let on_invalid_reason = body.push_lambda(|body, _| {
+            let panic_reason =
+                body.push(Expression::Text("The `reason` must be a text.".to_string()));
+            body.push(Expression::Panic {
+                reason: panic_reason,
+                responsible: responsible_for_call,
+            });
+        });
+        body.push(Expression::Call {
+            function: builtin_if_else,
+            arguments: vec![is_reason_text, lambda_returning_nothing, on_invalid_reason],
+            responsible: needs_code,
+        });
+
+        // The core logic of the needs.
+        let panic_lambda = body.push_lambda(|body, _| {
+            body.push(Expression::Panic {
+                reason,
+                responsible: responsible_for_condition,
+            });
+        });
+        body.push(Expression::Call {
+            function: builtin_if_else,
+            arguments: vec![condition, lambda_returning_nothing, panic_lambda],
+            responsible: needs_code,
+        });
+    })
+}
+
+impl Expression {
+    fn build_lambda<F>(id_generator: &mut IdGenerator<Id>, function: F) -> Self
+    where
+        F: Fn(&mut LambdaBuilder, Id), // takes the builder and the responsible parameter
+    {
+        let responsible_parameter = id_generator.generate();
+
+        let mut builder = LambdaBuilder {
+            id_generator,
+            body: Body::new(),
+            parameters: vec![],
+        };
+        function(&mut builder, responsible_parameter);
+
+        Expression::Lambda {
+            parameters: builder.parameters,
+            responsible_parameter,
+            body: builder.body,
+            fuzzable: false,
+        }
+    }
+}
+struct LambdaBuilder<'a> {
+    id_generator: &'a mut IdGenerator<Id>,
+    parameters: Vec<Id>,
+    body: Body,
+}
+impl<'a> LambdaBuilder<'a> {
+    fn new_parameter(&mut self) -> Id {
+        let id = self.id_generator.generate();
+        self.parameters.push(id);
+        id
+    }
+    fn push(&mut self, expression: Expression) -> Id {
+        self.body.push_with_new_id(self.id_generator, expression)
+    }
+    fn push_lambda<F>(&mut self, function: F) -> Id
+    where
+        F: Fn(&mut LambdaBuilder, Id),
+    {
+        let lambda = Expression::build_lambda(&mut self.id_generator, function);
+        self.push(lambda)
+    }
+}
+
 fn compile_expression(
     id_generator: &mut IdGenerator<Id>,
     body: &mut Body,
     mapping: &mut HashMap<hir::Id, Id>,
+    needs_function: Id,
     responsible_for_needs: Id,
     hir_id: &hir::Id,
     expression: hir::Expression,
@@ -101,6 +295,7 @@ fn compile_expression(
                     id_generator,
                     &mut lambda_body,
                     mapping,
+                    needs_function,
                     responsible,
                     &id,
                     expression,
@@ -186,11 +381,10 @@ fn compile_expression(
         hir::Expression::Needs { condition, reason } => {
             let responsible =
                 body.push_with_new_id(id_generator, Expression::Responsibility(hir_id.clone()));
-            Expression::Needs {
-                condition: mapping[&condition],
-                reason: mapping[&reason],
+            Expression::Call {
+                function: needs_function,
+                arguments: vec![mapping[&condition], mapping[&reason], responsible_for_needs],
                 responsible,
-                responsible_for_condition: responsible_for_needs,
             }
         }
         hir::Expression::Error { child, errors } => Expression::Error {

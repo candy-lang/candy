@@ -58,24 +58,6 @@ impl Mir {
                         *expression = evaluated_call;
                     }
                 }
-                Expression::Needs {
-                    condition,
-                    reason,
-                    responsible,
-                    responsible_for_condition,
-                } => {
-                    if let Expression::Symbol(symbol) = visible.get(*condition) {
-                        let result = match symbol.as_str() {
-                            "True" => Expression::Symbol("Nothing".to_string()),
-                            "False" => Expression::Panic {
-                                reason: *reason,
-                                responsible: *responsible_for_condition,
-                            },
-                            _ => return,
-                        };
-                        *expression = result;
-                    }
-                }
                 Expression::Error { child, errors } => {
                     // TODO (before merging PR): Remove and replace with a
                     // panic.

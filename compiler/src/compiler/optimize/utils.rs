@@ -87,17 +87,6 @@ impl Expression {
                 referenced.insert(*relative_path);
                 referenced.insert(*responsible);
             }
-            Expression::Needs {
-                condition,
-                reason,
-                responsible,
-                responsible_for_condition,
-            } => {
-                referenced.insert(*condition);
-                referenced.insert(*reason);
-                referenced.insert(*responsible);
-                referenced.insert(*responsible_for_condition);
-            }
             Expression::Panic {
                 reason,
                 responsible,
@@ -181,7 +170,6 @@ impl Expression {
             Expression::Responsibility(_) => true,
             Expression::Call { .. } => false,
             Expression::UseModule { .. } => false,
-            Expression::Needs { .. } => false,
             Expression::Panic { .. } => false,
             Expression::Error { .. } => false,
             Expression::Multiple(body) => body.iter().all(|(_, expr)| expr.is_pure()),
@@ -288,17 +276,6 @@ impl Expression {
             } => {
                 replacer(relative_path);
                 replacer(responsible);
-            }
-            Expression::Needs {
-                condition,
-                reason,
-                responsible,
-                responsible_for_condition,
-            } => {
-                replacer(condition);
-                replacer(reason);
-                replacer(responsible);
-                replacer(responsible_for_condition);
             }
             Expression::Panic {
                 reason,
