@@ -218,7 +218,6 @@ impl Expression {
             parameters: builder.parameters,
             responsible_parameter,
             body: builder.body,
-            fuzzable: false,
         }
     }
 }
@@ -309,7 +308,6 @@ fn compile_expression(
                     parameters,
                     responsible_parameter,
                     body: lambda_body,
-                    fuzzable,
                 },
             );
             if config.register_fuzzables && fuzzable {

@@ -341,18 +341,12 @@ impl fmt::Debug for Expression {
                 parameters,
                 responsible_parameter,
                 body,
-                fuzzable,
             } => write!(f,
-                "{{ {} (+ responsible {responsible_parameter}) -> ({})\n{}\n}}",
+                "{{ {} (+ responsible {responsible_parameter}) ->\n{}\n}}",
                 parameters
                     .iter()
                     .map(|parameter| format!("{parameter}"))
                     .join(" "),
-                if *fuzzable {
-                    "fuzzable"
-                } else {
-                    "non-fuzzable"
-                },
                 format!("{body}")
                     .lines()
                     .map(|line| format!("  {line}"))

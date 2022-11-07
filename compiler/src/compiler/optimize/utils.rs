@@ -249,7 +249,6 @@ impl Expression {
                 parameters,
                 responsible_parameter,
                 body,
-                fuzzable: _,
             } => {
                 for parameter in parameters {
                     replacer(parameter);
@@ -340,7 +339,6 @@ impl Expression {
                 parameters,
                 responsible_parameter,
                 body,
-                fuzzable: _,
             } => {
                 for parameter in parameters {
                     replacer(parameter);
@@ -393,7 +391,6 @@ impl Mir {
                 parameters,
                 responsible_parameter,
                 body,
-                fuzzable: _,
             } = expression
             {
                 let mut inner_visible = visible.clone();

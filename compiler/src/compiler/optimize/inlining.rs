@@ -61,7 +61,6 @@ impl Expression {
             parameters,
             responsible_parameter,
             body,
-            fuzzable: _,
         } = visible.get(*function) else {
             return Err("Tried to inline, but the call's receiver is not a lambda.");
         };
