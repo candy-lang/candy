@@ -111,7 +111,7 @@ impl Fiber {
             captured: vec![],
             num_args: 0,
             body: vec![
-                Instruction::CreateResponsibility { id },
+                Instruction::CreateHirId(id),
                 Instruction::TraceCallStarts {
                     num_args: arguments.len(),
                 },
@@ -341,7 +341,7 @@ impl Fiber {
                 let address = self.heap.create_struct(entries);
                 self.data_stack.push(address);
             }
-            Instruction::CreateResponsibility { id } => {
+            Instruction::CreateHirId(id) => {
                 todo!()
             }
             Instruction::CreateClosure {
@@ -389,7 +389,7 @@ impl Fiber {
                 let closure_address = self.data_stack.pop().unwrap();
 
                 args.reverse();
-                let responsible = self.heap.get_responsibility(responsible);
+                let responsible = self.heap.get_hir_id(responsible);
 
                 let object = self.heap.get(closure_address);
                 match object.data.clone() {
@@ -443,7 +443,7 @@ impl Fiber {
                 let responsible = self.data_stack.pop().unwrap();
                 let relative_path = self.data_stack.pop().unwrap();
 
-                let responsible = self.heap.get_responsibility(responsible);
+                let responsible = self.heap.get_hir_id(responsible);
 
                 match self.use_module(use_provider, current_module, relative_path) {
                     Ok(()) => {}
@@ -457,7 +457,7 @@ impl Fiber {
             //     let reason = self.data_stack.pop().unwrap();
             //     let condition = self.data_stack.pop().unwrap();
 
-            //     let responsible = self.heap.get_responsibility(reason);
+            //     let responsible = self.heap.get_hir_id(reason);
             //     let reason = match self.heap.get(reason).data.clone() {
             //         Data::Text(reason) => reason.value,
             //         _ => {
@@ -518,7 +518,7 @@ impl Fiber {
                 let code_reference = self.data_stack.pop().unwrap();
 
                 args.reverse();
-                let responsible = self.heap.get_responsibility(responsible);
+                let responsible = self.heap.get_hir_id(responsible);
 
                 tracer.call_started(todo!(), todo!(), args, &self.heap);
             }

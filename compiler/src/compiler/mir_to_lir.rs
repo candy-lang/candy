@@ -23,7 +23,7 @@ fn lir(db: &dyn MirToLir, module: Module, config: MirConfig) -> Option<Arc<Lir>>
 
 fn compile_lambda(
     captured: &[Id],
-    parameters: &[Id], // including responsibility parameter
+    parameters: &[Id], // including responsible HIR ID parameter
     body: &Body,
 ) -> Vec<Instruction> {
     let mut context = LoweringContext::default();
@@ -78,13 +78,8 @@ impl LoweringContext {
                     },
                 );
             }
-            Expression::Responsibility(responsibility) => {
-                self.emit(
-                    id,
-                    Instruction::CreateResponsibility {
-                        id: responsibility.clone(),
-                    },
-                );
+            Expression::HirId(hir_id) => {
+                self.emit(id, Instruction::CreateHirId(hir_id.clone()));
             }
             Expression::Lambda {
                 parameters,
@@ -198,6 +193,7 @@ impl LoweringContext {
             } => {
                 self.emit_push_from_stack(*hir_expression);
                 self.emit_push_from_stack(*value);
+                self.emit(id, Instruction::TraceExpressionEvaluated);
             }
             Expression::TraceFoundFuzzableClosure {
                 hir_definition,

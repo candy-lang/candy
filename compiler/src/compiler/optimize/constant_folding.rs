@@ -150,9 +150,9 @@ impl Mir {
                     let value = fields
                         .iter()
                         .find(|(k, _)| k.semantically_equals(key_id, visible).unwrap_or(false))
-                        .map(|(_, value)| value.clone());
+                        .map(|(_, value)| *value);
                     if let Some(value) = value {
-                        Expression::Reference(value.clone())
+                        Expression::Reference(value)
                     } else {
                         return Some(Err(format!(
                             "Struct access will panic because key {key_id} isn't in there."

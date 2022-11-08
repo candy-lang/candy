@@ -30,11 +30,12 @@ pub enum Expression {
     Builtin(BuiltinFunction),
     Struct(Vec<(Id, Id)>),
     Reference(Id),
+    /// A reference to code in the HIR.
+    HirId(hir::Id),
     /// In the MIR, responsibilities are explicitly tracked. All lambdas take a
-    /// responsibility as an extra parameter. Based on whether the function is
-    /// fuzzable or not, this parameter may be used to dynamically determine
+    /// responsible HIR ID as an extra parameter. Based on whether the function
+    /// is fuzzable or not, this parameter may be used to dynamically determine
     /// who's at fault if some `needs` is not fulfilled.
-    Responsibility(hir::Id),
     Lambda {
         parameters: Vec<Id>,
         responsible_parameter: Id,
@@ -68,8 +69,11 @@ pub enum Expression {
         errors: Vec<CompilerError>,
     },
     /// For convenience when writing optimization passes, this expression allows
-    /// storing multiple inner expressions. It's quickly expanded using the
-    /// TODO optimization.
+    /// storing multiple inner expressions in a single expression. The expansion
+    /// back into multiple expressions happens in the [multiple flattening]
+    /// optimization.
+    /// 
+    /// [multiple flattening]: super::optimize::multiple_flattening
     Multiple(Body),
 
     /// Indicates that a module started.
@@ -78,14 +82,14 @@ pub enum Expression {
     /// it needs to always be compiled into the MIR because the `ModuleStarts`
     /// and `ModuleEnds` instructions directly influence the import stack of the
     /// VM and thereby the behavior of the program. Depending on the order of
-    /// instructions being executed, an import may succeed or panic because of a
-    /// circular import.
+    /// instructions being executed, an import may succeed, or panic because of
+    /// a circular import.
     /// 
     /// If there's no `use` between the `ModuleStarts` and `ModuleEnds`
     /// expressions, they can be optimized away.
     ModuleStarts { module: Module },
     ModuleEnds,
-    
+
     TraceCallStarts {
         hir_call: Id,
         function: Id,
@@ -266,7 +270,7 @@ impl hash::Hash for Expression {
             Expression::Builtin(builtin) => builtin.hash(state),
             Expression::Struct(struct_) => struct_.len().hash(state),
             Expression::Reference(id) => id.hash(state),
-            Expression::Responsibility(id) => id.hash(state),
+            Expression::HirId(id) => id.hash(state),
             Expression::Lambda { body, .. } => body.hash(state),
             Expression::Parameter => {}
             Expression::Call {
@@ -342,8 +346,6 @@ impl fmt::Debug for Expression {
             Expression::Text(text) => write!(f, "{text:?}"),
             Expression::Symbol(symbol) => write!(f, "{symbol}"),
             Expression::Builtin(builtin) => write!(f, "builtin{builtin:?}"),
-            Expression::Reference(id) => write!(f, "{id}"),
-            Expression::Responsibility(id) => write!(f, "{id}"),
             Expression::Struct(fields) => write!(f, 
                 "[{}]",
                 fields
@@ -351,7 +353,8 @@ impl fmt::Debug for Expression {
                     .map(|(key, value)| format!("{key}: {value}"))
                     .join(", "),
             ),
-            Expression::Responsibility(responsibility) => write!(f, "{responsibility}"),
+            Expression::Reference(id) => write!(f, "{id}"),
+            Expression::HirId(id) => write!(f, "{id}"),
             Expression::Lambda {
                 parameters,
                 responsible_parameter,

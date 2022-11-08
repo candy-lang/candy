@@ -2,10 +2,7 @@ mod object;
 mod pointer;
 
 pub use self::{
-    object::{
-        Builtin, Closure, Data, Int, Object, ReceivePort, Responsibility, SendPort, Struct, Symbol,
-        Text,
-    },
+    object::{Builtin, Closure, Data, Int, Object, ReceivePort, SendPort, Struct, Symbol, Text},
     pointer::Pointer,
 };
 use super::ids::ChannelId;
@@ -80,9 +77,8 @@ impl Heap {
             .get_mut(&address)
             .unwrap_or_else(|| panic!("Couldn't get object {address}."))
     }
-    pub fn get_responsibility(&self, address: Pointer) -> Id {
-        let responsibility: Responsibility = self.get(address).data.clone().try_into().unwrap();
-        responsibility.id
+    pub fn get_hir_id(&self, address: Pointer) -> Id {
+        self.get(address).data.clone().try_into().unwrap()
     }
 
     pub fn dup(&mut self, address: Pointer) {
@@ -197,7 +193,7 @@ impl Heap {
                     .map(|(hash, key, value)| (*hash, address_map[key], address_map[value]))
                     .collect(),
             }),
-            Data::Responsibility(responsibility) => Data::Responsibility(responsibility.clone()),
+            Data::HirId(id) => Data::HirId(id.clone()),
             Data::Closure(closure) => Data::Closure(Closure {
                 captured: closure
                     .captured

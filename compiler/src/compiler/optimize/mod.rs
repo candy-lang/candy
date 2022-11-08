@@ -152,7 +152,7 @@ fn recover_from_cycle(
     );
     let responsible = body.push_with_new_id(
         &mut id_generator,
-        Expression::Responsibility(hir::Id::new(module.clone(), vec![])),
+        Expression::HirId(hir::Id::new(module.clone(), vec![])),
     );
     body.push_with_new_id(
         &mut id_generator,

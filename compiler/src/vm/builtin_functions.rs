@@ -2,9 +2,7 @@ use super::{
     channel::{Capacity, Packet},
     context::PanickingUseProvider,
     fiber::{Fiber, Status},
-    heap::{
-        Closure, Data, Int, Pointer, ReceivePort, Responsibility, SendPort, Struct, Symbol, Text,
-    },
+    heap::{Closure, Data, Int, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
     ids::ChannelId,
     tracer::{dummy::DummyTracer, Tracer},
     FiberId, Heap,
@@ -424,7 +422,7 @@ impl Heap {
                 Data::Text(_) => "Text",
                 Data::Symbol(_) => "Symbol",
                 Data::Struct(_) => "Struct",
-                Data::Responsibility(_) => unreachable!(),
+                Data::HirId(_) => unreachable!(),
                 Data::Closure(_) => "Function",
                 Data::Builtin(_) => "Builtin",
                 Data::SendPort(_) => "SendPort",
@@ -492,11 +490,7 @@ impl_data_try_into_type!(Int, Int, "a builtin function expected an int");
 impl_data_try_into_type!(Text, Text, "a builtin function expected a text");
 impl_data_try_into_type!(Symbol, Symbol, "a builtin function expected a symbol");
 impl_data_try_into_type!(Struct, Struct, "a builtin function expected a struct");
-impl_data_try_into_type!(
-    Responsibility,
-    Responsibility,
-    "a builtin function expected a responsibility"
-);
+impl_data_try_into_type!(Id, HirId, "a builtin function expected a HIR ID");
 impl_data_try_into_type!(Closure, Closure, "a builtin function expected a closure");
 impl_data_try_into_type!(
     SendPort,

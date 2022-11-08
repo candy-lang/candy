@@ -29,10 +29,8 @@ pub enum Instruction {
         num_fields: usize,
     },
 
-    /// Pushes a responsibility.
-    CreateResponsibility {
-        id: hir::Id,
-    },
+    /// Pushes a HIR ID.
+    CreateHirId(hir::Id),
 
     /// Pushes a closure.
     ///
@@ -73,7 +71,7 @@ pub enum Instruction {
     /// instruction pointer to continue where the current function was called.
     Return,
 
-    /// Pops a string path and responsibility and then resolves the path
+    /// Pops a string path and responsilbe HIR ID and then resolves the path
     /// relative to the current module. Then does different things depending on
     /// whether this is a code or asset module.
     ///
@@ -136,7 +134,7 @@ impl Instruction {
                 stack.pop_multiple(2 * num_fields); // fields
                 stack.push(result);
             }
-            Instruction::CreateResponsibility { .. } => {
+            Instruction::CreateHirId { .. } => {
                 stack.push(result);
             }
             Instruction::CreateClosure { .. } => {
@@ -217,7 +215,7 @@ impl Display for Instruction {
             } => {
                 write!(f, "createStruct {num_entries}")
             }
-            Instruction::CreateResponsibility { id } => write!(f, "createResponsibility {id}"),
+            Instruction::CreateHirId(id) => write!(f, "createHirId {id}"),
             Instruction::CreateClosure {
                 captured,
                 num_args,

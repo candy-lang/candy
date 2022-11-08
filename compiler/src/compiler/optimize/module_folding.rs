@@ -51,7 +51,7 @@ impl Mir {
                 // warn!("use called with non-constant text");
                 return; // TODO
             };
-            let Ok(path) = UsePath::parse(&path) else {
+            let Ok(path) = UsePath::parse(path) else {
                 warn!("use called with an invalid path");
                 return; // TODO
             };

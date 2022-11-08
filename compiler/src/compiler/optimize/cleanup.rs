@@ -19,7 +19,7 @@ impl Mir {
                 self.body.sort_by(|(_, a), (_, b)| {
                     fn order_score(expr: &Expression) -> u8 {
                         match expr {
-                            Expression::Responsibility(_) => 0,
+                            Expression::HirId(_) => 0,
                             Expression::Builtin(_) => 1,
                             Expression::Symbol(_) => 2,
                             Expression::Int(_) => 3,
@@ -28,16 +28,16 @@ impl Mir {
                         }
                     }
                     match (a, b) {
-                        (Expression::Responsibility(a), Expression::Responsibility(b)) => {
+                        (Expression::HirId(a), Expression::HirId(b)) => {
                             format!("{a}").cmp(&format!("{b}"))
                         }
                         (Expression::Builtin(a), Expression::Builtin(b)) => {
                             format!("{a:?}").cmp(&format!("{b:?}"))
                         }
-                        (Expression::Symbol(a), Expression::Symbol(b)) => a.cmp(&b),
-                        (Expression::Int(a), Expression::Int(b)) => a.cmp(&b),
-                        (Expression::Text(a), Expression::Text(b)) => a.cmp(&b),
-                        _ => order_score(&a).cmp(&order_score(&b)),
+                        (Expression::Symbol(a), Expression::Symbol(b)) => a.cmp(b),
+                        (Expression::Int(a), Expression::Int(b)) => a.cmp(b),
+                        (Expression::Text(a), Expression::Text(b)) => a.cmp(b),
+                        _ => order_score(a).cmp(&order_score(b)),
                     }
                 });
             }

@@ -58,7 +58,7 @@ impl Expression {
             | Expression::Text(_)
             | Expression::Symbol(_)
             | Expression::Builtin(_)
-            | Expression::Responsibility(_) => {}
+            | Expression::HirId(_) => {}
             Expression::Struct(fields) => {
                 for (key, value) in fields {
                     referenced.insert(*key);
@@ -169,7 +169,7 @@ impl Expression {
             Expression::Lambda { .. } => true,
             Expression::Parameter => false,
             Expression::Builtin(_) => true,
-            Expression::Responsibility(_) => true,
+            Expression::HirId(_) => true,
             Expression::Call { .. } => false,
             Expression::UseModule { .. } => false,
             Expression::Panic { .. } => false,
@@ -235,13 +235,13 @@ impl Expression {
             | Expression::Text(_)
             | Expression::Symbol(_)
             | Expression::Builtin(_)
-            | Expression::Responsibility(_) => {}
+            | Expression::HirId(_) => {}
             Expression::Struct(fields) => {
                 *fields = fields
                     .iter()
                     .map(|(key, value)| {
-                        let mut key = key.clone();
-                        let mut value = value.clone();
+                        let mut key = *key;
+                        let mut value = *value;
                         replacer(&mut key);
                         replacer(&mut value);
                         (key, value)
@@ -402,10 +402,10 @@ impl Mir {
                 let mut inner_visible = visible.clone();
                 inner_visible.extend(parameters.iter().copied());
                 inner_visible.insert(*responsible_parameter);
-                self.validate_body(&body, defined_ids, inner_visible);
+                self.validate_body(body, defined_ids, inner_visible);
             }
             if let Expression::Multiple(body) = expression {
-                self.validate_body(&body, defined_ids, visible.clone());
+                self.validate_body(body, defined_ids, visible.clone());
             }
 
             if defined_ids.contains(&id) {

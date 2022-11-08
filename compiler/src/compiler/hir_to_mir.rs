@@ -39,9 +39,9 @@ fn compile_module(module: Module, hir: hir::Body, config: &MirConfig) -> Mir {
     let needs_function = generate_needs_function(&mut id_generator);
     let needs_function = body.push_with_new_id(&mut id_generator, needs_function);
 
-    let module_responsibility = body.push_with_new_id(
+    let module_hir_id = body.push_with_new_id(
         &mut id_generator,
-        Expression::Responsibility(hir::Id::new(module, vec![])),
+        Expression::HirId(hir::Id::new(module, vec![])),
     );
     for (id, expression) in hir.expressions {
         compile_expression(
@@ -49,7 +49,7 @@ fn compile_module(module: Module, hir: hir::Body, config: &MirConfig) -> Mir {
             &mut body,
             &mut mapping,
             needs_function,
-            module_responsibility,
+            module_hir_id,
             &id,
             expression,
             config,
@@ -59,14 +59,14 @@ fn compile_module(module: Module, hir: hir::Body, config: &MirConfig) -> Mir {
     Mir { id_generator, body }
 }
 
-/// In the MIR, there's no longer the concept of needs. Instead, responsibilites
-/// are first-class objects and there's a `panic` expression that takes a
-/// responsibility.
+/// In the MIR, there's no longer the concept of needs. Instead, HIR IDs are
+/// first-class expressions and there's a `panic` expression that takes a HIR
+/// ID that's responsible.
 ///
 /// This function generates the `needs` function. Unlike regular functions, it
-/// also expects a responsibility as a normal parameter.
+/// also expects a HIR ID as a normal parameter.
 ///
-/// Here's a high-level pseudocode of the generated needs function:
+/// Here's a high-level pseudocode of the generated `needs` function:
 ///
 /// ```pseudocode
 /// needs = { condition reason responsibleForCondition (responsibleForCall) ->
@@ -92,7 +92,7 @@ fn generate_needs_function(id_generator: &mut IdGenerator<Id>) -> Expression {
         let responsible_for_condition = body.new_parameter();
 
         // Common stuff.
-        let needs_code = body.push(Expression::Responsibility(hir::Id::new(
+        let needs_code = body.push(Expression::HirId(hir::Id::new(
             Module {
                 package: Package::Anonymous {
                     url: "$generated".to_string(),
@@ -239,7 +239,7 @@ impl<'a> LambdaBuilder<'a> {
     where
         F: Fn(&mut LambdaBuilder, Id),
     {
-        let lambda = Expression::build_lambda(&mut self.id_generator, function);
+        let lambda = Expression::build_lambda(self.id_generator, function);
         self.push(lambda)
     }
 }
@@ -312,7 +312,7 @@ fn compile_expression(
             );
             if config.register_fuzzables && fuzzable {
                 let hir_definition =
-                    body.push_with_new_id(id_generator, Expression::Responsibility(hir_id.clone()));
+                    body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
                 body.push_with_new_id(
                     id_generator,
                     Expression::TraceFoundFuzzableClosure {
@@ -329,7 +329,7 @@ fn compile_expression(
             arguments,
         } => {
             let responsible =
-                body.push_with_new_id(id_generator, Expression::Responsibility(hir_id.clone()));
+                body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
             let arguments = arguments
                 .iter()
                 .map(|argument| mapping[argument])
@@ -337,7 +337,7 @@ fn compile_expression(
 
             if config.trace_calls {
                 let hir_call =
-                    body.push_with_new_id(id_generator, Expression::Responsibility(hir_id.clone()));
+                    body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
                 body.push_with_new_id(
                     id_generator,
                     Expression::TraceCallStarts {
@@ -378,7 +378,7 @@ fn compile_expression(
         },
         hir::Expression::Needs { condition, reason } => {
             let responsible =
-                body.push_with_new_id(id_generator, Expression::Responsibility(hir_id.clone()));
+                body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
             Expression::Call {
                 function: needs_function,
                 arguments: vec![mapping[&condition], mapping[&reason], responsible_for_needs],
@@ -395,8 +395,7 @@ fn compile_expression(
     mapping.insert(hir_id.clone(), id);
 
     if config.trace_evaluated_expressions {
-        let hir_expression =
-            body.push_with_new_id(id_generator, Expression::Responsibility(hir_id.clone()));
+        let hir_expression = body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
         body.push_with_new_id(
             id_generator,
             Expression::TraceExpressionEvaluated {

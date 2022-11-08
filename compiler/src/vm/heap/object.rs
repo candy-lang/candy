@@ -30,7 +30,7 @@ pub enum Data {
     Text(Text),
     Symbol(Symbol),
     Struct(Struct),
-    Responsibility(Responsibility),
+    HirId(Id),
     Closure(Closure),
     Builtin(Builtin),
     SendPort(SendPort),
@@ -56,11 +56,6 @@ pub struct Symbol {
 #[derive(Default, Clone)]
 pub struct Struct {
     pub fields: Vec<(u64, Pointer, Pointer)>, // list of hash, key, and value
-}
-
-#[derive(Clone, Hash, Debug)]
-pub struct Responsibility {
-    pub id: Id,
 }
 
 #[derive(Clone)]
@@ -152,9 +147,7 @@ impl Closure {
                     num_args: 0,
                     body: lir.instructions,
                 },
-                Instruction::CreateResponsibility {
-                    id: Id::new(module, vec![]),
-                },
+                Instruction::CreateHirId(Id::new(module, vec![])),
                 Instruction::Call { num_args: 0 },
                 Instruction::ModuleEnds,
                 Instruction::Return,
@@ -207,7 +200,7 @@ impl Data {
                 }
                 s.hash(state)
             }
-            Data::Responsibility(responsibility) => responsibility.hash(state),
+            Data::HirId(id) => id.hash(state),
             Data::Closure(closure) => {
                 for captured in &closure.captured {
                     captured.hash_with_state(heap, state);
@@ -227,7 +220,7 @@ impl Data {
             (Data::Text(a), Data::Text(b)) => a.value == b.value,
             (Data::Symbol(a), Data::Symbol(b)) => a.value == b.value,
             (Data::Struct(a), Data::Struct(b)) => a.equals(heap, b),
-            (Data::Responsibility(a), Data::Responsibility(b)) => a.id == b.id,
+            (Data::HirId(a), Data::HirId(b)) => a == b,
             (Data::Closure(_), Data::Closure(_)) => false,
             (Data::Builtin(a), Data::Builtin(b)) => a.function == b.function,
             (Data::SendPort(a), Data::SendPort(b)) => a.channel == b.channel,
@@ -250,7 +243,7 @@ impl Data {
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
             ),
-            Data::Responsibility(id) => format!("{id:?}"),
+            Data::HirId(id) => format!("{id:?}"),
             Data::Closure(_) => "{…}".to_string(),
             Data::Builtin(builtin) => format!("builtin{:?}", builtin.function),
             Data::SendPort(port) => format!("sendPort {:?}", port.channel),
@@ -264,7 +257,7 @@ impl Data {
             | Data::Text(_)
             | Data::Symbol(_)
             | Data::Builtin(_)
-            | Data::Responsibility(_)
+            | Data::HirId(_)
             | Data::SendPort(_)
             | Data::ReceivePort(_) => vec![],
             Data::Struct(struct_) => struct_
