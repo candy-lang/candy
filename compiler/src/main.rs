@@ -111,12 +111,13 @@ enum Exit {
 }
 
 fn build(options: CandyBuildOptions) -> ProgramResult {
+    let db = Database::default();
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
         options.file.clone(),
         ModuleKind::Code,
     );
-    let result = raw_build(module.clone(), options.debug);
+    let result = raw_build(&db, module.clone(), options.debug);
 
     if !options.watch {
         match result {
@@ -132,16 +133,14 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         loop {
             match rx.recv() {
                 Ok(_) => {
-                    raw_build(module.clone(), options.debug);
+                    raw_build(&db, module.clone(), options.debug);
                 }
                 Err(e) => error!("watch error: {e:#?}"),
             }
         }
     }
 }
-fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
-    let db = Database::default();
-
+fn raw_build(db: &Database, module: Module, debug: bool) -> Option<Arc<Lir>> {
     tracing::span!(Level::DEBUG, "Parsing string to RCST").in_scope(|| {
         let rcst = db
             .rcst(module.clone())
@@ -223,14 +222,14 @@ fn raw_build(module: Module, debug: bool) -> Option<Arc<Lir>> {
 }
 
 fn run(options: CandyRunOptions) -> ProgramResult {
+    let db = Database::default();
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
         options.file.clone(),
         ModuleKind::Code,
     );
-    let db = Database::default();
 
-    if raw_build(module.clone(), false).is_none() {
+    if raw_build(&db, module.clone(), false).is_none() {
         warn!("File not found.");
         return Err(Exit::FileNotFound);
     };
@@ -383,19 +382,19 @@ impl StdoutService {
 }
 
 async fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
+    let db = Database::default();
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
         options.file.clone(),
         ModuleKind::Code,
     );
 
-    if raw_build(module.clone(), false).is_none() {
+    if raw_build(&db, module.clone(), false).is_none() {
         warn!("File not found.");
         return Err(Exit::FileNotFound);
     }
 
     debug!("Fuzzing `{module}`.");
-    let db = Database::default();
     let failing_cases = fuzzer::fuzz(&db, module).await;
 
     if failing_cases.is_empty() {
