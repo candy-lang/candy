@@ -100,38 +100,27 @@ impl Fiber {
     }
     pub fn new_for_running_closure(
         heap: Heap,
-        id: hir::Id,
         closure: Pointer,
         arguments: &[Pointer],
+        responsible: hir::Id,
     ) -> Self {
         assert!(matches!(heap.get(closure).data, Data::Closure(_)));
 
         let mut fiber = Self::new_with_heap(heap);
-        let runner_closure = fiber.heap.create(Data::Closure(Closure {
-            captured: vec![],
-            num_args: 0,
-            body: vec![
-                Instruction::CreateHirId(id),
-                Instruction::TraceCallStarts {
-                    num_args: arguments.len(),
-                },
-                Instruction::Call {
-                    num_args: arguments.len(),
-                },
-                Instruction::TraceCallEnds,
-                Instruction::Return,
-            ],
-        }));
-        fiber.data_stack.extend(arguments);
-        fiber.data_stack.push(closure);
-        fiber.data_stack.push(runner_closure);
-
+        let responsible = fiber.heap.create(Data::HirId(responsible));
         fiber.status = Status::Running;
+
+        fiber.data_stack.push(closure);
+        fiber.data_stack.extend(arguments);
+        fiber.data_stack.push(responsible);
         fiber.run_instruction(
             &PanickingUseProvider,
             &mut DummyTracer.for_fiber(FiberId::root()),
-            Instruction::Call { num_args: 0 },
+            Instruction::Call {
+                num_args: arguments.len(),
+            },
         );
+
         fiber
     }
     pub fn new_for_running_module_closure(module: Module, closure: Closure) -> Self {
@@ -144,9 +133,10 @@ impl Fiber {
             closure.num_args, 0,
             "Closure is not a module closure (it has arguments)."
         );
+        let module_id = Id::new(module, vec![]);
         let mut heap = Heap::default();
         let closure = heap.create_closure(closure);
-        Self::new_for_running_closure(heap, Id::new(module, vec![]), closure, &[])
+        Self::new_for_running_closure(heap, closure, &[], module_id)
     }
 
     pub fn tear_down(mut self) -> ExecutionResult {

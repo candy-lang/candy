@@ -7,6 +7,8 @@ parallel body :=
     needs False "the function given to `parallel` takes no parameter, but it should accept a nursery"
   }
   needs (function.is1 body) "`parallel` needs a function that takes a nursery"
+  ## TODO: Propagate the responsibility here. `body` may contain a `needs` that
+  ## always fails. That shouldn't be our fault, but our caller's.
   ✨.parallel body
 
 async nursery body :=

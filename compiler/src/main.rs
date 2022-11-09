@@ -307,13 +307,10 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         heap.create_struct(HashMap::from([(stdout_symbol, stdout_port)]))
     };
     let main_id = Id::new(module.clone(), vec!["main".to_string()]);
-    tracer.for_fiber(FiberId::root()).call_started(
-        Id::new(module, vec!["main".to_string()]),
-        main,
-        vec![environment],
-        &heap,
-    );
-    vm.set_up_for_running_closure(heap, main_id, main, &[environment]);
+    tracer
+        .for_fiber(FiberId::root())
+        .call_started(main_id, main, vec![environment], &heap);
+    vm.set_up_for_running_closure(heap, main, &[environment], Id::platform());
     loop {
         match vm.status() {
             Status::CanRun => {

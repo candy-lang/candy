@@ -1,5 +1,8 @@
 use super::{ast_to_hir::AstToHir, error::CompilerError};
-use crate::{builtin_functions::BuiltinFunction, module::Module};
+use crate::{
+    builtin_functions::BuiltinFunction,
+    module::{Module, ModuleKind, Package},
+};
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use num_bigint::BigUint;
@@ -107,6 +110,39 @@ pub struct Id {
 impl Id {
     pub fn new(module: Module, keys: Vec<String>) -> Self {
         Self { module, keys }
+    }
+
+    /// An ID that can be used in cases where no real ID exists. For example,
+    /// when calling the `main` function, we want to be able to shift blame to
+    /// the platform for passing a wrong environment, but the platform doesn't
+    /// have a corresponding HIR ID.
+    pub fn special(name: &str) -> Self {
+        Self {
+            module: Module {
+                package: Package::Anonymous {
+                    url: format!("${}", name),
+                },
+                path: vec![],
+                kind: ModuleKind::Code,
+            },
+            keys: vec![],
+        }
+    }
+    pub fn platform() -> Self {
+        Self::special("platform")
+    }
+    pub fn fuzzer() -> Self {
+        Self::special("fuzzer")
+    }
+    /// TODO: Currently, when a higher-order function calls a closure passed as
+    /// a parameter, that's registered as a normal call instruction, making the
+    /// callsite in the higher-order function responsible for the successful
+    /// fulfillment of the passed function's `needs`. We probably want to change
+    /// how that works so that the caller of the higher-order function is at
+    /// fault when passing a panicking function. After we did that, we should be
+    /// able to remove this ID.
+    pub fn complicated_responsibility() -> Self {
+        Self::special("complicated-responsibility")
     }
 
     pub fn is_root(&self) -> bool {

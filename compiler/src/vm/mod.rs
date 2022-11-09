@@ -24,7 +24,8 @@ use self::{
 };
 use crate::{
     compiler::hir::Id,
-    utils::{CountableId, IdGenerator}, module::Module,
+    module::Module,
+    utils::{CountableId, IdGenerator},
 };
 use itertools::Itertools;
 use rand::seq::SliceRandom;
@@ -152,11 +153,16 @@ impl Vm {
     pub fn set_up_for_running_closure(
         &mut self,
         heap: Heap,
-        id: Id,
         closure: Pointer,
         arguments: &[Pointer],
+        responsible: Id,
     ) {
-        self.set_up_with_fiber(Fiber::new_for_running_closure(heap, id, closure, arguments));
+        self.set_up_with_fiber(Fiber::new_for_running_closure(
+            heap,
+            closure,
+            arguments,
+            responsible,
+        ));
     }
     pub fn set_up_for_running_module_closure(&mut self, module: Module, closure: Closure) {
         self.set_up_with_fiber(Fiber::new_for_running_module_closure(module, closure))
@@ -332,9 +338,9 @@ impl Vm {
                         FiberTree::Single(Single {
                             fiber: Fiber::new_for_running_closure(
                                 heap,
-                                todo!(),
                                 body,
                                 &[nursery_send_port],
+                                Id::complicated_responsibility(),
                             ),
                             parent: Some(fiber_id),
                         }),
@@ -362,7 +368,12 @@ impl Vm {
                     self.fibers.insert(
                         id,
                         FiberTree::Single(Single {
-                            fiber: Fiber::new_for_running_closure(heap, todo!(), body, &[]),
+                            fiber: Fiber::new_for_running_closure(
+                                heap,
+                                body,
+                                &[],
+                                Id::complicated_responsibility(),
+                            ),
                             parent: Some(fiber_id),
                         }),
                     );
@@ -572,9 +583,9 @@ impl Vm {
                             FiberTree::Single(Single {
                                 fiber: Fiber::new_for_running_closure(
                                     heap,
-                                    todo!(),
                                     closure_to_spawn,
                                     &[],
+                                    Id::complicated_responsibility(),
                                 ),
                                 parent: Some(parent_id),
                             }),
