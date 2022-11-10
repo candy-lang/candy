@@ -404,8 +404,8 @@ impl Heap {
         })
     }
     fn text_concatenate(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |textA: Text, textB: Text| {
-            Return(self.create_text(format!("{}{}", textA.value, textB.value)))
+        unpack_and_later_drop!(self, args, |text_a: Text, text_b: Text| {
+            Return(self.create_text(format!("{}{}", text_a.value, text_b.value)))
         })
     }
     fn text_contains(&mut self, args: &[Pointer]) -> BuiltinResult {
