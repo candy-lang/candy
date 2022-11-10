@@ -77,6 +77,13 @@ fn ast(db: &dyn CstToAst, module: Module) -> Option<AstResult> {
     Some((Arc::new(asts), context.id_mapping))
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+enum LoweringType {
+    Expression,
+    Pattern,
+    PatternLiteralPart,
+}
+
 struct LoweringContext {
     module: Module,
     next_id: usize,
@@ -91,9 +98,11 @@ impl LoweringContext {
         }
     }
     fn lower_csts(&mut self, csts: &[Cst]) -> Vec<Ast> {
-        csts.iter().map(|it| self.lower_cst(it)).collect()
+        csts.iter()
+            .map(|it| self.lower_cst(it, LoweringType::Expression))
+            .collect()
     }
-    fn lower_cst(&mut self, cst: &Cst) -> Ast {
+    fn lower_cst(&mut self, cst: &Cst, lowering_type: LoweringType) -> Ast {
         match &cst.kind {
             CstKind::EqualsSign
             | CstKind::Comma
@@ -127,7 +136,20 @@ impl LoweringContext {
             }
             CstKind::Identifier(identifier) => {
                 let string = self.create_string_without_id_mapping(identifier.to_string());
-                self.create_ast(cst.id, AstKind::Identifier(Identifier(string)))
+                let mut kind = AstKind::Identifier(Identifier(string));
+                if lowering_type == LoweringType::PatternLiteralPart {
+                    kind = AstKind::Error {
+                        child: None,
+                        errors: vec![CompilerError {
+                            module: self.module.clone(),
+                            span: cst.span.clone(),
+                            payload: CompilerErrorPayload::Ast(
+                                AstError::PatternLiteralPartContainsIdentifier,
+                            ),
+                        }],
+                    };
+                };
+                self.create_ast(cst.id, kind)
             }
             CstKind::Symbol(symbol) => {
                 let string = self.create_string_without_id_mapping(symbol.to_string());
@@ -182,7 +204,9 @@ impl LoweringContext {
                 inner,
                 closing_parenthesis,
             } => {
-                let mut ast = self.lower_cst(inner);
+                assert_eq!(lowering_type, LoweringType::Expression);
+
+                let mut ast = self.lower_cst(inner, LoweringType::Expression);
 
                 assert!(
                     matches!(opening_parenthesis.kind, CstKind::OpeningParenthesis),
@@ -211,6 +235,8 @@ impl LoweringContext {
                 receiver,
                 arguments,
             } => {
+                assert_eq!(lowering_type, LoweringType::Expression);
+
                 let mut receiver_kind = &receiver.kind;
                 loop {
                     receiver_kind = match receiver_kind {
@@ -236,7 +262,7 @@ impl LoweringContext {
                         _ => break,
                     };
                 }
-                let receiver = self.lower_cst(receiver);
+                let receiver = self.lower_cst(receiver, LoweringType::Expression);
                 let arguments = self.lower_csts(arguments);
 
                 self.create_ast(
@@ -277,7 +303,7 @@ impl LoweringContext {
                             continue;
                         };
 
-                        let mut value = self.lower_cst(&value.clone());
+                        let mut value = self.lower_cst(&value.clone(), lowering_type);
 
                         if let Some(comma) = comma {
                             if !matches!(comma.kind, CstKind::Comma) {
@@ -293,7 +319,7 @@ impl LoweringContext {
                                             ),
                                         }],
                                     },
-                                )
+                                );
                             }
                         }
 
@@ -346,8 +372,13 @@ impl LoweringContext {
                             comma,
                         } = &field.kind
                         {
-                            let mut key = self.lower_cst(&key.clone());
-                            let mut value = self.lower_cst(&value.clone());
+                            let key_lowering_type = match lowering_type {
+                                LoweringType::Expression => LoweringType::Expression,
+                                LoweringType::Pattern | LoweringType::PatternLiteralPart => {
+                                    LoweringType::PatternLiteralPart
+                                }
+                            };
+                            let mut key = self.lower_cst(&key, key_lowering_type);
 
                             if !matches!(colon.kind, CstKind::Colon) {
                                 key = self.create_ast(
@@ -364,6 +395,9 @@ impl LoweringContext {
                                     },
                                 )
                             }
+
+                            let mut value = self.lower_cst(&value.clone(), lowering_type);
+
                             if let Some(comma) = comma {
                                 if !matches!(comma.kind, CstKind::Comma) {
                                     value = self.create_ast(
@@ -419,6 +453,8 @@ impl LoweringContext {
             }
             CstKind::StructField { .. } => panic!("StructField should only appear in Struct."),
             CstKind::StructAccess { struct_, dot, key } => {
+                assert_eq!(lowering_type, LoweringType::Expression);
+
                 self.lower_struct_access(cst.id, struct_, dot, key)
             }
             CstKind::Lambda {
@@ -427,6 +463,8 @@ impl LoweringContext {
                 body,
                 closing_curly_brace,
             } => {
+                assert_eq!(lowering_type, LoweringType::Expression);
+
                 assert!(
                     matches!(opening_curly_brace.kind, CstKind::OpeningCurlyBrace),
                     "Expected an opening curly brace at the beginning of a lambda, but found {}.",
@@ -477,19 +515,11 @@ impl LoweringContext {
                 ast
             }
             CstKind::Assignment {
-                name,
+                name_or_pattern,
                 parameters,
                 assignment_sign,
                 body,
             } => {
-                let name = match &name.kind {
-                    CstKind::Identifier(identifier) => {
-                        self.create_string(name.id.to_owned(), identifier.to_owned())
-                    }
-                    _ => panic!("Expected an identifier, but found `{}`.", name),
-                };
-                let (parameters, errors) = self.lower_parameters(parameters);
-
                 assert!(
                     matches!(assignment_sign.kind, CstKind::EqualsSign | CstKind::ColonEqualsSign),
                     "Expected an equals sign or colon equals sign for the assignment, but found {} instead.",
@@ -497,20 +527,35 @@ impl LoweringContext {
                 );
 
                 let body = self.lower_csts(body);
-                let body = if !parameters.is_empty() {
-                    AssignmentBody::Lambda(Lambda {
-                        parameters,
+                let (body, errors) = if parameters.is_empty() {
+                    let body = AssignmentBody::Body {
+                        pattern: Box::new(self.lower_cst(name_or_pattern, LoweringType::Pattern)),
                         body,
-                        fuzzable: true,
-                    })
+                    };
+                    (body, vec![])
                 } else {
-                    AssignmentBody::Body(body)
+                    let name = match &name_or_pattern.kind {
+                        CstKind::Identifier(identifier) => {
+                            self.create_string(name_or_pattern.id.to_owned(), identifier.to_owned())
+                        }
+                        _ => panic!("Expected an identifier, but found `{}`.", name_or_pattern),
+                    };
+
+                    let (parameters, errors) = self.lower_parameters(parameters);
+                    let body = AssignmentBody::Lambda {
+                        name,
+                        lambda: Lambda {
+                            parameters,
+                            body,
+                            fuzzable: true,
+                        },
+                    };
+                    (body, errors)
                 };
 
                 let mut ast = self.create_ast(
                     cst.id,
                     AstKind::Assignment(ast::Assignment {
-                        name,
                         is_public: matches!(assignment_sign.kind, CstKind::ColonEqualsSign),
                         body,
                     }),
@@ -541,7 +586,7 @@ impl LoweringContext {
     }
 
     fn lower_struct_access(&mut self, id: cst::Id, struct_: &Cst, dot: &Cst, key: &Cst) -> Ast {
-        let struct_ = self.lower_cst(struct_);
+        let struct_ = self.lower_cst(struct_, LoweringType::Expression);
 
         assert!(
             matches!(dot.kind, CstKind::Dot),

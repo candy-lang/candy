@@ -20,10 +20,12 @@ use self::{
         UseProvider,
     },
     heap::SendPort,
-    ids::{CountableId, IdGenerator},
     tracer::Tracer,
 };
-use crate::compiler::hir::Id;
+use crate::{
+    compiler::hir::Id,
+    utils::{CountableId, IdGenerator},
+};
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use std::{
@@ -131,8 +133,8 @@ impl Vm {
             channels: HashMap::new(),
             completed_operations: Default::default(),
             unreferenced_channels: Default::default(),
-            operation_id_generator: IdGenerator::start_at(0),
-            channel_id_generator: IdGenerator::start_at(0),
+            operation_id_generator: Default::default(),
+            channel_id_generator: Default::default(),
             fiber_id_generator: IdGenerator::start_at(FiberId::root().to_usize() + 1),
         }
     }

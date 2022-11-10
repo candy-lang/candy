@@ -11,6 +11,7 @@ mod database;
 mod fuzzer;
 mod language_server;
 mod module;
+mod utils;
 mod vm;
 
 use crate::{

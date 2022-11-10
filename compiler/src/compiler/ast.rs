@@ -90,14 +90,13 @@ pub struct Call {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Assignment {
-    pub name: AstString,
     pub is_public: bool,
     pub body: AssignmentBody,
 }
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum AssignmentBody {
-    Lambda(Lambda),
-    Body(Vec<Ast>),
+    Lambda { name: AstString, lambda: Lambda },
+    Body { pattern: Box<Ast>, body: Vec<Ast> },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -120,6 +119,7 @@ pub enum AstError {
     ListWithNonListItem,
     ListWithoutClosingParenthesis,
     ParenthesizedWithoutClosingParenthesis,
+    PatternLiteralPartContainsIdentifier,
     StructKeyWithoutColon,
     StructValueWithoutComma,
     StructWithNonStructField,
@@ -193,8 +193,8 @@ impl FindAst for Assignment {
 impl FindAst for AssignmentBody {
     fn find(&self, id: &Id) -> Option<&Ast> {
         match self {
-            AssignmentBody::Lambda(lambda) => lambda.find(id),
-            AssignmentBody::Body(body) => body.find(id),
+            AssignmentBody::Lambda { name, lambda } => lambda.find(id),
+            AssignmentBody::Body { pattern, body } => pattern.find(id).or_else(|| body.find(id)),
         }
     }
 }
@@ -236,10 +236,11 @@ impl CollectErrors for Ast {
             AstKind::Lambda(lambda) => lambda.body.collect_errors(errors),
             AstKind::Call(call) => call.arguments.collect_errors(errors),
             AstKind::Assignment(assignment) => match assignment.body {
-                AssignmentBody::Lambda(lambda) => lambda.body.collect_errors(errors),
-                AssignmentBody::Body(body) => {
+                AssignmentBody::Lambda { name, lambda } => lambda.body.collect_errors(errors),
+                AssignmentBody::Body { pattern, body } => {
+                    pattern.collect_errors(errors);
                     for ast in body {
-                        ast.collect_errors(errors)
+                        ast.collect_errors(errors);
                     }
                 }
             },
@@ -303,12 +304,23 @@ impl Display for Ast {
             AstKind::Assignment(assignment) => {
                 write!(
                     f,
-                    "assignment: {} =\n{}",
-                    assignment.name,
-                    format!("{}", assignment.body)
-                        .lines()
-                        .map(|line| format!("  {line}"))
-                        .join("\n"),
+                    "assignment: {} {}=\n{}",
+                    match &assignment.body {
+                        AssignmentBody::Lambda { name, .. } => name.value.to_owned(),
+                        AssignmentBody::Body { pattern, .. } => format!("{}", pattern),
+                    },
+                    if assignment.is_public { ":" } else { "" },
+                    format!(
+                        "{}",
+                        match &assignment.body {
+                            AssignmentBody::Lambda { lambda, .. } => format!("{}", lambda),
+                            AssignmentBody::Body { body, .. } =>
+                                format!("{}", body.iter().map(|it| format!("{it}")).join("\n")),
+                        }
+                    )
+                    .lines()
+                    .map(|line| format!("  {line}"))
+                    .join("\n"),
                 )
             }
             AstKind::Error { child, errors } => {
@@ -321,16 +333,6 @@ impl Display for Ast {
                     write!(f, "\n  fallback: {child}")?;
                 }
                 Ok(())
-            }
-        }
-    }
-}
-impl Display for AssignmentBody {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            AssignmentBody::Lambda(lambda) => write!(f, "{lambda}"),
-            AssignmentBody::Body(body) => {
-                write!(f, "{}", body.iter().map(|it| format!("{it}")).join("\n"))
             }
         }
     }

@@ -123,7 +123,7 @@ impl<'a> Context<'a> {
                 self.visit_csts(body);
             }
             CstKind::Assignment {
-                name,
+                name_or_pattern,
                 assignment_sign,
                 parameters,
                 body,
@@ -139,7 +139,7 @@ impl<'a> Context<'a> {
                     );
                 }
 
-                self.visit_cst(name);
+                self.visit_cst(name_or_pattern);
                 self.visit_csts(parameters);
                 self.visit_csts(body);
             }

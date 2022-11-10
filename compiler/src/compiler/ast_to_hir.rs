@@ -6,12 +6,13 @@ use super::{
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
     error::{CompilerError, CompilerErrorPayload},
-    hir::{self, Body, Expression, HirError, Lambda},
+    hir::{self, Body, Expression, HirError, Lambda, Pattern, PatternIdentifierId},
     utils::AdjustCasingOfFirstLetter,
 };
 use crate::{
     builtin_functions::{self, BuiltinFunction},
     module::Module,
+    utils::IdGenerator,
 };
 use itertools::Itertools;
 use std::{collections::HashMap, mem, ops::Range, sync::Arc};
@@ -154,9 +155,9 @@ impl<'a> Context<'a> {
             AstKind::Int(Int(int)) => {
                 self.push(Some(ast.id.clone()), Expression::Int(int.to_owned()), None)
             }
-            AstKind::Text(Text(string)) => self.push(
+            AstKind::Text(Text(text)) => self.push(
                 Some(ast.id.clone()),
-                Expression::Text(string.value.to_owned()),
+                Expression::Text(text.value.to_owned()),
                 None,
             ),
             AstKind::Identifier(Identifier(name)) => {
@@ -199,42 +200,67 @@ impl<'a> Context<'a> {
             }
             AstKind::Lambda(lambda) => self.compile_lambda(ast.id.clone(), lambda, None),
             AstKind::Call(call) => self.lower_call(Some(ast.id.clone()), call),
-            AstKind::Assignment(Assignment {
-                name,
-                is_public,
-                body,
-            }) => {
-                let name_string = name.value.to_owned();
-                let body = match body {
-                    ast::AssignmentBody::Lambda(lambda) => {
-                        self.compile_lambda(ast.id.clone(), lambda, Some(name_string.clone()))
+            AstKind::Assignment(Assignment { is_public, body }) => {
+                let (names, body) = match body {
+                    ast::AssignmentBody::Lambda { name, lambda } => {
+                        let name_string = name.value.to_owned();
+                        let body =
+                            self.compile_lambda(ast.id.clone(), lambda, Some(name_string.clone()));
+                        let name_id = self.push(
+                            Some(name.id.clone()),
+                            Expression::Reference(body.clone()),
+                            Some(name.value.to_owned()),
+                        );
+                        (vec![(name.value.to_owned(), name_id)], body)
                     }
-                    ast::AssignmentBody::Body(body) => {
+                    ast::AssignmentBody::Body { pattern, body } => {
                         let reset_state = self.start_non_top_level();
                         let body = self.compile(body);
                         self.end_non_top_level(reset_state);
 
-                        self.push(Some(ast.id.clone()), Expression::Reference(body), None)
+                        let (pattern, identifier_ids) = PatternContext::compile(pattern);
+                        let body = self.push(
+                            Some(ast.id.clone()),
+                            Expression::Destructure {
+                                expression: body,
+                                pattern,
+                            },
+                            None,
+                        );
+
+                        let names = identifier_ids
+                            .into_iter()
+                            .sorted_by_key(|(_, (_, identifier_id))| identifier_id.0)
+                            .map(|(name, (ast_id, identifier_id))| {
+                                let id = self.push(
+                                    Some(ast_id),
+                                    Expression::PatternIdentifierReference {
+                                        destructuring: body.clone(),
+                                        identifier_id,
+                                    },
+                                    Some(name.to_owned()),
+                                );
+                                (name, id)
+                            })
+                            .collect_vec();
+                        (names, body)
                     }
                 };
-                self.push(
-                    Some(name.id.clone()),
-                    Expression::Reference(body.clone()),
-                    Some(name_string.clone()),
-                );
                 if *is_public {
                     if self.is_top_level {
-                        if self.public_identifiers.contains_key(&name_string) {
-                            self.push_error(
-                                None,
-                                ast.id.module.clone(),
-                                self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
-                                HirError::PublicAssignmentWithSameName {
-                                    name: name_string.clone(),
-                                },
-                            );
+                        for (name, id) in names {
+                            if self.public_identifiers.contains_key(&name) {
+                                self.push_error(
+                                    None,
+                                    ast.id.module.clone(),
+                                    self.db.ast_id_to_display_span(ast.id.clone()).unwrap(),
+                                    HirError::PublicAssignmentWithSameName {
+                                        name: name.to_owned(),
+                                    },
+                                );
+                            }
+                            self.public_identifiers.insert(name, id);
                         }
-                        self.public_identifiers.insert(name_string, body.clone());
                     } else {
                         self.push_error(
                             None,
@@ -538,4 +564,63 @@ fn add_keys(parents: &[String], id: String) -> Vec<String> {
         .map(|it| it.to_string())
         .chain(vec![id])
         .collect()
+}
+
+/// The `ast::Id` is the ID of the first occurrence of this identifier in the
+/// AST.
+type PatternIdentifierIds = HashMap<String, (ast::Id, PatternIdentifierId)>;
+
+#[derive(Default)]
+struct PatternContext {
+    identifier_id_generator: IdGenerator<PatternIdentifierId>,
+    identifier_ids: PatternIdentifierIds,
+}
+impl PatternContext {
+    fn compile(ast: &Ast) -> (Pattern, PatternIdentifierIds) {
+        let mut context = PatternContext::default();
+        let pattern = context.compile_pattern(ast);
+        (pattern, context.identifier_ids)
+    }
+
+    fn compile_pattern(&mut self, ast: &Ast) -> Pattern {
+        match &ast.kind {
+            AstKind::Int(Int(int)) => Pattern::Int(int.to_owned()),
+            AstKind::Text(Text(text)) => Pattern::Text(text.value.to_owned()),
+            AstKind::Identifier(Identifier(name)) => {
+                let (_, pattern_id) = self
+                    .identifier_ids
+                    .entry(name.value.to_owned())
+                    .or_insert_with(|| {
+                        (name.id.to_owned(), self.identifier_id_generator.generate())
+                    });
+                Pattern::NewIdentifier(pattern_id.to_owned())
+            }
+            AstKind::Symbol(Symbol(symbol)) => Pattern::Symbol(symbol.value.to_owned()),
+            AstKind::List(List(items)) => {
+                let items = items
+                    .iter()
+                    .map(|item| self.compile_pattern(item))
+                    .collect_vec();
+                Pattern::List(items)
+            }
+            AstKind::Struct(Struct { fields }) => {
+                let fields = fields
+                    .iter()
+                    .map(|(key, value)| (self.compile_pattern(key), self.compile_pattern(value)))
+                    .collect();
+                Pattern::Struct(fields)
+            }
+            AstKind::StructAccess(_)
+            | AstKind::Lambda(_)
+            | AstKind::Call(_)
+            | AstKind::Assignment(_) => {
+                unreachable!(
+                    "AST pattern can't contain struct access, lambda, call, or assignment."
+                )
+            }
+            AstKind::Error { errors, .. } => Pattern::Error {
+                errors: errors.clone(),
+            },
+        }
+    }
 }

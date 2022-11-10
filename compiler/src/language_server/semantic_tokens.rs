@@ -261,12 +261,12 @@ impl<'a> Context<'a> {
                 self.visit_cst(closing_curly_brace, None);
             }
             CstKind::Assignment {
-                name,
+                name_or_pattern,
                 parameters,
                 assignment_sign,
                 body,
             } => {
-                self.visit_cst(name, Some(SemanticTokenType::Assignment));
+                self.visit_cst(name_or_pattern, Some(SemanticTokenType::Assignment));
                 self.visit_csts(&parameters[..], Some(SemanticTokenType::Parameter));
                 self.visit_cst(assignment_sign, None);
                 self.visit_csts(body, None);
