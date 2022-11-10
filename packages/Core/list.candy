@@ -8,14 +8,14 @@ filled length item :=
   needs (int.is length)
   needs (int.isNonNegative length)
   needs (int.fitsInRustU32 length)
-  ✨.listFilled length item
+  length | ✨.listFilled item
 # TODO: `generate length valueGetter` when we have loops
 
 is value := type.is value List
 
 length list :=
   needs (is list)
-  ✨.listLength list
+  list | ✨.listLength
 isEmpty list :=
   needs (is list)
   equals (length list) 0
@@ -23,56 +23,53 @@ isEmpty list :=
 lastIndex list :=
   needs (is list)
   needs (bool.not (isEmpty list))
-  int.minus (length list) 1
+  length list | int.minus 1
 isValidIndex list index :=
   needs (is list)
-  bool.lazyAnd
-    (int.is index)
-    {
-      bool.and
-        int.isNonNegative index
-        int.isLessThanOrEqualTo index (lastIndex list)
-    }
+  int.is index | bool.lazyAnd {
+    int.isNonNegative index
+    | bool.and (index | int.isLessThanOrEqualTo (lastIndex list))
+  }
 
 get list index :=
   needs (is list)
   needs (isValidIndex index)
-  ✨.listGet list index
+  list | ✨.listGet index
 
 last list :=
   needs (is list)
   needs (bool.not (isEmpty list))
-  get list (lastIndex list)
+  list | get (lastIndex list)
 
 insert list index item :=
   needs (is list)
 
   needs (int.is index)
   needs (int.isNonNegative index)
-  needs (int.isLessThanOrEqualTo index (length list))
+  needs (index | int.isLessThanOrEqualTo (length list))
 
-  ✨.listInsert list index item
+  list | ✨.listInsert index item
 
 prepend list item :=
   needs (is list)
-  insert list 0 item
+  list | insert 0 item
 append list item :=
   needs (is list)
-  insert list (length list) item
+  list | insert (length list) item
 
 replace list index newValue :=
   needs (is list)
   needs (isValidIndex index)
-  ✨.listReplace list index newValue
+  list | ✨.listReplace index newValue
 update list index updater :=
   needs (is list)
   needs (isValidIndex index)
   needs (function.is1 updater)
-  oldValue = get list index
+  oldValue = list | get index
   newValue = updater oldValue
-  replace list index newValue
+  list | replace index newValue
 
 removeAt list index :=
   needs (is list)
   needs (isValidIndex index)
-  ✨.listRemoveAt list index
+  list | ✨.listRemoveAt index

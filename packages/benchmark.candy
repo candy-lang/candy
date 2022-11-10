@@ -4,10 +4,9 @@
 core = use "..Core"
 
 fibRec fibRec n =
-  core.ifElse (core.int.isLessThan n 2) { n } {
-    core.int.add
-      fibRec fibRec (core.int.subtract n 1)
-      fibRec fibRec (core.int.subtract n 2)
+  core.ifElse (n | core.int.isLessThan 2) { n } {
+    fibRec fibRec (n | core.int.subtract 1)
+    | core.int.add (fibRec fibRec (n | core.int.subtract 2))
   }
 fib n = fibRec fibRec n
 twentyOne := fib 8
@@ -17,13 +16,16 @@ main := { environment ->
   print "Hello, world!"
 
   core.parallel { nursery ->
-    print (core.await (core.async nursery {
+    nursery
+    | core.async {
       print "Hello from fiber!"
       "Hello, async await!"
-    }))
+    }
+    | core.await
+    | print
 
-    core.async nursery { print "Kiwi" }
-    core.async nursery { print "Banana" }
+    nursery | core.async { print "Kiwi" }
+    nursery | core.async { print "Banana" }
     print "Hi"
   }
 }
