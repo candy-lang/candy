@@ -1062,7 +1062,7 @@ mod parse {
 
     #[instrument]
     fn list(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        let (mut outer_input, mut opening_parenthesis) = opening_parenthesis(input)?;
+        let (mut input, mut opening_parenthesis) = opening_parenthesis(input)?;
 
         // Empty list `(,)`
         'handleEmptyList: {
@@ -1074,10 +1074,7 @@ mod parse {
                 .wrap_in_whitespace(leading_whitespace);
 
             // Comma.
-            let (input, comma) = match comma(input) {
-                Some((input, comma)) => (input, comma),
-                None => break 'handleEmptyList,
-            };
+            let Some((input, comma)) = comma(input) else { break 'handleEmptyList; };
 
             // Whitespace after comma.
             let (input, trailing_whitespace) =
@@ -1085,9 +1082,8 @@ mod parse {
             let comma = comma.wrap_in_whitespace(trailing_whitespace);
 
             // Closing parenthesis.
-            let (input, closing_parenthesis) = match closing_parenthesis(input) {
-                Some((input, closing_parenthesis)) => (input, closing_parenthesis),
-                None => break 'handleEmptyList,
+            let Some((input, closing_parenthesis)) = closing_parenthesis(input) else {
+                break 'handleEmptyList;
             };
 
             return Some((
@@ -1104,10 +1100,11 @@ mod parse {
         let mut items_indentation = indentation;
         let mut has_at_least_one_comma = false;
         loop {
-            let input = outer_input;
+            let new_input = input;
 
             // Whitespace before value.
-            let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+            let (new_input, whitespace) =
+                whitespaces_and_newlines(new_input, indentation + 1, true);
             if whitespace.is_multiline() {
                 items_indentation = indentation + 1;
             }
@@ -1119,10 +1116,11 @@ mod parse {
             }
 
             // Value.
-            let (input, value, has_value) = match expression(input, items_indentation, true) {
-                Some((input, value)) => (input, value, true),
+            let (new_input, value, has_value) = match expression(new_input, items_indentation, true)
+            {
+                Some((new_input, value)) => (new_input, value, true),
                 None => (
-                    input,
+                    new_input,
                     Rcst::Error {
                         unparsable_input: "".to_string(),
                         error: RcstError::ListItemMissesValue,
@@ -1132,16 +1130,17 @@ mod parse {
             };
 
             // Whitespace between value and comma.
-            let (input, whitespace) = whitespaces_and_newlines(input, items_indentation + 1, true);
+            let (new_input, whitespace) =
+                whitespaces_and_newlines(new_input, items_indentation + 1, true);
             if whitespace.is_multiline() {
                 items_indentation = indentation + 1;
             }
             let value = value.wrap_in_whitespace(whitespace);
 
             // Comma.
-            let (input, comma) = match comma(input) {
-                Some((input, comma)) => (input, Some(comma)),
-                None => (input, None),
+            let (new_input, comma) = match comma(new_input) {
+                Some((new_input, comma)) => (new_input, Some(comma)),
+                None => (new_input, None),
             };
 
             if !has_value && comma.is_none() {
@@ -1149,7 +1148,7 @@ mod parse {
             }
             has_at_least_one_comma |= comma.is_some();
 
-            outer_input = input;
+            input = new_input;
             items.push(Rcst::ListItem {
                 value: Box::new(value),
                 comma: comma.map(Box::new),
@@ -1158,7 +1157,6 @@ mod parse {
         if !has_at_least_one_comma {
             return None;
         }
-        let input = outer_input;
 
         let (new_input, whitespace) = whitespaces_and_newlines(input, indentation, true);
 
@@ -1200,13 +1198,7 @@ mod parse {
                 "",
                 Rcst::List {
                     opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
-                    items: vec![Rcst::ListItem {
-                        value: Box::new(Rcst::Error {
-                            unparsable_input: "".to_string(),
-                            error: RcstError::ListItemMissesValue,
-                        }),
-                        comma: Some(Box::new(Rcst::Comma)),
-                    }],
+                    items: vec![Rcst::Comma],
                     closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
                 },
             )),
