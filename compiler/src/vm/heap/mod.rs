@@ -244,6 +244,9 @@ impl Heap {
     pub fn create_struct(&mut self, fields: HashMap<Pointer, Pointer>) -> Pointer {
         self.create(Data::Struct(Struct::from_fields(self, fields)))
     }
+    pub fn create_hir_id(&mut self, id: Id) -> Pointer {
+        self.create(Data::HirId(id))
+    }
     pub fn create_closure(&mut self, closure: Closure) -> Pointer {
         self.create(Data::Closure(closure))
     }

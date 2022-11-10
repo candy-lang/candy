@@ -16,7 +16,7 @@ use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::ToPrimitive;
 use std::{ops::Deref, str::FromStr};
-use tracing::{info, span, Level};
+use tracing::{debug, info, span, Level};
 use unicode_segmentation::UnicodeSegmentation;
 
 impl Fiber {
@@ -24,16 +24,17 @@ impl Fiber {
         &mut self,
         builtin_function: &BuiltinFunction,
         args: &[Pointer],
-        responsible: Id,
+        responsible: Pointer,
     ) {
+        debug!("Running builtin{builtin_function:?}");
         let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
             BuiltinFunction::ChannelCreate => self.heap.channel_create(args),
             BuiltinFunction::ChannelSend => self.heap.channel_send(args),
             BuiltinFunction::ChannelReceive => self.heap.channel_receive(args),
             BuiltinFunction::Equals => self.heap.equals(args),
-            BuiltinFunction::FunctionRun => self.heap.function_run(args),
+            BuiltinFunction::FunctionRun => self.heap.function_run(args, responsible),
             BuiltinFunction::GetArgumentCount => self.heap.get_argument_count(args),
-            BuiltinFunction::IfElse => self.heap.if_else(args),
+            BuiltinFunction::IfElse => self.heap.if_else(args, responsible),
             BuiltinFunction::IntAdd => self.heap.int_add(args),
             BuiltinFunction::IntBitLength => self.heap.int_bit_length(args),
             BuiltinFunction::IntBitwiseAnd => self.heap.int_bitwise_and(args),
@@ -68,8 +69,12 @@ impl Fiber {
         });
         match result {
             Ok(Return(value)) => self.data_stack.push(value),
-            Ok(DivergeControlFlow { closure }) => {
+            Ok(DivergeControlFlow {
+                closure,
+                responsible,
+            }) => {
                 self.data_stack.push(closure);
+                self.data_stack.push(responsible);
                 self.run_instruction(
                     &PanickingUseProvider,
                     &mut DummyTracer.for_fiber(FiberId::root()),
@@ -81,7 +86,7 @@ impl Fiber {
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
             Ok(Parallel { body }) => self.status = Status::InParallelScope { body },
             Ok(Try { body }) => self.status = Status::InTry { body },
-            Err(reason) => self.panic(reason, responsible),
+            Err(reason) => self.panic(reason, self.heap.get_hir_id(responsible)),
         }
     }
 }
@@ -89,12 +94,26 @@ impl Fiber {
 type BuiltinResult = Result<SuccessfulBehavior, String>;
 enum SuccessfulBehavior {
     Return(Pointer),
-    DivergeControlFlow { closure: Pointer },
-    CreateChannel { capacity: Capacity },
-    Send { channel: ChannelId, packet: Packet },
-    Receive { channel: ChannelId },
-    Parallel { body: Pointer },
-    Try { body: Pointer },
+    DivergeControlFlow {
+        closure: Pointer,
+        responsible: Pointer,
+    },
+    CreateChannel {
+        capacity: Capacity,
+    },
+    Send {
+        channel: ChannelId,
+        packet: Packet,
+    },
+    Receive {
+        channel: ChannelId,
+    },
+    Parallel {
+        body: Pointer,
+    },
+    Try {
+        body: Pointer,
+    },
 }
 use SuccessfulBehavior::*;
 
@@ -185,11 +204,12 @@ impl Heap {
         })
     }
 
-    fn function_run(&mut self, args: &[Pointer]) -> BuiltinResult {
+    fn function_run(&mut self, args: &[Pointer], responsible: Pointer) -> BuiltinResult {
         unpack!(self, args, |closure: Closure| {
             closure.should_take_no_arguments()?;
             DivergeControlFlow {
                 closure: closure.address,
+                responsible,
             }
         })
     }
@@ -200,7 +220,7 @@ impl Heap {
         })
     }
 
-    fn if_else(&mut self, args: &[Pointer]) -> BuiltinResult {
+    fn if_else(&mut self, args: &[Pointer], responsible: Pointer) -> BuiltinResult {
         unpack!(self, args, |condition: bool,
                              then: Closure,
                              else_: Closure| {
@@ -213,6 +233,7 @@ impl Heap {
             self.drop(dont_run.address);
             DivergeControlFlow {
                 closure: run.address,
+                responsible,
             }
         })
     }
@@ -490,7 +511,7 @@ impl_data_try_into_type!(Int, Int, "a builtin function expected an int");
 impl_data_try_into_type!(Text, Text, "a builtin function expected a text");
 impl_data_try_into_type!(Symbol, Symbol, "a builtin function expected a symbol");
 impl_data_try_into_type!(Struct, Struct, "a builtin function expected a struct");
-impl_data_try_into_type!(Id, HirId, "a builtin function expected a HIR ID");
+impl_data_try_into_type!(Id, HirId, "expected a HIR ID");
 impl_data_try_into_type!(Closure, Closure, "a builtin function expected a closure");
 impl_data_try_into_type!(
     SendPort,

@@ -37,7 +37,7 @@ pub enum Instruction {
     /// a -> a, pointer to closure
     CreateClosure {
         captured: Vec<StackOffset>,
-        num_args: usize,
+        num_args: usize, // excluding responsible parameter
         body: Vec<Instruction>,
     },
 
@@ -52,9 +52,8 @@ pub enum Instruction {
     /// Leaves the top stack item untouched, but removes n below.
     PopMultipleBelowTop(usize),
 
-    /// Pops a closure and num_args arguments, pushes the current instruction
-    /// pointer, all captured variables, and arguments, and then changes the
-    /// instruction pointer to the first instruction of the closure.
+    /// Sets up the data stack for a closure execution and then changes the
+    /// instruction pointer to the first instruction.
     ///
     /// a, closure, arg1, arg2, ..., argN, responsible -> a, caller, captured vars, arg1, arg2, ..., argN, responsible
     ///
@@ -63,7 +62,7 @@ pub enum Instruction {
     ///
     /// a, closure, arg1, arg2, ..., argN, responsible ~> a, return value from closure
     Call {
-        num_args: usize,
+        num_args: usize, // excluding the responsible argument
     },
 
     /// Returns from the current closure to the original caller. Leaves the data
@@ -172,7 +171,7 @@ impl Instruction {
             }
             Instruction::ModuleStarts { .. } => {}
             Instruction::ModuleEnds => {}
-            Instruction::TraceCallStarts { num_args } => {
+            Instruction::TraceCallStarts { .. } => {
                 stack.pop(); // HIR ID
             }
             Instruction::TraceCallEnds => {}

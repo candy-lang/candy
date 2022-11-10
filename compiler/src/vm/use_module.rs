@@ -37,7 +37,7 @@ impl Fiber {
                 self.data_stack.push(list);
             }
             UseResult::Code(lir) => {
-                let module_closure = Closure::of_module_lir(module, lir);
+                let module_closure = Closure::of_module_lir(lir);
                 let address = self.heap.create_closure(module_closure);
                 self.data_stack.push(address);
                 self.run_instruction(

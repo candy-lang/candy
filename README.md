@@ -136,17 +136,14 @@ We already have a language server that provides some tooling.
 
 ## Short-term TODOs
 
-- fix fault attribution
 - new name?
 - add caching while compile-time evaluating code
 - tags
 - pattern matching
 - pipe operator
-- add CI
 - add tests
 - add a more lightweight tracer that only tracks stack traces
 - text interpolation
-- optimize: eliminate common subtrees
 - optimize: inline functions
 - minimize inputs found through fuzzing
 - fuzz parser
@@ -157,6 +154,8 @@ We already have a language server that provides some tooling.
 - distinguish packages from normal modules
 - complain about comment lines with too much indentation
 - develop guidelines about how to format reasons
+- disallow passing named closures as parameters? or auto-propagate caller's fault to called parameters?
+- replace occurrences of `Id::complicated_responsibility()`
 
 ## How to use Candy
 

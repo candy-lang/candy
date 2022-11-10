@@ -117,7 +117,7 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         options.file.clone(),
         ModuleKind::Code,
     );
-    let result = raw_build(&db, module.clone(), options.debug);
+    let result = raw_build(&db, module.clone(), &MirConfig::default(), options.debug);
 
     if !options.watch {
         match result {
@@ -133,14 +133,14 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         loop {
             match rx.recv() {
                 Ok(_) => {
-                    raw_build(&db, module.clone(), options.debug);
+                    raw_build(&db, module.clone(), &MirConfig::default(), options.debug);
                 }
                 Err(e) => error!("watch error: {e:#?}"),
             }
         }
     }
 }
-fn raw_build(db: &Database, module: Module, debug: bool) -> Option<Arc<Lir>> {
+fn raw_build(db: &Database, module: Module, config: &MirConfig, debug: bool) -> Option<Arc<Lir>> {
     tracing::span!(Level::DEBUG, "Parsing string to RCST").in_scope(|| {
         let rcst = db
             .rcst(module.clone())
@@ -200,18 +200,23 @@ fn raw_build(db: &Database, module: Module, debug: bool) -> Option<Arc<Lir>> {
     });
 
     tracing::span!(Level::DEBUG, "Turning HIR to MIR").in_scope(|| {
-        db.mir(module.clone(), MirConfig::default()).unwrap();
+        let mir = db.mir(module.clone(), config.clone()).unwrap();
+        if debug {
+            module.dump_associated_debug_file("mir", &format!("{mir:?}"));
+        }
     });
     tracing::span!(Level::DEBUG, "Optimizing MIR").in_scope(|| {
         let mir = db
-            .mir_with_obvious_optimized(module.clone(), MirConfig::default())
+            .mir_with_obvious_optimized(module.clone(), config.clone())
             .unwrap();
-        info!("Optimized MIR:\n{mir:?}");
+        if debug {
+            module.dump_associated_debug_file("optimized_mir", &format!("{mir:?}"));
+        }
     });
 
     // return None;
     let lir = tracing::span!(Level::DEBUG, "Lowering MIR to LIR").in_scope(|| {
-        let lir = db.lir(module.clone(), MirConfig::default()).unwrap();
+        let lir = db.lir(module.clone(), config.clone()).unwrap();
         if debug {
             module.dump_associated_debug_file("lir", &format!("{lir}"));
         }
@@ -229,11 +234,15 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         ModuleKind::Code,
     );
 
-    if raw_build(&db, module.clone(), false).is_none() {
+    let config = MirConfig {
+        register_fuzzables: false,
+        trace_calls: false,
+        trace_evaluated_expressions: false,
+    };
+    if raw_build(&db, module.clone(), &config, false).is_none() {
         warn!("File not found.");
         return Err(Exit::FileNotFound);
     };
-    // TODO: Optimize the code before running.
 
     let path_string = options.file.to_string_lossy();
     debug!("Running `{path_string}`.");
@@ -244,10 +253,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let mut vm = Vm::new();
     vm.set_up_for_running_module_closure(module.clone(), module_closure);
     vm.run(
-        &DbUseProvider {
-            db: &db,
-            config: MirConfig::default(),
-        },
+        &DbUseProvider { db: &db, config },
         &mut RunForever,
         &mut tracer,
     );
@@ -388,8 +394,13 @@ async fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
         options.file.clone(),
         ModuleKind::Code,
     );
+    let config = MirConfig {
+        register_fuzzables: true,
+        trace_calls: false,
+        trace_evaluated_expressions: false,
+    };
 
-    if raw_build(&db, module.clone(), false).is_none() {
+    if raw_build(&db, module.clone(), &config, false).is_none() {
         warn!("File not found.");
         return Err(Exit::FileNotFound);
     }

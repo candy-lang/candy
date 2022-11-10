@@ -15,9 +15,9 @@ use crate::{
 };
 use itertools::Itertools;
 use std::collections::HashMap;
-use tracing::trace;
+use tracing::{debug, trace};
 
-const TRACE: bool = false;
+const TRACE: bool = true;
 
 /// A fiber represents an execution thread of a program. It's a stack-based
 /// machine that runs instructions from a LIR. Fibers are owned by a `Vm`.
@@ -28,7 +28,6 @@ pub struct Fiber {
     pub data_stack: Vec<Pointer>,
     pub call_stack: Vec<InstructionPointer>,
     pub import_stack: Vec<Module>,
-    pub responsible_stack: Vec<Id>,
     pub heap: Heap,
 }
 
@@ -94,7 +93,6 @@ impl Fiber {
             data_stack: vec![],
             call_stack: vec![],
             import_stack: vec![],
-            responsible_stack: vec![],
             heap,
         }
     }
@@ -221,6 +219,11 @@ impl Fiber {
     }
 
     fn get_from_data_stack(&self, offset: usize) -> Pointer {
+        debug!(
+            "Getting stuff from data stack. Len: {}, Offset: {}",
+            self.data_stack.len(),
+            offset
+        );
         self.data_stack[self.data_stack.len() - 1 - offset]
     }
     pub fn panic(&mut self, reason: String, responsible: hir::Id) {
@@ -255,37 +258,6 @@ impl Fiber {
             };
             let instruction = current_body[self.next_instruction.instruction].clone();
 
-            if TRACE {
-                trace!(
-                    "Instruction pointer: {}:{}",
-                    self.next_instruction.closure,
-                    self.next_instruction.instruction
-                );
-                trace!(
-                    "Data stack: {}",
-                    self.data_stack
-                        .iter()
-                        .map(|it| it.format(&self.heap))
-                        .join(", ")
-                );
-                trace!(
-                    "Call stack: {}",
-                    self.call_stack
-                        .iter()
-                        .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
-                        .join(", ")
-                );
-                trace!(
-                    "Responsible stack: {}",
-                    self.responsible_stack
-                        .iter()
-                        .map(|responsible| format!("{}", responsible))
-                        .join(", ")
-                );
-                trace!("Heap: {:?}", self.heap);
-                trace!("Running instruction: {instruction:?}");
-            }
-
             self.next_instruction.instruction += 1;
             self.run_instruction(use_provider, tracer, instruction);
             execution_controller.instruction_executed();
@@ -301,6 +273,29 @@ impl Fiber {
         tracer: &mut FiberTracer,
         instruction: Instruction,
     ) {
+        if TRACE {
+            debug!(
+                "Instruction pointer: {}:{}",
+                self.next_instruction.closure, self.next_instruction.instruction
+            );
+            debug!(
+                "Data stack: {}",
+                self.data_stack
+                    .iter()
+                    .map(|it| it.format(&self.heap))
+                    .join(", ")
+            );
+            debug!(
+                "Call stack: {}",
+                self.call_stack
+                    .iter()
+                    .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
+                    .join(", ")
+            );
+            debug!("Heap: {:?}", self.heap);
+            debug!("Running instruction: {instruction:?}");
+        }
+
         match instruction {
             Instruction::CreateInt(int) => {
                 let address = self.heap.create_int(int);
@@ -332,7 +327,8 @@ impl Fiber {
                 self.data_stack.push(address);
             }
             Instruction::CreateHirId(id) => {
-                todo!()
+                let address = self.heap.create_hir_id(id);
+                self.data_stack.push(address);
             }
             Instruction::CreateClosure {
                 num_args,
@@ -371,18 +367,18 @@ impl Fiber {
                 self.data_stack.push(top);
             }
             Instruction::Call { num_args } => {
-                let responsible = self.data_stack.pop().unwrap();
+                let responsible_address = self.data_stack.pop().unwrap();
                 let mut args = vec![];
                 for _ in 0..num_args {
                     args.push(self.data_stack.pop().unwrap());
                 }
-                let closure_address = self.data_stack.pop().unwrap();
+                let callee_address = self.data_stack.pop().unwrap();
 
+                let callee = self.heap.get(callee_address);
                 args.reverse();
-                let responsible = self.heap.get_hir_id(responsible);
+                let responsible = self.heap.get_hir_id(responsible_address);
 
-                let object = self.heap.get(closure_address);
-                match object.data.clone() {
+                match callee.data.clone() {
                     Data::Closure(Closure {
                         captured,
                         num_args: expected_num_args,
@@ -393,24 +389,26 @@ impl Fiber {
                             return;
                         }
 
+                        debug!("Executing call. Pushing {} captured values, {} args, and responsible address {}.", captured.len(), args.len(), responsible_address);
                         self.call_stack.push(self.next_instruction);
                         self.data_stack.append(&mut captured.clone());
                         for captured in captured {
                             self.heap.dup(captured);
                         }
                         self.data_stack.append(&mut args);
+                        self.data_stack.push(responsible_address);
                         self.next_instruction =
-                            InstructionPointer::start_of_closure(closure_address);
+                            InstructionPointer::start_of_closure(callee_address);
                     }
                     Data::Builtin(Builtin { function: builtin }) => {
-                        self.heap.drop(closure_address);
-                        self.run_builtin_function(&builtin, &args, responsible);
+                        self.heap.drop(callee_address);
+                        self.run_builtin_function(&builtin, &args, responsible_address);
                     }
                     _ => {
                         self.panic(
                             format!(
                                 "you can only call closures and builtins, but you tried to call {}",
-                                object.format(&self.heap),
+                                callee.format(&self.heap),
                             ),
                             responsible,
                         );
@@ -499,14 +497,15 @@ impl Fiber {
                 self.import_stack.pop().unwrap();
             }
             Instruction::TraceCallStarts { num_args } => {
-                let responsible = self.data_stack.pop().unwrap();
+                let call_site = self.data_stack.pop().unwrap();
+                let responsible = self.data_stack[self.data_stack.len() - 2];
                 let mut args = vec![];
-                for _ in 0..num_args {
-                    args.push(self.data_stack.pop().unwrap());
+                for i in 0..num_args {
+                    args.push(self.data_stack[self.data_stack.len() - 1 - num_args + i]);
                 }
-                let closure_address = self.data_stack.pop().unwrap();
-                let code_reference = self.data_stack.pop().unwrap();
+                let closure_address = self.data_stack[self.data_stack.len() - 2 - num_args];
 
+                let call_site = self.heap.get_hir_id(call_site);
                 args.reverse();
                 let responsible = self.heap.get_hir_id(responsible);
 

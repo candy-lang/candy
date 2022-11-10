@@ -134,29 +134,16 @@ impl Struct {
 }
 
 impl Closure {
-    pub fn of_module_lir(module: Module, lir: Lir) -> Self {
+    pub fn of_module_lir(lir: Lir) -> Self {
         Closure {
             captured: vec![],
             num_args: 0,
-            body: vec![
-                Instruction::ModuleStarts {
-                    module: module.clone(),
-                },
-                Instruction::CreateClosure {
-                    captured: vec![],
-                    num_args: 0,
-                    body: lir.instructions,
-                },
-                Instruction::CreateHirId(Id::new(module, vec![])),
-                Instruction::Call { num_args: 0 },
-                Instruction::ModuleEnds,
-                Instruction::Return,
-            ],
+            body: lir.instructions,
         }
     }
     pub fn of_module(db: &Database, module: Module, config: MirConfig) -> Option<Self> {
         let lir = db.lir(module.clone(), config)?;
-        Some(Self::of_module_lir(module, (*lir).clone()))
+        Some(Self::of_module_lir((*lir).clone()))
     }
 }
 
