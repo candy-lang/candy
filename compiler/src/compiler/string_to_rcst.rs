@@ -752,14 +752,19 @@ mod parse {
             let mut did_make_progress = false;
 
             'structAccess: {
-                let (new_input, whitespace) =
+                let (new_input, whitespace_after_struct) =
                     whitespaces_and_newlines(input, indentation + 1, true);
+
                 let Some((new_input, dot)) = dot(new_input) else { break 'structAccess; };
+                let (new_input, whitespace_after_dot) =
+                    whitespaces_and_newlines(new_input, indentation + 1, true);
+                let dot = dot.wrap_in_whitespace(whitespace_after_dot);
+
                 let Some((new_input, key)) = identifier(new_input) else { break 'structAccess; };
 
                 input = new_input;
                 result = Rcst::StructAccess {
-                    struct_: Box::new(result.wrap_in_whitespace(whitespace)),
+                    struct_: Box::new(result.wrap_in_whitespace(whitespace_after_struct)),
                     dot: Box::new(dot),
                     key: Box::new(key),
                 };
