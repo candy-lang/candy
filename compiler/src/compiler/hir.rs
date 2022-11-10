@@ -202,6 +202,7 @@ impl Expression {
         Expression::Symbol("Nothing".to_string())
     }
 }
+#[allow(clippy::derive_hash_xor_eq)]
 impl hash::Hash for Expression {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
@@ -220,6 +221,7 @@ pub struct Body {
     pub expressions: LinkedHashMap<Id, Expression>,
     pub identifiers: HashMap<Id, String>,
 }
+#[allow(clippy::derive_hash_xor_eq)]
 impl hash::Hash for Body {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.expressions.hash(state);

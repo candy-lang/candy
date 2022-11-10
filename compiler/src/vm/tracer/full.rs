@@ -1,12 +1,7 @@
-use itertools::Itertools;
-
-use crate::{
-    module::Module,
-    vm::{ChannelId, FiberId, Heap, Pointer},
-};
-use std::{collections::HashMap, fmt, time::Instant};
-
 use super::{FiberEvent, Tracer, VmEvent};
+use crate::vm::{ChannelId, FiberId, Heap, Pointer};
+use itertools::Itertools;
+use std::{collections::HashMap, fmt, time::Instant};
 
 /// A full tracer that saves all events that occur with timestamps.
 #[derive(Clone, Default)]
@@ -52,12 +47,6 @@ pub enum StoredVmEvent {
 }
 #[derive(Clone)]
 pub enum StoredFiberEvent {
-    ModuleStarted {
-        module: Module,
-    },
-    ModuleEnded {
-        export_map: Pointer,
-    },
     ValueEvaluated {
         expression: Pointer,
         value: Pointer,
@@ -129,11 +118,6 @@ impl FullTracer {
     }
     fn map_fiber_event(&mut self, event: FiberEvent, fiber: FiberId) -> StoredFiberEvent {
         match event {
-            FiberEvent::ModuleStarted { module } => StoredFiberEvent::ModuleStarted { module },
-            FiberEvent::ModuleEnded { export_map, heap } => {
-                let export_map = self.import_from_heap(export_map, heap, Some(fiber));
-                StoredFiberEvent::ModuleEnded { export_map }
-            }
             FiberEvent::ValueEvaluated {
                 expression: id,
                 value,
@@ -214,12 +198,6 @@ impl fmt::Debug for FullTracer {
                     StoredVmEvent::InFiber { fiber, event } => format!(
                         "{fiber:?}: {}",
                         match event {
-                            StoredFiberEvent::ModuleStarted { module } =>
-                                format!("module {module} started"),
-                            StoredFiberEvent::ModuleEnded { export_map } => format!(
-                                "module ended and exported {}",
-                                export_map.format(&self.heap)
-                            ),
                             StoredFiberEvent::ValueEvaluated { expression, value } =>
                                 format!("value {expression} is {}", value.format(&self.heap)),
                             StoredFiberEvent::FoundFuzzableClosure { definition, .. } =>
@@ -230,9 +208,10 @@ impl fmt::Debug for FullTracer {
                                 arguments,
                                 responsible,
                             } => format!(
-                                "call {call_site} started: {} {}",
+                                "call {call_site} started: {} {} ({} is responsible)",
                                 closure.format(&self.heap),
-                                arguments.iter().map(|arg| arg.format(&self.heap)).join(" ")
+                                arguments.iter().map(|arg| arg.format(&self.heap)).join(" "),
+                                self.heap.get_hir_id(*responsible),
                             ),
                             StoredFiberEvent::CallEnded { return_value } =>
                                 format!("call ended: {}", return_value.format(&self.heap)),

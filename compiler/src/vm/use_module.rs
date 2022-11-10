@@ -27,7 +27,7 @@ impl Fiber {
         let target = UsePath::parse(path.value.as_str())?;
         let module = target.resolve_relative_to(current_module)?;
 
-        match use_provider.use_module(module.clone())? {
+        match use_provider.use_module(module)? {
             UseResult::Asset(bytes) => {
                 let bytes = bytes
                     .iter()

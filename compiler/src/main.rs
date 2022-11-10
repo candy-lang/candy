@@ -34,7 +34,7 @@ use crate::{
     },
 };
 use compiler::{
-    hir_to_mir::{HirToMir, MirConfig},
+    hir_to_mir::{HirToMir, TracingConfig},
     lir::Lir,
     optimize::OptimizeMir,
 };
@@ -117,7 +117,12 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         options.file.clone(),
         ModuleKind::Code,
     );
-    let result = raw_build(&db, module.clone(), &MirConfig::default(), options.debug);
+    let result = raw_build(
+        &db,
+        module.clone(),
+        &TracingConfig::default(),
+        options.debug,
+    );
 
     if !options.watch {
         match result {
@@ -133,14 +138,24 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         loop {
             match rx.recv() {
                 Ok(_) => {
-                    raw_build(&db, module.clone(), &MirConfig::default(), options.debug);
+                    raw_build(
+                        &db,
+                        module.clone(),
+                        &TracingConfig::default(),
+                        options.debug,
+                    );
                 }
                 Err(e) => error!("watch error: {e:#?}"),
             }
         }
     }
 }
-fn raw_build(db: &Database, module: Module, config: &MirConfig, debug: bool) -> Option<Arc<Lir>> {
+fn raw_build(
+    db: &Database,
+    module: Module,
+    config: &TracingConfig,
+    debug: bool,
+) -> Option<Arc<Lir>> {
     tracing::span!(Level::DEBUG, "Parsing string to RCST").in_scope(|| {
         let rcst = db
             .rcst(module.clone())
@@ -234,7 +249,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         ModuleKind::Code,
     );
 
-    let config = MirConfig {
+    let config = TracingConfig {
         register_fuzzables: false,
         trace_calls: false,
         trace_evaluated_expressions: false,
@@ -247,7 +262,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let path_string = options.file.to_string_lossy();
     debug!("Running `{path_string}`.");
 
-    let module_closure = Closure::of_module(&db, module.clone(), MirConfig::default()).unwrap();
+    let module_closure = Closure::of_module(&db, module.clone(), TracingConfig::default()).unwrap();
     let mut tracer = FullTracer::default();
 
     let mut vm = Vm::new();
@@ -329,7 +344,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
                 vm.run(
                     &DbUseProvider {
                         db: &db,
-                        config: MirConfig::default(),
+                        config: TracingConfig::default(),
                     },
                     &mut RunForever,
                     &mut tracer,
@@ -398,7 +413,7 @@ async fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
         options.file.clone(),
         ModuleKind::Code,
     );
-    let config = MirConfig {
+    let config = TracingConfig {
         register_fuzzables: true,
         trace_calls: false,
         trace_evaluated_expressions: false,

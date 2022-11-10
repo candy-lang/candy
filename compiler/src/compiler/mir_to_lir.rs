@@ -1,6 +1,6 @@
 use super::{
     cst::CstDb,
-    hir_to_mir::MirConfig,
+    hir_to_mir::TracingConfig,
     lir::{Instruction, Lir, StackOffset},
     mir::{Body, Expression, Id},
     optimize::OptimizeMir,
@@ -11,10 +11,10 @@ use std::sync::Arc;
 
 #[salsa::query_group(MirToLirStorage)]
 pub trait MirToLir: CstDb + OptimizeMir {
-    fn lir(&self, module: Module, config: MirConfig) -> Option<Arc<Lir>>;
+    fn lir(&self, module: Module, config: TracingConfig) -> Option<Arc<Lir>>;
 }
 
-fn lir(db: &dyn MirToLir, module: Module, config: MirConfig) -> Option<Arc<Lir>> {
+fn lir(db: &dyn MirToLir, module: Module, config: TracingConfig) -> Option<Arc<Lir>> {
     let mir = db.mir_with_obvious_optimized(module, config)?;
     let instructions = compile_lambda(&[], &[], &mir.body);
     Some(Arc::new(Lir { instructions }))
@@ -136,10 +136,6 @@ impl LoweringContext {
                         current_module: current_module.clone(),
                     },
                 );
-            }
-            Expression::Error { errors, .. } => {
-                // TODO(before merging PR): Point to optimization that removes needs.
-                panic!("The MIR shouldn't contain compiler error expressions anymore.");
             }
             Expression::Panic {
                 reason,

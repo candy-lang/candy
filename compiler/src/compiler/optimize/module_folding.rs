@@ -29,7 +29,7 @@
 
 use crate::{
     compiler::{
-        hir_to_mir::MirConfig,
+        hir_to_mir::TracingConfig,
         mir::{Expression, Id, Mir},
         optimize::OptimizeMir,
     },
@@ -39,7 +39,7 @@ use std::collections::HashMap;
 use tracing::warn;
 
 impl Mir {
-    pub fn fold_modules(&mut self, db: &dyn OptimizeMir, config: &MirConfig) {
+    pub fn fold_modules(&mut self, db: &dyn OptimizeMir, config: &TracingConfig) {
         self.body.visit(&mut |_, expression, visible, _| {
             let Expression::UseModule {
                     current_module,

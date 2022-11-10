@@ -1,5 +1,5 @@
 use crate::{
-    compiler::{hir_to_mir::MirConfig, lir::Lir, mir_to_lir::MirToLir},
+    compiler::{hir_to_mir::TracingConfig, lir::Lir, mir_to_lir::MirToLir},
     database::Database,
     module::{Module, ModuleDb, ModuleKind},
 };
@@ -26,7 +26,7 @@ impl UseProvider for PanickingUseProvider {
 
 pub struct DbUseProvider<'a> {
     pub db: &'a Database,
-    pub config: MirConfig,
+    pub config: TracingConfig,
 }
 impl<'a> UseProvider for DbUseProvider<'a> {
     fn use_module(&self, module: Module) -> Result<UseResult, String> {

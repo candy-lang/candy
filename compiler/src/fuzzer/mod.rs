@@ -7,7 +7,7 @@ pub use self::{
     utils::FuzzablesFinder,
 };
 use crate::{
-    compiler::{hir::Id, hir_to_mir::MirConfig},
+    compiler::{hir::Id, hir_to_mir::TracingConfig},
     database::Database,
     module::Module,
     vm::{
@@ -25,12 +25,12 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
         let mut vm = Vm::new();
         vm.set_up_for_running_module_closure(
             module.clone(),
-            Closure::of_module(db, module, MirConfig::default()).unwrap(),
+            Closure::of_module(db, module, TracingConfig::default()).unwrap(),
         );
         vm.run(
             &DbUseProvider {
                 db,
-                config: MirConfig::default(),
+                config: TracingConfig::default(),
             },
             &mut RunForever,
             &mut tracer,
@@ -51,7 +51,7 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
         fuzzer.run(
             &mut DbUseProvider {
                 db,
-                config: MirConfig::default(),
+                config: TracingConfig::default(),
             },
             &mut RunLimitedNumberOfInstructions::new(1000),
         );

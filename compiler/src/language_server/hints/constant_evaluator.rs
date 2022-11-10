@@ -5,7 +5,7 @@ use crate::{
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
         hir::Id,
-        hir_to_mir::MirConfig,
+        hir_to_mir::TracingConfig,
     },
     database::Database,
     language_server::hints::{utils::id_to_end_of_line, HintKind},
@@ -15,7 +15,7 @@ use crate::{
         context::{DbUseProvider, RunLimitedNumberOfInstructions},
         tracer::{
             full::{FullTracer, StoredFiberEvent, StoredVmEvent, TimedEvent},
-            stack_trace::StackEntry,
+            stack_trace::Call,
         },
         Closure, FiberId, Heap, Pointer, Vm,
     },
@@ -40,7 +40,7 @@ impl ConstantEvaluator {
         let mut vm = Vm::new();
         vm.set_up_for_running_module_closure(
             module.clone(),
-            Closure::of_module(db, module.clone(), MirConfig::default()).unwrap(),
+            Closure::of_module(db, module.clone(), TracingConfig::default()).unwrap(),
         );
         self.evaluators.insert(module, Evaluator { tracer, vm });
     }
@@ -66,7 +66,7 @@ impl ConstantEvaluator {
             evaluator.vm.run(
                 &DbUseProvider {
                     db,
-                    config: MirConfig::default(),
+                    config: TracingConfig::default(),
                 },
                 &mut RunLimitedNumberOfInstructions::new(500),
                 &mut evaluator.tracer,
@@ -165,21 +165,19 @@ fn panic_hint(
     }
 
     let last_call_in_this_module = stack.iter().find(|entry| {
-        let StackEntry::Call { call_site, .. } = entry else {
-            return false;
-        };
+        let Call { call_site, .. } = entry;
         let call_site = evaluator.tracer.heap.get_hir_id(*call_site);
         // Make sure the entry comes from the same file and is not generated
         // code.
         call_site.module == module && db.hir_to_cst_id(call_site).is_some()
     })?;
 
-    let StackEntry::Call {
+    let Call {
         call_site,
         closure,
         arguments: args,
-        responsible: _,
-    } = last_call_in_this_module else { unreachable!(); };
+        ..
+    } = last_call_in_this_module;
     let call_site = evaluator.tracer.heap.get_hir_id(*call_site);
     let call_info = format!(
         "{} {}",

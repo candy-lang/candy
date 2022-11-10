@@ -3,7 +3,7 @@ use crate::{
     compiler::{
         ast_to_hir::AstToHir,
         hir::{Expression, HirDb, Id, Lambda},
-        hir_to_mir::MirConfig,
+        hir_to_mir::TracingConfig,
     },
     database::Database,
     fuzzer::{Fuzzer, Status},
@@ -58,7 +58,7 @@ impl FuzzerManager {
         fuzzer.run(
             &mut DbUseProvider {
                 db,
-                config: MirConfig::default(),
+                config: TracingConfig::default(),
             },
             &mut RunLimitedNumberOfInstructions::new(100),
         );

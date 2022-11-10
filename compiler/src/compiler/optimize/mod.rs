@@ -56,7 +56,7 @@ mod utils;
 
 use super::{
     hir,
-    hir_to_mir::{HirToMir, MirConfig},
+    hir_to_mir::{HirToMir, TracingConfig},
     mir::{Body, Expression, Mir},
 };
 use crate::{module::Module, utils::IdGenerator};
@@ -66,13 +66,14 @@ use tracing::debug;
 #[salsa::query_group(OptimizeMirStorage)]
 pub trait OptimizeMir: HirToMir {
     #[salsa::cycle(recover_from_cycle)]
-    fn mir_with_obvious_optimized(&self, module: Module, config: MirConfig) -> Option<Arc<Mir>>;
+    fn mir_with_obvious_optimized(&self, module: Module, config: TracingConfig)
+        -> Option<Arc<Mir>>;
 }
 
 fn mir_with_obvious_optimized(
     db: &dyn OptimizeMir,
     module: Module,
-    config: MirConfig,
+    config: TracingConfig,
 ) -> Option<Arc<Mir>> {
     let mir = db.mir(module.clone(), config.clone())?;
     let mut mir = (*mir).clone();
@@ -81,17 +82,13 @@ fn mir_with_obvious_optimized(
 }
 
 impl Mir {
-    // pub fn optimize(&mut self, db: &Database) {
-    //     debug!("MIR: {self:?}");
-    //     debug!("Complexity: {}", self.complexity());
-    //     self.optimize_obvious(db, &[]);
-    //     debug!("Done optimizing.");
-    //     debug!("MIR: {self:?}");
-    //     debug!("Complexity: {}", self.complexity());
-    // }
-
     /// Performs optimizations that improve both performance and code size.
-    pub fn optimize_obvious(&mut self, module: Module, db: &dyn OptimizeMir, config: &MirConfig) {
+    pub fn optimize_obvious(
+        &mut self,
+        module: Module,
+        db: &dyn OptimizeMir,
+        config: &TracingConfig,
+    ) {
         debug!("{module}: {}", self.complexity());
         self.optimize_obvious_self_contained();
         debug!("{module}: {}", self.complexity());
@@ -131,25 +128,18 @@ impl Mir {
 
 fn recover_from_cycle(
     _db: &dyn OptimizeMir,
-    _cycle: &Vec<String>,
+    cycle: &[String],
     module: &Module,
-    _config: &MirConfig,
+    _config: &TracingConfig,
 ) -> Option<Arc<Mir>> {
-    // self.panic(format!(
-    //     "there's an import cycle ({})",
-    //     self.import_stack
-    //         .iter()
-    //         .skip_while(|it| **it != module)
-    //         .chain([&module])
-    //         .map(|module| format!("{module}"))
-    //         .join(" → "),
-    // ));
-
     let mut id_generator = IdGenerator::start_at(0);
     let mut body = Body::new();
     let reason = body.push_with_new_id(
         &mut id_generator,
-        Expression::Text("There's a cycle in the used modules.".to_string()),
+        Expression::Text(format!(
+            "There's a cycle in the used modules: {}",
+            cycle.join(" → ")
+        )),
     );
     let responsible = body.push_with_new_id(
         &mut id_generator,

@@ -36,33 +36,34 @@ use crate::{
 impl Mir {
     pub fn fold_constants(&mut self) {
         self.body.visit(&mut |_, expression, visible, _| {
-            match expression {
-                Expression::Call {
-                    function,
-                    arguments,
-                    responsible,
-                    ..
-                } => {
-                    if let Expression::Builtin(builtin) = visible.get(*function) &&
-                        let Some(result) = Self::run_builtin(*builtin, arguments, visible)
-                    {
-                        let evaluated_call = match result {
-                            Ok(return_value) => return_value,
-                            Err(panic_reason) => {
-                                let mut body = Body::new();
-                                let reason = body.push_with_new_id(&mut self.id_generator, Expression::Text(panic_reason));
-                                body.push_with_new_id(&mut self.id_generator, Expression::Panic { reason, responsible: *responsible });
-                                Expression::Multiple(body)
+            let Expression::Call {
+                function,
+                arguments,
+                responsible,
+                ..
+            } = expression else { return; };
+            let Expression::Builtin(builtin) = visible.get(*function) else { return; };
+
+            if let Some(result) = Self::run_builtin(*builtin, arguments, visible) {
+                let evaluated_call = match result {
+                    Ok(return_value) => return_value,
+                    Err(panic_reason) => {
+                        let mut body = Body::new();
+                        let reason = body.push_with_new_id(
+                            &mut self.id_generator,
+                            Expression::Text(panic_reason),
+                        );
+                        body.push_with_new_id(
+                            &mut self.id_generator,
+                            Expression::Panic {
+                                reason,
+                                responsible: *responsible,
                             },
-                        };
-                        *expression = evaluated_call;
+                        );
+                        Expression::Multiple(body)
                     }
-                }
-                Expression::Error { child, errors } => {
-                    // TODO (before merging PR): Remove and replace with a
-                    // panic.
-                }
-                _ => {}
+                };
+                *expression = evaluated_call;
             }
         });
     }

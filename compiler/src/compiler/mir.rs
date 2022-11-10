@@ -1,4 +1,4 @@
-use super::{error::CompilerError, hir};
+use super::hir;
 use crate::{
     builtin_functions::BuiltinFunction,
     module::Module,
@@ -62,12 +62,7 @@ pub enum Expression {
         reason: Id,
         responsible: Id,
     },
-    // TODO: Think about removing this. We should be able to model this using a
-    // `Panic` instead. Also think about how the child will be handled.
-    Error {
-        child: Option<Id>,
-        errors: Vec<CompilerError>,
-    },
+
     /// For convenience when writing optimization passes, this expression allows
     /// storing multiple inner expressions in a single expression. The expansion
     /// back into multiple expressions happens in the [multiple flattening]
@@ -260,6 +255,7 @@ impl VisibleExpressions {
     }
 }
 
+#[allow(clippy::derive_hash_xor_eq)]
 impl hash::Hash for Expression {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
@@ -298,7 +294,6 @@ impl hash::Hash for Expression {
                 reason.hash(state);
                 responsible.hash(state);
             }
-            Expression::Error { errors, .. } => errors.hash(state),
             Expression::Multiple(body) => body.hash(state),
             Expression::ModuleStarts { module } => module.hash(state),
             Expression::ModuleEnds => {},
@@ -394,12 +389,6 @@ impl fmt::Debug for Expression {
                 reason,
                 responsible,
             } => write!(f, "panicking because {reason} ({responsible} is at fault)"),
-            Expression::Error { errors, .. } => {
-                write!(f, "{}\n{}",
-                    format!("{}", if errors.len() == 1 { "error" } else { "errors" }),
-                    errors.iter().map(|error| format!("  {error:?}")).join("\n"),
-                )
-            }
             Expression::Multiple(body) => write!(f,
                 "\n{}",
                 format!("{body}")

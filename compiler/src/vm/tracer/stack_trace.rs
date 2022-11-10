@@ -10,7 +10,6 @@ use crate::{
     },
     database::Database,
     language_server::utils::LspPositionConversion,
-    module::Module,
 };
 use itertools::Itertools;
 use pad::PadStr;
@@ -21,40 +20,27 @@ use tracing::debug;
 // trace at a given moment in time.
 
 #[derive(Clone)]
-pub enum StackEntry {
-    Call {
-        call_site: Pointer,
-        closure: Pointer,
-        arguments: Vec<Pointer>,
-        responsible: Pointer,
-    },
-    Module {
-        module: Module,
-    },
+pub struct Call {
+    pub call_site: Pointer,
+    pub closure: Pointer,
+    pub arguments: Vec<Pointer>,
+    pub responsible: Pointer,
 }
 
 impl FullTracer {
-    pub fn stack_traces(&self) -> HashMap<FiberId, Vec<StackEntry>> {
-        let mut stacks: HashMap<FiberId, Vec<StackEntry>> = HashMap::new();
+    pub fn stack_traces(&self) -> HashMap<FiberId, Vec<Call>> {
+        let mut stacks: HashMap<FiberId, Vec<Call>> = HashMap::new();
         for timed_event in &self.events {
             let StoredVmEvent::InFiber { fiber, event } = &timed_event.event else { continue; };
             let stack = stacks.entry(*fiber).or_default();
             match event {
-                StoredFiberEvent::ModuleStarted { module } => {
-                    stack.push(StackEntry::Module {
-                        module: module.clone(),
-                    });
-                }
-                StoredFiberEvent::ModuleEnded { .. } => {
-                    assert!(matches!(stack.pop().unwrap(), StackEntry::Module { .. }));
-                }
                 StoredFiberEvent::CallStarted {
                     call_site,
                     closure,
                     arguments,
                     responsible,
                 } => {
-                    stack.push(StackEntry::Call {
+                    stack.push(Call {
                         call_site: *call_site,
                         closure: *closure,
                         arguments: arguments.clone(),
@@ -62,68 +48,54 @@ impl FullTracer {
                     });
                 }
                 StoredFiberEvent::CallEnded { .. } => {
-                    assert!(matches!(stack.pop().unwrap(), StackEntry::Call { .. }));
+                    assert!(matches!(stack.pop().unwrap(), Call { .. }));
                 }
                 _ => {}
             }
         }
         stacks
     }
-    pub fn format_stack_trace(&self, db: &Database, stack: &[StackEntry]) -> String {
+    pub fn format_stack_trace(&self, db: &Database, stack: &[Call]) -> String {
         let mut caller_locations_and_calls = vec![];
 
-        for entry in stack.iter().rev() {
-            let hir_id = match entry {
-                StackEntry::Call { call_site: id, .. } => Some(id),
-                StackEntry::Module { .. } => None,
-            };
-            let hir_id = hir_id.map(|id| self.heap.get_hir_id(*id));
-            let (cst_id, span) = if let Some(hir_id) = hir_id.clone() {
-                let module = hir_id.module.clone();
-                let cst_id = db.hir_to_cst_id(hir_id.clone());
-                let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
-                let span = cst.map(|cst| {
-                    (
-                        db.offset_to_lsp(module.clone(), cst.span.start),
-                        db.offset_to_lsp(module.clone(), cst.span.end),
-                    )
-                });
-                (cst_id, span)
-            } else {
-                (None, None)
-            };
+        for Call {
+            call_site,
+            closure,
+            arguments,
+            responsible: _,
+        } in stack.iter().rev()
+        {
+            let hir_id = self.heap.get_hir_id(*call_site);
+            let module = hir_id.module.clone();
+            let cst_id = db.hir_to_cst_id(hir_id.clone());
+            let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
+            let span = cst.map(|cst| {
+                (
+                    db.offset_to_lsp(module.clone(), cst.span.start),
+                    db.offset_to_lsp(module.clone(), cst.span.end),
+                )
+            });
             let caller_location_string = format!(
-                "{} {}",
-                hir_id
-                    .clone()
-                    .map(|id| format!("{id}"))
-                    .unwrap_or_else(|| "<no hir>".to_string()),
+                "{hir_id} {}",
                 span.map(|((start_line, start_col), (end_line, end_col))| format!(
                     "{}:{} – {}:{}",
                     start_line, start_col, end_line, end_col
                 ))
                 .unwrap_or_else(|| "<no location>".to_string())
             );
-            let call_string = match entry {
-                StackEntry::Call {
-                    closure,
-                    arguments: args,
-                    ..
-                } => format!(
-                    "{} {}",
-                    cst_id
-                        .and_then(|id| {
-                            let cst = db.find_cst(hir_id.unwrap().module.clone(), id);
-                            match cst.kind {
-                                CstKind::Call { receiver, .. } => receiver.extract_receiver_name(),
-                                _ => None,
-                            }
-                        })
-                        .unwrap_or_else(|| closure.format(&self.heap)),
-                    args.iter().map(|arg| arg.format(&self.heap)).join(" ")
-                ),
-                StackEntry::Module { module } => format!("module {module}"),
-            };
+            let call_string = format!(
+                "{} {}",
+                cst_id
+                    .and_then(|id| {
+                        let cst = db.find_cst(hir_id.module.clone(), id);
+                        match cst.kind {
+                            CstKind::Call { receiver, .. } => receiver.extract_receiver_name(),
+                            _ => None,
+                        }
+                    })
+                    .unwrap_or_else(|| closure.format(&self.heap)),
+                arguments.iter().map(|arg| arg.format(&self.heap)).join(" ")
+            );
             caller_locations_and_calls.push((caller_location_string, call_string));
         }
 

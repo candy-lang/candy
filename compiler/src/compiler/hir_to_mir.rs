@@ -14,27 +14,34 @@ use std::{collections::HashMap, sync::Arc};
 
 #[salsa::query_group(HirToMirStorage)]
 pub trait HirToMir: CstDb + AstToHir {
-    fn mir(&self, module: Module, config: MirConfig) -> Option<Arc<Mir>>;
+    fn mir(&self, module: Module, config: TracingConfig) -> Option<Arc<Mir>>;
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Default)]
-pub struct MirConfig {
+pub struct TracingConfig {
     pub register_fuzzables: bool,
     pub trace_calls: bool,
     pub trace_evaluated_expressions: bool,
 }
 
-fn mir(db: &dyn HirToMir, module: Module, config: MirConfig) -> Option<Arc<Mir>> {
+fn mir(db: &dyn HirToMir, module: Module, config: TracingConfig) -> Option<Arc<Mir>> {
     let (hir, _) = db.hir(module.clone())?;
     let hir = (*hir).clone();
     let mir = compile_module(module, hir, &config);
     Some(Arc::new(mir))
 }
 
-fn compile_module(module: Module, hir: hir::Body, config: &MirConfig) -> Mir {
+fn compile_module(module: Module, hir: hir::Body, config: &TracingConfig) -> Mir {
     let mut id_generator = IdGenerator::start_at(0);
     let mut body = Body::new();
     let mut mapping = HashMap::<hir::Id, Id>::new();
+
+    body.push_with_new_id(
+        &mut id_generator,
+        Expression::ModuleStarts {
+            module: module.clone(),
+        },
+    );
 
     let needs_function = generate_needs_function(&mut id_generator);
     let needs_function = body.push_with_new_id(&mut id_generator, needs_function);
@@ -55,6 +62,10 @@ fn compile_module(module: Module, hir: hir::Body, config: &MirConfig) -> Mir {
             config,
         );
     }
+
+    let return_value = body.return_value();
+    body.push_with_new_id(&mut id_generator, Expression::ModuleEnds);
+    body.push_with_new_id(&mut id_generator, Expression::Reference(return_value));
 
     Mir { id_generator, body }
 }
@@ -242,6 +253,8 @@ impl<'a> LambdaBuilder<'a> {
     }
 }
 
+// Nothing to see here.
+#[allow(clippy::too_many_arguments)]
 fn compile_expression(
     id_generator: &mut IdGenerator<Id>,
     body: &mut Body,
@@ -250,7 +263,7 @@ fn compile_expression(
     responsible_for_needs: Id,
     hir_id: &hir::Id,
     expression: hir::Expression,
-    config: &MirConfig,
+    config: &TracingConfig,
 ) {
     let expression = match expression {
         hir::Expression::Int(int) => Expression::Int(int.into()),
@@ -383,10 +396,24 @@ fn compile_expression(
                 responsible,
             }
         }
-        hir::Expression::Error { child, errors } => Expression::Error {
-            child: child.map(|child| mapping[&child]),
-            errors,
-        },
+        hir::Expression::Error { errors, .. } => {
+            let reason = body.push_with_new_id(
+                id_generator,
+                Expression::Text(format!(
+                    "The code still contains errors:\n{}",
+                    errors
+                        .into_iter()
+                        .map(|error| format!("{error:?}"))
+                        .join("\n"),
+                )),
+            );
+            let responsible =
+                body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
+            Expression::Panic {
+                reason,
+                responsible,
+            }
+        }
     };
 
     let id = body.push_with_new_id(id_generator, expression);

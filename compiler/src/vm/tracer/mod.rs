@@ -3,7 +3,6 @@ pub mod full;
 pub mod stack_trace;
 
 use super::{heap::Pointer, ChannelId, FiberId, Heap};
-use crate::module::Module;
 
 /// An event that happened inside a VM.
 #[derive(Clone)]
@@ -39,13 +38,6 @@ pub enum VmEvent<'event> {
 /// An event that happened inside a fiber.
 #[derive(Clone)]
 pub enum FiberEvent<'event> {
-    ModuleStarted {
-        module: Module,
-    },
-    ModuleEnded {
-        export_map: Pointer,
-        heap: &'event Heap,
-    },
     ValueEvaluated {
         expression: Pointer,
         value: Pointer,
@@ -120,12 +112,6 @@ impl<'fiber> FiberTracer<'fiber> {
         });
     }
 
-    pub fn module_started(&mut self, module: Module) {
-        self.add(FiberEvent::ModuleStarted { module });
-    }
-    pub fn module_ended(&mut self, export_map: Pointer, heap: &Heap) {
-        self.add(FiberEvent::ModuleEnded { export_map, heap });
-    }
     pub fn value_evaluated(&mut self, expression: Pointer, value: Pointer, heap: &Heap) {
         self.add(FiberEvent::ValueEvaluated {
             expression,

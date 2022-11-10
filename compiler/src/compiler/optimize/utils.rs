@@ -94,11 +94,6 @@ impl Expression {
                 referenced.insert(*reason);
                 referenced.insert(*responsible);
             }
-            Expression::Error { child, .. } => {
-                if let Some(child) = child {
-                    referenced.insert(*child);
-                }
-            }
             Expression::Multiple(body) => body.collect_referenced_ids(referenced),
             Expression::ModuleStarts { .. } => {}
             Expression::ModuleEnds => {}
@@ -173,7 +168,6 @@ impl Expression {
             Expression::Call { .. } => false,
             Expression::UseModule { .. } => false,
             Expression::Panic { .. } => false,
-            Expression::Error { .. } => false,
             Expression::Multiple(body) => body.iter().all(|(_, expr)| expr.is_pure()),
             Expression::ModuleStarts { .. } => false,
             Expression::ModuleEnds => false,
@@ -286,11 +280,6 @@ impl Expression {
             } => {
                 replacer(reason);
                 replacer(responsible);
-            }
-            Expression::Error { child, .. } => {
-                if let Some(child) = child {
-                    replacer(child);
-                }
             }
             Expression::Multiple(body) => body.replace_id_references(replacer),
             Expression::TraceCallStarts {
