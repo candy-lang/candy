@@ -14,17 +14,9 @@ fib = { n -> fibRec fibRec n }
 twentyOne := fib 8
 
 main := { environment ->
-  print message = { core.channel.send environment.stdout message }
+  print message =
+    needs (core.text.is message)
+    core.channel.send environment.stdout message
+
   print "Hello, world!"
-
-  core.parallel { nursery ->
-    print (core.await (core.async nursery {
-      print "Hello from fiber!"
-      "Hello, async await!"
-    }))
-
-    core.async nursery { print "Kiwi" }
-    core.async nursery { print "Banana" }
-    print "Hi"
-  }
 }
