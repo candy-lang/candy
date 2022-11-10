@@ -12,7 +12,7 @@ use crate::{
     module::Module,
     vm::{
         context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
-        tracer::FullTracer,
+        tracer::full::FullTracer,
         Closure, Heap, Packet, Pointer, Vm,
     },
 };
