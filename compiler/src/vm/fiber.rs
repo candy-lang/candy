@@ -482,7 +482,7 @@ impl Fiber {
                 let closure = self.data_stack.nth_last(0);
 
                 if !matches!(self.heap.get(closure).data, Data::Closure(_)) {
-                    panic!("Instruction RegisterFuzzableClosure executed, but stack top is not a closure.");
+                    panic!("Instruction TraceFoundFuzzableClosure executed, but stack top is not a closure.");
                 }
 
                 tracer.found_fuzzable_closure(definition, closure, &self.heap);

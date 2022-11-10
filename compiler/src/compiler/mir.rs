@@ -401,7 +401,7 @@ impl fmt::Debug for Expression {
             Expression::TraceCallStarts { hir_call, function, arguments, responsible } => write!(f, "trace: start of call of {function} with {} ({responsible} is responsible, code is at {hir_call})", arguments.iter().map(|arg| format!("{arg}")).join(" ")),
             Expression::TraceCallEnds { return_value } => write!(f, "trace: end of call with return value {return_value}"),
             Expression::TraceExpressionEvaluated { hir_expression, value  } => write!(f, "trace: expression {hir_expression} evaluated to {value}"),
-            Expression::TraceFoundFuzzableClosure { hir_definition, closure } => write!(f, "trace: register fuzzable closure {closure}, defined at {hir_definition}"),
+            Expression::TraceFoundFuzzableClosure { hir_definition, closure } => write!(f, "trace: found fuzzable closure {closure}, defined at {hir_definition}"),
         }
     }
 }
