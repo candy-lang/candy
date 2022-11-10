@@ -154,10 +154,9 @@ macro_rules! unpack_and_later_drop {
 impl Heap {
     fn channel_create(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |capacity: Int| {
-            CreateChannel {
-                capacity: capacity.value.clone().try_into().expect(
-                    "you tried to create a channel with a capacity bigger than the maximum usize",
-                ),
+            match capacity.value.clone().try_into() {
+                Ok(capacity) => CreateChannel { capacity },
+                Err(_) => return Err("you tried to create a channel with a capacity that is either negative or bigger than the maximum usize".to_string()),
             }
         })
     }
@@ -354,7 +353,7 @@ impl Heap {
     fn parallel(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack!(self, args, |body_taking_nursery: Closure| {
             if body_taking_nursery.num_args != 1 {
-                return Err("Parallel expects a closure that takes a nursery.".to_string());
+                return Err("parallel expects a closure taking a nursery".to_string());
             }
             Parallel {
                 body: body_taking_nursery.address,
@@ -376,7 +375,10 @@ impl Heap {
                     self.dup(value);
                     Ok(Return(value))
                 }
-                None => Err(format!("Struct does not contain key {}.", key.format(self))),
+                None => Err(format!(
+                    "the struct does not contain the key {}",
+                    key.format(self)
+                )),
             }
         })
     }
@@ -564,7 +566,7 @@ impl TryInto<bool> for Data {
         match symbol.value.as_str() {
             "True" => Ok(true),
             "False" => Ok(false),
-            _ => Err("a builtin function expected `True` or `False`".to_string()),
+            _ => Err("a builtin function expected True or False".to_string()),
         }
     }
 }

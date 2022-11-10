@@ -3,35 +3,27 @@
 
 core = use "..Core"
 
-# fibRec fibRec n =
-#   core.ifElse (core.int.isLessThan n 2) { n } {
-#     core.int.add
-#       fibRec fibRec (core.int.subtract n 1)
-#       fibRec fibRec (core.int.subtract n 2)
-#   }
-# fib n = fibRec fibRec n
-# 
-# twentyOne := fib 8
+fibRec fibRec n =
+  core.ifElse (core.int.isLessThan n 2) { n } {
+    core.int.add
+      fibRec fibRec (core.int.subtract n 1)
+      fibRec fibRec (core.int.subtract n 2)
+  }
+fib n = fibRec fibRec n
+twentyOne := fib 8
 
-channel = core.channel.create 3
-core.channel.send channel.sendPort "One"
-core.channel.send channel.sendPort "Two"
-✨.print (core.channel.receive channel.receivePort)
-core.channel.send channel.sendPort "Three"
-✨.print (core.channel.receive channel.receivePort)
-✨.print (core.channel.receive channel.receivePort)
+main := { environment ->
+  print message = { core.channel.send environment.stdout message }
+  print "Hello, world!"
 
-core.parallel { nursery ->
-  ✨.print (core.await (core.async nursery {
-    ✨.print "Hello from fiber!"
-    "Hello, async await!"
-  }))
+  core.parallel { nursery ->
+    print (core.await (core.async nursery {
+      print "Hello from fiber!"
+      "Hello, async await!"
+    }))
 
-  core.async nursery { ✨.print "Kiwi" }
-  core.async nursery { ✨.print "Banana" }
-  ✨.print "Hi"
+    core.async nursery { print "Kiwi" }
+    core.async nursery { print "Banana" }
+    print "Hi"
+  }
 }
-
-main environment :=
-  ✨.print "Hello, world!"
-  core.channel.send environment.stdout "Hello, world!"

@@ -1,8 +1,9 @@
 channel = use "..channel"
 function = use "..function"
+if = (use "..conditionals").if
 
-parallel body := 
-  needs (function.is1 body)
+parallel body :=
+  needs (function.is1 body) "The `body` should be a function taking a nursery."
   ✨.parallel body
 
 async nursery body :=
@@ -13,5 +14,5 @@ async nursery body :=
   returnChannel.receivePort
 
 await fiber :=
-  needs (channel.isReceivePort fiber)
+  needs (channel.isReceivePort fiber) "`fiber` should be a value returned by `async`."
   channel.receive fiber

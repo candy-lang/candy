@@ -344,7 +344,20 @@ impl<'a> Context<'a> {
                         condition: Box::new(condition.clone()),
                         reason: Box::new(self.push(
                             None,
-                            Expression::Text("needs not satisfied".to_string()),
+                            Expression::Text(
+                                match self.db.ast_id_to_span(call.arguments[0].id.clone()) {
+                                    Some(span) => format!(
+                                            "`{}` was not satisfied",
+                                            &self
+                                                .db
+                                                .get_module_content_as_string(
+                                                    call.arguments[0].id.module.clone()
+                                                )
+                                                .unwrap()[span],
+                                        ),
+                                    None => "the needs of a function were not met".to_string(),
+                                },
+                            ),
                             None,
                         )),
                     },

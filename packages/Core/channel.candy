@@ -1,4 +1,6 @@
+bool = use "..bool"
 equals = (use "..equality").equals
+if = (use "..conditionals").if
 isInt = (use "..int").is
 isType = (use "..type").is
 
@@ -6,13 +8,15 @@ isSendPort value := isType value SendPort
 isReceivePort value := isType value ReceivePort
 
 create capacity :=
-  needs (isInt capacity)
+  needs (isInt capacity) "`capacity` is not an integer. Channels need a capacity because otherwise, there would be no backpressure among fibers, and memory leaks would go unnoticed."
   ✨.channelCreate capacity
 
 send port packet :=
-  needs (isSendPort port) "send needs a send port"
+  needs (bool.not (isReceivePort port)) "`port` should be a send port, not a receive port."
+  needs (isSendPort port)
   ✨.channelSend port packet
 
 receive port :=
-  needs (isReceivePort port) "receive needs a receive port"
+  needs (bool.not (isSendPort port)) "`port` should be a receive port, not a send port."
+  needs (isReceivePort port)
   ✨.channelReceive port

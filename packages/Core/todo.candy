@@ -2,5 +2,6 @@ text = use "..text"
 
 todo message :=
   needs (text.is message)
-  ## TODO: use text interpolation when available
+  ## There is no way to call `todo` correctly.
+  ## TODO: Use text interpolation when available.
   needs False (text.concatenate "TODO: " message)
