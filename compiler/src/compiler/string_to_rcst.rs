@@ -745,18 +745,13 @@ mod parse {
             })?;
 
         loop {
-            let (new_input, dot) = match dot(input) {
-                Some(it) => it,
-                None => break,
-            };
-            let (new_input, key) = match identifier(new_input) {
-                Some(it) => it,
-                None => break,
-            };
+            let (new_input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+            let Some((new_input, dot)) = dot(new_input) else { break; };
+            let Some((new_input, key)) = identifier(new_input) else { break; };
 
             input = new_input;
             expression = Rcst::StructAccess {
-                struct_: Box::new(expression),
+                struct_: Box::new(expression.wrap_in_whitespace(whitespace)),
                 dot: Box::new(dot),
                 key: Box::new(key),
             };
@@ -785,6 +780,31 @@ mod parse {
                     closing_parenthesis: Box::new(Rcst::ClosingParenthesis)
                 }
             ))
+        );
+        // foo
+        //   .bar
+        assert_eq!(
+            expression("foo\n  .bar", 0, true),
+            Some((
+                "",
+                Rcst::StructAccess {
+                    struct_: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![
+                            Rcst::Newline("\n".to_string()),
+                            Rcst::Whitespace("  ".to_string()),
+                        ],
+                    }),
+                    dot: Box::new(Rcst::Dot),
+                    key: Box::new(Rcst::Identifier("bar".to_owned())),
+                },
+            )),
+        );
+        // foo
+        // .bar
+        assert_eq!(
+            expression("foo\n.bar", 0, true),
+            Some(("\n.bar", Rcst::Identifier("foo".to_string()))),
         );
     }
 
