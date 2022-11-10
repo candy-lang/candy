@@ -261,7 +261,11 @@ impl Data {
             Data::Symbol(symbol) => symbol.value.to_string(),
             Data::List(List { items }) => format!(
                 "({})",
-                items.iter().map(|item| item.format(heap)).join(", ")
+                if items.is_empty() {
+                    ",".to_owned()
+                } else {
+                    items.iter().map(|item| item.format(heap)).join(", ")
+                },
             ),
             Data::Struct(struct_) => format!(
                 "[{}]",
