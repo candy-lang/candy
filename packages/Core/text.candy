@@ -39,10 +39,10 @@ getRange text startInclusive endExclusive :=
   # TODO: Support ranges when we have them.
   ✨.textGetRange text startInclusive endExclusive
 
-concatenate valueA valueB :=
-  needs (is valueA)
-  needs (is valueB)
-  ✨.textConcatenate valueA valueB
+concatenate textA textB :=
+  needs (is textA)
+  needs (is textB)
+  ✨.textConcatenate textA textB
 
 startsWith text pattern :=
   needs (is text)

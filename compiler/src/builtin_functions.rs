@@ -37,7 +37,7 @@ pub enum BuiltinFunction {
     StructGetKeys,       // struct -> listOfKeys
     StructHasKey,        // struct key -> booleanSymbol
     TextCharacters,      // text -> (listOfText: list)
-    TextConcatenate,     // (valueA: text) (valueB: text) -> (concatenated: text)
+    TextConcatenate,     // (textA: text) (textB: text) -> (concatenated: text)
     TextContains,        // text (pattern: text) -> booleanSymbol
     TextEndsWith,        // text (pattern: text) -> booleanSymbol
     TextGetRange,        // text (startInclusive: int) (endExclusive: int) -> (substring: text)
