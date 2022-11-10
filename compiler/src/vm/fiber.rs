@@ -1,7 +1,7 @@
 use super::{
     channel::{Capacity, Packet},
     context::{ExecutionController, PanickingUseProvider, UseProvider},
-    heap::{Builtin, Closure, Data, Heap, Pointer},
+    heap::{Builtin, Closure, Data, Heap, Pointer, Text},
     ids::ChannelId,
     tracer::{dummy::DummyTracer, FiberTracer, Tracer},
     FiberId,
@@ -191,7 +191,7 @@ impl Fiber {
         self.data_stack.push(address);
         self.status = Status::Running;
     }
-    pub fn complete_parallel_scope(&mut self, result: Result<Packet, String>) {
+    pub fn complete_parallel_scope(&mut self, result: Result<Packet, (String, Id)>) {
         assert!(matches!(self.status, Status::InParallelScope { .. }));
 
         match result {
@@ -202,7 +202,7 @@ impl Fiber {
                 self.data_stack.push(value);
                 self.status = Status::Running;
             }
-            Err(reason) => self.panic(reason, todo!()),
+            Err((reason, responsible)) => self.panic(reason, responsible),
         }
     }
     pub fn complete_try(&mut self, result: ExecutionResult) {
@@ -440,49 +440,20 @@ impl Fiber {
                     }
                 }
             }
-            // Instruction::Needs => {
-            //     let responsible = self.data_stack.pop().unwrap();
-            //     let reason = self.data_stack.pop().unwrap();
-            //     let condition = self.data_stack.pop().unwrap();
-
-            //     let responsible = self.heap.get_hir_id(reason);
-            //     let reason = match self.heap.get(reason).data.clone() {
-            //         Data::Text(reason) => reason.value,
-            //         _ => {
-            //             self.panic(
-            //                 "you can only use text as the reason of a `needs`".to_string(),
-            //                 todo!(),
-            //             );
-            //             return;
-            //         }
-            //     };
-
-            //     match self.heap.get(condition).data.clone() {
-            //         Data::Symbol(symbol) => match symbol.value.as_str() {
-            //             "True" => {
-            //                 self.data_stack.push(self.heap.create_nothing());
-            //             }
-            //             "False" => self.panic(reason, responsible),
-            //             _ => {
-            //                 self.panic(
-            //                     "needs expect True or False as the condition".to_string(),
-            //                     todo!(),
-            //                 );
-            //             }
-            //         },
-            //         _ => {
-            //             self.panic(
-            //                 "needs expect a boolean symbol as the condition".to_string(),
-            //                 todo!(),
-            //             );
-            //         }
-            //     }
-            // }
             Instruction::Panic => {
-                let responsible = self.data_stack.pop().unwrap();
+                let responsible_for_call = self.data_stack.pop().unwrap();
+                let responsible_for_panic = self.data_stack.pop().unwrap();
                 let reason = self.data_stack.pop().unwrap();
 
-                self.panic(todo!(), todo!());
+                let reason: Result<Text, _> = self.heap.get(reason).data.clone().try_into();
+                let Ok(reason) = reason else {
+                    let responsible = self.heap.get_hir_id(responsible_for_call);
+                    self.panic("The `reason` needs to be a text.".to_string(), responsible);
+                    return;
+                };
+                let responsible = self.heap.get_hir_id(responsible_for_panic);
+
+                self.panic(reason.value, responsible);
             }
             Instruction::ModuleStarts { module } => {
                 if self.import_stack.contains(&module) {
@@ -498,40 +469,45 @@ impl Fiber {
             }
             Instruction::TraceCallStarts { num_args } => {
                 let call_site = self.data_stack.pop().unwrap();
-                let responsible = self.data_stack[self.data_stack.len() - 2];
+                let responsible = self.data_stack.nth_last(0);
                 let mut args = vec![];
                 for i in 0..num_args {
-                    args.push(self.data_stack[self.data_stack.len() - 1 - num_args + i]);
+                    args.push(self.data_stack[self.data_stack.len() - num_args - 1 + i]);
                 }
-                let closure_address = self.data_stack[self.data_stack.len() - 2 - num_args];
+                let callee_address = self.data_stack.nth_last(1 + num_args);
 
-                let call_site = self.heap.get_hir_id(call_site);
-                args.reverse();
-                let responsible = self.heap.get_hir_id(responsible);
-
-                tracer.call_started(todo!(), todo!(), args, &self.heap);
+                tracer.call_started(call_site, callee_address, args, responsible, &self.heap);
             }
             Instruction::TraceCallEnds => {
-                let return_value = self.data_stack.pop().unwrap();
+                let return_value = self.data_stack.nth_last(0);
 
                 tracer.call_ended(return_value, &self.heap);
             }
             Instruction::TraceExpressionEvaluated => {
-                let value = self.data_stack.pop().unwrap();
                 let expression = self.data_stack.pop().unwrap();
+                let value = self.data_stack.nth_last(0);
 
-                tracer.value_evaluated(todo!(), value, &self.heap);
+                tracer.value_evaluated(expression, value, &self.heap);
             }
             Instruction::TraceFoundFuzzableClosure => {
-                let closure = self.data_stack.pop().unwrap();
                 let definition = self.data_stack.pop().unwrap();
+                let closure = self.data_stack.nth_last(0);
 
                 if !matches!(self.heap.get(closure).data, Data::Closure(_)) {
                     panic!("Instruction RegisterFuzzableClosure executed, but stack top is not a closure.");
                 }
-                self.heap.dup(closure);
-                tracer.found_fuzzable_closure(todo!(), closure, &self.heap);
+
+                tracer.found_fuzzable_closure(definition, closure, &self.heap);
             }
         }
+    }
+}
+
+trait NthLast {
+    fn nth_last(&mut self, index: usize) -> Pointer;
+}
+impl NthLast for Vec<Pointer> {
+    fn nth_last(&mut self, index: usize) -> Pointer {
+        self[self.len() - 1 - index]
     }
 }

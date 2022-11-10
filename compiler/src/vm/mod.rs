@@ -441,11 +441,14 @@ impl Vm {
                                 )
                             }
                         }
-                        ExecutionResult::Panicked { reason, .. } => self.finish_parallel(
+                        ExecutionResult::Panicked {
+                            reason,
+                            responsible,
+                        } => self.finish_parallel(
                             tracer,
                             parent,
                             Performer::Fiber(fiber_id),
-                            Err(reason),
+                            Err((reason, responsible)),
                         ),
                     }
                 }
@@ -488,7 +491,7 @@ impl Vm {
         tracer: &mut T,
         parallel_id: FiberId,
         cause: Performer,
-        result: Result<(), String>,
+        result: Result<(), (String, Id)>,
     ) {
         let parallel = self
             .fibers
@@ -558,7 +561,7 @@ impl Vm {
                     tree.as_single_mut().unwrap().fiber.panic(
                         "the nursery is already dead because the parallel section ended"
                             .to_string(),
-                        todo!(),
+                        Id::complicated_responsibility(),
                     );
                 }
                 return;
@@ -605,7 +608,10 @@ impl Vm {
                         tracer,
                         parent_id,
                         performer.clone(),
-                        Err("a nursery received an invalid message".to_string()),
+                        Err((
+                            "a nursery received an invalid message".to_string(),
+                            Id::complicated_responsibility(),
+                        )),
                     ),
                 }
 

@@ -85,9 +85,13 @@ impl ConstantEvaluator {
             .iter()
             .filter_map(|event| match &event.event {
                 StoredVmEvent::InFiber {
-                    event: StoredFiberEvent::FoundFuzzableClosure { id, closure },
+                    event:
+                        StoredFiberEvent::FoundFuzzableClosure {
+                            definition: id,
+                            closure,
+                        },
                     ..
-                } => Some((id.clone(), *closure)),
+                } => Some((evaluator.tracer.heap.get_hir_id(*id), *closure)),
                 _ => None,
             })
             .collect();
@@ -110,7 +114,8 @@ impl ConstantEvaluator {
 
         for TimedEvent { event, .. } in &evaluator.tracer.events {
             let StoredVmEvent::InFiber { event, .. } = event else { continue; };
-            let StoredFiberEvent::ValueEvaluated { id, value } = event else { continue; };
+            let StoredFiberEvent::ValueEvaluated { expression, value } = event else { continue; };
+            let id = evaluator.tracer.heap.get_hir_id(*expression);
 
             if &id.module != module {
                 continue;
@@ -160,45 +165,32 @@ fn panic_hint(
     }
 
     let last_call_in_this_module = stack.iter().find(|entry| {
-        let id = match entry {
-            StackEntry::Call { id, .. } => id,
-            StackEntry::Needs { id, .. } => id,
-            _ => return false,
+        let StackEntry::Call { call_site, .. } = entry else {
+            return false;
         };
+        let call_site = evaluator.tracer.heap.get_hir_id(*call_site);
         // Make sure the entry comes from the same file and is not generated
         // code.
-        id.module == module && db.hir_to_cst_id(id.clone()).is_some()
+        call_site.module == module && db.hir_to_cst_id(call_site).is_some()
     })?;
 
-    let (id, call_info) = match last_call_in_this_module {
-        StackEntry::Call { id, closure, args } => (
-            id,
-            format!(
-                "{} {}",
-                closure.format(&evaluator.tracer.heap),
-                args.iter()
-                    .map(|arg| arg.format(&evaluator.tracer.heap))
-                    .join(" ")
-            ),
-        ),
-        StackEntry::Needs {
-            id,
-            condition,
-            reason,
-        } => (
-            id,
-            format!(
-                "needs {} {}",
-                condition.format(&evaluator.tracer.heap),
-                reason.format(&evaluator.tracer.heap)
-            ),
-        ),
-        _ => unreachable!(),
-    };
+    let StackEntry::Call {
+        call_site,
+        closure,
+        args,
+    } = last_call_in_this_module else { unreachable!(); };
+    let call_site = evaluator.tracer.heap.get_hir_id(*call_site);
+    let call_info = format!(
+        "{} {}",
+        closure.format(&evaluator.tracer.heap),
+        args.iter()
+            .map(|arg| arg.format(&evaluator.tracer.heap))
+            .join(" ")
+    );
 
     Some(Hint {
         kind: HintKind::Panic,
         text: format!("Calling `{call_info}` panics because {reason}."),
-        position: id_to_end_of_line(db, id.clone())?,
+        position: id_to_end_of_line(db, call_site)?,
     })
 }

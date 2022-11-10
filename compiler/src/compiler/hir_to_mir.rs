@@ -19,9 +19,9 @@ pub trait HirToMir: CstDb + AstToHir {
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Default)]
 pub struct MirConfig {
-    register_fuzzables: bool,
-    trace_calls: bool,
-    trace_evaluated_expressions: bool,
+    pub register_fuzzables: bool,
+    pub trace_calls: bool,
+    pub trace_evaluated_expressions: bool,
 }
 
 fn mir(db: &dyn HirToMir, module: Module, config: MirConfig) -> Option<Arc<Mir>> {
@@ -128,16 +128,14 @@ fn generate_needs_function(id_generator: &mut IdGenerator<Id>) -> Expression {
         let lambda_returning_whether_condition_is_false = body.push_lambda(|body, _| {
             body.push(Expression::Reference(is_condition_false));
         });
-        let is_condition_bool = body.push_lambda(|body, _| {
-            body.push(Expression::Call {
-                function: builtin_if_else,
-                arguments: vec![
-                    is_condition_true,
-                    lambda_returning_true,
-                    lambda_returning_whether_condition_is_false,
-                ],
-                responsible: needs_code,
-            });
+        let is_condition_bool = body.push(Expression::Call {
+            function: builtin_if_else,
+            arguments: vec![
+                is_condition_true,
+                lambda_returning_true,
+                lambda_returning_whether_condition_is_false,
+            ],
+            responsible: needs_code,
         });
         let on_invalid_condition = body.push_lambda(|body, _| {
             let panic_reason = body.push(Expression::Text(

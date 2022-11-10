@@ -16,8 +16,9 @@ pub struct FuzzablesFinder {
 impl Tracer for FuzzablesFinder {
     fn add(&mut self, event: VmEvent) {
         let VmEvent::InFiber { fiber, event } = event else { return; };
-        let FiberEvent::FoundFuzzableClosure { id, closure, heap } = event else { return; };
+        let FiberEvent::FoundFuzzableClosure { definition, closure, heap } = event else { return; };
 
+        let definition = self.heap.get_hir_id(definition);
         let address_map = self
             .transferred_objects
             .entry(fiber)
@@ -27,6 +28,6 @@ impl Tracer for FuzzablesFinder {
             closure,
             address_map,
         );
-        self.fuzzables.push((id, address));
+        self.fuzzables.push((definition, address));
     }
 }

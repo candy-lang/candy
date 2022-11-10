@@ -119,12 +119,11 @@ impl FuzzerManager {
                             _ => None,
                         })
                         .find(|event| {
-                            let innermost_panicking_call_id = match &event {
-                                StoredFiberEvent::CallStarted { id, .. } => id,
-                                StoredFiberEvent::NeedsStarted { id, .. } => id,
-                                _ => return false,
+                            let StoredFiberEvent::CallStarted { call_site, .. } = event else {
+                                return false;
                             };
-                            id.is_same_module_and_any_parent_of(innermost_panicking_call_id)
+                            let call_site = tracer.heap.get_hir_id(*call_site);
+                            id.is_same_module_and_any_parent_of(&call_site)
                                 && db.hir_to_cst_id(id.clone()).is_some()
                         });
                     let panicking_inner_call = match panicking_inner_call {
@@ -136,27 +135,25 @@ impl FuzzerManager {
                             continue;
                         }
                     };
-                    let (call_id, name, arguments) = match &panicking_inner_call {
-                        StoredFiberEvent::CallStarted { id, closure, args } => {
-                            (id.clone(), closure.format(&tracer.heap), args.clone())
-                        }
-                        StoredFiberEvent::NeedsStarted {
-                            id,
-                            condition,
-                            reason,
-                        } => (id.clone(), "needs".to_string(), vec![*condition, *reason]),
-                        _ => unreachable!(),
-                    };
+                    let StoredFiberEvent::CallStarted {
+                        call_site,
+                        closure,
+                        arguments,
+                    } = panicking_inner_call else { unreachable!(); };
+                    let call_site = tracer.heap.get_hir_id(*call_site);
+                    let name = closure.format(&tracer.heap);
+
                     Hint {
                         kind: HintKind::Fuzz,
                         text: format!(
                             "then `{name} {}` panics because {reason}.",
                             arguments
                                 .iter()
+                                .cloned()
                                 .map(|arg| arg.format(&tracer.heap))
                                 .join(" "),
                         ),
-                        position: id_to_end_of_line(db, call_id).unwrap(),
+                        position: id_to_end_of_line(db, call_site).unwrap(),
                     }
                 };
 

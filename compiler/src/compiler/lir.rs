@@ -91,6 +91,9 @@ pub enum Instruction {
         current_module: Module,
     },
 
+    /// Panics. Because the panic instruction only occurs inside the generated
+    /// needs function, the reason is already guaranteed to be a text.
+    ///
     /// a, reason, responsible -> 💥
     Panic,
 

@@ -1,6 +1,6 @@
 use super::{
     cst::CstDb,
-    hir_to_mir::{HirToMir, MirConfig},
+    hir_to_mir::MirConfig,
     lir::{Instruction, Lir, StackOffset},
     mir::{Body, Expression, Id},
     optimize::OptimizeMir,
@@ -8,7 +8,6 @@ use super::{
 use crate::{module::Module, utils::CountableId};
 use itertools::Itertools;
 use std::sync::Arc;
-use tracing::debug;
 
 #[salsa::query_group(MirToLirStorage)]
 pub trait MirToLir: CstDb + OptimizeMir {
@@ -35,7 +34,6 @@ fn compile_lambda(
     }
 
     for (id, expression) in body.iter() {
-        debug!("Compiling body part {id}");
         context.compile_expression(id, expression);
     }
 
@@ -57,7 +55,6 @@ struct LoweringContext {
 }
 impl LoweringContext {
     fn compile_expression(&mut self, id: Id, expression: &Expression) {
-        debug!("Compiling {id}.");
         match expression {
             Expression::Int(int) => self.emit(id, Instruction::CreateInt(int.clone())),
             Expression::Text(text) => self.emit(id, Instruction::CreateText(text.clone())),
@@ -98,7 +95,7 @@ impl LoweringContext {
                             .iter()
                             .map(|id| self.stack.find_id(*id))
                             .collect_vec(),
-                        num_args: all_parameters.len(),
+                        num_args: parameters.len(),
                         body: instructions,
                     },
                 );
@@ -204,10 +201,6 @@ impl LoweringContext {
                 self.emit(id, Instruction::TraceFoundFuzzableClosure);
             }
         }
-        debug!(
-            "Stack: {}",
-            self.stack.iter().map(|id| format!("{id}")).join(" ")
-        );
     }
 
     fn emit_push_from_stack(&mut self, id: Id) {

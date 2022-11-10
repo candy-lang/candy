@@ -285,6 +285,8 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         } => {
             error!("The module panicked because {reason}.");
             error!("{responsible} is responsible.");
+            let span = db.hir_id_to_span(responsible).unwrap();
+            error!("Responsible is at {span:?}.");
             error!(
                 "This is the stack trace:\n{}",
                 tracer.format_panic_stack_trace_to_root_fiber(&db)
@@ -312,9 +314,14 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         heap.create_struct(HashMap::from([(stdout_symbol, stdout_port)]))
     };
     let main_id = Id::new(module.clone(), vec!["main".to_string()]);
-    tracer
-        .for_fiber(FiberId::root())
-        .call_started(main_id, main, vec![environment], &heap);
+    let platform = heap.create_hir_id(Id::platform());
+    tracer.for_fiber(FiberId::root()).call_started(
+        platform,
+        main,
+        vec![environment],
+        platform,
+        &heap,
+    );
     vm.set_up_for_running_closure(heap, main, &[environment], Id::platform());
     loop {
         match vm.status() {
@@ -329,9 +336,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
                     &mut tracer,
                 );
             }
-            Status::WaitingForOperations => {
-                todo!("VM can't proceed until some operations complete.");
-            }
+            Status::WaitingForOperations => {}
             _ => break,
         }
         stdout.run(&mut vm);

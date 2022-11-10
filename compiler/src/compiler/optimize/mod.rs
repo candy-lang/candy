@@ -100,6 +100,7 @@ impl Mir {
         self.optimize_obvious_self_contained();
         debug!("{module}: {}", self.complexity());
         self.cleanup();
+        debug!("Cleaned up:\n{self:?}");
     }
 
     /// Performs optimizations that improve both performance and code size and

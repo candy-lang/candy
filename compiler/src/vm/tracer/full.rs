@@ -1,7 +1,6 @@
 use itertools::Itertools;
 
 use crate::{
-    compiler::hir::Id,
     module::Module,
     vm::{ChannelId, FiberId, Heap, Pointer},
 };
@@ -60,27 +59,21 @@ pub enum StoredFiberEvent {
         export_map: Pointer,
     },
     ValueEvaluated {
-        id: Id,
+        expression: Pointer,
         value: Pointer,
     },
     FoundFuzzableClosure {
-        id: Id,
+        definition: Pointer,
         closure: Pointer,
     },
     CallStarted {
-        id: Id,
+        call_site: Pointer,
         closure: Pointer,
-        args: Vec<Pointer>,
+        arguments: Vec<Pointer>,
     },
     CallEnded {
         return_value: Pointer,
     },
-    NeedsStarted {
-        id: Id,
-        condition: Pointer,
-        reason: Pointer,
-    },
-    NeedsEnded,
 }
 
 impl Tracer for FullTracer {
@@ -140,18 +133,33 @@ impl FullTracer {
                 let export_map = self.import_from_heap(export_map, heap, Some(fiber));
                 StoredFiberEvent::ModuleEnded { export_map }
             }
-            FiberEvent::ValueEvaluated { id, value, heap } => {
+            FiberEvent::ValueEvaluated {
+                expression: id,
+                value,
+                heap,
+            } => {
                 let value = self.import_from_heap(value, heap, Some(fiber));
-                StoredFiberEvent::ValueEvaluated { id, value }
+                StoredFiberEvent::ValueEvaluated {
+                    expression: id,
+                    value,
+                }
             }
-            FiberEvent::FoundFuzzableClosure { id, closure, heap } => {
+            FiberEvent::FoundFuzzableClosure {
+                definition: id,
+                closure,
+                heap,
+            } => {
                 let closure = self.import_from_heap(closure, heap, Some(fiber));
-                StoredFiberEvent::FoundFuzzableClosure { id, closure }
+                StoredFiberEvent::FoundFuzzableClosure {
+                    definition: id,
+                    closure,
+                }
             }
             FiberEvent::CallStarted {
-                id,
+                call_site,
                 closure,
                 args,
+                responsible,
                 heap,
             } => {
                 let closure = self.import_from_heap(closure, heap, Some(fiber));
@@ -159,27 +167,16 @@ impl FullTracer {
                     .into_iter()
                     .map(|arg| self.import_from_heap(arg, heap, Some(fiber)))
                     .collect();
-                StoredFiberEvent::CallStarted { id, closure, args }
+                StoredFiberEvent::CallStarted {
+                    call_site,
+                    closure,
+                    arguments: args,
+                }
             }
             FiberEvent::CallEnded { return_value, heap } => {
                 let return_value = self.import_from_heap(return_value, heap, Some(fiber));
                 StoredFiberEvent::CallEnded { return_value }
             }
-            FiberEvent::NeedsStarted {
-                id,
-                condition,
-                reason,
-                heap,
-            } => {
-                let condition = self.import_from_heap(condition, heap, Some(fiber));
-                let reason = self.import_from_heap(reason, heap, Some(fiber));
-                StoredFiberEvent::NeedsStarted {
-                    id,
-                    condition,
-                    reason,
-                }
-            }
-            FiberEvent::NeedsEnded => StoredFiberEvent::NeedsEnded,
         }
     }
 }
@@ -221,27 +218,21 @@ impl fmt::Debug for FullTracer {
                                 "module ended and exported {}",
                                 export_map.format(&self.heap)
                             ),
-                            StoredFiberEvent::ValueEvaluated { id, value } =>
-                                format!("value {id} is {}", value.format(&self.heap)),
-                            StoredFiberEvent::FoundFuzzableClosure { id, .. } =>
-                                format!("found fuzzable closure {id}"),
-                            StoredFiberEvent::CallStarted { id, closure, args } => format!(
-                                "call {id} started: {} {}",
+                            StoredFiberEvent::ValueEvaluated { expression, value } =>
+                                format!("value {expression} is {}", value.format(&self.heap)),
+                            StoredFiberEvent::FoundFuzzableClosure { definition, .. } =>
+                                format!("found fuzzable closure {definition}"),
+                            StoredFiberEvent::CallStarted {
+                                call_site,
+                                closure,
+                                arguments,
+                            } => format!(
+                                "call {call_site} started: {} {}",
                                 closure.format(&self.heap),
-                                args.iter().map(|arg| arg.format(&self.heap)).join(" ")
+                                arguments.iter().map(|arg| arg.format(&self.heap)).join(" ")
                             ),
                             StoredFiberEvent::CallEnded { return_value } =>
                                 format!("call ended: {}", return_value.format(&self.heap)),
-                            StoredFiberEvent::NeedsStarted {
-                                id,
-                                condition,
-                                reason,
-                            } => format!(
-                                "needs {id} started: needs {} {}",
-                                condition.format(&self.heap),
-                                reason.format(&self.heap)
-                            ),
-                            StoredFiberEvent::NeedsEnded => "needs ended".to_string(),
                         }
                     ),
                 }

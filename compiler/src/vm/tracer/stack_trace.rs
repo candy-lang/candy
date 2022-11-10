@@ -7,7 +7,6 @@ use crate::{
     compiler::{
         ast_to_hir::AstToHir,
         cst::{Cst, CstDb, CstKind},
-        hir::Id,
     },
     database::Database,
     language_server::utils::LspPositionConversion,
@@ -16,6 +15,7 @@ use crate::{
 use itertools::Itertools;
 use pad::PadStr;
 use std::collections::HashMap;
+use tracing::debug;
 
 // Stack traces are a reduced view of the tracing state that represent the stack
 // trace at a given moment in time.
@@ -23,14 +23,9 @@ use std::collections::HashMap;
 #[derive(Clone)]
 pub enum StackEntry {
     Call {
-        id: Id,
+        call_site: Pointer,
         closure: Pointer,
         args: Vec<Pointer>,
-    },
-    Needs {
-        id: Id,
-        condition: Pointer,
-        reason: Pointer,
     },
     Module {
         module: Module,
@@ -52,29 +47,19 @@ impl FullTracer {
                 StoredFiberEvent::ModuleEnded { .. } => {
                     assert!(matches!(stack.pop().unwrap(), StackEntry::Module { .. }));
                 }
-                StoredFiberEvent::CallStarted { id, closure, args } => {
+                StoredFiberEvent::CallStarted {
+                    call_site,
+                    closure,
+                    arguments: args,
+                } => {
                     stack.push(StackEntry::Call {
-                        id: id.clone(),
+                        call_site: *call_site,
                         closure: *closure,
                         args: args.clone(),
                     });
                 }
                 StoredFiberEvent::CallEnded { .. } => {
                     assert!(matches!(stack.pop().unwrap(), StackEntry::Call { .. }));
-                }
-                StoredFiberEvent::NeedsStarted {
-                    id,
-                    condition,
-                    reason,
-                } => {
-                    stack.push(StackEntry::Needs {
-                        id: id.clone(),
-                        condition: *condition,
-                        reason: *reason,
-                    });
-                }
-                StoredFiberEvent::NeedsEnded => {
-                    assert!(matches!(stack.pop().unwrap(), StackEntry::Needs { .. }));
                 }
                 _ => {}
             }
@@ -86,11 +71,11 @@ impl FullTracer {
 
         for entry in stack.iter().rev() {
             let hir_id = match entry {
-                StackEntry::Call { id, .. } => Some(id),
-                StackEntry::Needs { id, .. } => Some(id),
+                StackEntry::Call { call_site: id, .. } => Some(id),
                 StackEntry::Module { .. } => None,
             };
-            let (cst_id, span) = if let Some(hir_id) = hir_id {
+            let hir_id = hir_id.map(|id| self.heap.get_hir_id(*id));
+            let (cst_id, span) = if let Some(hir_id) = hir_id.clone() {
                 let module = hir_id.module.clone();
                 let cst_id = db.hir_to_cst_id(hir_id.clone());
                 let cst = cst_id.map(|id| db.find_cst(module.clone(), id));
@@ -107,6 +92,7 @@ impl FullTracer {
             let caller_location_string = format!(
                 "{} {}",
                 hir_id
+                    .clone()
                     .map(|id| format!("{id}"))
                     .unwrap_or_else(|| "<no hir>".to_string()),
                 span.map(|((start_line, start_col), (end_line, end_col))| format!(
@@ -128,13 +114,6 @@ impl FullTracer {
                         })
                         .unwrap_or_else(|| closure.format(&self.heap)),
                     args.iter().map(|arg| arg.format(&self.heap)).join(" ")
-                ),
-                StackEntry::Needs {
-                    condition, reason, ..
-                } => format!(
-                    "needs {} {}",
-                    condition.format(&self.heap),
-                    reason.format(&self.heap),
                 ),
                 StackEntry::Module { module } => format!("module {module}"),
             };
@@ -173,6 +152,7 @@ impl FullTracer {
         }
 
         let stack_traces = self.stack_traces();
+        debug!("Stack traces: {:?}", stack_traces.keys().collect_vec());
         panicking_fiber_chain
             .into_iter()
             .rev()
