@@ -1246,11 +1246,11 @@ mod parse {
                 },
             )),
         );
-        // [
+        // (
         //   foo,
         //   4,
         //   "Hi",
-        // ]
+        // )
         assert_eq!(
             list("(\n  foo,\n  4,\n  \"Hi\",\n)", 0),
             Some((
