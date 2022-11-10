@@ -1,5 +1,6 @@
 bool = use "..bool"
 equals = (use "..equality").equals
+function = use "..function"
 int = use "..int"
 type = use "..type"
 
@@ -63,6 +64,13 @@ replace list index newValue :=
   needs (is list)
   needs (isValidIndex index)
   ✨.listReplace list index newValue
+update list index updater :=
+  needs (is list)
+  needs (isValidIndex index)
+  needs (function.is1 updater)
+  oldValue = get list index
+  newValue = updater oldValue
+  replace list index newValue
 
 removeAt list index :=
   needs (is list)
