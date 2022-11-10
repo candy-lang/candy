@@ -25,7 +25,7 @@ pub enum BuiltinFunction {
     IntShiftLeft,        // (value: int) (amount: int) -> (shifted: int)
     IntShiftRight,       // (value: int) (amount: int) -> (shifted: int)
     IntSubtract,         // (minuend: int) (subtrahend: int) -> (difference: int)
-    ListCreate,          // (length: int) -> list
+    ListFilled,          // (length: int) item -> list
     ListGet,             // list (index: int) -> item
     ListInsert,          // list (index: int) item -> list
     ListLength,          // list -> int

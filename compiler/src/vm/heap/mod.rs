@@ -81,7 +81,10 @@ impl Heap {
     }
 
     pub fn dup(&mut self, address: Pointer) {
-        self.get_mut(address).reference_count += 1;
+        self.dup_by(address, 1);
+    }
+    pub fn dup_by(&mut self, address: Pointer, amount: usize) {
+        self.get_mut(address).reference_count += amount;
 
         let object = self.get(address);
         trace!(

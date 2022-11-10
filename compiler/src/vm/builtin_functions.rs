@@ -44,7 +44,7 @@ impl Fiber {
             BuiltinFunction::IntShiftLeft => self.heap.int_shift_left(args),
             BuiltinFunction::IntShiftRight => self.heap.int_shift_right(args),
             BuiltinFunction::IntSubtract => self.heap.int_subtract(args),
-            BuiltinFunction::ListCreate => self.heap.list_create(args),
+            BuiltinFunction::ListFilled => self.heap.list_filled(args),
             BuiltinFunction::ListGet => self.heap.list_get(args),
             BuiltinFunction::ListInsert => self.heap.list_insert(args),
             BuiltinFunction::ListLength => self.heap.list_length(args),
@@ -297,11 +297,11 @@ impl Heap {
         })
     }
 
-    fn list_create(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |length: Int| {
+    fn list_filled(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |length: Int, item: Any| {
             let length = length.value.to_usize().unwrap();
-            let nothing = self.create_nothing();
-            Return(self.create_list(vec![nothing; length]))
+            self.dup_by(item.address, length);
+            Return(self.create_list(vec![item.address; length]))
         })
     }
     fn list_get(&mut self, args: &[Pointer]) -> BuiltinResult {

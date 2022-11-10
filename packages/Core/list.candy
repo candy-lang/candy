@@ -3,11 +3,11 @@ equals = (use "..equality").equals
 int = use "..int"
 type = use "..type"
 
-create length :=
+filled length item :=
   needs (int.is length)
   needs (int.isNonNegative length)
   needs (int.fitsInRustU32 length)
-  ✨.listCreate length
+  ✨.listFilled length item
 # TODO: `generate length valueGetter` when we have loops
 
 is value := type.is value List
