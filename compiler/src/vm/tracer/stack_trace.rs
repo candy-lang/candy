@@ -25,7 +25,8 @@ pub enum StackEntry {
     Call {
         call_site: Pointer,
         closure: Pointer,
-        args: Vec<Pointer>,
+        arguments: Vec<Pointer>,
+        responsible: Pointer,
     },
     Module {
         module: Module,
@@ -50,12 +51,14 @@ impl FullTracer {
                 StoredFiberEvent::CallStarted {
                     call_site,
                     closure,
-                    arguments: args,
+                    arguments,
+                    responsible,
                 } => {
                     stack.push(StackEntry::Call {
                         call_site: *call_site,
                         closure: *closure,
-                        args: args.clone(),
+                        arguments: arguments.clone(),
+                        responsible: *responsible,
                     });
                 }
                 StoredFiberEvent::CallEnded { .. } => {
@@ -102,7 +105,11 @@ impl FullTracer {
                 .unwrap_or_else(|| "<no location>".to_string())
             );
             let call_string = match entry {
-                StackEntry::Call { closure, args, .. } => format!(
+                StackEntry::Call {
+                    closure,
+                    arguments: args,
+                    ..
+                } => format!(
                     "{} {}",
                     cst_id
                         .and_then(|id| {

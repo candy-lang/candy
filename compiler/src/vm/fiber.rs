@@ -15,9 +15,9 @@ use crate::{
 };
 use itertools::Itertools;
 use std::collections::HashMap;
-use tracing::{debug, trace};
+use tracing::trace;
 
-const TRACE: bool = true;
+const TRACE: bool = false;
 
 /// A fiber represents an execution thread of a program. It's a stack-based
 /// machine that runs instructions from a LIR. Fibers are owned by a `Vm`.
@@ -219,11 +219,6 @@ impl Fiber {
     }
 
     fn get_from_data_stack(&self, offset: usize) -> Pointer {
-        debug!(
-            "Getting stuff from data stack. Len: {}, Offset: {}",
-            self.data_stack.len(),
-            offset
-        );
         self.data_stack[self.data_stack.len() - 1 - offset]
     }
     pub fn panic(&mut self, reason: String, responsible: hir::Id) {
@@ -274,26 +269,27 @@ impl Fiber {
         instruction: Instruction,
     ) {
         if TRACE {
-            debug!(
+            trace!(
                 "Instruction pointer: {}:{}",
-                self.next_instruction.closure, self.next_instruction.instruction
+                self.next_instruction.closure,
+                self.next_instruction.instruction
             );
-            debug!(
+            trace!(
                 "Data stack: {}",
                 self.data_stack
                     .iter()
                     .map(|it| it.format(&self.heap))
                     .join(", ")
             );
-            debug!(
+            trace!(
                 "Call stack: {}",
                 self.call_stack
                     .iter()
                     .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
                     .join(", ")
             );
-            debug!("Heap: {:?}", self.heap);
-            debug!("Running instruction: {instruction:?}");
+            trace!("Heap: {:?}", self.heap);
+            trace!("Running instruction: {instruction:?}");
         }
 
         match instruction {
@@ -389,7 +385,6 @@ impl Fiber {
                             return;
                         }
 
-                        debug!("Executing call. Pushing {} captured values, {} args, and responsible address {}.", captured.len(), args.len(), responsible_address);
                         self.call_stack.push(self.next_instruction);
                         self.data_stack.append(&mut captured.clone());
                         for captured in captured {
@@ -416,13 +411,6 @@ impl Fiber {
                 };
             }
             Instruction::Return => {
-                let closure: Closure = self
-                    .heap
-                    .get(self.next_instruction.closure)
-                    .data
-                    .clone()
-                    .try_into()
-                    .unwrap();
                 self.heap.drop(self.next_instruction.closure);
                 let caller = self.call_stack.pop().unwrap();
                 self.next_instruction = caller;

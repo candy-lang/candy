@@ -7,7 +7,7 @@ use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use num_bigint::BigUint;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt::{self, Display, Formatter},
     hash,
     sync::Arc,
@@ -213,20 +213,6 @@ pub struct Lambda {
     pub parameters: Vec<Id>,
     pub body: Body,
     pub fuzzable: bool,
-}
-impl Lambda {
-    pub fn captured_ids(&self, my_id: &Id) -> Vec<Id> {
-        let mut captured = vec![];
-        self.body.collect_all_ids(&mut captured);
-        captured
-            .into_iter()
-            .filter(|potentially_captured_id| {
-                !my_id.is_same_module_and_any_parent_of(potentially_captured_id)
-            })
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect_vec()
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

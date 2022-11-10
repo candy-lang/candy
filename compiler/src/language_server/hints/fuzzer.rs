@@ -139,6 +139,7 @@ impl FuzzerManager {
                         call_site,
                         closure,
                         arguments,
+                        responsible: _
                     } = panicking_inner_call else { unreachable!(); };
                     let call_site = tracer.heap.get_hir_id(*call_site);
                     let name = closure.format(&tracer.heap);

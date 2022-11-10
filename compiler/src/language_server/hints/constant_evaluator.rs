@@ -177,7 +177,8 @@ fn panic_hint(
     let StackEntry::Call {
         call_site,
         closure,
-        args,
+        arguments: args,
+        responsible: _,
     } = last_call_in_this_module else { unreachable!(); };
     let call_site = evaluator.tracer.heap.get_hir_id(*call_site);
     let call_info = format!(

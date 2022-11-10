@@ -70,6 +70,7 @@ pub enum StoredFiberEvent {
         call_site: Pointer,
         closure: Pointer,
         arguments: Vec<Pointer>,
+        responsible: Pointer,
     },
     CallEnded {
         return_value: Pointer,
@@ -158,12 +159,12 @@ impl FullTracer {
             FiberEvent::CallStarted {
                 call_site,
                 closure,
-                args,
+                arguments,
                 responsible,
                 heap,
             } => {
                 let closure = self.import_from_heap(closure, heap, Some(fiber));
-                let args = args
+                let args = arguments
                     .into_iter()
                     .map(|arg| self.import_from_heap(arg, heap, Some(fiber)))
                     .collect();
@@ -171,6 +172,7 @@ impl FullTracer {
                     call_site,
                     closure,
                     arguments: args,
+                    responsible,
                 }
             }
             FiberEvent::CallEnded { return_value, heap } => {
@@ -226,6 +228,7 @@ impl fmt::Debug for FullTracer {
                                 call_site,
                                 closure,
                                 arguments,
+                                responsible,
                             } => format!(
                                 "call {call_site} started: {} {}",
                                 closure.format(&self.heap),

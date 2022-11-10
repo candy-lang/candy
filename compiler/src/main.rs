@@ -313,7 +313,6 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         let stdout_port = heap.create_send_port(stdout.channel);
         heap.create_struct(HashMap::from([(stdout_symbol, stdout_port)]))
     };
-    let main_id = Id::new(module.clone(), vec!["main".to_string()]);
     let platform = heap.create_hir_id(Id::platform());
     tracer.for_fiber(FiberId::root()).call_started(
         platform,
