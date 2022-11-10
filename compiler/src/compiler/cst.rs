@@ -322,8 +322,29 @@ pub trait UnwrapWhitespaceAndComment {
 impl UnwrapWhitespaceAndComment for Cst {
     fn unwrap_whitespace_and_comment(&self) -> Self {
         let kind = match &self.kind {
+            kind @ (CstKind::EqualsSign
+            | CstKind::Comma
+            | CstKind::Dot
+            | CstKind::Colon
+            | CstKind::ColonEqualsSign
+            | CstKind::Bar
+            | CstKind::OpeningParenthesis
+            | CstKind::ClosingParenthesis
+            | CstKind::OpeningBracket
+            | CstKind::ClosingBracket
+            | CstKind::OpeningCurlyBrace
+            | CstKind::ClosingCurlyBrace
+            | CstKind::Arrow
+            | CstKind::DoubleQuote
+            | CstKind::Octothorpe
+            | CstKind::Whitespace(_)
+            | CstKind::Newline(_)
+            | CstKind::Comment { .. }) => kind.clone(),
             CstKind::TrailingWhitespace { child, .. } => {
                 return child.unwrap_whitespace_and_comment()
+            }
+            kind @ (CstKind::Identifier(_) | CstKind::Symbol(_) | CstKind::Int { .. }) => {
+                kind.clone()
             }
             CstKind::Text {
                 opening_quote,
@@ -333,6 +354,16 @@ impl UnwrapWhitespaceAndComment for Cst {
                 opening_quote: Box::new(opening_quote.unwrap_whitespace_and_comment()),
                 parts: parts.unwrap_whitespace_and_comment(),
                 closing_quote: Box::new(closing_quote.unwrap_whitespace_and_comment()),
+            },
+            kind @ CstKind::TextPart(_) => kind.clone(),
+            CstKind::Pipe {
+                receiver,
+                bar,
+                call,
+            } => CstKind::Pipe {
+                receiver: Box::new(receiver.unwrap_whitespace_and_comment()),
+                bar: Box::new(bar.unwrap_whitespace_and_comment()),
+                call: Box::new(call.unwrap_whitespace_and_comment()),
             },
             CstKind::Parenthesized {
                 opening_parenthesis,
@@ -419,7 +450,7 @@ impl UnwrapWhitespaceAndComment for Cst {
                 assignment_sign: Box::new(assignment_sign.unwrap_whitespace_and_comment()),
                 body: body.unwrap_whitespace_and_comment(),
             },
-            other_kind => other_kind.clone(),
+            kind @ CstKind::Error { .. } => kind.clone(),
         };
         Cst {
             id: self.id,

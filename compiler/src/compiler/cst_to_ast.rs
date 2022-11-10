@@ -186,7 +186,7 @@ impl LoweringContext {
                 let ast = self.lower_cst(receiver);
 
                 assert!(
-                    matches!(receiver.kind, CstKind::Bar),
+                    matches!(bar.kind, CstKind::Bar),
                     "Pipe must contain a bar, but instead contained a {}.",
                     bar,
                 );

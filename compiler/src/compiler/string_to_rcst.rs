@@ -780,8 +780,13 @@ mod parse {
                     whitespaces_and_newlines(new_input, indentation + 1, true);
                 let bar = bar.wrap_in_whitespace(whitespace_after_bar);
 
-                let (new_input, call) = expression(new_input, indentation + 1, true)
-                    .unwrap_or_else(|| {
+                let indentation = if bar.is_multiline() {
+                    indentation + 1
+                } else {
+                    indentation
+                };
+                let (new_input, call) =
+                    expression(new_input, indentation, true).unwrap_or_else(|| {
                         let error = Rcst::Error {
                             unparsable_input: "".to_string(),
                             error: RcstError::PipeMissesCall,
