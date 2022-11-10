@@ -78,7 +78,6 @@ jobs:
           profile: minimal
           toolchain: ${{ env.RUST_VERSION }}
           override: true
-          components: clippy
       - uses: actions-rs/cargo@v1
         with:
           command: run

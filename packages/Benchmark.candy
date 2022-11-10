@@ -10,7 +10,9 @@ fibRec = { fibRec n ->
       fibRec fibRec (core.int.subtract n 2)
   }
 }
-fib = { n -> fibRec fibRec n }
+fib n =
+  needs (core.int.is n)
+  fibRec fibRec n
 twentyOne := fib 8
 
 main := { environment ->

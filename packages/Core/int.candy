@@ -73,7 +73,7 @@ absolute value :=
   needs (is value)
   conditionals.ifElse (isNegative value) (negate value) value
 
-fitsInRustU32 value =
+fitsInRustU32 value :=
   needs (is value)
   needs (isNonNegative value)  "you gave `fitsInRustU128` a signed int"
 
