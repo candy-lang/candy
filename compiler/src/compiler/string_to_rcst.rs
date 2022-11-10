@@ -116,6 +116,10 @@ mod parse {
         literal(input, ":=").map(|it| (it, Rcst::ColonEqualsSign))
     }
     #[instrument]
+    fn bar(input: &str) -> Option<(&str, Rcst)> {
+        literal(input, "|").map(|it| (it, Rcst::Bar))
+    }
+    #[instrument]
     fn opening_bracket(input: &str) -> Option<(&str, Rcst)> {
         literal(input, "[").map(|it| (it, Rcst::OpeningBracket))
     }
@@ -710,7 +714,7 @@ mod parse {
         indentation: usize,
         allow_call_and_assignment: bool,
     ) -> Option<(&str, Rcst)> {
-        let (mut input, mut expression) = int(input)
+        let (mut input, mut result) = int(input)
             .or_else(|| text(input, indentation))
             .or_else(|| symbol(input))
             .or_else(|| list(input, indentation))
@@ -745,18 +749,55 @@ mod parse {
             })?;
 
         loop {
-            let (new_input, whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
-            let Some((new_input, dot)) = dot(new_input) else { break; };
-            let Some((new_input, key)) = identifier(new_input) else { break; };
+            let mut did_make_progress = false;
 
-            input = new_input;
-            expression = Rcst::StructAccess {
-                struct_: Box::new(expression.wrap_in_whitespace(whitespace)),
-                dot: Box::new(dot),
-                key: Box::new(key),
-            };
+            'structAccess: {
+                let (new_input, whitespace) =
+                    whitespaces_and_newlines(input, indentation + 1, true);
+                let Some((new_input, dot)) = dot(new_input) else { break 'structAccess; };
+                let Some((new_input, key)) = identifier(new_input) else { break 'structAccess; };
+
+                input = new_input;
+                result = Rcst::StructAccess {
+                    struct_: Box::new(result.wrap_in_whitespace(whitespace)),
+                    dot: Box::new(dot),
+                    key: Box::new(key),
+                };
+                did_make_progress = true;
+            }
+
+            'pipe: {
+                let (new_input, whitespace_after_receiver) =
+                    whitespaces_and_newlines(input, indentation, true);
+
+                let Some((new_input, bar)) = bar(new_input) else { break 'pipe; };
+                let (new_input, whitespace_after_bar) =
+                    whitespaces_and_newlines(new_input, indentation + 1, true);
+                let bar = bar.wrap_in_whitespace(whitespace_after_bar);
+
+                let (new_input, call) = expression(new_input, indentation + 1, true)
+                    .unwrap_or_else(|| {
+                        let error = Rcst::Error {
+                            unparsable_input: "".to_string(),
+                            error: RcstError::PipeMissesCall,
+                        };
+                        (new_input, error)
+                    });
+
+                input = new_input;
+                result = Rcst::Pipe {
+                    receiver: Box::new(result.wrap_in_whitespace(whitespace_after_receiver)),
+                    bar: Box::new(bar),
+                    call: Box::new(call),
+                };
+                did_make_progress = true;
+            }
+
+            if !did_make_progress {
+                break;
+            }
         }
-        Some((input, expression))
+        Some((input, result))
     }
     #[test]
     fn test_expression() {
@@ -805,6 +846,50 @@ mod parse {
         assert_eq!(
             expression("foo\n.bar", 0, true),
             Some(("\n.bar", Rcst::Identifier("foo".to_string()))),
+        );
+        // foo
+        // | bar
+        assert_eq!(
+            expression("foo\n| bar", 0, true),
+            Some((
+                "",
+                Rcst::Pipe {
+                    receiver: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Newline("\n".to_string())],
+                    }),
+                    bar: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Bar),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    call: Box::new(Rcst::Identifier("bar".to_owned())),
+                },
+            )),
+        );
+        // foo
+        // | bar baz
+        assert_eq!(
+            expression("foo\n| bar baz", 0, true),
+            Some((
+                "",
+                Rcst::Pipe {
+                    receiver: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Newline("\n".to_string())],
+                    }),
+                    bar: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Bar),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    call: Box::new(Rcst::Call {
+                        receiver: Box::new(Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Identifier("bar".to_owned())),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                        }),
+                        arguments: vec![Rcst::Identifier("baz".to_owned())],
+                    }),
+                },
+            )),
         );
     }
 
