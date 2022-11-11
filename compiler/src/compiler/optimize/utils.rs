@@ -59,6 +59,9 @@ impl Expression {
             | Expression::Symbol(_)
             | Expression::Builtin(_)
             | Expression::HirId(_) => {}
+            Expression::List(items) => {
+                referenced.extend(items);
+            }
             Expression::Struct(fields) => {
                 for (key, value) in fields {
                     referenced.insert(*key);
@@ -160,6 +163,7 @@ impl Expression {
             Expression::Text(_) => true,
             Expression::Reference(_) => true,
             Expression::Symbol(_) => true,
+            Expression::List(_) => true,
             Expression::Struct(_) => true,
             Expression::Lambda { .. } => true,
             Expression::Parameter => false,
@@ -230,17 +234,16 @@ impl Expression {
             | Expression::Symbol(_)
             | Expression::Builtin(_)
             | Expression::HirId(_) => {}
+            Expression::List(items) => {
+                for item in items {
+                    replacer(item);
+                }
+            }
             Expression::Struct(fields) => {
-                *fields = fields
-                    .iter()
-                    .map(|(key, value)| {
-                        let mut key = *key;
-                        let mut value = *value;
-                        replacer(&mut key);
-                        replacer(&mut value);
-                        (key, value)
-                    })
-                    .collect();
+                for (key, value) in fields {
+                    replacer(key);
+                    replacer(value);
+                }
             }
             Expression::Reference(reference) => replacer(reference),
             Expression::Lambda {

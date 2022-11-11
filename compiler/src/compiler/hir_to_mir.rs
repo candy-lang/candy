@@ -270,6 +270,10 @@ fn compile_expression(
         hir::Expression::Text(text) => Expression::Text(text),
         hir::Expression::Reference(reference) => Expression::Reference(mapping[&reference]),
         hir::Expression::Symbol(symbol) => Expression::Symbol(symbol),
+        hir::Expression::Builtin(builtin) => Expression::Builtin(builtin),
+        hir::Expression::List(items) => {
+            Expression::List(items.iter().map(|item| mapping[item]).collect())
+        }
         hir::Expression::Struct(fields) => Expression::Struct(
             fields
                 .iter()
@@ -334,7 +338,6 @@ fn compile_expression(
             }
             Expression::Reference(lambda)
         }
-        hir::Expression::Builtin(builtin) => Expression::Builtin(builtin),
         hir::Expression::Call {
             function,
             arguments,

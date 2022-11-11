@@ -8,6 +8,7 @@ use super::{
 use crate::{module::Module, utils::CountableId};
 use itertools::Itertools;
 use std::sync::Arc;
+use tracing::debug;
 
 #[salsa::query_group(MirToLirStorage)]
 pub trait MirToLir: CstDb + OptimizeMir {
@@ -16,13 +17,14 @@ pub trait MirToLir: CstDb + OptimizeMir {
 
 fn lir(db: &dyn MirToLir, module: Module, config: TracingConfig) -> Option<Arc<Lir>> {
     let mir = db.mir_with_obvious_optimized(module, config)?;
-    let instructions = compile_lambda(&[], &[], &mir.body);
+    let instructions = compile_lambda(&[], &[], Id::from_usize(0), &mir.body);
     Some(Arc::new(Lir { instructions }))
 }
 
 fn compile_lambda(
     captured: &[Id],
-    parameters: &[Id], // including responsible HIR ID parameter
+    parameters: &[Id],
+    responsible_parameter: Id,
     body: &Body,
 ) -> Vec<Instruction> {
     let mut context = LoweringContext::default();
@@ -32,6 +34,7 @@ fn compile_lambda(
     for parameter in parameters {
         context.stack.push(*parameter);
     }
+    context.stack.push(responsible_parameter);
 
     for (id, expression) in body.iter() {
         context.compile_expression(id, expression);
@@ -63,6 +66,20 @@ impl LoweringContext {
                 self.stack.replace_top_id(id);
             }
             Expression::Symbol(symbol) => self.emit(id, Instruction::CreateSymbol(symbol.clone())),
+            Expression::Builtin(builtin) => {
+                self.emit(id, Instruction::CreateBuiltin(*builtin));
+            }
+            Expression::List(items) => {
+                for item in items {
+                    self.emit_push_from_stack(*item);
+                }
+                self.emit(
+                    id,
+                    Instruction::CreateList {
+                        num_items: items.len(),
+                    },
+                );
+            }
             Expression::Struct(fields) => {
                 for (key, value) in fields {
                     self.emit_push_from_stack(*key);
@@ -84,9 +101,8 @@ impl LoweringContext {
                 body,
             } => {
                 let captured = expression.captured_ids();
-                let mut all_parameters = parameters.clone();
-                all_parameters.push(*responsible_parameter);
-                let instructions = compile_lambda(&captured, &all_parameters, body);
+                let instructions =
+                    compile_lambda(&captured, parameters, *responsible_parameter, body);
 
                 self.emit(
                     id,
@@ -119,9 +135,6 @@ impl LoweringContext {
                         num_args: arguments.len(),
                     },
                 );
-            }
-            Expression::Builtin(builtin) => {
-                self.emit(id, Instruction::CreateBuiltin(*builtin));
             }
             Expression::UseModule {
                 current_module,

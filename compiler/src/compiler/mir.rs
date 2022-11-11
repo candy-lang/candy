@@ -28,9 +28,10 @@ pub enum Expression {
     Text(String),
     Symbol(String),
     Builtin(BuiltinFunction),
+    List(Vec<Id>),
     Struct(Vec<(Id, Id)>),
     Reference(Id),
-    /// A reference to code in the HIR.
+    /// A HIR ID that can be used to refer to code in the HIR.
     HirId(hir::Id),
     /// In the MIR, responsibilities are explicitly tracked. All lambdas take a
     /// responsible HIR ID as an extra parameter. Based on whether the function
@@ -264,7 +265,8 @@ impl hash::Hash for Expression {
             Expression::Text(text) => text.hash(state),
             Expression::Symbol(symbol) => symbol.hash(state),
             Expression::Builtin(builtin) => builtin.hash(state),
-            Expression::Struct(struct_) => struct_.len().hash(state),
+            Expression::List(items) => items.len().hash(state),
+            Expression::Struct(fields) => fields.len().hash(state),
             Expression::Reference(id) => id.hash(state),
             Expression::HirId(id) => id.hash(state),
             Expression::Lambda { body, .. } => body.hash(state),
@@ -329,6 +331,11 @@ impl fmt::Display for Body {
         Ok(())
     }
 }
+impl fmt::Debug for Id {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "${}", self.0)
+    }
+}
 impl fmt::Display for Id {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "${}", self.0)
@@ -341,6 +348,17 @@ impl fmt::Debug for Expression {
             Expression::Text(text) => write!(f, "{text:?}"),
             Expression::Symbol(symbol) => write!(f, "{symbol}"),
             Expression::Builtin(builtin) => write!(f, "builtin{builtin:?}"),
+            Expression::List(items) => write!(f, 
+                "({})",
+                if items.is_empty() {
+                    ",".to_string()
+                } else {
+                    items
+                        .iter()
+                        .map(|item| format!("{item}"))
+                        .join(", ")
+                }
+            ),
             Expression::Struct(fields) => write!(f, 
                 "[{}]",
                 fields
