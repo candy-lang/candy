@@ -806,58 +806,6 @@ mod parse {
                 }
             }
 
-            'structAccess: {
-                let (new_input, whitespace_after_struct) =
-                    whitespaces_and_newlines(input, indentation + 1, true);
-
-                let Some((new_input, dot)) = dot(new_input) else { break 'structAccess; };
-                let (new_input, whitespace_after_dot) =
-                    whitespaces_and_newlines(new_input, indentation + 1, true);
-                let dot = dot.wrap_in_whitespace(whitespace_after_dot);
-
-                let Some((new_input, key)) = identifier(new_input) else { break 'structAccess; };
-
-                input = new_input;
-                result = Rcst::StructAccess {
-                    struct_: Box::new(result.wrap_in_whitespace(whitespace_after_struct)),
-                    dot: Box::new(dot),
-                    key: Box::new(key),
-                };
-                did_make_progress = true;
-            }
-
-            'pipe: {
-                let (new_input, whitespace_after_receiver) =
-                    whitespaces_and_newlines(input, indentation, true);
-
-                let Some((new_input, bar)) = bar(new_input) else { break 'pipe; };
-                let (new_input, whitespace_after_bar) =
-                    whitespaces_and_newlines(new_input, indentation + 1, true);
-                let bar = bar.wrap_in_whitespace(whitespace_after_bar);
-
-                let indentation = if bar.is_multiline() {
-                    indentation + 1
-                } else {
-                    indentation
-                };
-                let (new_input, call) = expression(new_input, indentation, true, false)
-                    .unwrap_or_else(|| {
-                        let error = Rcst::Error {
-                            unparsable_input: "".to_string(),
-                            error: RcstError::PipeMissesCall,
-                        };
-                        (new_input, error)
-                    });
-
-                input = new_input;
-                result = Rcst::Pipe {
-                    receiver: Box::new(result.wrap_in_whitespace(whitespace_after_receiver)),
-                    bar: Box::new(bar),
-                    call: Box::new(call),
-                };
-                did_make_progress = true;
-            }
-
             if !did_make_progress {
                 break;
             }
