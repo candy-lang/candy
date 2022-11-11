@@ -125,10 +125,7 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
     );
 
     if !options.watch {
-        match result {
-            Some(_) => Ok(()),
-            None => Err(Exit::FileNotFound),
-        }
+        result.ok_or(Exit::FileNotFound).map(|_| ())
     } else {
         let (tx, rx) = channel();
         let mut watcher = watcher(tx, Duration::from_secs(1)).unwrap();

@@ -1,9 +1,6 @@
 bool = use "..bool"
 if = (use "..conditionals").if
-panic = (use "..panic").panic
 
 check condition :=
   needs (bool.is condition)
-  if
-    bool.not condition
-    { panic "A check didn't succeed" }
+  needs condition "A check didn't succeed."
