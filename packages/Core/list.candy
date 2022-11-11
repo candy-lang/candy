@@ -1,0 +1,75 @@
+bool = use "..bool"
+equals = (use "..equality").equals
+function = use "..function"
+int = use "..int"
+type = use "..type"
+
+filled length item :=
+  needs (int.is length)
+  needs (int.isNonNegative length)
+  needs (int.fitsInRustU32 length)
+  ✨.listFilled length item
+# TODO: `generate length valueGetter` when we have loops
+
+is value := type.is value List
+
+length list :=
+  needs (is list)
+  list | ✨.listLength
+isEmpty list :=
+  needs (is list)
+  equals (length list) 0
+
+lastIndex list :=
+  needs (is list)
+  needs (bool.not (isEmpty list))
+  length list | int.minus 1
+isValidIndex list index :=
+  needs (is list)
+  int.is index | bool.lazyAnd {
+    int.isNonNegative index
+    | bool.and (index | int.isLessThanOrEqualTo (lastIndex list))
+  }
+
+get list index :=
+  needs (is list)
+  needs (isValidIndex index)
+  list | ✨.listGet index
+
+last list :=
+  needs (is list)
+  needs (bool.not (isEmpty list))
+  list | get (lastIndex list)
+
+insert list index item :=
+  needs (is list)
+
+  needs (int.is index)
+  needs (int.isNonNegative index)
+  needs (index | int.isLessThanOrEqualTo (length list))
+
+  list | ✨.listInsert index item
+
+prepend list item :=
+  needs (is list)
+  list | insert 0 item
+append list item :=
+  needs (is list)
+  list | insert (length list) item
+
+replace list index newValue :=
+  needs (is list)
+  needs (isValidIndex index)
+  list | ✨.listReplace index newValue
+update list index updater :=
+  needs (is list)
+  needs (isValidIndex index)
+  needs (function.is1 updater)
+  oldValue = list | get index
+  newValue = updater oldValue
+  list | replace index newValue
+
+removeAt list index :=
+  needs (is list)
+  needs (isValidIndex index)
+  list | ✨.listRemoveAt index

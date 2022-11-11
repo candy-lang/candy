@@ -1,3 +1,0 @@
-use ..Primitives
-
-public builtin fun panic(message: String): Never

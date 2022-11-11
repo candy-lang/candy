@@ -3,35 +3,6 @@ use ..Operators
 use ..Primitives
 use ..String
 
-public builtin type Int
-
-impl Int {
-  public static builtin fun parse(value: String): Int
-}
-
-impl Int: Comparable {
-  builtin fun compareTo(other: Int): Less | Equal | Greater
-}
-
-impl Int: Add {
-  builtin fun add(other: Int): Int
-}
-impl Int: Subtract {
-  builtin fun subtract(other: Int): Int
-}
-impl Int: Negate {
-  builtin fun negate(): Int
-}
-impl Int: Multiply {
-  builtin fun multiply(other: Int): Int
-}
-impl Int: DivideTruncating {
-  builtin fun divideTruncating(other: Int): Int
-}
-impl Int: Modulo {
-  builtin fun modulo(other: Int): Int
-}
-
 impl Int: Hash {
   fun hash[H: Hasher](): H { H.primitive(this) }
 }

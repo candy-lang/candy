@@ -2,7 +2,9 @@ mod object;
 mod pointer;
 
 pub use self::{
-    object::{Builtin, Closure, Data, Int, Object, ReceivePort, SendPort, Struct, Symbol, Text},
+    object::{
+        Builtin, Closure, Data, Int, List, Object, ReceivePort, SendPort, Struct, Symbol, Text,
+    },
     pointer::Pointer,
 };
 use super::ids::ChannelId;
@@ -79,7 +81,10 @@ impl Heap {
     }
 
     pub fn dup(&mut self, address: Pointer) {
-        self.get_mut(address).reference_count += 1;
+        self.dup_by(address, 1);
+    }
+    pub fn dup_by(&mut self, address: Pointer, amount: usize) {
+        self.get_mut(address).reference_count += amount;
 
         let object = self.get(address);
         trace!(
@@ -183,6 +188,9 @@ impl Heap {
             Data::Int(int) => Data::Int(int.clone()),
             Data::Text(text) => Data::Text(text.clone()),
             Data::Symbol(symbol) => Data::Symbol(symbol.clone()),
+            Data::List(List { items }) => Data::List(List {
+                items: items.iter().map(|item| address_map[item]).collect(),
+            }),
             Data::Struct(struct_) => Data::Struct(Struct {
                 fields: struct_
                     .fields
@@ -257,13 +265,8 @@ impl Heap {
     pub fn create_nothing(&mut self) -> Pointer {
         self.create_symbol("Nothing".to_string())
     }
-    pub fn create_list(&mut self, items: &[Pointer]) -> Pointer {
-        let fields = items
-            .iter()
-            .enumerate()
-            .map(|(index, item)| (self.create_int(index.into()), *item))
-            .collect();
-        self.create_struct(fields)
+    pub fn create_list(&mut self, items: Vec<Pointer>) -> Pointer {
+        self.create(Data::List(List { items }))
     }
     pub fn create_bool(&mut self, value: bool) -> Pointer {
         self.create_symbol(if value { "True" } else { "False" }.to_string())

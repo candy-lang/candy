@@ -22,11 +22,18 @@ pub enum Instruction {
     /// Pushes a symbol.
     CreateSymbol(String),
 
-    /// Pops 2 * num_entries items, pushes a struct.
+    /// Pops num_items items, pushes a list.
+    ///
+    /// a, item, item, ..., item -> a, pointer to list
+    CreateList {
+        num_items: usize,
+    },
+
+    /// Pops 2 * num_fields items, pushes a struct.
     ///
     /// a, key, value, key, value, ..., key, value -> a, pointer to struct
     CreateStruct {
-        num_entries: usize,
+        num_fields: usize,
     },
 
     /// Pushes a closure.
@@ -134,8 +141,11 @@ impl Display for Instruction {
             Instruction::CreateInt(int) => write!(f, "createInt {int}"),
             Instruction::CreateText(text) => write!(f, "createText {text:?}"),
             Instruction::CreateSymbol(symbol) => write!(f, "createSymbol {symbol}"),
-            Instruction::CreateStruct { num_entries } => {
-                write!(f, "createStruct {num_entries}")
+            Instruction::CreateList { num_items } => {
+                write!(f, "createList {num_items}")
+            }
+            Instruction::CreateStruct { num_fields } => {
+                write!(f, "createStruct {num_fields}")
             }
             Instruction::CreateClosure {
                 id,

@@ -3,41 +3,8 @@ use ..Operators
 use ..Panic
 use ..Primitives
 
-public type Maybe[T] = Some T | None
-
 impl[T] Maybe[T] {
-  public fun unwrap(): T {
-    this.else({ panic("Called unwrap on None.") })
-  }
-
-  public fun else(alternative: () -> T): T {
-    this.match[T](some = { it }, none = alternative)
-  }
-  public fun else(alternative: () -> Maybe[T]): Maybe[T] {
-    this.match[Maybe[T]](some = { Maybe[T].Some(it) }, none = alternative)
-  }
-
-  public fun map[Out](mapper: (T) -> Out): Maybe[Out] {
-    this.flatMap[Out]({ Maybe[Out].Some(mapper(it)) })
-  }
-
-  public fun flatMap[Out](mapper: (T) -> Maybe[Out]): Maybe[Out] {
-    this.match[Maybe[Out]](some = { mapper(it) }, none = { Maybe[Out].None() })
-  }
-
   public fun do(body: (T) -> Nothing) { this.map[Nothing](body) }
-
-  public fun isSome(): Bool { this.match[Bool](some = { true() }, none = { false() }) }
-  public fun isNone(): Bool { this.isSome().not() }
-}
-
-impl[T: Equals] Maybe[T]: Equals {
-  fun equals(other: This): Bool {
-    this.match[Bool](
-      some = { a -> other.match[Bool](some = { b -> a == b }, none = { false() }) }
-      none = { other.isNone() }
-    )
-  }
 }
 
 impl[T: Hash] Maybe[T]: Hash {

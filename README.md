@@ -78,7 +78,6 @@ We already have a language server that provides some tooling.
   - HTTP, UDP
 - compiler
   - make functions independent of their order in top-level scope
-  - lists
   - text interpolation
   - fibers, channels
   - patterns
@@ -141,7 +140,6 @@ We already have a language server that provides some tooling.
 - add caching while compile-time evaluating code
 - tags
 - pattern matching
-- pipe operator
 - add CI
 - add tests
 - add a more lightweight tracer that only tracks stack traces

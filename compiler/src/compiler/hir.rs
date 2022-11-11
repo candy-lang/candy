@@ -57,6 +57,9 @@ impl Expression {
                 ids.push(id.clone());
             }
             Expression::Symbol(_) => {}
+            Expression::List(items) => {
+                ids.extend(items.iter().cloned());
+            }
             Expression::Struct(entries) => {
                 for (key_id, value_id) in entries.iter() {
                     ids.push(key_id.to_owned());
@@ -141,6 +144,7 @@ pub enum Expression {
     Text(String),
     Reference(Id),
     Symbol(String),
+    List(Vec<Id>),
     Struct(HashMap<Id, Id>),
     Lambda(Lambda),
     Builtin(BuiltinFunction),
@@ -206,10 +210,10 @@ impl Body {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum HirError {
-    UnknownReference { name: String },
+    NeedsWithWrongNumberOfArguments { num_args: usize },
     PublicAssignmentInNotTopLevel,
     PublicAssignmentWithSameName { name: String },
-    NeedsWithWrongNumberOfArguments { num_args: usize },
+    UnknownReference { name: String },
 }
 
 impl Body {
@@ -234,6 +238,13 @@ impl fmt::Display for Expression {
             Expression::Text(text) => write!(f, "text {text:?}"),
             Expression::Reference(reference) => write!(f, "reference {reference}"),
             Expression::Symbol(symbol) => write!(f, "symbol {symbol}"),
+            Expression::List(items) => {
+                write!(
+                    f,
+                    "list (\n{}\n)",
+                    items.iter().map(|item| format!("  {item},")).join("\n"),
+                )
+            }
             Expression::Struct(entries) => {
                 write!(
                     f,
@@ -332,6 +343,7 @@ impl Expression {
             Expression::Text { .. } => None,
             Expression::Reference { .. } => None,
             Expression::Symbol { .. } => None,
+            Expression::List(_) => None,
             Expression::Struct(_) => None,
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
             Expression::Builtin(_) => None,
@@ -367,6 +379,7 @@ impl CollectErrors for Expression {
             | Expression::Text(_)
             | Expression::Reference(_)
             | Expression::Symbol(_)
+            | Expression::List(_)
             | Expression::Struct(_)
             | Expression::Builtin(_)
             | Expression::Call { .. }

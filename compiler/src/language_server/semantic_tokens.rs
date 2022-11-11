@@ -145,21 +145,21 @@ impl<'a> Context<'a> {
     fn visit_cst(&mut self, cst: &Cst, token_type_for_identifier: Option<SemanticTokenType>) {
         match &cst.kind {
             CstKind::EqualsSign => self.add_token(cst.span.clone(), SemanticTokenType::Operator),
-            CstKind::Comma => {}
-            CstKind::Dot => {}
-            CstKind::Colon => {}
-            CstKind::ColonEqualsSign => {}
-            CstKind::OpeningParenthesis => {}
-            CstKind::ClosingParenthesis => {}
-            CstKind::OpeningBracket => {}
-            CstKind::ClosingBracket => {}
-            CstKind::OpeningCurlyBrace => {}
-            CstKind::ClosingCurlyBrace => {}
+            CstKind::Comma
+            | CstKind::Dot
+            | CstKind::Colon
+            | CstKind::ColonEqualsSign
+            | CstKind::Bar
+            | CstKind::OpeningParenthesis
+            | CstKind::ClosingParenthesis
+            | CstKind::OpeningBracket
+            | CstKind::ClosingBracket
+            | CstKind::OpeningCurlyBrace
+            | CstKind::ClosingCurlyBrace => {}
             CstKind::Arrow => self.add_token(cst.span.clone(), SemanticTokenType::Operator),
             CstKind::DoubleQuote => {} // handled by parent
             CstKind::Octothorpe => {}  // handled by parent
-            CstKind::Whitespace(_) => {}
-            CstKind::Newline(_) => {}
+            CstKind::Whitespace(_) | CstKind::Newline(_) => {}
             CstKind::Comment { octothorpe, .. } => {
                 self.visit_cst(octothorpe, None);
                 self.add_token(cst.span.clone(), SemanticTokenType::Comment);
@@ -188,6 +188,15 @@ impl<'a> Context<'a> {
                 self.add_token(closing_quote.span.clone(), SemanticTokenType::String);
             }
             CstKind::TextPart(_) => {} // handled by parent
+            CstKind::Pipe {
+                receiver,
+                bar,
+                call,
+            } => {
+                self.visit_cst(receiver, None);
+                self.visit_cst(bar, None);
+                self.visit_cst(call, None);
+            }
             CstKind::Parenthesized {
                 opening_parenthesis,
                 inner,
@@ -204,6 +213,21 @@ impl<'a> Context<'a> {
                 self.visit_cst(receiver, Some(SemanticTokenType::Function));
                 self.visit_csts(arguments, None);
             }
+            CstKind::List {
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+            } => {
+                self.visit_cst(opening_parenthesis, None);
+                self.visit_csts(items, None);
+                self.visit_cst(closing_parenthesis, None);
+            }
+            CstKind::ListItem { value, comma } => {
+                self.visit_cst(value, None);
+                if let Some(comma) = comma {
+                    self.visit_cst(comma, None);
+                }
+            }
             CstKind::Struct {
                 opening_bracket,
                 fields,
@@ -214,14 +238,13 @@ impl<'a> Context<'a> {
                 self.visit_cst(closing_bracket, None);
             }
             CstKind::StructField {
-                key_and_colon,
+                key,
+                colon,
                 value,
                 comma,
             } => {
-                if let Some(box (key, colon)) = key_and_colon {
-                    self.visit_cst(key, None);
-                    self.visit_cst(colon, None);
-                }
+                self.visit_cst(key, None);
+                self.visit_cst(colon, None);
                 self.visit_cst(value, None);
                 if let Some(comma) = comma {
                     self.visit_cst(comma, None);

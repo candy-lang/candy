@@ -25,13 +25,19 @@ pub enum BuiltinFunction {
     IntShiftLeft,        // (value: int) (amount: int) -> (shifted: int)
     IntShiftRight,       // (value: int) (amount: int) -> (shifted: int)
     IntSubtract,         // (minuend: int) (subtrahend: int) -> (difference: int)
+    ListFilled,          // (length: int) item -> list
+    ListGet,             // list (index: int) -> item
+    ListInsert,          // list (index: int) item -> list
+    ListLength,          // list -> int
+    ListRemoveAt,        // list (index: int) -> (list, item)
+    ListReplace,         // list (index: int) newItem -> list
     Parallel,            // body: Closure -> returnValueOfClosure
     Print,               // message -> Nothing
     StructGet,           // struct key -> value
     StructGetKeys,       // struct -> listOfKeys
     StructHasKey,        // struct key -> booleanSymbol
     TextCharacters,      // text -> (listOfText: list)
-    TextConcatenate,     // (valueA: text) (valueB: text) -> (concatenated: text)
+    TextConcatenate,     // (textA: text) (textB: text) -> (concatenated: text)
     TextContains,        // text (pattern: text) -> booleanSymbol
     TextEndsWith,        // text (pattern: text) -> booleanSymbol
     TextGetRange,        // text (startInclusive: int) (endExclusive: int) -> (substring: text)

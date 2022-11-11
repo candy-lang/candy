@@ -57,7 +57,7 @@ impl From<Module> for Url {
                     .to_possible_paths()
                     .unwrap()
                     .into_iter()
-                    .find(|path| path.exists())
+                    .find_or_first(|path| path.exists())
                     .unwrap(),
             )
             .unwrap(),

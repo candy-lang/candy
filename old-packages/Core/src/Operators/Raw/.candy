@@ -1,7 +1,0 @@
-# The Candy compiler knows the traits in this module and enables operators for the types that
-# implement them.
-
-## TODO(later, marcelgarus): Document precedence here.
-
-public use .Infix
-public use .Prefix
