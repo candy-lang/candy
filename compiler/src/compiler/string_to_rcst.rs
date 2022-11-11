@@ -82,7 +82,7 @@ mod parse {
     use itertools::Itertools;
     use tracing::instrument;
 
-    static MEANINGFUL_PUNCTUATION: &str = "()[]:,{}->=.";
+    static MEANINGFUL_PUNCTUATION: &str = "()[]:,{}->=.|";
     static SUPPORTED_WHITESPACE: &str = " \r\n\t";
 
     #[instrument]
@@ -1002,7 +1002,7 @@ mod parse {
     fn test_run_of_expressions() {
         assert_eq!(
             run_of_expressions("print", 0),
-            Some(("", vec![Rcst::Identifier("print".to_string())]))
+            Some(("", vec![Rcst::Identifier("print".to_string())])),
         );
         // foo
         //   bar
@@ -1015,12 +1015,12 @@ mod parse {
                         child: Box::new(Rcst::Identifier("foo".to_string())),
                         whitespace: vec![
                             Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string())
+                            Rcst::Whitespace("  ".to_string()),
                         ],
                     }),
                     arguments: vec![Rcst::Identifier("bar".to_string())],
                 },
-            ))
+            )),
         );
         assert_eq!(
             run_of_expressions("(foo Bar) Baz", 0),
@@ -1033,17 +1033,27 @@ mod parse {
                             inner: Box::new(Rcst::Call {
                                 receiver: Box::new(Rcst::TrailingWhitespace {
                                     child: Box::new(Rcst::Identifier("foo".to_string())),
-                                    whitespace: vec![Rcst::Whitespace(" ".to_string())]
+                                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
                                 }),
-                                arguments: vec![Rcst::Symbol("Bar".to_string())]
+                                arguments: vec![Rcst::Symbol("Bar".to_string())],
                             }),
-                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis)
+                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
                         }),
-                        whitespace: vec![Rcst::Whitespace(" ".to_string())]
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     },
-                    Rcst::Symbol("Baz".to_string())
-                ]
-            ))
+                    Rcst::Symbol("Baz".to_string()),
+                ],
+            )),
+        );
+        assert_eq!(
+            run_of_expressions("foo | bar", 0),
+            Some((
+                "| bar",
+                vec![Rcst::TrailingWhitespace {
+                    child: Box::new(Rcst::Identifier("foo".to_string())),
+                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                }],
+            )),
         );
     }
 
