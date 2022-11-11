@@ -41,31 +41,33 @@ impl<'a> Context<'a> {
     }
     fn visit_cst(&mut self, cst: &Cst) {
         match &cst.kind {
-            CstKind::EqualsSign => {}
-            CstKind::Comma => {}
-            CstKind::Dot => {}
-            CstKind::Colon => {}
-            CstKind::ColonEqualsSign => {}
-            CstKind::OpeningParenthesis => {}
-            CstKind::ClosingParenthesis => {}
-            CstKind::OpeningBracket => {}
-            CstKind::ClosingBracket => {}
-            CstKind::OpeningCurlyBrace => {}
-            CstKind::ClosingCurlyBrace => {}
-            CstKind::Arrow => {}
-            CstKind::DoubleQuote => {}
-            CstKind::Octothorpe => {}
-            CstKind::Whitespace(_) => {}
-            CstKind::Newline(_) => {}
+            CstKind::EqualsSign
+            | CstKind::Comma
+            | CstKind::Dot
+            | CstKind::Colon
+            | CstKind::ColonEqualsSign
+            | CstKind::Bar
+            | CstKind::OpeningParenthesis
+            | CstKind::ClosingParenthesis
+            | CstKind::OpeningBracket
+            | CstKind::ClosingBracket
+            | CstKind::OpeningCurlyBrace
+            | CstKind::ClosingCurlyBrace
+            | CstKind::Arrow
+            | CstKind::DoubleQuote
+            | CstKind::Octothorpe
+            | CstKind::Whitespace(_)
+            | CstKind::Newline(_) => {}
             // TODO: support folding ranges for comments
             CstKind::Comment { .. } => {}
             CstKind::TrailingWhitespace { child, .. } => self.visit_cst(child),
-            CstKind::Identifier(_) => {}
-            CstKind::Symbol(_) => {}
-            CstKind::Int { .. } => {}
+            CstKind::Identifier(_) | CstKind::Symbol(_) | CstKind::Int { .. } => {}
             // TODO: support folding ranges for multiline texts
-            CstKind::Text { .. } => {}
-            CstKind::TextPart(_) => {}
+            CstKind::Text { .. } | CstKind::TextPart(_) => {}
+            CstKind::Pipe { receiver, call, .. } => {
+                self.visit_cst(receiver);
+                self.visit_cst(call);
+            }
             CstKind::Parenthesized { inner, .. } => self.visit_cst(inner),
             CstKind::Call {
                 receiver,

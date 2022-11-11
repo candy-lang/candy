@@ -2,5 +2,9 @@ bool = use "..bool"
 if = (use "..conditionals").if
 
 check condition :=
+  # Panics if the `condition` is `False`.
+  #
+  # This function is useful for ensuring that your mental model of the state of
+  # your program matches its actual state.
   needs (bool.is condition)
   needs condition "A check didn't succeed."

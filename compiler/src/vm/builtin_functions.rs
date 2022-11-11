@@ -44,7 +44,7 @@ impl Fiber {
             BuiltinFunction::IntShiftLeft => self.heap.int_shift_left(args),
             BuiltinFunction::IntShiftRight => self.heap.int_shift_right(args),
             BuiltinFunction::IntSubtract => self.heap.int_subtract(args),
-            BuiltinFunction::ListCreate => self.heap.list_create(args),
+            BuiltinFunction::ListFilled => self.heap.list_filled(args),
             BuiltinFunction::ListGet => self.heap.list_get(args),
             BuiltinFunction::ListInsert => self.heap.list_insert(args),
             BuiltinFunction::ListLength => self.heap.list_length(args),
@@ -297,11 +297,11 @@ impl Heap {
         })
     }
 
-    fn list_create(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |length: Int| {
+    fn list_filled(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |length: Int, item: Any| {
             let length = length.value.to_usize().unwrap();
-            let nothing = self.create_nothing();
-            Return(self.create_list(vec![nothing; length]))
+            self.dup_by(item.address, length);
+            Return(self.create_list(vec![item.address; length]))
         })
     }
     fn list_get(&mut self, args: &[Pointer]) -> BuiltinResult {
@@ -396,16 +396,17 @@ impl Heap {
 
     fn text_characters(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
-            let mut character_addresses = vec![];
-            for c in text.value.graphemes(true) {
-                character_addresses.push(self.create_text(c.to_string()));
-            }
+            let character_addresses = text
+                .value
+                .graphemes(true)
+                .map(|it| self.create_text(it.to_string()))
+                .collect_vec();
             Return(self.create_list(character_addresses))
         })
     }
     fn text_concatenate(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |a: Text, b: Text| {
-            Return(self.create_text(format!("{}{}", a.value, b.value)))
+        unpack_and_later_drop!(self, args, |text_a: Text, text_b: Text| {
+            Return(self.create_text(format!("{}{}", text_a.value, text_b.value)))
         })
     }
     fn text_contains(&mut self, args: &[Pointer]) -> BuiltinResult {
