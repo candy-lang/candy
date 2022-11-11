@@ -396,10 +396,11 @@ impl Heap {
 
     fn text_characters(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
-            let mut character_addresses = vec![];
-            for c in text.value.graphemes(true) {
-                character_addresses.push(self.create_text(c.to_string()));
-            }
+            let character_addresses = text
+                .value
+                .graphemes(true)
+                .map(|it| self.create_text(it.to_string()))
+                .collect_vec();
             Return(self.create_list(character_addresses))
         })
     }

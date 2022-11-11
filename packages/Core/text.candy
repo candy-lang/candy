@@ -2,6 +2,7 @@ bool = use "..bool"
 conditionals = use "..conditionals"
 equals = (use "..equality").equals
 int = use "..int"
+list = use "..list"
 struct = use "..struct"
 type = use "..type"
 
@@ -23,7 +24,7 @@ characterAt text index :=
   needs (int.is index)
   needs (int.isNonNegative index)
   needs (int.isLessThan index (length text))
-  text | characters | struct.getUnwrap index
+  text | characters | list.get index
 
 getRange text startInclusive endExclusive :=
   needs (is text)
