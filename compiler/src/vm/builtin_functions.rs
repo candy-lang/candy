@@ -16,7 +16,7 @@ use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::ToPrimitive;
 use std::{ops::Deref, str::FromStr};
-use tracing::{debug, info, span, Level};
+use tracing::{info, span, Level};
 use unicode_segmentation::UnicodeSegmentation;
 
 impl Fiber {
@@ -26,7 +26,6 @@ impl Fiber {
         args: &[Pointer],
         responsible: Pointer,
     ) {
-        debug!("Running builtin{builtin_function:?}");
         let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
             BuiltinFunction::ChannelCreate => self.heap.channel_create(args),
             BuiltinFunction::ChannelSend => self.heap.channel_send(args),

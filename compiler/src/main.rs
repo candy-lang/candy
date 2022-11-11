@@ -468,13 +468,13 @@ fn init_logger() {
             "candy::compiler::string_to_rcst",
             Level::WARN,
         )))
-        // .with_filter(filter::filter_fn(level_for(
-        //     "candy::compiler",
-        //     Level::DEBUG,
-        // )))
+        .with_filter(filter::filter_fn(level_for(
+            "candy::compiler",
+            Level::DEBUG,
+        )))
         .with_filter(filter::filter_fn(level_for(
             "candy::language_server",
-            Level::DEBUG,
+            Level::TRACE,
         )))
         .with_filter(filter::filter_fn(level_for("candy::vm", Level::DEBUG)))
         .with_filter(filter::filter_fn(level_for(
