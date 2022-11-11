@@ -135,7 +135,10 @@ impl FullTracer {
         panicking_fiber_chain
             .into_iter()
             .rev()
-            .map(|fiber| self.format_stack_trace(db, &stack_traces[&fiber]))
+            .map(|fiber| match stack_traces.get(&fiber) {
+                Some(stack_trace) => self.format_stack_trace(db, stack_trace),
+                None => "(there's no stack trace for this fiber)".to_string(),
+            })
             .join("\n(fiber boundary)\n")
     }
 }

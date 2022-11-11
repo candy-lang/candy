@@ -49,8 +49,8 @@ impl HirError {
     }
 }
 
-impl From<Module> for Url {
-    fn from(module: Module) -> Url {
+impl From<Module> for Option<Url> {
+    fn from(module: Module) -> Option<Url> {
         match module.package {
             Package::User(_) | Package::External(_) => Url::from_file_path(
                 module
@@ -60,8 +60,9 @@ impl From<Module> for Url {
                     .find_or_first(|path| path.exists())
                     .unwrap(),
             )
-            .unwrap(),
-            Package::Anonymous { url } => Url::parse(&format!("untitled:{url}",)).unwrap(),
+            .ok(),
+            Package::Anonymous { url } => Url::parse(&format!("untitled:{url}",)).ok(),
+            Package::Tooling(_) => None,
         }
     }
 }

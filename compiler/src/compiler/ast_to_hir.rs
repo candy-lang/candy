@@ -30,7 +30,7 @@ pub trait AstToHir: CstDb + CstToAst {
 }
 
 fn hir_to_ast_id(db: &dyn AstToHir, id: hir::Id) -> Option<ast::Id> {
-    let (_, hir_to_ast_id_mapping) = db.hir(id.module.clone()).unwrap();
+    let (_, hir_to_ast_id_mapping) = db.hir(id.module.clone())?;
     hir_to_ast_id_mapping.get(&id).cloned()
 }
 fn hir_to_cst_id(db: &dyn AstToHir, id: hir::Id) -> Option<cst::Id> {

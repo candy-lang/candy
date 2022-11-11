@@ -115,16 +115,13 @@ impl Id {
         Self { module, keys }
     }
 
-    /// An ID that can be used in cases where no real ID exists. For example,
-    /// when calling the `main` function, we want to be able to shift blame to
-    /// the platform for passing a wrong environment, but the platform doesn't
-    /// have a corresponding HIR ID.
-    pub fn special(name: &str) -> Self {
+    /// An ID that can be used to blame the tooling. For example, when calling
+    /// the `main` function, we want to be able to blame the platform for
+    /// passing a wrong environment.
+    fn tooling(name: String) -> Self {
         Self {
             module: Module {
-                package: Package::Anonymous {
-                    url: format!("${}", name),
-                },
+                package: Package::Tooling(name),
                 path: vec![],
                 kind: ModuleKind::Code,
             },
@@ -132,10 +129,10 @@ impl Id {
         }
     }
     pub fn platform() -> Self {
-        Self::special("platform")
+        Self::tooling("platform".to_string())
     }
     pub fn fuzzer() -> Self {
-        Self::special("fuzzer")
+        Self::tooling("fuzzer".to_string())
     }
     /// TODO: Currently, when a higher-order function calls a closure passed as
     /// a parameter, that's registered as a normal call instruction, making the
@@ -145,7 +142,7 @@ impl Id {
     /// fault when passing a panicking function. After we did that, we should be
     /// able to remove this ID.
     pub fn complicated_responsibility() -> Self {
-        Self::special("complicated-responsibility")
+        Self::tooling("complicated-responsibility".to_string())
     }
 
     pub fn is_root(&self) -> bool {

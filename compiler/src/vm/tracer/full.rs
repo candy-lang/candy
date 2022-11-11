@@ -119,24 +119,23 @@ impl FullTracer {
     fn map_fiber_event(&mut self, event: FiberEvent, fiber: FiberId) -> StoredFiberEvent {
         match event {
             FiberEvent::ValueEvaluated {
-                expression: id,
+                expression,
                 value,
                 heap,
             } => {
+                let expression = self.import_from_heap(expression, heap, Some(fiber));
                 let value = self.import_from_heap(value, heap, Some(fiber));
-                StoredFiberEvent::ValueEvaluated {
-                    expression: id,
-                    value,
-                }
+                StoredFiberEvent::ValueEvaluated { expression, value }
             }
             FiberEvent::FoundFuzzableClosure {
-                definition: id,
+                definition,
                 closure,
                 heap,
             } => {
+                let definition = self.import_from_heap(definition, heap, Some(fiber));
                 let closure = self.import_from_heap(closure, heap, Some(fiber));
                 StoredFiberEvent::FoundFuzzableClosure {
-                    definition: id,
+                    definition,
                     closure,
                 }
             }
@@ -147,15 +146,16 @@ impl FullTracer {
                 responsible,
                 heap,
             } => {
+                let call_site = self.import_from_heap(call_site, heap, Some(fiber));
                 let closure = self.import_from_heap(closure, heap, Some(fiber));
-                let args = arguments
+                let arguments = arguments
                     .into_iter()
                     .map(|arg| self.import_from_heap(arg, heap, Some(fiber)))
                     .collect();
                 StoredFiberEvent::CallStarted {
                     call_site,
                     closure,
-                    arguments: args,
+                    arguments,
                     responsible,
                 }
             }

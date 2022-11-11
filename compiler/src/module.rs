@@ -46,6 +46,10 @@ pub enum Package {
     /// not yet persisted to disk (such as when opening a new VSCode tab and
     /// typing some code).
     Anonymous { url: String },
+
+    /// This package can make the tooling responsible for calls. For example,
+    /// the fuzzer and constant evaluator use this.
+    Tooling(String),
 }
 
 impl Module {
@@ -127,6 +131,7 @@ impl Package {
             Package::User(path) => Some(path.clone()),
             Package::External(path) => Some(path.clone()),
             Package::Anonymous { .. } => None,
+            Package::Tooling(_) => None,
         }
     }
 }
@@ -171,6 +176,7 @@ impl Display for Package {
             Package::User(path) => write!(f, "user:{path:?}"),
             Package::External(path) => write!(f, "extern:{path:?}"),
             Package::Anonymous { url } => write!(f, "anonymous:{url}"),
+            Package::Tooling(tooling) => write!(f, "tooling:{tooling}"),
         }
     }
 }

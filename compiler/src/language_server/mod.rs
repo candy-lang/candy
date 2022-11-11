@@ -93,9 +93,10 @@ impl LanguageServer for CandyLanguageServer {
         let hint_reporter = async move || {
             while let Some((module, hints)) = hints_receiver.recv().await {
                 debug!("Reporting hints for {module}: {hints:?}");
+                let url: Option<Url> = module.into();
                 client
                     .send_notification::<HintsNotification>(HintsNotification {
-                        uri: Url::from(module).to_string(),
+                        uri: url.unwrap().to_string(),
                         hints,
                     })
                     .await;
@@ -327,8 +328,9 @@ impl CandyLanguageServer {
                     .map(|it| it.into_diagnostic(&db, module.clone()))
                     .collect()
             };
+            let url: Option<Url> = module.clone().into();
             self.client
-                .publish_diagnostics(module.clone().into(), diagnostics, None)
+                .publish_diagnostics(url.unwrap(), diagnostics, None)
                 .await;
         }
     }
