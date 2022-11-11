@@ -46,15 +46,15 @@ Candy blurs the line between those stages, for example, by replacing compile-tim
   ```candy
   foo a =             # If you pass a = 0,
     needs (isInt a)
-    math.logarithm a  # then this fails because logarithm only works on positive numbers.
+    math.logarithm a  # then this panics: The `input` must be a positive number.
 
   efficientTextReverse text =
     needs (isText text)
-    needs (isPalindrome text) "efficientTextReverse only works on palindromes"
+    needs (isPalindrome text) "Only palindromes can be efficiently reversed."
     text
 
   greetBackwards name =                   # If you pass name = "Test",
-    "Hello, {efficientTextReverse name}"  # then this fails because efficientTextReverse only works on palindromes.
+    "Hello, {efficientTextReverse name}"  # then this panics: Only palindromes can be efficiently reversed.
   ```
 
 To get a more in-depth introduction, read the [language document](language.md).

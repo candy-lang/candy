@@ -299,7 +299,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
             reason,
             responsible,
         } => {
-            error!("The module panicked because {reason}.");
+            error!("The module panicked: {reason}");
             error!("{responsible} is responsible.");
             let span = db.hir_id_to_span(responsible).unwrap();
             error!("Responsible is at {span:?}.");

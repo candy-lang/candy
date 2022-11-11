@@ -211,10 +211,10 @@ Variables only exist until the end of the scope they're defined in.
 
 ```candy
 foo =
-  bar = hello  # error because hello doesn't exist yet
+  bar = hello  # Error because `hello` doesn't exist yet.
   hello = 5
   4
-bar = hello  # error because hello doesn't exist anymore
+bar = hello  # Error because `hello` doesn't exist anymore.
 ```
 
 Variables at the file's top level are visible to the module system (“public”) if they are declared using `:=`.
@@ -249,7 +249,7 @@ Grouping using parentheses is only necessary if you have nested calls.
 ```
 five = identity 5
 five = identity (identity 5)
-error = identity identity 5  # error because the first `identity` is called with two arguments
+error = identity identity 5  # Error because the first `identity` is called with two arguments.
 ```
 
 You can also split arguments across multiple lines using indentation.
@@ -422,9 +422,9 @@ Optionally, you can pass a reason to the `needs` function that describes why you
 
 ```candy
 foo a =
-  needs (core.int.is a) "life's not fair"
+  needs (core.int.is a) "Life's not fair."
 
-foo Hey  # Calling `foo Hey` panics because life's not fair.
+foo Hey  # Calling `foo Hey` panics: Life's not fair.
 ```
 
 Here are some recommended guidelines for writing reasons:

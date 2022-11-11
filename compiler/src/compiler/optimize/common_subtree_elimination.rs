@@ -10,7 +10,7 @@
 //! $3 = call $0 with $1 $2  |  $3 = call $0 with $1 $2
 //! ```
 //!
-//! This is especially effective after [constant lifting], because lots of
+//! This is especially effective after [constant lifting] because lots of
 //! constants are in the same scope. This optimization is also a necessity to
 //! avoid exponential code blowup when importing modules – after
 //! [module folding], a lot of duplicate functions exist.

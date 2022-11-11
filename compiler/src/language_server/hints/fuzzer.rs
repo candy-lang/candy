@@ -147,7 +147,7 @@ impl FuzzerManager {
                     Hint {
                         kind: HintKind::Fuzz,
                         text: format!(
-                            "then `{name} {}` panics because {reason}.",
+                            "then `{name} {}` panics: {reason}",
                             arguments
                                 .iter()
                                 .cloned()

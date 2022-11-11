@@ -88,7 +88,7 @@ pub struct FailingFuzzCase {
 impl FailingFuzzCase {
     pub fn dump(&self, db: &Database) {
         error!(
-            "Calling `{} {}` doesn't work because {}.",
+            "Calling `{} {}` panics: {}",
             self.closure,
             self.arguments
                 .iter()

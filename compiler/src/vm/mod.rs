@@ -559,7 +559,7 @@ impl Vm {
                 if let Performer::Fiber(fiber) = performer {
                     let tree = self.fibers.get_mut(&fiber).unwrap();
                     tree.as_single_mut().unwrap().fiber.panic(
-                        "the nursery is already dead because the parallel section ended"
+                        "The nursery is already dead because the parallel section ended."
                             .to_string(),
                         Id::complicated_responsibility(),
                     );

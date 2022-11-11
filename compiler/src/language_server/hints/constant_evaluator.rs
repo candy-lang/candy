@@ -189,7 +189,7 @@ fn panic_hint(
 
     Some(Hint {
         kind: HintKind::Panic,
-        text: format!("Calling `{call_info}` panics because {reason}."),
+        text: format!("Calling `{call_info}` panics: {reason}"),
         position: id_to_end_of_line(db, call_site)?,
     })
 }

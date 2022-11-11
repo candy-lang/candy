@@ -388,7 +388,7 @@ impl Fiber {
                         ..
                     }) => {
                         if num_args != expected_num_args {
-                            self.panic(format!("a closure expected {expected_num_args} parameters, but you called it with {num_args} arguments"), responsible);
+                            self.panic(format!("A closure expected {expected_num_args} parameters, but you called it with {num_args} arguments."), responsible);
                             return;
                         }
 
