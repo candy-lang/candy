@@ -713,6 +713,7 @@ mod parse {
         input: &str,
         indentation: usize,
         allow_call_and_assignment: bool,
+        allow_pipe: bool,
     ) -> Option<(&str, Rcst)> {
         let (mut input, mut result) = int(input)
             .or_else(|| text(input, indentation))
@@ -771,6 +772,60 @@ mod parse {
                 did_make_progress = true;
             }
 
+            if allow_pipe {
+                'pipe: {
+                    let (new_input, whitespace_after_receiver) =
+                        whitespaces_and_newlines(input, indentation, true);
+
+                    let Some((new_input, bar)) = bar(new_input) else { break 'pipe; };
+                    let (new_input, whitespace_after_bar) =
+                        whitespaces_and_newlines(new_input, indentation + 1, true);
+                    let bar = bar.wrap_in_whitespace(whitespace_after_bar);
+
+                    let indentation = if bar.is_multiline() {
+                        indentation + 1
+                    } else {
+                        indentation
+                    };
+                    let (new_input, call) = expression(new_input, indentation, true, false)
+                        .unwrap_or_else(|| {
+                            let error = Rcst::Error {
+                                unparsable_input: "".to_string(),
+                                error: RcstError::PipeMissesCall,
+                            };
+                            (new_input, error)
+                        });
+
+                    input = new_input;
+                    result = Rcst::Pipe {
+                        receiver: Box::new(result.wrap_in_whitespace(whitespace_after_receiver)),
+                        bar: Box::new(bar),
+                        call: Box::new(call),
+                    };
+                    did_make_progress = true;
+                }
+            }
+
+            'structAccess: {
+                let (new_input, whitespace_after_struct) =
+                    whitespaces_and_newlines(input, indentation + 1, true);
+
+                let Some((new_input, dot)) = dot(new_input) else { break 'structAccess; };
+                let (new_input, whitespace_after_dot) =
+                    whitespaces_and_newlines(new_input, indentation + 1, true);
+                let dot = dot.wrap_in_whitespace(whitespace_after_dot);
+
+                let Some((new_input, key)) = identifier(new_input) else { break 'structAccess; };
+
+                input = new_input;
+                result = Rcst::StructAccess {
+                    struct_: Box::new(result.wrap_in_whitespace(whitespace_after_struct)),
+                    dot: Box::new(dot),
+                    key: Box::new(key),
+                };
+                did_make_progress = true;
+            }
+
             'pipe: {
                 let (new_input, whitespace_after_receiver) =
                     whitespaces_and_newlines(input, indentation, true);
@@ -785,8 +840,8 @@ mod parse {
                 } else {
                     indentation
                 };
-                let (new_input, call) =
-                    expression(new_input, indentation, true).unwrap_or_else(|| {
+                let (new_input, call) = expression(new_input, indentation, true, false)
+                    .unwrap_or_else(|| {
                         let error = Rcst::Error {
                             unparsable_input: "".to_string(),
                             error: RcstError::PipeMissesCall,
@@ -812,11 +867,11 @@ mod parse {
     #[test]
     fn test_expression() {
         assert_eq!(
-            expression("foo", 0, true),
+            expression("foo", 0, true, true),
             Some(("", Rcst::Identifier("foo".to_string())))
         );
         assert_eq!(
-            expression("(foo Bar)", 0, false),
+            expression("(foo Bar)", 0, false, true),
             Some((
                 "",
                 Rcst::Parenthesized {
@@ -835,7 +890,7 @@ mod parse {
         // foo
         //   .bar
         assert_eq!(
-            expression("foo\n  .bar", 0, true),
+            expression("foo\n  .bar", 0, true, true),
             Some((
                 "",
                 Rcst::StructAccess {
@@ -854,13 +909,13 @@ mod parse {
         // foo
         // .bar
         assert_eq!(
-            expression("foo\n.bar", 0, true),
+            expression("foo\n.bar", 0, true, true),
             Some(("\n.bar", Rcst::Identifier("foo".to_string()))),
         );
         // foo
         // | bar
         assert_eq!(
-            expression("foo\n| bar", 0, true),
+            expression("foo\n| bar", 0, true, true),
             Some((
                 "",
                 Rcst::Pipe {
@@ -879,7 +934,7 @@ mod parse {
         // foo
         // | bar baz
         assert_eq!(
-            expression("foo\n| bar baz", 0, true),
+            expression("foo\n| bar baz", 0, true, true),
             Some((
                 "",
                 Rcst::Pipe {
@@ -907,7 +962,7 @@ mod parse {
     #[instrument]
     fn run_of_expressions(input: &str, indentation: usize) -> Option<(&str, Vec<Rcst>)> {
         let mut expressions = vec![];
-        let (mut input, expr) = expression(input, indentation, false)?;
+        let (mut input, expr) = expression(input, indentation, false, false)?;
         expressions.push(expr);
 
         let mut has_multiline_whitespace = false;
@@ -922,7 +977,7 @@ mod parse {
             let last = expressions.pop().unwrap();
             expressions.push(last.wrap_in_whitespace(whitespace));
 
-            let (i, expr) = match expression(i, indentation, has_multiline_whitespace) {
+            let (i, expr) = match expression(i, indentation, has_multiline_whitespace, false) {
                 Some(it) => it,
                 None => {
                     let fallback = closing_parenthesis(i)
@@ -1231,18 +1286,18 @@ mod parse {
             }
 
             // Value.
-            let (new_input, value, has_value) = match expression(new_input, items_indentation, true)
-            {
-                Some((new_input, value)) => (new_input, value, true),
-                None => (
-                    new_input,
-                    Rcst::Error {
-                        unparsable_input: "".to_string(),
-                        error: RcstError::ListItemMissesValue,
-                    },
-                    false,
-                ),
-            };
+            let (new_input, value, has_value) =
+                match expression(new_input, items_indentation, true, true) {
+                    Some((new_input, value)) => (new_input, value, true),
+                    None => (
+                        new_input,
+                        Rcst::Error {
+                            unparsable_input: "".to_string(),
+                            error: RcstError::ListItemMissesValue,
+                        },
+                        false,
+                    ),
+                };
 
             // Whitespace between value and comma.
             let (new_input, whitespace) =
@@ -1434,7 +1489,7 @@ mod parse {
             }
 
             // The key itself.
-            let (input, key, has_key) = match expression(input, fields_indentation, true) {
+            let (input, key, has_key) = match expression(input, fields_indentation, true, true) {
                 Some((input, key)) => (input, key, true),
                 None => (
                     input,
@@ -1474,17 +1529,18 @@ mod parse {
             let colon = colon.wrap_in_whitespace(whitespace);
 
             // Value.
-            let (input, value, has_value) = match expression(input, fields_indentation + 1, true) {
-                Some((input, value)) => (input, value, true),
-                None => (
-                    input,
-                    Rcst::Error {
-                        unparsable_input: "".to_string(),
-                        error: RcstError::StructFieldMissesValue,
-                    },
-                    false,
-                ),
-            };
+            let (input, value, has_value) =
+                match expression(input, fields_indentation + 1, true, true) {
+                    Some((input, value)) => (input, value, true),
+                    None => (
+                        input,
+                        Rcst::Error {
+                            unparsable_input: "".to_string(),
+                            error: RcstError::StructFieldMissesValue,
+                        },
+                        false,
+                    ),
+                };
 
             // Whitespace between value and comma.
             let (input, whitespace) = whitespaces_and_newlines(input, fields_indentation + 1, true);
@@ -1643,7 +1699,7 @@ mod parse {
         };
         let opening_parenthesis = opening_parenthesis.wrap_in_whitespace(whitespace);
 
-        let (input, inner) = expression(input, inner_indentation, true).unwrap_or((
+        let (input, inner) = expression(input, inner_indentation, true, true).unwrap_or((
             input,
             Rcst::Error {
                 unparsable_input: "".to_string(),
@@ -1732,7 +1788,7 @@ mod parse {
                 });
             }
 
-            match expression(input, indentation, true) {
+            match expression(input, indentation, true, true) {
                 Some((new_input, expression)) => {
                     input = new_input;
 
@@ -1778,7 +1834,7 @@ mod parse {
                 }
 
                 input = i;
-                match expression(input, indentation + 1, false) {
+                match expression(input, indentation + 1, false, false) {
                     Some((i, parameter)) => {
                         input = i;
                         parameters.push(parameter);
@@ -1805,7 +1861,7 @@ mod parse {
 
         let (input, mut body, whitespace_before_closing_curly_brace, closing_curly_brace) = {
             let input_before_parsing_expression = i;
-            let (i, body_expression) = match expression(i, indentation + 1, true) {
+            let (i, body_expression) = match expression(i, indentation + 1, true, true) {
                 Some((i, expression)) => (i, vec![expression]),
                 None => (i, vec![]),
             };
@@ -2021,7 +2077,7 @@ mod parse {
                 (input, assignment_sign, body)
             }
         } else {
-            match expression(input, indentation, true) {
+            match expression(input, indentation, true, true) {
                 Some((input, expression)) => (input, assignment_sign, vec![expression]),
                 None => (
                     input_after_assignment_sign,
