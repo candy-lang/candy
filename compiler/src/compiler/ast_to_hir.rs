@@ -1,7 +1,7 @@
 use super::{
     ast::{
-        self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, Struct, StructAccess,
-        Symbol, Text,
+        self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, List, Struct,
+        StructAccess, Symbol, Text,
     },
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
@@ -180,28 +180,19 @@ impl<'a> Context<'a> {
                 Expression::Symbol(symbol.value.to_owned()),
                 None,
             ),
-            AstKind::Struct(Struct {
-                positional_fields,
-                named_fields,
-            }) => {
-                let mut fields = positional_fields
+            AstKind::List(List(items)) => {
+                let hir_items = items
                     .iter()
-                    .enumerate()
-                    .map(|(index, value)| {
-                        (
-                            self.push(None, Expression::Int(index.into()), None),
-                            self.compile_single(value),
-                        )
-                    })
-                    .collect::<HashMap<_, _>>();
-                for (key, value) in named_fields {
-                    fields.insert(self.compile_single(key), self.compile_single(value));
-                }
-                self.push(
-                    Some(ast.id.clone()),
-                    Expression::Struct(fields.into()),
-                    None,
-                )
+                    .map(|item| self.compile_single(item))
+                    .collect_vec();
+                self.push(Some(ast.id.clone()), Expression::List(hir_items), None)
+            }
+            AstKind::Struct(Struct { fields }) => {
+                let fields = fields
+                    .iter()
+                    .map(|(key, value)| (self.compile_single(key), self.compile_single(value)))
+                    .collect();
+                self.push(Some(ast.id.clone()), Expression::Struct(fields), None)
             }
             AstKind::StructAccess(struct_access) => {
                 self.lower_struct_access(Some(ast.id.clone()), struct_access)

@@ -52,7 +52,7 @@ struct LoweringContext {
 }
 impl LoweringContext {
     fn compile_expression(&mut self, id: &hir::Id, expression: &Expression) {
-        let span = span!(Level::TRACE, "Compiling expression {expression:?}");
+        let span = span!(Level::TRACE, "Compiling expression", ?expression);
         let _enter = span.enter();
 
         match expression {
@@ -63,6 +63,12 @@ impl LoweringContext {
                 self.stack.replace_top_id(id.clone());
             }
             Expression::Symbol(symbol) => self.emit_create_symbol(id.clone(), symbol.clone()),
+            Expression::List(items) => {
+                for item in items {
+                    self.emit_push_from_stack(item.clone());
+                }
+                self.emit_create_list(id.clone(), items.len());
+            }
             Expression::Struct(entries) => {
                 for (key, value) in entries {
                     self.emit_push_from_stack(key.clone());
@@ -139,9 +145,14 @@ impl LoweringContext {
         self.emit(Instruction::CreateSymbol(symbol));
         self.stack.push(id);
     }
-    fn emit_create_struct(&mut self, id: hir::Id, num_entries: usize) {
-        self.emit(Instruction::CreateStruct { num_entries });
-        self.stack.pop_multiple(2 * num_entries);
+    fn emit_create_list(&mut self, id: hir::Id, num_items: usize) {
+        self.emit(Instruction::CreateList { num_items });
+        self.stack.pop_multiple(num_items);
+        self.stack.push(id);
+    }
+    fn emit_create_struct(&mut self, id: hir::Id, num_fields: usize) {
+        self.emit(Instruction::CreateStruct { num_fields });
+        self.stack.pop_multiple(2 * num_fields);
         self.stack.push(id);
     }
     fn emit_create_closure(

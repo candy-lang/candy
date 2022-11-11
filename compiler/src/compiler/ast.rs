@@ -36,6 +36,7 @@ pub enum AstKind {
     Text(Text),
     Identifier(Identifier),
     Symbol(Symbol),
+    List(List),
     Struct(Struct),
     StructAccess(StructAccess),
     Lambda(Lambda),
@@ -62,9 +63,11 @@ pub struct Identifier(pub AstString);
 pub struct Symbol(pub AstString);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct List(pub Vec<Ast>);
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Struct {
-    pub positional_fields: Vec<Ast>,
-    pub named_fields: LinkedHashMap<Ast, Ast>,
+    pub fields: LinkedHashMap<Ast, Ast>,
 }
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct StructAccess {
@@ -111,16 +114,18 @@ impl Deref for AstString {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum AstError {
-    UnexpectedPunctuation,
-    TextWithoutClosingQuote,
-    ParenthesizedWithoutClosingParenthesis,
-    StructWithNonStructField,
-    StructWithoutClosingBrace,
-    StructKeyWithoutColon,
-    StructValueWithoutComma,
-    StructPositionalAfterNamedField,
     ExpectedParameter,
     LambdaWithoutClosingCurlyBrace,
+    ListItemWithoutComma,
+    ListWithNonListItem,
+    ListWithoutClosingParenthesis,
+    ParenthesizedWithoutClosingParenthesis,
+    StructKeyWithoutColon,
+    StructValueWithoutComma,
+    StructWithNonStructField,
+    StructWithoutClosingBrace,
+    TextWithoutClosingQuote,
+    UnexpectedPunctuation,
 }
 
 pub trait FindAst {
@@ -137,6 +142,7 @@ impl FindAst for Ast {
             AstKind::Text(_) => None,
             AstKind::Identifier(_) => None,
             AstKind::Symbol(_) => None,
+            AstKind::List(list) => list.find(id),
             AstKind::Struct(struct_) => struct_.find(id),
             AstKind::StructAccess(access) => access.find(id),
             AstKind::Lambda(lambda) => lambda.find(id),
@@ -146,17 +152,22 @@ impl FindAst for Ast {
         }
     }
 }
+impl FindAst for List {
+    fn find(&self, id: &Id) -> Option<&Ast> {
+        self.0.find(id)
+    }
+}
 impl FindAst for Struct {
     fn find(&self, id: &Id) -> Option<&Ast> {
-        self.positional_fields
-            .iter()
-            .chain(
-                self.named_fields
-                    .iter()
-                    .flat_map(|(key, value)| vec![key, value].into_iter()),
-            )
-            .filter_map(|value| value.find(id))
-            .next()
+        for (key, value) in &self.fields {
+            if let Some(ast) = key.find(id) {
+                return Some(ast);
+            }
+            if let Some(ast) = value.find(id) {
+                return Some(ast);
+            }
+        }
+        None
     }
 }
 impl FindAst for StructAccess {
@@ -208,11 +219,13 @@ impl CollectErrors for Ast {
             AstKind::Text(_) => {}
             AstKind::Identifier(_) => {}
             AstKind::Symbol(_) => {}
-            AstKind::Struct(struct_) => {
-                for value in struct_.positional_fields {
-                    value.collect_errors(errors);
+            AstKind::List(List(items)) => {
+                for item in items {
+                    item.collect_errors(errors);
                 }
-                for (key, value) in struct_.named_fields {
+            }
+            AstKind::Struct(struct_) => {
+                for (key, value) in struct_.fields {
                     key.collect_errors(errors);
                     value.collect_errors(errors);
                 }
@@ -254,24 +267,30 @@ impl Display for Ast {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}: ", self.id)?;
         match &self.kind {
-            AstKind::Int(int) => write!(f, "int {}", int.0),
-            AstKind::Text(text) => write!(f, "text \"{}\"", text.0),
-            AstKind::Identifier(identifier) => write!(f, "identifier {}", identifier.0),
-            AstKind::Symbol(symbol) => write!(f, "symbol {}", symbol.0),
-            AstKind::Struct(struct_) => {
+            AstKind::Int(Int(int)) => write!(f, "int {}", int),
+            AstKind::Text(Text(text)) => write!(f, "text \"{}\"", text),
+            AstKind::Identifier(Identifier(identifier)) => write!(f, "identifier {}", identifier),
+            AstKind::Symbol(Symbol(symbol)) => write!(f, "symbol {}", symbol),
+            AstKind::List(List(items)) => {
+                write!(
+                    f,
+                    "list (\n{}\n)",
+                    items
+                        .iter()
+                        .map(|value| format!("{value},"))
+                        .join("\n")
+                        .lines()
+                        .map(|line| format!("  {line}"))
+                        .join("\n")
+                )
+            }
+            AstKind::Struct(Struct { fields }) => {
                 write!(
                     f,
                     "struct [\n{}\n]",
-                    struct_
-                        .positional_fields
+                    fields
                         .iter()
-                        .map(|value| format!("{value},"))
-                        .chain(
-                            struct_
-                                .named_fields
-                                .iter()
-                                .map(|(key, value)| format!("{key}: {value},"))
-                        )
+                        .map(|(key, value)| format!("{key}: {value},"))
                         .join("\n")
                         .lines()
                         .map(|line| format!("  {line}"))
