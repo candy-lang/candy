@@ -12,6 +12,7 @@ pub use self::{
     fiber::{ExecutionResult, Fiber},
     heap::{Closure, Heap, Object, Pointer, Struct},
     ids::{ChannelId, FiberId, OperationId},
+    tracer::{full::FullTracer, Tracer},
 };
 use self::{
     channel::{Channel, Completer, Performer},
@@ -21,7 +22,6 @@ use self::{
     },
     heap::SendPort,
     ids::{CountableId, IdGenerator},
-    tracer::Tracer,
 };
 use crate::compiler::hir::Id;
 use itertools::Itertools;

@@ -12,13 +12,14 @@ use crate::{
     module::Module,
     vm::{
         context::{DbUseProvider, RunForever, RunLimitedNumberOfInstructions},
-        Closure, Heap, Pointer, Vm,
+        tracer::full::FullTracer,
+        Closure, Heap, Packet, Pointer, Vm,
     },
 };
 use itertools::Itertools;
 use tracing::{error, info};
 
-pub async fn fuzz(db: &Database, module: Module) {
+pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
     let (fuzzables_heap, fuzzables): (Heap, Vec<(Id, Pointer)>) = {
         let mut tracer = FuzzablesFinder::default();
         let mut vm = Vm::new();
@@ -32,6 +33,8 @@ pub async fn fuzz(db: &Database, module: Module) {
         fuzzables.len()
     );
 
+    let mut failing_cases = vec![];
+
     for (id, closure) in fuzzables {
         info!("Fuzzing {id}.");
         let mut fuzzer = Fuzzer::new(&fuzzables_heap, closure, id.clone());
@@ -39,7 +42,7 @@ pub async fn fuzz(db: &Database, module: Module) {
             &mut DbUseProvider { db },
             &mut RunLimitedNumberOfInstructions::new(1000),
         );
-        match fuzzer.status() {
+        match fuzzer.into_status() {
             Status::StillFuzzing { .. } => {}
             Status::PanickedForArguments {
                 arguments,
@@ -47,15 +50,42 @@ pub async fn fuzz(db: &Database, module: Module) {
                 tracer,
             } => {
                 error!("The fuzzer discovered an input that crashes {id}:");
-                error!(
-                    "Calling `{id} {}` doesn't work because {reason}.",
-                    arguments.iter().map(|arg| format!("{arg:?}")).join(" "),
-                );
-                error!(
-                    "This is the stack trace:\n{}",
-                    tracer.format_panic_stack_trace_to_root_fiber(db)
-                );
+                let case = FailingFuzzCase {
+                    closure: id,
+                    arguments,
+                    reason,
+                    tracer,
+                };
+                case.dump(db);
+                failing_cases.push(case);
             }
         }
+    }
+
+    failing_cases
+}
+
+pub struct FailingFuzzCase {
+    closure: Id,
+    arguments: Vec<Packet>,
+    reason: String,
+    tracer: FullTracer,
+}
+
+impl FailingFuzzCase {
+    pub fn dump(&self, db: &Database) {
+        error!(
+            "Calling `{} {}` doesn't work because {}.",
+            self.closure,
+            self.arguments
+                .iter()
+                .map(|arg| format!("{arg:?}"))
+                .join(" "),
+            self.reason,
+        );
+        error!(
+            "This is the stack trace:\n{}",
+            self.tracer.format_panic_stack_trace_to_root_fiber(db)
+        );
     }
 }
