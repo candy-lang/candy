@@ -19,9 +19,9 @@ create capacity :=
 send port packet :=
   needs (bool.not (isReceivePort port)) "`port` should be a send port, not a receive port."
   needs (isSendPort port)
-  ✨.channelSend port packet
+  port | ✨.channelSend packet
 
 receive port :=
   needs (bool.not (isSendPort port)) "`port` should be a receive port, not a send port."
   needs (isReceivePort port)
-  ✨.channelReceive port
+  port | ✨.channelReceive

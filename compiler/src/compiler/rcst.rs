@@ -9,6 +9,7 @@ pub enum Rcst {
     Dot,                // .
     Colon,              // :
     ColonEqualsSign,    // :=
+    Bar,                // |
     OpeningParenthesis, // (
     ClosingParenthesis, // )
     OpeningBracket,     // [
@@ -40,6 +41,11 @@ pub enum Rcst {
         closing_quote: Box<Rcst>,
     },
     TextPart(String),
+    Pipe {
+        receiver: Box<Rcst>,
+        bar: Box<Rcst>,
+        call: Box<Rcst>,
+    },
     Parenthesized {
         opening_parenthesis: Box<Rcst>,
         inner: Box<Rcst>,
@@ -49,13 +55,23 @@ pub enum Rcst {
         receiver: Box<Rcst>,
         arguments: Vec<Rcst>,
     },
+    List {
+        opening_parenthesis: Box<Rcst>,
+        items: Vec<Rcst>,
+        closing_parenthesis: Box<Rcst>,
+    },
+    ListItem {
+        value: Box<Rcst>,
+        comma: Option<Box<Rcst>>,
+    },
     Struct {
         opening_bracket: Box<Rcst>,
         fields: Vec<Rcst>,
         closing_bracket: Box<Rcst>,
     },
     StructField {
-        key_and_colon: Option<Box<(Rcst, Rcst)>>,
+        key: Box<Rcst>,
+        colon: Box<Rcst>,
         value: Box<Rcst>,
         comma: Option<Box<Rcst>>,
     },
@@ -84,23 +100,26 @@ pub enum Rcst {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum RcstError {
+    CurlyBraceNotClosed,
     IdentifierContainsNonAlphanumericAscii,
-    SymbolContainsNonAlphanumericAscii,
     IntContainsNonDigits,
-    TextNotClosed,
-    TextNotSufficientlyIndented,
-    StructFieldMissesKey,
-    StructFieldMissesColon,
-    StructFieldMissesValue,
-    StructNotClosed,
-    WeirdWhitespace,
-    WeirdWhitespaceInIndentation,
+    ListItemMissesValue,
+    ListNotClosed,
     OpeningParenthesisWithoutExpression,
     ParenthesisNotClosed,
+    PipeMissesCall,
+    StructFieldMissesColon,
+    StructFieldMissesKey,
+    StructFieldMissesValue,
+    StructNotClosed,
+    SymbolContainsNonAlphanumericAscii,
+    TextNotClosed,
+    TextNotSufficientlyIndented,
     TooMuchWhitespace,
-    CurlyBraceNotClosed,
-    UnparsedRest,
     UnexpectedCharacters,
+    UnparsedRest,
+    WeirdWhitespace,
+    WeirdWhitespaceInIndentation,
 }
 
 impl Display for Rcst {
@@ -111,6 +130,7 @@ impl Display for Rcst {
             Rcst::Dot => ".".fmt(f),
             Rcst::Colon => ":".fmt(f),
             Rcst::ColonEqualsSign => ":=".fmt(f),
+            Rcst::Bar => "|".fmt(f),
             Rcst::OpeningParenthesis => "(".fmt(f),
             Rcst::ClosingParenthesis => ")".fmt(f),
             Rcst::OpeningBracket => "[".fmt(f),
@@ -151,6 +171,15 @@ impl Display for Rcst {
                 closing_quote.fmt(f)
             }
             Rcst::TextPart(literal) => literal.fmt(f),
+            Rcst::Pipe {
+                receiver,
+                bar,
+                call,
+            } => {
+                receiver.fmt(f)?;
+                bar.fmt(f)?;
+                call.fmt(f)
+            }
             Rcst::Parenthesized {
                 opening_parenthesis,
                 inner,
@@ -170,6 +199,24 @@ impl Display for Rcst {
                 }
                 Ok(())
             }
+            Rcst::List {
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+            } => {
+                opening_parenthesis.fmt(f)?;
+                for item in items {
+                    item.fmt(f)?;
+                }
+                closing_parenthesis.fmt(f)
+            }
+            Rcst::ListItem { value, comma } => {
+                value.fmt(f)?;
+                if let Some(comma) = comma {
+                    comma.fmt(f)?;
+                }
+                Ok(())
+            }
             Rcst::Struct {
                 opening_bracket,
                 fields,
@@ -182,14 +229,13 @@ impl Display for Rcst {
                 closing_bracket.fmt(f)
             }
             Rcst::StructField {
-                key_and_colon,
+                key,
+                colon,
                 value,
                 comma,
             } => {
-                if let Some(box (key, colon)) = key_and_colon {
-                    key.fmt(f)?;
-                    colon.fmt(f)?;
-                }
+                key.fmt(f)?;
+                colon.fmt(f)?;
                 value.fmt(f)?;
                 if let Some(comma) = comma {
                     comma.fmt(f)?;
@@ -254,6 +300,7 @@ impl IsMultiline for Rcst {
             Rcst::Dot => false,
             Rcst::Colon => false,
             Rcst::ColonEqualsSign => false,
+            Rcst::Bar => false,
             Rcst::OpeningParenthesis => false,
             Rcst::ClosingParenthesis => false,
             Rcst::OpeningBracket => false,
@@ -280,6 +327,11 @@ impl IsMultiline for Rcst {
                 opening_quote.is_multiline() || parts.is_multiline() || closing_quote.is_multiline()
             }
             Rcst::TextPart(_) => false,
+            Rcst::Pipe {
+                receiver,
+                bar,
+                call,
+            } => receiver.is_multiline() || bar.is_multiline() || call.is_multiline(),
             Rcst::Parenthesized {
                 opening_parenthesis,
                 inner,
@@ -293,6 +345,22 @@ impl IsMultiline for Rcst {
                 receiver,
                 arguments,
             } => receiver.is_multiline() || arguments.is_multiline(),
+            Rcst::List {
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+            } => {
+                opening_parenthesis.is_multiline()
+                    || items.is_multiline()
+                    || closing_parenthesis.is_multiline()
+            }
+            Rcst::ListItem { value, comma } => {
+                value.is_multiline()
+                    || comma
+                        .as_ref()
+                        .map(|comma| comma.is_multiline())
+                        .unwrap_or(false)
+            }
             Rcst::Struct {
                 opening_bracket,
                 fields,
@@ -303,14 +371,13 @@ impl IsMultiline for Rcst {
                     || closing_bracket.is_multiline()
             }
             Rcst::StructField {
-                key_and_colon,
+                key,
+                colon,
                 value,
                 comma,
             } => {
-                key_and_colon
-                    .as_ref()
-                    .map(|box (key, colon)| key.is_multiline() || colon.is_multiline())
-                    .unwrap_or(false)
+                key.is_multiline()
+                    || colon.is_multiline()
                     || value.is_multiline()
                     || comma
                         .as_ref()

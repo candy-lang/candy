@@ -29,6 +29,7 @@ pub enum Data {
     Int(Int),
     Text(Text),
     Symbol(Symbol),
+    List(List),
     Struct(Struct),
     HirId(Id),
     Closure(Closure),
@@ -54,6 +55,11 @@ pub struct Symbol {
 }
 
 #[derive(Default, Clone)]
+pub struct List {
+    pub items: Vec<Pointer>,
+}
+
+#[derive(Default, Clone)]
 pub struct Struct {
     pub fields: Vec<(u64, Pointer, Pointer)>, // list of hash, key, and value
 }
@@ -70,6 +76,18 @@ pub struct Builtin {
     pub function: BuiltinFunction,
 }
 
+impl List {
+    fn equals(&self, heap: &Heap, other: &List) -> bool {
+        if self.items.len() != other.items.len() {
+            return false;
+        }
+
+        self.items
+            .iter()
+            .zip_eq(other.items.iter())
+            .all(|(a, &b)| a.equals(heap, b))
+    }
+}
 impl Struct {
     pub fn from_fields(heap: &Heap, fields: HashMap<Pointer, Pointer>) -> Self {
         let mut s = Self::default();
@@ -122,14 +140,12 @@ impl Struct {
         if self.len() != other.len() {
             return false;
         }
-        for (key_a, value_a) in self.iter() {
-            for (key_b, value_b) in other.iter() {
-                if !key_a.equals(heap, key_b) || !value_a.equals(heap, value_b) {
-                    return false;
-                }
-            }
-        }
-        true
+
+        self.iter()
+            .zip_eq(other.iter())
+            .all(|((key_a, value_a), (key_b, value_b))| {
+                key_a.equals(heap, key_b) && value_a.equals(heap, value_b)
+            })
     }
 }
 
@@ -179,6 +195,13 @@ impl Data {
             Data::Int(int) => int.value.hash(state),
             Data::Text(text) => text.value.hash(state),
             Data::Symbol(symbol) => symbol.value.hash(state),
+            Data::List(List { items }) => {
+                let mut s = 0;
+                for item in items {
+                    s ^= item.hash(heap);
+                }
+                s.hash(state)
+            }
             Data::Struct(struct_) => {
                 let mut s = 0;
                 for (key, value) in struct_.iter() {
@@ -206,6 +229,7 @@ impl Data {
             (Data::Int(a), Data::Int(b)) => a.value == b.value,
             (Data::Text(a), Data::Text(b)) => a.value == b.value,
             (Data::Symbol(a), Data::Symbol(b)) => a.value == b.value,
+            (Data::List(a), Data::List(b)) => a.equals(heap, b),
             (Data::Struct(a), Data::Struct(b)) => a.equals(heap, b),
             (Data::HirId(a), Data::HirId(b)) => a == b,
             (Data::Closure(_), Data::Closure(_)) => false,
@@ -221,6 +245,14 @@ impl Data {
             Data::Int(int) => format!("{}", int.value),
             Data::Text(text) => format!("\"{}\"", text.value),
             Data::Symbol(symbol) => symbol.value.to_string(),
+            Data::List(List { items }) => format!(
+                "({})",
+                if items.is_empty() {
+                    ",".to_owned()
+                } else {
+                    items.iter().map(|item| item.format(heap)).join(", ")
+                },
+            ),
             Data::Struct(struct_) => format!(
                 "[{}]",
                 struct_
@@ -247,6 +279,7 @@ impl Data {
             | Data::HirId(_)
             | Data::SendPort(_)
             | Data::ReceivePort(_) => vec![],
+            Data::List(List { items }) => items.clone(),
             Data::Struct(struct_) => struct_
                 .iter()
                 .flat_map(|(a, b)| vec![a, b].into_iter())

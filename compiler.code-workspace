@@ -1,0 +1,41 @@
+{
+  "folders": [
+    {
+      "name": "🍭 Candy",
+      "path": "."
+    },
+    {
+      "name": "Compiler",
+      "path": "compiler"
+    },
+    {
+      "name": "VS Code Extension",
+      "path": "vscode_extension"
+    },
+    {
+      "name": "Packages",
+      "path": "packages"
+    },
+    {
+      "name": "Old Packages",
+      "path": "old-packages"
+    }
+  ],
+  "settings": {
+    // Please keep these settings in sync with ./packages/candy.code-workspace.
+    "editor.codeActionsOnSave": {
+      "source.fixAll": true,
+      "source.organizeImports": true
+    },
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.patterns": {
+      "*.candy": "${capture}.candy.*"
+    },
+    "git.branchProtection": ["main"],
+    "rust-analyzer.checkOnSave.command": "clippy",
+    "task.allowAutomaticTasks": "on"
+  }
+}

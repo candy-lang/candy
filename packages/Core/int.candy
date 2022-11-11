@@ -9,36 +9,37 @@ is value := type.is value Int
 add summandA summandB :=
   needs (is summandA)
   needs (is summandB)
-  ✨.intAdd summandA summandB
+  summandA | ✨.intAdd summandB
 subtract minuend subtrahend :=
   needs (is minuend)
   needs (is subtrahend)
-  ✨.intSubtract minuend subtrahend
+  minuend | ✨.intSubtract subtrahend
 negate value :=
   needs (is value)
   subtract 0 value
 multiply factorA factorB :=
   needs (is factorA)
   needs (is factorB)
-  ✨.intMultiply factorA factorB
+  factorA | ✨.intMultiply factorB
 divideTruncating dividend divisor :=
   needs (is dividend)
   needs (is divisor)
-  ✨.intDivideTruncating dividend divisor
+  dividend | ✨.intDivideTruncating divisor
 remainder dividend divisor :=
   needs (is dividend)
   needs (is divisor)
-  ✨.intRemainder dividend divisor
+  dividend | ✨.intRemainder divisor
 modulo dividend divisor :=
   needs (is dividend)
   needs (is divisor)
-  ✨.intModulo dividend divisor
+  dividend | ✨.intModulo divisor
 
 compareTo valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  result = ✨.intCompareTo valueA valueB
-  check (bool.implies (equals result Equal) (equals valueA valueB))
+  result = valueA | ✨.intCompareTo valueB
+  check (equals result Equal | bool.implies (equals valueA valueB))
+  # check ((equals result Equal) | bool.implies (equals valueA valueB))
   result
 isLessThan valueA valueB :=
   needs (is valueA)
@@ -51,75 +52,76 @@ isGreaterThan valueA valueB :=
 isLessThanOrEqualTo valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  bool.not (isGreaterThan valueA valueB)
+  valueA | isGreaterThan valueB | bool.not
 isGreaterThanOrEqualTo valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  bool.not (isLessThan valueA valueB)
+  valueA | isLessThan valueB | bool.not
 
 isPositive value :=
   needs (is value)
-  isGreaterThan value 0
+  value | isGreaterThan 0
 isNonPositive value :=
   needs (is value)
-  bool.not (isPositive value)
+  value | isPositive | bool.not
 isNegative value :=
   needs (is value)
-  isLessThan value 0
+  value | isLessThan 0
 isNonNegative value :=
   needs (is value)
-  bool.not (isNegative value)
+  value | isNegative | bool.not
 absolute value :=
   needs (is value)
   conditionals.ifElse (isNegative value) (negate value) value
 
 fitsInRustU32 value :=
   needs (is value)
-  needs (isNonNegative value)  "you gave `fitsInRustU128` a signed int"
+  needs (isNonNegative value)
 
   rustU32Max = 4294967295
   # https://doc.rust-lang.org/std/primitive.u32.html#associatedconstant.MAX
-  isLessThan value rustU32Max
+  value | isLessThan rustU32Max
 fitsInRustU128 value :=
   needs (is value)
   needs (isNonNegative value)
 
   rustU128Max = 340282366920938463463374607431768211455
   # https://doc.rust-lang.org/std/primitive.u128.html#associatedconstant.MAX
-  isLessThan value rustU128Max
+  value | isLessThan rustU128Max
+
 shiftLeft value amount :=
   needs (is value)
   needs (is amount)
   needs (isNonNegative amount) "The shift `amount` is negative. You might want to call `shiftRight` instead."
   # TODO: Add the negated value in the error message as soon as we support string interpolation.
   needs (fitsInRustU128 amount) "Shifts by that much are not yet supported."
-  ✨.intShiftLeft value amount
+  value | ✨.intShiftLeft amount
 shiftRight value amount :=
   needs (is value)
   needs (is amount)
   needs (isNonNegative amount) "The shift `amount` is negative. You might want to call `shiftLeft` instead."
   # TODO: Add the negated value in the error message as soon as we support string interpolation.
   needs (fitsInRustU128 amount) "Shifts by that much are not yet supported."
-  ✨.intShiftRight value amount
+  value | ✨.intShiftRight amount
 
 bitLength value :=
   # Determines the fewest bits necessary to express this integer, not including
   # the sign.
   needs (is value)
-  ✨.intBitLength value
+  value | ✨.intBitLength
 
 bitwiseAnd valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  ✨.intBitwiseAnd valueA valueB
+  valueA | ✨.intBitwiseAnd valueB
 bitwiseOr valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  ✨.intBitwiseOr valueA valueB
+  valueA | ✨.intBitwiseOr valueB
 bitwiseXor valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  ✨.intBitwiseXor valueA valueB
+  valueA | ✨.intBitwiseXor valueB
 
 isEven value :=
   needs (is value)
@@ -127,21 +129,21 @@ isEven value :=
 isOdd value :=
   needs (is value)
   isOdd = equals (bitwiseAnd value 1) 1
-  check (equals (isEven value) (bool.not isOdd))
+  check (value | isEven | equals (isOdd | bool.not))
   isOdd
 
 min valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   conditionals.ifElse
-    isLessThanOrEqualTo valueA valueB
+    valueA | isLessThanOrEqualTo valueB
     { valueA }
     { valueB }
 max valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   conditionals.ifElse
-    isGreaterThanOrEqualTo valueA valueB
+    valueA | isGreaterThanOrEqualTo valueB
     { valueA }
     { valueB }
 coerceAtLeast value minimum :=
@@ -156,9 +158,9 @@ coerceIn value minimum maximum :=
   needs (is value)
   needs (is minimum)
   needs (is maximum)
-  needs (isLessThanOrEqualTo minimum maximum)
-  coerceAtMost (coerceAtLeast value minimum) maximum
+  needs (minimum | isLessThanOrEqualTo maximum)
+  value | coerceAtLeast minimum | coerceAtMost maximum
 
 parse text :=
   needs (type.is text Text)
-  ✨.intParse text
+  text | ✨.intParse

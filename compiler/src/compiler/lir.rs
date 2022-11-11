@@ -22,6 +22,18 @@ pub enum Instruction {
     /// Pushes a symbol.
     CreateSymbol(String),
 
+    /// Pushes a builtin function.
+    ///
+    /// a -> a, builtin
+    CreateBuiltin(BuiltinFunction),
+
+    /// Pops num_items items, pushes a list.
+    ///
+    /// a, item, item, ..., item -> a, pointer to list
+    CreateList {
+        num_items: usize,
+    },
+
     /// Pops 2 * num_fields items, pushes a struct.
     ///
     /// a, key, value, key, value, ..., key, value -> a, pointer to struct
@@ -40,11 +52,6 @@ pub enum Instruction {
         num_args: usize, // excluding responsible parameter
         body: Vec<Instruction>,
     },
-
-    /// Pushes a builtin function.
-    ///
-    /// a -> a, builtin
-    CreateBuiltin(BuiltinFunction),
 
     /// Pushes an item from back in the stack on the stack again.
     PushFromStack(StackOffset),
@@ -132,6 +139,13 @@ impl Instruction {
             Instruction::CreateSymbol(_) => {
                 stack.push(result);
             }
+            Instruction::CreateBuiltin(_) => {
+                stack.push(result);
+            }
+            Instruction::CreateList { num_items } => {
+                stack.pop_multiple(*num_items);
+                stack.push(result);
+            }
             Instruction::CreateStruct { num_fields } => {
                 stack.pop_multiple(2 * num_fields); // fields
                 stack.push(result);
@@ -140,9 +154,6 @@ impl Instruction {
                 stack.push(result);
             }
             Instruction::CreateClosure { .. } => {
-                stack.push(result);
-            }
-            Instruction::CreateBuiltin(_) => {
                 stack.push(result);
             }
             Instruction::PushFromStack(_) => {
@@ -171,6 +182,7 @@ impl Instruction {
             Instruction::Panic => {
                 stack.pop(); // responsible
                 stack.pop(); // reason
+                stack.push(result);
             }
             Instruction::ModuleStarts { .. } => {}
             Instruction::ModuleEnds => {}
@@ -205,10 +217,11 @@ impl Display for Instruction {
             Instruction::CreateInt(int) => write!(f, "createInt {int}"),
             Instruction::CreateText(text) => write!(f, "createText {text:?}"),
             Instruction::CreateSymbol(symbol) => write!(f, "createSymbol {symbol}"),
-            Instruction::CreateStruct {
-                num_fields: num_entries,
-            } => {
-                write!(f, "createStruct {num_entries}")
+            Instruction::CreateList { num_items } => {
+                write!(f, "createList {num_items}")
+            }
+            Instruction::CreateStruct { num_fields } => {
+                write!(f, "createStruct {num_fields}")
             }
             Instruction::CreateHirId(id) => write!(f, "createHirId {id}"),
             Instruction::CreateClosure {

@@ -52,7 +52,11 @@ use std::{
 use structopt::StructOpt;
 use tower_lsp::{LspService, Server};
 use tracing::{debug, error, info, warn, Level, Metadata};
-use tracing_subscriber::{filter, fmt::format::FmtSpan, prelude::*};
+use tracing_subscriber::{
+    filter,
+    fmt::{format::FmtSpan, writer::BoxMakeWriter},
+    prelude::*,
+};
 use vm::{ChannelId, CompletedOperation, OperationId};
 
 #[derive(StructOpt, Debug)]
@@ -93,7 +97,6 @@ struct CandyFuzzOptions {
 
 #[tokio::main]
 async fn main() -> ProgramResult {
-    init_logger();
     match CandyOptions::from_args() {
         CandyOptions::Build(options) => build(options),
         CandyOptions::Run(options) => run(options),
@@ -111,6 +114,7 @@ enum Exit {
 }
 
 fn build(options: CandyBuildOptions) -> ProgramResult {
+    init_logger(true);
     let db = Database::default();
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
@@ -226,7 +230,6 @@ fn raw_build(
         }
     });
 
-    // return None;
     let lir = tracing::span!(Level::DEBUG, "Lowering MIR to LIR").in_scope(|| {
         let lir = db.lir(module.clone(), config.clone()).unwrap();
         if debug {
@@ -239,6 +242,7 @@ fn raw_build(
 }
 
 fn run(options: CandyRunOptions) -> ProgramResult {
+    init_logger(true);
     let db = Database::default();
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
@@ -259,7 +263,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let path_string = options.file.to_string_lossy();
     debug!("Running `{path_string}`.");
 
-    let module_closure = Closure::of_module(&db, module.clone(), TracingConfig::default()).unwrap();
+    let module_closure = Closure::of_module(&db, module.clone(), config.clone()).unwrap();
     let mut tracer = FullTracer::default();
 
     let mut vm = Vm::new();
@@ -404,6 +408,7 @@ impl StdoutService {
 }
 
 async fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
+    init_logger(true);
     let db = Database::default();
     let module = Module::from_package_root_and_file(
         current_dir().unwrap(),
@@ -440,6 +445,7 @@ async fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
 }
 
 async fn lsp() -> ProgramResult {
+    init_logger(false);
     info!("Starting language server…");
     let (service, socket) = LspService::new(CandyLanguageServer::from_client);
     Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
@@ -448,9 +454,15 @@ async fn lsp() -> ProgramResult {
     Ok(())
 }
 
-fn init_logger() {
+fn init_logger(use_stdout: bool) {
+    let writer = if use_stdout {
+        BoxMakeWriter::new(std::io::stdout)
+    } else {
+        BoxMakeWriter::new(std::io::stderr)
+    };
     let console_log = tracing_subscriber::fmt::layer()
         .compact()
+        .with_writer(writer)
         .with_span_events(FmtSpan::ENTER)
         .with_filter(filter::filter_fn(|metadata| {
             // For external packages, show only the error logs.

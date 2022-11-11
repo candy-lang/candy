@@ -4,13 +4,13 @@ is value := type.is value Struct
 
 hasKey struct key :=
   needs (is struct)
-  ✨.structHasKey struct key
+  struct | ✨.structHasKey key
 
 getUnwrap struct key :=
   needs (is struct)
   needs (hasKey struct key)
-  ✨.structGet struct key
+  struct | ✨.structGet key
 
 getKeys struct :=
   needs (is struct)
-  ✨.structGetKeys struct
+  struct | ✨.structGetKeys

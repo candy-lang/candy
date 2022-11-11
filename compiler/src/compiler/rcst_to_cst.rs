@@ -67,6 +67,10 @@ impl RcstToCstExt for Rcst {
                 state.offset += 2;
                 CstKind::ColonEqualsSign
             }
+            Rcst::Bar => {
+                state.offset += 1;
+                CstKind::Bar
+            }
             Rcst::OpeningParenthesis => {
                 state.offset += 1;
                 CstKind::OpeningParenthesis
@@ -158,6 +162,19 @@ impl RcstToCstExt for Rcst {
                 receiver: Box::new(receiver.to_cst(state)),
                 arguments: arguments.to_csts(state),
             },
+            Rcst::List {
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+            } => CstKind::List {
+                opening_parenthesis: Box::new(opening_parenthesis.to_cst(state)),
+                items: items.to_csts(state),
+                closing_parenthesis: Box::new(closing_parenthesis.to_cst(state)),
+            },
+            Rcst::ListItem { value, comma } => CstKind::ListItem {
+                value: Box::new(value.to_cst(state)),
+                comma: comma.map(|comma| Box::new(comma.to_cst(state))),
+            },
             Rcst::Struct {
                 opening_bracket,
                 fields,
@@ -168,12 +185,13 @@ impl RcstToCstExt for Rcst {
                 closing_bracket: Box::new(closing_bracket.to_cst(state)),
             },
             Rcst::StructField {
-                key_and_colon,
+                key,
+                colon,
                 value,
                 comma,
             } => CstKind::StructField {
-                key_and_colon: key_and_colon
-                    .map(|box (key, colon)| Box::new((key.to_cst(state), colon.to_cst(state)))),
+                key: Box::new(key.to_cst(state)),
+                colon: Box::new(colon.to_cst(state)),
                 value: Box::new(value.to_cst(state)),
                 comma: comma.map(|comma| Box::new(comma.to_cst(state))),
             },
@@ -181,6 +199,15 @@ impl RcstToCstExt for Rcst {
                 struct_: Box::new(struct_.to_cst(state)),
                 dot: Box::new(dot.to_cst(state)),
                 key: Box::new(key.to_cst(state)),
+            },
+            Rcst::Pipe {
+                receiver,
+                bar,
+                call,
+            } => CstKind::Pipe {
+                receiver: Box::new(receiver.to_cst(state)),
+                bar: Box::new(bar.to_cst(state)),
+                call: Box::new(call.to_cst(state)),
             },
             Rcst::Parenthesized {
                 opening_parenthesis,

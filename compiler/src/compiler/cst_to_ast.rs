@@ -8,13 +8,12 @@ use super::{
 };
 use crate::{
     compiler::{
-        ast::{AssignmentBody, Struct},
+        ast::{AssignmentBody, List, Struct},
         cst::UnwrapWhitespaceAndComment,
     },
     module::Module,
 };
 use itertools::Itertools;
-use linked_hash_map::LinkedHashMap;
 use std::{collections::HashMap, ops::Range, sync::Arc};
 
 #[salsa::query_group(CstToAstStorage)]
@@ -101,6 +100,7 @@ impl LoweringContext {
             | CstKind::Dot
             | CstKind::Colon
             | CstKind::ColonEqualsSign
+            | CstKind::Bar
             | CstKind::OpeningParenthesis
             | CstKind::ClosingParenthesis
             | CstKind::OpeningBracket
@@ -178,6 +178,42 @@ impl LoweringContext {
                 text
             }
             CstKind::TextPart(_) => panic!("TextPart should only occur in Text."),
+            CstKind::Pipe {
+                receiver,
+                bar,
+                call,
+            } => {
+                let ast = self.lower_cst(receiver);
+
+                assert!(
+                    matches!(bar.kind, CstKind::Bar),
+                    "Pipe must contain a bar, but instead contained a {}.",
+                    bar,
+                );
+
+                let call = self.lower_cst(call);
+                let call = match call {
+                    Ast {
+                        kind:
+                            AstKind::Call(ast::Call {
+                                receiver,
+                                mut arguments,
+                            }),
+                        ..
+                    } => {
+                        arguments.insert(0, ast);
+                        ast::Call {
+                            receiver,
+                            arguments,
+                        }
+                    }
+                    call => ast::Call {
+                        receiver: Box::new(call),
+                        arguments: vec![ast],
+                    },
+                };
+                self.create_ast(cst.id, AstKind::Call(call))
+            }
             CstKind::Parenthesized {
                 opening_parenthesis,
                 inner,
@@ -188,7 +224,7 @@ impl LoweringContext {
                 assert!(
                     matches!(opening_parenthesis.kind, CstKind::OpeningParenthesis),
                     "Parenthesized needs to start with opening parenthesis, but started with {}.",
-                    opening_parenthesis
+                    opening_parenthesis,
                 );
                 if !matches!(closing_parenthesis.kind, CstKind::ClosingParenthesis) {
                     ast = self.create_ast(
@@ -248,6 +284,82 @@ impl LoweringContext {
                     }),
                 )
             }
+            CstKind::List {
+                opening_parenthesis,
+                items,
+                closing_parenthesis,
+            } => {
+                let mut errors = vec![];
+
+                assert!(
+                    matches!(opening_parenthesis.kind, CstKind::OpeningParenthesis),
+                    "List should always have an opening parenthesis, but instead had {}.",
+                    opening_parenthesis
+                );
+
+                let mut ast_items = vec![];
+                if items.len() == 1 && let CstKind::Comma = items[0].kind {
+                    // Empty list (`(,)`), do nothing.
+                } else {
+                    for item in items {
+                        let CstKind::ListItem {
+                            value,
+                            comma,
+                        } = &item.kind else {
+                            errors.push(CompilerError {
+                                module: self.module.clone(),
+                                span: cst.span.clone(),
+                                payload: CompilerErrorPayload::Ast(AstError::ListWithNonListItem),
+                            });
+                            continue;
+                        };
+
+                        let mut value = self.lower_cst(&value.clone());
+
+                        if let Some(comma) = comma {
+                            if !matches!(comma.kind, CstKind::Comma) {
+                                value = self.create_ast(
+                                    comma.id,
+                                    AstKind::Error {
+                                        child: Some(Box::new(value)),
+                                        errors: vec![CompilerError {
+                                            module: self.module.clone(),
+                                            span: comma.span.clone(),
+                                            payload: CompilerErrorPayload::Ast(
+                                                AstError::ListItemWithoutComma,
+                                            ),
+                                        }],
+                                    },
+                                )
+                            }
+                        }
+
+                        ast_items.push(value);
+                    }
+                }
+
+                if !matches!(closing_parenthesis.kind, CstKind::ClosingParenthesis) {
+                    errors.push(CompilerError {
+                        module: self.module.clone(),
+                        span: closing_parenthesis.span.clone(),
+                        payload: CompilerErrorPayload::Ast(AstError::ListWithoutClosingParenthesis),
+                    });
+                }
+
+                let ast = self.create_ast(cst.id, AstKind::List(List(ast_items)));
+                if errors.is_empty() {
+                    ast
+                } else {
+                    self.create_ast(
+                        cst.id,
+                        AstKind::Error {
+                            child: Some(Box::new(ast)),
+                            errors,
+                        },
+                    )
+                }
+            }
+            CstKind::ListItem { .. } => panic!("ListItem should only appear in List."),
             CstKind::Struct {
                 opening_bracket,
                 fields,
@@ -261,17 +373,19 @@ impl LoweringContext {
                     opening_bracket
                 );
 
-                let mut positional_fields = vec![];
-                let mut named_fields = LinkedHashMap::new();
-                for field in fields {
-                    if let CstKind::StructField {
-                        key_and_colon,
-                        value,
-                        comma,
-                    } = &field.kind
-                    {
-                        let key = key_and_colon.as_ref().map(|box (key, colon)| {
+                let fields = fields
+                    .iter()
+                    .filter_map(|field| {
+                        if let CstKind::StructField {
+                            key,
+                            colon,
+                            value,
+                            comma,
+                        } = &field.kind
+                        {
                             let mut key = self.lower_cst(&key.clone());
+                            let mut value = self.lower_cst(&value.clone());
+
                             if !matches!(colon.kind, CstKind::Colon) {
                                 key = self.create_ast(
                                     colon.id,
@@ -286,58 +400,38 @@ impl LoweringContext {
                                         }],
                                     },
                                 )
-                            };
-                            key
-                        });
-
-                        let mut value = self.lower_cst(&value.clone());
-                        if !named_fields.is_empty() && key.is_none() {
-                            value = self.create_ast(
-                                field.id,
-                                AstKind::Error {
-                                    child: Some(Box::new(value)),
-                                    errors: vec![CompilerError {
-                                        module: self.module.clone(),
-                                        span: field.span.clone(),
-                                        payload: CompilerErrorPayload::Ast(
-                                            AstError::StructPositionalAfterNamedField,
-                                        ),
-                                    }],
-                                },
-                            )
-                        }
-
-                        if let Some(comma) = comma {
-                            if !matches!(comma.kind, CstKind::Comma) {
-                                value = self.create_ast(
-                                    comma.id,
-                                    AstKind::Error {
-                                        child: Some(Box::new(value)),
-                                        errors: vec![CompilerError {
-                                            module: self.module.clone(),
-                                            span: comma.span.clone(),
-                                            payload: CompilerErrorPayload::Ast(
-                                                AstError::StructValueWithoutComma,
-                                            ),
-                                        }],
-                                    },
-                                )
                             }
-                        }
+                            if let Some(comma) = comma {
+                                if !matches!(comma.kind, CstKind::Comma) {
+                                    value = self.create_ast(
+                                        comma.id,
+                                        AstKind::Error {
+                                            child: Some(Box::new(value)),
+                                            errors: vec![CompilerError {
+                                                module: self.module.clone(),
+                                                span: comma.span.clone(),
+                                                payload: CompilerErrorPayload::Ast(
+                                                    AstError::StructValueWithoutComma,
+                                                ),
+                                            }],
+                                        },
+                                    )
+                                }
+                            }
 
-                        if let Some(key) = key {
-                            named_fields.insert(key, value);
+                            Some((key, value))
                         } else {
-                            positional_fields.push(value);
+                            errors.push(CompilerError {
+                                module: self.module.clone(),
+                                span: cst.span.clone(),
+                                payload: CompilerErrorPayload::Ast(
+                                    AstError::StructWithNonStructField,
+                                ),
+                            });
+                            None
                         }
-                    } else {
-                        errors.push(CompilerError {
-                            module: self.module.clone(),
-                            span: cst.span.clone(),
-                            payload: CompilerErrorPayload::Ast(AstError::StructWithNonStructField),
-                        });
-                    }
-                }
+                    })
+                    .collect();
 
                 if !matches!(closing_bracket.kind, CstKind::ClosingBracket) {
                     errors.push(CompilerError {
@@ -347,13 +441,7 @@ impl LoweringContext {
                     });
                 }
 
-                let ast = self.create_ast(
-                    cst.id,
-                    AstKind::Struct(Struct {
-                        positional_fields,
-                        named_fields,
-                    }),
-                );
+                let ast = self.create_ast(cst.id, AstKind::Struct(Struct { fields }));
                 if errors.is_empty() {
                     ast
                 } else {
