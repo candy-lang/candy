@@ -8,7 +8,6 @@ use super::{
 use crate::{module::Module, utils::CountableId};
 use itertools::Itertools;
 use std::sync::Arc;
-use tracing::debug;
 
 #[salsa::query_group(MirToLirStorage)]
 pub trait MirToLir: CstDb + OptimizeMir {
