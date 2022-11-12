@@ -150,7 +150,7 @@ impl Body {
     pub fn flatten_multiples(&mut self) {
         let old_expressions = mem::take(&mut self.expressions);
 
-        for (id, expression) in old_expressions.into_iter() {
+        for (id, mut expression) in old_expressions.into_iter() {
             if let Expression::Multiple(mut inner_body) = expression {
                 inner_body.flatten_multiples();
                 let returned_by_inner = inner_body.return_value();
@@ -159,6 +159,9 @@ impl Body {
                 }
                 self.expressions.push((id, Expression::Reference(returned_by_inner)));
             } else {
+                if let Expression::Lambda { body, .. } = &mut expression {
+                    body.flatten_multiples();
+                }
                 self.expressions.push((id, expression));
             }
         }
