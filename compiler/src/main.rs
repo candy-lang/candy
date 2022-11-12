@@ -76,6 +76,9 @@ struct CandyBuildOptions {
     #[structopt(long)]
     watch: bool,
 
+    #[structopt(long)]
+    tracing: bool,
+
     #[structopt(parse(from_os_str))]
     file: PathBuf,
 }
@@ -84,6 +87,9 @@ struct CandyBuildOptions {
 struct CandyRunOptions {
     #[structopt(long)]
     debug: bool,
+
+    #[structopt(long)]
+    tracing: bool,
 
     #[structopt(parse(from_os_str))]
     file: PathBuf,
@@ -121,12 +127,12 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         options.file.clone(),
         ModuleKind::Code,
     );
-    let result = raw_build(
-        &db,
-        module.clone(),
-        &TracingConfig::default(),
-        options.debug,
-    );
+    let config = TracingConfig {
+        register_fuzzables: false,
+        trace_calls: options.tracing,
+        trace_evaluated_expressions: false,
+    };
+    let result = raw_build(&db, module.clone(), &config, options.debug);
 
     if !options.watch {
         result.ok_or(Exit::FileNotFound).map(|_| ())
@@ -139,12 +145,7 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         loop {
             match rx.recv() {
                 Ok(_) => {
-                    raw_build(
-                        &db,
-                        module.clone(),
-                        &TracingConfig::default(),
-                        options.debug,
-                    );
+                    raw_build(&db, module.clone(), &config, options.debug);
                 }
                 Err(e) => error!("watch error: {e:#?}"),
             }
@@ -228,6 +229,11 @@ fn raw_build(
         if debug {
             module.dump_associated_debug_file("optimized_mir", &format!("{mir:?}"));
         }
+        let mut mir = (*mir).clone();
+        mir.flatten_multiples();
+        if debug {
+            module.dump_associated_debug_file("no_mut_mir", &format!("{mir:?}"));
+        }
     });
 
     let lir = tracing::span!(Level::DEBUG, "Lowering MIR to LIR").in_scope(|| {
@@ -252,7 +258,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
 
     let config = TracingConfig {
         register_fuzzables: false,
-        trace_calls: false,
+        trace_calls: options.tracing,
         trace_evaluated_expressions: false,
     };
     if raw_build(&db, module.clone(), &config, false).is_none() {
@@ -269,7 +275,10 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let mut vm = Vm::new();
     vm.set_up_for_running_module_closure(module.clone(), module_closure);
     vm.run(
-        &DbUseProvider { db: &db, config },
+        &DbUseProvider {
+            db: &db,
+            config: config.clone(),
+        },
         &mut RunForever,
         &mut tracer,
     );
@@ -345,7 +354,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
                 vm.run(
                     &DbUseProvider {
                         db: &db,
-                        config: TracingConfig::default(),
+                        config: config.clone(),
                     },
                     &mut RunForever,
                     &mut tracer,
