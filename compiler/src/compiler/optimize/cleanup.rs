@@ -45,7 +45,7 @@ impl Mir {
         }
     }
 
-    fn normalize_ids(&mut self) {
+    pub fn normalize_ids(&mut self) {
         let mut generator = IdGenerator::start_at(0);
         let mapping: HashMap<Id, Id> = self
             .body

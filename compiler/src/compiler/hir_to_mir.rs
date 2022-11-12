@@ -209,50 +209,6 @@ fn generate_needs_function(id_generator: &mut IdGenerator<Id>) -> Expression {
     })
 }
 
-impl Expression {
-    fn build_lambda<F>(id_generator: &mut IdGenerator<Id>, function: F) -> Self
-    where
-        F: Fn(&mut LambdaBuilder, Id), // takes the builder and the responsible parameter
-    {
-        let responsible_parameter = id_generator.generate();
-
-        let mut builder = LambdaBuilder {
-            id_generator,
-            body: Body::new(),
-            parameters: vec![],
-        };
-        function(&mut builder, responsible_parameter);
-
-        Expression::Lambda {
-            parameters: builder.parameters,
-            responsible_parameter,
-            body: builder.body,
-        }
-    }
-}
-struct LambdaBuilder<'a> {
-    id_generator: &'a mut IdGenerator<Id>,
-    parameters: Vec<Id>,
-    body: Body,
-}
-impl<'a> LambdaBuilder<'a> {
-    fn new_parameter(&mut self) -> Id {
-        let id = self.id_generator.generate();
-        self.parameters.push(id);
-        id
-    }
-    fn push(&mut self, expression: Expression) -> Id {
-        self.body.push_with_new_id(self.id_generator, expression)
-    }
-    fn push_lambda<F>(&mut self, function: F) -> Id
-    where
-        F: Fn(&mut LambdaBuilder, Id),
-    {
-        let lambda = Expression::build_lambda(self.id_generator, function);
-        self.push(lambda)
-    }
-}
-
 // Nothing to see here.
 #[allow(clippy::too_many_arguments)]
 fn compile_expression(

@@ -321,6 +321,69 @@ impl hash::Hash for Expression {
     }
 }
 
+impl Mir {
+    pub fn build<F: Fn(&mut MirBodyBuilder)>(function: F) -> Self {
+        let mut id_generator = IdGenerator::start_at(0);
+        let mut builder = MirBodyBuilder::with_generator(&mut id_generator);
+        function(&mut builder);
+        assert!(builder.parameters.is_empty());
+        let body = builder.body;
+
+        Mir {
+            id_generator,
+            body
+        }
+    }
+}
+impl Expression {
+    // The builder function takes the builder and the responsible parameter.
+    pub fn build_lambda<F: Fn(&mut MirBodyBuilder, Id)>(id_generator: &mut IdGenerator<Id>, function: F) -> Self
+    {
+        let responsible_parameter = id_generator.generate();
+        let mut builder = MirBodyBuilder::with_generator(id_generator);
+        function(&mut builder, responsible_parameter);
+
+        Expression::Lambda {
+            parameters: builder.parameters,
+            responsible_parameter,
+            body: builder.body,
+        }
+    }
+}
+pub struct MirBodyBuilder<'a> {
+    id_generator: &'a mut IdGenerator<Id>,
+    parameters: Vec<Id>,
+    body: Body,
+}
+impl<'a> MirBodyBuilder<'a> {
+    fn with_generator(id_generator: &'a mut IdGenerator<Id>) -> Self {
+        MirBodyBuilder {
+            id_generator,
+            parameters: vec![],
+            body: Body::new(),
+        }
+    }
+    pub fn new_parameter(&mut self) -> Id {
+        let id = self.id_generator.generate();
+        self.parameters.push(id);
+        id
+    }
+    pub fn push(&mut self, expression: Expression) -> Id {
+        self.body.push_with_new_id(self.id_generator, expression)
+    }
+    pub fn push_lambda<F: Fn(&mut MirBodyBuilder, Id)>(&mut self, function: F) -> Id {
+        let lambda = Expression::build_lambda(self.id_generator, function);
+        self.push(lambda)
+    }
+    pub fn push_multiple<F: Fn(&mut MirBodyBuilder)>(&mut self, function: F) -> Id {
+        let mut builder = MirBodyBuilder::with_generator(self.id_generator);
+        function(&mut builder);
+        assert!(builder.parameters.is_empty());
+        let body = builder.body;
+        self.push(Expression::Multiple(body))
+    }
+}
+
 impl fmt::Debug for Mir {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.body)
