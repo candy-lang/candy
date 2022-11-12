@@ -380,7 +380,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
             reason,
             responsible,
         } => {
-            error!("The main function panicked because {reason}.");
+            error!("The main function panicked: {reason}");
             error!("{responsible} is responsible.");
             error!(
                 "This is the stack trace:\n{}",
