@@ -103,7 +103,7 @@ impl FullTracer {
             .iter()
             .map(|(location, _)| location.len())
             .max()
-            .unwrap();
+            .unwrap_or_default();
 
         caller_locations_and_calls
             .into_iter()

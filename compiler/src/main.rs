@@ -229,11 +229,6 @@ fn raw_build(
         if debug {
             module.dump_associated_debug_file("optimized_mir", &format!("{mir:?}"));
         }
-        let mut mir = (*mir).clone();
-        mir.flatten_multiples();
-        if debug {
-            module.dump_associated_debug_file("no_mut_mir", &format!("{mir:?}"));
-        }
     });
 
     let lir = tracing::span!(Level::DEBUG, "Lowering MIR to LIR").in_scope(|| {

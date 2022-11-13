@@ -152,6 +152,7 @@ impl FullTracer {
                     .into_iter()
                     .map(|arg| self.import_from_heap(arg, heap, Some(fiber)))
                     .collect();
+                let responsible = self.import_from_heap(responsible, heap, Some(fiber));
                 StoredFiberEvent::CallStarted {
                     call_site,
                     closure,
@@ -208,9 +209,10 @@ impl fmt::Debug for FullTracer {
                                 arguments,
                                 responsible,
                             } => format!(
-                                "call {call_site} started: {} {} ({} is responsible)",
+                                "call started: {} {} (call site {}, {} is responsible)",
                                 closure.format(&self.heap),
                                 arguments.iter().map(|arg| arg.format(&self.heap)).join(" "),
+                                self.heap.get_hir_id(*call_site),
                                 self.heap.get_hir_id(*responsible),
                             ),
                             StoredFiberEvent::CallEnded { return_value } =>
