@@ -16,10 +16,7 @@
 //! [module folding]: super::module_folding
 //! [inlining]: super::inlining
 
-use crate::{
-    builtin_functions::BuiltinFunction,
-    compiler::mir::{Expression, Mir},
-};
+use crate::compiler::mir::Mir;
 
 impl Mir {
     pub fn flatten_multiples(&mut self) {
@@ -31,6 +28,8 @@ impl Mir {
 
 #[test]
 fn test_multiple_flattening() {
+    use crate::{builtin_functions::BuiltinFunction, compiler::mir::Expression};
+
     // $0 =
     //   $1 = builtinEquals
     //
