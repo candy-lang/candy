@@ -256,7 +256,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         trace_calls: options.tracing,
         trace_evaluated_expressions: false,
     };
-    if raw_build(&db, module.clone(), &config, false).is_none() {
+    if raw_build(&db, module.clone(), &config, options.debug).is_none() {
         warn!("File not found.");
         return Err(Exit::FileNotFound);
     };
@@ -362,6 +362,9 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         for channel in vm.unreferenced_channels.iter().copied().collect_vec() {
             vm.free_channel(channel);
         }
+    }
+    if options.debug {
+        module.dump_associated_debug_file("trace", &format!("{tracer:?}"));
     }
     match vm.tear_down() {
         ExecutionResult::Finished(return_value) => {
