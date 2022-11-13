@@ -135,7 +135,7 @@ macro_rules! unpack {
                 ( $( *$arg, )+ )
             } else {
                 return Err(
-                    "a builtin function was called with the wrong number of arguments".to_string(),
+                    "A builtin function was called with the wrong number of arguments.".to_string(),
                 );
             };
             let ( $( $arg, )+ ): ( $( UnpackedData<$type>, )+ ) = ( $(
@@ -156,7 +156,7 @@ macro_rules! unpack_and_later_drop {
                 ( $( *$arg, )+ )
             } else {
                 return Err(
-                    "a builtin function was called with the wrong number of arguments".to_string(),
+                    "A builtin function was called with the wrong number of arguments.".to_string(),
                 );
             };
             let ( $( $arg, )+ ): ( $( UnpackedData<$type>, )+ ) = ( $(
@@ -178,7 +178,7 @@ impl Heap {
         unpack_and_later_drop!(self, args, |capacity: Int| {
             match capacity.value.clone().try_into() {
                 Ok(capacity) => CreateChannel { capacity },
-                Err(_) => return Err("you tried to create a channel with a capacity that is either negative or bigger than the maximum usize".to_string()),
+                Err(_) => return Err("You tried to create a channel with a capacity that is either negative or bigger than the maximum usize.".to_string()),
             }
         })
     }
@@ -377,7 +377,7 @@ impl Heap {
     fn parallel(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack!(self, args, |body_taking_nursery: Closure| {
             if body_taking_nursery.num_args != 1 {
-                return Err("parallel expects a closure taking a nursery".to_string());
+                return Err("`parallel` expects a closure taking a nursery.".to_string());
             }
             Parallel {
                 body: body_taking_nursery.address,
@@ -400,7 +400,7 @@ impl Heap {
                     Ok(Return(value))
                 }
                 None => Err(format!(
-                    "the struct does not contain the key {}",
+                    "The struct does not contain the key {}.",
                     key.format(self)
                 )),
             }
@@ -518,7 +518,7 @@ impl Closure {
     fn should_take_no_arguments(&self) -> Result<(), String> {
         match self.num_args {
             0 => Ok(()),
-            n => Err(format!("a builtin function expected a function without arguments, but got one that takes {n} arguments")),
+            n => Err(format!("A builtin function expected a function without arguments, but got one that takes {n} arguments.")),
         }
     }
 }
@@ -567,22 +567,22 @@ macro_rules! impl_data_try_into_type {
         }
     };
 }
-impl_data_try_into_type!(Int, Int, "a builtin function expected an int");
-impl_data_try_into_type!(Text, Text, "a builtin function expected a text");
-impl_data_try_into_type!(Symbol, Symbol, "a builtin function expected a symbol");
-impl_data_try_into_type!(List, List, "a builtin function expected a list");
-impl_data_try_into_type!(Struct, Struct, "a builtin function expected a struct");
+impl_data_try_into_type!(Int, Int, "A builtin function expected an int.");
+impl_data_try_into_type!(Text, Text, "A builtin function expected a text.");
+impl_data_try_into_type!(Symbol, Symbol, "A builtin function expected a symbol.");
+impl_data_try_into_type!(List, List, "A builtin function expected a list.");
+impl_data_try_into_type!(Struct, Struct, "A builtin function expected a struct.");
 impl_data_try_into_type!(Id, HirId, "expected a HIR ID");
-impl_data_try_into_type!(Closure, Closure, "a builtin function expected a closure");
+impl_data_try_into_type!(Closure, Closure, "A builtin function expected a closure.");
 impl_data_try_into_type!(
     SendPort,
     SendPort,
-    "a builtin function expected a send port"
+    "A builtin function expected a send port."
 );
 impl_data_try_into_type!(
     ReceivePort,
     ReceivePort,
-    "a builtin function expected a receive port"
+    "A builtin function expected a receive port."
 );
 
 impl TryInto<bool> for Data {
@@ -593,7 +593,7 @@ impl TryInto<bool> for Data {
         match symbol.value.as_str() {
             "True" => Ok(true),
             "False" => Ok(false),
-            _ => Err("a builtin function expected True or False".to_string()),
+            _ => Err("A builtin function expected `True` or `False`.".to_string()),
         }
     }
 }

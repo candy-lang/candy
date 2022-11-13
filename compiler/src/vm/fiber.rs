@@ -409,7 +409,7 @@ impl Fiber {
                     _ => {
                         self.panic(
                             format!(
-                                "you can only call closures and builtins, but you tried to call {}",
+                                "You can only call closures and builtins, but you tried to call {}.",
                                 callee.format(&self.heap),
                             ),
                             responsible,
