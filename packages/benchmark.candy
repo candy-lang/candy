@@ -25,9 +25,9 @@ main := { environment ->
   core.parallel { nursery ->
     nursery
     | core.async {
-        print "Hello from fiber!"
-        "Hello, async await!"
-      }
+      print "Hello from fiber!"
+      "Hello, async await!"
+    }
     | core.await
     | print
 
