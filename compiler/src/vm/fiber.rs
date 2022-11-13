@@ -463,30 +463,31 @@ impl Fiber {
                 self.import_stack.pop().unwrap();
             }
             Instruction::TraceCallStarts { num_args } => {
-                let call_site = self.data_stack.pop().unwrap();
-                let responsible = self.data_stack.nth_last(0);
+                let responsible = self.data_stack.pop().unwrap();
                 let mut args = vec![];
-                for i in 0..num_args {
-                    args.push(self.data_stack[self.data_stack.len() - num_args - 1 + i]);
+                for _ in 0..num_args {
+                    args.push(self.data_stack.pop().unwrap());
                 }
-                let callee_address = self.data_stack.nth_last(1 + num_args);
+                let callee_address = self.data_stack.pop().unwrap();
+                let call_site = self.data_stack.pop().unwrap();
 
+                args.reverse();
                 tracer.call_started(call_site, callee_address, args, responsible, &self.heap);
             }
             Instruction::TraceCallEnds => {
-                let return_value = self.data_stack.nth_last(0);
+                let return_value = self.data_stack.pop().unwrap();
 
                 tracer.call_ended(return_value, &self.heap);
             }
             Instruction::TraceExpressionEvaluated => {
+                let value = self.data_stack.pop().unwrap();
                 let expression = self.data_stack.pop().unwrap();
-                let value = self.data_stack.nth_last(0);
 
                 tracer.value_evaluated(expression, value, &self.heap);
             }
             Instruction::TraceFoundFuzzableClosure => {
+                let closure = self.data_stack.pop().unwrap();
                 let definition = self.data_stack.pop().unwrap();
-                let closure = self.data_stack.nth_last(0);
 
                 if !matches!(self.heap.get(closure).data, Data::Closure(_)) {
                     panic!("Instruction TraceFoundFuzzableClosure executed, but stack top is not a closure.");

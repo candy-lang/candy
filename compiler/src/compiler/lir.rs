@@ -109,18 +109,18 @@ pub enum Instruction {
     },
     ModuleEnds,
 
-    /// a, function, arg1, arg2, ..., argN, responsible, HIR ID -> a, function, arg1, arg2, ..., argN, responsible
+    /// a, HIR ID, function, arg1, arg2, ..., argN, responsible -> a
     TraceCallStarts {
         num_args: usize,
     },
 
-    // a, return value -> a, return value
+    // a, return value -> a
     TraceCallEnds,
 
-    /// a, value, HIR ID -> a, value
+    /// a, HIR ID, value -> a
     TraceExpressionEvaluated,
 
-    /// a, closure, HIR ID -> a, closure
+    /// a, HIR ID, closure -> a
     TraceFoundFuzzableClosure,
 }
 
@@ -186,14 +186,21 @@ impl Instruction {
             }
             Instruction::ModuleStarts { .. } => {}
             Instruction::ModuleEnds => {}
-            Instruction::TraceCallStarts { .. } => {
+            Instruction::TraceCallStarts { num_args } => {
+                stack.pop(); // responsible
+                stack.pop_multiple(*num_args);
+                stack.pop(); // callee
                 stack.pop(); // HIR ID
             }
-            Instruction::TraceCallEnds => {}
+            Instruction::TraceCallEnds => {
+                stack.pop(); // return value
+            }
             Instruction::TraceExpressionEvaluated => {
+                stack.pop(); // value
                 stack.pop(); // HIR ID
             }
             Instruction::TraceFoundFuzzableClosure => {
+                stack.pop(); // value
                 stack.pop(); // HIR ID
             }
         }
