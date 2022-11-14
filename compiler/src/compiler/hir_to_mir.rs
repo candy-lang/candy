@@ -1,11 +1,13 @@
 use super::{
     ast_to_hir::AstToHir,
     cst::CstDb,
+    error::CompilerError,
     hir,
     mir::{Body, Expression, Id, Mir},
 };
 use crate::{
     builtin_functions::BuiltinFunction,
+    language_server::utils::LspPositionConversion,
     module::{Module, ModuleKind, Package},
     utils::IdGenerator,
 };
@@ -13,7 +15,7 @@ use itertools::Itertools;
 use std::{collections::HashMap, sync::Arc};
 
 #[salsa::query_group(HirToMirStorage)]
-pub trait HirToMir: CstDb + AstToHir {
+pub trait HirToMir: CstDb + AstToHir + LspPositionConversion {
     fn mir(&self, module: Module, config: TracingConfig) -> Option<Arc<Mir>>;
 }
 
@@ -27,11 +29,16 @@ pub struct TracingConfig {
 fn mir(db: &dyn HirToMir, module: Module, config: TracingConfig) -> Option<Arc<Mir>> {
     let (hir, _) = db.hir(module.clone())?;
     let hir = (*hir).clone();
-    let mir = compile_module(module, hir, &config);
+    let mir = compile_module(db, module, hir, &config);
     Some(Arc::new(mir))
 }
 
-fn compile_module(module: Module, hir: hir::Body, config: &TracingConfig) -> Mir {
+fn compile_module(
+    db: &dyn HirToMir,
+    module: Module,
+    hir: hir::Body,
+    config: &TracingConfig,
+) -> Mir {
     let mut id_generator = IdGenerator::start_at(0);
     let mut body = Body::new();
     let mut mapping = HashMap::<hir::Id, Id>::new();
@@ -52,6 +59,7 @@ fn compile_module(module: Module, hir: hir::Body, config: &TracingConfig) -> Mir
     );
     for (id, expression) in hir.expressions {
         compile_expression(
+            db,
             &mut id_generator,
             &mut body,
             &mut mapping,
@@ -212,6 +220,7 @@ fn generate_needs_function(id_generator: &mut IdGenerator<Id>) -> Expression {
 // Nothing to see here.
 #[allow(clippy::too_many_arguments)]
 fn compile_expression(
+    db: &dyn HirToMir,
     id_generator: &mut IdGenerator<Id>,
     body: &mut Body,
     mapping: &mut HashMap<hir::Id, Id>,
@@ -262,6 +271,7 @@ fn compile_expression(
 
             for (id, expression) in original_body.expressions {
                 compile_expression(
+                    db,
                     id_generator,
                     &mut lambda_body,
                     mapping,
@@ -358,13 +368,20 @@ fn compile_expression(
         hir::Expression::Error { errors, .. } => {
             let reason = body.push_with_new_id(
                 id_generator,
-                Expression::Text(format!(
-                    "The code still contains errors:\n{}",
-                    errors
-                        .into_iter()
-                        .map(|error| format!("{error:?}"))
-                        .join("\n"),
-                )),
+                Expression::Text(if errors.len() == 1 {
+                    format!(
+                        "The code still contains an error: {}",
+                        errors.into_iter().next().unwrap().format_nicely(db)
+                    )
+                } else {
+                    format!(
+                        "The code still contains errors:\n{}",
+                        errors
+                            .into_iter()
+                            .map(|error| format!("- {}", error.format_nicely(db)))
+                            .join("\n"),
+                    )
+                }),
             );
             let responsible =
                 body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
@@ -387,5 +404,17 @@ fn compile_expression(
                 value: id,
             },
         );
+    }
+}
+
+impl CompilerError {
+    fn format_nicely(&self, db: &dyn HirToMir) -> String {
+        let (start_line, start_col) = db.offset_to_lsp(self.module.clone(), self.span.start);
+        let (end_line, end_col) = db.offset_to_lsp(self.module.clone(), self.span.end);
+
+        format!(
+            "{}, {}:{} – {}:{}: {}",
+            self.module, start_line, start_col, end_line, end_col, self.payload
+        )
     }
 }
