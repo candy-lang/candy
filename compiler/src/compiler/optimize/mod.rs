@@ -75,9 +75,12 @@ fn mir_with_obvious_optimized(
     module: Module,
     config: TracingConfig,
 ) -> Option<Arc<Mir>> {
+    debug!("{module}: Compiling");
     let mir = db.mir(module.clone(), config.clone())?;
     let mut mir = (*mir).clone();
-    mir.optimize_obvious(module, db, &config);
+    debug!("{module}: Optimizing. {}", mir.complexity());
+    mir.optimize_obvious(module.clone(), db, &config);
+    debug!("{module}: Done. {}", mir.complexity());
     Some(Arc::new(mir))
 }
 
@@ -89,13 +92,9 @@ impl Mir {
         db: &dyn OptimizeMir,
         config: &TracingConfig,
     ) {
-        debug!("{module}: {}", self.complexity());
         self.optimize_obvious_self_contained();
-        debug!("{module}: {}", self.complexity());
         self.fold_modules(db, config);
-        debug!("{module}: {}", self.complexity());
         self.optimize_obvious_self_contained();
-        debug!("{module}: {}", self.complexity());
         self.cleanup();
     }
 

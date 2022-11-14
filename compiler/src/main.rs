@@ -345,7 +345,6 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     loop {
         match vm.status() {
             Status::CanRun => {
-                debug!("VM still running.");
                 vm.run(
                     &DbUseProvider {
                         db: &db,
