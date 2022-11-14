@@ -436,15 +436,16 @@ impl Fiber {
                 }
             }
             Instruction::Panic => {
-                let responsible_for_call = self.data_stack.pop().unwrap();
                 let responsible_for_panic = self.data_stack.pop().unwrap();
                 let reason = self.data_stack.pop().unwrap();
 
                 let reason: Result<Text, _> = self.heap.get(reason).data.clone().try_into();
                 let Ok(reason) = reason else {
-                    let responsible = self.heap.get_hir_id(responsible_for_call);
-                    self.panic("The `reason` needs to be a text.".to_string(), responsible);
-                    return;
+                    // Panic expressions only occur inside the needs function
+                    // where we have validated the inputs before calling the
+                    // instructions, or when lowering compiler errors from the
+                    // HIR to the MIR.
+                    panic!("We should never generate a LIR where the reason is not a text.");
                 };
                 let responsible = self.heap.get_hir_id(responsible_for_panic);
 
