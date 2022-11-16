@@ -1,3 +1,5 @@
+use tracing::debug;
+
 use crate::{
     compiler::mir::{Body, Expression, Id, Mir},
     utils::IdGenerator,
@@ -16,33 +18,37 @@ impl Mir {
         for (id, expression) in old_body.into_iter() {
             if still_constants && !expression.is_pure() {
                 still_constants = false;
-                self.body.sort_by(|(_, a), (_, b)| {
-                    fn order_score(expr: &Expression) -> u8 {
-                        match expr {
-                            Expression::HirId(_) => 0,
-                            Expression::Builtin(_) => 1,
-                            Expression::Symbol(_) => 2,
-                            Expression::Int(_) => 3,
-                            Expression::Text(_) => 4,
-                            _ => 5,
-                        }
-                    }
-                    match (a, b) {
-                        (Expression::HirId(a), Expression::HirId(b)) => {
-                            format!("{a}").cmp(&format!("{b}"))
-                        }
-                        (Expression::Builtin(a), Expression::Builtin(b)) => {
-                            format!("{a:?}").cmp(&format!("{b:?}"))
-                        }
-                        (Expression::Symbol(a), Expression::Symbol(b)) => a.cmp(b),
-                        (Expression::Int(a), Expression::Int(b)) => a.cmp(b),
-                        (Expression::Text(a), Expression::Text(b)) => a.cmp(b),
-                        _ => order_score(a).cmp(&order_score(b)),
-                    }
-                });
+                Self::sort_constants(&mut self.body);
             }
             self.body.push(id, expression);
         }
+        if still_constants {
+            Self::sort_constants(&mut self.body);
+        }
+    }
+    fn sort_constants(body: &mut Body) {
+        body.sort_by(|(_, a), (_, b)| {
+            fn order_score(expr: &Expression) -> u8 {
+                match expr {
+                    Expression::HirId(_) => 0,
+                    Expression::Builtin(_) => 1,
+                    Expression::Symbol(_) => 2,
+                    Expression::Int(_) => 3,
+                    Expression::Text(_) => 4,
+                    _ => 5,
+                }
+            }
+            match (a, b) {
+                (Expression::HirId(a), Expression::HirId(b)) => format!("{a}").cmp(&format!("{b}")),
+                (Expression::Builtin(a), Expression::Builtin(b)) => {
+                    format!("{a:?}").cmp(&format!("{b:?}"))
+                }
+                (Expression::Symbol(a), Expression::Symbol(b)) => a.cmp(b),
+                (Expression::Int(a), Expression::Int(b)) => a.cmp(b),
+                (Expression::Text(a), Expression::Text(b)) => a.cmp(b),
+                _ => order_score(a).cmp(&order_score(b)),
+            }
+        });
     }
 
     pub fn normalize_ids(&mut self) {
