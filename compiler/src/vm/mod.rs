@@ -10,7 +10,7 @@ mod use_module;
 pub use self::{
     channel::Packet,
     fiber::{ExecutionResult, Fiber},
-    heap::{Closure, Heap, Object, Pointer, Struct},
+    heap::{Closure, Data, Heap, Object, Pointer, SendPort, Struct},
     ids::{ChannelId, FiberId, OperationId},
     tracer::{full::FullTracer, Tracer},
 };
@@ -20,7 +20,6 @@ use self::{
         CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions,
         UseProvider,
     },
-    heap::SendPort,
 };
 use crate::{
     compiler::hir::Id,

@@ -29,8 +29,8 @@ use crate::{
     module::{Module, ModuleKind},
     vm::{
         context::{DbUseProvider, RunForever},
-        tracer::{full::FullTracer, Tracer},
-        Closure, ExecutionResult, FiberId, Status, Struct, Vm,
+        tracer::{dummy::DummyTracer, full::FullTracer, Tracer},
+        Closure, Data, ExecutionResult, FiberId, Heap, Packet, SendPort, Status, Struct, Vm,
     },
 };
 use compiler::{
@@ -158,86 +158,72 @@ fn raw_build(
     config: &TracingConfig,
     debug: bool,
 ) -> Option<Arc<Lir>> {
-    tracing::span!(Level::DEBUG, "Parsing string to RCST").in_scope(|| {
-        let rcst = db
-            .rcst(module.clone())
-            .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", module, err));
-        if debug {
-            module.dump_associated_debug_file("rcst", &format!("{:#?}\n", rcst));
-        }
-    });
+    let rcst = db
+        .rcst(module.clone())
+        .unwrap_or_else(|err| panic!("Error parsing file `{}`: {:?}", module, err));
+    if debug {
+        module.dump_associated_debug_file("rcst", &format!("{:#?}\n", rcst));
+    }
 
-    tracing::span!(Level::DEBUG, "Turning RCST to CST").in_scope(|| {
-        let cst = db.cst(module.clone()).unwrap();
-        if debug {
-            module.dump_associated_debug_file("cst", &format!("{:#?}\n", cst));
-        }
-    });
+    let cst = db.cst(module.clone()).unwrap();
+    if debug {
+        module.dump_associated_debug_file("cst", &format!("{:#?}\n", cst));
+    }
 
-    tracing::span!(Level::DEBUG, "Abstracting CST to AST").in_scope(|| {
-        let (asts, ast_cst_id_map) = db.ast(module.clone()).unwrap();
-        if debug {
-            module.dump_associated_debug_file(
-                "ast",
-                &format!("{}\n", asts.iter().map(|ast| format!("{}", ast)).join("\n")),
-            );
-            module.dump_associated_debug_file(
-                "ast_to_cst_ids",
-                &ast_cst_id_map
-                    .keys()
-                    .into_iter()
-                    .sorted_by_key(|it| it.local)
-                    .map(|key| format!("{key} -> {}\n", ast_cst_id_map[key].0))
-                    .join(""),
-            );
-        }
-    });
+    let (asts, ast_cst_id_map) = db.ast(module.clone()).unwrap();
+    if debug {
+        module.dump_associated_debug_file(
+            "ast",
+            &format!("{}\n", asts.iter().map(|ast| format!("{}", ast)).join("\n")),
+        );
+        module.dump_associated_debug_file(
+            "ast_to_cst_ids",
+            &ast_cst_id_map
+                .keys()
+                .into_iter()
+                .sorted_by_key(|it| it.local)
+                .map(|key| format!("{key} -> {}\n", ast_cst_id_map[key].0))
+                .join(""),
+        );
+    }
 
-    tracing::span!(Level::DEBUG, "Turning AST to HIR").in_scope(|| {
-        let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
-        if debug {
-            module.dump_associated_debug_file("hir", &format!("{}", hir));
-            module.dump_associated_debug_file(
-                "hir_to_ast_ids",
-                &hir_ast_id_map
-                    .keys()
-                    .into_iter()
-                    .map(|key| format!("{key} -> {}\n", hir_ast_id_map[key]))
-                    .join(""),
-            );
-        }
+    let (hir, hir_ast_id_map) = db.hir(module.clone()).unwrap();
+    if debug {
+        module.dump_associated_debug_file("hir", &format!("{}", hir));
+        module.dump_associated_debug_file(
+            "hir_to_ast_ids",
+            &hir_ast_id_map
+                .keys()
+                .into_iter()
+                .map(|key| format!("{key} -> {}\n", hir_ast_id_map[key]))
+                .join(""),
+        );
+    }
 
-        let mut errors = vec![];
-        hir.collect_errors(&mut errors);
-        for CompilerError { span, payload, .. } in errors {
-            let (start_line, start_col) = db.offset_to_lsp(module.clone(), span.start);
-            let (end_line, end_col) = db.offset_to_lsp(module.clone(), span.end);
-            warn!("{start_line}:{start_col} – {end_line}:{end_col}: {payload:?}");
-        }
-    });
+    let mut errors = vec![];
+    hir.collect_errors(&mut errors);
+    for CompilerError { span, payload, .. } in errors {
+        let (start_line, start_col) = db.offset_to_lsp(module.clone(), span.start);
+        let (end_line, end_col) = db.offset_to_lsp(module.clone(), span.end);
+        warn!("{start_line}:{start_col} – {end_line}:{end_col}: {payload:?}");
+    }
 
-    tracing::span!(Level::DEBUG, "Turning HIR to MIR").in_scope(|| {
-        let mir = db.mir(module.clone(), config.clone()).unwrap();
-        if debug {
-            module.dump_associated_debug_file("mir", &format!("{mir:?}"));
-        }
-    });
-    tracing::span!(Level::DEBUG, "Optimizing MIR").in_scope(|| {
-        let mir = db
-            .mir_with_obvious_optimized(module.clone(), config.clone())
-            .unwrap();
-        if debug {
-            module.dump_associated_debug_file("optimized_mir", &format!("{mir:?}"));
-        }
-    });
+    let mir = db.mir(module.clone(), config.clone()).unwrap();
+    if debug {
+        module.dump_associated_debug_file("mir", &format!("{mir:?}"));
+    }
 
-    let lir = tracing::span!(Level::DEBUG, "Lowering MIR to LIR").in_scope(|| {
-        let lir = db.lir(module.clone(), config.clone()).unwrap();
-        if debug {
-            module.dump_associated_debug_file("lir", &format!("{lir}"));
-        }
-        lir
-    });
+    let optimized_mir = db
+        .mir_with_obvious_optimized(module.clone(), config.clone())
+        .unwrap();
+    if debug {
+        module.dump_associated_debug_file("optimized_mir", &format!("{optimized_mir:?}"));
+    }
+
+    let lir = db.lir(module.clone(), config.clone()).unwrap();
+    if debug {
+        module.dump_associated_debug_file("lir", &format!("{lir}"));
+    }
 
     Some(lir)
 }

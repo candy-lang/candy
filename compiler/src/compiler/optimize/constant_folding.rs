@@ -156,7 +156,8 @@ impl Mir {
                         Expression::Reference(value)
                     } else {
                         return Some(Err(format!(
-                            "Struct access will panic because key {key_id} isn't in there."
+                            "Struct access will panic because key {:?} isn't in there.",
+                            visible.get(key_id),
                         )));
                     }
                 } else {
