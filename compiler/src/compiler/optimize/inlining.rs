@@ -44,6 +44,8 @@ use crate::{
 };
 use std::collections::{HashMap, HashSet};
 
+use super::complexity::Complexity;
+
 impl Expression {
     pub fn inline_call(
         &mut self,
@@ -98,8 +100,8 @@ impl Mir {
         for (id, expression) in self.body.iter() {
             if let Expression::Lambda { body, .. } = expression &&
                     body.iter().any(|(_, expr)| matches!(expr, Expression::UseModule { .. })) {
-                    functions_with_use.insert(id);
-                }
+                functions_with_use.insert(id);
+            }
         }
 
         self.body.visit_with_visible(&mut |_, expression, visible, _| {
@@ -107,6 +109,33 @@ impl Mir {
                 // If inlining fails with an `Err`, there's nothing we can do
                 // except apply other optimizations first and then try again
                 // later.
+                let _ = expression.inline_call(visible, &mut self.id_generator);
+            }
+        });
+    }
+
+    pub fn inline_functions_of_maximum_complexity(&mut self, complexity: Complexity) {
+        let mut small_functions = HashSet::new();
+        for (id, expression) in self.body.iter() {
+            if let Expression::Lambda { body, .. } = expression && body.complexity() <= complexity {
+                small_functions.insert(id);
+            }
+        }
+
+        self.body.visit_with_visible(&mut |_, expression, visible, _| {
+            if let Expression::Call { function, .. } = expression && small_functions.contains(function) {
+                let _ = expression.inline_call(visible, &mut self.id_generator);
+            }
+        });
+    }
+
+    pub fn inline_functions_only_called_once(&mut self) {
+        let mut ids_to_number_of_references: HashMap<Id, usize> = HashMap::new();
+        self.body.replace_id_references(&mut |id| {
+            *ids_to_number_of_references.entry(*id).or_default() += 1;
+        });
+        self.body.visit_with_visible(&mut |_, expression, visible, _| {
+            if let Expression::Call { function, .. } = expression && ids_to_number_of_references[function] == 1 {
                 let _ = expression.inline_call(visible, &mut self.id_generator);
             }
         });

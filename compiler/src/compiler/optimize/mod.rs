@@ -104,6 +104,7 @@ impl Mir {
             self.checked_optimization(|mir| mir.tree_shake());
             self.checked_optimization(|mir| mir.fold_constants());
             self.checked_optimization(|mir| mir.inline_functions_containing_use());
+            self.checked_optimization(|mir| mir.inline_functions_only_called_once());
             self.checked_optimization(|mir| mir.lift_constants());
             self.checked_optimization(|mir| mir.eliminate_common_subtrees());
             self.checked_optimization(|mir| mir.flatten_multiples());
