@@ -2,7 +2,7 @@
 # `cargo build --release --manifest-path=compiler/Cargo.toml -- run packages/benchmark.candy`
 # `cargo build --release --manifest-path=compiler/Cargo.toml && time target/release/candy run packages/benchmark.candy`
 
-core = use "..Core"
+core = use "...Core"
 ifElse = core.ifElse
 int = core.int
 
