@@ -1,0 +1,30 @@
+# Run or benchmark by navigating to the Candy folder and then running this command:
+# `cargo build --release --manifest-path=compiler/Cargo.toml -- run packages/benchmark.candy`
+# `cargo build --release --manifest-path=compiler/Cargo.toml && time target/release/candy run packages/benchmark.candy`
+
+core = use "..Core"
+async = core.async
+await = core.await
+channel = core.channel
+parallel = core.parallel
+text = core.text
+
+main := { environment ->
+  print message =
+    needs (text.is message)
+    channel.send environment.stdout message
+
+  parallel { nursery ->
+    nursery
+    | async {
+      print "Hello from fiber!"
+      "Hello, async await!"
+    }
+    | await
+    | print
+
+    nursery | async { print "Kiwi" }
+    nursery | async { print "Banana" }
+    print "Hi"
+  }
+}

@@ -1,0 +1,48 @@
+# Echoes whatever you send to it on stdin.
+
+core = use "...Core"
+async = core.async
+await = core.await
+channel = core.channel
+equals = core.equals
+ifElse = core.ifElse
+int = core.int
+run = core.function.run
+text = core.text
+
+main := { environment ->
+  print message =
+    needs (text.is message)
+    environment.stdout | channel.send message
+
+  read = {
+    response = channel.create 1
+    environment.stdin | channel.send response.sendPort
+    await response.receivePort
+  }
+
+  print "Welcome to the number guessing game!"
+
+  guessRec = { guessRec correct ->
+    print "What's your guess?"
+    guess = run read | text.trim | int.parse
+    
+    ifElse (equals guess.type Err) {
+      print "Your guess must be a number."
+      guess guessRec correct
+    } {
+      guess = guess.value
+
+      ifElse (equals guess correct) { print "You did it!" } {
+        ifElse (int.isLessThan correct guess) {
+          print "The correct number is lower!"
+        } {
+          print "The correct number is greater!"
+        }
+        guessRec guessRec correct
+      }
+    }
+  }
+
+  guessRec guessRec 20
+}
