@@ -28,7 +28,7 @@ impl Mir {
     pub fn eliminate_common_subtrees(&mut self) {
         let mut pure_expressions: HashMap<Expression, Id> = HashMap::new();
 
-        self.body.visit(&mut |id, expression, visible, _| {
+        self.body.visit_with_visible(&mut |id, expression, visible, _| {
             if !expression.is_pure() {
                 return;
             }

@@ -23,13 +23,13 @@ impl Mir {
     pub fn follow_references(&mut self) {
         let mut replacements = HashMap::<Id, Id>::new();
 
-        self.body.visit(&mut |id, expression, _, _| {
+        self.body.visit(&mut |id, expression, _| {
             if let Expression::Reference(reference) = &expression {
                 let replacement = *replacements.get(reference).unwrap_or(reference);
                 replacements.insert(id, replacement);
             }
         });
-        self.body.visit(&mut |_, expression, _, _| {
+        self.body.visit(&mut |_, expression, _| {
             expression.replace_id_references(&mut |id| {
                 if let Some(&replacement) = replacements.get(id) {
                     *id = replacement;

@@ -102,7 +102,7 @@ impl Mir {
                 }
         }
 
-        self.body.visit(&mut |_, expression, visible, _| {
+        self.body.visit_with_visible(&mut |_, expression, visible, _| {
             if let Expression::Call { function, .. } = expression && functions_with_use.contains(function) {
                 // If inlining fails with an `Err`, there's nothing we can do
                 // except apply other optimizations first and then try again

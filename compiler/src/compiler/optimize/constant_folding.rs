@@ -35,37 +35,38 @@ use crate::{
 
 impl Mir {
     pub fn fold_constants(&mut self) {
-        self.body.visit(&mut |_, expression, visible, _| {
-            let Expression::Call {
+        self.body
+            .visit_with_visible(&mut |_, expression, visible, _| {
+                let Expression::Call {
                 function,
                 arguments,
                 responsible,
                 ..
             } = expression else { return; };
-            let Expression::Builtin(builtin) = visible.get(*function) else { return; };
+                let Expression::Builtin(builtin) = visible.get(*function) else { return; };
 
-            if let Some(result) = Self::run_builtin(*builtin, arguments, visible) {
-                let evaluated_call = match result {
-                    Ok(return_value) => return_value,
-                    Err(panic_reason) => {
-                        let mut body = Body::new();
-                        let reason = body.push_with_new_id(
-                            &mut self.id_generator,
-                            Expression::Text(panic_reason),
-                        );
-                        body.push_with_new_id(
-                            &mut self.id_generator,
-                            Expression::Panic {
-                                reason,
-                                responsible: *responsible,
-                            },
-                        );
-                        Expression::Multiple(body)
-                    }
-                };
-                *expression = evaluated_call;
-            }
-        });
+                if let Some(result) = Self::run_builtin(*builtin, arguments, visible) {
+                    let evaluated_call = match result {
+                        Ok(return_value) => return_value,
+                        Err(panic_reason) => {
+                            let mut body = Body::new();
+                            let reason = body.push_with_new_id(
+                                &mut self.id_generator,
+                                Expression::Text(panic_reason),
+                            );
+                            body.push_with_new_id(
+                                &mut self.id_generator,
+                                Expression::Panic {
+                                    reason,
+                                    responsible: *responsible,
+                                },
+                            );
+                            Expression::Multiple(body)
+                        }
+                    };
+                    *expression = evaluated_call;
+                }
+            });
     }
 
     /// This function tries to run a builtin, requiring a minimal amount of

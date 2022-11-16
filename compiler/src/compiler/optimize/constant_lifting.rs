@@ -46,7 +46,7 @@ impl Mir {
     pub fn lift_constants(&mut self) {
         let mut constants = vec![];
         let mut constant_ids = HashSet::new();
-        self.body.visit(&mut |id, expression, _, is_return_value| {
+        self.body.visit(&mut |id, expression, is_return_value| {
             let is_constant = expression.is_pure()
                 && expression
                     .captured_ids()

@@ -40,44 +40,45 @@ use tracing::warn;
 
 impl Mir {
     pub fn fold_modules(&mut self, db: &dyn OptimizeMir, config: &TracingConfig) {
-        self.body.visit(&mut |_, expression, visible, _| {
-            let Expression::UseModule {
+        self.body
+            .visit_with_visible(&mut |_, expression, visible, _| {
+                let Expression::UseModule {
                     current_module,
                     relative_path,
                     responsible: _,
                 } = expression else { return; };
 
-            let Expression::Text(path) = visible.get(*relative_path) else {
+                let Expression::Text(path) = visible.get(*relative_path) else {
                 // warn!("use called with non-constant text");
                 return; // TODO
             };
-            let Ok(path) = UsePath::parse(path) else {
+                let Ok(path) = UsePath::parse(path) else {
                 warn!("use called with an invalid path");
                 return; // TODO
             };
-            let Ok(module_to_import) = path.resolve_relative_to(current_module.clone()) else {
+                let Ok(module_to_import) = path.resolve_relative_to(current_module.clone()) else {
                 warn!("use called with an invalid path");
                 return; // TODO
             };
 
-            // debug!("Loading and optimizing module {module_to_import}");
-            let mir = db.mir_with_obvious_optimized(module_to_import, config.clone());
-            let Some(mir) = mir else {
+                // debug!("Loading and optimizing module {module_to_import}");
+                let mir = db.mir_with_obvious_optimized(module_to_import, config.clone());
+                let Some(mir) = mir else {
                 warn!("Module not found.");
                 return; // TODO
             };
-            let mir = (*mir).clone();
+                let mir = (*mir).clone();
 
-            let mapping: HashMap<Id, Id> = mir
-                .body
-                .all_ids()
-                .into_iter()
-                .map(|id| (id, self.id_generator.generate()))
-                .collect();
-            let mut body_to_insert = mir.body;
-            body_to_insert.replace_ids(&mut |id| *id = mapping[id]);
+                let mapping: HashMap<Id, Id> = mir
+                    .body
+                    .all_ids()
+                    .into_iter()
+                    .map(|id| (id, self.id_generator.generate()))
+                    .collect();
+                let mut body_to_insert = mir.body;
+                body_to_insert.replace_ids(&mut |id| *id = mapping[id]);
 
-            *expression = Expression::Multiple(body_to_insert);
-        });
+                *expression = Expression::Multiple(body_to_insert);
+            });
     }
 }

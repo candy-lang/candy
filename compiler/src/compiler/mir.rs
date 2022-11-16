@@ -197,6 +197,29 @@ impl Body {
 }
 
 impl Body {
+    pub fn visit(&mut self, visitor: &mut dyn FnMut(Id, &mut Expression, bool)) {
+        self.visit_rec(visitor);
+    }
+    fn visit_rec(&mut self, visitor: &mut dyn FnMut(Id, &mut Expression, bool)) {
+        let length = self.expressions.len();
+        for i in 0..length {
+            let (id, mut expression) = self.expressions.remove(i);
+            Self::visit_expression(id, &mut expression, i == length - 1, visitor);
+            self.expressions.insert(i, (id, expression.clone()));
+        }
+    }
+    fn visit_expression(
+        id: Id,
+        expression: &mut Expression,
+        is_returned: bool,
+        visitor: &mut dyn FnMut(Id, &mut Expression, bool),
+    ) {
+        if let Expression::Lambda { body, .. } | Expression::Multiple(body) = expression {
+            body.visit_rec(visitor);
+        }
+        visitor(id, expression, is_returned);
+    }
+
     /// Calls the visitor for each contained expression, even expressions in
     /// lambdas or multiples.
     ///
@@ -209,13 +232,13 @@ impl Body {
     /// to inspect all expressions currently in scope. Finally, the visitor also
     /// receives whether the current expression is returned from the surrounding
     /// body.
-    pub fn visit(
+    pub fn visit_with_visible(
         &mut self,
         visitor: &mut dyn FnMut(Id, &mut Expression, &VisibleExpressions, bool),
     ) {
-        self.visit_with_visible(VisibleExpressions::none_visible(), visitor);
+        self.visit_with_visible_rec(VisibleExpressions::none_visible(), visitor);
     }
-    fn visit_with_visible(
+    fn visit_with_visible_rec(
         &mut self,
         mut visible: VisibleExpressions,
         visitor: &mut dyn FnMut(Id, &mut Expression, &VisibleExpressions, bool),
@@ -223,7 +246,7 @@ impl Body {
         let length = self.expressions.len();
         for i in 0..length {
             let (id, mut expression) = self.expressions.remove(i);
-            Self::visit_expression(
+            Self::visit_expression_with_visible(
                 id,
                 &mut expression,
                 visible.clone(),
@@ -234,8 +257,7 @@ impl Body {
             visible.insert(id, expression);
         }
     }
-
-    fn visit_expression(
+    fn visit_expression_with_visible(
         id: Id,
         expression: &mut Expression,
         visible: VisibleExpressions,
@@ -254,10 +276,10 @@ impl Body {
                 inner_visible.insert(*parameter, Expression::Parameter);
             }
             inner_visible.insert(*responsible_parameter, Expression::Parameter);
-            body.visit_with_visible(inner_visible, visitor);
+            body.visit_with_visible_rec(inner_visible, visitor);
         }
         if let Expression::Multiple(body) = expression {
-            body.visit_with_visible(visible.clone(), visitor);
+            body.visit_with_visible_rec(visible.clone(), visitor);
         }
 
         visitor(id, expression, &visible, is_returned);
