@@ -386,8 +386,8 @@ impl Heap {
     }
 
     fn print(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |message: Text| {
-            info!("{:?}", message.value);
+        unpack_and_later_drop!(self, args, |message: Any| {
+            info!("{:?}", message.data.data.format(self));
             Return(self.create_nothing())
         })
     }
