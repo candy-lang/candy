@@ -45,6 +45,7 @@ use std::{
     collections::HashMap,
     convert::TryInto,
     env::current_dir,
+    io::{self, BufRead},
     path::PathBuf,
     sync::{mpsc::channel, Arc},
     time::Duration,
@@ -314,10 +315,16 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     // TODO: Add more environment stuff.
     let mut vm = Vm::new();
     let mut stdout = StdoutService::new(&mut vm);
+    let mut stdin = StdinService::new(&mut vm);
     let environment = {
         let stdout_symbol = heap.create_symbol("Stdout".to_string());
         let stdout_port = heap.create_send_port(stdout.channel);
-        heap.create_struct(HashMap::from([(stdout_symbol, stdout_port)]))
+        let stdin_symbol = heap.create_symbol("Stdin".to_string());
+        let stdin_port = heap.create_send_port(stdin.channel);
+        heap.create_struct(HashMap::from([
+            (stdout_symbol, stdout_port),
+            (stdin_symbol, stdin_port),
+        ]))
     };
     let platform = heap.create_hir_id(Id::platform());
     tracer.for_fiber(FiberId::root()).call_started(
@@ -344,6 +351,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
             _ => break,
         }
         stdout.run(&mut vm);
+        stdin.run(&mut vm);
         for channel in vm.unreferenced_channels.iter().copied().collect_vec() {
             vm.free_channel(channel);
         }
@@ -393,7 +401,51 @@ impl StdoutService {
         if let Some(CompletedOperation::Received { packet }) =
             vm.completed_operations.remove(&self.current_receive)
         {
-            info!("Sent to stdout: {packet:?}");
+            match &packet.heap.get(packet.address).data {
+                Data::Text(text) => println!("{}", text.value),
+                _ => info!("Non-text value sent to stdout: {packet:?}"),
+            }
+            self.current_receive = vm.receive(self.channel);
+        }
+    }
+}
+struct StdinService {
+    channel: ChannelId,
+    current_receive: OperationId,
+}
+impl StdinService {
+    fn new(vm: &mut Vm) -> Self {
+        let channel = vm.create_channel(1);
+        let current_receive = vm.receive(channel);
+        Self {
+            channel,
+            current_receive,
+        }
+    }
+    fn run(&mut self, vm: &mut Vm) {
+        if let Some(CompletedOperation::Received { packet }) =
+            vm.completed_operations.remove(&self.current_receive)
+        {
+            let request: SendPort = packet
+                .heap
+                .get(packet.address)
+                .data
+                .clone()
+                .try_into()
+                .expect("expected a send port");
+            debug!("Reading from stdin");
+            let input = {
+                let stdin = io::stdin();
+                stdin.lock().lines().next().unwrap().unwrap()
+            };
+            let packet = {
+                let mut heap = Heap::default();
+                let address = heap.create_text(input);
+                Packet { heap, address }
+            };
+            vm.send(&mut DummyTracer, request.channel, packet);
+
+            // Receive the next request
             self.current_receive = vm.receive(self.channel);
         }
     }
