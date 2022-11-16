@@ -3,8 +3,8 @@ use core::fmt;
 use std::{cmp::Ordering, ops::Add};
 
 pub struct Complexity {
-    is_self_contained: bool,
-    expressions: usize,
+    pub is_self_contained: bool,
+    pub expressions: usize,
 }
 
 impl Complexity {
@@ -67,7 +67,7 @@ impl Mir {
     }
 }
 impl Body {
-    fn complexity(&self) -> Complexity {
+    pub fn complexity(&self) -> Complexity {
         let mut complexity = Complexity::none();
         for (_, expression) in self.iter() {
             complexity = complexity + expression.complexity();

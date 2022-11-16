@@ -55,6 +55,8 @@ mod reference_following;
 mod tree_shaking;
 mod utils;
 
+use self::complexity::Complexity;
+
 use super::{
     hir,
     hir_to_mir::{HirToMir, TracingConfig},
@@ -86,6 +88,22 @@ fn mir_with_obvious_optimized(
 }
 
 impl Mir {
+    pub fn optimize_opinionated(&mut self, db: &dyn OptimizeMir, config: &TracingConfig) {
+        loop {
+            let before = self.clone();
+
+            self.inline_functions_of_maximum_complexity(Complexity {
+                is_self_contained: true,
+                expressions: 2,
+            });
+            self.optimize_obvious(db, config);
+
+            if *self == before {
+                return;
+            }
+        }
+    }
+
     /// Performs optimizations that improve both performance and code size.
     pub fn optimize_obvious(&mut self, db: &dyn OptimizeMir, config: &TracingConfig) {
         self.optimize_obvious_self_contained();
