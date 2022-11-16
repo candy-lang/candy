@@ -115,7 +115,9 @@ impl Mir {
 
     fn checked_optimization(&mut self, optimization: fn(&mut Mir) -> ()) {
         optimization(self);
-        self.validate();
+        if cfg!(debug_assertions) {
+            self.validate();
+        }
     }
 }
 

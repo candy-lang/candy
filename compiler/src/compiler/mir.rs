@@ -6,7 +6,7 @@ use crate::{
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::{cmp::Ordering, fmt, hash, mem};
+use std::{cmp::Ordering, collections::HashMap, fmt, hash, mem};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Mir {
@@ -236,31 +236,35 @@ impl Body {
         &mut self,
         visitor: &mut dyn FnMut(Id, &mut Expression, &VisibleExpressions, bool),
     ) {
-        self.visit_with_visible_rec(VisibleExpressions::none_visible(), visitor);
+        self.visit_with_visible_rec(&mut VisibleExpressions::none_visible(), visitor);
     }
     fn visit_with_visible_rec(
         &mut self,
-        mut visible: VisibleExpressions,
+        visible: &mut VisibleExpressions,
         visitor: &mut dyn FnMut(Id, &mut Expression, &VisibleExpressions, bool),
     ) {
-        let length = self.expressions.len();
-        for i in 0..length {
-            let (id, mut expression) = self.expressions.remove(i);
-            Self::visit_expression_with_visible(
-                id,
-                &mut expression,
-                visible.clone(),
-                i == length - 1,
-                visitor,
+        let expressions_in_this_body = self.expressions.iter().map(|(id, _)| *id).collect_vec();
+        let length = expressions_in_this_body.len();
+
+        for index in 0..length {
+            let (id, mut expression) = mem::replace(
+                self.expressions.get_mut(index).unwrap(),
+                (Id::from_usize(0), Expression::Parameter),
             );
-            self.expressions.insert(i, (id, expression.clone()));
+            let is_returned = index == length - 1;
+            Self::visit_expression_with_visible(id, &mut expression, visible, is_returned, visitor);
             visible.insert(id, expression);
+        }
+
+        for (index, id) in expressions_in_this_body.iter().enumerate() {
+            *self.expressions.get_mut(index).unwrap() =
+                (*id, visible.expressions.remove(id).unwrap());
         }
     }
     fn visit_expression_with_visible(
         id: Id,
         expression: &mut Expression,
-        visible: VisibleExpressions,
+        visible: &mut VisibleExpressions,
         is_returned: bool,
         visitor: &mut dyn FnMut(Id, &mut Expression, &VisibleExpressions, bool),
     ) {
@@ -271,18 +275,21 @@ impl Body {
             ..
         } = expression
         {
-            let mut inner_visible = visible.clone();
-            for parameter in parameters {
-                inner_visible.insert(*parameter, Expression::Parameter);
+            for parameter in parameters.iter() {
+                visible.insert(*parameter, Expression::Parameter);
             }
-            inner_visible.insert(*responsible_parameter, Expression::Parameter);
-            body.visit_with_visible_rec(inner_visible, visitor);
+            visible.insert(*responsible_parameter, Expression::Parameter);
+            body.visit_with_visible_rec(visible, visitor);
+            for parameter in parameters.iter() {
+                visible.expressions.remove(parameter);
+            }
+            visible.expressions.remove(responsible_parameter);
         }
         if let Expression::Multiple(body) = expression {
-            body.visit_with_visible_rec(visible.clone(), visitor);
+            body.visit_with_visible_rec(visible, visitor);
         }
 
-        visitor(id, expression, &visible, is_returned);
+        visitor(id, expression, visible, is_returned);
     }
 
     pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Body)) {
@@ -304,12 +311,12 @@ impl Expression {
 
 #[derive(Clone)]
 pub struct VisibleExpressions {
-    expressions: im::HashMap<Id, Expression>,
+    expressions: HashMap<Id, Expression>,
 }
 impl VisibleExpressions {
     pub fn none_visible() -> Self {
         Self {
-            expressions: im::HashMap::new(),
+            expressions: HashMap::new(),
         }
     }
     pub fn insert(&mut self, id: Id, expression: Expression) {
