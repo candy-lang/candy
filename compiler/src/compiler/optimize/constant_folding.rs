@@ -41,11 +41,11 @@ impl Mir {
                 function,
                 arguments,
                 responsible,
-                ..
             } = expression else { return; };
                 let Expression::Builtin(builtin) = visible.get(*function) else { return; };
 
-                if let Some(result) = Self::run_builtin(*builtin, arguments, visible) {
+                if let Some(result) = Self::run_builtin(*builtin, arguments, *responsible, visible)
+                {
                     let evaluated_call = match result {
                         Ok(return_value) => return_value,
                         Err(panic_reason) => {
@@ -80,6 +80,7 @@ impl Mir {
     fn run_builtin(
         builtin: BuiltinFunction,
         arguments: &[Id],
+        responsible: Id,
         visible: &VisibleExpressions,
     ) -> Option<Result<Expression, String>> {
         // warn!("Constant folding candidate: builtin{builtin:?}");
@@ -107,9 +108,44 @@ impl Mir {
                 let are_equal = a == b || a.semantically_equals(b, visible)?;
                 Expression::Symbol(if are_equal { "True" } else { "False" }.to_string())
             }
-            // BuiltinFunction::FunctionRun => return,
+            BuiltinFunction::FunctionRun => {
+                if arguments.len() != 1 {
+                    return Some(Err("wrong number of arguments".to_string()));
+                }
+                Expression::Call {
+                    function: arguments[0],
+                    arguments: vec![],
+                    responsible,
+                }
+            }
             // BuiltinFunction::GetArgumentCount => todo!(),
-            // BuiltinFunction::IfElse => todo!(),
+            BuiltinFunction::IfElse => {
+                if arguments.len() != 3 {
+                    return Some(Err("wrong number of arguments".to_string()));
+                }
+
+                let condition = arguments[0];
+                let then_body = arguments[1];
+                let else_body = arguments[2];
+
+                let Expression::Symbol(symbol) = visible.get(condition) else {
+                    return None;
+                };
+
+                match symbol.as_str() {
+                    "True" => Expression::Call {
+                        function: then_body,
+                        arguments: vec![],
+                        responsible,
+                    },
+                    "False" => Expression::Call {
+                        function: else_body,
+                        arguments: vec![],
+                        responsible,
+                    },
+                    _ => return None,
+                }
+            }
             // BuiltinFunction::IntAdd => todo!(),
             // BuiltinFunction::IntBitLength => todo!(),
             // BuiltinFunction::IntBitwiseAnd => todo!(),
@@ -178,7 +214,75 @@ impl Mir {
             // BuiltinFunction::TextTrimEnd => todo!(),
             // BuiltinFunction::TextTrimStart => todo!(),
             // BuiltinFunction::Try => todo!(),
-            // BuiltinFunction::TypeOf => todo!(),
+            BuiltinFunction::TypeOf => {
+                if arguments.len() != 1 {
+                    return Some(Err("wrong number of arguments".to_string()));
+                }
+
+                match visible.get(arguments[0]) {
+                    Expression::Int(_) => Expression::Symbol("Int".to_string()),
+                    Expression::Text(_) => Expression::Symbol("Text".to_string()),
+                    Expression::Symbol(_) => Expression::Symbol("Symbol".to_string()),
+                    Expression::Builtin(_) => Expression::Symbol("Function".to_string()),
+                    Expression::List(_) => Expression::Symbol("List".to_string()),
+                    Expression::Struct(_) => Expression::Symbol("Struct".to_string()),
+                    Expression::Reference(_) => return None,
+                    Expression::HirId(_) => unreachable!(),
+                    Expression::Lambda { .. } => Expression::Symbol("Function".to_string()),
+                    Expression::Parameter => return None,
+                    Expression::Call { function, .. } => {
+                        let callee = visible.get(*function);
+                        let Expression::Builtin(builtin) = callee else {
+                            return None;
+                        };
+                        let return_type = match builtin {
+                            BuiltinFunction::Equals => "Symbol",
+                            BuiltinFunction::GetArgumentCount => "Int",
+                            BuiltinFunction::IntAdd => "Int",
+                            BuiltinFunction::IntBitLength => "Int",
+                            BuiltinFunction::IntBitwiseAnd => "Int",
+                            BuiltinFunction::IntBitwiseOr => "Int",
+                            BuiltinFunction::IntBitwiseXor => "Int",
+                            BuiltinFunction::IntCompareTo => "Symbol",
+                            BuiltinFunction::IntDivideTruncating => "Int",
+                            BuiltinFunction::IntModulo => "Int",
+                            BuiltinFunction::IntMultiply => "Int",
+                            BuiltinFunction::IntRemainder => "Int",
+                            BuiltinFunction::IntShiftLeft => "Int",
+                            BuiltinFunction::IntShiftRight => "Int",
+                            BuiltinFunction::IntSubtract => "Int",
+                            BuiltinFunction::ListFilled => "List",
+                            BuiltinFunction::ListInsert => "List",
+                            BuiltinFunction::ListLength => "Int",
+                            BuiltinFunction::ListRemoveAt => "List",
+                            BuiltinFunction::ListReplace => "List",
+                            BuiltinFunction::StructHasKey => "Symbol",
+                            BuiltinFunction::TextCharacters => "List",
+                            BuiltinFunction::TextConcatenate => "Text",
+                            BuiltinFunction::TextContains => "Symbol",
+                            BuiltinFunction::TextEndsWith => "Symbol",
+                            BuiltinFunction::TextGetRange => "Text",
+                            BuiltinFunction::TextIsEmpty => "Symbol",
+                            BuiltinFunction::TextLength => "Int",
+                            BuiltinFunction::TextStartsWith => "Symbol",
+                            BuiltinFunction::TextTrimEnd => "Text",
+                            BuiltinFunction::TextTrimStart => "Text",
+                            BuiltinFunction::TypeOf => "Symbol",
+                            _ => return None,
+                        };
+                        Expression::Symbol(return_type.to_string())
+                    }
+                    Expression::UseModule { .. } => return None,
+                    Expression::Panic { .. } => return None,
+                    Expression::Multiple(_) => return None,
+                    Expression::ModuleStarts { .. }
+                    | Expression::ModuleEnds
+                    | Expression::TraceCallStarts { .. }
+                    | Expression::TraceCallEnds { .. }
+                    | Expression::TraceExpressionEvaluated { .. }
+                    | Expression::TraceFoundFuzzableClosure { .. } => unreachable!(),
+                }
+            }
             _ => return None,
         }))
     }
