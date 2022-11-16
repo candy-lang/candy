@@ -2,6 +2,10 @@
 # `cargo build --release --manifest-path=compiler/Cargo.toml -- run packages/benchmark.candy`
 # `cargo build --release --manifest-path=compiler/Cargo.toml && time target/release/candy run packages/benchmark.candy`
 
+core = use "...Core"
+channel = core.channel
+text = core.text
+
 echo = use "..echo"
 fibonacci = use "..fibonacci"
 
