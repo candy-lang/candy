@@ -20,17 +20,23 @@ use itertools::Itertools;
 use tracing::{error, info};
 
 pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
+    let config = TracingConfig {
+        register_fuzzables: true,
+        trace_calls: false,
+        trace_evaluated_expressions: false,
+    };
+
     let (fuzzables_heap, fuzzables): (Heap, Vec<(Id, Pointer)>) = {
         let mut tracer = FuzzablesFinder::default();
         let mut vm = Vm::new();
         vm.set_up_for_running_module_closure(
             module.clone(),
-            Closure::of_module(db, module, TracingConfig::default()).unwrap(),
+            Closure::of_module(db, module, config.clone()).unwrap(),
         );
         vm.run(
             &DbUseProvider {
                 db,
-                config: TracingConfig::default(),
+                config: config.clone(),
             },
             &mut RunForever,
             &mut tracer,
@@ -51,7 +57,7 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
         fuzzer.run(
             &mut DbUseProvider {
                 db,
-                config: TracingConfig::default(),
+                config: config.clone(),
             },
             &mut RunLimitedNumberOfInstructions::new(1000),
         );
