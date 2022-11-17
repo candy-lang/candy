@@ -136,14 +136,14 @@ min valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   conditionals.ifElse
-    valueA | isLessThanOrEqualTo valueB
+    (valueA | isLessThanOrEqualTo valueB)
     { valueA }
     { valueB }
 max valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   conditionals.ifElse
-    valueA | isGreaterThanOrEqualTo valueB
+    (valueA | isGreaterThanOrEqualTo valueB)
     { valueA }
     { valueB }
 coerceAtLeast value minimum :=
