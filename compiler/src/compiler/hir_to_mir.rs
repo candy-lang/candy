@@ -28,15 +28,14 @@ pub struct TracingConfig {
 
 fn mir(db: &dyn HirToMir, module: Module, config: TracingConfig) -> Option<Arc<Mir>> {
     let (hir, _) = db.hir(module.clone())?;
-    let hir = (*hir).clone();
-    let mir = compile_module(db, module, hir, &config);
+    let mir = compile_module(db, module, &hir, &config);
     Some(Arc::new(mir))
 }
 
 fn compile_module(
     db: &dyn HirToMir,
     module: Module,
-    hir: hir::Body,
+    hir: &hir::Body,
     config: &TracingConfig,
 ) -> Mir {
     let mut id_generator = IdGenerator::start_at(0);
@@ -57,7 +56,7 @@ fn compile_module(
         &mut id_generator,
         Expression::HirId(hir::Id::new(module, vec![])),
     );
-    for (id, expression) in hir.expressions {
+    for (id, expression) in &hir.expressions {
         compile_expression(
             db,
             &mut id_generator,
@@ -65,7 +64,7 @@ fn compile_module(
             &mut mapping,
             needs_function,
             module_hir_id,
-            &id,
+            id,
             expression,
             config,
         );
@@ -227,15 +226,15 @@ fn compile_expression(
     needs_function: Id,
     responsible_for_needs: Id,
     hir_id: &hir::Id,
-    expression: hir::Expression,
+    expression: &hir::Expression,
     config: &TracingConfig,
 ) {
     let expression = match expression {
-        hir::Expression::Int(int) => Expression::Int(int.into()),
-        hir::Expression::Text(text) => Expression::Text(text),
-        hir::Expression::Reference(reference) => Expression::Reference(mapping[&reference]),
-        hir::Expression::Symbol(symbol) => Expression::Symbol(symbol),
-        hir::Expression::Builtin(builtin) => Expression::Builtin(builtin),
+        hir::Expression::Int(int) => Expression::Int(int.clone().into()),
+        hir::Expression::Text(text) => Expression::Text(text.clone()),
+        hir::Expression::Reference(reference) => Expression::Reference(mapping[reference]),
+        hir::Expression::Symbol(symbol) => Expression::Symbol(symbol.clone()),
+        hir::Expression::Builtin(builtin) => Expression::Builtin(*builtin),
         hir::Expression::List(items) => {
             Expression::List(items.iter().map(|item| mapping[item]).collect())
         }
@@ -257,10 +256,10 @@ fn compile_expression(
             for original_parameter in original_parameters {
                 let parameter = id_generator.generate();
                 parameters.push(parameter);
-                mapping.insert(original_parameter, parameter);
+                mapping.insert(original_parameter.clone(), parameter);
             }
 
-            let responsible = if fuzzable {
+            let responsible = if *fuzzable {
                 responsible_parameter
             } else {
                 // This is a lambda with curly braces, so whoever is responsible
@@ -269,7 +268,7 @@ fn compile_expression(
                 responsible_for_needs
             };
 
-            for (id, expression) in original_body.expressions {
+            for (id, expression) in &original_body.expressions {
                 compile_expression(
                     db,
                     id_generator,
@@ -277,7 +276,7 @@ fn compile_expression(
                     mapping,
                     needs_function,
                     responsible,
-                    &id,
+                    id,
                     expression,
                     config,
                 );
@@ -291,7 +290,7 @@ fn compile_expression(
                     body: lambda_body,
                 },
             );
-            if config.register_fuzzables && fuzzable {
+            if config.register_fuzzables && *fuzzable {
                 let hir_definition =
                     body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
                 body.push_with_new_id(
@@ -322,7 +321,7 @@ fn compile_expression(
                     id_generator,
                     Expression::TraceCallStarts {
                         hir_call,
-                        function: mapping[&function],
+                        function: mapping[function],
                         arguments: arguments.clone(),
                         responsible,
                     },
@@ -331,7 +330,7 @@ fn compile_expression(
             let call = body.push_with_new_id(
                 id_generator,
                 Expression::Call {
-                    function: mapping[&function],
+                    function: mapping[function],
                     arguments,
                     responsible,
                 },
@@ -348,8 +347,8 @@ fn compile_expression(
             current_module,
             relative_path,
         } => Expression::UseModule {
-            current_module,
-            relative_path: mapping[&relative_path],
+            current_module: current_module.clone(),
+            relative_path: mapping[relative_path],
             // The `UseModule` expression only exists in the generated `use`
             // function. If a use fails, that's also the fault of the caller.
             // Essentially, the `UseModule` expression works exactly like a
@@ -361,7 +360,7 @@ fn compile_expression(
                 body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
             Expression::Call {
                 function: needs_function,
-                arguments: vec![mapping[&condition], mapping[&reason], responsible_for_needs],
+                arguments: vec![mapping[condition], mapping[reason], responsible_for_needs],
                 responsible,
             }
         }
@@ -371,13 +370,13 @@ fn compile_expression(
                 Expression::Text(if errors.len() == 1 {
                     format!(
                         "The code still contains an error: {}",
-                        errors.into_iter().next().unwrap().format_nicely(db)
+                        errors.iter().next().unwrap().format_nicely(db)
                     )
                 } else {
                     format!(
                         "The code still contains errors:\n{}",
                         errors
-                            .into_iter()
+                            .iter()
                             .map(|error| format!("- {}", error.format_nicely(db)))
                             .join("\n"),
                     )

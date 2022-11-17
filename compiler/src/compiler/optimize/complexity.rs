@@ -68,11 +68,10 @@ impl Mir {
 }
 impl Body {
     pub fn complexity(&self) -> Complexity {
-        let mut complexity = Complexity::none();
-        for (_, expression) in self.iter() {
-            complexity = complexity + expression.complexity();
-        }
-        complexity
+        self.iter()
+            .fold(Complexity::none(), |complexity, (_, expression)| {
+                complexity + expression.complexity()
+            })
     }
 }
 impl Expression {

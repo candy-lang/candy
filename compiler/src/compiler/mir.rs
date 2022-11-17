@@ -116,6 +116,29 @@ impl CountableId for Id {
     }
 }
 
+impl Expression {
+    pub fn nothing() -> Self {
+        Expression::Symbol("Nothing".to_string())
+    }
+}
+impl From<bool> for Expression {
+    fn from(value: bool) -> Self {
+        Expression::Symbol(if value { "True" } else { "False" }.to_string())
+    }
+}
+impl TryInto<bool> for &Expression {
+    type Error = ();
+
+    fn try_into(self) -> Result<bool, ()> {
+        let Expression::Symbol(symbol) = self else { return Err(()); };
+        match symbol.as_str() {
+            "True" => Ok(true),
+            "False" => Ok(false),
+            _ => Err(()),
+        }
+    }
+}
+
 impl Body {
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = (Id, &Expression)> {
         self.expressions
@@ -498,18 +521,17 @@ impl fmt::Debug for Expression {
             Expression::Text(text) => write!(f, "{text:?}"),
             Expression::Symbol(symbol) => write!(f, "{symbol}"),
             Expression::Builtin(builtin) => write!(f, "builtin{builtin:?}"),
-            Expression::List(items) => write!(f,
+            Expression::List(items) => write!(
+                f,
                 "({})",
                 if items.is_empty() {
                     ",".to_string()
                 } else {
-                    items
-                        .iter()
-                        .map(|item| format!("{item}"))
-                        .join(", ")
+                    items.iter().map(|item| format!("{item}")).join(", ")
                 }
             ),
-            Expression::Struct(fields) => write!(f,
+            Expression::Struct(fields) => write!(
+                f,
                 "[{}]",
                 fields
                     .iter()
@@ -522,12 +544,14 @@ impl fmt::Debug for Expression {
                 parameters,
                 responsible_parameter,
                 body,
-            } => write!(f,
+            } => write!(
+                f,
                 "{{ {} ->\n{}\n}}",
                 if parameters.is_empty() {
                     format!("(responsible {responsible_parameter})")
                 } else {
-                    format!("{} (+ responsible {responsible_parameter})",
+                    format!(
+                        "{} (+ responsible {responsible_parameter})",
                         parameters
                             .iter()
                             .map(|parameter| format!("{parameter}"))
@@ -545,7 +569,8 @@ impl fmt::Debug for Expression {
                 arguments,
                 responsible,
             } => {
-                write!(f,
+                write!(
+                    f,
                     "call {function} with {} ({responsible} is responsible)",
                     if arguments.is_empty() {
                         "no arguments".to_string()
@@ -558,12 +583,16 @@ impl fmt::Debug for Expression {
                 current_module,
                 relative_path,
                 responsible,
-            } => write!(f, "use {relative_path} (relative to {current_module}; {responsible} is responsible)"),
+            } => write!(
+                f,
+                "use {relative_path} (relative to {current_module}; {responsible} is responsible)"
+            ),
             Expression::Panic {
                 reason,
                 responsible,
             } => write!(f, "panicking because {reason} ({responsible} is at fault)"),
-            Expression::Multiple(body) => write!(f,
+            Expression::Multiple(body) => write!(
+                f,
                 "\n{}",
                 format!("{body}")
                     .lines()
@@ -576,22 +605,31 @@ impl fmt::Debug for Expression {
                 hir_call,
                 function,
                 arguments,
-                responsible
+                responsible,
             } => {
                 write!(f,
                     "trace: start of call of {function} with {} ({responsible} is responsible, code is at {hir_call})",
                     arguments.iter().map(|arg| format!("{arg}")).join(" "),
                 )
-            },
+            }
             Expression::TraceCallEnds { return_value } => {
                 write!(f, "trace: end of call with return value {return_value}")
-            },
-            Expression::TraceExpressionEvaluated { hir_expression, value  } => {
+            }
+            Expression::TraceExpressionEvaluated {
+                hir_expression,
+                value,
+            } => {
                 write!(f, "trace: expression {hir_expression} evaluated to {value}")
-            },
-            Expression::TraceFoundFuzzableClosure { hir_definition, closure } => {
-                write!(f, "trace: found fuzzable closure {closure}, defined at {hir_definition}")
-            },
+            }
+            Expression::TraceFoundFuzzableClosure {
+                hir_definition,
+                closure,
+            } => {
+                write!(
+                    f,
+                    "trace: found fuzzable closure {closure}, defined at {hir_definition}"
+                )
+            }
         }
     }
 }

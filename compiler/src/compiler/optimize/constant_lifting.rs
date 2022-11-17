@@ -61,15 +61,16 @@ impl Mir {
                     .captured_ids()
                     .iter()
                     .all(|captured| constant_ids.contains(captured));
-            if is_constant {
-                if is_return_value && let Expression::Reference(_) = expression {
+            if !is_constant {
+                return;
+            }
+            if is_return_value && let Expression::Reference(_) = expression {
                     // Returned references shouldn't be lifted. If we would lift
                     // one, we'd have to add a reference anyway.
                     return;
                 }
-                constants.push((id, expression.clone()));
-                constant_ids.insert(id);
-            }
+            constants.push((id, expression.clone()));
+            constant_ids.insert(id);
         });
 
         self.body.visit_bodies(&mut |body| {

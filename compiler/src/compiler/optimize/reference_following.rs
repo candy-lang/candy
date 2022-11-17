@@ -40,13 +40,15 @@ impl Mir {
 
     pub fn remove_redundant_return_references(&mut self) {
         self.body.visit_bodies(&mut |body| {
-            let mut from_back = body.iter_mut().rev();
-            let (last_id, last_expression) = from_back.next().unwrap();
-            let Some((before_last_id, _)) = from_back.next() else { return; };
+            loop {
+                let mut from_back = body.iter_mut().rev();
+                let (last_id, last_expression) = from_back.next().unwrap();
+                let Some((before_last_id, _)) = from_back.next() else { return; };
 
-            if let Expression::Reference(referenced) = last_expression && before_last_id == *referenced {
-                drop(from_back);
-                body.remove_all(|id, _| last_id == id);
+                if let Expression::Reference(referenced) = last_expression && before_last_id == *referenced {
+                    drop(from_back);
+                    body.remove_all(|id, _| last_id == id);
+                }
             }
         });
     }

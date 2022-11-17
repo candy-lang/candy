@@ -32,7 +32,7 @@ impl Mir {
 
             for (index, (_, expr)) in body.iter_mut().enumerate() {
                 if indices_of_expressions_to_eliminate.contains(&index) {
-                    *expr = Expression::Symbol("Nothing".to_string());
+                    *expr = Expression::nothing();
                 }
             }
         });

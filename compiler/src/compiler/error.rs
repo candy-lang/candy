@@ -81,13 +81,13 @@ impl Display for CompilerErrorPayload {
             .to_string(),
             CompilerErrorPayload::Hir(error) => match error {
                 HirError::NeedsWithWrongNumberOfArguments { num_args } => {
-                    format!("This `needs` is given {num_args} arguments, but it needs one or two – a condition and an optional reason.")
+                    format!("`needs` accepts one or two arguments, but was called with {num_args} arguments. Its parameters are the `condition` and an optional `message`.")
                 }
                 HirError::PublicAssignmentInNotTopLevel => {
-                    "This re-assigns a value that is public. That's not allowed.".to_string()
+                    "Public assignments (:=) can only be used in top-level code.".to_string()
                 }
                 HirError::PublicAssignmentWithSameName { name } => {
-                    format!("There already exists a public assignment named `{name}`.")
+                    format!("There already exists a public assignment (:=) named `{name}`.")
                 }
                 HirError::UnknownReference { name } => {
                     format!("Here, you reference `{name}`, but that name is not in scope.")

@@ -43,29 +43,28 @@ impl Mir {
                     responsible,
                 } = expression else { return; };
                 let Expression::Builtin(builtin) = visible.get(*function) else { return; };
-
-                if let Some(result) = Self::run_builtin(*builtin, arguments, *responsible, visible)
-                {
-                    let evaluated_call = match result {
-                        Ok(return_value) => return_value,
-                        Err(panic_reason) => {
-                            let mut body = Body::default();
-                            let reason = body.push_with_new_id(
-                                &mut self.id_generator,
-                                Expression::Text(panic_reason),
-                            );
-                            body.push_with_new_id(
-                                &mut self.id_generator,
-                                Expression::Panic {
-                                    reason,
-                                    responsible: *responsible,
-                                },
-                            );
-                            Expression::Multiple(body)
-                        }
-                    };
-                    *expression = evaluated_call;
-                }
+                let Some(result) = Self::run_builtin(*builtin, arguments, *responsible, visible) else {
+                    return;
+                };
+                let evaluated_call = match result {
+                    Ok(return_value) => return_value,
+                    Err(panic_reason) => {
+                        let mut body = Body::default();
+                        let reason = body.push_with_new_id(
+                            &mut self.id_generator,
+                            Expression::Text(panic_reason),
+                        );
+                        body.push_with_new_id(
+                            &mut self.id_generator,
+                            Expression::Panic {
+                                reason,
+                                responsible: *responsible,
+                            },
+                        );
+                        Expression::Multiple(body)
+                    }
+                };
+                *expression = evaluated_call;
             });
     }
 
@@ -83,20 +82,7 @@ impl Mir {
         responsible: Id,
         visible: &VisibleExpressions,
     ) -> Option<Result<Expression, String>> {
-        // warn!("Constant folding candidate: builtin{builtin:?}");
-        // warn!(
-        //     "Arguments: {}",
-        //     arguments.iter().map(|arg| format!("{arg}")).join(", ")
-        // );
-        // warn!(
-        //     "Expressions:\n{}",
-        //     expressions
-        //         .iter()
-        //         .map(|(id, expr)| format!("{id}: {expr}"))
-        //         .join("\n")
-        // );
-
-        Some(Ok(match builtin {
+        let return_value = match builtin {
             BuiltinFunction::Equals => {
                 if arguments.len() != 2 {
                     return Some(Err("wrong number of arguments".to_string()));
@@ -118,7 +104,6 @@ impl Mir {
                     responsible,
                 }
             }
-            // BuiltinFunction::GetArgumentCount => todo!(),
             BuiltinFunction::IfElse => {
                 if arguments.len() != 3 {
                     return Some(Err("wrong number of arguments".to_string()));
@@ -128,40 +113,15 @@ impl Mir {
                 let then_body = arguments[1];
                 let else_body = arguments[2];
 
-                let Expression::Symbol(symbol) = visible.get(condition) else {
+                let Ok(condition) = visible.get(condition).try_into() else {
                     return None;
                 };
-
-                match symbol.as_str() {
-                    "True" => Expression::Call {
-                        function: then_body,
-                        arguments: vec![],
-                        responsible,
-                    },
-                    "False" => Expression::Call {
-                        function: else_body,
-                        arguments: vec![],
-                        responsible,
-                    },
-                    _ => return None,
+                Expression::Call {
+                    function: if condition { then_body } else { else_body },
+                    arguments: vec![],
+                    responsible,
                 }
             }
-            // BuiltinFunction::IntAdd => todo!(),
-            // BuiltinFunction::IntBitLength => todo!(),
-            // BuiltinFunction::IntBitwiseAnd => todo!(),
-            // BuiltinFunction::IntBitwiseOr => todo!(),
-            // BuiltinFunction::IntBitwiseXor => todo!(),
-            // BuiltinFunction::IntCompareTo => todo!(),
-            // BuiltinFunction::IntDivideTruncating => todo!(),
-            // BuiltinFunction::IntModulo => todo!(),
-            // BuiltinFunction::IntMultiply => todo!(),
-            // BuiltinFunction::IntParse => todo!(),
-            // BuiltinFunction::IntRemainder => todo!(),
-            // BuiltinFunction::IntShiftLeft => todo!(),
-            // BuiltinFunction::IntShiftRight => todo!(),
-            // BuiltinFunction::IntSubtract => todo!(),
-            // BuiltinFunction::Parallel => todo!(),
-            // BuiltinFunction::Print => todo!(),
             BuiltinFunction::StructGet => {
                 if arguments.len() != 2 {
                     return Some(Err("wrong number of arguments".to_string()));
@@ -180,40 +140,29 @@ impl Mir {
                 // constant, we may still conclude the result of the builtin:
                 // If one key `semantically_equals` the requested one and all
                 // others are definitely not, then we can still resolve that.
+                if !visible.get(key_id).is_constant(visible) {
+                    return None;
+                };
                 if fields
                     .iter()
-                    .all(|(key, _)| visible.get(*key).is_constant(visible))
-                    && visible.get(key_id).is_constant(visible)
+                    .any(|(key, _)| !visible.get(*key).is_constant(visible))
                 {
-                    let value = fields
-                        .iter()
-                        .find(|(k, _)| k.semantically_equals(key_id, visible).unwrap_or(false))
-                        .map(|(_, value)| *value);
-                    if let Some(value) = value {
-                        Expression::Reference(value)
-                    } else {
-                        return Some(Err(format!(
-                            "Struct access will panic because key {:?} isn't in there.",
-                            visible.get(key_id),
-                        )));
-                    }
-                } else {
                     return None;
                 }
+
+                let value = fields
+                    .iter()
+                    .find(|(k, _)| k.semantically_equals(key_id, visible).unwrap_or(false))
+                    .map(|(_, value)| *value);
+                if let Some(value) = value {
+                    Expression::Reference(value)
+                } else {
+                    return Some(Err(format!(
+                        "Struct access will panic because key {:?} isn't in there.",
+                        visible.get(key_id),
+                    )));
+                }
             }
-            // BuiltinFunction::StructGetKeys => todo!(),
-            // BuiltinFunction::StructHasKey => todo!(),
-            // BuiltinFunction::TextCharacters => todo!(),
-            // BuiltinFunction::TextConcatenate => todo!(),
-            // BuiltinFunction::TextContains => todo!(),
-            // BuiltinFunction::TextEndsWith => todo!(),
-            // BuiltinFunction::TextGetRange => todo!(),
-            // BuiltinFunction::TextIsEmpty => todo!(),
-            // BuiltinFunction::TextLength => todo!(),
-            // BuiltinFunction::TextStartsWith => todo!(),
-            // BuiltinFunction::TextTrimEnd => todo!(),
-            // BuiltinFunction::TextTrimStart => todo!(),
-            // BuiltinFunction::Try => todo!(),
             BuiltinFunction::TypeOf => {
                 if arguments.len() != 1 {
                     return Some(Err("wrong number of arguments".to_string()));
@@ -284,6 +233,7 @@ impl Mir {
                 }
             }
             _ => return None,
-        }))
+        };
+        Some(Ok(return_value))
     }
 }
