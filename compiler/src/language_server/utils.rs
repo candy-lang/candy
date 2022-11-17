@@ -1,8 +1,5 @@
 use crate::{
-    compiler::{
-        error::{CompilerError, CompilerErrorPayload},
-        hir::HirError,
-    },
+    compiler::error::CompilerError,
     database::Database,
     module::{Module, ModuleDb, Package},
 };
