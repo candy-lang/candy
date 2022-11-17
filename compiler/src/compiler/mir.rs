@@ -123,6 +123,24 @@ impl Body {
         }
     }
 
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = (Id, &Expression)> {
+        self.expressions
+            .iter()
+            .map(|(id, expression)| (*id, expression))
+    }
+    pub fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item = (Id, &mut Expression)> {
+        self.expressions
+            .iter_mut()
+            .map(|(id, expression)| (*id, expression))
+    }
+    pub fn into_iter(self) -> impl DoubleEndedIterator<Item = (Id, Expression)> {
+        self.expressions.into_iter()
+    }
+    pub fn return_value(&mut self) -> Id {
+        let (id, _) = self.expressions.iter_mut().last().unwrap();
+        *id
+    }
+
     pub fn push(&mut self, id: Id, expression: Expression) {
         self.expressions.push((id, expression));
     }
@@ -154,11 +172,6 @@ impl Body {
         self.expressions.sort_by(predicate);
     }
 
-    pub fn return_value(&mut self) -> Id {
-        let (id, _) = self.expressions.iter_mut().last().unwrap();
-        *id
-    }
-
     /// Flattens all `Expression::Multiple`.
     pub fn flatten_multiples(&mut self) {
         let old_expressions = mem::take(&mut self.expressions);
@@ -179,20 +192,6 @@ impl Body {
                 self.expressions.push((id, expression));
             }
         }
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (Id, &Expression)> {
-        self.expressions
-            .iter()
-            .map(|(id, expression)| (*id, expression))
-    }
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Id, &mut Expression)> {
-        self.expressions
-            .iter_mut()
-            .map(|(id, expression)| (*id, expression))
-    }
-    pub fn into_iter(self) -> impl Iterator<Item = (Id, Expression)> {
-        self.expressions.into_iter()
     }
 }
 
