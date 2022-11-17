@@ -129,6 +129,13 @@ impl Mir {
         });
     }
 
+    pub fn inline_tiny_functions(&mut self) {
+        self.inline_functions_of_maximum_complexity(Complexity {
+            is_self_contained: true,
+            expressions: 1,
+        });
+    }
+
     pub fn inline_functions_only_called_once(&mut self) {
         let mut ids_to_number_of_references: HashMap<Id, usize> = HashMap::new();
         self.body.replace_id_references(&mut |id| {
