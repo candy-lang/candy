@@ -35,14 +35,14 @@ main := { environment ->
 
       ifElse (equals guess correct) { print "You did it!" } {
         ifElse (int.isLessThan correct guess) {
-          print "The correct number is lower!"
+          print "Lower!"
         } {
-          print "The correct number is greater!"
+          print "Higher!"
         }
         guessRec guessRec correct
       }
     }
   }
 
-  guessRec guessRec 20
+  guessRec guessRec 42
 }
