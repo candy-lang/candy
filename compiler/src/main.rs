@@ -45,7 +45,7 @@ use std::{
     collections::HashMap,
     convert::TryInto,
     env::current_dir,
-    io::{self, BufRead},
+    io::{self, BufRead, Write},
     path::PathBuf,
     sync::{mpsc::channel, Arc},
     time::Duration,
@@ -390,7 +390,7 @@ struct StdoutService {
 }
 impl StdoutService {
     fn new(vm: &mut Vm) -> Self {
-        let channel = vm.create_channel(1);
+        let channel = vm.create_channel(0);
         let current_receive = vm.receive(channel);
         Self {
             channel,
@@ -398,7 +398,7 @@ impl StdoutService {
         }
     }
     fn run(&mut self, vm: &mut Vm) {
-        if let Some(CompletedOperation::Received { packet }) =
+        while let Some(CompletedOperation::Received { packet }) =
             vm.completed_operations.remove(&self.current_receive)
         {
             match &packet.heap.get(packet.address).data {
@@ -415,7 +415,7 @@ struct StdinService {
 }
 impl StdinService {
     fn new(vm: &mut Vm) -> Self {
-        let channel = vm.create_channel(1);
+        let channel = vm.create_channel(0);
         let current_receive = vm.receive(channel);
         Self {
             channel,
@@ -423,7 +423,7 @@ impl StdinService {
         }
     }
     fn run(&mut self, vm: &mut Vm) {
-        if let Some(CompletedOperation::Received { packet }) =
+        while let Some(CompletedOperation::Received { packet }) =
             vm.completed_operations.remove(&self.current_receive)
         {
             let request: SendPort = packet
@@ -433,7 +433,8 @@ impl StdinService {
                 .clone()
                 .try_into()
                 .expect("expected a send port");
-            debug!("Reading from stdin");
+            print!(">> ");
+            io::stdout().flush().unwrap();
             let input = {
                 let stdin = io::stdin();
                 stdin.lock().lines().next().unwrap().unwrap()
