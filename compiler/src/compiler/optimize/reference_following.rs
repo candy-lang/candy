@@ -48,6 +48,8 @@ impl Mir {
                 if let Expression::Reference(referenced) = last_expression && before_last_id == *referenced {
                     drop(from_back);
                     body.remove_all(|id, _| last_id == id);
+                } else {
+                    break;
                 }
             }
         });
