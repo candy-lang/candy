@@ -40,7 +40,7 @@ fn compile_module(
     config: &TracingConfig,
 ) -> Mir {
     let mut id_generator = IdGenerator::start_at(0);
-    let mut body = Body::new();
+    let mut body = Body::default();
     let mut mapping = HashMap::<hir::Id, Id>::new();
 
     body.push_with_new_id(
@@ -252,7 +252,7 @@ fn compile_expression(
         }) => {
             let mut parameters = vec![];
             let responsible_parameter: Id = id_generator.generate();
-            let mut lambda_body = Body::new();
+            let mut lambda_body = Body::default();
 
             for original_parameter in original_parameters {
                 let parameter = id_generator.generate();

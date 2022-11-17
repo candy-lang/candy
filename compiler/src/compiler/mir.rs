@@ -17,7 +17,7 @@ pub struct Mir {
 #[derive(Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Id(usize);
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Default)]
 pub struct Body {
     expressions: Vec<(Id, Expression)>,
 }
@@ -117,12 +117,6 @@ impl CountableId for Id {
 }
 
 impl Body {
-    pub fn new() -> Self {
-        Self {
-            expressions: vec![],
-        }
-    }
-
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = (Id, &Expression)> {
         self.expressions
             .iter()
@@ -137,7 +131,7 @@ impl Body {
         self.expressions.into_iter()
     }
     pub fn return_value(&mut self) -> Id {
-        let (id, _) = self.expressions.iter_mut().last().unwrap();
+        let (id, _) = self.expressions.last().unwrap();
         *id
     }
 
@@ -193,18 +187,12 @@ impl Body {
             }
         }
     }
-}
 
-impl Body {
     pub fn visit(&mut self, visitor: &mut dyn FnMut(Id, &mut Expression, bool)) {
-        self.visit_rec(visitor);
-    }
-    fn visit_rec(&mut self, visitor: &mut dyn FnMut(Id, &mut Expression, bool)) {
         let length = self.expressions.len();
         for i in 0..length {
-            let (id, mut expression) = self.expressions.remove(i);
-            Self::visit_expression(id, &mut expression, i == length - 1, visitor);
-            self.expressions.insert(i, (id, expression.clone()));
+            let (id, expression) = self.expressions.get_mut(i).unwrap();
+            Self::visit_expression(*id, expression, i == length - 1, visitor);
         }
     }
     fn visit_expression(
@@ -214,7 +202,7 @@ impl Body {
         visitor: &mut dyn FnMut(Id, &mut Expression, bool),
     ) {
         if let Expression::Lambda { body, .. } | Expression::Multiple(body) = expression {
-            body.visit_rec(visitor);
+            body.visit(visitor);
         }
         visitor(id, expression, is_returned);
     }
@@ -292,10 +280,10 @@ impl Body {
     }
 
     pub fn visit_bodies(&mut self, visitor: &mut dyn FnMut(&mut Body)) {
-        visitor(self);
         for (_, expression) in self.iter_mut() {
             expression.visit_bodies(visitor);
         }
+        visitor(self);
     }
 }
 impl Expression {
@@ -338,11 +326,19 @@ impl hash::Hash for Expression {
             Expression::Text(text) => text.hash(state),
             Expression::Symbol(symbol) => symbol.hash(state),
             Expression::Builtin(builtin) => builtin.hash(state),
-            Expression::List(items) => items.len().hash(state),
+            Expression::List(items) => items.hash(state),
             Expression::Struct(fields) => fields.len().hash(state),
             Expression::Reference(id) => id.hash(state),
             Expression::HirId(id) => id.hash(state),
-            Expression::Lambda { body, .. } => body.hash(state),
+            Expression::Lambda {
+                parameters,
+                responsible_parameter,
+                body,
+            } => {
+                parameters.hash(state);
+                responsible_parameter.hash(state);
+                body.hash(state);
+            }
             Expression::Parameter => {}
             Expression::Call {
                 function,
@@ -442,7 +438,7 @@ impl<'a> MirBodyBuilder<'a> {
         MirBodyBuilder {
             id_generator,
             parameters: vec![],
-            body: Body::new(),
+            body: Body::default(),
         }
     }
     pub fn new_parameter(&mut self) -> Id {
@@ -467,6 +463,11 @@ impl<'a> MirBodyBuilder<'a> {
     }
 }
 
+impl fmt::Display for Mir {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.body)
+    }
+}
 impl fmt::Debug for Mir {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.body)
@@ -522,11 +523,17 @@ impl fmt::Debug for Expression {
                 responsible_parameter,
                 body,
             } => write!(f,
-                "{{ {} (+ responsible {responsible_parameter}) ->\n{}\n}}",
-                parameters
-                    .iter()
-                    .map(|parameter| format!("{parameter}"))
-                    .join(" "),
+                "{{ {} ->\n{}\n}}",
+                if parameters.is_empty() {
+                    format!("(responsible {responsible_parameter})")
+                } else {
+                    format!("{} (+ responsible {responsible_parameter})",
+                        parameters
+                            .iter()
+                            .map(|parameter| format!("{parameter}"))
+                            .join(" "),
+                    )
+                },
                 format!("{body}")
                     .lines()
                     .map(|line| format!("  {line}"))
@@ -565,10 +572,26 @@ impl fmt::Debug for Expression {
             ),
             Expression::ModuleStarts { module } => write!(f, "module {module} starts"),
             Expression::ModuleEnds => write!(f, "module ends"),
-            Expression::TraceCallStarts { hir_call, function, arguments, responsible } => write!(f, "trace: start of call of {function} with {} ({responsible} is responsible, code is at {hir_call})", arguments.iter().map(|arg| format!("{arg}")).join(" ")),
-            Expression::TraceCallEnds { return_value } => write!(f, "trace: end of call with return value {return_value}"),
-            Expression::TraceExpressionEvaluated { hir_expression, value  } => write!(f, "trace: expression {hir_expression} evaluated to {value}"),
-            Expression::TraceFoundFuzzableClosure { hir_definition, closure } => write!(f, "trace: found fuzzable closure {closure}, defined at {hir_definition}"),
+            Expression::TraceCallStarts {
+                hir_call,
+                function,
+                arguments,
+                responsible
+            } => {
+                write!(f,
+                    "trace: start of call of {function} with {} ({responsible} is responsible, code is at {hir_call})",
+                    arguments.iter().map(|arg| format!("{arg}")).join(" "),
+                )
+            },
+            Expression::TraceCallEnds { return_value } => {
+                write!(f, "trace: end of call with return value {return_value}")
+            },
+            Expression::TraceExpressionEvaluated { hir_expression, value  } => {
+                write!(f, "trace: expression {hir_expression} evaluated to {value}")
+            },
+            Expression::TraceFoundFuzzableClosure { hir_definition, closure } => {
+                write!(f, "trace: found fuzzable closure {closure}, defined at {hir_definition}")
+            },
         }
     }
 }

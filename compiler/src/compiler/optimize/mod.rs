@@ -133,7 +133,7 @@ fn recover_from_cycle(
     _config: &TracingConfig,
 ) -> Option<Arc<Mir>> {
     let mut id_generator = IdGenerator::start_at(0);
-    let mut body = Body::new();
+    let mut body = Body::default();
     let reason = body.push_with_new_id(
         &mut id_generator,
         Expression::Text(format!(

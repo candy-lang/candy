@@ -12,7 +12,7 @@ impl Mir {
 
     fn sort_leading_constants(&mut self) {
         let mut still_constants = true;
-        let old_body = mem::replace(&mut self.body, Body::new());
+        let old_body = mem::take(&mut self.body);
         for (id, expression) in old_body.into_iter() {
             if still_constants && !expression.is_pure() {
                 still_constants = false;

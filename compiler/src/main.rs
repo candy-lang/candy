@@ -211,14 +211,14 @@ fn raw_build(
 
     let mir = db.mir(module.clone(), config.clone()).unwrap();
     if debug {
-        module.dump_associated_debug_file("mir", &format!("{mir:?}"));
+        module.dump_associated_debug_file("mir", &format!("{mir}"));
     }
 
     let optimized_mir = db
         .mir_with_obvious_optimized(module.clone(), config.clone())
         .unwrap();
     if debug {
-        module.dump_associated_debug_file("optimized_mir", &format!("{optimized_mir:?}"));
+        module.dump_associated_debug_file("optimized_mir", &format!("{optimized_mir}"));
     }
 
     let lir = db.lir(module.clone(), config.clone()).unwrap();

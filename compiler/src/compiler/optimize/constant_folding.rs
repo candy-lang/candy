@@ -49,7 +49,7 @@ impl Mir {
                     let evaluated_call = match result {
                         Ok(return_value) => return_value,
                         Err(panic_reason) => {
-                            let mut body = Body::new();
+                            let mut body = Body::default();
                             let reason = body.push_with_new_id(
                                 &mut self.id_generator,
                                 Expression::Text(panic_reason),

@@ -353,7 +353,7 @@ impl Expression {
 }
 impl Body {
     pub fn replace_ids<F: FnMut(&mut Id)>(&mut self, replacer: &mut F) {
-        let body = mem::replace(self, Body::new());
+        let body = mem::take(self);
         for (mut id, mut expression) in body.into_iter() {
             replacer(&mut id);
             expression.replace_ids(replacer);
@@ -374,14 +374,14 @@ impl Mir {
     ) {
         if body.iter().next().is_none() {
             error!("A body of a lambda is empty! Lambdas should have at least a return value.");
-            error!("This is the MIR:\n{self:?}");
+            error!("This is the MIR:\n{self}");
             panic!("Mir is invalid!");
         }
         for (id, expression) in body.iter() {
             for captured in expression.captured_ids() {
                 if !visible.contains(&captured) {
                     error!("Mir is invalid! {id} captures {captured}, but that's not visible.");
-                    error!("This is the MIR:\n{self:?}");
+                    error!("This is the MIR:\n{self}");
                     panic!("Mir is invalid!");
                 }
             }
@@ -402,7 +402,7 @@ impl Mir {
 
             if defined_ids.contains(&id) {
                 error!("ID {id} exists twice.");
-                error!("This is the MIR:\n{self:?}");
+                error!("This is the MIR:\n{self}");
                 panic!("Mir is invalid!");
             }
             defined_ids.insert(id);
