@@ -1,5 +1,3 @@
-use tracing::debug;
-
 use crate::{
     compiler::mir::{Body, Expression, Id, Mir},
     utils::IdGenerator,
