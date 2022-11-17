@@ -56,7 +56,7 @@ impl fmt::Display for Complexity {
             } else {
                 "still contains `use`"
             },
-            self.expressions
+            self.expressions,
         )
     }
 }

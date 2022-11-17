@@ -53,8 +53,8 @@ impl Expression {
         let mut generator = IdGenerator::start_at(
             self.captured_ids()
                 .into_iter()
-                .map(|id| id.to_usize() + 1)
                 .max()
+                .map(|id| id.to_usize() + 1)
                 .unwrap_or(0),
         );
         let mapping: HashMap<Id, Id> = self

@@ -38,10 +38,10 @@ impl Mir {
         self.body
             .visit_with_visible(&mut |_, expression, visible, _| {
                 let Expression::Call {
-                function,
-                arguments,
-                responsible,
-            } = expression else { return; };
+                    function,
+                    arguments,
+                    responsible,
+                } = expression else { return; };
                 let Expression::Builtin(builtin) = visible.get(*function) else { return; };
 
                 if let Some(result) = Self::run_builtin(*builtin, arguments, *responsible, visible)
@@ -105,7 +105,7 @@ impl Mir {
                 let a = arguments[0];
                 let b = arguments[1];
 
-                let are_equal = a == b || a.semantically_equals(b, visible)?;
+                let are_equal = a.semantically_equals(b, visible)?;
                 Expression::Symbol(if are_equal { "True" } else { "False" }.to_string())
             }
             BuiltinFunction::FunctionRun => {

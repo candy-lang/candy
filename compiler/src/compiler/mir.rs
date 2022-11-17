@@ -551,7 +551,7 @@ impl fmt::Debug for Expression {
                 current_module,
                 relative_path,
                 responsible,
-            } => write!(f, "use {relative_path} (relative to {current_module}; also, {responsible} is responsible)"),
+            } => write!(f, "use {relative_path} (relative to {current_module}; {responsible} is responsible)"),
             Expression::Panic {
                 reason,
                 responsible,

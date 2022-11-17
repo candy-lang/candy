@@ -90,7 +90,7 @@ fn compile_module(
 /// ```pseudocode
 /// needs = { condition reason responsibleForCondition (responsibleForCall) ->
 ///   isConditionBool = builtinIfElse
-///     (builtinEquals condition True)
+///     builtinEquals condition True
 ///     { True }
 ///     { builtinEquals condition False }
 ///   builtinIfElse isConditionBool { Nothing } {
@@ -413,7 +413,7 @@ impl CompilerError {
         let (end_line, end_col) = db.offset_to_lsp(self.module.clone(), self.span.end);
 
         format!(
-            "{}, {}:{} – {}:{}: {}",
+            "{}:{}:{} – {}:{}: {}",
             self.module, start_line, start_col, end_line, end_col, self.payload
         )
     }
