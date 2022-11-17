@@ -119,6 +119,7 @@ impl Mir {
             let before = self.clone();
 
             self.checked_optimization(|mir| mir.follow_references());
+            self.checked_optimization(|mir| mir.remove_redundant_return_references());
             self.checked_optimization(|mir| mir.tree_shake());
             self.checked_optimization(|mir| mir.fold_constants());
             self.checked_optimization(|mir| mir.inline_functions_containing_use());
