@@ -9,7 +9,7 @@ These are the compiler stages:
 * CST ("Concrete Syntax Tree"): Similar to RCST, but tree nodes also have IDs and know what ranges in the source file they correspond to.
 * AST ("Abstract Syntax Tree"): A tree where unnecessary cruft is removed and some invariants are validated.
 * HIR ("High-Level Intermediate Representation"): The canonical representation of source code in single-static-assignment form (SSA).
-* MIR ("Mid-Level Intermediate Representation"): A representation with explicit tracking of responsibilities and desugaring. Tailored for applying optimizations.
+* MIR ("Mid-Level Intermediate Representation"): A representation with desugaring and explicit tracking of responsibilities. Tailored for applying optimizations.
 * LIR ("Low-Level Intermediate Representation"): An instruction code for a stack-based virtual machine.
 
 Note that if an error occurs in a compilation stage, we don't immediately abort but rather just try to contain the error in a subtree of the code and emit an error node.
