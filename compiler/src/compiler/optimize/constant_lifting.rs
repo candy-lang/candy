@@ -44,9 +44,18 @@ use std::collections::HashSet;
 
 impl Mir {
     pub fn lift_constants(&mut self) {
+        // Expressions in the top level should not be lifted as that would just
+        // mean moving some constants and then creating references to them in
+        // the original places.
+        let top_level_ids = self.body.all_ids();
+
         let mut constants = vec![];
         let mut constant_ids = HashSet::new();
+
         self.body.visit(&mut |id, expression, is_return_value| {
+            if top_level_ids.contains(&id) {
+                return;
+            }
             let is_constant = expression.is_pure()
                 && expression
                     .captured_ids()
@@ -54,13 +63,10 @@ impl Mir {
                     .all(|captured| constant_ids.contains(captured));
             if is_constant {
                 if is_return_value && let Expression::Reference(_) = expression {
-                        // Returned references shouldn't be lifted. For each of
-                        // them, it's guaranteed that no later expression
-                        // depends on it (because it's the last in the body) and
-                        // if it were to be lifted, we'd have to add a reference
-                        // anyway.
-                        return;
-                    }
+                    // Returned references shouldn't be lifted. If we would lift
+                    // one, we'd have to add a reference anyway.
+                    return;
+                }
                 constants.push((id, expression.clone()));
                 constant_ids.insert(id);
             }
@@ -87,7 +93,7 @@ impl Mir {
         let return_value = body.return_value();
         body.remove_all(|id, _| constant_ids.contains(&id));
 
-        if body.iter().map(|(id, _)| id).last() != Some(return_value) {
+        if constant_ids.contains(&return_value) {
             // The return value was removed. Add a reference to the lifted
             // constant.
             body.push(id_generator.generate(), Expression::Reference(return_value));
