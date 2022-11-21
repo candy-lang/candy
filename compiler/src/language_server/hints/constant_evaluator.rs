@@ -23,7 +23,7 @@ use crate::{
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::collections::HashMap;
-use tracing::{span, trace, Level};
+use tracing::{span, Level};
 
 #[derive(Default)]
 pub struct ConstantEvaluator {
@@ -50,17 +50,11 @@ impl ConstantEvaluator {
     }
 
     pub fn run(&mut self, db: &Database) -> Option<Module> {
-        let num_evaluators = self.evaluators.len();
         let mut running_evaluators = self
             .evaluators
             .iter_mut()
             .filter(|(_, evaluator)| matches!(evaluator.vm.status(), vm::Status::CanRun))
             .collect_vec();
-        trace!(
-            "Constant evaluator running. {} running VMs, {} in total.",
-            running_evaluators.len(),
-            num_evaluators,
-        );
 
         if let Some((module, evaluator)) = running_evaluators.choose_mut(&mut thread_rng()) {
             evaluator.vm.run(

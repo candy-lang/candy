@@ -17,7 +17,7 @@ use crate::{
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::collections::HashMap;
-use tracing::{error, trace};
+use tracing::error;
 
 #[derive(Default)]
 pub struct FuzzerManager {
@@ -49,10 +49,6 @@ impl FuzzerManager {
             .flat_map(|fuzzers| fuzzers.values_mut())
             .filter(|fuzzer| matches!(fuzzer.status(), Status::StillFuzzing { .. }))
             .collect_vec();
-        trace!(
-            "Fuzzer running. {} fuzzers for relevant closures are running.",
-            running_fuzzers.len(),
-        );
 
         let fuzzer = running_fuzzers.choose_mut(&mut thread_rng())?;
         fuzzer.run(

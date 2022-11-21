@@ -23,7 +23,7 @@ use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
 };
-use tracing::{trace, warn};
+use tracing::warn;
 
 pub enum Event {
     UpdateModule(Module, Vec<u8>),
@@ -66,7 +66,6 @@ pub async fn run_server(
     let mut outgoing_hints = OutgoingHints::new(outgoing_hints);
 
     'server_loop: loop {
-        trace!("Hints server is running.");
         sleep(Duration::from_millis(100)).await;
 
         loop {
