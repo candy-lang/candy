@@ -55,20 +55,19 @@ impl ConstantEvaluator {
             .iter_mut()
             .filter(|(_, evaluator)| matches!(evaluator.vm.status(), vm::Status::CanRun))
             .collect_vec();
+        let Some((module, evaluator)) = running_evaluators.choose_mut(&mut thread_rng()) else {
+            return None;
+        };
 
-        if let Some((module, evaluator)) = running_evaluators.choose_mut(&mut thread_rng()) {
-            evaluator.vm.run(
-                &DbUseProvider {
-                    db,
-                    config: TracingConfig::default(),
-                },
-                &mut RunLimitedNumberOfInstructions::new(500),
-                &mut evaluator.tracer,
-            );
-            Some(module.clone())
-        } else {
-            None
-        }
+        evaluator.vm.run(
+            &DbUseProvider {
+                db,
+                config: TracingConfig::default(),
+            },
+            &mut RunLimitedNumberOfInstructions::new(500),
+            &mut evaluator.tracer,
+        );
+        Some(module.clone())
     }
 
     pub fn get_fuzzable_closures(&self, module: &Module) -> (Heap, Vec<(Id, Pointer)>) {
