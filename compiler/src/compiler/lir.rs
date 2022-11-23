@@ -187,21 +187,21 @@ impl Instruction {
             Instruction::ModuleStarts { .. } => {}
             Instruction::ModuleEnds => {}
             Instruction::TraceCallStarts { num_args } => {
+                stack.pop(); // HIR ID
                 stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
                 stack.pop(); // callee
-                stack.pop(); // HIR ID
             }
             Instruction::TraceCallEnds => {
                 stack.pop(); // return value
             }
             Instruction::TraceExpressionEvaluated => {
-                stack.pop(); // value
                 stack.pop(); // HIR ID
+                stack.pop(); // value
             }
             Instruction::TraceFoundFuzzableClosure => {
-                stack.pop(); // value
                 stack.pop(); // HIR ID
+                stack.pop(); // value
             }
         }
     }

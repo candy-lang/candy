@@ -403,6 +403,7 @@ fn compile_expression(
                 value: id,
             },
         );
+        body.push_with_new_id(id_generator, Expression::Reference(id));
     }
 }
 

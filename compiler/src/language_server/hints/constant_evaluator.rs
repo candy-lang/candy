@@ -36,11 +36,16 @@ struct Evaluator {
 
 impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
+        let config = TracingConfig {
+            register_fuzzables: false,
+            trace_calls: false,
+            trace_evaluated_expressions: true,
+        };
         let tracer = FullTracer::default();
         let mut vm = Vm::new();
         vm.set_up_for_running_module_closure(
             module.clone(),
-            Closure::of_module(db, module.clone(), TracingConfig::default()).unwrap(),
+            Closure::of_module(db, module.clone(), config).unwrap(),
         );
         self.evaluators.insert(module, Evaluator { tracer, vm });
     }
