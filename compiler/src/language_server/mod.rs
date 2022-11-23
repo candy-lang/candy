@@ -85,8 +85,8 @@ impl LanguageServer for CandyLanguageServer {
             _ => panic!("Workspace folder must be a file URI."),
         };
 
-        let (events_sender, events_receiver) = tokio::sync::mpsc::channel(16);
-        let (hints_sender, mut hints_receiver) = tokio::sync::mpsc::channel(8);
+        let (events_sender, events_receiver) = tokio::sync::mpsc::channel(1024);
+        let (hints_sender, mut hints_receiver) = tokio::sync::mpsc::channel(1024);
         tokio::spawn(hints::run_server(events_receiver, hints_sender));
         *self.hints_server_sink.lock().await = Some(events_sender);
         let client = self.client.clone();
