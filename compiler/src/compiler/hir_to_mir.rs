@@ -19,11 +19,21 @@ pub trait HirToMir: CstDb + AstToHir + LspPositionConversion {
     fn mir(&self, module: Module, config: TracingConfig) -> Option<Arc<Mir>>;
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Default)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct TracingConfig {
     pub register_fuzzables: bool,
     pub trace_calls: bool,
     pub trace_evaluated_expressions: bool,
+}
+
+impl TracingConfig {
+    pub fn none() -> Self {
+        Self {
+            register_fuzzables: false,
+            trace_calls: false,
+            trace_evaluated_expressions: false,
+        }
+    }
 }
 
 fn mir(db: &dyn HirToMir, module: Module, config: TracingConfig) -> Option<Arc<Mir>> {

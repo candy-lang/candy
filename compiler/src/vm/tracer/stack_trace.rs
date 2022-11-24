@@ -62,7 +62,7 @@ impl FullTracer {
             call_site,
             callee,
             arguments,
-            ..,
+            ..
         } in stack.iter().rev()
         {
             let hir_id = self.heap.get_hir_id(*call_site);

@@ -67,7 +67,7 @@ impl ConstantEvaluator {
         evaluator.vm.run(
             &DbUseProvider {
                 db,
-                config: TracingConfig::default(),
+                config: TracingConfig::none(),
             },
             &mut RunLimitedNumberOfInstructions::new(500),
             &mut evaluator.tracer,
