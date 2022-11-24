@@ -15,18 +15,19 @@
 
 use crate::compiler::mir::{Expression, Mir};
 use itertools::Itertools;
+use std::collections::HashSet;
 
 impl Mir {
     pub fn cancel_out_module_expressions(&mut self) {
         self.body.visit_bodies(&mut |body| {
-            let mut indices_of_expressions_to_eliminate = vec![];
+            let mut indices_of_expressions_to_eliminate = HashSet::new();
 
             for ((a_index, (_, a)), (b_index, (_, b))) in body.iter().enumerate().tuple_windows() {
                 if matches!(a, Expression::ModuleStarts { .. })
                     && matches!(b, Expression::ModuleEnds)
                 {
-                    indices_of_expressions_to_eliminate.push(a_index);
-                    indices_of_expressions_to_eliminate.push(b_index);
+                    indices_of_expressions_to_eliminate.insert(a_index);
+                    indices_of_expressions_to_eliminate.insert(b_index);
                 }
             }
 
