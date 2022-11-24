@@ -72,7 +72,7 @@ isNonNegative value :=
   value | isNegative | bool.not
 absolute value :=
   needs (is value)
-  conditionals.ifElse (isNegative value) (negate value) value
+  conditionals.ifElse (isNegative value) { negate value } { value }
 
 fitsInRustU32 value :=
   needs (is value)

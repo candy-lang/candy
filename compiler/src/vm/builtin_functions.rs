@@ -310,9 +310,8 @@ impl Heap {
     }
     fn int_shift_right(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Int, amount: Int| {
-            let value = value.value.to_biguint().unwrap();
             let amount = amount.value.to_u128().unwrap();
-            Return(self.create_int((value >> amount).into()))
+            Return(self.create_int(&value.value >> amount))
         })
     }
     fn int_subtract(&mut self, args: &[Pointer]) -> BuiltinResult {
