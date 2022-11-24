@@ -60,7 +60,7 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
                 db,
                 config: config.clone(),
             },
-            &mut RunLimitedNumberOfInstructions::new(1000),
+            &mut RunLimitedNumberOfInstructions::new(100000),
         );
         match fuzzer.into_status() {
             Status::StillFuzzing { .. } => {}
