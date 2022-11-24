@@ -10,14 +10,13 @@ use crate::{
     module::Module,
     vm::{
         context::{DbUseProvider, RunLimitedNumberOfInstructions},
-        tracer::full::{StoredFiberEvent, StoredVmEvent},
         Heap, Pointer,
     },
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::collections::HashMap;
-use tracing::error;
+use tracing::{debug, error};
 
 #[derive(Default)]
 pub struct FuzzerManager {
@@ -68,11 +67,14 @@ impl FuzzerManager {
     pub fn get_hints(&self, db: &Database, module: &Module) -> Vec<Vec<Hint>> {
         let mut hints = vec![];
 
+        debug!("There are {} fuzzers.", self.fuzzers.len());
+
         for fuzzer in self.fuzzers[module].values() {
             let Status::PanickedForArguments {
                 arguments,
                 reason,
-                tracer,
+                responsible,
+                ..
             } = fuzzer.status() else { continue; };
 
             let id = fuzzer.closure_id.clone();
@@ -104,53 +106,29 @@ impl FuzzerManager {
             };
 
             let second_hint = {
-                let panicking_inner_call = tracer
-                    .events
-                    .iter()
-                    .rev()
-                    // Find the innermost panicking call that is in the
-                    // function.
-                    .filter_map(|event| match &event.event {
-                        StoredVmEvent::InFiber { event, .. } => Some(event),
-                        _ => None,
-                    })
-                    .find(|event| {
-                        let StoredFiberEvent::CallStarted { call_site, .. } = event else {
-                                return false;
-                            };
-                        let call_site = tracer.heap.get_hir_id(*call_site);
-                        id.is_same_module_and_any_parent_of(&call_site)
-                            && db.hir_to_cst_id(id.clone()).is_some()
-                    });
-                let panicking_inner_call = match panicking_inner_call {
-                    Some(panicking_inner_call) => panicking_inner_call,
-                    None => {
-                        // We found a panicking function without an inner
-                        // panicking needs. This indicates an error during
-                        // compilation within a function body.
-                        continue;
-                    }
-                };
-                let StoredFiberEvent::CallStarted {
-                    call_site,
-                    closure,
-                    arguments,
-                    responsible: _
-                } = panicking_inner_call else { unreachable!(); };
-                let call_site = tracer.heap.get_hir_id(*call_site);
-                let name = closure.format(&tracer.heap);
+                if &responsible.module != module {
+                    // The function panics internally for an input, but it's the
+                    // fault of an inner function that's in another module. The
+                    // fuzz case should instead be highlighted in the used
+                    // function directly. We don't do that right now because we
+                    // assume the fuzzer will find the panic when fuzzing the
+                    // faulty function, but we should save the panicking case
+                    // (or something like that) in the future.
+                    continue;
+                }
+                if db.hir_to_cst_id(id.clone()).is_none() {
+                    panic!(
+                        "It looks like the generated code {responsible} is at fault for a panic."
+                    );
+                }
 
+                // TODO: In the future, re-run only the failing case with
+                // tracing enabled and also show the arguments to the failing
+                // function in the hint.
                 Hint {
                     kind: HintKind::Fuzz,
-                    text: format!(
-                        "then `{name} {}` panics: {reason}",
-                        arguments
-                            .iter()
-                            .cloned()
-                            .map(|arg| arg.format(&tracer.heap))
-                            .join(" "),
-                    ),
-                    position: id_to_end_of_line(db, call_site).unwrap(),
+                    text: format!("then {responsible} panics: {reason}"),
+                    position: id_to_end_of_line(db, responsible.clone()).unwrap(),
                 }
             };
 

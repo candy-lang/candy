@@ -67,6 +67,7 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
             Status::PanickedForArguments {
                 arguments,
                 reason,
+                responsible,
                 tracer,
             } => {
                 error!("The fuzzer discovered an input that crashes {id}:");
@@ -74,6 +75,7 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
                     closure: id,
                     arguments,
                     reason,
+                    responsible,
                     tracer,
                 };
                 case.dump(db);
@@ -89,6 +91,7 @@ pub struct FailingFuzzCase {
     closure: Id,
     arguments: Vec<Packet>,
     reason: String,
+    responsible: Id,
     tracer: FullTracer,
 }
 
@@ -103,6 +106,7 @@ impl FailingFuzzCase {
                 .join(" "),
             self.reason,
         );
+        error!("{} is responsible.", self.responsible,);
         error!(
             "This is the stack trace:\n{}",
             self.tracer.format_panic_stack_trace_to_root_fiber(db)

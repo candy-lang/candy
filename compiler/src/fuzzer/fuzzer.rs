@@ -32,6 +32,7 @@ pub enum Status {
     PanickedForArguments {
         arguments: Vec<Packet>,
         reason: String,
+        responsible: hir::Id,
         tracer: FullTracer,
     },
 }
@@ -117,6 +118,7 @@ impl Fuzzer {
                         Status::PanickedForArguments {
                             arguments,
                             reason,
+                            responsible,
                             tracer,
                         }
                     }
@@ -127,10 +129,12 @@ impl Fuzzer {
             Status::PanickedForArguments {
                 arguments,
                 reason,
+                responsible,
                 tracer,
             } => Status::PanickedForArguments {
                 arguments,
                 reason,
+                responsible,
                 tracer,
             },
         }
