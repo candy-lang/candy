@@ -29,7 +29,6 @@
 //! }                           |  }
 //! ```
 //!
-//! TODO: Don't sort constant here, but in a cleanup pass instead.
 //! TODO: Have a separate constant heap directly in the LIR, so that
 //! instructions such as `Instruction::CreateInt` are never actually executed at
 //! runtime.
@@ -65,10 +64,10 @@ impl Mir {
                 return;
             }
             if is_return_value && let Expression::Reference(_) = expression {
-                    // Returned references shouldn't be lifted. If we would lift
-                    // one, we'd have to add a reference anyway.
-                    return;
-                }
+                // Returned references shouldn't be lifted. If we would lift
+                // one, we'd have to add a reference anyway.
+                return;
+            }
             constants.push((id, expression.clone()));
             constant_ids.insert(id);
         });

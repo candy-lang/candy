@@ -1,7 +1,7 @@
 //! Module stack collapsing removes `ModuleStarts` and `ModuleEnds` expressions
-//! without a `Use` in between. Those are guaranteed not to cause cycles:
-//! Surrounding expressions for the same module can only be created by the same
-//! salsa query, so the import cycle would have been detected right there.
+//! without a `Use` in between. Those are guaranteed not to cause cycles: Nested
+//! expressions for the same module can only be created by the same salsa query,
+//! so the import cycle would have been detected right there.
 //!
 //! Here's a before-and-after example of module expressions cancelling out:
 //!
