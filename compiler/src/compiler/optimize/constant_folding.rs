@@ -142,7 +142,7 @@ impl Mir {
                 // others are definitely not, then we can still resolve that.
                 if !visible.get(key_id).is_constant(visible) {
                     return None;
-                };
+                }
                 if fields
                     .iter()
                     .any(|(key, _)| !visible.get(*key).is_constant(visible))
@@ -152,6 +152,7 @@ impl Mir {
 
                 let value = fields
                     .iter()
+                    .rev()
                     .find(|(k, _)| k.semantically_equals(key_id, visible).unwrap_or(false))
                     .map(|(_, value)| *value);
                 if let Some(value) = value {
