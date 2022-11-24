@@ -183,7 +183,9 @@ impl Expression {
         }
     }
 
-    /// Whether the value of this expression is known at compile-time.
+    /// Whether the value of this expression is pure and known at compile-time.
+    /// This is useful for moving expressions around without changing the
+    /// semantics.
     pub fn is_constant(&self, visible: &VisibleExpressions) -> bool {
         self.is_pure()
             && self
