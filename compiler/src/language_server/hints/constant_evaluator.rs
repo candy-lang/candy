@@ -37,7 +37,7 @@ struct Evaluator {
 impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
         let config = TracingConfig {
-            register_fuzzables: false,
+            register_fuzzables: true,
             trace_calls: false,
             trace_evaluated_expressions: true,
         };

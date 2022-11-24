@@ -23,7 +23,7 @@ use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
 };
-use tracing::warn;
+use tracing::{debug, warn};
 
 pub enum Event {
     UpdateModule(Module, Vec<u8>),
@@ -96,11 +96,15 @@ pub async fn run_server(
         // priority. When constant evaluation is done, we try fuzzing the
         // functions we found.
         let module_with_new_insight = 'new_insight: {
+            debug!("Constant evaluating.");
             if let Some(module) = constant_evaluator.run(&db) {
                 let (heap, closures) = constant_evaluator.get_fuzzable_closures(&module);
                 fuzzer.update_module(module.clone(), &heap, &closures);
                 break 'new_insight Some(module);
             }
+            // For fuzzing, we're a bit more resource-conscious.
+            sleep(Duration::from_millis(200)).await;
+            debug!("Fuzzing.");
             if let Some(module) = fuzzer.run(&db) {
                 warn!("Fuzzer found a problem!");
                 break 'new_insight Some(module);
@@ -161,9 +165,12 @@ impl OutgoingHints {
     }
 
     async fn report_hints(&mut self, module: Module, hints: Vec<Hint>) {
+        debug!("Reporting hints for {module}:\n{hints:?}");
         if self.last_sent.get(&module) != Some(&hints) {
             self.last_sent.insert(module.clone(), hints.clone());
             self.sender.send((module, hints)).await.unwrap();
+        } else {
+            debug!("Not sending hints to the main thread because they're the same as last time.");
         }
     }
 }

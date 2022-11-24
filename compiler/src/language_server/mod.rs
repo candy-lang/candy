@@ -92,7 +92,6 @@ impl LanguageServer for CandyLanguageServer {
         let client = self.client.clone();
         let hint_reporter = async move || {
             while let Some((module, hints)) = hints_receiver.recv().await {
-                debug!("Reporting hints for {module}: {hints:?}");
                 let url: Option<Url> = module.into();
                 client
                     .send_notification::<HintsNotification>(HintsNotification {
