@@ -141,16 +141,17 @@ impl Body {
 
 impl Expression {
     pub fn captured_ids(&self) -> Vec<Id> {
-        let defined = self.defined_ids().into_iter().collect::<HashSet<_>>();
-        let referenced = self.referenced_ids().into_iter().collect::<HashSet<_>>();
-        referenced.difference(&defined).copied().collect()
+        let mut ids = self.referenced_ids().into_iter().collect::<HashSet<_>>();
+        for id in self.defined_ids() {
+            ids.remove(&id);
+        }
+        ids.into_iter().collect()
     }
 }
 
 impl Body {
     pub fn all_ids(&self) -> HashSet<Id> {
-        let mut ids = HashSet::new();
-        ids.extend(self.defined_ids().into_iter());
+        let mut ids = self.defined_ids().into_iter().collect::<HashSet<_>>();
         self.collect_referenced_ids(&mut ids);
         ids
     }
@@ -376,14 +377,14 @@ impl Mir {
         if body.iter().next().is_none() {
             error!("A body of a lambda is empty! Lambdas should have at least a return value.");
             error!("This is the MIR:\n{self}");
-            panic!("Mir is invalid!");
+            panic!("MIR is invalid!");
         }
         for (id, expression) in body.iter() {
             for captured in expression.captured_ids() {
                 if !visible.contains(&captured) {
-                    error!("Mir is invalid! {id} captures {captured}, but that's not visible.");
+                    error!("MIR is invalid! {id} captures {captured}, but that's not visible.");
                     error!("This is the MIR:\n{self}");
-                    panic!("Mir is invalid!");
+                    panic!("MIR is invalid!");
                 }
             }
             if let Expression::Lambda {
@@ -404,7 +405,7 @@ impl Mir {
             if defined_ids.contains(&id) {
                 error!("ID {id} exists twice.");
                 error!("This is the MIR:\n{self}");
-                panic!("Mir is invalid!");
+                panic!("MIR is invalid!");
             }
             defined_ids.insert(id);
 

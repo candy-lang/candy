@@ -21,18 +21,14 @@
 //!   $7 = use $4 relative to here, $5 responsible
 //! ```
 //!
-//! Inlining makes lots of other optimizations more effective, in partuclar
+//! Inlining makes lots of other optimizations more effective, in partiuclar
 //! [tree shaking] of lambdas that were inlined into all call sites. Because at
 //! the call sites, more information about arguments exist, [constant folding]
 //! and [module folding] can be more effective.
 //!
-//! TODO: Also inline functions only used once.
-//! TODO: Also inline small functions containing only one expression. That
-//! doesn't even make the code longer, just replaces the call.
-//! TODO: Speculatively inline smallish functions and do more optimizations to
-//! see if they become obvious optimizations.
 //! TODO: When we have a metric for judging performance vs. code size, also
-//! speculatively inline more call sites.
+//! speculatively inline more call sites, such as smallish functions and
+//! functions only used once.
 //!
 //! [constant folding]: super::constant_folding
 //! [module folding]: super::module_folding
@@ -64,7 +60,7 @@ impl Expression {
             responsible_parameter,
             body,
         } = visible.get(*function) else {
-            return Err("Tried to inline, but the call's receiver is not a lambda.");
+            return Err("Tried to inline, but the callee is not a lambda.");
         };
         if arguments.len() != parameters.len() {
             return Err("Tried to inline, but the number of arguments doesn't match the expected parameter count.");
@@ -137,12 +133,12 @@ impl Mir {
     }
 
     pub fn inline_functions_only_called_once(&mut self) {
-        let mut ids_to_number_of_references: HashMap<Id, usize> = HashMap::new();
+        let mut reference_counts: HashMap<Id, usize> = HashMap::new();
         self.body.replace_id_references(&mut |id| {
-            *ids_to_number_of_references.entry(*id).or_default() += 1;
+            *reference_counts.entry(*id).or_default() += 1;
         });
         self.body.visit_with_visible(&mut |_, expression, visible, _| {
-            if let Expression::Call { function, .. } = expression && ids_to_number_of_references[function] == 1 {
+            if let Expression::Call { function, .. } = expression && reference_counts[function] == 1 {
                 let _ = expression.inline_call(visible, &mut self.id_generator);
             }
         });

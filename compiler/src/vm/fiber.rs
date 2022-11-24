@@ -272,21 +272,21 @@ impl Fiber {
             trace!(
                 "Instruction pointer: {}:{}",
                 self.next_instruction.closure,
-                self.next_instruction.instruction
+                self.next_instruction.instruction,
             );
             trace!(
                 "Data stack: {}",
                 self.data_stack
                     .iter()
                     .map(|it| it.format(&self.heap))
-                    .join(", ")
+                    .join(", "),
             );
             trace!(
                 "Call stack: {}",
                 self.call_stack
                     .iter()
                     .map(|ip| format!("{}:{}", ip.closure, ip.instruction))
-                    .join(", ")
+                    .join(", "),
             );
             trace!("Heap: {:?}", self.heap);
             trace!("Running instruction: {instruction:?}");
@@ -379,7 +379,6 @@ impl Fiber {
 
                 let callee = self.heap.get(callee_address);
                 args.reverse();
-                let responsible = self.heap.get_hir_id(responsible_address);
 
                 match callee.data.clone() {
                     Data::Closure(Closure {
@@ -388,7 +387,10 @@ impl Fiber {
                         ..
                     }) => {
                         if num_args != expected_num_args {
-                            self.panic(format!("A closure expected {expected_num_args} parameters, but you called it with {num_args} arguments."), responsible);
+                            self.panic(
+                                format!("A closure expected {expected_num_args} parameters, but you called it with {num_args} arguments."),
+                                self.heap.get_hir_id(responsible_address),
+                            );
                             return;
                         }
 
@@ -412,7 +414,7 @@ impl Fiber {
                                 "You can only call closures and builtins, but you tried to call {}.",
                                 callee.format(&self.heap),
                             ),
-                            responsible,
+                            self.heap.get_hir_id(responsible_address),
                         );
                     }
                 };
@@ -426,11 +428,10 @@ impl Fiber {
                 let responsible = self.data_stack.pop().unwrap();
                 let relative_path = self.data_stack.pop().unwrap();
 
-                let responsible = self.heap.get_hir_id(responsible);
-
                 match self.use_module(use_provider, current_module, relative_path) {
                     Ok(()) => {}
                     Err(reason) => {
+                        let responsible = self.heap.get_hir_id(responsible);
                         self.panic(reason, responsible);
                     }
                 }
@@ -490,9 +491,10 @@ impl Fiber {
                 let closure = self.data_stack.pop().unwrap();
                 let definition = self.data_stack.pop().unwrap();
 
-                if !matches!(self.heap.get(closure).data, Data::Closure(_)) {
-                    panic!("Instruction TraceFoundFuzzableClosure executed, but stack top is not a closure.");
-                }
+                assert!(
+                    matches!(self.heap.get(closure).data, Data::Closure(_)),
+                    "Instruction TraceFoundFuzzableClosure executed, but stack top is not a closure.",
+                );
 
                 tracer.found_fuzzable_closure(definition, closure, &self.heap);
             }

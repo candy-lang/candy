@@ -9,12 +9,12 @@
 //! - Making the code fast.
 //! - Making the code small.
 //!
-//! Some optimizations benefit both of those objectives. For example, removing
-//! unused code from the program makes it smaller, but also means there's less
-//! code to be executed. Other optimizations further one objective, but harm the
-//! other. For example, inlining functions (basically copying their code to
-//! where they're used), can make the code bigger, but faster because there are
-//! less function calls to be performed.
+//! Some optimizations benefit both of these objectives. For example, removing
+//! ignored computations from the program makes it smaller, but also means
+//! there's less code to be executed. Other optimizations further one objective,
+//! but harm the other. For example, inlining functions (basically copying their
+//! code to where they're used), can make the code bigger, but also potentially
+//! faster because there are less function calls to be performed.
 //!
 //! Depending on the use case, the tradeoff between both objectives changes. To
 //! put you in the right mindset, here are just two use cases:
@@ -76,12 +76,15 @@ fn mir_with_obvious_optimized(
     module: Module,
     config: TracingConfig,
 ) -> Option<Arc<Mir>> {
-    debug!("{module}: Compiling");
+    debug!("{module}: Compiling.");
     let mir = db.mir(module.clone(), config.clone())?;
     let mut mir = (*mir).clone();
-    debug!("{module}: Optimizing. {}", mir.complexity());
+
+    let complexity_before = mir.complexity();
     mir.optimize_obvious(db, &config);
-    debug!("{module}: Done. {}", mir.complexity());
+    let complexity_after = mir.complexity();
+
+    debug!("{module}: Done. Optimized from {complexity_before} to {complexity_after}");
     Some(Arc::new(mir))
 }
 
@@ -138,7 +141,7 @@ fn recover_from_cycle(
         &mut id_generator,
         Expression::Text(format!(
             "There's a cycle in the used modules: {}",
-            cycle.join(" → ")
+            cycle.join(" → "),
         )),
     );
     let responsible = body.push_with_new_id(
