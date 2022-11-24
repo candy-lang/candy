@@ -98,6 +98,9 @@ struct CandyRunOptions {
 
 #[derive(StructOpt, Debug)]
 struct CandyFuzzOptions {
+    #[structopt(long)]
+    debug: bool,
+
     #[structopt(parse(from_os_str))]
     file: PathBuf,
 }
@@ -466,7 +469,7 @@ async fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
         trace_evaluated_expressions: false,
     };
 
-    if raw_build(&db, module.clone(), &config, false).is_none() {
+    if raw_build(&db, module.clone(), &config, options.debug).is_none() {
         warn!("File not found.");
         return Err(Exit::FileNotFound);
     }
