@@ -48,7 +48,7 @@ impl FullTracer {
                     });
                 }
                 StoredFiberEvent::CallEnded { .. } => {
-                    assert!(matches!(stack.pop().unwrap(), Call { .. }));
+                    stack.pop().unwrap();
                 }
                 _ => {}
             }
@@ -62,7 +62,7 @@ impl FullTracer {
             call_site,
             callee,
             arguments,
-            responsible: _,
+            ..,
         } in stack.iter().rev()
         {
             let hir_id = self.heap.get_hir_id(*call_site);
@@ -94,7 +94,7 @@ impl FullTracer {
                         }
                     })
                     .unwrap_or_else(|| callee.format(&self.heap)),
-                arguments.iter().map(|arg| arg.format(&self.heap)).join(" ")
+                arguments.iter().map(|arg| arg.format(&self.heap)).join(" "),
             );
             caller_locations_and_calls.push((caller_location_string, call_string));
         }
