@@ -25,29 +25,3 @@ impl Mir {
         self.body.flatten_multiples();
     }
 }
-
-#[test]
-fn test_multiple_flattening() {
-    use crate::{builtin_functions::BuiltinFunction, compiler::mir::Expression};
-
-    // $0 =
-    //   $1 = builtinEquals
-    //
-    // # becomes:
-    // $0 = builtinEquals
-    // $1 = $0
-    let mut mir = Mir::build(|body| {
-        body.push_multiple(|body| {
-            body.push(Expression::Builtin(BuiltinFunction::Equals));
-        });
-    });
-    mir.flatten_multiples();
-    mir.normalize_ids();
-    assert_eq!(
-        mir,
-        Mir::build(|body| {
-            let inlined = body.push(Expression::Builtin(BuiltinFunction::Equals));
-            body.push(Expression::Reference(inlined));
-        }),
-    );
-}
