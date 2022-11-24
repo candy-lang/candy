@@ -201,15 +201,16 @@ impl Id {
         let self_expr = visible.get(self);
         let other_expr = visible.get(other);
 
-        if matches!(self_expr, Expression::Parameter) || matches!(other_expr, Expression::Parameter)
-        {
-            return None;
-        }
         if let Expression::Reference(reference) = self_expr {
             return reference.semantically_equals(other, visible);
         }
         if let Expression::Reference(reference) = other_expr {
             return self.semantically_equals(*reference, visible);
+        }
+
+        if matches!(self_expr, Expression::Parameter) || matches!(other_expr, Expression::Parameter)
+        {
+            return None;
         }
 
         if self_expr == other_expr {
