@@ -46,7 +46,7 @@ impl Mir {
         // Expressions in the top level should not be lifted as that would just
         // mean moving some constants and then creating references to them in
         // the original places.
-        let top_level_ids = self.body.all_ids();
+        let top_level_ids = self.body.iter().map(|(id, _)| id).collect::<HashSet<_>>();
 
         let mut constants = vec![];
         let mut constant_ids = HashSet::new();

@@ -91,8 +91,16 @@ fn mir_with_obvious_optimized(
 impl Mir {
     /// Performs optimizations that improve both performance and code size.
     pub fn optimize_obvious(&mut self, db: &dyn OptimizeMir, config: &TracingConfig) {
-        self.optimize_obvious_self_contained();
-        self.fold_modules(db, config);
+        loop {
+            let before = self.clone();
+
+            self.optimize_obvious_self_contained();
+            self.fold_modules(db, config);
+
+            if *self == before {
+                break;
+            }
+        }
         self.optimize_obvious_self_contained();
         self.cleanup();
     }

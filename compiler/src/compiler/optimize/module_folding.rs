@@ -52,11 +52,11 @@ impl Mir {
                     return; // TODO: Replace with a panic.
                 };
                 let Ok(path) = UsePath::parse(path) else {
-                    warn!("use called with an invalid path");
+                    warn!("`use` called with an invalid path.");
                     return; // TODO: Replace with a panic.
                 };
                 let Ok(module_to_import) = path.resolve_relative_to(current_module.clone()) else {
-                    warn!("use called with an invalid path");
+                    warn!("`use` called with an invalid path.");
                     return; // TODO: Replace with a panic.
                 };
 
