@@ -69,93 +69,92 @@ impl FuzzerManager {
         let mut hints = vec![];
 
         for fuzzer in self.fuzzers[module].values() {
-            if let Status::PanickedForArguments {
+            let Status::PanickedForArguments {
                 arguments,
                 reason,
                 tracer,
-            } = fuzzer.status()
-            {
-                let id = fuzzer.closure_id.clone();
-                let first_hint = {
-                    let parameter_names = match db.find_expression(id.clone()) {
-                        Some(Expression::Lambda(Lambda { parameters, .. })) => parameters
-                            .into_iter()
-                            .map(|parameter| parameter.keys.last().unwrap().to_string())
-                            .collect_vec(),
-                        Some(_) => panic!("Looks like we fuzzed a non-closure. That's weird."),
-                        None => {
-                            error!("Using fuzzing, we found an error in a generated closure.");
-                            continue;
-                        }
-                    };
-                    Hint {
-                        kind: HintKind::Fuzz,
-                        text: format!(
-                            "If this is called with {},",
-                            parameter_names
-                                .iter()
-                                .zip(arguments.iter())
-                                .map(|(name, argument)| format!("`{name} = {argument:?}`"))
-                                .collect_vec()
-                                .join_with_commas_and_and(),
-                        ),
-                        position: id_to_end_of_line(db, id.clone()).unwrap(),
+            } = fuzzer.status() else { continue; };
+
+            let id = fuzzer.closure_id.clone();
+            let first_hint = {
+                let parameter_names = match db.find_expression(id.clone()) {
+                    Some(Expression::Lambda(Lambda { parameters, .. })) => parameters
+                        .into_iter()
+                        .map(|parameter| parameter.keys.last().unwrap().to_string())
+                        .collect_vec(),
+                    Some(_) => panic!("Looks like we fuzzed a non-closure. That's weird."),
+                    None => {
+                        error!("Using fuzzing, we found an error in a generated closure.");
+                        continue;
                     }
                 };
+                Hint {
+                    kind: HintKind::Fuzz,
+                    text: format!(
+                        "If this is called with {},",
+                        parameter_names
+                            .iter()
+                            .zip(arguments.iter())
+                            .map(|(name, argument)| format!("`{name} = {argument:?}`"))
+                            .collect_vec()
+                            .join_with_commas_and_and(),
+                    ),
+                    position: id_to_end_of_line(db, id.clone()).unwrap(),
+                }
+            };
 
-                let second_hint = {
-                    let panicking_inner_call = tracer
-                        .events
-                        .iter()
-                        .rev()
-                        // Find the innermost panicking call that is in the
-                        // function.
-                        .filter_map(|event| match &event.event {
-                            StoredVmEvent::InFiber { event, .. } => Some(event),
-                            _ => None,
-                        })
-                        .find(|event| {
-                            let StoredFiberEvent::CallStarted { call_site, .. } = event else {
+            let second_hint = {
+                let panicking_inner_call = tracer
+                    .events
+                    .iter()
+                    .rev()
+                    // Find the innermost panicking call that is in the
+                    // function.
+                    .filter_map(|event| match &event.event {
+                        StoredVmEvent::InFiber { event, .. } => Some(event),
+                        _ => None,
+                    })
+                    .find(|event| {
+                        let StoredFiberEvent::CallStarted { call_site, .. } = event else {
                                 return false;
                             };
-                            let call_site = tracer.heap.get_hir_id(*call_site);
-                            id.is_same_module_and_any_parent_of(&call_site)
-                                && db.hir_to_cst_id(id.clone()).is_some()
-                        });
-                    let panicking_inner_call = match panicking_inner_call {
-                        Some(panicking_inner_call) => panicking_inner_call,
-                        None => {
-                            // We found a panicking function without an inner
-                            // panicking needs. This indicates an error during
-                            // compilation within a function body.
-                            continue;
-                        }
-                    };
-                    let StoredFiberEvent::CallStarted {
-                        call_site,
-                        closure,
-                        arguments,
-                        responsible: _
-                    } = panicking_inner_call else { unreachable!(); };
-                    let call_site = tracer.heap.get_hir_id(*call_site);
-                    let name = closure.format(&tracer.heap);
-
-                    Hint {
-                        kind: HintKind::Fuzz,
-                        text: format!(
-                            "then `{name} {}` panics: {reason}",
-                            arguments
-                                .iter()
-                                .cloned()
-                                .map(|arg| arg.format(&tracer.heap))
-                                .join(" "),
-                        ),
-                        position: id_to_end_of_line(db, call_site).unwrap(),
+                        let call_site = tracer.heap.get_hir_id(*call_site);
+                        id.is_same_module_and_any_parent_of(&call_site)
+                            && db.hir_to_cst_id(id.clone()).is_some()
+                    });
+                let panicking_inner_call = match panicking_inner_call {
+                    Some(panicking_inner_call) => panicking_inner_call,
+                    None => {
+                        // We found a panicking function without an inner
+                        // panicking needs. This indicates an error during
+                        // compilation within a function body.
+                        continue;
                     }
                 };
+                let StoredFiberEvent::CallStarted {
+                    call_site,
+                    closure,
+                    arguments,
+                    responsible: _
+                } = panicking_inner_call else { unreachable!(); };
+                let call_site = tracer.heap.get_hir_id(*call_site);
+                let name = closure.format(&tracer.heap);
 
-                hints.push(vec![first_hint, second_hint]);
-            }
+                Hint {
+                    kind: HintKind::Fuzz,
+                    text: format!(
+                        "then `{name} {}` panics: {reason}",
+                        arguments
+                            .iter()
+                            .cloned()
+                            .map(|arg| arg.format(&tracer.heap))
+                            .join(" "),
+                    ),
+                    position: id_to_end_of_line(db, call_site).unwrap(),
+                }
+            };
+
+            hints.push(vec![first_hint, second_hint]);
         }
 
         hints
