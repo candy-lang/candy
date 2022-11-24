@@ -5,7 +5,7 @@ use crate::{
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
         hir::Id,
-        hir_to_mir::TracingConfig,
+        TracingConfig,
     },
     database::Database,
     language_server::hints::{utils::id_to_end_of_line, HintKind},

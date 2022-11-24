@@ -29,9 +29,9 @@
 
 use crate::{
     compiler::{
-        hir_to_mir::TracingConfig,
         mir::{Expression, Id, Mir},
         optimize::OptimizeMir,
+        utils::TracingConfig,
     },
     module::UsePath,
 };

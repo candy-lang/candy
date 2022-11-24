@@ -33,11 +33,7 @@ use crate::{
         Closure, Data, ExecutionResult, FiberId, Heap, Packet, SendPort, Status, Struct, Vm,
     },
 };
-use compiler::{
-    hir_to_mir::{HirToMir, TracingConfig},
-    lir::Lir,
-    optimize::OptimizeMir,
-};
+use compiler::{hir_to_mir::HirToMir, lir::Lir, optimize::OptimizeMir, TracingConfig};
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
 use notify::{watcher, RecursiveMode, Watcher};

@@ -57,8 +57,9 @@ mod utils;
 
 use super::{
     hir,
-    hir_to_mir::{HirToMir, TracingConfig},
+    hir_to_mir::HirToMir,
     mir::{Body, Expression, Mir},
+    utils::TracingConfig,
 };
 use crate::{module::Module, utils::IdGenerator};
 use std::sync::Arc;

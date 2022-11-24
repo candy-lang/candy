@@ -1,9 +1,9 @@
 use super::{
     cst::CstDb,
-    hir_to_mir::TracingConfig,
     lir::{Instruction, Lir, StackOffset},
     mir::{Body, Expression, Id},
     optimize::OptimizeMir,
+    utils::TracingConfig,
 };
 use crate::{module::Module, utils::CountableId};
 use itertools::Itertools;

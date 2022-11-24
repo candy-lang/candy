@@ -7,7 +7,7 @@ pub use self::{
     utils::FuzzablesFinder,
 };
 use crate::{
-    compiler::{hir::Id, hir_to_mir::TracingConfig},
+    compiler::{hir::Id, TracingConfig},
     database::Database,
     module::Module,
     vm::{

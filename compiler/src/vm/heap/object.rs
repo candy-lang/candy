@@ -3,9 +3,9 @@ use crate::{
     builtin_functions::BuiltinFunction,
     compiler::{
         hir::Id,
-        hir_to_mir::TracingConfig,
         lir::{Instruction, Lir},
         mir_to_lir::MirToLir,
+        TracingConfig,
     },
     database::Database,
     module::Module,

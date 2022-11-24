@@ -1,5 +1,5 @@
 use crate::{
-    compiler::{hir_to_mir::TracingConfig, lir::Lir, mir_to_lir::MirToLir},
+    compiler::{lir::Lir, mir_to_lir::MirToLir, TracingConfig},
     database::Database,
     module::{Module, ModuleDb, ModuleKind},
 };

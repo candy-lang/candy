@@ -3,7 +3,7 @@ use crate::{
     compiler::{
         ast_to_hir::AstToHir,
         hir::{Expression, HirDb, Id, Lambda},
-        hir_to_mir::TracingConfig,
+        TracingConfig,
     },
     database::Database,
     fuzzer::{Fuzzer, Status},

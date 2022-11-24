@@ -1,3 +1,20 @@
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+pub struct TracingConfig {
+    pub register_fuzzables: bool,
+    pub trace_calls: bool,
+    pub trace_evaluated_expressions: bool,
+}
+
+impl TracingConfig {
+    pub fn none() -> Self {
+        Self {
+            register_fuzzables: false,
+            trace_calls: false,
+            trace_evaluated_expressions: false,
+        }
+    }
+}
+
 pub trait AdjustCasingOfFirstLetter {
     fn lowercase_first_letter(&self) -> String;
     fn uppercase_first_letter(&self) -> String;
