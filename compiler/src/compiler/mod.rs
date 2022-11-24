@@ -13,6 +13,7 @@ pub mod optimize;
 pub mod rcst;
 pub mod rcst_to_cst;
 pub mod string_to_rcst;
+mod tracing;
 mod utils;
 
-pub use utils::TracingConfig;
+pub use self::tracing::{TracingConfig, TracingMode};

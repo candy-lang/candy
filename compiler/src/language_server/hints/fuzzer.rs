@@ -53,7 +53,7 @@ impl FuzzerManager {
         fuzzer.run(
             &mut DbUseProvider {
                 db,
-                config: TracingConfig::none(),
+                tracing: TracingConfig::off(),
             },
             &mut RunLimitedNumberOfInstructions::new(100),
         );

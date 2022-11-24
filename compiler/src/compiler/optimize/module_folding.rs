@@ -31,7 +31,7 @@ use crate::{
     compiler::{
         mir::{Expression, Id, Mir},
         optimize::OptimizeMir,
-        utils::TracingConfig,
+        tracing::TracingConfig,
     },
     module::UsePath,
 };
@@ -39,7 +39,7 @@ use std::collections::HashMap;
 use tracing::warn;
 
 impl Mir {
-    pub fn fold_modules(&mut self, db: &dyn OptimizeMir, config: &TracingConfig) {
+    pub fn fold_modules(&mut self, db: &dyn OptimizeMir, tracing: &TracingConfig) {
         self.body
             .visit_with_visible(&mut |_, expression, visible, _| {
                 let Expression::UseModule {
@@ -49,24 +49,24 @@ impl Mir {
                 } = expression else { return; };
 
                 let Expression::Text(path) = visible.get(*relative_path) else {
-                // warn!("use called with non-constant text");
-                return; // TODO
-            };
+                    return; // TODO
+                };
                 let Ok(path) = UsePath::parse(path) else {
-                warn!("use called with an invalid path");
-                return; // TODO
-            };
+                    warn!("use called with an invalid path");
+                    return; // TODO
+                };
                 let Ok(module_to_import) = path.resolve_relative_to(current_module.clone()) else {
-                warn!("use called with an invalid path");
-                return; // TODO
-            };
+                    warn!("use called with an invalid path");
+                    return; // TODO
+                };
 
                 // debug!("Loading and optimizing module {module_to_import}");
-                let mir = db.mir_with_obvious_optimized(module_to_import, config.clone());
+                let mir =
+                    db.mir_with_obvious_optimized(module_to_import, tracing.for_child_module());
                 let Some(mir) = mir else {
-                warn!("Module not found.");
-                return; // TODO
-            };
+                    warn!("Module not found.");
+                    return; // TODO
+                };
                 let mir = (*mir).clone();
 
                 let mapping: HashMap<Id, Id> = mir

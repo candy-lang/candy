@@ -59,7 +59,7 @@ use super::{
     hir,
     hir_to_mir::HirToMir,
     mir::{Body, Expression, Mir},
-    utils::TracingConfig,
+    tracing::TracingConfig,
 };
 use crate::{module::Module, utils::IdGenerator};
 use std::sync::Arc;
@@ -68,29 +68,32 @@ use tracing::debug;
 #[salsa::query_group(OptimizeMirStorage)]
 pub trait OptimizeMir: HirToMir {
     #[salsa::cycle(recover_from_cycle)]
-    fn mir_with_obvious_optimized(&self, module: Module, config: TracingConfig)
-        -> Option<Arc<Mir>>;
+    fn mir_with_obvious_optimized(
+        &self,
+        module: Module,
+        tracing: TracingConfig,
+    ) -> Option<Arc<Mir>>;
 }
 
 fn mir_with_obvious_optimized(
     db: &dyn OptimizeMir,
     module: Module,
-    config: TracingConfig,
+    tracing: TracingConfig,
 ) -> Option<Arc<Mir>> {
     debug!("{module}: Compiling");
-    let mir = db.mir(module.clone(), config.clone())?;
+    let mir = db.mir(module.clone(), tracing.clone())?;
     let mut mir = (*mir).clone();
     debug!("{module}: Optimizing. {}", mir.complexity());
-    mir.optimize_obvious(db, &config);
+    mir.optimize_obvious(db, &tracing);
     debug!("{module}: Done. {}", mir.complexity());
     Some(Arc::new(mir))
 }
 
 impl Mir {
     /// Performs optimizations that improve both performance and code size.
-    pub fn optimize_obvious(&mut self, db: &dyn OptimizeMir, config: &TracingConfig) {
+    pub fn optimize_obvious(&mut self, db: &dyn OptimizeMir, tracing: &TracingConfig) {
         self.optimize_obvious_self_contained();
-        self.fold_modules(db, config);
+        self.fold_modules(db, tracing);
         self.optimize_obvious_self_contained();
         self.cleanup();
     }
@@ -131,7 +134,7 @@ fn recover_from_cycle(
     _db: &dyn OptimizeMir,
     cycle: &[String],
     module: &Module,
-    _config: &TracingConfig,
+    _tracing: &TracingConfig,
 ) -> Option<Arc<Mir>> {
     let mut id_generator = IdGenerator::start_at(0);
     let mut body = Body::default();

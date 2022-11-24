@@ -157,8 +157,8 @@ impl Closure {
             body: lir.instructions,
         }
     }
-    pub fn of_module(db: &Database, module: Module, config: TracingConfig) -> Option<Self> {
-        let lir = db.lir(module, config)?;
+    pub fn of_module(db: &Database, module: Module, tracing: TracingConfig) -> Option<Self> {
+        let lir = db.lir(module, tracing)?;
         Some(Self::of_module_lir((*lir).clone()))
     }
 }
