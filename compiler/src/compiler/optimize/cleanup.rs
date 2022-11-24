@@ -1,3 +1,15 @@
+//! Cleanup makes the MIR more regular. Thus, it's easier to read for humans and
+//! salsa should have an easier time caching optimized MIRs.
+//!
+//! Here's a before-and-after example:
+//!
+//! ```mir
+//! $4 = "Banana"  |  $0 = "Apple"
+//! $8 = Foo       |  $1 = "Banana"
+//! $2 = "Apple"   |  $2 = Foo
+//! ...            |  ...
+//! ```
+
 use crate::{
     compiler::mir::{Body, Expression, Id, Mir},
     utils::IdGenerator,
@@ -10,6 +22,12 @@ impl Mir {
         self.normalize_ids();
     }
 
+    /// Sorts the leading constants in the body. This wouldn't be super useful
+    /// when applied to an unoptimized MIR, but because we optimize it using
+    /// [constant lifting], we can assume that all constants at the beginning
+    /// of the body.
+    ///
+    /// [constant lifting]: super::constant_lifting
     fn sort_leading_constants(&mut self) {
         let mut still_constants = true;
         let old_body = mem::take(&mut self.body);
@@ -24,6 +42,7 @@ impl Mir {
             Self::sort_constants(&mut self.body);
         }
     }
+    /// Assumes that the given body contains only constants.
     fn sort_constants(body: &mut Body) {
         body.sort_by(|(_, a), (_, b)| {
             fn order_score(expr: &Expression) -> u8 {
