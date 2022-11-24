@@ -57,7 +57,7 @@ pub enum StoredFiberEvent {
     },
     CallStarted {
         call_site: Pointer,
-        closure: Pointer,
+        callee: Pointer,
         arguments: Vec<Pointer>,
         responsible: Pointer,
     },
@@ -141,13 +141,13 @@ impl FullTracer {
             }
             FiberEvent::CallStarted {
                 call_site,
-                closure,
+                callee,
                 arguments,
                 responsible,
                 heap,
             } => {
                 let call_site = self.import_from_heap(call_site, heap, Some(fiber));
-                let closure = self.import_from_heap(closure, heap, Some(fiber));
+                let callee = self.import_from_heap(callee, heap, Some(fiber));
                 let arguments = arguments
                     .into_iter()
                     .map(|arg| self.import_from_heap(arg, heap, Some(fiber)))
@@ -155,7 +155,7 @@ impl FullTracer {
                 let responsible = self.import_from_heap(responsible, heap, Some(fiber));
                 StoredFiberEvent::CallStarted {
                     call_site,
-                    closure,
+                    callee,
                     arguments,
                     responsible,
                 }
@@ -205,12 +205,12 @@ impl fmt::Debug for FullTracer {
                                 format!("found fuzzable closure {definition}"),
                             StoredFiberEvent::CallStarted {
                                 call_site,
-                                closure,
+                                callee,
                                 arguments,
                                 responsible,
                             } => format!(
                                 "call started: {} {} (call site {}, {} is responsible)",
-                                closure.format(&self.heap),
+                                callee.format(&self.heap),
                                 arguments.iter().map(|arg| arg.format(&self.heap)).join(" "),
                                 self.heap.get_hir_id(*call_site),
                                 self.heap.get_hir_id(*responsible),

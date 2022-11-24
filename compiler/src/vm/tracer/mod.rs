@@ -50,7 +50,7 @@ pub enum FiberEvent<'event> {
     },
     CallStarted {
         call_site: Pointer,
-        closure: Pointer,
+        callee: Pointer,
         arguments: Vec<Pointer>,
         responsible: Pointer,
         heap: &'event Heap,
@@ -129,14 +129,14 @@ impl<'fiber> FiberTracer<'fiber> {
     pub fn call_started(
         &mut self,
         call_site: Pointer,
-        closure: Pointer,
+        callee: Pointer,
         args: Vec<Pointer>,
         responsible: Pointer,
         heap: &Heap,
     ) {
         self.add(FiberEvent::CallStarted {
             call_site,
-            closure,
+            callee,
             arguments: args,
             responsible,
             heap,

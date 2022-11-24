@@ -172,14 +172,14 @@ fn panic_hint(
 
     let Call {
         call_site,
-        closure,
+        callee,
         arguments: args,
         ..
     } = last_call_in_this_module;
     let call_site = evaluator.tracer.heap.get_hir_id(*call_site);
     let call_info = format!(
         "{} {}",
-        closure.format(&evaluator.tracer.heap),
+        callee.format(&evaluator.tracer.heap),
         args.iter()
             .map(|arg| arg.format(&evaluator.tracer.heap))
             .join(" ")

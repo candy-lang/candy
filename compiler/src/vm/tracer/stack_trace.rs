@@ -22,7 +22,7 @@ use tracing::debug;
 #[derive(Clone)]
 pub struct Call {
     pub call_site: Pointer,
-    pub closure: Pointer,
+    pub callee: Pointer,
     pub arguments: Vec<Pointer>,
     pub responsible: Pointer,
 }
@@ -36,13 +36,13 @@ impl FullTracer {
             match event {
                 StoredFiberEvent::CallStarted {
                     call_site,
-                    closure,
+                    callee,
                     arguments,
                     responsible,
                 } => {
                     stack.push(Call {
                         call_site: *call_site,
-                        closure: *closure,
+                        callee: *callee,
                         arguments: arguments.clone(),
                         responsible: *responsible,
                     });
@@ -60,7 +60,7 @@ impl FullTracer {
 
         for Call {
             call_site,
-            closure,
+            callee,
             arguments,
             responsible: _,
         } in stack.iter().rev()
@@ -93,7 +93,7 @@ impl FullTracer {
                             _ => None,
                         }
                     })
-                    .unwrap_or_else(|| closure.format(&self.heap)),
+                    .unwrap_or_else(|| callee.format(&self.heap)),
                 arguments.iter().map(|arg| arg.format(&self.heap)).join(" ")
             );
             caller_locations_and_calls.push((caller_location_string, call_string));
