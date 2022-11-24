@@ -571,7 +571,7 @@ impl_data_try_into_type!(Text, Text, "A builtin function expected a text.");
 impl_data_try_into_type!(Symbol, Symbol, "A builtin function expected a symbol.");
 impl_data_try_into_type!(List, List, "A builtin function expected a list.");
 impl_data_try_into_type!(Struct, Struct, "A builtin function expected a struct.");
-impl_data_try_into_type!(Id, HirId, "expected a HIR ID");
+impl_data_try_into_type!(Id, HirId, "A builtin function expected a HIR ID.");
 impl_data_try_into_type!(Closure, Closure, "A builtin function expected a closure.");
 impl_data_try_into_type!(
     SendPort,

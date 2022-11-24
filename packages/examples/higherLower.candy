@@ -1,4 +1,5 @@
-# Echoes whatever you send to it on stdin.
+# Repeatedly asks you for a guess and tells you whether the secret number is
+# higher or lower. Exits once you found the secret number.
 
 core = use "...Core"
 async = core.async
@@ -7,6 +8,7 @@ channel = core.channel
 equals = core.equals
 ifElse = core.ifElse
 int = core.int
+result = core.result
 run = core.function.run
 text = core.text
 
@@ -27,12 +29,7 @@ main := { environment ->
     print "What's your guess?"
     guess = run read | text.trim | int.parse
     
-    ifElse (equals guess.type Err) {
-      print "Your guess must be a number."
-      guess guessRec correct
-    } {
-      guess = guess.value
-
+    guess | result.mapOrElse { guess ->
       ifElse (equals guess correct) { print "You did it!" } {
         ifElse (int.isLessThan correct guess) {
           print "Lower!"
@@ -41,6 +38,9 @@ main := { environment ->
         }
         guessRec guessRec correct
       }
+    } { error ->
+      print "Your guess must be a number."
+      guess guessRec correct
     }
   }
 

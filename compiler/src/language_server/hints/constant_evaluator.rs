@@ -162,9 +162,8 @@ fn panic_hint(
         return None;
     }
 
-    let last_call_in_this_module = stack.iter().find(|entry| {
-        let Call { call_site, .. } = entry;
-        let call_site = evaluator.tracer.heap.get_hir_id(*call_site);
+    let last_call_in_this_module = stack.iter().find(|call| {
+        let call_site = evaluator.tracer.heap.get_hir_id(call.call_site);
         // Make sure the entry comes from the same file and is not generated
         // code.
         call_site.module == module && db.hir_to_cst_id(call_site).is_some()
@@ -182,7 +181,7 @@ fn panic_hint(
         callee.format(&evaluator.tracer.heap),
         args.iter()
             .map(|arg| arg.format(&evaluator.tracer.heap))
-            .join(" ")
+            .join(" "),
     );
 
     Some(Hint {

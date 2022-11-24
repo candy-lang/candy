@@ -80,7 +80,8 @@ impl Heap {
             .unwrap_or_else(|| panic!("Couldn't get object {address}."))
     }
     pub fn get_hir_id(&self, address: Pointer) -> Id {
-        self.get(address).data.clone().try_into().unwrap()
+        let Data::HirId(id) = &self.get(address).data else { panic!(); };
+        id.clone()
     }
 
     pub fn dup(&mut self, address: Pointer) {

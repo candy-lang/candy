@@ -49,23 +49,22 @@ impl Mir {
                 } = expression else { return; };
 
                 let Expression::Text(path) = visible.get(*relative_path) else {
-                    return; // TODO
+                    return; // TODO: Replace with a panic.
                 };
                 let Ok(path) = UsePath::parse(path) else {
                     warn!("use called with an invalid path");
-                    return; // TODO
+                    return; // TODO: Replace with a panic.
                 };
                 let Ok(module_to_import) = path.resolve_relative_to(current_module.clone()) else {
                     warn!("use called with an invalid path");
-                    return; // TODO
+                    return; // TODO: Replace with a panic.
                 };
 
-                // debug!("Loading and optimizing module {module_to_import}");
                 let mir =
                     db.mir_with_obvious_optimized(module_to_import, tracing.for_child_module());
                 let Some(mir) = mir else {
                     warn!("Module not found.");
-                    return; // TODO
+                    return; // TODO: Replace with a panic.
                 };
                 let mir = (*mir).clone();
 
