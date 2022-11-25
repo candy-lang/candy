@@ -245,6 +245,7 @@ pub trait ModuleWatcher {
     fn get_open_module_raw(&self, module: &Module) -> Option<Vec<u8>>;
 }
 
+#[derive(Debug)]
 pub struct UsePath {
     parent_navigations: usize,
     path: String,
