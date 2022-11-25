@@ -1,6 +1,6 @@
 bool = use "..bool"
 equals = (use "..equality").equals
-if = (use "..conditionals").if
+if = (use "..controlFlow").if
 int = use "..int"
 isType = (use "..type").is
 

@@ -1,5 +1,5 @@
 bool = use "..bool"
-if = (use "..conditionals").if
+if = (use "..controlFlow").if
 
 check condition :=
   # Panics if the `condition` is `False`.
