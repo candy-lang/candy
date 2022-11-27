@@ -2160,5 +2160,89 @@ mod parse {
                 }
             ))
         );
+        assert_eq!(
+            assignment("foo = # comment\n", 0),
+            Some((
+                "\n",
+                Rcst::Assignment {
+                    name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    parameters: vec![],
+                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::EqualsSign),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    body: vec![Rcst::Comment {
+                        octothorpe: Box::new(Rcst::Octothorpe),
+                        comment: " comment".to_string()
+                    }],
+                }
+            ))
+        );
+        // foo =
+        //   # comment
+        // 3
+        assert_eq!(
+            assignment("foo =\n  # comment\n3", 0),
+            Some((
+                "\n3",
+                Rcst::Assignment {
+                    name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    parameters: vec![],
+                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::EqualsSign),
+                        whitespace: vec![
+                            Rcst::Newline("\n".to_string()),
+                            Rcst::Whitespace("  ".to_string())
+                        ],
+                    }),
+                    body: vec![Rcst::Comment {
+                        octothorpe: Box::new(Rcst::Octothorpe),
+                        comment: " comment".to_string()
+                    }],
+                }
+            ))
+        );
+        // foo =
+        //   # comment
+        //   5
+        // 3
+        assert_eq!(
+            assignment("foo =\n  # comment\n  5\n3", 0),
+            Some((
+                "\n3",
+                Rcst::Assignment {
+                    name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    parameters: vec![],
+                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::EqualsSign),
+                        whitespace: vec![
+                            Rcst::Newline("\n".to_string()),
+                            Rcst::Whitespace("  ".to_string())
+                        ],
+                    }),
+                    body: vec![
+                        Rcst::Comment {
+                            octothorpe: Box::new(Rcst::Octothorpe),
+                            comment: " comment".to_string()
+                        },
+                        Rcst::Newline("\n".to_string()),
+                        Rcst::Whitespace("  ".to_string()),
+                        Rcst::Int {
+                            value: 5u8.into(),
+                            string: "5".to_string()
+                        }
+                    ],
+                }
+            ))
+        );
     }
 }
