@@ -150,7 +150,6 @@ We already have a language server that provides some tooling.
 - fuzz parser
 - remove builtinPrint
 - optimize: tail call optimization
-- parse function declaration with doc comment but no code
 - tracing visualization
 - distinguish packages from normal modules
 - complain about comment lines with too much indentation
