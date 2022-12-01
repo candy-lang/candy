@@ -154,6 +154,12 @@ We already have a language server that provides some tooling.
 - develop guidelines about how to format reasons
 - disallow passing named closures as parameters? or auto-propagate caller's fault to called parameters?
 - replace occurrences of `Id::complicated_responsibility()`
+- fix usage of pipes in indented code such as this:
+  ```candy
+  foo
+    bar | baz
+  ## Currently, this is parsed as `baz (foo bar)`.
+  ```
 
 ## How to use Candy
 
