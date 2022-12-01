@@ -55,7 +55,7 @@ impl FuzzerManager {
                 db,
                 tracing: TracingConfig::off(),
             },
-            &mut RunLimitedNumberOfInstructions::new(100),
+            &mut RunLimitedNumberOfInstructions::new(1000),
         );
 
         match &fuzzer.status() {

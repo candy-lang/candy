@@ -103,7 +103,7 @@ pub async fn run_server(
                 break 'new_insight Some(module);
             }
             // For fuzzing, we're a bit more resource-conscious.
-            sleep(Duration::from_millis(200)).await;
+            sleep(Duration::from_millis(1000)).await;
             debug!("Fuzzing.");
             if let Some(module) = fuzzer.run(&db) {
                 warn!("Fuzzer found a problem!");
