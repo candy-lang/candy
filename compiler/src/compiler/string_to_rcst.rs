@@ -2016,7 +2016,7 @@ mod parse {
         let original_assignment_sign = assignment_sign.clone();
         let input_after_assignment_sign = input;
 
-        let (input, more_whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+        let (input, more_whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
         assignment_sign = assignment_sign.wrap_in_whitespace(more_whitespace.clone());
 
         let is_multiline = name.is_multiline()
@@ -2035,7 +2035,7 @@ mod parse {
                 (input, assignment_sign, body)
             }
         } else {
-            match expression(input, indentation, true, true) {
+            match comment(input).or_else(|| expression(input, indentation, true, true)) {
                 Some((input, expression)) => (input, assignment_sign, vec![expression]),
                 None => (
                     input_after_assignment_sign,
