@@ -154,11 +154,15 @@ We already have a language server that provides some tooling.
 - disallow passing named closures as parameters? or auto-propagate caller's fault to called parameters?
 - replace occurrences of `Id::complicated_responsibility()`
 - fix usage of pipes in indented code such as this:
+
   ```candy
   foo
     bar | baz
   ## Currently, this is parsed as `baz (foo bar)`.
   ```
+
+- more efficient argument preparation in LIR function call (so we don't have to push references if the evaluation order doesn't change conceptually)
+- fix evaluation order of pipe expression by keeping it in the AST
 
 ## How to use Candy
 
