@@ -553,7 +553,7 @@ impl TryInto<Any> for Data {
     }
 }
 macro_rules! impl_data_try_into_type {
-    ($type:ty, $variant:tt, $error_message:expr) => {
+    ($type:ty, $variant:tt, $error_message:expr$(,)?) => {
         impl TryInto<$type> for Data {
             type Error = String;
 
@@ -576,12 +576,12 @@ impl_data_try_into_type!(Closure, Closure, "A builtin function expected a closur
 impl_data_try_into_type!(
     SendPort,
     SendPort,
-    "A builtin function expected a send port."
+    "A builtin function expected a send port.",
 );
 impl_data_try_into_type!(
     ReceivePort,
     ReceivePort,
-    "A builtin function expected a receive port."
+    "A builtin function expected a receive port.",
 );
 
 impl TryInto<bool> for Data {
