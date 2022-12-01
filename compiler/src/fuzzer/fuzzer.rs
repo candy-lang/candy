@@ -1,6 +1,6 @@
 use super::generator::generate_n_values;
 use crate::{
-    compiler::hir,
+    compiler::hir::{self, Id},
     vm::{
         self,
         context::{ExecutionController, UseProvider},
@@ -32,6 +32,7 @@ pub enum Status {
     PanickedForArguments {
         arguments: Vec<Packet>,
         reason: String,
+        responsible: hir::Id,
         tracer: FullTracer,
     },
 }
@@ -52,7 +53,7 @@ impl Status {
             .collect_vec();
 
         let mut vm = Vm::new();
-        vm.set_up_for_running_closure(vm_heap, closure, &argument_addresses);
+        vm.set_up_for_running_closure(vm_heap, closure, &argument_addresses, Id::fuzzer());
 
         Status::StillFuzzing {
             vm,
@@ -78,6 +79,9 @@ impl Fuzzer {
 
     pub fn status(&self) -> &Status {
         self.status.as_ref().unwrap()
+    }
+    pub fn into_status(self) -> Status {
+        self.status.unwrap()
     }
 
     pub fn run<U: UseProvider, E: ExecutionController>(
@@ -106,19 +110,15 @@ impl Fuzzer {
                     Status::StillFuzzing { vm, arguments, tracer }
                 }
                 vm::Status::WaitingForOperations => panic!("Fuzzing should not have to wait on channel operations because arguments were not channels."),
-                // The VM finished running without panicking.
                 vm::Status::Done => Status::new_fuzzing_attempt(&self.closure_heap, self.closure),
                 vm::Status::Panicked { reason, responsible } => {
-                    // If a `needs` directly inside the tested closure was not
-                    // satisfied, then the panic is not closure's fault, but our
-                    // fault.
-                    let is_our_fault = responsible.is_none();
-                    if is_our_fault {
+                    if responsible == Id::fuzzer() {
                         Status::new_fuzzing_attempt(&self.closure_heap, self.closure)
                     } else {
                         Status::PanickedForArguments {
                             arguments,
                             reason,
+                            responsible,
                             tracer,
                         }
                     }
@@ -129,10 +129,12 @@ impl Fuzzer {
             Status::PanickedForArguments {
                 arguments,
                 reason,
+                responsible,
                 tracer,
             } => Status::PanickedForArguments {
                 arguments,
                 reason,
+                responsible,
                 tracer,
             },
         }

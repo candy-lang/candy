@@ -3,7 +3,6 @@ pub mod full;
 pub mod stack_trace;
 
 use super::{heap::Pointer, ChannelId, FiberId, Heap};
-use crate::{compiler::hir::Id, module::Module};
 
 /// An event that happened inside a VM.
 #[derive(Clone)]
@@ -39,40 +38,27 @@ pub enum VmEvent<'event> {
 /// An event that happened inside a fiber.
 #[derive(Clone)]
 pub enum FiberEvent<'event> {
-    ModuleStarted {
-        module: Module,
-    },
-    ModuleEnded {
-        export_map: Pointer,
-        heap: &'event Heap,
-    },
     ValueEvaluated {
-        id: Id,
+        expression: Pointer,
         value: Pointer,
         heap: &'event Heap,
     },
     FoundFuzzableClosure {
-        id: Id,
+        definition: Pointer,
         closure: Pointer,
         heap: &'event Heap,
     },
     CallStarted {
-        id: Id,
-        closure: Pointer,
-        args: Vec<Pointer>,
+        call_site: Pointer,
+        callee: Pointer,
+        arguments: Vec<Pointer>,
+        responsible: Pointer,
         heap: &'event Heap,
     },
     CallEnded {
         return_value: Pointer,
         heap: &'event Heap,
     },
-    NeedsStarted {
-        id: Id,
-        condition: Pointer,
-        reason: Pointer,
-        heap: &'event Heap,
-    },
-    NeedsEnded,
 }
 
 pub trait Tracer {
@@ -126,38 +112,37 @@ impl<'fiber> FiberTracer<'fiber> {
         });
     }
 
-    pub fn module_started(&mut self, module: Module) {
-        self.add(FiberEvent::ModuleStarted { module });
+    pub fn value_evaluated(&mut self, expression: Pointer, value: Pointer, heap: &Heap) {
+        self.add(FiberEvent::ValueEvaluated {
+            expression,
+            value,
+            heap,
+        });
     }
-    pub fn module_ended(&mut self, export_map: Pointer, heap: &Heap) {
-        self.add(FiberEvent::ModuleEnded { export_map, heap });
-    }
-    pub fn value_evaluated(&mut self, id: Id, value: Pointer, heap: &Heap) {
-        self.add(FiberEvent::ValueEvaluated { id, value, heap });
-    }
-    pub fn found_fuzzable_closure(&mut self, id: Id, closure: Pointer, heap: &Heap) {
-        self.add(FiberEvent::FoundFuzzableClosure { id, closure, heap });
-    }
-    pub fn call_started(&mut self, id: Id, closure: Pointer, args: Vec<Pointer>, heap: &Heap) {
-        self.add(FiberEvent::CallStarted {
-            id,
+    pub fn found_fuzzable_closure(&mut self, definition: Pointer, closure: Pointer, heap: &Heap) {
+        self.add(FiberEvent::FoundFuzzableClosure {
+            definition,
             closure,
-            args,
+            heap,
+        });
+    }
+    pub fn call_started(
+        &mut self,
+        call_site: Pointer,
+        callee: Pointer,
+        args: Vec<Pointer>,
+        responsible: Pointer,
+        heap: &Heap,
+    ) {
+        self.add(FiberEvent::CallStarted {
+            call_site,
+            callee,
+            arguments: args,
+            responsible,
             heap,
         });
     }
     pub fn call_ended(&mut self, return_value: Pointer, heap: &Heap) {
         self.add(FiberEvent::CallEnded { return_value, heap });
-    }
-    pub fn needs_started(&mut self, id: Id, condition: Pointer, reason: Pointer, heap: &Heap) {
-        self.add(FiberEvent::NeedsStarted {
-            id,
-            condition,
-            reason,
-            heap,
-        });
-    }
-    pub fn needs_ended(&mut self) {
-        self.add(FiberEvent::NeedsEnded);
     }
 }

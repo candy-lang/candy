@@ -8,7 +8,7 @@ filled length item :=
   needs (int.is length)
   needs (int.isNonNegative length)
   needs (int.fitsInRustU32 length)
-  length | ✨.listFilled item
+  ✨.listFilled length item
 # TODO: `generate length valueGetter` when we have loops
 
 is value := type.is value List

@@ -1,0 +1,48 @@
+# Repeatedly asks you for a guess and tells you whether the secret number is
+# higher or lower. Exits once you found the secret number.
+
+core = use "...Core"
+async = core.async
+await = core.await
+channel = core.channel
+equals = core.equals
+ifElse = core.ifElse
+int = core.int
+result = core.result
+run = core.function.run
+text = core.text
+
+main := { environment ->
+  print message =
+    needs (text.is message)
+    environment.stdout | channel.send message
+
+  read = {
+    response = channel.create 1
+    environment.stdin | channel.send response.sendPort
+    await response.receivePort
+  }
+
+  print "Welcome to the number guessing game!"
+
+  guessRec = { guessRec correct ->
+    print "What's your guess?"
+    guess = run read | text.trim | int.parse
+    
+    guess | result.mapOrElse { guess ->
+      ifElse (equals guess correct) { print "You did it!" } {
+        ifElse (int.isLessThan correct guess) {
+          print "Lower!"
+        } {
+          print "Higher!"
+        }
+        guessRec guessRec correct
+      }
+    } { error ->
+      print "Your guess must be a number."
+      guess guessRec correct
+    }
+  }
+
+  guessRec guessRec 42
+}

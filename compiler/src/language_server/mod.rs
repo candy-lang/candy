@@ -85,17 +85,17 @@ impl LanguageServer for CandyLanguageServer {
             _ => panic!("Workspace folder must be a file URI."),
         };
 
-        let (events_sender, events_receiver) = tokio::sync::mpsc::channel(16);
-        let (hints_sender, mut hints_receiver) = tokio::sync::mpsc::channel(8);
+        let (events_sender, events_receiver) = tokio::sync::mpsc::channel(1024);
+        let (hints_sender, mut hints_receiver) = tokio::sync::mpsc::channel(1024);
         tokio::spawn(hints::run_server(events_receiver, hints_sender));
         *self.hints_server_sink.lock().await = Some(events_sender);
         let client = self.client.clone();
         let hint_reporter = async move || {
             while let Some((module, hints)) = hints_receiver.recv().await {
-                debug!("Reporting hints for {module}: {hints:?}");
+                let url: Option<Url> = module.into();
                 client
                     .send_notification::<HintsNotification>(HintsNotification {
-                        uri: Url::from(module).to_string(),
+                        uri: url.unwrap().to_string(),
                         hints,
                     })
                     .await;
@@ -327,8 +327,9 @@ impl CandyLanguageServer {
                     .map(|it| it.into_diagnostic(&db, module.clone()))
                     .collect()
             };
+            let url: Option<Url> = module.clone().into();
             self.client
-                .publish_diagnostics(module.clone().into(), diagnostics, None)
+                .publish_diagnostics(url.unwrap(), diagnostics, None)
                 .await;
         }
     }

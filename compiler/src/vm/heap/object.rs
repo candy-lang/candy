@@ -3,8 +3,9 @@ use crate::{
     builtin_functions::BuiltinFunction,
     compiler::{
         hir::Id,
-        hir_to_lir::HirToLir,
         lir::{Instruction, Lir},
+        mir_to_lir::MirToLir,
+        TracingConfig,
     },
     database::Database,
     module::Module,
@@ -30,6 +31,7 @@ pub enum Data {
     Symbol(Symbol),
     List(List),
     Struct(Struct),
+    HirId(Id),
     Closure(Closure),
     Builtin(Builtin),
     SendPort(SendPort),
@@ -64,11 +66,9 @@ pub struct Struct {
 
 #[derive(Clone)]
 pub struct Closure {
-    pub id: Id,
     pub captured: Vec<Pointer>,
     pub num_args: usize,
     pub body: Vec<Instruction>,
-    pub responsible: Option<Id>,
 }
 
 #[derive(Clone)]
@@ -150,32 +150,16 @@ impl Struct {
 }
 
 impl Closure {
-    pub fn of_module_lir(module: Module, lir: Lir) -> Self {
+    pub fn of_module_lir(lir: Lir) -> Self {
         Closure {
-            id: Id::new(module.clone(), vec![]),
             captured: vec![],
             num_args: 0,
-            body: vec![
-                Instruction::TraceModuleStarts {
-                    module: module.clone(),
-                },
-                Instruction::CreateClosure {
-                    id: Id::new(module, vec![]),
-                    captured: vec![],
-                    num_args: 0,
-                    body: lir.instructions,
-                    is_curly: true,
-                },
-                Instruction::Call { num_args: 0 },
-                Instruction::TraceModuleEnds,
-                Instruction::Return,
-            ],
-            responsible: None,
+            body: lir.instructions,
         }
     }
-    pub fn of_module(db: &Database, module: Module) -> Option<Self> {
-        let lir = db.lir(module.clone())?;
-        Some(Self::of_module_lir(module, (*lir).clone()))
+    pub fn of_module(db: &Database, module: Module, tracing: TracingConfig) -> Option<Self> {
+        let lir = db.lir(module, tracing)?;
+        Some(Self::of_module_lir((*lir).clone()))
     }
 }
 
@@ -226,6 +210,7 @@ impl Data {
                 }
                 s.hash(state)
             }
+            Data::HirId(id) => id.hash(state),
             Data::Closure(closure) => {
                 for captured in &closure.captured {
                     captured.hash_with_state(heap, state);
@@ -246,6 +231,7 @@ impl Data {
             (Data::Symbol(a), Data::Symbol(b)) => a.value == b.value,
             (Data::List(a), Data::List(b)) => a.equals(heap, b),
             (Data::Struct(a), Data::Struct(b)) => a.equals(heap, b),
+            (Data::HirId(a), Data::HirId(b)) => a == b,
             (Data::Closure(_), Data::Closure(_)) => false,
             (Data::Builtin(a), Data::Builtin(b)) => a.function == b.function,
             (Data::SendPort(a), Data::SendPort(b)) => a.channel == b.channel,
@@ -276,6 +262,7 @@ impl Data {
                     .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ")
             ),
+            Data::HirId(id) => format!("{id:?}"),
             Data::Closure(_) => "{…}".to_string(),
             Data::Builtin(builtin) => format!("builtin{:?}", builtin.function),
             Data::SendPort(port) => format!("sendPort {:?}", port.channel),
@@ -289,6 +276,7 @@ impl Data {
             | Data::Text(_)
             | Data::Symbol(_)
             | Data::Builtin(_)
+            | Data::HirId(_)
             | Data::SendPort(_)
             | Data::ReceivePort(_) => vec![],
             Data::List(List { items }) => items.clone(),

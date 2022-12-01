@@ -46,6 +46,10 @@ pub enum Package {
     /// not yet persisted to disk (such as when opening a new VSCode tab and
     /// typing some code).
     Anonymous { url: String },
+
+    /// This package can make the tooling responsible for calls. For example,
+    /// the fuzzer and constant evaluator use this.
+    Tooling(String),
 }
 
 impl Module {
@@ -127,6 +131,7 @@ impl Package {
             Package::User(path) => Some(path.clone()),
             Package::External(path) => Some(path.clone()),
             Package::Anonymous { .. } => None,
+            Package::Tooling(_) => None,
         }
     }
 }
@@ -171,6 +176,7 @@ impl Display for Package {
             Package::User(path) => write!(f, "user:{path:?}"),
             Package::External(path) => write!(f, "extern:{path:?}"),
             Package::Anonymous { url } => write!(f, "anonymous:{url}"),
+            Package::Tooling(tooling) => write!(f, "tooling:{tooling}"),
         }
     }
 }
@@ -237,6 +243,60 @@ fn get_open_module_content(db: &dyn ModuleDb, module: Module) -> Option<Arc<Vec<
 
 pub trait ModuleWatcher {
     fn get_open_module_raw(&self, module: &Module) -> Option<Vec<u8>>;
+}
+
+pub struct UsePath {
+    parent_navigations: usize,
+    path: String,
+}
+impl UsePath {
+    const PARENT_NAVIGATION_CHAR: char = '.';
+
+    pub fn parse(mut path: &str) -> Result<Self, String> {
+        let parent_navigations = {
+            let mut navigations = 0;
+            while path.starts_with(UsePath::PARENT_NAVIGATION_CHAR) {
+                navigations += 1;
+                path = &path[UsePath::PARENT_NAVIGATION_CHAR.len_utf8()..];
+            }
+            match navigations {
+                0 => return Err("the target must start with at least one dot".to_string()),
+                i => i - 1, // two dots means one parent navigation
+            }
+        };
+        let path = {
+            if !path.chars().all(|c| c.is_ascii_alphanumeric() || c == '.') {
+                return Err("the target name can only contain letters and dots".to_string());
+            }
+            path.to_string()
+        };
+        Ok(UsePath {
+            parent_navigations,
+            path,
+        })
+    }
+
+    pub fn resolve_relative_to(&self, current_module: Module) -> Result<Module, String> {
+        let kind = if self.path.contains('.') {
+            ModuleKind::Asset
+        } else {
+            ModuleKind::Code
+        };
+
+        let mut path = current_module.path;
+        for _ in 0..self.parent_navigations {
+            if path.pop().is_none() {
+                return Err("too many parent navigations".to_string());
+            }
+        }
+        path.push(self.path.to_string());
+
+        Ok(Module {
+            package: current_module.package,
+            path: path.clone(),
+            kind,
+        })
+    }
 }
 
 #[cfg(test)]

@@ -2,6 +2,7 @@ bool = use "..bool"
 conditionals = use "..conditionals"
 equals = (use "..equality").equals
 int = use "..int"
+list = use "..list"
 struct = use "..struct"
 type = use "..type"
 
@@ -23,18 +24,19 @@ characterAt text index :=
   needs (int.is index)
   needs (int.isNonNegative index)
   needs (int.isLessThan index (length text))
-  text | characters | struct.getUnwrap index
+  text | characters | list.get index
 
 getRange text startInclusive endExclusive :=
   needs (is text)
 
   needs (int.is startInclusive)
   needs (int.isNonNegative startInclusive)
-  needs (int.is endExclusive)
 
+  needs (int.is endExclusive)
   needs (int.isNonNegative endExclusive)
+
   needs (int.isLessThanOrEqualTo startInclusive endExclusive)
-  needs (int.isLessThan endExclusive (length text))
+  needs (int.isLessThanOrEqualTo endExclusive (length text))
 
   # TODO: Support ranges when we have them.
   text | ✨.textGetRange startInclusive endExclusive
@@ -61,7 +63,7 @@ removePrefix text prefix :=
   needs (is text)
   needs (is prefix)
   conditionals.ifElse
-    text | startsWith prefix
+    (text | startsWith prefix)
     { text | getRange (prefix | length) (text | length) }
     { text }
 removeSuffix text suffix :=

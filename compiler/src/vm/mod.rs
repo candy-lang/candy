@@ -10,8 +10,9 @@ mod use_module;
 pub use self::{
     channel::Packet,
     fiber::{ExecutionResult, Fiber},
-    heap::{Closure, Heap, Object, Pointer, Struct},
+    heap::{Closure, Data, Heap, Object, Pointer, SendPort, Struct},
     ids::{ChannelId, FiberId, OperationId},
+    tracer::{full::FullTracer, Tracer},
 };
 use self::{
     channel::{Channel, Completer, Performer},
@@ -19,11 +20,12 @@ use self::{
         CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions,
         UseProvider,
     },
-    heap::SendPort,
-    ids::{CountableId, IdGenerator},
-    tracer::Tracer,
 };
-use crate::compiler::hir::Id;
+use crate::{
+    compiler::hir::Id,
+    module::Module,
+    utils::{CountableId, IdGenerator},
+};
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use std::{
@@ -112,10 +114,7 @@ pub enum Status {
     CanRun,
     WaitingForOperations,
     Done,
-    Panicked {
-        reason: String,
-        responsible: Option<Id>,
-    },
+    Panicked { reason: String, responsible: Id },
 }
 
 impl FiberId {
@@ -155,11 +154,17 @@ impl Vm {
         heap: Heap,
         closure: Pointer,
         arguments: &[Pointer],
+        responsible: Id,
     ) {
-        self.set_up_with_fiber(Fiber::new_for_running_closure(heap, closure, arguments));
+        self.set_up_with_fiber(Fiber::new_for_running_closure(
+            heap,
+            closure,
+            arguments,
+            responsible,
+        ));
     }
-    pub fn set_up_for_running_module_closure(&mut self, closure: Closure) {
-        self.set_up_with_fiber(Fiber::new_for_running_module_closure(closure))
+    pub fn set_up_for_running_module_closure(&mut self, module: Module, closure: Closure) {
+        self.set_up_with_fiber(Fiber::new_for_running_module_closure(module, closure))
     }
 
     pub fn tear_down(mut self) -> ExecutionResult {
@@ -330,7 +335,12 @@ impl Vm {
                     self.fibers.insert(
                         id,
                         FiberTree::Single(Single {
-                            fiber: Fiber::new_for_running_closure(heap, body, &[nursery_send_port]),
+                            fiber: Fiber::new_for_running_closure(
+                                heap,
+                                body,
+                                &[nursery_send_port],
+                                Id::complicated_responsibility(),
+                            ),
                             parent: Some(fiber_id),
                         }),
                     );
@@ -357,7 +367,12 @@ impl Vm {
                     self.fibers.insert(
                         id,
                         FiberTree::Single(Single {
-                            fiber: Fiber::new_for_running_closure(heap, body, &[]),
+                            fiber: Fiber::new_for_running_closure(
+                                heap,
+                                body,
+                                &[],
+                                Id::complicated_responsibility(),
+                            ),
                             parent: Some(fiber_id),
                         }),
                     );
@@ -425,11 +440,14 @@ impl Vm {
                                 )
                             }
                         }
-                        ExecutionResult::Panicked { reason, .. } => self.finish_parallel(
+                        ExecutionResult::Panicked {
+                            reason,
+                            responsible,
+                        } => self.finish_parallel(
                             tracer,
                             parent,
                             Performer::Fiber(fiber_id),
-                            Err(reason),
+                            Err((reason, responsible)),
                         ),
                     }
                 }
@@ -472,7 +490,7 @@ impl Vm {
         tracer: &mut T,
         parallel_id: FiberId,
         cause: Performer,
-        result: Result<(), String>,
+        result: Result<(), (String, Id)>,
     ) {
         let parallel = self
             .fibers
@@ -540,8 +558,9 @@ impl Vm {
                 if let Performer::Fiber(fiber) = performer {
                     let tree = self.fibers.get_mut(&fiber).unwrap();
                     tree.as_single_mut().unwrap().fiber.panic(
-                        "the nursery is already dead because the parallel section ended"
+                        "The nursery is already dead because the parallel section ended."
                             .to_string(),
+                        Id::complicated_responsibility(),
                     );
                 }
                 return;
@@ -564,7 +583,12 @@ impl Vm {
                         self.fibers.insert(
                             child_id,
                             FiberTree::Single(Single {
-                                fiber: Fiber::new_for_running_closure(heap, closure_to_spawn, &[]),
+                                fiber: Fiber::new_for_running_closure(
+                                    heap,
+                                    closure_to_spawn,
+                                    &[],
+                                    Id::complicated_responsibility(),
+                                ),
                                 parent: Some(parent_id),
                             }),
                         );
@@ -583,7 +607,10 @@ impl Vm {
                         tracer,
                         parent_id,
                         performer.clone(),
-                        Err("a nursery received an invalid message".to_string()),
+                        Err((
+                            "a nursery received an invalid message".to_string(),
+                            Id::complicated_responsibility(),
+                        )),
                     ),
                 }
 

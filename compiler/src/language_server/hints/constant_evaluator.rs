@@ -5,6 +5,7 @@ use crate::{
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
         hir::Id,
+        TracingConfig, TracingMode,
     },
     database::Database,
     language_server::hints::{utils::id_to_end_of_line, HintKind},
@@ -14,7 +15,7 @@ use crate::{
         context::{DbUseProvider, RunLimitedNumberOfInstructions},
         tracer::{
             full::{FullTracer, StoredFiberEvent, StoredVmEvent, TimedEvent},
-            stack_trace::StackEntry,
+            stack_trace::Call,
         },
         Closure, FiberId, Heap, Pointer, Vm,
     },
@@ -22,7 +23,7 @@ use crate::{
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::collections::HashMap;
-use tracing::{span, trace, Level};
+use tracing::{span, Level};
 
 #[derive(Default)]
 pub struct ConstantEvaluator {
@@ -35,9 +36,17 @@ struct Evaluator {
 
 impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
+        let tracing = TracingConfig {
+            register_fuzzables: TracingMode::OnlyCurrent,
+            calls: TracingMode::Off,
+            evaluated_expressions: TracingMode::OnlyCurrent,
+        };
         let tracer = FullTracer::default();
         let mut vm = Vm::new();
-        vm.set_up_for_running_module_closure(Closure::of_module(db, module.clone()).unwrap());
+        vm.set_up_for_running_module_closure(
+            module.clone(),
+            Closure::of_module(db, module.clone(), tracing).unwrap(),
+        );
         self.evaluators.insert(module, Evaluator { tracer, vm });
     }
 
@@ -46,28 +55,22 @@ impl ConstantEvaluator {
     }
 
     pub fn run(&mut self, db: &Database) -> Option<Module> {
-        let num_evaluators = self.evaluators.len();
         let mut running_evaluators = self
             .evaluators
             .iter_mut()
             .filter(|(_, evaluator)| matches!(evaluator.vm.status(), vm::Status::CanRun))
             .collect_vec();
-        trace!(
-            "Constant evaluator running. {} running VMs, {} in total.",
-            running_evaluators.len(),
-            num_evaluators,
-        );
+        let (module, evaluator) = running_evaluators.choose_mut(&mut thread_rng())?;
 
-        if let Some((module, evaluator)) = running_evaluators.choose_mut(&mut thread_rng()) {
-            evaluator.vm.run(
-                &DbUseProvider { db },
-                &mut RunLimitedNumberOfInstructions::new(500),
-                &mut evaluator.tracer,
-            );
-            Some(module.clone())
-        } else {
-            None
-        }
+        evaluator.vm.run(
+            &DbUseProvider {
+                db,
+                tracing: TracingConfig::off(),
+            },
+            &mut RunLimitedNumberOfInstructions::new(500),
+            &mut evaluator.tracer,
+        );
+        Some(module.clone())
     }
 
     pub fn get_fuzzable_closures(&self, module: &Module) -> (Heap, Vec<(Id, Pointer)>) {
@@ -78,9 +81,13 @@ impl ConstantEvaluator {
             .iter()
             .filter_map(|event| match &event.event {
                 StoredVmEvent::InFiber {
-                    event: StoredFiberEvent::FoundFuzzableClosure { id, closure },
+                    event:
+                        StoredFiberEvent::FoundFuzzableClosure {
+                            definition: id,
+                            closure,
+                        },
                     ..
-                } => Some((id.clone(), *closure)),
+                } => Some((evaluator.tracer.heap.get_hir_id(*id), *closure)),
                 _ => None,
             })
             .collect();
@@ -103,7 +110,8 @@ impl ConstantEvaluator {
 
         for TimedEvent { event, .. } in &evaluator.tracer.events {
             let StoredVmEvent::InFiber { event, .. } = event else { continue; };
-            let StoredFiberEvent::ValueEvaluated { id, value } = event else { continue; };
+            let StoredFiberEvent::ValueEvaluated { expression, value } = event else { continue; };
+            let id = evaluator.tracer.heap.get_hir_id(*expression);
 
             if &id.module != module {
                 continue;
@@ -152,46 +160,31 @@ fn panic_hint(
         return None;
     }
 
-    let last_call_in_this_module = stack.iter().find(|entry| {
-        let id = match entry {
-            StackEntry::Call { id, .. } => id,
-            StackEntry::Needs { id, .. } => id,
-            _ => return false,
-        };
+    let last_call_in_this_module = stack.iter().find(|call| {
+        let call_site = evaluator.tracer.heap.get_hir_id(call.call_site);
         // Make sure the entry comes from the same file and is not generated
         // code.
-        id.module == module && db.hir_to_cst_id(id.clone()).is_some()
+        call_site.module == module && db.hir_to_cst_id(call_site).is_some()
     })?;
 
-    let (id, call_info) = match last_call_in_this_module {
-        StackEntry::Call { id, closure, args } => (
-            id,
-            format!(
-                "{} {}",
-                closure.format(&evaluator.tracer.heap),
-                args.iter()
-                    .map(|arg| arg.format(&evaluator.tracer.heap))
-                    .join(" ")
-            ),
-        ),
-        StackEntry::Needs {
-            id,
-            condition,
-            reason,
-        } => (
-            id,
-            format!(
-                "needs {} {}",
-                condition.format(&evaluator.tracer.heap),
-                reason.format(&evaluator.tracer.heap)
-            ),
-        ),
-        _ => unreachable!(),
-    };
+    let Call {
+        call_site,
+        callee,
+        arguments: args,
+        ..
+    } = last_call_in_this_module;
+    let call_site = evaluator.tracer.heap.get_hir_id(*call_site);
+    let call_info = format!(
+        "{} {}",
+        callee.format(&evaluator.tracer.heap),
+        args.iter()
+            .map(|arg| arg.format(&evaluator.tracer.heap))
+            .join(" "),
+    );
 
     Some(Hint {
         kind: HintKind::Panic,
-        text: format!("Calling `{call_info}` panics because {reason}."),
-        position: id_to_end_of_line(db, id.clone())?,
+        text: format!("Calling `{call_info}` panics: {reason}"),
+        position: id_to_end_of_line(db, call_site)?,
     })
 }

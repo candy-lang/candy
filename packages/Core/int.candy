@@ -39,6 +39,7 @@ compareTo valueA valueB :=
   needs (is valueB)
   result = valueA | ✨.intCompareTo valueB
   check (equals result Equal | bool.implies (equals valueA valueB))
+  # check ((equals result Equal) | bool.implies (equals valueA valueB))
   result
 isLessThan valueA valueB :=
   needs (is valueA)
@@ -71,7 +72,7 @@ isNonNegative value :=
   value | isNegative | bool.not
 absolute value :=
   needs (is value)
-  conditionals.ifElse (isNegative value) (negate value) value
+  conditionals.ifElse (isNegative value) { negate value } { value }
 
 fitsInRustU32 value :=
   needs (is value)
@@ -80,7 +81,7 @@ fitsInRustU32 value :=
   rustU32Max = 4294967295
   # https://doc.rust-lang.org/std/primitive.u32.html#associatedconstant.MAX
   value | isLessThan rustU32Max
-fitsInRustU128 value =
+fitsInRustU128 value :=
   needs (is value)
   needs (isNonNegative value)
 
@@ -135,14 +136,14 @@ min valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   conditionals.ifElse
-    valueA | isLessThanOrEqualTo valueB
+    (valueA | isLessThanOrEqualTo valueB)
     { valueA }
     { valueB }
 max valueA valueB :=
   needs (is valueA)
   needs (is valueB)
   conditionals.ifElse
-    valueA | isGreaterThanOrEqualTo valueB
+    (valueA | isGreaterThanOrEqualTo valueB)
     { valueA }
     { valueB }
 coerceAtLeast value minimum :=

@@ -1,12 +1,15 @@
 use super::{ast_to_hir::AstToHir, error::CompilerError};
-use crate::{builtin_functions::BuiltinFunction, module::Module};
-use im::HashMap;
+use crate::{
+    builtin_functions::BuiltinFunction,
+    module::{Module, ModuleKind, Package},
+};
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use num_bigint::BigUint;
 use std::{
-    collections::HashSet,
+    collections::HashMap,
     fmt::{self, Display, Formatter},
+    hash,
     sync::Arc,
 };
 use tracing::info;
@@ -86,8 +89,8 @@ impl Expression {
             }
             Expression::Builtin(_) => {}
             Expression::Needs { condition, reason } => {
-                ids.push(*condition.clone());
-                ids.push(*reason.clone());
+                ids.push(condition.clone());
+                ids.push(reason.clone());
             }
             Expression::Error { .. } => {}
         }
@@ -110,6 +113,36 @@ pub struct Id {
 impl Id {
     pub fn new(module: Module, keys: Vec<String>) -> Self {
         Self { module, keys }
+    }
+
+    /// An ID that can be used to blame the tooling. For example, when calling
+    /// the `main` function, we want to be able to blame the platform for
+    /// passing a wrong environment.
+    fn tooling(name: String) -> Self {
+        Self {
+            module: Module {
+                package: Package::Tooling(name),
+                path: vec![],
+                kind: ModuleKind::Code,
+            },
+            keys: vec![],
+        }
+    }
+    pub fn platform() -> Self {
+        Self::tooling("platform".to_string())
+    }
+    pub fn fuzzer() -> Self {
+        Self::tooling("fuzzer".to_string())
+    }
+    /// TODO: Currently, when a higher-order function calls a closure passed as
+    /// a parameter, that's registered as a normal call instruction, making the
+    /// callsite in the higher-order function responsible for the successful
+    /// fulfillment of the passed function's `needs`. We probably want to change
+    /// how that works so that the caller of the higher-order function is at
+    /// fault when passing a panicking function. After we did that, we should be
+    /// able to remove this ID.
+    pub fn complicated_responsibility() -> Self {
+        Self::tooling("complicated-responsibility".to_string())
     }
 
     pub fn is_root(&self) -> bool {
@@ -138,7 +171,7 @@ impl Display for Id {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Expression {
     Int(BigUint),
     Text(String),
@@ -157,8 +190,8 @@ pub enum Expression {
         relative_path: Id,
     },
     Needs {
-        condition: Box<Id>,
-        reason: Box<Id>,
+        condition: Id,
+        reason: Id,
     },
     Error {
         child: Option<Id>,
@@ -170,6 +203,12 @@ impl Expression {
         Expression::Symbol("Nothing".to_string())
     }
 }
+#[allow(clippy::derive_hash_xor_eq)]
+impl hash::Hash for Expression {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Lambda {
@@ -177,34 +216,16 @@ pub struct Lambda {
     pub body: Body,
     pub fuzzable: bool,
 }
-impl Lambda {
-    pub fn captured_ids(&self, my_id: &Id) -> Vec<Id> {
-        let mut captured = vec![];
-        self.body.collect_all_ids(&mut captured);
-        captured
-            .into_iter()
-            .filter(|potentially_captured_id| {
-                !my_id.is_same_module_and_any_parent_of(potentially_captured_id)
-            })
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect_vec()
-    }
-}
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Body {
     pub expressions: LinkedHashMap<Id, Expression>,
     pub identifiers: HashMap<Id, String>,
 }
-impl Body {
-    #[allow(dead_code)]
-    pub fn return_value(&self) -> Id {
-        self.expressions
-            .keys()
-            .last()
-            .expect("no expressions")
-            .clone()
+#[allow(clippy::derive_hash_xor_eq)]
+impl hash::Hash for Body {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.expressions.hash(state);
     }
 }
 
@@ -329,7 +350,7 @@ impl fmt::Display for Lambda {
 }
 impl fmt::Display for Body {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (id, expression) in self.expressions.iter() {
+        for (id, expression) in &self.expressions {
             writeln!(f, "{id} = {expression}")?;
         }
         Ok(())
@@ -355,7 +376,7 @@ impl Expression {
     }
 }
 impl Body {
-    fn find(&self, id: &Id) -> Option<&Expression> {
+    pub fn find(&self, id: &Id) -> Option<&Expression> {
         if let Some(expression) = self.expressions.get(id) {
             Some(expression)
         } else {

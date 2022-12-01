@@ -4,7 +4,9 @@ if = (use "..conditionals").if
 
 parallel body :=
   needs (function.is1 body) "The `body` should be a function taking a nursery."
-  body | ✨.parallel
+  ## TODO: Propagate the responsibility here. `body` may contain a `needs` that
+  ## always fails. That shouldn't be our fault, but our caller's.
+  ✨.parallel body
 
 async nursery body :=
   needs (channel.isSendPort nursery)

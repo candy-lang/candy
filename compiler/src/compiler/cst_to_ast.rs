@@ -58,7 +58,7 @@ fn ast(db: &dyn CstToAst, module: Module) -> Option<AstResult> {
             let cst = cst.unwrap_whitespace_and_comment();
             context.lower_csts(&cst)
         }
-        Err(InvalidModuleError::DoesNotExist) => return None,
+        Err(InvalidModuleError::DoesNotExist | InvalidModuleError::IsToolingModule) => return None,
         Err(InvalidModuleError::InvalidUtf8) => {
             vec![Ast {
                 id: context.create_next_id_without_mapping(),
