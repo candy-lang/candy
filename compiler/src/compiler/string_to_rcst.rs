@@ -204,10 +204,11 @@ mod parse {
         if w == "✨" {
             return Some((input, Rcst::Identifier(w)));
         }
-        if !w.chars().next().unwrap().is_lowercase() {
+        let next_character = w.chars().next().unwrap();
+        if !next_character.is_lowercase() && next_character != '_' {
             return None;
         }
-        if w.chars().all(|c| c.is_ascii_alphanumeric()) {
+        if w.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
             Some((input, Rcst::Identifier(w)))
         } else {
             Some((
@@ -224,6 +225,14 @@ mod parse {
         assert_eq!(
             identifier("foo bar"),
             Some((" bar", Rcst::Identifier("foo".to_string())))
+        );
+        assert_eq!(
+            identifier("_"),
+            Some(("", Rcst::Identifier("_".to_string()))),
+        );
+        assert_eq!(
+            identifier("_foo"),
+            Some(("", Rcst::Identifier("_foo".to_string()))),
         );
         assert_eq!(identifier("Foo bar"), None);
         assert_eq!(identifier("012 bar"), None);
@@ -245,7 +254,7 @@ mod parse {
         if !w.chars().next().unwrap().is_uppercase() {
             return None;
         }
-        if w.chars().all(|c| c.is_ascii_alphanumeric()) {
+        if w.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
             Some((input, Rcst::Symbol(w)))
         } else {
             Some((
@@ -262,6 +271,10 @@ mod parse {
         assert_eq!(
             symbol("Foo b"),
             Some((" b", Rcst::Symbol("Foo".to_string())))
+        );
+        assert_eq!(
+            symbol("Foo_Bar"),
+            Some(("", Rcst::Symbol("Foo_Bar".to_string())))
         );
         assert_eq!(symbol("foo bar"), None);
         assert_eq!(symbol("012 bar"), None);
