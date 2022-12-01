@@ -1,8 +1,5 @@
 use crate::{
-    compiler::{
-        error::{CompilerError, CompilerErrorPayload},
-        hir::HirError,
-    },
+    compiler::error::CompilerError,
     database::Database,
     module::{Module, ModuleDb, Package},
 };
@@ -23,12 +20,7 @@ impl CompilerError {
             code: None,
             code_description: None,
             source: Some("🍭 Candy".to_owned()),
-            message: match self.payload {
-                CompilerErrorPayload::InvalidUtf8 => "Invalid UTF-8".to_string(),
-                CompilerErrorPayload::Rcst(rcst) => format!("RCST: {rcst:?}"),
-                CompilerErrorPayload::Ast(ast) => format!("AST: {ast:?}"),
-                CompilerErrorPayload::Hir(hir) => hir.format_message(),
-            },
+            message: self.payload.to_string(),
             related_information: None,
             tags: None,
             data: None,
@@ -36,32 +28,22 @@ impl CompilerError {
     }
 }
 
-impl HirError {
-    fn format_message(&self) -> String {
-        match self {
-            HirError::UnknownReference { name } => format!("Unknown reference “{name}”."),
-            HirError::PublicAssignmentInNotTopLevel => {
-                "Public assignments (:=) can only be used in top-level code.".to_string()
-            }
-            HirError::PublicAssignmentWithSameName { .. } => "A public assignment with the same name already exists.".to_string(),
-            HirError::NeedsWithWrongNumberOfArguments { num_args } => format!("`needs` accepts one or two arguments, but was called with {num_args} arguments. Its parameters are the `condition` and an optional `message`."),
-        }
-    }
-}
-
-impl From<Module> for Url {
-    fn from(module: Module) -> Url {
+impl From<Module> for Option<Url> {
+    fn from(module: Module) -> Option<Url> {
         match module.package {
-            Package::User(_) | Package::External(_) => Url::from_file_path(
-                module
-                    .to_possible_paths()
-                    .unwrap()
-                    .into_iter()
-                    .find_or_first(|path| path.exists())
-                    .unwrap(),
-            )
-            .unwrap(),
-            Package::Anonymous { url } => Url::parse(&format!("untitled:{url}",)).unwrap(),
+            Package::User(_) | Package::External(_) => Some(
+                Url::from_file_path(
+                    module
+                        .to_possible_paths()
+                        .unwrap()
+                        .into_iter()
+                        .find_or_first(|path| path.exists())
+                        .unwrap(),
+                )
+                .unwrap(),
+            ),
+            Package::Anonymous { url } => Some(Url::parse(&format!("untitled:{url}",)).unwrap()),
+            Package::Tooling(_) => None,
         }
     }
 }

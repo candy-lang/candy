@@ -7,7 +7,7 @@ pub use self::{
     utils::FuzzablesFinder,
 };
 use crate::{
-    compiler::hir::Id,
+    compiler::{hir::Id, hir_to_mir::TracingConfig},
     database::Database,
     module::Module,
     vm::{
@@ -17,14 +17,31 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use std::collections::HashMap;
 use tracing::{error, info};
 
 pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
-    let (fuzzables_heap, fuzzables): (Heap, Vec<(Id, Pointer)>) = {
+    let config = TracingConfig {
+        register_fuzzables: true,
+        trace_calls: false,
+        trace_evaluated_expressions: false,
+    };
+
+    let (fuzzables_heap, fuzzables): (Heap, HashMap<Id, Pointer>) = {
         let mut tracer = FuzzablesFinder::default();
         let mut vm = Vm::new();
-        vm.set_up_for_running_module_closure(Closure::of_module(db, module).unwrap());
-        vm.run(&DbUseProvider { db }, &mut RunForever, &mut tracer);
+        vm.set_up_for_running_module_closure(
+            module.clone(),
+            Closure::of_module(db, module, config.clone()).unwrap(),
+        );
+        vm.run(
+            &DbUseProvider {
+                db,
+                config: config.clone(),
+            },
+            &mut RunForever,
+            &mut tracer,
+        );
         (tracer.heap, tracer.fuzzables)
     };
 
@@ -39,14 +56,18 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
         info!("Fuzzing {id}.");
         let mut fuzzer = Fuzzer::new(&fuzzables_heap, closure, id.clone());
         fuzzer.run(
-            &mut DbUseProvider { db },
-            &mut RunLimitedNumberOfInstructions::new(1000),
+            &mut DbUseProvider {
+                db,
+                config: config.clone(),
+            },
+            &mut RunLimitedNumberOfInstructions::new(100000),
         );
         match fuzzer.into_status() {
             Status::StillFuzzing { .. } => {}
             Status::PanickedForArguments {
                 arguments,
                 reason,
+                responsible,
                 tracer,
             } => {
                 error!("The fuzzer discovered an input that crashes {id}:");
@@ -54,6 +75,7 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
                     closure: id,
                     arguments,
                     reason,
+                    responsible,
                     tracer,
                 };
                 case.dump(db);
@@ -69,13 +91,14 @@ pub struct FailingFuzzCase {
     closure: Id,
     arguments: Vec<Packet>,
     reason: String,
+    responsible: Id,
     tracer: FullTracer,
 }
 
 impl FailingFuzzCase {
     pub fn dump(&self, db: &Database) {
         error!(
-            "Calling `{} {}` doesn't work because {}.",
+            "Calling `{} {}` panics: {}",
             self.closure,
             self.arguments
                 .iter()
@@ -83,6 +106,7 @@ impl FailingFuzzCase {
                 .join(" "),
             self.reason,
         );
+        error!("{} is responsible.", self.responsible,);
         error!(
             "This is the stack trace:\n{}",
             self.tracer.format_panic_stack_trace_to_root_fiber(db)

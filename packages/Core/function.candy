@@ -14,7 +14,7 @@ is3 value := ✨.ifElse (is value) { equals (getArgumentCount value) 3 } { False
 is4 value := ✨.ifElse (is value) { equals (getArgumentCount value) 4 } { False }
 is5 value := ✨.ifElse (is value) { equals (getArgumentCount value) 5 } { False }
 
-run body =
+run body :=
   # A function that runs the given `body` with no arguments and returns its result.
   #
   # ```
@@ -25,7 +25,7 @@ run body =
   needs (is0 body)
   ✨.functionRun body
 
-doNotRun body =
+doNotRun body :=
   # A function that doesn't run the given `body`.
   #
   # This function is useful during development to mark code that's not ready to run yet. In contrast

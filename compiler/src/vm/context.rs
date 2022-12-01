@@ -1,5 +1,5 @@
 use crate::{
-    compiler::{hir_to_lir::HirToLir, lir::Lir},
+    compiler::{hir_to_mir::TracingConfig, lir::Lir, mir_to_lir::MirToLir},
     database::Database,
     module::{Module, ModuleDb, ModuleKind},
 };
@@ -26,6 +26,7 @@ impl UseProvider for PanickingUseProvider {
 
 pub struct DbUseProvider<'a> {
     pub db: &'a Database,
+    pub config: TracingConfig,
 }
 impl<'a> UseProvider for DbUseProvider<'a> {
     fn use_module(&self, module: Module) -> Result<UseResult, String> {
@@ -34,7 +35,7 @@ impl<'a> UseProvider for DbUseProvider<'a> {
                 Some(bytes) => Ok(UseResult::Asset((*bytes).clone())),
                 None => Err(format!("use couldn't import the asset module `{}`", module)),
             },
-            ModuleKind::Code => match self.db.lir(module.clone()) {
+            ModuleKind::Code => match self.db.lir(module.clone(), self.config.clone()) {
                 Some(lir) => Ok(UseResult::Code((*lir).clone())),
                 None => Err(format!("use couldn't import the code module `{}`", module)),
             },

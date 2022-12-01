@@ -46,15 +46,15 @@ Candy blurs the line between those stages, for example, by replacing compile-tim
   ```candy
   foo a =             # If you pass a = 0,
     needs (isInt a)
-    math.logarithm a  # then this fails because logarithm only works on positive numbers.
+    math.logarithm a  # then this panics: The `input` must be a positive number.
 
   efficientTextReverse text =
     needs (isText text)
-    needs (isPalindrome text) "efficientTextReverse only works on palindromes"
+    needs (isPalindrome text) "Only palindromes can be efficiently reversed."
     text
 
   greetBackwards name =                   # If you pass name = "Test",
-    "Hello, {efficientTextReverse name}"  # then this fails because efficientTextReverse only works on palindromes.
+    "Hello, {efficientTextReverse name}"  # then this panics: Only palindromes can be efficiently reversed.
   ```
 
 To get a more in-depth introduction, read the [language document](language.md).
@@ -135,16 +135,13 @@ We already have a language server that provides some tooling.
 
 ## Short-term TODOs
 
-- fix fault attribution
 - new name?
 - add caching while compile-time evaluating code
 - tags
 - pattern matching
-- add CI
 - add tests
 - add a more lightweight tracer that only tracks stack traces
 - text interpolation
-- optimize: eliminate common subtrees
 - optimize: inline functions
 - minimize inputs found through fuzzing
 - fuzz parser
@@ -154,6 +151,14 @@ We already have a language server that provides some tooling.
 - distinguish packages from normal modules
 - complain about comment lines with too much indentation
 - develop guidelines about how to format reasons
+- disallow passing named closures as parameters? or auto-propagate caller's fault to called parameters?
+- replace occurrences of `Id::complicated_responsibility()`
+- fix usage of pipes in indented code such as this:
+  ```candy
+  foo
+    bar | baz
+  ## Currently, this is parsed as `baz (foo bar)`.
+  ```
 
 ## How to use Candy
 

@@ -7,7 +7,10 @@ use super::{
     tracer::{dummy::DummyTracer, Tracer},
     FiberId, Heap,
 };
-use crate::{builtin_functions::BuiltinFunction, compiler::lir::Instruction};
+use crate::{
+    builtin_functions::BuiltinFunction,
+    compiler::{hir::Id, lir::Instruction},
+};
 use itertools::Itertools;
 use num_bigint::BigInt;
 use num_integer::Integer;
@@ -21,15 +24,16 @@ impl Fiber {
         &mut self,
         builtin_function: &BuiltinFunction,
         args: &[Pointer],
+        responsible: Pointer,
     ) {
         let result = span!(Level::TRACE, "Running builtin").in_scope(|| match &builtin_function {
             BuiltinFunction::ChannelCreate => self.heap.channel_create(args),
             BuiltinFunction::ChannelSend => self.heap.channel_send(args),
             BuiltinFunction::ChannelReceive => self.heap.channel_receive(args),
             BuiltinFunction::Equals => self.heap.equals(args),
-            BuiltinFunction::FunctionRun => self.heap.function_run(args),
+            BuiltinFunction::FunctionRun => self.heap.function_run(args, responsible),
             BuiltinFunction::GetArgumentCount => self.heap.get_argument_count(args),
-            BuiltinFunction::IfElse => self.heap.if_else(args),
+            BuiltinFunction::IfElse => self.heap.if_else(args, responsible),
             BuiltinFunction::IntAdd => self.heap.int_add(args),
             BuiltinFunction::IntBitLength => self.heap.int_bit_length(args),
             BuiltinFunction::IntBitwiseAnd => self.heap.int_bitwise_and(args),
@@ -70,8 +74,12 @@ impl Fiber {
         });
         match result {
             Ok(Return(value)) => self.data_stack.push(value),
-            Ok(DivergeControlFlow { closure }) => {
+            Ok(DivergeControlFlow {
+                closure,
+                responsible,
+            }) => {
                 self.data_stack.push(closure);
+                self.data_stack.push(responsible);
                 self.run_instruction(
                     &PanickingUseProvider,
                     &mut DummyTracer.for_fiber(FiberId::root()),
@@ -83,7 +91,7 @@ impl Fiber {
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
             Ok(Parallel { body }) => self.status = Status::InParallelScope { body },
             Ok(Try { body }) => self.status = Status::InTry { body },
-            Err(reason) => self.panic(reason),
+            Err(reason) => self.panic(reason, self.heap.get_hir_id(responsible)),
         }
     }
 }
@@ -91,12 +99,26 @@ impl Fiber {
 type BuiltinResult = Result<SuccessfulBehavior, String>;
 enum SuccessfulBehavior {
     Return(Pointer),
-    DivergeControlFlow { closure: Pointer },
-    CreateChannel { capacity: Capacity },
-    Send { channel: ChannelId, packet: Packet },
-    Receive { channel: ChannelId },
-    Parallel { body: Pointer },
-    Try { body: Pointer },
+    DivergeControlFlow {
+        closure: Pointer,
+        responsible: Pointer,
+    },
+    CreateChannel {
+        capacity: Capacity,
+    },
+    Send {
+        channel: ChannelId,
+        packet: Packet,
+    },
+    Receive {
+        channel: ChannelId,
+    },
+    Parallel {
+        body: Pointer,
+    },
+    Try {
+        body: Pointer,
+    },
 }
 use SuccessfulBehavior::*;
 
@@ -113,7 +135,7 @@ macro_rules! unpack {
                 ( $( *$arg, )+ )
             } else {
                 return Err(
-                    "a builtin function was called with the wrong number of arguments".to_string(),
+                    "A builtin function was called with the wrong number of arguments.".to_string(),
                 );
             };
             let ( $( $arg, )+ ): ( $( UnpackedData<$type>, )+ ) = ( $(
@@ -134,7 +156,7 @@ macro_rules! unpack_and_later_drop {
                 ( $( *$arg, )+ )
             } else {
                 return Err(
-                    "a builtin function was called with the wrong number of arguments".to_string(),
+                    "A builtin function was called with the wrong number of arguments.".to_string(),
                 );
             };
             let ( $( $arg, )+ ): ( $( UnpackedData<$type>, )+ ) = ( $(
@@ -156,7 +178,7 @@ impl Heap {
         unpack_and_later_drop!(self, args, |capacity: Int| {
             match capacity.value.clone().try_into() {
                 Ok(capacity) => CreateChannel { capacity },
-                Err(_) => return Err("you tried to create a channel with a capacity that is either negative or bigger than the maximum usize".to_string()),
+                Err(_) => return Err("You tried to create a channel with a capacity that is either negative or bigger than the maximum usize.".to_string()),
             }
         })
     }
@@ -187,11 +209,12 @@ impl Heap {
         })
     }
 
-    fn function_run(&mut self, args: &[Pointer]) -> BuiltinResult {
+    fn function_run(&mut self, args: &[Pointer], responsible: Pointer) -> BuiltinResult {
         unpack!(self, args, |closure: Closure| {
             closure.should_take_no_arguments()?;
             DivergeControlFlow {
                 closure: closure.address,
+                responsible,
             }
         })
     }
@@ -202,7 +225,7 @@ impl Heap {
         })
     }
 
-    fn if_else(&mut self, args: &[Pointer]) -> BuiltinResult {
+    fn if_else(&mut self, args: &[Pointer], responsible: Pointer) -> BuiltinResult {
         unpack!(self, args, |condition: bool,
                              then: Closure,
                              else_: Closure| {
@@ -215,6 +238,7 @@ impl Heap {
             self.drop(dont_run.address);
             DivergeControlFlow {
                 closure: run.address,
+                responsible,
             }
         })
     }
@@ -286,9 +310,8 @@ impl Heap {
     }
     fn int_shift_right(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Int, amount: Int| {
-            let value = value.value.to_biguint().unwrap();
             let amount = amount.value.to_u128().unwrap();
-            Return(self.create_int((value >> amount).into()))
+            Return(self.create_int(&value.value >> amount))
         })
     }
     fn int_subtract(&mut self, args: &[Pointer]) -> BuiltinResult {
@@ -353,7 +376,7 @@ impl Heap {
     fn parallel(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack!(self, args, |body_taking_nursery: Closure| {
             if body_taking_nursery.num_args != 1 {
-                return Err("parallel expects a closure taking a nursery".to_string());
+                return Err("`parallel` expects a closure taking a nursery.".to_string());
             }
             Parallel {
                 body: body_taking_nursery.address,
@@ -362,8 +385,8 @@ impl Heap {
     }
 
     fn print(&mut self, args: &[Pointer]) -> BuiltinResult {
-        unpack_and_later_drop!(self, args, |message: Text| {
-            info!("{:?}", message.value);
+        unpack_and_later_drop!(self, args, |message: Any| {
+            info!("{:?}", message.data.data.format(self));
             Return(self.create_nothing())
         })
     }
@@ -376,7 +399,7 @@ impl Heap {
                     Ok(Return(value))
                 }
                 None => Err(format!(
-                    "the struct does not contain the key {}",
+                    "The struct does not contain the key {}.",
                     key.format(self)
                 )),
             }
@@ -479,6 +502,7 @@ impl Heap {
                 Data::Symbol(_) => "Symbol",
                 Data::List(_) => "List",
                 Data::Struct(_) => "Struct",
+                Data::HirId(_) => unreachable!(),
                 Data::Closure(_) => "Function",
                 Data::Builtin(_) => "Builtin",
                 Data::SendPort(_) => "SendPort",
@@ -493,7 +517,7 @@ impl Closure {
     fn should_take_no_arguments(&self) -> Result<(), String> {
         match self.num_args {
             0 => Ok(()),
-            n => Err(format!("a builtin function expected a function without arguments, but got one that takes {n} arguments")),
+            n => Err(format!("A builtin function expected a function without arguments, but got one that takes {n} arguments.")),
         }
     }
 }
@@ -529,7 +553,7 @@ impl TryInto<Any> for Data {
     }
 }
 macro_rules! impl_data_try_into_type {
-    ($type:ty, $variant:tt, $error_message:expr) => {
+    ($type:ty, $variant:tt, $error_message:expr$(,)?) => {
         impl TryInto<$type> for Data {
             type Error = String;
 
@@ -542,21 +566,22 @@ macro_rules! impl_data_try_into_type {
         }
     };
 }
-impl_data_try_into_type!(Int, Int, "a builtin function expected an int");
-impl_data_try_into_type!(Text, Text, "a builtin function expected a text");
-impl_data_try_into_type!(Symbol, Symbol, "a builtin function expected a symbol");
-impl_data_try_into_type!(List, List, "a builtin function expected a list");
-impl_data_try_into_type!(Struct, Struct, "a builtin function expected a struct");
-impl_data_try_into_type!(Closure, Closure, "a builtin function expected a closure");
+impl_data_try_into_type!(Int, Int, "A builtin function expected an int.");
+impl_data_try_into_type!(Text, Text, "A builtin function expected a text.");
+impl_data_try_into_type!(Symbol, Symbol, "A builtin function expected a symbol.");
+impl_data_try_into_type!(List, List, "A builtin function expected a list.");
+impl_data_try_into_type!(Struct, Struct, "A builtin function expected a struct.");
+impl_data_try_into_type!(Id, HirId, "A builtin function expected a HIR ID.");
+impl_data_try_into_type!(Closure, Closure, "A builtin function expected a closure.");
 impl_data_try_into_type!(
     SendPort,
     SendPort,
-    "a builtin function expected a send port"
+    "A builtin function expected a send port.",
 );
 impl_data_try_into_type!(
     ReceivePort,
     ReceivePort,
-    "a builtin function expected a receive port"
+    "A builtin function expected a receive port.",
 );
 
 impl TryInto<bool> for Data {
@@ -567,7 +592,7 @@ impl TryInto<bool> for Data {
         match symbol.value.as_str() {
             "True" => Ok(true),
             "False" => Ok(false),
-            _ => Err("a builtin function expected True or False".to_string()),
+            _ => Err("A builtin function expected `True` or `False`.".to_string()),
         }
     }
 }

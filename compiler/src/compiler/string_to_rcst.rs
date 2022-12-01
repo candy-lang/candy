@@ -1,5 +1,5 @@
 use super::rcst::{Rcst, RcstError};
-use crate::module::{Module, ModuleDb};
+use crate::module::{Module, ModuleDb, Package};
 use std::sync::Arc;
 
 #[salsa::query_group(StringToRcstStorage)]
@@ -8,6 +8,9 @@ pub trait StringToRcst: ModuleDb {
 }
 
 fn rcst(db: &dyn StringToRcst, module: Module) -> Result<Arc<Vec<Rcst>>, InvalidModuleError> {
+    if let Package::Tooling(_) = &module.package {
+        return Err(InvalidModuleError::IsToolingModule);
+    }
     let source = db
         .get_module_content(module)
         .ok_or(InvalidModuleError::DoesNotExist)?;
@@ -31,6 +34,7 @@ fn rcst(db: &dyn StringToRcst, module: Module) -> Result<Arc<Vec<Rcst>>, Invalid
 pub enum InvalidModuleError {
     DoesNotExist,
     InvalidUtf8,
+    IsToolingModule,
 }
 
 impl Rcst {

@@ -1,0 +1,16 @@
+# Run or benchmark by navigating to the Candy folder and then running this command:
+# `cargo build --release --manifest-path=compiler/Cargo.toml -- run packages/examples/benchmark.candy`
+# `cargo build --release --manifest-path=compiler/Cargo.toml && time target/release/candy run packages/examples/benchmark.candy`
+
+core = use "...Core"
+channel = core.channel
+text = core.text
+
+echo = use "..echo"
+fibonacci = use "..fibonacci"
+
+main := { environment ->
+  print message =
+    needs (text.is message)
+    environment.stdout | channel.send message
+}
