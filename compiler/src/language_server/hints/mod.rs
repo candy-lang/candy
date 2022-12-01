@@ -179,7 +179,7 @@ impl OutgoingHints {
 /// [em quad](https://en.wikipedia.org/wiki/Quad_(typography)) instead, which
 /// seems to have the same width as a normal space in VSCode.
 fn quasi_spaces(n: usize) -> String {
-    " ".repeat(n)
+    format!(" {}", " ".repeat(n))
 }
 
 trait AlignHints {
