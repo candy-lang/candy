@@ -108,12 +108,12 @@ impl FuzzerManager {
             let second_hint = {
                 if &responsible.module != module {
                     // The function panics internally for an input, but it's the
-                    // fault of an inner function that's in another module. The
-                    // fuzz case should instead be highlighted in the used
-                    // function directly. We don't do that right now because we
-                    // assume the fuzzer will find the panic when fuzzing the
-                    // faulty function, but we should save the panicking case
-                    // (or something like that) in the future.
+                    // fault of an inner function that's in another module.
+                    // TODO: The fuzz case should instead be highlighted in the
+                    // used function directly. We don't do that right now
+                    // because we assume the fuzzer will find the panic when
+                    // fuzzing the faulty function, but we should save the
+                    // panicking case (or something like that) in the future.
                     continue;
                 }
                 if db.hir_to_cst_id(id.clone()).is_none() {

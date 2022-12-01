@@ -30,7 +30,7 @@
 use crate::{
     compiler::{
         mir::{Expression, Id, Mir},
-        optimize::OptimizeMir,
+        mir_optimize::OptimizeMir,
         tracing::TracingConfig,
     },
     module::UsePath,

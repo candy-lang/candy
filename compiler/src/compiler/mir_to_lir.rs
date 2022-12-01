@@ -2,7 +2,7 @@ use super::{
     cst::CstDb,
     lir::{Instruction, Lir, StackOffset},
     mir::{Body, Expression, Id},
-    optimize::OptimizeMir,
+    mir_optimize::OptimizeMir,
     tracing::TracingConfig,
 };
 use crate::{module::Module, utils::CountableId};

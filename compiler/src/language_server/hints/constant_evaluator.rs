@@ -60,9 +60,7 @@ impl ConstantEvaluator {
             .iter_mut()
             .filter(|(_, evaluator)| matches!(evaluator.vm.status(), vm::Status::CanRun))
             .collect_vec();
-        let Some((module, evaluator)) = running_evaluators.choose_mut(&mut thread_rng()) else {
-            return None;
-        };
+        let (module, evaluator) = running_evaluators.choose_mut(&mut thread_rng())?;
 
         evaluator.vm.run(
             &DbUseProvider {

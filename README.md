@@ -147,13 +147,18 @@ We already have a language server that provides some tooling.
 - fuzz parser
 - remove builtinPrint
 - optimize: tail call optimization
-- parse function declaration with doc comment but no code
 - tracing visualization
 - distinguish packages from normal modules
 - complain about comment lines with too much indentation
 - develop guidelines about how to format reasons
 - disallow passing named closures as parameters? or auto-propagate caller's fault to called parameters?
 - replace occurrences of `Id::complicated_responsibility()`
+- fix usage of pipes in indented code such as this:
+  ```candy
+  foo
+    bar | baz
+  ## Currently, this is parsed as `baz (foo bar)`.
+  ```
 
 ## How to use Candy
 
