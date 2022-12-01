@@ -370,54 +370,33 @@ impl Fiber {
                 self.data_stack.push(top);
             }
             Instruction::Call { num_args } => {
-                let responsible_address = self.data_stack.pop().unwrap();
-                let mut args = vec![];
+                let responsible = self.data_stack.pop().unwrap();
+                let mut arguments = vec![];
                 for _ in 0..num_args {
-                    args.push(self.data_stack.pop().unwrap());
+                    arguments.push(self.data_stack.pop().unwrap());
                 }
-                let callee_address = self.data_stack.pop().unwrap();
+                arguments.reverse();
+                let callee = self.data_stack.pop().unwrap();
 
-                let callee = self.heap.get(callee_address);
-                args.reverse();
+                self.call(callee, arguments, responsible);
+            }
+            Instruction::TailCall {
+                num_locals_to_pop,
+                num_args,
+            } => {
+                let responsible = self.data_stack.pop().unwrap();
+                let mut arguments = vec![];
+                for _ in 0..num_args {
+                    arguments.push(self.data_stack.pop().unwrap());
+                }
+                arguments.reverse();
+                let callee = self.data_stack.pop().unwrap();
+                for _ in 0..num_locals_to_pop {
+                    let address = self.data_stack.pop().unwrap();
+                    self.heap.drop(address);
+                }
 
-                match callee.data.clone() {
-                    Data::Closure(Closure {
-                        captured,
-                        num_args: expected_num_args,
-                        ..
-                    }) => {
-                        if num_args != expected_num_args {
-                            self.panic(
-                                format!("A closure expected {expected_num_args} parameters, but you called it with {num_args} arguments."),
-                                self.heap.get_hir_id(responsible_address),
-                            );
-                            return;
-                        }
-
-                        self.call_stack.push(self.next_instruction);
-                        self.data_stack.append(&mut captured.clone());
-                        for captured in captured {
-                            self.heap.dup(captured);
-                        }
-                        self.data_stack.append(&mut args);
-                        self.data_stack.push(responsible_address);
-                        self.next_instruction =
-                            InstructionPointer::start_of_closure(callee_address);
-                    }
-                    Data::Builtin(Builtin { function: builtin }) => {
-                        self.heap.drop(callee_address);
-                        self.run_builtin_function(&builtin, &args, responsible_address);
-                    }
-                    _ => {
-                        self.panic(
-                            format!(
-                                "You can only call closures and builtins, but you tried to call {}.",
-                                callee.format(&self.heap),
-                            ),
-                            self.heap.get_hir_id(responsible_address),
-                        );
-                    }
-                };
+                self.call(callee, arguments, responsible);
             }
             Instruction::Return => {
                 self.heap.drop(self.next_instruction.closure);
@@ -499,6 +478,48 @@ impl Fiber {
                 tracer.found_fuzzable_closure(definition, closure, &self.heap);
             }
         }
+    }
+
+    fn call(&mut self, callee: Pointer, arguments: Vec<Pointer>, responsible: Pointer) {
+        let callee_object = self.heap.get(callee);
+
+        match callee_object.data.clone() {
+            Data::Closure(Closure {
+                captured,
+                num_args: expected_num_args,
+                ..
+            }) => {
+                if arguments.len() != expected_num_args {
+                    self.panic(
+                        format!("A closure expected {expected_num_args} parameters, but you called it with {} arguments.", arguments.len()),
+                        self.heap.get_hir_id(responsible),
+                    );
+                    return;
+                }
+
+                self.call_stack.push(self.next_instruction);
+                self.data_stack.append(&mut captured.clone());
+                for captured in captured {
+                    self.heap.dup(captured);
+                }
+                self.data_stack.append(&mut arguments.clone());
+                self.data_stack.push(responsible);
+                self.next_instruction = InstructionPointer::start_of_closure(callee);
+            }
+            Data::Builtin(Builtin { function: builtin }) => {
+                self.heap.drop(callee);
+                self.run_builtin_function(&builtin, &arguments, responsible);
+            }
+            _ => {
+                self.panic(
+                    format!(
+                        "You can only call closures and builtins, but you tried to call {}.",
+                        callee_object.format(&self.heap),
+                    ),
+                    self.heap.get_hir_id(responsible),
+                );
+            }
+        };
     }
 }
 
