@@ -105,7 +105,7 @@ impl Body {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub struct Id {
     pub module: Module,
     pub keys: Vec<String>,
@@ -165,9 +165,14 @@ impl Id {
             && self.keys.iter().zip(&other.keys).all(|(a, b)| a == b)
     }
 }
-impl Display for Id {
+impl fmt::Debug for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "HirId({}:{})", self.module, self.keys.iter().join(":"))
+    }
+}
+impl Display for Id {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{self:?}")
     }
 }
 

@@ -483,15 +483,13 @@ impl Fiber {
         responsible: Pointer,
         is_tail_call: bool,
     ) {
-        let callee_object = self.heap.get(callee);
-
-        match callee_object.data.clone() {
+        match &self.heap.get(callee).data {
             Data::Closure(Closure {
                 captured,
                 num_args: expected_num_args,
                 ..
             }) => {
-                if arguments.len() != expected_num_args {
+                if arguments.len() != *expected_num_args {
                     self.panic(
                         format!("A closure expected {expected_num_args} parameters, but you called it with {} arguments.", arguments.len()),
                         self.heap.get_hir_id(responsible),
@@ -503,7 +501,7 @@ impl Fiber {
                     self.call_stack.push(self.next_instruction);
                 }
                 self.data_stack.append(&mut captured.clone());
-                for captured in captured {
+                for captured in captured.clone() {
                     self.heap.dup(captured);
                 }
                 self.data_stack.append(&mut arguments.clone());
@@ -511,6 +509,7 @@ impl Fiber {
                 self.next_instruction = InstructionPointer::start_of_closure(callee);
             }
             Data::Builtin(Builtin { function: builtin }) => {
+                let builtin = *builtin;
                 self.heap.drop(callee);
                 self.run_builtin_function(&builtin, &arguments, responsible);
                 if is_tail_call {
@@ -521,7 +520,7 @@ impl Fiber {
                 self.panic(
                     format!(
                         "You can only call closures and builtins, but you tried to call {}.",
-                        callee_object.format(&self.heap),
+                        callee.format(&self.heap),
                     ),
                     self.heap.get_hir_id(responsible),
                 );

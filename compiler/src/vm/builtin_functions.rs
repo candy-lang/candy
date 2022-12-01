@@ -386,7 +386,7 @@ impl Heap {
 
     fn print(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |message: Any| {
-            info!("{:?}", message.data.data.format(self));
+            info!("{:?}", message.address.format(self));
             Return(self.create_nothing())
         })
     }
@@ -400,7 +400,7 @@ impl Heap {
                 }
                 None => Err(format!(
                     "The struct does not contain the key {}.",
-                    key.format(self)
+                    key.address.format(self)
                 )),
             }
         })
