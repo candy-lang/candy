@@ -378,7 +378,7 @@ impl Fiber {
                 arguments.reverse();
                 let callee = self.data_stack.pop().unwrap();
 
-                self.call(callee, arguments, responsible);
+                self.call(callee, arguments, responsible, false);
             }
             Instruction::TailCall {
                 num_locals_to_pop,
@@ -396,13 +396,9 @@ impl Fiber {
                     self.heap.drop(address);
                 }
 
-                self.call(callee, arguments, responsible);
+                self.call(callee, arguments, responsible, true);
             }
-            Instruction::Return => {
-                self.heap.drop(self.next_instruction.closure);
-                let caller = self.call_stack.pop().unwrap();
-                self.next_instruction = caller;
-            }
+            Instruction::Return => self.return_(),
             Instruction::UseModule { current_module } => {
                 let responsible = self.data_stack.pop().unwrap();
                 let relative_path = self.data_stack.pop().unwrap();
@@ -480,7 +476,13 @@ impl Fiber {
         }
     }
 
-    fn call(&mut self, callee: Pointer, arguments: Vec<Pointer>, responsible: Pointer) {
+    fn call(
+        &mut self,
+        callee: Pointer,
+        arguments: Vec<Pointer>,
+        responsible: Pointer,
+        is_tail_call: bool,
+    ) {
         let callee_object = self.heap.get(callee);
 
         match callee_object.data.clone() {
@@ -497,7 +499,9 @@ impl Fiber {
                     return;
                 }
 
-                self.call_stack.push(self.next_instruction);
+                if !is_tail_call {
+                    self.call_stack.push(self.next_instruction);
+                }
                 self.data_stack.append(&mut captured.clone());
                 for captured in captured {
                     self.heap.dup(captured);
@@ -509,6 +513,9 @@ impl Fiber {
             Data::Builtin(Builtin { function: builtin }) => {
                 self.heap.drop(callee);
                 self.run_builtin_function(&builtin, &arguments, responsible);
+                if is_tail_call {
+                    self.return_();
+                }
             }
             _ => {
                 self.panic(
@@ -520,6 +527,12 @@ impl Fiber {
                 );
             }
         };
+    }
+
+    fn return_(&mut self) {
+        self.heap.drop(self.next_instruction.closure);
+        let caller = self.call_stack.pop().unwrap();
+        self.next_instruction = caller;
     }
 }
 
