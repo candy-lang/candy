@@ -3,7 +3,7 @@ use super::{
     hir_to_mir::TracingConfig,
     lir::{Instruction, Lir, StackOffset},
     mir::{Body, Expression, Id},
-    optimize::OptimizeMir,
+    mir_optimize::OptimizeMir,
 };
 use crate::{module::Module, utils::CountableId};
 use itertools::Itertools;

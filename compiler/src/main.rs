@@ -36,7 +36,7 @@ use crate::{
 use compiler::{
     hir_to_mir::{HirToMir, TracingConfig},
     lir::Lir,
-    optimize::OptimizeMir,
+    mir_optimize::OptimizeMir,
 };
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
