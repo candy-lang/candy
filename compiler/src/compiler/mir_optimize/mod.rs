@@ -108,6 +108,9 @@ impl Mir {
     /// Performs optimizations that improve both performance and code size and
     /// that work without looking at other modules.
     pub fn optimize_obvious_self_contained(&mut self) {
+        // TODO: This optimization may make the code more inefficient for very
+        // long functions containing a `use`. Remove this optimization as soon
+        // as we support general speculative inlining.
         self.checked_optimization(|mir| mir.inline_functions_containing_use());
 
         loop {
