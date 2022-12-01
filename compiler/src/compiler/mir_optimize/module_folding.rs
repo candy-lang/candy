@@ -29,9 +29,9 @@
 
 use crate::{
     compiler::{
-        hir_to_mir::TracingConfig,
         mir::{Expression, Id, Mir},
         mir_optimize::OptimizeMir,
+        tracing::TracingConfig,
     },
     module::UsePath,
 };
@@ -39,7 +39,7 @@ use std::collections::HashMap;
 use tracing::warn;
 
 impl Mir {
-    pub fn fold_modules(&mut self, db: &dyn OptimizeMir, config: &TracingConfig) {
+    pub fn fold_modules(&mut self, db: &dyn OptimizeMir, tracing: &TracingConfig) {
         self.body
             .visit_with_visible(&mut |_, expression, visible, _| {
                 let Expression::UseModule {
@@ -60,7 +60,8 @@ impl Mir {
                     return; // TODO: Replace with a panic.
                 };
 
-                let mir = db.mir_with_obvious_optimized(module_to_import, config.clone());
+                let mir =
+                    db.mir_with_obvious_optimized(module_to_import, tracing.for_child_module());
                 let Some(mir) = mir else {
                     warn!("Module not found.");
                     return; // TODO: Replace with a panic.

@@ -57,8 +57,9 @@ mod utils;
 
 use super::{
     hir,
-    hir_to_mir::{HirToMir, TracingConfig},
+    hir_to_mir::HirToMir,
     mir::{Body, Expression, Mir},
+    tracing::TracingConfig,
 };
 use crate::{module::Module, utils::IdGenerator};
 use std::sync::Arc;
@@ -67,21 +68,24 @@ use tracing::debug;
 #[salsa::query_group(OptimizeMirStorage)]
 pub trait OptimizeMir: HirToMir {
     #[salsa::cycle(recover_from_cycle)]
-    fn mir_with_obvious_optimized(&self, module: Module, config: TracingConfig)
-        -> Option<Arc<Mir>>;
+    fn mir_with_obvious_optimized(
+        &self,
+        module: Module,
+        tracing: TracingConfig,
+    ) -> Option<Arc<Mir>>;
 }
 
 fn mir_with_obvious_optimized(
     db: &dyn OptimizeMir,
     module: Module,
-    config: TracingConfig,
+    tracing: TracingConfig,
 ) -> Option<Arc<Mir>> {
     debug!("{module}: Compiling.");
-    let mir = db.mir(module.clone(), config.clone())?;
+    let mir = db.mir(module.clone(), tracing.clone())?;
     let mut mir = (*mir).clone();
 
     let complexity_before = mir.complexity();
-    mir.optimize_obvious(db, &config);
+    mir.optimize_obvious(db, &tracing);
     let complexity_after = mir.complexity();
 
     debug!("{module}: Done. Optimized from {complexity_before} to {complexity_after}");
@@ -89,13 +93,14 @@ fn mir_with_obvious_optimized(
 }
 
 impl Mir {
-    /// Performs optimizations that improve both performance and code size.
-    pub fn optimize_obvious(&mut self, db: &dyn OptimizeMir, config: &TracingConfig) {
+    /// Performs optimizations that (usually) improve both performance and code
+    /// size.
+    pub fn optimize_obvious(&mut self, db: &dyn OptimizeMir, tracing: &TracingConfig) {
         loop {
             let before = self.clone();
 
             self.optimize_obvious_self_contained();
-            self.fold_modules(db, config);
+            self.fold_modules(db, tracing);
 
             if *self == before {
                 break;
@@ -105,8 +110,8 @@ impl Mir {
         self.cleanup();
     }
 
-    /// Performs optimizations that improve both performance and code size and
-    /// that work without looking at other modules.
+    /// Performs optimizations that (usually) improve both performance and code
+    /// size and that work without looking at other modules.
     pub fn optimize_obvious_self_contained(&mut self) {
         // TODO: This optimization may make the code more inefficient for very
         // long functions containing a `use`. Remove this optimization as soon
@@ -145,7 +150,7 @@ fn recover_from_cycle(
     _db: &dyn OptimizeMir,
     cycle: &[String],
     module: &Module,
-    _config: &TracingConfig,
+    _tracing: &TracingConfig,
 ) -> Option<Arc<Mir>> {
     let mut id_generator = IdGenerator::start_at(0);
     let mut body = Body::default();

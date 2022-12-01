@@ -7,7 +7,7 @@ pub use self::{
     utils::FuzzablesFinder,
 };
 use crate::{
-    compiler::{hir::Id, hir_to_mir::TracingConfig},
+    compiler::{hir::Id, TracingConfig, TracingMode},
     database::Database,
     module::Module,
     vm::{
@@ -21,10 +21,10 @@ use std::collections::HashMap;
 use tracing::{error, info};
 
 pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
-    let config = TracingConfig {
-        register_fuzzables: true,
-        trace_calls: false,
-        trace_evaluated_expressions: false,
+    let tracing = TracingConfig {
+        register_fuzzables: TracingMode::All,
+        calls: TracingMode::Off,
+        evaluated_expressions: TracingMode::Off,
     };
 
     let (fuzzables_heap, fuzzables): (Heap, HashMap<Id, Pointer>) = {
@@ -32,12 +32,12 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
         let mut vm = Vm::new();
         vm.set_up_for_running_module_closure(
             module.clone(),
-            Closure::of_module(db, module, config.clone()).unwrap(),
+            Closure::of_module(db, module, tracing.clone()).unwrap(),
         );
         vm.run(
             &DbUseProvider {
                 db,
-                config: config.clone(),
+                tracing: tracing.clone(),
             },
             &mut RunForever,
             &mut tracer,
@@ -58,7 +58,7 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
         fuzzer.run(
             &mut DbUseProvider {
                 db,
-                config: config.clone(),
+                tracing: tracing.clone(),
             },
             &mut RunLimitedNumberOfInstructions::new(100000),
         );

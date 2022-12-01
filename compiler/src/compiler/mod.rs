@@ -13,4 +13,7 @@ pub mod mir_to_lir;
 pub mod rcst;
 pub mod rcst_to_cst;
 pub mod string_to_rcst;
+mod tracing;
 mod utils;
+
+pub use self::tracing::{TracingConfig, TracingMode};

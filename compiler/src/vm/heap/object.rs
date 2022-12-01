@@ -3,9 +3,9 @@ use crate::{
     builtin_functions::BuiltinFunction,
     compiler::{
         hir::Id,
-        hir_to_mir::TracingConfig,
         lir::{Instruction, Lir},
         mir_to_lir::MirToLir,
+        TracingConfig,
     },
     database::Database,
     module::Module,
@@ -157,8 +157,8 @@ impl Closure {
             body: lir.instructions,
         }
     }
-    pub fn of_module(db: &Database, module: Module, config: TracingConfig) -> Option<Self> {
-        let lir = db.lir(module, config)?;
+    pub fn of_module(db: &Database, module: Module, tracing: TracingConfig) -> Option<Self> {
+        let lir = db.lir(module, tracing)?;
         Some(Self::of_module_lir((*lir).clone()))
     }
 }

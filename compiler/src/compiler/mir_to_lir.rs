@@ -1,9 +1,9 @@
 use super::{
     cst::CstDb,
-    hir_to_mir::TracingConfig,
     lir::{Instruction, Lir, StackOffset},
     mir::{Body, Expression, Id},
     mir_optimize::OptimizeMir,
+    tracing::TracingConfig,
 };
 use crate::{module::Module, utils::CountableId};
 use itertools::Itertools;
@@ -11,11 +11,11 @@ use std::sync::Arc;
 
 #[salsa::query_group(MirToLirStorage)]
 pub trait MirToLir: CstDb + OptimizeMir {
-    fn lir(&self, module: Module, config: TracingConfig) -> Option<Arc<Lir>>;
+    fn lir(&self, module: Module, tracing: TracingConfig) -> Option<Arc<Lir>>;
 }
 
-fn lir(db: &dyn MirToLir, module: Module, config: TracingConfig) -> Option<Arc<Lir>> {
-    let mir = db.mir_with_obvious_optimized(module, config)?;
+fn lir(db: &dyn MirToLir, module: Module, tracing: TracingConfig) -> Option<Arc<Lir>> {
+    let mir = db.mir_with_obvious_optimized(module, tracing)?;
     let instructions = compile_lambda(&[], &[], Id::from_usize(0), &mir.body);
     Some(Arc::new(Lir { instructions }))
 }

@@ -4,6 +4,7 @@ use super::{
     error::CompilerError,
     hir,
     mir::{Body, Expression, Id, Mir},
+    tracing::TracingConfig,
 };
 use crate::{
     builtin_functions::BuiltinFunction,
@@ -16,29 +17,12 @@ use std::{collections::HashMap, sync::Arc};
 
 #[salsa::query_group(HirToMirStorage)]
 pub trait HirToMir: CstDb + AstToHir + LspPositionConversion {
-    fn mir(&self, module: Module, config: TracingConfig) -> Option<Arc<Mir>>;
+    fn mir(&self, module: Module, tracing: TracingConfig) -> Option<Arc<Mir>>;
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
-pub struct TracingConfig {
-    pub register_fuzzables: bool,
-    pub trace_calls: bool,
-    pub trace_evaluated_expressions: bool,
-}
-
-impl TracingConfig {
-    pub fn none() -> Self {
-        Self {
-            register_fuzzables: false,
-            trace_calls: false,
-            trace_evaluated_expressions: false,
-        }
-    }
-}
-
-fn mir(db: &dyn HirToMir, module: Module, config: TracingConfig) -> Option<Arc<Mir>> {
+fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> Option<Arc<Mir>> {
     let (hir, _) = db.hir(module.clone())?;
-    let mir = compile_module(db, module, &hir, &config);
+    let mir = compile_module(db, module, &hir, &tracing);
     Some(Arc::new(mir))
 }
 
@@ -46,7 +30,7 @@ fn compile_module(
     db: &dyn HirToMir,
     module: Module,
     hir: &hir::Body,
-    config: &TracingConfig,
+    tracing: &TracingConfig,
 ) -> Mir {
     let mut id_generator = IdGenerator::start_at(0);
     let mut body = Body::default();
@@ -76,7 +60,7 @@ fn compile_module(
             module_hir_id,
             id,
             expression,
-            config,
+            tracing,
         );
     }
 
@@ -237,7 +221,7 @@ fn compile_expression(
     responsible_for_needs: Id,
     hir_id: &hir::Id,
     expression: &hir::Expression,
-    config: &TracingConfig,
+    tracing: &TracingConfig,
 ) {
     let expression = match expression {
         hir::Expression::Int(int) => Expression::Int(int.clone().into()),
@@ -288,7 +272,7 @@ fn compile_expression(
                     responsible,
                     id,
                     expression,
-                    config,
+                    tracing,
                 );
             }
 
@@ -300,7 +284,7 @@ fn compile_expression(
                     body: lambda_body,
                 },
             );
-            if config.register_fuzzables && *fuzzable {
+            if tracing.register_fuzzables.is_enabled() && *fuzzable {
                 let hir_definition =
                     body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
                 body.push_with_new_id(
@@ -324,7 +308,7 @@ fn compile_expression(
                 .map(|argument| mapping[argument])
                 .collect_vec();
 
-            if config.trace_calls {
+            if tracing.calls.is_enabled() {
                 let hir_call =
                     body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
                 body.push_with_new_id(
@@ -345,7 +329,7 @@ fn compile_expression(
                     responsible,
                 },
             );
-            if config.trace_calls {
+            if tracing.calls.is_enabled() {
                 body.push_with_new_id(
                     id_generator,
                     Expression::TraceCallEnds { return_value: call },
@@ -404,7 +388,7 @@ fn compile_expression(
     let id = body.push_with_new_id(id_generator, expression);
     mapping.insert(hir_id.clone(), id);
 
-    if config.trace_evaluated_expressions {
+    if tracing.evaluated_expressions.is_enabled() {
         let hir_expression = body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
         body.push_with_new_id(
             id_generator,

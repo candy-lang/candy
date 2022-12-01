@@ -5,7 +5,7 @@ use crate::{
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
         hir::Id,
-        hir_to_mir::TracingConfig,
+        TracingConfig, TracingMode,
     },
     database::Database,
     language_server::hints::{utils::id_to_end_of_line, HintKind},
@@ -36,16 +36,16 @@ struct Evaluator {
 
 impl ConstantEvaluator {
     pub fn update_module(&mut self, db: &Database, module: Module) {
-        let config = TracingConfig {
-            register_fuzzables: true,
-            trace_calls: false,
-            trace_evaluated_expressions: true,
+        let tracing = TracingConfig {
+            register_fuzzables: TracingMode::OnlyCurrent,
+            calls: TracingMode::Off,
+            evaluated_expressions: TracingMode::OnlyCurrent,
         };
         let tracer = FullTracer::default();
         let mut vm = Vm::new();
         vm.set_up_for_running_module_closure(
             module.clone(),
-            Closure::of_module(db, module.clone(), config).unwrap(),
+            Closure::of_module(db, module.clone(), tracing).unwrap(),
         );
         self.evaluators.insert(module, Evaluator { tracer, vm });
     }
@@ -65,7 +65,7 @@ impl ConstantEvaluator {
         evaluator.vm.run(
             &DbUseProvider {
                 db,
-                config: TracingConfig::none(),
+                tracing: TracingConfig::off(),
             },
             &mut RunLimitedNumberOfInstructions::new(500),
             &mut evaluator.tracer,

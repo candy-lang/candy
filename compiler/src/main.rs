@@ -34,9 +34,7 @@ use crate::{
     },
 };
 use compiler::{
-    hir_to_mir::{HirToMir, TracingConfig},
-    lir::Lir,
-    mir_optimize::OptimizeMir,
+    hir_to_mir::HirToMir, lir::Lir, mir_optimize::OptimizeMir, TracingConfig, TracingMode,
 };
 use itertools::Itertools;
 use language_server::CandyLanguageServer;
@@ -131,12 +129,12 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         options.file.clone(),
         ModuleKind::Code,
     );
-    let config = TracingConfig {
-        register_fuzzables: false,
-        trace_calls: options.tracing,
-        trace_evaluated_expressions: false,
+    let tracing = TracingConfig {
+        register_fuzzables: TracingMode::Off,
+        calls: TracingMode::all_or_off(options.tracing),
+        evaluated_expressions: TracingMode::all_or_off(options.tracing),
     };
-    let result = raw_build(&db, module.clone(), &config, options.debug);
+    let result = raw_build(&db, module.clone(), &tracing, options.debug);
 
     if !options.watch {
         result.ok_or(Exit::FileNotFound).map(|_| ())
@@ -149,7 +147,7 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
         loop {
             match rx.recv() {
                 Ok(_) => {
-                    raw_build(&db, module.clone(), &config, options.debug);
+                    raw_build(&db, module.clone(), &tracing, options.debug);
                 }
                 Err(e) => error!("watch error: {e:#?}"),
             }
@@ -159,7 +157,7 @@ fn build(options: CandyBuildOptions) -> ProgramResult {
 fn raw_build(
     db: &Database,
     module: Module,
-    config: &TracingConfig,
+    tracing: &TracingConfig,
     debug: bool,
 ) -> Option<Arc<Lir>> {
     let rcst = db
@@ -212,19 +210,19 @@ fn raw_build(
         warn!("{start_line}:{start_col} – {end_line}:{end_col}: {payload:?}");
     }
 
-    let mir = db.mir(module.clone(), config.clone()).unwrap();
+    let mir = db.mir(module.clone(), tracing.clone()).unwrap();
     if debug {
         module.dump_associated_debug_file("mir", &format!("{mir}"));
     }
 
     let optimized_mir = db
-        .mir_with_obvious_optimized(module.clone(), config.clone())
+        .mir_with_obvious_optimized(module.clone(), tracing.clone())
         .unwrap();
     if debug {
         module.dump_associated_debug_file("optimized_mir", &format!("{optimized_mir}"));
     }
 
-    let lir = db.lir(module.clone(), config.clone()).unwrap();
+    let lir = db.lir(module.clone(), tracing.clone()).unwrap();
     if debug {
         module.dump_associated_debug_file("lir", &format!("{lir}"));
     }
@@ -241,12 +239,12 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         ModuleKind::Code,
     );
 
-    let config = TracingConfig {
-        register_fuzzables: false,
-        trace_calls: options.tracing,
-        trace_evaluated_expressions: false,
+    let tracing = TracingConfig {
+        register_fuzzables: TracingMode::Off,
+        calls: TracingMode::all_or_off(options.tracing),
+        evaluated_expressions: TracingMode::only_current_or_off(options.tracing),
     };
-    if raw_build(&db, module.clone(), &config, options.debug).is_none() {
+    if raw_build(&db, module.clone(), &tracing, options.debug).is_none() {
         warn!("File not found.");
         return Err(Exit::FileNotFound);
     };
@@ -254,7 +252,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let path_string = options.file.to_string_lossy();
     debug!("Running `{path_string}`.");
 
-    let module_closure = Closure::of_module(&db, module.clone(), config.clone()).unwrap();
+    let module_closure = Closure::of_module(&db, module.clone(), tracing.clone()).unwrap();
     let mut tracer = FullTracer::default();
 
     let mut vm = Vm::new();
@@ -262,7 +260,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     vm.run(
         &DbUseProvider {
             db: &db,
-            config: config.clone(),
+            tracing: tracing.clone(),
         },
         &mut RunForever,
         &mut tracer,
@@ -344,7 +342,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
                 vm.run(
                     &DbUseProvider {
                         db: &db,
-                        config: config.clone(),
+                        tracing: tracing.clone(),
                     },
                     &mut RunForever,
                     &mut tracer,
@@ -463,13 +461,13 @@ async fn fuzz(options: CandyFuzzOptions) -> ProgramResult {
         options.file.clone(),
         ModuleKind::Code,
     );
-    let config = TracingConfig {
-        register_fuzzables: true,
-        trace_calls: false,
-        trace_evaluated_expressions: false,
+    let tracing = TracingConfig {
+        register_fuzzables: TracingMode::All,
+        calls: TracingMode::Off,
+        evaluated_expressions: TracingMode::Off,
     };
 
-    if raw_build(&db, module.clone(), &config, options.debug).is_none() {
+    if raw_build(&db, module.clone(), &tracing, options.debug).is_none() {
         warn!("File not found.");
         return Err(Exit::FileNotFound);
     }
