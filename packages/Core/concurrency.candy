@@ -4,15 +4,17 @@ if = (use "..conditionals").if
 
 parallel body :=
   needs (function.is1 body) "The `body` should be a function taking a nursery."
+  ## TODO: Propagate the responsibility here. `body` may contain a `needs` that
+  ## always fails. That shouldn't be our fault, but our caller's.
   ✨.parallel body
 
 async nursery body :=
   needs (channel.isSendPort nursery)
   needs (function.is0 body)
   returnChannel = channel.create 1
-  channel.send nursery [Closure: body, ReturnChannel: returnChannel.sendPort]
+  nursery | channel.send [Closure: body, ReturnChannel: returnChannel.sendPort]
   returnChannel.receivePort
 
 await fiber :=
   needs (channel.isReceivePort fiber) "`fiber` should be a value returned by `async`."
-  channel.receive fiber
+  fiber | channel.receive

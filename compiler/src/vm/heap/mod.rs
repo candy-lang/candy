@@ -8,7 +8,7 @@ pub use self::{
     pointer::Pointer,
 };
 use super::ids::ChannelId;
-use crate::builtin_functions::BuiltinFunction;
+use crate::{builtin_functions::BuiltinFunction, compiler::hir::Id};
 use itertools::Itertools;
 use num_bigint::BigInt;
 use std::{
@@ -79,9 +79,16 @@ impl Heap {
             .get_mut(&address)
             .unwrap_or_else(|| panic!("Couldn't get object {address}."))
     }
+    pub fn get_hir_id(&self, address: Pointer) -> Id {
+        let Data::HirId(id) = &self.get(address).data else { panic!(); };
+        id.clone()
+    }
 
     pub fn dup(&mut self, address: Pointer) {
-        self.get_mut(address).reference_count += 1;
+        self.dup_by(address, 1);
+    }
+    pub fn dup_by(&mut self, address: Pointer, amount: usize) {
+        self.get_mut(address).reference_count += amount;
 
         let object = self.get(address);
         trace!(
@@ -195,8 +202,8 @@ impl Heap {
                     .map(|(hash, key, value)| (*hash, address_map[key], address_map[value]))
                     .collect(),
             }),
+            Data::HirId(id) => Data::HirId(id.clone()),
             Data::Closure(closure) => Data::Closure(Closure {
-                id: closure.id.clone(),
                 captured: closure
                     .captured
                     .iter()
@@ -204,7 +211,6 @@ impl Heap {
                     .collect(),
                 num_args: closure.num_args,
                 body: closure.body.clone(),
-                responsible: closure.responsible.clone(),
             }),
             Data::Builtin(builtin) => Data::Builtin(builtin.clone()),
             Data::SendPort(port) => Data::SendPort(SendPort::new(port.channel)),
@@ -246,6 +252,9 @@ impl Heap {
     }
     pub fn create_struct(&mut self, fields: HashMap<Pointer, Pointer>) -> Pointer {
         self.create(Data::Struct(Struct::from_fields(self, fields)))
+    }
+    pub fn create_hir_id(&mut self, id: Id) -> Pointer {
+        self.create(Data::HirId(id))
     }
     pub fn create_closure(&mut self, closure: Closure) -> Pointer {
         self.create(Data::Closure(closure))

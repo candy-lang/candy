@@ -1,9 +1,0 @@
-use ..Panic
-use ..Primitives
-use ..String
-
-public fun todo(message: String = "Not implemented"): Never {
-  # Always panics with a todo message.
-
-  panic("TODO: {message}")
-}

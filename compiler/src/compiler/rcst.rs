@@ -9,6 +9,7 @@ pub enum Rcst {
     Dot,                // .
     Colon,              // :
     ColonEqualsSign,    // :=
+    Bar,                // |
     OpeningParenthesis, // (
     ClosingParenthesis, // )
     OpeningBracket,     // [
@@ -40,6 +41,11 @@ pub enum Rcst {
         closing_quote: Box<Rcst>,
     },
     TextPart(String),
+    Pipe {
+        receiver: Box<Rcst>,
+        bar: Box<Rcst>,
+        call: Box<Rcst>,
+    },
     Parenthesized {
         opening_parenthesis: Box<Rcst>,
         inner: Box<Rcst>,
@@ -102,6 +108,7 @@ pub enum RcstError {
     ListNotClosed,
     OpeningParenthesisWithoutExpression,
     ParenthesisNotClosed,
+    PipeMissesCall,
     StructFieldMissesColon,
     StructFieldMissesKey,
     StructFieldMissesValue,
@@ -124,6 +131,7 @@ impl Display for Rcst {
             Rcst::Dot => ".".fmt(f),
             Rcst::Colon => ":".fmt(f),
             Rcst::ColonEqualsSign => ":=".fmt(f),
+            Rcst::Bar => "|".fmt(f),
             Rcst::OpeningParenthesis => "(".fmt(f),
             Rcst::ClosingParenthesis => ")".fmt(f),
             Rcst::OpeningBracket => "[".fmt(f),
@@ -164,6 +172,15 @@ impl Display for Rcst {
                 closing_quote.fmt(f)
             }
             Rcst::TextPart(literal) => literal.fmt(f),
+            Rcst::Pipe {
+                receiver,
+                bar,
+                call,
+            } => {
+                receiver.fmt(f)?;
+                bar.fmt(f)?;
+                call.fmt(f)
+            }
             Rcst::Parenthesized {
                 opening_parenthesis,
                 inner,
@@ -284,6 +301,7 @@ impl IsMultiline for Rcst {
             Rcst::Dot => false,
             Rcst::Colon => false,
             Rcst::ColonEqualsSign => false,
+            Rcst::Bar => false,
             Rcst::OpeningParenthesis => false,
             Rcst::ClosingParenthesis => false,
             Rcst::OpeningBracket => false,
@@ -310,6 +328,11 @@ impl IsMultiline for Rcst {
                 opening_quote.is_multiline() || parts.is_multiline() || closing_quote.is_multiline()
             }
             Rcst::TextPart(_) => false,
+            Rcst::Pipe {
+                receiver,
+                bar,
+                call,
+            } => receiver.is_multiline() || bar.is_multiline() || call.is_multiline(),
             Rcst::Parenthesized {
                 opening_parenthesis,
                 inner,

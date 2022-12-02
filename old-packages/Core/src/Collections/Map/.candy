@@ -12,37 +12,11 @@ public use .LinkedHashMap
 public trait Map[Key: Equals & Hash, Value] {
   static fun empty(): Map[Key, Value] { BucketMap[Key, Value].empty() }
 
-  static fun of(single: (Key, Value)): Map[Key, Value] {
-    Map[Key, Value].empty().set(single.key, single.value)
-  }
-  static fun of(first: (Key, Value), second: (Key, Value)): Map[Key, Value] {
-    Map[Key, Value].of(first).set(second.key, second.value)
-  }
-  static fun of(first: (Key, Value), second: (Key, Value), third: (Key, Value)): Map[Key, Value] {
-    Map[Key, Value].of(first, second).set(third.key, third.value)
-  }
-  static fun of(
-    first: (Key, Value),
-    second: (Key, Value),
-    third: (Key, Value),
-    fourth: (Key, Value),
-  ): Map[Key, Value] { Map[Key, Value].of(first, second, third).set(fourth.key, fourth.value) }
-  static fun of(
-    first: (Key, Value),
-    second: (Key, Value),
-    third: (Key, Value),
-    fourth: (Key, Value),
-    fifth: (Key, Value),
-  ): Map[Key, Value] {
-    Map[Key, Value].of(first, second, third, fourth).set(fifth.key, fifth.value)
-  }
-
   fun length(): Int
   fun isEmpty(): Bool { this.length() == 0 }
   fun isNotEmpty(): Bool { this.isEmpty().not() }
 
   fun get(key: Key): Maybe[Value]
-  fun containsKey(key: Key): Bool { this.get(key).isSome() }
 
   fun set(key: Key, value: Value): Map[Key, Value]
   fun setAll(map: Map[Key, Value]): Map[Key, Value] {

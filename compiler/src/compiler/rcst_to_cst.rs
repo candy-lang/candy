@@ -67,6 +67,10 @@ impl RcstToCstExt for Rcst {
                 state.offset += 2;
                 CstKind::ColonEqualsSign
             }
+            Rcst::Bar => {
+                state.offset += 1;
+                CstKind::Bar
+            }
             Rcst::OpeningParenthesis => {
                 state.offset += 1;
                 CstKind::OpeningParenthesis
@@ -195,6 +199,15 @@ impl RcstToCstExt for Rcst {
                 struct_: Box::new(struct_.to_cst(state)),
                 dot: Box::new(dot.to_cst(state)),
                 key: Box::new(key.to_cst(state)),
+            },
+            Rcst::Pipe {
+                receiver,
+                bar,
+                call,
+            } => CstKind::Pipe {
+                receiver: Box::new(receiver.to_cst(state)),
+                bar: Box::new(bar.to_cst(state)),
+                call: Box::new(call.to_cst(state)),
             },
             Rcst::Parenthesized {
                 opening_parenthesis,

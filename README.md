@@ -46,15 +46,15 @@ Candy blurs the line between those stages, for example, by replacing compile-tim
   ```candy
   foo a =             # If you pass a = 0,
     needs (isInt a)
-    math.logarithm a  # then this fails because logarithm only works on positive numbers.
+    math.logarithm a  # then this panics: The `input` must be a positive number.
 
   efficientTextReverse text =
     needs (isText text)
-    needs (isPalindrome text) "efficientTextReverse only works on palindromes"
+    needs (isPalindrome text) "Only palindromes can be efficiently reversed."
     text
 
   greetBackwards name =                   # If you pass name = "Test",
-    "Hello, {efficientTextReverse name}"  # then this fails because efficientTextReverse only works on palindromes.
+    "Hello, {efficientTextReverse name}"  # then this panics: Only palindromes can be efficiently reversed.
   ```
 
 To get a more in-depth introduction, read the [language document](language.md).
@@ -97,6 +97,7 @@ We already have a language server that provides some tooling.
   - LLVM, WASM
 - IDE support:
   - generate debug files
+  - DAP
   - [ ] completion, completion resolve
   - [ ] hover
   - [ ] signatureHelp
@@ -135,34 +136,45 @@ We already have a language server that provides some tooling.
 
 ## Short-term TODOs
 
-- fix fault attribution
 - new name?
 - add caching while compile-time evaluating code
 - tags
 - pattern matching
-- pipe operator
-- add CI
 - add tests
 - add a more lightweight tracer that only tracks stack traces
 - text interpolation
-- optimize: eliminate common subtrees
 - optimize: inline functions
 - minimize inputs found through fuzzing
 - fuzz parser
 - remove builtinPrint
 - optimize: tail call optimization
-- parse function declaration with doc comment but no code
 - tracing visualization
 - distinguish packages from normal modules
 - complain about comment lines with too much indentation
 - develop guidelines about how to format reasons
+- disallow passing named closures as parameters? or auto-propagate caller's fault to called parameters?
+- replace occurrences of `Id::complicated_responsibility()`
+- fix usage of pipes in indented code such as this:
+
+  ```candy
+  foo
+    bar | baz
+  ## Currently, this is parsed as `baz (foo bar)`.
+  ```
+
+- more efficient argument preparation in LIR function call (so we don't have to push references if the evaluation order doesn't change conceptually)
+- fix evaluation order of pipe expression by keeping it in the AST
 
 ## How to use Candy
 
-1. Install Rust.
-2. Clone this repo.
-3. Open the workspace in VS Code.
-4. In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/compiler/Cargo.toml -- lsp",`.
-5. Run `npm install` inside `vscode_extension/`.
-6. Run the launch config “Run Extension (VS Code Extension)”.
-7. In the new VS Code window that opens, you can enjoy 🍭 Candy :)
+1. Install [<img height="16" src="https://rust-lang.org/static/images/favicon.svg"> Rust](https://rust-lang.org): https://www.rust-lang.org/tools/install.
+2. Configure Rust to use the nightly toolchain: `rustup default nightly`.
+3. Install Rust's Clippy (a linter): `rustup component add clippy`.
+4. Clone this repo.
+5. Open the workspace (`compiler.code-workspace`) in VS Code.
+6. In the VS Code settings (JSON), add the following: `"candy.languageServerCommand": "cargo run --manifest-path <path-to-the-candy-folder>/compiler/Cargo.toml -- lsp"`.  
+   If you want to write code in 🍭 Candy (as opposed to working on the compiler), you should also add `--release` before the standalone `--`.
+   This makes the IDE tooling faster, but startup will take longer.
+7. Run `npm install` inside `vscode_extension/`.
+8. Run the launch config “Run Extension (VS Code Extension)”.
+9. In the new VS Code window that opens, you can enjoy 🍭 Candy :)

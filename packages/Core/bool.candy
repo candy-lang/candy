@@ -4,9 +4,9 @@ type = use "..type"
 
 is value :=
   ✨.ifElse
-    ✨.equals value True
+    equals value True
     { True }
-    { ✨.equals value False }
+    { equals value False }
 
 not a :=
   needs (is a)
@@ -18,7 +18,7 @@ lazyAnd a b :=
   ✨.ifElse
     a
     {
-      result = ✨.functionRun b
+      result = b | ✨.functionRun
       needs (is result) "`b` didn't return a bool."
       result
     }
@@ -35,14 +35,14 @@ lazyOr a b :=
     a
     { True }
     {
-      result = ✨.functionRun b
+      result = b | ✨.functionRun
       needs (is result) "`b` didn't return a bool."
       result
     }
 or a b :=
   needs (is a)
   needs (is b)
-  lazyOr a { b }
+  a | lazyOr { b }
 
 xor a b :=
   needs (is a)

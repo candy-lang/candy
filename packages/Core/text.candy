@@ -2,6 +2,7 @@ bool = use "..bool"
 conditionals = use "..conditionals"
 equals = (use "..equality").equals
 int = use "..int"
+list = use "..list"
 struct = use "..struct"
 type = use "..type"
 
@@ -9,76 +10,77 @@ is value := type.is value Text
 
 isEmpty text :=
   needs (is text)
-  ✨.textIsEmpty text
+  text | ✨.textIsEmpty
 length text :=
   # Returns the number of Unicode grapheme clusters in this text.
   needs (is text)
-  ✨.textLength text
+  text | ✨.textLength
 
 characters text :=
   needs (is text)
-  ✨.textCharacters text
+  text | ✨.textCharacters
 characterAt text index :=
   needs (is text)
   needs (int.is index)
   needs (int.isNonNegative index)
   needs (int.isLessThan index (length text))
-  struct.getUnwrap (characters text) index
+  text | characters | list.get index
 
 getRange text startInclusive endExclusive :=
   needs (is text)
 
   needs (int.is startInclusive)
   needs (int.isNonNegative startInclusive)
-  needs (int.is endExclusive)
 
+  needs (int.is endExclusive)
   needs (int.isNonNegative endExclusive)
+
   needs (int.isLessThanOrEqualTo startInclusive endExclusive)
-  needs (int.isLessThan endExclusive (length text))
+  needs (int.isLessThanOrEqualTo endExclusive (length text))
 
   # TODO: Support ranges when we have them.
-  ✨.textGetRange text startInclusive endExclusive
+  text | ✨.textGetRange startInclusive endExclusive
 
-concatenate valueA valueB :=
-  needs (is valueA)
-  needs (is valueB)
-  ✨.textConcatenate valueA valueB
+concatenate textA textB :=
+  needs (is textA)
+  needs (is textB)
+  textA | ✨.textConcatenate textB
 
 startsWith text pattern :=
   needs (is text)
   needs (is pattern)
-  ✨.textStartsWith text pattern
+  text | ✨.textStartsWith pattern
 endsWith text pattern :=
   needs (is text)
   needs (is pattern)
-  ✨.textEndsWith text pattern
+  text | ✨.textEndsWith pattern
 contains text pattern :=
   needs (is text)
   needs (is pattern)
-  ✨.textContains text pattern
+  text | ✨.textContains pattern
 
 removePrefix text prefix :=
   needs (is text)
   needs (is prefix)
   conditionals.ifElse
-    startsWith text prefix
-    { getRange text (length prefix) (length text) }
+    (text | startsWith prefix)
+    { text | getRange (prefix | length) (text | length) }
     { text }
 removeSuffix text suffix :=
   needs (is text)
   needs (is suffix)
-  textLength = length text
+  textLength = text | length
   conditionals.ifElse
     endsWith text suffix
-    { getRange text (int.subtract textLength (length suffix)) textLength }
+    { text | getRange (textLength | int.subtract (suffix | length)) textLength }
     { text }
 
 trimStart text :=
   needs (is text)
-  ✨.textTrimStart text
+  text | ✨.textTrimStart
 trimEnd text :=
   needs (is text)
-  ✨.textTrimEnd text
+  text | ✨.textTrimEnd
 trim text :=
   needs (is text)
-  trimEnd (trimStart text)
+  text | trimStart | trimEnd

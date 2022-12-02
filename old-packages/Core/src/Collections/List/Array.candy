@@ -4,9 +4,6 @@ use ...Iterate
 use ...LinkedList
 use ..
 
-public builtin type Array[Item]
-# A structure that holds a fixed number of `Item`s.
-
 impl[Item] Array[Item] {
   public static fun filled(length: Int /* UInt */, item: Item): Array[Item] {
     # Creates a new `Array` of the given `length`, where every slot is filled with the same `item`.
@@ -17,25 +14,10 @@ impl[Item] Array[Item] {
   public static builtin fun generate(length: Int, generator: (Int) -> Item): Array[Item]
   # Creates a new `Array` of the given `length` where the `generator` is invoked with indices to
   # generate items to fill the slots.
-
-  public static fun empty(): Array[Item] {
-    This.generate(0, { panic("Generation of an empty `Array` called the generator function.") })
-  }
-  public static fun of(first: Item): Array[Item] { This.generate(1, { first }) }
-  public static fun of(first: Item, second: Item): Array[Item] {
-    This.generate(2, { if(it == 0, { first }).else({ second }) })
-  }
-  public static fun of(first: Item, second: Item, third: Item): Array[Item] {
-    This.generate(3, { if(it == 0, { first }).else({ if(it == 1, ({ second }).else({ third }) }) })
-  }
 }
 
 impl[Item] Array[Item]: List[Item]
 impl[Item] Array[Item]: Iterate[Item] {
-  public builtin fun length(): Int
-
-  public builtin fun get(index: Int /* UInt */): Maybe[Item]
-
   fun iterate(): Maybe[(Item, Iterate[Item])] { ArrayIterate[Item](this, 0).iterate() }
 }
 type ArrayIterate[Item] = (array: Array[Item], cursor: Int = 0)

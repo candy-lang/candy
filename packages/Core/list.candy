@@ -1,70 +1,83 @@
 bool = use "..bool"
+ifElse = (use "..conditionals").ifElse
 equals = (use "..equality").equals
+function = use "..function"
 int = use "..int"
+result = use "..result"
 type = use "..type"
 
-create length :=
+filled length item :=
   needs (int.is length)
   needs (int.isNonNegative length)
   needs (int.fitsInRustU32 length)
-  ✨.listCreate length
+  ✨.listFilled length item
 # TODO: `generate length valueGetter` when we have loops
 
 is value := type.is value List
 
 length list :=
   needs (is list)
-  ✨.listLength list
+  list | ✨.listLength
 isEmpty list :=
   needs (is list)
   equals (length list) 0
 
 lastIndex list :=
   needs (is list)
-  needs (bool.not (isEmpty list))
-  int.minus (length list) 1
+  ifElse
+    (list | isEmpty)
+    result.error "Can't get the last index of an empty list."
+    list | length | int.minus 1 | result.ok
 isValidIndex list index :=
   needs (is list)
-  bool.lazyAnd
-    (int.is index)
-    {
-      bool.and
-        int.isNonNegative index
-        int.isLessThanOrEqualTo index (lastIndex list)
-    }
+  needs (int.is index)
+  ifElse
+    (list | isEmpty)
+    False
+    index | int.isNonNegative
+  | bool.lazyAnd { index | int.isLessThanOrEqualTo (list | lastIndex | result.unwrap) }
 
 get list index :=
   needs (is list)
   needs (isValidIndex index)
-  ✨.listGet list index
+  list | ✨.listGet index
 
+# TODO: add `single list` when we have pattern matching
 last list :=
   needs (is list)
-  needs (bool.not (isEmpty list))
-  get list (lastIndex list)
+  list | lastIndex
+  | result.mapError "Can't get the last item of an empty list."
+  | result.map { index -> list | get index }
 
 insert list index item :=
   needs (is list)
 
   needs (int.is index)
   needs (int.isNonNegative index)
-  needs (int.isLessThanOrEqualTo index (length list))
+  needs (index | int.isLessThanOrEqualTo (length list))
 
-  ✨.listInsert list index item
+  list | ✨.listInsert index item
 
 prepend list item :=
   needs (is list)
-  insert list 0 item
+  list | insert 0 item
 append list item :=
   needs (is list)
-  insert list (length list) item
+  list | insert (length list) item
 
 replace list index newValue :=
   needs (is list)
   needs (isValidIndex index)
-  ✨.listReplace list index newValue
+  list | ✨.listReplace index newValue
+update list index updater :=
+  needs (is list)
+  needs (isValidIndex index)
+  needs (function.is1 updater)
+  oldValue = list | get index
+  newValue = updater oldValue
+  list | replace index newValue
 
 removeAt list index :=
   needs (is list)
   needs (isValidIndex index)
-  ✨.listRemoveAt list index
+  list | ✨.listRemoveAt index

@@ -3,20 +3,20 @@ use crate::{
     compiler::{
         ast_to_hir::AstToHir,
         hir::{Expression, HirDb, Id, Lambda},
+        TracingConfig,
     },
     database::Database,
     fuzzer::{Fuzzer, Status},
     module::Module,
     vm::{
         context::{DbUseProvider, RunLimitedNumberOfInstructions},
-        tracer::full::{StoredFiberEvent, StoredVmEvent},
         Heap, Pointer,
     },
 };
 use itertools::Itertools;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::collections::HashMap;
-use tracing::{error, trace};
+use tracing::{debug, error};
 
 #[derive(Default)]
 pub struct FuzzerManager {
@@ -48,14 +48,13 @@ impl FuzzerManager {
             .flat_map(|fuzzers| fuzzers.values_mut())
             .filter(|fuzzer| matches!(fuzzer.status(), Status::StillFuzzing { .. }))
             .collect_vec();
-        trace!(
-            "Fuzzer running. {} fuzzers for relevant closures are running.",
-            running_fuzzers.len(),
-        );
 
         let fuzzer = running_fuzzers.choose_mut(&mut thread_rng())?;
         fuzzer.run(
-            &mut DbUseProvider { db },
+            &mut DbUseProvider {
+                db,
+                tracing: TracingConfig::off(),
+            },
             &mut RunLimitedNumberOfInstructions::new(100),
         );
 
@@ -68,96 +67,72 @@ impl FuzzerManager {
     pub fn get_hints(&self, db: &Database, module: &Module) -> Vec<Vec<Hint>> {
         let mut hints = vec![];
 
+        debug!("There are {} fuzzers.", self.fuzzers.len());
+
         for fuzzer in self.fuzzers[module].values() {
-            if let Status::PanickedForArguments {
+            let Status::PanickedForArguments {
                 arguments,
                 reason,
-                tracer,
-            } = fuzzer.status()
-            {
-                let id = fuzzer.closure_id.clone();
-                let first_hint = {
-                    let parameter_names = match db.find_expression(id.clone()) {
-                        Some(Expression::Lambda(Lambda { parameters, .. })) => parameters
-                            .into_iter()
-                            .map(|parameter| parameter.keys.last().unwrap().to_string())
-                            .collect_vec(),
-                        Some(_) => panic!("Looks like we fuzzed a non-closure. That's weird."),
-                        None => {
-                            error!("Using fuzzing, we found an error in a generated closure.");
-                            continue;
-                        }
-                    };
-                    Hint {
-                        kind: HintKind::Fuzz,
-                        text: format!(
-                            "If this is called with {},",
-                            parameter_names
-                                .iter()
-                                .zip(arguments.iter())
-                                .map(|(name, argument)| format!("`{name} = {argument:?}`"))
-                                .collect_vec()
-                                .join_with_commas_and_and(),
-                        ),
-                        position: id_to_end_of_line(db, id.clone()).unwrap(),
+                responsible,
+                ..
+            } = fuzzer.status() else { continue; };
+
+            let id = fuzzer.closure_id.clone();
+            let first_hint = {
+                let parameter_names = match db.find_expression(id.clone()) {
+                    Some(Expression::Lambda(Lambda { parameters, .. })) => parameters
+                        .into_iter()
+                        .map(|parameter| parameter.keys.last().unwrap().to_string())
+                        .collect_vec(),
+                    Some(_) => panic!("Looks like we fuzzed a non-closure. That's weird."),
+                    None => {
+                        error!("Using fuzzing, we found an error in a generated closure.");
+                        continue;
                     }
                 };
+                Hint {
+                    kind: HintKind::Fuzz,
+                    text: format!(
+                        "If this is called with {},",
+                        parameter_names
+                            .iter()
+                            .zip(arguments.iter())
+                            .map(|(name, argument)| format!("`{name} = {argument:?}`"))
+                            .collect_vec()
+                            .join_with_commas_and_and(),
+                    ),
+                    position: id_to_end_of_line(db, id.clone()).unwrap(),
+                }
+            };
 
-                let second_hint = {
-                    let panicking_inner_call = tracer
-                        .events
-                        .iter()
-                        .rev()
-                        // Find the innermost panicking call that is in the
-                        // function.
-                        .filter_map(|event| match &event.event {
-                            StoredVmEvent::InFiber { event, .. } => Some(event),
-                            _ => None,
-                        })
-                        .find(|event| {
-                            let innermost_panicking_call_id = match &event {
-                                StoredFiberEvent::CallStarted { id, .. } => id,
-                                StoredFiberEvent::NeedsStarted { id, .. } => id,
-                                _ => return false,
-                            };
-                            id.is_same_module_and_any_parent_of(innermost_panicking_call_id)
-                                && db.hir_to_cst_id(id.clone()).is_some()
-                        });
-                    let panicking_inner_call = match panicking_inner_call {
-                        Some(panicking_inner_call) => panicking_inner_call,
-                        None => {
-                            // We found a panicking function without an inner
-                            // panicking needs. This indicates an error during
-                            // compilation within a function body.
-                            continue;
-                        }
-                    };
-                    let (call_id, name, arguments) = match &panicking_inner_call {
-                        StoredFiberEvent::CallStarted { id, closure, args } => {
-                            (id.clone(), closure.format(&tracer.heap), args.clone())
-                        }
-                        StoredFiberEvent::NeedsStarted {
-                            id,
-                            condition,
-                            reason,
-                        } => (id.clone(), "needs".to_string(), vec![*condition, *reason]),
-                        _ => unreachable!(),
-                    };
-                    Hint {
-                        kind: HintKind::Fuzz,
-                        text: format!(
-                            "then `{name} {}` panics because {reason}.",
-                            arguments
-                                .iter()
-                                .map(|arg| arg.format(&tracer.heap))
-                                .join(" "),
-                        ),
-                        position: id_to_end_of_line(db, call_id).unwrap(),
-                    }
-                };
+            let second_hint = {
+                if &responsible.module != module {
+                    // The function panics internally for an input, but it's the
+                    // fault of an inner function that's in another module.
+                    // TODO: The fuzz case should instead be highlighted in the
+                    // used function directly. We don't do that right now
+                    // because we assume the fuzzer will find the panic when
+                    // fuzzing the faulty function, but we should save the
+                    // panicking case (or something like that) in the future.
+                    continue;
+                }
+                if db.hir_to_cst_id(id.clone()).is_none() {
+                    panic!(
+                        "It looks like the generated code {responsible} is at fault for a panic."
+                    );
+                }
 
-                hints.push(vec![first_hint, second_hint]);
-            }
+                // TODO: In the future, re-run only the failing case with
+                // tracing enabled and also show the arguments to the failing
+                // function in the hint.
+                Hint {
+                    kind: HintKind::Fuzz,
+                    text: format!("then {responsible} panics: {reason}"),
+                    position: id_to_end_of_line(db, responsible.clone()).unwrap(),
+                }
+            };
+
+            hints.push(vec![first_hint, second_hint]);
         }
 
         hints

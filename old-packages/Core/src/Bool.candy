@@ -3,36 +3,6 @@ use ..Int
 use ..Maybe
 use ..Operators
 
-public type Bool = True | False
-
-public fun true(): Bool { Bool.True() }
-public fun false(): Bool { Bool.False() }
-
-impl Bool {
-  public fun not(): Bool { this.match[Bool](true = { false() }, false = { true() }) }
-}
-
-impl Bool: And {
-  fun and(other: Bool): Bool { this.match[Bool](true = { other }, false = { false() }) }
-}
-
-impl Bool: Or {
-  fun or(other: Bool): Bool { this.match[Bool](true = { true() }, false = { other }) }
-}
-
-impl Bool: Equals {
-  fun equals(other: This): Bool { this.match[Bool](true = { other }, false = { other.not() }) }
-}
-
-impl Bool: Implies {
-  fun implies(other: Bool): Bool { this.match[Bool](true = { other }, false = { true() }) }
-}
-
-impl Bool {
-  public fun and(other: () -> Bool): Bool { this.match[Bool](true = other, false = { false() }) }
-  public fun or(other: () -> Bool): Bool { this.match[Bool](true = { true() }, false = other) }
-}
-
 impl Bool: Hash {
   fun hash[H: Hasher](): H { H.primitive(this.match[Int](true = { 1 }, false = { 0 })) }
 }

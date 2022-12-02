@@ -9,15 +9,7 @@ public builtin type String
 # A valid Unicode string.
 
 impl String {
-  public builtin fun characters(): Iterate[String]
-  public builtin fun substring(offset: Int, length: Int): String
-
-  public builtin fun isEmpty(): Bool
-  public builtin fun isNotEmpty(): Bool
-  public builtin fun length(): Int
-
   public builtin fun split(pattern: String): List[String]
-  public builtin fun trim(): String
 }
 
 impl String: Compare {
@@ -26,11 +18,6 @@ impl String: Compare {
 impl String: Hash {
   builtin fun hash[H: Hasher](): H
 }
-
-impl String: InfixPlus[This, This] {
-  builtin fun infixPlus(other: This): This
-}
-
 
 impl String {
   public static fun build(builder: (StringBuilder) -> Nothing): String {

@@ -58,7 +58,7 @@ fn ast(db: &dyn CstToAst, module: Module) -> Option<AstResult> {
             let cst = cst.unwrap_whitespace_and_comment();
             context.lower_csts(&cst)
         }
-        Err(InvalidModuleError::DoesNotExist) => return None,
+        Err(InvalidModuleError::DoesNotExist | InvalidModuleError::IsToolingModule) => return None,
         Err(InvalidModuleError::InvalidUtf8) => {
             vec![Ast {
                 id: context.create_next_id_without_mapping(),
@@ -109,6 +109,7 @@ impl LoweringContext {
             | CstKind::Dot
             | CstKind::Colon
             | CstKind::ColonEqualsSign
+            | CstKind::Bar
             | CstKind::OpeningParenthesis
             | CstKind::ClosingParenthesis
             | CstKind::OpeningBracket
@@ -199,6 +200,42 @@ impl LoweringContext {
                 text
             }
             CstKind::TextPart(_) => panic!("TextPart should only occur in Text."),
+            CstKind::Pipe {
+                receiver,
+                bar,
+                call,
+            } => {
+                let ast = self.lower_cst(receiver);
+
+                assert!(
+                    matches!(bar.kind, CstKind::Bar),
+                    "Pipe must contain a bar, but instead contained a {}.",
+                    bar,
+                );
+
+                let call = self.lower_cst(call);
+                let call = match call {
+                    Ast {
+                        kind:
+                            AstKind::Call(ast::Call {
+                                receiver,
+                                mut arguments,
+                            }),
+                        ..
+                    } => {
+                        arguments.insert(0, ast);
+                        ast::Call {
+                            receiver,
+                            arguments,
+                        }
+                    }
+                    call => ast::Call {
+                        receiver: Box::new(call),
+                        arguments: vec![ast],
+                    },
+                };
+                self.create_ast(cst.id, AstKind::Call(call))
+            }
             CstKind::Parenthesized {
                 opening_parenthesis,
                 inner,
@@ -211,7 +248,7 @@ impl LoweringContext {
                 assert!(
                     matches!(opening_parenthesis.kind, CstKind::OpeningParenthesis),
                     "Parenthesized needs to start with opening parenthesis, but started with {}.",
-                    opening_parenthesis
+                    opening_parenthesis,
                 );
                 if !matches!(closing_parenthesis.kind, CstKind::ClosingParenthesis) {
                     ast = self.create_ast(

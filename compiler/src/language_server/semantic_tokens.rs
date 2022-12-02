@@ -145,21 +145,21 @@ impl<'a> Context<'a> {
     fn visit_cst(&mut self, cst: &Cst, token_type_for_identifier: Option<SemanticTokenType>) {
         match &cst.kind {
             CstKind::EqualsSign => self.add_token(cst.span.clone(), SemanticTokenType::Operator),
-            CstKind::Comma => {}
-            CstKind::Dot => {}
-            CstKind::Colon => {}
-            CstKind::ColonEqualsSign => {}
-            CstKind::OpeningParenthesis => {}
-            CstKind::ClosingParenthesis => {}
-            CstKind::OpeningBracket => {}
-            CstKind::ClosingBracket => {}
-            CstKind::OpeningCurlyBrace => {}
-            CstKind::ClosingCurlyBrace => {}
+            CstKind::Comma
+            | CstKind::Dot
+            | CstKind::Colon
+            | CstKind::ColonEqualsSign
+            | CstKind::Bar
+            | CstKind::OpeningParenthesis
+            | CstKind::ClosingParenthesis
+            | CstKind::OpeningBracket
+            | CstKind::ClosingBracket
+            | CstKind::OpeningCurlyBrace
+            | CstKind::ClosingCurlyBrace => {}
             CstKind::Arrow => self.add_token(cst.span.clone(), SemanticTokenType::Operator),
             CstKind::DoubleQuote => {} // handled by parent
             CstKind::Octothorpe => {}  // handled by parent
-            CstKind::Whitespace(_) => {}
-            CstKind::Newline(_) => {}
+            CstKind::Whitespace(_) | CstKind::Newline(_) => {}
             CstKind::Comment { octothorpe, .. } => {
                 self.visit_cst(octothorpe, None);
                 self.add_token(cst.span.clone(), SemanticTokenType::Comment);
@@ -188,6 +188,15 @@ impl<'a> Context<'a> {
                 self.add_token(closing_quote.span.clone(), SemanticTokenType::String);
             }
             CstKind::TextPart(_) => {} // handled by parent
+            CstKind::Pipe {
+                receiver,
+                bar,
+                call,
+            } => {
+                self.visit_cst(receiver, None);
+                self.visit_cst(bar, None);
+                self.visit_cst(call, None);
+            }
             CstKind::Parenthesized {
                 opening_parenthesis,
                 inner,

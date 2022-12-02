@@ -46,6 +46,7 @@ pub enum CstKind {
     Dot,                // .
     Colon,              // :
     ColonEqualsSign,    // :=
+    Bar,                // |
     OpeningParenthesis, // (
     ClosingParenthesis, // )
     OpeningBracket,     // [
@@ -77,6 +78,11 @@ pub enum CstKind {
         closing_quote: Box<Cst>,
     },
     TextPart(String),
+    Pipe {
+        receiver: Box<Cst>,
+        bar: Box<Cst>,
+        call: Box<Cst>,
+    },
     Parenthesized {
         opening_parenthesis: Box<Cst>,
         inner: Box<Cst>,
@@ -137,6 +143,7 @@ impl Display for Cst {
             CstKind::Dot => '.'.fmt(f),
             CstKind::Colon => ':'.fmt(f),
             CstKind::ColonEqualsSign => ":=".fmt(f),
+            CstKind::Bar => "|".fmt(f),
             CstKind::OpeningParenthesis => '('.fmt(f),
             CstKind::ClosingParenthesis => ')'.fmt(f),
             CstKind::OpeningBracket => '['.fmt(f),
@@ -177,6 +184,11 @@ impl Display for Cst {
                 closing_quote.fmt(f)
             }
             CstKind::TextPart(literal) => literal.fmt(f),
+            CstKind::Pipe {
+                receiver,
+                bar,
+                call,
+            } => write!(f, "{}{}{}", receiver, bar, call),
             CstKind::Parenthesized {
                 opening_parenthesis,
                 inner,
@@ -312,8 +324,29 @@ pub trait UnwrapWhitespaceAndComment {
 impl UnwrapWhitespaceAndComment for Cst {
     fn unwrap_whitespace_and_comment(&self) -> Self {
         let kind = match &self.kind {
+            kind @ (CstKind::EqualsSign
+            | CstKind::Comma
+            | CstKind::Dot
+            | CstKind::Colon
+            | CstKind::ColonEqualsSign
+            | CstKind::Bar
+            | CstKind::OpeningParenthesis
+            | CstKind::ClosingParenthesis
+            | CstKind::OpeningBracket
+            | CstKind::ClosingBracket
+            | CstKind::OpeningCurlyBrace
+            | CstKind::ClosingCurlyBrace
+            | CstKind::Arrow
+            | CstKind::DoubleQuote
+            | CstKind::Octothorpe
+            | CstKind::Whitespace(_)
+            | CstKind::Newline(_)
+            | CstKind::Comment { .. }) => kind.clone(),
             CstKind::TrailingWhitespace { child, .. } => {
                 return child.unwrap_whitespace_and_comment()
+            }
+            kind @ (CstKind::Identifier(_) | CstKind::Symbol(_) | CstKind::Int { .. }) => {
+                kind.clone()
             }
             CstKind::Text {
                 opening_quote,
@@ -323,6 +356,16 @@ impl UnwrapWhitespaceAndComment for Cst {
                 opening_quote: Box::new(opening_quote.unwrap_whitespace_and_comment()),
                 parts: parts.unwrap_whitespace_and_comment(),
                 closing_quote: Box::new(closing_quote.unwrap_whitespace_and_comment()),
+            },
+            kind @ CstKind::TextPart(_) => kind.clone(),
+            CstKind::Pipe {
+                receiver,
+                bar,
+                call,
+            } => CstKind::Pipe {
+                receiver: Box::new(receiver.unwrap_whitespace_and_comment()),
+                bar: Box::new(bar.unwrap_whitespace_and_comment()),
+                call: Box::new(call.unwrap_whitespace_and_comment()),
             },
             CstKind::Parenthesized {
                 opening_parenthesis,
@@ -409,7 +452,7 @@ impl UnwrapWhitespaceAndComment for Cst {
                 assignment_sign: Box::new(assignment_sign.unwrap_whitespace_and_comment()),
                 body: body.unwrap_whitespace_and_comment(),
             },
-            other_kind => other_kind.clone(),
+            kind @ CstKind::Error { .. } => kind.clone(),
         };
         Cst {
             id: self.id,
@@ -444,29 +487,28 @@ impl TreeWithIds for Cst {
         };
 
         match &self.kind {
-            CstKind::EqualsSign => None,
-            CstKind::Comma => None,
-            CstKind::Dot => None,
-            CstKind::Colon => None,
-            CstKind::ColonEqualsSign => None,
-            CstKind::OpeningParenthesis => None,
-            CstKind::ClosingParenthesis => None,
-            CstKind::OpeningBracket => None,
-            CstKind::ClosingBracket => None,
-            CstKind::OpeningCurlyBrace => None,
-            CstKind::ClosingCurlyBrace => None,
-            CstKind::Arrow => None,
-            CstKind::DoubleQuote => None,
-            CstKind::Octothorpe => None,
-            CstKind::Whitespace(_) => None,
-            CstKind::Newline(_) => None,
+            CstKind::EqualsSign
+            | CstKind::Comma
+            | CstKind::Dot
+            | CstKind::Colon
+            | CstKind::ColonEqualsSign
+            | CstKind::Bar
+            | CstKind::OpeningParenthesis
+            | CstKind::ClosingParenthesis
+            | CstKind::OpeningBracket
+            | CstKind::ClosingBracket
+            | CstKind::OpeningCurlyBrace
+            | CstKind::ClosingCurlyBrace
+            | CstKind::Arrow
+            | CstKind::DoubleQuote
+            | CstKind::Octothorpe
+            | CstKind::Whitespace(_)
+            | CstKind::Newline(_) => None,
             CstKind::Comment { octothorpe, .. } => octothorpe.find(id),
             CstKind::TrailingWhitespace { child, whitespace } => {
                 child.find(id).or_else(|| whitespace.find(id))
             }
-            CstKind::Identifier(_) => None,
-            CstKind::Symbol(_) => None,
-            CstKind::Int { .. } => None,
+            CstKind::Identifier(_) | CstKind::Symbol(_) | CstKind::Int { .. } => None,
             CstKind::Text {
                 opening_quote,
                 parts,
@@ -476,6 +518,14 @@ impl TreeWithIds for Cst {
                 .or_else(|| parts.find(id))
                 .or_else(|| closing_quote.find(id)),
             CstKind::TextPart(_) => None,
+            CstKind::Pipe {
+                receiver,
+                bar,
+                call,
+            } => receiver
+                .find(id)
+                .or_else(|| bar.find(id))
+                .or_else(|| call.find(id)),
             CstKind::Parenthesized {
                 opening_parenthesis,
                 inner,
@@ -556,29 +606,35 @@ impl TreeWithIds for Cst {
     }
     fn find_by_offset(&self, offset: &usize) -> Option<&Cst> {
         let (inner, is_end_inclusive) = match &self.kind {
-            CstKind::EqualsSign { .. } => (None, false),
-            CstKind::Comma { .. } => (None, false),
-            CstKind::Dot { .. } => (None, false),
-            CstKind::Colon { .. } => (None, false),
-            CstKind::ColonEqualsSign { .. } => (None, false),
-            CstKind::OpeningParenthesis { .. } => (None, false),
-            CstKind::ClosingParenthesis { .. } => (None, false),
-            CstKind::OpeningBracket { .. } => (None, false),
-            CstKind::ClosingBracket { .. } => (None, false),
-            CstKind::OpeningCurlyBrace { .. } => (None, false),
-            CstKind::ClosingCurlyBrace { .. } => (None, false),
-            CstKind::Arrow { .. } => (None, false),
-            CstKind::DoubleQuote => (None, false),
-            CstKind::Octothorpe => (None, false),
-            CstKind::Whitespace(_) => (None, false),
-            CstKind::Newline(_) => (None, false),
+            CstKind::EqualsSign
+            | CstKind::Comma
+            | CstKind::Dot
+            | CstKind::Colon
+            | CstKind::ColonEqualsSign
+            | CstKind::Bar
+            | CstKind::OpeningParenthesis
+            | CstKind::ClosingParenthesis
+            | CstKind::OpeningBracket
+            | CstKind::ClosingBracket
+            | CstKind::OpeningCurlyBrace
+            | CstKind::ClosingCurlyBrace
+            | CstKind::Arrow
+            | CstKind::DoubleQuote
+            | CstKind::Octothorpe
+            | CstKind::Whitespace(_)
+            | CstKind::Newline(_) => (None, false),
             CstKind::Comment { octothorpe, .. } => (octothorpe.find_by_offset(offset), true),
             CstKind::TrailingWhitespace { child, .. } => (child.find_by_offset(offset), false),
-            CstKind::Identifier { .. } => (None, true),
-            CstKind::Symbol { .. } => (None, true),
-            CstKind::Int { .. } => (None, true),
-            CstKind::Text { .. } => (None, false),
-            CstKind::TextPart(_) => (None, false),
+            CstKind::Identifier { .. } | CstKind::Symbol { .. } | CstKind::Int { .. } => {
+                (None, true)
+            }
+            CstKind::Text { .. } | CstKind::TextPart(_) => (None, false),
+            CstKind::Pipe { receiver, call, .. } => (
+                receiver
+                    .find_by_offset(offset)
+                    .or_else(|| call.find_by_offset(offset)),
+                false,
+            ),
             CstKind::Parenthesized { inner, .. } => (inner.find_by_offset(offset), false),
             CstKind::Call {
                 receiver,
