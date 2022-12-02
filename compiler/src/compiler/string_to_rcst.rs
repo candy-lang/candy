@@ -747,13 +747,9 @@ mod parse {
         allow_call_and_assignment: bool,
         allow_pipe: bool,
     ) -> Option<(&str, Rcst)> {
-        let (mut input, mut result) = int(input)
-            .or_else(|| text(input, indentation))
-            .or_else(|| symbol(input))
-            .or_else(|| list(input, indentation, ParseType::Expression))
-            .or_else(|| struct_(input, indentation, ParseType::Expression))
-            .or_else(|| parenthesized(input, indentation))
-            .or_else(|| lambda(input, indentation))
+        // If we start the call list with `if … else …`, the formatting looks
+        // weird. Hence, we start with a single `None`.
+        let (mut input, mut result) = None
             .or_else(|| {
                 if allow_call_and_assignment {
                     assignment(input, indentation)
@@ -761,6 +757,13 @@ mod parse {
                     None
                 }
             })
+            .or_else(|| int(input))
+            .or_else(|| text(input, indentation))
+            .or_else(|| symbol(input))
+            .or_else(|| list(input, indentation, ParseType::Expression))
+            .or_else(|| struct_(input, indentation, ParseType::Expression))
+            .or_else(|| parenthesized(input, indentation))
+            .or_else(|| lambda(input, indentation))
             .or_else(|| {
                 if allow_call_and_assignment {
                     call(input, indentation)
