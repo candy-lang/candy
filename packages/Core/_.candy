@@ -19,5 +19,6 @@ panic := (use ".panic").panic
 result := use ".result"
 struct := use ".struct"
 text := use ".text"
+toDebugText := (use ".toDebugText").toDebugText
 todo := (use ".todo").todo
 type := use ".type"
