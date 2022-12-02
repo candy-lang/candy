@@ -193,7 +193,7 @@ impl FindAst for Assignment {
 impl FindAst for AssignmentBody {
     fn find(&self, id: &Id) -> Option<&Ast> {
         match self {
-            AssignmentBody::Lambda { name, lambda } => lambda.find(id),
+            AssignmentBody::Lambda { name: _, lambda } => lambda.find(id),
             AssignmentBody::Body { pattern, body } => pattern.find(id).or_else(|| body.find(id)),
         }
     }
@@ -236,7 +236,7 @@ impl CollectErrors for Ast {
             AstKind::Lambda(lambda) => lambda.body.collect_errors(errors),
             AstKind::Call(call) => call.arguments.collect_errors(errors),
             AstKind::Assignment(assignment) => match assignment.body {
-                AssignmentBody::Lambda { name, lambda } => lambda.body.collect_errors(errors),
+                AssignmentBody::Lambda { name: _, lambda } => lambda.body.collect_errors(errors),
                 AssignmentBody::Body { pattern, body } => {
                     pattern.collect_errors(errors);
                     for ast in body {
@@ -310,14 +310,11 @@ impl Display for Ast {
                         AssignmentBody::Body { pattern, .. } => format!("{}", pattern),
                     },
                     if assignment.is_public { ":" } else { "" },
-                    format!(
-                        "{}",
-                        match &assignment.body {
-                            AssignmentBody::Lambda { lambda, .. } => format!("{}", lambda),
-                            AssignmentBody::Body { body, .. } =>
-                                format!("{}", body.iter().map(|it| format!("{it}")).join("\n")),
-                        }
-                    )
+                    match &assignment.body {
+                        AssignmentBody::Lambda { lambda, .. } => format!("{}", lambda),
+                        AssignmentBody::Body { body, .. } =>
+                            body.iter().map(|it| format!("{it}")).join("\n"),
+                    }
                     .lines()
                     .map(|line| format!("  {line}"))
                     .join("\n"),

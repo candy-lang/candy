@@ -34,7 +34,7 @@ fn compile_module(
 ) -> Mir {
     let mut id_generator = IdGenerator::start_at(0);
     let mut body = Body::default();
-    let mut mapping = HashMap::<hir::Id, Id>::new();
+    let mut mapping = HashMap::new();
 
     body.push_with_new_id(
         &mut id_generator,

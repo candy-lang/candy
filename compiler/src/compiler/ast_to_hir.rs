@@ -204,8 +204,7 @@ impl<'a> Context<'a> {
                 let (names, body) = match body {
                     ast::AssignmentBody::Lambda { name, lambda } => {
                         let name_string = name.value.to_owned();
-                        let body =
-                            self.compile_lambda(ast.id.clone(), lambda, Some(name_string.clone()));
+                        let body = self.compile_lambda(ast.id.clone(), lambda, Some(name_string));
                         let name_id = self.push(
                             Some(name.id.clone()),
                             Expression::Reference(body.clone()),

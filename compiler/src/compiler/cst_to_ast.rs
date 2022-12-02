@@ -417,7 +417,7 @@ impl LoweringContext {
                                     LoweringType::PatternLiteralPart
                                 }
                             };
-                            let mut key = self.lower_cst(&key, key_lowering_type);
+                            let mut key = self.lower_cst(key, key_lowering_type);
 
                             if !matches!(colon.kind, CstKind::Colon) {
                                 key = self.create_ast(
