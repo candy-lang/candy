@@ -2309,6 +2309,62 @@ mod parse {
             )),
         );
         assert_eq!(
+            assignment("(foo, bar) = (1, 2)", 0),
+            Some((
+                "",
+                Rcst::Assignment {
+                    name_or_pattern: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::List {
+                            opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                            items: vec![
+                                Rcst::TrailingWhitespace {
+                                    child: Box::new(Rcst::ListItem {
+                                        value: Box::new(Rcst::Identifier("foo".to_string())),
+                                        comma: Some(Box::new(Rcst::Comma)),
+                                    }),
+                                    whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                                },
+                                Rcst::ListItem {
+                                    value: Box::new(Rcst::Identifier("bar".to_string())),
+                                    comma: None,
+                                },
+                            ],
+                            closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
+                        }),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    parameters: vec![],
+                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::EqualsSign),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    body: vec![Rcst::List {
+                        opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
+                        items: vec![
+                            Rcst::TrailingWhitespace {
+                                child: Box::new(Rcst::ListItem {
+                                    value: Box::new(Rcst::Int {
+                                        value: 1u8.into(),
+                                        string: "1".to_string(),
+                                    }),
+                                    comma: Some(Box::new(Rcst::Comma)),
+                                }),
+                                whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                            },
+                            Rcst::ListItem {
+                                value: Box::new(Rcst::Int {
+                                    value: 2u8.into(),
+                                    string: "2".to_string(),
+                                }),
+                                comma: None,
+                            },
+                        ],
+                        closing_parenthesis: Box::new(Rcst::ClosingParenthesis),
+                    }],
+                },
+            )),
+        );
+        assert_eq!(
             assignment("[Foo: foo] = bar", 0),
             Some((
                 "",
@@ -2317,7 +2373,7 @@ mod parse {
                         child: Box::new(Rcst::Struct {
                             opening_bracket: Box::new(Rcst::OpeningBracket),
                             fields: vec![Rcst::StructField {
-                                key: Box::new(Rcst::Identifier("Foo".to_string())),
+                                key: Box::new(Rcst::Symbol("Foo".to_string())),
                                 colon: Box::new(Rcst::TrailingWhitespace {
                                     child: Box::new(Rcst::Colon),
                                     whitespace: vec![Rcst::Whitespace(" ".to_string())],
@@ -2330,8 +2386,11 @@ mod parse {
                         whitespace: vec![Rcst::Whitespace(" ".to_string())],
                     }),
                     parameters: vec![],
-                    assignment_sign: Box::new(Rcst::EqualsSign),
-                    body: vec![],
+                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::EqualsSign),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    body: vec![Rcst::Identifier("bar".to_string())],
                 },
             )),
         );
