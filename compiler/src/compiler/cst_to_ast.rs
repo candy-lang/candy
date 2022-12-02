@@ -205,7 +205,9 @@ impl LoweringContext {
                 bar,
                 call,
             } => {
-                let ast = self.lower_cst(receiver);
+                assert_eq!(lowering_type, LoweringType::Expression);
+
+                let ast = self.lower_cst(receiver, LoweringType::Expression);
 
                 assert!(
                     matches!(bar.kind, CstKind::Bar),
@@ -213,7 +215,7 @@ impl LoweringContext {
                     bar,
                 );
 
-                let call = self.lower_cst(call);
+                let call = self.lower_cst(call, LoweringType::Expression);
                 let call = match call {
                     Ast {
                         kind:

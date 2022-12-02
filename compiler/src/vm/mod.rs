@@ -20,8 +20,6 @@ use self::{
         CombiningExecutionController, ExecutionController, RunLimitedNumberOfInstructions,
         UseProvider,
     },
-    heap::SendPort,
-    tracer::Tracer,
 };
 use crate::{
     compiler::hir::Id,

@@ -1,7 +1,11 @@
-use super::{ast_to_hir::AstToHir, error::CompilerError};
+use crate::{
     builtin_functions::BuiltinFunction,
-    module::{Module, ModuleKind, Package},utils::CountableId
+    module::{Module, ModuleKind, Package},
+    utils::CountableId,
 };
+
+use super::{ast_to_hir::AstToHir, error::CompilerError};
+use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use num_bigint::BigUint;
 use std::{
@@ -236,7 +240,7 @@ impl fmt::Debug for PatternIdentifierId {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Pattern {
     NewIdentifier(PatternIdentifierId),
     Int(BigUint),
@@ -246,6 +250,12 @@ pub enum Pattern {
     // Keys may not contain `NewIdentifier`.
     Struct(HashMap<Pattern, Pattern>),
     Error { errors: Vec<CompilerError> },
+}
+#[allow(clippy::derive_hash_xor_eq)]
+impl hash::Hash for Pattern {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
