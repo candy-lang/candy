@@ -203,6 +203,8 @@ impl<'a> Context<'a> {
                     self.visit_id(value_id.to_owned());
                 }
             }
+            Expression::Destructure { .. } => {},
+            Expression::PatternIdentifierReference { .. } => {}
             Expression::Lambda(Lambda { body, .. }) => {
                 // We don't need to visit the parameters: They can only be the
                 // declaration of an identifier and don't reference it any other
