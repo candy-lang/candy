@@ -1,7 +1,9 @@
 bool = use "..bool"
+ifElse = (use "..conditionals").ifElse
 equals = (use "..equality").equals
 function = use "..function"
 int = use "..int"
+result = use "..result"
 type = use "..type"
 
 filled length item :=
@@ -22,24 +24,30 @@ isEmpty list :=
 
 lastIndex list :=
   needs (is list)
-  needs (bool.not (isEmpty list))
-  length list | int.minus 1
+  ifElse
+    (list | isEmpty)
+    result.error "Can't get the last index of an empty list."
+    list | length | int.minus 1 | result.ok
 isValidIndex list index :=
   needs (is list)
-  int.is index | bool.lazyAnd {
-    int.isNonNegative index
-    | bool.and (index | int.isLessThanOrEqualTo (lastIndex list))
-  }
+  needs (int.is index)
+  ifElse
+    (list | isEmpty)
+    False
+    index | int.isNonNegative
+  | bool.lazyAnd { index | int.isLessThanOrEqualTo (list | lastIndex | result.unwrap) }
 
 get list index :=
   needs (is list)
   needs (isValidIndex index)
   list | ✨.listGet index
 
+# TODO: add `single list` when we have pattern matching
 last list :=
   needs (is list)
-  needs (bool.not (isEmpty list))
-  list | get (lastIndex list)
+  list | lastIndex
+  | result.mapError "Can't get the last item of an empty list."
+  | result.map { index -> list | get index }
 
 insert list index item :=
   needs (is list)
