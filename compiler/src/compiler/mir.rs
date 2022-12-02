@@ -554,7 +554,7 @@ impl fmt::Debug for Expression {
                     ",".to_string()
                 } else {
                     items.iter().map(|item| format!("{item}")).join(", ")
-                }
+                },
             ),
             Expression::Struct(fields) => write!(
                 f,
@@ -594,24 +594,22 @@ impl fmt::Debug for Expression {
                 function,
                 arguments,
                 responsible,
-            } => {
-                write!(
-                    f,
-                    "call {function} with {} ({responsible} is responsible)",
-                    if arguments.is_empty() {
-                        "no arguments".to_string()
-                    } else {
-                        arguments.iter().map(|arg| format!("{arg}")).join(" ")
-                    }
-                )
-            }
+            } => write!(
+                f,
+                "call {function} with {} ({responsible} is responsible)",
+                if arguments.is_empty() {
+                    "no arguments".to_string()
+                } else {
+                    arguments.iter().map(|arg| format!("{arg}")).join(" ")
+                },
+            ),
             Expression::UseModule {
                 current_module,
                 relative_path,
                 responsible,
             } => write!(
                 f,
-                "use {relative_path} (relative to {current_module}; {responsible} is responsible)"
+                "use {relative_path} (relative to {current_module}; {responsible} is responsible)",
             ),
             Expression::Panic {
                 reason,
@@ -632,12 +630,10 @@ impl fmt::Debug for Expression {
                 function,
                 arguments,
                 responsible,
-            } => {
-                write!(f,
-                    "trace: start of call of {function} with {} ({responsible} is responsible, code is at {hir_call})",
-                    arguments.iter().map(|arg| format!("{arg}")).join(" "),
-                )
-            }
+            } => write!(f,
+                "trace: start of call of {function} with {} ({responsible} is responsible, code is at {hir_call})",
+                arguments.iter().map(|arg| format!("{arg}")).join(" "),
+            ),
             Expression::TraceCallEnds { return_value } => {
                 write!(f, "trace: end of call with return value {return_value}")
             }
@@ -653,7 +649,7 @@ impl fmt::Debug for Expression {
             } => {
                 write!(
                     f,
-                    "trace: found fuzzable closure {closure}, defined at {hir_definition}"
+                    "trace: found fuzzable closure {closure}, defined at {hir_definition}",
                 )
             }
         }

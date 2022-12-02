@@ -2020,7 +2020,7 @@ mod parse {
         let original_assignment_sign = assignment_sign.clone();
         let input_after_assignment_sign = input;
 
-        let (input, more_whitespace) = whitespaces_and_newlines(input, indentation + 1, true);
+        let (input, more_whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
         assignment_sign = assignment_sign.wrap_in_whitespace(more_whitespace.clone());
 
         let is_multiline = name.is_multiline()
@@ -2039,7 +2039,7 @@ mod parse {
                 (input, assignment_sign, body)
             }
         } else {
-            match expression(input, indentation, true, true) {
+            match comment(input).or_else(|| expression(input, indentation, true, true)) {
                 Some((input, expression)) => (input, assignment_sign, vec![expression]),
                 None => (
                     input_after_assignment_sign,
@@ -2161,6 +2161,90 @@ mod parse {
                     parameters: vec![],
                     assignment_sign: Box::new(Rcst::EqualsSign),
                     body: vec![],
+                }
+            ))
+        );
+        assert_eq!(
+            assignment("foo = # comment\n", 0),
+            Some((
+                "\n",
+                Rcst::Assignment {
+                    name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    parameters: vec![],
+                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::EqualsSign),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    body: vec![Rcst::Comment {
+                        octothorpe: Box::new(Rcst::Octothorpe),
+                        comment: " comment".to_string()
+                    }],
+                }
+            ))
+        );
+        // foo =
+        //   # comment
+        // 3
+        assert_eq!(
+            assignment("foo =\n  # comment\n3", 0),
+            Some((
+                "\n3",
+                Rcst::Assignment {
+                    name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    parameters: vec![],
+                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::EqualsSign),
+                        whitespace: vec![
+                            Rcst::Newline("\n".to_string()),
+                            Rcst::Whitespace("  ".to_string())
+                        ],
+                    }),
+                    body: vec![Rcst::Comment {
+                        octothorpe: Box::new(Rcst::Octothorpe),
+                        comment: " comment".to_string()
+                    }],
+                }
+            ))
+        );
+        // foo =
+        //   # comment
+        //   5
+        // 3
+        assert_eq!(
+            assignment("foo =\n  # comment\n  5\n3", 0),
+            Some((
+                "\n3",
+                Rcst::Assignment {
+                    name: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::Identifier("foo".to_string())),
+                        whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                    }),
+                    parameters: vec![],
+                    assignment_sign: Box::new(Rcst::TrailingWhitespace {
+                        child: Box::new(Rcst::EqualsSign),
+                        whitespace: vec![
+                            Rcst::Newline("\n".to_string()),
+                            Rcst::Whitespace("  ".to_string())
+                        ],
+                    }),
+                    body: vec![
+                        Rcst::Comment {
+                            octothorpe: Box::new(Rcst::Octothorpe),
+                            comment: " comment".to_string()
+                        },
+                        Rcst::Newline("\n".to_string()),
+                        Rcst::Whitespace("  ".to_string()),
+                        Rcst::Int {
+                            value: 5u8.into(),
+                            string: "5".to_string()
+                        }
+                    ],
                 }
             ))
         );
