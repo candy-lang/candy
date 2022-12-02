@@ -1,11 +1,10 @@
 use super::{
-    context::{PanickingUseProvider, UseProvider, UseResult},
+    context::{UseProvider, UseResult},
     heap::{Closure, Pointer, Text},
-    tracer::{dummy::DummyTracer, Tracer},
-    Fiber, FiberId,
+    Fiber,
 };
 use crate::{
-    compiler::lir::Instruction,
+    compiler::hir::Id,
     module::{Module, UsePath},
 };
 use itertools::Itertools;
@@ -37,14 +36,9 @@ impl Fiber {
                 self.data_stack.push(list);
             }
             UseResult::Code(lir) => {
-                let module_closure = Closure::of_module_lir(lir);
-                let address = self.heap.create_closure(module_closure);
-                self.data_stack.push(address);
-                self.run_instruction(
-                    &PanickingUseProvider,
-                    &mut DummyTracer.for_fiber(FiberId::root()),
-                    Instruction::Call { num_args: 0 },
-                );
+                let closure = self.heap.create_closure(Closure::of_module_lir(lir));
+                let responsible = self.heap.create_hir_id(Id::dummy());
+                self.call(closure, vec![], responsible);
             }
         }
 

@@ -1,10 +1,9 @@
 use super::{
     channel::{Capacity, Packet},
-    context::{ExecutionController, PanickingUseProvider, UseProvider},
+    context::{ExecutionController, UseProvider},
     heap::{Builtin, Closure, Data, Heap, Pointer, Text},
     ids::ChannelId,
-    tracer::{dummy::DummyTracer, FiberTracer, Tracer},
-    FiberId,
+    tracer::FiberTracer,
 };
 use crate::{
     compiler::{
@@ -107,17 +106,7 @@ impl Fiber {
         let mut fiber = Self::new_with_heap(heap);
         let responsible = fiber.heap.create(Data::HirId(responsible));
         fiber.status = Status::Running;
-
-        fiber.data_stack.push(closure);
-        fiber.data_stack.extend(arguments);
-        fiber.data_stack.push(responsible);
-        fiber.run_instruction(
-            &PanickingUseProvider,
-            &mut DummyTracer.for_fiber(FiberId::root()),
-            Instruction::Call {
-                num_args: arguments.len(),
-            },
-        );
+        fiber.call(closure, arguments.to_vec(), responsible);
 
         fiber
     }
@@ -251,7 +240,10 @@ impl Fiber {
             } else {
                 panic!("The instruction pointer points to a non-closure.");
             };
-            let instruction = current_body[self.next_instruction.instruction].clone();
+            let instruction = current_body
+                .get(self.next_instruction.instruction)
+                .expect("invalid instruction pointer")
+                .clone();
 
             self.next_instruction.instruction += 1;
             self.run_instruction(use_provider, tracer, instruction);
@@ -278,7 +270,7 @@ impl Fiber {
                 "Data stack: {}",
                 self.data_stack
                     .iter()
-                    .map(|it| it.format(&self.heap))
+                    .map(|it| it.format_debug(&self.heap))
                     .join(", "),
             );
             trace!(
@@ -378,7 +370,7 @@ impl Fiber {
                 arguments.reverse();
                 let callee = self.data_stack.pop().unwrap();
 
-                self.call(callee, arguments, responsible, false);
+                self.call(callee, arguments, responsible);
             }
             Instruction::TailCall {
                 num_locals_to_pop,
@@ -396,9 +388,17 @@ impl Fiber {
                     self.heap.drop(address);
                 }
 
-                self.call(callee, arguments, responsible, true);
+                // Tail calling a function is basically just a normal call, but
+                // pretending we are our caller.
+                let caller = self.call_stack.pop().unwrap();
+                self.next_instruction = caller;
+                self.call(callee, arguments, responsible);
             }
-            Instruction::Return => self.return_(),
+            Instruction::Return => {
+                self.heap.drop(self.next_instruction.closure);
+                let caller = self.call_stack.pop().unwrap();
+                self.next_instruction = caller;
+            }
             Instruction::UseModule { current_module } => {
                 let responsible = self.data_stack.pop().unwrap();
                 let relative_path = self.data_stack.pop().unwrap();
@@ -476,13 +476,7 @@ impl Fiber {
         }
     }
 
-    fn call(
-        &mut self,
-        callee: Pointer,
-        arguments: Vec<Pointer>,
-        responsible: Pointer,
-        is_tail_call: bool,
-    ) {
+    pub fn call(&mut self, callee: Pointer, arguments: Vec<Pointer>, responsible: Pointer) {
         match &self.heap.get(callee).data {
             Data::Closure(Closure {
                 captured,
@@ -497,9 +491,7 @@ impl Fiber {
                     return;
                 }
 
-                if !is_tail_call {
-                    self.call_stack.push(self.next_instruction);
-                }
+                self.call_stack.push(self.next_instruction);
                 self.data_stack.append(&mut captured.clone());
                 for captured in captured.clone() {
                     self.heap.dup(captured);
@@ -512,9 +504,6 @@ impl Fiber {
                 let builtin = *builtin;
                 self.heap.drop(callee);
                 self.run_builtin_function(&builtin, &arguments, responsible);
-                if is_tail_call {
-                    self.return_();
-                }
             }
             _ => {
                 self.panic(
@@ -526,12 +515,6 @@ impl Fiber {
                 );
             }
         };
-    }
-
-    fn return_(&mut self) {
-        self.heap.drop(self.next_instruction.closure);
-        let caller = self.call_stack.pop().unwrap();
-        self.next_instruction = caller;
     }
 }
 

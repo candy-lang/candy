@@ -128,11 +128,16 @@ impl Id {
             keys: vec![],
         }
     }
+    /// Refers to the platform (non-Candy code).
     pub fn platform() -> Self {
         Self::tooling("platform".to_string())
     }
     pub fn fuzzer() -> Self {
         Self::tooling("fuzzer".to_string())
+    }
+    /// A dummy ID that is guaranteed to never be responsible for a panic.
+    pub fn dummy() -> Self {
+        Self::tooling("dummy".to_string())
     }
     /// TODO: Currently, when a higher-order function calls a closure passed as
     /// a parameter, that's registered as a normal call instruction, making the

@@ -1,16 +1,11 @@
 use super::{
     channel::{Capacity, Packet},
-    context::PanickingUseProvider,
     fiber::{Fiber, Status},
     heap::{Closure, Data, Int, List, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
     ids::ChannelId,
-    tracer::{dummy::DummyTracer, Tracer},
-    FiberId, Heap,
+    Heap,
 };
-use crate::{
-    builtin_functions::BuiltinFunction,
-    compiler::{hir::Id, lir::Instruction},
-};
+use crate::{builtin_functions::BuiltinFunction, compiler::hir::Id};
 use itertools::Itertools;
 use num_bigint::BigInt;
 use num_integer::Integer;
@@ -77,15 +72,7 @@ impl Fiber {
             Ok(DivergeControlFlow {
                 closure,
                 responsible,
-            }) => {
-                self.data_stack.push(closure);
-                self.data_stack.push(responsible);
-                self.run_instruction(
-                    &PanickingUseProvider,
-                    &mut DummyTracer.for_fiber(FiberId::root()),
-                    Instruction::Call { num_args: 0 },
-                );
-            }
+            }) => self.call(closure, vec![], responsible),
             Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
             Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
