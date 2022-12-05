@@ -137,11 +137,6 @@ pub async fn run_server(
                 .sorted_by_key(|hint| hint.position)
                 .collect_vec();
 
-            module.dump_associated_debug_file(
-                "hints",
-                &hints.iter().map(|hint| format!("{hint:?}")).join("\n"),
-            );
-
             // Only show the most important hint per line.
             let hints = hints
                 .into_iter()
