@@ -1,0 +1,2 @@
+day1simple := use ".day1simple.txt"
+day1 := use ".day1.txt"
