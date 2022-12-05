@@ -79,25 +79,23 @@ We already have a language server that provides some tooling.
 - compiler
   - make functions independent of their order in top-level scope
   - text interpolation
-  - fibers, channels
   - patterns
-  - pipe operator
   - "type" proofs
   - fuzzing of the compiler itself
   - package root marker
   - package path dependencies
-  - performance
-    - multithreading
-    - object deduplication
-    - profiler
-    - memory representation
-      - inlining of ints/etc.
-      - size of an object
-      - heap management
   - LLVM, WASM
+- VM
+  - multithreading
+  - object deduplication
+  - profiler
+  - memory representation
+    - inlining of ints/etc.
+    - size of an object
+    - heap management
 - IDE support:
   - generate debug files
-  - DAP
+  - DAP (debug adapter protocol)
   - [ ] completion, completion resolve
   - [ ] hover
   - [ ] signatureHelp
@@ -122,6 +120,8 @@ We already have a language server that provides some tooling.
   - [x] ~~linkedEditingRange~~
   - [ ] moniker
 - packages
+  - stdin/out utilities such as a print method
+  - files
   - logging
   - HTTP Server
   - Markdown
@@ -164,6 +164,7 @@ We already have a language server that provides some tooling.
 
 - more efficient argument preparation in LIR function call (so we don't have to push references if the evaluation order doesn't change conceptually)
 - fix evaluation order of pipe expression by keeping it in the AST
+- convert the readme todos into GitHub issues
 
 ## How to use Candy
 
