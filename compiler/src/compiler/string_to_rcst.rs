@@ -731,6 +731,23 @@ mod parse {
                 }
             ))
         );
+        assert_eq!(
+            text("''\"foo\"'bar\"'' baz", 0),
+            Some((
+                " baz",
+                Rcst::Text {
+                    opening_quote: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![Rcst::SingleQuote, Rcst::SingleQuote],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote)
+                    }),
+                    parts: vec![Rcst::TextPart("foo\"'bar".to_string())],
+                    closing_quote: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![Rcst::SingleQuote, Rcst::SingleQuote]
+                    })
+                }
+            ))
+        );
     }
 
     #[instrument(level = "trace")]
