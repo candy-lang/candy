@@ -54,6 +54,7 @@ pub enum CstKind {
     OpeningCurlyBrace,  // {
     ClosingCurlyBrace,  // }
     Arrow,              // ->
+    SingleQuote,        // '
     DoubleQuote,        // "
     Octothorpe,         // #
     Whitespace(String),
@@ -151,6 +152,7 @@ impl Display for Cst {
             CstKind::OpeningCurlyBrace => '{'.fmt(f),
             CstKind::ClosingCurlyBrace => '}'.fmt(f),
             CstKind::Arrow => "->".fmt(f),
+            CstKind::SingleQuote => "'".fmt(f),
             CstKind::DoubleQuote => '"'.fmt(f),
             CstKind::Octothorpe => '#'.fmt(f),
             CstKind::Whitespace(whitespace) => whitespace.fmt(f),
@@ -335,6 +337,7 @@ impl UnwrapWhitespaceAndComment for Cst {
             | CstKind::OpeningCurlyBrace
             | CstKind::ClosingCurlyBrace
             | CstKind::Arrow
+            | CstKind::SingleQuote
             | CstKind::DoubleQuote
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)
@@ -498,6 +501,7 @@ impl TreeWithIds for Cst {
             | CstKind::OpeningCurlyBrace
             | CstKind::ClosingCurlyBrace
             | CstKind::Arrow
+            | CstKind::SingleQuote
             | CstKind::DoubleQuote
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)
@@ -617,6 +621,7 @@ impl TreeWithIds for Cst {
             | CstKind::OpeningCurlyBrace
             | CstKind::ClosingCurlyBrace
             | CstKind::Arrow
+            | CstKind::SingleQuote
             | CstKind::DoubleQuote
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)

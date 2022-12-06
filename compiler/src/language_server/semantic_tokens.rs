@@ -157,6 +157,7 @@ impl<'a> Context<'a> {
             | CstKind::OpeningCurlyBrace
             | CstKind::ClosingCurlyBrace => {}
             CstKind::Arrow => self.add_token(cst.span.clone(), SemanticTokenType::Operator),
+            CstKind::SingleQuote => {} // handled by parent
             CstKind::DoubleQuote => {} // handled by parent
             CstKind::Octothorpe => {}  // handled by parent
             CstKind::Whitespace(_) | CstKind::Newline(_) => {}

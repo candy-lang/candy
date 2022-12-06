@@ -17,6 +17,7 @@ pub enum Rcst {
     OpeningCurlyBrace,  // {
     ClosingCurlyBrace,  // }
     Arrow,              // ->
+    SingleQuote,        // '
     DoubleQuote,        // "
     Octothorpe,         // #
     Whitespace(String), // contains only non-multiline whitespace
@@ -138,6 +139,7 @@ impl Display for Rcst {
             Rcst::OpeningCurlyBrace => "{".fmt(f),
             Rcst::ClosingCurlyBrace => "}".fmt(f),
             Rcst::Arrow => "->".fmt(f),
+            Rcst::SingleQuote => "'".fmt(f),
             Rcst::DoubleQuote => '"'.fmt(f),
             Rcst::Octothorpe => "#".fmt(f),
             Rcst::Whitespace(whitespace) => whitespace.fmt(f),
@@ -308,6 +310,7 @@ impl IsMultiline for Rcst {
             Rcst::OpeningCurlyBrace => false,
             Rcst::ClosingCurlyBrace => false,
             Rcst::Arrow => false,
+            Rcst::SingleQuote => false,
             Rcst::DoubleQuote => false,
             Rcst::Octothorpe => false,
             Rcst::Whitespace(_) => false,

@@ -99,6 +99,10 @@ impl RcstToCstExt for Rcst {
                 state.offset += 2;
                 CstKind::Arrow
             }
+            Rcst::SingleQuote => {
+                state.offset += 1;
+                CstKind::SingleQuote
+            }
             Rcst::DoubleQuote => {
                 state.offset += 1;
                 CstKind::DoubleQuote

@@ -108,6 +108,7 @@ impl LoweringContext {
             | CstKind::OpeningCurlyBrace
             | CstKind::ClosingCurlyBrace
             | CstKind::Arrow
+            | CstKind::SingleQuote
             | CstKind::DoubleQuote
             | CstKind::Octothorpe => self.create_ast(
                 cst.id,

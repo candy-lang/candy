@@ -54,6 +54,7 @@ impl<'a> Context<'a> {
             | CstKind::OpeningCurlyBrace
             | CstKind::ClosingCurlyBrace
             | CstKind::Arrow
+            | CstKind::SingleQuote
             | CstKind::DoubleQuote
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)
