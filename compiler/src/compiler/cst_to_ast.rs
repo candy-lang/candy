@@ -178,7 +178,9 @@ impl LoweringContext {
 
                 text
             }
-            CstKind::TextPart(_) => panic!("TextPart should only occur in Text."),
+            CstKind::OpeningText { .. } | CstKind::ClosingText { .. } | CstKind::TextPart(_) => {
+                panic!("TextPart should only occur in Text.")
+            }
             CstKind::Pipe {
                 receiver,
                 bar,

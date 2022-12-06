@@ -146,6 +146,20 @@ impl RcstToCstExt for Rcst {
                 state.offset += string.len();
                 CstKind::Int { value, string }
             }
+            Rcst::OpeningText {
+                opening_single_quotes,
+                opening_double_quote,
+            } => CstKind::OpeningText {
+                opening_single_quotes: opening_single_quotes.to_csts(state),
+                opening_double_quote: Box::new(opening_double_quote.to_cst(state)),
+            },
+            Rcst::ClosingText {
+                closing_double_quote,
+                closing_single_quotes,
+            } => CstKind::ClosingText {
+                closing_double_quote: Box::new(closing_double_quote.to_cst(state)),
+                closing_single_quotes: closing_single_quotes.to_csts(state),
+            },
             Rcst::Text {
                 opening_quote,
                 parts,

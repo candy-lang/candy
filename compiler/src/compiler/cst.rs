@@ -73,6 +73,14 @@ pub enum CstKind {
         value: BigUint,
         string: String,
     },
+    OpeningText {
+        opening_single_quotes: Vec<Cst>,
+        opening_double_quote: Box<Cst>,
+    },
+    ClosingText {
+        closing_double_quote: Box<Cst>,
+        closing_single_quotes: Vec<Cst>,
+    },
     Text {
         opening_quote: Box<Cst>,
         parts: Vec<Cst>,
@@ -174,6 +182,25 @@ impl Display for Cst {
             CstKind::Identifier(identifier) => identifier.fmt(f),
             CstKind::Symbol(symbol) => symbol.fmt(f),
             CstKind::Int { string, .. } => string.fmt(f),
+            CstKind::OpeningText {
+                opening_single_quotes,
+                opening_double_quote,
+            } => {
+                for opening_single_quote in opening_single_quotes {
+                    opening_single_quote.fmt(f)?;
+                }
+                opening_double_quote.fmt(f)
+            }
+            CstKind::ClosingText {
+                closing_double_quote,
+                closing_single_quotes,
+            } => {
+                closing_double_quote.fmt(f)?;
+                for closing_single_quote in closing_single_quotes {
+                    closing_single_quote.fmt(f)?;
+                }
+                Ok(())
+            }
             CstKind::Text {
                 opening_quote,
                 parts,
@@ -349,6 +376,24 @@ impl UnwrapWhitespaceAndComment for Cst {
             kind @ (CstKind::Identifier(_) | CstKind::Symbol(_) | CstKind::Int { .. }) => {
                 kind.clone()
             }
+            CstKind::OpeningText {
+                opening_single_quotes,
+                opening_double_quote,
+            } => CstKind::OpeningText {
+                opening_single_quotes: opening_single_quotes.unwrap_whitespace_and_comment(),
+                opening_double_quote: Box::new(
+                    opening_double_quote.unwrap_whitespace_and_comment(),
+                ),
+            },
+            CstKind::ClosingText {
+                closing_double_quote,
+                closing_single_quotes,
+            } => CstKind::ClosingText {
+                closing_double_quote: Box::new(
+                    closing_double_quote.unwrap_whitespace_and_comment(),
+                ),
+                closing_single_quotes: closing_single_quotes.unwrap_whitespace_and_comment(),
+            },
             CstKind::Text {
                 opening_quote,
                 parts,
@@ -511,6 +556,18 @@ impl TreeWithIds for Cst {
                 child.find(id).or_else(|| whitespace.find(id))
             }
             CstKind::Identifier(_) | CstKind::Symbol(_) | CstKind::Int { .. } => None,
+            CstKind::OpeningText {
+                opening_single_quotes,
+                opening_double_quote,
+            } => opening_single_quotes
+                .find(id)
+                .or_else(|| opening_double_quote.find(id)),
+            CstKind::ClosingText {
+                closing_double_quote,
+                closing_single_quotes,
+            } => closing_double_quote
+                .find(id)
+                .or_else(|| closing_single_quotes.find(id)),
             CstKind::Text {
                 opening_quote,
                 parts,
@@ -631,7 +688,10 @@ impl TreeWithIds for Cst {
             CstKind::Identifier { .. } | CstKind::Symbol { .. } | CstKind::Int { .. } => {
                 (None, true)
             }
-            CstKind::Text { .. } | CstKind::TextPart(_) => (None, false),
+            CstKind::OpeningText { .. }
+            | CstKind::ClosingText { .. }
+            | CstKind::Text { .. }
+            | CstKind::TextPart(_) => (None, false),
             CstKind::Pipe { receiver, call, .. } => (
                 receiver
                     .find_by_offset(offset)

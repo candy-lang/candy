@@ -175,6 +175,24 @@ impl<'a> Context<'a> {
             ),
             CstKind::Symbol { .. } => self.add_token(cst.span.clone(), SemanticTokenType::Symbol),
             CstKind::Int { .. } => self.add_token(cst.span.clone(), SemanticTokenType::Number),
+            CstKind::OpeningText {
+                opening_single_quotes,
+                opening_double_quote,
+            } => {
+                for opening_single_quote in opening_single_quotes {
+                    self.add_token(opening_single_quote.span.clone(), SemanticTokenType::String);
+                }
+                self.add_token(opening_double_quote.span.clone(), SemanticTokenType::String);
+            }
+            CstKind::ClosingText {
+                closing_double_quote,
+                closing_single_quotes,
+            } => {
+                self.add_token(closing_double_quote.span.clone(), SemanticTokenType::String);
+                for closing_single_quote in closing_single_quotes {
+                    self.add_token(closing_single_quote.span.clone(), SemanticTokenType::String);
+                }
+            }
             CstKind::Text {
                 opening_quote,
                 parts,

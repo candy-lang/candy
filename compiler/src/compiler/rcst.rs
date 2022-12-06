@@ -36,6 +36,14 @@ pub enum Rcst {
         value: BigUint,
         string: String,
     },
+    OpeningText {
+        opening_single_quotes: Vec<Rcst>,
+        opening_double_quote: Box<Rcst>,
+    },
+    ClosingText {
+        closing_double_quote: Box<Rcst>,
+        closing_single_quotes: Vec<Rcst>,
+    },
     Text {
         opening_quote: Box<Rcst>,
         parts: Vec<Rcst>,
@@ -161,6 +169,25 @@ impl Display for Rcst {
             Rcst::Identifier(identifier) => identifier.fmt(f),
             Rcst::Symbol(symbol) => symbol.fmt(f),
             Rcst::Int { string, .. } => string.fmt(f),
+            Rcst::OpeningText {
+                opening_single_quotes,
+                opening_double_quote,
+            } => {
+                for opening_single_quote in opening_single_quotes {
+                    opening_single_quote.fmt(f)?;
+                }
+                opening_double_quote.fmt(f)
+            }
+            Rcst::ClosingText {
+                closing_double_quote,
+                closing_single_quotes,
+            } => {
+                closing_double_quote.fmt(f)?;
+                for closing_single_quote in closing_single_quotes {
+                    closing_single_quote.fmt(f)?;
+                }
+                Ok(())
+            }
             Rcst::Text {
                 opening_quote,
                 parts,
@@ -322,6 +349,8 @@ impl IsMultiline for Rcst {
             Rcst::Identifier(_) => false,
             Rcst::Symbol(_) => false,
             Rcst::Int { .. } => false,
+            Rcst::OpeningText { .. } => false,
+            Rcst::ClosingText { .. } => false,
             Rcst::Text {
                 opening_quote,
                 parts,

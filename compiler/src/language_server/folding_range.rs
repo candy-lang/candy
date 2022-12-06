@@ -64,7 +64,10 @@ impl<'a> Context<'a> {
             CstKind::TrailingWhitespace { child, .. } => self.visit_cst(child),
             CstKind::Identifier(_) | CstKind::Symbol(_) | CstKind::Int { .. } => {}
             // TODO: support folding ranges for multiline texts
-            CstKind::Text { .. } | CstKind::TextPart(_) => {}
+            CstKind::OpeningText { .. }
+            | CstKind::ClosingText { .. }
+            | CstKind::Text { .. }
+            | CstKind::TextPart(_) => {}
             CstKind::Pipe { receiver, call, .. } => {
                 self.visit_cst(receiver);
                 self.visit_cst(call);
