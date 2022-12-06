@@ -642,7 +642,10 @@ mod parse {
         Some((
             input,
             Rcst::Text {
-                opening_quote: Box::new(opening_quote),
+                opening_quote: Box::new(Rcst::OpeningText {
+                    opening_single_quotes,
+                    opening_double_quote: Box::new(opening_double_quote),
+                }),
                 parts,
                 closing_quote: Box::new(closing_quote),
             },
@@ -656,9 +659,15 @@ mod parse {
             Some((
                 " bar",
                 Rcst::Text {
-                    opening_quote: Box::new(Rcst::DoubleQuote),
+                    opening_quote: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote)
+                    }),
                     parts: vec![Rcst::TextPart("foo".to_string())],
-                    closing_quote: Box::new(Rcst::DoubleQuote)
+                    closing_quote: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![]
+                    })
                 }
             ))
         );
@@ -669,14 +678,20 @@ mod parse {
             Some((
                 "2",
                 Rcst::Text {
-                    opening_quote: Box::new(Rcst::DoubleQuote),
+                    opening_quote: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote)
+                    }),
                     parts: vec![
                         Rcst::TextPart("foo".to_string()),
                         Rcst::Newline("\n".to_string()),
                         Rcst::Whitespace("  ".to_string()),
                         Rcst::TextPart("bar".to_string())
                     ],
-                    closing_quote: Box::new(Rcst::DoubleQuote),
+                    closing_quote: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![]
+                    })
                 }
             ))
         );
@@ -687,7 +702,10 @@ mod parse {
             Some((
                 "\n  bar\"2",
                 Rcst::Text {
-                    opening_quote: Box::new(Rcst::DoubleQuote),
+                    opening_quote: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote)
+                    }),
                     parts: vec![Rcst::TextPart("foo".to_string()),],
                     closing_quote: Box::new(Rcst::Error {
                         unparsable_input: "".to_string(),
@@ -701,7 +719,10 @@ mod parse {
             Some((
                 "",
                 Rcst::Text {
-                    opening_quote: Box::new(Rcst::DoubleQuote),
+                    opening_quote: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote)
+                    }),
                     parts: vec![Rcst::TextPart("foo".to_string()),],
                     closing_quote: Box::new(Rcst::Error {
                         unparsable_input: "".to_string(),
@@ -1414,9 +1435,15 @@ mod parse {
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::ListItem {
                                 value: Box::new(Rcst::Text {
-                                    opening_quote: Box::new(Rcst::DoubleQuote),
+                                    opening_quote: Box::new(Rcst::OpeningText {
+                                        opening_single_quotes: vec![],
+                                        opening_double_quote: Box::new(Rcst::DoubleQuote)
+                                    }),
                                     parts: vec![Rcst::TextPart("Hi".to_string())],
-                                    closing_quote: Box::new(Rcst::DoubleQuote),
+                                    closing_quote: Box::new(Rcst::ClosingText {
+                                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                                        closing_single_quotes: vec![]
+                                    }),
                                 }),
                                 comma: Some(Box::new(Rcst::Comma))
                             }),
@@ -1634,9 +1661,15 @@ mod parse {
                                     whitespace: vec![Rcst::Whitespace(" ".to_string())],
                                 }),
                                 value: Box::new(Rcst::Text {
-                                    opening_quote: Box::new(Rcst::DoubleQuote),
+                                    opening_quote: Box::new(Rcst::OpeningText {
+                                        opening_single_quotes: vec![],
+                                        opening_double_quote: Box::new(Rcst::DoubleQuote)
+                                    }),
                                     parts: vec![Rcst::TextPart("Hi".to_string())],
-                                    closing_quote: Box::new(Rcst::DoubleQuote),
+                                    closing_quote: Box::new(Rcst::ClosingText {
+                                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                                        closing_single_quotes: vec![]
+                                    }),
                                 }),
                                 comma: Some(Box::new(Rcst::Comma))
                             }),
