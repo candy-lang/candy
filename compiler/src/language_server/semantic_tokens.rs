@@ -198,13 +198,13 @@ impl<'a> Context<'a> {
                 parts,
                 closing_quote,
             } => {
-                self.add_token(opening_quote.span.clone(), SemanticTokenType::String);
+                self.visit_cst(opening_quote, None);
                 for part in parts {
                     if let CstKind::TextPart(_) = part.kind {
                         self.add_token(part.span.clone(), SemanticTokenType::String)
                     }
                 }
-                self.add_token(closing_quote.span.clone(), SemanticTokenType::String);
+                self.visit_cst(closing_quote, None);
             }
             CstKind::TextPart(_) => {} // handled by parent
             CstKind::Pipe {

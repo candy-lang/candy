@@ -141,11 +141,20 @@ impl LoweringContext {
                 parts,
                 closing_quote,
             } => {
-                assert!(
-                    matches!(opening_quote.kind, CstKind::DoubleQuote),
-                    "Text needs to start with opening double quote, but started with {}.",
-                    opening_quote
-                );
+                let opening_single_quote_count = match &opening_quote.kind {
+                    CstKind::OpeningText {
+                        opening_single_quotes,
+                        opening_double_quote: box Cst {
+                            kind: CstKind::DoubleQuote,
+                            ..
+                        }
+                    } if opening_single_quotes
+                        .iter()
+                        .all(|opening_single_quote| -> bool {
+                            matches!(opening_single_quote.kind, CstKind::SingleQuote)
+                        }) => opening_single_quotes.len(),
+                    _ => panic!("Text needs to start with any numer of opening single quotes followed by an opening double quote, but started with {}.", opening_quote)
+                };
 
                 let text = parts
                     .iter()
@@ -160,7 +169,20 @@ impl LoweringContext {
                 let string = self.create_string_without_id_mapping(text);
                 let mut text = self.create_ast(cst.id, AstKind::Text(Text(string)));
 
-                if !matches!(closing_quote.kind, CstKind::DoubleQuote) {
+                if !matches!(
+                    &closing_quote.kind,
+                    CstKind::ClosingText {
+                        closing_double_quote: box Cst {
+                            kind: CstKind::DoubleQuote,
+                            ..
+                        },
+                        closing_single_quotes
+                    } if closing_single_quotes
+                        .iter()
+                        .all(|opening_single_quote| -> bool {
+                            matches!(opening_single_quote.kind, CstKind::SingleQuote)
+                        }) && opening_single_quote_count == closing_single_quotes.len()
+                ) {
                     text = self.create_ast(
                         closing_quote.id,
                         AstKind::Error {

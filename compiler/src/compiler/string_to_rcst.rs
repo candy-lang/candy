@@ -152,6 +152,22 @@ mod parse {
         literal(input, "->").map(|it| (it, Rcst::Arrow))
     }
     #[instrument(level = "trace")]
+    fn single_quote(input: &str) -> Option<(&str, Rcst)> {
+        literal(input, "'").map(|it| (it, Rcst::SingleQuote))
+    }
+    #[instrument(level = "trace")]
+    fn single_quotes(mut input: &str, count: Option<usize>) -> Option<(&str, Vec<Rcst>)> {
+        let mut single_quotes = vec![];
+        while let Some((input_after_single_quote, single_quote)) = single_quote(input) {
+            input = input_after_single_quote;
+            single_quotes.push(single_quote)
+        }
+        match count {
+            Some(count) if count != single_quotes.len() => None,
+            _ => Some((input, single_quotes)),
+        }
+    }
+    #[instrument(level = "trace")]
     fn double_quote(input: &str) -> Option<(&str, Rcst)> {
         literal(input, "\"").map(|it| (it, Rcst::DoubleQuote))
     }
@@ -603,15 +619,26 @@ mod parse {
 
     #[instrument(level = "trace")]
     fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        let (mut input, opening_quote) = double_quote(input)?;
+        let (input, opening_single_quotes) = single_quotes(input, None)?;
+        let (mut input, opening_double_quote) = double_quote(input)?;
+
         let mut line = vec![];
         let mut parts = vec![];
         let closing_quote = loop {
             match input.chars().next() {
                 Some('"') => {
                     input = &input[1..];
-                    parts.push(Rcst::TextPart(line.drain(..).join("")));
-                    break Rcst::DoubleQuote;
+                    match single_quotes(input, Some(opening_single_quotes.len())) {
+                        Some((input_after_single_quotes, closing_single_quotes)) => {
+                            input = input_after_single_quotes;
+                            parts.push(Rcst::TextPart(line.drain(..).join("")));
+                            break Rcst::ClosingText {
+                                closing_double_quote: Box::new(Rcst::DoubleQuote),
+                                closing_single_quotes,
+                            };
+                        }
+                        None => line.push('"'),
+                    }
                 }
                 None => {
                     parts.push(Rcst::TextPart(line.drain(..).join("")));
