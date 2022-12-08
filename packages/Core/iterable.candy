@@ -168,6 +168,21 @@ forEach iterable action :=
 
 ## Conversion
 
+fromList l :=
+  needs (list.is l)
+  # () => Result[(Item, Iterable[Item]), Any]
+  # iterable | function.run | result.map { it -> it | list.get 0 }
+  # The state contains the list and an index.
+  newWithState (l, 0) { state ->
+    l = state | list.get 0
+    index = state | list.get 1
+    ifElse (l | list.isValidIndex index) {
+      result.ok (list.get l index, (l, index | int.add 1))
+    } {
+      result.error Empty
+    }
+  }
+
 toList iterable :=
   needs (is iterable)
   iterable | foldLeft (,) { result item -> result | list.append item }
