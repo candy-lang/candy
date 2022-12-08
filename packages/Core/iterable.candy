@@ -164,7 +164,9 @@ any iterable tester :=
 forEach iterable action :=
   needs (is iterable)
   needs (function.is1 action)
-  iterable | map action
+  iterable
+  | map action
+  | foldLeft Nothing { _ _ -> Nothing }
 
 ## Conversion
 
@@ -174,11 +176,15 @@ fromList l :=
   # iterable | function.run | result.map { it -> it | list.get 0 }
   # The state contains the list and an index.
   newWithState (l, 0) { state ->
+    ✨.print state
     l = state | list.get 0
     index = state | list.get 1
+    ✨.print l
     ifElse (l | list.isValidIndex index) {
+      ✨.print Ok
       result.ok (list.get l index, (l, index | int.add 1))
     } {
+      ✨.print Err
       result.error Empty
     }
   }
