@@ -27,7 +27,7 @@ lastIndex list :=
   ifElse
     (list | isEmpty)
     { result.error "Can't get the last index of an empty list." }
-    { list | length | int.minus 1 | result.ok }
+    { list | length | int.subtract 1 | result.ok }
 isValidIndex list index :=
   needs (is list)
   needs (int.is index)
@@ -39,7 +39,7 @@ isValidIndex list index :=
 
 get list index :=
   needs (is list)
-  needs (isValidIndex index)
+  needs (list | isValidIndex index)
   list | ✨.listGet index
 
 # TODO: add `single list` when we have pattern matching
