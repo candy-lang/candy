@@ -1,0 +1,10 @@
+core = use "...Core"
+iterable = core.iterable
+
+main := { env ->
+  print = { message -> core.channel.send env.stdout message }
+
+  ("Hello", "World")
+  | iterable.fromList
+  | iterable.forEach { item -> print item }
+}
