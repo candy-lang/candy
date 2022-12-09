@@ -31,26 +31,26 @@ isEmpty iterable :=
 ##
 ## These return an iterable with the same length, but different items.
 
-rawMapWithStateHelper = { rawMapWithStateHelper state mapper ->
+generateWithStateHelper = { generateWithStateHelper state mapper ->
   {
     result = mapper state
     newItem = result | list.get 0
     newState = result | list.get 1
     newItem | result.map { newItem ->
-      (newItem, rawMapWithStateHelper newState mapper)
+      (newItem, generateWithStateHelper newState mapper)
     }
   }
 }
-rawMapWithState initialState mapper :=
+generateWithState initialState mapper :=
   # `mapper` receives the previous state and returns the optional item to emit
   # (or none if it's done) and the new state.
   needs (function.is1 mapper)
-  rawMapWithStateHelper rawMapWithStateHelper initialState mapper
+  generateWithStateHelper generateWithStateHelper initialState mapper
 
 map iterable mapper :=
   needs (is iterable)
   needs (function.is1 mapper)
-  iterable | rawMapWithState { previousState ->
+  iterable | generateWithState { previousState ->
     previousState | next | result.map { itemAndRest ->
       item = itemAndRest | list.get 0
       rest = itemAndRest | list.get 1
@@ -60,7 +60,7 @@ map iterable mapper :=
 
 withIndex iterable :=
   needs (is iterable)
-  (iterable, 0) | rawMapWithState { previousState ->
+  (iterable, 0) | generateWithState { previousState ->
     iterable = previousState | list.get 0
     index = previousState | list.get 1
     iterable | next | result.map { itemAndRest ->
