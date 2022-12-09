@@ -158,7 +158,10 @@ any iterable tester :=
 forEach iterable action :=
   needs (is iterable)
   needs (function.is1 action)
-  iterable | map action
+  iterable | foldLeft Nothing { _ item ->
+    action item
+    Nothing
+  }
 
 ## Conversion
 
