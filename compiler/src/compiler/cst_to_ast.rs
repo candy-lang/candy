@@ -396,13 +396,18 @@ impl LoweringContext {
                 let fields = fields
                     .iter()
                     .filter_map(|field| {
-                        if let CstKind::StructField {
-                            key,
-                            colon,
+                        let CstKind::StructField {
+                            key_and_colon,
                             value,
                             comma,
-                        } = &field.kind
-                        {
+                        } = &field.kind else {
+                            errors.push(self.create_error(cst, AstError::StructWithNonStructField));
+                           return None;
+                        };
+
+                        if let Some(box (key, colon)) = key_and_colon {
+                            // Normal syntax, e.g. `[foo: bar]`.
+
                             let key_lowering_type = match lowering_type {
                                 LoweringType::Expression => LoweringType::Expression,
                                 LoweringType::Pattern | LoweringType::PatternLiteralPart => {
@@ -438,11 +443,39 @@ impl LoweringContext {
                                     )
                                 }
                             }
-
-                            Some((key, value))
+                            Some((Some(key), value))
                         } else {
-                            errors.push(self.create_error(cst, AstError::StructWithNonStructField));
-                            None
+                            // Shorthand syntax, e.g. `[foo]`.
+                            let mut ast = self.lower_cst(&value.clone(), lowering_type);
+
+                            if !matches!(ast.kind, AstKind::Identifier(_)) {
+                                ast = self.create_ast(
+                                    value.id,
+                                    AstKind::Error {
+                                        child: Some(Box::new(ast)),
+                                        errors: vec![self.create_error(
+                                            value,
+                                            AstError::StructShorthandWithNotIdentifier,
+                                        )],
+                                    },
+                                )
+                            }
+
+                            if let Some(comma) = comma {
+                                if !matches!(comma.kind, CstKind::Comma) {
+                                    ast = self.create_ast(
+                                        comma.id,
+                                        AstKind::Error {
+                                            child: Some(Box::new(ast)),
+                                            errors: vec![self.create_error(
+                                                comma,
+                                                AstError::StructValueWithoutComma,
+                                            )],
+                                        },
+                                    )
+                                }
+                            }
+                            Some((None, ast))
                         }
                     })
                     .collect();

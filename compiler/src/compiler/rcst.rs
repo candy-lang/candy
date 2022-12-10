@@ -70,8 +70,7 @@ pub enum Rcst {
         closing_bracket: Box<Rcst>,
     },
     StructField {
-        key: Box<Rcst>,
-        colon: Box<Rcst>,
+        key_and_colon: Option<Box<(Rcst, Rcst)>>,
         value: Box<Rcst>,
         comma: Option<Box<Rcst>>,
     },
@@ -230,13 +229,14 @@ impl Display for Rcst {
                 closing_bracket.fmt(f)
             }
             Rcst::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => {
-                key.fmt(f)?;
-                colon.fmt(f)?;
+                if let Some(box (key, colon)) = key_and_colon {
+                    key.fmt(f)?;
+                    colon.fmt(f)?;
+                }
                 value.fmt(f)?;
                 if let Some(comma) = comma {
                     comma.fmt(f)?;
@@ -372,13 +372,14 @@ impl IsMultiline for Rcst {
                     || closing_bracket.is_multiline()
             }
             Rcst::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => {
-                key.is_multiline()
-                    || colon.is_multiline()
+                key_and_colon
+                    .as_ref()
+                    .map(|box (key, colon)| key.is_multiline() || colon.is_multiline())
+                    .unwrap_or(false)
                     || value.is_multiline()
                     || comma
                         .as_ref()

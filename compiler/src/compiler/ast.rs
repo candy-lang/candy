@@ -1,7 +1,6 @@
 use super::{cst_to_ast::CstToAst, error::CompilerError, utils::AdjustCasingOfFirstLetter};
 use crate::module::Module;
 use itertools::Itertools;
-use linked_hash_map::LinkedHashMap;
 use num_bigint::BigUint;
 use std::{
     fmt::{self, Display, Formatter},
@@ -76,7 +75,7 @@ pub struct List(pub Vec<Ast>);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Struct {
-    pub fields: LinkedHashMap<Ast, Ast>,
+    pub fields: Vec<(Option<Ast>, Ast)>,
 }
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct StructAccess {
@@ -131,6 +130,7 @@ pub enum AstError {
     PatternContainsInvalidExpression,
     PatternLiteralPartContainsInvalidExpression,
     StructKeyWithoutColon,
+    StructShorthandWithNotIdentifier,
     StructValueWithoutComma,
     StructWithNonStructField,
     StructWithoutClosingBrace,
@@ -169,15 +169,11 @@ impl FindAst for List {
 }
 impl FindAst for Struct {
     fn find(&self, id: &Id) -> Option<&Ast> {
-        for (key, value) in &self.fields {
-            if let Some(ast) = key.find(id) {
-                return Some(ast);
-            }
-            if let Some(ast) = value.find(id) {
-                return Some(ast);
-            }
-        }
-        None
+        self.fields.iter().find_map(|(key, value)| {
+            key.as_ref()
+                .and_then(|key| key.find(id))
+                .or_else(|| value.find(id))
+        })
     }
 }
 impl FindAst for StructAccess {
@@ -210,12 +206,7 @@ impl FindAst for AssignmentBody {
 }
 impl FindAst for Vec<Ast> {
     fn find(&self, id: &Id) -> Option<&Ast> {
-        for ast in self {
-            if let Some(ast) = ast.find(id) {
-                return Some(ast);
-            }
-        }
-        None
+        self.iter().find_map(|ast| ast.find(id))
     }
 }
 
@@ -236,7 +227,9 @@ impl CollectErrors for Ast {
             }
             AstKind::Struct(struct_) => {
                 for (key, value) in struct_.fields {
-                    key.collect_errors(errors);
+                    if let Some(key) = key {
+                        key.collect_errors(errors)
+                    }
                     value.collect_errors(errors);
                 }
             }
@@ -301,7 +294,11 @@ impl Display for Ast {
                     "struct [\n{}\n]",
                     fields
                         .iter()
-                        .map(|(key, value)| format!("{key}: {value},"))
+                        .map(|(key, value)| if let Some(key) = key {
+                            format!("{key}: {value},")
+                        } else {
+                            format!("{value},")
+                        })
                         .join("\n")
                         .lines()
                         .map(|line| format!("  {line}"))

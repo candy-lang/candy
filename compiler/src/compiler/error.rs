@@ -74,6 +74,9 @@ impl Display for CompilerErrorPayload {
                     "This type of expression is not allowed in this part of a pattern."
                 }
                 AstError::StructKeyWithoutColon => "This struct key should be followed by a colon.",
+                AstError::StructShorthandWithNotIdentifier => {
+                    "Shorthand syntax in structs only supports identifiers."
+                }
                 AstError::StructValueWithoutComma => {
                     "This struct value should be followed by a comma."
                 }

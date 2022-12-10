@@ -191,7 +191,22 @@ impl<'a> Context<'a> {
             AstKind::Struct(Struct { fields }) => {
                 let fields = fields
                     .iter()
-                    .map(|(key, value)| (self.compile_single(key), self.compile_single(value)))
+                    .map(|(key, value)| {
+                        let key = key
+                            .as_ref()
+                            .map(|key| self.compile_single(key))
+                            .unwrap_or_else(|| {
+                                let AstKind::Identifier(Identifier(name)) = &value.kind else {
+                                    panic!("Expected identifier in struct shorthand.");
+                                };
+                                self.push(
+                                    Some(value.id.clone()),
+                                    Expression::Symbol(name.value.uppercase_first_letter()),
+                                    None,
+                                )
+                            });
+                        (key, self.compile_single(value))
+                    })
                     .collect();
                 self.push(Some(ast.id.clone()), Expression::Struct(fields), None)
             }
@@ -605,7 +620,18 @@ impl PatternContext {
             AstKind::Struct(Struct { fields }) => {
                 let fields = fields
                     .iter()
-                    .map(|(key, value)| (self.compile_pattern(key), self.compile_pattern(value)))
+                    .map(|(key, value)| {
+                        let key = key
+                            .as_ref()
+                            .map(|key| self.compile_pattern(key))
+                            .unwrap_or_else(|| {
+                                let AstKind::Identifier(Identifier(name)) = &value.kind else {
+                                    panic!("Expected identifier in struct shorthand.");
+                                };
+                                Pattern::Symbol(name.value.uppercase_first_letter())
+                            });
+                        (key, self.compile_pattern(value))
+                    })
                     .collect();
                 Pattern::Struct(fields)
             }
