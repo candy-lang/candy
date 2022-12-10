@@ -590,7 +590,7 @@ impl PatternContext {
                     .identifier_ids
                     .entry(name.value.to_owned())
                     .or_insert_with(|| {
-                        (name.id.to_owned(), self.identifier_id_generator.generate())
+                        (ast.id.to_owned(), self.identifier_id_generator.generate())
                     });
                 Pattern::NewIdentifier(pattern_id.to_owned())
             }
