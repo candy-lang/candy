@@ -105,7 +105,7 @@ impl Body {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub struct Id {
     pub module: Module,
     pub keys: Vec<String>,
@@ -128,11 +128,16 @@ impl Id {
             keys: vec![],
         }
     }
+    /// Refers to the platform (non-Candy code).
     pub fn platform() -> Self {
         Self::tooling("platform".to_string())
     }
     pub fn fuzzer() -> Self {
         Self::tooling("fuzzer".to_string())
+    }
+    /// A dummy ID that is guaranteed to never be responsible for a panic.
+    pub fn dummy() -> Self {
+        Self::tooling("dummy".to_string())
     }
     /// TODO: Currently, when a higher-order function calls a closure passed as
     /// a parameter, that's registered as a normal call instruction, making the
@@ -165,9 +170,14 @@ impl Id {
             && self.keys.iter().zip(&other.keys).all(|(a, b)| a == b)
     }
 }
-impl Display for Id {
+impl fmt::Debug for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "HirId({}:{})", self.module, self.keys.iter().join(":"))
+    }
+}
+impl Display for Id {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{self:?}")
     }
 }
 

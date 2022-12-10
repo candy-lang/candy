@@ -7,9 +7,10 @@ parallel := concurrency.parallel
 async := concurrency.async
 await := concurrency.await
 
-conditionals = use ".conditionals"
-if := conditionals.if
-ifElse := conditionals.ifElse
+controlFlow = use ".controlFlow"
+if := controlFlow.if
+ifElse := controlFlow.ifElse
+loop := controlFlow.loop
 
 equals := (use ".equality").equals
 function := use ".function"
