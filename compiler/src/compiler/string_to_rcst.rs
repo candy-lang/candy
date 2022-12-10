@@ -1764,23 +1764,6 @@ mod parse {
             pattern("foo", 0),
             Some(("", Rcst::Identifier("foo".to_string())))
         );
-        assert_eq!(
-            pattern("(foo Bar)", 0),
-            Some((
-                "",
-                Rcst::Parenthesized {
-                    opening_parenthesis: Box::new(Rcst::OpeningParenthesis),
-                    inner: Box::new(Rcst::Call {
-                        receiver: Box::new(Rcst::TrailingWhitespace {
-                            child: Box::new(Rcst::Identifier("foo".to_string())),
-                            whitespace: vec![Rcst::Whitespace(" ".to_string())]
-                        }),
-                        arguments: vec![Rcst::Symbol("Bar".to_string())]
-                    }),
-                    closing_parenthesis: Box::new(Rcst::ClosingParenthesis)
-                }
-            ))
-        );
     }
 
     #[instrument(level = "trace")]
