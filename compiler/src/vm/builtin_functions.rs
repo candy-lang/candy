@@ -387,7 +387,7 @@ impl Heap {
                 }
                 None => Err(format!(
                     "The struct does not contain the key {}.",
-                    key.address.format(self)
+                    key.address.format(self),
                 )),
             }
         })

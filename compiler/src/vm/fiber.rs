@@ -485,17 +485,20 @@ impl Fiber {
             }) => {
                 if arguments.len() != *expected_num_args {
                     self.panic(
-                        format!("A closure expected {expected_num_args} parameters, but you called it with {} arguments.", arguments.len()),
+                        format!(
+                            "A closure expected {expected_num_args} parameters, but you called it with {} arguments.",
+                            arguments.len(),
+                        ),
                         self.heap.get_hir_id(responsible),
                     );
                     return;
                 }
 
                 self.call_stack.push(self.next_instruction);
-                self.data_stack.append(&mut captured.clone());
                 for captured in captured.clone() {
                     self.heap.dup(captured);
                 }
+                self.data_stack.append(&mut captured.clone());
                 self.data_stack.append(&mut arguments.clone());
                 self.data_stack.push(responsible);
                 self.next_instruction = InstructionPointer::start_of_closure(callee);
