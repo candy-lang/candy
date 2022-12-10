@@ -1,4 +1,4 @@
-use super::{error::CompilerError, utils::AdjustCasingOfFirstLetter};
+use super::{cst_to_ast::CstToAst, error::CompilerError, utils::AdjustCasingOfFirstLetter};
 use crate::module::Module;
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
@@ -7,6 +7,15 @@ use std::{
     fmt::{self, Display, Formatter},
     ops::Deref,
 };
+
+#[salsa::query_group(AstDbStorage)]
+pub trait AstDb: CstToAst {
+    fn find_ast(&self, id: Id) -> Option<Ast>;
+}
+fn find_ast(db: &dyn AstDb, id: Id) -> Option<Ast> {
+    let (ast, _) = db.ast(id.module.clone()).unwrap();
+    ast.find(&id).map(|it| it.to_owned())
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Id {
