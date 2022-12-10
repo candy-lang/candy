@@ -1,7 +1,7 @@
 use super::{
     ast::{
         self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, List, Struct,
-        StructAccess, Symbol, Text,
+        StructAccess, Symbol, Text, TextPart,
     },
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
@@ -154,7 +154,8 @@ impl<'a> Context<'a> {
             AstKind::Int(Int(int)) => {
                 self.push(Some(ast.id.clone()), Expression::Int(int.to_owned()), None)
             }
-            AstKind::Text(Text(string)) => self.push(
+            AstKind::Text(text) => self.lower_text(Some(ast.id.clone()), text),
+            AstKind::TextPart(TextPart(string)) => self.push(
                 Some(ast.id.clone()),
                 Expression::Text(string.value.to_owned()),
                 None,
@@ -257,6 +258,32 @@ impl<'a> Context<'a> {
                     None,
                 )
             }
+        }
+    }
+
+    fn lower_text(&mut self, id: Option<ast::Id>, text: &Text) -> hir::Id {
+        // TODO: Convert parts to text
+        if let [first, rest @ ..] = text.0.as_slice() {
+            let mut result = self.compile_single(first);
+            for part in rest {
+                let part_id = self.compile_single(part);
+                let concatenate = self.push(
+                    None,
+                    Expression::Builtin(BuiltinFunction::TextConcatenate),
+                    None,
+                );
+                result = self.push(
+                    None,
+                    Expression::Call {
+                        function: concatenate,
+                        arguments: vec![result.clone(), part_id],
+                    },
+                    None,
+                );
+            }
+            result
+        } else {
+            self.push(id, Expression::Text("".to_string()), None)
         }
     }
 

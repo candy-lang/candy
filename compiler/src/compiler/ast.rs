@@ -34,6 +34,7 @@ pub struct Ast {
 pub enum AstKind {
     Int(Int),
     Text(Text),
+    TextPart(TextPart),
     Identifier(Identifier),
     Symbol(Symbol),
     List(List),
@@ -54,7 +55,10 @@ pub enum AstKind {
 pub struct Int(pub BigUint);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct Text(pub AstString);
+pub struct Text(pub Vec<Ast>);
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct TextPart(pub AstString);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Identifier(pub AstString);
@@ -140,6 +144,7 @@ impl FindAst for Ast {
         match &self.kind {
             AstKind::Int(_) => None,
             AstKind::Text(_) => None,
+            AstKind::TextPart(_) => None,
             AstKind::Identifier(_) => None,
             AstKind::Symbol(_) => None,
             AstKind::List(list) => list.find(id),
@@ -216,7 +221,12 @@ impl CollectErrors for Ast {
     fn collect_errors(self, errors: &mut Vec<CompilerError>) {
         match self.kind {
             AstKind::Int(_) => {}
-            AstKind::Text(_) => {}
+            AstKind::Text(Text(parts)) => {
+                for part in parts {
+                    part.collect_errors(errors);
+                }
+            }
+            AstKind::TextPart(_) => {}
             AstKind::Identifier(_) => {}
             AstKind::Symbol(_) => {}
             AstKind::List(List(items)) => {
@@ -268,7 +278,20 @@ impl Display for Ast {
         write!(f, "{}: ", self.id)?;
         match &self.kind {
             AstKind::Int(Int(int)) => write!(f, "int {}", int),
-            AstKind::Text(Text(text)) => write!(f, "text \"{}\"", text),
+            AstKind::Text(Text(parts)) => {
+                write!(
+                    f,
+                    "text (\n{}\n)",
+                    parts
+                        .iter()
+                        .map(|part| format!("{part},"))
+                        .join("\n")
+                        .lines()
+                        .map(|line| format!("  {line}"))
+                        .join("\n")
+                )
+            }
+            AstKind::TextPart(TextPart(text)) => write!(f, "textPart \"{}\"", text),
             AstKind::Identifier(Identifier(identifier)) => write!(f, "identifier {}", identifier),
             AstKind::Symbol(Symbol(symbol)) => write!(f, "symbol {}", symbol),
             AstKind::List(List(items)) => {

@@ -1,5 +1,7 @@
 use super::{
-    ast::{self, Ast, AstError, AstKind, AstString, Identifier, Int, Lambda, Symbol, Text},
+    ast::{
+        self, Ast, AstError, AstKind, AstString, Identifier, Int, Lambda, Symbol, Text, TextPart,
+    },
     cst::{self, Cst, CstDb, CstKind},
     error::{CompilerError, CompilerErrorPayload},
     rcst_to_cst::RcstToCst,
@@ -167,7 +169,8 @@ impl LoweringContext {
                     })
                     .join("");
                 let string = self.create_string_without_id_mapping(text);
-                let mut text = self.create_ast(cst.id, AstKind::Text(Text(string)));
+                let text_part = self.create_ast(cst.id, AstKind::TextPart(TextPart(string)));
+                let mut text = self.create_ast(cst.id, AstKind::Text(Text(vec![text_part])));
 
                 if !matches!(
                     &closing_quote.kind,
@@ -200,9 +203,9 @@ impl LoweringContext {
 
                 text
             }
-            CstKind::OpeningText { .. } | CstKind::ClosingText { .. } | CstKind::TextPart(_) => {
-                panic!("TextPart should only occur in Text.")
-            }
+            CstKind::OpeningText { .. } => panic!("OpeningText should only occur in Text."),
+            CstKind::ClosingText { .. } => panic!("ClosingText should only occur in Text."),
+            CstKind::TextPart(_) => panic!("TextPart should only occur in Text."),
             CstKind::Pipe {
                 receiver,
                 bar,
