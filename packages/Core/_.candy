@@ -15,6 +15,7 @@ loop := controlFlow.loop
 equals := (use ".equality").equals
 function := use ".function"
 int := use ".int"
+iterable := use ".iterable"
 list := use ".list"
 panic := (use ".panic").panic
 result := use ".result"

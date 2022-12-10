@@ -1,0 +1,170 @@
+bool = use "..bool"
+equals = (use "..equality").equals
+function = use "..function"
+int = use "..int"
+result = use "..result"
+list = use "..list"
+
+# An iterable is a `() => Result[(Item, Iterable[Item]), Any]`.
+# isWithItemType value checkItem :=
+#   result.is value | bool.lazyAnd {
+#     value
+#     | result.map { current ->
+#       list.is current
+#       | bool.lazyAnd { equals (current | list.length) 2 }
+#       | bool.lazyAnd { checkItem (current | list.get 0) }
+#       | bool.lazyAnd (function.is0 (current | list.get 1))
+#     }
+#     | result.unwrapOr True
+#   }
+# is value := isWithItemType value { _ -> True }
+is value := function.is0 value
+
+next iterable :=
+  needs (is iterable)
+  iterable | function.run | result.map { it -> it | list.get 0 }
+isEmpty iterable :=
+  needs (is iterable)
+  iterable | next | result.isOk
+
+## Mapping Transformation
+##
+## These return an iterable with the same length, but different items.
+
+generateWithStateHelper = { generateWithStateHelper state mapper ->
+  {
+    result = mapper state
+    newItem = result | list.get 0
+    newState = result | list.get 1
+    newItem | result.map { newItem ->
+      (newItem, generateWithStateHelper newState mapper)
+    }
+  }
+}
+generateWithState initialState mapper :=
+  # `mapper` receives the previous state and returns the optional item to emit
+  # (or none if it's done) and the new state.
+  needs (function.is1 mapper)
+  generateWithStateHelper generateWithStateHelper initialState mapper
+
+map iterable mapper :=
+  needs (is iterable)
+  needs (function.is1 mapper)
+  iterable | generateWithState { previousState ->
+    previousState | next | result.map { itemAndRest ->
+      item = itemAndRest | list.get 0
+      rest = itemAndRest | list.get 1
+      (mapper item, rest)
+    }
+  }
+
+withIndex iterable :=
+  needs (is iterable)
+  (iterable, 0) | generateWithState { previousState ->
+    iterable = previousState | list.get 0
+    index = previousState | list.get 1
+    iterable | next | result.map { itemAndRest ->
+      item = itemAndRest | list.get 0
+      rest = itemAndRest | list.get 1
+      ((item, index), (rest, index | int.add 1))
+    }
+  }
+
+## Reduction
+
+# TODO: ensure this works with tail recursion
+foldLeftHelper = { foldLeftHelper iterable value combine ->
+  iterable
+  | next
+  | result.map { it ->
+    currentItem = it | list.get 0
+    remainingIterable = it | list.get 1
+    newValue = combine value currentItem
+    foldLeftHelper foldLeftHelper remainingIterable newValue combine
+  }
+  | result.unwrapOr value
+}
+foldLeft iterable initialValue combine :=
+  needs (is iterable)
+  needs (function.is2 combine)
+  foldLeftHelper foldLeftHelper iterable initialValue combine
+# TODO: `foldRight`
+
+reduceLeft iterable combine :=
+  needs (is iterable)
+  needs (function.is2 combine)
+  iterable
+  | next
+  | result.mapError { _ -> "Can't `reduceLeft` an empty iterable" }
+  | result.map { it ->
+    currentItem = it | list.get 0
+    remainingIterable = it | list.get 1
+    remainingIterable | foldLeft currentItem combine
+  }
+# TODO: `reduceRight`
+
+sum iterableOfInt :=
+  needs (is iterableOfInt)
+  iterableOfInt | reduceLeft { a b ->
+    needs (int.is a)
+    needs (int.is b)
+    a | int.add b
+  }
+length iterable :=
+  needs (is iterable)
+  iterable | map { _ -> 1 } | sum | result.unwrapOr 0
+
+all iterable tester :=
+  needs (is iterable)
+  needs (function.is1 tester)
+  iterable | foldLeft True { result item ->
+    itemResult = tester item
+    needs (bool.is itemResult)
+    result | bool.and itemResult
+  }
+  # TODO: stop after the first `False`
+any iterable tester :=
+  needs (is iterable)
+  needs (function.is1 tester)
+  iterable | foldLeft False { result item ->
+    itemResult = tester item
+    needs (bool.is itemResult)
+    result | bool.or itemResult
+  }
+  # TODO: stop after the first `True`
+
+## Filtering
+
+# whereWithStateHelper = { whereWithStateHelper iterable state tester ->
+#   iterable | result.map { it ->
+#     currentItem = it | list.get 0
+#     remainingIterable = it | list.get 1
+#     (
+#       mapper currentItem,
+#       mapHelper mapHelper remainingIterable mapper,
+#     )
+#   }
+# }
+# whereWithState iterable initialState tester :=
+#   needs (is iterable)
+#   needs (function.is2 tester)
+#   whereWithStateHelper whereWithStateHelper iterable initialState tester
+# where iterable tester :=
+#   needs (is iterable)
+#   needs (function.is1 tester)
+
+## Action
+
+forEach iterable action :=
+  needs (is iterable)
+  needs (function.is1 action)
+  iterable | foldLeft Nothing { _ item ->
+    action item
+    Nothing
+  }
+
+## Conversion
+
+toList iterable :=
+  needs (is iterable)
+  iterable | foldLeft (,) { result item -> result | list.append item }

@@ -97,6 +97,7 @@ We already have a language server that provides some tooling.
   - LLVM, WASM
 - IDE support:
   - generate debug files
+  - DAP
   - [ ] completion, completion resolve
   - [ ] hover
   - [ ] signatureHelp

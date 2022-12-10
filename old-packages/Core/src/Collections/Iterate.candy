@@ -15,10 +15,6 @@ use ..Set
 public trait Iterate[Item] {
   # A thing that can be iterated over.
 
-  fun iterate(): Maybe[(Item, Iterate[Item])]
-  # Returns `Some` with the next item and an `Iterate` containing the remaining items, or `None` if
-  # it finished iterating.
-
   ## Getters
 
   fun get(index: Int /* UInt */): Maybe[Item] {
@@ -37,12 +33,6 @@ public trait Iterate[Item] {
     })
   }
 
-  fun first(): Maybe[Item] { this.get(0) }
-  fun second(): Maybe[Item] { this.get(1) }
-  fun third(): Maybe[Item] { this.get(2) }
-  fun fourth(): Maybe[Item] { this.get(3) }
-  fun fifth(): Maybe[Item] { this.get(4) }
-
   fun nthLast(index: Int): Maybe[Item] {
     assert(index >= 0, "Can't access a negative index in an `Iterate`.")
     ## TODO(later, marcelgarus): Make this way more efficient.
@@ -51,12 +41,6 @@ public trait Iterate[Item] {
     list.get(list.length() - index - 1)
   }
 
-  fun last(): Maybe[Item] { this.nthLast(0) }
-  fun secondLast(): Maybe[Item] { this.nthLast(1) }
-  fun thirdLast(): Maybe[Item] { this.nthLast(2) }
-  fun fourthLast(): Maybe[Item] { this.nthLast(3) }
-  fun fifthLast(): Maybe[Item] { this.nthLast(4) }
-
   fun single(): Maybe[Item] {
     this.iterate().flatMap({
       let item = it.first
@@ -64,36 +48,11 @@ public trait Iterate[Item] {
     })
   }
 
-  ## Properties.
-
-  fun length(): Int /* UInt */ { this.sumBy({ 1 }) }
-
-  ## Boolean checks.
-
-  fun isEmpty(): Bool { this.first().isNone() }
-  fun isNotEmpty(): Bool { this.isEmpty().not() }
-
-  fun all(tester: (Item) -> Bool): Bool {
-    this.foldLeft[Out](true(), { result, item -> result & tester(item) })
-  }
-  fun any(tester: (Item) -> Bool): Bool {
-    this.foldLeft[Out](false(), { result, item -> result | tester(item) })
-  }
-
   ## Reductions.
 
-  fun foldLeft[Out](initial: Out, combine: (Out, Item) -> Out): Out {
-    let result = Mutable[Out](initial)
-    this.do({ result.set(combine(result.get(), it)) })
-    result.get()
-  }
   fun foldRight[Out](initial: Out, combine: (Item, Out) -> Out): Out {
     this.toList().reverse().foldLeft[Out](initial, { result, item -> combine(item, result) })
   }
-  fun reduceLeft(combine: (Item, Item) -> Item): Maybe[Item] {
-    this.iterate().map[Item]({ it.second.foldLeft[Out](it.first, combine) })
-  }
-  ## TODO(later, marcelgarus): reduceRight
 
   fun minBy[C: Compare](selector: (Item) -> C): Maybe[Item] {
     this.reduceLeft[Item]({ result, item ->
@@ -123,20 +82,9 @@ public trait Iterate[Item] {
   ## TODO(later, JonasWanke): singleIndexWhere
 
   ## Mapping transformations.
-  ## These return an `Iterate` with the same length, but a different type.
 
-  fun map[Out](mapper: (Item) -> Out): Iterate[Out] {
-    this.mapIndexed[Out]({ index, item -> mapper(item) })
-  }
   fun mapIndexed[Out](mapper: (Int, Item) -> Out): Iterate[Out] {
     MappedIterate[Item, Out](this, mapper, 0)
-  }
-  fun withIndex(): Iterate[(Int /* UInt */, Item)] {
-    this.mapIndexed[(Int, Item)]({ index, item -> (index, item) })
-  }
-
-  fun cast[Type](): Iterate[Maybe[Item & Type]] {
-    this.map[Item & Type]({ it.as[Item & Type]() })
   }
 
   ## Selection transformations.
@@ -221,16 +169,6 @@ public trait Iterate[Item] {
 
   fun zip[Other](other: Iterate[Other]): Iterate[(Item, Other)] {
     ZipIterate[Item, Other](this, other)
-  }
-
-  ## Action.
-
-  fun do(action: (Item) -> Nothing) { this.map[Nothing](action) }
-
-  ## Conversions.
-
-  fun toList(): List[Item] {
-    this.foldLeft[List[Item]](List[Item].empty(), { result, item -> result + item })
   }
 
   ## Extras:
