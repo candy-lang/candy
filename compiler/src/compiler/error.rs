@@ -67,8 +67,11 @@ impl Display for CompilerErrorPayload {
                 AstError::ParenthesizedWithoutClosingParenthesis => {
                     "This expression is parenthesized, but the closing parenthesis is missing."
                 }
-                AstError::PatternLiteralPartContainsIdentifier => {
-                    "This part of a pattern may not contain identifiers."
+                AstError::PatternContainsInvalidExpression => {
+                    "This type of expression is not allowed in patterns."
+                }
+                AstError::PatternLiteralPartContainsInvalidExpression => {
+                    "This type of expression is not allowed in this part of a pattern."
                 }
                 AstError::StructKeyWithoutColon => "This struct key should be followed by a colon.",
                 AstError::StructValueWithoutComma => {

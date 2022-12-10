@@ -145,7 +145,7 @@ impl LoweringContext {
                             module: self.module.clone(),
                             span: cst.span.clone(),
                             payload: CompilerErrorPayload::Ast(
-                                AstError::PatternLiteralPartContainsIdentifier,
+                                AstError::PatternLiteralPartContainsInvalidExpression,
                             ),
                         }],
                     };
@@ -319,6 +319,16 @@ impl LoweringContext {
             } => {
                 let mut errors = vec![];
 
+                if lowering_type == LoweringType::PatternLiteralPart {
+                    errors.push(CompilerError {
+                        module: self.module.clone(),
+                        span: cst.span.clone(),
+                        payload: CompilerErrorPayload::Ast(
+                            AstError::PatternLiteralPartContainsInvalidExpression,
+                        ),
+                    });
+                };
+
                 assert!(
                     matches!(opening_parenthesis.kind, CstKind::OpeningParenthesis),
                     "List should always have an opening parenthesis, but instead had {}.",
@@ -374,18 +384,17 @@ impl LoweringContext {
                     });
                 }
 
-                let ast = self.create_ast(cst.id, AstKind::List(List(ast_items)));
-                if errors.is_empty() {
-                    ast
-                } else {
-                    self.create_ast(
+                let mut ast = self.create_ast(cst.id, AstKind::List(List(ast_items)));
+                if !errors.is_empty() {
+                    ast = self.create_ast(
                         cst.id,
                         AstKind::Error {
                             child: Some(Box::new(ast)),
                             errors,
                         },
-                    )
+                    );
                 }
+                ast
             }
             CstKind::ListItem { .. } => panic!("ListItem should only appear in List."),
             CstKind::Struct {
@@ -394,6 +403,16 @@ impl LoweringContext {
                 closing_bracket,
             } => {
                 let mut errors = vec![];
+
+                if lowering_type == LoweringType::PatternLiteralPart {
+                    errors.push(CompilerError {
+                        module: self.module.clone(),
+                        span: cst.span.clone(),
+                        payload: CompilerErrorPayload::Ast(
+                            AstError::PatternLiteralPartContainsInvalidExpression,
+                        ),
+                    });
+                };
 
                 assert!(
                     matches!(opening_bracket.kind, CstKind::OpeningBracket),
@@ -477,24 +496,43 @@ impl LoweringContext {
                     });
                 }
 
-                let ast = self.create_ast(cst.id, AstKind::Struct(Struct { fields }));
-                if errors.is_empty() {
-                    ast
-                } else {
-                    self.create_ast(
+                let mut ast = self.create_ast(cst.id, AstKind::Struct(Struct { fields }));
+                if !errors.is_empty() {
+                    ast = self.create_ast(
                         cst.id,
                         AstKind::Error {
                             child: Some(Box::new(ast)),
                             errors,
                         },
-                    )
+                    );
                 }
+                ast
             }
             CstKind::StructField { .. } => panic!("StructField should only appear in Struct."),
             CstKind::StructAccess { struct_, dot, key } => {
-                assert_eq!(lowering_type, LoweringType::Expression);
+                let mut errors = vec![];
 
-                self.lower_struct_access(cst.id, struct_, dot, key)
+                if lowering_type != LoweringType::Expression {
+                    errors.push(CompilerError {
+                        module: self.module.clone(),
+                        span: cst.span.clone(),
+                        payload: CompilerErrorPayload::Ast(
+                            AstError::PatternContainsInvalidExpression,
+                        ),
+                    });
+                };
+
+                let mut ast = self.lower_struct_access(cst.id, struct_, dot, key);
+                if !errors.is_empty() {
+                    ast = self.create_ast(
+                        cst.id,
+                        AstKind::Error {
+                            child: Some(Box::new(ast)),
+                            errors,
+                        },
+                    );
+                }
+                ast
             }
             CstKind::Lambda {
                 opening_curly_brace,
@@ -502,7 +540,17 @@ impl LoweringContext {
                 body,
                 closing_curly_brace,
             } => {
-                assert_eq!(lowering_type, LoweringType::Expression);
+                let mut errors = vec![];
+
+                if lowering_type != LoweringType::Expression {
+                    errors.push(CompilerError {
+                        module: self.module.clone(),
+                        span: cst.span.clone(),
+                        payload: CompilerErrorPayload::Ast(
+                            AstError::PatternContainsInvalidExpression,
+                        ),
+                    });
+                };
 
                 assert!(
                     matches!(opening_curly_brace.kind, CstKind::OpeningCurlyBrace),
@@ -510,7 +558,7 @@ impl LoweringContext {
                     opening_curly_brace,
                 );
 
-                let (parameters, mut errors) =
+                let (parameters, mut parameter_errors) =
                     if let Some((parameters, arrow)) = parameters_and_arrow {
                         assert!(
                             matches!(arrow.kind, CstKind::Arrow),
@@ -521,6 +569,7 @@ impl LoweringContext {
                     } else {
                         (vec![], vec![])
                     };
+                errors.append(&mut parameter_errors);
 
                 let body = self.lower_csts(body);
 
