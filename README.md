@@ -81,7 +81,7 @@ We already have a language server that provides some tooling.
   - text interpolation
   - fibers, channels
   - patterns
-  - pipe operator
+  - improve pattern match panic messages: `[Foo, 1, {a}] = [Foo, 2, {A: B]]` could generate a message like `` Expected `[_, 1, _]`, got `[_, 2, _]`. ``
   - "type" proofs
   - fuzzing of the compiler itself
   - package root marker
