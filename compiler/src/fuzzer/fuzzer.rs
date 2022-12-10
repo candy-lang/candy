@@ -53,7 +53,7 @@ impl Status {
             .collect_vec();
 
         let mut vm = Vm::new();
-        vm.set_up_for_running_closure(vm_heap, closure, &argument_addresses, Id::fuzzer());
+        vm.set_up_for_running_closure(vm_heap, closure, argument_addresses, Id::fuzzer());
 
         Status::StillFuzzing {
             vm,

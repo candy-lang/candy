@@ -98,7 +98,7 @@ impl Fiber {
     pub fn new_for_running_closure(
         heap: Heap,
         closure: Pointer,
-        arguments: &[Pointer],
+        arguments: Vec<Pointer>,
         responsible: hir::Id,
     ) -> Self {
         assert!(matches!(heap.get(closure).data, Data::Closure(_)));
@@ -106,7 +106,7 @@ impl Fiber {
         let mut fiber = Self::new_with_heap(heap);
         let responsible = fiber.heap.create(Data::HirId(responsible));
         fiber.status = Status::Running;
-        fiber.call(closure, arguments.to_vec(), responsible);
+        fiber.call(closure, arguments, responsible);
 
         fiber
     }
@@ -123,7 +123,7 @@ impl Fiber {
         let module_id = Id::new(module, vec![]);
         let mut heap = Heap::default();
         let closure = heap.create_closure(closure);
-        Self::new_for_running_closure(heap, closure, &[], module_id)
+        Self::new_for_running_closure(heap, closure, vec![], module_id)
     }
 
     pub fn tear_down(mut self) -> ExecutionResult {
@@ -495,10 +495,11 @@ impl Fiber {
                 }
 
                 self.call_stack.push(self.next_instruction);
-                for captured in captured.clone() {
-                    self.heap.dup(captured);
+                let mut captured = captured.clone();
+                for captured in &captured {
+                    self.heap.dup(*captured);
                 }
-                self.data_stack.append(&mut captured.clone());
+                self.data_stack.append(&mut captured);
                 self.data_stack.append(&mut arguments.clone());
                 self.data_stack.push(responsible);
                 self.next_instruction = InstructionPointer::start_of_closure(callee);
