@@ -534,6 +534,38 @@ fn compile_destructure(
                 expression,
                 "Struct".to_string(),
             );
+
+            // Destructure the elements.
+            let builtin_struct_get = body.push_with_new_id(
+                id_generator,
+                Expression::Builtin(BuiltinFunction::StructGet),
+            );
+            for (key_pattern, value_pattern) in struct_ {
+                let key = compile_pattern_to_key_expression(
+                    db,
+                    id_generator,
+                    body,
+                    responsible,
+                    key_pattern,
+                );
+                let item = body.push_with_new_id(
+                    id_generator,
+                    Expression::Call {
+                        function: builtin_struct_get,
+                        arguments: vec![expression, key],
+                        responsible,
+                    },
+                );
+                compile_destructure(
+                    db,
+                    id_generator,
+                    body,
+                    identifier_ids,
+                    responsible,
+                    item,
+                    value_pattern,
+                );
+            }
         }
         hir::Pattern::Error { errors } => {
             compile_errors(db, id_generator, body, responsible, errors);
@@ -677,6 +709,28 @@ fn push_empty_lambda(id_generator: &mut IdGenerator<Id>, body: &mut Body) -> Id 
         body.push(Expression::Reference(nothing));
     });
     body.push_with_new_id(id_generator, lambda)
+}
+fn compile_pattern_to_key_expression(
+    db: &dyn HirToMir,
+    id_generator: &mut IdGenerator<Id>,
+    body: &mut Body,
+    responsible: Id,
+    pattern: &hir::Pattern,
+) -> Id {
+    let expression = match pattern {
+        hir::Pattern::NewIdentifier(_) => {
+            panic!("New identifiers can't be used in this part of a pattern.")
+        }
+        hir::Pattern::Int(int) => Expression::Int(int.to_owned().into()),
+        hir::Pattern::Text(text) => Expression::Text(text.to_owned()),
+        hir::Pattern::Symbol(symbol) => Expression::Symbol(symbol.to_owned()),
+        hir::Pattern::List(_) => panic!("Lists can't be used in this part of a pattern."),
+        hir::Pattern::Struct(_) => panic!("Structs can't be used in this part of a pattern."),
+        hir::Pattern::Error { errors } => {
+            compile_errors(db, id_generator, body, responsible, errors)
+        }
+    };
+    body.push_with_new_id(id_generator, expression)
 }
 
 // Errors
