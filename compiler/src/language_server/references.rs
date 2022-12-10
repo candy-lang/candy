@@ -179,30 +179,17 @@ impl<'a> Context<'a> {
             Expression::Int(_) => {}
             Expression::Text(_) => {}
             Expression::Reference(target) => {
-                if let ReferenceQuery::Id(target_id) = &self.query {
-                    if target == target_id {
-                        self.add_reference(id, DocumentHighlightKind::READ);
-                    }
+                if let ReferenceQuery::Id(target_id) = &self.query && target == target_id {
+                    self.add_reference(id, DocumentHighlightKind::READ);
                 }
             }
             Expression::Symbol(symbol) => {
-                if let ReferenceQuery::Symbol(_, target) = &self.query {
-                    if symbol == target {
-                        self.add_reference(id, DocumentHighlightKind::READ);
-                    }
+                if let ReferenceQuery::Symbol(_, target) = &self.query && symbol == target {
+                    self.add_reference(id, DocumentHighlightKind::READ);
                 }
             }
-            Expression::List(items) => {
-                for item_id in items {
-                    self.visit_id(item_id.to_owned());
-                }
-            }
-            Expression::Struct(entries) => {
-                for (key_id, value_id) in entries {
-                    self.visit_id(key_id.to_owned());
-                    self.visit_id(value_id.to_owned());
-                }
-            }
+            Expression::List(_) => { }
+            Expression::Struct(_) => { }
             Expression::Destructure { .. } => {},
             Expression::PatternIdentifierReference { .. } => {}
             Expression::Lambda(Lambda { body, .. }) => {
@@ -216,10 +203,8 @@ impl<'a> Context<'a> {
                 function,
                 arguments,
             } => {
-                if let ReferenceQuery::Id(target_id) = &self.query {
-                    if function == target_id {
-                        self.add_reference(id, DocumentHighlightKind::READ);
-                    }
+                if let ReferenceQuery::Id(target_id) = &self.query && function == target_id {
+                    self.add_reference(id, DocumentHighlightKind::READ);
                 }
                 self.visit_ids(arguments);
             }
