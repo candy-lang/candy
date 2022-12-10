@@ -1,7 +1,7 @@
 bool = use "..bool"
 check = (use "..check").check
-equals = (use "..equality").equals
 ifElse = (use "..controlFlow").ifElse
+equals = (use "..equality").equals
 type = use "..type"
 
 is value := type.is value Int

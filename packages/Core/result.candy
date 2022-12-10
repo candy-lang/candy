@@ -1,7 +1,7 @@
 bool = use "..bool"
+ifElse = (use "..controlFlow").ifElse
 equals = (use "..equality").equals
 function = use "..function"
-ifElse = (use "..controlFlow").ifElse
 struct = use "..struct"
 
 is value :=
