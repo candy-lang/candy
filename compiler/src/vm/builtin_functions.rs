@@ -481,7 +481,7 @@ impl Heap {
     #[allow(clippy::wrong_self_convention)]
     fn to_debug_text(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |value: Any| {
-            Return(self.create_text(value.data.format(self)))
+            Return(self.create_text(value.address.format(self)))
         })
     }
 
