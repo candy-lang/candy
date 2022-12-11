@@ -112,7 +112,7 @@ impl Module {
             let last = last
                 .strip_suffix(".candy")
                 .expect("Code module doesn't end with `.candy`?");
-            if !last.is_empty() {
+            if last != "_" {
                 path.push(last.to_string());
             }
         }
@@ -245,6 +245,7 @@ pub trait ModuleWatcher {
     fn get_open_module_raw(&self, module: &Module) -> Option<Vec<u8>>;
 }
 
+#[derive(Debug)]
 pub struct UsePath {
     parent_navigations: usize,
     path: String,
@@ -260,7 +261,7 @@ impl UsePath {
                 path = &path[UsePath::PARENT_NAVIGATION_CHAR.len_utf8()..];
             }
             match navigations {
-                0 => return Err("the target must start with at least one dot".to_string()),
+                0 => return Err("The target must start with at least one dot.".to_string()),
                 i => i - 1, // two dots means one parent navigation
             }
         };

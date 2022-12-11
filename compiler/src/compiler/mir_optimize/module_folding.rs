@@ -60,10 +60,12 @@ impl Mir {
                     return; // TODO: Replace with a panic.
                 };
 
-                let mir =
-                    db.mir_with_obvious_optimized(module_to_import, tracing.for_child_module());
+                let mir = db.mir_with_obvious_optimized(
+                    module_to_import.clone(),
+                    tracing.for_child_module(),
+                );
                 let Some(mir) = mir else {
-                    warn!("Module not found.");
+                    warn!("Module {module_to_import} not found.");
                     return; // TODO: Replace with a panic.
                 };
                 let mir = (*mir).clone();

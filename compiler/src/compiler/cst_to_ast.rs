@@ -15,6 +15,7 @@ use crate::{
 };
 use itertools::Itertools;
 use std::{collections::HashMap, ops::Range, sync::Arc};
+use tracing::warn;
 
 #[salsa::query_group(CstToAstStorage)]
 pub trait CstToAst: CstDb + RcstToCst {
@@ -58,7 +59,14 @@ fn ast(db: &dyn CstToAst, module: Module) -> Option<AstResult> {
             let cst = cst.unwrap_whitespace_and_comment();
             context.lower_csts(&cst)
         }
-        Err(InvalidModuleError::DoesNotExist | InvalidModuleError::IsToolingModule) => return None,
+        Err(InvalidModuleError::DoesNotExist) => {
+            warn!("Tried to get AST of module that doesn't exist: {module}.");
+            return None;
+        }
+        Err(InvalidModuleError::IsToolingModule) => {
+            warn!("Tried to get AST of tooling module: {module}.");
+            return None;
+        }
         Err(InvalidModuleError::InvalidUtf8) => {
             vec![Ast {
                 id: context.create_next_id_without_mapping(),
