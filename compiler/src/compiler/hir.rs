@@ -433,7 +433,7 @@ impl fmt::Display for Pattern {
             Pattern::Error { child, errors } => {
                 write!(f, "{}", if errors.len() == 1 { "error" } else { "errors" })?;
                 for error in errors {
-                    write!(f, "\n  {error:?}")?;
+                    write!(f, "\n  {error}")?;
                 }
                 if let Some(child) = child {
                     write!(f, "\n  fallback: {child}")?;
