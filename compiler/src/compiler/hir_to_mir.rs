@@ -569,8 +569,20 @@ fn compile_destructure(
                 );
             }
         }
-        hir::Pattern::Error { errors } => {
+        hir::Pattern::Error { child, errors } => {
             compile_errors(db, id_generator, body, responsible, errors);
+            if let Some(child) = child {
+                // We still have to populate `identifier_ids`.
+                compile_destructure(
+                    db,
+                    id_generator,
+                    body,
+                    identifier_ids,
+                    responsible,
+                    expression,
+                    child,
+                );
+            }
         }
     }
 }
@@ -728,7 +740,7 @@ fn compile_pattern_to_key_expression(
         hir::Pattern::Symbol(symbol) => Expression::Symbol(symbol.to_owned()),
         hir::Pattern::List(_) => panic!("Lists can't be used in this part of a pattern."),
         hir::Pattern::Struct(_) => panic!("Structs can't be used in this part of a pattern."),
-        hir::Pattern::Error { errors } => {
+        hir::Pattern::Error { errors, .. } => {
             compile_errors(db, id_generator, body, responsible, errors)
         }
     };

@@ -195,15 +195,24 @@ impl<'a> Context<'a> {
                         let key = key
                             .as_ref()
                             .map(|key| self.compile_single(key))
-                            .unwrap_or_else(|| {
-                                let AstKind::Identifier(Identifier(name)) = &value.kind else {
-                                    panic!("Expected identifier in struct shorthand.");
-                                };
-                                self.push(
+                            .unwrap_or_else(|| match &value.kind {
+                                AstKind::Identifier(Identifier(name)) => self.push(
                                     Some(value.id.clone()),
                                     Expression::Symbol(name.value.uppercase_first_letter()),
                                     None,
-                                )
+                                ),
+                                AstKind::Error { errors, .. } => self.push(
+                                    Some(ast.id.clone()),
+                                    Expression::Error {
+                                        child: None,
+                                        // TODO: These errors are already reported for the value itself.
+                                        errors: errors.clone(),
+                                    },
+                                    None,
+                                ),
+                                _ => panic!(
+                                    "Expected identifier in struct shorthand, got {value:?}."
+                                ),
                             });
                         (key, self.compile_single(value))
                     })
@@ -624,11 +633,18 @@ impl PatternContext {
                         let key = key
                             .as_ref()
                             .map(|key| self.compile_pattern(key))
-                            .unwrap_or_else(|| {
-                                let AstKind::Identifier(Identifier(name)) = &value.kind else {
-                                    panic!("Expected identifier in struct shorthand.");
-                                };
-                                Pattern::Symbol(name.value.uppercase_first_letter())
+                            .unwrap_or_else(|| match &value.kind {
+                                AstKind::Identifier(Identifier(name)) => {
+                                    Pattern::Symbol(name.value.uppercase_first_letter())
+                                }
+                                AstKind::Error { errors, .. } => Pattern::Error {
+                                    child: None,
+                                    // TODO: These errors are already reported for the value itself.
+                                    errors: errors.to_owned(),
+                                },
+                                _ => panic!(
+                                    "Expected identifier in struct shorthand, got {value:?}."
+                                ),
                             });
                         (key, self.compile_pattern(value))
                     })
@@ -643,9 +659,15 @@ impl PatternContext {
                     "AST pattern can't contain struct access, lambda, call, or assignment."
                 )
             }
-            AstKind::Error { errors, .. } => Pattern::Error {
-                errors: errors.clone(),
-            },
+            AstKind::Error { child, errors, .. } => {
+                let child = child
+                    .as_ref()
+                    .map(|child| Box::new(self.compile_pattern(child)));
+                Pattern::Error {
+                    child,
+                    errors: errors.to_owned(),
+                }
+            }
         }
     }
 }

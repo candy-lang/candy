@@ -254,7 +254,10 @@ pub enum Pattern {
     List(Vec<Pattern>),
     // Keys may not contain `NewIdentifier`.
     Struct(HashMap<Pattern, Pattern>),
-    Error { errors: Vec<CompilerError> },
+    Error {
+        child: Option<Box<Pattern>>,
+        errors: Vec<CompilerError>,
+    },
 }
 #[allow(clippy::derive_hash_xor_eq)]
 impl hash::Hash for Pattern {
@@ -427,13 +430,15 @@ impl fmt::Display for Pattern {
                         .join(", "),
                 )
             }
-            Pattern::Error { errors } => {
-                write!(
-                    f,
-                    "{} ({})",
-                    if errors.len() == 1 { "error" } else { "errors" },
-                    errors.iter().map(|error| format!("{error:?}")).join(", "),
-                )
+            Pattern::Error { child, errors } => {
+                write!(f, "{}", if errors.len() == 1 { "error" } else { "errors" })?;
+                for error in errors {
+                    write!(f, "\n  {error:?}")?;
+                }
+                if let Some(child) = child {
+                    write!(f, "\n  fallback: {child}")?;
+                }
+                Ok(())
             }
         }
     }
