@@ -1619,8 +1619,8 @@ mod parse {
                     opening_bracket: Box::new(Rcst::OpeningBracket),
                     fields: vec![],
                     closing_bracket: Box::new(Rcst::ClosingBracket),
-                }
-            ))
+                },
+            )),
         );
         assert_eq!(
             struct_("[foo:bar]", 0, ParseType::Expression),
@@ -1635,10 +1635,10 @@ mod parse {
                         ))),
                         value: Box::new(Rcst::Identifier("bar".to_string())),
                         comma: None,
-                    },],
+                    }],
                     closing_bracket: Box::new(Rcst::ClosingBracket),
-                }
-            ))
+                },
+            )),
         );
         assert_eq!(
             struct_("[foo,bar:baz]", 0, ParseType::Expression),
@@ -1662,8 +1662,8 @@ mod parse {
                         },
                     ],
                     closing_bracket: Box::new(Rcst::ClosingBracket),
-                }
-            ))
+                },
+            )),
         );
         assert_eq!(
             struct_("[foo := [foo]", 0, ParseType::Pattern),
@@ -1699,7 +1699,7 @@ mod parse {
                         child: Box::new(Rcst::OpeningBracket),
                         whitespace: vec![
                             Rcst::Newline("\n".to_string()),
-                            Rcst::Whitespace("  ".to_string())
+                            Rcst::Whitespace("  ".to_string()),
                         ],
                     }),
                     fields: vec![
@@ -1717,8 +1717,8 @@ mod parse {
                             }),
                             whitespace: vec![
                                 Rcst::Newline("\n".to_string()),
-                                Rcst::Whitespace("  ".to_string())
-                            ]
+                                Rcst::Whitespace("  ".to_string()),
+                            ],
                         },
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::StructField {
@@ -1737,14 +1737,14 @@ mod parse {
                                     parts: vec![Rcst::TextPart("Hi".to_string())],
                                     closing_quote: Box::new(Rcst::DoubleQuote),
                                 }),
-                                comma: Some(Box::new(Rcst::Comma))
+                                comma: Some(Box::new(Rcst::Comma)),
                             }),
-                            whitespace: vec![Rcst::Newline("\n".to_string())]
-                        }
+                            whitespace: vec![Rcst::Newline("\n".to_string())],
+                        },
                     ],
                     closing_bracket: Box::new(Rcst::ClosingBracket),
-                }
-            ))
+                },
+            )),
         );
     }
 

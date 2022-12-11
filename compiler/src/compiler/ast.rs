@@ -331,7 +331,7 @@ impl Display for Ast {
                 write!(
                     f,
                     "error:\n{}",
-                    errors.iter().map(|error| format!("  {error}")).join("\n")
+                    errors.iter().map(|error| format!("  {error}")).join("\n"),
                 )?;
                 if let Some(child) = child {
                     write!(f, "\n  fallback: {child}")?;
