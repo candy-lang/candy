@@ -53,7 +53,7 @@ impl std::fmt::Debug for Heap {
                 f,
                 "{address}: {} {}",
                 object.reference_count,
-                object.format(self),
+                address.format_debug(self),
             )?;
         }
         write!(f, "}}")
@@ -94,7 +94,7 @@ impl Heap {
         trace!(
             "RefCount of {address} increased to {}. Value: {}",
             object.reference_count,
-            object.format(self),
+            address.format_debug(self),
         );
     }
     pub fn drop(&mut self, address: Pointer) {
@@ -117,7 +117,7 @@ impl Heap {
             reference_count: 1,
             data: object,
         };
-        trace!("Creating object {} at {address}.", object.format(self));
+        trace!("Creating object at {address}.");
         self.objects.insert(address, object);
         address
     }

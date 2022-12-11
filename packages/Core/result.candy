@@ -1,5 +1,5 @@
 bool = use "..bool"
-conditionals = use "..conditionals"
+[ifElse] = use "..controlFlow"
 [equals] = use "..equality"
 function = use "..function"
 struct = use "..struct"
@@ -47,7 +47,7 @@ mapOrElse result okMapper errorMapper :=
   needs (is result)
   needs (function.is1 okMapper)
   needs (function.is1 errorMapper)
-  conditionals.ifElse
+  ifElse
     equals result.type Ok
     { okMapper result.value }
     { errorMapper result.value }

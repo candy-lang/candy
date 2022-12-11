@@ -26,15 +26,15 @@ lastIndex list :=
   needs (is list)
   ifElse
     (list | isEmpty)
-    result.error "Can't get the last index of an empty list."
-    list | length | int.minus 1 | result.ok
+    { result.error "Can't get the last index of an empty list." }
+    { list | length | int.minus 1 | result.ok }
 isValidIndex list index :=
   needs (is list)
   needs (int.is index)
   ifElse
     (list | isEmpty)
-    False
-    index | int.isNonNegative
+    { False }
+    { index | int.isNonNegative }
   | bool.lazyAnd { index | int.isLessThanOrEqualTo (list | lastIndex | result.unwrap) }
 
 get list index :=

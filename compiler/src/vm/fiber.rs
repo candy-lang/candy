@@ -1,10 +1,9 @@
 use super::{
     channel::{Capacity, Packet},
-    context::{ExecutionController, PanickingUseProvider, UseProvider},
+    context::{ExecutionController, UseProvider},
     heap::{Builtin, Closure, Data, Heap, Pointer, Text},
     ids::ChannelId,
-    tracer::{dummy::DummyTracer, FiberTracer, Tracer},
-    FiberId,
+    tracer::FiberTracer,
 };
 use crate::{
     compiler::{
@@ -99,7 +98,7 @@ impl Fiber {
     pub fn new_for_running_closure(
         heap: Heap,
         closure: Pointer,
-        arguments: &[Pointer],
+        arguments: Vec<Pointer>,
         responsible: hir::Id,
     ) -> Self {
         assert!(matches!(heap.get(closure).data, Data::Closure(_)));
@@ -107,17 +106,7 @@ impl Fiber {
         let mut fiber = Self::new_with_heap(heap);
         let responsible = fiber.heap.create(Data::HirId(responsible));
         fiber.status = Status::Running;
-
-        fiber.data_stack.push(closure);
-        fiber.data_stack.extend(arguments);
-        fiber.data_stack.push(responsible);
-        fiber.run_instruction(
-            &PanickingUseProvider,
-            &mut DummyTracer.for_fiber(FiberId::root()),
-            Instruction::Call {
-                num_args: arguments.len(),
-            },
-        );
+        fiber.call(closure, arguments, responsible);
 
         fiber
     }
@@ -134,7 +123,7 @@ impl Fiber {
         let module_id = Id::new(module, vec![]);
         let mut heap = Heap::default();
         let closure = heap.create_closure(closure);
-        Self::new_for_running_closure(heap, closure, &[], module_id)
+        Self::new_for_running_closure(heap, closure, vec![], module_id)
     }
 
     pub fn tear_down(mut self) -> ExecutionResult {
@@ -251,7 +240,10 @@ impl Fiber {
             } else {
                 panic!("The instruction pointer points to a non-closure.");
             };
-            let instruction = current_body[self.next_instruction.instruction].clone();
+            let instruction = current_body
+                .get(self.next_instruction.instruction)
+                .expect("invalid instruction pointer")
+                .clone();
 
             self.next_instruction.instruction += 1;
             self.run_instruction(use_provider, tracer, instruction);
@@ -278,7 +270,7 @@ impl Fiber {
                 "Data stack: {}",
                 self.data_stack
                     .iter()
-                    .map(|it| it.format(&self.heap))
+                    .map(|it| it.format_debug(&self.heap))
                     .join(", "),
             );
             trace!(
@@ -370,54 +362,37 @@ impl Fiber {
                 self.data_stack.push(top);
             }
             Instruction::Call { num_args } => {
-                let responsible_address = self.data_stack.pop().unwrap();
-                let mut args = vec![];
+                let responsible = self.data_stack.pop().unwrap();
+                let mut arguments = vec![];
                 for _ in 0..num_args {
-                    args.push(self.data_stack.pop().unwrap());
+                    arguments.push(self.data_stack.pop().unwrap());
                 }
-                let callee_address = self.data_stack.pop().unwrap();
+                arguments.reverse();
+                let callee = self.data_stack.pop().unwrap();
 
-                let callee = self.heap.get(callee_address);
-                args.reverse();
+                self.call(callee, arguments, responsible);
+            }
+            Instruction::TailCall {
+                num_locals_to_pop,
+                num_args,
+            } => {
+                let responsible = self.data_stack.pop().unwrap();
+                let mut arguments = vec![];
+                for _ in 0..num_args {
+                    arguments.push(self.data_stack.pop().unwrap());
+                }
+                arguments.reverse();
+                let callee = self.data_stack.pop().unwrap();
+                for _ in 0..num_locals_to_pop {
+                    let address = self.data_stack.pop().unwrap();
+                    self.heap.drop(address);
+                }
 
-                match callee.data.clone() {
-                    Data::Closure(Closure {
-                        captured,
-                        num_args: expected_num_args,
-                        ..
-                    }) => {
-                        if num_args != expected_num_args {
-                            self.panic(
-                                format!("A closure expected {expected_num_args} parameters, but you called it with {num_args} arguments."),
-                                self.heap.get_hir_id(responsible_address),
-                            );
-                            return;
-                        }
-
-                        self.call_stack.push(self.next_instruction);
-                        self.data_stack.append(&mut captured.clone());
-                        for captured in captured {
-                            self.heap.dup(captured);
-                        }
-                        self.data_stack.append(&mut args);
-                        self.data_stack.push(responsible_address);
-                        self.next_instruction =
-                            InstructionPointer::start_of_closure(callee_address);
-                    }
-                    Data::Builtin(Builtin { function: builtin }) => {
-                        self.heap.drop(callee_address);
-                        self.run_builtin_function(&builtin, &args, responsible_address);
-                    }
-                    _ => {
-                        self.panic(
-                            format!(
-                                "You can only call closures and builtins, but you tried to call {}.",
-                                callee.format(&self.heap),
-                            ),
-                            self.heap.get_hir_id(responsible_address),
-                        );
-                    }
-                };
+                // Tail calling a function is basically just a normal call, but
+                // pretending we are our caller.
+                let caller = self.call_stack.pop().unwrap();
+                self.next_instruction = caller;
+                self.call(callee, arguments, responsible);
             }
             Instruction::Return => {
                 self.heap.drop(self.next_instruction.closure);
@@ -499,6 +474,51 @@ impl Fiber {
                 tracer.found_fuzzable_closure(definition, closure, &self.heap);
             }
         }
+    }
+
+    pub fn call(&mut self, callee: Pointer, arguments: Vec<Pointer>, responsible: Pointer) {
+        match &self.heap.get(callee).data {
+            Data::Closure(Closure {
+                captured,
+                num_args: expected_num_args,
+                ..
+            }) => {
+                if arguments.len() != *expected_num_args {
+                    self.panic(
+                        format!(
+                            "A closure expected {expected_num_args} parameters, but you called it with {} arguments.",
+                            arguments.len(),
+                        ),
+                        self.heap.get_hir_id(responsible),
+                    );
+                    return;
+                }
+
+                self.call_stack.push(self.next_instruction);
+                let mut captured = captured.clone();
+                for captured in &captured {
+                    self.heap.dup(*captured);
+                }
+                self.data_stack.append(&mut captured);
+                self.data_stack.append(&mut arguments.clone());
+                self.data_stack.push(responsible);
+                self.next_instruction = InstructionPointer::start_of_closure(callee);
+            }
+            Data::Builtin(Builtin { function: builtin }) => {
+                let builtin = *builtin;
+                self.heap.drop(callee);
+                self.run_builtin_function(&builtin, &arguments, responsible);
+            }
+            _ => {
+                self.panic(
+                    format!(
+                        "You can only call closures and builtins, but you tried to call {}.",
+                        callee.format(&self.heap),
+                    ),
+                    self.heap.get_hir_id(responsible),
+                );
+            }
+        };
     }
 }
 

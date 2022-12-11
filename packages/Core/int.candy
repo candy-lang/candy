@@ -1,6 +1,6 @@
 bool = use "..bool"
 [check] = use "..check"
-conditionals = use "..conditionals"
+[ifElse] = use "..controlFlow"
 [equals] = use "..equality"
 type = use "..type"
 
@@ -72,7 +72,7 @@ isNonNegative value :=
   value | isNegative | bool.not
 absolute value :=
   needs (is value)
-  conditionals.ifElse (isNegative value) { negate value } { value }
+  ifElse (isNegative value) { negate value } { value }
 
 fitsInRustU32 value :=
   needs (is value)
@@ -135,14 +135,14 @@ isOdd value :=
 min valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  conditionals.ifElse
+  ifElse
     (valueA | isLessThanOrEqualTo valueB)
     { valueA }
     { valueB }
 max valueA valueB :=
   needs (is valueA)
   needs (is valueB)
-  conditionals.ifElse
+  ifElse
     (valueA | isGreaterThanOrEqualTo valueB)
     { valueA }
     { valueB }

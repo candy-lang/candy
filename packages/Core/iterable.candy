@@ -31,24 +31,24 @@ isEmpty iterable :=
 ##
 ## These return an iterable with the same length, but different items.
 
-rawMapWithStateHelper = { rawMapWithStateHelper state mapper ->
+generateWithStateHelper = { generateWithStateHelper state mapper ->
   {
     [newItem, newState] = mapper state
     newItem | result.map { newItem ->
-      (newItem, rawMapWithStateHelper newState mapper)
+      (newItem, generateWithStateHelper newState mapper)
     }
   }
 }
-rawMapWithState initialState mapper :=
+generateWithState initialState mapper :=
   # `mapper` receives the previous state and returns the optional item to emit
   # (or none if it's done) and the new state.
   needs (function.is1 mapper)
-  rawMapWithStateHelper rawMapWithStateHelper initialState mapper
+  generateWithStateHelper generateWithStateHelper initialState mapper
 
 map iterable mapper :=
   needs (is iterable)
   needs (function.is1 mapper)
-  iterable | rawMapWithState { previousState ->
+  iterable | generateWithState { previousState ->
     previousState | next | result.map { itemAndRest ->
       [item, rest] = itemAndRest
       (mapper item, rest)
@@ -57,7 +57,7 @@ map iterable mapper :=
 
 withIndex iterable :=
   needs (is iterable)
-  (iterable, 0) | rawMapWithState { previousState ->
+  (iterable, 0) | generateWithState { previousState ->
     [iterable, index] = previousState
     iterable | next | result.map { itemAndRest ->
       [item, rest] = itemAndRest
@@ -105,7 +105,7 @@ sum iterableOfInt :=
   }
 length iterable :=
   needs (is iterable)
-  iterable | map { item -> 1 } | sum | result.unwrapOr 0
+  iterable | map { _ -> 1 } | sum | result.unwrapOr 0
 
 all iterable tester :=
   needs (is iterable)
@@ -150,7 +150,10 @@ any iterable tester :=
 forEach iterable action :=
   needs (is iterable)
   needs (function.is1 action)
-  iterable | map action
+  iterable | foldLeft Nothing { _ item ->
+    action item
+    Nothing
+  }
 
 ## Conversion
 

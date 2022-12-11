@@ -72,6 +72,14 @@ pub enum Instruction {
         num_args: usize, // excluding the responsible argument
     },
 
+    /// Like `Call`, but after popping the stack entries for the call itself, it
+    /// also pops the given number of local stack entries before actually
+    /// executing the call.
+    TailCall {
+        num_locals_to_pop: usize,
+        num_args: usize, // excluding the responsible argument
+    },
+
     /// Returns from the current closure to the original caller. Leaves the data
     /// stack untouched, but pops a caller from the call stack and returns the
     /// instruction pointer to continue where the current function was called.
@@ -168,6 +176,16 @@ impl Instruction {
                 stack.pop(); // responsible
                 stack.pop_multiple(*num_args);
                 stack.pop(); // closure/builtin
+                stack.push(result); // return value
+            }
+            Instruction::TailCall {
+                num_locals_to_pop,
+                num_args,
+            } => {
+                stack.pop(); // responsible
+                stack.pop_multiple(*num_args);
+                stack.pop(); // closure/builtin
+                stack.pop_multiple(*num_locals_to_pop);
                 stack.push(result); // return value
             }
             Instruction::Return => {
@@ -268,6 +286,15 @@ impl Display for Instruction {
             }
             Instruction::Call { num_args } => {
                 write!(f, "call with {num_args} arguments")
+            }
+            Instruction::TailCall {
+                num_locals_to_pop,
+                num_args,
+            } => {
+                write!(
+                    f,
+                    "tail call with {num_locals_to_pop} locals and {num_args} arguments"
+                )
             }
             Instruction::Return => write!(f, "return"),
             Instruction::UseModule { current_module } => {

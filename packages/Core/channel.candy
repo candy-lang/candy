@@ -1,6 +1,6 @@
 bool = use "..bool"
 [equals] = use "..equality"
-[if] = use "..conditionals"
+[if] = use "..controlFlow"
 int = use "..int"
 type = use "..type"
 

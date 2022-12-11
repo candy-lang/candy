@@ -1,5 +1,5 @@
 bool = use "..bool"
-[if] = use "..conditionals"
+[if] = use "..controlFlow"
 
 check condition :=
   # Panics if the `condition` is `False`.

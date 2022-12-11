@@ -240,36 +240,6 @@ impl Data {
         }
     }
 
-    pub fn format(&self, heap: &Heap) -> String {
-        match self {
-            Data::Int(int) => format!("{}", int.value),
-            Data::Text(text) => format!("\"{}\"", text.value),
-            Data::Symbol(symbol) => symbol.value.to_string(),
-            Data::List(List { items }) => format!(
-                "({})",
-                if items.is_empty() {
-                    ",".to_owned()
-                } else {
-                    items.iter().map(|item| item.format(heap)).join(", ")
-                },
-            ),
-            Data::Struct(struct_) => format!(
-                "[{}]",
-                struct_
-                    .iter()
-                    .map(|(key, value)| (key.format(heap), value.format(heap)))
-                    .sorted_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b))
-                    .map(|(key, value)| format!("{}: {}", key, value))
-                    .join(", ")
-            ),
-            Data::HirId(id) => format!("{id:?}"),
-            Data::Closure(_) => "{…}".to_string(),
-            Data::Builtin(builtin) => format!("builtin{:?}", builtin.function),
-            Data::SendPort(port) => format!("sendPort {:?}", port.channel),
-            Data::ReceivePort(port) => format!("receivePort {:?}", port.channel),
-        }
-    }
-
     pub fn children(&self) -> Vec<Pointer> {
         match self {
             Data::Int(_)
@@ -314,13 +284,53 @@ impl Pointer {
     fn hash_with_state<H: Hasher>(&self, heap: &Heap, state: &mut H) {
         heap.get(*self).hash_with_state(heap, state)
     }
+
     pub fn equals(&self, heap: &Heap, other: Self) -> bool {
         if *self == other {
             return true;
         }
         heap.get(*self).equals(heap, heap.get(other))
     }
+
     pub fn format(&self, heap: &Heap) -> String {
-        heap.get(*self).format(heap)
+        self.format_helper(heap, false)
+    }
+    pub fn format_debug(&self, heap: &Heap) -> String {
+        self.format_helper(heap, true)
+    }
+    fn format_helper(&self, heap: &Heap, is_debug: bool) -> String {
+        match &heap.get(*self).data {
+            Data::Int(int) => format!("{}", int.value),
+            Data::Text(text) => format!("\"{}\"", text.value),
+            Data::Symbol(symbol) => symbol.value.to_string(),
+            Data::List(List { items }) => format!(
+                "({})",
+                if items.is_empty() {
+                    ",".to_owned()
+                } else {
+                    items.iter().map(|item| item.format(heap)).join(", ")
+                },
+            ),
+            Data::Struct(struct_) => format!(
+                "[{}]",
+                struct_
+                    .iter()
+                    .map(|(key, value)| (key.format(heap), value.format(heap)))
+                    .sorted_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b))
+                    .map(|(key, value)| format!("{}: {}", key, value))
+                    .join(", ")
+            ),
+            Data::HirId(id) => format!("{id:?}"),
+            Data::Closure(_) => {
+                if is_debug {
+                    format!("{{{self}}}")
+                } else {
+                    "{…}".to_string()
+                }
+            }
+            Data::Builtin(builtin) => format!("builtin{:?}", builtin.function),
+            Data::SendPort(port) => format!("sendPort {:?}", port.channel),
+            Data::ReceivePort(port) => format!("receivePort {:?}", port.channel),
+        }
     }
 }
