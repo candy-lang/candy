@@ -274,7 +274,9 @@ fn compile_expression(
                 .unwrap_or_else(|| {
                     panic!("Destructure expression is missing for destructuring {destructuring}.")
                 });
-            let id = identifier_ids.remove(identifier_id).unwrap();
+            let id = identifier_ids.remove(identifier_id).unwrap_or_else(|| panic!(
+                    "Pattern identifier {identifier_id} is missing for destructuring {destructuring}.",
+                ));
             if identifier_ids.is_empty() {
                 pattern_identifier_ids.remove(destructuring).unwrap();
             }

@@ -239,6 +239,11 @@ impl fmt::Debug for PatternIdentifierId {
         write!(f, "pattern_identifier_{:x}", self.0)
     }
 }
+impl fmt::Display for PatternIdentifierId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "p${}", self.0)
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Pattern {
@@ -399,7 +404,7 @@ impl fmt::Display for Pattern {
         match self {
             Pattern::Int(int) => write!(f, "{int}"),
             Pattern::Text(text) => write!(f, "\"{text:?}\""),
-            Pattern::NewIdentifier(reference) => write!(f, "p${}", reference.0),
+            Pattern::NewIdentifier(reference) => write!(f, "{reference}"),
             Pattern::Symbol(symbol) => write!(f, "{symbol}"),
             Pattern::List(items) => {
                 write!(
