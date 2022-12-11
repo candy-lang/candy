@@ -8,7 +8,7 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
-use tracing::error;
+use tracing::{error, warn};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub struct Module {
@@ -157,14 +157,25 @@ impl Module {
             ],
         })
     }
+    fn try_to_path(&self) -> Option<PathBuf> {
+        let paths = self.to_possible_paths().unwrap_or_else(|| {
+            panic!(
+                "Tried to get content of anonymous module {self} that is not cached by the language server."
+            )
+        });
+        for path in paths {
+            match path.try_exists() {
+                Ok(true) => return Some(path),
+                Ok(false) => warn!("Broken symbolic link: `{path:?}`."),
+                Err(error) if matches!(error.kind(), std::io::ErrorKind::NotFound) => {}
+                Err(_) => error!("Unexpected error when reading file {path:?}."),
+            }
+        }
+        None
+    }
 
     pub fn dump_associated_debug_file(&self, debug_type: &str, content: &str) {
-        let mut path = match self.to_possible_paths() {
-            Some(path) => path,
-            None => return,
-        }
-        .pop()
-        .unwrap();
+        let Some(mut path) = self.try_to_path() else { return; };
         path.set_extension(format!("candy.{}", debug_type));
         fs::write(path, content).unwrap();
     }
@@ -212,15 +223,16 @@ fn get_module_content(db: &dyn ModuleDb, module: Module) -> Option<Arc<Vec<u8>>>
         return Some(content);
     };
 
-    for path in module.to_possible_paths().expect(
-        "Tried to get content of anonymous module that is not cached by the language server.",
-    ) {
+    let paths = module.to_possible_paths().unwrap_or_else(|| {
+        panic!(
+            "Tried to get content of anonymous module {module} that is not cached by the language server."
+        )
+    });
+    for path in paths {
         match fs::read(path.clone()) {
             Ok(content) => return Some(Arc::new(content)),
             Err(error) if matches!(error.kind(), std::io::ErrorKind::NotFound) => {}
-            Err(_) => {
-                error!("Unexpected error when reading file {:?}.", path);
-            }
+            Err(_) => error!("Unexpected error when reading file {path:?}."),
         }
     }
     None
