@@ -1498,8 +1498,10 @@ mod parse {
 
             // Colon.
             let (input, colon, has_colon) = match colon(input) {
-                Some((input, colon)) => (input, colon, true),
-                None => (
+                Some((new_input, colon)) if colon_equals_sign(input).is_none() => {
+                    (new_input, colon, true)
+                }
+                _ => (
                     input,
                     Rcst::Error {
                         unparsable_input: "".to_string(),
@@ -1662,6 +1664,27 @@ mod parse {
                     closing_bracket: Box::new(Rcst::ClosingBracket),
                 }
             ))
+        );
+        assert_eq!(
+            struct_("[foo := [foo]", 0, ParseType::Pattern),
+            Some((
+                ":= [foo]",
+                Rcst::Struct {
+                    opening_bracket: Box::new(Rcst::OpeningBracket),
+                    fields: vec![Rcst::StructField {
+                        key_and_colon: None,
+                        value: Box::new(Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Identifier("foo".to_string())),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                        }),
+                        comma: None,
+                    }],
+                    closing_bracket: Box::new(Rcst::Error {
+                        unparsable_input: "".to_string(),
+                        error: RcstError::StructNotClosed,
+                    }),
+                },
+            )),
         );
         // [
         //   foo: bar,
