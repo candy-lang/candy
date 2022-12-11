@@ -1,5 +1,5 @@
 bool = use "..bool"
-[ifElse] = use "..conditionals"
+[ifElse] = use "..controlFlow"
 [equals] = use "..equality"
 function = use "..function"
 int = use "..int"
