@@ -41,7 +41,7 @@ Candy blurs the line between those stages, for example, by replacing compile-tim
 
 - **Fuzzing instead of traditional types.**
   In Candy, functions have to specify their needs _exactly._
-  As you type, the tooling automatically tests your code with many input to see if one breaks the code:
+  As you type, the tooling automatically tests your code with many inputs to see if one breaks the code:
 
   ```candy
   foo a =             # If you pass a = 0,
@@ -164,6 +164,9 @@ We already have a language server that provides some tooling.
 
 - more efficient argument preparation in LIR function call (so we don't have to push references if the evaluation order doesn't change conceptually)
 - fix evaluation order of pipe expression by keeping it in the AST
+- shorter ID formatting for generated debug files
+- support destructuring in lambda parameters
+- find references in patterns
 
 ## How to use Candy
 
