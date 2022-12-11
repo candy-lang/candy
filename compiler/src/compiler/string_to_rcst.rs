@@ -734,7 +734,7 @@ mod parse {
         #[instrument(level = "trace")]
         fn parse(self, input: &str, indentation: usize) -> Option<(&str, Rcst)> {
             match self {
-                ParseType::Expression => expression(input, indentation, true, true),
+                ParseType::Expression => expression(input, indentation, false, true, true),
                 ParseType::Pattern => pattern(input, indentation),
             }
         }
@@ -744,14 +744,15 @@ mod parse {
     fn expression(
         input: &str,
         indentation: usize,
-        allow_call_and_assignment: bool,
+        allow_assignment: bool,
+        allow_call: bool,
         allow_pipe: bool,
     ) -> Option<(&str, Rcst)> {
         // If we start the call list with `if … else …`, the formatting looks
         // weird. Hence, we start with a single `None`.
         let (mut input, mut result) = None
             .or_else(|| {
-                if allow_call_and_assignment {
+                if allow_assignment {
                     assignment(input, indentation)
                 } else {
                     None
@@ -765,7 +766,7 @@ mod parse {
             .or_else(|| parenthesized(input, indentation))
             .or_else(|| lambda(input, indentation))
             .or_else(|| {
-                if allow_call_and_assignment {
+                if allow_call {
                     call(input, indentation)
                 } else {
                     None
@@ -822,7 +823,7 @@ mod parse {
                     } else {
                         indentation
                     };
-                    let (new_input, call) = expression(new_input, indentation, true, false)
+                    let (new_input, call) = expression(new_input, indentation, false, true, false)
                         .unwrap_or_else(|| {
                             let error = Rcst::Error {
                                 unparsable_input: "".to_string(),
@@ -850,11 +851,11 @@ mod parse {
     #[test]
     fn test_expression() {
         assert_eq!(
-            expression("foo", 0, true, true),
+            expression("foo", 0, true, true, true),
             Some(("", Rcst::Identifier("foo".to_string())))
         );
         assert_eq!(
-            expression("(foo Bar)", 0, false, true),
+            expression("(foo Bar)", 0, false, false, true),
             Some((
                 "",
                 Rcst::Parenthesized {
@@ -873,7 +874,7 @@ mod parse {
         // foo
         //   .bar
         assert_eq!(
-            expression("foo\n  .bar", 0, true, true),
+            expression("foo\n  .bar", 0, true, true, true),
             Some((
                 "",
                 Rcst::StructAccess {
@@ -892,13 +893,13 @@ mod parse {
         // foo
         // .bar
         assert_eq!(
-            expression("foo\n.bar", 0, true, true),
+            expression("foo\n.bar", 0, true, true, true),
             Some(("\n.bar", Rcst::Identifier("foo".to_string()))),
         );
         // foo
         // | bar
         assert_eq!(
-            expression("foo\n| bar", 0, true, true),
+            expression("foo\n| bar", 0, true, true, true),
             Some((
                 "",
                 Rcst::Pipe {
@@ -917,7 +918,7 @@ mod parse {
         // foo
         // | bar baz
         assert_eq!(
-            expression("foo\n| bar baz", 0, true, true),
+            expression("foo\n| bar baz", 0, true, true, true),
             Some((
                 "",
                 Rcst::Pipe {
@@ -945,7 +946,7 @@ mod parse {
     #[instrument(level = "trace")]
     fn run_of_expressions(input: &str, indentation: usize) -> Option<(&str, Vec<Rcst>)> {
         let mut expressions = vec![];
-        let (mut input, expr) = expression(input, indentation, false, false)?;
+        let (mut input, expr) = expression(input, indentation, false, false, false)?;
         expressions.push(expr);
 
         let mut has_multiline_whitespace = false;
@@ -960,7 +961,8 @@ mod parse {
             let last = expressions.pop().unwrap();
             expressions.push(last.wrap_in_whitespace(whitespace));
 
-            let (i, expr) = match expression(i, indentation, has_multiline_whitespace, false) {
+            let (i, expr) = match expression(i, indentation, false, has_multiline_whitespace, false)
+            {
                 Some(it) => it,
                 None => {
                     let fallback = closing_parenthesis(i)
@@ -1735,7 +1737,7 @@ mod parse {
         };
         let opening_parenthesis = opening_parenthesis.wrap_in_whitespace(whitespace);
 
-        let (input, inner) = expression(input, inner_indentation, true, true).unwrap_or((
+        let (input, inner) = expression(input, inner_indentation, false, true, true).unwrap_or((
             input,
             Rcst::Error {
                 unparsable_input: "".to_string(),
@@ -1841,7 +1843,7 @@ mod parse {
                 });
             }
 
-            match expression(input, indentation, true, true) {
+            match expression(input, indentation, true, true, true) {
                 Some((new_input, expression)) => {
                     input = new_input;
 
@@ -1887,7 +1889,7 @@ mod parse {
                 }
 
                 input = i;
-                match expression(input, indentation + 1, false, false) {
+                match expression(input, indentation + 1, false, false, false) {
                     Some((i, parameter)) => {
                         input = i;
                         parameters.push(parameter);
@@ -1914,7 +1916,7 @@ mod parse {
 
         let (input, mut body, whitespace_before_closing_curly_brace, closing_curly_brace) = {
             let input_before_parsing_expression = i;
-            let (i, body_expression) = match expression(i, indentation + 1, true, true) {
+            let (i, body_expression) = match expression(i, indentation + 1, true, true, true) {
                 Some((i, expression)) => (i, vec![expression]),
                 None => (i, vec![]),
             };
@@ -2129,7 +2131,7 @@ mod parse {
                 (input, assignment_sign, body)
             }
         } else {
-            match comment(input).or_else(|| expression(input, indentation, true, true)) {
+            match comment(input).or_else(|| expression(input, indentation, false, true, true)) {
                 Some((input, expression)) => (input, assignment_sign, vec![expression]),
                 None => (
                     input_after_assignment_sign,
