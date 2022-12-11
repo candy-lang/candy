@@ -207,7 +207,7 @@ fn raw_build(
     for CompilerError { span, payload, .. } in errors {
         let (start_line, start_col) = db.offset_to_lsp(module.clone(), span.start);
         let (end_line, end_col) = db.offset_to_lsp(module.clone(), span.end);
-        warn!("{start_line}:{start_col} – {end_line}:{end_col}: {payload:?}");
+        warn!("{start_line}:{start_col} – {end_line}:{end_col}: {payload}");
     }
 
     let mir = db.mir(module.clone(), tracing.clone()).unwrap();
