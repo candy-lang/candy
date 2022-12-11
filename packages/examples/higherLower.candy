@@ -1,16 +1,7 @@
 # Repeatedly asks you for a guess and tells you whether the secret number is
 # higher or lower. Exits once you found the secret number.
 
-core = use "...Core"
-async = core.async
-await = core.await
-channel = core.channel
-equals = core.equals
-ifElse = core.ifElse
-int = core.int
-result = core.result
-run = core.function.run
-text = core.text
+[async, await, channel, equals, ifElse, int, result, run, text] = use "...Core"
 
 main := { environment ->
   print message =

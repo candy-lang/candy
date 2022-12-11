@@ -1,6 +1,6 @@
 bool = use "..bool"
 conditionals = use "..conditionals"
-equals = (use "..equality").equals
+[equals] = use "..equality"
 function = use "..function"
 struct = use "..struct"
 

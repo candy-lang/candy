@@ -1,6 +1,6 @@
 channel = use "..channel"
 function = use "..function"
-if = (use "..conditionals").if
+[if] = use "..conditionals"
 
 parallel body :=
   needs (function.is1 body) "The `body` should be a function taking a nursery."

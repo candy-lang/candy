@@ -1,5 +1,5 @@
 bool = use "..bool"
-equals = (use "..equality").equals
+[equals] = use "..equality"
 function = use "..function"
 int = use "..int"
 result = use "..result"
@@ -33,9 +33,7 @@ isEmpty iterable :=
 
 rawMapWithStateHelper = { rawMapWithStateHelper state mapper ->
   {
-    result = mapper state
-    newItem = result | list.get 0
-    newState = result | list.get 1
+    [newItem, newState] = mapper state
     newItem | result.map { newItem ->
       (newItem, rawMapWithStateHelper newState mapper)
     }
@@ -52,8 +50,7 @@ map iterable mapper :=
   needs (function.is1 mapper)
   iterable | rawMapWithState { previousState ->
     previousState | next | result.map { itemAndRest ->
-      item = itemAndRest | list.get 0
-      rest = itemAndRest | list.get 1
+      [item, rest] = itemAndRest
       (mapper item, rest)
     }
   }
@@ -61,11 +58,9 @@ map iterable mapper :=
 withIndex iterable :=
   needs (is iterable)
   (iterable, 0) | rawMapWithState { previousState ->
-    iterable = previousState | list.get 0
-    index = previousState | list.get 1
+    [iterable, index] = previousState
     iterable | next | result.map { itemAndRest ->
-      item = itemAndRest | list.get 0
-      rest = itemAndRest | list.get 1
+      [item, rest] = itemAndRest
       ((item, index), (rest, index | int.add 1))
     }
   }
@@ -77,8 +72,7 @@ foldLeftHelper = { foldLeftHelper iterable value combine ->
   iterable
   | next
   | result.map { it ->
-    currentItem = it | list.get 0
-    remainingIterable = it | list.get 1
+    [currentItem, remainingIterable] = it
     newValue = combine value currentItem
     foldLeftHelper foldLeftHelper remainingIterable newValue combine
   }
@@ -97,8 +91,7 @@ reduceLeft iterable combine :=
   | next
   | result.mapError { _ -> "Can't `reduceLeft` an empty iterable" }
   | result.map { it ->
-    currentItem = it | list.get 0
-    remainingIterable = it | list.get 1
+    [currentItem, remainingIterable] = it
     remainingIterable | foldLeft currentItem combine
   }
 # TODO: `reduceRight`
@@ -137,8 +130,7 @@ any iterable tester :=
 
 # whereWithStateHelper = { whereWithStateHelper iterable state tester ->
 #   iterable | result.map { it ->
-#     currentItem = it | list.get 0
-#     remainingIterable = it | list.get 1
+#     [currentItem, remainingIterable] = it
 #     (
 #       mapper currentItem,
 #       mapHelper mapHelper remainingIterable mapper,

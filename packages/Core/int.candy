@@ -1,7 +1,7 @@
 bool = use "..bool"
-check = (use "..check").check
+[check] = use "..check"
 conditionals = use "..conditionals"
-equals = (use "..equality").equals
+[equals] = use "..equality"
 type = use "..type"
 
 is value := type.is value Int
