@@ -246,7 +246,7 @@ identity a = a
 You can call functions by writing their name followed by the arguments.
 Grouping using parentheses is only necessary if you have nested calls.
 
-```
+```candy
 five = identity 5
 five = identity (identity 5)
 error = identity identity 5  # Error because the first `identity` is called with two arguments.
@@ -255,7 +255,7 @@ error = identity identity 5  # Error because the first `identity` is called with
 You can also split arguments across multiple lines using indentation.
 This allows you to omit parentheses for nested calls.
 
-```
+```candy
 foo = add
   subtract 5 3
   multiply
@@ -274,7 +274,7 @@ Modules are self-contained units of code that choose what to expose to the outsi
 Modules correspond either to single candy files or directories containing a single file that is named just `_.candy`.
 For example, a Candy project might look like this:
 
-```
+```candy
 main.candy
 green/
   _.candy
@@ -289,7 +289,7 @@ red/
 
 This directory structure corresponds to the following module hierarchy:
 
-```
+```candy
 main        # from main.candy
 green       # from green/_.candy
   brown     # from green/brown.candy
@@ -303,7 +303,7 @@ Inside a module, top-level variable definitions can use a `:=` instead of `=` to
 In each module, there automatically exists a `use` function that will import other modules from the module tree.
 You pass it a text that describes what module to import.
 
-```
+```candy
 # inside red/yellow/_.candy
 
 foo = use ".purple"  # imports the purple child module
@@ -351,12 +351,12 @@ The `useAsset` also allows you to import arbitrary non-Candy files that are part
 In some cases, it makes more sense to express some data in other formats.
 For example, you might want to store user-facing translations for your program in a JSON file.
 
-```
+```plaintext
 main.candy
 translations.json
 ```
 
-```
+```candy
 # inside main.candy
 
 translations = json.parse (useAsset "..translations.json")
