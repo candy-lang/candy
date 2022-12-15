@@ -34,6 +34,7 @@ Note that not all of the features described here are implemented or even finaliz
 - [Comments](#comments)
 - [Panics](#panics)
 - [Needs](#needs)
+- [Destructuring](#destructuring)
 - [Pattern Matching](#pattern-matching)
 - [Concurrency](#concurrency)
   - [Channels](#channels)
@@ -454,6 +455,37 @@ If an input crashes in a way that your code is at fault, you will see a hint.
 mySqrt a =               # If you pass `a = -1`,
   needs (core.int.is a)  # this needs succeeds because `core.int.is -1 = True`,
   core.int.sqrt a        # but calling `core.int.sqrt -1` panics: If you want to take the square root of a negative integer, check out the `ComplexNumbers` package.
+```
+
+## Destructuring
+
+Instead of using `.` to access fields of a struct, Candy also supports destructuring:
+
+```candy
+# Using struct access:
+core = use "Core"
+ifElse = core.ifElse
+int = core.int
+list = core.list
+
+# Using destructuring:
+[ifElse, int, list] = use "Core"
+# This uses the shorthand syntax which is equivalent to:
+[IfElse: ifElse, Int: int, List: list] = use "Core"
+```
+
+If any of the fields you're trying to destructure doesn't exist, the code panics.
+
+Destructuring works for lists, too.
+The destructured list must have the same number of items as your pattern.
+
+```candy
+(foo, bar) = (Foo, Bar)
+
+(foo,) = (Foo, Bar)           # Panics: Expected 1 item, got 2.
+(foo, bar, baz) = (Foo, Bar)  # Panics: Expected 3 items, got 2.
+
+(123, bar) = (Foo, Bar)       # Panics: Expected `123`, got `Foo`.
 ```
 
 ## Pattern Matching
