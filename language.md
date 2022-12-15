@@ -268,7 +268,7 @@ TODO: Piping
 ## Modules
 
 For bigger project it becomes necessary to split code into multiple files.
-In Candy, *modules* are a unit of composition.
+In Candy, _modules_ are a unit of composition.
 Modules are self-contained units of code that choose what to expose to the outside world.
 
 Modules correspond either to single candy files or directories containing a single file that is named just `_.candy`.
@@ -385,7 +385,7 @@ Instead of types, Candy has a special function-like primitive called `needs`.
 Similar to `assert`s in other languages, `needs` accept a symbol that has to be either `True` or `False`.
 
 Functions can use `needs` to specify requirements for their arguments.
-Essentially, by defining `needs`, a function can *reject* certain inputs and mark the crash as the fault of the caller.
+Essentially, by defining `needs`, a function can _reject_ certain inputs and mark the crash as the fault of the caller.
 For example, here's a function that only accepts integers:
 
 ```candy
@@ -400,7 +400,7 @@ bar = foo A  # error
 ```
 
 Note that there is a difference between functions written as parameterized variables (`foo a = a`) and functions written as closures (`foo = { a -> a }`).
-`needs` always refer to the surrounding *parameterized variable*.
+`needs` always refer to the surrounding _parameterized variable_.
 Consequently, closures can't reject inputs, but they also don't promise that they can handle every input correctly.
 
 ```candy
@@ -429,7 +429,7 @@ foo Hey  # Calling `foo Hey` panics: Life's not fair.
 
 Here are some recommended guidelines for writing reasons:
 
-- For `needs` that only check the type, you typically don't need a reason. 
+- For `needs` that only check the type, you typically don't need a reason.
 - Try to keep the reason short and simple.
 - Phrase the reason as a self-contained sentence, including a period at the end.
 - Write concrete references such as function or parameter names in backticks.
@@ -477,8 +477,8 @@ foo = bar 5
 
 ## Concurrency
 
-Candy supports a lightweight version of threads called *fibers*.
-To enforce structured concurrency, they can only be spawned using a special concurrency object called the *nursery*.
+Candy supports a lightweight version of threads called _fibers_.
+To enforce structured concurrency, they can only be spawned using a special concurrency object called the _nursery_.
 In the following code, the surrounding call to `core.parallel` only exits when all fibers inside have completed.
 
 Note: The actual `print` works differently, using [capabilities](#environment-and-capabilities).
@@ -499,7 +499,7 @@ The only exception is if you pass it a nursery, which it can use to spawn other 
 
 Channels can be used to communicate between fibers.
 You can think of a channel like a conveyer belt or a pipe:
-It has a *send end*, which you can use to put messages into it, and it has a *receive end*, which you can use to read messages from it.
+It has a _send end_, which you can use to put messages into it, and it has a _receive end_, which you can use to read messages from it.
 A channel also has a capacity, which indicates how many messages it can hold simultaneously.
 
 ```candy
@@ -516,7 +516,7 @@ core.channel.receive receivePort  # Bar
 There is no guaranteed ordering between messages sent by multiple fibers, but messages coming from the same fiber are guaranteed to arrive in the same order they were sent.
 
 All channel operations are blocking.
-Thus, channels also function as a synchronization primitive and can generate *backpressure*.
+Thus, channels also function as a synchronization primitive and can generate _backpressure_.
 
 ```candy
 core.parallel { nursery ->
@@ -560,7 +560,7 @@ For example, on desktop platforms, the environment looks something like this:
 ]
 ```
 
-Channels also function as *capabilities* here:
+Channels also function as _capabilities_ here:
 If you don't pass the stdout channel to a function, there's no way for it to print anything.
 This is especially useful for more "powerful" capabilities like accessing the file system or network:
 When using a package, without reading its source code, you can be confident that it won't delete your files under some special circumstances.
