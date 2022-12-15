@@ -1,10 +1,40 @@
 core = use "...Core"
+bool = core.bool
+ifElse = core.ifElse
 iterable = core.iterable
+list = core.list
+result = core.result
+
+splitWhereFirst iter checker =
+  # Splits the iterable into a list and an iterable of the remaining items. The
+  # matching item itself is still the first item of the remaining iterable.
+  ✨.print "Getting leading items"
+  firstPart = iter
+  | iterable.takeUntil { item -> checker item }
+  | iterable.toList
+  ✨.print "Turned into list"
+  (firstPart, iter | iterable.skip (firstPart | list.length))
+
+split iter delimeter = iterable.newWithState iter { state ->
+  state | iterable.takeUntil { item -> core.equals item delimeter }
+  state | iterable.next | result.map {
+
+  }
+}
 
 main := { env ->
   print = { message -> core.channel.send env.stdout message }
 
-  ("Hello", "World")
+  foo = "Hello, world! This is some long text. Bla bla blub."
+  | core.text.characters
   | iterable.fromList
-  | iterable.forEach { item -> print item }
+  #| splitWhereFirst { c ->
+  #  ✨.print c
+  #  core.equals c ","
+  #}
+  #✨.print "Hi"
+  #✨.print foo
+  | iterable.forEach { item ->
+    print item
+  }
 }

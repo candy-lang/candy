@@ -31,10 +31,10 @@ isEmpty iterable :=
 newWithStateHelper = { newWithStateHelper state mapper ->
   {
     (mapper state) | result.map { result ->
-      ✨.print ("Result:", result)
+      #✨.print ("Result:", result)
       newItem = result | list.get 0
       newState = result | list.get 1
-      ✨.print ("New state:", newState)
+      #✨.print ("New state:", newState)
       (newItem, newWithStateHelper newWithStateHelper newState mapper)
     }
   }
@@ -57,7 +57,7 @@ map iterable mapper :=
   needs (function.is1 mapper)
   newWithState iterable { previousState ->
     previousState | next | result.map { itemAndRest ->
-      ✨.print ("Item and rest", itemAndRest)
+      #✨.print ("Item and rest", itemAndRest)
       item = itemAndRest | list.get 0
       rest = itemAndRest | list.get 1
       (mapper item, rest)
@@ -141,23 +141,38 @@ any iterable tester :=
 
 ## Filtering
 
-# whereWithStateHelper = { whereWithStateHelper iterable state tester ->
-#   iterable | result.map { it ->
-#     currentItem = it | list.get 0
-#     remainingIterable = it | list.get 1
-#     (
-#       mapper currentItem,
-#       mapHelper mapHelper remainingIterable mapper,
-#     )
-#   }
-# }
-# whereWithState iterable initialState tester :=
-#   needs (is iterable)
-#   needs (function.is2 tester)
-#   whereWithStateHelper whereWithStateHelper iterable initialState tester
-# where iterable tester :=
-#   needs (is iterable)
-#   needs (function.is1 tester)
+whereHelper = { whereHelper iterable tester ->
+  newWithState iterable { iterable ->
+    iterable
+    | next
+    | result.flatMap { itemAndRest ->
+      item = itemAndRest | list.get 0
+      rest = itemAndRest | list.get 1
+      ifElse (tester item) { result.ok itemAndRest } { whereHelper rest tester | next }
+    }
+  }
+}
+where iterable tester :=
+  needs (is iterable)
+  needs (function.is1 tester)
+  whereHelper whereHelper iterable tester
+
+takeWhile iterable tester = newWithState iterable { iterable ->
+  iterable
+  | next
+  | result.flatMap { itemAndRest ->
+    item = itemAndRest | list.get 0
+    ifElse (tester item) { result.ok itemAndRest } { result.error Empty }
+  }
+}
+
+takeUntil iterable tester = iterable | takeWhile { item -> tester item | bool.not }
+
+skip iterable n :=
+  needs (is iterable)
+  needs (int.is n)
+  needs (int.isNonNegative n)
+  ifElse (equals n 0) { iterable } { skip iterable (int.subtract n 1) }
 
 ## Action
 
@@ -176,19 +191,23 @@ fromList l :=
   # iterable | function.run | result.map { it -> it | list.get 0 }
   # The state contains the list and an index.
   newWithState (l, 0) { state ->
-    ✨.print state
+    #✨.print state
     l = state | list.get 0
     index = state | list.get 1
-    ✨.print l
+    #✨.print l
     ifElse (l | list.isValidIndex index) {
-      ✨.print Ok
+      #✨.print Ok
       result.ok (list.get l index, (l, index | int.add 1))
     } {
-      ✨.print Err
+      #✨.print Err
       result.error Empty
     }
   }
 
 toList iterable :=
+  ✨.print "Turning iterable to list"
   needs (is iterable)
-  iterable | foldLeft (,) { result item -> result | list.append item }
+  iterable | foldLeft (,) { result item ->
+    ✨.print ("Appending to list", result, item)
+    result | list.append item
+  }
