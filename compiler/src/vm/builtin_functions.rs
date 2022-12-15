@@ -58,6 +58,7 @@ impl Fiber {
             BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
             BuiltinFunction::TextContains => self.heap.text_contains(args),
             BuiltinFunction::TextEndsWith => self.heap.text_ends_with(args),
+            BuiltinFunction::TextFromUtf8 => self.heap.text_from_utf8(args),
             BuiltinFunction::TextGetRange => self.heap.text_get_range(args),
             BuiltinFunction::TextIsEmpty => self.heap.text_is_empty(args),
             BuiltinFunction::TextLength => self.heap.text_length(args),
@@ -428,6 +429,24 @@ impl Heap {
     fn text_ends_with(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text, suffix: Text| {
             Return(self.create_bool(text.value.ends_with(&suffix.value)))
+        })
+    }
+    fn text_from_utf8(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |bytes: List| {
+            let bytes = bytes
+                .items
+                .iter()
+                .map(|&it| {
+                    let int: Int = self.get(it).data.clone().try_into()?;
+                    int.value
+                        .to_u8()
+                        .ok_or_else(|| format!("Number is not a byte: {}.", int.value))
+                })
+                .try_collect()?;
+            let result = String::from_utf8(bytes)
+                .map(|string| self.create_text(string))
+                .map_err(|_| self.create_text("Invalid UTF-8.".to_string()));
+            Return(self.create_result(result))
         })
     }
     fn text_get_range(&mut self, args: &[Pointer]) -> BuiltinResult {

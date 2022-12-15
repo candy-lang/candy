@@ -2,11 +2,23 @@ bool = use "..bool"
 [ifElse] = use "..controlFlow"
 [equals] = use "..equality"
 int = use "..int"
+iterable = use "..iterable"
 list = use "..list"
 struct = use "..struct"
 type = use "..type"
 
 is value := type.is value Text
+
+fromUtf8 bytes :=
+  needs (list.is bytes)
+  # TODO: Add this when it runs faster.
+  # needs (bytes | iterable.fromList | iterable.all { byte ->
+  #   bool.lazyAnd (int.is byte) {
+  #     bool.and (byte | int.isNonNegative) (byte | int.isLessThan 256)
+  #   }
+  # })
+
+  bytes | ✨.textFromUtf8
 
 isEmpty text :=
   needs (is text)

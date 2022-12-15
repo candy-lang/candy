@@ -1,2 +1,4 @@
-day1simple := use ".day1simple.txt"
-day1 := use ".day1.txt"
+[result, text] = use "...Core"
+
+day1simple := use ".day1simple.txt" | text.fromUtf8 | result.unwrap
+day1 := use ".day1.txt" | text.fromUtf8 | result.unwrap
