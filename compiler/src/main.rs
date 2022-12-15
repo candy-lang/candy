@@ -204,10 +204,15 @@ fn raw_build(
 
     let mut errors = vec![];
     hir.collect_errors(&mut errors);
-    for CompilerError { span, payload, .. } in errors {
+    for CompilerError {
+        module,
+        span,
+        payload,
+    } in errors
+    {
         let (start_line, start_col) = db.offset_to_lsp(module.clone(), span.start);
         let (end_line, end_col) = db.offset_to_lsp(module.clone(), span.end);
-        warn!("{start_line}:{start_col} – {end_line}:{end_col}: {payload:?}");
+        warn!("{module}:{start_line}:{start_col} – {end_line}:{end_col}: {payload}");
     }
 
     let mir = db.mir(module.clone(), tracing.clone()).unwrap();
@@ -335,7 +340,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         platform,
         &heap,
     );
-    vm.set_up_for_running_closure(heap, main, &[environment], Id::platform());
+    vm.set_up_for_running_closure(heap, main, vec![environment], Id::platform());
     loop {
         match vm.status() {
             Status::CanRun => {

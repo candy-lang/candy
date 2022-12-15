@@ -1,0 +1,29 @@
+bool = use "..bool"
+[equals] = use "..equality"
+function = use "..function"
+
+ifElse condition then else :=
+  needs (bool.is condition)
+  needs (function.is0 then)
+  needs (function.is0 else)
+  ✨.ifElse condition then else
+
+if condition then :=
+  needs (bool.is condition)
+  needs (function.is0 then)
+  ifElse condition then {}
+
+## TODO: Support breaking with a value as soon as tags are supported.
+## TODO: Support looping with a state.
+loopRec = { loopRec body ->
+  result = function.run body
+  needs
+    ((result | equals Continue) | bool.or (result | equals Break))
+    "The `body` has to return `Continue` or `Break`."
+  if (result | equals Continue) {
+    loopRec loopRec body
+  }
+}
+loop body :=
+  needs (function.is0 body)
+  loopRec loopRec body

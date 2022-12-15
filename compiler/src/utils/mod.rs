@@ -18,6 +18,15 @@ impl<T: CountableId> IdGenerator<T> {
         T::from_usize(id)
     }
 }
+impl<T: CountableId> Default for IdGenerator<T> {
+    fn default() -> Self {
+        Self {
+            next_id: 0,
+            _data: Default::default(),
+        }
+    }
+}
+
 pub trait CountableId {
     fn from_usize(id: usize) -> Self;
     fn to_usize(&self) -> usize;

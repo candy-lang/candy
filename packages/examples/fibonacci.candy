@@ -1,6 +1,4 @@
-core = use "...Core"
-ifElse = core.ifElse
-int = core.int
+[ifElse, int] = use "...Core"
 
 fibRec = { fibRec n ->
   ifElse (n | int.isLessThan 2) { n } {

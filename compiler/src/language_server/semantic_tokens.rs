@@ -38,7 +38,7 @@ lazy_static! {
 #[derive(Debug, EnumIter, Hash, PartialEq, Eq, Clone, Copy)]
 enum SemanticTokenType {
     Parameter,
-    Assignment,
+    Variable,
     Symbol,
     Function,
     Comment,
@@ -57,7 +57,7 @@ impl SemanticTokenType {
     fn as_lsp(&self) -> lsp_types::SemanticTokenType {
         match self {
             SemanticTokenType::Parameter => lsp_types::SemanticTokenType::PARAMETER,
-            SemanticTokenType::Assignment => lsp_types::SemanticTokenType::VARIABLE,
+            SemanticTokenType::Variable => lsp_types::SemanticTokenType::VARIABLE,
             SemanticTokenType::Symbol => lsp_types::SemanticTokenType::ENUM_MEMBER,
             SemanticTokenType::Function => lsp_types::SemanticTokenType::FUNCTION,
             SemanticTokenType::Comment => lsp_types::SemanticTokenType::COMMENT,
@@ -121,7 +121,7 @@ impl<'a> Context<'a> {
             self.cursor,
         );
 
-        let definition_modifier = (type_ == SemanticTokenType::Assignment) as u32;
+        let definition_modifier = (type_ == SemanticTokenType::Variable) as u32;
         let readonly_modifier = 0b10;
         self.tokens.push(SemanticToken {
             delta_line: start.line - self.cursor.line,
@@ -170,7 +170,7 @@ impl<'a> Context<'a> {
             }
             CstKind::Identifier { .. } => self.add_token(
                 cst.span.clone(),
-                token_type_for_identifier.unwrap_or(SemanticTokenType::Function),
+                token_type_for_identifier.unwrap_or(SemanticTokenType::Variable),
             ),
             CstKind::Symbol { .. } => self.add_token(cst.span.clone(), SemanticTokenType::Symbol),
             CstKind::Int { .. } => self.add_token(cst.span.clone(), SemanticTokenType::Number),
@@ -219,11 +219,11 @@ impl<'a> Context<'a> {
                 closing_parenthesis,
             } => {
                 self.visit_cst(opening_parenthesis, None);
-                self.visit_csts(items, None);
+                self.visit_csts(items, token_type_for_identifier);
                 self.visit_cst(closing_parenthesis, None);
             }
             CstKind::ListItem { value, comma } => {
-                self.visit_cst(value, None);
+                self.visit_cst(value, token_type_for_identifier);
                 if let Some(comma) = comma {
                     self.visit_cst(comma, None);
                 }
@@ -234,18 +234,19 @@ impl<'a> Context<'a> {
                 closing_bracket,
             } => {
                 self.visit_cst(opening_bracket, None);
-                self.visit_csts(fields, None);
+                self.visit_csts(fields, token_type_for_identifier);
                 self.visit_cst(closing_bracket, None);
             }
             CstKind::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => {
-                self.visit_cst(key, None);
-                self.visit_cst(colon, None);
-                self.visit_cst(value, None);
+                if let Some(box (key, colon)) = key_and_colon {
+                    self.visit_cst(key, token_type_for_identifier);
+                    self.visit_cst(colon, None);
+                }
+                self.visit_cst(value, token_type_for_identifier);
                 if let Some(comma) = comma {
                     self.visit_cst(comma, None);
                 }
@@ -253,7 +254,10 @@ impl<'a> Context<'a> {
             CstKind::StructAccess { struct_, dot, key } => {
                 self.visit_cst(struct_, None);
                 self.visit_cst(dot, None);
-                self.visit_cst(key, Some(SemanticTokenType::Symbol));
+                self.visit_cst(
+                    key,
+                    Some(token_type_for_identifier.unwrap_or(SemanticTokenType::Symbol)),
+                );
             }
             CstKind::Lambda {
                 opening_curly_brace,
@@ -270,12 +274,12 @@ impl<'a> Context<'a> {
                 self.visit_cst(closing_curly_brace, None);
             }
             CstKind::Assignment {
-                name,
+                name_or_pattern,
                 parameters,
                 assignment_sign,
                 body,
             } => {
-                self.visit_cst(name, Some(SemanticTokenType::Assignment));
+                self.visit_cst(name_or_pattern, Some(SemanticTokenType::Variable));
                 self.visit_csts(&parameters[..], Some(SemanticTokenType::Parameter));
                 self.visit_cst(assignment_sign, None);
                 self.visit_csts(body, None);

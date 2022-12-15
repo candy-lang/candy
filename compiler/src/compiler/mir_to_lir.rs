@@ -39,13 +39,23 @@ fn compile_lambda(
         context.compile_expression(id, expression);
     }
 
-    // The stack should only contain the return value.
-    let dummy_id = Id::from_usize(0);
-    context.emit(
-        dummy_id,
-        Instruction::PopMultipleBelowTop(context.stack.len() - 1),
-    );
-    context.emit(dummy_id, Instruction::Return);
+    if matches!(
+        context.instructions.last().unwrap(),
+        Instruction::Call { .. }
+    ) {
+        let Instruction::Call { num_args } = context.instructions.pop().unwrap() else { unreachable!() };
+        context.instructions.push(Instruction::TailCall {
+            num_locals_to_pop: context.stack.len() - 1,
+            num_args,
+        });
+    } else {
+        let dummy_id = Id::from_usize(0);
+        context.emit(
+            dummy_id,
+            Instruction::PopMultipleBelowTop(context.stack.len() - 1),
+        );
+        context.emit(dummy_id, Instruction::Return);
+    }
 
     context.instructions
 }

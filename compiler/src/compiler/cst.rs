@@ -107,8 +107,7 @@ pub enum CstKind {
         closing_bracket: Box<Cst>,
     },
     StructField {
-        key: Box<Cst>,
-        colon: Box<Cst>,
+        key_and_colon: Option<Box<(Cst, Cst)>>,
         value: Box<Cst>,
         comma: Option<Box<Cst>>,
     },
@@ -124,7 +123,7 @@ pub enum CstKind {
         closing_curly_brace: Box<Cst>,
     },
     Assignment {
-        name: Box<Cst>,
+        name_or_pattern: Box<Cst>,
         parameters: Vec<Cst>,
         assignment_sign: Box<Cst>,
         body: Vec<Cst>,
@@ -234,13 +233,14 @@ impl Display for Cst {
                 closing_bracket.fmt(f)
             }
             CstKind::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => {
-                key.fmt(f)?;
-                colon.fmt(f)?;
+                if let Some(box (key, colon)) = key_and_colon {
+                    key.fmt(f)?;
+                    colon.fmt(f)?;
+                }
                 value.fmt(f)?;
                 if let Some(comma) = comma {
                     comma.fmt(f)?;
@@ -271,12 +271,12 @@ impl Display for Cst {
                 closing_curly_brace.fmt(f)
             }
             CstKind::Assignment {
-                name,
+                name_or_pattern,
                 parameters,
                 assignment_sign,
                 body,
             } => {
-                name.fmt(f)?;
+                name_or_pattern.fmt(f)?;
                 for parameter in parameters {
                     parameter.fmt(f)?;
                 }
@@ -302,7 +302,9 @@ impl Cst {
         match &self.kind {
             CstKind::TrailingWhitespace { child, .. } => child.display_span(),
             CstKind::Call { receiver, .. } => receiver.display_span(),
-            CstKind::Assignment { name, .. } => name.display_span(),
+            CstKind::Assignment {
+                name_or_pattern, ..
+            } => name_or_pattern.display_span(),
             _ => self.span.clone(),
         }
     }
@@ -406,13 +408,16 @@ impl UnwrapWhitespaceAndComment for Cst {
                 closing_bracket: Box::new(closing_bracket.unwrap_whitespace_and_comment()),
             },
             CstKind::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => CstKind::StructField {
-                key: Box::new(key.unwrap_whitespace_and_comment()),
-                colon: Box::new(colon.unwrap_whitespace_and_comment()),
+                key_and_colon: key_and_colon.as_ref().map(|box (key, colon)| {
+                    Box::new((
+                        key.unwrap_whitespace_and_comment(),
+                        colon.unwrap_whitespace_and_comment(),
+                    ))
+                }),
                 value: Box::new(value.unwrap_whitespace_and_comment()),
                 comma: comma
                     .as_ref()
@@ -440,12 +445,12 @@ impl UnwrapWhitespaceAndComment for Cst {
                 closing_curly_brace: Box::new(closing_curly_brace.unwrap_whitespace_and_comment()),
             },
             CstKind::Assignment {
-                name,
+                name_or_pattern,
                 parameters,
                 assignment_sign,
                 body,
             } => CstKind::Assignment {
-                name: Box::new(name.unwrap_whitespace_and_comment()),
+                name_or_pattern: Box::new(name_or_pattern.unwrap_whitespace_and_comment()),
                 parameters: parameters.unwrap_whitespace_and_comment(),
                 assignment_sign: Box::new(assignment_sign.unwrap_whitespace_and_comment()),
                 body: body.unwrap_whitespace_and_comment(),
@@ -556,13 +561,12 @@ impl TreeWithIds for Cst {
                 .or_else(|| fields.find(id))
                 .or_else(|| closing_bracket.find(id)),
             CstKind::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
-            } => key
-                .find(id)
-                .or_else(|| colon.find(id))
+            } => key_and_colon
+                .as_ref()
+                .and_then(|box (key, colon)| key.find(id).or_else(|| colon.find(id)))
                 .or_else(|| value.find(id))
                 .or_else(|| comma.as_ref().and_then(|comma| comma.find(id))),
             CstKind::StructAccess { struct_, dot, key } => struct_
@@ -586,11 +590,11 @@ impl TreeWithIds for Cst {
                 .or_else(|| body.find(id))
                 .or_else(|| closing_curly_brace.find(id)),
             CstKind::Assignment {
-                name,
+                name_or_pattern,
                 parameters,
                 assignment_sign,
                 body,
-            } => name
+            } => name_or_pattern
                 .find(id)
                 .or_else(|| parameters.find(id))
                 .or_else(|| assignment_sign.find(id))
@@ -672,13 +676,16 @@ impl TreeWithIds for Cst {
                 false,
             ),
             CstKind::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => (
-                key.find_by_offset(offset)
-                    .or_else(|| colon.find_by_offset(offset))
+                key_and_colon
+                    .as_ref()
+                    .and_then(|box (key, colon)| {
+                        key.find_by_offset(offset)
+                            .or_else(|| colon.find_by_offset(offset))
+                    })
                     .or_else(|| value.find_by_offset(offset))
                     .or_else(|| comma.find_by_offset(offset)),
                 false,
@@ -692,12 +699,13 @@ impl TreeWithIds for Cst {
             ),
             CstKind::Lambda { body, .. } => (body.find_by_offset(offset), false),
             CstKind::Assignment {
-                name,
+                name_or_pattern,
                 parameters,
                 assignment_sign,
                 body,
             } => (
-                name.find_by_offset(offset)
+                name_or_pattern
+                    .find_by_offset(offset)
                     .or_else(|| parameters.find_by_offset(offset))
                     .or_else(|| assignment_sign.find_by_offset(offset))
                     .or_else(|| body.find_by_offset(offset)),

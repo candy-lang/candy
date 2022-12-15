@@ -52,18 +52,20 @@ impl Mir {
                     return; // TODO: Replace with a panic.
                 };
                 let Ok(path) = UsePath::parse(path) else {
-                    warn!("`use` called with an invalid path.");
+                    warn!("`use` called with an invalid path: `\"{path}\"`.");
                     return; // TODO: Replace with a panic.
                 };
                 let Ok(module_to_import) = path.resolve_relative_to(current_module.clone()) else {
-                    warn!("`use` called with an invalid path.");
+                    warn!("`use` called with a path that doesn't refer to a module: `\"{path:?}\"` relative to {current_module}.");
                     return; // TODO: Replace with a panic.
                 };
 
-                let mir =
-                    db.mir_with_obvious_optimized(module_to_import, tracing.for_child_module());
+                let mir = db.mir_with_obvious_optimized(
+                    module_to_import.clone(),
+                    tracing.for_child_module(),
+                );
                 let Some(mir) = mir else {
-                    warn!("Module not found.");
+                    warn!("Module {module_to_import} not found.");
                     return; // TODO: Replace with a panic.
                 };
                 let mir = (*mir).clone();

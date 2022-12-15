@@ -137,14 +137,6 @@ pub async fn run_server(
                 .sorted_by_key(|hint| hint.position)
                 .collect_vec();
 
-            // Only show the most important hint per line.
-            let hints = hints
-                .into_iter()
-                .group_by(|hint| hint.position.line)
-                .into_iter()
-                .map(|(_, hints)| hints.max_by_key(|hint| hint.kind).unwrap())
-                .collect_vec();
-
             outgoing_hints.report_hints(module, hints).await;
         }
     }
@@ -177,7 +169,7 @@ impl OutgoingHints {
 /// [em quad](https://en.wikipedia.org/wiki/Quad_(typography)) instead, which
 /// seems to have the same width as a normal space in VSCode.
 fn quasi_spaces(n: usize) -> String {
-    " ".repeat(n)
+    format!(" {}", " ".repeat(n))
 }
 
 trait AlignHints {

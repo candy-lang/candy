@@ -1,5 +1,6 @@
-use crate::utils::CountableId;
 use std::fmt;
+
+use crate::utils::CountableId;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FiberId(usize);

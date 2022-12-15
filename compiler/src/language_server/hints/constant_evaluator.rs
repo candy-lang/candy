@@ -1,10 +1,9 @@
 use super::Hint;
 use crate::{
     compiler::{
-        ast::{AstKind, FindAst},
+        ast::{Assignment, AssignmentBody, AstDb, AstKind},
         ast_to_hir::AstToHir,
-        cst_to_ast::CstToAst,
-        hir::Id,
+        hir::{Expression, HirDb, Id},
         TracingConfig, TracingMode,
     },
     database::Database,
@@ -116,27 +115,41 @@ impl ConstantEvaluator {
             if &id.module != module {
                 continue;
             }
-            let ast_id = match db.hir_to_ast_id(id.clone()) {
-                Some(ast_id) => ast_id,
-                None => continue,
-            };
-            let ast = match db.ast(module.clone()) {
-                Some((ast, _)) => (*ast).clone(),
-                None => continue,
-            };
-            let ast = match ast.find(&ast_id) {
-                Some(ast) => ast,
-                None => continue,
-            };
-            if !matches!(ast.kind, AstKind::Assignment(_)) {
-                continue;
-            }
 
-            hints.push(Hint {
-                kind: HintKind::Value,
-                text: value.format(&evaluator.tracer.heap),
-                position: id_to_end_of_line(db, id.clone()).unwrap(),
-            });
+            let Some(hir) = db.find_expression(id.clone()) else { continue; };
+            match hir {
+                Expression::Reference(_) => {
+                    // Could be an assignment.
+                    let Some(ast_id) = db.hir_to_ast_id(id.clone()) else { continue; };
+                    let Some(ast) = db.find_ast(ast_id) else { continue; };
+                    let AstKind::Assignment(Assignment { body, .. }) = &ast.kind else { continue; };
+                    let creates_hint = match body {
+                        AssignmentBody::Lambda { .. } => true,
+                        AssignmentBody::Body { pattern, .. } => {
+                            matches!(pattern.kind, AstKind::Identifier(_))
+                        }
+                    };
+                    if !creates_hint {
+                        continue;
+                    }
+
+                    hints.push(Hint {
+                        kind: HintKind::Value,
+                        text: value.format(&evaluator.tracer.heap),
+                        position: id_to_end_of_line(db, id.clone()).unwrap(),
+                    });
+                }
+                Expression::PatternIdentifierReference { .. } => {
+                    let body = db.containing_body_of(id.clone());
+                    let name = body.identifiers.get(&id).unwrap();
+                    hints.push(Hint {
+                        kind: HintKind::Value,
+                        text: format!("{name} = {}", value.format(&evaluator.tracer.heap)),
+                        position: id_to_end_of_line(db, id.clone()).unwrap(),
+                    });
+                }
+                _ => {}
+            }
         }
 
         hints

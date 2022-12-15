@@ -1,9 +1,9 @@
 use crate::{
     compiler::{
-        ast_to_hir::AstToHirStorage, cst::CstDbStorage, cst_to_ast::CstToAstStorage,
-        hir::HirDbStorage, hir_to_mir::HirToMirStorage, mir_optimize::OptimizeMirStorage,
-        mir_to_lir::MirToLirStorage, rcst_to_cst::RcstToCstStorage,
-        string_to_rcst::StringToRcstStorage,
+        ast::AstDbStorage, ast_to_hir::AstToHirStorage, cst::CstDbStorage,
+        cst_to_ast::CstToAstStorage, hir::HirDbStorage, hir_to_mir::HirToMirStorage,
+        mir_optimize::OptimizeMirStorage, mir_to_lir::MirToLirStorage,
+        rcst_to_cst::RcstToCstStorage, string_to_rcst::StringToRcstStorage,
     },
     language_server::{
         folding_range::FoldingRangeDbStorage, references::ReferencesDbStorage,
@@ -15,6 +15,7 @@ use std::collections::HashMap;
 use tracing::warn;
 
 #[salsa::database(
+    AstDbStorage,
     AstToHirStorage,
     CstDbStorage,
     CstToAstStorage,
