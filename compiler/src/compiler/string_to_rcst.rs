@@ -156,18 +156,6 @@ mod parse {
         literal(input, "'").map(|it| (it, Rcst::SingleQuote))
     }
     #[instrument(level = "trace")]
-    fn single_quotes(mut input: &str, count: Option<usize>) -> Option<(&str, Vec<Rcst>)> {
-        let mut single_quotes = vec![];
-        while let Some((input_after_single_quote, single_quote)) = single_quote(input) {
-            input = input_after_single_quote;
-            single_quotes.push(single_quote)
-        }
-        match count {
-            Some(count) if count != single_quotes.len() => None,
-            _ => Some((input, single_quotes)),
-        }
-    }
-    #[instrument(level = "trace")]
     fn double_quote(input: &str) -> Option<(&str, Rcst)> {
         literal(input, "\"").map(|it| (it, Rcst::DoubleQuote))
     }
@@ -184,6 +172,25 @@ mod parse {
             }
         }
         None
+    }
+
+    fn parse_multiple<F>(
+        mut input: &str,
+        parse_single: F,
+        count: Option<usize>,
+    ) -> Option<(&str, Vec<Rcst>)>
+    where
+        F: Fn(&str) -> Option<(&str, Rcst)>,
+    {
+        let mut rcsts = vec![];
+        while let Some((input_after_single, rcst)) = parse_single(input) {
+            input = input_after_single;
+            rcsts.push(rcst);
+        }
+        match count {
+            Some(count) if count != rcsts.len() => None,
+            _ => Some((input, rcsts)),
+        }
     }
 
     /// "Word" refers to a bunch of characters that are not separated by
@@ -618,8 +625,67 @@ mod parse {
     }
 
     #[instrument(level = "trace")]
+    fn text_placeholder(input: &str, curly_brace_count: usize) -> Option<(&str, Rcst)> {
+        let (mut input, opening_curly_braces) =
+            parse_multiple(input, opening_curly_brace, Some(curly_brace_count))?;
+
+        let mut expression_text = vec![];
+        let closing_curly_braces = loop {
+            match input.chars().next() {
+                Some('}') => {
+                    match parse_multiple(input, closing_curly_brace, Some(curly_brace_count)) {
+                        Some((input_after_closing_curly_braces, closing_curly_braces)) => {
+                            input = input_after_closing_curly_braces;
+                            break closing_curly_braces;
+                        }
+                        _ => {
+                            input = &input[1..];
+                            expression_text.push('}');
+                        }
+                    }
+                }
+                Some('\n') | None => {
+                    break vec![Rcst::Error {
+                        unparsable_input: "".to_string(),
+                        error: RcstError::TextPlaceholderNotClosed,
+                    }];
+                }
+                Some(c) => {
+                    input = &input[c.len_utf8()..];
+                    expression_text.push(c);
+                }
+            }
+        };
+
+        // FIXME: Better report the error that the placeholder contains more then just one expression
+        if let Some((expression_text_after_expression, expression)) =
+            expression(&expression_text.iter().join(""), 0, true, true) && expression_text_after_expression.is_empty()
+        {
+            Some((
+                input,
+                Rcst::TextPlaceholder {
+                    opening_curly_braces,
+                    expression: Box::new(expression),
+                    closing_curly_braces,
+                },
+            ))
+        } else {
+            Some((
+                input,
+                Rcst::TextPlaceholder {
+                    opening_curly_braces,
+                    expression: Box::new(Rcst::Error {
+                        unparsable_input: expression_text.iter().join(""),
+                        error: RcstError::TextPlaceholderInvalidExpression,
+                    }),
+                    closing_curly_braces,
+                },
+            ))
+        }
+    }
+    #[instrument(level = "trace")]
     fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        let (input, opening_single_quotes) = single_quotes(input, None)?;
+        let (input, opening_single_quotes) = parse_multiple(input, single_quote, None)?;
         let (mut input, opening_double_quote) = double_quote(input)?;
 
         let mut line = vec![];
@@ -628,7 +694,7 @@ mod parse {
             match input.chars().next() {
                 Some('"') => {
                     input = &input[1..];
-                    match single_quotes(input, Some(opening_single_quotes.len())) {
+                    match parse_multiple(input, single_quote, Some(opening_single_quotes.len())) {
                         Some((input_after_single_quotes, closing_single_quotes)) => {
                             input = input_after_single_quotes;
                             parts.push(Rcst::TextPart(line.drain(..).join("")));
@@ -640,6 +706,17 @@ mod parse {
                         None => line.push('"'),
                     }
                 }
+                Some('{') => match text_placeholder(input, opening_single_quotes.len() + 1) {
+                    Some((input_after_template, placeholder)) => {
+                        parts.push(Rcst::TextPart(line.drain(..).join("")));
+                        input = input_after_template;
+                        parts.push(placeholder);
+                    }
+                    None => {
+                        input = &input[1..];
+                        line.push('{');
+                    }
+                },
                 None => {
                     parts.push(Rcst::TextPart(line.drain(..).join("")));
                     break Rcst::Error {
