@@ -45,6 +45,10 @@ impl Display for CompilerErrorPayload {
                 }
                 RcstError::TextNotClosed => "This text isn't closed.",
                 RcstError::TextNotSufficientlyIndented => "This text isn't sufficiently indented.",
+                RcstError::TextPlaceholderNotClosed => "This text placeholder isn't closed.",
+                RcstError::TextPlaceholderInvalidExpression => {
+                    "This text placeholder contains an invalid expression."
+                }
                 RcstError::TooMuchWhitespace => "There is too much whitespace here.",
                 RcstError::UnexpectedCharacters => "This is an unexpected character.",
                 RcstError::UnparsedRest => "The parser couldn't parse this rest.",

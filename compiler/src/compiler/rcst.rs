@@ -129,6 +129,8 @@ pub enum RcstError {
     SymbolContainsNonAlphanumericAscii,
     TextNotClosed,
     TextNotSufficientlyIndented,
+    TextPlaceholderNotClosed,
+    TextPlaceholderInvalidExpression,
     TooMuchWhitespace,
     UnexpectedCharacters,
     UnparsedRest,
