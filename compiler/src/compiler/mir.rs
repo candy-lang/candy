@@ -462,7 +462,7 @@ impl Mir {
 }
 impl Expression {
     // The builder function takes the builder and the responsible parameter.
-    pub fn build_lambda<F: Fn(&mut MirBodyBuilder, Id)>(
+    pub fn build_lambda<F: FnOnce(&mut MirBodyBuilder, Id)>(
         id_generator: &mut IdGenerator<Id>,
         function: F,
     ) -> Self {

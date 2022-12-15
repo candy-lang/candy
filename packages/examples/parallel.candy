@@ -1,9 +1,4 @@
-core = use "..Core"
-async = core.async
-await = core.await
-channel = core.channel
-parallel = core.parallel
-text = core.text
+[async, await, channel, parallel, text] = use "..Core"
 
 main := { environment ->
   print message =

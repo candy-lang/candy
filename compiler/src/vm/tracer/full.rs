@@ -217,9 +217,9 @@ impl fmt::Debug for FullTracer {
                             ),
                             StoredFiberEvent::CallEnded { return_value } =>
                                 format!("call ended: {}", return_value.format(&self.heap)),
-                        }
+                        },
                     ),
-                }
+                },
             )?;
         }
         Ok(())

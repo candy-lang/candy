@@ -1,6 +1,6 @@
 bool = use "..bool"
-ifElse = (use "..controlFlow").ifElse
-equals = (use "..equality").equals
+[ifElse] = use "..controlFlow"
+[equals] = use "..equality"
 function = use "..function"
 struct = use "..struct"
 

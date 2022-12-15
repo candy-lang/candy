@@ -1,7 +1,6 @@
 bool = use "..bool"
-equals = (use "..equality").equals
+[equals] = use "..equality"
 function = use "..function"
-isSymbol = (use "..symbol").is
 
 ifElse condition then else :=
   needs (bool.is condition)

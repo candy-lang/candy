@@ -8,6 +8,15 @@ pub struct CompilerError {
     pub span: Range<usize>,
     pub payload: CompilerErrorPayload,
 }
+impl Display for CompilerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} span({} – {}): {}",
+            self.module, self.span.start, self.span.end, self.payload,
+        )
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum CompilerErrorPayload {
@@ -16,7 +25,6 @@ pub enum CompilerErrorPayload {
     Ast(AstError),
     Hir(HirError),
 }
-
 impl Display for CompilerErrorPayload {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let message = match self {
@@ -67,7 +75,16 @@ impl Display for CompilerErrorPayload {
                 AstError::ParenthesizedWithoutClosingParenthesis => {
                     "This expression is parenthesized, but the closing parenthesis is missing."
                 }
+                AstError::PatternContainsInvalidExpression => {
+                    "This type of expression is not allowed in patterns."
+                }
+                AstError::PatternLiteralPartContainsInvalidExpression => {
+                    "This type of expression is not allowed in this part of a pattern."
+                }
                 AstError::StructKeyWithoutColon => "This struct key should be followed by a colon.",
+                AstError::StructShorthandWithNotIdentifier => {
+                    "Shorthand syntax in structs only supports identifiers."
+                }
                 AstError::StructValueWithoutComma => {
                     "This struct value should be followed by a comma."
                 }
@@ -89,9 +106,7 @@ impl Display for CompilerErrorPayload {
                 HirError::PublicAssignmentWithSameName { name } => {
                     format!("There already exists a public assignment (:=) named `{name}`.")
                 }
-                HirError::UnknownReference { name } => {
-                    format!("Here, you reference `{name}`, but that name is not in scope.")
-                }
+                HirError::UnknownReference { name } => format!("`{name}`is not in scope."),
             },
         };
         write!(f, "{message}")

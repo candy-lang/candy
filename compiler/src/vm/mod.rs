@@ -130,8 +130,8 @@ impl Vm {
             channels: HashMap::new(),
             completed_operations: Default::default(),
             unreferenced_channels: Default::default(),
-            operation_id_generator: IdGenerator::start_at(0),
-            channel_id_generator: IdGenerator::start_at(0),
+            operation_id_generator: Default::default(),
+            channel_id_generator: Default::default(),
             fiber_id_generator: IdGenerator::start_at(FiberId::root().to_usize() + 1),
         }
     }

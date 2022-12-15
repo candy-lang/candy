@@ -64,6 +64,7 @@ impl Fiber {
             BuiltinFunction::TextStartsWith => self.heap.text_starts_with(args),
             BuiltinFunction::TextTrimEnd => self.heap.text_trim_end(args),
             BuiltinFunction::TextTrimStart => self.heap.text_trim_start(args),
+            BuiltinFunction::ToDebugText => self.heap.to_debug_text(args),
             BuiltinFunction::Try => self.heap.try_(args),
             BuiltinFunction::TypeOf => self.heap.type_of(args),
         });
@@ -474,6 +475,13 @@ impl Heap {
     fn text_trim_start(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
             Return(self.create_text(text.value.trim_start().to_string()))
+        })
+    }
+
+    #[allow(clippy::wrong_self_convention)]
+    fn to_debug_text(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |value: Any| {
+            Return(self.create_text(value.address.format(self)))
         })
     }
 

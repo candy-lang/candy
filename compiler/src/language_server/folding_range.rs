@@ -91,8 +91,14 @@ impl<'a> Context<'a> {
             CstKind::ListItem { value, .. } => self.visit_cst(value),
             // TODO: support folding ranges for structs
             CstKind::Struct { fields, .. } => self.visit_csts(fields),
-            CstKind::StructField { key, value, .. } => {
-                self.visit_cst(key);
+            CstKind::StructField {
+                key_and_colon,
+                value,
+                ..
+            } => {
+                if let Some(box (key, _)) = key_and_colon {
+                    self.visit_cst(key);
+                }
                 self.visit_cst(value);
             }
             CstKind::StructAccess { struct_, dot, key } => {
@@ -125,7 +131,7 @@ impl<'a> Context<'a> {
                 self.visit_csts(body);
             }
             CstKind::Assignment {
-                name,
+                name_or_pattern,
                 assignment_sign,
                 parameters,
                 body,
@@ -141,7 +147,7 @@ impl<'a> Context<'a> {
                     );
                 }
 
-                self.visit_cst(name);
+                self.visit_cst(name_or_pattern);
                 self.visit_csts(parameters);
                 self.visit_csts(body);
             }

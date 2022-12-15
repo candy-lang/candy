@@ -134,14 +134,6 @@ pub async fn run_server(
                 .sorted_by_key(|hint| hint.position)
                 .collect_vec();
 
-            // Only show the most important hint per line.
-            let hints = hints
-                .into_iter()
-                .group_by(|hint| hint.position.line)
-                .into_iter()
-                .map(|(_, hints)| hints.max_by_key(|hint| hint.kind).unwrap())
-                .collect_vec();
-
             outgoing_hints.report_hints(module, hints).await;
         }
     }

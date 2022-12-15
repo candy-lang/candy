@@ -1,4 +1,4 @@
-equals = (use "..equality").equals
+[equals] = use "..equality"
 type = use "..type"
 
 is value := type.is value Function
