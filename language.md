@@ -23,6 +23,7 @@ Note that not all of the features described here are implemented or even finaliz
   - [Integers](#integers)
   - [Texts](#texts)
   - [Symbols](#symbols)
+  - [Lists](#lists)
   - [Structs](#structs)
   - [Closures](#closures)
   - [Ports](#ports)
@@ -134,6 +135,20 @@ Green
 Foo
 ```
 
+### Lists
+
+A list is a compound object that holds aa collection of elements identified by integer index.
+You can create a list by placing a sequence of comma-separated expressions inside parentheses:
+
+```candy
+("Candy", 42, 4, FooBar) # List with four elements
+(Foo,)                   # List with one element
+(Foo)                    # NOT a list; this evaluates to just `Foo`
+(,)                      # Empty list
+```
+
+TODO: Accessing and modifying lists: `core.list` and destructuring
+
 ### Structs
 
 Structs are mappings from keys to values (also known as dictionaries or hash maps in other languages).
@@ -145,15 +160,6 @@ Structs are mappings from keys to values (also known as dictionaries or hash map
   "TextKey": 4,
   3: 2,
 ]
-```
-
-Omitting keys is equivalent to using zero-indexed numbers as keys. You can also add fields with explicit keys after these:
-
-```candy
-[Hello, World, Foo: Bar]
-
-# equivalent:
-[0: Hello, 1: World, Foo: Bar]
 ```
 
 To lookup a key that is a symbol, you can use the dot syntax:
