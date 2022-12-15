@@ -101,16 +101,12 @@ pub async fn run_server(
                 fuzzer.update_module(module.clone(), &heap, &closures);
                 debug!("The constant evaluator made progress in {module}.");
                 break 'new_insight Some(module);
-            } else {
-                debug!("Constant evaluation is done.");
             }
             // For fuzzing, we're a bit more resource-conscious.
             sleep(Duration::from_millis(200)).await;
             if let Some(module) = fuzzer.run(&db) {
                 debug!("The fuzzer made progress in {module}.");
                 break 'new_insight Some(module);
-            } else {
-                debug!("The fuzzer is done.");
             }
             None
         };
