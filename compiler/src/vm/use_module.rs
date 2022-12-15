@@ -1,5 +1,5 @@
 use super::{
-    context::{UseProvider, UseResult},
+    context::UseProvider,
     heap::{Closure, Pointer, Text},
     Fiber,
 };
@@ -7,7 +7,6 @@ use crate::{
     compiler::hir::Id,
     module::{Module, UsePath},
 };
-use itertools::Itertools;
 
 impl Fiber {
     pub fn use_module(
@@ -26,21 +25,14 @@ impl Fiber {
         let target = UsePath::parse(path.value.as_str())?;
         let module = target.resolve_relative_to(current_module)?;
 
-        match use_provider.use_module(module)? {
-            UseResult::Asset(bytes) => {
-                let bytes = bytes
-                    .iter()
-                    .map(|byte| self.heap.create_int((*byte).into()))
-                    .collect_vec();
-                let list = self.heap.create_list(bytes);
-                self.data_stack.push(list);
-            }
-            UseResult::Code(lir) => {
-                let closure = self.heap.create_closure(Closure::of_module_lir(lir));
-                let responsible = self.heap.create_hir_id(Id::dummy());
-                self.call(closure, vec![], responsible);
-            }
-        }
+        let lir = use_provider
+            .use_module(module.clone())
+            .ok_or_else(|| format!("`use` couldn't import the module `{}`.", module))?;
+        let closure = self
+            .heap
+            .create_closure(Closure::of_module_lir(lir.as_ref().to_owned()));
+        let responsible = self.heap.create_hir_id(Id::dummy());
+        self.call(closure, vec![], responsible);
 
         Ok(())
     }

@@ -448,8 +448,6 @@ impl hash::Hash for Expression {
 }
 
 impl Mir {
-    // For now, this is only used in tests.
-    #[cfg(test)]
     pub fn build<F: Fn(&mut MirBodyBuilder)>(function: F) -> Self {
         let mut id_generator = IdGenerator::start_at(0);
         let mut builder = MirBodyBuilder::with_generator(&mut id_generator);
