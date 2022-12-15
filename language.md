@@ -160,6 +160,9 @@ Structs are mappings from keys to values (also known as dictionaries or hash map
   "TextKey": 4,
   3: 2,
 ]
+
+foo = 123
+[foo]  # Shorthand for `[Foo: foo]`
 ```
 
 To lookup a key that is a symbol, you can use the dot syntax:
