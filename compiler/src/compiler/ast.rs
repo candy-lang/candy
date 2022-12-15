@@ -129,6 +129,7 @@ pub enum AstError {
     StructWithNonStructField,
     StructWithoutClosingBrace,
     TextWithoutClosingQuote,
+    TextPlaceholderWithoutClosingCurlyBraces,
     UnexpectedPunctuation,
 }
 

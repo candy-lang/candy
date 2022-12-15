@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use super::{
     ast::{
         self, Ast, AstError, AstKind, AstString, Identifier, Int, Lambda, Symbol, Text, TextPart,
@@ -15,7 +17,6 @@ use crate::{
     },
     module::Module,
 };
-use itertools::Itertools;
 use std::{collections::HashMap, ops::Range, sync::Arc};
 
 #[salsa::query_group(CstToAstStorage)]
@@ -155,22 +156,71 @@ impl LoweringContext {
                         .all(|opening_single_quote| -> bool {
                             matches!(opening_single_quote.kind, CstKind::SingleQuote)
                         }) => opening_single_quotes.len(),
-                    _ => panic!("Text needs to start with any numer of opening single quotes followed by an opening double quote, but started with {}.", opening_quote)
+                    _ => panic!("Text needs to start with any number of opening single quotes followed by an opening double quote, but started with {}.", opening_quote)
                 };
 
-                let text = parts
-                    .iter()
-                    .filter_map(|it| match it {
+                let mut lowered_parts = vec![];
+                for part in parts {
+                    match part {
                         Cst {
                             kind: CstKind::TextPart(text),
                             ..
-                        } => Some(text),
+                        } => {
+                            // TODO: Combine successive text parts during compile time
+                            let string = self.create_string_without_id_mapping(text.clone());
+                            let text_part =
+                                self.create_ast(cst.id, AstKind::TextPart(TextPart(string)));
+                            lowered_parts.push(text_part);
+                        },
+                        Cst {
+                            kind: CstKind::TextPlaceholder { 
+                                opening_curly_braces,
+                                expression,
+                                closing_curly_braces
+                            },
+                            ..
+                        } => {
+                            if opening_curly_braces.len() != (opening_single_quote_count + 1)
+                                || opening_curly_braces
+                                    .iter()
+                                    .all(|opening_curly_brace| !matches!(opening_curly_brace.kind, CstKind::OpeningCurlyBrace)) 
+                            {
+                                panic!(
+                                    "Text placeholder needs to start with {} opening curly braces, but started with {}.", 
+                                    opening_single_quote_count + 1, 
+                                    opening_curly_braces.iter().map(|cst| format!("{}", cst)).join("")
+                                )
+                            }
+                            
+                            let ast = self.lower_cst(expression);
+
+                            if closing_curly_braces.len() != opening_single_quote_count + 1 
+                                || closing_curly_braces
+                                    .iter()
+                                    .all(|closing_curly_brace| -> bool {matches!(closing_curly_brace.kind, CstKind::ClosingCurlyBrace)}) 
+                            {
+                                lowered_parts.push(ast);
+                            } else {
+                                let error = self.create_ast(
+                                    cst.id,
+                                    AstKind::Error {
+                                        child: Some(Box::new(ast)),
+                                        errors: vec![CompilerError {
+                                            module: self.module.clone(),
+                                            span: cst.span.clone(),
+                                            payload: CompilerErrorPayload::Ast(
+                                                AstError::TextPlaceholderWithoutClosingCurlyBraces,
+                                            ),
+                                        }],
+                                    },
+                                );
+                                lowered_parts.push(error);
+                            }
+                        },
                         _ => panic!("Text contains non-TextPart. Whitespaces should have been removed already."),
-                    })
-                    .join("");
-                let string = self.create_string_without_id_mapping(text);
-                let text_part = self.create_ast(cst.id, AstKind::TextPart(TextPart(string)));
-                let mut text = self.create_ast(cst.id, AstKind::Text(Text(vec![text_part])));
+                    }
+                }
+                let mut text = self.create_ast(cst.id, AstKind::Text(Text(lowered_parts)));
 
                 if !matches!(
                     &closing_quote.kind,
@@ -206,6 +256,7 @@ impl LoweringContext {
             CstKind::OpeningText { .. } => panic!("OpeningText should only occur in Text."),
             CstKind::ClosingText { .. } => panic!("ClosingText should only occur in Text."),
             CstKind::TextPart(_) => panic!("TextPart should only occur in Text."),
+            CstKind::TextPlaceholder { .. } => panic!("TextPlaceholder should only occur in Text."),
             CstKind::Pipe {
                 receiver,
                 bar,

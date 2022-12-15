@@ -87,6 +87,11 @@ pub enum CstKind {
         closing_quote: Box<Cst>,
     },
     TextPart(String),
+    TextPlaceholder {
+        opening_curly_braces: Vec<Cst>,
+        expression: Box<Cst>,
+        closing_curly_braces: Vec<Cst>,
+    },
     Pipe {
         receiver: Box<Cst>,
         bar: Box<Cst>,
@@ -213,6 +218,20 @@ impl Display for Cst {
                 closing_quote.fmt(f)
             }
             CstKind::TextPart(literal) => literal.fmt(f),
+            CstKind::TextPlaceholder {
+                opening_curly_braces,
+                expression,
+                closing_curly_braces,
+            } => {
+                for opening_curly_brace in opening_curly_braces {
+                    opening_curly_brace.fmt(f)?;
+                }
+                expression.fmt(f)?;
+                for closing_curly_brace in closing_curly_braces {
+                    closing_curly_brace.fmt(f)?;
+                }
+                Ok(())
+            }
             CstKind::Pipe {
                 receiver,
                 bar,
@@ -404,6 +423,15 @@ impl UnwrapWhitespaceAndComment for Cst {
                 closing_quote: Box::new(closing_quote.unwrap_whitespace_and_comment()),
             },
             kind @ CstKind::TextPart(_) => kind.clone(),
+            CstKind::TextPlaceholder {
+                opening_curly_braces,
+                expression,
+                closing_curly_braces,
+            } => CstKind::TextPlaceholder {
+                opening_curly_braces: opening_curly_braces.unwrap_whitespace_and_comment(),
+                expression: Box::new(expression.unwrap_whitespace_and_comment()),
+                closing_curly_braces: closing_curly_braces.unwrap_whitespace_and_comment(),
+            },
             CstKind::Pipe {
                 receiver,
                 bar,
@@ -577,6 +605,14 @@ impl TreeWithIds for Cst {
                 .or_else(|| parts.find(id))
                 .or_else(|| closing_quote.find(id)),
             CstKind::TextPart(_) => None,
+            CstKind::TextPlaceholder {
+                opening_curly_braces,
+                expression,
+                closing_curly_braces,
+            } => opening_curly_braces
+                .find(id)
+                .or_else(|| expression.find(id))
+                .or_else(|| closing_curly_braces.find(id)),
             CstKind::Pipe {
                 receiver,
                 bar,
@@ -688,10 +724,24 @@ impl TreeWithIds for Cst {
             CstKind::Identifier { .. } | CstKind::Symbol { .. } | CstKind::Int { .. } => {
                 (None, true)
             }
+            CstKind::Text { parts, .. } => {
+                let res = parts.find_by_offset(offset);
+                if matches!(
+                    &res,
+                    Some(Cst {
+                        kind: CstKind::TextPlaceholder { .. },
+                        ..
+                    })
+                ) {
+                    (res, false)
+                } else {
+                    (None, false)
+                }
+            }
             CstKind::OpeningText { .. }
             | CstKind::ClosingText { .. }
-            | CstKind::Text { .. }
-            | CstKind::TextPart(_) => (None, false),
+            | CstKind::TextPart(_)
+            | CstKind::TextPlaceholder { .. } => (None, false),
             CstKind::Pipe { receiver, call, .. } => (
                 receiver
                     .find_by_offset(offset)

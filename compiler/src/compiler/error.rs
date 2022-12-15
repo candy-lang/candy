@@ -76,6 +76,9 @@ impl Display for CompilerErrorPayload {
                     "This struct doesn't have a closing bracket."
                 }
                 AstError::TextWithoutClosingQuote => "This text never ends.",
+                AstError::TextPlaceholderWithoutClosingCurlyBraces => {
+                    "This text placeholder never ends."
+                }
                 AstError::UnexpectedPunctuation => "This punctuation was unexpected.",
             }
             .to_string(),

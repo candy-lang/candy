@@ -50,6 +50,11 @@ pub enum Rcst {
         closing_quote: Box<Rcst>,
     },
     TextPart(String),
+    TextPlaceholder {
+        opening_curly_braces: Vec<Rcst>,
+        expression: Box<Rcst>,
+        closing_curly_braces: Vec<Rcst>,
+    },
     Pipe {
         receiver: Box<Rcst>,
         bar: Box<Rcst>,
@@ -200,6 +205,20 @@ impl Display for Rcst {
                 closing_quote.fmt(f)
             }
             Rcst::TextPart(literal) => literal.fmt(f),
+            Rcst::TextPlaceholder {
+                opening_curly_braces,
+                expression,
+                closing_curly_braces,
+            } => {
+                for opening_curly_brace in opening_curly_braces {
+                    opening_curly_brace.fmt(f)?;
+                }
+                expression.fmt(f)?;
+                for closing_curly_brace in closing_curly_braces {
+                    closing_curly_brace.fmt(f)?;
+                }
+                Ok(())
+            }
             Rcst::Pipe {
                 receiver,
                 bar,
@@ -359,6 +378,7 @@ impl IsMultiline for Rcst {
                 opening_quote.is_multiline() || parts.is_multiline() || closing_quote.is_multiline()
             }
             Rcst::TextPart(_) => false,
+            Rcst::TextPlaceholder { .. } => false,
             Rcst::Pipe {
                 receiver,
                 bar,

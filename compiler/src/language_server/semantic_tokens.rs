@@ -200,13 +200,24 @@ impl<'a> Context<'a> {
             } => {
                 self.visit_cst(opening_quote, None);
                 for part in parts {
-                    if let CstKind::TextPart(_) = part.kind {
-                        self.add_token(part.span.clone(), SemanticTokenType::String)
-                    }
+                    self.visit_cst(part, None);
                 }
                 self.visit_cst(closing_quote, None);
             }
-            CstKind::TextPart(_) => {} // handled by parent
+            CstKind::TextPart(_) => self.add_token(cst.span.clone(), SemanticTokenType::String),
+            CstKind::TextPlaceholder {
+                opening_curly_braces,
+                expression,
+                closing_curly_braces,
+            } => {
+                for opening_curly_brace in opening_curly_braces {
+                    self.visit_cst(opening_curly_brace, None);
+                }
+                self.visit_cst(expression, None);
+                for closing_curly_brace in closing_curly_braces {
+                    self.visit_cst(closing_curly_brace, None);
+                }
+            }
             CstKind::Pipe {
                 receiver,
                 bar,

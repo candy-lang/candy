@@ -173,6 +173,15 @@ impl RcstToCstExt for Rcst {
                 state.offset += text.len();
                 CstKind::TextPart(text)
             }
+            Rcst::TextPlaceholder {
+                opening_curly_braces,
+                expression,
+                closing_curly_braces,
+            } => CstKind::TextPlaceholder {
+                opening_curly_braces: opening_curly_braces.to_csts(state),
+                expression: Box::new(expression.to_cst(state)),
+                closing_curly_braces: closing_curly_braces.to_csts(state),
+            },
             Rcst::Call {
                 receiver,
                 arguments,
