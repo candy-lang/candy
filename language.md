@@ -57,7 +57,8 @@ Source code is stored in plain text files with a `.candy` file extension.
 ## This is a comment.
 ```
 
-> One `#` is also a comment, but a doc comment for the item above it. See [Comments](#comments) for more info on that.
+> One `#` is also a comment, but a doc comment for the item above it.
+> See [Comments](#comments) for more info on that.
 
 Naming rules are similar to other programming languages.
 Identifiers start with a lowercase letter and may contain letters or digits.
@@ -443,7 +444,8 @@ Here are some recommended guidelines for writing reasons:
 - Try to keep the reason short and simple.
 - Phrase the reason as a self-contained sentence, including a period at the end.
 - Write concrete references such as function or parameter names in backticks.
-- Prefer concepts over concrete functions. For example, write "This function needs a non-negative int." rather than "This function needs an int that `isNonNegative`." – after all, users can always jump to the `needs` itself.
+- Prefer concepts over concrete functions.
+  For example, write "This function needs a non-negative int." rather than "This function needs an int that `isNonNegative`." – after all, users can always jump to the `needs` itself.
 - Consider also highlighting what is wrong with the input rather than just spelling out the needs.
 - Consider starting new sentences in long reasons.
 - Consider special-casing typical erroneous inputs with custom reasons.
