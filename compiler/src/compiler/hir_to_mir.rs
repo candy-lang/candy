@@ -494,8 +494,9 @@ fn compile_destructure(
                 |body, _expected, actual| {
                     vec![
                         body.push(Expression::Text(format!(
-                            "Expected {} items, got ",
+                            "Expected {} {}, got ",
                             list.len(),
+                            if list.len() == 1 { "item" } else { "items" },
                         ))),
                         actual,
                         body.push(Expression::Text(".".to_string())),
