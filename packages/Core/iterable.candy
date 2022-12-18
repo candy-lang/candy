@@ -137,8 +137,7 @@ whereHelper = { whereHelper iterable tester ->
     iterable
     | next
     | result.flatMap { itemAndRest ->
-      item = itemAndRest | list.get 0
-      rest = itemAndRest | list.get 1
+      [item, rest] = itemAndRest
       ifElse (tester item) { result.ok itemAndRest } { whereHelper rest tester | next }
     }
   }
@@ -152,7 +151,7 @@ takeWhile iterable tester = newWithState iterable { iterable ->
   iterable
   | next
   | result.flatMap { itemAndRest ->
-    item = itemAndRest | list.get 0
+    [item, _] = itemAndRest
     ifElse (tester item) { result.ok itemAndRest } { result.error Empty }
   }
 }
@@ -183,23 +182,14 @@ fromList l :=
   # iterable | function.run | result.map { it -> it | list.get 0 }
   # The state contains the list and an index.
   newWithState (l, 0) { state ->
-    #✨.print state
-    l = state | list.get 0
-    index = state | list.get 1
-    #✨.print l
+    [l, index] = state
     ifElse (l | list.isValidIndex index) {
-      #✨.print Ok
-      result.ok (list.get l index, (l, index | int.add 1))
+      result.ok (l | list.get index, (l, index | int.add 1))
     } {
-      #✨.print Err
       result.error Empty
     }
   }
 
 toList iterable :=
-  ✨.print "Turning iterable to list"
   needs (is iterable)
-  iterable | foldLeft (,) { result item ->
-    ✨.print ("Appending to list", result, item)
-    result | list.append item
-  }
+  iterable | foldLeft (,) { result item -> result | list.append item }
