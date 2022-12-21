@@ -133,7 +133,7 @@ any iterable tester :=
 ## Filtering
 
 whereHelper = { whereHelper iterable tester ->
-  newWithState iterable { iterable ->
+  generateWithState iterable { iterable ->
     iterable
     | next
     | result.flatMap { itemAndRest ->
@@ -147,7 +147,7 @@ where iterable tester :=
   needs (function.is1 tester)
   whereHelper whereHelper iterable tester
 
-takeWhile iterable tester = newWithState iterable { iterable ->
+takeWhile iterable tester = generateWithState iterable { iterable ->
   iterable
   | next
   | result.flatMap { itemAndRest ->
@@ -181,7 +181,7 @@ fromList l :=
   # () => Result[(Item, Iterable[Item]), Any]
   # iterable | function.run | result.map { it -> it | list.get 0 }
   # The state contains the list and an index.
-  newWithState (l, 0) { state ->
+  generateWithState (l, 0) { state ->
     [l, index] = state
     ifElse (l | list.isValidIndex index) {
       result.ok (l | list.get index, (l, index | int.add 1))
