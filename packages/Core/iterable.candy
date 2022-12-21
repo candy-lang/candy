@@ -6,7 +6,7 @@ int = use "..int"
 result = use "..result"
 list = use "..list"
 
-# An iterable is a `() => Result[(Item, Iterable[Item]), Any]`.
+# An iterable is a `() -> Result[[Item, Rest: Iterable[Item]], Any]`.
 # isWithItemType value checkItem :=
 #   result.is value | bool.lazyAnd {
 #     value
@@ -32,7 +32,10 @@ generateWithStateHelper = { generateWithStateHelper state mapper ->
   {
     mapper state | result.map { result ->
       [newItem, newState] = result
-      (newItem, generateWithStateHelper generateWithStateHelper newState mapper)
+      [
+        Item: newItem,
+        Rest: generateWithStateHelper generateWithStateHelper newState mapper,
+      ]
     }
   }
 }
@@ -40,7 +43,8 @@ generateWithState initialState mapper :=
   # Creates a new iterator from a state and mapper. The `mapper` receives the
   # current state and returns either one of these:
   #
-  # - a `result.ok` containing the item to emit and the new state
+  # - a `result.ok` of a struct containing the item to emit (`NewItem`) and the
+  #   new state (`NewState`)
   # - a `result.err`, indicating that the iterator is done
   needs (function.is1 mapper)
   generateWithStateHelper generateWithStateHelper initialState mapper
@@ -55,17 +59,17 @@ map iterable mapper :=
   generateWithState iterable { previousState ->
     previousState | next | result.map { itemAndRest ->
       [item, rest] = itemAndRest
-      (mapper item, rest)
+      [Item: mapper item, rest]
     }
   }
 
 withIndex iterable :=
   needs (is iterable)
-  generateWithState (iterable, 0) { previousState ->
+  generateWithState [iterable, Index: 0] { previousState ->
     [iterable, index] = previousState
     iterable | next | result.map { itemAndRest ->
       [item, rest] = itemAndRest
-      ((item, index), (rest, index | int.add 1))
+      [Item: [item, index], Rest: [Iterable: rest, Index: index | int.add 1]]
     }
   }
 
@@ -76,9 +80,9 @@ foldLeftHelper = { foldLeftHelper iterable value combine ->
   iterable
   | next
   | result.map { it ->
-    [currentItem, remainingIterable] = it
-    newValue = combine value currentItem
-    foldLeftHelper foldLeftHelper remainingIterable newValue combine
+    [item, rest] = it
+    newValue = combine value item
+    foldLeftHelper foldLeftHelper rest newValue combine
   }
   | result.unwrapOr value
 }
@@ -95,8 +99,8 @@ reduceLeft iterable combine :=
   | next
   | result.mapError { _ -> "Can't `reduceLeft` an empty iterable" }
   | result.map { it ->
-    [currentItem, remainingIterable] = it
-    remainingIterable | foldLeft currentItem combine
+    [item, rest] = it
+    rest | foldLeft item combine
   }
 # TODO: `reduceRight`
 
@@ -151,8 +155,11 @@ takeWhile iterable tester = generateWithState iterable { iterable ->
   iterable
   | next
   | result.flatMap { itemAndRest ->
-    [item, _] = itemAndRest
-    ifElse (tester item) { result.ok itemAndRest } { result.error Empty }
+    ifElse (tester itemAndRest.item) {
+      result.ok itemAndRest
+    } {
+      result.error Empty
+    }
   }
 }
 
@@ -184,10 +191,10 @@ fromList l :=
   # () => Result[(Item, Iterable[Item]), Any]
   # iterable | function.run | result.map { it -> it | list.get 0 }
   # The state contains the list and an index.
-  generateWithState (l, 0) { state ->
+  generateWithState [l, Index: 0] { state ->
     [l, index] = state
     ifElse (l | list.isValidIndex index) {
-      result.ok (l | list.get index, (l, index | int.add 1))
+      result.ok (l | list.get index, [l, Index: index | int.add 1])
     } {
       result.error Empty
     }
