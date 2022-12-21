@@ -36,6 +36,7 @@ Note that not all of the features described here are implemented or even finaliz
 - [Needs](#needs)
 - [Destructuring](#destructuring)
 - [Pattern Matching](#pattern-matching)
+- [Meta wrappers](#meta-wrappers)
 - [Concurrency](#concurrency)
   - [Channels](#channels)
 - [Packages](#packages)
@@ -517,6 +518,25 @@ core.int.add a b
 # actually a pattern:
 foo = bar 5
 ```
+
+TODO: Have a way of destructuring so that the parent is at fault if it doesn't succeed.
+
+## Meta wrappers
+
+- encapsulation: you usually don't have to look into the internal structure
+- attaching stuff to an object that's not used during runtime
+  - doc comments
+  - source location (HIR ID)
+  - debug representation
+  - (IDE tooling)
+- (nominal typing)
+
+metaWrapper (String value) [
+  Doc: "documentation",
+  ToText: { value -> ... },
+]
+
+TODO: Give the `ToText` a receive port to support progressive visualizations?
 
 ## Concurrency
 

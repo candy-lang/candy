@@ -21,8 +21,22 @@ pub trait HirToMir: CstDb + AstToHir + LspPositionConversion {
 }
 
 fn mir(db: &dyn HirToMir, module: Module, tracing: TracingConfig) -> Option<Arc<Mir>> {
-    let (hir, _) = db.hir(module.clone())?;
-    let mir = compile_module(db, module, &hir, &tracing);
+    let mir = match module.kind {
+        ModuleKind::Code => {
+            let (hir, _) = db.hir(module.clone())?;
+            compile_module(db, module, &hir, &tracing)
+        }
+        ModuleKind::Asset => {
+            let bytes = db.get_module_content(module)?;
+            Mir::build(|body| {
+                let bytes = bytes
+                    .iter()
+                    .map(|&it| body.push(Expression::Int(it.into())))
+                    .collect_vec();
+                body.push(Expression::List(bytes));
+            })
+        }
+    };
     Some(Arc::new(mir))
 }
 

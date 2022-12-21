@@ -80,25 +80,24 @@ We already have a language server that provides some tooling.
 - compiler
   - make functions independent of their order in top-level scope
   - text interpolation
-  - fibers, channels
   - patterns
   - improve pattern match panic messages: `[Foo, 1, {a}] = [Foo, 2, {A: B]]` could generate a message like `` Expected `[_, 1, _]`, got `[_, 2, _]`. ``
   - "type" proofs
   - fuzzing of the compiler itself
   - package root marker
   - package path dependencies
-  - performance
-    - multithreading
-    - object deduplication
-    - profiler
-    - memory representation
-      - inlining of ints/etc.
-      - size of an object
-      - heap management
   - LLVM, WASM
+- VM
+  - multithreading
+  - object deduplication
+  - profiler
+  - memory representation
+    - inlining of ints/etc.
+    - size of an object
+    - heap management
 - IDE support:
   - generate debug files
-  - DAP
+  - DAP (debug adapter protocol)
   - [ ] completion, completion resolve
   - [ ] hover
   - [ ] signatureHelp
@@ -123,6 +122,8 @@ We already have a language server that provides some tooling.
   - [x] ~~linkedEditingRange~~
   - [ ] moniker
 - packages
+  - stdin/out utilities such as a print method
+  - files
   - logging
   - HTTP Server
   - Markdown
@@ -148,7 +149,6 @@ We already have a language server that provides some tooling.
 - minimize inputs found through fuzzing
 - fuzz parser
 - remove builtinPrint
-- optimize: tail call optimization
 - tracing visualization
 - distinguish packages from normal modules
 - complain about comment lines with too much indentation
@@ -168,6 +168,7 @@ We already have a language server that provides some tooling.
 - shorter ID formatting for generated debug files
 - support destructuring in lambda parameters
 - find references in patterns
+- convert the readme todos into GitHub issues
 
 ## How to use Candy
 

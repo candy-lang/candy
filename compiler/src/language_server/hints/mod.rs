@@ -23,7 +23,7 @@ use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
 };
-use tracing::{debug, warn};
+use tracing::debug;
 
 pub enum Event {
     UpdateModule(Module, Vec<u8>),
@@ -96,17 +96,16 @@ pub async fn run_server(
         // priority. When constant evaluation is done, we try fuzzing the
         // functions we found.
         let module_with_new_insight = 'new_insight: {
-            debug!("Constant evaluating…");
             if let Some(module) = constant_evaluator.run(&db) {
                 let (heap, closures) = constant_evaluator.get_fuzzable_closures(&module);
                 fuzzer.update_module(module.clone(), &heap, &closures);
+                debug!("The constant evaluator made progress in {module}.");
                 break 'new_insight Some(module);
             }
             // For fuzzing, we're a bit more resource-conscious.
             sleep(Duration::from_millis(200)).await;
-            debug!("Fuzzing…");
             if let Some(module) = fuzzer.run(&db) {
-                warn!("Fuzzer found a problem!");
+                debug!("The fuzzer made progress in {module}.");
                 break 'new_insight Some(module);
             }
             None
