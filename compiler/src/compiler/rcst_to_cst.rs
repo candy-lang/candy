@@ -161,23 +161,23 @@ impl RcstToCstExt for Rcst {
                 closing_single_quotes: closing_single_quotes.to_csts(state),
             },
             Rcst::Text {
-                opening_quote,
+                opening: opening_quote,
                 parts,
-                closing_quote,
+                closing: closing_quote,
             } => CstKind::Text {
-                opening_quote: Box::new(opening_quote.to_cst(state)),
+                opening: Box::new(opening_quote.to_cst(state)),
                 parts: parts.to_csts(state),
-                closing_quote: Box::new(closing_quote.to_cst(state)),
+                closing: Box::new(closing_quote.to_cst(state)),
             },
             Rcst::TextPart(text) => {
                 state.offset += text.len();
                 CstKind::TextPart(text)
             }
-            Rcst::TextPlaceholder {
+            Rcst::TextInterpolation {
                 opening_curly_braces,
                 expression,
                 closing_curly_braces,
-            } => CstKind::TextPlaceholder {
+            } => CstKind::TextInterpolation {
                 opening_curly_braces: opening_curly_braces.to_csts(state),
                 expression: Box::new(expression.to_cst(state)),
                 closing_curly_braces: closing_curly_braces.to_csts(state),

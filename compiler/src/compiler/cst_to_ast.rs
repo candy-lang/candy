@@ -140,9 +140,9 @@ impl LoweringContext {
             }
             CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(value.clone()))),
             CstKind::Text {
-                opening_quote,
+                opening: opening_quote,
                 parts,
-                closing_quote,
+                closing: closing_quote,
             } => {
                 let opening_single_quote_count = match &opening_quote.kind {
                     CstKind::OpeningText {
@@ -153,8 +153,8 @@ impl LoweringContext {
                         }
                     } if opening_single_quotes
                         .iter()
-                        .all(|opening_single_quote| -> bool {
-                            matches!(opening_single_quote.kind, CstKind::SingleQuote)
+                        .all(|single_quote| -> bool {
+                            matches!(single_quote.kind, CstKind::SingleQuote)
                         }) => opening_single_quotes.len(),
                     _ => panic!("Text needs to start with any number of opening single quotes followed by an opening double quote, but started with {}.", opening_quote)
                 };
@@ -173,7 +173,7 @@ impl LoweringContext {
                             lowered_parts.push(text_part);
                         },
                         Cst {
-                            kind: CstKind::TextPlaceholder { 
+                            kind: CstKind::TextInterpolation { 
                                 opening_curly_braces,
                                 expression,
                                 closing_curly_braces
@@ -186,7 +186,7 @@ impl LoweringContext {
                                     .all(|opening_curly_brace| !matches!(opening_curly_brace.kind, CstKind::OpeningCurlyBrace)) 
                             {
                                 panic!(
-                                    "Text placeholder needs to start with {} opening curly braces, but started with {}.", 
+                                    "Text interpolation needs to start with {} opening curly braces, but started with {}.", 
                                     opening_single_quote_count + 1, 
                                     opening_curly_braces.iter().map(|cst| format!("{}", cst)).join("")
                                 )
@@ -209,7 +209,7 @@ impl LoweringContext {
                                             module: self.module.clone(),
                                             span: cst.span.clone(),
                                             payload: CompilerErrorPayload::Ast(
-                                                AstError::TextPlaceholderWithoutClosingCurlyBraces,
+                                                AstError::TextInterpolationWithoutClosingCurlyBraces,
                                             ),
                                         }],
                                     },
@@ -232,8 +232,8 @@ impl LoweringContext {
                         closing_single_quotes
                     } if closing_single_quotes
                         .iter()
-                        .all(|opening_single_quote| -> bool {
-                            matches!(opening_single_quote.kind, CstKind::SingleQuote)
+                        .all(|single_quote| -> bool {
+                            matches!(single_quote.kind, CstKind::SingleQuote)
                         }) && opening_single_quote_count == closing_single_quotes.len()
                 ) {
                     text = self.create_ast(
@@ -256,7 +256,7 @@ impl LoweringContext {
             CstKind::OpeningText { .. } => panic!("OpeningText should only occur in Text."),
             CstKind::ClosingText { .. } => panic!("ClosingText should only occur in Text."),
             CstKind::TextPart(_) => panic!("TextPart should only occur in Text."),
-            CstKind::TextPlaceholder { .. } => panic!("TextPlaceholder should only occur in Text."),
+            CstKind::TextInterpolation { .. } => panic!("TextInterpolation should only occur in Text."),
             CstKind::Pipe {
                 receiver,
                 bar,

@@ -82,12 +82,12 @@ pub enum CstKind {
         closing_single_quotes: Vec<Cst>,
     },
     Text {
-        opening_quote: Box<Cst>,
+        opening: Box<Cst>,
         parts: Vec<Cst>,
-        closing_quote: Box<Cst>,
+        closing: Box<Cst>,
     },
     TextPart(String),
-    TextPlaceholder {
+    TextInterpolation {
         opening_curly_braces: Vec<Cst>,
         expression: Box<Cst>,
         closing_curly_braces: Vec<Cst>,
@@ -207,9 +207,9 @@ impl Display for Cst {
                 Ok(())
             }
             CstKind::Text {
-                opening_quote,
+                opening: opening_quote,
                 parts,
-                closing_quote,
+                closing: closing_quote,
             } => {
                 opening_quote.fmt(f)?;
                 for part in parts {
@@ -218,7 +218,7 @@ impl Display for Cst {
                 closing_quote.fmt(f)
             }
             CstKind::TextPart(literal) => literal.fmt(f),
-            CstKind::TextPlaceholder {
+            CstKind::TextInterpolation {
                 opening_curly_braces,
                 expression,
                 closing_curly_braces,
@@ -414,20 +414,20 @@ impl UnwrapWhitespaceAndComment for Cst {
                 closing_single_quotes: closing_single_quotes.unwrap_whitespace_and_comment(),
             },
             CstKind::Text {
-                opening_quote,
+                opening: opening_quote,
                 parts,
-                closing_quote,
+                closing: closing_quote,
             } => CstKind::Text {
-                opening_quote: Box::new(opening_quote.unwrap_whitespace_and_comment()),
+                opening: Box::new(opening_quote.unwrap_whitespace_and_comment()),
                 parts: parts.unwrap_whitespace_and_comment(),
-                closing_quote: Box::new(closing_quote.unwrap_whitespace_and_comment()),
+                closing: Box::new(closing_quote.unwrap_whitespace_and_comment()),
             },
             kind @ CstKind::TextPart(_) => kind.clone(),
-            CstKind::TextPlaceholder {
+            CstKind::TextInterpolation {
                 opening_curly_braces,
                 expression,
                 closing_curly_braces,
-            } => CstKind::TextPlaceholder {
+            } => CstKind::TextInterpolation {
                 opening_curly_braces: opening_curly_braces.unwrap_whitespace_and_comment(),
                 expression: Box::new(expression.unwrap_whitespace_and_comment()),
                 closing_curly_braces: closing_curly_braces.unwrap_whitespace_and_comment(),
@@ -597,15 +597,15 @@ impl TreeWithIds for Cst {
                 .find(id)
                 .or_else(|| closing_single_quotes.find(id)),
             CstKind::Text {
-                opening_quote,
+                opening: opening_quote,
                 parts,
-                closing_quote,
+                closing: closing_quote,
             } => opening_quote
                 .find(id)
                 .or_else(|| parts.find(id))
                 .or_else(|| closing_quote.find(id)),
             CstKind::TextPart(_) => None,
-            CstKind::TextPlaceholder {
+            CstKind::TextInterpolation {
                 opening_curly_braces,
                 expression,
                 closing_curly_braces,
@@ -729,7 +729,7 @@ impl TreeWithIds for Cst {
                 if matches!(
                     &res,
                     Some(Cst {
-                        kind: CstKind::TextPlaceholder { .. },
+                        kind: CstKind::TextInterpolation { .. },
                         ..
                     })
                 ) {
@@ -741,7 +741,7 @@ impl TreeWithIds for Cst {
             CstKind::OpeningText { .. }
             | CstKind::ClosingText { .. }
             | CstKind::TextPart(_)
-            | CstKind::TextPlaceholder { .. } => (None, false),
+            | CstKind::TextInterpolation { .. } => (None, false),
             CstKind::Pipe { receiver, call, .. } => (
                 receiver
                     .find_by_offset(offset)

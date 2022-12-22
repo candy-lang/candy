@@ -45,12 +45,12 @@ pub enum Rcst {
         closing_single_quotes: Vec<Rcst>,
     },
     Text {
-        opening_quote: Box<Rcst>,
+        opening: Box<Rcst>,
         parts: Vec<Rcst>,
-        closing_quote: Box<Rcst>,
+        closing: Box<Rcst>,
     },
     TextPart(String),
-    TextPlaceholder {
+    TextInterpolation {
         opening_curly_braces: Vec<Rcst>,
         expression: Box<Rcst>,
         closing_curly_braces: Vec<Rcst>,
@@ -129,8 +129,8 @@ pub enum RcstError {
     SymbolContainsNonAlphanumericAscii,
     TextNotClosed,
     TextNotSufficientlyIndented,
-    TextPlaceholderNotClosed,
-    TextPlaceholderInvalidExpression,
+    TextInterpolationNotClosed,
+    TextInterpolationInvalidExpression,
     TooMuchWhitespace,
     UnexpectedCharacters,
     UnparsedRest,
@@ -196,9 +196,9 @@ impl Display for Rcst {
                 Ok(())
             }
             Rcst::Text {
-                opening_quote,
+                opening: opening_quote,
                 parts,
-                closing_quote,
+                closing: closing_quote,
             } => {
                 opening_quote.fmt(f)?;
                 for part in parts {
@@ -207,7 +207,7 @@ impl Display for Rcst {
                 closing_quote.fmt(f)
             }
             Rcst::TextPart(literal) => literal.fmt(f),
-            Rcst::TextPlaceholder {
+            Rcst::TextInterpolation {
                 opening_curly_braces,
                 expression,
                 closing_curly_braces,
@@ -373,14 +373,14 @@ impl IsMultiline for Rcst {
             Rcst::OpeningText { .. } => false,
             Rcst::ClosingText { .. } => false,
             Rcst::Text {
-                opening_quote,
+                opening: opening_quote,
                 parts,
-                closing_quote,
+                closing: closing_quote,
             } => {
                 opening_quote.is_multiline() || parts.is_multiline() || closing_quote.is_multiline()
             }
             Rcst::TextPart(_) => false,
-            Rcst::TextPlaceholder { .. } => false,
+            Rcst::TextInterpolation { .. } => false,
             Rcst::Pipe {
                 receiver,
                 bar,

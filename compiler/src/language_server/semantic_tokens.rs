@@ -194,9 +194,9 @@ impl<'a> Context<'a> {
                 }
             }
             CstKind::Text {
-                opening_quote,
+                opening: opening_quote,
                 parts,
-                closing_quote,
+                closing: closing_quote,
             } => {
                 self.visit_cst(opening_quote, None);
                 for part in parts {
@@ -205,7 +205,7 @@ impl<'a> Context<'a> {
                 self.visit_cst(closing_quote, None);
             }
             CstKind::TextPart(_) => self.add_token(cst.span.clone(), SemanticTokenType::String),
-            CstKind::TextPlaceholder {
+            CstKind::TextInterpolation {
                 opening_curly_braces,
                 expression,
                 closing_curly_braces,

@@ -68,7 +68,7 @@ impl<'a> Context<'a> {
             | CstKind::ClosingText { .. }
             | CstKind::Text { .. }
             | CstKind::TextPart(_)
-            | CstKind::TextPlaceholder { .. } => {}
+            | CstKind::TextInterpolation { .. } => {}
             CstKind::Pipe { receiver, call, .. } => {
                 self.visit_cst(receiver);
                 self.visit_cst(call);

@@ -45,9 +45,9 @@ impl Display for CompilerErrorPayload {
                 }
                 RcstError::TextNotClosed => "This text isn't closed.",
                 RcstError::TextNotSufficientlyIndented => "This text isn't sufficiently indented.",
-                RcstError::TextPlaceholderNotClosed => "This text placeholder isn't closed.",
-                RcstError::TextPlaceholderInvalidExpression => {
-                    "This text placeholder contains an invalid expression."
+                RcstError::TextInterpolationNotClosed => "This text interpolation isn't closed.",
+                RcstError::TextInterpolationInvalidExpression => {
+                    "This text interpolation contains an invalid expression."
                 }
                 RcstError::TooMuchWhitespace => "There is too much whitespace here.",
                 RcstError::UnexpectedCharacters => "This is an unexpected character.",
@@ -80,8 +80,8 @@ impl Display for CompilerErrorPayload {
                     "This struct doesn't have a closing bracket."
                 }
                 AstError::TextWithoutClosingQuote => "This text never ends.",
-                AstError::TextPlaceholderWithoutClosingCurlyBraces => {
-                    "This text placeholder never ends."
+                AstError::TextInterpolationWithoutClosingCurlyBraces => {
+                    "This text interpolation never ends."
                 }
                 AstError::UnexpectedPunctuation => "This punctuation was unexpected.",
             }
