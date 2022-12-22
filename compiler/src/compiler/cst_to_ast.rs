@@ -166,10 +166,10 @@ impl LoweringContext {
                             kind: CstKind::TextPart(text),
                             ..
                         } => {
-                            // TODO: Combine successive text parts during compile time
+                            // TODO: Combine successive text parts during compile time. This can also be done in later stages.
                             let string = self.create_string_without_id_mapping(text.clone());
                             let text_part =
-                                self.create_ast(cst.id, AstKind::TextPart(TextPart(string)));
+                                self.create_ast(part.id, AstKind::TextPart(TextPart(string)));
                             lowered_parts.push(text_part);
                         },
                         Cst {
@@ -194,20 +194,20 @@ impl LoweringContext {
                             
                             let ast = self.lower_cst(expression);
 
-                            if closing_curly_braces.len() != opening_single_quote_count + 1 
-                                || closing_curly_braces
+                            if closing_curly_braces.len() == opening_single_quote_count + 1 
+                                && closing_curly_braces
                                     .iter()
-                                    .all(|closing_curly_brace| -> bool {matches!(closing_curly_brace.kind, CstKind::ClosingCurlyBrace)}) 
+                                    .all(|closing_curly_brace| matches!(closing_curly_brace.kind, CstKind::ClosingCurlyBrace)) 
                             {
                                 lowered_parts.push(ast);
                             } else {
                                 let error = self.create_ast(
-                                    cst.id,
+                                    part.id,
                                     AstKind::Error {
                                         child: Some(Box::new(ast)),
                                         errors: vec![CompilerError {
                                             module: self.module.clone(),
-                                            span: cst.span.clone(),
+                                            span: part.span.clone(),
                                             payload: CompilerErrorPayload::Ast(
                                                 AstError::TextInterpolationWithoutClosingCurlyBraces,
                                             ),
