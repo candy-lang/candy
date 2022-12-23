@@ -183,7 +183,9 @@ mod parse {
         F: Fn(&str) -> Option<(&str, Rcst)>,
     {
         let mut rcsts = vec![];
-        while let Some((input_after_single, rcst)) = parse_single(input) {
+        while let Some((input_after_single, rcst)) = parse_single(input) 
+            && count.map_or(true, |count| rcsts.len() < count) 
+        {
             input = input_after_single;
             rcsts.push(rcst);
         }
