@@ -688,6 +688,13 @@ mod parse {
         let (input, opening_single_quotes) = parse_multiple(input, single_quote, None)?;
         let (mut input, opening_double_quote) = double_quote(input)?;
 
+        let push_line_to_parts = |line: &mut Vec<char>, parts: &mut Vec<Rcst>| {
+            let joined_line = line.drain(..).join("");
+            if !joined_line.is_empty() {
+                parts.push(Rcst::TextPart(joined_line));
+            }
+        };
+
         let mut line = vec![];
         let mut parts = vec![];
         let closing_quote = loop {
@@ -697,7 +704,7 @@ mod parse {
                     match parse_multiple(input, single_quote, Some(opening_single_quotes.len())) {
                         Some((input_after_single_quotes, closing_single_quotes)) => {
                             input = input_after_single_quotes;
-                            parts.push(Rcst::TextPart(line.drain(..).join("")));
+                            push_line_to_parts(&mut line, &mut parts);
                             break Rcst::ClosingText {
                                 closing_double_quote: Box::new(Rcst::DoubleQuote),
                                 closing_single_quotes,
@@ -708,7 +715,7 @@ mod parse {
                 }
                 Some('{') => match text_interpolation(input, opening_single_quotes.len() + 1) {
                     Some((input_after_template, interpolation)) => {
-                        parts.push(Rcst::TextPart(line.drain(..).join("")));
+                        push_line_to_parts(&mut line, &mut parts);
                         input = input_after_template;
                         parts.push(interpolation);
                     }
@@ -718,14 +725,14 @@ mod parse {
                     }
                 },
                 None => {
-                    parts.push(Rcst::TextPart(line.drain(..).join("")));
+                    push_line_to_parts(&mut line, &mut parts);
                     break Rcst::Error {
                         unparsable_input: "".to_string(),
                         error: RcstError::TextNotClosed,
                     };
                 }
                 Some('\n') => {
-                    parts.push(Rcst::TextPart(line.drain(..).join("")));
+                    push_line_to_parts(&mut line, &mut parts);
                     let (i, mut whitespace) =
                         whitespaces_and_newlines(input, indentation + 1, false);
                     input = i;
