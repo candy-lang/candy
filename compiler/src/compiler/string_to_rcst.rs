@@ -626,62 +626,45 @@ mod parse {
 
     #[instrument(level = "trace")]
     fn text_interpolation(input: &str, curly_brace_count: usize) -> Option<(&str, Rcst)> {
-        let (mut input, opening_curly_braces) =
+        let (mut input, mut opening_curly_braces) =
             parse_multiple(input, opening_curly_brace, Some(curly_brace_count))?;
 
-        let mut expression_text = vec![];
-        let closing_curly_braces = loop {
-            match input.chars().next() {
-                Some('}') => {
-                    match parse_multiple(input, closing_curly_brace, Some(curly_brace_count)) {
-                        Some((input_after_closing_curly_braces, closing_curly_braces)) => {
-                            input = input_after_closing_curly_braces;
-                            break closing_curly_braces;
-                        }
-                        _ => {
-                            input = &input[1..];
-                            expression_text.push('}');
-                        }
-                    }
-                }
-                Some('\n') | None => {
-                    break vec![Rcst::Error {
-                        unparsable_input: "".to_string(),
-                        error: RcstError::TextInterpolationNotClosed,
-                    }];
-                }
-                Some(c) => {
-                    input = &input[c.len_utf8()..];
-                    expression_text.push(c);
-                }
-            }
-        };
-
-        // FIXME: Better report the error that the interpolation contains more then just one expression
-        if let Some((expression_text_after_expression, expression)) =
-            expression(&expression_text.iter().join(""), 0, true, true) && expression_text_after_expression.is_empty()
-        {
-            Some((
-                input,
-                Rcst::TextInterpolation {
-                    opening_curly_braces,
-                    expression: Box::new(expression),
-                    closing_curly_braces,
-                },
-            ))
-        } else {
-            Some((
-                input,
-                Rcst::TextInterpolation {
-                    opening_curly_braces,
-                    expression: Box::new(Rcst::Error {
-                        unparsable_input: expression_text.iter().join(""),
-                        error: RcstError::TextInterpolationInvalidExpression,
-                    }),
-                    closing_curly_braces,
-                },
-            ))
+        if let Some((new_input, whitespace)) = single_line_whitespace(input) {
+            input = new_input;
+            let last = opening_curly_braces.pop().unwrap();
+            opening_curly_braces.push(last.wrap_in_whitespace(vec![whitespace]));
         }
+
+        let (mut input, mut expression) = expression(input, 0, true, true).unwrap_or((
+            input,
+            Rcst::Error {
+                unparsable_input: "".to_string(),
+                error: RcstError::TextInterpolationWithoutExpression,
+            },
+        ));
+
+        if let Some((new_input, whitespace)) = single_line_whitespace(input) {
+            input = new_input;
+            expression = expression.wrap_in_whitespace(vec![whitespace]);
+        }
+
+        let (input, closing_curly_braces) =
+            parse_multiple(input, closing_curly_brace, Some(curly_brace_count)).unwrap_or((
+                input,
+                vec![Rcst::Error {
+                    unparsable_input: "".to_string(),
+                    error: RcstError::TextInterpolationNotClosed,
+                }],
+            ));
+
+        Some((
+            input,
+            Rcst::TextInterpolation {
+                opening_curly_braces,
+                expression: Box::new(expression),
+                closing_curly_braces,
+            },
+        ))
     }
     #[instrument(level = "trace")]
     fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {

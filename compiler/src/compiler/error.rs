@@ -46,8 +46,8 @@ impl Display for CompilerErrorPayload {
                 RcstError::TextNotClosed => "This text isn't closed.",
                 RcstError::TextNotSufficientlyIndented => "This text isn't sufficiently indented.",
                 RcstError::TextInterpolationNotClosed => "This text interpolation isn't closed.",
-                RcstError::TextInterpolationInvalidExpression => {
-                    "This text interpolation contains an invalid expression."
+                RcstError::TextInterpolationWithoutExpression => {
+                    "Here's a start of a text interpolation without an expression after it."
                 }
                 RcstError::TooMuchWhitespace => "There is too much whitespace here.",
                 RcstError::UnexpectedCharacters => "This is an unexpected character.",

@@ -130,7 +130,7 @@ pub enum RcstError {
     TextNotClosed,
     TextNotSufficientlyIndented,
     TextInterpolationNotClosed,
-    TextInterpolationInvalidExpression,
+    TextInterpolationWithoutExpression,
     TooMuchWhitespace,
     UnexpectedCharacters,
     UnparsedRest,
