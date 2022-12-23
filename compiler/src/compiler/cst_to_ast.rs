@@ -198,7 +198,7 @@ impl LoweringContext {
                             lowered_parts.push(text_part);
                         },
                         Cst {
-                            kind: CstKind::TextInterpolation { 
+                            kind: CstKind::TextInterpolation {
                                 opening_curly_braces,
                                 expression,
                                 closing_curly_braces
@@ -217,21 +217,21 @@ impl LoweringContext {
                             if opening_curly_braces.len() != (opening_single_quote_count + 1)
                                 || opening_curly_braces
                                     .iter()
-                                    .all(|opening_curly_brace| !matches!(opening_curly_brace.kind, CstKind::OpeningCurlyBrace)) 
+                                    .all(|opening_curly_brace| !matches!(opening_curly_brace.kind, CstKind::OpeningCurlyBrace))
                             {
                                 panic!(
                                     "Text interpolation needs to start with {} opening curly braces, but started with {}.", 
-                                    opening_single_quote_count + 1, 
+                                    opening_single_quote_count + 1,
                                     opening_curly_braces.iter().map(|cst| format!("{}", cst)).join("")
                                 )
                             }
-                            
+
                             let ast = self.lower_cst(expression, LoweringType::Expression);
 
-                            if closing_curly_braces.len() == opening_single_quote_count + 1 
+                            if closing_curly_braces.len() == opening_single_quote_count + 1
                                 && closing_curly_braces
                                     .iter()
-                                    .all(|closing_curly_brace| matches!(closing_curly_brace.kind, CstKind::ClosingCurlyBrace)) 
+                                    .all(|closing_curly_brace| matches!(closing_curly_brace.kind, CstKind::ClosingCurlyBrace))
                             {
                                 lowered_parts.push(ast);
                             } else {
@@ -270,7 +270,8 @@ impl LoweringContext {
                             matches!(single_quote.kind, CstKind::SingleQuote)
                         }) && opening_single_quote_count == closing_single_quotes.len()
                 ) {
-                    errors.push(self.create_error(closing_quote, AstError::TextWithoutClosingQuote));
+                    errors
+                        .push(self.create_error(closing_quote, AstError::TextWithoutClosingQuote));
                 }
 
                 if !errors.is_empty() {
@@ -287,7 +288,9 @@ impl LoweringContext {
             CstKind::OpeningText { .. } => panic!("OpeningText should only occur in Text."),
             CstKind::ClosingText { .. } => panic!("ClosingText should only occur in Text."),
             CstKind::TextPart(_) => panic!("TextPart should only occur in Text."),
-            CstKind::TextInterpolation { .. } => panic!("TextInterpolation should only occur in Text."),
+            CstKind::TextInterpolation { .. } => {
+                panic!("TextInterpolation should only occur in Text.")
+            }
             CstKind::Pipe {
                 receiver,
                 bar,
