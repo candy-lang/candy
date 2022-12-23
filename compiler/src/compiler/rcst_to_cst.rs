@@ -212,13 +212,12 @@ impl RcstToCstExt for Rcst {
                 closing_bracket: Box::new(closing_bracket.to_cst(state)),
             },
             Rcst::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => CstKind::StructField {
-                key: Box::new(key.to_cst(state)),
-                colon: Box::new(colon.to_cst(state)),
+                key_and_colon: key_and_colon
+                    .map(|box (key, colon)| Box::new((key.to_cst(state), colon.to_cst(state)))),
                 value: Box::new(value.to_cst(state)),
                 comma: comma.map(|comma| Box::new(comma.to_cst(state))),
             },
@@ -259,12 +258,12 @@ impl RcstToCstExt for Rcst {
                 closing_curly_brace: Box::new(closing_curly_brace.to_cst(state)),
             },
             Rcst::Assignment {
-                name,
+                name_or_pattern,
                 parameters,
                 assignment_sign,
                 body,
             } => CstKind::Assignment {
-                name: Box::new(name.to_cst(state)),
+                name_or_pattern: Box::new(name_or_pattern.to_cst(state)),
                 parameters: parameters.to_csts(state),
                 assignment_sign: Box::new(assignment_sign.to_cst(state)),
                 body: body.to_csts(state),

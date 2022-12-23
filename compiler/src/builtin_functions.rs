@@ -40,12 +40,14 @@ pub enum BuiltinFunction {
     TextConcatenate,     // (textA: text) (textB: text) -> (concatenated: text)
     TextContains,        // text (pattern: text) -> booleanSymbol
     TextEndsWith,        // text (pattern: text) -> booleanSymbol
+    TextFromUtf8,        // (bytes: listOfInteger) -> resultOfText
     TextGetRange,        // text (startInclusive: int) (endExclusive: int) -> (substring: text)
     TextIsEmpty,         // text -> (isEmpty: booleanSymbol)
     TextLength,          // text -> (length: int)
     TextStartsWith,      // text (pattern: text) -> booleanSymbol
     TextTrimEnd,         // text -> text
     TextTrimStart,       // text -> text
+    ToDebugText,         // any -> text
     Try,                 // closure -> okWithClosureResultOrErrorWithPanicReason
     TypeOf,              // any -> typeSymbol
 }

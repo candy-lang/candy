@@ -1,16 +1,11 @@
 use super::{
     channel::{Capacity, Packet},
-    context::PanickingUseProvider,
     fiber::{Fiber, Status},
     heap::{Closure, Data, Int, List, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
     ids::ChannelId,
-    tracer::{dummy::DummyTracer, Tracer},
-    FiberId, Heap,
+    Heap,
 };
-use crate::{
-    builtin_functions::BuiltinFunction,
-    compiler::{hir::Id, lir::Instruction},
-};
+use crate::{builtin_functions::BuiltinFunction, compiler::hir::Id};
 use itertools::Itertools;
 use num_bigint::BigInt;
 use num_integer::Integer;
@@ -63,12 +58,14 @@ impl Fiber {
             BuiltinFunction::TextConcatenate => self.heap.text_concatenate(args),
             BuiltinFunction::TextContains => self.heap.text_contains(args),
             BuiltinFunction::TextEndsWith => self.heap.text_ends_with(args),
+            BuiltinFunction::TextFromUtf8 => self.heap.text_from_utf8(args),
             BuiltinFunction::TextGetRange => self.heap.text_get_range(args),
             BuiltinFunction::TextIsEmpty => self.heap.text_is_empty(args),
             BuiltinFunction::TextLength => self.heap.text_length(args),
             BuiltinFunction::TextStartsWith => self.heap.text_starts_with(args),
             BuiltinFunction::TextTrimEnd => self.heap.text_trim_end(args),
             BuiltinFunction::TextTrimStart => self.heap.text_trim_start(args),
+            BuiltinFunction::ToDebugText => self.heap.to_debug_text(args),
             BuiltinFunction::Try => self.heap.try_(args),
             BuiltinFunction::TypeOf => self.heap.type_of(args),
         });
@@ -77,15 +74,7 @@ impl Fiber {
             Ok(DivergeControlFlow {
                 closure,
                 responsible,
-            }) => {
-                self.data_stack.push(closure);
-                self.data_stack.push(responsible);
-                self.run_instruction(
-                    &PanickingUseProvider,
-                    &mut DummyTracer.for_fiber(FiberId::root()),
-                    Instruction::Call { num_args: 0 },
-                );
-            }
+            }) => self.call(closure, vec![], responsible),
             Ok(CreateChannel { capacity }) => self.status = Status::CreatingChannel { capacity },
             Ok(Send { channel, packet }) => self.status = Status::Sending { channel, packet },
             Ok(Receive { channel }) => self.status = Status::Receiving { channel },
@@ -386,7 +375,7 @@ impl Heap {
 
     fn print(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |message: Any| {
-            info!("{:?}", message.data.data.format(self));
+            info!("{}", message.address.format(self));
             Return(self.create_nothing())
         })
     }
@@ -400,7 +389,7 @@ impl Heap {
                 }
                 None => Err(format!(
                     "The struct does not contain the key {}.",
-                    key.format(self)
+                    key.address.format(self),
                 )),
             }
         })
@@ -440,6 +429,24 @@ impl Heap {
     fn text_ends_with(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text, suffix: Text| {
             Return(self.create_bool(text.value.ends_with(&suffix.value)))
+        })
+    }
+    fn text_from_utf8(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |bytes: List| {
+            let bytes = bytes
+                .items
+                .iter()
+                .map(|&it| {
+                    let int: Int = self.get(it).data.clone().try_into()?;
+                    int.value
+                        .to_u8()
+                        .ok_or_else(|| format!("Number is not a byte: {}.", int.value))
+                })
+                .try_collect()?;
+            let result = String::from_utf8(bytes)
+                .map(|string| self.create_text(string))
+                .map_err(|_| self.create_text("Invalid UTF-8.".to_string()));
+            Return(self.create_result(result))
         })
     }
     fn text_get_range(&mut self, args: &[Pointer]) -> BuiltinResult {
@@ -487,6 +494,13 @@ impl Heap {
     fn text_trim_start(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: Text| {
             Return(self.create_text(text.value.trim_start().to_string()))
+        })
+    }
+
+    #[allow(clippy::wrong_self_convention)]
+    fn to_debug_text(&mut self, args: &[Pointer]) -> BuiltinResult {
+        unpack_and_later_drop!(self, args, |value: Any| {
+            Return(self.create_text(value.address.format(self)))
         })
     }
 

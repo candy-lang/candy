@@ -1,23 +1,17 @@
 bool := use ".bool"
 channel := use ".channel"
-check := (use ".check").check
-
-concurrency = use ".concurrency"
-parallel := concurrency.parallel
-async := concurrency.async
-await := concurrency.await
-
-conditionals = use ".conditionals"
-if := conditionals.if
-ifElse := conditionals.ifElse
-
-equals := (use ".equality").equals
+[check] := use ".check"
+[async, await, parallel] := use ".concurrency"
+[if, ifElse, loop] := use ".controlFlow"
+[equals] := use ".equality"
 function := use ".function"
 int := use ".int"
+iterable := use ".iterable"
 list := use ".list"
-panic := (use ".panic").panic
+[panic] := use ".panic"
 result := use ".result"
 struct := use ".struct"
 text := use ".text"
-todo := (use ".todo").todo
+[toDebugText] := use ".toDebugText"
+[todo] := use ".todo"
 type := use ".type"

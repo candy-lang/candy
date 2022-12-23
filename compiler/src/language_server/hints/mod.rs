@@ -23,7 +23,7 @@ use tokio::{
     sync::mpsc::{error::TryRecvError, Receiver, Sender},
     time::sleep,
 };
-use tracing::{debug, warn};
+use tracing::debug;
 
 pub enum Event {
     UpdateModule(Module, Vec<u8>),
@@ -96,17 +96,16 @@ pub async fn run_server(
         // priority. When constant evaluation is done, we try fuzzing the
         // functions we found.
         let module_with_new_insight = 'new_insight: {
-            debug!("Constant evaluating…");
             if let Some(module) = constant_evaluator.run(&db) {
                 let (heap, closures) = constant_evaluator.get_fuzzable_closures(&module);
                 fuzzer.update_module(module.clone(), &heap, &closures);
+                debug!("The constant evaluator made progress in {module}.");
                 break 'new_insight Some(module);
             }
             // For fuzzing, we're a bit more resource-conscious.
             sleep(Duration::from_millis(200)).await;
-            debug!("Fuzzing…");
             if let Some(module) = fuzzer.run(&db) {
-                warn!("Fuzzer found a problem!");
+                debug!("The fuzzer made progress in {module}.");
                 break 'new_insight Some(module);
             }
             None
@@ -132,19 +131,6 @@ pub async fn run_server(
                     hint_group
                 })
                 .sorted_by_key(|hint| hint.position)
-                .collect_vec();
-
-            module.dump_associated_debug_file(
-                "hints",
-                &hints.iter().map(|hint| format!("{hint:?}")).join("\n"),
-            );
-
-            // Only show the most important hint per line.
-            let hints = hints
-                .into_iter()
-                .group_by(|hint| hint.position.line)
-                .into_iter()
-                .map(|(_, hints)| hints.max_by_key(|hint| hint.kind).unwrap())
                 .collect_vec();
 
             outgoing_hints.report_hints(module, hints).await;
@@ -179,7 +165,7 @@ impl OutgoingHints {
 /// [em quad](https://en.wikipedia.org/wiki/Quad_(typography)) instead, which
 /// seems to have the same width as a normal space in VSCode.
 fn quasi_spaces(n: usize) -> String {
-    " ".repeat(n)
+    format!(" {}", " ".repeat(n))
 }
 
 trait AlignHints {

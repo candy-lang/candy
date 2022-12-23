@@ -1,12 +1,24 @@
 bool = use "..bool"
-conditionals = use "..conditionals"
-equals = (use "..equality").equals
+[ifElse] = use "..controlFlow"
+[equals] = use "..equality"
 int = use "..int"
+iterable = use "..iterable"
 list = use "..list"
 struct = use "..struct"
 type = use "..type"
 
 is value := type.is value Text
+
+fromUtf8 bytes :=
+  needs (list.is bytes)
+  # TODO: Add this when it runs faster.
+  # needs (bytes | iterable.fromList | iterable.all { byte ->
+  #   bool.lazyAnd (int.is byte) {
+  #     bool.and (byte | int.isNonNegative) (byte | int.isLessThan 256)
+  #   }
+  # })
+
+  bytes | ✨.textFromUtf8
 
 isEmpty text :=
   needs (is text)
@@ -62,7 +74,7 @@ contains text pattern :=
 removePrefix text prefix :=
   needs (is text)
   needs (is prefix)
-  conditionals.ifElse
+  ifElse
     (text | startsWith prefix)
     { text | getRange (prefix | length) (text | length) }
     { text }
@@ -70,7 +82,7 @@ removeSuffix text suffix :=
   needs (is text)
   needs (is suffix)
   textLength = text | length
-  conditionals.ifElse
+  ifElse
     endsWith text suffix
     { text | getRange (textLength | int.subtract (suffix | length)) textLength }
     { text }

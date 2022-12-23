@@ -1,6 +1,6 @@
 bool = use "..bool"
-conditionals = use "..conditionals"
-equals = (use "..equality").equals
+[ifElse] = use "..controlFlow"
+[equals] = use "..equality"
 function = use "..function"
 struct = use "..struct"
 
@@ -47,7 +47,7 @@ mapOrElse result okMapper errorMapper :=
   needs (is result)
   needs (function.is1 okMapper)
   needs (function.is1 errorMapper)
-  conditionals.ifElse
+  ifElse
     equals result.type Ok
     { okMapper result.value }
     { errorMapper result.value }
@@ -65,7 +65,7 @@ flatMap result okMapper :=
   # `okMapper` can also return a result. This is useful for chaining together
   # multiple computations that may fail.
   needs (is result)
-  needs (is function.is1 okMapper)
+  needs (function.is1 okMapper)
   result | mapOr { value -> okMapper value } result
 map result okMapper :=
   # Returns `ok (okMapper result.value)` if it `isOk` and `result` if it
@@ -101,7 +101,7 @@ or resultA resultB :=
 
 unwrapOrElse result defaultGetter :=
   needs (is result)
-  result | mapOrElse { value -> value } { value -> function.call defaultGetter }
+  result | mapOrElse { value -> value } { value -> function.run defaultGetter }
 unwrapOr result default :=
   needs (is result)
   unwrapOrElse result { default }

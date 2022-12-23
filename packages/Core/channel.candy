@@ -1,11 +1,11 @@
 bool = use "..bool"
-equals = (use "..equality").equals
-if = (use "..conditionals").if
+[equals] = use "..equality"
+[if] = use "..controlFlow"
 int = use "..int"
-isType = (use "..type").is
+type = use "..type"
 
-isSendPort value := isType value SendPort
-isReceivePort value := isType value ReceivePort
+isSendPort value := type.is value SendPort
+isReceivePort value := type.is value ReceivePort
 
 create capacity :=
   needs (int.is capacity) "`capacity` is not an integer. Channels need a capacity because otherwise, there would be no backpressure among fibers, and memory leaks would go unnoticed."

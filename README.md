@@ -15,7 +15,8 @@ Candy blurs the line between those stages, for example, by replacing compile-tim
   3                   # int
   "Candy"             # text
   Green               # symbol
-  [ Name: "Candy" ]   # struct
+  (Foo, Bar)          # list
+  [Name: "Candy"]     # struct
   { it -> add it 2 }  # closure
   ```
 
@@ -41,7 +42,7 @@ Candy blurs the line between those stages, for example, by replacing compile-tim
 
 - **Fuzzing instead of traditional types.**
   In Candy, functions have to specify their needs _exactly._
-  As you type, the tooling automatically tests your code with many input to see if one breaks the code:
+  As you type, the tooling automatically tests your code with many inputs to see if one breaks the code:
 
   ```candy
   foo a =             # If you pass a = 0,
@@ -79,24 +80,24 @@ We already have a language server that provides some tooling.
 - compiler
   - make functions independent of their order in top-level scope
   - text interpolation
-  - fibers, channels
   - patterns
-  - pipe operator
+  - improve pattern match panic messages: `[Foo, 1, {a}] = [Foo, 2, {A: B]]` could generate a message like `` Expected `[_, 1, _]`, got `[_, 2, _]`. ``
   - "type" proofs
   - fuzzing of the compiler itself
   - package root marker
   - package path dependencies
-  - performance
-    - multithreading
-    - object deduplication
-    - profiler
-    - memory representation
-      - inlining of ints/etc.
-      - size of an object
-      - heap management
   - LLVM, WASM
+- VM
+  - multithreading
+  - object deduplication
+  - profiler
+  - memory representation
+    - inlining of ints/etc.
+    - size of an object
+    - heap management
 - IDE support:
   - generate debug files
+  - DAP (debug adapter protocol)
   - [ ] completion, completion resolve
   - [ ] hover
   - [ ] signatureHelp
@@ -121,6 +122,8 @@ We already have a language server that provides some tooling.
   - [x] ~~linkedEditingRange~~
   - [ ] moniker
 - packages
+  - stdin/out utilities such as a print method
+  - files
   - logging
   - HTTP Server
   - Markdown
@@ -146,7 +149,6 @@ We already have a language server that provides some tooling.
 - minimize inputs found through fuzzing
 - fuzz parser
 - remove builtinPrint
-- optimize: tail call optimization
 - tracing visualization
 - distinguish packages from normal modules
 - complain about comment lines with too much indentation
@@ -163,6 +165,10 @@ We already have a language server that provides some tooling.
 
 - more efficient argument preparation in LIR function call (so we don't have to push references if the evaluation order doesn't change conceptually)
 - fix evaluation order of pipe expression by keeping it in the AST
+- shorter ID formatting for generated debug files
+- support destructuring in lambda parameters
+- find references in patterns
+- convert the readme todos into GitHub issues
 
 ## How to use Candy
 

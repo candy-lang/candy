@@ -1,11 +1,6 @@
 # Echoes whatever you send to it on stdin.
 
-core = use "...Core"
-async = core.async
-await = core.await
-channel = core.channel
-run = core.function.run
-text = core.text
+[async, await, channel, function, text] = use "...Core"
 
 main := { environment ->
   print message =
@@ -19,7 +14,7 @@ main := { environment ->
   }
 
   print "Hello, world!"
-  foo = run read
+  foo = function.run read
   print "Echo:"
   print foo
 }

@@ -1,8 +1,10 @@
-use super::{ast_to_hir::AstToHir, error::CompilerError};
 use crate::{
     builtin_functions::BuiltinFunction,
     module::{Module, ModuleKind, Package},
+    utils::CountableId,
 };
+
+use super::{ast_to_hir::AstToHir, error::CompilerError};
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use num_bigint::BigUint;
@@ -69,6 +71,10 @@ impl Expression {
                     ids.push(value_id.to_owned());
                 }
             }
+            Expression::Destructure { expression, .. } => ids.push(expression.to_owned()),
+            Expression::PatternIdentifierReference { destructuring, .. } => {
+                ids.push(destructuring.to_owned())
+            }
             Expression::Lambda(Lambda {
                 parameters, body, ..
             }) => {
@@ -105,7 +111,7 @@ impl Body {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub struct Id {
     pub module: Module,
     pub keys: Vec<String>,
@@ -128,11 +134,16 @@ impl Id {
             keys: vec![],
         }
     }
+    /// Refers to the platform (non-Candy code).
     pub fn platform() -> Self {
         Self::tooling("platform".to_string())
     }
     pub fn fuzzer() -> Self {
         Self::tooling("fuzzer".to_string())
+    }
+    /// A dummy ID that is guaranteed to never be responsible for a panic.
+    pub fn dummy() -> Self {
+        Self::tooling("dummy".to_string())
     }
     /// TODO: Currently, when a higher-order function calls a closure passed as
     /// a parameter, that's registered as a normal call instruction, making the
@@ -165,9 +176,14 @@ impl Id {
             && self.keys.iter().zip(&other.keys).all(|(a, b)| a == b)
     }
 }
-impl Display for Id {
+impl fmt::Debug for Id {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "HirId({}:{})", self.module, self.keys.iter().join(":"))
+    }
+}
+impl Display for Id {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{self:?}")
     }
 }
 
@@ -179,6 +195,14 @@ pub enum Expression {
     Symbol(String),
     List(Vec<Id>),
     Struct(HashMap<Id, Id>),
+    Destructure {
+        expression: Id,
+        pattern: Pattern,
+    },
+    PatternIdentifierReference {
+        destructuring: Id,
+        identifier_id: PatternIdentifierId,
+    },
     Lambda(Lambda),
     Builtin(BuiltinFunction),
     Call {
@@ -205,6 +229,48 @@ impl Expression {
 }
 #[allow(clippy::derive_hash_xor_eq)]
 impl hash::Hash for Expression {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct PatternIdentifierId(pub usize);
+impl CountableId for PatternIdentifierId {
+    fn from_usize(id: usize) -> Self {
+        Self(id)
+    }
+    fn to_usize(&self) -> usize {
+        self.0
+    }
+}
+impl fmt::Debug for PatternIdentifierId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "pattern_identifier_{:x}", self.0)
+    }
+}
+impl fmt::Display for PatternIdentifierId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "p${}", self.0)
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Pattern {
+    NewIdentifier(PatternIdentifierId),
+    Int(BigUint),
+    Text(String),
+    Symbol(String),
+    List(Vec<Pattern>),
+    // Keys may not contain `NewIdentifier`.
+    Struct(HashMap<Pattern, Pattern>),
+    Error {
+        child: Option<Box<Pattern>>,
+        errors: Vec<CompilerError>,
+    },
+}
+#[allow(clippy::derive_hash_xor_eq)]
+impl hash::Hash for Pattern {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
     }
@@ -276,6 +342,18 @@ impl fmt::Display for Expression {
                         .join("\n"),
                 )
             }
+            Expression::Destructure {
+                expression,
+                pattern,
+            } => write!(f, "destructure {expression} into {pattern}"),
+            Expression::PatternIdentifierReference {
+                destructuring,
+                identifier_id,
+            } => write!(
+                f,
+                "get destructured p${} from {destructuring}",
+                identifier_id.0
+            ),
             Expression::Lambda(lambda) => {
                 write!(
                     f,
@@ -334,6 +412,47 @@ impl fmt::Display for Expression {
         }
     }
 }
+impl fmt::Display for Pattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Pattern::Int(int) => write!(f, "{int}"),
+            Pattern::Text(text) => write!(f, "\"{text:?}\""),
+            Pattern::NewIdentifier(reference) => write!(f, "{reference}"),
+            Pattern::Symbol(symbol) => write!(f, "{symbol}"),
+            Pattern::List(items) => {
+                write!(
+                    f,
+                    "({})",
+                    match items.as_slice() {
+                        [] => ",".to_owned(),
+                        [item] => format!("{item},"),
+                        items => items.iter().map(|item| format!("{item}")).join(", "),
+                    },
+                )
+            }
+            Pattern::Struct(entries) => {
+                write!(
+                    f,
+                    "[{}]",
+                    entries
+                        .iter()
+                        .map(|(key, value)| format!("{key}: {value}"))
+                        .join(", "),
+                )
+            }
+            Pattern::Error { child, errors } => {
+                write!(f, "{}", if errors.len() == 1 { "error" } else { "errors" })?;
+                for error in errors {
+                    write!(f, "\n  {error}")?;
+                }
+                if let Some(child) = child {
+                    write!(f, "\n  fallback: {child}")?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
 impl fmt::Display for Lambda {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
@@ -366,6 +485,8 @@ impl Expression {
             Expression::Symbol { .. } => None,
             Expression::List(_) => None,
             Expression::Struct(_) => None,
+            Expression::Destructure { .. } => None,
+            Expression::PatternIdentifierReference { .. } => None,
             Expression::Lambda(Lambda { body, .. }) => body.find(id),
             Expression::Builtin(_) => None,
             Expression::Call { .. } => None,
@@ -402,12 +523,31 @@ impl CollectErrors for Expression {
             | Expression::Symbol(_)
             | Expression::List(_)
             | Expression::Struct(_)
+            | Expression::PatternIdentifierReference { .. }
             | Expression::Builtin(_)
             | Expression::Call { .. }
             | Expression::UseModule { .. }
             | Expression::Needs { .. } => {}
             Expression::Lambda(lambda) => lambda.body.collect_errors(errors),
+            Expression::Destructure { pattern, .. } => pattern.collect_errors(errors),
             Expression::Error {
+                errors: the_errors, ..
+            } => {
+                errors.append(&mut the_errors.clone());
+            }
+        }
+    }
+}
+impl CollectErrors for Pattern {
+    fn collect_errors(&self, errors: &mut Vec<CompilerError>) {
+        match self {
+            Pattern::NewIdentifier(_)
+            | Pattern::Int(_)
+            | Pattern::Text(_)
+            | Pattern::Symbol(_)
+            | Pattern::List(_)
+            | Pattern::Struct(_) => {}
+            Pattern::Error {
                 errors: the_errors, ..
             } => {
                 errors.append(&mut the_errors.clone());

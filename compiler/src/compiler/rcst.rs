@@ -84,8 +84,7 @@ pub enum Rcst {
         closing_bracket: Box<Rcst>,
     },
     StructField {
-        key: Box<Rcst>,
-        colon: Box<Rcst>,
+        key_and_colon: Option<Box<(Rcst, Rcst)>>,
         value: Box<Rcst>,
         comma: Option<Box<Rcst>>,
     },
@@ -101,11 +100,12 @@ pub enum Rcst {
         closing_curly_brace: Box<Rcst>,
     },
     Assignment {
-        name: Box<Rcst>,
+        name_or_pattern: Box<Rcst>,
         parameters: Vec<Rcst>,
         assignment_sign: Box<Rcst>,
         body: Vec<Rcst>,
     },
+
     Error {
         unparsable_input: String,
         error: RcstError,
@@ -279,13 +279,14 @@ impl Display for Rcst {
                 closing_bracket.fmt(f)
             }
             Rcst::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => {
-                key.fmt(f)?;
-                colon.fmt(f)?;
+                if let Some(box (key, colon)) = key_and_colon {
+                    key.fmt(f)?;
+                    colon.fmt(f)?;
+                }
                 value.fmt(f)?;
                 if let Some(comma) = comma {
                     comma.fmt(f)?;
@@ -316,12 +317,12 @@ impl Display for Rcst {
                 closing_curly_brace.fmt(f)
             }
             Rcst::Assignment {
-                name,
+                name_or_pattern,
                 parameters,
                 assignment_sign,
                 body,
             } => {
-                name.fmt(f)?;
+                name_or_pattern.fmt(f)?;
                 for parameter in parameters {
                     parameter.fmt(f)?;
                 }
@@ -425,13 +426,14 @@ impl IsMultiline for Rcst {
                     || closing_bracket.is_multiline()
             }
             Rcst::StructField {
-                key,
-                colon,
+                key_and_colon,
                 value,
                 comma,
             } => {
-                key.is_multiline()
-                    || colon.is_multiline()
+                key_and_colon
+                    .as_ref()
+                    .map(|box (key, colon)| key.is_multiline() || colon.is_multiline())
+                    .unwrap_or(false)
                     || value.is_multiline()
                     || comma
                         .as_ref()
@@ -458,12 +460,12 @@ impl IsMultiline for Rcst {
                     || closing_curly_brace.is_multiline()
             }
             Rcst::Assignment {
-                name,
+                name_or_pattern,
                 parameters,
                 assignment_sign,
                 body,
             } => {
-                name.is_multiline()
+                name_or_pattern.is_multiline()
                     || parameters.is_multiline()
                     || assignment_sign.is_multiline()
                     || body.is_multiline()

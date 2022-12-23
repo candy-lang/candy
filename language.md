@@ -23,6 +23,7 @@ Note that not all of the features described here are implemented or even finaliz
   - [Integers](#integers)
   - [Texts](#texts)
   - [Symbols](#symbols)
+  - [Lists](#lists)
   - [Structs](#structs)
   - [Closures](#closures)
   - [Ports](#ports)
@@ -33,7 +34,9 @@ Note that not all of the features described here are implemented or even finaliz
 - [Comments](#comments)
 - [Panics](#panics)
 - [Needs](#needs)
+- [Destructuring](#destructuring)
 - [Pattern Matching](#pattern-matching)
+- [Meta wrappers](#meta-wrappers)
 - [Concurrency](#concurrency)
   - [Channels](#channels)
 - [Packages](#packages)
@@ -55,7 +58,8 @@ Source code is stored in plain text files with a `.candy` file extension.
 ## This is a comment.
 ```
 
-> One `#` is also a comment, but a doc comment for the item above it. See [Comments](#comments) for more info on that.
+> One `#` is also a comment, but a doc comment for the item above it.
+> See [Comments](#comments) for more info on that.
 
 Naming rules are similar to other programming languages.
 Identifiers start with a lowercase letter and may contain letters or digits.
@@ -134,6 +138,20 @@ Green
 Foo
 ```
 
+### Lists
+
+A list is a compound object that holds a collection of elements identified by integer index.
+You can create a list by placing a sequence of comma-separated expressions inside parentheses:
+
+```candy
+("Candy", 42, 4, FooBar) # List with four elements
+(Foo,)                   # List with one element
+(Foo)                    # NOT a list; this evaluates to just `Foo`
+(,)                      # Empty list
+```
+
+TODO: Accessing and modifying lists: `core.list` and destructuring
+
 ### Structs
 
 Structs are mappings from keys to values (also known as dictionaries or hash maps in other languages).
@@ -145,15 +163,9 @@ Structs are mappings from keys to values (also known as dictionaries or hash map
   "TextKey": 4,
   3: 2,
 ]
-```
 
-Omitting keys is equivalent to using zero-indexed numbers as keys. You can also add fields with explicit keys after these:
-
-```candy
-[Hello, World, Foo: Bar]
-
-# equivalent:
-[0: Hello, 1: World, Foo: Bar]
+foo = 123
+[foo]  # Shorthand for `[Foo: foo]`
 ```
 
 To lookup a key that is a symbol, you can use the dot syntax:
@@ -246,7 +258,7 @@ identity a = a
 You can call functions by writing their name followed by the arguments.
 Grouping using parentheses is only necessary if you have nested calls.
 
-```
+```candy
 five = identity 5
 five = identity (identity 5)
 error = identity identity 5  # Error because the first `identity` is called with two arguments.
@@ -255,7 +267,7 @@ error = identity identity 5  # Error because the first `identity` is called with
 You can also split arguments across multiple lines using indentation.
 This allows you to omit parentheses for nested calls.
 
-```
+```candy
 foo = add
   subtract 5 3
   multiply
@@ -268,13 +280,13 @@ TODO: Piping
 ## Modules
 
 For bigger project it becomes necessary to split code into multiple files.
-In Candy, *modules* are a unit of composition.
+In Candy, _modules_ are a unit of composition.
 Modules are self-contained units of code that choose what to expose to the outside world.
 
 Modules correspond either to single candy files or directories containing a single file that is named just `_.candy`.
 For example, a Candy project might look like this:
 
-```
+```candy
 main.candy
 green/
   _.candy
@@ -289,7 +301,7 @@ red/
 
 This directory structure corresponds to the following module hierarchy:
 
-```
+```candy
 main        # from main.candy
 green       # from green/_.candy
   brown     # from green/brown.candy
@@ -303,7 +315,7 @@ Inside a module, top-level variable definitions can use a `:=` instead of `=` to
 In each module, there automatically exists a `use` function that will import other modules from the module tree.
 You pass it a text that describes what module to import.
 
-```
+```candy
 # inside red/yellow/_.candy
 
 foo = use ".purple"  # imports the purple child module
@@ -351,12 +363,12 @@ The `useAsset` also allows you to import arbitrary non-Candy files that are part
 In some cases, it makes more sense to express some data in other formats.
 For example, you might want to store user-facing translations for your program in a JSON file.
 
-```
+```plaintext
 main.candy
 translations.json
 ```
 
-```
+```candy
 # inside main.candy
 
 translations = json.parse (useAsset "..translations.json")
@@ -385,7 +397,7 @@ Instead of types, Candy has a special function-like primitive called `needs`.
 Similar to `assert`s in other languages, `needs` accept a symbol that has to be either `True` or `False`.
 
 Functions can use `needs` to specify requirements for their arguments.
-Essentially, by defining `needs`, a function can *reject* certain inputs and mark the crash as the fault of the caller.
+Essentially, by defining `needs`, a function can _reject_ certain inputs and mark the crash as the fault of the caller.
 For example, here's a function that only accepts integers:
 
 ```candy
@@ -400,7 +412,7 @@ bar = foo A  # error
 ```
 
 Note that there is a difference between functions written as parameterized variables (`foo a = a`) and functions written as closures (`foo = { a -> a }`).
-`needs` always refer to the surrounding *parameterized variable*.
+`needs` always refer to the surrounding _parameterized variable_.
 Consequently, closures can't reject inputs, but they also don't promise that they can handle every input correctly.
 
 ```candy
@@ -429,11 +441,12 @@ foo Hey  # Calling `foo Hey` panics: Life's not fair.
 
 Here are some recommended guidelines for writing reasons:
 
-- For `needs` that only check the type, you typically don't need a reason. 
+- For `needs` that only check the type, you typically don't need a reason.
 - Try to keep the reason short and simple.
 - Phrase the reason as a self-contained sentence, including a period at the end.
 - Write concrete references such as function or parameter names in backticks.
-- Prefer concepts over concrete functions. For example, write "This function needs a non-negative int." rather than "This function needs an int that `isNonNegative`." – after all, users can always jump to the `needs` itself.
+- Prefer concepts over concrete functions.
+  For example, write "This function needs a non-negative int." rather than "This function needs an int that `isNonNegative`." – after all, users can always jump to the `needs` itself.
 - Consider also highlighting what is wrong with the input rather than just spelling out the needs.
 - Consider starting new sentences in long reasons.
 - Consider special-casing typical erroneous inputs with custom reasons.
@@ -445,6 +458,37 @@ If an input crashes in a way that your code is at fault, you will see a hint.
 mySqrt a =               # If you pass `a = -1`,
   needs (core.int.is a)  # this needs succeeds because `core.int.is -1 = True`,
   core.int.sqrt a        # but calling `core.int.sqrt -1` panics: If you want to take the square root of a negative integer, check out the `ComplexNumbers` package.
+```
+
+## Destructuring
+
+Instead of using `.` to access fields of a struct, Candy also supports destructuring:
+
+```candy
+# Using struct access:
+core = use "Core"
+ifElse = core.ifElse
+int = core.int
+list = core.list
+
+# Using destructuring:
+[ifElse, int, list] = use "Core"
+# This uses the shorthand syntax which is equivalent to:
+[IfElse: ifElse, Int: int, List: list] = use "Core"
+```
+
+If any of the fields you're trying to destructure doesn't exist, the code panics.
+
+Destructuring works for lists, too.
+The destructured list must have the same number of items as your pattern.
+
+```candy
+(foo, bar) = (Foo, Bar)
+
+(foo,) = (Foo, Bar)           # Panics: Expected 1 item, got 2.
+(foo, bar, baz) = (Foo, Bar)  # Panics: Expected 3 items, got 2.
+
+(123, bar) = (Foo, Bar)       # Panics: Expected `123`, got `Foo`.
 ```
 
 ## Pattern Matching
@@ -475,10 +519,29 @@ core.int.add a b
 foo = bar 5
 ```
 
+TODO: Have a way of destructuring so that the parent is at fault if it doesn't succeed.
+
+## Meta wrappers
+
+- encapsulation: you usually don't have to look into the internal structure
+- attaching stuff to an object that's not used during runtime
+  - doc comments
+  - source location (HIR ID)
+  - debug representation
+  - (IDE tooling)
+- (nominal typing)
+
+metaWrapper (String value) [
+  Doc: "documentation",
+  ToText: { value -> ... },
+]
+
+TODO: Give the `ToText` a receive port to support progressive visualizations?
+
 ## Concurrency
 
-Candy supports a lightweight version of threads called *fibers*.
-To enforce structured concurrency, they can only be spawned using a special concurrency object called the *nursery*.
+Candy supports a lightweight version of threads called _fibers_.
+To enforce structured concurrency, they can only be spawned using a special concurrency object called the _nursery_.
 In the following code, the surrounding call to `core.parallel` only exits when all fibers inside have completed.
 
 Note: The actual `print` works differently, using [capabilities](#environment-and-capabilities).
@@ -499,7 +562,7 @@ The only exception is if you pass it a nursery, which it can use to spawn other 
 
 Channels can be used to communicate between fibers.
 You can think of a channel like a conveyer belt or a pipe:
-It has a *send end*, which you can use to put messages into it, and it has a *receive end*, which you can use to read messages from it.
+It has a _send end_, which you can use to put messages into it, and it has a _receive end_, which you can use to read messages from it.
 A channel also has a capacity, which indicates how many messages it can hold simultaneously.
 
 ```candy
@@ -516,7 +579,7 @@ core.channel.receive receivePort  # Bar
 There is no guaranteed ordering between messages sent by multiple fibers, but messages coming from the same fiber are guaranteed to arrive in the same order they were sent.
 
 All channel operations are blocking.
-Thus, channels also function as a synchronization primitive and can generate *backpressure*.
+Thus, channels also function as a synchronization primitive and can generate _backpressure_.
 
 ```candy
 core.parallel { nursery ->
@@ -560,7 +623,7 @@ For example, on desktop platforms, the environment looks something like this:
 ]
 ```
 
-Channels also function as *capabilities* here:
+Channels also function as _capabilities_ here:
 If you don't pass the stdout channel to a function, there's no way for it to print anything.
 This is especially useful for more "powerful" capabilities like accessing the file system or network:
 When using a package, without reading its source code, you can be confident that it won't delete your files under some special circumstances.
