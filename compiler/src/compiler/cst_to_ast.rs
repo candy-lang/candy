@@ -163,13 +163,13 @@ impl LoweringContext {
             }
             CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(value.clone()))),
             CstKind::Text {
-                opening: opening_quote,
+                opening,
                 parts,
-                closing: closing_quote,
+                closing,
             } => {
                 let mut errors = vec![];
 
-                let opening_single_quote_count = match &opening_quote.kind {
+                let opening_single_quote_count = match &opening.kind {
                     CstKind::OpeningText {
                         opening_single_quotes,
                         opening_double_quote: box Cst {
@@ -181,7 +181,7 @@ impl LoweringContext {
                         .all(|single_quote| -> bool {
                             matches!(single_quote.kind, CstKind::SingleQuote)
                         }) => opening_single_quotes.len(),
-                    _ => panic!("Text needs to start with any number of opening single quotes followed by an opening double quote, but started with {}.", opening_quote)
+                    _ => panic!("Text needs to start with any number of single quotes followed by a double quote, but started with {}.", opening)
                 };
 
                 let mut lowered_parts = vec![];
@@ -257,7 +257,7 @@ impl LoweringContext {
                 let mut text = self.create_ast(cst.id, AstKind::Text(Text(lowered_parts)));
 
                 if !matches!(
-                    &closing_quote.kind,
+                    &closing.kind,
                     CstKind::ClosingText {
                         closing_double_quote: box Cst {
                             kind: CstKind::DoubleQuote,
@@ -270,8 +270,7 @@ impl LoweringContext {
                             matches!(single_quote.kind, CstKind::SingleQuote)
                         }) && opening_single_quote_count == closing_single_quotes.len()
                 ) {
-                    errors
-                        .push(self.create_error(closing_quote, AstError::TextWithoutClosingQuote));
+                    errors.push(self.create_error(closing, AstError::TextWithoutClosingQuote));
                 }
 
                 if !errors.is_empty() {

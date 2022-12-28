@@ -196,15 +196,15 @@ impl Display for Rcst {
                 Ok(())
             }
             Rcst::Text {
-                opening: opening_quote,
+                opening,
                 parts,
-                closing: closing_quote,
+                closing,
             } => {
-                opening_quote.fmt(f)?;
+                opening.fmt(f)?;
                 for part in parts {
                     part.fmt(f)?;
                 }
-                closing_quote.fmt(f)
+                closing.fmt(f)
             }
             Rcst::TextPart(literal) => literal.fmt(f),
             Rcst::TextInterpolation {
@@ -374,12 +374,10 @@ impl IsMultiline for Rcst {
             Rcst::OpeningText { .. } => false,
             Rcst::ClosingText { .. } => false,
             Rcst::Text {
-                opening: opening_quote,
+                opening,
                 parts,
-                closing: closing_quote,
-            } => {
-                opening_quote.is_multiline() || parts.is_multiline() || closing_quote.is_multiline()
-            }
+                closing,
+            } => opening.is_multiline() || parts.is_multiline() || closing.is_multiline(),
             Rcst::TextPart(_) => false,
             Rcst::TextInterpolation { .. } => false,
             Rcst::Pipe {

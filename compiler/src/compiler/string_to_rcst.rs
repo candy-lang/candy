@@ -697,7 +697,7 @@ mod parse {
 
         let mut line = vec![];
         let mut parts = vec![];
-        let closing_quote = loop {
+        let closing = loop {
             match input.chars().next() {
                 Some('"') => {
                     input = &input[1..];
@@ -714,9 +714,9 @@ mod parse {
                     }
                 }
                 Some('{') => match text_interpolation(input, opening_single_quotes.len() + 1) {
-                    Some((input_after_template, interpolation)) => {
+                    Some((input_after_interpolation, interpolation)) => {
                         push_line_to_parts(&mut line, &mut parts);
-                        input = input_after_template;
+                        input = input_after_interpolation;
                         parts.push(interpolation);
                     }
                     None => {
@@ -758,7 +758,7 @@ mod parse {
                     opening_double_quote: Box::new(opening_double_quote),
                 }),
                 parts,
-                closing: Box::new(closing_quote),
+                closing: Box::new(closing),
             },
         ))
     }

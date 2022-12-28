@@ -194,15 +194,15 @@ impl<'a> Context<'a> {
                 }
             }
             CstKind::Text {
-                opening: opening_quote,
+                opening,
                 parts,
-                closing: closing_quote,
+                closing,
             } => {
-                self.visit_cst(opening_quote, None);
+                self.visit_cst(opening, None);
                 for part in parts {
                     self.visit_cst(part, None);
                 }
-                self.visit_cst(closing_quote, None);
+                self.visit_cst(closing, None);
             }
             CstKind::TextPart(_) => self.add_token(cst.span.clone(), SemanticTokenType::String),
             CstKind::TextInterpolation {

@@ -161,13 +161,13 @@ impl RcstToCstExt for Rcst {
                 closing_single_quotes: closing_single_quotes.to_csts(state),
             },
             Rcst::Text {
-                opening: opening_quote,
+                opening,
                 parts,
-                closing: closing_quote,
+                closing,
             } => CstKind::Text {
-                opening: Box::new(opening_quote.to_cst(state)),
+                opening: Box::new(opening.to_cst(state)),
                 parts: parts.to_csts(state),
-                closing: Box::new(closing_quote.to_cst(state)),
+                closing: Box::new(closing.to_cst(state)),
             },
             Rcst::TextPart(text) => {
                 state.offset += text.len();

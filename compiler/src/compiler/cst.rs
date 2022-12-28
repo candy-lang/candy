@@ -206,15 +206,15 @@ impl Display for Cst {
                 Ok(())
             }
             CstKind::Text {
-                opening: opening_quote,
+                opening,
                 parts,
-                closing: closing_quote,
+                closing,
             } => {
-                opening_quote.fmt(f)?;
+                opening.fmt(f)?;
                 for part in parts {
                     part.fmt(f)?;
                 }
-                closing_quote.fmt(f)
+                closing.fmt(f)
             }
             CstKind::TextPart(literal) => literal.fmt(f),
             CstKind::TextInterpolation {
@@ -416,13 +416,13 @@ impl UnwrapWhitespaceAndComment for Cst {
                 closing_single_quotes: closing_single_quotes.unwrap_whitespace_and_comment(),
             },
             CstKind::Text {
-                opening: opening_quote,
+                opening,
                 parts,
-                closing: closing_quote,
+                closing,
             } => CstKind::Text {
-                opening: Box::new(opening_quote.unwrap_whitespace_and_comment()),
+                opening: Box::new(opening.unwrap_whitespace_and_comment()),
                 parts: parts.unwrap_whitespace_and_comment(),
-                closing: Box::new(closing_quote.unwrap_whitespace_and_comment()),
+                closing: Box::new(closing.unwrap_whitespace_and_comment()),
             },
             kind @ CstKind::TextPart(_) => kind.clone(),
             CstKind::TextInterpolation {
@@ -602,13 +602,13 @@ impl TreeWithIds for Cst {
                 .find(id)
                 .or_else(|| closing_single_quotes.find(id)),
             CstKind::Text {
-                opening: opening_quote,
+                opening,
                 parts,
-                closing: closing_quote,
-            } => opening_quote
+                closing,
+            } => opening
                 .find(id)
                 .or_else(|| parts.find(id))
-                .or_else(|| closing_quote.find(id)),
+                .or_else(|| closing.find(id)),
             CstKind::TextPart(_) => None,
             CstKind::TextInterpolation {
                 opening_curly_braces,
