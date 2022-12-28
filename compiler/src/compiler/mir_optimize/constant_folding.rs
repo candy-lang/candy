@@ -233,6 +233,23 @@ impl Mir {
                     | Expression::TraceFoundFuzzableClosure { .. } => unreachable!(),
                 }
             }
+            BuiltinFunction::TextConcatenate => {
+                // TODO: Properly implement this optimization.
+                //       This is just a preliminary implementation to get use working
+                //       with the changes introduced by text interpolation.
+                if arguments.len() != 2 {
+                    return Some(Err("wrong number of arguments".to_string()));
+                }
+
+                let a = visible.get(arguments[0]);
+                let b = visible.get(arguments[1]);
+
+                if let Expression::Text(text_a) = a && let Expression::Text(text_b) = b {
+                    Expression::Text(format!("{}{}", text_a, text_b))
+                } else {
+                    return None
+                }
+            }
             _ => return None,
         };
         Some(Ok(return_value))
