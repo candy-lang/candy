@@ -261,7 +261,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let module_closure = Closure::of_module(&db, module.clone(), tracing.clone()).unwrap();
     let mut tracer = FullTracer::default();
 
-    let mut vm = Vm::new();
+    let mut vm = Vm::default();
     vm.set_up_for_running_module_closure(module.clone(), module_closure);
     vm.run(
         &DbUseProvider {
@@ -320,7 +320,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
 
     debug!("Running main function.");
     // TODO: Add more environment stuff.
-    let mut vm = Vm::new();
+    let mut vm = Vm::default();
     let mut stdout = StdoutService::new(&mut vm);
     let mut stdin = StdinService::new(&mut vm);
     let environment = {

@@ -123,8 +123,8 @@ impl FiberId {
     }
 }
 
-impl Vm {
-    pub fn new() -> Self {
+impl Default for Vm {
+    fn default() -> Self {
         Self {
             fibers: HashMap::new(),
             channels: HashMap::new(),
@@ -135,7 +135,8 @@ impl Vm {
             fiber_id_generator: IdGenerator::start_at(FiberId::root().to_usize() + 1),
         }
     }
-
+}
+impl Vm {
     fn set_up_with_fiber(&mut self, fiber: Fiber) {
         assert!(
             !self.fibers.contains_key(&FiberId::root()),
