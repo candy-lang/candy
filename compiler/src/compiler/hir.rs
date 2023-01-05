@@ -283,7 +283,7 @@ pub struct Lambda {
     pub fuzzable: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Body {
     pub expressions: LinkedHashMap<Id, Expression>,
     pub identifiers: HashMap<Id, String>,
@@ -304,12 +304,6 @@ pub enum HirError {
 }
 
 impl Body {
-    pub fn new() -> Self {
-        Self {
-            expressions: LinkedHashMap::new(),
-            identifiers: HashMap::new(),
-        }
-    }
     pub fn push(&mut self, id: Id, expression: Expression, identifier: Option<String>) {
         self.expressions.insert(id.to_owned(), expression);
         if let Some(identifier) = identifier {
