@@ -20,7 +20,7 @@ use crate::{
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
         error::CompilerError,
-        hir::{self, CollectErrors, Id},
+        hir::{self, CollectErrors},
         mir_to_lir::MirToLir,
         rcst_to_cst::RcstToCst,
         string_to_rcst::StringToRcst,
@@ -333,7 +333,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
             (stdin_symbol, stdin_port),
         ]))
     };
-    let platform = heap.create_hir_id(Id::platform());
+    let platform = heap.create_hir_id(hir::Id::platform());
     tracer.for_fiber(FiberId::root()).call_started(
         platform,
         main,
@@ -341,7 +341,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         platform,
         &heap,
     );
-    vm.set_up_for_running_closure(heap, main, vec![environment], Id::platform());
+    vm.set_up_for_running_closure(heap, main, vec![environment], hir::Id::platform());
     loop {
         match vm.status() {
             Status::CanRun => {
