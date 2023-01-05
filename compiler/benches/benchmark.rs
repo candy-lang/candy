@@ -11,12 +11,12 @@ mod utils;
 fn benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("basics");
 
-    group.sample_size(20);
+    group.sample_size(100);
     group.bench_function("hello_world", |b| {
         b.run_candy(r#"main _ := "Hello, world!""#);
     });
 
-    group.sample_size(10);
+    group.sample_size(20);
     let n = 15;
     let fibonacci_code = format!(
         r#"[ifElse, int] = use "..Core"
