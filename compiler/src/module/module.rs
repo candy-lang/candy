@@ -139,7 +139,12 @@ impl Module {
     pub fn dump_associated_debug_file(&self, debug_type: &str, content: &str) {
         let Some(mut path) = self.try_to_path() else { return; };
         path.set_extension(format!("candy.{}", debug_type));
-        fs::write(path, content).unwrap();
+        fs::write(path.clone(), content).unwrap_or_else(|error| {
+            warn!(
+                "Couldn't write to associated debug file {}: {error}.",
+                path.to_string_lossy(),
+            )
+        });
     }
 }
 
@@ -153,7 +158,6 @@ impl Display for Module {
                 .iter()
                 .map(|component| component.to_string())
                 .join("/")
-        )?;
-        Ok(())
+        )
     }
 }
