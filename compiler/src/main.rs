@@ -358,9 +358,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         }
         stdout.run(&mut vm);
         stdin.run(&mut vm);
-        for channel in vm.unreferenced_channels.iter().copied().collect_vec() {
-            vm.free_channel(channel);
-        }
+        vm.free_unreferenced_channels();
     }
     if options.debug {
         module.dump_associated_debug_file("trace", &format!("{tracer:?}"));

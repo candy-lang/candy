@@ -244,6 +244,12 @@ impl Vm {
         operation_id
     }
 
+    pub fn free_unreferenced_channels(&mut self) {
+        for channel in self.unreferenced_channels.iter().copied().collect_vec() {
+            self.free_channel(channel);
+        }
+    }
+
     /// May only be called if the channel is in the `unreferenced_channels`.
     pub fn free_channel(&mut self, channel: ChannelId) {
         assert!(self.unreferenced_channels.contains(&channel));
