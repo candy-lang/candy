@@ -13,6 +13,9 @@ target
 **/perf.data
 **/perf.data.old
 
+# Flamegraph
+*.svg
+
 # Dart/Pub
 **/doc/api/
 .dart_tool/

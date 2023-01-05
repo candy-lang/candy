@@ -28,7 +28,7 @@ pub trait CstToAst: CstDb + RcstToCst {
     fn ast(&self, module: Module) -> Option<AstResult>;
 }
 
-type AstResult = (Arc<Vec<Ast>>, HashMap<ast::Id, cst::Id>);
+type AstResult = (Arc<Vec<Ast>>, Arc<HashMap<ast::Id, cst::Id>>);
 
 fn ast_to_cst_id(db: &dyn CstToAst, id: ast::Id) -> Option<cst::Id> {
     let (_, ast_to_cst_id_mapping) = db.ast(id.module.clone()).unwrap();
@@ -82,7 +82,7 @@ fn ast(db: &dyn CstToAst, module: Module) -> Option<AstResult> {
         }
     };
 
-    Some((Arc::new(asts), context.id_mapping))
+    Some((Arc::new(asts), Arc::new(context.id_mapping)))
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

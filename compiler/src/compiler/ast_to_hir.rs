@@ -27,8 +27,9 @@ pub trait AstToHir: CstDb + CstToAst {
     fn ast_to_hir_id(&self, id: ast::Id) -> Option<hir::Id>;
     fn cst_to_hir_id(&self, module: Module, id: cst::Id) -> Option<hir::Id>;
 
-    fn hir(&self, module: Module) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)>;
+    fn hir(&self, module: Module) -> Option<HirResult>;
 }
+type HirResult = (Arc<Body>, Arc<HashMap<hir::Id, ast::Id>>);
 
 fn hir_to_ast_id(db: &dyn AstToHir, id: hir::Id) -> Option<ast::Id> {
     let (_, hir_to_ast_id_mapping) = db.hir(id.module.clone()).unwrap();
@@ -57,10 +58,10 @@ fn cst_to_hir_id(db: &dyn AstToHir, module: Module, id: cst::Id) -> Option<hir::
     db.ast_to_hir_id(id)
 }
 
-fn hir(db: &dyn AstToHir, module: Module) -> Option<(Arc<Body>, HashMap<hir::Id, ast::Id>)> {
+fn hir(db: &dyn AstToHir, module: Module) -> Option<HirResult> {
     let (ast, _) = db.ast(module.clone())?;
     let (body, id_mapping) = compile_top_level(db, module, &ast);
-    Some((Arc::new(body), id_mapping))
+    Some((Arc::new(body), Arc::new(id_mapping)))
 }
 
 fn compile_top_level(
