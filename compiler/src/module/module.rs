@@ -54,7 +54,7 @@ impl Module {
             )
         });
         let relative_path =
-            match relative_path.strip_prefix(fs::canonicalize(package_root.clone()).unwrap()) {
+            match relative_path.strip_prefix(fs::canonicalize(&package_root).unwrap()) {
                 Ok(path) => path,
                 Err(_) => {
                     return Module {

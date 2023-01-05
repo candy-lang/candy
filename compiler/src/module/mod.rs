@@ -34,17 +34,19 @@ pub struct InMemoryModuleProvider {
 impl InMemoryModuleProvider {
     // It's exported in `lib.rs`, but the linter still complains about it.
     #[allow(dead_code)]
-    pub fn for_modules(modules: HashMap<Module, &str>) -> Self {
-        Self {
-            modules: modules
-                .into_iter()
-                .map(|(module, content)| (module, Arc::new(content.as_bytes().to_vec())))
-                .collect(),
+    pub fn for_modules<S: AsRef<str>>(modules: HashMap<Module, S>) -> Self {
+        let mut result = Self::default();
+        for (module, content) in modules {
+            result.add_str(&module, content);
         }
+        result
     }
 
     pub fn add(&mut self, module: &Module, content: Vec<u8>) {
         self.modules.insert(module.clone(), Arc::new(content));
+    }
+    pub fn add_str<S: AsRef<str>>(&mut self, module: &Module, content: S) {
+        self.add(module, content.as_ref().as_bytes().to_vec())
     }
     pub fn remove(&mut self, module: &Module) {
         self.modules.remove(module);

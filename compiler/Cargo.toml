@@ -38,6 +38,7 @@ tracing = { version = "0.1", features = ["release_max_level_debug"] }
 tracing-subscriber = { version = "0.2.0", features = ["registry"] }
 unicode-segmentation = "1.9.0"
 url = "2.2.2"
+walkdir = "2.3.2"
 
 [dev-dependencies]
 criterion = "0.4.0"
