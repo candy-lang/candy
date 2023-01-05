@@ -104,7 +104,7 @@ impl Expression {
 }
 impl Body {
     fn collect_all_ids(&self, ids: &mut Vec<Id>) {
-        ids.extend(self.expressions.keys().into_iter().cloned());
+        ids.extend(self.expressions.keys().cloned());
         for expression in self.expressions.values() {
             expression.collect_all_ids(ids);
         }

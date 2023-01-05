@@ -183,7 +183,6 @@ fn raw_build(
             "ast_to_cst_ids",
             &ast_cst_id_map
                 .keys()
-                .into_iter()
                 .sorted_by_key(|it| it.local)
                 .map(|key| format!("{key} -> {}\n", ast_cst_id_map[key].0))
                 .join(""),
@@ -197,7 +196,6 @@ fn raw_build(
             "hir_to_ast_ids",
             &hir_ast_id_map
                 .keys()
-                .into_iter()
                 .map(|key| format!("{key} -> {}\n", hir_ast_id_map[key]))
                 .join(""),
         );

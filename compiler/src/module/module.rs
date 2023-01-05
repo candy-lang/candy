@@ -67,7 +67,6 @@ impl Module {
 
         let mut path = relative_path
             .components()
-            .into_iter()
             .map(|component| match component {
                 std::path::Component::Prefix(_) => unreachable!(),
                 std::path::Component::RootDir => unreachable!(),
