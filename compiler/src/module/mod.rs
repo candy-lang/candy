@@ -32,6 +32,8 @@ pub struct InMemoryModuleProvider {
     modules: HashMap<Module, Arc<Vec<u8>>>,
 }
 impl InMemoryModuleProvider {
+    // It's exported in `lib.rs`, but the linter still complains about it.
+    #[allow(dead_code)]
     pub fn for_modules(modules: HashMap<Module, &str>) -> Self {
         Self {
             modules: modules
