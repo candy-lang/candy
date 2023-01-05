@@ -87,14 +87,9 @@ impl Heap {
         self.dup_by(address, 1);
     }
     pub fn dup_by(&mut self, address: Pointer, amount: usize) {
-        self.get_mut(address).reference_count += amount;
-
-        let object = self.get(address);
-        trace!(
-            "RefCount of {address} increased to {}. Value: {}",
-            object.reference_count,
-            address.format_debug(self),
-        );
+        let object = self.get_mut(address);
+        object.reference_count += amount;
+        let new_reference_count = object.reference_count;
 
         if let Some(channel) = object.data.channel() {
             *self
@@ -103,6 +98,12 @@ impl Heap {
                 .or_insert_with(|| panic!("Called `dup_by` on a channel that doesn't exist.")) +=
                 amount;
         };
+
+        trace!(
+            "RefCount of {address} increased to {}. Value: {}",
+            new_reference_count,
+            address.format_debug(self),
+        );
     }
     pub fn drop(&mut self, address: Pointer) {
         trace!(
