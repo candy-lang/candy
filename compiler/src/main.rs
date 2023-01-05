@@ -1,3 +1,4 @@
+// Keep these in sync with `lib.rs`!
 #![feature(async_closure)]
 #![feature(box_patterns)]
 #![feature(let_chains)]

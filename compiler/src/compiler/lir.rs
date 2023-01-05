@@ -1,5 +1,5 @@
 use super::mir::Id;
-use crate::{builtin_functions::BuiltinFunction, hir, module::Module};
+use crate::{builtin_functions::BuiltinFunction, compiler::hir, module::Module};
 use itertools::Itertools;
 use num_bigint::BigInt;
 use std::fmt::Display;
