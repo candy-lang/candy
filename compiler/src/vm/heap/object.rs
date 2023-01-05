@@ -334,3 +334,40 @@ impl Pointer {
         }
     }
 }
+
+macro_rules! impl_data_try_into_type {
+    ($type:ty, $variant:tt, $error_message:expr$(,)?) => {
+        impl TryInto<$type> for Data {
+            type Error = String;
+
+            fn try_into(self) -> Result<$type, Self::Error> {
+                match self {
+                    Data::$variant(it) => Ok(it),
+                    _ => Err($error_message.to_string()),
+                }
+            }
+        }
+    };
+}
+impl_data_try_into_type!(Int, Int, "Expected an int.");
+impl_data_try_into_type!(Text, Text, "Expected a text.");
+impl_data_try_into_type!(Symbol, Symbol, "Expected a symbol.");
+impl_data_try_into_type!(List, List, "Expected a list.");
+impl_data_try_into_type!(Struct, Struct, "Expected a struct.");
+impl_data_try_into_type!(Id, HirId, "Expected a HIR ID.");
+impl_data_try_into_type!(Closure, Closure, "Expected a closure.");
+impl_data_try_into_type!(SendPort, SendPort, "Expected a send port.");
+impl_data_try_into_type!(ReceivePort, ReceivePort, "Expected a receive port.");
+
+impl TryInto<bool> for Data {
+    type Error = String;
+
+    fn try_into(self) -> Result<bool, Self::Error> {
+        let symbol: Symbol = self.try_into()?;
+        match symbol.value.as_str() {
+            "True" => Ok(true),
+            "False" => Ok(false),
+            _ => Err("Expected `True` or `False`.".to_string()),
+        }
+    }
+}

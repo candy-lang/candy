@@ -1,11 +1,11 @@
 use super::{
     channel::{Capacity, Packet},
     fiber::{Fiber, Status},
-    heap::{Closure, Data, Int, List, Pointer, ReceivePort, SendPort, Struct, Symbol, Text},
+    heap::{Closure, Data, Int, List, Pointer, ReceivePort, SendPort, Struct, Text},
     ids::ChannelId,
     Heap,
 };
-use crate::{builtin_functions::BuiltinFunction, compiler::hir::Id};
+use crate::builtin_functions::BuiltinFunction;
 use itertools::Itertools;
 use num_bigint::BigInt;
 use num_integer::Integer;
@@ -564,49 +564,5 @@ impl TryInto<Any> for Data {
 
     fn try_into(self) -> Result<Any, Self::Error> {
         Ok(Any { data: self })
-    }
-}
-macro_rules! impl_data_try_into_type {
-    ($type:ty, $variant:tt, $error_message:expr$(,)?) => {
-        impl TryInto<$type> for Data {
-            type Error = String;
-
-            fn try_into(self) -> Result<$type, Self::Error> {
-                match self {
-                    Data::$variant(it) => Ok(it),
-                    _ => Err($error_message.to_string()),
-                }
-            }
-        }
-    };
-}
-impl_data_try_into_type!(Int, Int, "A builtin function expected an int.");
-impl_data_try_into_type!(Text, Text, "A builtin function expected a text.");
-impl_data_try_into_type!(Symbol, Symbol, "A builtin function expected a symbol.");
-impl_data_try_into_type!(List, List, "A builtin function expected a list.");
-impl_data_try_into_type!(Struct, Struct, "A builtin function expected a struct.");
-impl_data_try_into_type!(Id, HirId, "A builtin function expected a HIR ID.");
-impl_data_try_into_type!(Closure, Closure, "A builtin function expected a closure.");
-impl_data_try_into_type!(
-    SendPort,
-    SendPort,
-    "A builtin function expected a send port.",
-);
-impl_data_try_into_type!(
-    ReceivePort,
-    ReceivePort,
-    "A builtin function expected a receive port.",
-);
-
-impl TryInto<bool> for Data {
-    type Error = String;
-
-    fn try_into(self) -> Result<bool, Self::Error> {
-        let symbol: Symbol = self.try_into()?;
-        match symbol.value.as_str() {
-            "True" => Ok(true),
-            "False" => Ok(false),
-            _ => Err("A builtin function expected `True` or `False`.".to_string()),
-        }
     }
 }
