@@ -472,7 +472,7 @@ impl Vm {
         let mut known_channels = HashSet::new();
         for fiber in self.fibers.values() {
             if let Some(single) = fiber.as_single() {
-                known_channels.extend(single.fiber.heap.known_channels().into_iter());
+                known_channels.extend(single.fiber.heap.known_channels());
             }
         }
         // Because we don't track yet which channels have leaked to the outside
