@@ -23,6 +23,12 @@ lazy_static! {
     };
 }
 
+pub fn setup_and_compile(source_code: &str) -> (Database, Lir) {
+    let mut db = setup();
+    let lir = compile(&mut db, source_code).as_ref().to_owned();
+    (db, lir)
+}
+
 pub fn setup() -> Database {
     let mut module_provider = load_core();
     module_provider.add_str(&MODULE, r#"_ = use "..Core""#);
@@ -57,11 +63,6 @@ fn load_core() -> InMemoryModuleProvider {
         modules.insert(module, source_code);
     }
     InMemoryModuleProvider::for_modules(modules)
-}
-
-pub fn compile_and_run(db: &mut Database, source_code: &str) {
-    let lir = compile(db, source_code);
-    run(db, lir.as_ref().to_owned());
 }
 
 pub fn compile(db: &mut Database, source_code: &str) -> Arc<Lir> {
