@@ -10,7 +10,7 @@
     "directory": "new-new-packages/vscode_extension"
   },
   "engines": {
-    "vscode": "^1.48.0"
+    "vscode": "^1.74.0"
   },
   "categories": [
     "Programming Languages",
@@ -18,7 +18,6 @@
     "Snippets"
   ],
   "activationEvents": [
-    "onLanguage:candy",
     "workspaceContains:**/*.candy"
   ],
   "main": "./out/extension.js",
