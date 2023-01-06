@@ -222,7 +222,7 @@ impl LoweringContext {
                                 panic!(
                                     "Text interpolation needs to start with {} opening curly braces, but started with {}.", 
                                     opening_single_quote_count + 1,
-                                    opening_curly_braces.iter().map(|cst| format!("{}", cst)).join("")
+                                    opening_curly_braces.iter().map(|cst| format!("{}", cst)).join(""),
                                 )
                             }
 
