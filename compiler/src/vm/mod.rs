@@ -10,7 +10,7 @@ mod use_module;
 pub use self::{
     channel::Packet,
     fiber::{ExecutionResult, Fiber},
-    heap::{Closure, Data, Heap, Object, Pointer, SendPort, Struct},
+    heap::{Closure, Data, Heap, Int, List, Object, Pointer, SendPort, Struct, Text},
     ids::{ChannelId, FiberId, OperationId},
     tracer::{full::FullTracer, Tracer},
 };
@@ -123,8 +123,8 @@ impl FiberId {
     }
 }
 
-impl Vm {
-    pub fn new() -> Self {
+impl Default for Vm {
+    fn default() -> Self {
         Self {
             fibers: HashMap::new(),
             channels: HashMap::new(),
@@ -135,7 +135,8 @@ impl Vm {
             fiber_id_generator: IdGenerator::start_at(FiberId::root().to_usize() + 1),
         }
     }
-
+}
+impl Vm {
     fn set_up_with_fiber(&mut self, fiber: Fiber) {
         assert!(
             !self.fibers.contains_key(&FiberId::root()),
@@ -242,6 +243,12 @@ impl Vm {
         let operation_id = self.operation_id_generator.generate();
         self.receive_from_channel(Performer::External(operation_id), channel);
         operation_id
+    }
+
+    pub fn free_unreferenced_channels(&mut self) {
+        for channel in self.unreferenced_channels.iter().copied().collect_vec() {
+            self.free_channel(channel);
+        }
     }
 
     /// May only be called if the channel is in the `unreferenced_channels`.

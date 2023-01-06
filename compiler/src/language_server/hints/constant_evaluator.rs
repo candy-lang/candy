@@ -41,7 +41,7 @@ impl ConstantEvaluator {
             evaluated_expressions: TracingMode::OnlyCurrent,
         };
         let tracer = FullTracer::default();
-        let mut vm = Vm::new();
+        let mut vm = Vm::default();
         vm.set_up_for_running_module_closure(
             module.clone(),
             Closure::of_module(db, module.clone(), tracing).unwrap(),

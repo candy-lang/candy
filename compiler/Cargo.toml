@@ -4,9 +4,6 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.56"
 
-[profile.release]
-debug = true
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -31,14 +28,23 @@ serde_json = "1.0.80"
 structopt = "0.3.25"
 strum = "0.24.0"
 strum_macros = "0.24"
-tokio = { version = "1.18.0", features = ["full"] }
+tokio = { version = "1.23.1", features = ["full"] }
 tokio-util = "0.7.1"
 tower-lsp = "0.17.0"
 tracing = { version = "0.1", features = ["release_max_level_debug"] }
 tracing-subscriber = { version = "0.2.0", features = ["registry"] }
 unicode-segmentation = "1.9.0"
 url = "2.2.2"
+walkdir = "2.3.2"
 
+[dev-dependencies]
+criterion = "0.4.0"
+
+[[bench]]
+name = "benchmark"
+harness = false
+
+# https://github.com/flamegraph-rs/flamegraph
 [target.x86_64-unknown-linux-gnu]
 linker = "/usr/bin/clang"
 rustflags = ["-Clink-arg=-fuse-ld=lld", "-Clink-arg=-Wl,--no-rosegment"]

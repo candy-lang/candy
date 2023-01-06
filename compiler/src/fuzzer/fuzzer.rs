@@ -52,7 +52,7 @@ impl Status {
             .map(|arg| arg.clone_to_other_heap(&mut vm_heap))
             .collect_vec();
 
-        let mut vm = Vm::new();
+        let mut vm = Vm::default();
         vm.set_up_for_running_closure(vm_heap, closure, argument_addresses, Id::fuzzer());
 
         Status::StillFuzzing {

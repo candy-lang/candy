@@ -73,7 +73,7 @@ fn compile_top_level(
         id_mapping: HashMap::new(),
         db,
         public_identifiers: HashMap::new(),
-        body: Body::new(),
+        body: Body::default(),
         prefix_keys: vec![],
         identifiers: im::HashMap::new(),
         is_top_level: true,
@@ -116,7 +116,7 @@ struct NonTopLevelResetState(bool);
 impl<'a> Context<'a> {
     fn start_scope(&mut self) -> ScopeResetState {
         ScopeResetState {
-            body: mem::replace(&mut self.body, Body::new()),
+            body: mem::take(&mut self.body),
             prefix_keys: self.prefix_keys.clone(),
             identifiers: self.identifiers.clone(),
             non_top_level_reset_state: self.start_non_top_level(),

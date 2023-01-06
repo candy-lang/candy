@@ -15,8 +15,8 @@ use self::{
 };
 use crate::{
     compiler::{ast_to_hir::AstToHir, hir::CollectErrors},
+    database::Database,
     module::{Module, ModuleDb, ModuleKind},
-    Database,
 };
 use itertools::Itertools;
 use lsp_types::{
@@ -241,7 +241,7 @@ impl LanguageServer for CandyLanguageServer {
             let mut db = self.db.lock().await;
             let text = apply_text_changes(&db, module.clone(), params.content_changes);
             db.did_change_module(&module, text.clone().into_bytes());
-            open_modules.extend(db.open_modules.keys().cloned());
+            open_modules.extend(db.get_open_modules().cloned());
             text.into_bytes()
         };
         self.analyze_modules(open_modules).await;

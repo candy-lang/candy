@@ -3,3 +3,7 @@
 members = [
     "compiler",
 ]
+
+[profile.release]
+# https://github.com/flamegraph-rs/flamegraph#usage-with-benchmarks
+debug = true

@@ -16,7 +16,7 @@ pub enum TracingMode {
 }
 
 impl TracingConfig {
-    pub fn off() -> Self {
+    pub const fn off() -> Self {
         Self {
             register_fuzzables: TracingMode::Off,
             calls: TracingMode::Off,

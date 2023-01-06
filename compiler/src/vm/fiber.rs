@@ -476,7 +476,7 @@ impl Fiber {
         }
     }
 
-    pub fn call(&mut self, callee: Pointer, arguments: Vec<Pointer>, responsible: Pointer) {
+    pub fn call(&mut self, callee: Pointer, mut arguments: Vec<Pointer>, responsible: Pointer) {
         match &self.heap.get(callee).data {
             Data::Closure(Closure {
                 captured,
@@ -500,7 +500,7 @@ impl Fiber {
                     self.heap.dup(*captured);
                 }
                 self.data_stack.append(&mut captured);
-                self.data_stack.append(&mut arguments.clone());
+                self.data_stack.append(&mut arguments);
                 self.data_stack.push(responsible);
                 self.next_instruction = InstructionPointer::start_of_closure(callee);
             }
