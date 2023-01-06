@@ -728,19 +728,8 @@ impl TreeWithIds for Cst {
             CstKind::Identifier { .. } | CstKind::Symbol { .. } | CstKind::Int { .. } => {
                 (None, true)
             }
-            CstKind::Text { parts, .. } => {
-                let res = parts.find_by_offset(offset);
-                if let Some(Cst {
-                    kind: CstKind::TextInterpolation { .. },
-                    ..
-                }) = &res
-                {
-                    (res, false)
-                } else {
-                    (None, false)
-                }
-            }
-            CstKind::OpeningText { .. }
+            CstKind::Text { .. }
+            | CstKind::OpeningText { .. }
             | CstKind::ClosingText { .. }
             | CstKind::TextPart(_)
             | CstKind::TextInterpolation { .. } => (None, false),
