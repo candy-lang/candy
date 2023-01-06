@@ -29,7 +29,7 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
 
     let (fuzzables_heap, fuzzables): (Heap, HashMap<Id, Pointer>) = {
         let mut tracer = FuzzablesFinder::default();
-        let mut vm = Vm::new();
+        let mut vm = Vm::default();
         vm.set_up_for_running_module_closure(
             module.clone(),
             Closure::of_module(db, module, tracing.clone()).unwrap(),

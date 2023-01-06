@@ -6,7 +6,7 @@ use crate::{
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::{cmp::Ordering, collections::HashMap, fmt, hash, mem};
+use std::{cmp::Ordering, collections::HashMap, fmt, hash, mem, vec};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Mir {
@@ -150,9 +150,16 @@ impl Body {
             .iter_mut()
             .map(|(id, expression)| (*id, expression))
     }
-    pub fn into_iter(self) -> impl DoubleEndedIterator<Item = (Id, Expression)> {
+}
+impl IntoIterator for Body {
+    type Item = (Id, Expression);
+    type IntoIter = vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
         self.expressions.into_iter()
     }
+}
+impl Body {
     pub fn return_value(&mut self) -> Id {
         let (id, _) = self.expressions.last().unwrap();
         *id

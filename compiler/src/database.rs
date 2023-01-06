@@ -9,10 +9,11 @@ use crate::{
         folding_range::FoldingRangeDbStorage, references::ReferencesDbStorage,
         semantic_tokens::SemanticTokenDbStorage, utils::LspPositionConversionStorage,
     },
-    module::{GetOpenModuleContentQuery, Module, ModuleDbStorage, ModuleWatcher},
+    module::{
+        FileSystemModuleProvider, GetModuleContentQuery, InMemoryModuleProvider, Module,
+        ModuleDbStorage, ModuleProvider, ModuleProviderOwner, OverlayModuleProvider,
+    },
 };
-use std::collections::HashMap;
-use tracing::warn;
 
 #[salsa::database(
     AstDbStorage,
@@ -31,41 +32,48 @@ use tracing::warn;
     SemanticTokenDbStorage,
     StringToRcstStorage
 )]
-#[derive(Default)]
 pub struct Database {
     storage: salsa::Storage<Self>,
-    pub open_modules: HashMap<Module, Vec<u8>>,
+    module_provider: OverlayModuleProvider<InMemoryModuleProvider, Box<dyn ModuleProvider + Send>>,
 }
 impl salsa::Database for Database {}
 
-impl Database {
-    pub fn did_open_module(&mut self, module: &Module, content: Vec<u8>) {
-        let old_value = self.open_modules.insert(module.clone(), content);
-        if old_value.is_some() {
-            warn!("Module {module} was opened, but it was already open.");
-        }
-
-        GetOpenModuleContentQuery.in_db_mut(self).invalidate(module);
-    }
-    pub fn did_change_module(&mut self, module: &Module, content: Vec<u8>) {
-        let old_value = self.open_modules.insert(module.to_owned(), content);
-        if old_value.is_none() {
-            warn!("Module {module} was changed, but it wasn't open before.");
-        }
-
-        GetOpenModuleContentQuery.in_db_mut(self).invalidate(module);
-    }
-    pub fn did_close_module(&mut self, module: &Module) {
-        let old_value = self.open_modules.remove(module);
-        if old_value.is_none() {
-            warn!("Module {module} was closed, but it wasn't open before.");
-        }
-
-        GetOpenModuleContentQuery.in_db_mut(self).invalidate(module);
+impl Default for Database {
+    fn default() -> Self {
+        Self::new(Box::<FileSystemModuleProvider>::default())
     }
 }
-impl ModuleWatcher for Database {
-    fn get_open_module_raw(&self, module: &Module) -> Option<Vec<u8>> {
-        self.open_modules.get(module).cloned()
+
+impl Database {
+    pub fn new(module_provider: Box<dyn ModuleProvider + Send>) -> Self {
+        Self {
+            storage: salsa::Storage::default(),
+            module_provider: OverlayModuleProvider::new(
+                InMemoryModuleProvider::default(),
+                module_provider,
+            ),
+        }
+    }
+
+    pub fn did_open_module(&mut self, module: &Module, content: Vec<u8>) {
+        self.module_provider.overlay.add(module, content);
+        GetModuleContentQuery.in_db_mut(self).invalidate(module);
+    }
+    pub fn did_change_module(&mut self, module: &Module, content: Vec<u8>) {
+        self.module_provider.overlay.add(module, content);
+        GetModuleContentQuery.in_db_mut(self).invalidate(module);
+    }
+    pub fn did_close_module(&mut self, module: &Module) {
+        self.module_provider.overlay.remove(module);
+        GetModuleContentQuery.in_db_mut(self).invalidate(module);
+    }
+    pub fn get_open_modules(&mut self) -> impl Iterator<Item = &Module> {
+        self.module_provider.overlay.get_all_modules()
+    }
+}
+
+impl ModuleProviderOwner for Database {
+    fn get_module_provider(&self) -> &dyn ModuleProvider {
+        &self.module_provider
     }
 }

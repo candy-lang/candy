@@ -1,3 +1,4 @@
+// Keep these in sync with `lib.rs`!
 #![feature(async_closure)]
 #![feature(box_patterns)]
 #![feature(let_chains)]
@@ -19,7 +20,7 @@ use crate::{
         ast_to_hir::AstToHir,
         cst_to_ast::CstToAst,
         error::CompilerError,
-        hir::{self, CollectErrors, Id},
+        hir::{self, CollectErrors},
         mir_to_lir::MirToLir,
         rcst_to_cst::RcstToCst,
         string_to_rcst::StringToRcst,
@@ -182,7 +183,6 @@ fn raw_build(
             "ast_to_cst_ids",
             &ast_cst_id_map
                 .keys()
-                .into_iter()
                 .sorted_by_key(|it| it.local)
                 .map(|key| format!("{key} -> {}\n", ast_cst_id_map[key].0))
                 .join(""),
@@ -196,7 +196,6 @@ fn raw_build(
             "hir_to_ast_ids",
             &hir_ast_id_map
                 .keys()
-                .into_iter()
                 .map(|key| format!("{key} -> {}\n", hir_ast_id_map[key]))
                 .join(""),
         );
@@ -260,7 +259,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
     let module_closure = Closure::of_module(&db, module.clone(), tracing.clone()).unwrap();
     let mut tracer = FullTracer::default();
 
-    let mut vm = Vm::new();
+    let mut vm = Vm::default();
     vm.set_up_for_running_module_closure(module.clone(), module_closure);
     vm.run(
         &DbUseProvider {
@@ -319,7 +318,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
 
     debug!("Running main function.");
     // TODO: Add more environment stuff.
-    let mut vm = Vm::new();
+    let mut vm = Vm::default();
     let mut stdout = StdoutService::new(&mut vm);
     let mut stdin = StdinService::new(&mut vm);
     let environment = {
@@ -332,7 +331,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
             (stdin_symbol, stdin_port),
         ]))
     };
-    let platform = heap.create_hir_id(Id::platform());
+    let platform = heap.create_hir_id(hir::Id::platform());
     tracer.for_fiber(FiberId::root()).call_started(
         platform,
         main,
@@ -340,7 +339,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         platform,
         &heap,
     );
-    vm.set_up_for_running_closure(heap, main, vec![environment], Id::platform());
+    vm.set_up_for_running_closure(heap, main, vec![environment], hir::Id::platform());
     loop {
         match vm.status() {
             Status::CanRun => {
@@ -358,9 +357,7 @@ fn run(options: CandyRunOptions) -> ProgramResult {
         }
         stdout.run(&mut vm);
         stdin.run(&mut vm);
-        for channel in vm.unreferenced_channels.iter().copied().collect_vec() {
-            vm.free_channel(channel);
-        }
+        vm.free_unreferenced_channels();
     }
     if options.debug {
         module.dump_associated_debug_file("trace", &format!("{tracer:?}"));
