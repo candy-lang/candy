@@ -224,6 +224,7 @@ impl CollectErrors for Ast {
         match self.kind {
             AstKind::Int(_) => {}
             AstKind::Text(Text(parts)) => parts.collect_errors(errors),
+            AstKind::TextPart(_) => {}
             AstKind::Identifier(_) => {}
             AstKind::Symbol(_) => {}
             AstKind::List(List(items)) => {
