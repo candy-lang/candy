@@ -640,28 +640,31 @@ mod parse {
     }
 
     #[instrument(level = "trace")]
-    fn text_interpolation(input: &str, curly_brace_count: usize) -> Option<(&str, Rcst)> {
+    fn text_interpolation(
+        input: &str,
+        indentation: usize,
+        curly_brace_count: usize,
+    ) -> Option<(&str, Rcst)> {
         let (mut input, mut opening_curly_braces) =
             parse_multiple(input, opening_curly_brace, Some((curly_brace_count, true)))?;
 
-        if let Some((new_input, whitespace)) = single_line_whitespace(input) {
-            input = new_input;
-            let last = opening_curly_braces.pop().unwrap();
-            opening_curly_braces.push(last.wrap_in_whitespace(vec![whitespace]));
-        }
+        let (new_input, whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
+        input = new_input;
+        let last = opening_curly_braces.pop().unwrap();
+        opening_curly_braces.push(last.wrap_in_whitespace(whitespace));
 
-        let (mut input, mut expression) = expression(input, 0, false, true, true).unwrap_or((
-            input,
-            Rcst::Error {
-                unparsable_input: "".to_string(),
-                error: RcstError::TextInterpolationWithoutExpression,
-            },
-        ));
+        let (mut input, mut expression) = expression(input, indentation + 1, false, true, true)
+            .unwrap_or((
+                input,
+                Rcst::Error {
+                    unparsable_input: "".to_string(),
+                    error: RcstError::TextInterpolationWithoutExpression,
+                },
+            ));
 
-        if let Some((new_input, whitespace)) = single_line_whitespace(input) {
-            input = new_input;
-            expression = expression.wrap_in_whitespace(vec![whitespace]);
-        }
+        let (new_input, whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
+        input = new_input;
+        expression = expression.wrap_in_whitespace(whitespace);
 
         let (input, closing_curly_braces) =
             parse_multiple(input, closing_curly_brace, Some((curly_brace_count, false))).unwrap_or(
@@ -719,17 +722,19 @@ mod parse {
                         None => line.push('"'),
                     }
                 }
-                Some('{') => match text_interpolation(input, opening_single_quotes.len() + 1) {
-                    Some((input_after_interpolation, interpolation)) => {
-                        push_line_to_parts(&mut line, &mut parts);
-                        input = input_after_interpolation;
-                        parts.push(interpolation);
+                Some('{') => {
+                    match text_interpolation(input, indentation, opening_single_quotes.len() + 1) {
+                        Some((input_after_interpolation, interpolation)) => {
+                            push_line_to_parts(&mut line, &mut parts);
+                            input = input_after_interpolation;
+                            parts.push(interpolation);
+                        }
+                        None => {
+                            input = &input[1..];
+                            line.push('{');
+                        }
                     }
-                    None => {
-                        input = &input[1..];
-                        line.push('{');
-                    }
-                },
+                }
                 None => {
                     push_line_to_parts(&mut line, &mut parts);
                     break Rcst::Error {
