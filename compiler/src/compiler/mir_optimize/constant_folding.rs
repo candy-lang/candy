@@ -241,13 +241,16 @@ impl Mir {
                     return Some(Err("wrong number of arguments".to_string()));
                 };
 
-                let a = visible.get(*a);
-                let b = visible.get(*b);
-
-                if let Expression::Text(text_a) = a && let Expression::Text(text_b) = b {
-                    Expression::Text(format!("{}{}", text_a, text_b))
-                } else {
-                    return None
+                match (visible.get(*a), visible.get(*b)) {
+                    (Expression::Text(text), other) | (other, Expression::Text(text))
+                        if text.is_empty() =>
+                    {
+                        other.clone()
+                    }
+                    (Expression::Text(text_a), Expression::Text(text_b)) => {
+                        Expression::Text(format!("{}{}", text_a, text_b))
+                    }
+                    _ => return None,
                 }
             }
             _ => return None,
