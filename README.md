@@ -79,7 +79,6 @@ We already have a language server that provides some tooling.
   - HTTP, UDP
 - compiler
   - make functions independent of their order in top-level scope
-  - text interpolation
   - patterns
   - improve pattern match panic messages: `[Foo, 1, {a}] = [Foo, 2, {A: B]]` could generate a message like `` Expected `[_, 1, _]`, got `[_, 2, _]`. ``
   - "type" proofs
@@ -144,7 +143,6 @@ We already have a language server that provides some tooling.
 - pattern matching
 - add tests
 - add a more lightweight tracer that only tracks stack traces
-- text interpolation
 - optimize: inline functions
 - minimize inputs found through fuzzing
 - fuzz parser

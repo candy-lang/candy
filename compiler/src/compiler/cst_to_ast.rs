@@ -191,7 +191,6 @@ impl LoweringContext {
                             kind: CstKind::TextPart(text),
                             ..
                         } => {
-                            // TODO: Combine successive text parts during compile time. This can also be done in later stages.
                             let string = self.create_string_without_id_mapping(text.clone());
                             let text_part =
                                 self.create_ast(part.id, AstKind::TextPart(TextPart(string)));

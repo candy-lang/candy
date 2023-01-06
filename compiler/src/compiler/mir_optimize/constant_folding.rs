@@ -234,9 +234,6 @@ impl Mir {
                 }
             }
             BuiltinFunction::TextConcatenate => {
-                // TODO: Properly implement this optimization.
-                //       This is just a preliminary implementation to get use working
-                //       with the changes introduced by text interpolation.
                 let [a, b] = arguments else {
                     return Some(Err("wrong number of arguments".to_string()));
                 };
