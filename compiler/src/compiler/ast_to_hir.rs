@@ -312,24 +312,31 @@ impl<'a> Context<'a> {
 
     fn lower_text(&mut self, id: Option<ast::Id>, text: &Text) -> hir::Id {
         // TODO: Convert parts to text
-        let concatenate = self.push(
+        let builtin_text_concatenate = self.push(
             None,
             Expression::Builtin(BuiltinFunction::TextConcatenate),
             None,
         );
-        let mut result = self.push(id, Expression::Text("".to_string()), None);
-        for part in &text.0 {
-            let part_id = self.compile_single(part);
-            result = self.push(
-                None,
-                Expression::Call {
-                    function: concatenate.clone(),
-                    arguments: vec![result.clone(), part_id],
-                },
-                None,
-            );
-        }
-        result
+
+        let compiled_parts = text
+            .0
+            .iter()
+            .map(|part| self.compile_single(part))
+            .collect_vec();
+
+        compiled_parts
+            .into_iter()
+            .reduce(|left, right| {
+                self.push(
+                    None,
+                    Expression::Call {
+                        function: builtin_text_concatenate.clone(),
+                        arguments: vec![left, right],
+                    },
+                    None,
+                )
+            })
+            .unwrap_or_else(|| self.push(id, Expression::Text("".to_string()), None))
     }
 
     fn compile_lambda(
