@@ -223,12 +223,7 @@ impl CollectErrors for Ast {
     fn collect_errors(self, errors: &mut Vec<CompilerError>) {
         match self.kind {
             AstKind::Int(_) => {}
-            AstKind::Text(Text(parts)) => {
-                for part in parts {
-                    part.collect_errors(errors);
-                }
-            }
-            AstKind::TextPart(_) => {}
+            AstKind::Text(Text(parts)) => parts.collect_errors(errors),
             AstKind::Identifier(_) => {}
             AstKind::Symbol(_) => {}
             AstKind::List(List(items)) => {

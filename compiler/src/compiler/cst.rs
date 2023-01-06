@@ -730,13 +730,11 @@ impl TreeWithIds for Cst {
             }
             CstKind::Text { parts, .. } => {
                 let res = parts.find_by_offset(offset);
-                if matches!(
-                    &res,
-                    Some(Cst {
-                        kind: CstKind::TextInterpolation { .. },
-                        ..
-                    })
-                ) {
+                if let Some(Cst {
+                    kind: CstKind::TextInterpolation { .. },
+                    ..
+                }) = &res
+                {
                     (res, false)
                 } else {
                     (None, false)
