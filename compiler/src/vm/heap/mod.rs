@@ -11,10 +11,7 @@ use super::ids::ChannelId;
 use crate::{builtin_functions::BuiltinFunction, compiler::hir::Id};
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::{
-    cmp::Ordering,
-    collections::{HashMap, HashSet},
-};
+use std::{cmp::Ordering, collections::HashMap};
 
 const TRACE: bool = false;
 
@@ -39,6 +36,7 @@ macro_rules! trace {
 #[derive(Clone)]
 pub struct Heap {
     objects: HashMap<Pointer, Object>,
+    channel_refcounts: HashMap<ChannelId, usize>,
     next_address: Pointer,
 }
 
@@ -64,6 +62,7 @@ impl Default for Heap {
     fn default() -> Self {
         Self {
             objects: HashMap::new(),
+            channel_refcounts: HashMap::new(),
             next_address: Pointer::from_raw(1),
         }
     }
@@ -88,12 +87,21 @@ impl Heap {
         self.dup_by(address, 1);
     }
     pub fn dup_by(&mut self, address: Pointer, amount: usize) {
-        self.get_mut(address).reference_count += amount;
+        let object = self.get_mut(address);
+        object.reference_count += amount;
+        let new_reference_count = object.reference_count;
 
-        let object = self.get(address);
+        if let Some(channel) = object.data.channel() {
+            *self
+                .channel_refcounts
+                .entry(channel)
+                .or_insert_with(|| panic!("Called `dup_by` on a channel that doesn't exist.")) +=
+                amount;
+        };
+
         trace!(
             "RefCount of {address} increased to {}. Value: {}",
-            object.reference_count,
+            new_reference_count,
             address.format_debug(self),
         );
     }
@@ -105,8 +113,22 @@ impl Heap {
         );
 
         let object = self.get_mut(address);
+
         object.reference_count -= 1;
-        if object.reference_count == 0 {
+        let new_reference_count = object.reference_count;
+
+        if let Some(channel) = object.data.channel() {
+            let channel_refcount = self
+                .channel_refcounts
+                .entry(channel)
+                .or_insert_with(|| panic!("Called `drop` on a channel that doesn't exist."));
+            *channel_refcount -= 1;
+            if *channel_refcount == 0 {
+                self.channel_refcounts.remove(&channel).unwrap();
+            }
+        };
+
+        if new_reference_count == 0 {
             self.free(address);
         }
     }
@@ -231,14 +253,8 @@ impl Heap {
         self.clone_single_to_other_heap_with_existing_mapping(other, address, &mut HashMap::new())
     }
 
-    pub fn known_channels(&self) -> HashSet<ChannelId> {
-        let mut known = HashSet::new();
-        for object in self.objects.values() {
-            if let Some(channel) = object.data.channel() {
-                known.insert(channel);
-            }
-        }
-        known
+    pub fn known_channels(&self) -> impl IntoIterator<Item = ChannelId> + '_ {
+        self.channel_refcounts.keys().copied()
     }
 
     pub fn create_int(&mut self, int: BigInt) -> Pointer {
@@ -263,9 +279,13 @@ impl Heap {
         self.create(Data::Builtin(Builtin { function: builtin }))
     }
     pub fn create_send_port(&mut self, channel: ChannelId) -> Pointer {
+        let existing_count = self.channel_refcounts.insert(channel, 1);
+        assert!(existing_count.is_none());
         self.create(Data::SendPort(SendPort::new(channel)))
     }
     pub fn create_receive_port(&mut self, channel: ChannelId) -> Pointer {
+        let existing_count = self.channel_refcounts.insert(channel, 1);
+        assert!(existing_count.is_none());
         self.create(Data::ReceivePort(ReceivePort::new(channel)))
     }
     pub fn create_nothing(&mut self) -> Pointer {

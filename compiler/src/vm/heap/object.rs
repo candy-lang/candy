@@ -258,6 +258,13 @@ impl Data {
         }
     }
 
+    pub fn closure(&self) -> Option<&Closure> {
+        if let Data::Closure(closure) = self {
+            Some(closure)
+        } else {
+            None
+        }
+    }
     pub fn channel(&self) -> Option<ChannelId> {
         if let Data::SendPort(SendPort { channel }) | Data::ReceivePort(ReceivePort { channel }) =
             self
@@ -347,6 +354,16 @@ macro_rules! impl_data_try_into_type {
                 }
             }
         }
+        impl<'a> TryInto<&'a $type> for &'a Data {
+            type Error = String;
+
+            fn try_into(self) -> Result<&'a $type, Self::Error> {
+                match &self {
+                    Data::$variant(it) => Ok(it),
+                    _ => Err($error_message.to_string()),
+                }
+            }
+        }
     };
 }
 impl_data_try_into_type!(Int, Int, "Expected an int.");
@@ -359,11 +376,11 @@ impl_data_try_into_type!(Closure, Closure, "Expected a closure.");
 impl_data_try_into_type!(SendPort, SendPort, "Expected a send port.");
 impl_data_try_into_type!(ReceivePort, ReceivePort, "Expected a receive port.");
 
-impl TryInto<bool> for Data {
+impl TryInto<bool> for &Data {
     type Error = String;
 
     fn try_into(self) -> Result<bool, Self::Error> {
-        let symbol: Symbol = self.try_into()?;
+        let symbol: &Symbol = self.try_into()?;
         match symbol.value.as_str() {
             "True" => Ok(true),
             "False" => Ok(false),

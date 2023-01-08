@@ -22,26 +22,33 @@ use crate::{
     compiler::mir::{Expression, Id, Mir},
     utils::{CountableId, IdGenerator},
 };
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 impl Mir {
     pub fn eliminate_common_subtrees(&mut self) {
         let mut pure_expressions: HashMap<Expression, Id> = HashMap::new();
 
-        self.body.visit_with_visible(&mut |id, expression, visible, _| {
-            if !expression.is_pure() {
-                return;
-            }
+        self.body
+            .visit_with_visible(&mut |id, expression, visible, _| {
+                if !expression.is_pure() {
+                    return;
+                }
 
-            let mut normalized = expression.clone();
-            normalized.normalize();
+                let mut normalized = expression.clone();
+                normalized.normalize();
 
-            if let Some(id_of_same_expression) = pure_expressions.get(&normalized) && visible.contains(*id_of_same_expression) {
-                *expression = Expression::Reference(*id_of_same_expression);
-            } else {
-                pure_expressions.insert(normalized, id);
-            }
-        });
+                let existing_entry = pure_expressions.entry(normalized);
+                match existing_entry {
+                    Entry::Occupied(id_of_same_expression)
+                        if visible.contains(*id_of_same_expression.get()) =>
+                    {
+                        *expression = Expression::Reference(*id_of_same_expression.get());
+                    }
+                    _ => {
+                        existing_entry.insert_entry(id);
+                    }
+                }
+            });
     }
 }
 
