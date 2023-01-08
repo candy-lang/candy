@@ -424,7 +424,7 @@ impl Heap {
 
     fn text_characters(&mut self, args: &[Pointer]) -> BuiltinResult {
         unpack_and_later_drop!(self, args, |text: &Text| {
-            let text = text.value.clone(); // FIXME: remove clone
+            let text = text.value.clone();
             let character_addresses = text
                 .graphemes(true)
                 .map(|it| self.create_text(it.to_string()))

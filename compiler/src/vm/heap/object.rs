@@ -258,6 +258,13 @@ impl Data {
         }
     }
 
+    pub fn closure(&self) -> Option<&Closure> {
+        if let Data::Closure(closure) = self {
+            Some(closure)
+        } else {
+            None
+        }
+    }
     pub fn channel(&self) -> Option<ChannelId> {
         if let Data::SendPort(SendPort { channel }) | Data::ReceivePort(ReceivePort { channel }) =
             self
