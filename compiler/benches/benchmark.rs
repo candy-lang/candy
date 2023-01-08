@@ -8,12 +8,12 @@ mod utils;
 
 // `Core` is available via `use "..Core"`.
 
-fn benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("basics");
+fn vm_runtime(c: &mut Criterion) {
+    let mut group = c.benchmark_group("VM Runtime");
 
     group.sample_size(100);
     group.bench_function("hello_world", |b| {
-        b.run_candy(r#"main _ := "Hello, world!""#);
+        b.run_vm(r#"main _ := "Hello, world!""#);
     });
 
     group.sample_size(20);
@@ -34,17 +34,17 @@ fib n =
 main _ := fib {n}"#
     );
     group.bench_function(BenchmarkId::new("fibonacci", n), |b| {
-        b.run_candy(&fibonacci_code)
+        b.run_vm(&fibonacci_code)
     });
 
     group.finish();
 }
 
 trait BencherExtension {
-    fn run_candy(&mut self, source_code: &str);
+    fn run_vm(&mut self, source_code: &str);
 }
 impl<'a, M: Measurement> BencherExtension for Bencher<'a, M> {
-    fn run_candy(&mut self, source_code: &str) {
+    fn run_vm(&mut self, source_code: &str) {
         self.iter_batched(
             || setup_and_compile(source_code),
             |(db, lir)| run(&db, lir),
@@ -53,5 +53,5 @@ impl<'a, M: Measurement> BencherExtension for Bencher<'a, M> {
     }
 }
 
-criterion_group!(benches, benchmark);
+criterion_group!(benches, vm_runtime);
 criterion_main!(benches);
