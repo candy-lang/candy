@@ -1,6 +1,6 @@
-on: pull_request
-
 name: Compiler
+
+on: pull_request
 
 env:
   RUST_VERSION: nightly
@@ -97,3 +97,33 @@ jobs:
   #       with:
   #         command: run
   #         args: --manifest-path compiler/Cargo.toml -- fuzz packages/Benchmark.candy
+
+  benchmark:
+    name: Benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+
+      - name: Run benchmark
+        run: cargo bench -- --output-format bencher | tee output.txt
+
+      - name: Store benchmark result - separate results repo
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Compiler
+          tool: cargo
+          output-file-path: output.txt
+          gh-pages-branch: gh-pages
+          gh-repository: 'github.com/benchmark-action/github-action-benchmark-results'
+          benchmark-data-dir-path: dev/bench
+          github-token: ${{ secrets.BENCHMARK_RESULTS_TOKEN }}
+          auto-push: true
+          comment-always: true
+          comment-on-alert: true
+          alert-threshold: 150%
+          fail-on-alert: true
