@@ -16,6 +16,19 @@ jobs:
           profile: minimal
           toolchain: ${{ env.RUST_VERSION }}
           override: true
+
+      - name: Cache Rust dependencies and build
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/git/db/
+            ~/.cargo/registry/cache/
+            ~/.cargo/registry/index/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
       - uses: actions-rs/cargo@v1
         with:
           command: check
@@ -31,6 +44,19 @@ jobs:
           profile: minimal
           toolchain: ${{ env.RUST_VERSION }}
           override: true
+
+      - name: Cache Rust dependencies and build
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/git/db/
+            ~/.cargo/registry/cache/
+            ~/.cargo/registry/index/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
       - uses: actions-rs/cargo@v1
         with:
           command: test
@@ -47,6 +73,19 @@ jobs:
           toolchain: ${{ env.RUST_VERSION }}
           override: true
           components: rustfmt
+
+      - name: Cache Rust dependencies and build
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/git/db/
+            ~/.cargo/registry/cache/
+            ~/.cargo/registry/index/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
       - uses: actions-rs/cargo@v1
         with:
           command: fmt
@@ -63,6 +102,19 @@ jobs:
           toolchain: ${{ env.RUST_VERSION }}
           override: true
           components: clippy
+
+      - name: Cache Rust dependencies and build
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/git/db/
+            ~/.cargo/registry/cache/
+            ~/.cargo/registry/index/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
@@ -78,6 +130,19 @@ jobs:
           profile: minimal
           toolchain: ${{ env.RUST_VERSION }}
           override: true
+
+      - name: Cache Rust dependencies and build
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/git/db/
+            ~/.cargo/registry/cache/
+            ~/.cargo/registry/index/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
       - uses: actions-rs/cargo@v1
         with:
           command: run
@@ -93,6 +158,19 @@ jobs:
   #         profile: minimal
   #         toolchain: ${{ env.RUST_VERSION }}
   #         override: true
+  #
+  #     - name: Cache Rust dependencies and build
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: |
+  #           ~/.cargo/bin/
+  #           ~/.cargo/git/db/
+  #           ~/.cargo/registry/cache/
+  #           ~/.cargo/registry/index/
+  #           target/
+  #         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+  #         restore-keys: ${{ runner.os }}-cargo-
+  #
   #     - uses: actions-rs/cargo@v1
   #       with:
   #         command: run
@@ -108,6 +186,18 @@ jobs:
           profile: minimal
           toolchain: ${{ env.RUST_VERSION }}
           override: true
+
+      - name: Cache Rust dependencies and build
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/git/db/
+            ~/.cargo/registry/cache/
+            ~/.cargo/registry/index/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
 
       - name: Run benchmark
         run: cargo bench -- --output-format bencher | tee output.txt
