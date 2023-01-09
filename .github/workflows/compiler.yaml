@@ -112,14 +112,14 @@ jobs:
       - name: Run benchmark
         run: cargo bench -- --output-format bencher | tee output.txt
 
-      - name: Store benchmark result - separate results repo
+      - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Compiler
           tool: cargo
           output-file-path: output.txt
           gh-pages-branch: gh-pages
-          gh-repository: 'github.com/benchmark-action/github-action-benchmark-results'
+          gh-repository: github.com/candy-lang/benchmark-results
           benchmark-data-dir-path: dev/bench
           github-token: ${{ secrets.BENCHMARK_RESULTS_TOKEN }}
           auto-push: true
