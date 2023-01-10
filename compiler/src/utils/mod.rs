@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct IdGenerator<T: CountableId> {
     next_id: usize,
     _data: PhantomData<T>,
