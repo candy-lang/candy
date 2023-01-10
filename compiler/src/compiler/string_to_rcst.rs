@@ -645,15 +645,14 @@ mod parse {
         indentation: usize,
         curly_brace_count: usize,
     ) -> Option<(&str, Rcst)> {
-        let (mut input, mut opening_curly_braces) =
+        let (input, mut opening_curly_braces) =
             parse_multiple(input, opening_curly_brace, Some((curly_brace_count, true)))?;
 
-        let (new_input, whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
-        input = new_input;
+        let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
         let last = opening_curly_braces.pop().unwrap();
         opening_curly_braces.push(last.wrap_in_whitespace(whitespace));
 
-        let (mut input, mut expression) = expression(input, indentation + 1, false, true, true)
+        let (input, mut expression) = expression(input, indentation + 1, false, true, true)
             .unwrap_or((
                 input,
                 Rcst::Error {
@@ -662,8 +661,7 @@ mod parse {
                 },
             ));
 
-        let (new_input, whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
-        input = new_input;
+        let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
         expression = expression.wrap_in_whitespace(whitespace);
 
         let (input, closing_curly_braces) =
