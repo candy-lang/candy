@@ -1,5 +1,9 @@
+use itertools::Itertools;
+
 use super::{
-    ast::{self, Ast, AstError, AstKind, AstString, Identifier, Int, Lambda, Symbol, Text},
+    ast::{
+        self, Ast, AstError, AstKind, AstString, Identifier, Int, Lambda, Symbol, Text, TextPart,
+    },
     cst::{self, Cst, CstDb, CstKind},
     error::{CompilerError, CompilerErrorPayload},
     rcst_to_cst::RcstToCst,
@@ -13,7 +17,6 @@ use crate::{
     },
     module::Module,
 };
-use itertools::Itertools;
 use std::{collections::HashMap, ops::Range, sync::Arc};
 use tracing::warn;
 
@@ -125,6 +128,7 @@ impl LoweringContext {
             | CstKind::OpeningCurlyBrace
             | CstKind::ClosingCurlyBrace
             | CstKind::Arrow
+            | CstKind::SingleQuote
             | CstKind::DoubleQuote
             | CstKind::Octothorpe => self.create_ast(
                 cst.id,
@@ -159,44 +163,132 @@ impl LoweringContext {
             }
             CstKind::Int { value, .. } => self.create_ast(cst.id, AstKind::Int(Int(value.clone()))),
             CstKind::Text {
-                opening_quote,
+                opening,
                 parts,
-                closing_quote,
+                closing,
             } => {
-                assert!(
-                    matches!(opening_quote.kind, CstKind::DoubleQuote),
-                    "Text needs to start with opening double quote, but started with {}.",
-                    opening_quote
-                );
+                let mut errors = vec![];
 
-                let text = parts
-                    .iter()
-                    .filter_map(|it| match it {
+                let opening_single_quote_count = match &opening.kind {
+                    CstKind::OpeningText {
+                        opening_single_quotes,
+                        opening_double_quote: box Cst {
+                            kind: CstKind::DoubleQuote,
+                            ..
+                        }
+                    } if opening_single_quotes
+                        .iter()
+                        .all(|single_quote| -> bool {
+                            matches!(single_quote.kind, CstKind::SingleQuote)
+                        }) => opening_single_quotes.len(),
+                    _ => panic!("Text needs to start with any number of single quotes followed by a double quote, but started with {}.", opening)
+                };
+
+                let mut lowered_parts = vec![];
+                for part in parts {
+                    match part {
                         Cst {
                             kind: CstKind::TextPart(text),
                             ..
-                        } => Some(text),
-                        _ => panic!("Text contains non-TextPart. Whitespaces should have been removed already."),
-                    })
-                    .join("");
-                let string = self.create_string_without_id_mapping(text);
-                let mut text = self.create_ast(cst.id, AstKind::Text(Text(string)));
+                        } => {
+                            let string = self.create_string_without_id_mapping(text.clone());
+                            let text_part =
+                                self.create_ast(part.id, AstKind::TextPart(TextPart(string)));
+                            lowered_parts.push(text_part);
+                        },
+                        Cst {
+                            kind: CstKind::TextInterpolation {
+                                opening_curly_braces,
+                                expression,
+                                closing_curly_braces
+                            },
+                            ..
+                        } => {
+                            if lowering_type != LoweringType::Expression {
+                                errors.push(
+                                    self.create_error(
+                                        part,
+                                        AstError::PatternContainsInvalidExpression,
+                                    ),
+                                );
+                            };
 
-                if !matches!(closing_quote.kind, CstKind::DoubleQuote) {
+                            if opening_curly_braces.len() != (opening_single_quote_count + 1)
+                                || opening_curly_braces
+                                    .iter()
+                                    .all(|opening_curly_brace| !matches!(opening_curly_brace.kind, CstKind::OpeningCurlyBrace))
+                            {
+                                panic!(
+                                    "Text interpolation needs to start with {} opening curly braces, but started with {}.", 
+                                    opening_single_quote_count + 1,
+                                    opening_curly_braces.iter().map(|cst| format!("{}", cst)).join(""),
+                                )
+                            }
+
+                            let ast = self.lower_cst(expression, LoweringType::Expression);
+
+                            if closing_curly_braces.len() == opening_single_quote_count + 1
+                                && closing_curly_braces
+                                    .iter()
+                                    .all(|closing_curly_brace| matches!(closing_curly_brace.kind, CstKind::ClosingCurlyBrace))
+                            {
+                                lowered_parts.push(ast);
+                            } else {
+                                let error = self.create_ast(
+                                    part.id,
+                                    AstKind::Error {
+                                        child: Some(Box::new(ast)),
+                                        errors: vec![CompilerError {
+                                            module: self.module.clone(),
+                                            span: part.span.clone(),
+                                            payload: CompilerErrorPayload::Ast(
+                                                AstError::TextInterpolationWithoutClosingCurlyBraces,
+                                            ),
+                                        }],
+                                    },
+                                );
+                                lowered_parts.push(error);
+                            }
+                        },
+                        _ => panic!("Text contains non-TextPart. Whitespaces should have been removed already."),
+                    }
+                }
+                let mut text = self.create_ast(cst.id, AstKind::Text(Text(lowered_parts)));
+
+                if !matches!(
+                    &closing.kind,
+                    CstKind::ClosingText {
+                        closing_double_quote: box Cst {
+                            kind: CstKind::DoubleQuote,
+                            ..
+                        },
+                        closing_single_quotes
+                    } if closing_single_quotes
+                        .iter()
+                        .all(|single_quote| -> bool {
+                            matches!(single_quote.kind, CstKind::SingleQuote)
+                        }) && opening_single_quote_count == closing_single_quotes.len()
+                ) {
+                    errors.push(self.create_error(closing, AstError::TextWithoutClosingQuote));
+                }
+
+                if !errors.is_empty() {
                     text = self.create_ast(
-                        closing_quote.id,
+                        cst.id,
                         AstKind::Error {
                             child: Some(Box::new(text)),
-                            errors: vec![
-                                self.create_error(closing_quote, AstError::TextWithoutClosingQuote)
-                            ],
+                            errors,
                         },
                     );
                 }
-
                 text
             }
+            CstKind::OpeningText { .. } => panic!("OpeningText should only occur in Text."),
+            CstKind::ClosingText { .. } => panic!("ClosingText should only occur in Text."),
             CstKind::TextPart(_) => panic!("TextPart should only occur in Text."),
+            CstKind::TextInterpolation { .. } => {
+                panic!("TextInterpolation should only occur in Text.")
+            }
             CstKind::Pipe {
                 receiver,
                 bar,

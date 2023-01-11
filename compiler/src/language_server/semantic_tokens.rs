@@ -157,6 +157,7 @@ impl<'a> Context<'a> {
             | CstKind::OpeningCurlyBrace
             | CstKind::ClosingCurlyBrace => {}
             CstKind::Arrow => self.add_token(cst.span.clone(), SemanticTokenType::Operator),
+            CstKind::SingleQuote => {} // handled by parent
             CstKind::DoubleQuote => {} // handled by parent
             CstKind::Octothorpe => {}  // handled by parent
             CstKind::Whitespace(_) | CstKind::Newline(_) => {}
@@ -174,20 +175,49 @@ impl<'a> Context<'a> {
             ),
             CstKind::Symbol { .. } => self.add_token(cst.span.clone(), SemanticTokenType::Symbol),
             CstKind::Int { .. } => self.add_token(cst.span.clone(), SemanticTokenType::Number),
-            CstKind::Text {
-                opening_quote,
-                parts,
-                closing_quote,
+            CstKind::OpeningText {
+                opening_single_quotes,
+                opening_double_quote,
             } => {
-                self.add_token(opening_quote.span.clone(), SemanticTokenType::String);
-                for part in parts {
-                    if let CstKind::TextPart(_) = part.kind {
-                        self.add_token(part.span.clone(), SemanticTokenType::String)
-                    }
+                for opening_single_quote in opening_single_quotes {
+                    self.add_token(opening_single_quote.span.clone(), SemanticTokenType::String);
                 }
-                self.add_token(closing_quote.span.clone(), SemanticTokenType::String);
+                self.add_token(opening_double_quote.span.clone(), SemanticTokenType::String);
             }
-            CstKind::TextPart(_) => {} // handled by parent
+            CstKind::ClosingText {
+                closing_double_quote,
+                closing_single_quotes,
+            } => {
+                self.add_token(closing_double_quote.span.clone(), SemanticTokenType::String);
+                for closing_single_quote in closing_single_quotes {
+                    self.add_token(closing_single_quote.span.clone(), SemanticTokenType::String);
+                }
+            }
+            CstKind::Text {
+                opening,
+                parts,
+                closing,
+            } => {
+                self.visit_cst(opening, None);
+                for part in parts {
+                    self.visit_cst(part, None);
+                }
+                self.visit_cst(closing, None);
+            }
+            CstKind::TextPart(_) => self.add_token(cst.span.clone(), SemanticTokenType::String),
+            CstKind::TextInterpolation {
+                opening_curly_braces,
+                expression,
+                closing_curly_braces,
+            } => {
+                for opening_curly_brace in opening_curly_braces {
+                    self.visit_cst(opening_curly_brace, None);
+                }
+                self.visit_cst(expression, None);
+                for closing_curly_brace in closing_curly_braces {
+                    self.visit_cst(closing_curly_brace, None);
+                }
+            }
             CstKind::Pipe {
                 receiver,
                 bar,

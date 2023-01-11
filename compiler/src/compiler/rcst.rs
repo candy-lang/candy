@@ -17,6 +17,7 @@ pub enum Rcst {
     OpeningCurlyBrace,  // {
     ClosingCurlyBrace,  // }
     Arrow,              // ->
+    SingleQuote,        // '
     DoubleQuote,        // "
     Octothorpe,         // #
     Whitespace(String), // contains only non-multiline whitespace
@@ -35,12 +36,25 @@ pub enum Rcst {
         value: BigUint,
         string: String,
     },
+    OpeningText {
+        opening_single_quotes: Vec<Rcst>,
+        opening_double_quote: Box<Rcst>,
+    },
+    ClosingText {
+        closing_double_quote: Box<Rcst>,
+        closing_single_quotes: Vec<Rcst>,
+    },
     Text {
-        opening_quote: Box<Rcst>,
+        opening: Box<Rcst>,
         parts: Vec<Rcst>,
-        closing_quote: Box<Rcst>,
+        closing: Box<Rcst>,
     },
     TextPart(String),
+    TextInterpolation {
+        opening_curly_braces: Vec<Rcst>,
+        expression: Box<Rcst>,
+        closing_curly_braces: Vec<Rcst>,
+    },
     Pipe {
         receiver: Box<Rcst>,
         bar: Box<Rcst>,
@@ -115,6 +129,8 @@ pub enum RcstError {
     SymbolContainsNonAlphanumericAscii,
     TextNotClosed,
     TextNotSufficientlyIndented,
+    TextInterpolationNotClosed,
+    TextInterpolationWithoutExpression,
     TooMuchWhitespace,
     UnexpectedCharacters,
     UnparsedRest,
@@ -138,6 +154,7 @@ impl Display for Rcst {
             Rcst::OpeningCurlyBrace => "{".fmt(f),
             Rcst::ClosingCurlyBrace => "}".fmt(f),
             Rcst::Arrow => "->".fmt(f),
+            Rcst::SingleQuote => "'".fmt(f),
             Rcst::DoubleQuote => '"'.fmt(f),
             Rcst::Octothorpe => "#".fmt(f),
             Rcst::Whitespace(whitespace) => whitespace.fmt(f),
@@ -159,18 +176,51 @@ impl Display for Rcst {
             Rcst::Identifier(identifier) => identifier.fmt(f),
             Rcst::Symbol(symbol) => symbol.fmt(f),
             Rcst::Int { string, .. } => string.fmt(f),
-            Rcst::Text {
-                opening_quote,
-                parts,
-                closing_quote,
+            Rcst::OpeningText {
+                opening_single_quotes,
+                opening_double_quote,
             } => {
-                opening_quote.fmt(f)?;
+                for opening_single_quote in opening_single_quotes {
+                    opening_single_quote.fmt(f)?;
+                }
+                opening_double_quote.fmt(f)
+            }
+            Rcst::ClosingText {
+                closing_double_quote,
+                closing_single_quotes,
+            } => {
+                closing_double_quote.fmt(f)?;
+                for closing_single_quote in closing_single_quotes {
+                    closing_single_quote.fmt(f)?;
+                }
+                Ok(())
+            }
+            Rcst::Text {
+                opening,
+                parts,
+                closing,
+            } => {
+                opening.fmt(f)?;
                 for part in parts {
                     part.fmt(f)?;
                 }
-                closing_quote.fmt(f)
+                closing.fmt(f)
             }
             Rcst::TextPart(literal) => literal.fmt(f),
+            Rcst::TextInterpolation {
+                opening_curly_braces,
+                expression,
+                closing_curly_braces,
+            } => {
+                for opening_curly_brace in opening_curly_braces {
+                    opening_curly_brace.fmt(f)?;
+                }
+                expression.fmt(f)?;
+                for closing_curly_brace in closing_curly_braces {
+                    closing_curly_brace.fmt(f)?;
+                }
+                Ok(())
+            }
             Rcst::Pipe {
                 receiver,
                 bar,
@@ -309,6 +359,7 @@ impl IsMultiline for Rcst {
             Rcst::OpeningCurlyBrace => false,
             Rcst::ClosingCurlyBrace => false,
             Rcst::Arrow => false,
+            Rcst::SingleQuote => false,
             Rcst::DoubleQuote => false,
             Rcst::Octothorpe => false,
             Rcst::Whitespace(_) => false,
@@ -320,14 +371,15 @@ impl IsMultiline for Rcst {
             Rcst::Identifier(_) => false,
             Rcst::Symbol(_) => false,
             Rcst::Int { .. } => false,
+            Rcst::OpeningText { .. } => false,
+            Rcst::ClosingText { .. } => false,
             Rcst::Text {
-                opening_quote,
+                opening,
                 parts,
-                closing_quote,
-            } => {
-                opening_quote.is_multiline() || parts.is_multiline() || closing_quote.is_multiline()
-            }
+                closing,
+            } => opening.is_multiline() || parts.is_multiline() || closing.is_multiline(),
             Rcst::TextPart(_) => false,
+            Rcst::TextInterpolation { .. } => false,
             Rcst::Pipe {
                 receiver,
                 bar,

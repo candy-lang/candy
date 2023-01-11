@@ -152,6 +152,10 @@ mod parse {
         literal(input, "->").map(|it| (it, Rcst::Arrow))
     }
     #[instrument(level = "trace")]
+    fn single_quote(input: &str) -> Option<(&str, Rcst)> {
+        literal(input, "'").map(|it| (it, Rcst::SingleQuote))
+    }
+    #[instrument(level = "trace")]
     fn double_quote(input: &str) -> Option<(&str, Rcst)> {
         literal(input, "\"").map(|it| (it, Rcst::DoubleQuote))
     }
@@ -168,6 +172,27 @@ mod parse {
             }
         }
         None
+    }
+
+    fn parse_multiple<F>(
+        mut input: &str,
+        parse_single: F,
+        count: Option<(usize, bool)>,
+    ) -> Option<(&str, Vec<Rcst>)>
+    where
+        F: Fn(&str) -> Option<(&str, Rcst)>,
+    {
+        let mut rcsts = vec![];
+        while let Some((input_after_single, rcst)) = parse_single(input)
+            && count.map_or(true, |(count, exact)| exact || rcsts.len() < count)
+        {
+            input = input_after_single;
+            rcsts.push(rcst);
+        }
+        match count {
+            Some((count, _)) if count != rcsts.len() => None,
+            _ => Some((input, rcsts)),
+        }
     }
 
     /// "Word" refers to a bunch of characters that are not separated by
@@ -615,26 +640,108 @@ mod parse {
     }
 
     #[instrument(level = "trace")]
+    fn text_interpolation(
+        input: &str,
+        indentation: usize,
+        curly_brace_count: usize,
+    ) -> Option<(&str, Rcst)> {
+        let (input, mut opening_curly_braces) =
+            parse_multiple(input, opening_curly_brace, Some((curly_brace_count, true)))?;
+
+        let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
+        let last = opening_curly_braces.pop().unwrap();
+        opening_curly_braces.push(last.wrap_in_whitespace(whitespace));
+
+        let (input, mut expression) = expression(input, indentation + 1, false, true, true)
+            .unwrap_or((
+                input,
+                Rcst::Error {
+                    unparsable_input: "".to_string(),
+                    error: RcstError::TextInterpolationWithoutExpression,
+                },
+            ));
+
+        let (input, whitespace) = whitespaces_and_newlines(input, indentation + 1, false);
+        expression = expression.wrap_in_whitespace(whitespace);
+
+        let (input, closing_curly_braces) =
+            parse_multiple(input, closing_curly_brace, Some((curly_brace_count, false))).unwrap_or(
+                (
+                    input,
+                    vec![Rcst::Error {
+                        unparsable_input: "".to_string(),
+                        error: RcstError::TextInterpolationNotClosed,
+                    }],
+                ),
+            );
+
+        Some((
+            input,
+            Rcst::TextInterpolation {
+                opening_curly_braces,
+                expression: Box::new(expression),
+                closing_curly_braces,
+            },
+        ))
+    }
+
+    // FIXME: It might be a good idea to ignore text interpolations in patterns
+    #[instrument(level = "trace")]
     fn text(input: &str, indentation: usize) -> Option<(&str, Rcst)> {
-        let (mut input, opening_quote) = double_quote(input)?;
+        let (input, opening_single_quotes) = parse_multiple(input, single_quote, None)?;
+        let (mut input, opening_double_quote) = double_quote(input)?;
+
+        let push_line_to_parts = |line: &mut Vec<char>, parts: &mut Vec<Rcst>| {
+            let joined_line = line.drain(..).join("");
+            if !joined_line.is_empty() {
+                parts.push(Rcst::TextPart(joined_line));
+            }
+        };
+
         let mut line = vec![];
         let mut parts = vec![];
-        let closing_quote = loop {
+        let closing = loop {
             match input.chars().next() {
                 Some('"') => {
                     input = &input[1..];
-                    parts.push(Rcst::TextPart(line.drain(..).join("")));
-                    break Rcst::DoubleQuote;
+                    match parse_multiple(
+                        input,
+                        single_quote,
+                        Some((opening_single_quotes.len(), false)),
+                    ) {
+                        Some((input_after_single_quotes, closing_single_quotes)) => {
+                            input = input_after_single_quotes;
+                            push_line_to_parts(&mut line, &mut parts);
+                            break Rcst::ClosingText {
+                                closing_double_quote: Box::new(Rcst::DoubleQuote),
+                                closing_single_quotes,
+                            };
+                        }
+                        None => line.push('"'),
+                    }
+                }
+                Some('{') => {
+                    match text_interpolation(input, indentation, opening_single_quotes.len() + 1) {
+                        Some((input_after_interpolation, interpolation)) => {
+                            push_line_to_parts(&mut line, &mut parts);
+                            input = input_after_interpolation;
+                            parts.push(interpolation);
+                        }
+                        None => {
+                            input = &input[1..];
+                            line.push('{');
+                        }
+                    }
                 }
                 None => {
-                    parts.push(Rcst::TextPart(line.drain(..).join("")));
+                    push_line_to_parts(&mut line, &mut parts);
                     break Rcst::Error {
                         unparsable_input: "".to_string(),
                         error: RcstError::TextNotClosed,
                     };
                 }
                 Some('\n') => {
-                    parts.push(Rcst::TextPart(line.drain(..).join("")));
+                    push_line_to_parts(&mut line, &mut parts);
                     let (i, mut whitespace) =
                         whitespaces_and_newlines(input, indentation + 1, false);
                     input = i;
@@ -655,9 +762,12 @@ mod parse {
         Some((
             input,
             Rcst::Text {
-                opening_quote: Box::new(opening_quote),
+                opening: Box::new(Rcst::OpeningText {
+                    opening_single_quotes,
+                    opening_double_quote: Box::new(opening_double_quote),
+                }),
                 parts,
-                closing_quote: Box::new(closing_quote),
+                closing: Box::new(closing),
             },
         ))
     }
@@ -669,11 +779,17 @@ mod parse {
             Some((
                 " bar",
                 Rcst::Text {
-                    opening_quote: Box::new(Rcst::DoubleQuote),
+                    opening: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                    }),
                     parts: vec![Rcst::TextPart("foo".to_string())],
-                    closing_quote: Box::new(Rcst::DoubleQuote)
-                }
-            ))
+                    closing: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![],
+                    }),
+                },
+            )),
         );
         // "foo
         //   bar"2
@@ -682,16 +798,22 @@ mod parse {
             Some((
                 "2",
                 Rcst::Text {
-                    opening_quote: Box::new(Rcst::DoubleQuote),
+                    opening: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                    }),
                     parts: vec![
                         Rcst::TextPart("foo".to_string()),
                         Rcst::Newline("\n".to_string()),
                         Rcst::Whitespace("  ".to_string()),
                         Rcst::TextPart("bar".to_string())
                     ],
-                    closing_quote: Box::new(Rcst::DoubleQuote),
-                }
-            ))
+                    closing: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![]
+                    }),
+                },
+            )),
         );
         //   "foo
         //   bar"
@@ -700,9 +822,12 @@ mod parse {
             Some((
                 "\n  bar\"2",
                 Rcst::Text {
-                    opening_quote: Box::new(Rcst::DoubleQuote),
+                    opening: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                    }),
                     parts: vec![Rcst::TextPart("foo".to_string()),],
-                    closing_quote: Box::new(Rcst::Error {
+                    closing: Box::new(Rcst::Error {
                         unparsable_input: "".to_string(),
                         error: RcstError::TextNotSufficientlyIndented,
                     }),
@@ -714,14 +839,361 @@ mod parse {
             Some((
                 "",
                 Rcst::Text {
-                    opening_quote: Box::new(Rcst::DoubleQuote),
+                    opening: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote)
+                    }),
                     parts: vec![Rcst::TextPart("foo".to_string()),],
-                    closing_quote: Box::new(Rcst::Error {
+                    closing: Box::new(Rcst::Error {
                         unparsable_input: "".to_string(),
                         error: RcstError::TextNotClosed,
                     }),
                 }
             ))
+        );
+        assert_eq!(
+            text("''\"foo\"'bar\"'' baz", 0),
+            Some((
+                " baz",
+                Rcst::Text {
+                    opening: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![Rcst::SingleQuote, Rcst::SingleQuote],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                    }),
+                    parts: vec![Rcst::TextPart("foo\"'bar".to_string())],
+                    closing: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![Rcst::SingleQuote, Rcst::SingleQuote],
+                    }),
+                },
+            )),
+        );
+        assert_eq!(
+            text("\"foo {\"bar\"} baz\"", 0),
+            Some((
+                "",
+                Rcst::Text {
+                    opening: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                    }),
+                    parts: vec![
+                        Rcst::TextPart("foo ".to_string()),
+                        Rcst::TextInterpolation {
+                            opening_curly_braces: vec![Rcst::OpeningCurlyBrace],
+                            expression: Box::new(Rcst::Text {
+                                opening: Box::new(Rcst::OpeningText {
+                                    opening_single_quotes: vec![],
+                                    opening_double_quote: Box::new(Rcst::DoubleQuote),
+                                }),
+                                parts: vec![Rcst::TextPart("bar".to_string())],
+                                closing: Box::new(Rcst::ClosingText {
+                                    closing_double_quote: Box::new(Rcst::DoubleQuote),
+                                    closing_single_quotes: vec![],
+                                }),
+                            }),
+                            closing_curly_braces: vec![Rcst::ClosingCurlyBrace],
+                        },
+                        Rcst::TextPart(" baz".to_string()),
+                    ],
+                    closing: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![],
+                    }),
+                },
+            )),
+        );
+        assert_eq!(
+            text("'\"foo {\"bar\"} baz\"'", 0),
+            Some((
+                "",
+                Rcst::Text {
+                    opening: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![Rcst::SingleQuote],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                    }),
+                    parts: vec![Rcst::TextPart("foo {\"bar\"} baz".to_string())],
+                    closing: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![Rcst::SingleQuote],
+                    }),
+                },
+            )),
+        );
+        assert_eq!(
+            text("\"foo {  \"bar\" } baz\"", 0),
+            Some((
+                "",
+                Rcst::Text {
+                    opening: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote)
+                    }),
+                    parts: vec![
+                        Rcst::TextPart("foo ".to_string()),
+                        Rcst::TextInterpolation {
+                            opening_curly_braces: vec![Rcst::TrailingWhitespace {
+                                child: Box::new(Rcst::OpeningCurlyBrace),
+                                whitespace: vec![Rcst::Whitespace("  ".to_string())],
+                            }],
+                            expression: Box::new(Rcst::TrailingWhitespace {
+                                child: Box::new(Rcst::Text {
+                                    opening: Box::new(Rcst::OpeningText {
+                                        opening_single_quotes: vec![],
+                                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                                    }),
+                                    parts: vec![Rcst::TextPart("bar".to_string())],
+                                    closing: Box::new(Rcst::ClosingText {
+                                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                                        closing_single_quotes: vec![],
+                                    }),
+                                }),
+                                whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                            }),
+                            closing_curly_braces: vec![Rcst::ClosingCurlyBrace],
+                        },
+                        Rcst::TextPart(" baz".to_string()),
+                    ],
+                    closing: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![],
+                    }),
+                },
+            )),
+        );
+        assert_eq!(
+            text(
+                "\"Some text with {'\"an interpolation containing {{\"an interpolation\"}}\"'}\"",
+                0,
+            ),
+            Some((
+                "",
+                Rcst::Text {
+                    opening: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                    }),
+                    parts: vec![
+                        Rcst::TextPart("Some text with ".to_string()),
+                        Rcst::TextInterpolation {
+                            opening_curly_braces: vec![Rcst::OpeningCurlyBrace],
+                            expression: Box::new(Rcst::Text {
+                                opening: Box::new(Rcst::OpeningText {
+                                    opening_single_quotes: vec![Rcst::SingleQuote],
+                                    opening_double_quote: Box::new(Rcst::DoubleQuote),
+                                }),
+                                parts: vec![
+                                    Rcst::TextPart("an interpolation containing ".to_string()),
+                                    Rcst::TextInterpolation {
+                                        opening_curly_braces: vec![
+                                            Rcst::OpeningCurlyBrace,
+                                            Rcst::OpeningCurlyBrace,
+                                        ],
+                                        expression: Box::new(Rcst::Text {
+                                            opening: Box::new(Rcst::OpeningText {
+                                                opening_single_quotes: vec![],
+                                                opening_double_quote: Box::new(Rcst::DoubleQuote),
+                                            }),
+                                            parts: vec![Rcst::TextPart(
+                                                "an interpolation".to_string(),
+                                            )],
+                                            closing: Box::new(Rcst::ClosingText {
+                                                closing_double_quote: Box::new(Rcst::DoubleQuote),
+                                                closing_single_quotes: vec![],
+                                            }),
+                                        }),
+                                        closing_curly_braces: vec![
+                                            Rcst::ClosingCurlyBrace,
+                                            Rcst::ClosingCurlyBrace,
+                                        ],
+                                    },
+                                ],
+                                closing: Box::new(Rcst::ClosingText {
+                                    closing_double_quote: Box::new(Rcst::DoubleQuote),
+                                    closing_single_quotes: vec![Rcst::SingleQuote],
+                                })
+                            }),
+                            closing_curly_braces: vec![Rcst::ClosingCurlyBrace],
+                        },
+                    ],
+                    closing: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![],
+                    }),
+                },
+            )),
+        );
+        assert_eq!(
+            text("\"{ {2} }\"", 0),
+            Some((
+                "",
+                Rcst::Text {
+                    opening: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                    }),
+                    parts: vec![Rcst::TextInterpolation {
+                        opening_curly_braces: vec![Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::OpeningCurlyBrace),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                        }],
+                        expression: Box::new(Rcst::TrailingWhitespace {
+                            child: Box::new(Rcst::Lambda {
+                                opening_curly_brace: Box::new(Rcst::OpeningCurlyBrace),
+                                parameters_and_arrow: None,
+                                body: vec![Rcst::Int {
+                                    value: 2u8.into(),
+                                    string: "2".to_string(),
+                                }],
+                                closing_curly_brace: Box::new(Rcst::ClosingCurlyBrace),
+                            }),
+                            whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                        }),
+                        closing_curly_braces: vec![Rcst::ClosingCurlyBrace],
+                    }],
+                    closing: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![],
+                    }),
+                },
+            )),
+        );
+        assert_eq!(
+            text("\"{{2}}\"", 0),
+            Some((
+                "",
+                Rcst::Text {
+                    opening: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                    }),
+                    parts: vec![
+                        Rcst::TextPart("{".to_string()),
+                        Rcst::TextInterpolation {
+                            opening_curly_braces: vec![Rcst::OpeningCurlyBrace],
+                            expression: Box::new(Rcst::Int {
+                                value: 2u8.into(),
+                                string: "2".to_string()
+                            }),
+                            closing_curly_braces: vec![Rcst::ClosingCurlyBrace],
+                        },
+                        Rcst::TextPart("}".to_string()),
+                    ],
+                    closing: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![],
+                    }),
+                },
+            )),
+        );
+        assert_eq!(
+            text("\"foo {} baz\"", 0),
+            Some((
+                "",
+                Rcst::Text {
+                    opening: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                    }),
+                    parts: vec![
+                        Rcst::TextPart("foo ".to_string()),
+                        Rcst::TextInterpolation {
+                            opening_curly_braces: vec![Rcst::OpeningCurlyBrace],
+                            expression: Box::new(Rcst::Error {
+                                unparsable_input: "".to_string(),
+                                error: RcstError::TextInterpolationWithoutExpression,
+                            }),
+                            closing_curly_braces: vec![Rcst::ClosingCurlyBrace],
+                        },
+                        Rcst::TextPart(" baz".to_string()),
+                    ],
+                    closing: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![],
+                    }),
+                },
+            )),
+        );
+        assert_eq!(
+            text("\"foo {\"bar\" baz\"", 0),
+            Some((
+                "",
+                Rcst::Text {
+                    opening: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                    }),
+                    parts: vec![
+                        Rcst::TextPart("foo ".to_string()),
+                        Rcst::TextInterpolation {
+                            opening_curly_braces: vec![Rcst::OpeningCurlyBrace],
+                            expression: Box::new(Rcst::TrailingWhitespace {
+                                child: Box::new(Rcst::Text {
+                                    opening: Box::new(Rcst::OpeningText {
+                                        opening_single_quotes: vec![],
+                                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                                    }),
+                                    parts: vec![Rcst::TextPart("bar".to_string())],
+                                    closing: Box::new(Rcst::ClosingText {
+                                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                                        closing_single_quotes: vec![],
+                                    }),
+                                }),
+                                whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                            }),
+                            closing_curly_braces: vec![Rcst::Error {
+                                unparsable_input: "".to_string(),
+                                error: RcstError::TextInterpolationNotClosed,
+                            }],
+                        },
+                        Rcst::TextPart("baz".to_string()),
+                    ],
+                    closing: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![],
+                    }),
+                },
+            )),
+        );
+        assert_eq!(
+            text("\"foo {\"bar\" \"a\"} baz\"", 0),
+            Some((
+                "a\"} baz\"",
+                Rcst::Text {
+                    opening: Box::new(Rcst::OpeningText {
+                        opening_single_quotes: vec![],
+                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                    }),
+                    parts: vec![
+                        Rcst::TextPart("foo ".to_string()),
+                        Rcst::TextInterpolation {
+                            opening_curly_braces: vec![Rcst::OpeningCurlyBrace],
+                            expression: Box::new(Rcst::TrailingWhitespace {
+                                child: Box::new(Rcst::Text {
+                                    opening: Box::new(Rcst::OpeningText {
+                                        opening_single_quotes: vec![],
+                                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                                    }),
+                                    parts: vec![Rcst::TextPart("bar".to_string())],
+                                    closing: Box::new(Rcst::ClosingText {
+                                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                                        closing_single_quotes: vec![],
+                                    })
+                                }),
+                                whitespace: vec![Rcst::Whitespace(" ".to_string())],
+                            }),
+                            closing_curly_braces: vec![Rcst::Error {
+                                unparsable_input: "".to_string(),
+                                error: RcstError::TextInterpolationNotClosed,
+                            }],
+                        },
+                    ],
+                    closing: Box::new(Rcst::ClosingText {
+                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                        closing_single_quotes: vec![],
+                    }),
+                },
+            )),
         );
     }
 
@@ -1447,9 +1919,15 @@ mod parse {
                         Rcst::TrailingWhitespace {
                             child: Box::new(Rcst::ListItem {
                                 value: Box::new(Rcst::Text {
-                                    opening_quote: Box::new(Rcst::DoubleQuote),
+                                    opening: Box::new(Rcst::OpeningText {
+                                        opening_single_quotes: vec![],
+                                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                                    }),
                                     parts: vec![Rcst::TextPart("Hi".to_string())],
-                                    closing_quote: Box::new(Rcst::DoubleQuote),
+                                    closing: Box::new(Rcst::ClosingText {
+                                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                                        closing_single_quotes: vec![],
+                                    }),
                                 }),
                                 comma: Some(Box::new(Rcst::Comma))
                             }),
@@ -1733,9 +2211,15 @@ mod parse {
                                     },
                                 ))),
                                 value: Box::new(Rcst::Text {
-                                    opening_quote: Box::new(Rcst::DoubleQuote),
+                                    opening: Box::new(Rcst::OpeningText {
+                                        opening_single_quotes: vec![],
+                                        opening_double_quote: Box::new(Rcst::DoubleQuote),
+                                    }),
                                     parts: vec![Rcst::TextPart("Hi".to_string())],
-                                    closing_quote: Box::new(Rcst::DoubleQuote),
+                                    closing: Box::new(Rcst::ClosingText {
+                                        closing_double_quote: Box::new(Rcst::DoubleQuote),
+                                        closing_single_quotes: vec![],
+                                    }),
                                 }),
                                 comma: Some(Box::new(Rcst::Comma)),
                             }),

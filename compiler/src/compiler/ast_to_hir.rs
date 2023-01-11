@@ -1,7 +1,7 @@
 use super::{
     ast::{
         self, Assignment, Ast, AstKind, AstString, Call, Identifier, Int, List, Struct,
-        StructAccess, Symbol, Text,
+        StructAccess, Symbol, Text, TextPart,
     },
     cst::{self, CstDb},
     cst_to_ast::CstToAst,
@@ -156,9 +156,10 @@ impl<'a> Context<'a> {
             AstKind::Int(Int(int)) => {
                 self.push(Some(ast.id.clone()), Expression::Int(int.to_owned()), None)
             }
-            AstKind::Text(Text(text)) => self.push(
+            AstKind::Text(text) => self.lower_text(Some(ast.id.clone()), text),
+            AstKind::TextPart(TextPart(string)) => self.push(
                 Some(ast.id.clone()),
-                Expression::Text(text.value.to_owned()),
+                Expression::Text(string.value.to_owned()),
                 None,
             ),
             AstKind::Identifier(Identifier(name)) => {
@@ -308,6 +309,35 @@ impl<'a> Context<'a> {
                 )
             }
         }
+    }
+
+    fn lower_text(&mut self, id: Option<ast::Id>, text: &Text) -> hir::Id {
+        // TODO: Convert parts to text
+        let builtin_text_concatenate = self.push(
+            None,
+            Expression::Builtin(BuiltinFunction::TextConcatenate),
+            None,
+        );
+
+        let compiled_parts = text
+            .0
+            .iter()
+            .map(|part| self.compile_single(part))
+            .collect_vec();
+
+        compiled_parts
+            .into_iter()
+            .reduce(|left, right| {
+                self.push(
+                    None,
+                    Expression::Call {
+                        function: builtin_text_concatenate.clone(),
+                        arguments: vec![left, right],
+                    },
+                    None,
+                )
+            })
+            .unwrap_or_else(|| self.push(id, Expression::Text("".to_string()), None))
     }
 
     fn compile_lambda(
@@ -609,7 +639,17 @@ impl PatternContext {
     fn compile_pattern(&mut self, ast: &Ast) -> Pattern {
         match &ast.kind {
             AstKind::Int(Int(int)) => Pattern::Int(int.to_owned()),
-            AstKind::Text(Text(text)) => Pattern::Text(text.value.to_owned()),
+            AstKind::Text(Text(text)) => Pattern::Text(
+                text.iter()
+                    .map(|part| match &part.kind {
+                        AstKind::TextPart(TextPart(string)) => string.value.to_owned(),
+                        _ => panic!("AST pattern can't contain text interpolations."),
+                    })
+                    .join(""),
+            ),
+            AstKind::TextPart(_) => {
+                unreachable!("TextPart should not occur in AST patterns.")
+            }
             AstKind::Identifier(Identifier(name)) => {
                 let (_, pattern_id) = self
                     .identifier_ids

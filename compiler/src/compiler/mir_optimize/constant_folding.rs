@@ -233,6 +233,23 @@ impl Mir {
                     | Expression::TraceFoundFuzzableClosure { .. } => unreachable!(),
                 }
             }
+            BuiltinFunction::TextConcatenate => {
+                let [a, b] = arguments else {
+                    return Some(Err("wrong number of arguments".to_string()));
+                };
+
+                match (visible.get(*a), visible.get(*b)) {
+                    (Expression::Text(text), other) | (other, Expression::Text(text))
+                        if text.is_empty() =>
+                    {
+                        other.clone()
+                    }
+                    (Expression::Text(text_a), Expression::Text(text_b)) => {
+                        Expression::Text(format!("{}{}", text_a, text_b))
+                    }
+                    _ => return None,
+                }
+            }
             _ => return None,
         };
         Some(Ok(return_value))

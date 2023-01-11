@@ -54,6 +54,7 @@ pub enum CstKind {
     OpeningCurlyBrace,  // {
     ClosingCurlyBrace,  // }
     Arrow,              // ->
+    SingleQuote,        // '
     DoubleQuote,        // "
     Octothorpe,         // #
     Whitespace(String),
@@ -72,12 +73,25 @@ pub enum CstKind {
         value: BigUint,
         string: String,
     },
+    OpeningText {
+        opening_single_quotes: Vec<Cst>,
+        opening_double_quote: Box<Cst>,
+    },
+    ClosingText {
+        closing_double_quote: Box<Cst>,
+        closing_single_quotes: Vec<Cst>,
+    },
     Text {
-        opening_quote: Box<Cst>,
+        opening: Box<Cst>,
         parts: Vec<Cst>,
-        closing_quote: Box<Cst>,
+        closing: Box<Cst>,
     },
     TextPart(String),
+    TextInterpolation {
+        opening_curly_braces: Vec<Cst>,
+        expression: Box<Cst>,
+        closing_curly_braces: Vec<Cst>,
+    },
     Pipe {
         receiver: Box<Cst>,
         bar: Box<Cst>,
@@ -150,6 +164,7 @@ impl Display for Cst {
             CstKind::OpeningCurlyBrace => '{'.fmt(f),
             CstKind::ClosingCurlyBrace => '}'.fmt(f),
             CstKind::Arrow => "->".fmt(f),
+            CstKind::SingleQuote => "'".fmt(f),
             CstKind::DoubleQuote => '"'.fmt(f),
             CstKind::Octothorpe => '#'.fmt(f),
             CstKind::Whitespace(whitespace) => whitespace.fmt(f),
@@ -171,18 +186,51 @@ impl Display for Cst {
             CstKind::Identifier(identifier) => identifier.fmt(f),
             CstKind::Symbol(symbol) => symbol.fmt(f),
             CstKind::Int { string, .. } => string.fmt(f),
-            CstKind::Text {
-                opening_quote,
-                parts,
-                closing_quote,
+            CstKind::OpeningText {
+                opening_single_quotes,
+                opening_double_quote,
             } => {
-                opening_quote.fmt(f)?;
+                for opening_single_quote in opening_single_quotes {
+                    opening_single_quote.fmt(f)?;
+                }
+                opening_double_quote.fmt(f)
+            }
+            CstKind::ClosingText {
+                closing_double_quote,
+                closing_single_quotes,
+            } => {
+                closing_double_quote.fmt(f)?;
+                for closing_single_quote in closing_single_quotes {
+                    closing_single_quote.fmt(f)?;
+                }
+                Ok(())
+            }
+            CstKind::Text {
+                opening,
+                parts,
+                closing,
+            } => {
+                opening.fmt(f)?;
                 for part in parts {
                     part.fmt(f)?;
                 }
-                closing_quote.fmt(f)
+                closing.fmt(f)
             }
             CstKind::TextPart(literal) => literal.fmt(f),
+            CstKind::TextInterpolation {
+                opening_curly_braces,
+                expression,
+                closing_curly_braces,
+            } => {
+                for opening_curly_brace in opening_curly_braces {
+                    opening_curly_brace.fmt(f)?;
+                }
+                expression.fmt(f)?;
+                for closing_curly_brace in closing_curly_braces {
+                    closing_curly_brace.fmt(f)?;
+                }
+                Ok(())
+            }
             CstKind::Pipe {
                 receiver,
                 bar,
@@ -337,6 +385,7 @@ impl UnwrapWhitespaceAndComment for Cst {
             | CstKind::OpeningCurlyBrace
             | CstKind::ClosingCurlyBrace
             | CstKind::Arrow
+            | CstKind::SingleQuote
             | CstKind::DoubleQuote
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)
@@ -348,16 +397,43 @@ impl UnwrapWhitespaceAndComment for Cst {
             kind @ (CstKind::Identifier(_) | CstKind::Symbol(_) | CstKind::Int { .. }) => {
                 kind.clone()
             }
+            CstKind::OpeningText {
+                opening_single_quotes,
+                opening_double_quote,
+            } => CstKind::OpeningText {
+                opening_single_quotes: opening_single_quotes.unwrap_whitespace_and_comment(),
+                opening_double_quote: Box::new(
+                    opening_double_quote.unwrap_whitespace_and_comment(),
+                ),
+            },
+            CstKind::ClosingText {
+                closing_double_quote,
+                closing_single_quotes,
+            } => CstKind::ClosingText {
+                closing_double_quote: Box::new(
+                    closing_double_quote.unwrap_whitespace_and_comment(),
+                ),
+                closing_single_quotes: closing_single_quotes.unwrap_whitespace_and_comment(),
+            },
             CstKind::Text {
-                opening_quote,
+                opening,
                 parts,
-                closing_quote,
+                closing,
             } => CstKind::Text {
-                opening_quote: Box::new(opening_quote.unwrap_whitespace_and_comment()),
+                opening: Box::new(opening.unwrap_whitespace_and_comment()),
                 parts: parts.unwrap_whitespace_and_comment(),
-                closing_quote: Box::new(closing_quote.unwrap_whitespace_and_comment()),
+                closing: Box::new(closing.unwrap_whitespace_and_comment()),
             },
             kind @ CstKind::TextPart(_) => kind.clone(),
+            CstKind::TextInterpolation {
+                opening_curly_braces,
+                expression,
+                closing_curly_braces,
+            } => CstKind::TextInterpolation {
+                opening_curly_braces: opening_curly_braces.unwrap_whitespace_and_comment(),
+                expression: Box::new(expression.unwrap_whitespace_and_comment()),
+                closing_curly_braces: closing_curly_braces.unwrap_whitespace_and_comment(),
+            },
             CstKind::Pipe {
                 receiver,
                 bar,
@@ -503,6 +579,7 @@ impl TreeWithIds for Cst {
             | CstKind::OpeningCurlyBrace
             | CstKind::ClosingCurlyBrace
             | CstKind::Arrow
+            | CstKind::SingleQuote
             | CstKind::DoubleQuote
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)
@@ -512,15 +589,35 @@ impl TreeWithIds for Cst {
                 child.find(id).or_else(|| whitespace.find(id))
             }
             CstKind::Identifier(_) | CstKind::Symbol(_) | CstKind::Int { .. } => None,
+            CstKind::OpeningText {
+                opening_single_quotes,
+                opening_double_quote,
+            } => opening_single_quotes
+                .find(id)
+                .or_else(|| opening_double_quote.find(id)),
+            CstKind::ClosingText {
+                closing_double_quote,
+                closing_single_quotes,
+            } => closing_double_quote
+                .find(id)
+                .or_else(|| closing_single_quotes.find(id)),
             CstKind::Text {
-                opening_quote,
+                opening,
                 parts,
-                closing_quote,
-            } => opening_quote
+                closing,
+            } => opening
                 .find(id)
                 .or_else(|| parts.find(id))
-                .or_else(|| closing_quote.find(id)),
+                .or_else(|| closing.find(id)),
             CstKind::TextPart(_) => None,
+            CstKind::TextInterpolation {
+                opening_curly_braces,
+                expression,
+                closing_curly_braces,
+            } => opening_curly_braces
+                .find(id)
+                .or_else(|| expression.find(id))
+                .or_else(|| closing_curly_braces.find(id)),
             CstKind::Pipe {
                 receiver,
                 bar,
@@ -621,6 +718,7 @@ impl TreeWithIds for Cst {
             | CstKind::OpeningCurlyBrace
             | CstKind::ClosingCurlyBrace
             | CstKind::Arrow
+            | CstKind::SingleQuote
             | CstKind::DoubleQuote
             | CstKind::Octothorpe
             | CstKind::Whitespace(_)
@@ -630,7 +728,11 @@ impl TreeWithIds for Cst {
             CstKind::Identifier { .. } | CstKind::Symbol { .. } | CstKind::Int { .. } => {
                 (None, true)
             }
-            CstKind::Text { .. } | CstKind::TextPart(_) => (None, false),
+            CstKind::Text { .. }
+            | CstKind::OpeningText { .. }
+            | CstKind::ClosingText { .. }
+            | CstKind::TextPart(_)
+            | CstKind::TextInterpolation { .. } => (None, false),
             CstKind::Pipe { receiver, call, .. } => (
                 receiver
                     .find_by_offset(offset)

@@ -99,6 +99,10 @@ impl RcstToCstExt for Rcst {
                 state.offset += 2;
                 CstKind::Arrow
             }
+            Rcst::SingleQuote => {
+                state.offset += 1;
+                CstKind::SingleQuote
+            }
             Rcst::DoubleQuote => {
                 state.offset += 1;
                 CstKind::DoubleQuote
@@ -142,19 +146,42 @@ impl RcstToCstExt for Rcst {
                 state.offset += string.len();
                 CstKind::Int { value, string }
             }
+            Rcst::OpeningText {
+                opening_single_quotes,
+                opening_double_quote,
+            } => CstKind::OpeningText {
+                opening_single_quotes: opening_single_quotes.to_csts(state),
+                opening_double_quote: Box::new(opening_double_quote.to_cst(state)),
+            },
+            Rcst::ClosingText {
+                closing_double_quote,
+                closing_single_quotes,
+            } => CstKind::ClosingText {
+                closing_double_quote: Box::new(closing_double_quote.to_cst(state)),
+                closing_single_quotes: closing_single_quotes.to_csts(state),
+            },
             Rcst::Text {
-                opening_quote,
+                opening,
                 parts,
-                closing_quote,
+                closing,
             } => CstKind::Text {
-                opening_quote: Box::new(opening_quote.to_cst(state)),
+                opening: Box::new(opening.to_cst(state)),
                 parts: parts.to_csts(state),
-                closing_quote: Box::new(closing_quote.to_cst(state)),
+                closing: Box::new(closing.to_cst(state)),
             },
             Rcst::TextPart(text) => {
                 state.offset += text.len();
                 CstKind::TextPart(text)
             }
+            Rcst::TextInterpolation {
+                opening_curly_braces,
+                expression,
+                closing_curly_braces,
+            } => CstKind::TextInterpolation {
+                opening_curly_braces: opening_curly_braces.to_csts(state),
+                expression: Box::new(expression.to_cst(state)),
+                closing_curly_braces: closing_curly_braces.to_csts(state),
+            },
             Rcst::Call {
                 receiver,
                 arguments,
