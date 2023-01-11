@@ -101,12 +101,12 @@ impl Mir {
     /// size.
     pub fn optimize_obvious(&mut self, db: &dyn OptimizeMir, tracing: &TracingConfig) {
         loop {
-            let before = self.clone();
+            let hashcode_before = self.do_hash();
 
             self.optimize_obvious_self_contained();
             self.fold_modules(db, tracing);
 
-            if *self == before {
+            if self.do_hash() == hashcode_before {
                 break;
             }
         }
