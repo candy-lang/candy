@@ -332,7 +332,21 @@ impl LoweringContext {
                 inner,
                 closing_parenthesis,
             } => {
-                assert_eq!(lowering_type, LoweringType::Expression);
+                match lowering_type {
+                    LoweringType::Expression => {
+                        return self.create_ast(
+                            cst.id,
+                            AstKind::Error {
+                                child: None,
+                                errors: vec![
+                                    self.create_error(cst, AstError::ParenthesizedInPattern)
+                                ],
+                            },
+                        )
+                    }
+                    LoweringType::Pattern => {}
+                    LoweringType::PatternLiteralPart => {}
+                }
 
                 let mut ast = self.lower_cst(inner, LoweringType::Expression);
 

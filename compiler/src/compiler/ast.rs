@@ -130,6 +130,7 @@ pub enum AstError {
     ListItemWithoutComma,
     ListWithNonListItem,
     ListWithoutClosingParenthesis,
+    ParenthesizedInPattern,
     ParenthesizedWithoutClosingParenthesis,
     PatternContainsInvalidExpression,
     PatternLiteralPartContainsInvalidExpression,
