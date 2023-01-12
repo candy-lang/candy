@@ -715,6 +715,19 @@ impl LoweringContext {
                         CstKind::Identifier(identifier) => {
                             self.create_string(name_or_pattern.id.to_owned(), identifier.to_owned())
                         }
+                        CstKind::Error { error, .. } => {
+                            return self.create_ast(
+                                cst.id,
+                                AstKind::Error {
+                                    child: None,
+                                    errors: vec![CompilerError {
+                                        module: self.module.clone(),
+                                        span: name_or_pattern.span.clone(),
+                                        payload: CompilerErrorPayload::Rcst(error.clone()),
+                                    }],
+                                },
+                            );
+                        }
                         _ => panic!("Expected an identifier, but found `{}`.", name_or_pattern),
                     };
 
