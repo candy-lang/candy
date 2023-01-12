@@ -186,23 +186,17 @@ impl LoweringContext {
 
                 let mut lowered_parts = vec![];
                 for part in parts {
-                    match part {
-                        Cst {
-                            kind: CstKind::TextPart(text),
-                            ..
-                        } => {
+                    match &part.kind {
+                        CstKind::TextPart(text) => {
                             let string = self.create_string_without_id_mapping(text.clone());
                             let text_part =
                                 self.create_ast(part.id, AstKind::TextPart(TextPart(string)));
                             lowered_parts.push(text_part);
                         },
-                        Cst {
-                            kind: CstKind::TextInterpolation {
-                                opening_curly_braces,
-                                expression,
-                                closing_curly_braces
-                            },
-                            ..
+                        CstKind::TextInterpolation {
+                            opening_curly_braces,
+                            expression,
+                            closing_curly_braces,
                         } => {
                             if lowering_type != LoweringType::Expression {
                                 errors.push(
