@@ -8,7 +8,7 @@ use itertools::Itertools;
 use num_bigint::BigInt;
 use std::{cmp::Ordering, collections::HashMap, fmt, hash, mem, vec};
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Mir {
     pub id_generator: IdGenerator<Id>,
     pub body: Body,
