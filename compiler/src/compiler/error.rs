@@ -76,6 +76,7 @@ impl Display for CompilerErrorPayload {
                 AstError::ListWithoutClosingParenthesis => {
                     "This list doesn't have a closing parenthesis."
                 }
+                AstError::ParenthesizedInPattern => "You can not use parentheses in patterns.",
                 AstError::ParenthesizedWithoutClosingParenthesis => {
                     "This expression is parenthesized, but the closing parenthesis is missing."
                 }
