@@ -244,6 +244,11 @@ impl LoweringContext {
                                 lowered_parts.push(error);
                             }
                         },
+                        CstKind::Error { error, .. } => errors.push(CompilerError {
+                            module: self.module.clone(),
+                            span: part.span.clone(),
+                            payload: CompilerErrorPayload::Rcst(error.clone()),
+                        }),
                         _ => panic!("Text contains non-TextPart. Whitespaces should have been removed already."),
                     }
                 }
