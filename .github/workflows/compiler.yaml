@@ -1,6 +1,9 @@
 name: Compiler
 
-on: pull_request
+on:
+  push:
+    branches: [main]
+  pull_request:
 
 env:
   RUST_VERSION: nightly
