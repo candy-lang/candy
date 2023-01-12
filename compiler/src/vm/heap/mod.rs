@@ -279,11 +279,17 @@ impl Heap {
         self.create(Data::Builtin(Builtin { function: builtin }))
     }
     pub fn create_send_port(&mut self, channel: ChannelId) -> Pointer {
-        self.channel_refcounts.entry(channel).and_modify(|count| *count +=1).or_insert(1);
+        self.channel_refcounts
+            .entry(channel)
+            .and_modify(|count| *count += 1)
+            .or_insert(1);
         self.create(Data::SendPort(SendPort::new(channel)))
     }
     pub fn create_receive_port(&mut self, channel: ChannelId) -> Pointer {
-        self.channel_refcounts.entry(channel).and_modify(|count| *count +=1).or_insert(1);
+        self.channel_refcounts
+            .entry(channel)
+            .and_modify(|count| *count += 1)
+            .or_insert(1);
         self.create(Data::ReceivePort(ReceivePort::new(channel)))
     }
     pub fn create_nothing(&mut self) -> Pointer {
