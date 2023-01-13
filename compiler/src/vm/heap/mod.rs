@@ -183,7 +183,7 @@ impl Heap {
         })
     }
     fn free(&mut self, address: Pointer) {
-        let object = std::mem::replace(&mut self.objects[address.raw()], None).unwrap();
+        let object = std::mem::take(&mut self.objects[address.raw()]).unwrap();
         self.empty_addresses.push(address);
         trace!("Freeing object at {address}.");
         assert_eq!(object.reference_count, 0);
