@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Compiler: Build (debug)",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["build", "--manifest-path=./compiler/Cargo.toml"]
+    },
+    {
+      "label": "Compiler: Build (release)",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["build", "--manifest-path=./compiler/Cargo.toml", "--release"]
+    }
+  ]
+}

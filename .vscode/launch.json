@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Compiler: Debug Fibonacci",
+      "type": "lldb",
+      "request": "launch",
+      "preLaunchTask": "Compiler: Build (debug)",
+      "program": "${workspaceRoot}/target/debug/candy",
+      "args": ["run", "--debug", "packages/examples/fibonacci.candy"],
+      "cwd": "${workspaceRoot}"
+    }
+  ]
+}
