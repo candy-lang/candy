@@ -214,6 +214,9 @@ jobs:
           gh-pages-branch: gh-pages
           gh-repository: github.com/candy-lang/benchmark-results
           benchmark-data-dir-path: ./
+          # Only push results to the benchmark repository if we ran on a commit
+          # to the main branch.
+          external-data-json-path: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '' || 'data.json' }}
           github-token: ${{ secrets.BENCHMARK_RESULTS_TOKEN }}
           auto-push: true
           comment-always: true
