@@ -2,16 +2,16 @@ name: name_checker
 version: 0.1.0
 
 environment:
-  sdk: ">=2.7.0 <3.0.0"
+  sdk: '>=2.18.0 <3.0.0'
 
 dependencies:
   basics: ^0.4.0
   characters: ^1.0.0
   collection: ^1.14.12
-  dartx: ^0.5.0
   http: ^0.13.5
   meta: ^1.1.8
   retry: ^3.1.0
 
 dev_dependencies:
-  extra_pedantic: ^1.2.0
+  dart_code_metrics: ^5.0.1
+  flutter_lints: ^2.0.1

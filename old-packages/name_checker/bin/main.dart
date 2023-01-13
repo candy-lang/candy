@@ -133,7 +133,7 @@ extension ListExtension<T> on List<T> {
 Future<String> isDomainAvailable(String name) async {
   final body = await retry(() async {
     final rawResponse = await http.post(
-      'https://domains.google.com/v1/Main/FeSearchService/Search?authuser=0',
+      Uri.https('domains.google.com', '/v1/Main/FeSearchService/Search'),
       headers: {
         'accept': 'application/json',
         'content-type': 'application/json',
@@ -177,7 +177,7 @@ Future<String> isDomainAvailable(String name) async {
 }
 
 Future<String> isGitHubOrganizationAvailable(String name) async {
-  final response = await http.head('https://github.com/$name');
+  final response = await http.head(Uri.https('github.com', '/$name'));
 
   switch (response.statusCode) {
     case HttpStatus.ok:
