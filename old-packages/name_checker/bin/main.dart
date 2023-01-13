@@ -58,11 +58,15 @@ const names = {
 };
 
 Future<void> main(List<String> args) async {
-  // final result = StringBuffer()
-  //   ..writeln('# Names for Candy')
-  //   ..writeln()
-  //   ..writeln('| Name | Domain | Domain `-lang` | GitHub | GitHub `-lang` |')
-  //   ..writeln('| :- | :-: | :-: | :-: | :-: |');
+  final resultFile = File('result.md');
+  if (!resultFile.existsSync()) {
+    await resultFile.writeAsString(
+      '# Names for Candy\n'
+      '\n'
+      '| Name | Domain | Domain `-lang` | GitHub | GitHub `-lang` |\n'
+      '| :- | :-: | :-: | :-: | :-: |\n',
+    );
+  }
 
   final names = <String>{};
   for (final name in _generateNames(200)) {
@@ -82,13 +86,11 @@ Future<void> main(List<String> args) async {
     final gitHubShort = results[2];
     final gitHubLong = results[3];
 
-    await File('result.md').writeAsString(
+    await resultFile.writeAsString(
       '| $name | $domainShort | $domainLong | $gitHubShort | $gitHubLong |\n',
       mode: FileMode.append,
     );
   }
-
-  // await File('result.md').writeAsString(result.toString());
 }
 
 Iterable<String> _generateNames(int count) sync* {
