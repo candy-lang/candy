@@ -216,7 +216,7 @@ jobs:
           benchmark-data-dir-path: ./
           # Only push results to the benchmark repository if we ran on a commit
           # to the main branch.
-          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && true || false }}
+          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           github-token: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.BENCHMARK_RESULTS_TOKEN || secrets.BENCHMARK_RESULTS_COMMENT_TOKEN }}
           comment-always: true
           comment-on-alert: true
