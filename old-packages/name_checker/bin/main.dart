@@ -1,11 +1,11 @@
-// ignore_for_file: avoid_print
-
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
 import 'package:http/http.dart' as http;
 import 'package:retry/retry.dart';
+
+// ignore_for_file: avoid_print, avoid_dynamic_calls
 
 const names = {
   // 'aaaaa',
