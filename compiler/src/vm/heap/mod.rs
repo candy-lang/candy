@@ -49,8 +49,13 @@ impl std::fmt::Debug for Heap {
         for (address, object) in objects {
             writeln!(
                 f,
-                "{address}: {} {}",
+                "{address} ({} {}): {}",
                 object.reference_count,
+                if object.reference_count == 1 {
+                    "ref"
+                } else {
+                    "refs"
+                },
                 address.format_debug(self),
             )?;
         }
