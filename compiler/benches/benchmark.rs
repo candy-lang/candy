@@ -31,7 +31,7 @@ fib n =
   needs (int.is n)
   fibRec fibRec n
 
-main _ := fib {n}"#
+main _ := fib {n}"#,
     );
     group.bench_function(BenchmarkId::new("fibonacci", n), |b| {
         b.run_vm(&fibonacci_code)
