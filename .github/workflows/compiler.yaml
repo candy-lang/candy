@@ -1,6 +1,9 @@
 name: Compiler
 
-on: pull_request
+on:
+  push:
+    branches: [main]
+  pull_request:
 
 env:
   RUST_VERSION: nightly
@@ -210,7 +213,7 @@ jobs:
           output-file-path: output.txt
           gh-pages-branch: gh-pages
           gh-repository: github.com/candy-lang/benchmark-results
-          benchmark-data-dir-path: dev/bench
+          benchmark-data-dir-path: ./
           github-token: ${{ secrets.BENCHMARK_RESULTS_TOKEN }}
           auto-push: true
           comment-always: true
