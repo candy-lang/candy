@@ -13,7 +13,8 @@ use crate::{
     utils::IdGenerator,
 };
 use itertools::Itertools;
-use std::{collections::HashMap, sync::Arc};
+use rustc_hash::FxHashMap;
+use std::sync::Arc;
 
 #[salsa::query_group(HirToMirStorage)]
 pub trait HirToMir: CstDb + AstToHir + LspPositionConversion {
@@ -48,7 +49,7 @@ fn compile_module(
 ) -> Mir {
     let mut id_generator = IdGenerator::start_at(0);
     let mut body = Body::default();
-    let mut mapping = HashMap::new();
+    let mut mapping = FxHashMap::default();
 
     body.push_with_new_id(
         &mut id_generator,
@@ -64,7 +65,7 @@ fn compile_module(
         &mut id_generator,
         Expression::HirId(hir::Id::new(module, vec![])),
     );
-    let mut pattern_identifier_ids = HashMap::new();
+    let mut pattern_identifier_ids = FxHashMap::default();
     for (id, expression) in &hir.expressions {
         compile_expression(
             db,
@@ -233,8 +234,8 @@ fn compile_expression(
     db: &dyn HirToMir,
     id_generator: &mut IdGenerator<Id>,
     body: &mut Body,
-    mapping: &mut HashMap<hir::Id, Id>,
-    pattern_identifier_ids: &mut HashMap<hir::Id, HashMap<hir::PatternIdentifierId, Id>>,
+    mapping: &mut FxHashMap<hir::Id, Id>,
+    pattern_identifier_ids: &mut FxHashMap<hir::Id, FxHashMap<hir::PatternIdentifierId, Id>>,
     needs_function: Id,
     responsible_for_needs: Id,
     hir_id: &hir::Id,
@@ -263,7 +264,7 @@ fn compile_expression(
             let responsible =
                 body.push_with_new_id(id_generator, Expression::HirId(hir_id.clone()));
             let expression = mapping[expression];
-            let mut identifier_ids = HashMap::new();
+            let mut identifier_ids = FxHashMap::default();
             compile_destructure(
                 db,
                 id_generator,
@@ -445,7 +446,7 @@ fn compile_destructure(
     db: &dyn HirToMir,
     id_generator: &mut IdGenerator<Id>,
     body: &mut Body,
-    identifier_ids: &mut HashMap<hir::PatternIdentifierId, Id>,
+    identifier_ids: &mut FxHashMap<hir::PatternIdentifierId, Id>,
     responsible: Id,
     expression: Id,
     pattern: &hir::Pattern,

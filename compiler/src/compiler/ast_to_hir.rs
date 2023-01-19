@@ -15,7 +15,8 @@ use crate::{
     utils::IdGenerator,
 };
 use itertools::Itertools;
-use std::{collections::HashMap, mem, ops::Range, sync::Arc};
+use rustc_hash::FxHashMap;
+use std::{mem, ops::Range, sync::Arc};
 
 #[salsa::query_group(AstToHirStorage)]
 pub trait AstToHir: CstDb + CstToAst {
@@ -29,7 +30,7 @@ pub trait AstToHir: CstDb + CstToAst {
 
     fn hir(&self, module: Module) -> Option<HirResult>;
 }
-type HirResult = (Arc<Body>, Arc<HashMap<hir::Id, ast::Id>>);
+type HirResult = (Arc<Body>, Arc<FxHashMap<hir::Id, ast::Id>>);
 
 fn hir_to_ast_id(db: &dyn AstToHir, id: hir::Id) -> Option<ast::Id> {
     let (_, hir_to_ast_id_mapping) = db.hir(id.module.clone()).unwrap();
@@ -68,12 +69,12 @@ fn compile_top_level(
     db: &dyn AstToHir,
     module: Module,
     ast: &[Ast],
-) -> (Body, HashMap<hir::Id, ast::Id>) {
+) -> (Body, FxHashMap<hir::Id, ast::Id>) {
     let mut context = Context {
         module,
-        id_mapping: HashMap::new(),
+        id_mapping: FxHashMap::default(),
         db,
-        public_identifiers: HashMap::new(),
+        public_identifiers: FxHashMap::default(),
         body: Body::default(),
         prefix_keys: vec![],
         identifiers: im::HashMap::new(),
@@ -95,9 +96,9 @@ fn compile_top_level(
 
 struct Context<'a> {
     module: Module,
-    id_mapping: HashMap<hir::Id, Option<ast::Id>>,
+    id_mapping: FxHashMap<hir::Id, Option<ast::Id>>,
     db: &'a dyn AstToHir,
-    public_identifiers: HashMap<String, hir::Id>,
+    public_identifiers: FxHashMap<String, hir::Id>,
     body: Body,
     prefix_keys: Vec<String>,
     identifiers: im::HashMap<String, hir::Id>,
@@ -539,7 +540,7 @@ impl<'a> Context<'a> {
 
 impl<'a> Context<'a> {
     fn generate_sparkles(&mut self) {
-        let mut sparkles_map = HashMap::new();
+        let mut sparkles_map = FxHashMap::default();
 
         for builtin_function in builtin_functions::VALUES.iter() {
             let symbol = self.push(
@@ -597,7 +598,7 @@ impl<'a> Context<'a> {
         //   HirId(~:test.candy:100): HirId(~:test.candy:101),
         // ]
 
-        let mut exports = HashMap::new();
+        let mut exports = FxHashMap::default();
         for (name, id) in self.public_identifiers.clone() {
             exports.insert(
                 self.push(
@@ -622,7 +623,7 @@ fn add_keys(parents: &[String], id: String) -> Vec<String> {
 
 /// The `ast::Id` is the ID of the first occurrence of this identifier in the
 /// AST.
-type PatternIdentifierIds = HashMap<String, (ast::Id, PatternIdentifierId)>;
+type PatternIdentifierIds = FxHashMap<String, (ast::Id, PatternIdentifierId)>;
 
 #[derive(Default)]
 struct PatternContext {

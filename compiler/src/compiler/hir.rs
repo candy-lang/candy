@@ -8,8 +8,8 @@ use super::{ast_to_hir::AstToHir, error::CompilerError};
 use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 use num_bigint::BigUint;
+use rustc_hash::FxHashMap;
 use std::{
-    collections::HashMap,
     fmt::{self, Display, Formatter},
     hash,
     sync::Arc,
@@ -194,7 +194,7 @@ pub enum Expression {
     Reference(Id),
     Symbol(String),
     List(Vec<Id>),
-    Struct(HashMap<Id, Id>),
+    Struct(FxHashMap<Id, Id>),
     Destructure {
         expression: Id,
         pattern: Pattern,
@@ -263,7 +263,7 @@ pub enum Pattern {
     Symbol(String),
     List(Vec<Pattern>),
     // Keys may not contain `NewIdentifier`.
-    Struct(HashMap<Pattern, Pattern>),
+    Struct(FxHashMap<Pattern, Pattern>),
     Error {
         child: Option<Box<Pattern>>,
         errors: Vec<CompilerError>,
@@ -286,7 +286,7 @@ pub struct Lambda {
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Body {
     pub expressions: LinkedHashMap<Id, Expression>,
-    pub identifiers: HashMap<Id, String>,
+    pub identifiers: FxHashMap<Id, String>,
 }
 #[allow(clippy::derived_hash_with_manual_eq)]
 impl hash::Hash for Body {

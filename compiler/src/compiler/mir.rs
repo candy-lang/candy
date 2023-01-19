@@ -6,7 +6,8 @@ use crate::{
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::{cmp::Ordering, collections::HashMap, fmt, hash, mem, vec};
+use rustc_hash::FxHashMap;
+use std::{cmp::Ordering, fmt, hash, mem, vec};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Mir {
@@ -328,12 +329,12 @@ impl Expression {
 
 #[derive(Clone)]
 pub struct VisibleExpressions {
-    expressions: HashMap<Id, Expression>,
+    expressions: FxHashMap<Id, Expression>,
 }
 impl VisibleExpressions {
     pub fn none_visible() -> Self {
         Self {
-            expressions: HashMap::new(),
+            expressions: FxHashMap::default(),
         }
     }
     pub fn insert(&mut self, id: Id, expression: Expression) {
