@@ -187,23 +187,17 @@ impl LoweringContext {
 
                 let mut lowered_parts = vec![];
                 for part in parts {
-                    match part {
-                        Cst {
-                            kind: CstKind::TextPart(text),
-                            ..
-                        } => {
+                    match &part.kind {
+                        CstKind::TextPart(text) => {
                             let string = self.create_string_without_id_mapping(text.clone());
                             let text_part =
                                 self.create_ast(part.id, AstKind::TextPart(TextPart(string)));
                             lowered_parts.push(text_part);
                         },
-                        Cst {
-                            kind: CstKind::TextInterpolation {
-                                opening_curly_braces,
-                                expression,
-                                closing_curly_braces
-                            },
-                            ..
+                        CstKind::TextInterpolation {
+                            opening_curly_braces,
+                            expression,
+                            closing_curly_braces,
                         } => {
                             if lowering_type != LoweringType::Expression {
                                 errors.push(
@@ -251,6 +245,11 @@ impl LoweringContext {
                                 lowered_parts.push(error);
                             }
                         },
+                        CstKind::Error { error, .. } => errors.push(CompilerError {
+                            module: self.module.clone(),
+                            span: part.span.clone(),
+                            payload: CompilerErrorPayload::Rcst(error.clone()),
+                        }),
                         _ => panic!("Text contains non-TextPart. Whitespaces should have been removed already."),
                     }
                 }
@@ -295,7 +294,18 @@ impl LoweringContext {
                 bar,
                 call,
             } => {
-                assert_eq!(lowering_type, LoweringType::Expression);
+                match lowering_type {
+                    LoweringType::Expression => {}
+                    LoweringType::Pattern | LoweringType::PatternLiteralPart => {
+                        return self.create_ast(
+                            cst.id,
+                            AstKind::Error {
+                                child: None,
+                                errors: vec![self.create_error(cst, AstError::PipeInPattern)],
+                            },
+                        )
+                    }
+                }
 
                 let ast = self.lower_cst(receiver, LoweringType::Expression);
 
@@ -333,7 +343,20 @@ impl LoweringContext {
                 inner,
                 closing_parenthesis,
             } => {
-                assert_eq!(lowering_type, LoweringType::Expression);
+                match lowering_type {
+                    LoweringType::Expression => {}
+                    LoweringType::Pattern | LoweringType::PatternLiteralPart => {
+                        return self.create_ast(
+                            cst.id,
+                            AstKind::Error {
+                                child: None,
+                                errors: vec![
+                                    self.create_error(cst, AstError::ParenthesizedInPattern)
+                                ],
+                            },
+                        );
+                    }
+                }
 
                 let mut ast = self.lower_cst(inner, LoweringType::Expression);
 
@@ -361,7 +384,18 @@ impl LoweringContext {
                 receiver,
                 arguments,
             } => {
-                assert_eq!(lowering_type, LoweringType::Expression);
+                match lowering_type {
+                    LoweringType::Expression => {}
+                    LoweringType::Pattern | LoweringType::PatternLiteralPart => {
+                        return self.create_ast(
+                            cst.id,
+                            AstKind::Error {
+                                child: None,
+                                errors: vec![self.create_error(cst, AstError::CallInPattern)],
+                            },
+                        )
+                    }
+                }
 
                 let mut receiver_kind = &receiver.kind;
                 loop {
@@ -702,7 +736,34 @@ impl LoweringContext {
                         CstKind::Identifier(identifier) => {
                             self.create_string(name_or_pattern.id.to_owned(), identifier.to_owned())
                         }
-                        _ => panic!("Expected an identifier, but found `{}`.", name_or_pattern),
+                        CstKind::Error { error, .. } => {
+                            return self.create_ast(
+                                cst.id,
+                                AstKind::Error {
+                                    child: None,
+                                    errors: vec![CompilerError {
+                                        module: self.module.clone(),
+                                        span: name_or_pattern.span.clone(),
+                                        payload: CompilerErrorPayload::Rcst(error.clone()),
+                                    }],
+                                },
+                            );
+                        }
+                        _ => {
+                            return self.create_ast(
+                                cst.id,
+                                AstKind::Error {
+                                    child: None,
+                                    errors: vec![CompilerError {
+                                        module: self.module.clone(),
+                                        span: name_or_pattern.span.clone(),
+                                        payload: CompilerErrorPayload::Ast(
+                                            AstError::ExpectedNameOrPatternInAssignment,
+                                        ),
+                                    }],
+                                },
+                            );
+                        }
                     };
 
                     let (parameters, errors) = self.lower_parameters(parameters);

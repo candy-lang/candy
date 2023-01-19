@@ -67,6 +67,10 @@ impl Display for CompilerErrorPayload {
             }
             .to_string(),
             CompilerErrorPayload::Ast(error) => match error {
+                AstError::CallInPattern => "Calls in patterns are not allowed.",
+                AstError::ExpectedNameOrPatternInAssignment => {
+                    "An assignment should have a name or pattern on the left side."
+                }
                 AstError::ExpectedParameter => "A parameter should come here.",
                 AstError::LambdaWithoutClosingCurlyBrace => {
                     "This lambda doesn't have a closing curly brace."
@@ -76,6 +80,7 @@ impl Display for CompilerErrorPayload {
                 AstError::ListWithoutClosingParenthesis => {
                     "This list doesn't have a closing parenthesis."
                 }
+                AstError::ParenthesizedInPattern => "Parentheses are not allowed in patterns.",
                 AstError::ParenthesizedWithoutClosingParenthesis => {
                     "This expression is parenthesized, but the closing parenthesis is missing."
                 }
@@ -85,6 +90,7 @@ impl Display for CompilerErrorPayload {
                 AstError::PatternLiteralPartContainsInvalidExpression => {
                     "This type of expression is not allowed in this part of a pattern."
                 }
+                AstError::PipeInPattern => "Pipes are not allowed in patterns.",
                 AstError::StructKeyWithoutColon => "This struct key should be followed by a colon.",
                 AstError::StructShorthandWithNotIdentifier => {
                     "Shorthand syntax in structs only supports identifiers."

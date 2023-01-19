@@ -275,8 +275,11 @@ fn compile_expression(
                 pattern,
             );
 
-            let existing_entry = pattern_identifier_ids.insert(hir_id.to_owned(), identifier_ids);
-            assert!(existing_entry.is_none());
+            if !identifier_ids.is_empty() {
+                let existing_entry =
+                    pattern_identifier_ids.insert(hir_id.to_owned(), identifier_ids);
+                assert!(existing_entry.is_none());
+            }
 
             Expression::Reference(expression)
         }
