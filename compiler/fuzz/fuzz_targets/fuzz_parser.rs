@@ -1,7 +1,5 @@
 #![no_main]
 
-use std::collections::HashMap;
-
 use candy::{
     compiler::{hir, mir_to_lir::MirToLir, TracingConfig},
     database::Database,
