@@ -420,6 +420,6 @@ impl Display for Call {
 }
 impl Display for AstString {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, #"{}@"{}""#, self.id.to_short_debug_string(), self.value)
+        write!(f, r#"{}@"{}""#, self.id.to_short_debug_string(), self.value)
     }
 }
