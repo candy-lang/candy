@@ -344,7 +344,7 @@ impl fmt::Display for Expression {
                         .map(|(key, value)| format!(
                             "  {}: {},",
                             key.to_short_debug_string(),
-                            value.to_short_debug_string()
+                            value.to_short_debug_string(),
                         ))
                         .join("\n"),
                 )
@@ -355,7 +355,7 @@ impl fmt::Display for Expression {
             } => write!(
                 f,
                 "destructure {} into {pattern}",
-                expression.to_short_debug_string()
+                expression.to_short_debug_string(),
             ),
             Expression::PatternIdentifierReference {
                 destructuring,
@@ -398,7 +398,7 @@ impl fmt::Display for Expression {
                     arguments
                         .iter()
                         .map(|argument| format!("  {}", argument.to_short_debug_string()))
-                        .join("\n")
+                        .join("\n"),
                 )
             }
             Expression::UseModule {
@@ -408,7 +408,7 @@ impl fmt::Display for Expression {
                 f,
                 "use module {} relative to {}",
                 relative_path.to_short_debug_string(),
-                current_module
+                current_module,
             ),
             Expression::Needs { condition, reason } => {
                 write!(

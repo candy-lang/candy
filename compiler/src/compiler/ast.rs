@@ -379,7 +379,7 @@ impl Display for Lambda {
             } else {
                 format!(
                     "{} ->",
-                    self.parameters.iter().map(|it| format!("{it}")).join(" ")
+                    self.parameters.iter().map(|it| format!("{it}")).join(" "),
                 )
             },
             self.body
@@ -420,6 +420,6 @@ impl Display for Call {
 }
 impl Display for AstString {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}@\"{}\"", self.id.to_short_debug_string(), self.value)
+        write!(f, #"{}@"{}""#, self.id.to_short_debug_string(), self.value)
     }
 }
