@@ -13,9 +13,10 @@ use crate::{
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
+use rustc_hash::{FxHashMap, FxHasher};
 use std::{
-    collections::{hash_map::DefaultHasher, HashMap},
     hash::{Hash, Hasher},
+    iter,
     ops::Deref,
 };
 
@@ -89,7 +90,7 @@ impl List {
     }
 }
 impl Struct {
-    pub fn from_fields(heap: &Heap, fields: HashMap<Pointer, Pointer>) -> Self {
+    pub fn from_fields(heap: &Heap, fields: FxHashMap<Pointer, Pointer>) -> Self {
         let mut s = Self::default();
         for (key, value) in fields {
             s.insert(heap, key, value);
@@ -185,7 +186,7 @@ impl ReceivePort {
 
 impl Data {
     fn hash(&self, heap: &Heap) -> u64 {
-        let mut state = DefaultHasher::new();
+        let mut state = FxHasher::default();
         self.hash_with_state(heap, &mut state);
         state.finish()
     }
@@ -240,7 +241,7 @@ impl Data {
         }
     }
 
-    pub fn children(&self) -> Vec<Pointer> {
+    pub fn children(&self) -> Box<dyn Iterator<Item = Pointer> + '_> {
         match self {
             Data::Int(_)
             | Data::Text(_)
@@ -248,13 +249,10 @@ impl Data {
             | Data::Builtin(_)
             | Data::HirId(_)
             | Data::SendPort(_)
-            | Data::ReceivePort(_) => vec![],
-            Data::List(List { items }) => items.clone(),
-            Data::Struct(struct_) => struct_
-                .iter()
-                .flat_map(|(a, b)| vec![a, b].into_iter())
-                .collect_vec(),
-            Data::Closure(closure) => closure.captured.clone(),
+            | Data::ReceivePort(_) => Box::new(iter::empty()),
+            Data::List(List { items }) => Box::new(items.iter().copied()),
+            Data::Struct(struct_) => Box::new(struct_.iter().flat_map(|(a, b)| vec![a, b])),
+            Data::Closure(closure) => Box::new(closure.captured.iter().copied()),
         }
     }
 

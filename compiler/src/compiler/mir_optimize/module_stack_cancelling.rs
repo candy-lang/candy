@@ -15,12 +15,12 @@
 
 use crate::compiler::mir::{Expression, Mir};
 use itertools::Itertools;
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 
 impl Mir {
     pub fn cancel_out_module_expressions(&mut self) {
         self.body.visit_bodies(&mut |body| {
-            let mut indices_of_expressions_to_eliminate = HashSet::new();
+            let mut indices_of_expressions_to_eliminate = FxHashSet::default();
 
             for ((a_index, (_, a)), (b_index, (_, b))) in body.iter().enumerate().tuple_windows() {
                 if matches!(a, Expression::ModuleStarts { .. })

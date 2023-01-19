@@ -17,7 +17,7 @@ use crate::{
     },
 };
 use itertools::Itertools;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use tracing::{error, info};
 
 pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
@@ -27,7 +27,7 @@ pub async fn fuzz(db: &Database, module: Module) -> Vec<FailingFuzzCase> {
         evaluated_expressions: TracingMode::Off,
     };
 
-    let (fuzzables_heap, fuzzables): (Heap, HashMap<Id, Pointer>) = {
+    let (fuzzables_heap, fuzzables): (Heap, FxHashMap<Id, Pointer>) = {
         let mut tracer = FuzzablesFinder::default();
         let mut vm = Vm::default();
         vm.set_up_for_running_module_closure(

@@ -34,11 +34,12 @@
 //! [module folding]: super::module_folding
 //! [tree shaking]: super::tree_shaking
 
+use rustc_hash::{FxHashMap, FxHashSet};
+
 use crate::{
     compiler::mir::{Expression, Id, Mir, VisibleExpressions},
     utils::IdGenerator,
 };
-use std::collections::{HashMap, HashSet};
 
 use super::complexity::Complexity;
 
@@ -66,7 +67,7 @@ impl Expression {
             return Err("Tried to inline, but the number of arguments doesn't match the expected parameter count.");
         }
 
-        let id_mapping: HashMap<Id, Id> = parameters
+        let id_mapping: FxHashMap<Id, Id> = parameters
             .iter()
             .zip(arguments.iter())
             .map(|(parameter, argument)| (*parameter, *argument))
@@ -92,7 +93,7 @@ impl Expression {
 
 impl Mir {
     pub fn inline_functions_containing_use(&mut self) {
-        let mut functions_with_use = HashSet::new();
+        let mut functions_with_use = FxHashSet::default();
         for (id, expression) in self.body.iter() {
             if let Expression::Lambda { body, .. } = expression &&
                     body.iter().any(|(_, expr)| matches!(expr, Expression::UseModule { .. })) {
@@ -111,7 +112,7 @@ impl Mir {
     }
 
     pub fn inline_functions_of_maximum_complexity(&mut self, complexity: Complexity) {
-        let mut small_functions = HashSet::new();
+        let mut small_functions = FxHashSet::default();
         for (id, expression) in self.body.iter() {
             if let Expression::Lambda { body, .. } = expression && body.complexity() <= complexity {
                 small_functions.insert(id);
@@ -133,7 +134,7 @@ impl Mir {
     }
 
     pub fn inline_functions_only_called_once(&mut self) {
-        let mut reference_counts: HashMap<Id, usize> = HashMap::new();
+        let mut reference_counts: FxHashMap<Id, usize> = FxHashMap::default();
         self.body.replace_id_references(&mut |id| {
             *reference_counts.entry(*id).or_default() += 1;
         });

@@ -1,7 +1,5 @@
 #![no_main]
 
-use std::collections::HashMap;
-
 use candy::{
     compiler::{hir, mir_to_lir::MirToLir, TracingConfig},
     database::Database,
@@ -26,14 +24,10 @@ lazy_static! {
 }
 
 fuzz_target!(|data: &[u8]| {
-    let Ok(source_code) = String::from_utf8(data.to_vec()) else {
-        return;
-    };
+    let mut module_provider = InMemoryModuleProvider::default();
+    module_provider.add(&MODULE, data.to_vec());
+    let db = Database::new(Box::new(module_provider));
 
-    let module_provider = InMemoryModuleProvider::for_modules::<String>(HashMap::new());
-    let mut db = Database::new(Box::new(module_provider));
-
-    db.did_open_module(&MODULE, source_code.as_bytes().to_owned());
     let lir = db
         .lir(MODULE.clone(), TRACING.clone())
         .unwrap()

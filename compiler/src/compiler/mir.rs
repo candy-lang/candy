@@ -6,9 +6,10 @@ use crate::{
 };
 use itertools::Itertools;
 use num_bigint::BigInt;
-use std::{cmp::Ordering, collections::HashMap, fmt, hash, mem, vec};
+use rustc_hash::FxHashMap;
+use std::{cmp::Ordering, fmt, hash, mem, vec};
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Mir {
     pub id_generator: IdGenerator<Id>,
     pub body: Body,
@@ -328,12 +329,12 @@ impl Expression {
 
 #[derive(Clone)]
 pub struct VisibleExpressions {
-    expressions: HashMap<Id, Expression>,
+    expressions: FxHashMap<Id, Expression>,
 }
 impl VisibleExpressions {
     pub fn none_visible() -> Self {
         Self {
-            expressions: HashMap::new(),
+            expressions: FxHashMap::default(),
         }
     }
     pub fn insert(&mut self, id: Id, expression: Expression) {
@@ -373,7 +374,7 @@ fn test_multiple_flattening() {
     );
 }
 
-#[allow(clippy::derive_hash_xor_eq)]
+#[allow(clippy::derived_hash_with_manual_eq)]
 impl hash::Hash for Expression {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);

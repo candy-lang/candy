@@ -62,7 +62,11 @@ use super::{
     tracing::TracingConfig,
 };
 use crate::{module::Module, utils::IdGenerator};
-use std::sync::Arc;
+use rustc_hash::FxHasher;
+use std::{
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 use tracing::debug;
 
 #[salsa::query_group(OptimizeMirStorage)]
@@ -97,12 +101,12 @@ impl Mir {
     /// size.
     pub fn optimize_obvious(&mut self, db: &dyn OptimizeMir, tracing: &TracingConfig) {
         loop {
-            let before = self.clone();
+            let hashcode_before = self.do_hash();
 
             self.optimize_obvious_self_contained();
             self.fold_modules(db, tracing);
 
-            if *self == before {
+            if self.do_hash() == hashcode_before {
                 break;
             }
         }
@@ -119,7 +123,7 @@ impl Mir {
         self.checked_optimization(|mir| mir.inline_functions_containing_use());
 
         loop {
-            let before = self.clone();
+            let hashcode_before = self.do_hash();
 
             self.checked_optimization(|mir| mir.follow_references());
             self.checked_optimization(|mir| mir.remove_redundant_return_references());
@@ -132,10 +136,15 @@ impl Mir {
             self.checked_optimization(|mir| mir.flatten_multiples());
             self.checked_optimization(|mir| mir.cancel_out_module_expressions());
 
-            if *self == before {
+            if self.do_hash() == hashcode_before {
                 return;
             }
         }
+    }
+    fn do_hash(&self) -> u64 {
+        let mut hasher = FxHasher::default();
+        self.hash(&mut hasher);
+        hasher.finish()
     }
 
     fn checked_optimization(&mut self, optimization: fn(&mut Mir) -> ()) {

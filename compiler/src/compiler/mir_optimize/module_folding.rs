@@ -35,7 +35,7 @@ use crate::{
     },
     module::UsePath,
 };
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use tracing::warn;
 
 impl Mir {
@@ -70,7 +70,7 @@ impl Mir {
                 };
                 let mir = (*mir).clone();
 
-                let mapping: HashMap<Id, Id> = mir
+                let mapping: FxHashMap<Id, Id> = mir
                     .body
                     .all_ids()
                     .into_iter()
