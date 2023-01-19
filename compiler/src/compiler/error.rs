@@ -67,6 +67,7 @@ impl Display for CompilerErrorPayload {
             }
             .to_string(),
             CompilerErrorPayload::Ast(error) => match error {
+                AstError::CallInPattern => "Calls in patterns are not allowed.",
                 AstError::ExpectedNameOrPatternInAssignment => {
                     "An assignment should have a name or pattern on the left side."
                 }
